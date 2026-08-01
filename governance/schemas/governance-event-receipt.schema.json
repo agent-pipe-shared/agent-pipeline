@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.dev/schemas/pipeline.governance-event-receipt.v1.json",
+  "title": "Pipeline governance event receipt v1",
+  "description": "Closed, sanitized append/readback or recovery receipt with an independently retainable checkpoint witness.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "operation", "outcome", "repositoryFingerprint", "idempotencyKey", "requestDigest", "eventId", "eventDigest", "eventPath", "readbackDigest", "checkpoint"],
+  "properties": {
+    "schema": { "const": "pipeline.governance-event-receipt.v1" },
+    "operation": { "enum": ["append", "recover"] },
+    "outcome": { "enum": ["appended", "idempotent-replay", "recovered"] },
+    "repositoryFingerprint": { "$ref": "#/$defs/sha256" },
+    "idempotencyKey": { "$ref": "#/$defs/id" },
+    "requestDigest": { "$ref": "#/$defs/sha256" },
+    "eventId": { "$ref": "#/$defs/id" },
+    "eventDigest": { "$ref": "#/$defs/sha256" },
+    "eventPath": { "type": "string", "pattern": "^governance/events/(?:human|agent|lifecycle)/[a-z][a-z0-9-]{0,63}/[1-9][0-9]*-[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\\.json$" },
+    "readbackDigest": { "$ref": "#/$defs/sha256" },
+    "checkpoint": { "$ref": "#/$defs/checkpoint" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "operation": { "const": "append" } }, "required": ["operation"] },
+      "then": { "properties": { "outcome": { "enum": ["appended", "idempotent-replay"] } } }
+    },
+    {
+      "if": { "properties": { "operation": { "const": "recover" } }, "required": ["operation"] },
+      "then": { "properties": { "outcome": { "const": "recovered" } } }
+    }
+  ],
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "checkpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repositoryFingerprint", "streamId", "sequence", "eventDigest", "candidateCommit", "candidateTree"],
+      "properties": {
+        "repositoryFingerprint": { "$ref": "#/$defs/sha256" },
+        "streamId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+        "sequence": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+        "eventDigest": { "$ref": "#/$defs/sha256" },
+        "candidateCommit": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+        "candidateTree": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" }
+      }
+    }
+  }
+}

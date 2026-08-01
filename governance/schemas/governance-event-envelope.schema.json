@@ -1,0 +1,209 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.dev/schemas/pipeline.governance-event-envelope.v1.json",
+  "title": "Pipeline governance event envelope v1",
+  "description": "Closed, privacy-safe common envelope for one canonical governance event. Domain payloads remain origin-specific.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "payloadSchema",
+    "canonicalization",
+    "digestAlgorithm",
+    "eventId",
+    "idempotencyKey",
+    "origin",
+    "authorityClass",
+    "eventType",
+    "occurredAtEpochMs",
+    "observedAtEpochMs",
+    "timeAssurance",
+    "repositoryFingerprint",
+    "sourceUri",
+    "streamId",
+    "sequence",
+    "previousEventDigest",
+    "eventDigest",
+    "correlation",
+    "candidate",
+    "artifacts",
+    "policy",
+    "classification",
+    "storageProfile",
+    "retentionCompatibility",
+    "disclosureClass",
+    "payloadDigest",
+    "payload"
+  ],
+  "properties": {
+    "schema": { "const": "pipeline.governance-event-envelope.v1" },
+    "payloadSchema": {
+      "enum": [
+        "pipeline.human-governance-decision.v1",
+        "pipeline.agent-decision-event.v1",
+        "pipeline.lifecycle-governance-event.v1"
+      ]
+    },
+    "canonicalization": { "const": "RFC8785" },
+    "digestAlgorithm": { "const": "sha-256" },
+    "eventId": { "$ref": "#/$defs/id" },
+    "idempotencyKey": { "$ref": "#/$defs/id" },
+    "origin": { "enum": ["human", "agent", "lifecycle"] },
+    "authorityClass": { "enum": ["human-authority", "non-authoritative"] },
+    "eventType": { "$ref": "#/$defs/type" },
+    "occurredAtEpochMs": { "$ref": "#/$defs/epochMs" },
+    "observedAtEpochMs": { "$ref": "#/$defs/epochMs" },
+    "timeAssurance": { "enum": ["locally-observed", "externally-attested", "unknown"] },
+    "repositoryFingerprint": { "$ref": "#/$defs/sha256" },
+    "sourceUri": { "type": "string", "pattern": "^urn:pipeline:repository:[a-f0-9]{64}$" },
+    "streamId": { "$ref": "#/$defs/streamId" },
+    "sequence": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+    "previousEventDigest": { "$ref": "#/$defs/nullableSha256" },
+    "eventDigest": { "$ref": "#/$defs/sha256" },
+    "correlation": { "$ref": "#/$defs/correlation" },
+    "candidate": { "$ref": "#/$defs/candidateState" },
+    "artifacts": {
+      "type": "array",
+      "maxItems": 128,
+      "items": { "$ref": "#/$defs/artifactState" }
+    },
+    "policy": { "$ref": "#/$defs/policyState" },
+    "classification": { "enum": ["repository-public-safe", "restricted"] },
+    "storageProfile": { "enum": ["repository-public-safe", "restricted-machine-local"] },
+    "retentionCompatibility": { "enum": ["repository-retained", "machine-local-expiring", "unknown"] },
+    "disclosureClass": { "enum": ["repository-visible", "machine-local-only", "redacted", "omitted-by-policy"] },
+    "payloadDigest": { "$ref": "#/$defs/sha256" },
+    "payload": { "type": "object" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "origin": { "const": "human" } }, "required": ["origin"] },
+      "then": {
+        "properties": {
+          "payloadSchema": { "const": "pipeline.human-governance-decision.v1" },
+          "authorityClass": { "const": "human-authority" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "origin": { "const": "agent" } }, "required": ["origin"] },
+      "then": {
+        "properties": {
+          "payloadSchema": { "const": "pipeline.agent-decision-event.v1" },
+          "authorityClass": { "const": "non-authoritative" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "origin": { "const": "lifecycle" } }, "required": ["origin"] },
+      "then": {
+        "properties": {
+          "payloadSchema": { "const": "pipeline.lifecycle-governance-event.v1" },
+          "authorityClass": { "const": "non-authoritative" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "storageProfile": { "const": "repository-public-safe" } }, "required": ["storageProfile"] },
+      "then": {
+        "properties": {
+          "classification": { "const": "repository-public-safe" },
+          "retentionCompatibility": { "const": "repository-retained" },
+          "disclosureClass": { "enum": ["repository-visible", "redacted", "omitted-by-policy"] }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "storageProfile": { "const": "restricted-machine-local" } }, "required": ["storageProfile"] },
+      "then": {
+        "properties": {
+          "classification": { "const": "restricted" },
+          "retentionCompatibility": { "const": "machine-local-expiring" },
+          "disclosureClass": { "enum": ["machine-local-only", "redacted", "omitted-by-policy"] }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "nullableSha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "streamId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+    "type": { "type": "string", "pattern": "^[a-z][a-z0-9.-]{0,127}$" },
+    "epochMs": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+    "typedState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state"],
+      "properties": {
+        "state": { "enum": ["unknown", "unavailable", "omitted-by-policy", "redacted", "invalid", "not-applicable"] }
+      }
+    },
+    "idState": {
+      "oneOf": [
+        { "$ref": "#/$defs/id" },
+        { "$ref": "#/$defs/typedState" }
+      ]
+    },
+    "correlation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["featureId", "packageId", "requestId", "sessionId", "dispatchId", "traceId"],
+      "properties": {
+        "featureId": { "$ref": "#/$defs/idState" },
+        "packageId": { "$ref": "#/$defs/idState" },
+        "requestId": { "$ref": "#/$defs/idState" },
+        "sessionId": { "$ref": "#/$defs/idState" },
+        "dispatchId": { "$ref": "#/$defs/idState" },
+        "traceId": { "$ref": "#/$defs/idState" }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "tree"],
+      "properties": {
+        "commit": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+        "tree": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" }
+      }
+    },
+    "candidateState": {
+      "oneOf": [
+        { "$ref": "#/$defs/candidate" },
+        { "$ref": "#/$defs/typedState" }
+      ]
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "artifactState": {
+      "oneOf": [
+        { "$ref": "#/$defs/artifact" },
+        { "$ref": "#/$defs/typedState" }
+      ]
+    },
+    "digestState": {
+      "oneOf": [
+        { "$ref": "#/$defs/sha256" },
+        { "$ref": "#/$defs/typedState" }
+      ]
+    },
+    "policyState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policyDigest", "configurationDigest", "capturePolicyDigest", "redactionPolicyDigest"],
+      "properties": {
+        "policyDigest": { "$ref": "#/$defs/digestState" },
+        "configurationDigest": { "$ref": "#/$defs/digestState" },
+        "capturePolicyDigest": { "$ref": "#/$defs/digestState" },
+        "redactionPolicyDigest": { "$ref": "#/$defs/digestState" }
+      }
+    }
+  }
+}
