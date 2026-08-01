@@ -73,7 +73,7 @@
     {
       "class": "design",
       "path": "specs/sprint-phoenix-epic/design/governance-conformance.md",
-      "sha256": "6eb7ad79e582e7d216b25961aa586957237487aa69209a21bf5f5cccfa6336c0",
+      "sha256": "a5ee4c1666aea37b77677caf2f6aab584d8963f9ad39e74bf2f34aee56f07853",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"
