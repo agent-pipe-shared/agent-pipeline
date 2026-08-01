@@ -29,6 +29,8 @@ import {
   planProjectOnboardingV3,
   planProjectPartialAuthorityAdoption,
   applyProjectPartialAuthorityAdoption,
+  applyProjectOnboardingReinstall,
+  planProjectOnboardingReinstall,
   planProjectRemoteAdoptionV4,
   applyProjectRemoteAdoptionV4,
   renderProjectOnboardingAction,
@@ -3675,6 +3677,25 @@ test("partial authority apply creates only absent owned targets and preserves us
     assert.equal(readFileSync(join(path, ".claude", "pipeline.json"), "utf8"), '{"project":"legacy"}\n');
     assert.equal(readFileSync(join(path, ".agents", "AGENTS.md"), "utf8"), "user-owned\n");
     assert.equal(readFileSync(join(path, ".codex", "hooks.json"), "utf8"), "user-owned\n");
+  } finally { dispose(path); }
+});
+
+test("reinstall quarantines only current V3 authority and leaves legacy calibration intact", () => {
+  const path = root();
+  try {
+    assert.equal(spawnSync("git", ["init", "--initial-branch=main"], { cwd: path }).status, 0);
+    const realDeps = { ...fakeDeps, spawnSync };
+    const portable = planProjectOnboardingV3({ rootDir: path, deps: realDeps });
+    assert.equal(applyProjectOnboardingV3(portable, { rootDir: path, activate: true, deps: realDeps }).status, "applied");
+    const legacy = readFileSync(join(path, ".claude", "pipeline.json"), "utf8");
+    const plan = planProjectOnboardingReinstall({ rootDir: path, deps: realDeps });
+    assert.equal(plan.status, "ready", JSON.stringify(plan));
+    const applied = applyProjectOnboardingReinstall({ rootDir: path, planSha256: plan.planSha256, activate: true, deps: realDeps });
+    assert.equal(applied.status, "applied", JSON.stringify(applied));
+    assert.equal(existsSync(join(path, "pipeline.user.yaml")), false);
+    assert.equal(existsSync(join(path, ".claude", "pipeline.yaml")), false);
+    assert.equal(readFileSync(join(path, ".claude", "pipeline.json"), "utf8"), legacy);
+    assert.equal(existsSync(join(path, ".git", "agent-pipeline", "reinstall-quarantine", plan.planSha256, "receipt.json")), true);
   } finally { dispose(path); }
 });
 

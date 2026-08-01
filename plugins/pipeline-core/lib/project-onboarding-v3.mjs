@@ -71,6 +71,7 @@ import {
   resolveProjectAuthorityPaths,
 } from "./project-authority.mjs";
 import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
+import { discoverRepository } from "./worktree-lifecycle.mjs";
 
 const SOURCE = "pipeline.user.yaml";
 const SCHEMA = "pipeline.project-onboarding.v4";
@@ -81,6 +82,7 @@ const SOURCE_RECOVERY_SCHEMA = "pipeline.project-onboarding-source-recovery.v1";
 const MANIFEST_REPAIR_PLAN_SCHEMA = "pipeline.project-onboarding-manifest-repair-plan.v1";
 const PARTIAL_AUTHORITY_PLAN_SCHEMA = "pipeline.project-onboarding-partial-authority-plan.v1";
 const PARTIAL_AUTHORITY_SOURCE = "canonical-fresh-v3";
+const REINSTALL_PLAN_SCHEMA = "pipeline.project-onboarding-reinstall-plan.v1";
 const SAFE_RELATIVE = /^(?!\/)(?!.*(?:^|\/)\.\.?($|\/))[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u;
 const AUTHENTICATED = new WeakMap();
 const AUTHENTICATED_MANIFEST_REPAIRS = new WeakMap();
@@ -259,6 +261,59 @@ export function applyProjectPartialAuthorityAdoption({ rootDir = process.cwd(), 
   } catch (error) {
     const failures = rollback(root, created, createdDirectories, null, null, false, fs);
     return { schema: PARTIAL_AUTHORITY_PLAN_SCHEMA, status: failures.length ? "rollback-failed" : "rolled-back", root, diagnostics: [diagnostic("$.transaction", failures.length ? "rollback_failed" : "apply_failed", error.message, "repair the root and run the typed plan again")] };
+  }
+}
+
+/**
+ * Reinstall is deliberately an authority-only transaction.  It never treats
+ * legacy calibration, skills, hooks, docs, or runner directories as owned.
+ */
+export function planProjectOnboardingReinstall({ rootDir = process.cwd(), deps: overrides = {} } = {}) {
+  const fs = deps(overrides); let root;
+  try { root = safeRoot(rootDir, fs); } catch (error) { return { schema: REINSTALL_PLAN_SCHEMA, status: "unrepairable", diagnostics: [diagnostic("$.root", "unsafe_root", error.message, "supply a physical project root")] }; }
+  const sourcePath = safePath(root, SOURCE, fs); const manifestPath = safePath(root, ".claude/pipeline.yaml", fs);
+  let source;
+  try { source = readBoundPhysicalFile(sourcePath, fs); } catch { return { schema: REINSTALL_PLAN_SCHEMA, status: "not-applicable", root, diagnostics: [diagnostic("$.source", "reinstall_source_unavailable", "a current V3 source is required for a reversible reinstall", "use partial-authority adoption for legacy or absent V3 authority")] }; }
+  let intent; let projection;
+  try {
+    intent = parseYaml(decodeUtf8Strict(source, SOURCE));
+    if (!validatePipelineUserV3(intent).ok) throw new Error("invalid V3 source");
+    projection = planRuntimeProjectionV3(intent, { source: SOURCE, baselines: currentRuntimeBaselines(root, intent, fs) });
+  } catch { return { schema: REINSTALL_PLAN_SCHEMA, status: "not-applicable", root, diagnostics: [diagnostic("$.source", "reinstall_source_unowned", "the V3 source cannot prove a current owned projection", "use the source-owning recovery route")] }; }
+  const expected = projection.targets.find((target) => target.path === ".claude/pipeline.yaml")?.after?.bytes;
+  let manifest;
+  try { manifest = readBoundPhysicalFile(manifestPath, fs); } catch { return { schema: REINSTALL_PLAN_SCHEMA, status: "not-applicable", root, diagnostics: [diagnostic("$.manifest", "reinstall_manifest_unavailable", "the generated manifest is unavailable", "use the manifest repair route")] }; }
+  if (typeof expected !== "string" || Buffer.compare(manifest, Buffer.from(expected, "utf8")) !== 0) return { schema: REINSTALL_PLAN_SCHEMA, status: "not-applicable", root, diagnostics: [diagnostic("$.manifest", "reinstall_manifest_unowned", "the existing manifest is not the current generated V3 projection", "repair or preserve it through its owning workflow")] };
+  let repository;
+  try { repository = discoverRepository(root, { spawn: fs.spawnSync }); } catch { return { schema: REINSTALL_PLAN_SCHEMA, status: "private-store-unavailable", root, diagnostics: [diagnostic("$.repository", "reinstall_private_store_unavailable", "the physical Git common directory is unavailable", "restore local Git capability before retrying")] }; }
+  const targets = [{ path: SOURCE, before: describe(source) }, { path: ".claude/pipeline.yaml", before: describe(manifest) }];
+  const binding = { schema: REINSTALL_PLAN_SCHEMA, root, commonDir: repository.commonDir, targets };
+  const planSha256 = sha256(JSON.stringify(stable(binding)));
+  return { ...binding, status: "ready", planSha256, mutation: false, applyAction: commandAction([ONBOARDING_SCRIPT, "apply-reinstall", "--root", root, "--plan-sha256", planSha256, "--activate"], true, true, REINSTALL_PLAN_SCHEMA, ["applied"]) };
+}
+
+export function applyProjectOnboardingReinstall({ rootDir = process.cwd(), planSha256, activate = false, deps: overrides = {} } = {}) {
+  const fs = deps(overrides);
+  if (!activate || !SHA256_RE.test(planSha256 ?? "")) return { schema: REINSTALL_PLAN_SCHEMA, status: "activation-required" };
+  const plan = planProjectOnboardingReinstall({ rootDir, deps: fs });
+  if (plan.status !== "ready" || plan.planSha256 !== planSha256) return { schema: REINSTALL_PLAN_SCHEMA, status: "invalid-plan", root: plan.root };
+  const archive = join(plan.commonDir, "agent-pipeline", "reinstall-quarantine", planSha256);
+  const moved = [];
+  try {
+    fs.mkdirSync(archive, { recursive: true, mode: 0o700 });
+    for (const target of plan.targets) {
+      const source = safePath(plan.root, target.path, fs); const bytes = readBoundPhysicalFile(source, fs);
+      if (sha256(bytes) !== target.before.sha256) throw new Error(`preimage changed: ${target.path}`);
+      const destination = join(archive, target.path.replaceAll("/", "__"));
+      if (fs.existsSync(destination)) throw new Error(`quarantine collision: ${target.path}`);
+      fs.renameSync(source, destination); moved.push({ source, destination });
+    }
+    fs.writeFileSync(join(archive, "receipt.json"), `${JSON.stringify({ schema: REINSTALL_PLAN_SCHEMA, planSha256, targets: plan.targets })}\n`, { encoding: "utf8", flag: "wx", mode: 0o600 });
+    return { schema: REINSTALL_PLAN_SCHEMA, status: "applied", root: plan.root, quarantine: { status: "private", planSha256 }, changes: plan.targets.map((target) => target.path) };
+  } catch (error) {
+    const failures = [];
+    for (const entry of moved.reverse()) try { if (!fs.existsSync(entry.source) && fs.existsSync(entry.destination)) fs.renameSync(entry.destination, entry.source); } catch (rollbackError) { failures.push(rollbackError); }
+    return { schema: REINSTALL_PLAN_SCHEMA, status: failures.length ? "rollback-failed" : "rolled-back", root: plan.root, diagnostics: [diagnostic("$.transaction", failures.length ? "reinstall_rollback_failed" : "reinstall_apply_failed", error.message, "inspect the private quarantine before retrying")] };
   }
 }
 function runtimePaths() { return loadRuntimeProjectionV3OwnedKeys().targets.map((target) => target.path).sort(); }
