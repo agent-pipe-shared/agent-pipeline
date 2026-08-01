@@ -502,10 +502,16 @@ export function approveSubmittedPlan({
       ? null
       : sha256CanonicalJson(state.planInvalidation),
   };
+  const next = { ...state, planApproved: true, planApproval: approval };
+  // A renewed exact approval supersedes any retained historical revocation.
+  // Keeping that stale record would produce an impossible mixed state
+  // (approved current authority plus revoked prior authority) and leave the
+  // sanctioned reopen -> submit -> approve recovery path permanently blocked.
+  delete next.planRevocation;
   return {
     ok: true,
     replay: false,
-    state: { ...state, planApproved: true, planApproval: approval },
+    state: next,
     approval,
   };
 }

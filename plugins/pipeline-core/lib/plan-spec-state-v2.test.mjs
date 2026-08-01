@@ -308,14 +308,27 @@ test("reopen invalidates exact authority and permits repeated edits before exact
     specSha256: "b".repeat(64),
   };
   const secondSubmission = submitted(reopened.state, changedAuthority, RESUBMITTED);
-  assert.equal(derivePlanLifecycle(secondSubmission).status, "awaiting-approval");
-  const secondApproval = approved(secondSubmission, changedAuthority, REAPPROVED);
+  const withHistoricalRevocation = {
+    ...secondSubmission,
+    planRevocation: {
+      schema: "pipeline.plan-revocation.v2",
+      planPath: AUTHORITY.planPath,
+      planSha256: AUTHORITY.planSha256,
+      specPath: AUTHORITY.specPath,
+      specSha256: AUTHORITY.specSha256,
+      revokedBy: "PO",
+      revokedAt: REOPENED,
+    },
+  };
+  assert.equal(derivePlanLifecycle(withHistoricalRevocation).status, "awaiting-approval");
+  const secondApproval = approved(withHistoricalRevocation, changedAuthority, REAPPROVED);
   assert.equal(derivePlanLifecycle(secondApproval, {
     planSha256: changedAuthority.planSha256,
     specSha256: changedAuthority.specSha256,
     profileSha256: PROFILE,
   }).status, "approved");
   assert.notEqual(secondApproval.planApproval.submissionSha256, firstApproval.planApproval.submissionSha256);
+  assert.equal(secondApproval.planRevocation, undefined);
 });
 
 test("restart/resume is deterministic and hostile or contradictory states fail closed", () => {
