@@ -29,6 +29,15 @@ const FRESHNESS = ["status", "candidateMatches", "sourceInputsMatch"];
 const PRIVACY = ["classification", "exportPolicy"];
 const PAYLOAD = ["canonicalSha256", "formats"];
 const LIFECYCLE = ["state", "code"];
+const LIFECYCLE_CODE_BY_STATE = Object.freeze({
+  complete: [SBOM_LIFECYCLE_CODES.complete],
+  stale: [SBOM_LIFECYCLE_CODES.candidateStale, SBOM_LIFECYCLE_CODES.sourceInputsStale],
+  invalid: [SBOM_LIFECYCLE_CODES.invalidFacts, SBOM_LIFECYCLE_CODES.invalidRecord],
+  partial: [SBOM_LIFECYCLE_CODES.partial],
+  unsupported: [SBOM_LIFECYCLE_CODES.unsupported],
+  unavailable: [SBOM_LIFECYCLE_CODES.unavailable, SBOM_LIFECYCLE_CODES.missing],
+  "not-applicable": [SBOM_LIFECYCLE_CODES.notApplicable],
+});
 const own = (value, fields) => value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === fields.length && fields.every((field) => Object.hasOwn(value, field));
 const string = (value) => typeof value === "string" && value.trim() !== "";
 const digest = (value) => createHash("sha256").update(value).digest("hex");
@@ -110,7 +119,7 @@ export function validateSbomManifest(manifest) {
   closed(errors, manifest?.payload, PAYLOAD, "payload");
   if (!(sha(manifest?.payload?.canonicalSha256) && own(manifest?.payload?.formats, Object.keys(SBOM_FORMAT_PROFILES)) && Object.entries(SBOM_FORMAT_PROFILES).every(([format, profile]) => manifest.payload.formats[format]?.profile === profile && sha(manifest.payload.formats[format]?.sha256)))) errors.push("payload: canonical and profile digests required");
   closed(errors, manifest?.lifecycle, LIFECYCLE, "lifecycle");
-  if (!SBOM_LIFECYCLE_STATES.includes(manifest?.lifecycle?.state) || !string(manifest?.lifecycle?.code)) errors.push("lifecycle: stable state and code required");
+  if (!SBOM_LIFECYCLE_STATES.includes(manifest?.lifecycle?.state) || !LIFECYCLE_CODE_BY_STATE[manifest?.lifecycle?.state]?.includes(manifest?.lifecycle?.code)) errors.push("lifecycle: stable state and code required");
   if (manifest?.lifecycle?.state === "complete" && (manifest?.completeness?.status !== "complete" || manifest?.freshness?.status !== "fresh")) errors.push("lifecycle: complete requires complete and fresh inputs");
   return errors.length === 0 ? { valid: true } : { valid: false, errors };
 }

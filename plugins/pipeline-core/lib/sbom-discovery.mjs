@@ -3,8 +3,7 @@
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { validateFeatureTopology } from "./feature-package-topology.mjs";
-
-const own = (value, fields) => value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === fields.length && fields.every((field) => Object.hasOwn(value, field));
+import { validateSbomManifest } from "./sbom-manifest.mjs";
 
 /** Resolve exactly one declared supply-chain artifact; no filesystem path is guessed. */
 export function discoverSbom(rootDir, { featureId = null } = {}) {
@@ -23,7 +22,7 @@ export function discoverSbom(rootDir, { featureId = null } = {}) {
 
 /** A derived view that removes private component names/coordinates; never mutates the canonical record. */
 export function exportPublicSbom(manifest) {
-  if (!own(manifest, ["privacy", "components", "payload"]) || !own(manifest.privacy, ["classification", "exportPolicy"]) || !Array.isArray(manifest.components)) return { ok: false, code: "SBOM-EXPORT-INVALID" };
+  if (!validateSbomManifest(manifest).valid) return { ok: false, code: "SBOM-EXPORT-INVALID" };
   const redact = manifest.privacy.classification === "private" || manifest.privacy.exportPolicy === "public-redacted";
   const components = manifest.components.map((component) => redact
     ? { ...component, id: "redacted", scope: "redacted", provenance: "redacted", relationships: [] }
