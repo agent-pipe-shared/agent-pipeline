@@ -2528,11 +2528,13 @@ function reconcileDraftPreview(dir, manifestPath) {
     ["spec", `${manifest.slice(0, -"lifecycle.json".length)}spec.md`],
     ["acceptance", `${manifest.slice(0, -"lifecycle.json".length)}acceptance.md`],
     ["design", `${manifest.slice(0, -"lifecycle.json".length)}design/architecture.md`],
+    ["result", `${manifest.slice(0, -"lifecycle.json".length)}result.md`],
   ];
   const replacements = [];
   for (const [artifactClass, path] of expected) {
     const matches = value.artifacts.filter((artifact) => artifact?.class === artifactClass && artifact.path === path);
     if (matches.length !== 1 || !exactObjectKeys(matches[0], ["class", "path", "sha256", "authority", "mutability", "retention"]) || !SHA256_RE.test(matches[0].sha256)) return { ok: false, code: "PS-FEATURE-RECONCILE-SHAPE" };
+    if (artifactClass === "result" && (matches[0].authority !== true || matches[0].mutability !== "append-only" || matches[0].retention !== "active")) return { ok: false, code: "PS-FEATURE-RECONCILE-SHAPE" };
     const current = currentRepoArtifact(dir, path);
     if (!current) return { ok: false, code: "PS-FEATURE-RECONCILE-SOURCE" };
     if (current.sha256 !== matches[0].sha256) replacements.push({ index: value.artifacts.indexOf(matches[0]), old: matches[0].sha256, next: current.sha256 });

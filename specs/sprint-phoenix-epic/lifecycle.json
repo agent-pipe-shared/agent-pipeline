@@ -41,7 +41,7 @@
     {
       "class": "result",
       "path": "specs/sprint-phoenix-epic/result.md",
-      "sha256": "a95979c94a93547be2de4d130d5825b97946f63fae5345289b412458882a60c6",
+      "sha256": "708d9293ad8ec13bb58e39ffd857c0a624d93e17b35cde380f242d26de6d9198",
       "authority": true,
       "mutability": "append-only",
       "retention": "active"

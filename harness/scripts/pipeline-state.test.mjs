@@ -2170,7 +2170,9 @@ if (symlinkCapable) {
     artifact("spec", `${base}/spec.md`, "# Phoenix Spec\n", true),
     artifact("acceptance", `${base}/acceptance.md`, "# Phoenix Acceptance\n", true),
     artifact("design", `${base}/design/architecture.md`, "# Phoenix Architecture\n"),
+    artifact("result", `${base}/result.md`, "# Phoenix Result\n", true),
   ];
+  artifacts[4].mutability = "append-only";
   const manifestPath = `${base}/lifecycle.json`;
   const manifest = { schema: "pipeline.feature-package.v1", feature: { id, rigor: 2 }, state: "draft", artifacts, candidate: null, supersedes: null };
   const before = `${JSON.stringify(manifest, null, 2)}\n`;
@@ -2193,7 +2195,7 @@ if (symlinkCapable) {
   ok("PHX0A4 existing draft plan binds exactly the active PO approval", planned.value === 0 && request.operation === "reconcile-draft" && request.manifestPreimage === createHash("sha256").update(before).digest("hex") && request.authority.decision.approvalSha256 === sha256CanonicalJson(approval));
   ok("PHX0A5 existing draft reconciliation rejects a mismatched PO decision without mutation", deniedCode === 2 && deniedPreserved);
   const receipt = JSON.parse(readFileSync(join(dir, `${base}/evidence/lifecycle/feature-package-phx-reconcile-01.json`), "utf8"));
-  ok("PHX0A6 existing draft reconciliation changes only the four planned digest bindings and replays zero-write", applied === 0 && changedDigests === 4 && afterValue.state === "draft" && JSON.stringify(afterValue.feature) === JSON.stringify(manifest.feature) && JSON.stringify(afterValue.candidate) === "null" && JSON.stringify(afterValue.supersedes) === "null" && replay === 0 && readFileSync(join(dir, manifestPath), "utf8") === after && /^fp-[a-f0-9]{16}$/.test(receipt.correlation) && !/[a-f0-9]{32}/.test(JSON.stringify(receipt)));
+  ok("PHX0A6 existing draft reconciliation updates only the five planned digest bindings, including the append-only Result, and replays zero-write", applied === 0 && changedDigests === 5 && afterValue.artifacts[4].sha256 === createHash("sha256").update("# Phoenix Result\n").digest("hex") && afterValue.state === "draft" && JSON.stringify(afterValue.feature) === JSON.stringify(manifest.feature) && JSON.stringify(afterValue.candidate) === "null" && JSON.stringify(afterValue.supersedes) === "null" && replay === 0 && readFileSync(join(dir, manifestPath), "utf8") === after && /^fp-[a-f0-9]{16}$/.test(receipt.correlation) && !/[a-f0-9]{32}/.test(JSON.stringify(receipt)));
   writeFileSync(join(dir, manifestPath), after.replace("  \"schema\":", "\t\"schema\" :").replaceAll("\n", "\r\n"));
   writeFileSync(join(dir, planPath), "# Phoenix PRD revised\n");
   writeFileSync(join(dir, `${base}/acceptance.md`), "# Phoenix Acceptance revised\n");
