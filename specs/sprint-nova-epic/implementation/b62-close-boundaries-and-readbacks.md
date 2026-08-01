@@ -56,6 +56,26 @@ At `closed-local` and `delivered`, `completion.state` is `complete`, but
 `workflowTerminal` is false because release eligibility remains a deliberate,
 independently authorized successor. At `promoted`, both are true.
 
+## Compatibility and rollback
+
+The CLI readback changes from `pipeline.close-coordinator.next.v1` to
+`pipeline.close-coordinator.next.v2`. This is a deliberate major-version
+change: v1 emitted the contradictory pair `terminal: true` and a non-empty
+`next` array at `closed-local`; no persisted coordinator record embeds this
+ephemeral CLI response. The repository search identified no production v1
+consumer outside the coordinator's own contract test. Consumers must select
+the v2 schema and use `completion` for feature-closure progress and
+`terminal` only for coordinator workflow terminality. The new schema ID
+prevents a v1 parser from silently treating the corrected value as its old
+contract.
+
+Before any candidate promotion, rollback is an ordinary revert of the B62
+commit; it invalidates its Verify/Critic evidence and restores v1 without
+rewriting a coordinator record. After a published commit, use the same
+ordinary revert rather than rewriting shared history. No record migration,
+generic CAS, or repair action is permitted because B62 changes only future
+readbacks.
+
 ## Acceptance criteria
 
 1. A `plan-start` or `apply-start` with no or invalid `--close-intent` returns

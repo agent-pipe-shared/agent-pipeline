@@ -635,7 +635,7 @@ try {
   if (command === "next" && argv.length === 1 && COORDINATOR_PHASES.includes(argv[0])) {
     const completion = coordinatorCompletion(argv[0]);
     emit({
-      schema: "pipeline.close-coordinator.next.v1",
+      schema: "pipeline.close-coordinator.next.v2",
       phase: argv[0],
       next: completion.next,
       terminal: completion.workflowTerminal,

@@ -121,6 +121,7 @@ function publicationAuthorization() {
 test("active checkpoint preserves activeFeature", () => assert.deepEqual(step(fresh(), "checkpointed").activeFeature, { id: "feature", planPath: "specs/feature/plan.md", phase: "implementation" }));
 test("completion separates closure completion from workflow terminality", () => {
   const local = JSON.parse(spawnSync(process.execPath, [CLI, "next", "closed-local"], { encoding: "utf8" }).stdout);
+  assert.equal(local.schema, "pipeline.close-coordinator.next.v2");
   assert.deepEqual(local.next, ["release-eligible"]);
   assert.equal(local.terminal, false);
   assert.deepEqual(local.completion, {
