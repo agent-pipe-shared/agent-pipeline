@@ -59,9 +59,9 @@
  *   Value = exactly 3 segments split on the first two "|" (reason may itself contain
  *   "|"); token is a fresh one-time value, reason is mandatory and non-empty.
  *
- *   One-time semantics: a consumption ledger `.claude/guard-override.log.jsonl` (same
- *   $CLAUDE_PROJECT_DIR lookup as guard-config.json) records one JSON line per
- *   successful override `{ts, rule, token, reason, command}`. A `rule|token` pair
+ *   One-time semantics: a consumption ledger `.claude/guard-override.log.jsonl` bound to
+ *   the physical command target records one JSON line per successful override
+ *   `{ts, rule, token, reason, command, targetSha256}`. A `rule|token` pair
  *   already in the ledger is consumed forever — re-presenting it blocks.
  *
  *   Evaluation order: ALL deny rules are always evaluated; consumption is decided on
@@ -220,8 +220,9 @@
  *   printf '{"tool_input":{"command":"git add secrets.yaml"}}'          | node plugins/pipeline-core/hooks/guard-git.mjs; echo $?
  *   printf '{"tool_input":{"command":"git push origin main"}}'          | node plugins/pipeline-core/hooks/guard-git.mjs; echo $?
  */
-import { existsSync, readFileSync, appendFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, appendFileSync, realpathSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { join, resolve } from "node:path";
 
 import { stripQuotedSegments, normalizeGlobalGitOptions } from "../lib/git-cmd.mjs";
 import {
@@ -585,13 +586,31 @@ if (armingRaw !== null) {
 }
 
 // ---- override mechanism: consumption ledger -------------------------------------------
-function ledgerPath() {
-  return join(projectDir, guardAuditRelPath);
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
 }
-function readLedgerEntries() {
+function overrideTarget() {
+  let coordinator;
+  try { coordinator = realpathSync(projectDir); } catch { return { ok: false }; }
+  const roots = new Set([coordinator]);
+  for (const segment of cmd.split(/[;&|]+/u)) {
+    if (!/\bgit\b/u.test(segment)) continue;
+    for (const match of segment.matchAll(/(?:^|\s)-C\s+((?:"[^"]*"|'[^']*'|[^\s;&|])+)/gu)) {
+      const raw = match[1];
+      const value = (raw.startsWith("\"") && raw.endsWith("\"")) || (raw.startsWith("'") && raw.endsWith("'")) ? raw.slice(1, -1) : raw;
+      try { roots.add(realpathSync(resolve(coordinator, value))); } catch { return { ok: false }; }
+    }
+  }
+  if (roots.size !== 1 || !roots.has(coordinator)) return { ok: false };
+  return { ok: true, root: coordinator, sha256: sha256(coordinator) };
+}
+function ledgerPath(target) {
+  return join(target.root, guardAuditRelPath);
+}
+function readLedgerEntries(target) {
   let raw;
   try {
-    raw = readFileSync(ledgerPath(), "utf8");
+    raw = readFileSync(ledgerPath(target), "utf8");
   } catch {
     return []; // absent/unreadable ledger -> nothing consumed yet
   }
@@ -607,12 +626,12 @@ function readLedgerEntries() {
   }
   return entries;
 }
-function findConsumption(rule, token) {
-  return readLedgerEntries().find((e) => e && e.rule === rule && e.token === token) ?? null;
+function findConsumption(rule, token, target) {
+  return readLedgerEntries(target).find((e) => e && e.rule === rule && e.token === token && (!e.targetSha256 || e.targetSha256 === target.sha256)) ?? null;
 }
-function appendLedger(entry) {
+function appendLedger(entry, target) {
   try {
-    appendFileSync(ledgerPath(), JSON.stringify(entry) + "\n");
+    appendFileSync(ledgerPath(target), JSON.stringify(entry) + "\n");
     return true;
   } catch {
     return false; // fail-closed: caller must NOT apply the override
@@ -670,6 +689,14 @@ function blockLedgerFailure(rule) {
   ];
   emit(2, lines);
 }
+function blockTargetBindingFailure(rule) {
+  emit(2, [
+    formatBlockHeader(rule),
+    "Override NOT applied: command target and ledger target are not one confirmed physical project — fail-closed.",
+    overrideProcedureText(rule),
+    ...notices,
+  ]);
+}
 function allowWithOverride() {
   const lines = [
     `[git-guard] OVERRIDE APPLIED (one-time): rule ${arming.rule}, token ${arming.token}.`,
@@ -691,7 +718,9 @@ for (const rule of EXTRA_BLOCKERS) if (rule.re.test(normalizedStripped)) matched
 if (matched.length > 0) {
   const overrideCoversAll = arming && !arming.malformed && matched.every((r) => r.id === arming.rule);
   if (overrideCoversAll) {
-    const prior = findConsumption(arming.rule, arming.token);
+    const target = overrideTarget();
+    if (!target.ok) blockTargetBindingFailure(matched[0]);
+    const prior = findConsumption(arming.rule, arming.token, target);
     if (prior) {
       blockOverrideConsumed(matched[0], prior);
     } else {
@@ -701,7 +730,8 @@ if (matched.length > 0) {
         token: arming.token,
         reason: arming.reason,
         command: cmd,
-      });
+        targetSha256: target.sha256,
+      }, target);
       if (appended) allowWithOverride();
       else blockLedgerFailure(matched[0]);
     }

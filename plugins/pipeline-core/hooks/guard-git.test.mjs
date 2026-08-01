@@ -478,13 +478,12 @@ check("GO-CFG allow  -C interposed harmless command with the same config loaded"
   stderrEmpty: true,
 });
 
-// AR-3: an override armed for a rule applies identically when the command is normalized
-// through a `-C`-interposed form (fresh token, reusing the OV_DIR ledger from the P4-01 cases).
+// CYB-5c: an override may not consume a coordinator ledger through another -C target.
 check(
-  "GO-OV warn   override armed for GG-07 applies through a -C-interposed command (AR-3)",
+  "GO-OV block  override armed for GG-07 rejects a cross-target -C command",
   "PIPELINE_GUARD_OVERRIDE='GG-07|20260704-10|override through -C interposition, the PO approved' git -C sub reset --hard HEAD~1",
-  WARN,
-  { projectDir: OV_DIR, stderrIncludes: ["GG-07", "20260704-10", "OVERRIDE APPLIED"] },
+  BLOCK,
+  { projectDir: OV_DIR, stderrIncludes: ["GG-07", "command target and ledger target"] },
 );
 
 // ---- Rule 14: interpreter/remote wrapper with quoted destructive payload (raw-string rule,
