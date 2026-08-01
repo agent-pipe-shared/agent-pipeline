@@ -256,6 +256,7 @@ const TEST_SUITES = [
   { name: "sbom-lifecycle-tests", file: join(libDir, "sbom-lifecycle.test.mjs") },
   { name: "sbom-manifest-tests", file: join(libDir, "sbom-manifest.test.mjs") },
   { name: "sbom-node-adapter-tests", file: join(libDir, "sbom-node-adapter.test.mjs") },
+  { name: "sbom-discovery-tests", file: join(libDir, "sbom-discovery.test.mjs") },
   { name: "po-gate-authority-fixture-tests", file: join(libDir, "po-gate-authority.test.mjs") },
   { name: "public-core-observation-tests", file: join(libDir, "public-core-observation.test.mjs") },
   { name: "private-overlay-activation-tests", file: join(libDir, "private-overlay-activation.test.mjs") },

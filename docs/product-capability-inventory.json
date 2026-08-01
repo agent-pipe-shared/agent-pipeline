@@ -1193,6 +1193,12 @@
       "member": "sdlc-run-graph-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:sbom-discovery-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "sbom-discovery-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:sbom-lifecycle-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1835,6 +1841,7 @@
         "verify-phase:harness/scripts/verify.mjs:runtime-projection-v3-tests",
         "verify-phase:harness/scripts/verify.mjs:sandboxed-readonly-duty-tests",
         "verify-phase:harness/scripts/verify.mjs:sandboxed-readonly-host-bridge-tests",
+        "verify-phase:harness/scripts/verify.mjs:sbom-discovery-tests",
         "verify-phase:harness/scripts/verify.mjs:sbom-lifecycle-tests",
         "verify-phase:harness/scripts/verify.mjs:sbom-manifest-tests",
         "verify-phase:harness/scripts/verify.mjs:sbom-node-adapter-tests",
@@ -1899,6 +1906,7 @@
       ],
       "testEvidence": [
         "harness/scripts/check-doc-contracts.test.mjs",
+        "plugins/pipeline-core/lib/sbom-discovery.test.mjs",
         "plugins/pipeline-core/lib/sbom-lifecycle.test.mjs",
         "plugins/pipeline-core/lib/sbom-manifest.test.mjs",
         "plugins/pipeline-core/lib/sbom-node-adapter.test.mjs"
