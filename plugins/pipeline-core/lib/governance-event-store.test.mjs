@@ -231,13 +231,13 @@ test("restricted storage stays outside the repository, is owner-only encrypted, 
   await assert.rejects(() => queryRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization: queryAuthorization, key, recordId: stored.recordId }), (error) => error.code === "GES-MISSING");
   await assert.rejects(() => putRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: path.join(root, "restricted"), repositoryFingerprint: fingerprint, authorization: putAuthorization, key, keyGeneration: "key-1", expiresAtEpochMs: Date.now() + 60_000, event: restricted }), (error) => error.code === "GES-RESTRICTED-IN-REPOSITORY");
   const keyCustodyRoot = await mkdtemp(path.join(os.tmpdir(), "governance-key-custody-")); t.after(() => cleanup(keyCustodyRoot));
-  const keyFile = path.join(keyCustodyRoot, "key.bin"); await writeFile(keyFile, key, { mode: 0o600 });
+  const custodyFile = path.join(keyCustodyRoot, "material.bin"); await writeFile(custodyFile, key, { mode: 0o600 });
   const keyFileDigest = createHash("sha256").update(key).digest("hex");
   const destroyPlan = await planRestrictedGovernanceOperation({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, operation: "destroy-key", keyGeneration: "key-1", expectedKeyFileDigest: keyFileDigest, idempotencyKey: "destroy-plan-1" });
   assert.equal(destroyPlan.mutation, false);
   const destroyAuthorization = createRestrictedAuthorization({ key, repositoryFingerprint: fingerprint, operation: "destroy-key", expectedRecordDigest: keyFileDigest });
-  const destroyed = await destroyRestrictedGovernanceKey({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization: destroyAuthorization, key, keyGeneration: "key-1", keyFile, expectedKeyFileDigest: keyFileDigest, idempotencyKey: "destroy-1" });
+  const destroyed = await destroyRestrictedGovernanceKey({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization: destroyAuthorization, key, keyGeneration: "key-1", keyFile: custodyFile, expectedKeyFileDigest: keyFileDigest, idempotencyKey: "destroy-1" });
   assert.equal(destroyed.status, "key-file-unavailable");
-  const destroyReplay = await destroyRestrictedGovernanceKey({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization: destroyAuthorization, key, keyGeneration: "key-1", keyFile, expectedKeyFileDigest: keyFileDigest, idempotencyKey: "destroy-1" });
+  const destroyReplay = await destroyRestrictedGovernanceKey({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization: destroyAuthorization, key, keyGeneration: "key-1", keyFile: custodyFile, expectedKeyFileDigest: keyFileDigest, idempotencyKey: "destroy-1" });
   assert.equal(destroyReplay.status, "idempotent-replay");
 });
