@@ -80,6 +80,7 @@ const REMOTE_ADOPTION_PLAN_SCHEMA = "pipeline.project-onboarding-remote-adoption
 const SOURCE_RECOVERY_SCHEMA = "pipeline.project-onboarding-source-recovery.v1";
 const MANIFEST_REPAIR_PLAN_SCHEMA = "pipeline.project-onboarding-manifest-repair-plan.v1";
 const PARTIAL_AUTHORITY_PLAN_SCHEMA = "pipeline.project-onboarding-partial-authority-plan.v1";
+const PARTIAL_AUTHORITY_SOURCE = "canonical-fresh-v3";
 const SAFE_RELATIVE = /^(?!\/)(?!.*(?:^|\/)\.\.?($|\/))[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u;
 const AUTHENTICATED = new WeakMap();
 const AUTHENTICATED_MANIFEST_REPAIRS = new WeakMap();
@@ -209,20 +210,55 @@ export function planProjectPartialAuthorityAdoption({ rootDir = process.cwd(), p
     return { schema: PARTIAL_AUTHORITY_PLAN_SCHEMA, status: "not-applicable", root, diagnostics: [diagnostic("$.authority", "partial_authority_not_applicable", "the legacy-without-V3 recovery shape is absent", "use the lifecycle action returned for the current authority shape")] };
   }
   const supportedProfiles = ["epic", "feature", "mini"];
-  if (!supportedProfiles.includes(profile) || typeof source !== "string" || source.length === 0 || source.length > 160 || /[\0\r\n]/u.test(source)) {
+  if (!supportedProfiles.includes(profile) || source !== PARTIAL_AUTHORITY_SOURCE) {
     return {
       schema: PARTIAL_AUTHORITY_PLAN_SCHEMA, status: "selection-required", root,
-      selection: { profiles: supportedProfiles, source: "PO must supply one explicit V3 source selection; legacy calibration is not authority" },
-      diagnostics: [diagnostic("$.selection", "partial_authority_selection_required", "no explicit V3 authority selection is bound", "re-run plan-partial-authority with --profile and --source after PO selection")],
+      selection: { profiles: supportedProfiles, sources: [PARTIAL_AUTHORITY_SOURCE] },
+      diagnostics: [diagnostic("$.selection", "partial_authority_selection_required", "no explicit reconstructable V3 authority selection is bound", "re-run plan-partial-authority with --profile and --source canonical-fresh-v3 after PO selection")],
     };
   }
   const paths = [".claude", ".agents", ".codex", "docs"].filter((relative) => fs.existsSync(safePath(root, relative, fs))).sort();
   try {
     const artifacts = paths.map((relative) => ({ path: relative, snapshot: physicalTreeSnapshot(safePath(root, relative, fs), fs) }));
-    const plan = { schema: PARTIAL_AUTHORITY_PLAN_SCHEMA, status: "ready", root, selection: { profile, source }, artifacts, v3Target: { path: SOURCE, before: describe(null) }, mutation: false };
-    return { ...plan, planSha256: sha256(JSON.stringify(stable(plan))) };
+    const intent = freshIntent();
+    if (!validatePipelineUserV3(intent).ok) throw new Error("canonical V3 source is invalid");
+    const baselines = freshBaselines(intent);
+    const targets = [
+      { path: SOURCE, bytes: renderYaml(intent) },
+      { path: ".claude/pipeline.yaml", bytes: baselines[".claude/pipeline.yaml"].bytes },
+      { path: NEUTRAL_MANIFEST, bytes: baselines[NEUTRAL_MANIFEST].bytes },
+    ].sort((left, right) => left.path.localeCompare(right.path));
+    for (const target of targets) if (fs.existsSync(safePath(root, target.path, fs))) throw new Error(`Pipeline-owned target already exists: ${target.path}`);
+    const plan = { schema: PARTIAL_AUTHORITY_PLAN_SCHEMA, status: "ready", root, selection: { profile, source }, artifacts, targets: targets.map((target) => ({ path: target.path, before: describe(null), after: describe(target.bytes) })), mutation: false };
+    const planSha256 = sha256(JSON.stringify(stable(plan)));
+    return { ...plan, planSha256, applyAction: commandAction([ONBOARDING_SCRIPT, "apply-partial-authority", "--root", root, "--profile", profile, "--source", source, "--plan-sha256", planSha256, "--activate"], true, true, PARTIAL_AUTHORITY_PLAN_SCHEMA, ["applied", "runtime-initialization-required", "kickoff-required"]) };
   } catch (error) {
     return { schema: PARTIAL_AUTHORITY_PLAN_SCHEMA, status: "inventory-unavailable", root, diagnostics: [diagnostic("$.artifacts", "partial_authority_inventory_unavailable", error.message, "repair unsafe or unreadable user paths before planning")] };
+  }
+}
+
+export function applyProjectPartialAuthorityAdoption({ rootDir = process.cwd(), profile = null, source = null, planSha256, activate = false, deps: overrides = {} } = {}) {
+  const fs = deps(overrides);
+  if (!activate || !SHA256_RE.test(planSha256 ?? "")) return { schema: PARTIAL_AUTHORITY_PLAN_SCHEMA, status: "activation-required", diagnostics: [diagnostic("$.activate", "activation_required", "apply requires explicit activation", "review the digest-bound plan and pass --activate")] };
+  const plan = planProjectPartialAuthorityAdoption({ rootDir, profile, source, deps: fs });
+  if (plan.status !== "ready" || plan.planSha256 !== planSha256) return { schema: PARTIAL_AUTHORITY_PLAN_SCHEMA, status: "invalid-plan", root: plan.root, diagnostics: [diagnostic("$.planSha256", "plan_digest_mismatch", "the supplied plan digest is not current", "run the read-only partial-authority plan again")] };
+  const root = plan.root; const created = []; const createdDirectories = [];
+  try {
+    const intent = freshIntent(); const baselines = freshBaselines(intent);
+    const bytes = new Map([[SOURCE, renderYaml(intent)], [".claude/pipeline.yaml", baselines[".claude/pipeline.yaml"].bytes], [NEUTRAL_MANIFEST, baselines[NEUTRAL_MANIFEST].bytes]]);
+    for (const target of plan.targets) {
+      const path = safePath(root, target.path, fs);
+      if (fs.existsSync(path)) throw new Error(`target appeared during activation: ${target.path}`);
+      ensureTargetParents(root, path, createdDirectories, fs);
+      fs.writeFileSync(path, bytes.get(target.path), { encoding: "utf8", flag: "wx", mode: 0o600 });
+      const identity = fileIdentity(fs.lstatSync(path)); if (!identity) throw new Error(`created target identity is unavailable: ${target.path}`);
+      created.push({ path, identity });
+    }
+    const after = inspectProjectOnboardingV3({ rootDir: root, deps: fs });
+    return { schema: PARTIAL_AUTHORITY_PLAN_SCHEMA, status: "applied", root, changes: plan.targets.map((target) => target.path), postInspection: after };
+  } catch (error) {
+    const failures = rollback(root, created, createdDirectories, null, null, false, fs);
+    return { schema: PARTIAL_AUTHORITY_PLAN_SCHEMA, status: failures.length ? "rollback-failed" : "rolled-back", root, diagnostics: [diagnostic("$.transaction", failures.length ? "rollback_failed" : "apply_failed", error.message, "repair the root and run the typed plan again")] };
   }
 }
 function runtimePaths() { return loadRuntimeProjectionV3OwnedKeys().targets.map((target) => target.path).sort(); }

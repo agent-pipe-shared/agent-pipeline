@@ -28,6 +28,7 @@ import {
   planProjectOnboardingSourceRecoveryV4,
   planProjectOnboardingV3,
   planProjectPartialAuthorityAdoption,
+  applyProjectPartialAuthorityAdoption,
   planProjectRemoteAdoptionV4,
   applyProjectRemoteAdoptionV4,
   renderProjectOnboardingAction,
@@ -3648,11 +3649,32 @@ test("partial authority planner requires an explicit V3 selection and hashes pre
     writeFileSync(join(path, ".agents", "AGENTS.md"), "user-owned\n");
     const missing = planProjectPartialAuthorityAdoption({ rootDir: path, deps: fakeDeps });
     assert.equal(missing.status, "selection-required");
-    const planned = planProjectPartialAuthorityAdoption({ rootDir: path, profile: "epic", source: "PO-selected-v3", deps: fakeDeps });
+    const planned = planProjectPartialAuthorityAdoption({ rootDir: path, profile: "epic", source: "canonical-fresh-v3", deps: fakeDeps });
     assert.equal(planned.status, "ready");
     assert.match(planned.planSha256, /^[a-f0-9]{64}$/u);
     assert.deepEqual(planned.artifacts.map((entry) => entry.path), [".agents", ".claude"]);
     assert.equal(planned.mutation, false);
+  } finally { dispose(path); }
+});
+
+test("partial authority apply creates only absent owned targets and preserves user projections", () => {
+  const path = root();
+  try {
+    mkdirSync(join(path, ".claude"));
+    writeFileSync(join(path, ".claude", "pipeline.json"), '{"project":"legacy"}\n');
+    mkdirSync(join(path, ".agents"));
+    writeFileSync(join(path, ".agents", "AGENTS.md"), "user-owned\n");
+    mkdirSync(join(path, ".codex"));
+    writeFileSync(join(path, ".codex", "hooks.json"), "user-owned\n");
+    const plan = planProjectPartialAuthorityAdoption({ rootDir: path, profile: "feature", source: "canonical-fresh-v3", deps: fakeDeps });
+    const applied = applyProjectPartialAuthorityAdoption({ rootDir: path, profile: "feature", source: "canonical-fresh-v3", planSha256: plan.planSha256, activate: true, deps: fakeDeps });
+    assert.equal(applied.status, "applied", JSON.stringify(applied));
+    assert.equal(existsSync(join(path, "pipeline.user.yaml")), true);
+    assert.equal(existsSync(join(path, ".claude", "pipeline.yaml")), true);
+    assert.equal(existsSync(join(path, "project", "pipeline.yaml")), true);
+    assert.equal(readFileSync(join(path, ".claude", "pipeline.json"), "utf8"), '{"project":"legacy"}\n');
+    assert.equal(readFileSync(join(path, ".agents", "AGENTS.md"), "utf8"), "user-owned\n");
+    assert.equal(readFileSync(join(path, ".codex", "hooks.json"), "utf8"), "user-owned\n");
   } finally { dispose(path); }
 });
 

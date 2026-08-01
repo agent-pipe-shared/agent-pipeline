@@ -13,6 +13,7 @@ import {
   planProjectOnboardingLifecycleV4,
   planProjectOnboardingManifestRepairV4,
   planProjectPartialAuthorityAdoption,
+  applyProjectPartialAuthorityAdoption,
   planProjectRemoteAdoptionV4,
   applyProjectRemoteAdoptionV4,
   planProjectOnboardingSourceRecoveryV4,
@@ -47,7 +48,7 @@ function parse(args) {
     if (args[1] !== "inspect") return { error: "continuity requires inspect" };
     output.command = "continuity-inspect";
     start = 2;
-  } else if (["inspect", "plan", "plan-partial-authority", "plan-source-recovery", "plan-manifest-repair", "apply-manifest-repair", "apply-portable-seed", "plan-runtime", "initialize-runtime", "plan-repair", "apply-repair", "plan-readback", "apply-readback"].includes(args[0])) {
+  } else if (["inspect", "plan", "plan-partial-authority", "apply-partial-authority", "plan-source-recovery", "plan-manifest-repair", "apply-manifest-repair", "apply-portable-seed", "plan-runtime", "initialize-runtime", "plan-repair", "apply-repair", "plan-readback", "apply-readback"].includes(args[0])) {
     output.command = args[0];
     start = 1;
   }
@@ -78,7 +79,7 @@ function parse(args) {
     if (![output.profile, output.featureId, output.planPath, output.prdPath, output.specPath].every(Boolean)) return { error: "kickoff promotion requires --profile --id --plan-path --prd-path --spec-path" };
   } else if (output.command?.startsWith("kickoff-") && output.goal === undefined) return { error: "kickoff plan/apply requires --goal <text>" };
   else if (!output.command?.startsWith("kickoff-") && output.goal !== undefined) return { error: "--goal is only valid for kickoff plan/apply" };
-  if (output.activate && !["apply-portable-seed", "initialize-runtime", "apply-repair", "apply-readback", "apply-manifest-repair", "kickoff-apply", "kickoff-promote-apply", "adopt-remote-apply"].includes(output.command)) return { error: "--activate is only valid for an apply command" };
+  if (output.activate && !["apply-portable-seed", "initialize-runtime", "apply-repair", "apply-readback", "apply-manifest-repair", "apply-partial-authority", "kickoff-apply", "kickoff-promote-apply", "adopt-remote-apply"].includes(output.command)) return { error: "--activate is only valid for an apply command" };
   return output;
 }
 export function main(args = process.argv.slice(2), {
@@ -93,6 +94,7 @@ export function main(args = process.argv.slice(2), {
   try {
     if (options.command === "inspect") output = inspectProjectOnboardingV3({ rootDir: options.root, deps, intent: options.intent });
     else if (options.command === "plan-partial-authority") output = planProjectPartialAuthorityAdoption({ rootDir: options.root, profile: options.profile, source: options.source, deps });
+    else if (options.command === "apply-partial-authority") output = applyProjectPartialAuthorityAdoption({ rootDir: options.root, profile: options.profile, source: options.source, planSha256: options.planSha256, activate: options.activate, deps });
     else if (options.command === "adopt-remote-plan") output = planProjectRemoteAdoptionV4({ rootDir: options.root, remote: options.remote, ref: options.ref, deps });
     else if (options.command === "adopt-remote-apply") output = applyProjectRemoteAdoptionV4({ rootDir: options.root, remote: options.remote, ref: options.ref, planSha256: options.planSha256, activate: options.activate, deps });
     else if (options.command === "continuity-inspect") output = inspectProjectOnboardingV3({ rootDir: options.root, deps, intent: "onboarding" });
