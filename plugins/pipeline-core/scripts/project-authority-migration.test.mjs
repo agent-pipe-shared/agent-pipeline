@@ -18,5 +18,11 @@ try {
   assert.equal(main(["reconcile-state", "--root", root, "--activate"], { write: (chunk) => { stdout += chunk; }, previewWrite: (chunk) => { stderr += chunk; } }), 0);
   assert.equal(JSON.parse(stdout).status, "applied"); assert.equal(JSON.parse(stderr).operation, "state-reconciliation");
   assert.equal(JSON.parse(readFileSync(join(root, "project/pipeline-state.json"), "utf8")).continuity.authority.result.path, "specs/sprint-phoenix-epic/result.md");
-  console.log("project-authority-cli: 7 passed, 0 failed");
+  writeFileSync(join(root, ".claude/pipeline-state.json"), `${JSON.stringify({ activeFeature: { id: "f", planPath: "p", phase: "implementation" }, updatedAt: "legacy" })}\n`);
+  writeFileSync(join(root, "project/pipeline-state.json"), `${JSON.stringify({ activeFeature: { id: "f", planPath: "p", phase: "design" }, continuity: { authority: "neutral" }, updatedAt: "neutral" })}\n`);
+  stdout = ""; stderr = "";
+  assert.equal(main(["sync-state", "--root", root, "--activate"], { write: (chunk) => { stdout += chunk; }, previewWrite: (chunk) => { stderr += chunk; } }), 0);
+  assert.equal(JSON.parse(stdout).status, "applied"); assert.equal(JSON.parse(stderr).operation, "dual-state-synchronization");
+  assert.match(JSON.parse(stderr).explanation.why, /pre-write journal/);
+  console.log("project-authority-cli: 10 passed, 0 failed");
 } finally { rmSync(root, { recursive: true, force: true }); }

@@ -6,10 +6,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   applyPendingProjectAuthorityRecovery, applyProjectAuthorityMigration,
+  applyPendingProjectAuthorityStateSynchronizationRecovery,
   applyProjectAuthorityStateReconciliation,
   applyProjectAuthorityStateSynchronization,
   LEGACY_MANIFEST, LEGACY_STATE, NEUTRAL_MANIFEST, NEUTRAL_STATE,
-  planPendingProjectAuthorityRecovery, planProjectAuthorityMigration, planProjectAuthorityStateReconciliation, planProjectAuthorityStateSynchronization, readProjectAuthority,
+  planPendingProjectAuthorityRecovery, planPendingProjectAuthorityStateSynchronizationRecovery,
+  planProjectAuthorityMigration, planProjectAuthorityStateReconciliation, planProjectAuthorityStateSynchronization, readProjectAuthority,
 } from "./project-authority.mjs";
 
 const roots = [];
@@ -55,6 +57,20 @@ try {
     assert.equal(applyProjectAuthorityStateSynchronization(plan, { rootDir: base, activate: true }).status, "applied");
     const state = JSON.parse(readFileSync(join(base, NEUTRAL_STATE), "utf8")); assert.equal(state.activeFeature.phase, "implementation"); assert.equal(state.continuity.authority, "neutral");
     assert.equal(readFileSync(join(base, LEGACY_STATE), "utf8"), readFileSync(join(base, NEUTRAL_STATE), "utf8"));
+  });
+  ok("interrupted dual-state sync recovers the stage-publication crash window before a retry", () => {
+    const base = root(); legacy(base); assert.equal(applyProjectAuthorityMigration(planProjectAuthorityMigration({ rootDir: base }), { rootDir: base, activate: true }).status, "applied");
+    write(base, LEGACY_STATE, `${JSON.stringify({ activeFeature: { id: "f", planPath: "p", phase: "implementation" }, updatedAt: "legacy" })}\n`);
+    write(base, NEUTRAL_STATE, `${JSON.stringify({ activeFeature: { id: "f", planPath: "p", phase: "design" }, continuity: { authority: "neutral" }, updatedAt: "neutral" })}\n`);
+    const legacyBefore = readFileSync(join(base, LEGACY_STATE), "utf8"); const neutralBefore = readFileSync(join(base, NEUTRAL_STATE), "utf8");
+    const plan = planProjectAuthorityStateSynchronization({ rootDir: base });
+    assert.equal(applyProjectAuthorityStateSynchronization(plan, { rootDir: base, activate: true, interruptAfterStageRename: () => true }).status, "interrupted");
+    assert.equal(planProjectAuthorityStateSynchronization({ rootDir: base }).status, "recovery-required");
+    const recovery = planPendingProjectAuthorityStateSynchronizationRecovery({ rootDir: base });
+    assert.equal(recovery.status, "ready"); assert.equal(applyPendingProjectAuthorityStateSynchronizationRecovery(recovery, { rootDir: base }).status, "activation-required");
+    assert.equal(applyPendingProjectAuthorityStateSynchronizationRecovery(recovery, { rootDir: base, activate: true }).status, "recovered");
+    assert.equal(readFileSync(join(base, LEGACY_STATE), "utf8"), legacyBefore); assert.equal(readFileSync(join(base, NEUTRAL_STATE), "utf8"), neutralBefore);
+    assert.equal(applyProjectAuthorityStateSynchronization(planProjectAuthorityStateSynchronization({ rootDir: base }), { rootDir: base, activate: true }).status, "applied");
   });
   ok("source and destination drift reject before writes", () => {
     const base = root(); legacy(base); let plan = planProjectAuthorityMigration({ rootDir: base }); write(base, LEGACY_MANIFEST, "changed\n");

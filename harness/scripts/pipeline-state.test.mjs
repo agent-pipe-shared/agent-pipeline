@@ -2180,6 +2180,17 @@ if (symlinkCapable) {
   ok("PHX0A5 existing draft reconciliation rejects a mismatched PO decision without mutation", deniedCode === 2 && deniedPreserved);
   const receipt = JSON.parse(readFileSync(join(dir, `${base}/evidence/lifecycle/feature-package-phx-reconcile-01.json`), "utf8"));
   ok("PHX0A6 existing draft reconciliation changes only the four planned digest bindings and replays zero-write", applied === 0 && changedDigests === 4 && afterValue.state === "draft" && JSON.stringify(afterValue.feature) === JSON.stringify(manifest.feature) && JSON.stringify(afterValue.candidate) === "null" && JSON.stringify(afterValue.supersedes) === "null" && replay === 0 && readFileSync(join(dir, manifestPath), "utf8") === after && /^fp-[a-f0-9]{16}$/.test(receipt.correlation) && !/[a-f0-9]{32}/.test(JSON.stringify(receipt)));
+  writeFileSync(join(dir, manifestPath), after.replace("  \"schema\":", "\t\"schema\" :").replaceAll("\n", "\r\n"));
+  writeFileSync(join(dir, planPath), "# Phoenix PRD revised\n");
+  writeFileSync(join(dir, `${base}/acceptance.md`), "# Phoenix Acceptance revised\n");
+  const partialProposal = writeRequest(dir, "reconcile-partial-proposal", { operation: "reconcile-draft", targetState: "draft" });
+  const partialPlanned = captureConsoleLog(() => run(["feature-package-plan", "--manifest", manifestPath, "--proposal-file", partialProposal, "--idempotency-key", "partial-draft-reconciliation", "--expires-at", "2030-01-01T00:00:00.000Z"], { dir, poGateAuthority }));
+  const partialRequest = JSON.parse(partialPlanned.text).request; const partialBeforeBytes = readFileSync(join(dir, manifestPath), "utf8"); const partialBefore = JSON.parse(partialBeforeBytes);
+  const partialApplied = run(["feature-package-apply", "--request-file", writeRequest(dir, "reconcile-partial-request", partialRequest), "--request-sha256", sha256Canonical(partialRequest), "--lock-token", "partial-draft-reconciliation-lock"], { dir, poGateAuthority });
+  const partialAfterBytes = readFileSync(join(dir, manifestPath), "utf8"); const partialAfter = JSON.parse(partialAfterBytes);
+  const partialChanges = partialBefore.artifacts.filter((entry, index) => entry.sha256 !== partialAfter.artifacts[index].sha256).length;
+  const expectedPartialBytes = partialBeforeBytes.replace(partialBefore.artifacts[0].sha256, partialAfter.artifacts[0].sha256).replace(partialBefore.artifacts[2].sha256, partialAfter.artifacts[2].sha256);
+  ok("PHX0A7 draft reconciliation binds and updates only the two artifacts that drifted without reformatting other bytes", partialApplied === 0 && partialChanges === 2 && partialBefore.artifacts[1].sha256 === partialAfter.artifacts[1].sha256 && partialBefore.artifacts[3].sha256 === partialAfter.artifacts[3].sha256 && partialAfterBytes === expectedPartialBytes && partialAfterBytes.includes("\r\n\t\"schema\" :"));
 }
 
 // ---- PHX0A: one explicit mutable non-authority design-artifact reconciliation ----

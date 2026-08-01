@@ -2463,12 +2463,46 @@ function featureReceipt(request, outcome) {
     candidate: null, evidence: null,
   };
 }
+function lifecycleArtifactDigestRanges(source) {
+  let at = 0; const ranges = [];
+  const ws = () => { while (/[ \t\r\n]/.test(source[at] ?? "")) at += 1; };
+  const string = () => {
+    if (source[at] !== '"') throw new Error("string expected");
+    const start = at++;
+    while (at < source.length) {
+      const char = source[at++];
+      if (char === '"') return { value: JSON.parse(source.slice(start, at)), start, end: at };
+      if (char === "\\") { const escaped = source[at++]; if (escaped === "u") at += 4; }
+    }
+    throw new Error("unterminated string");
+  };
+  const value = (path = []) => {
+    ws(); const start = at;
+    if (source[at] === '"') return string().value;
+    if (source[at] === "{") {
+      at += 1; const object = {}; const seen = new Set(); ws(); if (source[at] === "}") { at += 1; return object; }
+      while (true) {
+        ws(); const key = string().value; if (seen.has(key)) throw new Error("duplicate key"); seen.add(key); ws(); if (source[at++] !== ":") throw new Error("colon expected"); ws();
+        const childStart = at; object[key] = value([...path, key]); const childEnd = at;
+        if (path.length === 2 && path[0] === "artifacts" && /^[0-9]+$/.test(path[1]) && key === "sha256") ranges[Number(path[1])] = { start: childStart, end: childEnd };
+        ws(); const separator = source[at++]; if (separator === "}") return object; if (separator !== ",") throw new Error("object separator expected");
+      }
+    }
+    if (source[at] === "[") {
+      at += 1; const array = []; ws(); if (source[at] === "]") { at += 1; return array; }
+      while (true) { array.push(value([...path, String(array.length)])); ws(); const separator = source[at++]; if (separator === "]") return array; if (separator !== ",") throw new Error("array separator expected"); }
+    }
+    const literal = /^(?:true|false|null|-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)/.exec(source.slice(at));
+    if (!literal) throw new Error("value expected"); at += literal[0].length; return JSON.parse(literal[0]);
+  };
+  value(); ws(); if (at !== source.length) throw new Error("trailing JSON content"); return ranges;
+}
 function reconcileDraftPreview(dir, manifestPath) {
   const manifest = typeof manifestPath === "string" ? manifestPath : "";
   if (isAbsolute(manifest) || manifest.includes("\\") || manifest.includes("\0") || manifest.split("/").some((part) => part === "" || part === "." || part === "..")) return { ok: false, code: "PS-FEATURE-PREIMAGE" };
   const target = resolve(dir, manifest);
-  let bytes; let value;
-  try { bytes = readFileSync(target, "utf8"); value = JSON.parse(bytes); } catch { return { ok: false, code: "PS-FEATURE-PREIMAGE" }; }
+  let bytes; let value; let digestRanges;
+  try { bytes = readFileSync(target, "utf8"); value = JSON.parse(bytes); digestRanges = lifecycleArtifactDigestRanges(bytes); } catch { return { ok: false, code: "PS-FEATURE-PREIMAGE" }; }
   const id = manifest.slice("specs/".length, -"/lifecycle.json".length);
   if (!manifest.startsWith("specs/") || !manifest.endsWith("/lifecycle.json") || !safePhxId(id)
     || !exactObjectKeys(value, ["schema", "feature", "state", "artifacts", "candidate", "supersedes"])
@@ -2486,20 +2520,19 @@ function reconcileDraftPreview(dir, manifestPath) {
     if (matches.length !== 1 || !exactObjectKeys(matches[0], ["class", "path", "sha256", "authority", "mutability", "retention"]) || !SHA256_RE.test(matches[0].sha256)) return { ok: false, code: "PS-FEATURE-RECONCILE-SHAPE" };
     const current = currentRepoArtifact(dir, path);
     if (!current) return { ok: false, code: "PS-FEATURE-RECONCILE-SOURCE" };
-    if (current.sha256 !== matches[0].sha256) replacements.push({ old: matches[0].sha256, next: current.sha256 });
+    if (current.sha256 !== matches[0].sha256) replacements.push({ index: value.artifacts.indexOf(matches[0]), old: matches[0].sha256, next: current.sha256 });
   }
   if (replacements.length === 0) return { ok: false, code: "PS-FEATURE-RECONCILE-NOOP" };
   let nextBytes = bytes;
-  for (const replacement of replacements) {
-    const token = `"sha256": "${replacement.old}"`;
-    const start = nextBytes.indexOf(token);
-    if (start < 0) return { ok: false, code: "PS-FEATURE-RECONCILE-BYTES" };
-    nextBytes = `${nextBytes.slice(0, start)}"sha256": "${replacement.next}"${nextBytes.slice(start + token.length)}`;
+  for (const replacement of [...replacements].sort((left, right) => right.index - left.index)) {
+    const range = digestRanges[replacement.index];
+    if (!range || JSON.parse(bytes.slice(range.start, range.end)) !== replacement.old) return { ok: false, code: "PS-FEATURE-RECONCILE-BYTES" };
+    nextBytes = `${nextBytes.slice(0, range.start)}${JSON.stringify(replacement.next)}${nextBytes.slice(range.end)}`;
   }
   let next;
   try { next = JSON.parse(nextBytes); } catch { return { ok: false, code: "PS-FEATURE-RECONCILE-BYTES" }; }
   const changed = value.artifacts.map((artifact, index) => artifact.sha256 === next.artifacts[index]?.sha256 ? 0 : 1).reduce((total, count) => total + count, 0);
-  if (changed !== replacements.length || featureArtifactSetSha256(value.artifacts) !== featureArtifactSetSha256(next.artifacts)) return { ok: false, code: "PS-FEATURE-RECONCILE-BYTES" };
+  if (changed !== replacements.length || !replacements.every(({ index, next: digest }) => next.artifacts[index]?.sha256 === digest) || featureArtifactSetSha256(value.artifacts) !== featureArtifactSetSha256(next.artifacts)) return { ok: false, code: "PS-FEATURE-RECONCILE-BYTES" };
   return { ok: true, manifest, bytes, value, nextBytes, next, preimage: sha256Bytes(bytes), artifactSetSha256: featureArtifactSetSha256(value.artifacts), receipt: { schema: "pipeline.feature-package-receipt.v1", manifest, manifestSha256: sha256Bytes(nextBytes), featureId: id, state: "draft", candidate: null, artifactCount: next.artifacts.length, findingCount: 0 } };
 }
 function reconcileMutableDesignPreview(dir, manifestPath, artifactPath) {

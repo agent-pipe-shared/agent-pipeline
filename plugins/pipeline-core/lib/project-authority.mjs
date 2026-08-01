@@ -23,8 +23,10 @@ export const NEUTRAL_STATE = "project/pipeline-state.json";
 export const LEGACY_MANIFEST = ".claude/pipeline.yaml";
 export const LEGACY_STATE = ".claude/pipeline-state.json";
 export const PROJECT_AUTHORITY_TRANSACTION_DIR = ".pipeline-project-authority-migration";
+export const PROJECT_AUTHORITY_STATE_SYNC_TRANSACTION_DIR = ".pipeline-project-authority-state-sync";
 const JOURNAL_FILE = "journal.json";
 const JOURNAL_SCHEMA = "pipeline.project-authority-journal.v1";
+const STATE_SYNC_JOURNAL_SCHEMA = "pipeline.project-authority-state-sync-journal.v1";
 const TARGETS = Object.freeze([
   { path: NEUTRAL_MANIFEST, legacy: LEGACY_MANIFEST, kind: "project-authority" },
   { path: NEUTRAL_STATE, legacy: LEGACY_STATE, kind: "project-state" },
@@ -33,6 +35,7 @@ const PLANS = new WeakMap();
 const RECOVERY_PLANS = new WeakMap();
 const STATE_RECONCILE_PLANS = new WeakMap();
 const STATE_SYNC_PLANS = new WeakMap();
+const STATE_SYNC_RECOVERY_PLANS = new WeakMap();
 const SHA256 = /^[0-9a-f]{64}$/u;
 
 class IntentionalInterruption extends Error {}
@@ -105,6 +108,10 @@ function transactionPaths(root) {
   const transaction = projectPath(root, PROJECT_AUTHORITY_TRANSACTION_DIR);
   return { transaction, journal: join(transaction, JOURNAL_FILE) };
 }
+function stateSyncTransactionPaths(root) {
+  const transaction = projectPath(root, PROJECT_AUTHORITY_STATE_SYNC_TRANSACTION_DIR);
+  return { transaction, journal: join(transaction, JOURNAL_FILE) };
+}
 function fsyncFile(path) { const fd = openSync(path, "r+"); try { fsyncSync(fd); } finally { closeSync(fd); } }
 function fsyncDirectory(path) {
   try { const fd = openSync(path, "r"); try { fsyncSync(fd); } finally { closeSync(fd); } }
@@ -116,10 +123,11 @@ function fsyncDirectory(path) {
   }
 }
 function durableWrite(path, value) { writeFileSync(path, value, { mode: 0o600 }); fsyncFile(path); }
-function durableJournal(root, journal) {
-  const { transaction, journal: path } = transactionPaths(root);
+function durableJournalAt(transaction, journal) {
+  const path = join(transaction, JOURNAL_FILE);
   durableWrite(path, `${JSON.stringify(journal)}\n`); fsyncDirectory(transaction);
 }
+function durableJournal(root, journal) { durableJournalAt(transactionPaths(root).transaction, journal); }
 function planSignature(plan) { return stableJson(plan); }
 function remember(plan, internal) { PLANS.set(plan, { signature: planSignature(plan), ...internal }); return plan; }
 function authenticated(plan) {
@@ -138,35 +146,142 @@ function changedTargets(root) {
 }
 function stateReconcileResult(status, extra = {}) { return { schema: PROJECT_AUTHORITY_STATE_RECONCILE_SCHEMA, status, requiresExplicitActivation: true, ...extra }; }
 function stateSyncResult(status, extra = {}) { return { schema: PROJECT_AUTHORITY_STATE_SYNC_SCHEMA, status, requiresExplicitActivation: true, ...extra }; }
+function stateSyncRecoveryResult(status, extra = {}) { return { schema: PROJECT_AUTHORITY_STATE_SYNC_SCHEMA, status, requiresExplicitActivation: true, ...extra }; }
 function stateProjection(root, path) {
   const before = image(root, path); if (before.status !== "present") throw new Error(`${path} is missing`);
   const value = JSON.parse(bytes(root, path).toString("utf8"));
-  if (!value?.activeFeature || typeof value.activeFeature !== "object") throw new Error(`${path} has no active feature`);
+  if (!value?.activeFeature || typeof value.activeFeature !== "object"
+    || typeof value.activeFeature.id !== "string" || value.activeFeature.id.length === 0
+    || typeof value.activeFeature.planPath !== "string" || value.activeFeature.planPath.length === 0
+    || typeof value.activeFeature.phase !== "string" || value.activeFeature.phase.length === 0
+    || typeof value.updatedAt !== "string" || value.updatedAt.length === 0) throw new Error(`${path} has an invalid active feature projection`);
   return { path, before, value };
+}
+function stateSyncTargets(legacy, neutral, after) {
+  return [{ path: LEGACY_STATE, before: legacy.before, after }, { path: NEUTRAL_STATE, before: neutral.before, after }];
+}
+function validateStateSyncJournal(root, journal) {
+  if (!journal || journal.schema !== STATE_SYNC_JOURNAL_SCHEMA || !["prepared", "applying", "complete"].includes(journal.state) || !Array.isArray(journal.targets) || journal.targets.length !== 2) throw new Error("state sync journal is corrupt");
+  const { transaction } = stateSyncTransactionPaths(root); const expectedPaths = [LEGACY_STATE, NEUTRAL_STATE];
+  for (const [index, entry] of journal.targets.entries()) {
+    if (!entry || entry.path !== expectedPaths[index] || !["staged", "displacing", "displaced", "renamed"].includes(entry.state)
+      || !entry.before || !entry.after || entry.before.status !== "present" || entry.after.status !== "present"
+      || !SHA256.test(entry.before.sha256) || !SHA256.test(entry.after.sha256)
+      || !Number.isInteger(entry.before.byteLength) || !Number.isInteger(entry.after.byteLength)
+      || entry.stage !== `stage-${index}` || entry.preimage !== `preimage-${index}` || entry.displaced !== `displaced-${index}`) throw new Error("state sync journal has an invalid target proof");
+    const stage = join(transaction, entry.stage); const preimage = join(transaction, entry.preimage); const displaced = join(transaction, entry.displaced); const current = image(root, entry.path);
+    const expectsStage = entry.state === "staged" || entry.state === "displacing" || (entry.state === "displaced" && current.status === "absent");
+    if (expectsStage && (!existsSync(stage) || !sameImage(present(readFileSync(stage)), entry.after))) throw new Error("state sync staged proof is missing or corrupt");
+    if (!expectsStage && existsSync(stage)) throw new Error("state sync consumed stage unexpectedly remains");
+    if (!existsSync(preimage) || !sameImage(present(readFileSync(preimage)), entry.before)) throw new Error("state sync preimage proof is missing or corrupt");
+    if ((entry.state === "staged" || entry.state === "displacing") && sameImage(current, entry.before)) continue;
+    if (entry.state === "displacing" && current.status === "absent" && existsSync(displaced)) continue;
+    if (entry.state === "displaced" && current.status === "absent" && existsSync(displaced)) continue;
+    if (entry.state === "displaced" && sameImage(current, entry.after) && existsSync(displaced)) continue;
+    if (entry.state === "renamed" && !sameImage(current, entry.after)) throw new Error("state sync target changed after interruption");
+    if (entry.state !== "renamed") throw new Error("state sync target changed during apply");
+  }
+}
+function prepareStateSync(root, targets, afterBytes) {
+  const { transaction } = stateSyncTransactionPaths(root); if (existsSync(transaction)) throw new Error("state sync recovery is required");
+  mkdirSync(transaction, { mode: 0o700 }); fsyncDirectory(root);
+  const entries = targets.map((target, index) => ({ ...target, stage: `stage-${index}`, preimage: `preimage-${index}`, displaced: `displaced-${index}`, state: "staged" }));
+  try {
+    for (const entry of entries) { durableWrite(join(transaction, entry.stage), afterBytes); durableWrite(join(transaction, entry.preimage), bytes(root, entry.path)); }
+    const journal = { schema: STATE_SYNC_JOURNAL_SCHEMA, state: "prepared", targets: entries }; durableJournalAt(transaction, journal); return journal;
+  } catch (error) { rmSync(transaction, { recursive: true, force: true }); throw error; }
+}
+function commitStateSyncTarget(root, journal, entry, { interruptAfterStageRename } = {}) {
+  const { transaction } = stateSyncTransactionPaths(root); const destination = projectPath(root, entry.path);
+  journal.state = "applying"; entry.state = "displacing"; durableJournalAt(transaction, journal);
+  renameSync(destination, join(transaction, entry.displaced)); fsyncDirectory(dirname(destination)); fsyncDirectory(transaction);
+  entry.state = "displaced"; durableJournalAt(transaction, journal);
+  renameSync(join(transaction, entry.stage), destination); fsyncDirectory(dirname(destination)); fsyncDirectory(transaction);
+  if (interruptAfterStageRename?.({ target: entry.path })) throw new IntentionalInterruption(`interrupted after staging ${entry.path}`);
+  if (!sameImage(image(root, entry.path), entry.after)) throw new Error(`state sync readback failed: ${entry.path}`);
+  entry.state = "renamed"; durableJournalAt(transaction, journal);
+}
+function restoreStateSync(root, journal) {
+  validateStateSyncJournal(root, journal); const { transaction } = stateSyncTransactionPaths(root);
+  journal.state = "applying"; durableJournalAt(transaction, journal);
+  for (const entry of [...journal.targets].reverse()) {
+    const destination = projectPath(root, entry.path); const current = image(root, entry.path);
+    if (entry.state === "staged" || (entry.state === "displacing" && sameImage(current, entry.before))) continue;
+    if ((entry.state === "displacing" || entry.state === "displaced") && current.status === "absent") {
+      renameSync(join(transaction, entry.displaced), destination); fsyncDirectory(dirname(destination)); entry.state = "staged"; durableJournalAt(transaction, journal); continue;
+    }
+    if (!sameImage(current, entry.after)) throw new Error(`state sync destination changed during recovery: ${entry.path}`);
+    const quarantine = join(transaction, `rollback-${entry.stage}`);
+    renameSync(destination, quarantine); renameSync(join(transaction, entry.displaced), destination); unlinkSync(quarantine);
+    fsyncDirectory(dirname(destination)); entry.state = "staged"; durableJournalAt(transaction, journal);
+  }
+  rmSync(transaction, { recursive: true, force: true }); fsyncDirectory(root);
 }
 /** Preview an exact two-projection alignment using neutral authority and the Legacy phase. */
 export function planProjectAuthorityStateSynchronization({ rootDir = process.cwd() } = {}) {
   let root;
   try {
     root = realRoot(rootDir); if (authority(root).source !== "neutral") return stateSyncResult("rejected", { reason: "neutral authority is required" });
+    if (existsSync(stateSyncTransactionPaths(root).transaction)) return stateSyncResult("recovery-required", { reason: "state sync recovery is required before a new plan" });
     const legacy = stateProjection(root, LEGACY_STATE); const neutral = stateProjection(root, NEUTRAL_STATE);
     if (legacy.value.activeFeature.id !== neutral.value.activeFeature.id || legacy.value.activeFeature.planPath !== neutral.value.activeFeature.planPath) throw new Error("state feature identities differ");
     const next = structuredClone(neutral.value); next.activeFeature = { ...next.activeFeature, phase: legacy.value.activeFeature.phase }; next.updatedAt = legacy.value.updatedAt;
     const bytesNext = Buffer.from(`${JSON.stringify(next, null, 2)}\n`, "utf8"); const after = present(bytesNext);
-    if (sameImage(legacy.before, after) && sameImage(neutral.before, after)) return stateSyncResult("noop", { reason: "state projections already aligned" });
-    const plan = stateSyncResult("ready", { phase: next.activeFeature.phase, targets: [{ path: LEGACY_STATE, before: legacy.before, after }, { path: NEUTRAL_STATE, before: neutral.before, after }] });
-    STATE_SYNC_PLANS.set(plan, { root, signature: planSignature(plan), legacy, neutral, bytesNext, after }); return plan;
+    const targets = stateSyncTargets(legacy, neutral, after);
+    if (sameImage(legacy.before, after) && sameImage(neutral.before, after)) {
+      const plan = stateSyncResult("noop", { reason: "state projections already aligned", phase: next.activeFeature.phase, targets });
+      STATE_SYNC_PLANS.set(plan, { root, signature: planSignature(plan), legacy, neutral, bytesNext, after, targets, status: "noop" }); return plan;
+    }
+    const plan = stateSyncResult("ready", { phase: next.activeFeature.phase, compatibility: "neutral-authority-with-legacy-phase", targets });
+    STATE_SYNC_PLANS.set(plan, { root, signature: planSignature(plan), legacy, neutral, bytesNext, after, targets, status: "ready" }); return plan;
   } catch (error) { return stateSyncResult("rejected", { reason: error.message }); }
 }
 /** Apply only an unchanged explicit dual-state synchronization plan. */
-export function applyProjectAuthorityStateSynchronization(plan, { rootDir = process.cwd(), activate = false } = {}) {
+export function applyProjectAuthorityStateSynchronization(plan, { rootDir = process.cwd(), activate = false, interruptAfterRename, interruptAfterStageRename } = {}) {
   const state = STATE_SYNC_PLANS.get(plan); if (!state || planSignature(plan) !== state.signature) return stateSyncResult("rejected", { reason: "unauthenticated or changed plan" });
+  if (state.status === "noop") return stateSyncResult("noop", { reason: "state projections already aligned", phase: state.legacy.value.activeFeature.phase, targets: [LEGACY_STATE, NEUTRAL_STATE] });
   if (!activate) return stateSyncResult("activation-required", { reason: "explicit activation required" });
   try {
     const root = realRoot(rootDir); if (root !== state.root || !sameImage(image(root, LEGACY_STATE), state.legacy.before) || !sameImage(image(root, NEUTRAL_STATE), state.neutral.before)) throw new Error("state changed since planning");
-    for (const entry of [state.legacy, state.neutral]) { const path = projectPath(root, entry.path); const temporary = `${path}.sync-${process.pid}`; durableWrite(temporary, state.bytesNext); renameSync(temporary, path); fsyncDirectory(dirname(path)); if (!sameImage(image(root, entry.path), state.after)) throw new Error(`readback failed: ${entry.path}`); }
-    STATE_SYNC_PLANS.delete(plan); return stateSyncResult("applied", { phase: state.legacy.value.activeFeature.phase, targets: [LEGACY_STATE, NEUTRAL_STATE] });
+    const journal = prepareStateSync(root, state.targets, state.bytesNext);
+    try {
+      for (const [index, entry] of journal.targets.entries()) {
+        commitStateSyncTarget(root, journal, entry, { interruptAfterStageRename });
+        if (interruptAfterRename?.({ index, target: entry.path })) throw new IntentionalInterruption(`interrupted after ${entry.path}`);
+      }
+      journal.state = "complete"; durableJournalAt(stateSyncTransactionPaths(root).transaction, journal); rmSync(stateSyncTransactionPaths(root).transaction, { recursive: true, force: true }); fsyncDirectory(root);
+      if (!sameImage(image(root, LEGACY_STATE), state.after) || !sameImage(image(root, NEUTRAL_STATE), state.after)) throw new Error("state sync final readback failed");
+      STATE_SYNC_PLANS.delete(plan); return stateSyncResult("applied", { phase: state.legacy.value.activeFeature.phase, targets: [LEGACY_STATE, NEUTRAL_STATE] });
+    } catch (error) {
+      if (error instanceof IntentionalInterruption) return stateSyncResult("interrupted", { reason: error.message });
+      try { restoreStateSync(root, journal); } catch (recoveryError) { return stateSyncResult("recovery-required", { reason: recoveryError.message }); }
+      return stateSyncResult("rolled-back", { reason: error.message });
+    }
   } catch (error) { return stateSyncResult("rejected", { reason: error.message }); }
+}
+/** Preview recovery after an interrupted dual-state synchronization; it never writes. */
+export function planPendingProjectAuthorityStateSynchronizationRecovery({ rootDir = process.cwd() } = {}) {
+  let root;
+  try {
+    root = realRoot(rootDir); const { transaction, journal: journalPath } = stateSyncTransactionPaths(root);
+    if (!existsSync(transaction)) return stateSyncRecoveryResult("none", { targets: [] });
+    if (!existsSync(journalPath)) return stateSyncRecoveryResult("recovery-required", { reason: "state sync transaction has no journal" });
+    const raw = readFileSync(journalPath); const journal = JSON.parse(raw); validateStateSyncJournal(root, journal);
+    const plan = stateSyncRecoveryResult("ready", { transaction: { journalSha256: sha(raw), journalState: journal.state }, targets: journal.targets.map(({ path, before, after, state }) => ({ path, before, after, journalState: state, action: "restore-recorded-preimage" })) });
+    STATE_SYNC_RECOVERY_PLANS.set(plan, { root, signature: planSignature(plan), journalSha256: sha(raw) }); return plan;
+  } catch (error) { return stateSyncRecoveryResult("recovery-required", { reason: error.message }); }
+}
+/** Restore only an unchanged journaled preimage after an interrupted dual-state synchronization. */
+export function applyPendingProjectAuthorityStateSynchronizationRecovery(plan, { rootDir = process.cwd(), activate = false } = {}) {
+  const state = STATE_SYNC_RECOVERY_PLANS.get(plan); if (!state || planSignature(plan) !== state.signature) return stateSyncRecoveryResult("rejected", { reason: "unauthenticated or changed recovery plan" });
+  if (!activate) return stateSyncRecoveryResult("activation-required", { reason: "explicit activation required" });
+  try {
+    const root = realRoot(rootDir); if (root !== state.root) throw new Error("recovery root differs from the authenticated plan root");
+    const { journal: journalPath } = stateSyncTransactionPaths(root); const raw = readFileSync(journalPath);
+    if (sha(raw) !== state.journalSha256) throw new Error("state sync journal changed since planning");
+    restoreStateSync(root, JSON.parse(raw)); STATE_SYNC_RECOVERY_PLANS.delete(plan);
+    return stateSyncRecoveryResult("recovered", { targets: [LEGACY_STATE, NEUTRAL_STATE] });
+  } catch (error) { return stateSyncRecoveryResult("rejected", { reason: error.message }); }
 }
 function stateResultPathCorrection(root) {
   const before = image(root, NEUTRAL_STATE);
