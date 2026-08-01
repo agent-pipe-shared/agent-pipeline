@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 import { createHash, randomBytes } from "node:crypto";
 import { lstatSync, readFileSync, realpathSync, writeFileSync, renameSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
