@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { readFileSync } from "node:fs";

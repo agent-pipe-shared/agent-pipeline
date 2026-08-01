@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import {
   BOOTSTRAP_PAYLOAD_MAX_BYTES,
