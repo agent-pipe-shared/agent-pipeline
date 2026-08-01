@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
 // CYB-3D -- topology-only SBOM discovery, derived public export and migration preview.
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { validateFeatureTopology } from "./feature-package-topology.mjs";
@@ -9,15 +10,26 @@ import { validateSbomManifest } from "./sbom-manifest.mjs";
 export function discoverSbom(rootDir, { featureId = null } = {}) {
   const root = resolve(rootDir); const checked = validateFeatureTopology(root);
   if (!checked.ok) return { ok: false, code: "SBOM-TOPOLOGY-INVALID", findings: checked.findings };
-  const matches = checked.receipts.filter((receipt) => featureId === null || receipt?.featureId === featureId).flatMap((receipt) => {
+  const artifacts = checked.receipts.filter((receipt) => featureId === null || receipt?.featureId === featureId).flatMap((receipt) => {
     try {
-      const manifest = JSON.parse(readFileSync(join(root, receipt.manifest), "utf8"));
-      return manifest.artifacts.filter((artifact) => artifact.class === "supply-chain").map((artifact) => ({ featureId: receipt.featureId, candidate: receipt.candidate, path: artifact.path, sha256: artifact.sha256 }));
+      const lifecycle = JSON.parse(readFileSync(join(root, receipt.manifest), "utf8"));
+      return lifecycle.artifacts.filter((artifact) => artifact.class === "supply-chain").map((artifact) => ({ receipt, artifact }));
     } catch { return []; }
   });
-  if (matches.length === 0) return { ok: false, code: "SBOM-NOT-REGISTERED" };
-  if (matches.length !== 1) return { ok: false, code: "SBOM-AMBIGUOUS-REGISTRATION" };
-  return { ok: true, artifact: matches[0] };
+  if (artifacts.length === 0) return { ok: false, code: "SBOM-NOT-REGISTERED" };
+  const resolved = [];
+  for (const { receipt, artifact } of artifacts) {
+    let manifest;
+    try { manifest = JSON.parse(readFileSync(join(root, artifact.path), "utf8")); }
+    catch { return { ok: false, code: "SBOM-ARTIFACT-NOT-SBOM", path: artifact.path }; }
+    if (!validateSbomManifest(manifest).valid) return { ok: false, code: "SBOM-ARTIFACT-NOT-SBOM", path: artifact.path };
+    if (receipt.candidate === null || manifest.candidate.commit !== receipt.candidate.commit || manifest.candidate.tree !== receipt.candidate.tree) return { ok: false, code: "SBOM-ARTIFACT-UNBOUND", path: artifact.path };
+    const bytes = readFileSync(join(root, artifact.path));
+    if (createHash("sha256").update(bytes).digest("hex") !== artifact.sha256) return { ok: false, code: "SBOM-ARTIFACT-UNBOUND", path: artifact.path };
+    resolved.push({ featureId: receipt.featureId, candidate: receipt.candidate, path: artifact.path, sha256: artifact.sha256 });
+  }
+  if (resolved.length !== 1) return { ok: false, code: "SBOM-AMBIGUOUS-REGISTRATION" };
+  return { ok: true, artifact: resolved[0] };
 }
 
 /** A derived view that removes private component names/coordinates; never mutates the canonical record. */

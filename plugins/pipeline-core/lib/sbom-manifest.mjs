@@ -20,6 +20,8 @@ export const SBOM_LIFECYCLE_CODES = Object.freeze({
 
 const HEX = /^[a-f0-9]{64}$/;
 const GIT_OBJECT = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
+const SPDX_ID = /^SPDXRef-[A-Za-z0-9.-]+$/;
+const CYCLONEDX_COMPONENT_TYPES = new Set(["application", "container", "device", "device-driver", "file", "firmware", "framework", "library", "machine-learning-model", "operating-system", "platform"]);
 const ROOT = ["schema", "candidate", "sourceInputs", "adapter", "formats", "components", "completeness", "freshness", "privacy", "payload", "lifecycle"];
 const CANDIDATE = ["repositoryFingerprint", "commit", "tree"];
 const ADAPTER = ["id", "version", "configSha256"];
@@ -78,7 +80,7 @@ export function validateSbomPayload(format, payload) {
   if (format === "cyclonedx-json") {
     const refs = Array.isArray(payload.components) ? payload.components.map((component) => component?.["bom-ref"]) : [];
     const valid = payload.bomFormat === "CycloneDX" && payload.specVersion === "1.6" && Number.isInteger(payload.version) && payload.version >= 1
-      && objectsWith(payload.components, ["type", "bom-ref", "name", "version"])
+      && objectsWith(payload.components, ["type", "bom-ref", "name", "version"]) && payload.components.every((component) => CYCLONEDX_COMPONENT_TYPES.has(component.type))
       && unique(refs) && payload.components.every((component) => Array.isArray(component.properties) && component.properties.every((property) => own(property, ["name", "value"]) && string(property.name) && string(property.value)) && component.properties.filter((property) => property.name === "pipeline.scope").length === 1)
       && Array.isArray(payload.dependencies) && payload.dependencies.length === payload.components.length
       && payload.dependencies.every((dependency) => own(dependency, ["ref", "dependsOn"]) && string(dependency.ref) && refs.includes(dependency.ref) && Array.isArray(dependency.dependsOn) && dependency.dependsOn.every((reference) => string(reference) && reference !== dependency.ref && refs.includes(reference)) && unique(dependency.dependsOn))
@@ -87,9 +89,9 @@ export function validateSbomPayload(format, payload) {
   }
   const packageIds = Array.isArray(payload.packages) ? payload.packages.map((pkg) => pkg?.SPDXID) : [];
   const packagePurls = Array.isArray(payload.packages) ? payload.packages.map((pkg) => pkg?.externalRefs?.filter((reference) => reference?.referenceType === "purl").map((reference) => reference.referenceLocator) ?? []) : [];
-  const valid = payload.spdxVersion === "SPDX-2.3" && payload.dataLicense === "CC0-1.0" && string(payload.SPDXID) && string(payload.name) && string(payload.documentNamespace)
+  const valid = payload.spdxVersion === "SPDX-2.3" && payload.dataLicense === "CC0-1.0" && payload.SPDXID === "SPDXRef-DOCUMENT" && string(payload.name) && string(payload.documentNamespace)
     && payload.creationInfo !== null && typeof payload.creationInfo === "object" && !Array.isArray(payload.creationInfo) && string(payload.creationInfo.created) && stringArray(payload.creationInfo.creators)
-    && objectsWith(payload.packages, ["SPDXID", "name", "versionInfo"]) && unique(packageIds) && payload.packages.every((pkg, index) => packagePurls[index].length === 1 && string(packagePurls[index][0]) && Array.isArray(pkg.annotations) && pkg.annotations.every((annotation) => own(annotation, ["comment"]) && string(annotation.comment)) && pkg.annotations.filter((annotation) => annotation.comment.startsWith("scope:") && string(annotation.comment.slice("scope:".length))).length === 1)
+    && objectsWith(payload.packages, ["SPDXID", "name", "versionInfo", "downloadLocation"]) && packageIds.every((id) => SPDX_ID.test(id)) && unique(packageIds) && payload.packages.every((pkg, index) => string(pkg.downloadLocation) && packagePurls[index].length === 1 && string(packagePurls[index][0]) && pkg.externalRefs.every((reference) => own(reference, ["referenceCategory", "referenceType", "referenceLocator"]) && reference.referenceCategory === "PACKAGE-MANAGER" && reference.referenceType === "purl" && string(reference.referenceLocator)) && Array.isArray(pkg.annotations) && pkg.annotations.every((annotation) => own(annotation, ["annotationType", "annotator", "annotationDate", "comment"]) && annotation.annotationType === "OTHER" && string(annotation.annotator) && string(annotation.annotationDate) && string(annotation.comment)) && pkg.annotations.filter((annotation) => annotation.comment.startsWith("scope:") && string(annotation.comment.slice("scope:".length))).length === 1)
     && unique(packagePurls.map(([purl]) => purl))
     && Array.isArray(payload.relationships) && payload.relationships.every((relationship) => own(relationship, ["spdxElementId", "relationshipType", "relatedSpdxElement"]) && packageIds.includes(relationship.spdxElementId) && relationship.relationshipType === "DEPENDS_ON" && relationship.spdxElementId !== relationship.relatedSpdxElement && packageIds.includes(relationship.relatedSpdxElement))
     && unique(payload.relationships.map((relationship) => `${relationship.spdxElementId}\u0000${relationship.relatedSpdxElement}`));

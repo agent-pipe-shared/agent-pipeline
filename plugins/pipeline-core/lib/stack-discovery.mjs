@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
@@ -15,10 +16,23 @@ export function validateStackDiscovery(value) {
   return { valid: true };
 }
 
+/** Observe the repository's current Git candidate locally; no network or setup command is used. */
+export function observeStackCandidate(rootDir) {
+  try {
+    const root = resolve(rootDir);
+    const commit = execFileSync("git", ["-C", root, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+    const tree = execFileSync("git", ["-C", root, "rev-parse", "HEAD^{tree}"], { encoding: "utf8" }).trim();
+    return own({ commit, tree }, ["commit", "tree"]) && oid(commit) && oid(tree) && commit !== tree ? { ok: true, candidate: { commit, tree } } : { ok: false, code: "STACK-DISCOVERY-CANDIDATE-UNAVAILABLE" };
+  } catch { return { ok: false, code: "STACK-DISCOVERY-CANDIDATE-UNAVAILABLE" }; }
+}
+
 /** Strictly reads a fixed metadata allowlist; it never invokes package managers or scripts. */
 export function discoverStackMetadata({ root, candidate } = {}) {
   if (typeof root !== "string" || !own(candidate, ["commit", "tree"]) || !oid(candidate.commit) || !oid(candidate.tree) || candidate.commit === candidate.tree) return { ok: false, code: "STACK-DISCOVERY-INVALID" };
-  const base = resolve(root); const observations = [];
+  const base = resolve(root); const observed = observeStackCandidate(base);
+  if (!observed.ok) return observed;
+  if (candidate.commit !== observed.candidate.commit || candidate.tree !== observed.candidate.tree) return { ok: false, code: "STACK-DISCOVERY-CANDIDATE-MISMATCH" };
+  const observations = [];
   for (const relative of FILES) {
     const path = join(base, relative);
     if (!existsSync(path)) continue;

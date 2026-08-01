@@ -33,6 +33,7 @@ assert.equal(evaluateProvenanceAdmission({ boundary: "promote", envelope, expect
 assert.deepEqual(evaluatePinningPolicy([{ kind: "action", value: "owner/action@" + "a".repeat(40) }, { kind: "image", value: "registry/image@sha256:" + hash("b") }]), { ok: true });
 assert.equal(evaluatePinningPolicy([{ kind: "action", value: "owner/action@main" }]).code, "PROVENANCE-UNPINNED");
 assert.equal(evaluateProvenanceAppend({ existing: [envelope], next: envelope }).code, "PROVENANCE-HISTORICAL-IMMUTABLE");
+assert.equal(evaluateProvenanceAppend({ existing: [envelope], next: { ...envelope, subject: { ...envelope.subject, sha256: hash("7") } } }).code, "PROVENANCE-SUBJECT-REUSE");
 assert.deepEqual(evaluateProvenanceAppend({ existing: [envelope], next: { ...envelope, subject: { id: "next.tar", sha256: hash("8") } } }), { allowed: true, code: "PROVENANCE-APPEND-ALLOWED" });
 assert.equal(evaluateProvenanceAppend({ existing: [{ schema: "invalid" }], next: envelope }).code, "PROVENANCE-APPEND-INVALID");
 console.log("provenance envelope checks passed");

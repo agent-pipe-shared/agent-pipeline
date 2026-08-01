@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 
 import { createDynamicTargetAuthorization, evaluateDynamicTargetAuthorization } from "./stack-dynamic-boundary.mjs";
 
@@ -35,6 +36,10 @@ check("receipt tampering cannot authorize a dynamic run", () => {
   assert.deepEqual(evaluateDynamicTargetAuthorization({ candidate, target, scope, receipt: { ...created.receipt, execution: { ...execution, network: "bounded" } } }), {
     allowed: false, code: "DYNAMIC-AUTHORIZATION-TAMPERED",
   });
+});
+check("a syntactically valid receipt cannot widen the timeout on revalidation", () => {
+  const receipt = { ...created.receipt, execution: { ...execution, timeoutMs: 60001 } }; const { digest, ...unsigned } = receipt; receipt.digest = createHash("sha256").update(JSON.stringify(unsigned)).digest("hex");
+  assert.deepEqual(evaluateDynamicTargetAuthorization({ candidate, target, scope, receipt }), { allowed: false, code: "DYNAMIC-EXECUTION-BOUNDARY" });
 });
 
 console.log(`${pass} stack dynamic boundary checks passed`);

@@ -1,0 +1,36 @@
+{
+  "schema": "pipeline.threat-model.v1",
+  "candidate": {
+    "commit": "e7cca89b0e166eac3711d4173a67f261c7229938",
+    "tree": "7afe1851e8baefadd97aa126c0a548e8b3b4cdfa"
+  },
+  "policyRevision": "cyb-4-policy-v1",
+  "classification": "public",
+  "entities": [
+    {
+      "id": "asset-4231d11762d74b6e",
+      "kind": "asset",
+      "label": "agent-pipeline-source",
+      "relationships": ["boundary-6e2cfaaebeec082e"]
+    },
+    {
+      "id": "boundary-6e2cfaaebeec082e",
+      "kind": "boundary",
+      "label": "operator-to-pipeline",
+      "relationships": ["threat-14282d4c29ace733"]
+    },
+    {
+      "id": "threat-14282d4c29ace733",
+      "kind": "threat",
+      "label": "untrusted-model-output",
+      "relationships": ["mitigation-145df3551a6c0e9d"]
+    },
+    {
+      "id": "mitigation-145df3551a6c0e9d",
+      "kind": "mitigation",
+      "label": "receipt-bound-gate",
+      "relationships": []
+    }
+  ],
+  "lifecycle": "approved"
+}

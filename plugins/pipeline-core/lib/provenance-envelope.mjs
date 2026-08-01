@@ -69,6 +69,7 @@ export function evaluatePinningPolicy(references) {
 /** Historical bindings append only; a correction must create a new envelope. */
 export function evaluateProvenanceAppend(input) {
   if (!own(input, ["existing", "next"]) || !Array.isArray(input.existing) || !input.existing.every((entry) => validateProvenanceEnvelope(entry).valid) || !validateProvenanceEnvelope(input.next).valid) return { allowed: false, code: "PROVENANCE-APPEND-INVALID" };
-  const duplicate = input.existing.some((entry) => entry.subject.id === input.next.subject.id && entry.subject.sha256 === input.next.subject.sha256);
-  return duplicate ? { allowed: false, code: "PROVENANCE-HISTORICAL-IMMUTABLE" } : { allowed: true, code: "PROVENANCE-APPEND-ALLOWED" };
+  const existingSubject = input.existing.find((entry) => entry.subject.id === input.next.subject.id);
+  if (!existingSubject) return { allowed: true, code: "PROVENANCE-APPEND-ALLOWED" };
+  return existingSubject.subject.sha256 === input.next.subject.sha256 ? { allowed: false, code: "PROVENANCE-HISTORICAL-IMMUTABLE" } : { allowed: false, code: "PROVENANCE-SUBJECT-REUSE" };
 }

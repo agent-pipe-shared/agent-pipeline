@@ -51,6 +51,17 @@ function adapter(kind) {
   });
 }
 
+function executionRecord(adapterValue, plan, environment) {
+  const unsigned = { schema: "pipeline.stack-adapter-execution.v1", adapterId: adapterValue.id, candidate: structuredClone(plan.candidate), planDigest: plan.digest, environment: structuredClone(environment), status: "PASS", findings: [], coverage: defaultCoverage(adapterValue.id), reason: "synthetic-conformance" };
+  return { ...unsigned, digest: digest(JSON.stringify(unsigned)) };
+}
+
+function validExecution(value, adapterValue, plan, environment) {
+  if (!own(value, ["schema", "adapterId", "candidate", "planDigest", "environment", "status", "findings", "coverage", "reason", "digest"]) || value.schema !== "pipeline.stack-adapter-execution.v1" || value.adapterId !== adapterValue.id || JSON.stringify(value.candidate) !== JSON.stringify(plan.candidate) || value.planDigest !== plan.digest || JSON.stringify(value.environment) !== JSON.stringify(environment) || value.status !== "PASS" || !Array.isArray(value.findings) || typeof value.reason !== "string" || !/^[a-f0-9]{64}$/u.test(value.digest)) return false;
+  const { digest: executionDigest, ...unsigned } = value;
+  return executionDigest === digest(JSON.stringify(unsigned));
+}
+
 /** Seven representative adapters, one per CYB-6 major technique cluster. */
 export const REPRESENTATIVE_STACK_ADAPTERS = Object.freeze(STACK_ADAPTER_KINDS.map(adapter));
 
@@ -74,15 +85,27 @@ export function validateStackAdapter(value) {
  * envelope.  The caller supplies already-observed synthetic output; no tool
  * command, network endpoint, credential, or repository path is accepted.
  */
+export function executeStackAdapterConformance(input) {
+  if (!own(input, ["adapter", "plan", "environment", "authorization"]) || !validateStackCapabilityPlan(input.plan).valid || !own(input.environment, ["platform", "nodeVersion"]) || !STACK_ADAPTER_PLATFORMS.includes(input.environment.platform) || !(typeof input.environment.nodeVersion === "string" || input.environment.nodeVersion === null)) return { ok: false, code: "STACK-ADAPTER-EXECUTION-INVALID" };
+  const adapterResult = validateStackAdapter(input.adapter);
+  if (!adapterResult.ok) return adapterResult;
+  const selection = input.plan.entries.find((entry) => entry.capability === input.adapter.capability);
+  if (!selection || !["selected", "optional-selected"].includes(selection.status)) return { ok: false, code: "STACK-ADAPTER-CAPABILITY-UNSELECTED" };
+  if (!input.adapter.supportedPlatforms.includes(input.environment.platform)) return { ok: false, code: "STACK-ADAPTER-PLATFORM-UNSUPPORTED" };
+  if (input.adapter.dynamic) {
+    if (!own(input.authorization, ["candidate", "target", "scope", "receipt"])) return { ok: false, code: "STACK-ADAPTER-VERIFICATION-REQUIRED" };
+    const authorization = evaluateDynamicTargetAuthorization(input.authorization);
+    if (!authorization.allowed || JSON.stringify(input.authorization.candidate) !== JSON.stringify(input.plan.candidate)) return { ok: false, code: "STACK-ADAPTER-VERIFICATION-REQUIRED" };
+  } else if (input.authorization !== null) return { ok: false, code: "STACK-ADAPTER-AUTHORIZATION-INVALID" };
+  return { ok: true, execution: executionRecord(input.adapter, input.plan, input.environment) };
+}
+
 export function createStackAdapterEvidence(input) {
-  if (!own(input, ["adapter", "plan", "environment", "result", "authorization"])
+  if (!own(input, ["adapter", "plan", "environment", "execution", "authorization"])
     || !validateStackCapabilityPlan(input.plan).valid
     || !own(input.environment, ["platform", "nodeVersion"])
     || !STACK_ADAPTER_PLATFORMS.includes(input.environment.platform)
-    || !(typeof input.environment.nodeVersion === "string" || input.environment.nodeVersion === null)
-    || !own(input.result, ["status", "findings", "coverage", "reason"])
-    || !STATUS.has(input.result.status) || !Array.isArray(input.result.findings)
-    || !(typeof input.result.reason === "string" || input.result.reason === null)) return { ok: false, code: "STACK-ADAPTER-INPUT-INVALID" };
+    || !(typeof input.environment.nodeVersion === "string" || input.environment.nodeVersion === null)) return { ok: false, code: "STACK-ADAPTER-INPUT-INVALID" };
   const adapterResult = validateStackAdapter(input.adapter);
   if (!adapterResult.ok) return adapterResult;
   const selection = input.plan.entries.find((entry) => entry.capability === input.adapter.capability);
@@ -95,6 +118,7 @@ export function createStackAdapterEvidence(input) {
   if (!input.adapter.supportedPlatforms.includes(input.environment.platform)) {
     return { ok: false, code: "STACK-ADAPTER-PLATFORM-UNSUPPORTED" };
   }
+  if (!validExecution(input.execution, input.adapter, input.plan, input.environment)) return { ok: false, code: "STACK-ADAPTER-EXECUTION-INVALID" };
   const evidence = {
     schema: "pipeline.security-evidence.v2",
     policy: { configurationSha256: digest(input.plan.policyRevision) },
@@ -108,11 +132,11 @@ export function createStackAdapterEvidence(input) {
       capabilityId: input.adapter.capability,
       tool: structuredClone(input.adapter.tool),
       rulePack: structuredClone(input.adapter.rulePack),
-      status: input.result.status,
+      status: input.execution.status,
       classification: "synthetic-conformance",
-      findings: structuredClone(input.result.findings),
-      coverage: structuredClone(input.result.coverage),
-      reason: input.result.reason,
+      findings: structuredClone(input.execution.findings),
+      coverage: structuredClone(input.execution.coverage),
+      reason: input.execution.reason,
     }],
   };
   const validation = validateSecurityEvidenceV2(evidence);
@@ -124,12 +148,9 @@ export function runRepresentativeAdapterConformance({ plan, platform = "linux", 
   if (!validateStackCapabilityPlan(plan).valid) return { ok: false, code: "STACK-ADAPTER-PLAN-INVALID" };
   const assessment = evaluateStackCapabilityPlan(plan);
   if (assessment.code === "STACK-REQUIRED-UNAVAILABLE") return { ok: false, code: "STACK-ADAPTER-REQUIRED-UNAVAILABLE", unavailable: assessment.unavailable };
-  const results = REPRESENTATIVE_STACK_ADAPTERS.filter((item) => plan.entries.some((entry) => entry.capability === item.capability && ["selected", "optional-selected"].includes(entry.status))).map((item) => createStackAdapterEvidence({
-    adapter: item,
-    plan,
-    environment: { platform, nodeVersion: null },
-    result: { status: "PASS", findings: [], coverage: defaultCoverage(item.id), reason: "synthetic-conformance" },
-    authorization: item.dynamic ? authorizations[item.capability] : null,
-  }));
+  const results = REPRESENTATIVE_STACK_ADAPTERS.filter((item) => plan.entries.some((entry) => entry.capability === item.capability && ["selected", "optional-selected"].includes(entry.status))).map((item) => {
+    const execution = executeStackAdapterConformance({ adapter: item, plan, environment: { platform, nodeVersion: null }, authorization: item.dynamic ? authorizations[item.capability] : null });
+    return execution.ok ? createStackAdapterEvidence({ adapter: item, plan, environment: { platform, nodeVersion: null }, execution: execution.execution, authorization: item.dynamic ? authorizations[item.capability] : null }) : execution;
+  });
   return results.length > 0 && results.every((result) => result.ok) ? { ok: true, candidate: structuredClone(plan.candidate), planDigest: plan.digest, results } : { ok: false, code: "STACK-ADAPTER-CONFORMANCE-FAILED", results };
 }

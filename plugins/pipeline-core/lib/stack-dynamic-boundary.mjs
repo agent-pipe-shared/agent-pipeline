@@ -64,6 +64,6 @@ export function evaluateDynamicTargetAuthorization(input) {
   if (canonical(input.candidate) !== canonical(input.receipt.candidate)) return { allowed: false, code: "DYNAMIC-CANDIDATE-MISMATCH" };
   if (sha(canonical(input.target)) !== input.receipt.targetSha256) return { allowed: false, code: "DYNAMIC-TARGET-MISMATCH" };
   if (sha(canonical(input.scope)) !== input.receipt.scopeSha256) return { allowed: false, code: "DYNAMIC-SCOPE-MISMATCH" };
-  if (input.receipt.execution.network !== "offline" || input.receipt.execution.credential !== "none") return { allowed: false, code: "DYNAMIC-EXECUTION-BOUNDARY" };
+  if (input.receipt.execution.network !== "offline" || input.receipt.execution.credential !== "none" || !Number.isInteger(input.receipt.execution.timeoutMs) || input.receipt.execution.timeoutMs < 1 || input.receipt.execution.timeoutMs > 60000) return { allowed: false, code: "DYNAMIC-EXECUTION-BOUNDARY" };
   return { allowed: true, code: "DYNAMIC-AUTHORIZED" };
 }

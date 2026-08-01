@@ -13,19 +13,33 @@ export const THREAT_ENTITY_KINDS = Object.freeze(["asset", "boundary", "threat",
 const RISK_INPUTS = Object.freeze(["assurance", "exposure", "data", "privilege", "dependencies", "architecture", "deployment", "agentEgress"]);
 const own = (value, fields) => value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === fields.length && fields.every((field) => Object.hasOwn(value, field));
 const text = (value) => typeof value === "string" && value.trim() !== "";
+const OID = /^[a-f0-9]{40,64}$/u;
+const CLOSED_ID = /^[a-z][a-z0-9-]{0,63}$/u;
 const stableId = (kind, value) => `${kind}-${createHash("sha256").update(`${kind}\n${value}`).digest("hex").slice(0, 16)}`;
 const SAFE_ENTITY_LABEL = /^[a-z][a-z0-9-]{0,63}$/u;
-const safeEntity = (entity) => own(entity, ["id", "kind", "label", "relationships"]) && text(entity.id) && THREAT_ENTITY_KINDS.includes(entity.kind) && SAFE_ENTITY_LABEL.test(entity.label) && Array.isArray(entity.relationships) && entity.relationships.every(text);
+const ENTITY_ID = new RegExp(`^(${THREAT_ENTITY_KINDS.join("|")})-[a-f0-9]{16}$`, "u");
+const candidate = (value) => own(value, ["commit", "tree"]) && OID.test(value.commit) && OID.test(value.tree) && value.commit !== value.tree;
+const entityId = (value, kind = null) => ENTITY_ID.test(value ?? "") && (kind === null || value.startsWith(`${kind}-`));
+const safeEntity = (entity) => own(entity, ["id", "kind", "label", "relationships"]) && entityId(entity.id, entity.kind) && THREAT_ENTITY_KINDS.includes(entity.kind) && SAFE_ENTITY_LABEL.test(entity.label) && Array.isArray(entity.relationships) && entity.relationships.every((relationship) => entityId(relationship)) && new Set(entity.relationships).size === entity.relationships.length && !entity.relationships.includes(entity.id);
+const canonicalJson = (value) => Array.isArray(value) ? `[${value.map(canonicalJson).join(",")}]` : value !== null && typeof value === "object" ? `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}` : JSON.stringify(value);
 
 /** Closed machine authority: candidate and effective policy are inseparable. */
 export function validateThreatModel(model) {
-  if (!own(model, ["schema", "candidate", "policyRevision", "classification", "entities", "lifecycle"]) || model.schema !== THREAT_MODEL_SCHEMA || !own(model.candidate, ["commit", "tree"]) || !text(model.candidate.commit) || !text(model.candidate.tree) || !text(model.policyRevision) || !["public", "private"].includes(model.classification) || !Array.isArray(model.entities) || !model.entities.every(safeEntity) || !["draft", "proposed", "approved", "implementing", "verified", "accepted-risk", "superseded", "retired"].includes(model.lifecycle)) return { valid: false, code: "THREAT-MODEL-INVALID" };
+  if (!own(model, ["schema", "candidate", "policyRevision", "classification", "entities", "lifecycle"]) || model.schema !== THREAT_MODEL_SCHEMA || !candidate(model.candidate) || !CLOSED_ID.test(model.policyRevision) || !["public", "private"].includes(model.classification) || !Array.isArray(model.entities) || !model.entities.every(safeEntity) || new Set(model.entities.map((entity) => entity.id)).size !== model.entities.length || !["draft", "proposed", "approved", "implementing", "verified", "accepted-risk", "superseded", "retired"].includes(model.lifecycle)) return { valid: false, code: "THREAT-MODEL-INVALID" };
+  const ids = new Set(model.entities.map((entity) => entity.id));
+  if (!model.entities.every((entity) => entity.relationships.every((relationship) => ids.has(relationship)))) return { valid: false, code: "THREAT-MODEL-RELATIONSHIP-INVALID" };
   return { valid: true };
+}
+
+/** Deterministic model identity lets an external approval receipt bind exact contents. */
+export function threatModelDigest(model) {
+  if (!validateThreatModel(model).valid) return { ok: false, code: "THREAT-MODEL-DIGEST-INVALID" };
+  return { ok: true, digest: createHash("sha256").update(canonicalJson(model)).digest("hex") };
 }
 
 /** Requirement proposals may link obligations, but cannot grant risk authority. */
 export function validateSecurityRequirement(requirement) {
-  if (!own(requirement, ["schema", "id", "candidate", "policyRevision", "links", "state"]) || requirement.schema !== SECURITY_REQUIREMENT_SCHEMA || !text(requirement.id) || !own(requirement.candidate, ["commit", "tree"]) || !text(requirement.candidate.commit) || !text(requirement.candidate.tree) || !text(requirement.policyRevision) || !Array.isArray(requirement.links) || !requirement.links.every((link) => own(link, ["kind", "id"]) && ["threat", "baseline", "test", "evidence"].includes(link.kind) && text(link.id)) || !["draft", "proposed", "implementing", "verified", "superseded", "retired"].includes(requirement.state)) return { valid: false, code: "SECURITY-REQUIREMENT-INVALID" };
+  if (!own(requirement, ["schema", "id", "candidate", "policyRevision", "links", "state"]) || requirement.schema !== SECURITY_REQUIREMENT_SCHEMA || !CLOSED_ID.test(requirement.id) || !candidate(requirement.candidate) || !CLOSED_ID.test(requirement.policyRevision) || !Array.isArray(requirement.links) || !requirement.links.every((link) => own(link, ["kind", "id"]) && ["threat", "baseline", "test", "evidence"].includes(link.kind) && CLOSED_ID.test(link.id)) || new Set(requirement.links.map((link) => `${link.kind}\0${link.id}`)).size !== requirement.links.length || !["draft", "proposed", "implementing", "verified", "superseded", "retired"].includes(requirement.state)) return { valid: false, code: "SECURITY-REQUIREMENT-INVALID" };
   return { valid: true };
 }
 
@@ -35,7 +49,7 @@ export function validateSecurityRequirement(requirement) {
  * caller must obtain the receipt from its configured authority.
  */
 export function validateThreatApprovalReceipt(receipt) {
-  if (!own(receipt, ["schema", "receiptId", "authority", "decision", "candidate", "policyRevision"]) || receipt.schema !== THREAT_APPROVAL_RECEIPT_SCHEMA || !text(receipt.receiptId) || !["human", "policy"].includes(receipt.authority) || !["approved", "accepted-risk", "not-applicable"].includes(receipt.decision) || !own(receipt.candidate, ["commit", "tree"]) || !text(receipt.candidate.commit) || !text(receipt.candidate.tree) || !text(receipt.policyRevision)) return { valid: false, code: "THREAT-APPROVAL-RECEIPT-INVALID" };
+  if (!own(receipt, ["schema", "receiptId", "authority", "decision", "candidate", "policyRevision", "modelDigest"]) || receipt.schema !== THREAT_APPROVAL_RECEIPT_SCHEMA || !CLOSED_ID.test(receipt.receiptId) || !["human", "policy"].includes(receipt.authority) || !["approved", "accepted-risk", "not-applicable"].includes(receipt.decision) || !candidate(receipt.candidate) || !CLOSED_ID.test(receipt.policyRevision) || !/^[a-f0-9]{64}$/u.test(receipt.modelDigest)) return { valid: false, code: "THREAT-APPROVAL-RECEIPT-INVALID" };
   return { valid: true };
 }
 
@@ -63,21 +77,26 @@ export function evaluateThreatTraceability(input) {
 
 /** Material deltas target only linked subjects; no blanket approval or mutation occurs. */
 export function evaluateThreatImpact(input) {
-  if (!own(input, ["changedSubjects", "links"]) || !Array.isArray(input.changedSubjects) || !input.changedSubjects.every(text) || !Array.isArray(input.links) || !input.links.every((link) => own(link, ["subject", "requirement"]) && text(link.subject) && text(link.requirement))) return { state: "invalid", code: "THREAT-IMPACT-INVALID" };
+  if (!own(input, ["model", "changedSubjects", "links"]) || !validateThreatModel(input.model).valid || !Array.isArray(input.changedSubjects) || !input.changedSubjects.every((subject) => CLOSED_ID.test(subject)) || new Set(input.changedSubjects).size !== input.changedSubjects.length || !Array.isArray(input.links) || !input.links.every((link) => own(link, ["subject", "requirement"]) && CLOSED_ID.test(link.subject) && CLOSED_ID.test(link.requirement)) || new Set(input.links.map((link) => `${link.subject}\0${link.requirement}`)).size !== input.links.length) return { state: "invalid", code: "THREAT-IMPACT-INVALID" };
   const affected = [...new Set(input.links.filter((link) => input.changedSubjects.includes(link.subject)).map((link) => link.requirement))].sort();
-  return { state: affected.length === 0 ? "current" : "stale", code: affected.length === 0 ? "THREAT-IMPACT-NONE" : "THREAT-IMPACT-REVIEW", affected };
+  const known = new Set(input.model.entities.map((entity) => entity.id));
+  const newBoundaries = input.changedSubjects.filter((subject) => subject.startsWith("boundary-") && !known.has(subject)).sort();
+  if (newBoundaries.length > 0) return { state: "stale", code: "THREAT-IMPACT-NEW-BOUNDARY", affected, newBoundaries };
+  return { state: affected.length === 0 ? "current" : "stale", code: affected.length === 0 ? "THREAT-IMPACT-NONE" : "THREAT-IMPACT-REVIEW", affected, newBoundaries: [] };
 }
 
 /** Named delivery boundaries accept only a fresh model bound to an external approval receipt. */
 export function evaluateThreatBoundary(input) {
-  if (!own(input, ["boundary", "applicability", "model", "approvalReceipt", "fresh"]) || !text(input.boundary) || !THREAT_MODEL_APPLICABILITY.includes(input.applicability) || typeof input.fresh !== "boolean") return { allowed: false, code: "THREAT-BOUNDARY-INVALID" };
+  if (!own(input, ["boundary", "applicability", "model", "approvalReceipt", "fresh", "impact"]) || !CLOSED_ID.test(input.boundary) || !THREAT_MODEL_APPLICABILITY.includes(input.applicability) || typeof input.fresh !== "boolean" || !own(input.impact, ["state", "code", "affected", "newBoundaries"]) || !["current", "stale"].includes(input.impact.state) || !Array.isArray(input.impact.affected) || !input.impact.affected.every((id) => CLOSED_ID.test(id)) || !Array.isArray(input.impact.newBoundaries) || !input.impact.newBoundaries.every((id) => entityId(id, "boundary"))) return { allowed: false, code: "THREAT-BOUNDARY-INVALID" };
   if (!validateThreatModel(input.model).valid) return { allowed: false, code: "THREAT-BOUNDARY-MODEL-INVALID" };
   if (!validateThreatApprovalReceipt(input.approvalReceipt).valid) return { allowed: false, code: "THREAT-BOUNDARY-RECEIPT-INVALID" };
   const receipt = input.approvalReceipt; const model = input.model;
   if (receipt.candidate.commit !== model.candidate.commit || receipt.candidate.tree !== model.candidate.tree || receipt.policyRevision !== model.policyRevision) return { allowed: false, code: "THREAT-BOUNDARY-RECEIPT-MISMATCH" };
+  if (input.impact.state !== "current") return { allowed: false, code: "THREAT-BOUNDARY-IMPACT-STALE", affected: input.impact.affected, newBoundaries: input.impact.newBoundaries };
   if (input.applicability === "not-applicable") return receipt.decision === "not-applicable" ? { allowed: true, code: "THREAT-BOUNDARY-NOT-APPLICABLE" } : { allowed: false, code: "THREAT-BOUNDARY-UNAPPROVED" };
   if (input.applicability !== "required") return { allowed: false, code: "THREAT-BOUNDARY-INCOMPLETE" };
   if (!input.fresh) return { allowed: false, code: "THREAT-BOUNDARY-STALE" };
+  if (receipt.modelDigest !== threatModelDigest(model).digest) return { allowed: false, code: "THREAT-BOUNDARY-RECEIPT-MISMATCH" };
   if (!((receipt.decision === "approved" && ["approved", "implementing", "verified"].includes(model.lifecycle)) || (receipt.decision === "accepted-risk" && model.lifecycle === "accepted-risk"))) return { allowed: false, code: "THREAT-BOUNDARY-UNAPPROVED" };
   return { allowed: true, code: "THREAT-BOUNDARY-ALLOWED" };
 }
@@ -96,8 +115,8 @@ export function discoverThreatModel(rootDir, { featureId = null } = {}) {
 /** Derive a safe public view; private disclosure stays outside canonical records. */
 export function exportThreatModelView(model) {
   if (!validateThreatModel(model).valid) return { ok: false, code: "THREAT-EXPORT-INVALID" };
-  const redact = model.classification === "private";
-  return { ok: true, authoritative: false, entities: model.entities.map((entity) => redact ? { id: entity.id, kind: entity.kind, label: "redacted" } : { id: entity.id, kind: entity.kind, label: entity.label }) };
+  if (model.classification === "private") return { ok: true, authoritative: false, classification: "private", entities: [] };
+  return { ok: true, authoritative: false, classification: "public", entities: model.entities.map((entity) => ({ id: entity.id, kind: entity.kind, label: entity.label })) };
 }
 
 /** Migration remains a non-mutating observation until separately activated. */
