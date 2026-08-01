@@ -164,6 +164,7 @@ const TEST_SUITES = [
   { name: "phoenix-governance-event-cli-tests", file: join(pluginScriptsDir, "governance-event.test.mjs") },
   { name: "phoenix-human-governance-ledger-tests", file: join(libDir, "human-governance-ledger.test.mjs") },
   { name: "phoenix-governance-authority-resolver-tests", file: join(libDir, "governance-authority-resolver.test.mjs") },
+  { name: "phoenix-governance-authority-tests", file: join(pluginScriptsDir, "governance-authority.test.mjs") },
   { name: "ruleset-source-tests", file: join(libDir, "ruleset-source.test.mjs") },
   { name: "bootstrap-env-check-tests", file: join(pluginScriptsDir, "bootstrap-env-check.test.mjs") },
   { name: "critic-bare-tests", file: join(pluginScriptsDir, "critic-bare.test.mjs") },

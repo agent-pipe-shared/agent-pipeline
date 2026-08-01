@@ -20,7 +20,7 @@ import {
 } from "./governance-event.mjs";
 import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
-import { validateHumanGovernanceDecision } from "./human-governance-ledger.mjs";
+import { validateHumanGovernanceDecision } from "./human-governance-decision.mjs";
 
 const REGISTRY_SCHEMA = "pipeline.governance-stream-registry.v1";
 const HEADS_SCHEMA = "pipeline.governance-event-heads.v1";
