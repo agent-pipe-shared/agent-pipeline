@@ -9,7 +9,7 @@
     {
       "class": "prd",
       "path": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
-      "sha256": "357f1f62975eb95bae927d55be41b265e1a0111e0fdde79930fe11829beb76c5",
+      "sha256": "92f38d22405392c860eab918a33d5f4d303170561efaa3df1ae5c3884c9b04e9",
       "authority": true,
       "mutability": "immutable",
       "retention": "active"

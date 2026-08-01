@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
   "planApproved": true,
-  "updatedAt": "2026-08-01T17:43:04.871Z",
+  "updatedAt": "2026-08-01T18:05:09.535Z",
   "closedFeatures": [
     {
       "id": "codex-onboarding-0.4.5",
@@ -20,7 +20,7 @@
   "continuity": {
     "schema": "pipeline.continuity.v0",
     "featureId": "sprint-phoenix-epic",
-    "revision": 13,
+    "revision": 14,
     "runtime": {
       "humanFacingLanguage": "en",
       "activeDuty": "Coordinator",
@@ -29,7 +29,7 @@
     "authority": {
       "prd": {
         "path": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
-        "sha256": "357f1f62975eb95bae927d55be41b265e1a0111e0fdde79930fe11829beb76c5"
+        "sha256": "92f38d22405392c860eab918a33d5f4d303170561efaa3df1ae5c3884c9b04e9"
       },
       "spec": {
         "path": "specs/sprint-phoenix-epic/spec.md",
@@ -69,7 +69,7 @@
     "approvedBy": "PO reauthorization for Phoenix R-14 digest binding",
     "approvedAt": "2026-07-27T19:28:45.190Z",
     "specBoundBy": "PO reauthorization for Phoenix R-14 digest binding",
-    "specBoundAt": "2026-08-01T17:41:34.394Z",
+    "specBoundAt": "2026-08-01T18:04:38.900Z",
     "poGateAuthority": {
       "schema": "pipeline.po-gate-authority.v2",
       "humanFacing": "en",
@@ -78,7 +78,7 @@
       "receiptSha256": "4b85ce328c1dd2056a5d263c6ca2a7afe8d23886771d29cf25ba0d1185c3cd31",
       "repositoryFingerprint": "92f4f001424af56c17e443aec9969d0ff5ac0e426b8f388fe06d4b1800aa2d35",
       "planPath": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
-      "planSha256": "357f1f62975eb95bae927d55be41b265e1a0111e0fdde79930fe11829beb76c5",
+      "planSha256": "92f38d22405392c860eab918a33d5f4d303170561efaa3df1ae5c3884c9b04e9",
       "specPath": "specs/sprint-phoenix-epic/spec.md",
       "specSha256": "39912b05660026f5dc82efa5f37aca33b7899d99ff8b29ced1545a9cb389f57f"
     }

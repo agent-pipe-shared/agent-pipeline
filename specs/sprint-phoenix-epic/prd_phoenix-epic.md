@@ -89,9 +89,13 @@ internal approval.
   path requires an exact scoped human decision, old/new artifact digests,
   atomic State readback, and a public-safe audit record.
 - A single writer-bound reconciliation of the inherited Phoenix `draft`
-  lifecycle manifest's stale PRD, Spec, acceptance, and architecture digests.
-  It preserves state and artifact inventory, requires an exact preview and
-  PO-bound apply/readback, and prohibits manual manifest edits.
+  lifecycle manifest's stale PRD, Spec, acceptance, architecture, and
+  append-only Result digests. Result reconciliation is admitted only when the
+  stale digest is proved as the exact preserved historical prefix followed by
+  the canonical Result reconciliation fence and the Continuity State binds the
+  current Result. It preserves state and artifact inventory, requires an exact
+  preview and PO-bound apply/readback, refuses metadata-only Result refreshes,
+  and prohibits manual manifest edits.
 - A correlated external-handoff, recovery, and workaround profile. Every
   Pipeline-known command or script offered for user execution is recorded
   before presentation, whether Pipeline-initiated or user-requested and
