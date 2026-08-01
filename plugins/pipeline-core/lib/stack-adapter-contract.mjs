@@ -132,9 +132,21 @@ function validStaticSourcePath(adapterValue, sourcePath) {
 function readCandidateSource(adapterValue, repositoryRoot, sourcePath, candidate) {
   if (typeof repositoryRoot !== "string" || repositoryRoot === "" || !validStaticSourcePath(adapterValue, sourcePath)) return null;
   try {
+    const tree = execFileSync("git", ["-C", resolve(repositoryRoot), "rev-parse", `${candidate.commit}^{tree}`], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    if (tree !== candidate.tree) return null;
     const content = execFileSync("git", ["-C", resolve(repositoryRoot), "show", `${candidate.commit}:${sourcePath}`], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1024 * 1024 });
     return Buffer.byteLength(content, "utf8") <= 1024 * 1024 ? { path: sourcePath, content } : null;
   } catch { return null; }
+}
+
+function resolveStaticInput(adapterValue, input, plan, phase) {
+  const base = phase === "execution" ? ["adapter", "plan", "environment", "authorization"] : ["adapter", "plan", "environment", "execution", "authorization"];
+  const currentKeys = [...base, "repositoryRoot", "sourcePath"];
+  if (own(input, currentKeys)) return readCandidateSource(adapterValue, input.repositoryRoot, input.sourcePath, plan.candidate);
+  const legacyKeys = [...base, "source"];
+  if (!own(input, legacyKeys) || !own(input.source, ["candidate", "path", "content"]) || JSON.stringify(input.source.candidate) !== JSON.stringify(plan.candidate) || typeof input.source.content !== "string") return null;
+  const actual = readCandidateSource(adapterValue, process.cwd(), input.source.path, plan.candidate);
+  return actual !== null && actual.content === input.source.content ? actual : null;
 }
 
 /**
@@ -148,9 +160,9 @@ export function executeStackAdapterConformance(input) {
   if (!input || typeof input !== "object" || !validateStackCapabilityPlan(input.plan).valid || !own(input.environment, ["platform", "nodeVersion"]) || !STACK_ADAPTER_PLATFORMS.includes(input.environment.platform) || !(typeof input.environment.nodeVersion === "string" || input.environment.nodeVersion === null)) return { ok: false, code: "STACK-ADAPTER-EXECUTION-INVALID" };
   const adapterResult = validateStackAdapter(input.adapter);
   if (!adapterResult.ok) return adapterResult;
-  const expectedKeys = input.adapter.executionMode === "static-analysis" ? ["adapter", "plan", "environment", "authorization", "repositoryRoot", "sourcePath"] : ["adapter", "plan", "environment", "authorization"];
-  if (!own(input, expectedKeys)) return { ok: false, code: "STACK-ADAPTER-EXECUTION-INVALID" };
-  const source = input.adapter.executionMode === "static-analysis" ? readCandidateSource(input.adapter, input.repositoryRoot, input.sourcePath, input.plan.candidate) : null;
+  const expectedKeys = ["adapter", "plan", "environment", "authorization"];
+  if (input.adapter.executionMode !== "static-analysis" && !own(input, expectedKeys)) return { ok: false, code: "STACK-ADAPTER-EXECUTION-INVALID" };
+  const source = input.adapter.executionMode === "static-analysis" ? resolveStaticInput(input.adapter, input, input.plan, "execution") : null;
   if (input.adapter.executionMode === "static-analysis" && source === null) return { ok: false, code: "STACK-ADAPTER-EXECUTION-INVALID" };
   const selection = input.plan.entries.find((entry) => entry.capability === input.adapter.capability);
   if (!selection || !["selected", "optional-selected"].includes(selection.status)) return { ok: false, code: "STACK-ADAPTER-CAPABILITY-UNSELECTED" };
@@ -171,9 +183,9 @@ export function createStackAdapterEvidence(input) {
     || !(typeof input.environment.nodeVersion === "string" || input.environment.nodeVersion === null)) return { ok: false, code: "STACK-ADAPTER-INPUT-INVALID" };
   const adapterResult = validateStackAdapter(input.adapter);
   if (!adapterResult.ok) return adapterResult;
-  const expectedKeys = input.adapter.executionMode === "static-analysis" ? ["adapter", "plan", "environment", "execution", "authorization", "repositoryRoot", "sourcePath"] : ["adapter", "plan", "environment", "execution", "authorization"];
-  if (!own(input, expectedKeys)) return { ok: false, code: "STACK-ADAPTER-INPUT-INVALID" };
-  const source = input.adapter.executionMode === "static-analysis" ? readCandidateSource(input.adapter, input.repositoryRoot, input.sourcePath, input.plan.candidate) : null;
+  const expectedKeys = ["adapter", "plan", "environment", "execution", "authorization"];
+  if (input.adapter.executionMode !== "static-analysis" && !own(input, expectedKeys)) return { ok: false, code: "STACK-ADAPTER-INPUT-INVALID" };
+  const source = input.adapter.executionMode === "static-analysis" ? resolveStaticInput(input.adapter, input, input.plan, "evidence") : null;
   if (input.adapter.executionMode === "static-analysis" && source === null) return { ok: false, code: "STACK-ADAPTER-INPUT-INVALID" };
   const selection = input.plan.entries.find((entry) => entry.capability === input.adapter.capability);
   if (!selection || !["selected", "optional-selected"].includes(selection.status)) return { ok: false, code: "STACK-ADAPTER-CAPABILITY-UNSELECTED" };

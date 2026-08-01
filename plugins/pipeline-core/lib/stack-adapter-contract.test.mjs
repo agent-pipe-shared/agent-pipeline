@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -164,6 +164,26 @@ check("real adapters reject missing or mismatched source without creating eviden
   assert.equal(executeStackAdapterConformance({ adapter: iac, plan, environment: { platform: "linux", nodeVersion: null }, authorization: null }).code, "STACK-ADAPTER-EXECUTION-INVALID");
   assert.equal(executeStackAdapterConformance({ adapter: iac, plan, environment: { platform: "linux", nodeVersion: null }, authorization: null, repositoryRoot: fixture.root, sourcePath: "Dockerfile" }).code, "STACK-ADAPTER-EXECUTION-INVALID");
   assert.equal(executeStackAdapterConformance({ adapter: iac, plan, environment: { platform: "linux", nodeVersion: null }, authorization: null, repositoryRoot: fixture.root, sourcePath: "infra/not-present.tf" }).code, "STACK-ADAPTER-EXECUTION-INVALID");
+});
+
+check("static analysis refuses a commit whose resolved tree differs from the plan", () => {
+  const wrongCandidate = { ...candidate, tree: "f".repeat(40) };
+  const wrongDiscovery = { ...discovery, candidate: wrongCandidate, digest: createHash("sha256").update(JSON.stringify({ candidate: wrongCandidate, observations })).digest("hex") };
+  const wrongPlan = buildStackCapabilityPlan({ candidate: wrongCandidate, discovery: wrongDiscovery, policyRevision: "policy-v1", threatModel: { candidate: wrongCandidate, digest: "d".repeat(64) }, observations: STACK_CAPABILITIES.map((capability) => ({ capability, present: true })), requirements: [] });
+  const iac = REPRESENTATIVE_STACK_ADAPTERS.find((adapter) => adapter.kind === "iac");
+  assert.equal(executeStackAdapterConformance({ adapter: iac, plan: wrongPlan, environment: { platform: "linux", nodeVersion: null }, authorization: null, repositoryRoot: fixture.root, sourcePath: "infra/main.tf" }).code, "STACK-ADAPTER-EXECUTION-INVALID");
+});
+
+check("legacy source callers remain compatible only when bytes match the candidate tree", () => {
+  const iac = REPRESENTATIVE_STACK_ADAPTERS.find((adapter) => adapter.kind === "iac");
+  const source = { candidate, path: "infra/main.tf", content: readFileSync(join(fixture.root, "infra/main.tf"), "utf8") };
+  const previous = process.cwd(); process.chdir(fixture.root);
+  try {
+    const execution = executeStackAdapterConformance({ adapter: iac, plan, environment: { platform: "linux", nodeVersion: null }, authorization: null, source });
+    assert.equal(execution.ok, true);
+    assert.equal(createStackAdapterEvidence({ adapter: iac, plan, environment: { platform: "linux", nodeVersion: null }, execution: execution.execution, authorization: null, source }).ok, true);
+    assert.equal(executeStackAdapterConformance({ adapter: iac, plan, environment: { platform: "linux", nodeVersion: null }, authorization: null, source: { ...source, content: "benign replacement" } }).code, "STACK-ADAPTER-EXECUTION-INVALID");
+  } finally { process.chdir(previous); }
 });
 
 console.log(`${pass} stack adapter contract checks passed`);
