@@ -348,6 +348,15 @@ check("pipeline-start can validate the shared profile when no feature is active"
   });
 });
 
+check("mixed project State authority fails closed instead of becoming an absent feature", () => {
+  withFixture({}, ({ primary, validate }) => {
+    write(join(primary, "project", "pipeline.yaml"), runtime("de"));
+    const result = validate();
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "PO-GATE-STATE-AUTHORITY-UNAVAILABLE");
+  });
+});
+
 check("an internally consistent legacy linked-worktree language cannot override the primary receipt", () => {
   withFixture({ linkedLanguage: "en" }, ({ current, receipt, validate }) => {
     write(join(current, "specs", "feature", "prd_feature.md"), prd("de"));

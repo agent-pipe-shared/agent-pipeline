@@ -477,7 +477,8 @@ function validatePoGateProfileSnapshot({ repoRoot, gitCommonDir, primaryRoot, re
 
 function activeFeatureState(repoRoot) {
   const authority = readProjectAuthority({ rootDir: repoRoot });
-  if (authority.status !== "ready" || authority.state === null) return { status: "absent" };
+  if (authority.status !== "ready") return { status: "unavailable" };
+  if (authority.state === null) return { status: "absent" };
   const raw = readPhysicalFile(repoRoot, authority.state);
   const state = JSON.parse(decodeUtf8(raw));
   if (!Object.prototype.hasOwnProperty.call(state, "activeFeature")) return { status: "absent" };
@@ -585,6 +586,9 @@ export function validatePoGateAuthority({
   }
   if (active.status === "invalid") {
     return fail("PO-GATE-ACTIVE-FEATURE-INVALID", "The active feature and planPath are missing or unsafe.", PRD_REPAIR);
+  }
+  if (active.status === "unavailable") {
+    return fail("PO-GATE-STATE-AUTHORITY-UNAVAILABLE", "The authoritative State projection is unavailable or mixed.", PRD_REPAIR);
   }
   if (active.status === "absent") {
     if (expectedPlanSha256 !== undefined || expectedSpecSha256 !== undefined) {
