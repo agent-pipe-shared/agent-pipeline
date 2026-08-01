@@ -8,6 +8,7 @@ import {
   RECOVERY_BRIDGE_DECISION_SCHEMA,
   RECOVERY_BRIDGE_ISSUANCE_CUTOFF,
   recoveryBridgeDecisionDigest,
+  recoveryBridgePoApprovalDecision,
   run,
   validateRecoveryBridgeDecision,
 } from "./pipeline-state.mjs";
@@ -26,6 +27,11 @@ const APPROVAL = Object.freeze({
   why: "The Recovery record changed after its prior digest was recorded, so verification needs the manifest to bind the current reviewed bytes.",
   scope: "Only the lifecycle manifest digest entry and the sanctioned writer receipt may change.",
   notAuthorized: "This does not authorize product implementation, a new dispatch, edits to RECOVERY.md, remote actions, or a completion claim.",
+});
+const AUTHORIZATION = Object.freeze({
+  required: "A current repository-scoped PO plan approval bound to the active Phoenix PRD and Spec.",
+  checkedBy: "The helper and lifecycle writer revalidate that approval before issuing, planning, or applying a Recovery Bridge request.",
+  notGrantedByCommand: "Running this command only records a short-lived, bound decision; it does not grant PO approval or authorize any other work.",
 });
 
 function fail(message) { throw new Error(message); }
@@ -62,6 +68,7 @@ try {
     console.log(JSON.stringify({
       status: "preview",
       approval: APPROVAL,
+      authorization: AUTHORIZATION,
       command: "node harness/scripts/phoenix-recovery-bridge-decision-helper.mjs issue --ttl-minutes 30",
     }, null, 2));
   } else if (action === "issue") {
@@ -78,23 +85,25 @@ try {
       operation: "reconcile-mutable-design",
       manifest: TARGETS.manifest,
       artifactPath: TARGETS.recovery,
-      assurance: "operator-local-attested",
+      assurance: "po-gate-bound",
       manifestPreimageSha256: digest(readRegular(TARGETS.manifest)),
       recoveryPostimageSha256: digest(readRegular(TARGETS.recovery)),
       prdSha256: digest(readRegular(TARGETS.prd)),
       specSha256: digest(readRegular(TARGETS.spec)),
+      poApproval: recoveryBridgePoApprovalDecision(ROOT),
       approvedBy: "PO",
       approvedAt,
       expiresAt,
       approval: APPROVAL,
       status: "issued",
     };
+    if (decision.poApproval === null) fail("refusing to issue without a current repository-scoped PO gate approval bound to the active Phoenix PRD and Spec");
     decision.decisionSha256 = recoveryBridgeDecisionDigest(decision);
     if (!validateRecoveryBridgeDecision(decision, { now: approvedAt }).ok) fail("generated decision failed validation");
     atomicWrite(OUTPUT, `${JSON.stringify(decision, null, 2)}\n`);
     const written = JSON.parse(readFileSync(OUTPUT, "utf8"));
     if (written.decisionSha256 !== decision.decisionSha256 || !validateRecoveryBridgeDecision(written, { now: approvedAt }).ok) fail("decision readback failed");
-    console.log(JSON.stringify({ status: "issued", decisionFile: "evidence/phoenix-recovery-bridge-decision.json", decisionId: decision.decisionId, decisionSha256: decision.decisionSha256, approvedAt, expiresAt, approval: APPROVAL }));
+    console.log(JSON.stringify({ status: "issued", decisionFile: "evidence/phoenix-recovery-bridge-decision.json", decisionId: decision.decisionId, decisionSha256: decision.decisionSha256, approvedAt, expiresAt, approval: APPROVAL, authorization: AUTHORIZATION }));
   } else if (action === "plan") {
     exactAction(argv, "plan");
     if (lstatSync(REQUEST_OUTPUT, { throwIfNoEntry: false }) !== undefined) fail(`refusing to overwrite existing request: ${REQUEST_OUTPUT}`);
@@ -111,7 +120,7 @@ try {
     atomicWrite(REQUEST_OUTPUT, `${JSON.stringify(planned.request, null, 2)}\n`);
     const written = JSON.parse(readFileSync(REQUEST_OUTPUT, "utf8"));
     if (JSON.stringify(written) !== JSON.stringify(planned.request)) fail("request readback failed");
-    console.log(JSON.stringify({ status: "planned", requestFile: "evidence/phoenix-recovery-bridge-request.json", requestSha256: planned.requestSha256, decisionSha256: planned.request.authority.decision.decisionSha256, expiresAt: planned.request.expiresAt, approval: planned.request.authority.decision.approval ?? null }));
+    console.log(JSON.stringify({ status: "planned", requestFile: "evidence/phoenix-recovery-bridge-request.json", requestSha256: planned.requestSha256, decisionSha256: planned.request.authority.decision.decisionSha256, expiresAt: planned.request.expiresAt, approval: planned.request.authority.decision.approval ?? null, authorization: AUTHORIZATION }));
   } else fail("usage: node harness/scripts/phoenix-recovery-bridge-decision-helper.mjs <preview|issue|plan> ...");
 } catch (error) {
   console.error(`phoenix-recovery-bridge-decision-helper: ${error.message}`);

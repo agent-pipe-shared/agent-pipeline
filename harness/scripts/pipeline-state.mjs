@@ -299,8 +299,10 @@ export const CONTINUITY_LOCK_SCHEMA_ID = "pipeline.continuity-lock.v0";
 export const CONTINUITY_LOCK_STALE_MS = 30_000;
 /**
  * Closed Recovery Bridge decision contract. The sole executable consumer is
- * the Phoenix-only adapter below. Its local operator-attested PO attribution
- * is immutable, and the adapter never treats mutable State as that authority.
+ * the Phoenix-only adapter below. Every new issuance is bound to the existing
+ * repository-scoped PO gate; a local caller can never create PO authority by
+ * choosing an attribution string. Legacy terminal records remain inspectable
+ * solely for recovery/readback compatibility.
  */
 export const RECOVERY_BRIDGE_DECISION_SCHEMA = "pipeline.recovery-bridge-decision.v1";
 export const RECOVERY_BRIDGE_PUBLIC_COMMIT_REQUEST_SCHEMA = "pipeline.recovery-bridge-public-commit-request.v1";
@@ -312,12 +314,12 @@ const RECOVERY_BRIDGE_FEATURE_ID = "sprint-phoenix-epic";
 const RECOVERY_BRIDGE_OPERATION = "reconcile-mutable-design";
 const RECOVERY_BRIDGE_MANIFEST = "specs/sprint-phoenix-epic/lifecycle.json";
 const RECOVERY_BRIDGE_ARTIFACT_PATH = "specs/sprint-phoenix-epic/RECOVERY.md";
-const RECOVERY_BRIDGE_ASSURANCE = "operator-local-attested";
+const RECOVERY_BRIDGE_ASSURANCE = "po-gate-bound";
 const RECOVERY_BRIDGE_ID_RE = /^rb-[a-f0-9]{16,64}$/u;
 const RECOVERY_BRIDGE_STATUS_MAX_JOURNALS = 64;
 const RECOVERY_BRIDGE_BINDING_KEYS = [
   "decisionId", "featureId", "operation", "manifest", "artifactPath", "assurance",
-  "manifestPreimageSha256", "recoveryPostimageSha256", "prdSha256", "specSha256", "approvedBy", "approvedAt", "expiresAt",
+  "manifestPreimageSha256", "recoveryPostimageSha256", "prdSha256", "specSha256", "poApproval", "approvedBy", "approvedAt", "expiresAt",
 ];
 const RECOVERY_BRIDGE_APPROVAL_KEYS = ["what", "why", "scope", "notAuthorized"];
 const RECOVERY_BRIDGE_DECISION_KEYS = [
@@ -326,9 +328,11 @@ const RECOVERY_BRIDGE_DECISION_KEYS = [
 ];
 
 function recoveryBridgeBindingKeys(value) {
-  return Object.hasOwn(value ?? {}, "approval")
-    ? [...RECOVERY_BRIDGE_BINDING_KEYS, "approval"]
-    : RECOVERY_BRIDGE_BINDING_KEYS;
+  const legacy = !Object.hasOwn(value ?? {}, "poApproval");
+  return [
+    ...RECOVERY_BRIDGE_BINDING_KEYS.filter((key) => key !== "poApproval" || !legacy),
+    ...(Object.hasOwn(value ?? {}, "approval") ? ["approval"] : []),
+  ];
 }
 function validRecoveryBridgeApproval(value) {
   return exactObjectKeys(value, RECOVERY_BRIDGE_APPROVAL_KEYS)
@@ -355,7 +359,8 @@ function recoveryBridgeNow(now) {
  */
 export function validateRecoveryBridgeDecision(value, { now } = {}) {
   const hasApproval = Object.hasOwn(value ?? {}, "approval");
-  if (!exactObjectKeys(value, hasApproval ? [...RECOVERY_BRIDGE_DECISION_KEYS, "approval"] : RECOVERY_BRIDGE_DECISION_KEYS)
+  const hasPoApproval = Object.hasOwn(value ?? {}, "poApproval");
+  if (!exactObjectKeys(value, [...RECOVERY_BRIDGE_DECISION_KEYS, ...(hasPoApproval ? ["poApproval"] : []), ...(hasApproval ? ["approval"] : [])])
     || value.schema !== RECOVERY_BRIDGE_DECISION_SCHEMA || (hasApproval && !validRecoveryBridgeApproval(value.approval))) {
     return { ok: false, code: "RB-DECISION-SCHEMA" };
   }
@@ -367,11 +372,16 @@ export function validateRecoveryBridgeDecision(value, { now } = {}) {
   if (value.featureId !== RECOVERY_BRIDGE_FEATURE_ID || value.operation !== RECOVERY_BRIDGE_OPERATION
     || value.manifest !== RECOVERY_BRIDGE_MANIFEST || value.artifactPath !== RECOVERY_BRIDGE_ARTIFACT_PATH
     || value.assurance !== RECOVERY_BRIDGE_ASSURANCE) return { ok: false, code: "RB-DECISION-TARGET" };
+  if (value.decisionSha256 !== recoveryBridgeDecisionDigest(value)) return { ok: false, code: "RB-DECISION-DIGEST" };
+  if (hasPoApproval && (!exactPoDecision(value.poApproval)
+    || value.poApproval.planPath !== "specs/sprint-phoenix-epic/prd_phoenix-epic.md"
+    || value.poApproval.specPath !== "specs/sprint-phoenix-epic/spec.md"
+    || value.poApproval.planSha256 !== value.prdSha256 || value.poApproval.specSha256 !== value.specSha256)) return { ok: false, code: "RB-DECISION-PO-AUTHORITY" };
+  if (value.status === "issued" && !hasPoApproval) return { ok: false, code: "RB-DECISION-PO-AUTHORITY" };
   if (value.approvedBy !== "PO" || !safeIso(value.approvedAt)) return { ok: false, code: "RB-DECISION-ATTRIBUTION" };
   if (Date.parse(value.approvedAt) > Date.parse(value.expiresAt)) return { ok: false, code: "RB-DECISION-CHRONOLOGY" };
   if (!["issued", "public-committed", "consumed"].includes(value.status)) return { ok: false, code: "RB-DECISION-STATUS" };
   if (Date.parse(value.expiresAt) > Date.parse(RECOVERY_BRIDGE_ISSUANCE_CUTOFF)) return { ok: false, code: "RB-DECISION-CUTOFF" };
-  if (value.decisionSha256 !== recoveryBridgeDecisionDigest(value)) return { ok: false, code: "RB-DECISION-DIGEST" };
   if (now !== undefined) {
     const nowMs = recoveryBridgeNow(now);
     if (nowMs === null) return { ok: false, code: "RB-DECISION-NOW" };
@@ -2386,6 +2396,10 @@ function exactPoDecision(value) {
     && typeof value.planPath === "string" && typeof value.specPath === "string"
     && SHA256_RE.test(value.planSha256) && SHA256_RE.test(value.specSha256) && SHA256_RE.test(value.approvalSha256);
 }
+/** Returns the current, independently revalidated existing PO-gate decision for Phoenix. */
+export function recoveryBridgePoApprovalDecision(dir, deps = {}) {
+  return poApprovalDecision(dir, { feature: { id: RECOVERY_BRIDGE_FEATURE_ID } }, deps);
+}
 function isRecoveryBridgeTarget(value) {
   return value?.operation === RECOVERY_BRIDGE_OPERATION
     && value.manifest === RECOVERY_BRIDGE_MANIFEST
@@ -2548,6 +2562,8 @@ function recoveryBridgeFeatureRequest(dir, decision, deps = {}) {
   const recovery = currentRepoArtifact(dir, RECOVERY_BRIDGE_ARTIFACT_PATH);
   if (!prd || !spec || !recovery || prd.sha256 !== decision.prdSha256 || spec.sha256 !== decision.specSha256
     || recovery.sha256 !== decision.recoveryPostimageSha256) return { ok: false, code: "RB-ARTIFACT-DRIFT" };
+  const poApproval = recoveryBridgePoApprovalDecision(dir, deps);
+  if (!poApproval || !samePhxJson(poApproval, decision.poApproval)) return { ok: false, code: "RB-PO-AUTHORITY-DRIFT" };
   const preview = reconcileMutableDesignPreview(dir, decision.manifest, decision.artifactPath);
   if (!preview.ok || preview.preimage !== decision.manifestPreimageSha256) return { ok: false, code: "RB-MANIFEST-DRIFT" };
   const request = {
