@@ -12,6 +12,7 @@ import {
   planProjectOnboardingKickoffPromotionV4,
   planProjectOnboardingLifecycleV4,
   planProjectOnboardingManifestRepairV4,
+  planProjectPartialAuthorityAdoption,
   planProjectRemoteAdoptionV4,
   applyProjectRemoteAdoptionV4,
   planProjectOnboardingSourceRecoveryV4,
@@ -20,6 +21,7 @@ import {
 function usage() {
   return [
     "Usage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--plan-sha256 <sha256>] [--activate]",
+    "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> [--profile <epic|feature|mini> --source <selection>]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--plan-sha256 <sha256>] [--activate]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> [--plan-sha256 <sha256>] [--activate]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> [--plan-sha256 <sha256>] [--activate]",
@@ -45,7 +47,7 @@ function parse(args) {
     if (args[1] !== "inspect") return { error: "continuity requires inspect" };
     output.command = "continuity-inspect";
     start = 2;
-  } else if (["inspect", "plan", "plan-source-recovery", "plan-manifest-repair", "apply-manifest-repair", "apply-portable-seed", "plan-runtime", "initialize-runtime", "plan-repair", "apply-repair", "plan-readback", "apply-readback"].includes(args[0])) {
+  } else if (["inspect", "plan", "plan-partial-authority", "plan-source-recovery", "plan-manifest-repair", "apply-manifest-repair", "apply-portable-seed", "plan-runtime", "initialize-runtime", "plan-repair", "apply-repair", "plan-readback", "apply-readback"].includes(args[0])) {
     output.command = args[0];
     start = 1;
   }
@@ -57,6 +59,7 @@ function parse(args) {
     else if (arg === "--intent") { const intent = args[index + 1]; if (!["onboarding", "bootstrap", "session", "dispatch"].includes(intent)) return { error: "--intent must be onboarding, bootstrap, session, or dispatch" }; output.intent = intent; index += 1; }
     else if (arg === "--goal") { const goal = args[index + 1]; if (goal === undefined) return { error: "--goal requires one argv text element" }; output.goal = goal; index += 1; }
     else if (arg === "--profile") { const profile = args[index + 1]; if (!["epic", "feature", "mini"].includes(profile)) return { error: "--profile must be epic, feature, or mini" }; output.profile = profile; index += 1; }
+    else if (arg === "--source") { const source = args[index + 1]; if (!source || source.startsWith("--")) return { error: "--source requires one explicit V3 source selection" }; output.source = source; index += 1; }
     else if (arg === "--id") { const featureId = args[index + 1]; if (!featureId || featureId.startsWith("--")) return { error: "--id requires a feature id" }; output.featureId = featureId; index += 1; }
     else if (arg === "--plan-path") { const planPath = args[index + 1]; if (!planPath || planPath.startsWith("--")) return { error: "--plan-path requires a repository path" }; output.planPath = planPath; index += 1; }
     else if (arg === "--prd-path") { const prdPath = args[index + 1]; if (!prdPath || prdPath.startsWith("--")) return { error: "--prd-path requires a repository path" }; output.prdPath = prdPath; index += 1; }
@@ -89,6 +92,7 @@ export function main(args = process.argv.slice(2), {
   let output;
   try {
     if (options.command === "inspect") output = inspectProjectOnboardingV3({ rootDir: options.root, deps, intent: options.intent });
+    else if (options.command === "plan-partial-authority") output = planProjectPartialAuthorityAdoption({ rootDir: options.root, profile: options.profile, source: options.source, deps });
     else if (options.command === "adopt-remote-plan") output = planProjectRemoteAdoptionV4({ rootDir: options.root, remote: options.remote, ref: options.ref, deps });
     else if (options.command === "adopt-remote-apply") output = applyProjectRemoteAdoptionV4({ rootDir: options.root, remote: options.remote, ref: options.ref, planSha256: options.planSha256, activate: options.activate, deps });
     else if (options.command === "continuity-inspect") output = inspectProjectOnboardingV3({ rootDir: options.root, deps, intent: "onboarding" });

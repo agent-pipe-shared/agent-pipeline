@@ -79,6 +79,7 @@ const PLAN_SCHEMA = "pipeline.project-onboarding-plan.v3";
 const REMOTE_ADOPTION_PLAN_SCHEMA = "pipeline.project-onboarding-remote-adoption-plan.v1";
 const SOURCE_RECOVERY_SCHEMA = "pipeline.project-onboarding-source-recovery.v1";
 const MANIFEST_REPAIR_PLAN_SCHEMA = "pipeline.project-onboarding-manifest-repair-plan.v1";
+const PARTIAL_AUTHORITY_PLAN_SCHEMA = "pipeline.project-onboarding-partial-authority-plan.v1";
 const SAFE_RELATIVE = /^(?!\/)(?!.*(?:^|\/)\.\.?($|\/))[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u;
 const AUTHENTICATED = new WeakMap();
 const AUTHENTICATED_MANIFEST_REPAIRS = new WeakMap();
@@ -189,6 +190,40 @@ function rootEntries(root, fs) {
     }
     return { name, symlink: info.isSymbolicLink(), directory: info.isDirectory(), file: info.isFile(), writable, empty };
   });
+}
+
+/**
+ * Read-only recovery planning for an old, incomplete Pipeline authority.
+ * This deliberately inventories user surfaces but does not infer a V3 source
+ * from legacy calibration and does not create any target.
+ */
+export function planProjectPartialAuthorityAdoption({ rootDir = process.cwd(), profile = null, source = null, deps: overrides = {} } = {}) {
+  const fs = deps(overrides);
+  let root;
+  try { root = safeRoot(rootDir, fs); } catch (error) {
+    return { schema: PARTIAL_AUTHORITY_PLAN_SCHEMA, status: "unsafe-root", diagnostics: [diagnostic("$.root", "unsafe_root", error.message, "supply a physical project root")] };
+  }
+  const legacy = safePath(root, LEGACY_CALIBRATION, fs);
+  const v3 = safePath(root, SOURCE, fs);
+  if (!fs.existsSync(legacy) || fs.existsSync(v3)) {
+    return { schema: PARTIAL_AUTHORITY_PLAN_SCHEMA, status: "not-applicable", root, diagnostics: [diagnostic("$.authority", "partial_authority_not_applicable", "the legacy-without-V3 recovery shape is absent", "use the lifecycle action returned for the current authority shape")] };
+  }
+  const supportedProfiles = ["epic", "feature", "mini"];
+  if (!supportedProfiles.includes(profile) || typeof source !== "string" || source.length === 0 || source.length > 160 || /[\0\r\n]/u.test(source)) {
+    return {
+      schema: PARTIAL_AUTHORITY_PLAN_SCHEMA, status: "selection-required", root,
+      selection: { profiles: supportedProfiles, source: "PO must supply one explicit V3 source selection; legacy calibration is not authority" },
+      diagnostics: [diagnostic("$.selection", "partial_authority_selection_required", "no explicit V3 authority selection is bound", "re-run plan-partial-authority with --profile and --source after PO selection")],
+    };
+  }
+  const paths = [".claude", ".agents", ".codex", "docs"].filter((relative) => fs.existsSync(safePath(root, relative, fs))).sort();
+  try {
+    const artifacts = paths.map((relative) => ({ path: relative, snapshot: physicalTreeSnapshot(safePath(root, relative, fs), fs) }));
+    const plan = { schema: PARTIAL_AUTHORITY_PLAN_SCHEMA, status: "ready", root, selection: { profile, source }, artifacts, v3Target: { path: SOURCE, before: describe(null) }, mutation: false };
+    return { ...plan, planSha256: sha256(JSON.stringify(stable(plan))) };
+  } catch (error) {
+    return { schema: PARTIAL_AUTHORITY_PLAN_SCHEMA, status: "inventory-unavailable", root, diagnostics: [diagnostic("$.artifacts", "partial_authority_inventory_unavailable", error.message, "repair unsafe or unreadable user paths before planning")] };
+  }
 }
 function runtimePaths() { return loadRuntimeProjectionV3OwnedKeys().targets.map((target) => target.path).sort(); }
 function hasOwnRuntime(root, fs) { return runtimePaths().some((relative) => fs.existsSync(safePath(root, relative, fs))); }
@@ -2501,8 +2536,11 @@ function v4Inspection(rootDir, fs, intent = "onboarding") {
     }
     const cleanupRecovery = partialCleanupRecoveryResult({ root: legacy.root, intent, repository });
     if (cleanupRecovery !== null) return cleanupRecovery;
-    return lifecycleResult({ status: "partial", root: legacy.root, intent, repository, runtime: emptyRuntime(), nextAction: null,
-      diagnostics: [lifecycleDiagnostic("$.authority", "partial_authority", "the project has an incomplete Pipeline authority", "inspect the existing source and generated targets")] });
+    const partialPlan = planProjectPartialAuthorityAdoption({ rootDir: legacy.root, deps: fs });
+    const reparable = partialPlan.status === "selection-required";
+    return lifecycleResult({ status: "partial", root: legacy.root, intent, repository, runtime: emptyRuntime(),
+      nextAction: reparable ? commandAction([ONBOARDING_SCRIPT, "plan-partial-authority", "--root", legacy.root], false, false, PARTIAL_AUTHORITY_PLAN_SCHEMA, ["selection-required", "ready"]) : null,
+      diagnostics: [lifecycleDiagnostic("$.authority", "partial_authority", "the project has an incomplete Pipeline authority", reparable ? "run the typed partial-authority planner and bind an explicit PO selection" : "inspect the existing source and generated targets")] });
   }
   if (legacy.status === "ready") {
     const projectAuthority = readProjectAuthority({ rootDir: legacy.root });
@@ -2731,8 +2769,11 @@ function v4Inspection(rootDir, fs, intent = "onboarding") {
   }
   const cleanupRecovery = partialCleanupRecoveryResult({ root: legacy.root, intent, repository });
   if (cleanupRecovery !== null) return cleanupRecovery;
-  return lifecycleResult({ status: "partial", root: legacy.root, intent, repository, runtime: emptyRuntime(), nextAction: null,
-    diagnostics: [lifecycleDiagnostic("$.authority", "partial_authority", "the Pipeline authority is incomplete", "inspect the source and generated targets")] });
+  const partialPlan = planProjectPartialAuthorityAdoption({ rootDir: legacy.root, deps: fs });
+  const reparable = partialPlan.status === "selection-required";
+  return lifecycleResult({ status: "partial", root: legacy.root, intent, repository, runtime: emptyRuntime(),
+    nextAction: reparable ? commandAction([ONBOARDING_SCRIPT, "plan-partial-authority", "--root", legacy.root], false, false, PARTIAL_AUTHORITY_PLAN_SCHEMA, ["selection-required", "ready"]) : null,
+    diagnostics: [lifecycleDiagnostic("$.authority", "partial_authority", "the Pipeline authority is incomplete", reparable ? "run the typed partial-authority planner and bind an explicit PO selection" : "inspect the source and generated targets")] });
 }
 
 export function inspectProjectOnboardingV3({ rootDir = process.cwd(), deps: overrides = {}, intent = "onboarding" } = {}) {

@@ -27,6 +27,7 @@ import {
   planProjectOnboardingManifestRepairV4,
   planProjectOnboardingSourceRecoveryV4,
   planProjectOnboardingV3,
+  planProjectPartialAuthorityAdoption,
   planProjectRemoteAdoptionV4,
   applyProjectRemoteAdoptionV4,
   renderProjectOnboardingAction,
@@ -3636,6 +3637,23 @@ test("remote adoption refuses a normal initialized Git repository before remote 
     assert.equal(planned.diagnostics[0]?.code, "git_control_not_host_reserved");
     assert.equal(fixture.calls.some(({ args }) => args[0] === "ls-remote"), false);
   } finally { dispose(target); }
+});
+
+test("partial authority planner requires an explicit V3 selection and hashes preserved user projections", () => {
+  const path = root();
+  try {
+    mkdirSync(join(path, ".claude"));
+    writeFileSync(join(path, ".claude", "pipeline.json"), '{"project":"legacy"}\n');
+    mkdirSync(join(path, ".agents"));
+    writeFileSync(join(path, ".agents", "AGENTS.md"), "user-owned\n");
+    const missing = planProjectPartialAuthorityAdoption({ rootDir: path, deps: fakeDeps });
+    assert.equal(missing.status, "selection-required");
+    const planned = planProjectPartialAuthorityAdoption({ rootDir: path, profile: "epic", source: "PO-selected-v3", deps: fakeDeps });
+    assert.equal(planned.status, "ready");
+    assert.match(planned.planSha256, /^[a-f0-9]{64}$/u);
+    assert.deepEqual(planned.artifacts.map((entry) => entry.path), [".agents", ".claude"]);
+    assert.equal(planned.mutation, false);
+  } finally { dispose(path); }
 });
 
 console.log(`\nproject-onboarding-v3: ${passed} passed, ${failures.length} failed`);
