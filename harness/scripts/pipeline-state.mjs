@@ -293,6 +293,11 @@ import {
   planFeaturePackageBootstrap,
   validateFeaturePackage,
 } from "../../plugins/pipeline-core/lib/feature-package-topology.mjs";
+import {
+  LEGACY_STATE,
+  NEUTRAL_STATE,
+  readProjectAuthority,
+} from "../../plugins/pipeline-core/lib/project-authority.mjs";
 
 export const SCHEMA_ID = "pipeline.state.v0";
 export const CONTINUITY_LOCK_SCHEMA_ID = "pipeline.continuity-lock.v0";
@@ -510,7 +515,11 @@ export function projectDir() {
 
 /** Path to the state file under a given project dir. */
 export function statePath(dir = projectDir()) {
-  return join(dir, ".claude", "pipeline-state.json");
+  const authority = readProjectAuthority({ rootDir: dir });
+  if (authority.status === "ready") {
+    return join(dir, authority.state ?? (authority.source === "neutral" ? NEUTRAL_STATE : LEGACY_STATE));
+  }
+  return join(dir, LEGACY_STATE);
 }
 
 /**

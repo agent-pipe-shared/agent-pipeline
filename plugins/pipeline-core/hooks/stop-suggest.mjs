@@ -213,6 +213,7 @@ import { join, dirname } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { loadManifestSafe, activePhases, gateConfig } from "../lib/manifest.mjs";
+import { readProjectAuthority } from "../lib/project-authority.mjs";
 
 // ---- phase -> gate mapping (ONE small table; later phases are one-line additions) -------
 export const PHASE_GATE_MAP = {
@@ -850,8 +851,10 @@ export function run() {
   const stopHookActive = resolveStopHookActiveFromInput(stdinInput);
 
   const manifest = loadManifestSafe(rootDir);
-  const stateFilePath = join(rootDir, ".claude", "pipeline-state.json");
-  const state = loadStateSafe(stateFilePath);
+  const authority = readProjectAuthority({ rootDir });
+  const state = loadStateSafe(join(rootDir, authority.status === "ready" && authority.state
+    ? authority.state
+    : ".claude/pipeline-state.json"));
   const phaseMessage = resolveSuggestion(manifest, state);
 
   // G-B context-budget part: only reachable with a resolvable session_id (no session_id ->

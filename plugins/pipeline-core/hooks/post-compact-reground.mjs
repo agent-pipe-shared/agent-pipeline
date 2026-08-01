@@ -10,6 +10,7 @@ import {
 } from "../lib/continuity-state.mjs";
 import { buildContinuationLine } from "../lib/interaction-continuity.mjs";
 import { reconcileMainSessionRoute } from "../lib/main-session-route.mjs";
+import { readProjectAuthority } from "../lib/project-authority.mjs";
 
 const OUTER_SCHEMA = "pipeline.state.v0";
 
@@ -189,7 +190,10 @@ export function run() {
   }
   if (!shouldActivate(input)) process.exit(0);
 
-  const state = loadStateSafe(join(rootDir, ".claude", "pipeline-state.json"));
+  const authority = readProjectAuthority({ rootDir });
+  const state = loadStateSafe(join(rootDir, authority.status === "ready" && authority.state
+    ? authority.state
+    : ".claude/pipeline-state.json"));
   const { stdout } = decideOutput(input, state);
   if (stdout) process.stdout.write(stdout);
   process.exit(0);

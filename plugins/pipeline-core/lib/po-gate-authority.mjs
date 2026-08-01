@@ -32,6 +32,7 @@ import { TextDecoder } from "node:util";
 
 import { parseYaml } from "./yaml-lite.mjs";
 import { assessWindowsPrivatePath } from "./windows-private-state.mjs";
+import { readProjectAuthority } from "./project-authority.mjs";
 
 export const PO_GATE_PROFILE_RECEIPT_SCHEMA = "pipeline.po-gate-profile-receipt.v1";
 export const PO_GATE_AUTHORITY_EVIDENCE_SCHEMA = "pipeline.po-gate-authority-evidence.v1";
@@ -475,7 +476,9 @@ function validatePoGateProfileSnapshot({ repoRoot, gitCommonDir, primaryRoot, re
 }
 
 function activeFeatureState(repoRoot) {
-  const raw = readPhysicalFile(repoRoot, ".claude/pipeline-state.json");
+  const authority = readProjectAuthority({ rootDir: repoRoot });
+  if (authority.status !== "ready" || authority.state === null) return { status: "absent" };
+  const raw = readPhysicalFile(repoRoot, authority.state);
   const state = JSON.parse(decodeUtf8(raw));
   if (!Object.prototype.hasOwnProperty.call(state, "activeFeature")) return { status: "absent" };
   const active = state?.activeFeature;

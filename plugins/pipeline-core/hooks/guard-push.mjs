@@ -89,6 +89,12 @@ import { spawnSync } from "node:child_process";
 
 import { loadManifest, gateConfig, loadDeployPolicy } from "../lib/manifest.mjs";
 import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv, refMatchesPattern } from "../lib/git-cmd.mjs";
+import { readProjectAuthority } from "../lib/project-authority.mjs";
+
+function resolvedStatePath(dir) {
+  const authority = readProjectAuthority({ rootDir: dir });
+  return authority.status === "ready" && authority.state ? join(dir, authority.state) : null;
+}
 
 function emit(code, lines) {
   process.stderr.write(lines.filter(Boolean).join("\n") + "\n");
@@ -587,7 +593,7 @@ function exactObjectKeys(value, keys) {
  * approval before this hook can observe `push-authorized`.
  */
 function readPublicationMode(dir) {
-  const statePath = join(dir, ".claude", "pipeline-state.json");
+  const statePath = resolvedStatePath(dir);
   let raw;
   try {
     raw = readFileSync(statePath, "utf8");
@@ -867,7 +873,7 @@ function isolatePushSegment(rawCmd) {
  * uses for this same file elsewhere in this hook.
  */
 function checkDeployApprovals(required) {
-  const path = join(projectDir, ".claude", "pipeline-state.json");
+  const path = resolvedStatePath(projectDir);
   let raw = null;
   try {
     raw = readFileSync(path, "utf8");
