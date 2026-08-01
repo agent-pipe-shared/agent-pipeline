@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
   "planApproved": true,
-  "updatedAt": "2026-08-01T11:50:24.433Z",
+  "updatedAt": "2026-08-01T13:52:07.387Z",
   "closedFeatures": [
     {
       "id": "sprint-sentinel-epic",
@@ -89,7 +89,7 @@
   "continuity": {
     "schema": "pipeline.continuity.v0",
     "featureId": "sprint-nova-epic",
-    "revision": 7,
+    "revision": 8,
     "runtime": {
       "humanFacingLanguage": "en",
       "activeDuty": "Elephant",
@@ -129,7 +129,93 @@
       "reservedRecoverySlots": 1,
       "fallbackPolicy": "defer"
     },
-    "closeTransition": null
+    "closeTransition": null,
+    "nativeContinuation": {
+      "schema": "pipeline.runner-native-continuation.v1",
+      "continuationId": "nova-b0",
+      "subject": {
+        "featureId": "sprint-nova-epic",
+        "phase": "implementation",
+        "planSha256": "792adc4567fd39cb6f07179ca6d623d2da97bb0a4b6f2aa0f1524e450af59bdb",
+        "specSha256": "ab67354e3da744150729b46c418347ce3e0fd4d4d17100f4b51a83ae465dcf52",
+        "queueRevision": 7,
+        "packageId": "nova-b0",
+        "actionId": "runner-native-continuation"
+      },
+      "objective": {
+        "conditionSha256": "a07337939952c780a88dd0d852605567b8ea12fb3ff7984a95e76a4208b623aa",
+        "summarySha256": "f3b434dcacacd7f25215a526bc805fc1d7756b14dfccafaac7d64b72f8bb971f"
+      },
+      "acceptance": [],
+      "evidence": [],
+      "terminal": {
+        "kind": "none",
+        "atRevision": 7
+      },
+      "runner": {
+        "runnerId": "codex",
+        "adapterVersion": "v1",
+        "capability": "available"
+      },
+      "generation": {
+        "number": 0,
+        "goalSha256": "e993614416c1409d52a89f72f645c5e43b20a6f7c9af03d592e1490f32be6e3d"
+      },
+      "status": "active",
+      "progress": [
+        {
+          "kind": "phase",
+          "status": "known",
+          "evidenceSha256": null
+        },
+        {
+          "kind": "queue-revision",
+          "status": "known",
+          "evidenceSha256": null
+        },
+        {
+          "kind": "deadline",
+          "status": "unknown",
+          "evidenceSha256": null
+        },
+        {
+          "kind": "tests",
+          "status": "unknown",
+          "evidenceSha256": null
+        },
+        {
+          "kind": "dispatch",
+          "status": "unknown",
+          "evidenceSha256": null
+        },
+        {
+          "kind": "candidate",
+          "status": "unknown",
+          "evidenceSha256": null
+        },
+        {
+          "kind": "evidence",
+          "status": "unknown",
+          "evidenceSha256": null
+        },
+        {
+          "kind": "artifacts",
+          "status": "unknown",
+          "evidenceSha256": null
+        }
+      ],
+      "readback": {
+        "goalIdSha256": "ad2292c45e7415d1926ec4de6dc20b15e581a98ac4b3d836b77f2a432d2a0e66",
+        "generation": 0,
+        "observedAt": "2026-08-01T13:47:47.000Z",
+        "status": "active"
+      },
+      "reason": {
+        "code": "activate",
+        "evidenceSha256": null
+      },
+      "recordSha256": "64a4252bee63394779b409398011b3165bfe074835a86d437e855b882f8ceb97"
+    }
   },
   "planSubmission": {
     "schema": "pipeline.plan-submission.v1",

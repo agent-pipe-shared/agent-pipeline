@@ -263,6 +263,7 @@ import {
   applyDecisionSelection,
   clearCourseDecisionReceipt,
   clearDecisionSelection,
+  applyRunnerNativeContinuation,
   bindContinuityResultForClose,
   compareAndSwapContinuity,
   planLegacyContinuityAdoption,
@@ -350,6 +351,7 @@ const RESULT_APPEND_COLLECTIONS = new Set([
 const CONTINUITY_SUBCOMMANDS = new Set([
   "continuity-init",
   "continuity-cas",
+  "continuity-apply-native",
   "continuity-integrate-final",
   "continuity-record-course-brief",
   "continuity-select-course",
@@ -1948,6 +1950,13 @@ function continuityTransition(sub, base, expectedRevision, request) {
   if (expectedRevision === "absent") return { ok: false, code: "PS-CONTINUITY-REVISION" };
   if (sub === "continuity-cas") {
     return compareAndSwapContinuity(base.continuity, { expectedRevision, next: request }, featureId);
+  }
+  if (sub === "continuity-apply-native") {
+    if (!exactObjectKeys(request, ["next"])) return { ok: false, code: "PS-CONTINUITY-REQUEST" };
+    // Native-goal evidence is controller-produced and may be installed only
+    // through this dedicated transition.  The generic CAS deliberately keeps
+    // nativeContinuation protected from every other State mutation.
+    return applyRunnerNativeContinuation(base.continuity, { expectedRevision, next: request.next }, featureId);
   }
   if (sub === "continuity-integrate-final") {
     if (!exactObjectKeys(request, ["observation", "next"])) return { ok: false, code: "PS-CONTINUITY-REQUEST" };
@@ -5049,7 +5058,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
 
     default: {
       console.error(
-        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, submit-plan, approve-plan, reopen-design, seal-plan-approval, set-phase, set-gate-estimate, revoke-plan, bind-plan-spec, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy, po-authority-rebind-plan, po-authority-rebind-apply, po-authority-decision-plan, po-authority-decision-select, po-authority-decision-apply, continuity-init, continuity-cas, continuity-integrate-final, continuity-record-course-brief, continuity-select-course, continuity-apply-decision, continuity-clear-decision, continuity-result-bootstrap-plan, continuity-result-bootstrap-apply, continuity-result-rebind-plan, continuity-result-rebind-apply, continuity-result-case-migration-plan, continuity-result-case-migration-apply, continuity-result-close-plan, continuity-result-close-apply, publication-prepare, publication-approve, publication-authorize, publication-reconcile, publication-observe, publication-start-readback, publication-close, publication-rearm, publication-block.`,
+        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, submit-plan, approve-plan, reopen-design, seal-plan-approval, set-phase, set-gate-estimate, revoke-plan, bind-plan-spec, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy, po-authority-rebind-plan, po-authority-rebind-apply, po-authority-decision-plan, po-authority-decision-select, po-authority-decision-apply, continuity-init, continuity-cas, continuity-apply-native, continuity-integrate-final, continuity-record-course-brief, continuity-select-course, continuity-apply-decision, continuity-clear-decision, continuity-result-bootstrap-plan, continuity-result-bootstrap-apply, continuity-result-rebind-plan, continuity-result-rebind-apply, continuity-result-case-migration-plan, continuity-result-case-migration-apply, continuity-result-close-plan, continuity-result-close-apply, publication-prepare, publication-approve, publication-authorize, publication-reconcile, publication-observe, publication-start-readback, publication-close, publication-rearm, publication-block.`,
       );
       return 2;
     }
