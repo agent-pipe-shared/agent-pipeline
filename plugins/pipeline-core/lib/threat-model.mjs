@@ -51,6 +51,16 @@ export function evaluateThreatImpact(input) {
   return { state: affected.length === 0 ? "current" : "stale", code: affected.length === 0 ? "THREAT-IMPACT-NONE" : "THREAT-IMPACT-REVIEW", affected };
 }
 
+/** Named delivery boundaries fail closed when a required model is not current and approved. */
+export function evaluateThreatBoundary(input) {
+  if (!own(input, ["boundary", "applicability", "lifecycle", "fresh"]) || !text(input.boundary) || !THREAT_MODEL_APPLICABILITY.includes(input.applicability) || typeof input.fresh !== "boolean" || !text(input.lifecycle)) return { allowed: false, code: "THREAT-BOUNDARY-INVALID" };
+  if (input.applicability === "not-applicable") return { allowed: true, code: "THREAT-BOUNDARY-NOT-APPLICABLE" };
+  if (input.applicability !== "required") return { allowed: false, code: "THREAT-BOUNDARY-INCOMPLETE" };
+  if (!input.fresh) return { allowed: false, code: "THREAT-BOUNDARY-STALE" };
+  if (!['approved', 'implementing', 'verified', 'accepted-risk'].includes(input.lifecycle)) return { allowed: false, code: "THREAT-BOUNDARY-UNAPPROVED" };
+  return { allowed: true, code: "THREAT-BOUNDARY-ALLOWED" };
+}
+
 /** Derive a safe public view; canonical authority and private coordinates stay untouched. */
 export function exportThreatModelView(model) {
   if (!own(model, ["classification", "entities"]) || !["public", "private"].includes(model.classification) || !Array.isArray(model.entities) || !model.entities.every((entity) => own(entity, ["id", "name", "coordinate"]) && text(entity.id) && text(entity.name) && text(entity.coordinate))) return { ok: false, code: "THREAT-EXPORT-INVALID" };

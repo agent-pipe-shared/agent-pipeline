@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { createThreatEntityId, evaluateThreatImpact, evaluateThreatModelApplicability, evaluateThreatTraceability, exportThreatModelView, previewThreatModelMigration, renderThreatModelView, validateSecurityRequirement, validateThreatModel } from "./threat-model.mjs";
+import { createThreatEntityId, evaluateThreatBoundary, evaluateThreatImpact, evaluateThreatModelApplicability, evaluateThreatTraceability, exportThreatModelView, previewThreatModelMigration, renderThreatModelView, validateSecurityRequirement, validateThreatModel } from "./threat-model.mjs";
 const complete = { applicability: "required", riskInputs: { assurance: true, exposure: true, data: true, privilege: true, dependencies: true, architecture: true, deployment: true, agentEgress: true } };
 assert.deepEqual(evaluateThreatModelApplicability(complete), { state: "required", code: "THREAT-REQUIRED" });
 assert.deepEqual(evaluateThreatModelApplicability({ ...complete, riskInputs: { ...complete.riskInputs, data: false } }), { state: "incomplete", code: "THREAT-RISK-INPUT-MISSING" });
@@ -15,4 +15,6 @@ assert.equal(validateThreatModel({ schema: "pipeline.threat-model.v1", candidate
 assert.equal(validateSecurityRequirement({ schema: "pipeline.security-requirement.v1", id: "R1", candidate: { commit: "a", tree: "b" }, policyRevision: "p", links: [{ kind: "threat", id: "T1" }], state: "proposed" }).valid, true);
 assert.equal(validateSecurityRequirement({ schema: "pipeline.security-requirement.v1", id: "R1", candidate: { commit: "a", tree: "b" }, policyRevision: "p", links: [{ kind: "threat", id: "T1" }], state: "proposed", approved: true }).valid, false);
 assert.match(renderThreatModelView({ schema: "pipeline.threat-model.v1", candidate: { commit: "a", tree: "b" }, policyRevision: "p", classification: "private", entities: [{ name: "asset", id: "A" }], lifecycle: "proposed" }).text, /asset/);
-console.log("13 threat-model checks passed");
+assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "required", lifecycle: "approved", fresh: false }), { allowed: false, code: "THREAT-BOUNDARY-STALE" });
+assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "required", lifecycle: "approved", fresh: true }), { allowed: true, code: "THREAT-BOUNDARY-ALLOWED" });
+console.log("15 threat-model checks passed");
