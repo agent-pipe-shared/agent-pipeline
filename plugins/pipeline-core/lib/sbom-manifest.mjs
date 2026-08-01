@@ -33,6 +33,7 @@ const own = (value, fields) => value !== null && typeof value === "object" && !A
 const string = (value) => typeof value === "string" && value.trim() !== "";
 const digest = (value) => createHash("sha256").update(value).digest("hex");
 const objectsWith = (value, fields) => Array.isArray(value) && value.every((entry) => entry !== null && typeof entry === "object" && !Array.isArray(entry) && fields.every((field) => string(entry[field])));
+const stringArray = (value) => Array.isArray(value) && value.length > 0 && value.every(string);
 
 /** Stable JSON encoding with lexicographically ordered object keys. */
 export function canonicalJson(value) {
@@ -63,10 +64,16 @@ function normalizedPayload(format, payload) {
 export function validateSbomPayload(format, payload) {
   if (!Object.hasOwn(SBOM_FORMAT_PROFILES, format) || payload === null || typeof payload !== "object" || Array.isArray(payload)) return { valid: false, code: "SBOM-PAYLOAD-FORMAT" };
   if (format === "cyclonedx-json") {
-    const valid = payload.bomFormat === "CycloneDX" && payload.specVersion === "1.6" && Number.isInteger(payload.version) && payload.version >= 1 && objectsWith(payload.components, ["type", "name"]);
+    const valid = payload.bomFormat === "CycloneDX" && payload.specVersion === "1.6" && Number.isInteger(payload.version) && payload.version >= 1
+      && objectsWith(payload.components, ["type", "bom-ref", "name", "version"])
+      && payload.components.every((component) => Array.isArray(component.properties) && component.properties.some((property) => property?.name === "pipeline.scope" && string(property.value)))
+      && Array.isArray(payload.dependencies) && payload.dependencies.length === payload.components.length && payload.dependencies.every((dependency) => string(dependency?.ref) && Array.isArray(dependency.dependsOn) && dependency.dependsOn.every(string));
     return valid ? { valid: true } : { valid: false, code: "SBOM-CYCLONEDX-PROFILE" };
   }
-  const valid = payload.spdxVersion === "SPDX-2.3" && payload.dataLicense === "CC0-1.0" && string(payload.SPDXID) && string(payload.name) && string(payload.documentNamespace) && payload.creationInfo !== null && typeof payload.creationInfo === "object" && !Array.isArray(payload.creationInfo) && objectsWith(payload.packages, ["SPDXID", "name"]);
+  const valid = payload.spdxVersion === "SPDX-2.3" && payload.dataLicense === "CC0-1.0" && string(payload.SPDXID) && string(payload.name) && string(payload.documentNamespace)
+    && payload.creationInfo !== null && typeof payload.creationInfo === "object" && !Array.isArray(payload.creationInfo) && string(payload.creationInfo.created) && stringArray(payload.creationInfo.creators)
+    && objectsWith(payload.packages, ["SPDXID", "name", "versionInfo"]) && payload.packages.every((pkg) => Array.isArray(pkg.externalRefs) && pkg.externalRefs.some((reference) => reference?.referenceType === "purl" && string(reference.referenceLocator)) && Array.isArray(pkg.annotations) && pkg.annotations.some((annotation) => string(annotation?.comment)))
+    && Array.isArray(payload.relationships) && payload.relationships.every((relationship) => string(relationship?.spdxElementId) && relationship.relationshipType === "DEPENDS_ON" && string(relationship?.relatedSpdxElement));
   return valid ? { valid: true } : { valid: false, code: "SBOM-SPDX-PROFILE" };
 }
 
