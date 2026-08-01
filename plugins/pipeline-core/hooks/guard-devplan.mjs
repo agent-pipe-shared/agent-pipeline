@@ -19,14 +19,15 @@
  * SOURCES OF TRUTH (both OPTIONAL — this hook is opt-in end to end)
  *   - Manifest gate: `.claude/pipeline.yaml`, `gates.dev-plan` (`mode`: blocking|warn|
  *     off, `type`: human) — read via `plugins/pipeline-core/lib/manifest.mjs`.
- *   - State: `.claude/pipeline-state.json` (schema `pipeline.state.v0`), written ONLY
- *     by `harness/scripts/pipeline-state.mjs` — this hook is a READER, never a writer.
+ *   - State: the `pipeline.state.v0` path returned by the runner-neutral
+ *     `readProjectAuthority()` resolver, written ONLY by
+ *     `harness/scripts/pipeline-state.mjs` — this hook is a READER, never a writer.
  *
  * EXIT SEMANTICS (shared with the rest of the guard family): 0 allow · 2 block
  * (stderr reason) · 1 allow + non-blocking WARN.
  *
  * FAIL-OPEN (exit 0, silent): no manifest at all · gate "dev-plan" absent · gate mode
- * "off" · no state file · state has no `activeFeature`. Every one of these means
+ * "off" · no resolved state file · state has no `activeFeature`. Every one of these means
  * "nothing to enforce yet" — never a paralysis-by-default trap (mirrors guard-
  * testpath.mjs's "NO CONFIG → NO-OP" philosophy).
  *
@@ -129,6 +130,7 @@ import { readFileSync } from "node:fs";
 import { join, relative, isAbsolute, posix } from "node:path";
 
 import { loadManifest, gateConfig } from "../lib/manifest.mjs";
+import { readProjectAuthority } from "../lib/project-authority.mjs";
 
 const DEFAULT_EXEMPT_PREFIXES = ["docs/", "specs/", ".claude/", "backlog/"];
 
@@ -195,12 +197,28 @@ const gate = gateConfig(manifest, "dev-plan");
 if (!gate || gate.mode === "off") process.exit(0);
 
 // ---- state: activeFeature / planApproved (fail-open on absent, WARN on malformed) --
-const statePath = join(projectDir, ".claude", "pipeline-state.json");
+// The project-authority resolver is the sole path-precedence decision. In particular,
+// a migrated repository with a neutral `project/pipeline-state.json` must not silently
+// fall back to a deleted `.claude/pipeline-state.json` and thereby lose an active gate.
+const authority = readProjectAuthority({ rootDir: projectDir });
+if (authority.status !== "ready") {
+  emit(1, [
+    `[guard-devplan] WARN: project State authority is unavailable (${authority.reason ?? authority.status}).`,
+    `Dev-Plan gate is being skipped (fail-open) -- repair the resolved project authority before implementation edits.`,
+  ]);
+}
+if (!authority.state) process.exit(0); // no State projection -- no active feature to enforce
+
+const statePath = join(projectDir, authority.state);
 let stateRaw;
 try {
   stateRaw = readFileSync(statePath, "utf8");
 } catch {
-  process.exit(0); // no state file at all -- fail-open
+  emit(1, [
+    `[guard-devplan] WARN: resolved State ${authority.state} is not readable.`,
+    `Dev-Plan gate is being skipped (fail-open) -- repair the state file (rewrite only via ` +
+      `harness/scripts/pipeline-state.mjs, never by hand).`,
+  ]);
 }
 let state;
 try {

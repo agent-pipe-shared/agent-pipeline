@@ -1,7 +1,7 @@
 # PHX-0 governance threat model
 
 Owner: Pipeline maintainers. Review this document with any PHX-0 transport,
-source-observation, or privacy-contract change.
+source-observation, privacy-contract, or project-authority boundary change.
 
 ## Assets and trust boundaries
 
@@ -13,6 +13,7 @@ source-observation, or privacy-contract change.
 | Consumer repository and private runtime | Project, HOME, plugin cache, credentials | Never include paths, cache roots, environment values, tokens, or private remotes in action/result diagnostics. |
 | Freshness result | Host adapter back to bootstrap | Accept only a schema-valid receipt that binds the exact action, fixed Git completion, public object ID, and validated host-control identity digest. |
 | Recovery Bridge authority | Existing repository-scoped PO gate to Phoenix lifecycle writer | New decisions bind the exact revalidated PO-gate approval digest plus active PRD/Spec paths and hashes; an attribution string is never authority. |
+| Dev-Plan State authority | Runner-neutral project-authority resolver | The guard reads only the resolver-selected `pipeline.state.v0` projection; a neutral State remains authoritative after legacy State retirement. |
 
 ## Abuse cases and mitigations
 
@@ -26,6 +27,7 @@ source-observation, or privacy-contract change.
 | Host output forges a success | Require result schema, exact request hash, completion state, valid Git ID, and the matching host-control identity digest. | Treat malformed output as unavailable; no write permission follows. |
 | Local caller forges `approvedBy: PO` or reuses an old Recovery Bridge decision | The helper refuses issuance without a current revalidated repository-scoped PO gate. The writer revalidates that gate and compares its complete binding against the decision before plan, apply, or recovery. | Reject with a typed PO-authority drift result; create a fresh PO-gate approval and a new short-lived decision. |
 | PRD, Spec, or PO approval changes after a Recovery Bridge decision | Decision digest binds the human-facing explanation, PO approval digest, and PRD/Spec hashes; the writer rereads all of them before mutation. | Reject as authority/artifact drift; no lifecycle manifest mutation occurs. |
+| Legacy State retirement makes the Dev-Plan guard read no active feature | Resolve State through `readProjectAuthority()` rather than a hard-coded `.claude/pipeline-state.json` path; the neutral projection is selected whenever its manifest is authoritative. | Restore a readable resolver-selected State with the sanctioned writer; do not use a legacy-path fallback. |
 | Diagnostic leaks private topology | Output is limited to status, source class, hashes, counts, typed reason, and (when needed) fixed public action. | Stop publication, remove the leaking field, and rerun privacy tests. |
 
 ## Operating and recovery rules
@@ -54,6 +56,13 @@ ledger. It consumes only the existing repository-scoped PO-gate authority that
 PHX-0 is explicitly permitted to use. PHX-2 replaces that compatibility source
 with the sanctioned human-ledger writer and resolver; no local helper, mutable
 state projection, chat transcript, or preview may mint authority on its own.
+
+The Dev-Plan guard treats State-path selection as an authority decision. It
+uses `readProjectAuthority()` and may read only the resolver-selected State
+projection. An absent selected State means that no active feature is recorded;
+an unavailable or unreadable selected authority is surfaced as a warning and
+must be repaired through the sanctioned State writer, never by reviving a
+legacy-path fallback.
 
 ## Acceptance mapping
 

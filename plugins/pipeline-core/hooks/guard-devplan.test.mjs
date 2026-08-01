@@ -31,6 +31,14 @@ function writeState(dir, obj) {
   mkdirSync(join(dir, ".claude"), { recursive: true });
   writeFileSync(join(dir, ".claude", "pipeline-state.json"), typeof obj === "string" ? obj : JSON.stringify(obj));
 }
+function writeNeutralManifest(dir, yamlText) {
+  mkdirSync(join(dir, "project"), { recursive: true });
+  writeFileSync(join(dir, "project", "pipeline.yaml"), yamlText);
+}
+function writeNeutralState(dir, obj) {
+  mkdirSync(join(dir, "project"), { recursive: true });
+  writeFileSync(join(dir, "project", "pipeline-state.json"), typeof obj === "string" ? obj : JSON.stringify(obj));
+}
 
 function runGuard(toolName, filePath, projectDir) {
   const res = spawnSync(process.execPath, [GUARD], {
@@ -349,6 +357,21 @@ const NO_FEATURE_STATE = { schema: "pipeline.state.v0" };
   check("DP24 block  absolute path with a traversal segment resolving outside docs/ is NOT exempt", "Edit", traversalAbs, BLOCK, {
     projectDir: dir,
     stderrIncludes: ["ap1-pipeline-tuning"],
+  });
+}
+
+// ---- DP25 neutral State authority remains enforced after legacy State retirement --------
+// The production migration retains the manifest compatibility projection but removes
+// `.claude/pipeline-state.json`. The guard must resolve and enforce the neutral State,
+// rather than treating the missing legacy path as "no active feature".
+{
+  const dir = freshDir("neutral-state-authority");
+  writeManifest(dir, MANIFEST_BLOCKING);
+  writeNeutralManifest(dir, MANIFEST_BLOCKING);
+  writeNeutralState(dir, UNAPPROVED_STATE);
+  check("DP25 block  unapproved neutral State without legacy State", "Edit", "src/foo.ts", BLOCK, {
+    projectDir: dir,
+    stderrIncludes: ["ap1-pipeline-tuning", "guard-devplan"],
   });
 }
 

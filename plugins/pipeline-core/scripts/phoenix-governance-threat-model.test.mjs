@@ -21,5 +21,8 @@ test("PHX-0 governance threat model inventories AC13 transport binding and AC14 
     "request hash",
     "host-transport-required",
     "HOME, cache, credential, private remote",
+    "Dev-Plan State authority",
+    "readProjectAuthority()",
+    "legacy-path fallback",
   ]) assert.equal(document.includes(required), true, `missing governed threat-model inventory: ${required}`);
 });
