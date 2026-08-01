@@ -20,7 +20,7 @@ Verify command. This implements the explicit registration decision in
   `control-evaluation-receipt.test.mjs`, `control-waiver-lifecycle.test.mjs`,
   and `control-catalog-drift.test.mjs` (all under
   `plugins/pipeline-core/lib/`).
-- `.claude/guard-config.json` — temporary TP-3 lift only if needed to make
+- `project/guard-config.json` — temporary TP-3 lift only if needed to make
   the permitted `verify.mjs` edit; restore it byte-identically before commit.
 
 ## Definition of done
