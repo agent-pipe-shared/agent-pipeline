@@ -62,11 +62,25 @@ For local development also print:
    The four required confirmation facts are: `runtime.status`, `profile/model`
    and `role`, `calibration/handover`, and `Verify availability`; each is
    digest-bound to the machine readback and printed before continuation.
-5. **Observation governance:** in the Public source checkout, run
-   `node harness/scripts/check-observation-governance.mjs` before confirmation.
-   A failing result is case **F6**: fail closed, perform read-only diagnosis
-   only, and correct the governed artifact through its reviewed recovery path
-   before restarting bootstrap.
+5. **Observation governance:** run
+   `node "${PIPELINE_PLUGIN_ROOT}/scripts/observation-governance-bootstrap.mjs" --root "$PWD"`
+   before confirmation. `not-applicable` is the successful Consumer-project
+   result: do not look for, copy, or repair `harness/scripts/check-observation-governance.mjs` there.
+   Only a checkout that carries the Pipeline source manifest is `required`; it
+   runs `node harness/scripts/check-observation-governance.mjs`. A `failed`
+   source-checkout result is case **F6**: fail closed, perform read-only
+   diagnosis only, and correct the governed artifact through its reviewed
+   recovery path before restarting bootstrap.
+
+6. **Optional restart hint:** after the portable seed and before a first
+   kickoff, capture a bounded distilled Design Input with
+   `resume-hint.mjs capture` when the user supplied one. Interpret user intent
+   rather than keywords: an intended restart/session cut captures it; changed
+   scope or constraints refresh it; canonised or revoked information is
+   discarded. At bootstrap, `resume-hint.mjs inspect` is passive context only:
+   `absent`, `challenged-stale`, or `ignored-invalid` never changes readiness,
+   actions, authority, approval, close state, or exit status. Do not capture
+   raw transcripts, commands, approvals, or lifecycle instructions.
 
 ## Typed lazy loading
 

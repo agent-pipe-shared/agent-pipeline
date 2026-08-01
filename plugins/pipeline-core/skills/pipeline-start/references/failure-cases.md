@@ -6,12 +6,14 @@ an actionable next route. A project-policy denial uses a narrower recovery
 action or one universal PO emergency plan; override admission is never operation
 success. Re-run the identical operation and its normal effect/readback contract.
 
-F6 observation governance is mandatory in the Public source checkout:
-`node harness/scripts/check-observation-governance.mjs` runs before confirmation.
-A failing result permits read-only diagnosis only; repair the governed artifact
-through its reviewed recovery path and restart bootstrap. Never treat a skipped
-governance check, human override admission, or recovery-plan creation as
-operation success.
+F6 observation governance is mandatory only in the Public source checkout.
+First run `observation-governance-bootstrap.mjs`; a Consumer result of
+`not-applicable` is successful and must never trigger a search, copy, or repair
+of `harness/scripts/check-observation-governance.mjs`. In a source checkout,
+that checker runs before confirmation. A failing result permits read-only
+diagnosis only; repair the governed artifact through its reviewed recovery path
+and restart bootstrap. Never treat a skipped governance check, human override
+admission, or recovery-plan creation as operation success.
 
 ## F6 — observation/document governance drift
 

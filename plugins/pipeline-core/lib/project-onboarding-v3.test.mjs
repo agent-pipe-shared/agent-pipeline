@@ -53,6 +53,8 @@ import {
   applyProjectAuthoritySessionCleanupRecovery,
   planProjectAuthoritySessionCleanupRecovery,
 } from "./project-authority.mjs";
+import { captureResumeHint, discardResumeHint, inspectResumeHint } from "./resume-hint.mjs";
+import { inspectObservationGovernanceBootstrap } from "./observation-governance-bootstrap.mjs";
 
 let passed = 0; const failures = [];
 function test(name, run) { try { run(); passed += 1; console.log(`PASS  ${name}`); } catch (error) { failures.push(`${name}: ${error.message}`); console.log(`FAIL  ${name} -- ${error.message}`); } }
@@ -3727,6 +3729,41 @@ test("reinstall quarantines only current V3 authority and leaves legacy calibrat
     assert.equal(readFileSync(join(path, ".claude", "pipeline.json"), "utf8"), legacy);
     assert.equal(existsSync(join(path, ".git", "agent-pipeline", "reinstall-quarantine", plan.planSha256, "receipt.json")), true);
   } finally { dispose(path); }
+});
+
+test("resume hint is a post-seed, non-authoritative restart aid that fails open", () => {
+  const path = root();
+  const basis = { featureId: "kickoff-demo", planSha256: "a".repeat(64), specSha256: "b".repeat(64) };
+  try {
+    assert.throws(() => captureResumeHint({ rootDir: path, summary: "Design input" }), /RH-PROJECT-UNINITIALIZED/);
+    mkdirSync(join(path, "project"));
+    writeFileSync(join(path, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+    const hint = captureResumeHint({ rootDir: path, summary: "Two click puzzles; no server.", basis, createdAt: "2026-08-01T12:00:00.000Z" });
+    assert.equal(hint.nonAuthoritative, true);
+    assert.equal(inspectResumeHint({ rootDir: path, basis, now: Date.parse("2026-08-02T12:00:00.000Z") }).status, "available");
+    assert.equal(inspectResumeHint({ rootDir: path, basis: { ...basis, planSha256: "c".repeat(64) }, now: Date.parse("2026-08-02T12:00:00.000Z") }).status, "challenged-stale");
+    writeFileSync(join(path, "project", "resume-hint.json"), "not json\n");
+    assert.equal(inspectResumeHint({ rootDir: path, basis }).status, "ignored-invalid");
+    assert.equal(discardResumeHint({ rootDir: path }).status, "discarded");
+    assert.equal(discardResumeHint({ rootDir: path }).status, "absent");
+  } finally { dispose(path); }
+});
+
+test("observation governance applies only to the Pipeline source checkout, never a fresh consumer", () => {
+  const consumer = root();
+  try {
+    assert.deepEqual(inspectObservationGovernanceBootstrap({ rootDir: consumer }), {
+      schema: "pipeline.observation-governance-bootstrap.v1", status: "not-applicable", sourceCheckout: false, checker: null,
+    });
+    const source = fileURLToPath(new URL("../../..", import.meta.url));
+    const observed = inspectObservationGovernanceBootstrap({ rootDir: source });
+    assert.equal(observed.status, "required");
+    assert.equal(observed.sourceCheckout, true);
+    const helper = fileURLToPath(new URL("../scripts/observation-governance-bootstrap.mjs", import.meta.url));
+    const invoked = spawnSync(process.execPath, [helper, "--root", consumer], { encoding: "utf8" });
+    assert.equal(invoked.status, 0, invoked.stderr);
+    assert.equal(JSON.parse(invoked.stdout).status, "not-applicable");
+  } finally { dispose(consumer); }
 });
 
 console.log(`\nproject-onboarding-v3: ${passed} passed, ${failures.length} failed`);
