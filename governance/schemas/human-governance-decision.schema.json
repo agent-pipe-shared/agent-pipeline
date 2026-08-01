@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.dev/schemas/pipeline.human-governance-decision.v1.json",
+  "title": "Pipeline human governance decision v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["decisionId", "event", "outcome", "authorityClass", "identityAssurance", "timeAssurance", "scope", "reasonCode", "policyDigest", "ruleDigest", "validity", "links"],
+  "properties": {
+    "decisionId": { "$ref": "#/$defs/id" },
+    "event": { "enum": ["requested", "granted", "denied", "cancelled", "consumed", "revoked", "expired", "corrected", "superseded"] },
+    "outcome": { "enum": ["pending", "granted", "denied", "cancelled", "consumed", "revoked", "expired", "corrected", "superseded"] },
+    "authorityClass": { "enum": ["product-owner", "delegated-reviewer", "security-reviewer", "privacy-reviewer"] },
+    "identityAssurance": { "enum": ["locally-attributed", "externally-attested", "unknown"] },
+    "timeAssurance": { "enum": ["locally-observed", "externally-attested", "unknown"] },
+    "scope": { "$ref": "#/$defs/scope" },
+    "reasonCode": { "$ref": "#/$defs/code" },
+    "policyDigest": { "$ref": "#/$defs/sha256" },
+    "ruleDigest": { "$ref": "#/$defs/sha256" },
+    "validity": { "$ref": "#/$defs/validity" },
+    "links": { "$ref": "#/$defs/links" }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9._:-]{0,127}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "oid": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+    "scope": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repositoryFingerprint", "candidate", "packageId", "action", "environment", "artifacts"],
+      "properties": {
+        "repositoryFingerprint": { "$ref": "#/$defs/sha256" },
+        "candidate": { "type": "object", "additionalProperties": false, "required": ["commit", "tree"], "properties": { "commit": { "$ref": "#/$defs/oid" }, "tree": { "$ref": "#/$defs/oid" } } },
+        "packageId": { "$ref": "#/$defs/id" },
+        "action": { "$ref": "#/$defs/code" },
+        "environment": { "$ref": "#/$defs/id" },
+        "artifacts": { "type": "array", "minItems": 1, "maxItems": 128, "items": { "type": "object", "additionalProperties": false, "required": ["path", "sha256"], "properties": { "path": { "type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$" }, "sha256": { "$ref": "#/$defs/sha256" } } } }
+      }
+    },
+    "validity": { "type": "object", "additionalProperties": false, "required": ["notBeforeEpochMs", "expiresAtEpochMs", "singleUse"], "properties": { "notBeforeEpochMs": { "type": "integer", "minimum": 0 }, "expiresAtEpochMs": { "type": "integer", "minimum": 0 }, "singleUse": { "type": "boolean" } } },
+    "links": { "type": "object", "additionalProperties": false, "required": ["requestDecisionId", "consumesDecisionId", "revokesDecisionId", "supersedesDecisionId", "correctsDecisionId"], "properties": { "requestDecisionId": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" }, "consumesDecisionId": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" }, "revokesDecisionId": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" }, "supersedesDecisionId": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" }, "correctsDecisionId": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" } } }
+  }
+}
