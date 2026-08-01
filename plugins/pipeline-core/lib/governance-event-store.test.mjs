@@ -1,0 +1,151 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
+/** Stateful PHX-1 tests for portable governance event storage. */
+import assert from "node:assert/strict";
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import test from "node:test";
+import { canonicalizeJson, sealGovernanceEvent } from "./governance-event.mjs";
+import {
+  GovernanceEventStoreError,
+  appendPortableGovernanceEvent,
+  loadGovernanceEventRegistry,
+  queryPortableGovernanceStream,
+  recoverPortableGovernanceProjection,
+  verifyPortableGovernanceStream,
+} from "./governance-event-store.mjs";
+
+const fingerprint = "a".repeat(64);
+const candidate = { commit: "b".repeat(40), tree: "c".repeat(40) };
+const unavailable = { state: "not-applicable" };
+
+function registryFixture() {
+  return {
+    schema: "pipeline.governance-stream-registry.v1",
+    repositoryFingerprint: fingerprint,
+    canonicalization: "RFC8785",
+    digestAlgorithm: "sha-256",
+    eventDigestDomain: "pipeline.governance-event.v1\0",
+    storageRoot: "governance/events",
+    streams: [
+      { streamId: "human", origin: "human", authorityClass: "human-authority", relativeRoot: "human", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+      { streamId: "agent", origin: "agent", authorityClass: "non-authoritative", relativeRoot: "agent", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+      { streamId: "lifecycle", origin: "lifecycle", authorityClass: "non-authoritative", relativeRoot: "lifecycle", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+    ],
+  };
+}
+
+async function fixtureRoot() {
+  const root = await mkdtemp(path.join(os.tmpdir(), "governance-event-store-"));
+  await mkdir(path.join(root, "governance/events"), { recursive: true });
+  await writeFile(path.join(root, "governance/events/registry.json"), `${canonicalizeJson(registryFixture())}\n`);
+  return root;
+}
+
+function intent(overrides = {}) {
+  return {
+    schema: "pipeline.governance-event-envelope.v1",
+    payloadSchema: "pipeline.lifecycle-governance-event.v1",
+    canonicalization: "RFC8785",
+    digestAlgorithm: "sha-256",
+    eventId: "evt-1",
+    idempotencyKey: "idem-1",
+    origin: "lifecycle",
+    authorityClass: "non-authoritative",
+    eventType: "lifecycle.started",
+    occurredAtEpochMs: 1,
+    observedAtEpochMs: 1,
+    timeAssurance: "locally-observed",
+    repositoryFingerprint: fingerprint,
+    sourceUri: `urn:pipeline:repository:${fingerprint}`,
+    streamId: "lifecycle",
+    correlation: { featureId: unavailable, packageId: unavailable, requestId: unavailable, sessionId: unavailable, dispatchId: unavailable, traceId: unavailable },
+    candidate,
+    artifacts: [unavailable],
+    policy: { policyDigest: unavailable, configurationDigest: unavailable, capturePolicyDigest: unavailable, redactionPolicyDigest: unavailable },
+    classification: "repository-public-safe",
+    storageProfile: "repository-public-safe",
+    retentionCompatibility: "repository-retained",
+    disclosureClass: "repository-visible",
+    payload: { phase: "started" },
+    ...overrides,
+  };
+}
+
+async function append(root, event = intent()) {
+  return appendPortableGovernanceEvent({ repositoryRoot: root, repositoryFingerprint: fingerprint, intent: event });
+}
+
+async function cleanup(root) { await rm(root, { recursive: true, force: true }); }
+
+test("portable append publishes canonical bytes, readback checkpoint, and source-last head", async (t) => {
+  const root = await fixtureRoot(); t.after(() => cleanup(root));
+  const observed = await append(root);
+  assert.equal(observed.outcome, "appended");
+  assert.equal(observed.eventPath, "governance/events/lifecycle/1-evt-1.json");
+  assert.deepEqual(observed.checkpoint, { repositoryFingerprint: fingerprint, streamId: "lifecycle", sequence: 1, eventDigest: observed.eventDigest, candidateCommit: candidate.commit, candidateTree: candidate.tree });
+  const stored = await readFile(path.join(root, observed.eventPath), "utf8");
+  assert.match(stored, /^\{"artifacts":/u, "stored record must be canonical JSON, not a pretty-print projection");
+  const heads = JSON.parse(await readFile(path.join(root, "governance/events/heads.json"), "utf8"));
+  assert.deepEqual(heads.streams.lifecycle, { sequence: 1, eventDigest: observed.eventDigest });
+  assert.equal((await loadGovernanceEventRegistry({ repositoryRoot: root })).repositoryFingerprint, fingerprint);
+});
+
+test("exact idempotency is a zero-write replay while a conflicting key fails closed", async (t) => {
+  const root = await fixtureRoot(); t.after(() => cleanup(root));
+  const first = await append(root);
+  const replay = await append(root);
+  assert.equal(replay.outcome, "idempotent-replay");
+  assert.equal(replay.eventDigest, first.eventDigest);
+  const conflict = intent({ payload: { phase: "different" } });
+  await assert.rejects(() => append(root, conflict), (error) => error instanceof GovernanceEventStoreError && error.code === "GES-IDEMPOTENCY-CONFLICT");
+  const result = await verifyPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" });
+  assert.equal(result.eventCount, 1);
+});
+
+test("verification is checkpoint-aware and queries return only validated chain records", async (t) => {
+  const root = await fixtureRoot(); t.after(() => cleanup(root));
+  const first = await append(root);
+  const second = await append(root, intent({ eventId: "evt-2", idempotencyKey: "idem-2", payload: { phase: "continued" }, occurredAtEpochMs: 2, observedAtEpochMs: 2 }));
+  const prefix = await verifyPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" });
+  assert.deepEqual(prefix, { integrity: "prefix-valid", completeness: "unknown", streamId: "lifecycle", eventCount: 2 });
+  const complete = await verifyPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", checkpoint: second.checkpoint });
+  assert.equal(complete.completeness, "verified");
+  const queried = await queryPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", checkpoint: first.checkpoint });
+  assert.deepEqual(queried.events.map((event) => event.sequence), [1, 2]);
+  assert.equal(queried.events[1].previousEventDigest, first.eventDigest);
+});
+
+test("tampering, non-canonical bytes, and forks fail before projection or query", async (t) => {
+  const root = await fixtureRoot(); t.after(() => cleanup(root));
+  const first = await append(root);
+  const eventPath = path.join(root, first.eventPath);
+  await writeFile(eventPath, `${JSON.stringify({ changed: true })}\n`);
+  await assert.rejects(() => verifyPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" }), (error) => error.code === "GES-EVENT-INVALID");
+  const forkRoot = await fixtureRoot(); t.after(() => cleanup(forkRoot));
+  await append(forkRoot);
+  const fork = sealGovernanceEvent({ ...intent({ eventId: "evt-fork", idempotencyKey: "idem-fork" }), sequence: 1, previousEventDigest: null, payloadDigest: "0".repeat(64), eventDigest: "0".repeat(64) });
+  await writeFile(path.join(forkRoot, "governance/events/lifecycle/1-evt-fork.json"), `${canonicalizeJson(fork)}\n`);
+  await assert.rejects(() => verifyPortableGovernanceStream({ repositoryRoot: forkRoot, repositoryFingerprint: fingerprint, streamId: "lifecycle" }), (error) => error.code === "GES-FORK");
+});
+
+test("symlink, cross-repository, and writer-owned intent fields are rejected", async (t) => {
+  const root = await fixtureRoot(); t.after(() => cleanup(root));
+  await assert.rejects(() => appendPortableGovernanceEvent({ repositoryRoot: root, repositoryFingerprint: "d".repeat(64), intent: intent() }), (error) => error.code === "GES-CROSS-REPOSITORY");
+  await assert.rejects(() => append(root, { ...intent(), sequence: 1 }), (error) => error.code === "GES-INTENT-FIELDS");
+  await mkdir(path.join(root, "outside"));
+  await symlink(path.join(root, "outside"), path.join(root, "governance/events/lifecycle"));
+  await assert.rejects(() => append(root), (error) => error.code === "GES-SYMLINK");
+});
+
+test("projection recovery requires a retained checkpoint and rebuilds a stale head without touching canonical events", async (t) => {
+  const root = await fixtureRoot(); t.after(() => cleanup(root));
+  const first = await append(root);
+  await writeFile(path.join(root, "governance/events/heads.json"), "{\"broken\":true}\n");
+  await assert.rejects(() => recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" }), (error) => error.code === "GES-RECOVERY-CHECKPOINT");
+  const recovered = await recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", checkpoint: first.checkpoint });
+  assert.equal(recovered.status, "projection-rebuilt");
+  const head = JSON.parse(await readFile(path.join(root, "governance/events/heads.json"), "utf8"));
+  assert.deepEqual(head.streams.lifecycle, { sequence: 1, eventDigest: first.eventDigest });
+});
