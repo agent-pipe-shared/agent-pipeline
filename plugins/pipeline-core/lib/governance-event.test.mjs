@@ -4,6 +4,16 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import {
+  GOVERNANCE_EVENT_DIGEST_DOMAIN,
+  MAX_GOVERNANCE_EVENT_BYTES,
+  MAX_GOVERNANCE_PAYLOAD_BYTES,
+  canonicalizeJson,
+  eventDigest,
+  parseStrictJson,
+  sealGovernanceEvent,
+  validateGovernanceEventEnvelope,
+} from "./governance-event.mjs";
 
 const repositoryRoot = new URL("../../../", import.meta.url);
 const loadJson = (relativePath) => JSON.parse(readFileSync(new URL(relativePath, repositoryRoot), "utf8"));
@@ -181,4 +191,48 @@ test("receipt checkpoint is independently repository and candidate bound", () =>
   assert.match(receipt.properties.eventPath.pattern, /^\^governance\/events\//u);
   assert.deepEqual(receipt.properties.operation.enum, ["append", "recover"]);
   assert.deepEqual(receipt.properties.outcome.enum, ["appended", "idempotent-replay", "recovered"]);
+});
+
+test("RFC 8785-compatible canonicalization sorts member names and uses one UTF-8 representation", () => {
+  assert.equal(canonicalizeJson({ z: [3, true], a: "é", b: 1 }), "{\"a\":\"é\",\"b\":1,\"z\":[3,true]}");
+  assert.equal(canonicalizeJson({ control: "\u000f", zero: -0 }), "{\"control\":\"\\u000f\",\"zero\":0}");
+  const sealed = sealGovernanceEvent(eventFixture());
+  assert.equal(sealed.payloadDigest, "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a");
+  assert.equal(sealed.eventDigest, eventDigest(sealed));
+  assert.equal(validateGovernanceEventEnvelope(sealed).valid, true);
+  assert.equal(eventDigest({ ...sealed, eventDigest: "f".repeat(64) }), sealed.eventDigest);
+  assert.equal(GOVERNANCE_EVENT_DIGEST_DOMAIN, "pipeline.governance-event.v1\0");
+});
+
+test("strict JSON rejects duplicate keys, malformed UTF-8, and lone Unicode surrogates", () => {
+  assert.throws(() => parseStrictJson("{\"key\":1,\"key\":2}"), /GE-JSON-DUPLICATE-KEY/u);
+  assert.throws(() => parseStrictJson(new Uint8Array([0xc3, 0x28])), /TypeError/u);
+  assert.throws(() => parseStrictJson("\"\\ud800\""), /GE-UNICODE/u);
+  assert.throws(() => canonicalizeJson("\ud800"), /GE-UNICODE/u);
+  assert.equal(parseStrictJson("{\"b\":2,\"a\":1}").a, 1);
+});
+
+test("primitive validation rejects unknown fields, cross-origin payloads, and digest tampering", () => {
+  const sealed = sealGovernanceEvent(eventFixture());
+  const unknown = validateGovernanceEventEnvelope({ ...sealed, untrusted: "value" });
+  assert.equal(unknown.valid, false);
+  assert.ok(unknown.errors.includes("envelope-unknown-or-missing-field"));
+  const crossOrigin = validateGovernanceEventEnvelope({ ...sealed, origin: "agent" });
+  assert.equal(crossOrigin.valid, false);
+  assert.ok(crossOrigin.errors.includes("origin-payload-schema"));
+  const modifiedPayload = validateGovernanceEventEnvelope({ ...sealed, payload: { changed: true } });
+  assert.equal(modifiedPayload.valid, false);
+  assert.ok(modifiedPayload.errors.includes("payload-digest-mismatch"));
+  assert.ok(modifiedPayload.errors.includes("event-digest-mismatch"));
+});
+
+test("primitive validation enforces payload and full-envelope size limits before storage", () => {
+  const oversizedPayload = eventFixture({ payload: { data: "x".repeat(MAX_GOVERNANCE_PAYLOAD_BYTES) } });
+  const payloadResult = validateGovernanceEventEnvelope(oversizedPayload, { verifyDigests: false });
+  assert.equal(payloadResult.valid, false);
+  assert.ok(payloadResult.errors.includes("payload-size-limit"));
+  const oversizedEnvelope = eventFixture({ payload: { data: "x".repeat(MAX_GOVERNANCE_EVENT_BYTES) } });
+  const envelopeResult = validateGovernanceEventEnvelope(oversizedEnvelope, { verifyDigests: false });
+  assert.equal(envelopeResult.valid, false);
+  assert.ok(envelopeResult.errors.includes("event-size-limit"));
 });
