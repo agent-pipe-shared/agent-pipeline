@@ -53,8 +53,10 @@ repository has an actual release-delivery workflow, the Release leg is
 accepted through the library-level `sealAndStoreReleaseVersionPlan()`
 integration smoke test: it must invoke the shared evaluator and prove both
 fail-closed and store-on-clean paths. This is not evidence of a live release
-ritual; wiring a future CLI/workflow remains a separately scoped end-to-end
-integration task.
+ritual. **Owner: PO; expiry: 2027-02-01.** By expiry the PO must create a
+`sprint:none` GitHub issue for the deferred Release workflow and require its
+end-to-end gate before the first live release. That issue is the return path;
+it does not claim that the integration has already shipped.
 
 Coverage note: matches `backlog-acceptance-matrix.md`'s "14" count for #42.
 
