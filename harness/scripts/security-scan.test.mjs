@@ -34,20 +34,22 @@ import { runSecurityScan } from "./security-scan.mjs";
 
 const SCRIPT = fileURLToPath(new URL("./security-scan.mjs", import.meta.url));
 const REPO_ROOT = join(dirname(SCRIPT), "..", "..");
-const NOVA_A1_NO_GIT_IGNORES = Object.freeze([
-  "backlog/transitions.ndjson:generic-api-key:73",
-  "backlog/transitions.ndjson:generic-api-key:74",
-  "specs/sprint-nova-epic/evidence/backlog/2026-07-24-unreachable-evidence-disposition.md:generic-api-key:1",
-  "backlog/receipts/7ac4c1dd233bdbfbec854f3f818464ebed2850144c42da6816557112af743570.json:generic-api-key:1",
-  "backlog/receipts/9367a90e2516ec6f621b5710ffabef67cbbf27116f7f46cef8f1f0dd69aebc25.json:generic-api-key:1",
-  "specs/sprint-nova-epic/evidence/backlog/event-39-amendment-intent.json:generic-api-key:1",
-  "backlog/receipts/f33b8d45db38e7b9061dde268405d86123fc90afc24330a626afba2507650281.json:generic-api-key:1",
-  "specs/sprint-nova-epic/evidence/backlog/event-40-amendment-intent.json:generic-api-key:1",
-  "specs/sprint-nova-epic/evidence/backlog/event-39-delivery-intent.json:generic-api-key:1",
-  "backlog/receipts/d311a66737ff088e2ae324df5f3525b08cefd4c9f58787d09870d3bd26961363.json:generic-api-key:1",
-  "specs/sprint-nova-epic/evidence/backlog/event-40-delivery-intent.json:generic-api-key:1",
-  "specs/sprint-nova-epic/evidence/backlog/issue-57-assign-intent.json:generic-api-key:1",
-  "specs/sprint-nova-epic/evidence/backlog/issue-57-bootstrap-intent.json:generic-api-key:1",
+const NOVA_A1_CONTENT_AUTHORITIES = Object.freeze([
+  "content-v1:0326c0edc10afd521b56b4823c2d7d78e9cf1e610faa7a59e8d0e0499f50fb7b:specs/sprint-nova-epic/evidence/backlog/2026-07-24-unreachable-evidence-disposition.md:generic-api-key:1:532",
+  "content-v1:051427313d0ea2513b6c50b6007f9e92ddfe4d40736dbd94981fff51a81e77ed:specs/sprint-nova-epic/evidence/backlog/event-40-amendment-intent.json:generic-api-key:1:813",
+  "content-v1:0e48bbb5bd8fd44e2c276aa1784c2e74a6b817fa7631a4670c31029bd5c8eb2b:backlog/receipts/7ac4c1dd233bdbfbec854f3f818464ebed2850144c42da6816557112af743570.json:generic-api-key:1:172",
+  "content-v1:1f117cf053d25b79b275e7b8ffda91cf7311a5669f4ae7e598acf575e9d2f8fc:backlog/receipts/9367a90e2516ec6f621b5710ffabef67cbbf27116f7f46cef8f1f0dd69aebc25.json:generic-api-key:1:172",
+  "content-v1:5c5b098ce7643e80379f9e0f37b6541424327d8e47b86b4686eac3dd66cad2ed:backlog/receipts/f33b8d45db38e7b9061dde268405d86123fc90afc24330a626afba2507650281.json:generic-api-key:1:173",
+  "content-v1:5cd5fc1f6125775588de4eba79084741c848910bd7e817696e0c4a03ac4c9273:specs/sprint-nova-epic/evidence/backlog/2026-07-24-unreachable-evidence-disposition.md:generic-api-key:1:844",
+  "content-v1:611f185b0944c0a7bf589d0831f9aad840b3cad51d88b0336cf0c98493ba88d4:backlog/transitions.ndjson:generic-api-key:74:843",
+  "content-v1:6ab2416ed93ecd5569eeb77e98310d8d8fbdb0ad7fc3cf3c1e334dbaa15961f7:specs/sprint-nova-epic/evidence/backlog/event-39-delivery-intent.json:generic-api-key:1:86",
+  "content-v1:7115725bc98e11ff55d82bbbb8efd67fd37d6a8f661f8a28019391bb64a071b8:specs/sprint-nova-epic/evidence/backlog/issue-57-bootstrap-intent.json:generic-api-key:1:91",
+  "content-v1:72c063a1d9676feca7ddf6bf5c48a646e66174d67a4612284fb87f03fe1a9b38:specs/sprint-nova-epic/evidence/backlog/event-39-amendment-intent.json:generic-api-key:1:830",
+  "content-v1:7c7f3f45a621ecc89e1c4581c59bb16cccf89e125de3e86516b64820161cebe4:backlog/receipts/d311a66737ff088e2ae324df5f3525b08cefd4c9f58787d09870d3bd26961363.json:generic-api-key:1:177",
+  "content-v1:b7bb6dad6c1bd87273732947cca62e8429d9f4c80557f0dcebd8bc95cfea6a75:specs/sprint-nova-epic/evidence/backlog/issue-57-assign-intent.json:generic-api-key:1:87",
+  "content-v1:c876696e50e6161b403250790f19ea0d07c957fb279e721589725cf1cd6db309:backlog/transitions.ndjson:generic-api-key:73:870",
+  "content-v1:c8ebaf6daf4957777ff3388a98d41b3564b9822b1dd2a622ef975ac5f6bb96a7:backlog/transitions.ndjson:generic-api-key:73:869",
+  "content-v1:d70126230e844c446f92529399917fca3550484aeb0911d3cc1c6a14d9d0d59c:specs/sprint-nova-epic/evidence/backlog/event-40-delivery-intent.json:generic-api-key:1:86",
 ]);
 const OBSOLETE_NO_GIT_FIXTURE_IGNORES = Object.freeze([
   "plugins/pipeline-core/lib/review-economy.test.mjs:generic-api-key:278",
@@ -479,13 +481,18 @@ process.exit(0);
     .map((line) => line.trim())
     .filter((line) => line && !line.startsWith("#"));
   assertEqual(
-    "gitleaks ignore: Nova A1 entries are exact, rebase-stable no-git fingerprints",
-    NOVA_A1_NO_GIT_IGNORES.map((entry) => ({
+    "gitleaks ignore: Nova A1 entries are exact, rebase-stable content authorities",
+    NOVA_A1_CONTENT_AUTHORITIES.map((entry) => ({
       entry,
       present: ignoreLines.includes(entry),
-      onlyExact: ignoreLines.filter((line) => line.endsWith(entry)).every((line) => line === entry),
+      count: ignoreLines.filter((line) => line === entry).length,
     })),
-    NOVA_A1_NO_GIT_IGNORES.map((entry) => ({ entry, present: true, onlyExact: true })),
+    NOVA_A1_CONTENT_AUTHORITIES.map((entry) => ({ entry, present: true, count: 1 })),
+  );
+  assertEqual(
+    "gitleaks ignore: Nova A1 no longer carries commit-bound legacy fingerprints",
+    ignoreLines.filter((line) => line.startsWith("9dd9c5b10d16d32cd7c41aba75d495fd25d7cf97:")),
+    [],
   );
 }
 {

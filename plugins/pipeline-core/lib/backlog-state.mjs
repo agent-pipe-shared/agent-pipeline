@@ -53,9 +53,6 @@ const AFK_REPAIR_EVIDENCE_KEYS = new Set(["kind", "commit", "reference", "source
 const AFK_REPAIR_DATE = "2026-07-23";
 const AFK_REPAIR_ACTOR = "sentinel-recovery";
 const AFK_REPAIR_REASON = "Repair the single missing initial ledger event for the existing open AFK-authorization process item; no status change or completion is claimed.";
-const MANAGED_ONBOARDING_REPAIR_DATE = "2026-07-25";
-const MANAGED_ONBOARDING_REPAIR_ACTOR = "backlog-ledger-repair";
-const MANAGED_ONBOARDING_REPAIR_REASON = "Repair the single missing initial ledger event for the existing open managed-onboarding success-contract item; no status change or completion is claimed.";
 const PROJECT_CLOSURE_READBACK_KEYS = new Set(["schema", "repository", "commit", "readbackCommit"]);
 const SENTINEL_RECOVERY_CATALOG_KEYS = new Set(["schema", "source", "recoveredAt", "items"]);
 const SENTINEL_RECOVERY_ITEM_KEYS = new Set(["id", "status", "type"]);
@@ -488,6 +485,7 @@ function validateTransitionShape(event, label, { readDispositionBytes = null, au
   const amendment = event.from === "closed" && event.to === "closed" && event?.evidence?.kind === "evidence-amendment";
   const reachabilityAmendment = event.from === event.to
     && event?.evidence?.kind === "reachability-amendment";
+  const v2Amendment = isV2EvidenceAmendment(event);
   const afkRepair = event.id === AFK_REPAIR_ID && event.from === null && event.to === "open" && event?.evidence?.kind === "missing-initial-ledger-repair";
   const managedRepair = event.id === MANAGED_ONBOARDING_REPAIR_ID && event.from === null && event.to === "open" && event?.evidence?.kind === "missing-initial-ledger-repair";
   if (event.from === event.to && !amendment && !reachabilityAmendment) errors.push(`${label}: transition must change status`);
@@ -500,10 +498,6 @@ function validateTransitionShape(event, label, { readDispositionBytes = null, au
   if (!isPlainObject(event.evidence)) errors.push(`${label}: evidence must be an object`);
   else if (v2Amendment) {
     errors.push(...validateBacklogEvidenceAmendment(event.evidence, { label: `${label}: evidence`, readDispositionBytes, authorizeAmendment }));
-  }
-  else if (isV2 && managedOnboardingRepair) {
-    for (const key of Object.keys(event.evidence)) if (!AFK_REPAIR_EVIDENCE_KEYS.has(key)) errors.push(v2Finding("SHAPE", `${label}: evidence has unsupported field ${key}`));
-    if (!HASH.test(asString(event.evidence.sourceSha256))) errors.push(v2Finding("SHAPE", `${label}: sourceSha256 must be a SHA-256 hex digest`));
   }
   else if (isV2) {
     errors.push(...validateV2OrdinaryEvidence(event.evidence, `${label}: evidence`));
@@ -603,6 +597,7 @@ export function validateTransitionLedger(events, items, { commitExists = null, r
   }
   const stateById = new Map();
   const closureCommitById = new Map();
+  const localEvidenceCommits = [];
   const reachabilitySupersessions = new Set();
   for (const event of events) {
     if (event?.evidence?.kind !== "reachability-amendment") continue;
@@ -648,26 +643,21 @@ export function validateTransitionLedger(events, items, { commitExists = null, r
       if (prior === "closed") {
         const closureAmendment = event.from === "closed" && event.to === "closed" && event?.evidence?.kind === "evidence-amendment";
         const reachabilityAmendment = event.from === "closed" && event.to === "closed" && event?.evidence?.kind === "reachability-amendment";
-        if (!closureAmendment && !reachabilityAmendment) errors.push(`${label}: closed must never transition to another status`);
+        if (v2Amendment) {
+          if (event.to !== "closed") mark(index, `${label}: evidence amendment must preserve closed status`);
+        } else if (!closureAmendment && !reachabilityAmendment) errors.push(`${label}: closed must never transition to another status`);
         else if (closureAmendment && event.evidence.previousClosureCommit !== closureCommitById.get(event.id)) errors.push(`${label}: previousClosureCommit does not bind the prior closure`);
+      } else if (v2Amendment) {
+        if (event.to !== prior) mark(index, `${label}: evidence amendment must not mutate status`);
       } else if (event?.evidence?.kind === "reachability-amendment") {
         if (event.to !== prior) errors.push(`${label}: reachability amendment must preserve status`);
       } else if (FORWARD_TRANSITIONS[prior] !== event.to) errors.push(`${label}: ${prior} may only move to ${FORWARD_TRANSITIONS[prior]}`);
     }
     if (BACKLOG_STATUSES.includes(event.to)) stateById.set(event.id, event.to);
-    if (event.to === "closed"
-      && event?.evidence?.kind !== "reachability-amendment"
-      && OID.test(asString(event?.evidence?.commit))) {
-      closureCommitById.set(event.id, event.evidence.commit);
-    }
+    const projectedCommit = projectedClosureCommit(event);
+    if (event.to === "closed" && event?.evidence?.kind !== "reachability-amendment" && OID.test(asString(projectedCommit))) closureCommitById.set(event.id, projectedCommit);
     const externalProjectClosure = item?.metadata?.closure_repository?.startsWith("project:") && event.to === "closed";
-    if (typeof commitExists === "function"
-      && !externalProjectClosure
-      && OID.test(asString(event?.evidence?.commit))
-      && !reachabilitySupersessions.has(event.sequence)
-      && !commitExists(event.evidence.commit)) {
-      errors.push(`${label}: evidence.commit is not a reachable local Git commit`);
-    }
+    if (!externalProjectClosure && OID.test(asString(event?.evidence?.commit))) localEvidenceCommits.push({ index, commit: event.evidence.commit });
     previousHash = typeof event.entryHash === "string" ? event.entryHash : previousHash;
   }
 
@@ -755,6 +745,7 @@ export function validateTransitionLedger(events, items, { commitExists = null, r
       acceptedByTarget.set(evidence.targetSequence, amendment.index);
     }
     for (const record of localEvidenceCommits) {
+      if (reachabilitySupersessions.has(record.index + 1)) continue;
       if (reachable(record.commit)) continue;
       if (acceptedByTarget.has(record.index + 1)) continue;
       mark(record.index, `ledger event ${record.index + 1}: evidence.commit is not a reachable local Git commit`);
@@ -766,9 +757,16 @@ export function validateTransitionLedger(events, items, { commitExists = null, r
     if (current === undefined) errors.push(`items: ${id} has no transition-ledger entry`);
     else if (current !== item.metadata.status) errors.push(`items: ${id} status does not match its final ledger transition`);
     if (item.metadata.status === "closed" && current === "closed") {
-      const final = [...events].reverse().find((event) =>
-        event?.id === id && event?.evidence?.kind !== "reachability-amendment");
-      if (final?.evidence?.commit !== item.metadata.closure_commit) errors.push(`items: ${id} closure_commit must equal its final ledger evidence.commit`);
+      const final = [...events].reverse().find((event) => event?.id === id && event?.evidence?.kind !== "reachability-amendment");
+      if (projectedClosureCommit(final) !== item.metadata.closure_commit) {
+        const finding = isV2EvidenceAmendment(final)
+          ? `items: ${id} closure_commit must equal its final ledger evidence.replacementCommit`
+          : `items: ${id} closure_commit must equal its final ledger evidence.commit`;
+        errors.push(isV2EvidenceAmendment(final) ? v2Finding("BOUND", finding) : finding);
+      }
+      if (isV2EvidenceAmendment(final) && item.metadata.closure_evidence !== final.evidence.reference) {
+        errors.push(v2Finding("BOUND", `items: ${id} closure_evidence must equal its final ledger evidence.reference`));
+      }
     }
   }
   return errors;

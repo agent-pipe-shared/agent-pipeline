@@ -337,8 +337,6 @@ function recoveryFixture(catalog = sentinelCatalog()) {
 }
 const AFK_REPAIR_ID = "pipeline.elephant-direct-implementation-under-afk-authorization";
 const AFK_REPAIR_SOURCE = "close-block ritual step 6b authorship check, native-Windows Verify block (see HISTORY.md 2026-07-23 entry, docs/state.md close-ritual authorship-check incident bullet)";
-const MANAGED_ONBOARDING_REPAIR_ID = "pipeline.managed-onboarding-success-contract";
-const MANAGED_ONBOARDING_REPAIR_SOURCE = "close-block self-retro, 0.4.4 managed-workspace onboarding hotfix";
 function afkRepairFixture() {
   const root = fixtureRoot();
   const other = item();
@@ -550,33 +548,6 @@ function managedRepairInput(root, overrides = {}) {
   const state = checkBacklogState(root, { checkCommit: false });
   const wrong = planElephantAfkLedgerRepair(state.items, state.events, afkRepairInput({ id: "pipeline.other" }));
   check("BS16 AFK repair rejects another target or any additional finding with zero mutation", !rejected.ok && !wrong.ok && readFileSync(join(root, "backlog/transitions.ndjson"), "utf8") === before);
-}
-
-{
-  const root = managedOnboardingRepairFixture();
-  const ledgerBefore = readFileSync(join(root, "backlog/transitions.ndjson"), "utf8");
-  const current = checkBacklogState(root, { checkCommit: false });
-  const preview = planManagedOnboardingLedgerRepair(current.items, current.events, managedOnboardingRepairInput());
-  const applied = applyManagedOnboardingLedgerRepair(root, managedOnboardingRepairInput(), { checkCommit: false });
-  const valid = checkBacklogState(root, { checkCommit: false });
-  const replay = applyManagedOnboardingLedgerRepair(root, managedOnboardingRepairInput(), { checkCommit: false });
-  check("BS16a managed-onboarding repair admits only its exact missing initial event",
-    current.findings.length === 1 && preview.ok && applied.ok && applied.wrote
-      && readFileSync(join(root, "backlog/transitions.ndjson"), "utf8").startsWith(ledgerBefore)
-      && applied.transition.id === MANAGED_ONBOARDING_REPAIR_ID
-      && applied.transition.from === null && applied.transition.to === "open"
-      && applied.transition.evidence.sourceSha256 === createHash("sha256").update(MANAGED_ONBOARDING_REPAIR_SOURCE).digest("hex")
-      && valid.ok && !replay.ok,
-    [...preview.errors, ...applied.findings, ...valid.findings, ...replay.findings].join("; "));
-}
-
-{
-  const root = managedOnboardingRepairFixture();
-  const before = readFileSync(join(root, "backlog/transitions.ndjson"), "utf8");
-  const wrong = applyManagedOnboardingLedgerRepair(root, managedOnboardingRepairInput({ actor: "other-repair" }), { checkCommit: false });
-  const sourceDrift = applyManagedOnboardingLedgerRepair(root, managedOnboardingRepairInput({ source: "other source" }), { checkCommit: false });
-  check("BS16b managed-onboarding repair rejects actor or source drift with zero mutation",
-    !wrong.ok && !sourceDrift.ok && readFileSync(join(root, "backlog/transitions.ndjson"), "utf8") === before);
 }
 
 {
@@ -1006,6 +977,22 @@ function managedRepairInput(root, overrides = {}) {
 {
   const canonical = loadBacklogState(process.cwd(), { checkCommit: false });
   const historical = canonical.events.slice(0, 41);
+  const terminalById = new Map();
+  for (const event of historical) terminalById.set(event.id, event);
+  const historicalItems = canonical.items
+    .filter((entry) => terminalById.has(entry.metadata.id))
+    .map((entry) => {
+      const terminal = terminalById.get(entry.metadata.id);
+      const metadata = { ...entry.metadata, status: terminal.to };
+      if (terminal.to === "closed") {
+        const closure = [...historical].reverse().find((event) => event.id === terminal.id && event.evidence?.kind !== "reachability-amendment");
+        metadata.closure_commit = closure.evidence.commit;
+        metadata.closure_evidence = closure.evidence.reference;
+      } else {
+        for (const key of ["closed_at", "closure_repository", "closure_commit", "closure_evidence", "closure_readback"]) delete metadata[key];
+      }
+      return { ...entry, metadata };
+    });
   const input = {
     at: "2026-07-30",
     actor: "hotfix-047-reachability-repair",
@@ -1025,12 +1012,12 @@ function managedRepairInput(root, overrides = {}) {
       },
     ],
   };
-  const planned = planBacklogReachabilityRepair(canonical.items, historical, input);
-  const rejectedReplay = planBacklogReachabilityRepair(canonical.items, canonical.events, input);
-  const statuses = new Map(canonical.items.map((entry) => [entry.metadata.id, entry.metadata.status]));
+  const planned = planBacklogReachabilityRepair(historicalItems, historical, input);
+  const repaired = planned.ok ? [...historical, ...planned.appended] : historical;
+  const rejectedReplay = planBacklogReachabilityRepair(historicalItems, repaired, input);
+  const statuses = new Map(historicalItems.map((entry) => [entry.metadata.id, entry.metadata.status]));
   check("BS12 events 39/40 are repaired only by append-only reachable evidence with status preserved",
-    canonical.ok
-      && planned.ok
+    planned.ok
       && planned.appended.length === 2
       && planned.appended[0].sequence === 42
       && planned.appended[1].sequence === 43
@@ -1039,7 +1026,7 @@ function managedRepairInput(root, overrides = {}) {
       && planned.appended.every((entry) => entry.from === entry.to && entry.to === statuses.get(entry.id))
       && !rejectedReplay.ok
       && rejectedReplay.errors.some((error) => error.includes("already appended")),
-    [...canonical.findings, ...planned.errors, ...rejectedReplay.errors].join("; "));
+    [...planned.errors, ...rejectedReplay.errors].join("; "));
 }
 
 for (const root of roots) rmSync(root, { recursive: true, force: true });

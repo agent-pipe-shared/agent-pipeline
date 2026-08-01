@@ -10,7 +10,7 @@
  * CLI process would test the sandbox rather than onboarding behavior.
  */
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -116,16 +116,12 @@ function actionArgs(result) {
   return result.nextAction.argv.slice(1);
 }
 
-function makeReady(path) {
-  const portable = run(onboarding, ["plan", "--root", path], path);
-  assert.equal(run(onboarding, actionArgs(portable.json), path).json.status, "runtime-initialization-required");
-  const runtime = run(onboarding, ["plan-runtime", "--root", path], path);
-  assert.equal(run(onboarding, actionArgs(runtime.json), path).json.status, "restart-required");
+function completeRuntimeReadback(path, now = 50_000) {
   const barrier = readRestartBarrier({ rootDir: path, spawn: cliGit });
   const issued = issueLaunchTicket({
     rootDir: path,
     barrierSha256: barrier.rawSha256,
-    now: 50_000,
+    now,
     spawn: cliGit,
     codexExecutable: process.execPath,
   });
@@ -133,7 +129,7 @@ function makeReady(path) {
     rootDir: path,
     ticketId: issued.ticketId,
     token: issued.token,
-    now: 50_001,
+    now: now + 1,
     spawn: cliGit,
     receipt: {
       schema: "pipeline.codex-project-runtime-readback.v1",
@@ -145,9 +141,16 @@ function makeReady(path) {
       effectiveConfigSha256: sha256("e2e-effective"),
       validatedAgentsSha256: sha256("e2e-agents"),
       ticketId: issued.ticketId,
-      observedAtEpochMs: 50_001,
+      observedAtEpochMs: now + 1,
     },
   });
+}
+function makeReady(path) {
+  const portable = run(onboarding, ["plan", "--root", path], path);
+  assert.equal(run(onboarding, actionArgs(portable.json), path).json.status, "runtime-initialization-required");
+  const runtime = run(onboarding, ["plan-runtime", "--root", path], path);
+  assert.equal(run(onboarding, actionArgs(runtime.json), path).json.status, "restart-required");
+  completeRuntimeReadback(path);
   const goal = "Recover one governed project";
   const kickoff = planProjectOnboardingKickoffV4({
     rootDir: path,
@@ -431,13 +434,14 @@ test("ready roots recover a missing manifest and a governed V3 registry checkout
     const manifestPath = join(path, ".claude", "pipeline.yaml");
     unlinkSync(manifestPath);
     const missing = run(onboarding, ["inspect", "--root", path], path);
-    assert.equal(missing.json.status, "partial");
-    assert.equal(missing.json.diagnostics[0].code, "manifest_invalid");
-    const manifestPlan = run(onboarding, actionArgs(missing.json), path);
-    assert.equal(manifestPlan.json.status, "ready");
-    assert.equal(manifestPlan.json.target.path, ".claude/pipeline.yaml");
-    const manifestApplied = run(onboarding, manifestPlan.json.applyAction.argv.slice(1), path);
-    assert.equal(manifestApplied.json.status, "ready");
+    assert.equal(missing.json.status, "runtime-initialization-required");
+    assert.equal(missing.json.diagnostics[0].code, "runtime_missing");
+    const runtimePlan = run(onboarding, actionArgs(missing.json), path);
+    assert.equal(runtimePlan.json.status, "runtime-initialization-required");
+    const runtimeApplied = run(onboarding, actionArgs(runtimePlan.json), path);
+    assert.equal(runtimeApplied.json.status, "restart-required");
+    completeRuntimeReadback(path, 60_000);
+    assert.equal(run(onboarding, ["inspect", "--root", path], path).json.status, "ready");
 
     const sourcePath = join(path, "pipeline.user.yaml");
     const currentSource = readFileSync(sourcePath, "utf8");

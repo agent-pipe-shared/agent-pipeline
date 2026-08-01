@@ -97,7 +97,7 @@
     {
       "class": "design",
       "path": "specs/sprint-nova-epic/design/rebase-readiness-0.4.7.md",
-      "sha256": "2c9236806e7f43a10dd14eb249fa274675caa314c35b1c917c7377fdc307c274",
+      "sha256": "bec6d30f710b070e1b739990373e68f49f8fa2f07d53bcc57c9e670a0b2ea7ba",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"
