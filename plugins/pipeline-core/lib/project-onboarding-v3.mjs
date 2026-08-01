@@ -2711,7 +2711,8 @@ function v4Inspection(rootDir, fs, intent = "onboarding") {
         rootDir: legacy.root,
         provenance: provenance.status === "ready" ? provenance : undefined,
       });
-      if (projectAuthority.status === "mixed" && migration.status === "ready") {
+      if ((projectAuthority.status === "mixed" || projectAuthority.code === "PA-LEGACY-STATE-RETIREMENT-REQUIRED")
+        && migration.status === "ready") {
         return lifecycleResult({
           status: "migration-required",
           root: legacy.root,
@@ -2728,8 +2729,12 @@ function v4Inspection(rootDir, fs, intent = "onboarding") {
           diagnostics: [lifecycleDiagnostic(
             "$.authority",
             "project_authority_remote_adoption_required",
-            "a remote checkout left a partial neutral authority beside a complete legacy authority",
-            "review the typed adoption plan; it archives neutral preimages in private Git metadata before replacing them",
+            projectAuthority.code === "PA-LEGACY-STATE-RETIREMENT-REQUIRED"
+              ? "a mutable legacy lifecycle State remains beside canonical neutral authority"
+              : "a remote checkout left a partial neutral authority beside a complete legacy authority",
+            projectAuthority.code === "PA-LEGACY-STATE-RETIREMENT-REQUIRED"
+              ? "review and apply the typed legacy-State retirement; it removes only the stale duplicate after an exact neutral-State preimage check"
+              : "review the typed adoption plan; it archives neutral preimages in private Git metadata before replacing them",
           )],
         });
       }

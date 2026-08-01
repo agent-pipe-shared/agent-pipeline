@@ -212,16 +212,37 @@ try {
     assert.equal(readFileSync(join(base, lock), "utf8"), "foreign lock\n");
     assert.equal(JSON.parse(readFileSync(join(base, NEUTRAL_STATE), "utf8")).continuity.runtime.sessionCleanup.sessionId, completed.sessionId);
   });
-  ok("activation is explicit and preserves legacy", () => {
+  ok("activation is explicit and retires the mutable legacy State", () => {
     const base = root(); legacy(base); const plan = planProjectAuthorityMigration({ rootDir: base });
     assert.equal(applyProjectAuthorityMigration(plan, { rootDir: base }).status, "activation-required");
     assert.equal(applyProjectAuthorityMigration(plan, { rootDir: base, activate: true }).status, "applied");
     assert.equal(readProjectAuthority({ rootDir: base }).source, "neutral");
     assert.equal(readFileSync(join(base, LEGACY_MANIFEST), "utf8"), readFileSync(join(base, NEUTRAL_MANIFEST), "utf8"));
-    assert.equal(readFileSync(join(base, LEGACY_STATE), "utf8"), readFileSync(join(base, NEUTRAL_STATE), "utf8"));
+    assert.equal(existsSync(join(base, LEGACY_STATE)), false);
     assert.equal(readFileSync(join(base, LEGACY_CALIBRATION), "utf8"), readFileSync(join(base, NEUTRAL_CALIBRATION), "utf8"));
     assert.equal(readFileSync(join(base, LEGACY_GUARD_CONFIG), "utf8"), readFileSync(join(base, NEUTRAL_GUARD_CONFIG), "utf8"));
     assert.equal(readFileSync(join(base, LEGACY_GUARD_AUDIT), "utf8"), readFileSync(join(base, NEUTRAL_GUARD_AUDIT), "utf8"));
+  });
+  ok("a stale legacy State requires exact retirement before neutral reads resume", () => {
+    const base = root(); legacy(base);
+    assert.equal(applyProjectAuthorityMigration(planProjectAuthorityMigration({ rootDir: base }), { rootDir: base, activate: true }).status, "applied");
+    const canonical = readFileSync(join(base, NEUTRAL_STATE), "utf8");
+    write(base, LEGACY_STATE, '{"schema":"pipeline.state.v0","planApproved":false}\n');
+    const blocked = readProjectAuthority({ rootDir: base });
+    assert.equal(blocked.status, "migration-required");
+    assert.equal(blocked.code, "PA-LEGACY-STATE-RETIREMENT-REQUIRED");
+    const plan = planProjectAuthorityMigration({ rootDir: base });
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.operation, "retire-legacy-state");
+    assert.deepEqual(plan.targets.map(({ path, action }) => ({ path, action })), [{ path: LEGACY_STATE, action: "retire" }]);
+    assert.equal(applyProjectAuthorityMigration(plan, { rootDir: base }).status, "activation-required");
+    assert.equal(readFileSync(join(base, LEGACY_STATE), "utf8"), '{"schema":"pipeline.state.v0","planApproved":false}\n');
+    const applied = applyProjectAuthorityMigration(plan, { rootDir: base, activate: true });
+    assert.equal(applied.status, "applied");
+    assert.equal(applied.legacyStateRetired, true);
+    assert.equal(existsSync(join(base, LEGACY_STATE)), false);
+    assert.equal(readFileSync(join(base, NEUTRAL_STATE), "utf8"), canonical);
+    assert.equal(readProjectAuthority({ rootDir: base }).status, "ready");
   });
   ok("migration preserves the canonical terminal generated YAML bytes without later drift", () => {
     const base = root(); legacy(base);

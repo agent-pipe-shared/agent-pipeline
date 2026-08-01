@@ -4,8 +4,10 @@
  *
  * Planning has no writes and exposes only paths and digests.  An in-process,
  * unchanged plan plus an explicit activation are required for a write.  The
- * legacy `.claude` authority is never moved or removed: consumers dual-read
- * it until the neutral `project/` authority has been committed and read back.
+ * legacy `.claude` configuration remains a compatibility input until the
+ * neutral `project/` authority has been committed and read back.  Mutable
+ * lifecycle State is different: after cutover, only the neutral State may
+ * remain, so a stale legacy copy can never become a second authority.
  */
 import { createHash } from "node:crypto";
 import {
@@ -202,10 +204,28 @@ function authority(root) {
         }
       }
     }
-    // A state file from a different layer would make the reader dependent on
-    // precedence rather than one authority boundary.  Stop instead of mixing.
+    // Lifecycle State is mutable.  Retaining a legacy copy after the neutral
+    // cutover creates two plausible, eventually divergent sources of truth.
+    // Do not hide that drift behind precedence: require the bounded retirement
+    // action before any reader proceeds.
+    if (neutral.state.status === "present" && legacy.state.status === "present") {
+      return {
+        status: "migration-required",
+        code: "PA-LEGACY-STATE-RETIREMENT-REQUIRED",
+        reason: "neutral authority and legacy lifecycle State coexist",
+        source: "neutral",
+        manifest: NEUTRAL_MANIFEST,
+        state: neutral.state.status === "present" ? NEUTRAL_STATE : null,
+        calibration: neutral.calibration.status === "present" ? NEUTRAL_CALIBRATION : null,
+        guardConfig: neutral.guardConfig.status === "present" ? NEUTRAL_GUARD_CONFIG : null,
+        guardAudit: neutral.guardAudit.status === "present" ? NEUTRAL_GUARD_AUDIT : null,
+        manifestSha256: neutral.manifest.sha256,
+        stateSha256: neutral.state.sha256,
+        legacyStateSha256: legacy.state.sha256,
+      };
+    }
     if (neutral.state.status === "absent" && legacy.state.status === "present") {
-      return { status: "mixed", reason: "neutral authority has no neutral state while legacy state remains" };
+      return { status: "mixed", reason: "neutral authority has no neutral State while legacy lifecycle State remains" };
     }
     for (const [name, neutralImage, legacyImage] of [
       ["calibration", neutral.calibration, legacy.calibration],
@@ -512,6 +532,25 @@ export function planProjectAuthorityMigration({ rootDir = process.cwd(), provena
     const { transaction, journal } = transactionPaths(root);
     if (existsSync(transaction) || existsSync(journal)) return result("recovery-required", { diagnostics: ["project authority recovery is required"], targets: [] });
     const current = authority(root);
+    if (current.code === "PA-LEGACY-STATE-RETIREMENT-REQUIRED") {
+      const neutralState = image(root, NEUTRAL_STATE);
+      const legacyState = image(root, LEGACY_STATE);
+      if (neutralState.status !== "present" || legacyState.status !== "present") {
+        return result("invalid-source", { diagnostics: ["legacy State retirement preimage is unavailable"], targets: [] });
+      }
+      return remember(result("ready", {
+        source: "neutral",
+        operation: "retire-legacy-state",
+        compatibility: "neutral-state-only",
+        targets: [{ path: LEGACY_STATE, kind: "legacy-project-state", before: legacyState, action: "retire" }],
+        activation: { required: true, command: "apply --activate", legacyStateRetired: true },
+      }), {
+        root,
+        status: "retire-legacy-state",
+        neutralState,
+        legacyState,
+      });
+    }
     if (current.status === "mixed") {
       if (provenance === undefined || provenance === null) return result("provenance-rejected", { code: "PA-PROVENANCE-REQUIRED", diagnostics: ["adopt-existing-neutral requires closed runtime/source/destination provenance"], targets: [] });
       if (provenanceResult.value?.operation !== undefined && provenanceResult.value.operation !== "adopt-existing-neutral") return result("provenance-rejected", { code: "PA-PROVENANCE-MISMATCH", diagnostics: ["mixed authority requires adopt-existing-neutral provenance"], targets: [] });
@@ -652,6 +691,30 @@ export function applyProjectAuthorityMigration(plan, { rootDir = process.cwd(), 
   let root;
   try {
     root = realRoot(rootDir); if (root !== state.root) throw new Error("apply root differs from the authenticated plan root");
+    if (state.status === "retire-legacy-state") {
+      const current = authority(root);
+      const neutralState = image(root, NEUTRAL_STATE);
+      const legacyState = image(root, LEGACY_STATE);
+      if (current.code !== "PA-LEGACY-STATE-RETIREMENT-REQUIRED"
+        || !sameImage(neutralState, state.neutralState)
+        || !sameImage(legacyState, state.legacyState)) {
+        throw new Error("legacy State retirement preimage changed since planning");
+      }
+      unlinkSync(projectPath(root, LEGACY_STATE));
+      fsyncDirectory(dirname(projectPath(root, LEGACY_STATE)));
+      const readback = authority(root);
+      if (readback.status !== "ready" || readback.source !== "neutral"
+        || readback.state !== NEUTRAL_STATE
+        || readback.stateSha256 !== state.neutralState.sha256) {
+        throw new Error("neutral State readback failed after legacy retirement");
+      }
+      PLANS.delete(plan);
+      return result("applied", {
+        source: "neutral",
+        targets: [LEGACY_STATE],
+        legacyStateRetired: true,
+      });
+    }
     const { transaction } = transactionPaths(root); if (existsSync(transaction)) throw new Error("project authority recovery is required");
     if (!authenticated(plan)) throw new Error("public plan changed since authentication");
     const portability = legacyStatePortability(root);
@@ -667,11 +730,44 @@ export function applyProjectAuthorityMigration(plan, { rootDir = process.cwd(), 
         if (interruptAfterRename?.({ index, target: entry.path })) throw new IntentionalInterruption(`interrupted after ${entry.path}`);
       }
       journal.state = "complete"; durableJournal(root, journal); rmSync(transaction, { recursive: true, force: true }); fsyncDirectory(root);
-      const readback = authority(root); if (readback.status !== "ready" || readback.source !== "neutral") throw new Error("neutral authority readback failed");
+      // The copy phase has committed the neutral State.  Retire the legacy
+      // state as a final, exact-image step so static Claude compatibility
+      // files remain available without leaving a second mutable authority.
+      const legacyStateEntry = journal.targets.find((entry) => entry.path === NEUTRAL_STATE);
+      const observedLegacyState = image(root, LEGACY_STATE);
+      if (legacyStateEntry?.after?.status === "present"
+        && !sameImage(observedLegacyState, legacyStateEntry.after)) {
+        return result("retirement-required", {
+          source: "neutral",
+          code: "PA-LEGACY-STATE-RETIREMENT-STALE",
+          diagnostics: ["legacy State changed before retirement"],
+          targets: [LEGACY_STATE],
+        });
+      }
+      try {
+        if (observedLegacyState.status === "present") {
+          unlinkSync(projectPath(root, LEGACY_STATE));
+          fsyncDirectory(dirname(projectPath(root, LEGACY_STATE)));
+        }
+      } catch (error) {
+        return result("retirement-required", {
+          source: "neutral",
+          code: "PA-LEGACY-STATE-RETIREMENT-UNRESOLVED",
+          diagnostics: [error.message],
+          targets: [LEGACY_STATE],
+        });
+      }
+      const readback = authority(root); if (readback.status !== "ready" || readback.source !== "neutral") return result("retirement-required", {
+        source: "neutral",
+        code: "PA-LEGACY-STATE-RETIREMENT-UNRESOLVED",
+        diagnostics: ["neutral authority readback requires legacy State retirement"],
+        targets: [LEGACY_STATE],
+      });
       PLANS.delete(plan); return result("applied", {
         source: "neutral",
         targets: state.targets.map(({ path }) => path),
-        legacyRetained: true,
+        legacyConfigurationRetained: true,
+        legacyStateRetired: true,
         ...(adoptionArchive === null ? {} : { adoptionArchive, adoptionReceipt: adoptionArchive.receipt }),
       });
     } catch (error) {
