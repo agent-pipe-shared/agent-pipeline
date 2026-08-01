@@ -15,7 +15,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { isAbsolute, join, relative, resolve } from "node:path";
+import { basename, isAbsolute, join, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { parseGuardCommand } from "../hooks/guard-command-grammar.mjs";
@@ -105,6 +105,116 @@ function topology(root, spawn = spawnSync) {
   const info = lstatSync(common);
   if (!info.isDirectory() || info.isSymbolicLink()) fail("HGO-COMMON-DIR", "Git common directory is unsafe");
   return { root: physical, common };
+}
+
+/**
+ * Read Git's already-created control layout without spawning Git.  This is
+ * deliberately narrower than topology(): it exists only so a Codex PreTool
+ * adapter which cannot spawn host Git can consume a capability for the one
+ * global action that does not mutate the repository.  Normal HGO requests
+ * continue to require Git's live HEAD/tree/status observation.
+ */
+function controlPathTopology(root) {
+  const physical = physicalRoot(root);
+  const control = join(physical, ".git");
+  if (!existsSync(control)) fail("HGO-CONTROL", "Git control path is missing");
+  const info = lstatSync(control);
+  let gitDir;
+  if (info.isDirectory() && !info.isSymbolicLink()) {
+    gitDir = realpathSync(control);
+  } else if (info.isFile() && !info.isSymbolicLink() && info.nlink === 1) {
+    const match = readFileSync(control, "utf8").match(/^gitdir:\s*(.+?)\s*$/mu);
+    if (!match || match[1].includes("\0")) fail("HGO-CONTROL", "Git control file is malformed");
+    const candidate = resolve(physical, match[1]);
+    const candidateInfo = lstatSync(candidate);
+    if (!candidateInfo.isDirectory() || candidateInfo.isSymbolicLink()) {
+      fail("HGO-CONTROL", "Git worktree control directory is unsafe");
+    }
+    gitDir = realpathSync(candidate);
+  } else {
+    fail("HGO-CONTROL", "Git control path is unsafe");
+  }
+  const commonFile = join(gitDir, "commondir");
+  let common = gitDir;
+  if (existsSync(commonFile)) {
+    const commonInfo = lstatSync(commonFile);
+    if (!commonInfo.isFile() || commonInfo.isSymbolicLink() || commonInfo.nlink !== 1) {
+      fail("HGO-CONTROL", "Git common-dir declaration is unsafe");
+    }
+    const raw = readFileSync(commonFile, "utf8").trim();
+    if (raw === "" || raw.includes("\0")) fail("HGO-CONTROL", "Git common-dir declaration is malformed");
+    const candidate = resolve(gitDir, raw);
+    const candidateInfo = lstatSync(candidate);
+    if (!candidateInfo.isDirectory() || candidateInfo.isSymbolicLink()) {
+      fail("HGO-CONTROL", "Git common directory is unsafe");
+    }
+    common = realpathSync(candidate);
+  }
+  return { root: physical, common };
+}
+
+function pluginSourceTreeSha256(sourceRoot) {
+  const entries = [];
+  const visit = (directory, prefix = "") => {
+    const children = readdirSync(directory, { withFileTypes: true })
+      .sort((left, right) => left.name.localeCompare(right.name));
+    for (const child of children) {
+      const relativePath = prefix === "" ? child.name : `${prefix}/${child.name}`;
+      const absolutePath = join(directory, child.name);
+      const info = lstatSync(absolutePath);
+      if (info.isSymbolicLink()) fail("HGO-PLUGIN-SOURCE", "local plugin source contains a symbolic link");
+      if (info.isDirectory()) {
+        visit(absolutePath, relativePath);
+        continue;
+      }
+      if (!info.isFile() || info.nlink !== 1 || realpathSync(absolutePath) !== absolutePath) {
+        fail("HGO-PLUGIN-SOURCE", "local plugin source contains an unsafe entry");
+      }
+      entries.push({ path: relativePath, sha256: sha(readFileSync(absolutePath)) });
+    }
+  };
+  visit(sourceRoot);
+  return sha(entries);
+}
+
+function localPluginInstallSourceObservation(repo) {
+  if (!isPipelineSourceRoot(repo.root)) fail("HGO-PLUGIN-SOURCE", "repository is not a Pipeline plugin source checkout");
+  const marketplace = join(repo.root, ".claude-plugin", "marketplace.json");
+  const sourceRoot = join(repo.root, "plugins", "pipeline-core");
+  const manifest = join(sourceRoot, ".codex-plugin", "plugin.json");
+  const sourceInfo = lstatSync(sourceRoot);
+  if (!sourceInfo.isDirectory() || sourceInfo.isSymbolicLink() || realpathSync(sourceRoot) !== sourceRoot) {
+    fail("HGO-PLUGIN-SOURCE", "local plugin source directory is unsafe");
+  }
+  for (const path of [marketplace, manifest]) {
+    const info = lstatSync(path);
+    if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || realpathSync(path) !== path) {
+      fail("HGO-PLUGIN-SOURCE", "local plugin source file is unsafe");
+    }
+  }
+  let marketplaceValue;
+  try { marketplaceValue = JSON.parse(readFileSync(marketplace, "utf8")); }
+  catch { fail("HGO-PLUGIN-SOURCE", "local marketplace declaration is malformed"); }
+  const registered = marketplaceValue?.name === "agent-pipeline-local"
+    && Array.isArray(marketplaceValue?.plugins)
+    && marketplaceValue.plugins.some((entry) => entry?.name === "pipeline-core" && entry?.source === "./plugins/pipeline-core");
+  if (!registered) fail("HGO-PLUGIN-SOURCE", "local marketplace does not bind pipeline-core");
+  return {
+    fingerprintSha256: sha({ physicalRoot: repo.root, physicalCommon: repo.common }),
+    head: null,
+    tree: null,
+    statusSha256: sha({
+      kind: "local-plugin-install-source.v1",
+      marketplaceSha256: sha(readFileSync(marketplace)),
+      manifestSha256: sha(readFileSync(manifest)),
+      pluginTreeSha256: pluginSourceTreeSha256(sourceRoot),
+    }),
+  };
+}
+
+function isPipelineSourceRoot(root) {
+  return existsSync(join(root, "plugins", "pipeline-core", ".codex-plugin", "plugin.json"))
+    && existsSync(join(root, "harness", "scripts", "verify.mjs"));
 }
 
 function secureDirectory(path, {
@@ -407,6 +517,20 @@ function exactGitSubcommand(parsed) {
   return segment.argv[index] ?? null;
 }
 
+function exactLocalPluginInstall(toolName, toolInput, root) {
+  if (toolName !== "Bash" || !isPipelineSourceRoot(root)) return false;
+  const parsed = parseGuardCommand(String(toolInput?.command ?? ""), root);
+  if (parsed.parseStatus !== "accepted" || parsed.segments.length !== 1
+    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return false;
+  const segment = parsed.segments[0];
+  if (!/codex(?:\.exe)?$/iu.test(basename(segment.executable))) return false;
+  return canonical(segment.argv) === canonical([
+    "plugin",
+    "add",
+    "pipeline-core@agent-pipeline-local",
+  ]);
+}
+
 function actionPreview(toolName, toolInput, paths, commandClass) {
   if (toolName === "Bash") {
     return {
@@ -450,7 +574,14 @@ function denialRetryActions(denials) {
 }
 
 function decisionPreview({ toolName, toolInput, paths, commandClass, denials }) {
-  const effect = commandClass === "git-commit"
+  const effect = commandClass === "local-plugin-install"
+    ? {
+      repository: "does not change the bound repository working tree, index, refs, or configuration",
+      external: "adds exactly pipeline-core@agent-pipeline-local to the host Codex plugin registry from the bound local source",
+      rollbackRecovery: "read back the native plugin registry; removal/restart remains a separately attended operator action",
+      residualRisk: "the host-wide Codex plugin selection changes and existing sessions keep their already-loaded plugin until the attended refresh boundary",
+    }
+    : commandClass === "git-commit"
     ? {
       repository: "creates one local commit from the already staged index if Git and hooks succeed",
       external: "no external effect is expected from git commit",
@@ -623,6 +754,15 @@ function eligibility(root, toolName, toolInput, { selectedAuthorSourceRoot = nul
   const serialized = canonical(toolInput);
   if (/(?:gh[pousr]_[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:token|password|secret)\s*[:=]\s*["']?[A-Za-z0-9+/_=-]{12,})/u.test(serialized)) {
     return { eligible: false, code: "HGO-NONOVERRIDABLE-SECRET", paths };
+  }
+  if (exactLocalPluginInstall(toolName, toolInput, root)) {
+    return {
+      eligible: true,
+      mode: "global-plugin-install",
+      sourceRoot: join(root, "plugins", "pipeline-core"),
+      paths,
+      commandClass: "local-plugin-install",
+    };
   }
   if (new Set(["Edit", "Write"]).has(toolName)) {
     const path = safePath(root, toolInput?.file_path);
@@ -940,7 +1080,7 @@ function validatedCapability(paths, path) {
     || !SHA256.test(value.toolInputSha256 ?? "")
     || typeof value.commandClass !== "string" || value.commandClass.trim() === ""
     || !object(value.policy) || !object(value.preview)
-    || !new Set(["standard", "pipeline-author-repair"]).has(value.mode)
+    || !new Set(["standard", "pipeline-author-repair", "global-plugin-install"]).has(value.mode)
     || !(value.authorSourceRoot === null || typeof value.authorSourceRoot === "string")
     || !SHA256.test(value.mac ?? "")
     || !(value.consumedAt === null || typeof value.consumedAt === "string")
@@ -969,7 +1109,7 @@ function validatedRequest(paths, requestSha256) {
     "policy", "preview", "eligiblePaths", "commandClass", "mode", "authorSourceRoot", "createdAt", "expiresAt",
   ])
     || request.schema !== REQUEST_SCHEMA || request.root === undefined
-    || !new Set(["standard", "pipeline-author-repair-candidate"]).has(request.mode)
+    || !new Set(["standard", "pipeline-author-repair-candidate", "global-plugin-install"]).has(request.mode)
     || request.authorSourceRoot !== null
     || !SHA256.test(request.toolInputSha256) || !Array.isArray(request.denials)
     || sha(request) !== requestSha256) fail("HGO-REQUEST", "override request is invalid");
@@ -986,9 +1126,16 @@ export function recordHumanGuardDenial({
   ttlMs = DEFAULT_TTL_MS,
   spawn = spawnSync,
 } = {}) {
-  const repo = topology(rootDir, spawn);
   if (!Array.isArray(denials) || denials.length === 0) fail("HGO-DENIAL", "denial set is empty");
-  const repository = repositoryObservation(repo.root, spawn);
+  const physicalRootDir = physicalRoot(rootDir);
+  const eligible = eligibility(physicalRootDir, toolName, toolInput);
+  const isLocalPluginInstall = eligible.eligible && eligible.mode === "global-plugin-install";
+  const repo = isLocalPluginInstall
+    ? controlPathTopology(physicalRootDir)
+    : topology(physicalRootDir, spawn);
+  const repository = isLocalPluginInstall
+    ? localPluginInstallSourceObservation(repo)
+    : repositoryObservation(repo.root, spawn);
   if (denials.some(({ guard }) => String(guard) === "guard-push.mjs")) {
     return recoveryRoute("HGO-PUBLICATION-REQUIRED", toolName, toolInput, [], {
       root: repo.root,
@@ -1007,7 +1154,6 @@ export function recordHumanGuardDenial({
       },
     };
   }
-  const eligible = eligibility(repo.root, toolName, toolInput);
   if (!eligible.eligible && !eligible.authorCandidate) {
     return recoveryRoute(eligible.code, toolName, toolInput, eligible.paths, {
       root: repo.root,
@@ -1078,19 +1224,37 @@ export function planHumanGuardOverride({
   scriptPath,
   authorSourceRoot: selectedAuthorSourceRoot = null,
 } = {}) {
-  const repo = topology(rootDir, spawn);
-  const paths = storage(repo.common);
-  const request = validatedRequest(paths, requestSha256);
+  let repo;
+  let paths;
+  let topologyError = null;
+  try {
+    repo = topology(rootDir, spawn);
+    paths = storage(repo.common);
+  } catch (error) {
+    topologyError = error;
+    repo = controlPathTopology(rootDir);
+    paths = storage(repo.common);
+  }
+  let request;
+  try { request = validatedRequest(paths, requestSha256); }
+  catch (error) {
+    if (topologyError !== null) throw topologyError;
+    throw error;
+  }
+  const isLocalPluginInstall = request.mode === "global-plugin-install";
+  if (topologyError !== null && !isLocalPluginInstall) throw topologyError;
   if (request.root !== repo.root || new Date(request.expiresAt).getTime() <= nowMs) fail("HGO-EXPIRED", "override request expired");
   const plugin = pluginIdentity(pluginRoot);
-  const repository = repositoryObservation(repo.root, spawn);
+  const repository = isLocalPluginInstall
+    ? localPluginInstallSourceObservation(repo)
+    : repositoryObservation(repo.root, spawn);
   const policy = policyIdentity(repo.root, pluginRoot, request.denials);
   if (canonical(plugin) !== canonical(request.plugin)
     || canonical(policy) !== canonical(request.policy)
     || canonical(repository) !== canonical(request.repository)) {
     fail("HGO-DRIFT", "override request preimage drifted");
   }
-  let mode = "standard";
+  let mode = isLocalPluginInstall ? "global-plugin-install" : "standard";
   let authorSourceRootValue = null;
   if (request.mode === "pipeline-author-repair-candidate") {
     authorSourceRootValue = authorEligiblePaths(repo.root, request.eligiblePaths, selectedAuthorSourceRoot);
@@ -1263,7 +1427,9 @@ export function authorizeHumanGuardOverride({
     scriptPath,
     authorSourceRoot,
   });
-  const repo = topology(rootDir, spawn);
+  const repo = planned.mode === "global-plugin-install"
+    ? controlPathTopology(rootDir)
+    : topology(rootDir, spawn);
   const paths = storage(repo.common);
   const capabilityCore = {
     schema: CAPABILITY_SCHEMA,
@@ -1345,7 +1511,11 @@ export function consumeHumanGuardOverride({
   spawn = spawnSync,
 } = {}) {
   let repo;
-  try { repo = topology(rootDir, spawn); } catch { return { status: "absent" }; }
+  try { repo = topology(rootDir, spawn); }
+  catch {
+    try { repo = controlPathTopology(rootDir); }
+    catch { return { status: "absent" }; }
+  }
   const paths = storage(repo.common);
   const toolInputSha256 = sha(toolInput);
   const denialDigests = denials.map((denial) => ({
@@ -1381,7 +1551,13 @@ export function consumeHumanGuardOverride({
       }
       const plugin = pluginIdentity(pluginRoot);
       const policy = policyIdentity(repo.root, pluginRoot, denials);
-      const repository = repositoryObservation(repo.root, spawn);
+      const isLocalPluginInstall = capability.mode === "global-plugin-install";
+      if (isLocalPluginInstall && !exactLocalPluginInstall(toolName, toolInput, repo.root)) {
+        return { status: "replan", code: "HGO-PLUGIN-INSTALL-SHAPE" };
+      }
+      const repository = isLocalPluginInstall
+        ? localPluginInstallSourceObservation(repo)
+        : repositoryObservation(repo.root, spawn);
       const expired = new Date(capability.expiresAt).getTime() <= nowMs;
       const drifted = capability.status !== "armed" || capability.root !== repo.root
         || capability.toolName !== toolName || capability.toolInputSha256 !== toolInputSha256
