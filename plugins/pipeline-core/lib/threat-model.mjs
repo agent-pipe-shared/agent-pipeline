@@ -3,6 +3,7 @@
 import { createHash } from "node:crypto";
 
 export const THREAT_MODEL_SCHEMA = "pipeline.threat-model.v1";
+export const SECURITY_REQUIREMENT_SCHEMA = "pipeline.security-requirement.v1";
 export const THREAT_MODEL_APPLICABILITY = Object.freeze(["required", "not-applicable", "deferred", "incomplete", "invalid"]);
 const RISK_INPUTS = Object.freeze(["assurance", "exposure", "data", "privilege", "dependencies", "architecture", "deployment", "agentEgress"]);
 const own = (value, fields) => value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === fields.length && fields.every((field) => Object.hasOwn(value, field));
@@ -12,6 +13,12 @@ const stableId = (kind, value) => `${kind}-${createHash("sha256").update(`${kind
 /** Closed machine authority: candidate and effective policy are inseparable. */
 export function validateThreatModel(model) {
   if (!own(model, ["schema", "candidate", "policyRevision", "classification", "entities", "lifecycle"]) || model.schema !== THREAT_MODEL_SCHEMA || !own(model.candidate, ["commit", "tree"]) || !text(model.candidate.commit) || !text(model.candidate.tree) || !text(model.policyRevision) || !["public", "private"].includes(model.classification) || !Array.isArray(model.entities) || !["draft", "proposed", "approved", "implementing", "verified", "accepted-risk", "superseded", "retired"].includes(model.lifecycle)) return { valid: false, code: "THREAT-MODEL-INVALID" };
+  return { valid: true };
+}
+
+/** Requirement proposals may link obligations, but cannot grant risk authority. */
+export function validateSecurityRequirement(requirement) {
+  if (!own(requirement, ["schema", "id", "candidate", "policyRevision", "links", "state"]) || requirement.schema !== SECURITY_REQUIREMENT_SCHEMA || !text(requirement.id) || !own(requirement.candidate, ["commit", "tree"]) || !text(requirement.candidate.commit) || !text(requirement.candidate.tree) || !text(requirement.policyRevision) || !Array.isArray(requirement.links) || !requirement.links.every((link) => own(link, ["kind", "id"]) && ["threat", "baseline", "test", "evidence"].includes(link.kind) && text(link.id)) || !["draft", "proposed", "implementing", "verified", "superseded", "retired"].includes(requirement.state)) return { valid: false, code: "SECURITY-REQUIREMENT-INVALID" };
   return { valid: true };
 }
 
