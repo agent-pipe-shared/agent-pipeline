@@ -118,6 +118,53 @@ change.
    URLs, credentials, secrets, or private identifiers. The validator rejects
    those forms rather than persisting them.
 
+### Kickoff intake, durable design package, and document quality
+
+Before the first `kickoff plan`, obtain both a single-line project goal and an
+explicit PO profile: `epic`, `feature`, or `mini`. Ask for them together when
+the project is pristine; if the user supplied only a goal, ask for the profile
+before continuing. Explain the choices briefly (`epic` = cross-package
+initiative, `feature` = bounded deliverable, `mini` = small, contained change).
+Never infer, silently select, or retrospectively claim a profile from the
+amount of text, an assistant's preferred route, or a model preflight. The
+profile is a PO input, not a second confirmation for an already authorized
+local onboarding transaction.
+
+The transaction-created `specs/kickoff-*` files are provisional bootstrap
+anchors, not the standard long-term design location. Once material design input
+exists, create the normal design package before presenting a planning result
+or proposing a restart, then use the sanctioned kickoff-promotion flow. Its
+directory is `specs/YYYY-MM-DD_short-topic/`, where the date is the local
+creation date and `short-topic` is a short, lowercase, ASCII-safe summary of
+the user's topic. Use `prd_short-topic.md`, `spec.md`, and `design-input.md`.
+Do not overwrite an existing package; choose an unambiguous suffix after a
+readback. The promotion's `--profile`, feature ID, plan path, PRD path and Spec
+path must bind to that package exactly.
+
+`design-input.md` is source evidence, not an unbounded conversation dump. It
+records a faithful, sanitised structured extraction of the material input
+(context, goals/non-goals, requested behaviour, constraints, risks, open
+questions, and stated decisions) plus its capture date. The PRD and Spec both
+link to it and carry a compact traceability table from its sections to their
+requirements/decisions. Preserve the user's specificity; do not collapse a
+detailed design into the initial one-line goal. Never persist private
+identifiers, credentials, host paths, URLs, commands, or raw transcripts; when
+such data is material, record only a redacted statement and a digest/reference
+that is safe for the repository.
+
+For material input, replace the bootstrap placeholders with a useful PRD and
+Spec before a normal plan gate. The PRD covers problem/users, outcomes and
+success measures, scope/non-goals, requirements with testable acceptance
+criteria, assumptions/risks/open questions, and user-flow decisions. The Spec
+covers linked source evidence, architecture and component responsibilities,
+interfaces/state or data, operational constraints, test/verification approach,
+and explicit PRD-to-Spec traceability. If the input describes an ordered user
+flow, state transition, branching, event handoff, or operational workflow,
+include a valid Mermaid flow/sequence/state diagram wherever it materially
+clarifies that flow (normally the PRD user flow and/or the Spec execution
+flow), and record a syntax self-check. Do not add a decorative diagram when no
+flow exists.
+
 ## Typed lazy loading
 
 The happy path loads no reference file. Load only the exact condition:

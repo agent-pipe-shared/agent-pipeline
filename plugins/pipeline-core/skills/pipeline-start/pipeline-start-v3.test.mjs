@@ -31,4 +31,11 @@ assert.match(core, /\*\*and\n   before proposing, displaying, or performing any 
 assert.match(core, /input received\n   after a short kickoff goal has already initialized the project/u);
 assert.match(core, /do not reduce it to a new short\n   kickoff goal or merely promise to remember it/u);
 assert.match(core, /Read back `resume-hint\.mjs inspect` after a\n   successful capture/u);
+assert.match(core, /obtain both a single-line project goal and an\nexplicit PO profile: `epic`, `feature`, or `mini`/u);
+assert.match(core, /Never infer, silently select, or retrospectively claim a profile/u);
+assert.match(core, /`specs\/kickoff-\*` files are provisional bootstrap\nanchors, not the standard long-term design location/u);
+assert.match(core, /`specs\/YYYY-MM-DD_short-topic\/`/u);
+assert.match(core, /`prd_short-topic\.md`, `spec\.md`, and `design-input\.md`/u);
+assert.match(core, /The PRD and Spec both\nlink to it and carry a compact traceability table/u);
+assert.match(core, /include a valid Mermaid flow\/sequence\/state diagram wherever it materially\nclarifies that flow/u);
 process.stdout.write("pipeline-start V3: core budget and lazy-reference checks passed\n");
