@@ -1,9 +1,10 @@
 # CYB-3 — SBOM lifecycle (feature spec)
 
-> **Status: DRAFT, design-phase, pre-gate.** Translates issue #39 (fetched
-> verbatim via `gh issue view 39`, 2026-07-25) into checkable form. Phase II,
-> depends on the CYB-1 boundary (applicability only — spec.md §4). Not
-> dispatched.
+> **Status: IMPLEMENTATION, PO-authorized 2026-08-01.** Translates issue #39
+> (fetched verbatim via `gh issue view 39`, 2026-07-25) into checkable form.
+> Phase II depends on the CYB-1 applicability boundary (resolved by the
+> scoped F1 Critic PASS at `20cc401`); the PO's direction to complete the
+> Cyborg epic authorizes implementation under the approved epic plan.
 
 ## 1. Problem (condensed)
 
@@ -88,3 +89,12 @@ Universal package rule (Verify + Security green, fresh Critic, PO gate). No
 dispatch before the epic-level PO gate and CYB-1 boundary are resolved; schema/
 adapter/fixture work may start once boundaries are approved (issue's own
 "Parallelism" note).
+
+## 8. Rollback
+
+Every CYB-3 slice is independently reversible. If a consumer rejects the new
+manifest contract or its profile bindings, stop adoption, revert that slice and
+its Verify registration together, retain any previously immutable release
+inventory unchanged, and record the candidate and evidence that triggered the
+rollback. No rollback may rewrite an historical SBOM or activate migration;
+the legacy baseline remains available until a separately approved migration.

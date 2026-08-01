@@ -20,6 +20,7 @@ const LIFECYCLE = ["state", "code"];
 const own = (value, fields) => value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === fields.length && fields.every((field) => Object.hasOwn(value, field));
 const string = (value) => typeof value === "string" && value.trim() !== "";
 const digest = (value) => createHash("sha256").update(value).digest("hex");
+const objectsWith = (value, fields) => Array.isArray(value) && value.every((entry) => entry !== null && typeof entry === "object" && !Array.isArray(entry) && fields.every((field) => string(entry[field])));
 
 /** Stable JSON encoding with lexicographically ordered object keys. */
 export function canonicalJson(value) {
@@ -42,11 +43,19 @@ function normalizedPayload(format, payload) {
   return copy;
 }
 
-/** Check the two pinned interchange profiles before a payload can be digested. */
+/**
+ * Check the required fields of the two pinned JSON interchange profiles before
+ * a payload can be digested. The portable core deliberately accepts no
+ * profile/version aliases: adapters must emit CycloneDX 1.6 or SPDX 2.3.
+ */
 export function validateSbomPayload(format, payload) {
   if (!Object.hasOwn(SBOM_FORMAT_PROFILES, format) || payload === null || typeof payload !== "object" || Array.isArray(payload)) return { valid: false, code: "SBOM-PAYLOAD-FORMAT" };
-  if (format === "cyclonedx-json") return payload.bomFormat === "CycloneDX" && payload.specVersion === "1.6" && Array.isArray(payload.components) ? { valid: true } : { valid: false, code: "SBOM-CYCLONEDX-PROFILE" };
-  return payload.spdxVersion === "SPDX-2.3" && Array.isArray(payload.packages) ? { valid: true } : { valid: false, code: "SBOM-SPDX-PROFILE" };
+  if (format === "cyclonedx-json") {
+    const valid = payload.bomFormat === "CycloneDX" && payload.specVersion === "1.6" && Number.isInteger(payload.version) && payload.version >= 1 && objectsWith(payload.components, ["type", "name"]);
+    return valid ? { valid: true } : { valid: false, code: "SBOM-CYCLONEDX-PROFILE" };
+  }
+  const valid = payload.spdxVersion === "SPDX-2.3" && payload.dataLicense === "CC0-1.0" && string(payload.SPDXID) && string(payload.name) && string(payload.documentNamespace) && payload.creationInfo !== null && typeof payload.creationInfo === "object" && !Array.isArray(payload.creationInfo) && objectsWith(payload.packages, ["SPDXID", "name"]);
+  return valid ? { valid: true } : { valid: false, code: "SBOM-SPDX-PROFILE" };
 }
 
 /** Strip only prescribed volatile serial/timestamp values and bind the logical payload. */
@@ -76,6 +85,7 @@ export function validateSbomManifest(manifest) {
   if (!(["complete", "partial", "unsupported"].includes(manifest?.completeness?.status) && Number.isInteger(manifest?.completeness?.declared) && Number.isInteger(manifest?.completeness?.observed) && manifest.completeness.declared >= manifest.completeness.observed && manifest.completeness.observed >= 0)) errors.push("completeness: invalid declaration");
   closed(errors, manifest?.freshness, FRESHNESS, "freshness");
   if (!(["fresh", "stale"].includes(manifest?.freshness?.status) && typeof manifest?.freshness?.candidateMatches === "boolean" && typeof manifest?.freshness?.sourceInputsMatch === "boolean")) errors.push("freshness: invalid declaration");
+  if (manifest?.freshness?.status === "fresh" && (!manifest.freshness.candidateMatches || !manifest.freshness.sourceInputsMatch)) errors.push("freshness: fresh requires exact candidate and source-input matches");
   closed(errors, manifest?.privacy, PRIVACY, "privacy");
   if (!(["public", "private"].includes(manifest?.privacy?.classification) && ["public-redacted", "private-only"].includes(manifest?.privacy?.exportPolicy))) errors.push("privacy: invalid declaration");
   closed(errors, manifest?.payload, PAYLOAD, "payload");

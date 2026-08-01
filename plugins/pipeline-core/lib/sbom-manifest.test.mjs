@@ -6,9 +6,9 @@ import { canonicalizeSbomPayload, SBOM_FORMAT_PROFILES, SBOM_MANIFEST_SCHEMA, va
 let passed = 0;
 function test(name, fn) { try { fn(); passed += 1; console.log(`PASS ${name}`); } catch (error) { console.error(`FAIL ${name}: ${error.message}`); process.exitCode = 1; } }
 const hex = (character) => character.repeat(64);
-const cdx = { bomFormat: "CycloneDX", specVersion: "1.6", serialNumber: "urn:uuid:one", metadata: { timestamp: "2026-08-01T00:00:00Z", component: { name: "app" } }, components: [{ name: "left-pad", version: "1.3.0" }] };
-const cdxEquivalent = { components: [{ name: "left-pad", version: "1.3.0" }], metadata: { component: { name: "app" }, timestamp: "2027-01-01T00:00:00Z" }, specVersion: "1.6", bomFormat: "CycloneDX", serialNumber: "urn:uuid:two" };
-const spdx = { spdxVersion: "SPDX-2.3", creationInfo: { created: "2026-08-01T00:00:00Z" }, packages: [{ SPDXID: "SPDXRef-left-pad", name: "left-pad", versionInfo: "1.3.0" }] };
+const cdx = { bomFormat: "CycloneDX", specVersion: "1.6", version: 1, serialNumber: "urn:uuid:one", metadata: { timestamp: "2026-08-01T00:00:00Z", component: { name: "app" } }, components: [{ type: "library", name: "left-pad", version: "1.3.0" }] };
+const cdxEquivalent = { components: [{ type: "library", name: "left-pad", version: "1.3.0" }], metadata: { component: { name: "app" }, timestamp: "2027-01-01T00:00:00Z" }, version: 1, specVersion: "1.6", bomFormat: "CycloneDX", serialNumber: "urn:uuid:two" };
+const spdx = { spdxVersion: "SPDX-2.3", dataLicense: "CC0-1.0", SPDXID: "SPDXRef-DOCUMENT", name: "app", documentNamespace: "https://example.invalid/spdx/app", creationInfo: { created: "2026-08-01T00:00:00Z" }, packages: [{ SPDXID: "SPDXRef-left-pad", name: "left-pad", versionInfo: "1.3.0" }] };
 const cdxDigest = canonicalizeSbomPayload("cyclonedx-json", cdx).sha256;
 const spdxDigest = canonicalizeSbomPayload("spdx-json", spdx).sha256;
 const recordDigest = createHash("sha256").update([`cyclonedx-json:${cdxDigest}`, `spdx-json:${spdxDigest}`].sort().join("\n")).digest("hex");
@@ -21,7 +21,7 @@ const manifest = {
 };
 test("pinned CycloneDX and SPDX profiles validate", () => { assert.equal(validateSbomPayload("cyclonedx-json", cdx).valid, true); assert.equal(validateSbomPayload("spdx-json", spdx).valid, true); });
 test("volatile serials and timestamps do not affect a logical digest", () => assert.equal(canonicalizeSbomPayload("cyclonedx-json", cdx).sha256, canonicalizeSbomPayload("cyclonedx-json", cdxEquivalent).sha256));
-test("unpinned profile fails closed", () => assert.equal(validateSbomPayload("cyclonedx-json", { ...cdx, specVersion: "1.5" }).valid, false));
+test("unpinned and structurally malformed profiles fail closed", () => { assert.equal(validateSbomPayload("cyclonedx-json", { ...cdx, specVersion: "1.5" }).valid, false); assert.equal(validateSbomPayload("cyclonedx-json", { ...cdx, components: [{}] }).valid, false); assert.equal(validateSbomPayload("spdx-json", { ...spdx, dataLicense: "MIT" }).valid, false); });
 test("closed manifest validates", () => assert.deepEqual(validateSbomManifest(manifest), { valid: true }));
 test("every required root field and unknown manifest field fail closed", () => {
   for (const field of Object.keys(manifest)) { const { [field]: omitted, ...withoutField } = manifest; assert.equal(validateSbomManifest(withoutField).valid, false, field); }
@@ -33,7 +33,7 @@ test("nested required fields and malformed digests fail closed", () => {
   assert.equal(validateSbomManifest({ ...manifest, sourceInputs: [{ ...manifest.sourceInputs[0], sha256: "not-a-digest" }] }).valid, false);
   assert.equal(validateSbomManifest({ ...manifest, payload: { ...manifest.payload, canonicalSha256: "not-a-digest" } }).valid, false);
 });
-test("complete cannot conceal stale or partial evidence", () => { assert.equal(validateSbomManifest({ ...manifest, freshness: { ...manifest.freshness, status: "stale" } }).valid, false); assert.equal(validateSbomManifest({ ...manifest, completeness: { ...manifest.completeness, status: "partial" } }).valid, false); });
+test("complete cannot conceal stale, unmatched or partial evidence", () => { assert.equal(validateSbomManifest({ ...manifest, freshness: { ...manifest.freshness, status: "stale" } }).valid, false); assert.equal(validateSbomManifest({ ...manifest, freshness: { ...manifest.freshness, candidateMatches: false } }).valid, false); assert.equal(validateSbomManifest({ ...manifest, freshness: { ...manifest.freshness, sourceInputsMatch: false } }).valid, false); assert.equal(validateSbomManifest({ ...manifest, completeness: { ...manifest.completeness, status: "partial" } }).valid, false); });
 test("per-format and aggregate digest mismatches differ", () => { assert.equal(validateSbomRecord({ ...manifest, payload: { ...manifest.payload, formats: { ...manifest.payload.formats, "spdx-json": { ...manifest.payload.formats["spdx-json"], sha256: hex("e") } } } }, { "cyclonedx-json": cdx, "spdx-json": spdx }).code, "SBOM-PAYLOAD-DIGEST-MISMATCH"); assert.equal(validateSbomRecord({ ...manifest, payload: { ...manifest.payload, canonicalSha256: hex("f") } }, { "cyclonedx-json": cdx, "spdx-json": spdx }).code, "SBOM-CANONICAL-DIGEST-MISMATCH"); });
 test("record binds both independently validated profiles", () => assert.deepEqual(validateSbomRecord(manifest, { "cyclonedx-json": cdx, "spdx-json": spdx }), { valid: true, digest: recordDigest }));
 console.log(`\n${passed} passed`);
