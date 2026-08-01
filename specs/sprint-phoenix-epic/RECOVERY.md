@@ -509,6 +509,48 @@ rejection: any confirmed canonical collision remains rejected, while a corrected
 successor requires its own candidate-bound evidence before it may replace the
 reverted validation.
 
+## R-16 — Recovery Bridge status-projection rollback path
+
+This record is limited to candidate
+`08202731833e30f20cc8da1be302d512ad6fb458`
+(`fix(phoenix): project pending bridge recovery`). That candidate changes only
+the `feature-package-status` projection for an outstanding private Recovery
+Bridge transaction: an exact current `public-committed` bridge transaction
+must be reported as `recovery-required`, and malformed or drifted private
+bridge state must never be reported as `ready`.
+
+If a concrete regression is diagnosed in that projection, the safe operator
+action is one new local compensating commit produced by:
+
+```text
+git revert 08202731833e30f20cc8da1be302d512ad6fb458
+```
+
+The revert is candidate-specific. It must not use `reset`, history rewriting,
+rebase, force-push, or an automatic remote operation. It also must not be
+used to change an in-flight bridge outcome: operators must not manually edit,
+delete, move, or synthesize private Recovery Bridge journals, the generic
+feature-package transaction journal, or any lifecycle manifest. An existing
+bridge transaction remains recoverable only through the sanctioned
+`feature-package-recover` writer and its exact receipt.
+
+Immediately after the compensating commit, perform read-only verification
+without altering those artifacts: inspect the unchanged Phoenix lifecycle
+manifest through `feature-package-inspect`, query
+`feature-package-status --manifest specs/sprint-phoenix-epic/lifecycle.json`,
+and confirm that the result is explained by the unchanged transaction state
+rather than a hand-edited journal or manifest. A status result alone is not a
+rollback success claim and does not authorize issuing, consuming, extending,
+or replacing a Product Owner decision.
+
+The compensating candidate requires fresh candidate-bound regression gates:
+the focused pipeline-state suite, aggregate `node harness/scripts/verify.mjs`,
+the integrated Security gate, and a fresh independent diff-scoped Critic.
+Only their exact evidence may establish that the revert restored the prior
+projection safely. Until then, the outcome is a pending local rollback with no
+claim of recovered lifecycle state, completion, push, merge, release, or
+remote write.
+
 ## Audit classification
 
 These records illustrate the Phoenix recovery profile:
