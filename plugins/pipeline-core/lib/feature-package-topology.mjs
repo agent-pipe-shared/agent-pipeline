@@ -170,14 +170,20 @@ export function planFeaturePackageBootstrap(rootDir = process.cwd(), manifestPat
   if (value?.schema !== FEATURE_PACKAGE_SCHEMA) findings.push("FTP-MANIFEST: unsupported schema");
   if (!exact(value?.feature, ["id", "rigor"]) || !SAFE_ID.test(value?.feature?.id ?? "") || value.feature.id !== pathId || ![1, 2].includes(value?.feature?.rigor)) findings.push("FTP-FEATURE: bootstrap feature id and rigor are invalid");
   if (value?.state !== "draft") findings.push("FTP-STATE: bootstrap target must be draft");
-  if (!Array.isArray(value?.artifacts) || value.artifacts.length === 0) findings.push("FTP-ARTIFACTS: draft bootstrap requires artifacts");
+  if (!Array.isArray(value?.artifacts) || value.artifacts.length !== 1) findings.push("FTP-ARTIFACTS: draft bootstrap requires exactly one artifact");
   if (value?.candidate !== null || value?.supersedes !== null) findings.push("FTP-BOOTSTRAP: draft bootstrap forbids candidate and supersedes bindings");
+  const folded = new Set();
+  const packageFiles = caseFoldedPackageFiles(root, pathId);
   for (const [index, artifact] of (Array.isArray(value?.artifacts) ? value.artifacts : []).entries()) {
     const label = `FTP-ARTIFACT-${index}`;
     if (!exact(artifact, ["class", "path", "sha256", "authority", "mutability", "retention"])) { findings.push(`${label}: closed artifact keys are required`); continue; }
     if (artifact.class !== "prd" || artifact.authority !== true || artifact.mutability !== "mutable" || artifact.retention !== "active") findings.push(`${label}: draft bootstrap permits only an active mutable authoritative prd`);
     if (packageRelative(pathId, artifact.path) === null || !canonicalRelative(root, artifact.path) || !SHA256.test(artifact.sha256 ?? "")) findings.push(`${label}: artifact binding is invalid`);
     else {
+      const caseKey = artifact.path.normalize("NFKC").toLocaleLowerCase("en-US");
+      if (folded.has(caseKey)) findings.push(`${label}: duplicate or case-fold/Unicode-normalization-colliding artifact path`);
+      folded.add(caseKey);
+      if ((packageFiles.get(caseKey)?.length ?? 0) > 1) findings.push(`${label}: filesystem case-fold or Unicode-normalization collision`);
       const bound = regularFile(root, artifact.path, findings, label);
       if (bound && digest(readFileSync(join(root, bound))) !== artifact.sha256) findings.push(`${label}: digest does not bind file bytes`);
     }

@@ -33,6 +33,11 @@ try {
   assert.equal(first.status, "bootstrap-preview");
   assert.deepEqual(first, second);
   assert.equal(first.receipt.manifestSha256, hash(proposal.manifestBytes));
+  const duplicateBootstrap = structuredClone(bootstrapManifest);
+  duplicateBootstrap.artifacts.push(structuredClone(bootstrapManifest.artifacts[0]));
+  const duplicatePreview = planFeaturePackageBootstrap(root, bootstrapPath, { targetState: "draft", manifestBytes: `${JSON.stringify(duplicateBootstrap)}\n` });
+  assert.equal(duplicatePreview.status, "rejected");
+  assert.match(duplicatePreview.findings.join("\n"), /exactly one artifact/u);
   assert.equal(planFeaturePackageBootstrap(root, bootstrapPath, { ...proposal, targetState: "approved" }).reason, "invalid-bootstrap-proposal");
   assert.equal(planFeaturePackageBootstrap(root, bootstrapPath, { targetState: "draft" }).reason, "invalid-bootstrap-proposal");
   assert.equal(planFeaturePackageBootstrap(root, `${bootstrapBase}/other.json`, proposal).reason, "invalid-bootstrap-manifest");
@@ -44,5 +49,5 @@ try {
   rmSync(join(root, `${base}/ſpec.md`));
   manifest.artifacts[1].sha256 = "0".repeat(64); writeFileSync(join(root, `${base}/lifecycle.json`), JSON.stringify(manifest));
   assert.match(validateFeatureTopology(root).findings.join("\n"), /digest does not bind/u);
-  console.log("feature-package-topology: 11 passed, 0 failed");
+  console.log("feature-package-topology: 12 passed, 0 failed");
 } finally { rmSync(root, { recursive: true, force: true }); }
