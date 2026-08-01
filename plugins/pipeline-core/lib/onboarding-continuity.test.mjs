@@ -6,6 +6,7 @@ import {
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   symlinkSync,
   writeFileSync,
@@ -66,6 +67,19 @@ function fixture(name, { handover, neutral = false } = {}) {
   writeFileSync(join(root, neutral ? "project" : ".claude", "pipeline.json"),
     `${JSON.stringify(calibration, null, 2)}\n`);
   return root;
+}
+function inventory(root) {
+  const entries = [];
+  const visit = (dir, relative = "") => {
+    for (const name of readdirSync(dir).sort()) {
+      const child = join(dir, name);
+      const rel = relative ? `${relative}/${name}` : name;
+      entries.push(Buffer.from(`${rel}\0`));
+      if (lstatSync(child).isDirectory()) visit(child, rel);
+    }
+  };
+  visit(root);
+  return Buffer.concat(entries);
 }
 
 function targetBytes(root, plan) {
@@ -339,7 +353,7 @@ check("160-byte goal is accepted exactly", () => {
 
 check("kickoff plan is deterministic, closed, valid, and read-only", () => {
   const root = fixture("plan-read-only", { handover: "notes/state with spaces.md" });
-  const before = [...spawnSync("find", [root, "-printf", "%P\\0"], { encoding: "buffer", shell: false }).stdout];
+  const before = [...inventory(root)];
   const first = planOnboardingKickoff({
     rootDir: root,
     goal: "Ship safe onboarding; never run $(touch nope)",
@@ -350,7 +364,7 @@ check("kickoff plan is deterministic, closed, valid, and read-only", () => {
     goal: "  Ship safe onboarding; never run $(touch nope)  ",
     onboardingScript: "/plugin/project-onboarding-v3.mjs",
   });
-  const after = [...spawnSync("find", [root, "-printf", "%P\\0"], { encoding: "buffer", shell: false }).stdout];
+  const after = [...inventory(root)];
   assert.deepEqual(first, second);
   assert.deepEqual(after, before);
   assert.equal(existsSync(join(root, "nope")), false);

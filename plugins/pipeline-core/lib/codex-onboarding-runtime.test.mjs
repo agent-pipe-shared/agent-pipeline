@@ -27,9 +27,16 @@ import { main as onboardingLaunchMain } from "../scripts/codex-onboarding-launch
 import { loadRuntimeProjectionV3OwnedKeys } from "./runtime-projection-v3.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+const TEST_RUNTIME_EXECUTABLE = realpathSync(process.execPath);
 const cases = [];
 function test(name, run) { cases.push([name, run]); }
 function root() { return mkdtempSync(join(tmpdir(), "codex onboarding runtime matrix with spaces-")); }
+function runtimeTestBin(rootDir) {
+  const bin = join(rootDir, "runtime-test-bin");
+  mkdirSync(bin);
+  symlinkSync(TEST_RUNTIME_EXECUTABLE, join(bin, "codex"));
+  return bin;
+}
 function dispose(path) { rmSync(path, { recursive: true, force: true }); }
 function git(path) { const result = spawnSync("git", ["init", "-q", "-b", "main"], { cwd: path, encoding: "utf8" }); assert.equal(result.status, 0, result.stderr); }
 function gitCommon(path) { return () => ({ status: 0, stdout: `${join(path, ".git")}\n`, stderr: "" }); }
@@ -107,7 +114,7 @@ function configReadChildTransportFixture({
   beforeConfigReadResponse = [remoteControlNotification()],
 } = {}) {
   return function childTransport(executable, argv, options) {
-    assert.equal(executable, resolveRuntimeExecutable().physicalPath);
+    assert.equal(executable, TEST_RUNTIME_EXECUTABLE);
     assert.deepEqual(argv, ["--strict-config", "app-server", "--listen", "stdio://"]);
     assert.equal(options.shell, false);
     assert.deepEqual(options.stdio, ["pipe", "pipe", "pipe"]);
@@ -350,7 +357,9 @@ test("the launch wrapper preserves the interactive Codex process contract withou
   const priorSentinel = process.env.PIPELINE_ONBOARDING_HOST_ENV_SENTINEL;
   const priorPath = process.env.PATH;
   try {
-    const executable = resolveRuntimeExecutable().physicalPath;
+    const executable = TEST_RUNTIME_EXECUTABLE;
+    const bin = runtimeTestBin(successPath);
+    process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${priorPath ?? ""}`;
     const prepare = (path, random) => {
       git(path);
       const binding = prepareRuntimeRestartBinding({
@@ -545,7 +554,7 @@ test("a barrier permits only one live issued ticket while expired history remain
   try {
     git(path);
     const fixture = seeded(path);
-    const executable = resolveRuntimeExecutable().physicalPath;
+    const executable = TEST_RUNTIME_EXECUTABLE;
     const binding = prepareRuntimeRestartBinding({
       rootDir: path, ...fixture, codexExecutable: executable, random: counterRandom(0x05, 0x06),
     });
@@ -679,7 +688,7 @@ test("duplicate, malformed, and unsafe ticket-set entries fail authentication an
   try {
     git(path);
     const fixture = seeded(path);
-    const executable = resolveRuntimeExecutable().physicalPath;
+    const executable = TEST_RUNTIME_EXECUTABLE;
     const binding = prepareRuntimeRestartBinding({
       rootDir: path, ...fixture, codexExecutable: executable, random: counterRandom(0x0c, 0x0d),
     });
@@ -879,7 +888,7 @@ test("the strict host helper requires a bound executable, ticket, fresh generati
 test("native config/read admits exact Codex 0.145 config warnings and requires the remote-control status", async () => {
   const path = root();
   try {
-    const executable = resolveRuntimeExecutable().physicalPath;
+    const executable = TEST_RUNTIME_EXECUTABLE;
     for (const status of ["disabled", "connecting", "connected", "errored"]) {
       const observed = await readNativeConfig({
         executable,
@@ -962,8 +971,8 @@ test("the productive main performs native config/read without a config/evidence 
   try {
     git(path);
     const fixture = seeded(path);
-    const executable = resolveRuntimeExecutable().physicalPath;
-    const bin = dirname(executable);
+    const executable = TEST_RUNTIME_EXECUTABLE;
+    const bin = runtimeTestBin(path);
     const binding = prepareRuntimeRestartBinding({
       rootDir: path, ...fixture, codexExecutable: executable, random: counterRandom(0x61, 0x62),
     });
