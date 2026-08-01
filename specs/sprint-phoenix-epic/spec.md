@@ -351,9 +351,19 @@ files are excepted only when their path is already declared here.
 | `docs/product-capability-inventory.json` | register new public capabilities/surfaces | Preserve capability governance. |
 | `.claude/pipeline.yaml` | register new Verify/security/governance paths only through its authoritative source workflow | Make new contracts enforceable without direct generated-file edits. |
 | `harness/scripts/verify.mjs` | add scoped Phoenix suite registrations | One Verify gate must cover every package. |
+| `harness/scripts/phoenix-recovery-bridge-decision-helper.mjs` | create a human-facing Recovery Bridge helper bound to an existing repository-scoped PO gate | Explain scope and non-authorizations without allowing a local caller to mint PO authority. |
+| `harness/scripts/recovery-bridge-approval.test.mjs` | cover explanation tampering, PO-gate binding, and legacy terminal-record inspection | Preserve fail-closed Recovery Bridge semantics. |
 | `harness/definition-of-done.md` | add governance-stream/privacy/external-projection closure checks | Make Epic completion auditable. |
+| `project/pipeline.yaml` | retain the neutral project-authority manifest under the sanctioned migration path | Make runner-neutral project authority inspectable without replacing legacy authority. |
+| `project/pipeline.json` | retain the neutral project calibration surface | Preserve local verification and handover calibration. |
+| `project/guard-config.json` | retain declared protected test-path policy | Keep protected test changes explicit and auditable. |
+| `project/pipeline-state.json` | update only through the sanctioned neutral-state reconciliation writer | Prevent direct edits to the active neutral authority projection. |
 | `plugins/pipeline-core/lib/feature-package-topology.mjs` | extend the accepted #22 planner with a read-only absent-manifest `draft` bootstrap preview | Let PHX-0 bind its initial manifest plan to the canonical topology planner without a temporary or hand-written authority file. |
 | `plugins/pipeline-core/lib/feature-package-topology.test.mjs` | add absent-manifest draft-bootstrap, rejection, and receipt fixtures | Prove the planner extension is closed, deterministic, and does not weaken existing-manifest validation. |
+| `plugins/pipeline-core/lib/project-authority.mjs` | add a preimage-bound, explicit-activation correction for the sole neutral Result-path case mismatch | Repair neutral authority without permitting arbitrary State replacement. |
+| `plugins/pipeline-core/lib/project-authority.test.mjs` | cover preview, explicit activation, readback, and no-op replay of the neutral Result-path correction | Prove the correction cannot become a general State writer. |
+| `plugins/pipeline-core/scripts/project-authority-migration.mjs` | expose the closed `reconcile-state` operator operation with pre-write preview | Keep the correction behind the sanctioned project-authority boundary. |
+| `plugins/pipeline-core/scripts/project-authority-migration.test.mjs` | cover the operator command and readback | Prove the human-facing write route is explicit and bounded. |
 | `specs/sprint-phoenix-epic/lifecycle.json` | reconcile only the existing draft manifest's stale PRD, Spec, acceptance, and architecture digest bindings through the PHX-0A feature-package writer | Keep the reviewed artifact set and `draft` state intact while replacing no authority bytes except the four writer-planned current digest values; forbid manual editing, direct hash replacement, or a state transition. |
 
 ### 7.2 Ruleset-source trust root

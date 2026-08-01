@@ -16,6 +16,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 
 export const PROJECT_AUTHORITY_SCHEMA = "pipeline.project-authority.v1";
 export const PROJECT_AUTHORITY_RECOVERY_SCHEMA = "pipeline.project-authority-recovery.v1";
+export const PROJECT_AUTHORITY_STATE_RECONCILE_SCHEMA = "pipeline.project-authority-state-reconcile.v1";
 export const NEUTRAL_MANIFEST = "project/pipeline.yaml";
 export const NEUTRAL_STATE = "project/pipeline-state.json";
 export const LEGACY_MANIFEST = ".claude/pipeline.yaml";
@@ -29,6 +30,7 @@ const TARGETS = Object.freeze([
 ]);
 const PLANS = new WeakMap();
 const RECOVERY_PLANS = new WeakMap();
+const STATE_RECONCILE_PLANS = new WeakMap();
 const SHA256 = /^[0-9a-f]{64}$/u;
 
 class IntentionalInterruption extends Error {}
@@ -131,6 +133,48 @@ function changedTargets(root) {
     const before = image(root, target.path);
     return { ...target, before, after: source, changed: !sameImage(before, source) };
   }).filter((target) => target.after.status === "present");
+}
+function stateReconcileResult(status, extra = {}) { return { schema: PROJECT_AUTHORITY_STATE_RECONCILE_SCHEMA, status, requiresExplicitActivation: true, ...extra }; }
+function stateResultPathCorrection(root) {
+  const before = image(root, NEUTRAL_STATE);
+  if (before.status !== "present") throw new Error("neutral project state is missing");
+  const value = JSON.parse(bytes(root, NEUTRAL_STATE).toString("utf8"));
+  const result = value?.continuity?.authority?.result;
+  if (!result || typeof result !== "object" || Array.isArray(result) || result.path !== "specs/sprint-phoenix-epic/Result.md" || !SHA256.test(result.sha256)) throw new Error("neutral project state has no recognized Result-path correction");
+  result.path = "specs/sprint-phoenix-epic/result.md";
+  const afterBytes = Buffer.from(`${JSON.stringify(value, null, 2)}\n`, "utf8");
+  return { path: NEUTRAL_STATE, before, after: present(afterBytes), afterBytes };
+}
+
+/** Preview the sole PHX-0 neutral-state case correction; it never writes. */
+export function planProjectAuthorityStateReconciliation({ rootDir = process.cwd() } = {}) {
+  let root;
+  try {
+    root = realRoot(rootDir); const current = authority(root);
+    if (current.status !== "ready" || current.source !== "neutral") return stateReconcileResult("rejected", { reason: "neutral project authority is required" });
+    const target = stateResultPathCorrection(root);
+    const plan = stateReconcileResult("ready", { target: { path: target.path, before: target.before, after: target.after }, correction: "result-path-case" });
+    STATE_RECONCILE_PLANS.set(plan, { root, signature: planSignature(plan), target }); return plan;
+  } catch (error) {
+    return stateReconcileResult(error.message.includes("no recognized") ? "noop" : "rejected", { reason: error.message });
+  }
+}
+function atomicReplace(root, target, before, afterBytes) {
+  const path = projectPath(root, target); if (!sameImage(image(root, target), before)) throw new Error("neutral project state changed since planning");
+  const temporary = join(dirname(path), `.${path.split(sep).at(-1)}.reconcile-${process.pid}-${Date.now()}`);
+  durableWrite(temporary, afterBytes); renameSync(temporary, path); fsyncDirectory(dirname(path));
+  if (!sameImage(image(root, target), present(afterBytes))) throw new Error("neutral project state readback failed");
+}
+/** Apply only an in-process, unchanged Result-path case-correction preview. */
+export function applyProjectAuthorityStateReconciliation(plan, { rootDir = process.cwd(), activate = false } = {}) {
+  const state = STATE_RECONCILE_PLANS.get(plan);
+  if (!state || planSignature(plan) !== state.signature) return stateReconcileResult("rejected", { reason: "unauthenticated or changed plan" });
+  if (!activate) return stateReconcileResult("activation-required", { reason: "explicit activation required" });
+  try {
+    const root = realRoot(rootDir); if (root !== state.root) throw new Error("apply root differs from the authenticated plan root");
+    atomicReplace(root, state.target.path, state.target.before, state.target.afterBytes); STATE_RECONCILE_PLANS.delete(plan);
+    return stateReconcileResult("applied", { target: state.target.path, correction: "result-path-case" });
+  } catch (error) { return stateReconcileResult("rejected", { reason: error.message }); }
 }
 
 /** Read neutral authority first; legacy is a compatibility reader only. */

@@ -6,8 +6,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   applyPendingProjectAuthorityRecovery, applyProjectAuthorityMigration,
+  applyProjectAuthorityStateReconciliation,
   LEGACY_MANIFEST, LEGACY_STATE, NEUTRAL_MANIFEST, NEUTRAL_STATE,
-  planPendingProjectAuthorityRecovery, planProjectAuthorityMigration, readProjectAuthority,
+  planPendingProjectAuthorityRecovery, planProjectAuthorityMigration, planProjectAuthorityStateReconciliation, readProjectAuthority,
 } from "./project-authority.mjs";
 
 const roots = [];
@@ -34,6 +35,15 @@ try {
   ok("neutral authority is a no-op", () => {
     const base = root(); legacy(base); assert.equal(applyProjectAuthorityMigration(planProjectAuthorityMigration({ rootDir: base }), { rootDir: base, activate: true }).status, "applied");
     const plan = planProjectAuthorityMigration({ rootDir: base }); assert.equal(plan.status, "noop"); assert.equal(applyProjectAuthorityMigration(plan, { rootDir: base }).status, "noop");
+  });
+  ok("neutral Result-path correction is previewed, explicit, and preimage-bound", () => {
+    const base = root(); legacy(base); assert.equal(applyProjectAuthorityMigration(planProjectAuthorityMigration({ rootDir: base }), { rootDir: base, activate: true }).status, "applied");
+    write(base, NEUTRAL_STATE, `${JSON.stringify({ continuity: { authority: { result: { path: "specs/sprint-phoenix-epic/Result.md", sha256: "a".repeat(64) } } } }, null, 2)}\n`);
+    const plan = planProjectAuthorityStateReconciliation({ rootDir: base });
+    assert.equal(plan.status, "ready"); assert.equal(applyProjectAuthorityStateReconciliation(plan, { rootDir: base }).status, "activation-required");
+    assert.equal(applyProjectAuthorityStateReconciliation(plan, { rootDir: base, activate: true }).status, "applied");
+    assert.equal(JSON.parse(readFileSync(join(base, NEUTRAL_STATE), "utf8")).continuity.authority.result.path, "specs/sprint-phoenix-epic/result.md");
+    assert.equal(planProjectAuthorityStateReconciliation({ rootDir: base }).status, "noop");
   });
   ok("source and destination drift reject before writes", () => {
     const base = root(); legacy(base); let plan = planProjectAuthorityMigration({ rootDir: base }); write(base, LEGACY_MANIFEST, "changed\n");
