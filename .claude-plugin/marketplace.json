@@ -1,5 +1,5 @@
 {
-  "name": "agent-pipeline",
+  "name": "agent-pipeline-local",
   "description": "The Agent-Pipeline plugin marketplace: one versioned source of truth for the agentic operating model (Elephant / Goldfish / Critic) across all projects. Single plugin source: ./plugins/pipeline-core.",
   "owner": {
     "name": "agent-pipeline"
