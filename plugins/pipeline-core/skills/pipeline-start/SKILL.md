@@ -92,14 +92,19 @@ change.
    diagnosis only, and correct the governed artifact through its reviewed
    recovery path before restarting bootstrap.
 
-6. **Restart hint for visible pre-bootstrap input:** after the portable seed
-   and before a first kickoff, the agent MUST first determine whether the user
-   supplied material design input, scope, constraints, or open questions before
-   pipeline activation. When it did, distil that input into a bounded, closed
-   context card and capture it with `resume-hint.mjs capture --card-file <json>`;
-   do not reduce it to a new short kickoff goal. A short goal with no further
+6. **Restart hint for material session input:** before a first kickoff **and
+   before proposing, displaying, or performing any restart, session cut or
+   Compact after kickoff**, the agent MUST determine whether the user supplied
+   material design input, scope, constraints, or open questions since the last
+   durable PRD/Spec update or Resume-Hint capture. This includes input received
+   after a short kickoff goal has already initialized the project. When it did,
+   distil that input into a bounded, closed context card and capture it with
+   `resume-hint.mjs capture --card-file <json>`; do not reduce it to a new short
+   kickoff goal or merely promise to remember it. A short goal with no further
    material input needs no card. Read back `resume-hint.mjs inspect` after a
-   successful capture and use an `available` card as context for the kickoff.
+   successful capture and state that the `available` card will be used in the
+   next session; when no restart follows, use it as context for the current
+   kickoff or planning step instead.
    The card is never a gate and capture failure must be surfaced honestly rather
    than claimed as persisted context.
    Its exact keys are `intent`, `scope`, `constraints`, and `questions`; each

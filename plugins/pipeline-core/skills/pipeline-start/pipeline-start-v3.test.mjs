@@ -27,4 +27,8 @@ assert.match(all, /four|three|Verify|handover/u);
 assert.match(core, /Operating Model, compiled runtime manifest and recorded active\nplan are the only gate authority/u);
 assert.match(core, /scoped edits, focused tests, state\nreadback, one-line commits, Verify, Critic preparation/u);
 assert.match(core, /A guard\ndenial alone is not a human gate/u);
+assert.match(core, /\*\*and\n   before proposing, displaying, or performing any restart, session cut or\n   Compact after kickoff\*\*/u);
+assert.match(core, /input received\n   after a short kickoff goal has already initialized the project/u);
+assert.match(core, /do not reduce it to a new short\n   kickoff goal or merely promise to remember it/u);
+assert.match(core, /Read back `resume-hint\.mjs inspect` after a\n   successful capture/u);
 process.stdout.write("pipeline-start V3: core budget and lazy-reference checks passed\n");
