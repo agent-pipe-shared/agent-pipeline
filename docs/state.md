@@ -38,6 +38,26 @@ Human-override bypass, `main` integration, publication, remote effect or edit
 outside the exact protected target. Git commits remain single-line invocations
 because of the guard.
 
+## 2026-08-01 Nova restart checkpoint
+
+- Current local implementation commits: `f61c270`, `3808b2b`, `f504700`, and
+  `29ebbf5`. Candidate `29ebbf5` / tree
+  `8dc9f9cdae0469ca0e070dcb32851b1d90713676` passed an attended Full Verify:
+  199 registered receipts, terminal status `passed`, exit `0`, and exact clean
+  candidate binding at start and finish.
+- The local-development Codex plugin was reinstalled successfully as
+  `pipeline-core` version `0.4.7+codex.20260801124809`. The next session must
+  run `pipeline-core:pipeline-start`; its WSL Git/onboarding commands use the
+  declared host-authorized boundary, not a sandbox Git probe.
+- The primary checkout intentionally still has only local plugin-update
+  metadata changes in `.claude-plugin/marketplace.json` and
+  `plugins/pipeline-core/.codex-plugin/plugin.json`; do not fold them into an
+  unrelated implementation commit. No push, merge, or publish occurred.
+- A Codex/host-daemon restart is an expected handover boundary, not a Verify
+  result. After restart, read the current bootstrap result and continue the
+  next bounded Nova implementation task autonomously; retain the standing
+  TP-1 through TP-5 task-scoped lifts and single-line commit convention.
+
 ## 2026-07-31 0.4.7 release qualification — authoritative latest
 
 - The public release surfaces are unified at `0.4.7` (`VERSION`, Codex and
