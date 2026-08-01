@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { createThreatEntityId, evaluateThreatBoundary, evaluateThreatImpact, evaluateThreatModelApplicability, previewThreatModelMigration, threatModelDigest } from "./threat-model.mjs";
+import { createThreatEntityId, evaluateThreatBoundary as evaluateThreatBoundaryCore, evaluateThreatImpact, evaluateThreatModelApplicability, previewThreatModelMigration, threatModelDigest } from "./threat-model.mjs";
 import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "./po-approval-proof.mjs";
 
 const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
+const evaluateThreatBoundary = (input) => evaluateThreatBoundaryCore({ deliveryCandidate: input.model?.candidate ?? candidate, ...input });
 const required = { applicability: "required", riskInputs: { assurance: true, exposure: true, data: true, privilege: true, dependencies: true, architecture: true, deployment: true, agentEgress: true } };
 const absentRisk = Object.fromEntries(Object.keys(required.riskInputs).map((key) => [key, false]));
 const model = (lifecycle) => ({ schema: "pipeline.threat-model.v1", candidate, policyRevision: "policy-v1", classification: "public", entities: [], lifecycle });

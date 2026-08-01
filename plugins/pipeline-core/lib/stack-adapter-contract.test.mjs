@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 
 import {
   REPRESENTATIVE_STACK_ADAPTERS,
@@ -11,6 +11,7 @@ import {
 } from "./stack-adapter-contract.mjs";
 import { buildStackCapabilityPlan, STACK_CAPABILITIES } from "./stack-capability-plan.mjs";
 import { createDynamicTargetAuthorization } from "./stack-dynamic-boundary.mjs";
+import { PO_APPROVAL_PROOF_SCHEMA } from "./po-approval-proof.mjs";
 import { validateSecurityEvidenceV2 } from "./security-evidence-evaluator.mjs";
 
 const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
@@ -18,7 +19,9 @@ const observations = [];
 const discovery = { ok: true, schema: "pipeline.stack-discovery.v1", candidate, observations, digest: createHash("sha256").update(JSON.stringify({ candidate, observations })).digest("hex") };
 const threatModel = { candidate, digest: "d".repeat(64) };
 const plan = buildStackCapabilityPlan({ candidate, discovery, policyRevision: "policy-v1", threatModel, observations: STACK_CAPABILITIES.map((capability) => ({ capability, present: true })), requirements: [] });
-function authorization(id) { const target = { id, environment: "test", bindingSha256: "c".repeat(64) }; const scope = { id: "scope", paths: ["fixtures"] }; const receipt = createDynamicTargetAuthorization({ candidate, target, scope, execution: { network: "offline", credential: "none", timeoutMs: 1000 } }).receipt; return { candidate, target, scope, receipt }; }
+const pair = generateKeyPairSync("ed25519"); const publicKey = pair.publicKey.export({ type: "spki", format: "pem" });
+const approvalAuthority = { keyReference: "test-external-key", publicKeySha256: createHash("sha256").update(publicKey).digest("hex") };
+function authorization(id) { const target = { id, environment: "test", bindingSha256: "c".repeat(64) }; const scope = { id: "scope", paths: ["fixtures"] }; const execution = { network: "offline", credential: "none", timeoutMs: 1000 }; const intent = createDynamicTargetAuthorization({ candidate, target, scope, execution }).intent; return { candidate, target, scope, execution, intent, approvalAuthority, approvalProof: { schema: PO_APPROVAL_PROOF_SCHEMA, intentSha256: intent.sha256, keyReference: approvalAuthority.keyReference, publicKey, signatureBase64: sign(null, Buffer.from(intent.sha256), pair.privateKey).toString("base64") } }; }
 const authorizations = { "cap.dast": authorization("dast-target"), "cap.fuzz": authorization("fuzz-target") };
 const coverage = {
   subject: "synthetic",

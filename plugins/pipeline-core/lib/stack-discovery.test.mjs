@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, writeFileSync, unlinkSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -14,4 +14,11 @@ assert.equal(one.ok, true); assert.equal(one.digest, two.digest); assert.deepEqu
 assert.deepEqual(validateStackDiscovery(one), { valid: true }); assert.equal(validateStackDiscovery({ ...one, digest: "c".repeat(64) }).valid, false);
 assert.deepEqual(discoverStackMetadata({ root, candidate: {} }), { ok: false, code: "STACK-DISCOVERY-INVALID" });
 assert.equal(discoverStackMetadata({ root, candidate: { ...candidate, tree: "c".repeat(40) } }).code, "STACK-DISCOVERY-CANDIDATE-MISMATCH");
-console.log("3 stack discovery checks passed");
+writeFileSync(join(root, "package.json"), "{\"mutated\":true}");
+assert.deepEqual(discoverStackMetadata({ root, candidate }), { ok: false, code: "STACK-DISCOVERY-DIRTY-WORKTREE" });
+execFileSync("git", ["-C", root, "checkout", "--", "package.json"]);
+writeFileSync(join(root, "untracked-metadata"), "dirty");
+assert.deepEqual(discoverStackMetadata({ root, candidate }), { ok: false, code: "STACK-DISCOVERY-DIRTY-WORKTREE" });
+unlinkSync(join(root, "untracked-metadata"));
+assert.equal(discoverStackMetadata({ root, candidate }).ok, true);
+console.log("4 stack discovery checks passed");

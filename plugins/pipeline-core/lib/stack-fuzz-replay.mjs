@@ -39,7 +39,7 @@ export function minimizeSyntheticFuzzCrash(input) {
 
 /** Execute the bounded synthetic predicate and seal its result before replay evaluation. */
 export function executeSyntheticFuzzReplay(input) {
-  if (!own(input, ["candidate", "reproducer", "oracle", "authorization", "fixed"]) || !candidate(input.candidate) || typeof input.fixed !== "boolean" || !own(input.reproducer, ["schema", "candidate", "inputSha256", "requiredTokensSha256", "minimized", "digest"]) || !own(input.oracle, ["requiredTokens"]) || !tokens(input.oracle.requiredTokens) || !own(input.authorization, ["candidate", "target", "scope", "receipt"])) return { ok: false, code: "FUZZ-EXECUTION-INVALID" };
+  if (!own(input, ["candidate", "reproducer", "oracle", "authorization", "fixed"]) || !candidate(input.candidate) || typeof input.fixed !== "boolean" || !own(input.reproducer, ["schema", "candidate", "inputSha256", "requiredTokensSha256", "minimized", "digest"]) || !own(input.oracle, ["requiredTokens"]) || !tokens(input.oracle.requiredTokens) || !own(input.authorization, ["candidate", "target", "scope", "execution", "intent", "approvalAuthority", "approvalProof"])) return { ok: false, code: "FUZZ-EXECUTION-INVALID" };
   const authorization = evaluateDynamicTargetAuthorization(input.authorization);
   if (!authorization.allowed || canonical(input.authorization.candidate) !== canonical(input.candidate) || canonical(input.reproducer.candidate) !== canonical(input.candidate) || sha(canonical(input.oracle.requiredTokens)) !== input.reproducer.requiredTokensSha256 || input.oracle.requiredTokens.join("") !== input.reproducer.minimized) return { ok: false, code: "FUZZ-EXECUTION-INVALID" };
   const unsigned = { schema: "pipeline.synthetic-fuzz-execution.v1", candidate: structuredClone(input.candidate), reproducerDigest: input.reproducer.digest, outcome: input.fixed ? "clean" : "reproduced" };
@@ -63,7 +63,7 @@ export function replaySyntheticFuzzCrash(input) {
   if (canonical(input.candidate) !== canonical(input.reproducer.candidate)) return { ok: false, code: "FUZZ-REPLAY-CANDIDATE-MISMATCH" };
   if (sha(canonical(input.oracle.requiredTokens)) !== input.reproducer.requiredTokensSha256) return { ok: false, code: "FUZZ-REPLAY-ORACLE-MISMATCH" };
   if (input.oracle.requiredTokens.join("") !== input.reproducer.minimized) return { ok: false, code: "FUZZ-REPLAY-MINIMIZATION-MISMATCH" };
-  if (!own(input.authorization, ["candidate", "target", "scope", "receipt"])) return { ok: false, code: "FUZZ-REPLAY-VERIFICATION-REQUIRED" };
+  if (!own(input.authorization, ["candidate", "target", "scope", "execution", "intent", "approvalAuthority", "approvalProof"])) return { ok: false, code: "FUZZ-REPLAY-VERIFICATION-REQUIRED" };
   const authorization = evaluateDynamicTargetAuthorization(input.authorization);
   if (!authorization.allowed || canonical(input.authorization.candidate) !== canonical(input.candidate)) return { ok: false, code: "FUZZ-REPLAY-VERIFICATION-REQUIRED" };
   const { digest: executionDigest, ...executionUnsigned } = input.execution;

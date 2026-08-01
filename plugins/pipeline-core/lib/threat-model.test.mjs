@@ -2,10 +2,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { createThreatEntityId, discoverThreatModel, evaluateThreatBoundary, evaluateThreatImpact, evaluateThreatModelApplicability, evaluateThreatTraceability, exportThreatModelView, previewThreatModelMigration, renderThreatModelView, threatModelDigest, validateSecurityRequirement, validateThreatApprovalReceipt, validateThreatModel } from "./threat-model.mjs";
+import { createThreatEntityId, discoverThreatModel, evaluateThreatBoundary as evaluateThreatBoundaryCore, evaluateThreatImpact, evaluateThreatModelApplicability, evaluateThreatTraceability, exportThreatModelView, previewThreatModelMigration, renderThreatModelView, threatModelDigest, validateSecurityRequirement, validateThreatApprovalReceipt, validateThreatModel } from "./threat-model.mjs";
 import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "./po-approval-proof.mjs";
 
 const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
+const evaluateThreatBoundary = (input) => evaluateThreatBoundaryCore({ deliveryCandidate: input.model?.candidate ?? candidate, ...input });
 const assetId = createThreatEntityId("asset", "service:api").id;
 const boundaryId = createThreatEntityId("boundary", "service:api:public").id;
 const newBoundaryId = createThreatEntityId("boundary", "service:worker:public").id;
@@ -61,4 +62,5 @@ assert.equal(validateThreatApprovalReceipt(referenceReceipt).valid, true);
 assert.equal(referenceReceipt.modelDigest, threatModelDigest(referenceModel).digest);
 assert.deepEqual(discoverThreatModel(process.cwd()), { ok: true, artifact: { featureId: "cyb-4", path: "specs/cyb-4/threat-model.json", sha256: "e4dd68ea838cabd33f8e746a4805846121cce20852dea4806e5799d878d36acc" } });
 assert.equal(evaluateThreatBoundary({ boundary: "release", applicability: "required", model: referenceModel, approvalReceipt: referenceReceipt, approvalProof: null, approvalAuthority, fresh: true, impact: impactFor(referenceModel) }).allowed, false);
-console.log("38 threat-model checks passed");
+assert.deepEqual(evaluateThreatBoundaryCore({ boundary: "release", deliveryCandidate: candidate, applicability: "required", model: referenceModel, approvalReceipt: referenceReceipt, approvalProof: null, approvalAuthority, fresh: true, impact: impactFor(referenceModel) }), { allowed: false, code: "THREAT-BOUNDARY-CANDIDATE-MISMATCH" });
+console.log("39 threat-model checks passed");

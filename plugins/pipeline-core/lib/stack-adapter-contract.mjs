@@ -93,7 +93,7 @@ export function executeStackAdapterConformance(input) {
   if (!selection || !["selected", "optional-selected"].includes(selection.status)) return { ok: false, code: "STACK-ADAPTER-CAPABILITY-UNSELECTED" };
   if (!input.adapter.supportedPlatforms.includes(input.environment.platform)) return { ok: false, code: "STACK-ADAPTER-PLATFORM-UNSUPPORTED" };
   if (input.adapter.dynamic) {
-    if (!own(input.authorization, ["candidate", "target", "scope", "receipt"])) return { ok: false, code: "STACK-ADAPTER-VERIFICATION-REQUIRED" };
+    if (!own(input.authorization, ["candidate", "target", "scope", "execution", "intent", "approvalAuthority", "approvalProof"])) return { ok: false, code: "STACK-ADAPTER-VERIFICATION-REQUIRED" };
     const authorization = evaluateDynamicTargetAuthorization(input.authorization);
     if (!authorization.allowed || JSON.stringify(input.authorization.candidate) !== JSON.stringify(input.plan.candidate)) return { ok: false, code: "STACK-ADAPTER-VERIFICATION-REQUIRED" };
   } else if (input.authorization !== null) return { ok: false, code: "STACK-ADAPTER-AUTHORIZATION-INVALID" };
@@ -111,7 +111,7 @@ export function createStackAdapterEvidence(input) {
   const selection = input.plan.entries.find((entry) => entry.capability === input.adapter.capability);
   if (!selection || !["selected", "optional-selected"].includes(selection.status)) return { ok: false, code: "STACK-ADAPTER-CAPABILITY-UNSELECTED" };
   if (input.adapter.dynamic) {
-    if (!own(input.authorization, ["candidate", "target", "scope", "receipt"])) return { ok: false, code: "STACK-ADAPTER-VERIFICATION-REQUIRED" };
+    if (!own(input.authorization, ["candidate", "target", "scope", "execution", "intent", "approvalAuthority", "approvalProof"])) return { ok: false, code: "STACK-ADAPTER-VERIFICATION-REQUIRED" };
     const authorization = evaluateDynamicTargetAuthorization(input.authorization);
     if (!authorization.allowed || JSON.stringify(input.authorization.candidate) !== JSON.stringify(input.plan.candidate)) return { ok: false, code: "STACK-ADAPTER-VERIFICATION-REQUIRED" };
   } else if (input.authorization !== null) return { ok: false, code: "STACK-ADAPTER-AUTHORIZATION-INVALID" };

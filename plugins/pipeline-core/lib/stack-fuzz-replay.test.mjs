@@ -1,13 +1,18 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { executeSyntheticFuzzReplay, minimizeSyntheticFuzzCrash, replaySyntheticFuzzCrash } from "./stack-fuzz-replay.mjs";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { createDynamicTargetAuthorization } from "./stack-dynamic-boundary.mjs";
+import { PO_APPROVAL_PROOF_SCHEMA } from "./po-approval-proof.mjs";
 
 const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
 const target = { id: "fuzz-target", environment: "test", bindingSha256: "c".repeat(64) };
 const scope = { id: "fuzz-scope", paths: ["fixtures"] };
-const receipt = createDynamicTargetAuthorization({ candidate, target, scope, execution: { network: "offline", credential: "none", timeoutMs: 1000 } }).receipt;
-const authorization = { candidate, target, scope, receipt };
+const execution = { network: "offline", credential: "none", timeoutMs: 1000 };
+const intent = createDynamicTargetAuthorization({ candidate, target, scope, execution }).intent;
+const pair = generateKeyPairSync("ed25519"); const publicKey = pair.publicKey.export({ type: "spki", format: "pem" });
+const approvalAuthority = { keyReference: "test-external-key", publicKeySha256: createHash("sha256").update(publicKey).digest("hex") };
+const authorization = { candidate, target, scope, execution, intent, approvalAuthority, approvalProof: { schema: PO_APPROVAL_PROOF_SCHEMA, intentSha256: intent.sha256, keyReference: approvalAuthority.keyReference, publicKey, signatureBase64: sign(null, Buffer.from(intent.sha256), pair.privateKey).toString("base64") } };
 const created = minimizeSyntheticFuzzCrash({ candidate, input: "prefix CRASH marker suffix", requiredTokens: ["CRASH", "marker"] });
 assert.equal(created.ok, true);
 const reproduced = executeSyntheticFuzzReplay({ candidate, reproducer: created.reproducer, oracle: { requiredTokens: ["CRASH", "marker"] }, authorization, fixed: false });

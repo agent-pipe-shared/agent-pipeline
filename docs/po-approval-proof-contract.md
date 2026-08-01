@@ -45,3 +45,14 @@ adapter needs only two operations: resolve the configured public trust anchor,
 then return a detached proof for `intentSha256`. This keeps initial setup light
 for solo developers while allowing richer adapters later without changing the
 receipt format or the PO approval process.
+
+## Candidate-bound reference records
+
+The checked-in CYB-4 threat-model and legacy receipt are immutable historical
+reference fixtures, not a delivery authority. They bind their recorded
+candidate only and have `authority: false` in the feature package manifest.
+They cannot approve a later Git candidate: the delivery boundary receives the
+candidate explicitly and requires a newly generated, externally signed proof
+whose intent binds that exact commit and tree. A final PO gate therefore does
+not rewrite or reuse a repository fixture; it imports and verifies detached
+proof material created after the final candidate exists.
