@@ -1115,6 +1115,30 @@
       "member": "routing-projection-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:provenance-attestation-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "provenance-attestation-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:provenance-envelope-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "provenance-envelope-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:provenance-fixture-matrix-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "provenance-fixture-matrix-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:provenance-local-builder-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "provenance-local-builder-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:ruleset-freshness-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1858,6 +1882,10 @@
         "verify-phase:harness/scripts/verify.mjs:project-onboarding-e2e-tests",
         "verify-phase:harness/scripts/verify.mjs:project-onboarding-ready-gate-tests",
         "verify-phase:harness/scripts/verify.mjs:project-onboarding-v3-tests",
+        "verify-phase:harness/scripts/verify.mjs:provenance-attestation-tests",
+        "verify-phase:harness/scripts/verify.mjs:provenance-envelope-tests",
+        "verify-phase:harness/scripts/verify.mjs:provenance-fixture-matrix-tests",
+        "verify-phase:harness/scripts/verify.mjs:provenance-local-builder-tests",
         "verify-phase:harness/scripts/verify.mjs:public-core-observation-tests",
         "verify-phase:harness/scripts/verify.mjs:publication-executor-tests",
         "verify-phase:harness/scripts/verify.mjs:recovery-preview-attestation-tests",
@@ -1948,6 +1976,10 @@
       ],
       "testEvidence": [
         "harness/scripts/check-doc-contracts.test.mjs",
+        "plugins/pipeline-core/lib/provenance-attestation.test.mjs",
+        "plugins/pipeline-core/lib/provenance-envelope.test.mjs",
+        "plugins/pipeline-core/lib/provenance-fixture-matrix.test.mjs",
+        "plugins/pipeline-core/lib/provenance-local-builder.test.mjs",
         "plugins/pipeline-core/lib/sbom-discovery.test.mjs",
         "plugins/pipeline-core/lib/sbom-fixture-matrix.test.mjs",
         "plugins/pipeline-core/lib/sbom-lifecycle.test.mjs",
