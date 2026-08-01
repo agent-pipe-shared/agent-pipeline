@@ -17,6 +17,18 @@ digest. A changed commit, tree or matrix requires a new record and fresh
 receipts; historical receipts remain history rather than evidence for the new
 candidate.
 
+## Candidate binding records
+
+| Candidate commit | Candidate tree | Branch | Matrix preimage SHA-256 | Created at |
+| --- | --- | --- | --- | --- |
+| `8ce8d5d3601feed226333451092b8fc06b6dd4a2` | `41a495f2cda4eaa4617e74581a3b094fe56b9ce6` | `feat/sprint-nova-codex-v046` | `3efaf5094617b212baf5f9e28a78dc8874812d87a0bea94fdf31502b90baf2b3` | `2026-08-01T12:11:03+02:00` |
+
+This record binds the immutable code candidate before this documentation-only
+append. Its exact Verify and Security evidence are
+`evidence/verify-latest.json` and `evidence/security-latest.json`; both bind
+the commit/tree pair above and finished cleanly. A Critic, PO-gate or
+publication record must repeat the same pair and this matrix preimage digest.
+
 | Issue / block | Accepted/current scope | Existing implementation or evidence | Remaining gap | Exact next verification / closure gate | Disposition |
 | --- | --- | --- | --- | --- | --- |
 | #57 / Nova A1 canonical reconciliation | Versioned Spec-bound delivery record; sanctioned append-only assignment/closure; CAS idempotence; portfolio snapshot; append-only repair of events 39/40; generic initializer. | A1 writer/reconciliation suites and backlog evidence (`evidence/backlog/*`) are recorded; ledger was re-integrated append-only at `44e25b8…` after the v0.4.7 adoption. | Fresh post-rebase binding, default checker/readback and all NVA-A57 rows have not been regenerated; no closure transition is authorized. | Run NVA-A57-1..6 against the exact candidate; prove checker green, stale/replay/partial failures, event-39/40 amendment readback, then Full Verify/Security/Critic and PO increment gate. | Implemented (provisional); not evidenced/closed. |
