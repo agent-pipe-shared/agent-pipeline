@@ -78,7 +78,7 @@ export function discoverThreatModel(rootDir, { featureId = null } = {}) {
   return { ok: true, artifact: matches[0] };
 }
 
-/** Derive a safe public view; canonical authority and private coordinates stay untouched. */
+/** Derive a safe public view; private disclosure stays outside canonical records. */
 export function exportThreatModelView(model) {
   if (!validateThreatModel(model).valid) return { ok: false, code: "THREAT-EXPORT-INVALID" };
   const redact = model.classification === "private";

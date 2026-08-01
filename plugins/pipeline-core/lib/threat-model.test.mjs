@@ -18,7 +18,7 @@ assert.deepEqual(previewThreatModelMigration({ hasCanonicalModel: false }).write
 assert.equal(validateThreatModel(model).valid, true);
 assert.equal(validateSecurityRequirement({ schema: "pipeline.security-requirement.v1", id: "R1", candidate: { commit: "a", tree: "b" }, policyRevision: "p", links: [{ kind: "threat", id: "T1" }], state: "proposed" }).valid, true);
 assert.equal(validateSecurityRequirement({ schema: "pipeline.security-requirement.v1", id: "R1", candidate: { commit: "a", tree: "b" }, policyRevision: "p", links: [{ kind: "threat", id: "T1" }], state: "proposed", approved: true }).valid, false);
-assert.match(renderThreatModelView(model).text, /public-api/);
+assert.deepEqual(renderThreatModelView(model), { ok: true, authoritative: false, text: "Threat model a\nPolicy p\nEntities\npublic-api" });
 assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "required", lifecycle: "approved", fresh: false }), { allowed: false, code: "THREAT-BOUNDARY-STALE" });
 assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "required", lifecycle: "approved", fresh: true }), { allowed: true, code: "THREAT-BOUNDARY-ALLOWED" });
 assert.equal(discoverThreatModel(process.cwd()).ok, false);
