@@ -2298,14 +2298,16 @@ test("kickoff promotion replaces only the exact unapproved seed and is replay-sa
     try {
       const barrier = initializeRestartRequiredRoot(path); clearRuntimeBarrier(path, barrier);
       completeKickoff(path, `Promotion ${profile}`);
-      mkdirSync(join(path, "specs"), { recursive: true });
-      const prdPath = `specs/${profile}-prd.md`;
-      const specPath = `specs/${profile}-spec.md`;
+      mkdirSync(join(path, "specs", profile), { recursive: true });
+      const prdPath = `specs/${profile}/prd-${profile}.md`;
+      const specPath = `specs/${profile}/spec.md`;
+      const designInputPath = `specs/${profile}/design-input.md`;
       writeFileSync(join(path, prdPath), `# ${profile} PRD\n`);
       writeFileSync(join(path, specPath), `# ${profile} Spec\n`);
+      writeFileSync(join(path, designInputPath), `# ${profile} design input\n`);
       const args = {
         rootDir: path, profile, featureId: `${profile}-work`, planPath: specPath,
-        prdPath, specPath, deps: fakeDeps,
+        prdPath, specPath, designInputPath, deps: fakeDeps,
       };
       const plan = planProjectOnboardingKickoffPromotionV4(args);
       assert.equal(plan.schema, "pipeline.codex-onboarding-kickoff-promotion-plan.v1");
@@ -2323,6 +2325,21 @@ test("kickoff promotion replaces only the exact unapproved seed and is replay-sa
       assert.equal(replayed.status, "ready");
     } finally { dispose(path); }
   }
+});
+
+test("kickoff promotion CLI requires a design-input path", () => {
+  const path = root();
+  const output = [];
+  try {
+    const code = onboardingCli([
+      "kickoff", "promote", "plan", "--root", path,
+      "--profile", "feature", "--id", "evidence-work",
+      "--plan-path", "specs/evidence/spec.md", "--prd-path", "specs/evidence/prd.md",
+      "--spec-path", "specs/evidence/spec.md",
+    ], { write: (chunk) => output.push(chunk) });
+    assert.equal(code, 2);
+    assert.match(output.join(""), /--design-input-path/u);
+  } finally { dispose(path); }
 });
 
 test("public cleanup privatization preserves the historical kickoff seed for CLI promotion", () => {
@@ -2381,12 +2398,15 @@ test("public cleanup privatization preserves the historical kickoff seed for CLI
     mkdirSync(join(path, "specs", "post-private"), { recursive: true });
     const prdPath = "specs/post-private/prd.md";
     const specPath = "specs/post-private/spec.md";
+    const designInputPath = "specs/post-private/design-input.md";
     writeFileSync(join(path, prdPath), "# Post-private PRD\n");
     writeFileSync(join(path, specPath), "# Post-private specification\n");
+    writeFileSync(join(path, designInputPath), "# Post-private design input\n");
     const promoteArgs = [
       "kickoff", "promote", "plan", "--root", path,
       "--profile", "feature", "--id", "post-private-work",
       "--plan-path", specPath, "--prd-path", prdPath, "--spec-path", specPath,
+      "--design-input-path", designInputPath,
     ];
     const planned = invokeOnboarding(promoteArgs);
     assert.equal(planned.code, 0, onboardingError);
@@ -2426,7 +2446,8 @@ test("kickoff promotion fails closed for authority drift, a real active feature,
     mkdirSync(join(path, "specs"), { recursive: true });
     writeFileSync(join(path, "specs", "real-prd.md"), "# PRD\n");
     writeFileSync(join(path, "specs", "real-spec.md"), "# Spec\n");
-    const args = { rootDir: path, profile: "feature", featureId: "real-work", planPath: "specs/real-spec.md", prdPath: "specs/real-prd.md", specPath: "specs/real-spec.md", deps: fakeDeps };
+    writeFileSync(join(path, "specs", "design-input.md"), "# Design input\n");
+    const args = { rootDir: path, profile: "feature", featureId: "real-work", planPath: "specs/real-spec.md", prdPath: "specs/real-prd.md", specPath: "specs/real-spec.md", designInputPath: "specs/design-input.md", deps: fakeDeps };
     const plan = planProjectOnboardingKickoffPromotionV4(args);
     writeFileSync(join(path, "specs", "real-spec.md"), "# changed\n");
     assert.throws(() => applyProjectOnboardingKickoffPromotionV4({ ...args, planSha256: plan.planSha256, activate: true }), /promotion plan digest/u);

@@ -143,8 +143,9 @@ path must bind to that package exactly.
 
 Treat that named package as a pre-authority staging set: write and review its
 PRD, Spec, and `design-input.md` there first, then run `kickoff promote plan`
-and only its digest-bound `kickoff promote apply` to bind their exact paths and
-hashes to State in one sanctioned transition. Never edit the active provisional
+and only its digest-bound `kickoff promote apply` to bind the PRD/Spec in State
+and the source-evidence path/hash in the same immutable continuity transaction.
+Never edit the active provisional
 `specs/kickoff-*` PRD/Spec, or any already bound PRD/Spec, merely to add richer
 design documentation. Do not invoke a repair, generic continuity CAS, manifest
 repair, or hash-rebinding cascade solely because a new design package was

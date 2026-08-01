@@ -377,6 +377,9 @@ function validateHistory(value) {
     "kind", "transactionSha256", "previousTransactionSha256", "profile", "kickoffFeatureId", "featureId",
     "planPath", "prdSha256", "specSha256", "beforeStateSha256", "afterStateSha256",
   ]);
+  const promotionEvidenceEntryKeys = new Set([
+    ...promotionEntryKeys, "designInputPath", "designInputSha256",
+  ]);
   const validKickoff = (entry) => exactKeys(entry, kickoffEntryKeys)
     && entry.kind === "kickoff"
     && [
@@ -384,7 +387,9 @@ function validateHistory(value) {
       "handoverSha256", "prdSha256", "specSha256",
     ].every((key) => SHA256_RE.test(entry[key]));
   const validPromotion = (entry, previous) => (exactKeys(entry, promotionEntryKeys)
-      || exactKeys(entry, new Set([...promotionEntryKeys, "cleanupBinding"])))
+      || exactKeys(entry, new Set([...promotionEntryKeys, "cleanupBinding"]))
+      || exactKeys(entry, promotionEvidenceEntryKeys)
+      || exactKeys(entry, new Set([...promotionEvidenceEntryKeys, "cleanupBinding"])))
     && entry.kind === "kickoff-promotion"
     && SHA256_RE.test(entry.transactionSha256)
     && entry.previousTransactionSha256 === previous?.transactionSha256
@@ -394,6 +399,9 @@ function validateHistory(value) {
     && typeof entry.planPath === "string"
     && ["prdSha256", "specSha256", "beforeStateSha256", "afterStateSha256"]
       .every((key) => SHA256_RE.test(entry[key]))
+    && (entry.designInputPath === undefined || (typeof entry.designInputPath === "string"
+      && SHA256_RE.test(entry.designInputSha256)
+      && (() => { try { safeRelativePath(entry.designInputPath, "promotion design input"); return true; } catch { return false; } })()))
     && (entry.cleanupBinding === undefined || (exactKeys(entry.cleanupBinding, new Set(["beforeSha256", "afterSha256"]))
       && SHA256_RE.test(entry.cleanupBinding.beforeSha256) && SHA256_RE.test(entry.cleanupBinding.afterSha256)));
   if (!exactKeys(value, new Set(["schema", "transactions"]))
@@ -471,6 +479,13 @@ function observeDetailed({
       }
       history = parseJsonObject(historyObservation, "private continuity history");
       validateHistory(history);
+      for (const entry of history.transactions.slice(1)) {
+        if (entry.designInputPath === undefined) continue;
+        const evidence = observeOptionalProjectFile(root, entry.designInputPath, "promotion design input");
+        if (evidence.status !== "present" || evidence.sha256 !== entry.designInputSha256) {
+          fail("KICKOFF-PROMOTION-EVIDENCE-DRIFT", "promotion design input does not match its bound evidence");
+        }
+      }
     }
 
     const hashes = {
@@ -3236,7 +3251,7 @@ export function reconstructOnboardingKickoffPlan(options = {}) {
   return buildOnboardingKickoffPlan({ ...options, allowAppliedReplay: true });
 }
 
-function promotionApplyAction(onboardingScript, root, profile, featureId, planPath, prdPath, specPath, planSha256) {
+function promotionApplyAction(onboardingScript, root, profile, featureId, planPath, prdPath, specPath, designInputPath, planSha256) {
   return {
     kind: "command",
     executable: "node",
@@ -3244,6 +3259,7 @@ function promotionApplyAction(onboardingScript, root, profile, featureId, planPa
       onboardingScript, "kickoff", "promote", "apply", "--root", root,
       "--profile", profile, "--id", featureId, "--plan-path", planPath,
       "--prd-path", prdPath, "--spec-path", specPath,
+      "--design-input-path", designInputPath,
       "--plan-sha256", planSha256, "--activate",
     ],
     mutation: true,
@@ -3345,32 +3361,37 @@ function recognisedKickoff(observed, spawn = defaultGitSpawn) {
   };
 }
 
-function promotionInput({ profile, featureId, planPath, prdPath, specPath }) {
+function promotionInput({ profile, featureId, planPath, prdPath, specPath, designInputPath }) {
   if (!PROMOTION_PROFILES.has(profile)) fail("KICKOFF-PROMOTION-INPUT", "promotion profile is invalid");
   if (!SAFE_FEATURE_ID.test(featureId ?? "") || featureId.startsWith("kickoff-")) {
     fail("KICKOFF-PROMOTION-INPUT", "promotion feature id is invalid");
   }
-  for (const [value, label] of [[planPath, "plan"], [prdPath, "PRD"], [specPath, "specification"]]) {
+  for (const [value, label] of [[planPath, "plan"], [prdPath, "PRD"], [specPath, "specification"], [designInputPath, "design input"]]) {
     safeRelativePath(value, `promotion ${label}`);
   }
-  if (planPath !== specPath || new Set([prdPath, specPath]).size !== 2) {
+  if (planPath !== specPath || new Set([prdPath, specPath, designInputPath]).size !== 3
+    || dirname(prdPath) !== dirname(specPath) || dirname(designInputPath) !== dirname(specPath)
+    || basename(designInputPath) !== "design-input.md") {
     fail("KICKOFF-PROMOTION-INPUT", "promotion plan and authority paths are inconsistent");
   }
-  return { profile, featureId, planPath, prdPath, specPath };
+  return { profile, featureId, planPath, prdPath, specPath, designInputPath };
 }
 
 function promotionArtifacts(root, input) {
   const prd = observeOptionalProjectFile(root, input.prdPath, "promotion PRD");
   const spec = observeOptionalProjectFile(root, input.specPath, "promotion specification");
-  if (prd.status !== "present" || spec.status !== "present") {
-    fail("KICKOFF-PROMOTION-AUTHORITY", "promotion PRD and specification must already exist");
+  const designInput = observeOptionalProjectFile(root, input.designInputPath, "promotion design input");
+  if (prd.status !== "present" || spec.status !== "present" || designInput.status !== "present") {
+    fail("KICKOFF-PROMOTION-AUTHORITY", "promotion PRD, specification, and design input must already exist");
   }
-  if (prd.path.startsWith("specs/kickoff-") || spec.path.startsWith("specs/kickoff-")) {
+  if ([input.prdPath, input.specPath, input.designInputPath]
+    .some((path) => path.startsWith("specs/kickoff-"))) {
     fail("KICKOFF-PROMOTION-AUTHORITY", "promotion authority must not reuse kickoff artifacts");
   }
   return {
     prd: { path: input.prdPath, sha256: prd.sha256 },
     spec: { path: input.specPath, sha256: spec.sha256 },
+    designInput: { path: input.designInputPath, sha256: designInput.sha256 },
   };
 }
 
@@ -3405,9 +3426,10 @@ function validatePromotionPlan(plan) {
     || !isAbsolute(plan.onboardingScript ?? "") || !SHA256_RE.test(plan.planSha256 ?? "")
     || !SHA256_RE.test(plan.transactionSha256 ?? "")
     || !exactKeys(plan.feature, new Set(["id", "planPath"]))
-    || !exactKeys(plan.authority, new Set(["prd", "spec"]))
+    || !exactKeys(plan.authority, new Set(["prd", "spec", "designInput"]))
     || !exactKeys(plan.authority.prd, new Set(["path", "sha256"]))
     || !exactKeys(plan.authority.spec, new Set(["path", "sha256"]))
+    || !exactKeys(plan.authority.designInput, new Set(["path", "sha256"]))
     || !exactKeys(plan.kickoff, new Set(["featureId", "transactionSha256", "stateSha256", "historySha256", "revision"]))
     || !(exactKeys(plan.targets, new Set(["state", "history"]))
       || exactKeys(plan.targets, new Set(["state", "history", "cleanupBinding"])))
@@ -3419,12 +3441,13 @@ function validatePromotionPlan(plan) {
   const input = promotionInput({
     profile: plan.profile, featureId: plan.feature.id, planPath: plan.feature.planPath,
     prdPath: plan.authority.prd.path, specPath: plan.authority.spec.path,
+    designInputPath: plan.authority.designInput.path,
   });
   const root = physicalRoot(plan.root);
   const selected = authorityPaths(root);
   if (root !== plan.root || plan.targets.state.path !== selected.state
     || plan.targets.history.path !== HISTORY_BASENAME
-    || ![plan.authority.prd.sha256, plan.authority.spec.sha256, plan.kickoff.transactionSha256,
+    || ![plan.authority.prd.sha256, plan.authority.spec.sha256, plan.authority.designInput.sha256, plan.kickoff.transactionSha256,
       plan.kickoff.stateSha256, plan.kickoff.historySha256, plan.targets.state.beforeSha256,
       plan.targets.state.afterSha256, plan.targets.history.beforeSha256, plan.targets.history.afterSha256]
       .every((value) => SHA256_RE.test(value ?? ""))) {
@@ -3462,6 +3485,8 @@ function validatePromotionPlan(plan) {
     || history[1].planPath !== input.planPath
     || history[1].prdSha256 !== plan.authority.prd.sha256
     || history[1].specSha256 !== plan.authority.spec.sha256
+    || history[1].designInputPath !== input.designInputPath
+    || history[1].designInputSha256 !== plan.authority.designInput.sha256
     || history[1].beforeStateSha256 !== plan.targets.state.beforeSha256
     || history[1].afterStateSha256 !== plan.targets.state.afterSha256) {
     fail("KICKOFF-PROMOTION-PLAN", "promotion history postimage is invalid");
@@ -3488,7 +3513,7 @@ function validatePromotionPlan(plan) {
   if (canonicalSha256(promotionBinding(plan)) !== plan.planSha256
     || canonicalJson(plan.applyAction) !== canonicalJson(promotionApplyAction(
       plan.onboardingScript, plan.root, input.profile, input.featureId, input.planPath,
-      input.prdPath, input.specPath, plan.planSha256,
+      input.prdPath, input.specPath, input.designInputPath, plan.planSha256,
     ))) {
     fail("KICKOFF-PROMOTION-PLAN", "promotion action binding is invalid");
   }
@@ -3496,12 +3521,12 @@ function validatePromotionPlan(plan) {
 }
 
 function buildKickoffPromotionPlan({
-  rootDir, profile, featureId, planPath, prdPath, specPath,
+  rootDir, profile, featureId, planPath, prdPath, specPath, designInputPath,
   repositoryCapability = "local", onboardingScript = DEFAULT_ONBOARDING_SCRIPT,
   spawn = defaultGitSpawn, allowAppliedReplay = false,
 } = {}) {
   if (!isAbsolute(onboardingScript)) fail("KICKOFF-PROMOTION-PLAN", "onboarding script must be absolute");
-  const input = promotionInput({ profile, featureId, planPath, prdPath, specPath });
+  const input = promotionInput({ profile, featureId, planPath, prdPath, specPath, designInputPath });
   const observed = observeDetailed({ rootDir, repositoryCapability, spawn });
   if (observed.continuity.status !== "valid") fail("KICKOFF-PROMOTION-STATE", "promotion requires valid continuity");
   const kickoff = recognisedKickoff(observed, spawn);
@@ -3512,7 +3537,8 @@ function buildKickoffPromotionPlan({
     if (entries?.length !== 2 || entry?.kind !== "kickoff-promotion"
       || entry.profile !== input.profile || entry.featureId !== input.featureId
       || entry.planPath !== input.planPath || entry.prdSha256 !== authority.prd.sha256
-      || entry.specSha256 !== authority.spec.sha256 || entry.afterStateSha256 !== observed.stateObservation.sha256
+      || entry.specSha256 !== authority.spec.sha256 || entry.designInputPath !== input.designInputPath
+      || entry.designInputSha256 !== authority.designInput.sha256 || entry.afterStateSha256 !== observed.stateObservation.sha256
       || observed.state?.activeFeature?.id !== input.featureId || observed.state?.activeFeature?.planPath !== input.planPath
       || observed.state?.continuity?.featureId !== input.featureId
       || observed.state?.continuity?.authority?.prd?.sha256 !== authority.prd.sha256
@@ -3545,7 +3571,7 @@ function buildKickoffPromotionPlan({
       transactionSha256: entry.transactionSha256, onboardingScript,
     };
     const planSha256 = canonicalSha256(binding);
-    const plan = { ...binding, planSha256, applyAction: promotionApplyAction(onboardingScript, observed.root, input.profile, input.featureId, input.planPath, input.prdPath, input.specPath, planSha256) };
+    const plan = { ...binding, planSha256, applyAction: promotionApplyAction(onboardingScript, observed.root, input.profile, input.featureId, input.planPath, input.prdPath, input.specPath, input.designInputPath, planSha256) };
     validatePromotionPlan(plan);
     return plan;
   }
@@ -3592,6 +3618,7 @@ function buildKickoffPromotionPlan({
     root: observed.root, repositoryCapability, profile: input.profile, feature: { id: input.featureId, planPath: input.planPath },
     kickoffTransactionSha256: kickoff.transactionSha256, beforeStateSha256, afterStateSha256,
     prdSha256: authority.prd.sha256, specSha256: authority.spec.sha256,
+    designInputPath: authority.designInput.path, designInputSha256: authority.designInput.sha256,
   };
   const transactionSha256 = canonicalSha256(transaction);
   const history = {
@@ -3600,6 +3627,7 @@ function buildKickoffPromotionPlan({
       kind: "kickoff-promotion", transactionSha256, previousTransactionSha256: kickoff.transactionSha256, kickoffFeatureId: kickoff.state.activeFeature.id,
       profile: input.profile, featureId: input.featureId, planPath: input.planPath,
       prdSha256: authority.prd.sha256, specSha256: authority.spec.sha256,
+      designInputPath: authority.designInput.path, designInputSha256: authority.designInput.sha256,
       beforeStateSha256, afterStateSha256,
       ...(cleanupBindingTarget === null ? {} : { cleanupBinding: cleanupBindingTarget }),
     }],
@@ -3624,7 +3652,7 @@ function buildKickoffPromotionPlan({
   const planSha256 = canonicalSha256(binding);
   const plan = {
     ...binding, planSha256,
-    applyAction: promotionApplyAction(onboardingScript, observed.root, input.profile, input.featureId, input.planPath, input.prdPath, input.specPath, planSha256),
+    applyAction: promotionApplyAction(onboardingScript, observed.root, input.profile, input.featureId, input.planPath, input.prdPath, input.specPath, input.designInputPath, planSha256),
   };
   validatePromotionPlan(plan);
   return plan;
@@ -4120,8 +4148,10 @@ export function applyOnboardingKickoffPromotion({
     const authority = promotionArtifacts(plan.root, {
       profile: plan.profile, featureId: plan.feature.id, planPath: plan.feature.planPath,
       prdPath: plan.authority.prd.path, specPath: plan.authority.spec.path,
+      designInputPath: plan.authority.designInput.path,
     });
-    if (authority.prd.sha256 !== plan.authority.prd.sha256 || authority.spec.sha256 !== plan.authority.spec.sha256) {
+    if (authority.prd.sha256 !== plan.authority.prd.sha256 || authority.spec.sha256 !== plan.authority.spec.sha256
+      || authority.designInput.sha256 !== plan.authority.designInput.sha256) {
       fail("KICKOFF-PROMOTION-CAS-DRIFT", "promotion authority bytes drifted");
     }
     const suffix = (deps.randomUUID ?? randomUUID)().replaceAll("-", "");

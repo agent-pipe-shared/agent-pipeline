@@ -27,7 +27,7 @@ function usage() {
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> [--profile <epic|feature|mini> --source <selection>]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--plan-sha256 <sha256>] [--activate]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> [--plan-sha256 <sha256>] [--activate]",
-    "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> [--plan-sha256 <sha256>] [--activate]",
+    "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> --design-input-path <path> [--plan-sha256 <sha256>] [--activate]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>",
   ].join("\n");
 }
@@ -67,6 +67,7 @@ function parse(args) {
     else if (arg === "--plan-path") { const planPath = args[index + 1]; if (!planPath || planPath.startsWith("--")) return { error: "--plan-path requires a repository path" }; output.planPath = planPath; index += 1; }
     else if (arg === "--prd-path") { const prdPath = args[index + 1]; if (!prdPath || prdPath.startsWith("--")) return { error: "--prd-path requires a repository path" }; output.prdPath = prdPath; index += 1; }
     else if (arg === "--spec-path") { const specPath = args[index + 1]; if (!specPath || specPath.startsWith("--")) return { error: "--spec-path requires a repository path" }; output.specPath = specPath; index += 1; }
+    else if (arg === "--design-input-path") { const designInputPath = args[index + 1]; if (!designInputPath || designInputPath.startsWith("--")) return { error: "--design-input-path requires a repository path" }; output.designInputPath = designInputPath; index += 1; }
     else if (arg === "--plan-sha256") { const digest = args[index + 1]; if (!/^[a-f0-9]{64}$/u.test(digest ?? "")) return { error: "--plan-sha256 requires a lowercase SHA-256 digest" }; output.planSha256 = digest; index += 1; }
     else if (arg === "--activate") output.activate = true;
     else if (arg === "--help" || arg === "-h") output.help = true;
@@ -78,7 +79,7 @@ function parse(args) {
   if (output.command === "adopt-remote-apply" && !output.planSha256) return { error: "adopt-remote apply requires --plan-sha256" };
   if (output.command?.startsWith("kickoff-promote-")) {
     if (output.goal !== undefined) return { error: "--goal is not valid for kickoff promotion" };
-    if (![output.profile, output.featureId, output.planPath, output.prdPath, output.specPath].every(Boolean)) return { error: "kickoff promotion requires --profile --id --plan-path --prd-path --spec-path" };
+    if (![output.profile, output.featureId, output.planPath, output.prdPath, output.specPath, output.designInputPath].every(Boolean)) return { error: "kickoff promotion requires --profile --id --plan-path --prd-path --spec-path --design-input-path" };
   } else if (output.command?.startsWith("kickoff-") && output.goal === undefined) return { error: "kickoff plan/apply requires --goal <text>" };
   else if (!output.command?.startsWith("kickoff-") && output.goal !== undefined) return { error: "--goal is only valid for kickoff plan/apply" };
   if (output.activate && !["apply-portable-seed", "initialize-runtime", "apply-repair", "apply-readback", "apply-manifest-repair", "apply-partial-authority", "apply-reinstall", "kickoff-apply", "kickoff-promote-apply", "adopt-remote-apply"].includes(output.command)) return { error: "--activate is only valid for an apply command" };
@@ -128,11 +129,11 @@ export function main(args = process.argv.slice(2), {
     });
     else if (options.command === "kickoff-promote-plan") output = planProjectOnboardingKickoffPromotionV4({
       rootDir: options.root, profile: options.profile, featureId: options.featureId,
-      planPath: options.planPath, prdPath: options.prdPath, specPath: options.specPath, deps,
+      planPath: options.planPath, prdPath: options.prdPath, specPath: options.specPath, designInputPath: options.designInputPath, deps,
     });
     else if (options.command === "kickoff-promote-apply") output = applyProjectOnboardingKickoffPromotionV4({
       rootDir: options.root, profile: options.profile, featureId: options.featureId,
-      planPath: options.planPath, prdPath: options.prdPath, specPath: options.specPath,
+      planPath: options.planPath, prdPath: options.prdPath, specPath: options.specPath, designInputPath: options.designInputPath,
       planSha256: options.planSha256, activate: options.activate, deps,
     });
     else {

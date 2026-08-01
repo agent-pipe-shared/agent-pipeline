@@ -812,6 +812,7 @@ function promotionSeed(name, { privatized = false } = {}) {
   mkdirSync(directory, { recursive: true });
   writeFileSync(join(directory, "prd.md"), `# ${name} PRD\n`);
   writeFileSync(join(directory, "spec.md"), `# ${name} specification\n`);
+  writeFileSync(join(directory, "design-input.md"), `# ${name} design input\n`);
   return {
     root,
     kickoff,
@@ -823,6 +824,7 @@ function promotionSeed(name, { privatized = false } = {}) {
       planPath: "specs/promoted/spec.md",
       prdPath: "specs/promoted/prd.md",
       specPath: "specs/promoted/spec.md",
+      designInputPath: "specs/promoted/design-input.md",
     },
   };
 }
@@ -839,6 +841,12 @@ check("revision-0 kickoff seed promotion remains monotonic and replayable", () =
   assert.equal(plan.kickoff.revision, 0);
   assert.equal(plan.targets.state.value.continuity.revision, 1);
   assert.equal(plan.targets.state.value.continuity.resume.sourceRevision, 1);
+  assert.deepEqual(plan.authority.designInput, {
+    path: "specs/promoted/design-input.md",
+    sha256: plan.targets.history.value.transactions[1].designInputSha256,
+  });
+  assert.equal(plan.targets.history.value.transactions[1].designInputPath, "specs/promoted/design-input.md");
+  assert.ok(plan.applyAction.argv.includes("--design-input-path"));
   const applied = applyOnboardingKickoffPromotion({
     plan,
     expectedPlanSha256: plan.planSha256,
@@ -853,6 +861,34 @@ check("revision-0 kickoff seed promotion remains monotonic and replayable", () =
   assert.equal(replay.status, "replayed");
   assert.equal(replay.mutated, false);
   assert.deepEqual(reconstructOnboardingKickoffPromotionPlan(seed.request), plan);
+});
+
+check("promotion requires bound design evidence and rejects post-promotion evidence drift without repair", () => {
+  const seed = promotionSeed("design-evidence");
+  const designInput = join(seed.root, "specs", "promoted", "design-input.md");
+  assert.throws(() => planOnboardingKickoffPromotion({ ...seed.request, designInputPath: undefined }),
+    /design input path is unsafe/u);
+  assert.throws(() => planOnboardingKickoffPromotion({ ...seed.request, designInputPath: "specs/other/design-input.md" }),
+    /promotion plan and authority paths are inconsistent/u);
+  const kickoffDirectory = join(seed.root, dirname(seed.kickoff.targets.prd.path));
+  const kickoffDesignInput = join(kickoffDirectory, "design-input.md");
+  writeFileSync(kickoffDesignInput, "# provisional evidence\n");
+  assert.throws(() => planOnboardingKickoffPromotion({
+    ...seed.request,
+    planPath: seed.kickoff.targets.spec.path,
+    prdPath: seed.kickoff.targets.prd.path,
+    specPath: seed.kickoff.targets.spec.path,
+    designInputPath: `${dirname(seed.kickoff.targets.spec.path)}/design-input.md`,
+  }), /promotion authority must not reuse kickoff artifacts/u);
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  writeFileSync(designInput, "# changed evidence\n");
+  assert.throws(() => applyOnboardingKickoffPromotion({
+    plan, expectedPlanSha256: plan.planSha256, activate: true,
+  }), /promotion authority bytes drifted/u);
+  writeFileSync(designInput, "# design-evidence design input\n");
+  applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  writeFileSync(designInput, "# altered after promotion\n");
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "unavailable");
 });
 
 check("authentic post-privatization kickoff seed promotes revision 1 to revision 2", () => {

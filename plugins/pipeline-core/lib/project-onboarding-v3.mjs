@@ -3576,26 +3576,26 @@ export function applyProjectOnboardingKickoffV4({
 }
 
 export function planProjectOnboardingKickoffPromotionV4({
-  rootDir = process.cwd(), profile, featureId, planPath, prdPath, specPath, deps: overrides = {},
+  rootDir = process.cwd(), profile, featureId, planPath, prdPath, specPath, designInputPath, deps: overrides = {},
 } = {}) {
   const fs = deps(overrides);
   const observed = v4Inspection(rootDir, fs, "onboarding");
   if (observed.status !== "ready" || observed.continuity.status !== "valid") return observed;
   return planOnboardingKickoffPromotion({
-    rootDir: observed.root, profile, featureId, planPath, prdPath, specPath,
+    rootDir: observed.root, profile, featureId, planPath, prdPath, specPath, designInputPath,
     repositoryCapability: observed.repository.mode, onboardingScript: ONBOARDING_SCRIPT, spawn: fs.spawnSync,
   });
 }
 
 export function applyProjectOnboardingKickoffPromotionV4({
-  rootDir = process.cwd(), profile, featureId, planPath, prdPath, specPath,
+  rootDir = process.cwd(), profile, featureId, planPath, prdPath, specPath, designInputPath,
   planSha256, activate = false, deps: overrides = {},
 } = {}) {
   const fs = deps(overrides);
   const observed = v4Inspection(rootDir, fs, "onboarding");
   if (observed.status !== "ready" || observed.continuity.status !== "valid") return observed;
   const plan = reconstructOnboardingKickoffPromotionPlan({
-    rootDir: observed.root, profile, featureId, planPath, prdPath, specPath,
+    rootDir: observed.root, profile, featureId, planPath, prdPath, specPath, designInputPath,
     repositoryCapability: observed.repository.mode, onboardingScript: ONBOARDING_SCRIPT, spawn: fs.spawnSync,
   });
   applyOnboardingKickoffPromotion({
