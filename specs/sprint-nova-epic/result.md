@@ -1010,3 +1010,20 @@ The current design correction adds the runner-neutral 10–15k Compact/bootstrap
 payload requirement and repairs the stale-revocation approval recovery path.
 Fresh candidate evidence is required before any increment acceptance, Issue
 closure, release or Epic close.
+
+## 2026-08-01 — TP-1 through TP-5 standing Nova lift reconfirmed
+
+Status: `po-authorized-standing-temporary-lifts; TP-3 exercised-and-restored`.
+
+The Product Owner reconfirmed that Sprint Nova may temporarily lift each of
+TP-1 through TP-5 for a bounded Nova task and exact write-set. Every lift must
+be restored immediately after its task; no lift permits weakened, skipped or
+deleted tests, nor does it authorize push, publication, external mutation or
+acceptance without the configured evidence.
+
+This entry records the TP-3 use for B0 payload verification wiring only:
+`harness/scripts/verify.mjs` gained additive registrations for the existing
+`bootstrap-payload-budget.test.mjs` and
+`bootstrap-payload-measure.test.mjs` suites. Both focused suites passed, no
+existing registration changed, and the TP-3 protected-path entry in
+`project/guard-config.json` was restored before Full Verify.

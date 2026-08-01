@@ -351,6 +351,8 @@ const TEST_SUITES = [
   { name: "windows-private-state-tests", file: join(libDir, "windows-private-state.test.mjs") },
   { name: "symlink-capability-tests", file: join(libDir, "symlink-capability.test.mjs") },
   { name: "runner-native-continuation-tests", file: join(libDir, "runner-native-continuation.test.mjs") },
+  { name: "bootstrap-payload-budget-tests", file: join(libDir, "bootstrap-payload-budget.test.mjs") },
+  { name: "bootstrap-payload-measure-cli-tests", file: join(pluginScriptsDir, "bootstrap-payload-measure.test.mjs") },
   { name: "local-supervisor-state-tests", file: join(libDir, "local-supervisor-state.test.mjs") },
   { name: "local-supervisor-setup-tests", file: join(pluginScriptsDir, "local-supervisor-setup.test.mjs") },
   { name: "local-worker-supervisor-core-tests", file: join(libDir, "local-worker-supervisor.test.mjs") },
