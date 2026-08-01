@@ -1,6 +1,6 @@
 # CYB-6 — stack-aware verification breadth (feature spec)
 
-> **Status: DRAFT, design-phase, pre-gate.** Translates issue #44 (fetched
+> **Status: IMPLEMENTATION, PO-authorized 2026-08-01.** Translates issue #44 (fetched
 > verbatim via `gh issue view 44`, 2026-07-25) into checkable form. Phase III,
 > depends on CYB-1 (`cap.*` family registry — CYB-6 populates the thirteen
 > CYB-1F-frozen roots with adapters/conformance, never owns the identity
@@ -76,7 +76,6 @@ where dependency/artifact analysis needs it, soft).
 
 ## 7. Gate
 
-Universal package rule. Inventory/adapter-family/synthetic-fixture work can
-run on separate branches once #41/#42 schemas are approved (issue's own
-"Parallelism" note) — but integration still needs CYB-1, CYB-2 AND CYB-4
-closed per the dependency spine (spec.md §4: "CYB-4 → CYB-6"). No dispatch yet.
+Universal package rule. The Sprint Cyborg PO direction of 2026-08-01
+authorizes inventory, adapter-family and synthetic-fixture work. Integration
+still requires CYB-1, CYB-2 and CYB-4 per the dependency spine.
