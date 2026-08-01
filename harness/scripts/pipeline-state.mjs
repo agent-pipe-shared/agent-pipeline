@@ -2757,19 +2757,39 @@ function runFeaturePackageCommand(sub, argv, deps) {
   if (!loaded.ok || sha256Bytes(canonicalPhxJson(loaded.value)) !== parsed.value["request-sha256"]) return 2;
   const request = loaded.value;
   if (!exactFeatureRequest(request)) return 2;
+  const bridge = isRecoveryBridgeTarget(request) && request.authority?.class === "recovery-bridge";
+  let resumeBridgeWithoutFeatureJournal = false;
   if (sub === "feature-package-recover") {
     const journal = readClosedJsonFile(dir, ".claude/feature-package-transaction.json");
-    if (!journal.ok || !samePhxJson(journal.value.request, request)) return 2;
+    if (!journal.ok || !samePhxJson(journal.value.request, request)) {
+      // This is deliberately narrower than generic recovery: a Bridge may
+      // resume only the crash window after its durable private public-commit
+      // and before the ordinary public journal exists.  A malformed or
+      // foreign journal is not treated as that missing-journal window.
+      if (!bridge || existsSync(featureJournalPath(dir))) return 2;
+      resumeBridgeWithoutFeatureJournal = true;
+    }
   }
   const lock = acquireContinuityLock(dir, parsed.value["lock-token"], deps);
   if (!lock.ok) return 2;
   try {
+    if (resumeBridgeWithoutFeatureJournal) {
+      const journal = readClosedJsonFile(dir, ".claude/feature-package-transaction.json");
+      if (journal.ok && samePhxJson(journal.value.request, request)) {
+        resumeBridgeWithoutFeatureJournal = false;
+      } else if (existsSync(featureJournalPath(dir))) {
+        return 2;
+      }
+    }
     const target = resolve(dir, request.manifest ?? "");
     const existing = existsSync(target);
-    const bridge = isRecoveryBridgeTarget(request) && request.authority?.class === "recovery-bridge";
     if (bridge) {
       const transaction = recoveryBridgeTransaction(dir, request.authority.decision.decisionId, deps);
       if (!transaction.ok) { console.error(`Error: Recovery Bridge private store refused (${transaction.code}).`); return 2; }
+      if (resumeBridgeWithoutFeatureJournal && (transaction.value === null
+        || transaction.value.requestSha256 !== sha256Bytes(canonicalPhxJson(request))
+        || transaction.value.decision.decisionSha256 !== request.authority.decision.decisionSha256
+        || transaction.value.decision.status !== "public-committed")) return 2;
       const consumedRecovery = transaction.value?.decision.status === "consumed";
       if (consumedRecovery && (sub !== "feature-package-recover"
         || transaction.value.requestSha256 !== sha256Bytes(canonicalPhxJson(request)))) return 2;

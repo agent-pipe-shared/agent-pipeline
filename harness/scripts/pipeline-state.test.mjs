@@ -2529,6 +2529,24 @@ function recoveryBridgeExecutableFixture() {
   ok("TP5 Recovery Bridge private store rejects missing, nonabsolute, malformed, and symlinked stores without manifest mutation", missing && relative && malformed && symlinked);
 }
 
+{
+  const fixture = recoveryBridgeExecutableFixture(); const now = () => "2026-08-01T00:00:00.000Z";
+  const planned = captureConsoleLog(() => run(["recovery-bridge-plan", "--decision-file", writeRequest(fixture.dir, "critic-recovery-decision", fixture.decision)], { dir: fixture.dir, now }));
+  const request = JSON.parse(planned.text).request; const requestFile = writeRequest(fixture.dir, "critic-recovery-request", request);
+  const deps = { dir: fixture.dir, now, gitCommonDir: () => ({ ok: true, path: fixture.gitCommonDir }) };
+  const committed = transitionRecoveryBridgeDecision(fixture.decision, "public-commit", recoveryBridgeCommitRequest(fixture.decision), { now: now() });
+  const privateDirectory = join(fixture.gitCommonDir, "agent-pipeline", "recovery-bridge", fixture.decision.decisionId); mkdirSync(privateDirectory, { recursive: true });
+  writeFileSync(join(privateDirectory, "journal.json"), JSON.stringify({ schema: "pipeline.recovery-bridge-transaction.v1", decision: committed.value, requestSha256: sha256Canonical(request) }) + "\n");
+  const genericJournal = join(fixture.dir, ".claude", "feature-package-transaction.json");
+  const before = JSON.parse(readFileSync(join(fixture.dir, fixture.manifestPath), "utf8"));
+  const recovery = run(["feature-package-recover", "--request-file", requestFile, "--request-sha256", sha256Canonical(request), "--lock-token", "rb-critic-recover"], deps);
+  const after = JSON.parse(readFileSync(join(fixture.dir, fixture.manifestPath), "utf8"));
+  const terminal = JSON.parse(readFileSync(join(privateDirectory, "journal.json"), "utf8"));
+  const changed = before.artifacts.map((entry, index) => entry.sha256 === after.artifacts[index].sha256 ? 0 : 1);
+  const nonBridge = structuredClone(request); nonBridge.authority = { class: "lifecycle-bootstrap", decision: null };
+  const nonBridgeRecover = run(["feature-package-recover", "--request-file", writeRequest(fixture.dir, "critic-non-bridge-request", nonBridge), "--request-sha256", sha256Canonical(nonBridge), "--lock-token", "rb-critic-non-bridge"], deps);
+  ok("TP5 Critic Recovery Bridge resume consumes an exact private public-committed transaction without a generic journal", planned.value === 0 && committed.ok && !existsSync(genericJournal) && recovery === 0 && terminal.decision.status === "consumed" && changed.reduce((sum, value) => sum + value, 0) === 1 && changed[3] === 1 && nonBridgeRecover === 2);
+}
 // ---- Cleanup ------------------------------------------------------------------------------
 for (const dir of ALL_DIRS) {
   try {
