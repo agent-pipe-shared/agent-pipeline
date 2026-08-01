@@ -598,8 +598,11 @@ function overrideTarget() {
   // realpath comparison below. `--git-dir` and `--work-tree` can each select a
   // different repository/worktree without a safe root proof in this hook, so an
   // armed override rejects them before either consumption lookup or append.
+  // GIT_DIR/GIT_WORK_TREE have the same target-selection power even when passed
+  // through a shell assignment or env wrapper, so they are rejected as well.
   // (Detection intentionally covers both --option=value and --option <value>.)
   const targetCommand = inlineArm?.remainder ?? cmd;
+  if (/(?:^|[\s;&|])(?:GIT_DIR|GIT_WORK_TREE)\s*=/u.test(targetCommand)) return { ok: false };
   for (const segment of targetCommand.split(/[;&|]+/u)) {
     if (!/\bgit\b/u.test(segment)) continue;
     const gitIndex = segment.search(/\bgit\b/u);
