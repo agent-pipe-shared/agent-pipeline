@@ -1145,6 +1145,12 @@
       "member": "stack-adapter-contract-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:stack-dynamic-boundary-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "stack-dynamic-boundary-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:ruleset-freshness-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1935,6 +1941,7 @@
         "verify-phase:harness/scripts/verify.mjs:spec-retention-check",
         "verify-phase:harness/scripts/verify.mjs:spec-retention-tests",
         "verify-phase:harness/scripts/verify.mjs:stack-adapter-contract-tests",
+        "verify-phase:harness/scripts/verify.mjs:stack-dynamic-boundary-tests",
         "verify-phase:harness/scripts/verify.mjs:staleness-check-tests",
         "verify-phase:harness/scripts/verify.mjs:state-budget-check",
         "verify-phase:harness/scripts/verify.mjs:state-budget-tests",

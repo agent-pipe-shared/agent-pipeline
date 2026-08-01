@@ -258,6 +258,7 @@ const TEST_SUITES = [
   { name: "provenance-fixture-matrix-tests", file: join(libDir, "provenance-fixture-matrix.test.mjs") },
   { name: "provenance-local-builder-tests", file: join(libDir, "provenance-local-builder.test.mjs") },
   { name: "stack-adapter-contract-tests", file: join(libDir, "stack-adapter-contract.test.mjs") },
+  { name: "stack-dynamic-boundary-tests", file: join(libDir, "stack-dynamic-boundary.test.mjs") },
   { name: "threat-model-discovery-tests", file: join(libDir, "threat-model-discovery.test.mjs") },
   { name: "threat-model-fixture-matrix-tests", file: join(libDir, "threat-model-fixture-matrix.test.mjs") },
   { name: "threat-model-tests", file: join(libDir, "threat-model.test.mjs") },
