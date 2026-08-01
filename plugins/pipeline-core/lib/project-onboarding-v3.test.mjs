@@ -3755,6 +3755,9 @@ test("resume hint is a post-seed, non-authoritative restart aid that fails open"
     assert.throws(() => captureResumeHint({ rootDir: path, context: { ...context, intent: "User: paste every command" } }), /RH-SCHEMA/);
     assert.throws(() => captureResumeHint({ rootDir: path, context: { ...context, constraints: ["Use token sk-example"] } }), /RH-SCHEMA/);
     assert.throws(() => captureResumeHint({ rootDir: path, context: { ...context, scope: ["Open /home/operator/private"] } }), /RH-SCHEMA/);
+    assert.throws(() => captureResumeHint({ rootDir: path, context: { ...context, scope: ["Review(/home/operator/private)"] } }), /RH-SCHEMA/);
+    assert.throws(() => captureResumeHint({ rootDir: path, context: { ...context, constraints: ["AKIAIOSFODNN7EXAMPLE"] } }), /RH-SCHEMA/);
+    assert.throws(() => captureResumeHint({ rootDir: path, context: { ...context, questions: ["Use Ab9Qx2Lm8Vw4Ze7Rt1Yu?"] } }), /RH-SCHEMA/);
     const helper = fileURLToPath(new URL("../scripts/resume-hint.mjs", import.meta.url));
     const cardPath = join(path, "resume-card.json");
     writeFileSync(cardPath, JSON.stringify(context));

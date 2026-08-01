@@ -12,7 +12,7 @@ const SHA256 = /^[a-f0-9]{64}$/;
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const MAX_FIELD_BYTES = 480;
 const CONTEXT_KEYS = ["intent", "scope", "constraints", "questions"];
-const SENSITIVE_OR_CONTROLLED_TEXT = /(?:```|\b(?:user|assistant|system)\s*:|https?:\/\/|\b(?:bearer|api[-_ ]?key|secret|password|credential|token|private key|approval|approved|authori[sz]ed)\b|\b(?:node|git|codex|npm|pnpm|yarn|bash|sh|python|curl)\b\s|[|><$`]|(?:^|\s)[~\/]|\\|\b(?:close[- ]?block|close[- ]?feature|pipeline[- ]?state)\b|\b(?:\d{1,3}\.){3}\d{1,3}\b|\b(?:ghp_|glpat-|sk-))/i;
+const SENSITIVE_OR_CONTROLLED_TEXT = /(?:```|\b(?:user|assistant|system)\s*:|https?:\/\/|\b(?:bearer|api[-_ ]?key|secret|password|credential|token|private key|approval|approved|authori[sz]ed)\b|\b(?:node|git|codex|npm|pnpm|yarn|bash|sh|python|curl)\b\s|[\\/|><$`@:]|\b(?:close[- ]?block|close[- ]?feature|pipeline[- ]?state)\b|\b(?:\d{1,3}\.){3}\d{1,3}\b|\b(?:ghp_|glpat-|sk-|AKIA)|\b[0-9a-f]{16,}\b|\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b)/i;
 
 function object(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
 function exact(value, keys) { return object(value) && Object.keys(value).length === keys.length && Object.keys(value).every((key) => keys.includes(key)); }
@@ -28,10 +28,18 @@ function validBasis(value) {
     && SHA256.test(value.planSha256) && SHA256.test(value.specSha256));
 }
 function validTimestamp(value) { return typeof value === "string" && Number.isFinite(Date.parse(value)); }
+function opaqueToken(value) {
+  return value.split(/\s+/).some((token) => {
+    const compact = token.replace(/[^A-Za-z0-9_=-]/g, "");
+    if (compact.length < 16) return false;
+    const hasLower = /[a-z]/.test(compact); const hasUpper = /[A-Z]/.test(compact); const hasDigit = /\d/.test(compact);
+    return (hasLower && hasUpper && hasDigit) || (compact.length >= 24 && (hasDigit || /[_=-]/.test(compact)));
+  });
+}
 function validText(value) {
   return typeof value === "string" && value === value.trim() && value.length > 0
     && !/[\r\n\0]/.test(value) && Buffer.byteLength(value, "utf8") <= MAX_FIELD_BYTES
-    && !SENSITIVE_OR_CONTROLLED_TEXT.test(value);
+    && !SENSITIVE_OR_CONTROLLED_TEXT.test(value) && !opaqueToken(value);
 }
 function validTextList(value, maximum) { return Array.isArray(value) && value.length <= maximum && value.every(validText); }
 function validContext(value) {
