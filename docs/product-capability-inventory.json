@@ -1217,6 +1217,12 @@
       "member": "sbom-node-adapter-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:sbom-release-binding-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "sbom-release-binding-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:security-scan",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1845,6 +1851,7 @@
         "verify-phase:harness/scripts/verify.mjs:sbom-lifecycle-tests",
         "verify-phase:harness/scripts/verify.mjs:sbom-manifest-tests",
         "verify-phase:harness/scripts/verify.mjs:sbom-node-adapter-tests",
+        "verify-phase:harness/scripts/verify.mjs:sbom-release-binding-tests",
         "verify-phase:harness/scripts/verify.mjs:schema-lite-tests",
         "verify-phase:harness/scripts/verify.mjs:sdlc-efficiency-metrics-tests",
         "verify-phase:harness/scripts/verify.mjs:sdlc-run-graph-tests",
@@ -1909,7 +1916,8 @@
         "plugins/pipeline-core/lib/sbom-discovery.test.mjs",
         "plugins/pipeline-core/lib/sbom-lifecycle.test.mjs",
         "plugins/pipeline-core/lib/sbom-manifest.test.mjs",
-        "plugins/pipeline-core/lib/sbom-node-adapter.test.mjs"
+        "plugins/pipeline-core/lib/sbom-node-adapter.test.mjs",
+        "plugins/pipeline-core/lib/sbom-release-binding.test.mjs"
       ],
       "targets": [
         {

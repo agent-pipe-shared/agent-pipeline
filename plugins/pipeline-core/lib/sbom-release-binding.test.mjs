@@ -1,0 +1,9 @@
+// SPDX-License-Identifier: SUL-1.0
+import assert from "node:assert/strict";
+import { bindSbomRelease, buildSbomAuditBundle } from "./sbom-release-binding.mjs";
+let passed = 0; function test(name, fn) { try { fn(); passed += 1; console.log(`PASS ${name}`); } catch (error) { console.error(`FAIL ${name}: ${error.message}`); process.exitCode = 1; } }
+const digest = "a".repeat(64); const manifest = { lifecycle: { state: "complete" }, freshness: { status: "fresh" }, completeness: { status: "complete" } }; const input = (release, components) => ({ release, manifest, validation: { valid: true, digest }, manifestDigest: "b".repeat(64), components });
+test("binds an immutable release and computes the next delta", () => { const first = bindSbomRelease([], input("1.0.0", ["a", "b"])); const second = bindSbomRelease(first.history, input("1.1.0", ["b", "c"])); assert.deepEqual(second.entry.delta, { added: ["c"], removed: ["a"] }); assert.equal(bindSbomRelease(second.history, input("1.1.0", ["b"])).code, "SBOM-RELEASE-IMMUTABLE"); });
+test("rejects stale, partial or invalid release inputs", () => { assert.equal(bindSbomRelease([], { ...input("1.0.0", ["a"]), manifest: { ...manifest, freshness: { status: "stale" } } }).code, "SBOM-RELEASE-PRECONDITION"); assert.equal(bindSbomRelease([], { ...input("1.0.0", ["a"]), validation: { valid: false } }).code, "SBOM-RELEASE-PRECONDITION"); });
+test("audit bundle contains all required digest references only", () => { const links = Object.fromEntries(["sbom", "policy", "completeness", "validation", "releaseBinding"].map((key) => [key, { schema: `pipeline.${key}.v1`, digest }])); const bundle = buildSbomAuditBundle(links); assert.equal(bundle.ok, true); assert.equal(bundle.authoritative, false); assert.equal(buildSbomAuditBundle({ ...links, vex: {} }).ok, false); });
+console.log(`\n${passed} passed`);
