@@ -1049,6 +1049,12 @@
       "member": "pipeline-update-channel-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:po-approval-proof-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "po-approval-proof-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:po-gate-authority-fixture-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1894,6 +1900,7 @@
         "verify-phase:harness/scripts/verify.mjs:pipeline-start-preflight-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-start-v3-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-tests",
+        "verify-phase:harness/scripts/verify.mjs:po-approval-proof-tests",
         "verify-phase:harness/scripts/verify.mjs:po-gate-authority-fixture-tests",
         "verify-phase:harness/scripts/verify.mjs:po-gate-profile-publisher-tests",
         "verify-phase:harness/scripts/verify.mjs:po-language-projection-check",
