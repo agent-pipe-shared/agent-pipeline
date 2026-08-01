@@ -12,7 +12,7 @@ const SHA256 = /^[a-f0-9]{64}$/;
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const MAX_FIELD_BYTES = 480;
 const CONTEXT_KEYS = ["intent", "scope", "constraints", "questions"];
-const SENSITIVE_OR_CONTROLLED_TEXT = /(?:```|\b(?:user|assistant|system)\s*:|https?:\/\/|\b(?:bearer|api[-_ ]?key|secret|password|credential|token|private key|approval|approved|authori[sz]ed)\b|\b(?:node|git|codex|npm|pnpm|yarn|bash|sh|python|curl)\b\s|[\\/|><$`@:]|\b(?:close[- ]?block|close[- ]?feature|pipeline[- ]?state)\b|\b(?:\d{1,3}\.){3}\d{1,3}\b|\b(?:ghp_|glpat-|sk-|AKIA|ASIA)|\b[0-9a-f]{16,}\b|\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b)/i;
+const SENSITIVE_OR_CONTROLLED_TEXT = /(?:```|\b(?:user|assistant|system)\s*:|https?:\/\/|\b(?:bearer|api[-_ ]?key|secret|password|credential|token|private key|approval|approved|authori[sz]ed)\b|\b(?:node|git|codex|npm|pnpm|yarn|bash|sh|python|curl)\b\s|[\\/|><$`@:]|\b(?:close[- ]?block|close[- ]?feature|pipeline[- ]?state)\b|\b(?:\d{1,3}\.){3}\d{1,3}\b|\b(?:ghp_|glpat_|sk-)|(?:AKIA|ASIA)[A-Z0-9]{16}|\b[0-9a-f]{16,}\b|\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b)/i;
 
 function object(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
 function exact(value, keys) { return object(value) && Object.keys(value).length === keys.length && Object.keys(value).every((key) => keys.includes(key)); }
