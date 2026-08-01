@@ -80,6 +80,11 @@ protection, or a need for an external watchdog/recovery supervisor.
   persisted consumer or migration target. An unavailable or incompatible
   runner continues to produce the typed degraded result; it does not change
   existing serial Pipeline execution or claim protected continuation.
+- The optional restart-hint sidecar is independently reversible: `resume-hint.mjs
+  discard` removes only `project/resume-hint.json`, while an absent, stale or
+  malformed hint already has no lifecycle effect. A defect is removed with a
+  forward revert of its module, CLI, instruction and tests; this never changes
+  State, HISTORY, handover, native goals or a close transition.
 - A defect is rolled back by one ordinary forward revert of the B0 code,
   schema, adapters and conformance fixtures as one unit. Any native goal that
   was actually set is first cleared through the same bounded adapter readback;
