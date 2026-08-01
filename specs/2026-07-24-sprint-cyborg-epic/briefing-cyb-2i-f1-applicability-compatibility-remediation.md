@@ -59,6 +59,13 @@ Promotion order:
 4. retain the prior catalog revision for one release window, and monitor for
    rejected `not-applicable` values rather than silently normalizing them.
 
+The compatibility window is owned by the **PO** and expires on **2027-02-01**.
+Before that date, the PO must either record evidence that every governed
+consumer accepts the three-value contract or approve a separately scoped
+extension with a new owner and expiry. On expiry without that evidence, stop
+new catalog-revision-2 adoption and use the global rollback below; an open
+window is never a standing exemption.
+
 ## Explicit global rollback
 
 Rollback is global because catalog applicability is shared policy, not a
