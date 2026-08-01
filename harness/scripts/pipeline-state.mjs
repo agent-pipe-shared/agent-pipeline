@@ -2683,6 +2683,31 @@ function recoveryBridgeTransaction(dir, decisionId, deps = {}) {
       : { ok: false, code: "RB-PRIVATE-STORE-INVALID" };
   } catch { return { ok: false, code: "RB-PRIVATE-STORE-INVALID" }; }
 }
+
+/**
+ * Historical Recovery Bridge journals used the predecessor assurance label
+ * `operator-local-attested`. A consumed journal cannot authorize a new
+ * transition, but its terminal record must not keep the status projection
+ * permanently unavailable after the assurance label was strengthened.
+ */
+function isConsumedLegacyRecoveryBridgeTransaction(value, decisionId) {
+  if (!exactObjectKeys(value, ["schema", "decision", "requestSha256"])
+    || value.schema !== RECOVERY_BRIDGE_TRANSACTION_SCHEMA
+    || !SHA256_RE.test(value.requestSha256)) return false;
+  const decision = value.decision;
+  if (decision?.decisionId !== decisionId
+    || decision?.status !== "consumed"
+    || decision?.assurance !== "operator-local-attested"
+    || decision?.decisionSha256 !== recoveryBridgeDecisionDigest(decision)) return false;
+
+  // Validate every other target, identity, time, and digest field against the
+  // current schema. Recomputing only the replaced assurance proves that this
+  // is the exact predecessor terminal form, not a relaxed live authority.
+  const normalized = { ...decision, assurance: RECOVERY_BRIDGE_ASSURANCE };
+  normalized.decisionSha256 = recoveryBridgeDecisionDigest(normalized);
+  return validateRecoveryBridgeDecision(normalized).ok;
+}
+
 function recoveryBridgeStatusProjection(dir, deps = {}) {
   let common;
   try { common = (deps.gitCommonDir ?? defaultGitCommonDir)(dir); } catch { return { ok: false, code: "RB-PRIVATE-STORE-UNAVAILABLE" }; }
@@ -2721,8 +2746,15 @@ function recoveryBridgeStatusProjection(dir, deps = {}) {
       if (!stat.isDirectory() || stat.isSymbolicLink()) return { ok: false, code: "RB-PRIVATE-STORE-INVALID" };
     } catch { return { ok: false, code: "RB-PRIVATE-STORE-UNAVAILABLE" }; }
     const transaction = recoveryBridgeTransaction(dir, entry.name, deps);
-    if (!transaction.ok || transaction.value === null
-      || transaction.value.decision.decisionId !== entry.name) return { ok: false, code: transaction.code ?? "RB-PRIVATE-STORE-INVALID" };
+    if (!transaction.ok) {
+      let legacy = null;
+      try { legacy = JSON.parse(readFileSync(join(root, entry.name, "journal.json"), "utf8")); } catch { /* fail closed below */ }
+      if (isConsumedLegacyRecoveryBridgeTransaction(legacy, entry.name)) continue;
+      return { ok: false, code: transaction.code ?? "RB-PRIVATE-STORE-INVALID" };
+    }
+    if (transaction.value === null || transaction.value.decision.decisionId !== entry.name) {
+      return { ok: false, code: "RB-PRIVATE-STORE-INVALID" };
+    }
     if (transaction.value.decision.status === "consumed") continue;
     const checked = validateRecoveryBridgeDecision(transaction.value.decision, { now: deps.now?.() });
     if (!checked.ok) return checked;

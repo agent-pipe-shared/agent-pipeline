@@ -1248,18 +1248,20 @@ if (securityGate && securityGate.mode !== "off") {
 // the actual network operation, then fetches the pushed ref from a fresh repository.
 failures.push(...checkAnonymousPublicPush(pushBinding, sourceCommit));
 
-// (c) PHX-2 transition. The current pipeline State is intentionally excluded:
-// it is mutable local coordination data and cannot prove a PO decision. Until
-// the Human Governance Decision Ledger and Authority Resolver exist, every active
-// Push-Gate is therefore blocked even when legacy or required State approval fields
-// match the source commit. This is runner- and platform-neutral: no shell, host,
-// Claude, Codex, or AGY integration can turn the local State into authority.
-failures.push(
-  "PHX-2 authority unavailable: mutable pipeline State approvals cannot authorize a push; " +
-    "require the Human Governance Decision Ledger and Authority Resolver.",
-);
+// (c) PHX-2 transition. Ordinary Push-Gate mode intentionally excludes mutable
+// pipeline State approvals: they cannot prove a PO decision. A valid active
+// publication projection is different: it was created by the dedicated
+// authority writer and has already been checked above for one exact, consumed
+// command tuple. Any malformed, stale, or differently shaped projection exits
+// fail-closed in enforcePublicationAuthorization.
+if (!publicationMode.active) {
+  failures.push(
+    "PHX-2 authority unavailable: mutable pipeline State approvals cannot authorize a push; " +
+      "require the Human Governance Decision Ledger and Authority Resolver.",
+  );
+}
 
-if (failures.length === 0) process.exit(0); // defensive: active Push-Gates add the PHX-2 transition finding
+if (failures.length === 0) process.exit(0);
 
 const message = [
   invalidityNote, // case B: non-null only for a semantic-invalid manifest with a release

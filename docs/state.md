@@ -3,15 +3,35 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-07-31
+**Last updated:** 2026-08-01
 **Project status:** ACTIVE
-**Current block:** Handover authority reconciled to the current Phoenix State; the persisted queue remains `review` before any further package dispatch
+**Current block:** Push-readiness correction is local and uncommitted; the persisted queue remains `review` before any further package dispatch
 **Branch:** `sprint_phoenix`, based on public `origin/main`
 `9d1b3dc108eb77629ace5b82002120f5539abd8d`
-**Pipeline:** `0.4.7+codex.20260731161954`
-**DoD:** 🟡 Phoenix remains open; PHX-0A lifecycle-manifest reconciliation has a committed writer readback, while later package selection remains gated by the persisted review action
+**Pipeline:** `0.4.7+codex.20260801130757`
+**DoD:** 🟡 Phoenix remains open; the lifecycle manifest is status-ready, while later package selection remains gated by the persisted review action
 
 ## Operational head
+
+### Push-readiness recovery — 2026-08-01
+
+- The current lifecycle manifest already binds the reviewed `RECOVERY.md`
+  bytes. A newly issued Recovery Bridge decision therefore produced no writer
+  request and was removed unused; no lifecycle-manifest or private-journal
+  bytes were edited by hand.
+- Two historical, already `consumed` private Bridge journals used the retired
+  `operator-local-attested` label. The status projection now recognizes only
+  that exact terminal predecessor form after validating every other binding.
+  It continues to reject any malformed or non-terminal legacy journal. The
+  live lifecycle status is `ready`.
+- The Push Guard now retains its ordinary PHX-2 fail-closed behavior while
+  admitting only an active, exact Publication Authority projection previously
+  validated by the dedicated State writer. No such publication authorization
+  exists yet, no remote action was attempted, and no push is claimed.
+- Focused evidence for this local candidate: Pipeline State 242/242, Push
+  Guard 99/99, Publication State Authority 6/6, and Publication Authority
+  12/12. Aggregate Verify, Security, and independent Critic remain required
+  before a one-shot, exact remote publication decision may be requested.
 
 - Project calibration is [`.claude/pipeline.json`](../.claude/pipeline.json);
   the required aggregate gate is `node harness/scripts/verify.mjs`.
