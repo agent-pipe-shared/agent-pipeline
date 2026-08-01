@@ -1307,6 +1307,18 @@
       "member": "v3-bootstrap-authority-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:threat-model-fixture-matrix-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "threat-model-fixture-matrix-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:threat-model-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "threat-model-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:validate-manifest",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1888,6 +1900,8 @@
         "verify-phase:harness/scripts/verify.mjs:statusline-context-tests",
         "verify-phase:harness/scripts/verify.mjs:stop-suggest-tests",
         "verify-phase:harness/scripts/verify.mjs:symlink-capability-tests",
+        "verify-phase:harness/scripts/verify.mjs:threat-model-fixture-matrix-tests",
+        "verify-phase:harness/scripts/verify.mjs:threat-model-tests",
         "verify-phase:harness/scripts/verify.mjs:v3-bootstrap-authority-tests",
         "verify-phase:harness/scripts/verify.mjs:validate-manifest",
         "verify-phase:harness/scripts/verify.mjs:validate-manifest-tests",
@@ -1933,6 +1947,8 @@
         "plugins/pipeline-core/lib/sbom-manifest.test.mjs",
         "plugins/pipeline-core/lib/sbom-node-adapter.test.mjs",
         "plugins/pipeline-core/lib/sbom-release-binding.test.mjs",
+        "plugins/pipeline-core/lib/threat-model-fixture-matrix.test.mjs",
+        "plugins/pipeline-core/lib/threat-model.test.mjs",
         "plugins/pipeline-core/scripts/sbom-discovery.test.mjs"
       ],
       "targets": [
