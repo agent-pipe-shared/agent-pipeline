@@ -319,13 +319,24 @@ const RECOVERY_BRIDGE_BINDING_KEYS = [
   "decisionId", "featureId", "operation", "manifest", "artifactPath", "assurance",
   "manifestPreimageSha256", "recoveryPostimageSha256", "prdSha256", "specSha256", "approvedBy", "approvedAt", "expiresAt",
 ];
+const RECOVERY_BRIDGE_APPROVAL_KEYS = ["what", "why", "scope", "notAuthorized"];
 const RECOVERY_BRIDGE_DECISION_KEYS = [
   "schema", "decisionId", "decisionSha256", "featureId", "operation", "manifest", "artifactPath", "assurance",
   "manifestPreimageSha256", "recoveryPostimageSha256", "prdSha256", "specSha256", "approvedBy", "approvedAt", "expiresAt", "status",
 ];
 
+function recoveryBridgeBindingKeys(value) {
+  return Object.hasOwn(value ?? {}, "approval")
+    ? [...RECOVERY_BRIDGE_BINDING_KEYS, "approval"]
+    : RECOVERY_BRIDGE_BINDING_KEYS;
+}
+function validRecoveryBridgeApproval(value) {
+  return exactObjectKeys(value, RECOVERY_BRIDGE_APPROVAL_KEYS)
+    && RECOVERY_BRIDGE_APPROVAL_KEYS.every((key) => typeof value[key] === "string"
+      && value[key].trim().length >= 12 && value[key].length <= 1_000);
+}
 function recoveryBridgeBinding(value) {
-  return Object.fromEntries(RECOVERY_BRIDGE_BINDING_KEYS.map((key) => [key, value?.[key]]));
+  return Object.fromEntries(recoveryBridgeBindingKeys(value).map((key) => [key, value?.[key]]));
 }
 
 /** Canonical digest for the immutable, exact Recovery Bridge decision binding. */
@@ -343,7 +354,9 @@ function recoveryBridgeNow(now) {
  * uncommitted issuance it enforces the non-extendable issuance cutoff.
  */
 export function validateRecoveryBridgeDecision(value, { now } = {}) {
-  if (!exactObjectKeys(value, RECOVERY_BRIDGE_DECISION_KEYS) || value.schema !== RECOVERY_BRIDGE_DECISION_SCHEMA) {
+  const hasApproval = Object.hasOwn(value ?? {}, "approval");
+  if (!exactObjectKeys(value, hasApproval ? [...RECOVERY_BRIDGE_DECISION_KEYS, "approval"] : RECOVERY_BRIDGE_DECISION_KEYS)
+    || value.schema !== RECOVERY_BRIDGE_DECISION_SCHEMA || (hasApproval && !validRecoveryBridgeApproval(value.approval))) {
     return { ok: false, code: "RB-DECISION-SCHEMA" };
   }
   if (!RECOVERY_BRIDGE_ID_RE.test(value.decisionId) || !SHA256_RE.test(value.decisionSha256)
@@ -369,12 +382,14 @@ export function validateRecoveryBridgeDecision(value, { now } = {}) {
 }
 
 function exactRecoveryBridgeRequest(value, schema) {
-  return exactObjectKeys(value, ["schema", "decisionSha256", ...RECOVERY_BRIDGE_BINDING_KEYS])
-    && value.schema === schema && SHA256_RE.test(value.decisionSha256);
+  const hasApproval = Object.hasOwn(value ?? {}, "approval");
+  return exactObjectKeys(value, ["schema", "decisionSha256", ...RECOVERY_BRIDGE_BINDING_KEYS, ...(hasApproval ? ["approval"] : [])])
+    && value.schema === schema && SHA256_RE.test(value.decisionSha256)
+    && (!hasApproval || validRecoveryBridgeApproval(value.approval));
 }
 
 function exactRecoveryBridgeBinding(record, binding) {
-  return RECOVERY_BRIDGE_BINDING_KEYS.every((key) => binding[key] === record[key]);
+  return recoveryBridgeBindingKeys(record).every((key) => samePhxJson(binding[key], record[key]));
 }
 
 function validateRecoveryBridgePublicCommit(record, request) {
@@ -384,7 +399,8 @@ function validateRecoveryBridgePublicCommit(record, request) {
 }
 
 function validateRecoveryBridgeConsumeReceipt(record, receipt) {
-  return exactObjectKeys(receipt, ["schema", "decisionSha256", ...RECOVERY_BRIDGE_BINDING_KEYS, "readback"])
+  const hasApproval = Object.hasOwn(receipt ?? {}, "approval");
+  return exactObjectKeys(receipt, ["schema", "decisionSha256", ...RECOVERY_BRIDGE_BINDING_KEYS, ...(hasApproval ? ["approval"] : []), "readback"])
     && receipt.schema === RECOVERY_BRIDGE_CONSUME_RECEIPT_SCHEMA && SHA256_RE.test(receipt.decisionSha256)
     && receipt.decisionSha256 === record.decisionSha256 && exactRecoveryBridgeBinding(record, receipt)
     && exactObjectKeys(receipt.readback, ["manifest", "artifactPath", "recoveryPostimageSha256"])
