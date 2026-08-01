@@ -6,6 +6,17 @@ it is not evidence of acceptance or closure. “Evidenced/closed” is reserved
 for a fresh, candidate-bound acceptance gate, which the current records do not
 claim. The released v0.4.7/#63 material is baseline history only.
 
+## Candidate binding protocol
+
+This document deliberately does **not** name the mutable working tree as a
+candidate. After the final Nova candidate commit is created, append one
+immutable record here with its full commit SHA, tree SHA, branch, matrix digest
+and creation time. Every Verify, Security, Critic, PO-gate and publication
+receipt used by this matrix must repeat that exact commit/tree pair and matrix
+digest. A changed commit, tree or matrix requires a new record and fresh
+receipts; historical receipts remain history rather than evidence for the new
+candidate.
+
 | Issue / block | Accepted/current scope | Existing implementation or evidence | Remaining gap | Exact next verification / closure gate | Disposition |
 | --- | --- | --- | --- | --- | --- |
 | #57 / Nova A1 canonical reconciliation | Versioned Spec-bound delivery record; sanctioned append-only assignment/closure; CAS idempotence; portfolio snapshot; append-only repair of events 39/40; generic initializer. | A1 writer/reconciliation suites and backlog evidence (`evidence/backlog/*`) are recorded; ledger was re-integrated append-only at `44e25b8…` after the v0.4.7 adoption. | Fresh post-rebase binding, default checker/readback and all NVA-A57 rows have not been regenerated; no closure transition is authorized. | Run NVA-A57-1..6 against the exact candidate; prove checker green, stale/replay/partial failures, event-39/40 amendment readback, then Full Verify/Security/Critic and PO increment gate. | Implemented (provisional); not evidenced/closed. |
@@ -25,6 +36,27 @@ claim. The released v0.4.7/#63 material is baseline history only.
 | #15 / Nova B3-A Antigravity Alpha | Documentation-bound third-runner descriptor (`alpha-documentation-only`), fail-closed unavailable cells; direct AGY execution belongs to #69 (`sprint:NONE`). | Alpha boundary suite (`5/5`) and PO narrowing/decision artifacts exist; execution/network cells remain unavailable. | Fresh candidate descriptor/readback and sprint-close transfer wording; no AGY execution or availability claim. | Run NVA-B15-1..6, verify hostile no-execution fixtures and exact #69 transfer disposition, then Nova B close gate. | Narrowed contract implemented; open pending evidence. |
 | #51 / Nova B4 forge/transport | Git-only VCS; GitHub/GitLab transport/forge contract, exact target/readback, explicit mutation gates; no silent weaker-control substitution. | Capability/transport/adapter fixtures (`15/15`, `25/25`) and GitLab mutation lifecycle tests are local evidence. | Required live read-only GitLab capability and exact transport readback are absent; no authorized mutation/readback. | Run NVA-B51-1..9 with approved disposable/live read-only target; prove capability cells, ref binding and explicit forge mutation readback. | Implemented (adapter contracts); open. |
 | #49 / Nova B5 macOS boundary | Synthetic/non-native macOS contract, bounded keep-awake/resume and nonblocking interaction; native Apple-Silicon transferred to #72 (`sprint:NONE`). | Synthetic macOS boundary (`6/6`) and candidate-freeze (`8/8`) suites plus transfer records exist. | No fresh candidate freeze/evidence matrix and no native evidence (correctly external to Nova). | Run NVA-B49-1..9; publish synthetic-only Verify/Security/Critic/readback and exact #72 transfer comment; never substitute hosted/Intel evidence. | Narrowed contract implemented; not evidenced/closed. |
+
+## PO-adopted cross-sprint hardening: #61 onboarding
+
+Issue #61 remains its original GitHub/sprint assignment; the PO has explicitly
+adopted its runner-neutral deadlock and onboarding hardening into Nova. This
+does not change the canonical issue assignment or imply closure by Nova.
+
+| Nova hardening slice | Acceptance boundary | Evidence required before a Nova candidate claim |
+| --- | --- | --- |
+| NVA-B61-1 canonical generated projection bytes | The shared V3 renderer emits exactly one terminal EOL for `.claude/pipeline.yaml` and `project/pipeline.yaml`; owned sections retain one separator only when followed by another top-level section. No agent manually trims generated output. | Exact LF/CRLF terminal/non-terminal byte tests; a sanctioned projection regeneration changes only owned bytes; direct whitespace drift is typed and the returned lifecycle repair path restores canonical bytes. |
+| NVA-B61-2 remote branch adoption before seed | A new Codex folder whose stated intent names an existing remote/branch is classified read-only before portable seed, Git initialization, runtime setup, kickoff, authority migration, or Cleanup binding. The existing branch is adopted into the permitted root and its own authority is then validated. | Fixture for empty host-reserved root plus existing governed remote branch; prove no generic seed/kickoff files, no movement of `.codex`, no invented Cleanup descriptor, preserved branch HEAD, exact target/upstream binding and one bounded confirmation. |
+| NVA-B61-3 transaction-owned rollback | A failed or interrupted onboarding transition exposes a typed, bounded rollback/recovery action for exactly the transaction's files. The lifecycle must not make its own rollback impossible merely because it is `partial`, `migration-required`, or a Cleanup observation is unavailable. | Failure injection after each onboarding write; prove no cross-root write, no reserved control-mount move, idempotent rollback/readback, and no external shell repair for a pipeline-created partial state. A migration may not require a private Cleanup authority that did not exist before that migration. |
+| NVA-B61-4 new local project before first remote branch | A genuinely new folder whose intended remote branch does not yet exist follows one explicit local-create path: initialize portable authority and Git once, create the first bounded project commit, then present a separate exact remote/branch binding and push plan. It must not require a pre-existing remote branch or loop between seed, kickoff, migration and push guard. | Fixture for empty root plus absent target ref; prove one confirmed initialization transaction, no repeated repair prompt, first commit/readback before push eligibility, typed `remote-branch-create-required` planning, exact destination binding, and a retryable/observable failed remote preflight without local lifecycle deadlock. |
+| NVA-B61-5 PO cleanup recovery override | When a Pipeline-created Cleanup state cannot be observed and ordinary `plan-recovery` returns `recovery-unavailable`, the system offers a separate read-only, digest-bound Human recovery plan for the exact repository and cleanup preimage. Its apply requires informed double confirmation, appends a tamper-evident audit record, changes only the bounded Pipeline-owned Cleanup state, and re-inspects lifecycle before permitting ordinary work. | Fixtures for unavailable cleanup observation and absent/invalid plan; prove no manual private-file edit, no generic guard bypass, no publication/push substitution, no `main` destination injection, distinct first/second confirmations, exact audit/readback, and fail-closed refusal when the transaction cannot prove ownership. |
+
+The source symptoms are treated as regressions, not user error: repeated
+confirmation loops, generic seed/kickoff before known-branch adoption, a busy
+Codex control mount, manually corrected generated YAML, a generated
+`cleanup_recovery_observation_unavailable` state with no typed repair action,
+and a guard that then proposes an unrelated `main` publication route are all
+failing acceptance outcomes.
 
 ## Recommended implementation order
 
