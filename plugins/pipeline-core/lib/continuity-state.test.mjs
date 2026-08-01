@@ -1344,6 +1344,28 @@ await asyncCheck("additive input persists a bounded digest and continues without
   assert.equal(added.next.nativeContinuation.progress.at(-1).kind, "input-question");
 });
 
+await asyncCheck("resume refreshes the active native-goal readback without advancing its generation", async () => {
+  const calls = [];
+  const activated = await reconcileRunnerNativeContinuation({ continuity: nativeState(), activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "activate", atRevision: 3 }, adapter: nativeAdapter(calls) });
+  const resumed = await reconcileRunnerNativeContinuation({ continuity: activated.next, activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "resume", atRevision: 4 }, adapter: nativeAdapter(calls) });
+  assert.equal(resumed.ok, true); assert.equal(resumed.code, "RNC-REFRESH"); assert.equal(resumed.action, "set");
+  assert.deepEqual(calls, [{ action: "set", generation: 0 }, { action: "set", generation: 0 }]);
+  assert.equal(resumed.next.nativeContinuation.status, "active");
+  assert.equal(resumed.next.nativeContinuation.generation.number, 0);
+  assert.equal(resumed.next.nativeContinuation.readback.observedAt, NATIVE_NOW);
+});
+
+await asyncCheck("resume degrades stale active-goal identity instead of trusting it or overwriting user control", async () => {
+  const calls = [];
+  const activated = await reconcileRunnerNativeContinuation({ continuity: nativeState(), activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "activate", atRevision: 3 }, adapter: nativeAdapter(calls) });
+  const resumed = await reconcileRunnerNativeContinuation({ continuity: activated.next, activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "compact-reentry", atRevision: 4 }, adapter: async (input) => { calls.push(input); return { ok: false, code: "CGH-ACTIVE-IDENTITY-MISMATCH", status: "unavailable", readback: null }; } });
+  assert.equal(resumed.ok, true); assert.equal(resumed.code, "RNC-REFRESH"); assert.equal(resumed.next.nativeContinuation.status, "unavailable");
+  assert.equal(resumed.next.nativeContinuation.runner.capability, "unavailable");
+  assert.equal(resumed.next.nativeContinuation.readback, null);
+  assert.equal(resumed.next.nativeContinuation.terminal.atRevision, 4);
+  assert.deepEqual(calls.map(({ action, generation }) => ({ action, generation })), [{ action: "set", generation: 0 }, { action: "set", generation: 0 }]);
+});
+
 await asyncCheck("verified completion requires acceptance evidence and unsupported capability persists degraded evidence", async () => {
   const calls = [];
   const activated = await reconcileRunnerNativeContinuation({ continuity: nativeState(), activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, acceptance: [{ criterionId: "native-goal", status: "passed", evidenceSha256: D }], event: { kind: "activate", atRevision: 3 }, adapter: nativeAdapter(calls) });

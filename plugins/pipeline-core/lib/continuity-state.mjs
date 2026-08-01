@@ -3,6 +3,7 @@
 import { normalizeContinuityHostObservation } from "./continuity-host-adapter.mjs";
 import {
   buildRunnerNativeContinuationRequest,
+  computeRunnerNativeContinuationDigest,
   materializeRunnerNativeContinuation,
   materializeRunnerNativeTerminal,
   planNativeGoalTransition,
@@ -519,6 +520,38 @@ export function applyRunnerNativeContinuation(current, request, activeFeatureId 
   return { ...applied, continuation: structuredClone(request.next.nativeContinuation ?? null) };
 }
 
+function refreshNativeContinuation(current, event, adapterResult) {
+  if (!validateRunnerNativeContinuation(current).ok) return { ok: false, code: "RNC-SCHEMA", continuation: null };
+  const request = {
+    ok: true,
+    request: {
+      continuationId: current.continuationId,
+      subject: structuredClone(current.subject),
+      objective: structuredClone(current.objective),
+      acceptance: structuredClone(current.acceptance),
+      evidence: structuredClone(current.evidence),
+      progress: structuredClone(current.progress),
+      runner: structuredClone(current.runner),
+    },
+  };
+  const materialized = materializeRunnerNativeContinuation({
+    request,
+    generation: current.generation.number,
+    adapterResult,
+    observedAt: adapterResult?.readback?.observedAt,
+    reasonCode: "active-goal-retained",
+  });
+  if (!materialized.ok) return materialized;
+  const continuation = materialized.continuation;
+  if (continuation.status !== "active") {
+    continuation.terminal = { ...continuation.terminal, atRevision: event.atRevision };
+    continuation.recordSha256 = computeRunnerNativeContinuationDigest(continuation);
+  }
+  return validateRunnerNativeContinuation(continuation).ok
+    ? { ok: true, code: "RNC-REFRESH", continuation }
+    : { ok: false, code: "RNC-SCHEMA", continuation: null };
+}
+
 /** Runner-native continuation controller; adapter remains the caller's authority. */
 export async function reconcileRunnerNativeContinuation({ continuity, activeFeature, continuationId, runner, acceptance = [], evidence = [], event, additiveInput = null, adapter } = {}) {
   if (typeof adapter !== "function" || !isObject(activeFeature) || !safeId(activeFeature.id) || !safeId(continuationId)
@@ -548,7 +581,19 @@ export async function reconcileRunnerNativeContinuation({ continuity, activeFeat
   }
   const transition = planNativeGoalTransition({ continuation: current, event });
   if (!transition.ok) return { ok: false, code: transition.code };
-  if (transition.action === "none") return { ok: true, code: transition.code, action: "none", expectedRevision: continuity.revision, next: structuredClone(continuity), continuation: structuredClone(current) };
+  if (transition.action === "none") {
+    // A retained generation is not a licence to trust a historical readback.
+    // The adapter performs a matching get, does not duplicate a matching set,
+    // and refuses to overwrite a different active user-controlled goal.
+    if (current.status === "active" && ["activate", "resume", "compact-reentry"].includes(event.kind)) {
+      const adapterResult = await adapter({ action: "set", generation: current.generation.number, subject: current.subject, objective: current.objective });
+      const refreshed = refreshNativeContinuation(current, event, adapterResult);
+      if (!refreshed.ok) return { ok: false, code: refreshed.code };
+      const next = structuredClone(continuity); next.revision += 1; next.nativeContinuation = refreshed.continuation;
+      return { ok: true, code: refreshed.code, action: "set", expectedRevision: continuity.revision, next, continuation: next.nativeContinuation };
+    }
+    return { ok: true, code: transition.code, action: "none", expectedRevision: continuity.revision, next: structuredClone(continuity), continuation: structuredClone(current) };
+  }
   const adapterResult = await adapter({ action: "clear", generation: current.generation.number, subject: current.subject, objective: current.objective });
   const terminal = materializeRunnerNativeTerminal({ continuation: current, transition, event, adapterResult });
   if (!terminal.ok) return { ok: false, code: terminal.code };
