@@ -618,6 +618,57 @@ test("self-application keeps behind and diverged distinct", () => {
   assert.equal(value.writePermitted, false);
 });
 
+test("a restricted selected host never falls back to an ambient self-application fetch", () => {
+  const { root, remote, source } = fixture("restricted-self-application");
+  const publisher = join(root, "publisher");
+  git(root, "clone", "-q", remote, publisher);
+  git(publisher, "config", "user.email", "ruleset@example.invalid");
+  git(publisher, "config", "user.name", "Ruleset Test");
+  commit(publisher, "public-new");
+  git(publisher, "push", "-q", "origin", "main");
+  const loaded = git(source, "rev-parse", "HEAD");
+  const publicHead = git(publisher, "rev-parse", "HEAD");
+  const boundaryId = "restricted-self-application-host";
+  let hostCalls = 0;
+  let ambientFetches = 0;
+  const value = inspectRulesetFreshness(join(root, "pre-head-consumer"), {
+    sourceObservation: sourceObservation(loaded, "self-application"),
+    loadedPluginRoot: source,
+    remoteUrl: remote,
+    networkPreflight: {
+      schema: FRESHNESS_NETWORK_PREFLIGHT_SCHEMA,
+      network: "restricted",
+      boundaryId,
+      expectedControlIdentitySha256: expectedControlIdentitySha256(),
+    },
+    hostTransport: {
+      schema: FRESHNESS_HOST_TRANSPORT_SCHEMA,
+      boundaryId,
+      access: "read-only",
+      network: "enabled",
+      execute(action) {
+        hostCalls += 1;
+        return {
+          schema: FRESHNESS_HOST_RESULT_SCHEMA,
+          requestSha256: action.requestSha256,
+          status: "completed",
+          stdout: `${publicHead}\tHEAD\n`,
+          receipt: hostExecutionReceipt(action, publicHead),
+        };
+      },
+    },
+    spawn(command, args, options) {
+      if (args.includes("fetch")) ambientFetches += 1;
+      return spawnSync(command, args, options);
+    },
+  });
+  assert.equal(value.status, "comparison-unavailable");
+  assert.equal(value.reason, "remote-object-unavailable");
+  assert.equal(value.writePermitted, false);
+  assert.equal(hostCalls, 1);
+  assert.equal(ambientFetches, 0);
+});
+
 test("consumer mismatch, offline public remote, and loaded/installed disagreement remain typed", () => {
   const { source } = fixture("typed");
   const loaded = git(source, "rev-parse", "HEAD");

@@ -263,6 +263,14 @@ function compareSelfApplication(pluginRoot, loadedSha, remoteSha, options = {}) 
     return relation(git(pluginRoot, ["rev-list", "--left-right", "--count", `${loadedSha}...${remoteSha}`], options), fields);
   }
 
+  // A selected restricted-boundary transport attests exactly the public-HEAD
+  // observation above. It does not authorize a second network operation from
+  // this common path. If that object is not already available locally, fail
+  // closed rather than issuing an ambient `git fetch` in the sandbox.
+  if (options.networkPreflight?.network === "restricted") {
+    return result("comparison-unavailable", { ...fields, reason: "remote-object-unavailable" });
+  }
+
   const objectResult = git(pluginRoot, ["rev-parse", "--git-path", "objects"], options);
   const objectRaw = String(objectResult.stdout ?? "").trim();
   if (objectResult.status !== 0 || !objectRaw) return result("comparison-unavailable", { ...fields, reason: "object-store-unavailable" });
