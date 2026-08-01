@@ -38,6 +38,11 @@ try {
   const duplicatePreview = planFeaturePackageBootstrap(root, bootstrapPath, { targetState: "draft", manifestBytes: `${JSON.stringify(duplicateBootstrap)}\n` });
   assert.equal(duplicatePreview.status, "rejected");
   assert.match(duplicatePreview.findings.join("\n"), /exactly one artifact/u);
+  file(`${bootstrapBase}/PRD.md`, "# Case collision\n");
+  const collisionPreview = planFeaturePackageBootstrap(root, bootstrapPath, proposal);
+  assert.equal(collisionPreview.status, "rejected");
+  assert.match(collisionPreview.findings.join("\n"), /filesystem case-fold or Unicode-normalization collision/u);
+  rmSync(join(root, `${bootstrapBase}/PRD.md`));
   assert.equal(planFeaturePackageBootstrap(root, bootstrapPath, { ...proposal, targetState: "approved" }).reason, "invalid-bootstrap-proposal");
   assert.equal(planFeaturePackageBootstrap(root, bootstrapPath, { targetState: "draft" }).reason, "invalid-bootstrap-proposal");
   assert.equal(planFeaturePackageBootstrap(root, `${bootstrapBase}/other.json`, proposal).reason, "invalid-bootstrap-manifest");
@@ -49,5 +54,5 @@ try {
   rmSync(join(root, `${base}/ſpec.md`));
   manifest.artifacts[1].sha256 = "0".repeat(64); writeFileSync(join(root, `${base}/lifecycle.json`), JSON.stringify(manifest));
   assert.match(validateFeatureTopology(root).findings.join("\n"), /digest does not bind/u);
-  console.log("feature-package-topology: 12 passed, 0 failed");
+  console.log("feature-package-topology: 13 passed, 0 failed");
 } finally { rmSync(root, { recursive: true, force: true }); }

@@ -968,6 +968,33 @@ in for that receipt. `feature-package-apply` accepts only
 that repo-relative request plus its exact digest and expected current preimage;
 it never accepts free-form manifest bytes.
 
+### PHX-0A bootstrap tightening: compatibility and rollback
+
+The absent-manifest `draft` bootstrap accepts exactly one artifact: the active,
+mutable, authoritative PRD. Earlier planner behavior admitted one or more
+artifacts even though every artifact still had to present as that same PRD
+shape. The only production consumer is `pipeline-state.mjs`
+`feature-package-plan` for `bootstrap-draft`; its deterministic proposal path
+therefore creates exactly the one supported artifact and requires no caller
+migration. Existing manifests do not pass through this absent-manifest branch,
+and no stored manifest, request, receipt, State record, or Result history is
+migrated by this tightening.
+
+During rollout, a legacy caller that submits a multi-artifact bootstrap is
+rejected before any journal, manifest, receipt, or State write. Its safe
+recovery is to issue the unchanged single-PRD proposal through the ordinary
+read-only plan path; it must not collapse artifacts manually after a rejected
+write because no write occurred. The added filesystem case-fold/NFKC check is
+also pre-write and protects the same proposal from a case-insensitive checkout
+ambiguity.
+
+Rollback is a normal revert of the tightening commit before publication. There
+is no feature flag or migration-down operation because the change has no
+persisted data format. A manifest validly created under the tightened contract
+remains valid if the code is reverted: the historical one-PRD draft shape is a
+strict subset of the earlier acceptance domain. No compatibility risk is
+deferred by this change.
+
 For the inherited Phoenix `draft` manifest, PHX-0A additionally performs one
 closed reconciliation of the five stale authority digest bindings (PRD, Spec,
 acceptance, architecture, and Result). It uses the same existing-manifest planner and

@@ -57,7 +57,7 @@
     {
       "class": "design",
       "path": "specs/sprint-phoenix-epic/design/architecture.md",
-      "sha256": "03f773ff85ec3956ecd1d4cda6ba3dce4f26a33838774a43423d4602e65dc591",
+      "sha256": "68cd01be379d8266caf4ea90b3a6135c848664e5b7729ac137e0365845713481",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"
