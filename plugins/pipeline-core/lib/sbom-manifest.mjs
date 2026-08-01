@@ -5,6 +5,18 @@ import { createHash } from "node:crypto";
 export const SBOM_MANIFEST_SCHEMA = "pipeline.sbom-manifest.v1";
 export const SBOM_FORMAT_PROFILES = Object.freeze({ "cyclonedx-json": "CycloneDX-1.6", "spdx-json": "SPDX-2.3" });
 export const SBOM_LIFECYCLE_STATES = Object.freeze(["complete", "stale", "invalid", "partial", "unsupported", "unavailable", "not-applicable"]);
+export const SBOM_LIFECYCLE_CODES = Object.freeze({
+  complete: "SBOM-COMPLETE",
+  candidateStale: "SBOM-CANDIDATE-STALE",
+  sourceInputsStale: "SBOM-SOURCE-INPUTS-STALE",
+  invalidFacts: "SBOM-LIFECYCLE-FACTS-INVALID",
+  invalidRecord: "SBOM-RECORD-INVALID",
+  partial: "SBOM-PARTIAL",
+  unsupported: "SBOM-ADAPTER-UNSUPPORTED",
+  unavailable: "SBOM-OBSERVATION-UNAVAILABLE",
+  missing: "SBOM-MISSING",
+  notApplicable: "SBOM-NOT-APPLICABLE",
+});
 
 const HEX = /^[a-f0-9]{64}$/;
 const ROOT = ["schema", "candidate", "sourceInputs", "adapter", "formats", "components", "completeness", "freshness", "privacy", "payload", "lifecycle"];
@@ -111,4 +123,30 @@ export function validateSbomRecord(manifest, payloads) {
   }
   const aggregate = digest(entries.sort().join("\n"));
   return aggregate === manifest.payload.canonicalSha256 ? { valid: true, digest: aggregate } : { valid: false, code: "SBOM-CANONICAL-DIGEST-MISMATCH" };
+}
+
+/**
+ * Classify pre-observed SBOM facts without performing discovery or validation.
+ * The input is deliberately closed so a missing observation cannot be mistaken
+ * for an applicability exemption. Callers retain the returned reason code as
+ * their stable, headless diagnostic.
+ */
+export function evaluateSbomLifecycle(facts) {
+  if (!own(facts, ["applicability", "availability", "support", "record", "candidateMatches", "sourceInputsMatch", "completeness"])
+    || !["applicable", "not-applicable"].includes(facts.applicability)
+    || !["available", "unavailable"].includes(facts.availability)
+    || !["supported", "unsupported"].includes(facts.support)
+    || !["present", "missing", "invalid"].includes(facts.record)
+    || typeof facts.candidateMatches !== "boolean"
+    || typeof facts.sourceInputsMatch !== "boolean"
+    || !["complete", "partial"].includes(facts.completeness)) return { state: "invalid", code: SBOM_LIFECYCLE_CODES.invalidFacts };
+  if (facts.applicability === "not-applicable") return { state: "not-applicable", code: SBOM_LIFECYCLE_CODES.notApplicable };
+  if (facts.availability === "unavailable") return { state: "unavailable", code: SBOM_LIFECYCLE_CODES.unavailable };
+  if (facts.support === "unsupported") return { state: "unsupported", code: SBOM_LIFECYCLE_CODES.unsupported };
+  if (facts.record === "missing") return { state: "unavailable", code: SBOM_LIFECYCLE_CODES.missing };
+  if (facts.record === "invalid") return { state: "invalid", code: SBOM_LIFECYCLE_CODES.invalidRecord };
+  if (!facts.candidateMatches) return { state: "stale", code: SBOM_LIFECYCLE_CODES.candidateStale };
+  if (!facts.sourceInputsMatch) return { state: "stale", code: SBOM_LIFECYCLE_CODES.sourceInputsStale };
+  if (facts.completeness === "partial") return { state: "partial", code: SBOM_LIFECYCLE_CODES.partial };
+  return { state: "complete", code: SBOM_LIFECYCLE_CODES.complete };
 }
