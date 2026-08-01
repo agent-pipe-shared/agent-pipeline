@@ -49,7 +49,7 @@ const catalogEntries = catalog.moduleAttribution.map(({ controlId, module, minAs
   return { control, minAssuranceLevel, module };
 });
 
-const COMMON_APPLICABILITY_INPUTS = { "repo.gitHistory": true };
+const COMMON_APPLICABILITY_INPUTS = { "repo.gitHistory": true, "repo.hasPackageSources": true };
 
 const NAMED_FIXTURES = {
   "web-api": { activatedModules: ["mod.web-api"] },
@@ -238,6 +238,32 @@ test('a resolved control with applicability "unknown" (missing runtime input) st
 
   const plan = buildCapabilityPlan(resolvedPolicy);
   assert.deepEqual(plan.required, ["cap.secrets"]);
+});
+
+test('a resolved control with applicability "not-applicable" contributes no capability to the plan', () => {
+  const catalogEntries = [{
+    control: {
+      id: "ctl.base.sca.dependency-lockfile",
+      revision: 2,
+      status: "active",
+      title: "Dependency lockfile integrity",
+      class: "base",
+      applicability: { expression: "when-true:repo.hasPackageSources", requiredInputs: ["repo.hasPackageSources"] },
+      capabilityRequirements: ["cap.sca"],
+      defaultFailureMode: "block",
+    },
+    minAssuranceLevel: "baseline",
+    module: null,
+  }];
+  const resolvedPolicy = resolveApplicableControls({
+    assuranceLevel: "baseline",
+    activatedModules: [],
+    applicabilityInputs: { "repo.hasPackageSources": false },
+    catalogEntries,
+  });
+
+  assert.equal(resolvedPolicy.resolvedControls[0].applicability, "not-applicable");
+  assert.deepEqual(buildCapabilityPlan(resolvedPolicy).required, []);
 });
 
 // --- plan digest: determinism + sensitivity to a changed resolved policy ---

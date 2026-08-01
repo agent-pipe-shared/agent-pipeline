@@ -190,6 +190,42 @@ function control(id, extra = {}) {
 // --- AC10: baseline-minimal adoption invokes no optional-module tooling ---
 
 {
+  const packageControl = control("ctl.base.sca.dependency-lockfile", {
+    applicability: {
+      expression: "when-true:repo.hasPackageSources",
+      requiredInputs: ["repo.hasPackageSources"],
+    },
+  });
+  const catalogEntries = [{ control: packageControl, minAssuranceLevel: "baseline", module: null }];
+
+  const absent = resolveApplicableControls({
+    assuranceLevel: "baseline",
+    activatedModules: [],
+    applicabilityInputs: { "repo.hasPackageSources": false },
+    catalogEntries,
+  }).resolvedControls[0];
+  assert.equal(absent.applicability, "not-applicable");
+  assert.deepEqual(absent.missingInputs, []);
+
+  const present = resolveApplicableControls({
+    assuranceLevel: "baseline",
+    activatedModules: [],
+    applicabilityInputs: { "repo.hasPackageSources": true },
+    catalogEntries,
+  }).resolvedControls[0];
+  assert.equal(present.applicability, "applicable");
+
+  const unknown = resolveApplicableControls({
+    assuranceLevel: "baseline",
+    activatedModules: [],
+    applicabilityInputs: {},
+    catalogEntries,
+  }).resolvedControls[0];
+  assert.equal(unknown.applicability, "unknown");
+  assert.deepEqual(unknown.missingInputs, ["repo.hasPackageSources"]);
+}
+
+{
   const catalogEntries = [
     { control: control("ctl.base.secrets.no-committed-secrets"), minAssuranceLevel: "baseline", module: null },
     { control: control("ctl.stack.container.nonroot-user"), minAssuranceLevel: "baseline", module: "mod.container-deploy" },

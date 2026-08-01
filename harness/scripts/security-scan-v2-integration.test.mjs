@@ -147,6 +147,14 @@ process.exit(0);
 `,
 );
 
+const osvNoPackageSources = writeFixtureBinary(
+  "osv-no-package-sources",
+  `if (process.argv.includes("--version")) { process.stdout.write("osv-scanner version: 2.0.3\\n"); process.exit(0); }
+process.stderr.write("No package sources found");
+process.exit(128);
+`,
+);
+
 const semgrepClean = writeFixtureBinary(
   "semgrep-clean",
   `process.stdout.write(JSON.stringify({ results: [] }));
@@ -197,6 +205,26 @@ test("v2 envelope is valid for a real clean Git candidate and captures all three
   assert.equal(verdictV2.plan.source, "repo-catalog");
   assert.deepEqual(verdictV2.plan.required, ["cap.sast", "cap.sca", "cap.secrets"]);
   assert.equal(verdictV2.verdict.blocking, false, "all required capabilities pass -> non-blocking verdict");
+});
+
+test("package-source-free repositories make SCA not-applicable without exempting missing tooling", async () => {
+  const rootDir = makeGitFixture("v2-no-package-sources", { license: true });
+  const { evidenceV2, verdictV2 } = await runSecurityScan({
+    rootDir,
+    env: {
+      PIPELINE_GITLEAKS_PATH: gitleaksClean,
+      PIPELINE_OSV_SCANNER_PATH: osvNoPackageSources,
+      PIPELINE_SEMGREP_PATH: semgrepClean,
+    },
+    spawnFn: fixtureSpawnFn,
+    timeoutMs: 5000,
+    assessTrustedExecutablePath: mockAssessFixtureBinary,
+  });
+
+  assert.deepEqual(verdictV2.plan.required, ["cap.sast", "cap.secrets"]);
+  assert.equal(verdictV2.capabilityOutcomes["cap.sca"], "not-applicable");
+  assert.equal(verdictV2.verdict.blocking, false);
+  assert.equal(evidenceV2.capabilities.find((record) => record.capabilityId === "cap.sca")?.status, "SKIPPED");
 });
 
 test("EXIT-NEUTRALITY: exit code matches pre-CYB-2E v1 behavior across representative classes", async () => {

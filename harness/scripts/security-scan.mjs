@@ -493,7 +493,7 @@ function rulePackRefFor(key, manifest) {
  * `required-capability-missing` on a binary-less machine is the honest record, not a failure.
  * Degrades to an empty plan (never throws) when the catalog is absent/malformed/unresolvable.
  */
-function sourceCapabilityPlan(rootDir, suiteCapabilityIds) {
+function sourceCapabilityPlan(rootDir, suiteCapabilityIds, applicabilityInputs = { "repo.gitHistory": true }) {
   const emptyPlan = (source) => ({ plan: { required: [], optional: [], planDigest: null }, source, resolvedPolicyDigest: null });
   let catalog;
   try {
@@ -522,15 +522,30 @@ function sourceCapabilityPlan(rootDir, suiteCapabilityIds) {
     const resolved = resolveApplicableControls({
       assuranceLevel: "baseline",
       activatedModules: [...activated],
-      // Truthful for a real Git working tree; does NOT affect the plan's required/optional set
-      // (buildCapabilityPlan design-decision 4 ignores applicability), only the resolved-policy digest.
-      applicabilityInputs: { "repo.gitHistory": true },
+      applicabilityInputs,
       catalogEntries,
     });
     return { plan: buildCapabilityPlan(resolved), source: "repo-catalog", resolvedPolicyDigest: resolved.digest };
   } catch (err) {
     return emptyPlan(`catalog-resolve-error: ${err?.message ?? err}`);
   }
+}
+
+function observedApplicabilityInputs(capabilityDefs) {
+  const inputs = { "repo.gitHistory": true };
+  const sca = capabilityDefs.find(({ contract }) => contract.capabilityId === "cap.sca")?.entry;
+  if (!sca) return inputs;
+
+  // Only the adapter's completed, exact no-source signal may exempt SCA.
+  // A missing binary, a crash, malformed output, or any unfamiliar result
+  // leaves the input absent so the resolver remains fail-closed (`unknown`).
+  if (sca.status === "SKIPPED" && sca.classification === "success"
+    && typeof sca.reason === "string" && sca.reason.startsWith("no package sources in project")) {
+    inputs["repo.hasPackageSources"] = false;
+  } else if (sca.status === "PASS" || sca.status === "FINDINGS") {
+    inputs["repo.hasPackageSources"] = true;
+  }
+  return inputs;
 }
 
 /** Coerces a v1 finding to a CLOSED, `validateFindingEnvelope`-passing v2 finding record. */
@@ -625,7 +640,11 @@ function buildSecurityEvidenceV2({ rootDir, evidence, exitCode, scanners, findin
   }
 
   const snapshotAt = evidence.finishedAt;
-  const { plan, source: planSource, resolvedPolicyDigest } = sourceCapabilityPlan(rootDir, capabilityDefs.map((d) => d.contract.capabilityId));
+  const { plan, source: planSource, resolvedPolicyDigest } = sourceCapabilityPlan(
+    rootDir,
+    capabilityDefs.map((d) => d.contract.capabilityId),
+    observedApplicabilityInputs(capabilityDefs),
+  );
 
   // v1-shaped evaluator candidate -> per-capability L3 outcomes -> aggregate verdict.
   // A candidate the plan can no longer be trusted against (dirty / mutated / uncertain) poisons

@@ -48,6 +48,14 @@ invalid/partial required capabilities.
 | AC13 | Docs distinguish clean/complete/unavailable/unsupported/waived/not-applicable | Doc lint or generated-from-schema check: all six terms defined distinctly, no doc conflates `unavailable` with `not-applicable` | Doc check |
 | AC14 | No commercial service required for core conformance | Full conformance suite runs offline with fake adapters only; CI job asserts no outbound network call during that suite | CI/network-isolation fixture |
 
+**AC8 Release acceptance boundary (PO decision, 2026-08-01):** Until this
+repository has an actual release-delivery workflow, the Release leg is
+accepted through the library-level `sealAndStoreReleaseVersionPlan()`
+integration smoke test: it must invoke the shared evaluator and prove both
+fail-closed and store-on-clean paths. This is not evidence of a live release
+ritual; wiring a future CLI/workflow remains a separately scoped end-to-end
+integration task.
+
 Coverage note: matches `backlog-acceptance-matrix.md`'s "14" count for #42.
 
 ## 4. Fixture matrix (from #42 §8, the actual test-first inventory)

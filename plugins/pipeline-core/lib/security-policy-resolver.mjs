@@ -81,19 +81,17 @@
 //          control,                        // the winning entry's control object, unmutated,
 //                                          // by reference
 //          contributingModule,             // string | null — which module's version won
-//          applicability: 'applicable' | 'unknown',
+//          applicability: 'applicable' | 'not-applicable' | 'unknown',
 //                                          // 'unknown' exactly when >=1 declared
 //                                          // `control.applicability.requiredInputs` entry is
-//                                          // absent from `applicabilityInputs` (AC4). This
-//                                          // resolver deliberately does NOT interpret the
-//                                          // free-form `applicability.expression` string as a
-//                                          // boolean condition — no expression grammar is
-//                                          // frozen anywhere (CYB-1F §8 calls the composite
-//                                          // shape this module's own prose encoding, not an
-//                                          // executable language) and none of AC2/AC3/AC4/AC10
-//                                          // requires evaluating it; `requiredInputs` presence
-//                                          // is the one machine-checkable gate those ACs name.
-//          missingInputs: string[],        // empty when applicability === 'applicable'
+//                                          // absent from `applicabilityInputs` (AC4).
+//                                          // `always` remains universally applicable. The
+//                                          // catalog also supports the closed
+//                                          // `when-true:<required-input>` form: a supplied
+//                                          // literal `false` resolves to `not-applicable`, so
+//                                          // a capability with no applicable subject is not
+//                                          // misreported as a missing required capability.
+//          missingInputs: string[],        // empty when applicability is decisive
 //        }>,                               // sorted ascending by `id` — canonical, independent
 //                                          // of catalogEntries input order; a control whose
 //                                          // module isn't activated, or whose level threshold
@@ -161,6 +159,30 @@ function canonicalize(value) {
     return `{${keys.map((k) => `${JSON.stringify(k)}:${canonicalize(value[k])}`).join(",")}}`;
   }
   return JSON.stringify(value);
+}
+
+function resolveApplicability(applicability, applicabilityInputs) {
+  const requiredInputs = applicability && Array.isArray(applicability.requiredInputs)
+    ? applicability.requiredInputs
+    : [];
+  const missingInputs = requiredInputs.filter((name) => !hasOwn(applicabilityInputs, name));
+  if (missingInputs.length > 0) return { applicability: "unknown", missingInputs };
+
+  const expression = applicability?.expression;
+  if (expression === "always" || typeof expression !== "string") {
+    return { applicability: "applicable", missingInputs: [] };
+  }
+  const whenTrue = expression.match(/^when-true:([^\s:]+)$/u);
+  if (whenTrue && requiredInputs.length === 1 && requiredInputs[0] === whenTrue[1]) {
+    return {
+      applicability: applicabilityInputs[whenTrue[1]] === false ? "not-applicable" : "applicable",
+      missingInputs: [],
+    };
+  }
+
+  // An unrecognized expression cannot establish an exemption. Keep it in
+  // scope as `unknown`, which downstream planning treats fail-closed.
+  return { applicability: "unknown", missingInputs: requiredInputs };
 }
 
 // The L1 applicability resolver (AC2, AC3, AC4, AC10). Pure: performs no
@@ -237,16 +259,17 @@ export function resolveApplicableControls(input) {
     // Precedence, not array/input order (AC3): lowest rank number wins.
     const winner = candidates.reduce((best, current) => (rankOfModule(current.module) < rankOfModule(best.module) ? current : best));
 
-    const applicability = isPlainObject(winner.control.applicability) ? winner.control.applicability : null;
-    const requiredInputs = applicability && Array.isArray(applicability.requiredInputs) ? applicability.requiredInputs : [];
-    const missingInputs = requiredInputs.filter((name) => !hasOwn(applicabilityInputs, name));
+    const applicability = resolveApplicability(
+      isPlainObject(winner.control.applicability) ? winner.control.applicability : null,
+      applicabilityInputs,
+    );
 
     resolvedControls.push({
       id,
       control: winner.control,
       contributingModule: winner.module,
-      applicability: missingInputs.length > 0 ? "unknown" : "applicable",
-      missingInputs,
+      applicability: applicability.applicability,
+      missingInputs: applicability.missingInputs,
     });
   }
 

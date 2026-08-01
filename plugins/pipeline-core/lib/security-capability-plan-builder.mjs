@@ -69,22 +69,13 @@
 //    so a root can never appear in both arrays, and both arrays are
 //    deduplicated and sorted for deterministic output.
 //
-// 4. Applicability is not consulted. `resolvedControls[]` entries with
-//    `applicability: "unknown"` (a declared `requiredInputs` value absent
-//    from the caller's `applicabilityInputs` at resolve time -- CYB-1b AC4)
-//    still contribute their `capabilityRequirements` to the plan exactly
-//    like an "applicable" entry. `resolveApplicableControls()` already omits
-//    any control whose module isn't activated or whose assurance-level
-//    threshold isn't met (CYB-1b AC10) -- that is the one and only filter
-//    this builder trusts for "is this control in scope at all." Applicability
-//    "unknown" means "we do not yet have enough runtime data to know whether
-//    this control's free-form condition truly holds," not "this control does
-//    not apply" -- silently shrinking the required set because of a missing
-//    runtime input would make a capability's requiredness gameable by simply
-//    never supplying that input. If a future package needs "unknown"
-//    surfaced/handled differently at evaluation time, that is downstream
-//    (CYB-2E/2F) evaluator policy, not a reason to drop it from the plan
-//    here.
+// 4. Applicability distinguishes an explicit exemption from uncertainty.
+//    `not-applicable` entries contribute no capability: the resolver has
+//    verified the control's closed applicability condition is false. Entries
+//    marked `unknown` still contribute exactly like `applicable` entries --
+//    missing runtime input must never shrink a required plan. This preserves
+//    fail-closed behavior while allowing a verified package-source-free
+//    repository to omit the dependency-scanning capability honestly.
 //
 // 5. Plan digest -- reuses CYB-1b's own canonical-digest APPROACH (a
 //    key-sorted recursive `canonicalize()` serialization hashed with
@@ -163,6 +154,7 @@ export function buildCapabilityPlan(resolvedPolicy) {
     if (!isPlainObject(entry) || !isPlainObject(entry.control)) {
       throw new TypeError(`buildCapabilityPlan: resolvedPolicy.resolvedControls[${index}].control must be a plain object`);
     }
+    if (entry.applicability === "not-applicable") return;
     const { capabilityRequirements, defaultFailureMode } = entry.control;
     if (capabilityRequirements === undefined) return; // this control names no capability at all
     if (!Array.isArray(capabilityRequirements)) {

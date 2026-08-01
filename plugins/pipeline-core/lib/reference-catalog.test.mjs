@@ -78,21 +78,21 @@ assert.equal(catalogEntries.length, catalog.controls.length, "every catalog cont
 const COMMON_APPLICABILITY_INPUTS = { "repo.gitHistory": true };
 
 const FIXTURES = {
-  "web-api": { activatedModules: ["mod.web-api"] },
-  "cli-lib": { activatedModules: ["mod.cli-lib"] },
-  "container-iac": { activatedModules: ["mod.container-deploy", "mod.iac-cloud"] },
-  "ai-agent": { activatedModules: ["mod.ai-agent"] },
-  "docs-only": { activatedModules: ["mod.docs-only"] },
+  "web-api": { activatedModules: ["mod.web-api"], applicabilityInputs: { "repo.hasPackageSources": true } },
+  "cli-lib": { activatedModules: ["mod.cli-lib"], applicabilityInputs: { "repo.hasPackageSources": true } },
+  "container-iac": { activatedModules: ["mod.container-deploy", "mod.iac-cloud"], applicabilityInputs: { "repo.hasPackageSources": true } },
+  "ai-agent": { activatedModules: ["mod.ai-agent"], applicabilityInputs: { "repo.hasPackageSources": true } },
+  "docs-only": { activatedModules: ["mod.docs-only"], applicabilityInputs: { "repo.hasPackageSources": false } },
 };
 
 assert.equal(Object.keys(FIXTURES).length, 5, "AC9 requires exactly 5 named fixtures");
 
 const resolved = {};
-for (const [name, { activatedModules }] of Object.entries(FIXTURES)) {
+for (const [name, { activatedModules, applicabilityInputs }] of Object.entries(FIXTURES)) {
   resolved[name] = resolveApplicableControls({
     assuranceLevel: "baseline",
     activatedModules,
-    applicabilityInputs: COMMON_APPLICABILITY_INPUTS,
+    applicabilityInputs: { ...COMMON_APPLICABILITY_INPUTS, ...applicabilityInputs },
     catalogEntries,
   });
 }
@@ -124,6 +124,7 @@ test("AC9 fixture: docs-only resolves only universal/base controls -- the CYB-1F
   const r = resolved["docs-only"];
   const ids = r.resolvedControls.map((c) => c.id).sort();
   assert.deepEqual(ids, ["ctl.base.sca.dependency-lockfile", "ctl.base.secrets.no-committed-secrets"]);
+  assert.equal(r.resolvedControls.find((c) => c.id === "ctl.base.sca.dependency-lockfile")?.applicability, "not-applicable");
   for (const c of r.resolvedControls) {
     assert.equal(c.contributingModule, null, `docs-only must not resolve any module-specific control, got contributingModule=${c.contributingModule} for ${c.id}`);
   }
