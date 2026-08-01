@@ -127,17 +127,37 @@ function initializedHostManagedRoot(label = "initialized host") {
   mkdirSync(join(root, ".codex"));
   mkdirSync(join(root, "project"), { recursive: true });
   mkdirSync(join(root, "docs"), { recursive: true });
-  mkdirSync(join(root, "specs"), { recursive: true });
+  const featureId = "kickoff-host-capability";
+  const prdPath = `specs/${featureId}/prd_${featureId}.md`;
+  const specPath = `specs/${featureId}/spec.md`;
+  mkdirSync(join(root, "specs", featureId), { recursive: true });
+  const prdBytes = "# Initial PRD\n";
+  const specBytes = "# Initial Spec\n";
+  const prdSha256 = sha256(Buffer.from(prdBytes));
+  const specSha256 = sha256(Buffer.from(specBytes));
+  const state = {
+    schema: "pipeline.state.v0",
+    activeFeature: { id: featureId, planPath: prdPath, phase: "design" },
+    planApproved: false,
+    continuity: {
+      schema: "pipeline.continuity.v0", featureId, revision: 0,
+      runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator" },
+      authority: { prd: { path: prdPath, sha256: prdSha256 }, spec: { path: specPath, sha256: specSha256 }, result: null },
+      queueHead: { packageId: "kickoff", actionId: "review", nextAction: "review", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null },
+      blocker: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" }, recovery: null, decisionTxn: null,
+      capacity: { concurrencyLimit: 4, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" },
+    },
+  };
   const files = {
     "project/pipeline.yaml": "schema: pipeline.manifest.v0\n",
     "project/pipeline.json": `${JSON.stringify({
       repositoryMode: "host-managed",
       handover: "docs/state.md",
     }, null, 2)}\n`,
-    "project/pipeline-state.json": "{\"schema\":\"pipeline.state.v1\"}\n",
+    "project/pipeline-state.json": `${JSON.stringify(state)}\n`,
     "docs/state.md": "# Initial state\n",
-    "specs/kickoff-initial-prd.md": "# Initial PRD\n",
-    "specs/kickoff-initial-spec.md": "# Initial Spec\n",
+    [prdPath]: prdBytes,
+    [specPath]: specBytes,
   };
   for (const [path, bytes] of Object.entries(files)) writeFileSync(join(root, path), bytes);
   const history = {
@@ -149,8 +169,8 @@ function initializedHostManagedRoot(label = "initialized host") {
       calibrationSha256: sha256(Buffer.from(files["project/pipeline.json"])),
       stateSha256: sha256(Buffer.from(files["project/pipeline-state.json"])),
       handoverSha256: sha256(Buffer.from(files["docs/state.md"])),
-      prdSha256: sha256(Buffer.from(files["specs/kickoff-initial-prd.md"])),
-      specSha256: sha256(Buffer.from(files["specs/kickoff-initial-spec.md"])),
+      prdSha256,
+      specSha256,
     }],
   };
   mkdirSync(join(root, ".git", "agent-pipeline", "onboarding"), { recursive: true });

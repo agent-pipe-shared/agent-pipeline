@@ -425,10 +425,11 @@ function managedPolicyLockYaml({ mode = "strict", status = "source-unverified" }
   }
   const rendered = messages.join("\n");
   ok(
-    "run: lifecycle remediation includes its executable and shell-quotes every argv element",
+    "run: lifecycle remediation omits typed action data from logs",
     code === 2
-      && rendered.includes("review and run: node '/plugin/project onboarding-v3.mjs' plan --root ")
-      && rendered.includes(`'${root}; touch must-stay-inert'`),
+      && rendered.includes("governed onboarding requires its next typed recovery action")
+      && !rendered.includes("project onboarding-v3.mjs")
+      && !rendered.includes("touch must-stay-inert"),
   );
   rmSync(root, { recursive: true, force: true });
 }

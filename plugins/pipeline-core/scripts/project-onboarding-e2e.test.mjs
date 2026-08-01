@@ -291,8 +291,8 @@ test("read-only host-control paths receive portable host-managed onboarding", ()
     for (const relative of [
       "project/pipeline-state.json",
       "docs/state.md",
-      "specs/kickoff-initial-prd.md",
-      "specs/kickoff-initial-spec.md",
+      kickoff.targets.prd.path,
+      kickoff.targets.spec.path,
     ]) {
       const target = join(path, relative);
       const original = readFileSync(target);

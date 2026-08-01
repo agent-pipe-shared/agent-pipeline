@@ -263,12 +263,19 @@ function boundKickoffHistory(root, historyPath, options = {}) {
     return null;
   }
   const latest = observed.history.transactions.at(-1);
+  const stateBytes = readBound(projectAuthorityPaths(root).state);
+  if (stateBytes === null) return null;
+  let state;
+  try { state = JSON.parse(stateBytes.toString("utf8")); } catch { return null; }
+  const prdPath = state?.continuity?.authority?.prd?.path;
+  const specPath = state?.continuity?.authority?.spec?.path;
+  if (typeof prdPath !== "string" || typeof specPath !== "string") return null;
   const bindings = {
     calibrationSha256: calibrationBytes,
-    stateSha256: readBound(projectAuthorityPaths(root).state),
+    stateSha256: stateBytes,
     handoverSha256: readBound("docs/state.md"),
-    prdSha256: readBound("specs/kickoff-initial-prd.md"),
-    specSha256: readBound("specs/kickoff-initial-spec.md"),
+    prdSha256: readBound(prdPath),
+    specSha256: readBound(specPath),
   };
   function readBound(path) {
     return readPhysicalBoundFile(root, path, options)?.bytes ?? null;

@@ -491,11 +491,10 @@ function runPoAuthorityRebindTests() {
       diagnostics: [{ code: `injected_${intent}_readback` }],
     }),
   }));
-  ok("PS53j postimage V4 failure names every predicate/intent and rolls both authority surfaces back", readbackFault.value === 2
-    && /pipeline\.po-authority-postimage-readback\.v1/u.test(readbackFault.text)
-    && /injected_bootstrap_readback/u.test(readbackFault.text)
-    && /injected_session_readback/u.test(readbackFault.text)
-    && /injected_dispatch_readback/u.test(readbackFault.text)
+  ok("PS53j postimage V4 failure rolls both authority surfaces back without logging readback payload", readbackFault.value === 2
+    && /postimage readback failed/iu.test(readbackFault.text)
+    && !/pipeline\.po-authority-postimage-readback\.v1/u.test(readbackFault.text)
+    && !/injected_(bootstrap|session|dispatch)_readback/u.test(readbackFault.text)
     && /rollback verified/iu.test(readbackFault.text)
     && readFileSync(join(fixture.dir, fixture.planPath), "utf8") === prdBefore
     && readFileSync(statePath(fixture.dir), "utf8") === stateBefore);

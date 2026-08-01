@@ -76,8 +76,25 @@ function portableAuthorityPaths(root) {
     };
 }
 
-function requiredPortablePaths(root) {
+function safeProjectPath(value) {
+  return typeof value === "string"
+    && value.length > 0
+    && !value.startsWith("/")
+    && !value.includes("\\")
+    && !value.split("/").some((part) => part === "" || part === "." || part === "..");
+}
+
+function requiredPortablePaths(root, read = readFileSync) {
   const authority = portableAuthorityPaths(root);
+  let state;
+  try { state = JSON.parse(read(join(root, authority.state)).toString("utf8")); } catch {
+    throw new Error("portable continuity state is unreadable");
+  }
+  const prdPath = state?.continuity?.authority?.prd?.path;
+  const specPath = state?.continuity?.authority?.spec?.path;
+  if (!safeProjectPath(prdPath) || !safeProjectPath(specPath)) {
+    throw new Error("portable continuity authority paths are unsafe");
+  }
   return [
     "pipeline.user.yaml",
     authority.calibration,
@@ -85,8 +102,8 @@ function requiredPortablePaths(root) {
     ".claude/settings.json",
     authority.state,
     "docs/state.md",
-    "specs/kickoff-initial-prd.md",
-    "specs/kickoff-initial-spec.md",
+    prdPath,
+    specPath,
     ".claude/.runtime/agent-pipeline/onboarding/continuity-history.json",
   ];
 }
@@ -116,7 +133,7 @@ function portableSnapshot(root, fs = {}) {
   const read = fs.readFileSync ?? readFileSync;
   const lstat = fs.lstatSync ?? lstatSync;
   const authority = portableAuthorityPaths(root);
-  const files = requiredPortablePaths(root).map((path) => {
+  const files = requiredPortablePaths(root, read).map((path) => {
     const absolute = join(root, path);
     const stat = lstat(absolute);
     if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`required portable file is unsafe: ${path}`);

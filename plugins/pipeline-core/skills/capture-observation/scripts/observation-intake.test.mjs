@@ -353,12 +353,14 @@ test("repository intake routes security privately and disables blank issues", ()
   const form = parseYaml(repoFile(".github/ISSUE_TEMPLATE/observation.yml"));
   const chooser = parseYaml(repoFile(".github/ISSUE_TEMPLATE/config.yml"));
   const renderedText = JSON.stringify(form);
-  const privateRoute = "https://github.com/agent-pipe-shared/agent-pipeline/security/advisories/new";
+  const privateRoute = new URL(chooser.contact_links[0].url);
 
   assert.equal(chooser.blank_issues_enabled, false);
   assert.equal(chooser.contact_links.length, 1);
-  assert.equal(chooser.contact_links[0].url, privateRoute);
-  assert(renderedText.includes(privateRoute));
+  assert.equal(privateRoute.protocol, "https:");
+  assert.equal(privateRoute.hostname, "github.com");
+  assert.equal(privateRoute.pathname, "/agent-pipe-shared/agent-pipeline/security/advisories/new");
+  assert.match(renderedText, /security\/advisories\/new/u);
   assert.match(renderedText, /raw logs/i);
   assert.match(renderedText, /prompts/i);
   assert.match(renderedText, /possible vulnerability/i);

@@ -35,7 +35,7 @@ function fixture() {
   mkdirSync(join(root, "docs"), { recursive: true });
   mkdirSync(join(root, "specs"), { recursive: true });
   const files = {
-    "pipeline.user.yaml": "schema: pipeline.user.v3\n",
+    "pipeline.user.yaml": "schema: pipeline.user.v3\nlanguage:\n  human_facing: en\n  agent_facing: en\n",
     ".claude/pipeline.json": `${JSON.stringify({
       repositoryMode: "host-managed",
       verify: "git diff --check",
@@ -46,7 +46,7 @@ function fixture() {
       stakes: "standard",
       constraints: [],
     }, null, 2)}\n`,
-    ".claude/pipeline.yaml": "schema: pipeline.manifest.v0\n",
+    ".claude/pipeline.yaml": "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\n",
     ".claude/settings.json": "{}\n",
   };
   for (const [path, bytes] of Object.entries(files)) writeFileSync(join(root, path), bytes);
@@ -158,7 +158,7 @@ test("host apply initializes only Git and requires one restart", () => {
   assert.equal(result.createsCommit, false);
   assert.equal(existsSync(join(root, ".git")), true);
   assert.equal(JSON.parse(readFileSync(join(root, ".claude/pipeline.json"), "utf8")).repositoryMode, "host-managed");
-  assert.equal(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), "schema: pipeline.user.v3\n");
+  assert.equal(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), "schema: pipeline.user.v3\nlanguage:\n  human_facing: en\n  agent_facing: en\n");
   assert.equal(existsSync(join(root, ".git/agent-pipeline/onboarding/continuity-history.json")), true);
   assert.equal(existsSync(join(root, ".claude/.runtime/agent-pipeline/onboarding/continuity-history.json")), true);
   const receipt = JSON.parse(readFileSync(join(root, CODEX_HOST_REPOSITORY_INIT_RECEIPT), "utf8"));

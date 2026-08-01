@@ -4308,7 +4308,7 @@ function runPoAuthorityRebindApply(apply, deps, lock, io, stateIo, {
       const stateRollback = restoreRebindFile(stateFile.absolute, stateFile.bytes, stateFile.identity.mode, lock.ownerNonce, stateIo);
       const prdRollback = !prdWriteRequired || restoreRebindFile(prd.absolute, prd.bytes, prd.identity.mode, lock.ownerNonce, io);
       const cleared = stateRollback && prdRollback && clearRebindTransaction(deps.dir);
-      console.error(`Error: PO authority rebind postimage readback failed (${JSON.stringify(postimageEvidence)}); ${stateRollback && prdRollback && cleared ? "rollback verified" : "rollback unresolved"}.`);
+      console.error(`Error: PO authority rebind postimage readback failed; ${stateRollback && prdRollback && cleared ? "rollback verified" : "rollback unresolved"}.`);
       return 2;
     }
     if (!clearRebindTransaction(deps.dir)) {

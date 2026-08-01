@@ -12,7 +12,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import {
@@ -394,6 +394,7 @@ check("kickoff plan is deterministic, closed, valid, and read-only", () => {
   assert.equal(first.targets.state.value.continuity.authority.spec.path,
     first.targets.spec.path);
   assert.notEqual(first.targets.prd.path, first.targets.spec.path);
+  assert.match(first.targets.prd.content, /^<!-- po-language: en -->$/mu);
 });
 
 check("apply requires activation and the exact plan digest", () => {
@@ -441,8 +442,9 @@ check("apply rejects apply-metadata drift even when the top-level digest field i
 
 check("pre-existing initial authority artifact blocks plan without overwriting it", () => {
   const root = fixture("authority-collision");
-  mkdirSync(join(root, "specs"), { recursive: true });
-  const path = join(root, "specs", "kickoff-initial-prd.md");
+  const baseline = planOnboardingKickoff({ rootDir: root, goal: "Create a product" });
+  const path = join(root, baseline.targets.prd.path);
+  mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, "user content\n");
   expectKickoffError("KICKOFF-NOT-PRISTINE", () => planOnboardingKickoff({
     rootDir: root,
@@ -686,8 +688,9 @@ check("kickoff never unlinks a predictable foreign temporary artifact", () => {
   const root = fixture("foreign-temp");
   const plan = planOnboardingKickoff({ rootDir: root, goal: "Create a safe product" });
   const suffix = "a".repeat(32);
-  const directory = join(root, "specs");
-  const foreignPath = join(directory, `.kickoff-initial-prd.md.kickoff-${suffix}.tmp`);
+  const targetPath = join(root, plan.targets.prd.path);
+  const directory = dirname(targetPath);
+  const foreignPath = join(directory, `.${basename(targetPath)}.kickoff-${suffix}.tmp`);
   mkdirSync(directory, { recursive: true });
   writeFileSync(foreignPath, "foreign temporary artifact\n", { mode: 0o600 });
   expectKickoffError("KICKOFF-WRITE-FAILED", () => applyOnboardingKickoff({
@@ -993,7 +996,7 @@ check("revision-1 kickoff lookalike without authenticated private binding is rej
 for (const [name, mutate] of [
   ["revision-two", (seed) => mutatePromotionState(seed, (state) => { state.continuity.revision = 2; })],
   ["authority-drift", (seed) => {
-    writeFileSync(join(seed.root, "specs", "kickoff-initial-prd.md"), "# drifted initial authority\n");
+    writeFileSync(join(seed.root, seed.kickoff.targets.prd.path), "# drifted initial authority\n");
   }],
   ["dispatch", (seed) => mutatePromotionState(seed, (state) => {
     state.continuity.queueHead.dispatch = {

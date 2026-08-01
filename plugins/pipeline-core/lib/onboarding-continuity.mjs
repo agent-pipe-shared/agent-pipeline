@@ -2753,11 +2753,30 @@ function initialAuthorityPaths(featureId) {
 }
 
 function kickoffLanguage(root) {
+  const userPath = join(root, "pipeline.user.yaml");
+  const runtimePath = join(root, ".claude", "pipeline.yaml");
+  let userBytes = null;
+  let runtimeBytes = null;
+  try { userBytes = readFileSync(userPath); } catch (error) {
+    if (error?.code !== "ENOENT") fail("KICKOFF-PLAN-INVALID", "kickoff PO-language projection is unavailable");
+  }
+  try { runtimeBytes = readFileSync(runtimePath); } catch (error) {
+    if (error?.code !== "ENOENT") fail("KICKOFF-PLAN-INVALID", "kickoff PO-language projection is unavailable");
+  }
+  // The standalone continuity planner is also used for pre-runtime recovery
+  // fixtures.  With neither projection present there is no configured language
+  // to preserve, so retain the historical canonical English seed.  A partial
+  // or malformed projection remains a closed error rather than being masked by
+  // this compatibility default.
+  if (userBytes === null && runtimeBytes === null) return "en";
+  if (userBytes === null || runtimeBytes === null) {
+    fail("KICKOFF-PLAN-INVALID", "kickoff PO-language projection is unavailable");
+  }
   let projection;
   try {
     projection = validatePoGateLanguageProjection(
-      readFileSync(join(root, "pipeline.user.yaml")),
-      readFileSync(join(root, ".claude", "pipeline.yaml")),
+      userBytes,
+      runtimeBytes,
     );
   } catch {
     fail("KICKOFF-PLAN-INVALID", "kickoff PO-language projection is unavailable");

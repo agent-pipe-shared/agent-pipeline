@@ -95,7 +95,7 @@ export function checkStatefulDesignContracts(surfaces) {
   for (const [surfaceIndex, surface] of STATEFUL_DESIGN_SURFACES.entries()) {
     const text = surfaces[surface];
     if (typeof text !== "string") continue;
-    const visibleText = stripFencedCode(text).replace(/<!--[\s\S]*?-->/g, "");
+    const visibleText = stripHtmlComments(stripFencedCode(text));
     const operativeText = extractMarkdownSection(visibleText, STATEFUL_DESIGN_OPERATIVE_HEADINGS[surfaceIndex]);
     for (const contract of STATEFUL_DESIGN_CONTRACTS) {
       if (!operativeText.includes(contract.phrases[surfaceIndex])) {
@@ -104,6 +104,19 @@ export function checkStatefulDesignContracts(surfaces) {
     }
   }
   return findings;
+}
+
+export function stripHtmlComments(value) {
+  let remaining = value;
+  let output = "";
+  while (true) {
+    const start = remaining.indexOf("<!--");
+    if (start === -1) return output + remaining;
+    output += remaining.slice(0, start);
+    const end = remaining.indexOf("-->", start + 4);
+    if (end === -1) return output;
+    remaining = remaining.slice(end + 3);
+  }
 }
 
 export function stripFencedCode(markdown) {
@@ -128,7 +141,7 @@ export function stripFencedCode(markdown) {
 
 function cleanHeading(value) {
   return value
-    .replace(/<[^>]*>/g, "")
+    .replace(/[<>]/g, "")
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/[`*_~]/g, "")
