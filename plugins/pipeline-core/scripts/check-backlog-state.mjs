@@ -109,6 +109,11 @@ function regularFile(root, repoPath) {
 
 function authorityApproval() { return { ok: true, code: "AUTHORITY:VALID" }; }
 
+function gitFileBytes(root, commit, repoPath) {
+  const result = spawnSync("git", ["show", `${commit}:${repoPath}`], { cwd: root, encoding: null });
+  return result.status === 0 && Buffer.isBuffer(result.stdout) ? result.stdout : null;
+}
+
 /**
  * v2 ordinary transitions point at their immutable delivery intent.  The
  * checker revalidates that intent and its exact authority receipt on every
@@ -142,7 +147,19 @@ function authorizeCanonicalOrdinaryEvidence(root, { event, evidence }) {
   if (createHash("sha256").update(canonicalJson(receiptRecord)).digest("hex") !== receipt.recordSha256) return null;
   if ((intent.operation === "initialize" && authority.kind !== "backlog-intake")
     || (intent.operation === "assign" && authority.kind !== "implementation-activation")) return null;
-  if (evidence.commit !== (intent.candidate?.commit ?? event.evidence.commit)) return null;
+  if (evidence.commit !== intent.candidate?.commit) {
+    // A rebase may preserve an already approved delivery intent while dropping
+    // its old candidate object.  The replacement evidence commit is accepted
+    // only when it contains the exact current intent and PO receipt bytes.
+    // This is deliberately a byte-for-byte continuity proof, not a broad
+    // historical-commit waiver.
+    const intentBytes = readFileSync(join(root, evidence.reference));
+    const rebasedIntentBytes = gitFileBytes(root, evidence.commit, evidence.reference);
+    const rebasedReceiptBytes = gitFileBytes(root, evidence.commit, authority.receiptPath);
+    if (!rebasedIntentBytes || !rebasedReceiptBytes
+      || Buffer.compare(rebasedIntentBytes, intentBytes) !== 0
+      || Buffer.compare(rebasedReceiptBytes, receiptBytes) !== 0) return null;
+  }
   return authorityApproval();
 }
 
@@ -372,7 +389,16 @@ export function loadBacklogState(root = DEFAULT_ROOT, { checkCommit = true, auth
     }
   }
   const commitExists = checkCommit ? (oid) => localCommitExists(root, oid) : null;
-  findings.push(...validateTransitionLedger(ledger.events, items, { commitExists }));
+  const readDispositionBytes = (repoPath) => {
+    if (!regularFile(root, repoPath)) return null;
+    try { return readFileSync(join(root, repoPath)); } catch { return null; }
+  };
+  findings.push(...validateTransitionLedger(ledger.events, items, {
+    commitExists,
+    readDispositionBytes,
+    authorizeAmendment: authorizeAmendment ?? authorizeCanonicalEvidenceAmendment,
+    authorizeOrdinaryEvidence: authorizeOrdinaryEvidence ?? ((input) => authorizeCanonicalOrdinaryEvidence(root, input)),
+  }));
   for (const event of ledger.events) {
     if (event?.id === "pipeline.managed-onboarding-success-contract" && event?.evidence?.kind === "missing-initial-ledger-repair") {
       const bytes = itemBytes.get(event.id);

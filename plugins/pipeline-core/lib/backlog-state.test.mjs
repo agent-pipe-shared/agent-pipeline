@@ -108,6 +108,17 @@ function v2OperationEvent(overrides = {}) {
   value.entryHash = transitionHash(value);
   return value;
 }
+
+{
+  const ordinary = v2OperationEvent();
+  const missingAuthority = validateTransitionLedger([ordinary], [item()]);
+  const authorized = validateTransitionLedger([ordinary], [item()], { authorizeOrdinaryEvidence: () => AUTHORITY_VALID });
+  check("BS23 v2 ordinary evidence is shape-checked and requires exact typed authority",
+    missingAuthority.some((finding) => finding === "AUTHORITY: ledger event 1: ordinary evidence authority is required")
+      && authorized.length === 0,
+    [...missingAuthority, ...authorized].join("; "));
+}
+
 function v2AmendmentEvent({ sequence, id, status, target, replacementCommit, previousHash, idempotencyKey, reference }) {
   const value = {
     schema: TRANSITION_V2_SCHEMA,

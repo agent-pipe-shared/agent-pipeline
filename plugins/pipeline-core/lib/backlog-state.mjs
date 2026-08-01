@@ -34,6 +34,8 @@ const CANONICAL_REPOSITORY_FILE_PATH = /^(?!\/)(?!.*\\)(?!.*\/\/)(?!.*\/$)(?!\.{
 const HASH = /^[a-f0-9]{64}$/u;
 const EVIDENCE_AMENDMENT_KEYS = new Set(["kind", "commit", "reference", "previousClosureCommit", "resultSha256", "privateLicenseGateSha256", "neutralPublicLicenseGateSha256"]);
 const REACHABILITY_AMENDMENT_KEYS = new Set(["kind", "commit", "reference", "supersedesSequence", "supersedesEntryHash", "referenceBlobOid", "referenceSha256"]);
+const V2_EVIDENCE_AMENDMENT_KEYS = new Set(["schema", "kind", "targetSequence", "targetEntryHash", "targetCommit", "replacementCommit", "reference", "dispositionSha256", "idempotencyKey"]);
+const V2_ORDINARY_EVIDENCE_KEYS = new Set(["kind", "commit", "reference", "legacyStatus"]);
 const AFK_REPAIR_ID = "pipeline.elephant-direct-implementation-under-afk-authorization";
 const MANAGED_ONBOARDING_REPAIR_ID = "pipeline.managed-onboarding-success-contract";
 const REACHABILITY_REPAIR_ACTOR = "hotfix-047-reachability-repair";
@@ -757,8 +759,11 @@ export function validateTransitionLedger(events, items, { commitExists = null, r
     if (current === undefined) errors.push(`items: ${id} has no transition-ledger entry`);
     else if (current !== item.metadata.status) errors.push(`items: ${id} status does not match its final ledger transition`);
     if (item.metadata.status === "closed" && current === "closed") {
+      const latest = [...events].reverse().find((event) => event?.id === id);
+      const reachabilitySuperseded = latest?.evidence?.kind === "reachability-amendment"
+        && reachabilitySupersessions.has(latest.evidence.supersedesSequence);
       const final = [...events].reverse().find((event) => event?.id === id && event?.evidence?.kind !== "reachability-amendment");
-      if (projectedClosureCommit(final) !== item.metadata.closure_commit) {
+      if (!reachabilitySuperseded && projectedClosureCommit(final) !== item.metadata.closure_commit) {
         const finding = isV2EvidenceAmendment(final)
           ? `items: ${id} closure_commit must equal its final ledger evidence.replacementCommit`
           : `items: ${id} closure_commit must equal its final ledger evidence.commit`;
