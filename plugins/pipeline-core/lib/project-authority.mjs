@@ -17,6 +17,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 export const PROJECT_AUTHORITY_SCHEMA = "pipeline.project-authority.v1";
 export const PROJECT_AUTHORITY_RECOVERY_SCHEMA = "pipeline.project-authority-recovery.v1";
 export const PROJECT_AUTHORITY_STATE_RECONCILE_SCHEMA = "pipeline.project-authority-state-reconcile.v1";
+export const PROJECT_AUTHORITY_STATE_SYNC_SCHEMA = "pipeline.project-authority-state-sync.v1";
 export const NEUTRAL_MANIFEST = "project/pipeline.yaml";
 export const NEUTRAL_STATE = "project/pipeline-state.json";
 export const LEGACY_MANIFEST = ".claude/pipeline.yaml";
@@ -31,6 +32,7 @@ const TARGETS = Object.freeze([
 const PLANS = new WeakMap();
 const RECOVERY_PLANS = new WeakMap();
 const STATE_RECONCILE_PLANS = new WeakMap();
+const STATE_SYNC_PLANS = new WeakMap();
 const SHA256 = /^[0-9a-f]{64}$/u;
 
 class IntentionalInterruption extends Error {}
@@ -135,6 +137,37 @@ function changedTargets(root) {
   }).filter((target) => target.after.status === "present");
 }
 function stateReconcileResult(status, extra = {}) { return { schema: PROJECT_AUTHORITY_STATE_RECONCILE_SCHEMA, status, requiresExplicitActivation: true, ...extra }; }
+function stateSyncResult(status, extra = {}) { return { schema: PROJECT_AUTHORITY_STATE_SYNC_SCHEMA, status, requiresExplicitActivation: true, ...extra }; }
+function stateProjection(root, path) {
+  const before = image(root, path); if (before.status !== "present") throw new Error(`${path} is missing`);
+  const value = JSON.parse(bytes(root, path).toString("utf8"));
+  if (!value?.activeFeature || typeof value.activeFeature !== "object") throw new Error(`${path} has no active feature`);
+  return { path, before, value };
+}
+/** Preview an exact two-projection alignment using neutral authority and the Legacy phase. */
+export function planProjectAuthorityStateSynchronization({ rootDir = process.cwd() } = {}) {
+  let root;
+  try {
+    root = realRoot(rootDir); if (authority(root).source !== "neutral") return stateSyncResult("rejected", { reason: "neutral authority is required" });
+    const legacy = stateProjection(root, LEGACY_STATE); const neutral = stateProjection(root, NEUTRAL_STATE);
+    if (legacy.value.activeFeature.id !== neutral.value.activeFeature.id || legacy.value.activeFeature.planPath !== neutral.value.activeFeature.planPath) throw new Error("state feature identities differ");
+    const next = structuredClone(neutral.value); next.activeFeature = { ...next.activeFeature, phase: legacy.value.activeFeature.phase }; next.updatedAt = legacy.value.updatedAt;
+    const bytesNext = Buffer.from(`${JSON.stringify(next, null, 2)}\n`, "utf8"); const after = present(bytesNext);
+    if (sameImage(legacy.before, after) && sameImage(neutral.before, after)) return stateSyncResult("noop", { reason: "state projections already aligned" });
+    const plan = stateSyncResult("ready", { phase: next.activeFeature.phase, targets: [{ path: LEGACY_STATE, before: legacy.before, after }, { path: NEUTRAL_STATE, before: neutral.before, after }] });
+    STATE_SYNC_PLANS.set(plan, { root, signature: planSignature(plan), legacy, neutral, bytesNext, after }); return plan;
+  } catch (error) { return stateSyncResult("rejected", { reason: error.message }); }
+}
+/** Apply only an unchanged explicit dual-state synchronization plan. */
+export function applyProjectAuthorityStateSynchronization(plan, { rootDir = process.cwd(), activate = false } = {}) {
+  const state = STATE_SYNC_PLANS.get(plan); if (!state || planSignature(plan) !== state.signature) return stateSyncResult("rejected", { reason: "unauthenticated or changed plan" });
+  if (!activate) return stateSyncResult("activation-required", { reason: "explicit activation required" });
+  try {
+    const root = realRoot(rootDir); if (root !== state.root || !sameImage(image(root, LEGACY_STATE), state.legacy.before) || !sameImage(image(root, NEUTRAL_STATE), state.neutral.before)) throw new Error("state changed since planning");
+    for (const entry of [state.legacy, state.neutral]) { const path = projectPath(root, entry.path); const temporary = `${path}.sync-${process.pid}`; durableWrite(temporary, state.bytesNext); renameSync(temporary, path); fsyncDirectory(dirname(path)); if (!sameImage(image(root, entry.path), state.after)) throw new Error(`readback failed: ${entry.path}`); }
+    STATE_SYNC_PLANS.delete(plan); return stateSyncResult("applied", { phase: state.legacy.value.activeFeature.phase, targets: [LEGACY_STATE, NEUTRAL_STATE] });
+  } catch (error) { return stateSyncResult("rejected", { reason: error.message }); }
+}
 function stateResultPathCorrection(root) {
   const before = image(root, NEUTRAL_STATE);
   if (before.status !== "present") throw new Error("neutral project state is missing");

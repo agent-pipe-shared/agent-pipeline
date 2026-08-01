@@ -2485,19 +2485,21 @@ function reconcileDraftPreview(dir, manifestPath) {
     const matches = value.artifacts.filter((artifact) => artifact?.class === artifactClass && artifact.path === path);
     if (matches.length !== 1 || !exactObjectKeys(matches[0], ["class", "path", "sha256", "authority", "mutability", "retention"]) || !SHA256_RE.test(matches[0].sha256)) return { ok: false, code: "PS-FEATURE-RECONCILE-SHAPE" };
     const current = currentRepoArtifact(dir, path);
-    if (!current || current.sha256 === matches[0].sha256) return { ok: false, code: "PS-FEATURE-RECONCILE-NOOP" };
-    replacements.push({ old: matches[0].sha256, next: current.sha256 });
+    if (!current) return { ok: false, code: "PS-FEATURE-RECONCILE-SOURCE" };
+    if (current.sha256 !== matches[0].sha256) replacements.push({ old: matches[0].sha256, next: current.sha256 });
   }
+  if (replacements.length === 0) return { ok: false, code: "PS-FEATURE-RECONCILE-NOOP" };
   let nextBytes = bytes;
   for (const replacement of replacements) {
     const token = `"sha256": "${replacement.old}"`;
-    if (nextBytes.split(token).length !== 2) return { ok: false, code: "PS-FEATURE-RECONCILE-BYTES" };
-    nextBytes = nextBytes.replace(replacement.old, replacement.next);
+    const start = nextBytes.indexOf(token);
+    if (start < 0) return { ok: false, code: "PS-FEATURE-RECONCILE-BYTES" };
+    nextBytes = `${nextBytes.slice(0, start)}"sha256": "${replacement.next}"${nextBytes.slice(start + token.length)}`;
   }
   let next;
   try { next = JSON.parse(nextBytes); } catch { return { ok: false, code: "PS-FEATURE-RECONCILE-BYTES" }; }
   const changed = value.artifacts.map((artifact, index) => artifact.sha256 === next.artifacts[index]?.sha256 ? 0 : 1).reduce((total, count) => total + count, 0);
-  if (changed !== 4 || featureArtifactSetSha256(value.artifacts) !== featureArtifactSetSha256(next.artifacts)) return { ok: false, code: "PS-FEATURE-RECONCILE-BYTES" };
+  if (changed !== replacements.length || featureArtifactSetSha256(value.artifacts) !== featureArtifactSetSha256(next.artifacts)) return { ok: false, code: "PS-FEATURE-RECONCILE-BYTES" };
   return { ok: true, manifest, bytes, value, nextBytes, next, preimage: sha256Bytes(bytes), artifactSetSha256: featureArtifactSetSha256(value.artifacts), receipt: { schema: "pipeline.feature-package-receipt.v1", manifest, manifestSha256: sha256Bytes(nextBytes), featureId: id, state: "draft", candidate: null, artifactCount: next.artifacts.length, findingCount: 0 } };
 }
 function reconcileMutableDesignPreview(dir, manifestPath, artifactPath) {

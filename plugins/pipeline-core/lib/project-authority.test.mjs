@@ -7,8 +7,9 @@ import { join } from "node:path";
 import {
   applyPendingProjectAuthorityRecovery, applyProjectAuthorityMigration,
   applyProjectAuthorityStateReconciliation,
+  applyProjectAuthorityStateSynchronization,
   LEGACY_MANIFEST, LEGACY_STATE, NEUTRAL_MANIFEST, NEUTRAL_STATE,
-  planPendingProjectAuthorityRecovery, planProjectAuthorityMigration, planProjectAuthorityStateReconciliation, readProjectAuthority,
+  planPendingProjectAuthorityRecovery, planProjectAuthorityMigration, planProjectAuthorityStateReconciliation, planProjectAuthorityStateSynchronization, readProjectAuthority,
 } from "./project-authority.mjs";
 
 const roots = [];
@@ -44,6 +45,16 @@ try {
     assert.equal(applyProjectAuthorityStateReconciliation(plan, { rootDir: base, activate: true }).status, "applied");
     assert.equal(JSON.parse(readFileSync(join(base, NEUTRAL_STATE), "utf8")).continuity.authority.result.path, "specs/sprint-phoenix-epic/result.md");
     assert.equal(planProjectAuthorityStateReconciliation({ rootDir: base }).status, "noop");
+  });
+  ok("dual-state sync binds both preimages and preserves neutral authority", () => {
+    const base = root(); legacy(base); assert.equal(applyProjectAuthorityMigration(planProjectAuthorityMigration({ rootDir: base }), { rootDir: base, activate: true }).status, "applied");
+    write(base, LEGACY_STATE, `${JSON.stringify({ activeFeature: { id: "f", planPath: "p", phase: "implementation" }, updatedAt: "legacy" })}\n`);
+    write(base, NEUTRAL_STATE, `${JSON.stringify({ activeFeature: { id: "f", planPath: "p", phase: "design" }, continuity: { authority: "neutral" }, updatedAt: "neutral" })}\n`);
+    const plan = planProjectAuthorityStateSynchronization({ rootDir: base }); assert.equal(plan.status, "ready");
+    assert.equal(applyProjectAuthorityStateSynchronization(plan, { rootDir: base }).status, "activation-required");
+    assert.equal(applyProjectAuthorityStateSynchronization(plan, { rootDir: base, activate: true }).status, "applied");
+    const state = JSON.parse(readFileSync(join(base, NEUTRAL_STATE), "utf8")); assert.equal(state.activeFeature.phase, "implementation"); assert.equal(state.continuity.authority, "neutral");
+    assert.equal(readFileSync(join(base, LEGACY_STATE), "utf8"), readFileSync(join(base, NEUTRAL_STATE), "utf8"));
   });
   ok("source and destination drift reject before writes", () => {
     const base = root(); legacy(base); let plan = planProjectAuthorityMigration({ rootDir: base }); write(base, LEGACY_MANIFEST, "changed\n");

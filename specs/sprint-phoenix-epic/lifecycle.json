@@ -9,7 +9,7 @@
     {
       "class": "prd",
       "path": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
-      "sha256": "579cac6f9a73e5789173526d5e776033a4c55104d1cc6134a8914cd2b971f35b",
+      "sha256": "27ff8b211136bb132566e9f0dbafa04bad6a2355aade83b241d194a782db9362",
       "authority": true,
       "mutability": "immutable",
       "retention": "active"
@@ -17,7 +17,7 @@
     {
       "class": "spec",
       "path": "specs/sprint-phoenix-epic/spec.md",
-      "sha256": "fba0faa25aa4f18ab3398de39b506879a87c2016983f0a28d878da4428100719",
+      "sha256": "238d05dd36936f428e05d732ffedc925fe8f3702d9fcdcb33a4a68d9711bf356",
       "authority": true,
       "mutability": "immutable",
       "retention": "active"

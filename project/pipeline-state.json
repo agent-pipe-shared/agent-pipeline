@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
   "planApproved": true,
-  "updatedAt": "2026-08-01T12:07:31.481Z",
+  "updatedAt": "2026-08-01T12:25:42.573Z",
   "closedFeatures": [
     {
       "id": "codex-onboarding-0.4.5",
@@ -15,7 +15,7 @@
   "activeFeature": {
     "id": "sprint-phoenix-epic",
     "planPath": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
-    "phase": "design"
+    "phase": "implementation"
   },
   "continuity": {
     "schema": "pipeline.continuity.v0",
