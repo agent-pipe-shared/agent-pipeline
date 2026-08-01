@@ -26,11 +26,13 @@ export function createArtifactIdentity(kind, bytes) {
 
 /** Produce, promotion and readback share one candidate/subject admission boundary. */
 export function evaluateProvenanceAdmission(input) {
-  if (!own(input, ["boundary", "envelope", "expected"]) || !["produce", "promote", "readback"].includes(input.boundary) || !own(input.expected, ["candidate", "subject"]) || !candidate(input.expected.candidate) || !subject(input.expected.subject)) return { allowed: false, code: "PROVENANCE-ADMISSION-INVALID" };
+  if (!own(input, ["boundary", "envelope", "expected"]) || !["produce", "promote", "readback"].includes(input.boundary) || !own(input.expected, ["builderDigest", "candidate", "materials", "subject"]) || !candidate(input.expected.candidate) || !subject(input.expected.subject) || !digest(input.expected.builderDigest) || !Array.isArray(input.expected.materials) || !input.expected.materials.every(material)) return { allowed: false, code: "PROVENANCE-ADMISSION-INVALID" };
   const checked = validateProvenanceEnvelope(input.envelope);
   if (!checked.valid) return { allowed: false, code: checked.code };
   if (JSON.stringify(input.envelope.candidate) !== JSON.stringify(input.expected.candidate)) return { allowed: false, code: "PROVENANCE-CANDIDATE-MISMATCH" };
   if (JSON.stringify(input.envelope.subject) !== JSON.stringify(input.expected.subject)) return { allowed: false, code: "PROVENANCE-SUBJECT-MISMATCH" };
+  if (JSON.stringify(input.envelope.materials) !== JSON.stringify(input.expected.materials)) return { allowed: false, code: "PROVENANCE-MATERIAL-MISMATCH" };
+  if (input.envelope.builder.digest !== input.expected.builderDigest) return { allowed: false, code: "PROVENANCE-BUILDER-MISMATCH" };
   if (input.envelope.assurance !== "verified" || input.envelope.attestation.status !== "verified") return { allowed: false, code: "PROVENANCE-UNVERIFIED" };
   return { allowed: true, code: "PROVENANCE-ADMISSION-ALLOWED" };
 }
