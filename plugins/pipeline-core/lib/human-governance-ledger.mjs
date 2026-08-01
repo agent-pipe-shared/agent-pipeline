@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Pure validation and authority resolution for PHX-2 human decisions. */
 import { canonicalSha256 } from "./governance-event.mjs";
+import { appendPortableGovernanceEvent, queryPortableGovernanceStream } from "./governance-event-store.mjs";
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const CODE = /^[A-Z][A-Z0-9._:-]{0,127}$/u;
@@ -54,4 +55,18 @@ export function resolveHumanGovernanceAuthority({ decisions, decisionId, reposit
   const dispositions = valid.filter((entry) => Object.values(entry.links).includes(decisionId));
   if (dispositions.some((entry) => ["consumed", "revoked", "superseded", "corrected"].includes(entry.event))) return Object.freeze({ status: "denied", reason: "disposed" });
   return Object.freeze({ status: "granted", decisionId, decisionDigest: canonicalSha256(decision), singleUse: decision.validity.singleUse, scope: decision.scope });
+}
+
+/** Append one already validated human decision through the canonical portable writer. */
+export async function appendHumanGovernanceDecision({ repositoryRoot, repositoryFingerprint, intent } = {}) {
+  if (!record(intent) || intent.origin !== "human" || intent.streamId !== "human" || intent.authorityClass !== "human-authority" || intent.payloadSchema !== "pipeline.human-governance-decision.v1") fail("HGL-APPEND-INTENT");
+  const decision = validateHumanGovernanceDecision(intent.payload);
+  if (intent.repositoryFingerprint !== repositoryFingerprint || decision.scope.repositoryFingerprint !== repositoryFingerprint) fail("HGL-CROSS-REPOSITORY");
+  return appendPortableGovernanceEvent({ repositoryRoot, repositoryFingerprint, intent });
+}
+
+/** Return only verified/prefix-valid canonical human decisions, never mutable projection state. */
+export async function queryHumanGovernanceDecisions({ repositoryRoot, repositoryFingerprint, checkpoint } = {}) {
+  const result = await queryPortableGovernanceStream({ repositoryRoot, repositoryFingerprint, streamId: "human", checkpoint });
+  return Object.freeze({ ...result, decisions: Object.freeze(result.events.map((event) => validateHumanGovernanceDecision(event.payload))) });
 }

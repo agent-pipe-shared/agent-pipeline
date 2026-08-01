@@ -20,6 +20,7 @@ import {
 } from "./governance-event.mjs";
 import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
+import { validateHumanGovernanceDecision } from "./human-governance-ledger.mjs";
 
 const REGISTRY_SCHEMA = "pipeline.governance-stream-registry.v1";
 const HEADS_SCHEMA = "pipeline.governance-event-heads.v1";
@@ -287,7 +288,13 @@ async function loadCapturePolicy(root) {
 function assertPortablePayload(event, policy) {
   const stream = policy.streams.find((entry) => entry?.origin === event.origin);
   if (!stream || stream.storageProfile !== "repository-public-safe" || stream.personalIdentifiability !== "prohibited" || stream.contextualIdentifiability !== "prohibited") fail("GES-CAPTURE-DENIED", "Capture policy denies this portable event.");
-  const allowed = event.origin === "lifecycle" ? ["phase"] : event.origin === "agent" ? ["kind", "code"] : ["decisionType", "scope"];
+  if (event.origin === "human") {
+    const decision = validateHumanGovernanceDecision(event.payload);
+    if (decision.scope.repositoryFingerprint !== event.repositoryFingerprint || decision.scope.candidate.commit !== event.candidate.commit || decision.scope.candidate.tree !== event.candidate.tree || event.eventType !== `human.${decision.event}`) fail("GES-PAYLOAD-SCHEMA", "Human decision payload does not bind its envelope.");
+    if (typeof event.policy.capturePolicyDigest !== "string" || event.policy.capturePolicyDigest !== canonicalSha256(policy)) fail("GES-CAPTURE-POLICY-BINDING", "Event does not bind the effective capture policy.");
+    return;
+  }
+  const allowed = event.origin === "lifecycle" ? ["phase"] : ["kind", "code"];
   if (!exactKeys(event.payload, allowed) || Object.values(event.payload).some((value) => typeof value !== "string" || !/^[A-Za-z0-9._:-]{1,128}$/u.test(value))) fail("GES-PAYLOAD-SCHEMA", "Portable payload is not closed or contains unsafe text.");
   if (typeof event.policy.capturePolicyDigest !== "string" || event.policy.capturePolicyDigest !== canonicalSha256(policy)) fail("GES-CAPTURE-POLICY-BINDING", "Event does not bind the effective capture policy.");
 }
