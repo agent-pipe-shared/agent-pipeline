@@ -66,4 +66,5 @@ test("authority CLI grants only a verified checkpoint-bound human decision", asy
   assert.deepEqual(granted, { schema: "pipeline.governance-authority-readback.v1", granted: true, decisionId: "grant-1", decisionDigest: canonicalSha256(decision(values.fingerprint)), singleUse: true, scope: decision(values.fingerprint).scope });
   await writeFile(requestFile, `${canonicalizeJson({ ...request, checkpoint: null })}\n`);
   assert.deepEqual(await main(["--repo", values.root, "--request-file", requestFile]), { schema: "pipeline.governance-authority-readback.v1", granted: false, reason: "checkpoint-unverified" });
+  assert.deepEqual(await main(["--repo", values.root, "--request-json", canonicalizeJson(request)]), granted);
 });
