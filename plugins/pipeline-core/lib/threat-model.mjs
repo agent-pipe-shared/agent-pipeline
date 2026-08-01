@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: SUL-1.0
 // CYB-4A -- pure, closed threat-model applicability and identity boundary.
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { validateFeatureTopology } from "./feature-package-topology.mjs";
 
 export const THREAT_MODEL_SCHEMA = "pipeline.threat-model.v1";
 export const SECURITY_REQUIREMENT_SCHEMA = "pipeline.security-requirement.v1";
@@ -59,6 +62,17 @@ export function evaluateThreatBoundary(input) {
   if (!input.fresh) return { allowed: false, code: "THREAT-BOUNDARY-STALE" };
   if (!['approved', 'implementing', 'verified', 'accepted-risk'].includes(input.lifecycle)) return { allowed: false, code: "THREAT-BOUNDARY-UNAPPROVED" };
   return { allowed: true, code: "THREAT-BOUNDARY-ALLOWED" };
+}
+
+/** Resolve exactly one topology-declared threat model; no path is inferred. */
+export function discoverThreatModel(rootDir, { featureId = null } = {}) {
+  const root = resolve(rootDir); const topology = validateFeatureTopology(root);
+  if (!topology.ok) return { ok: false, code: "THREAT-TOPOLOGY-INVALID", findings: topology.findings };
+  const matches = topology.receipts.filter((receipt) => featureId === null || receipt.featureId === featureId).flatMap((receipt) => {
+    try { const manifest = JSON.parse(readFileSync(join(root, receipt.manifest), "utf8")); return manifest.artifacts.filter((artifact) => artifact.class === "threat-model").map((artifact) => ({ featureId: receipt.featureId, path: artifact.path, sha256: artifact.sha256 })); } catch { return []; }
+  });
+  if (matches.length !== 1) return { ok: false, code: matches.length === 0 ? "THREAT-NOT-REGISTERED" : "THREAT-AMBIGUOUS-REGISTRATION" };
+  return { ok: true, artifact: matches[0] };
 }
 
 /** Derive a safe public view; canonical authority and private coordinates stay untouched. */
