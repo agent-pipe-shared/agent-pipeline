@@ -519,10 +519,16 @@ function sanctionedSessionCleanupArgs(args, root) {
   if (["start", "status", "release-binding", "plan-recovery", "plan-privatization"].includes(args[0])) {
     return args[1] === "--repo" && args[2] === root && args.length === 3;
   }
-  if (["apply-recovery", "apply-privatization"].includes(args[0])) {
+  if (args[0] === "confirm-privatization") {
     return args[1] === "--repo" && args[2] === root
       && args[3] === "--plan-sha256" && HEX.test(args[4] ?? "")
-      && args[5] === "--activate" && args.length === 6;
+      && args[5] === "--accept" && args.length === 6;
+  }
+  if (["apply-recovery", "apply-privatization"].includes(args[0])) {
+    if (args[1] !== "--repo" || args[2] !== root
+      || args[3] !== "--plan-sha256" || !HEX.test(args[4] ?? "")) return false;
+    return (args[0] === "apply-recovery" && args[5] === "--activate" && args.length === 6)
+      || (args[0] === "apply-privatization" && args[5] === "--activate" && args.length === 6);
   }
   return args[0] === "cleanup"
     && args[1] === "--repo" && args[2] === root

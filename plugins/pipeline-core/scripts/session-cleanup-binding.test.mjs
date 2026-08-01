@@ -424,6 +424,52 @@ test("privatization planning rejects missing, replaced, or multiple active descr
   }
 });
 
+test("double-confirmed privatization recovery clears only a leaked tuple and remains blocked when owner observation is unavailable", () => {
+  const root = neutralFixture("privatization-owner-observation-unavailable");
+  const statePath = join(root, "project", "pipeline-state.json");
+  try {
+    const started = invoke(["start", "--repo", root, "--session", "unavailable-owner-123"]);
+    assert.equal(started.code, 0);
+    const binding = readOnboardingSessionCleanupBinding({ rootDir: root });
+    assert.equal(binding.status, "bound");
+    const beforeBinding = readFileSync(join(root, ".git", "agent-pipeline", "onboarding", "session-cleanup-binding.json"));
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+    state.continuity.runtime.sessionCleanup = binding.sessionCleanup;
+    writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });
+    const descriptorPath = join(root, ".git", "agent-pipeline", "session-descriptors", "active", `${binding.sessionCleanup.sessionId}.json`);
+    writeFileSync(descriptorPath, "{broken descriptor}\n", { mode: 0o600 });
+
+    const plan = invoke(["plan-privatization", "--repo", root]).output;
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.mode, "owner-observation-recovery");
+    assert.equal(JSON.stringify(plan).includes(binding.sessionCleanup.sessionId), false);
+    assert.equal(JSON.stringify(plan).includes(binding.sessionCleanup.descriptorSha256), false);
+    assert.deepEqual(plan.applyAction.argv.slice(-3), [
+      "--plan-sha256", plan.planSha256, "--accept",
+    ]);
+    assert.throws(() => invoke([
+      "apply-privatization", "--repo", root, "--plan-sha256", plan.planSha256, "--activate",
+    ]), (error) => error?.code === "SESSION-CLEANUP-PRIVATIZE-CONFIRMATION");
+
+    const confirmed = invoke(plan.applyAction.argv.slice(1)).output;
+    assert.equal(confirmed.status, "confirmed");
+    assert.equal(confirmed.planSha256, plan.planSha256);
+    assert.equal(JSON.stringify(confirmed).includes(binding.sessionCleanup.sessionId), false);
+    const applied = invoke(confirmed.applyAction.argv.slice(1)).output;
+    assert.equal(applied.status, "blocked");
+    assert.equal(applied.lifecycleStatus, "ready");
+    assert.equal(applied.ownerObservation, "unavailable");
+    assert.match(applied.auditSha256, /^[a-f0-9]{64}$/u);
+    assert.equal(JSON.parse(readFileSync(statePath, "utf8")).continuity.runtime.sessionCleanup, null);
+    assert.deepEqual(readFileSync(join(root, ".git", "agent-pipeline", "onboarding", "session-cleanup-binding.json")), beforeBinding);
+    const auditPath = join(root, ".git", "agent-pipeline", "onboarding", `session-cleanup-privatization-audit.${plan.planSha256}.json`);
+    assert.equal(existsSync(auditPath), true);
+    assert.equal(JSON.stringify(JSON.parse(readFileSync(auditPath, "utf8"))).includes(binding.sessionCleanup.sessionId), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("privatization planning rejects malformed, multiply embedded, or conflicting bindings", () => {
   for (const mode of ["malformed", "multiple-binding", "private-conflict"]) {
     const root = neutralFixture(`neutral-privatization-${mode}`);

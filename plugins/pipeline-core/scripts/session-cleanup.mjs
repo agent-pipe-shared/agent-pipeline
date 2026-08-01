@@ -15,6 +15,7 @@ import {
   applyOnboardingKickoffPromotionCleanupRecovery,
   applyOnboardingSessionCleanupPrivatization,
   bindOnboardingSessionCleanup,
+  confirmOnboardingSessionCleanupPrivatization,
   planOnboardingKickoffPromotionCleanupRecovery,
   planOnboardingSessionCleanupPrivatization,
   readOnboardingSessionCleanupBinding,
@@ -51,6 +52,7 @@ const USAGE = `Usage:
   session-cleanup.mjs status --repo <checkout>
   session-cleanup.mjs release-binding --repo <checkout>
   session-cleanup.mjs plan-privatization --repo <checkout>
+  session-cleanup.mjs confirm-privatization --repo <checkout> --plan-sha256 <sha256> --accept
   session-cleanup.mjs apply-privatization --repo <checkout> --plan-sha256 <sha256> --activate
   session-cleanup.mjs plan-recovery --repo <checkout>
   session-cleanup.mjs apply-recovery --repo <checkout> --plan-sha256 <sha256> --activate
@@ -122,16 +124,17 @@ function drainSessionPower(repo, session) {
 function parseArgs(argv) {
   const [command, ...rest] = argv;
   if (!new Set([
-    "start", "status", "release-binding", "plan-privatization", "apply-privatization",
+    "start", "status", "release-binding", "plan-privatization", "confirm-privatization", "apply-privatization",
     "plan-recovery", "apply-recovery",
     "register-intent", "finalize", "seal", "cleanup", "hygiene",
   ]).has(command)) throw new Error(USAGE);
   const flags = {};
   for (let index = 0; index < rest.length; index += 2) {
     const key = rest[index];
-    if (key === "--activate") {
-      if (flags.activate === true) throw new Error("Duplicate option: --activate");
-      flags.activate = true;
+    if (key === "--activate" || key === "--accept") {
+      const name = key.slice(2);
+      if (flags[name] === true) throw new Error(`Duplicate option: ${key}`);
+      flags[name] = true;
       index -= 1;
       continue;
     }
@@ -147,7 +150,8 @@ function parseArgs(argv) {
   const allowed = command === "start" ? new Set(["repo", "session"])
     : new Set(["status", "release-binding"]).has(command) ? new Set(["repo"])
       : new Set(["plan-recovery", "plan-privatization"]).has(command) ? new Set(["repo"])
-        : new Set(["apply-recovery", "apply-privatization"]).has(command) ? new Set(["repo", "plan-sha256", "activate"])
+      : command === "confirm-privatization" ? new Set(["repo", "plan-sha256", "accept"])
+      : new Set(["apply-recovery", "apply-privatization"]).has(command) ? new Set(["repo", "plan-sha256", "activate"])
       : new Set([...common, ...extra]);
   for (const name of Object.keys(flags)) if (!allowed.has(name)) throw new Error(`Unknown option: --${name}`);
   return { command, flags };
@@ -244,6 +248,47 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
       rootDir: repo,
       expectedPlanSha256: required(flags, "plan-sha256"),
       activate: flags.activate === true,
+    });
+    if (output.recovery === "owner-observation-recovery") {
+      let lifecycleReady = false;
+      try {
+        requireReady({ rootDir: repo, intent: "bootstrap" });
+        lifecycleReady = true;
+      } catch {
+        lifecycleReady = false;
+      }
+      const inspectOwner = dependencies.inspectSessionOwnerRuntimeFn
+        ?? inspectSessionOwnerRuntime;
+      let ownerStatus = "unavailable";
+      try {
+        const binding = readOnboardingSessionCleanupBinding({ rootDir: repo });
+        if (binding.status === "bound" && binding.sessionCleanup !== null) {
+          const observed = inspectOwner(repo, binding.sessionCleanup.sessionId, {
+            expectedDescriptorSha256: binding.sessionCleanup.descriptorSha256,
+          });
+          if (observed?.status === "live" || observed?.status === "not-live" || observed?.status === "reused") {
+            ownerStatus = observed.status;
+          }
+        }
+      } catch {
+        ownerStatus = "unavailable";
+      }
+      if (!lifecycleReady || ownerStatus === "unavailable") {
+        output = {
+          ...output,
+          status: "blocked",
+          lifecycleStatus: lifecycleReady ? "ready" : "unavailable",
+          ownerObservation: ownerStatus,
+        };
+      }
+    }
+  } else if (command === "confirm-privatization") {
+    const confirmPrivatization = dependencies.confirmOnboardingSessionCleanupPrivatizationFn
+      ?? confirmOnboardingSessionCleanupPrivatization;
+    output = confirmPrivatization({
+      rootDir: repo,
+      expectedPlanSha256: required(flags, "plan-sha256"),
+      accept: flags.accept === true,
     });
   } else if (command === "start") {
     requireReady({ rootDir: repo, intent: "session" });

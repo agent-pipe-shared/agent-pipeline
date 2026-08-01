@@ -83,6 +83,9 @@ export const PRIVATE_SESSION_CLEANUP_RELEASE_RECEIPT_SCHEMA = "pipeline.private-
 export const PRIVATE_SESSION_CLEANUP_RELEASE_QUARANTINE_SCHEMA = "pipeline.private-session-cleanup-release-quarantine.v1";
 export const SESSION_CLEANUP_PRIVATIZATION_PLAN_SCHEMA = "pipeline.session-cleanup-privatization-plan.v1";
 export const SESSION_CLEANUP_PRIVATIZATION_APPLY_SCHEMA = "pipeline.session-cleanup-privatization-apply.v1";
+export const PRIVATE_SESSION_CLEANUP_PRIVATIZATION_AUDIT_SCHEMA = "pipeline.private-session-cleanup-privatization-audit.v1";
+export const PRIVATE_SESSION_CLEANUP_PRIVATIZATION_CONFIRMATION_SCHEMA = "pipeline.private-session-cleanup-privatization-confirmation.v1";
+export const SESSION_CLEANUP_PRIVATIZATION_CONFIRMATION_SCHEMA = "pipeline.session-cleanup-privatization-confirmation.v1";
 export const KICKOFF_PROMOTION_CLEANUP_RECOVERY_PLAN_SCHEMA = "pipeline.kickoff-promotion-cleanup-recovery-plan.v1";
 export const KICKOFF_PROMOTION_CLEANUP_RECOVERY_APPLY_SCHEMA = "pipeline.kickoff-promotion-cleanup-recovery-apply.v1";
 
@@ -97,6 +100,8 @@ const HISTORY_BASENAME = "continuity-history.json";
 const SESSION_CLEANUP_BINDING_BASENAME = "session-cleanup-binding.json";
 const SESSION_CLEANUP_KEY_BASENAME = "session-cleanup-binding.key";
 const SESSION_CLEANUP_RELEASE_RECEIPT_BASENAME = "session-cleanup-release-receipt.json";
+const SESSION_CLEANUP_PRIVATIZATION_AUDIT_BASENAME = "session-cleanup-privatization-audit";
+const SESSION_CLEANUP_PRIVATIZATION_CONFIRMATION_BASENAME = "session-cleanup-privatization-confirmation";
 const SHA256_RE = /^[a-f0-9]{64}$/u;
 const PLAN_KEYS = new Set([
   "schema", "root", "repositoryCapability", "goal", "goalSha256", "calibration",
@@ -839,6 +844,14 @@ function privateCleanupPaths(root, { create = false, spawn = defaultGitSpawn } =
     binding: join(privateState.directory, SESSION_CLEANUP_BINDING_BASENAME),
     key: join(privateState.directory, SESSION_CLEANUP_KEY_BASENAME),
     releaseReceipt: join(privateState.directory, SESSION_CLEANUP_RELEASE_RECEIPT_BASENAME),
+    privatizationAudit: (planSha256) => join(
+      privateState.directory,
+      `${SESSION_CLEANUP_PRIVATIZATION_AUDIT_BASENAME}.${planSha256}.json`,
+    ),
+    privatizationConfirmation: (planSha256) => join(
+      privateState.directory,
+      `${SESSION_CLEANUP_PRIVATIZATION_CONFIRMATION_BASENAME}.${planSha256}.json`,
+    ),
   };
 }
 
@@ -1230,7 +1243,7 @@ function observeMachineState(rootDir, spawn = defaultGitSpawn, {
       fail("SESSION-CLEANUP-STATE-NONPORTABLE", "neutral Pipeline machine state contains private cleanup identity");
     }
   }
-  const privateBinding = neutral ? readPrivateCleanupBinding(root, { spawn }).binding : null;
+  const privateBindingObservation = neutral ? readPrivateCleanupBinding(root, { spawn }) : null;
   return {
     root,
     path,
@@ -1238,7 +1251,8 @@ function observeMachineState(rootDir, spawn = defaultGitSpawn, {
     state,
     stateSha256: sha256(raw),
     neutral,
-    privateBinding,
+    privateBinding: privateBindingObservation?.binding ?? null,
+    privateBindingSha256: privateBindingObservation?.sha256 ?? null,
   };
 }
 
@@ -1279,6 +1293,7 @@ function observeSessionCleanupPrivatization(rootDir, spawn = defaultGitSpawn) {
       || canonicalJson(observed.privateBinding.sessionCleanup) !== canonicalJson(leakedBinding))) {
     fail("SESSION-CLEANUP-PRIVATE-CAS", "private cleanup binding conflicts with portable migration input");
   }
+  let descriptorObservation = "available";
   let descriptors;
   try {
     descriptors = listActiveSessionDescriptors(observed.root, { spawn });
@@ -1296,10 +1311,17 @@ function observeSessionCleanupPrivatization(rootDir, spawn = defaultGitSpawn) {
     });
   } catch (error) {
     if (error instanceof KickoffError) throw error;
-    fail(
-      "SESSION-CLEANUP-PRIVATIZE-DESCRIPTOR",
-      "cleanup privatization active descriptor is unavailable or inconsistent",
-    );
+    // An unavailable descriptor is not an ownership proof.  It can enter the
+    // exceptional Human recovery only when the private MAC binding already
+    // proves the exact feature/tuple.  Missing, replaced, or multiple
+    // descriptors above remain typed hard stops rather than being inferred.
+    if (observed.privateBinding === null || !SHA256_RE.test(observed.privateBindingSha256 ?? "")) {
+      fail(
+        "SESSION-CLEANUP-PRIVATIZE-DESCRIPTOR",
+        "cleanup privatization active descriptor is unavailable or inconsistent",
+      );
+    }
+    descriptorObservation = "unavailable";
   }
   return {
     ...observed,
@@ -1307,6 +1329,7 @@ function observeSessionCleanupPrivatization(rootDir, spawn = defaultGitSpawn) {
     featureId: observed.state.activeFeature.id,
     leakedBinding,
     portableState,
+    mode: descriptorObservation === "unavailable" ? "owner-observation-recovery" : "ordinary",
   };
 }
 
@@ -1335,11 +1358,12 @@ function sessionCleanupPrivatizationPlanCore(observed, sessionCleanupScript) {
     stateSha256: observed.stateSha256,
     featureId: observed.featureId,
     privateBindingStatus: observed.privateBinding === null ? "unbound" : "bound",
+    mode: observed.mode ?? "noop",
     sessionCleanupScript,
   };
 }
 
-function sessionCleanupPrivatizationApplyAction(sessionCleanupScript, root, planSha256) {
+function sessionCleanupPrivatizationApplyAction(sessionCleanupScript, root, planSha256, mode = "ordinary") {
   return {
     kind: "command",
     executable: "node",
@@ -1357,7 +1381,30 @@ function sessionCleanupPrivatizationApplyAction(sessionCleanupScript, root, plan
     executionBoundary: "host-authorized-wsl",
     expected: {
       schema: SESSION_CLEANUP_PRIVATIZATION_APPLY_SCHEMA,
-      statuses: ["applied", "noop"],
+      statuses: mode === "owner-observation-recovery" ? ["blocked"] : ["applied", "noop"],
+    },
+  };
+}
+
+function sessionCleanupPrivatizationConfirmationAction(sessionCleanupScript, root, planSha256) {
+  return {
+    kind: "command",
+    executable: "node",
+    argv: [
+      sessionCleanupScript,
+      "confirm-privatization",
+      "--repo",
+      root,
+      "--plan-sha256",
+      planSha256,
+      "--accept",
+    ],
+    mutation: true,
+    requiresConfirmation: true,
+    executionBoundary: "host-authorized-wsl",
+    expected: {
+      schema: SESSION_CLEANUP_PRIVATIZATION_CONFIRMATION_SCHEMA,
+      statuses: ["confirmed"],
     },
   };
 }
@@ -1386,10 +1433,173 @@ export function planOnboardingSessionCleanupPrivatization({
         requiresActivation: true,
       }
       : null,
-    applyAction: observed.status === "ready"
-      ? sessionCleanupPrivatizationApplyAction(writer, observed.root, planSha256)
-      : null,
+    applyAction: observed.status !== "ready" ? null
+      : observed.mode === "owner-observation-recovery"
+        ? sessionCleanupPrivatizationConfirmationAction(writer, observed.root, planSha256)
+        : sessionCleanupPrivatizationApplyAction(writer, observed.root, planSha256, observed.mode),
   };
+}
+
+function privatizationConfirmationCore({ planSha256, stateSha256, bindingSha256, acceptedAt }) {
+  return {
+    schema: PRIVATE_SESSION_CLEANUP_PRIVATIZATION_CONFIRMATION_SCHEMA,
+    planSha256,
+    stateSha256,
+    bindingSha256,
+    acceptedAt,
+  };
+}
+
+function readPrivateCleanupPrivatizationConfirmation(root, planSha256, { spawn = defaultGitSpawn } = {}) {
+  if (!SHA256_RE.test(planSha256 ?? "")) {
+    fail("SESSION-CLEANUP-PRIVATIZE-CONFIRMATION", "cleanup recovery confirmation digest is invalid");
+  }
+  const observed = readPrivateCleanupBinding(root, { spawn });
+  const path = observed.paths.privatizationConfirmation(planSha256);
+  if (!existsSync(path)) return null;
+  let value;
+  try { value = JSON.parse(assertPrivateCleanupFile(path, "private cleanup privatization confirmation").toString("utf8")); }
+  catch { fail("SESSION-CLEANUP-PRIVATIZE-CONFIRMATION", "cleanup recovery confirmation is malformed"); }
+  if (!exactKeys(value, new Set(["schema", "planSha256", "stateSha256", "bindingSha256", "acceptedAt", "mac"]))
+    || value.schema !== PRIVATE_SESSION_CLEANUP_PRIVATIZATION_CONFIRMATION_SCHEMA
+    || value.planSha256 !== planSha256
+    || !SHA256_RE.test(value.stateSha256 ?? "")
+    || !SHA256_RE.test(value.bindingSha256 ?? "")
+    || !canonicalIsoTimestamp(value.acceptedAt)
+    || !SHA256_RE.test(value.mac ?? "")) {
+    fail("SESSION-CLEANUP-PRIVATIZE-CONFIRMATION", "cleanup recovery confirmation has an invalid shape");
+  }
+  const core = privatizationConfirmationCore(value);
+  const expected = Buffer.from(cleanupBindingMac(core, observed.key), "hex");
+  const actual = Buffer.from(value.mac, "hex");
+  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
+    fail("SESSION-CLEANUP-PRIVATIZE-CONFIRMATION", "cleanup recovery confirmation authentication failed");
+  }
+  return value;
+}
+
+function writePrivateCleanupPrivatizationConfirmation(root, observed, planSha256, {
+  now = () => new Date().toISOString(),
+  spawn = defaultGitSpawn,
+} = {}) {
+  if (observed.mode !== "owner-observation-recovery" || !SHA256_RE.test(observed.privateBindingSha256 ?? "")) {
+    fail("SESSION-CLEANUP-PRIVATIZE-CONFIRMATION", "cleanup recovery confirmation has no eligible private binding");
+  }
+  const existing = readPrivateCleanupPrivatizationConfirmation(root, planSha256, { spawn });
+  if (existing !== null) {
+    if (existing.stateSha256 !== observed.stateSha256 || existing.bindingSha256 !== observed.privateBindingSha256) {
+      fail("SESSION-CLEANUP-PRIVATIZE-CONFIRMATION", "cleanup recovery confirmation preimage changed");
+    }
+    return existing;
+  }
+  const binding = readPrivateCleanupBinding(root, { spawn });
+  const core = privatizationConfirmationCore({
+    planSha256,
+    stateSha256: observed.stateSha256,
+    bindingSha256: observed.privateBindingSha256,
+    acceptedAt: now(),
+  });
+  if (!canonicalIsoTimestamp(core.acceptedAt)) {
+    fail("SESSION-CLEANUP-PRIVATIZE-CONFIRMATION", "cleanup recovery confirmation timestamp is invalid");
+  }
+  const value = { ...core, mac: cleanupBindingMac(core, binding.key) };
+  const path = binding.paths.privatizationConfirmation(planSha256);
+  try {
+    writeFileSync(path, `${JSON.stringify(value)}\n`, { mode: 0o600, flag: "wx" });
+    fsyncDirectory(binding.paths.directory);
+  } catch {
+    fail("SESSION-CLEANUP-PRIVATIZE-CONFIRMATION", "cleanup recovery confirmation could not be persisted");
+  }
+  const readback = readPrivateCleanupPrivatizationConfirmation(root, planSha256, { spawn });
+  if (canonicalJson(readback) !== canonicalJson(value)) {
+    fail("SESSION-CLEANUP-PRIVATIZE-CONFIRMATION", "cleanup recovery confirmation readback failed", { committed: true });
+  }
+  return readback;
+}
+
+export function confirmOnboardingSessionCleanupPrivatization({
+  rootDir,
+  expectedPlanSha256,
+  accept = false,
+  deps = {},
+  sessionCleanupScript = DEFAULT_SESSION_CLEANUP_SCRIPT,
+} = {}) {
+  if (accept !== true || !SHA256_RE.test(expectedPlanSha256 ?? "")) {
+    fail("SESSION-CLEANUP-PRIVATIZE-CONFIRMATION", "cleanup recovery confirmation requires the exact plan digest and acceptance");
+  }
+  const spawn = deps.spawn ?? defaultGitSpawn;
+  const plan = planOnboardingSessionCleanupPrivatization({ rootDir, spawn, sessionCleanupScript });
+  if (plan.status !== "ready" || plan.mode !== "owner-observation-recovery" || plan.planSha256 !== expectedPlanSha256) {
+    fail("SESSION-CLEANUP-PRIVATIZE-CONFIRMATION", "cleanup recovery confirmation preimage changed");
+  }
+  const observed = observeSessionCleanupPrivatization(rootDir, spawn);
+  const confirmation = writePrivateCleanupPrivatizationConfirmation(observed.root, observed, expectedPlanSha256, {
+    now: deps.now ?? (() => new Date().toISOString()),
+    spawn,
+  });
+  return {
+    schema: SESSION_CLEANUP_PRIVATIZATION_CONFIRMATION_SCHEMA,
+    status: "confirmed",
+    root: observed.root,
+    planSha256: confirmation.planSha256,
+    applyAction: sessionCleanupPrivatizationApplyAction(
+      sessionCleanupScript,
+      observed.root,
+      expectedPlanSha256,
+      "owner-observation-recovery",
+    ),
+  };
+}
+
+function writePrivateCleanupPrivatizationAudit(root, {
+  planSha256,
+  beforeStateSha256,
+  afterStateSha256,
+  bindingSha256,
+  now = () => new Date().toISOString(),
+  spawn = defaultGitSpawn,
+} = {}) {
+  if (![planSha256, beforeStateSha256, afterStateSha256, bindingSha256].every((value) => SHA256_RE.test(value ?? ""))) {
+    fail("SESSION-CLEANUP-PRIVATIZE-AUDIT", "cleanup privatization audit input is invalid");
+  }
+  const observed = readPrivateCleanupBinding(root, { spawn });
+  if (observed.binding === null || observed.sha256 !== bindingSha256) {
+    fail("SESSION-CLEANUP-PRIVATIZE-AUDIT", "cleanup privatization binding changed before audit");
+  }
+  const auditPath = observed.paths.privatizationAudit(planSha256);
+  const core = {
+    schema: PRIVATE_SESSION_CLEANUP_PRIVATIZATION_AUDIT_SCHEMA,
+    planSha256,
+    beforeStateSha256,
+    afterStateSha256,
+    bindingSha256,
+    appliedAt: now(),
+  };
+  if (!canonicalIsoTimestamp(core.appliedAt)) {
+    fail("SESSION-CLEANUP-PRIVATIZE-AUDIT", "cleanup privatization audit timestamp is invalid");
+  }
+  const value = { ...core, mac: cleanupBindingMac(core, observed.key) };
+  try {
+    if (existsSync(auditPath)) {
+      const existing = JSON.parse(assertPrivateCleanupFile(auditPath, "private cleanup privatization audit").toString("utf8"));
+      if (canonicalJson(existing) === canonicalJson(value)) return sha256(Buffer.from(JSON.stringify(existing)));
+      fail("SESSION-CLEANUP-PRIVATIZE-AUDIT", "cleanup privatization audit already differs");
+    }
+    writeFileSync(auditPath, `${JSON.stringify(value)}\n`, { mode: 0o600, flag: "wx" });
+    fsyncDirectory(observed.paths.directory);
+    const bytes = assertPrivateCleanupFile(auditPath, "private cleanup privatization audit");
+    const readback = JSON.parse(bytes.toString("utf8"));
+    const expected = Buffer.from(cleanupBindingMac(core, observed.key), "hex");
+    const actual = Buffer.from(readback?.mac ?? "", "hex");
+    if (canonicalJson(readback) !== canonicalJson(value)
+      || actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
+      fail("SESSION-CLEANUP-PRIVATIZE-AUDIT", "cleanup privatization audit readback failed", { committed: true });
+    }
+    return sha256(bytes);
+  } catch (error) {
+    if (error instanceof KickoffError) throw error;
+    fail("SESSION-CLEANUP-PRIVATIZE-AUDIT", "cleanup privatization audit could not be persisted", { committed: true });
+  }
 }
 
 /**
@@ -1427,6 +1637,14 @@ export function applyOnboardingSessionCleanupPrivatization({
       mutated: false,
     };
   }
+  const confirmation = initial.mode === "owner-observation-recovery"
+    ? readPrivateCleanupPrivatizationConfirmation(initial.root, expectedPlanSha256, { spawn })
+    : null;
+  if (initial.mode === "owner-observation-recovery"
+    && (confirmation === null || confirmation.stateSha256 !== initial.stateSha256
+      || confirmation.bindingSha256 !== initial.privateBindingSha256)) {
+    fail("SESSION-CLEANUP-PRIVATIZE-CONFIRMATION", "cleanup recovery requires a separately persisted exact plan acceptance");
+  }
 
   const lock = acquireLock(
     `${initial.path}.lock`,
@@ -1447,6 +1665,13 @@ export function applyOnboardingSessionCleanupPrivatization({
     )));
     if (current.status !== "ready" || currentPlanSha256 !== expectedPlanSha256) {
       fail("SESSION-CLEANUP-PRIVATIZE-CAS", "cleanup privatization preimage changed");
+    }
+    if (current.mode === "owner-observation-recovery") {
+      const lockedConfirmation = readPrivateCleanupPrivatizationConfirmation(current.root, expectedPlanSha256, { spawn });
+      if (lockedConfirmation === null || lockedConfirmation.stateSha256 !== current.stateSha256
+        || lockedConfirmation.bindingSha256 !== current.privateBindingSha256) {
+        fail("SESSION-CLEANUP-PRIVATIZE-CONFIRMATION", "cleanup recovery confirmation changed before apply");
+      }
     }
     if (current.privateBinding === null) {
       writePrivateCleanupBinding(current.root, current.featureId, current.leakedBinding, {
@@ -1482,6 +1707,16 @@ export function applyOnboardingSessionCleanupPrivatization({
       || canonicalJson(privateReadback?.sessionCleanup) !== canonicalJson(current.leakedBinding)) {
       fail("SESSION-CLEANUP-PRIVATIZE-READBACK", "cleanup privatization readback is invalid", { committed: true });
     }
+    const auditSha256 = current.mode === "owner-observation-recovery"
+      ? writePrivateCleanupPrivatizationAudit(current.root, {
+        planSha256: actualPlanSha256,
+        beforeStateSha256: current.stateSha256,
+        afterStateSha256: readback.stateSha256,
+        bindingSha256: current.privateBindingSha256,
+        now: deps.now ?? (() => new Date().toISOString()),
+        spawn,
+      })
+      : null;
     return {
       schema: SESSION_CLEANUP_PRIVATIZATION_APPLY_SCHEMA,
       status: "applied",
@@ -1490,6 +1725,10 @@ export function applyOnboardingSessionCleanupPrivatization({
       planSha256: actualPlanSha256,
       portable: true,
       mutated: true,
+      ...(auditSha256 === null ? {} : {
+        recovery: "owner-observation-recovery",
+        auditSha256,
+      }),
     };
   } catch (error) {
     if (!stateCommitted && temporaryRecord) {
