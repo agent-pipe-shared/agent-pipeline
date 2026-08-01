@@ -124,6 +124,7 @@ const APP_SERVER_HEALTH_SCRIPT = fileURLToPath(new URL("../scripts/codex-app-ser
 const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
 const PLUGIN_PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
 const SESSION_CLEANUP_SCRIPT = fileURLToPath(new URL("../scripts/session-cleanup.mjs", import.meta.url));
+const SESSION_CAPABILITY_DIAGNOSE_SCRIPT = fileURLToPath(new URL("../scripts/session-capability-diagnose.mjs", import.meta.url));
 function names(path) { return readdirSync(path).sort(); }
 function yaml(value, indent = "") {
   return Object.entries(value).map(([key, child]) => {
@@ -378,7 +379,21 @@ test("repository capability failures map exactly and stop before source/runtime 
       assert.deepEqual(observed.repository, repository, componentStatus);
       assert.equal(observed.diagnostics.length, 1, componentStatus);
       assert.equal(observed.diagnostics[0].code, diagnosticCode, componentStatus);
-      assert.equal(observed.nextAction, null, componentStatus);
+      if (componentStatus === "session-capability-unavailable") {
+        assertSingleLineAction(observed.nextAction, {
+          kind: "command",
+          executable: "node",
+          argv: [SESSION_CAPABILITY_DIAGNOSE_SCRIPT, "--repo", path],
+          mutation: true,
+          requiresConfirmation: false,
+          expected: {
+            schema: "pipeline.session-capability-diagnosis.v1",
+            statuses: ["ready", "unavailable", "precondition-unavailable"],
+          },
+        });
+      } else {
+        assert.equal(observed.nextAction, null, componentStatus);
+      }
       assert.deepEqual(observed.continuity, {
         status: "unavailable",
         stateSha256: null,

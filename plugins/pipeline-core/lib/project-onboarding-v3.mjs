@@ -91,6 +91,7 @@ const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v
 const MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/runner-profile-migration-v3.mjs", import.meta.url));
 const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
 const SESSION_CLEANUP_SCRIPT = fileURLToPath(new URL("../scripts/session-cleanup.mjs", import.meta.url));
+const SESSION_CAPABILITY_DIAGNOSE_SCRIPT = fileURLToPath(new URL("../scripts/session-capability-diagnose.mjs", import.meta.url));
 const PO_AUTHORITY_REBIND_WRITER = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
 const PO_PROFILE_REPAIR_WRITER = fileURLToPath(new URL("../scripts/po-gate-profile-repair.mjs", import.meta.url));
 const PROJECT_AUTHORITY_MIGRATION_WRITER = fileURLToPath(new URL("../scripts/project-authority-migration.mjs", import.meta.url));
@@ -2465,6 +2466,15 @@ function repositoryFailureResult(rootDir, fs, intent, repository) {
   if (repository.status !== "unavailable") {
     try { root = safeRoot(rootDir, fs); } catch {}
   }
+  const sessionCapabilityDiagnostic = repository.status === "session-capability-unavailable" && root !== null
+    ? commandAction(
+      [SESSION_CAPABILITY_DIAGNOSE_SCRIPT, "--repo", root],
+      true,
+      false,
+      "pipeline.session-capability-diagnosis.v1",
+      ["ready", "unavailable", "precondition-unavailable"],
+    )
+    : null;
   return lifecycleResult({
     status: failure.status,
     root,
@@ -2472,7 +2482,12 @@ function repositoryFailureResult(rootDir, fs, intent, repository) {
     intent,
     repository,
     runtime: emptyRuntime(),
-    nextAction: null,
+    // A failed descriptor probe is not an authority to alter private state.
+    // It is, however, diagnosable through the already sanctioned redacted,
+    // reversible probe. Returning that exact action prevents the
+    // lifecycle guard from asking callers to repeat an inspection that can
+    // never yield a recovery route by itself.
+    nextAction: sessionCapabilityDiagnostic,
     diagnostics: [lifecycleDiagnostic(failure.path, failure.code, failure.message, failure.guidance)],
   });
 }
