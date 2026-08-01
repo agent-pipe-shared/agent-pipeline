@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { createThreatEntityId, discoverThreatModel, evaluateThreatBoundary, evaluateThreatImpact, evaluateThreatModelApplicability, evaluateThreatTraceability, exportThreatModelView, previewThreatModelMigration, renderThreatModelView, validateSecurityRequirement, validateThreatModel } from "./threat-model.mjs";
 const complete = { applicability: "required", riskInputs: { assurance: true, exposure: true, data: true, privilege: true, dependencies: true, architecture: true, deployment: true, agentEgress: true } };
+const model = { schema: "pipeline.threat-model.v1", candidate: { commit: "a", tree: "b" }, policyRevision: "p", classification: "private", entities: [{ id: "asset-1", kind: "asset", label: "public-api", relationships: ["boundary-1"] }], lifecycle: "proposed" };
 assert.deepEqual(evaluateThreatModelApplicability(complete), { state: "required", code: "THREAT-REQUIRED" });
 assert.deepEqual(evaluateThreatModelApplicability({ ...complete, riskInputs: { ...complete.riskInputs, data: false } }), { state: "incomplete", code: "THREAT-RISK-INPUT-MISSING" });
 assert.equal(evaluateThreatModelApplicability({ applicability: "not-applicable", riskInputs: complete.riskInputs }).state, "invalid");
@@ -10,13 +11,15 @@ assert.equal(createThreatEntityId("asset", "service:api").id === createThreatEnt
 for (const kind of ["asset", "boundary", "threat", "abuse-case", "requirement", "mitigation"]) assert.equal(createThreatEntityId(kind, "canonical:one").id, createThreatEntityId(kind, "canonical:one").id, kind);
 assert.deepEqual(evaluateThreatTraceability({ requirements: ["R1"], links: [{ requirement: "R1", subject: "T1", kind: "threat" }] }), { ok: true });
 assert.deepEqual(evaluateThreatImpact({ changedSubjects: ["boundary:public"], links: [{ subject: "boundary:public", requirement: "R1" }, { subject: "asset:db", requirement: "R2" }] }), { state: "stale", code: "THREAT-IMPACT-REVIEW", affected: ["R1"] });
-assert.deepEqual(exportThreatModelView({ classification: "private", entities: [{ id: "A1", name: "internal api", coordinate: "private/host" }] }).entities[0], { id: "A1", name: "redacted", coordinate: "redacted" });
+assert.deepEqual(exportThreatModelView(model).entities[0], { id: "asset-1", kind: "asset", label: "redacted" });
+assert.equal(exportThreatModelView({ ...model, entities: [{ ...model.entities[0], coordinate: "private/host" }] }).ok, false);
+assert.equal(validateThreatModel({ ...model, entities: [{ ...model.entities[0], credential: "secret" }] }).valid, false);
 assert.deepEqual(previewThreatModelMigration({ hasCanonicalModel: false }).writes, []);
-assert.equal(validateThreatModel({ schema: "pipeline.threat-model.v1", candidate: { commit: "a", tree: "b" }, policyRevision: "p", classification: "private", entities: [], lifecycle: "proposed" }).valid, true);
+assert.equal(validateThreatModel(model).valid, true);
 assert.equal(validateSecurityRequirement({ schema: "pipeline.security-requirement.v1", id: "R1", candidate: { commit: "a", tree: "b" }, policyRevision: "p", links: [{ kind: "threat", id: "T1" }], state: "proposed" }).valid, true);
 assert.equal(validateSecurityRequirement({ schema: "pipeline.security-requirement.v1", id: "R1", candidate: { commit: "a", tree: "b" }, policyRevision: "p", links: [{ kind: "threat", id: "T1" }], state: "proposed", approved: true }).valid, false);
-assert.match(renderThreatModelView({ schema: "pipeline.threat-model.v1", candidate: { commit: "a", tree: "b" }, policyRevision: "p", classification: "private", entities: [{ name: "asset", id: "A" }], lifecycle: "proposed" }).text, /asset/);
+assert.match(renderThreatModelView(model).text, /public-api/);
 assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "required", lifecycle: "approved", fresh: false }), { allowed: false, code: "THREAT-BOUNDARY-STALE" });
 assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "required", lifecycle: "approved", fresh: true }), { allowed: true, code: "THREAT-BOUNDARY-ALLOWED" });
 assert.equal(discoverThreatModel(process.cwd()).ok, false);
-console.log("16 threat-model checks passed");
+console.log("18 threat-model checks passed");

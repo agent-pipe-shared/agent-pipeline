@@ -1,9 +1,22 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { evaluateThreatImpact, evaluateThreatModelApplicability, previewThreatModelMigration } from "./threat-model.mjs";
+import { evaluateThreatBoundary, evaluateThreatImpact, evaluateThreatModelApplicability, previewThreatModelMigration } from "./threat-model.mjs";
 const required = { applicability: "required", riskInputs: { assurance: true, exposure: true, data: true, privilege: true, dependencies: true, architecture: true, deployment: true, agentEgress: true } };
-const cases = ["low-risk CLI/library", "externally exposed API", "container/IaC deployment", "sensitive-data system", "AI/agent system with tools and egress", "architecture delta crossing trust boundary", "stale and superseded threat models", "valid not-applicable decision"];
-for (const name of cases) { if (name === "valid not-applicable decision") assert.equal(evaluateThreatModelApplicability({ ...required, applicability: "not-applicable", riskInputs: Object.fromEntries(Object.keys(required.riskInputs).map((key) => [key, false])) }).state, "not-applicable"); else assert.equal(evaluateThreatModelApplicability(required).state, "required"); }
-assert.equal(evaluateThreatImpact({ changedSubjects: ["boundary"], links: [{ subject: "boundary", requirement: "R" }] }).state, "stale");
+const absentRisk = Object.fromEntries(Object.keys(required.riskInputs).map((key) => [key, false]));
+const cases = [
+  { name: "low-risk CLI/library", input: required, state: "required", impact: { changedSubjects: ["asset:cli"], links: [] }, impactState: "current" },
+  { name: "externally exposed API", input: required, state: "required", impact: { changedSubjects: ["boundary:public"], links: [{ subject: "boundary:public", requirement: "R-api" }] }, impactState: "stale" },
+  { name: "container/IaC deployment", input: required, state: "required", impact: { changedSubjects: ["deployment:image"], links: [{ subject: "deployment:image", requirement: "R-image" }] }, impactState: "stale" },
+  { name: "sensitive-data system", input: required, state: "required", impact: { changedSubjects: ["data:customer"], links: [{ subject: "data:customer", requirement: "R-data" }] }, impactState: "stale" },
+  { name: "AI/agent system with tools and egress", input: required, state: "required", impact: { changedSubjects: ["agent:egress"], links: [{ subject: "agent:egress", requirement: "R-egress" }] }, impactState: "stale" },
+  { name: "architecture delta crossing trust boundary", input: required, state: "required", impact: { changedSubjects: ["boundary:trusted-to-public"], links: [{ subject: "boundary:trusted-to-public", requirement: "R-boundary" }, { subject: "asset:db", requirement: "R-db" }] }, impactState: "stale" },
+  { name: "stale and superseded threat models", input: required, state: "required", impact: { changedSubjects: ["dependency:auth"], links: [{ subject: "dependency:auth", requirement: "R-auth" }] }, impactState: "stale", boundary: { boundary: "release", applicability: "required", lifecycle: "superseded", fresh: false } },
+  { name: "valid not-applicable decision", input: { applicability: "not-applicable", riskInputs: absentRisk }, state: "not-applicable", impact: { changedSubjects: [], links: [] }, impactState: "current", boundary: { boundary: "release", applicability: "not-applicable", lifecycle: "retired", fresh: false } },
+];
+for (const fixture of cases) {
+  assert.equal(evaluateThreatModelApplicability(fixture.input).state, fixture.state, fixture.name);
+  assert.equal(evaluateThreatImpact(fixture.impact).state, fixture.impactState, fixture.name);
+  if (fixture.boundary) assert.equal(evaluateThreatBoundary(fixture.boundary).allowed, fixture.name === "valid not-applicable decision", fixture.name);
+}
 assert.deepEqual(previewThreatModelMigration({ hasCanonicalModel: false }), { schema: "pipeline.threat-model-migration-preview.v1", status: "incomplete", writes: [] });
 console.log(`${cases.length} threat-model fixture classes passed`);

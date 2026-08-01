@@ -8,14 +8,17 @@ import { validateFeatureTopology } from "./feature-package-topology.mjs";
 export const THREAT_MODEL_SCHEMA = "pipeline.threat-model.v1";
 export const SECURITY_REQUIREMENT_SCHEMA = "pipeline.security-requirement.v1";
 export const THREAT_MODEL_APPLICABILITY = Object.freeze(["required", "not-applicable", "deferred", "incomplete", "invalid"]);
+export const THREAT_ENTITY_KINDS = Object.freeze(["asset", "boundary", "threat", "abuse-case", "requirement", "mitigation"]);
 const RISK_INPUTS = Object.freeze(["assurance", "exposure", "data", "privilege", "dependencies", "architecture", "deployment", "agentEgress"]);
 const own = (value, fields) => value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === fields.length && fields.every((field) => Object.hasOwn(value, field));
 const text = (value) => typeof value === "string" && value.trim() !== "";
 const stableId = (kind, value) => `${kind}-${createHash("sha256").update(`${kind}\n${value}`).digest("hex").slice(0, 16)}`;
+const SAFE_ENTITY_LABEL = /^[a-z][a-z0-9-]{0,63}$/u;
+const safeEntity = (entity) => own(entity, ["id", "kind", "label", "relationships"]) && text(entity.id) && THREAT_ENTITY_KINDS.includes(entity.kind) && SAFE_ENTITY_LABEL.test(entity.label) && Array.isArray(entity.relationships) && entity.relationships.every(text);
 
 /** Closed machine authority: candidate and effective policy are inseparable. */
 export function validateThreatModel(model) {
-  if (!own(model, ["schema", "candidate", "policyRevision", "classification", "entities", "lifecycle"]) || model.schema !== THREAT_MODEL_SCHEMA || !own(model.candidate, ["commit", "tree"]) || !text(model.candidate.commit) || !text(model.candidate.tree) || !text(model.policyRevision) || !["public", "private"].includes(model.classification) || !Array.isArray(model.entities) || !["draft", "proposed", "approved", "implementing", "verified", "accepted-risk", "superseded", "retired"].includes(model.lifecycle)) return { valid: false, code: "THREAT-MODEL-INVALID" };
+  if (!own(model, ["schema", "candidate", "policyRevision", "classification", "entities", "lifecycle"]) || model.schema !== THREAT_MODEL_SCHEMA || !own(model.candidate, ["commit", "tree"]) || !text(model.candidate.commit) || !text(model.candidate.tree) || !text(model.policyRevision) || !["public", "private"].includes(model.classification) || !Array.isArray(model.entities) || !model.entities.every(safeEntity) || !["draft", "proposed", "approved", "implementing", "verified", "accepted-risk", "superseded", "retired"].includes(model.lifecycle)) return { valid: false, code: "THREAT-MODEL-INVALID" };
   return { valid: true };
 }
 
@@ -36,7 +39,7 @@ export function evaluateThreatModelApplicability(input) {
 
 /** Stable entity IDs depend only on declared kind and canonical source identity. */
 export function createThreatEntityId(kind, canonicalSource) {
-  if (!["asset", "boundary", "threat", "abuse-case", "requirement", "mitigation"].includes(kind) || !text(canonicalSource)) return { ok: false, code: "THREAT-ENTITY-INVALID" };
+  if (!THREAT_ENTITY_KINDS.includes(kind) || !text(canonicalSource)) return { ok: false, code: "THREAT-ENTITY-INVALID" };
   return { ok: true, id: stableId(kind, canonicalSource) };
 }
 
@@ -77,9 +80,9 @@ export function discoverThreatModel(rootDir, { featureId = null } = {}) {
 
 /** Derive a safe public view; canonical authority and private coordinates stay untouched. */
 export function exportThreatModelView(model) {
-  if (!own(model, ["classification", "entities"]) || !["public", "private"].includes(model.classification) || !Array.isArray(model.entities) || !model.entities.every((entity) => own(entity, ["id", "name", "coordinate"]) && text(entity.id) && text(entity.name) && text(entity.coordinate))) return { ok: false, code: "THREAT-EXPORT-INVALID" };
+  if (!validateThreatModel(model).valid) return { ok: false, code: "THREAT-EXPORT-INVALID" };
   const redact = model.classification === "private";
-  return { ok: true, authoritative: false, entities: model.entities.map((entity) => redact ? { id: entity.id, name: "redacted", coordinate: "redacted" } : { ...entity }) };
+  return { ok: true, authoritative: false, entities: model.entities.map((entity) => redact ? { id: entity.id, kind: entity.kind, label: "redacted" } : { id: entity.id, kind: entity.kind, label: entity.label }) };
 }
 
 /** Migration remains a non-mutating observation until separately activated. */
@@ -90,6 +93,6 @@ export function previewThreatModelMigration({ hasCanonicalModel } = {}) {
 /** Deterministic human view derived only from the validated machine authority. */
 export function renderThreatModelView(model) {
   if (!validateThreatModel(model).valid) return { ok: false, code: "THREAT-VIEW-INVALID" };
-  const names = model.entities.map((entity) => text(entity?.name) ? entity.name : entity?.id).filter(text).sort();
+  const names = model.entities.map((entity) => entity.label).sort();
   return { ok: true, authoritative: false, text: `Threat model ${model.candidate.commit}\nPolicy ${model.policyRevision}\nEntities\n${names.join("\n")}` };
 }
