@@ -6,10 +6,13 @@ import { join } from "node:path";
 
 export const RESUME_HINT_SCHEMA = "pipeline.resume-hint.v1";
 export const RESUME_HINT_PATH = "project/resume-hint.json";
-export const RESUME_HINT_MAX_BYTES = 8_192;
+export const RESUME_HINT_MAX_BYTES = 4_096;
 export const RESUME_HINT_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1_000;
 const SHA256 = /^[a-f0-9]{64}$/;
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+const MAX_FIELD_BYTES = 480;
+const CONTEXT_KEYS = ["intent", "scope", "constraints", "questions"];
+const SENSITIVE_OR_CONTROLLED_TEXT = /(?:```|\b(?:user|assistant|system)\s*:|https?:\/\/|\b(?:bearer|api[-_ ]?key|secret|password|credential|token|private key|approval|approved|authori[sz]ed)\b|\b(?:node|git|codex|npm|pnpm|yarn|bash|sh|python|curl)\b\s|[|><$`]|(?:^|\s)[~\/]|\\|\b(?:close[- ]?block|close[- ]?feature|pipeline[- ]?state)\b|\b(?:\d{1,3}\.){3}\d{1,3}\b|\b(?:ghp_|glpat-|sk-))/i;
 
 function object(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
 function exact(value, keys) { return object(value) && Object.keys(value).length === keys.length && Object.keys(value).every((key) => keys.includes(key)); }
@@ -25,20 +28,28 @@ function validBasis(value) {
     && SHA256.test(value.planSha256) && SHA256.test(value.specSha256));
 }
 function validTimestamp(value) { return typeof value === "string" && Number.isFinite(Date.parse(value)); }
+function validText(value) {
+  return typeof value === "string" && value === value.trim() && value.length > 0
+    && !/[\r\n\0]/.test(value) && Buffer.byteLength(value, "utf8") <= MAX_FIELD_BYTES
+    && !SENSITIVE_OR_CONTROLLED_TEXT.test(value);
+}
+function validTextList(value, maximum) { return Array.isArray(value) && value.length <= maximum && value.every(validText); }
+function validContext(value) {
+  return exact(value, CONTEXT_KEYS) && validText(value.intent)
+    && validTextList(value.scope, 4) && validTextList(value.constraints, 4) && validTextList(value.questions, 3);
+}
 
 export function validateResumeHint(value) {
-  if (!exact(value, ["schema", "nonAuthoritative", "summary", "createdAt", "basis", "contentSha256"])
+  if (!exact(value, ["schema", "nonAuthoritative", "context", "createdAt", "basis", "contentSha256"])
     || value.schema !== RESUME_HINT_SCHEMA || value.nonAuthoritative !== true
-    || typeof value.summary !== "string" || value.summary.includes("\0")
-    || Buffer.byteLength(value.summary, "utf8") < 1 || Buffer.byteLength(value.summary, "utf8") > RESUME_HINT_MAX_BYTES
+    || !validContext(value.context) || Buffer.byteLength(canonical(value.context), "utf8") > RESUME_HINT_MAX_BYTES
     || !validTimestamp(value.createdAt) || !validBasis(value.basis) || !SHA256.test(value.contentSha256)) return { ok: false, code: "RH-SCHEMA" };
   const { contentSha256, ...unsigned } = value;
   return digest(unsigned) === contentSha256 ? { ok: true, code: "RH-VALID" } : { ok: false, code: "RH-DIGEST" };
 }
 
-export function buildResumeHint({ summary, basis = null, createdAt = new Date().toISOString() } = {}) {
-  const normalized = typeof summary === "string" ? summary.trim() : "";
-  const unsigned = { schema: RESUME_HINT_SCHEMA, nonAuthoritative: true, summary: normalized, createdAt, basis };
+export function buildResumeHint({ context, basis = null, createdAt = new Date().toISOString() } = {}) {
+  const unsigned = { schema: RESUME_HINT_SCHEMA, nonAuthoritative: true, context, createdAt, basis };
   const candidate = { ...unsigned, contentSha256: digest(unsigned) };
   const checked = validateResumeHint(candidate);
   if (!checked.ok) throw new Error(checked.code);
@@ -70,10 +81,10 @@ export function inspectResumeHint({ rootDir, basis = null, now = Date.now(), fs 
 }
 
 /** Capture is permitted only after the portable project authority exists. */
-export function captureResumeHint({ rootDir, summary, basis = null, createdAt, fs = { existsSync, lstatSync, openSync, writeFileSync, closeSync, renameSync } } = {}) {
+export function captureResumeHint({ rootDir, context, basis = null, createdAt, fs = { existsSync, lstatSync, openSync, writeFileSync, closeSync, renameSync } } = {}) {
   const project = join(rootDir, "project");
   if (!fs.existsSync(join(project, "pipeline.yaml"))) throw new Error("RH-PROJECT-UNINITIALIZED");
-  const hint = buildResumeHint({ summary, basis, ...(createdAt === undefined ? {} : { createdAt }) });
+  const hint = buildResumeHint({ context, basis, ...(createdAt === undefined ? {} : { createdAt }) });
   const target = join(rootDir, RESUME_HINT_PATH);
   const temporary = `${target}.tmp`;
   const fd = fs.openSync(temporary, "wx", 0o600);

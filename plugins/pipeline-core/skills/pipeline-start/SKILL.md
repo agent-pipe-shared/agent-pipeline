@@ -73,14 +73,18 @@ For local development also print:
    recovery path before restarting bootstrap.
 
 6. **Optional restart hint:** after the portable seed and before a first
-   kickoff, capture a bounded distilled Design Input with
-   `resume-hint.mjs capture` when the user supplied one. Interpret user intent
+   kickoff, capture a bounded, closed context card with
+   `resume-hint.mjs capture --card-file <json>` when the user supplied one.
+   Its exact keys are `intent`, `scope`, `constraints`, and `questions`; each
+   value is a short distilled statement, never a transcript. Interpret user intent
    rather than keywords: an intended restart/session cut captures it; changed
    scope or constraints refresh it; canonised or revoked information is
    discarded. At bootstrap, `resume-hint.mjs inspect` is passive context only:
    `absent`, `challenged-stale`, or `ignored-invalid` never changes readiness,
    actions, authority, approval, close state, or exit status. Do not capture
-   raw transcripts, commands, approvals, or lifecycle instructions.
+   raw transcripts, commands, approvals, lifecycle instructions, host paths,
+   URLs, credentials, secrets, or private identifiers. The validator rejects
+   those forms rather than persisting them.
 
 ## Typed lazy loading
 
