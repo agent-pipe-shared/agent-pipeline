@@ -406,7 +406,6 @@ const PHASE_STEPS =
 const steps = [];
 let verifyRun = null;
 let verifyRunEvidence = null;
-const verifyProgressEmit = process.env.PIPELINE_VERIFY_PROGRESS === "silent" ? () => {} : console.log;
 // A known dirty candidate cannot produce delivery evidence.  Fail before any
 // expensive or externally-dependent suite so this is an actionable preflight,
 // not a misleading red full run.  Non-Git fixtures retain the historic
@@ -441,7 +440,6 @@ if (startedCandidate.status === "dirty") {
             phase26Result,
             phase3Result,
           },
-          emit: verifyProgressEmit,
         });
         steps.push(...verifyRun.steps.map(({ name, exitCode }) => ({ name, exitCode })));
         verifyRunEvidence = createPublicVerifyRunEvidence({

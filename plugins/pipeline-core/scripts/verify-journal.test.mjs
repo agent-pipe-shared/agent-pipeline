@@ -31,8 +31,10 @@ function currentProcessStartId() {
 test("private journal writes bounded JSON progress and keeps complete logs off the channel", () => {
   const f = fixture();
   const output = [];
+  const original = console.log;
+  console.log = (line) => output.push(line);
   try {
-    const result = runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-one", spawn: spawnPass, registerRun, emit: (line) => output.push(line) });
+    const result = runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-one", spawn: spawnPass, registerRun });
     assert.equal(result.terminal.status, "passed");
     assert.equal(output.length, 2);
     assert.equal(output.some((line) => line.includes("complete private log")), false);
@@ -41,18 +43,7 @@ test("private journal writes bounded JSON progress and keeps complete logs off t
     assert.equal(lstatSync(result.runDir).mode & 0o077, 0);
     assert.equal(lstatSync(join(result.runDir, "run.lock")).mode & 0o077, 0);
     assert.equal(JSON.parse(readFileSync(join(result.runDir, "run.lock"), "utf8")).status, "closed");
-  } finally { rmSync(f.root, { recursive: true, force: true }); }
-});
-
-test("a silent progress emitter retains the same durable journal and terminal receipt", () => {
-  const f = fixture();
-  try {
-    const result = runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-silent", spawn: spawnPass, registerRun, emit: () => {} });
-    assert.equal(result.terminal.status, "passed");
-    const journal = readFileSync(join(result.runDir, "progress.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line));
-    assert.equal(journal.length, 2);
-    assert.deepEqual(journal.map((entry) => entry.state), ["started", "completed"]);
-  } finally { rmSync(f.root, { recursive: true, force: true }); }
+  } finally { console.log = original; rmSync(f.root, { recursive: true, force: true }); }
 });
 
 test("a terminal matching receipt is reused and still produces complete current coverage", () => {
