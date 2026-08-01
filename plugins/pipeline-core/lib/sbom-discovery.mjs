@@ -25,7 +25,9 @@ export function discoverSbom(rootDir, { featureId = null } = {}) {
 export function exportPublicSbom(manifest) {
   if (!own(manifest, ["privacy", "components", "payload"]) || !own(manifest.privacy, ["classification", "exportPolicy"]) || !Array.isArray(manifest.components)) return { ok: false, code: "SBOM-EXPORT-INVALID" };
   const redact = manifest.privacy.classification === "private" || manifest.privacy.exportPolicy === "public-redacted";
-  const components = manifest.components.map((component) => redact ? { ...component, id: "redacted", provenance: "redacted" } : { ...component, relationships: [...component.relationships] });
+  const components = manifest.components.map((component) => redact
+    ? { ...component, id: "redacted", scope: "redacted", provenance: "redacted", relationships: [] }
+    : { ...component, relationships: [...component.relationships] });
   return { ok: true, schema: "pipeline.sbom-public-export.v1", authoritative: false, payloadDigest: manifest.payload.canonicalSha256, components };
 }
 
