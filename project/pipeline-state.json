@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
-  "planApproved": false,
-  "updatedAt": "2026-08-01T07:20:24.022Z",
+  "planApproved": true,
+  "updatedAt": "2026-08-01T07:28:09.336Z",
   "closedFeatures": [
     {
       "id": "sprint-sentinel-epic",
@@ -64,13 +64,13 @@
   "activeFeature": {
     "id": "sprint-nova-epic",
     "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-    "phase": "design"
+    "phase": "implementation"
   },
   "planApproval": {
     "schema": "pipeline.plan-approval.v4",
-    "approvedBy": "Product Owner (Nova post-v0.4.7 design and guard override amendment, 2026-08-01)",
-    "approvedAt": "2026-07-31T23:22:18.538Z",
-    "submissionSha256": "11a9ff18bf859a9f5091148adb9c852de3630bfed5796881bb5c15a61df9cf00",
+    "approvedBy": "PO explicit approved in Nova session 2026-08-01",
+    "approvedAt": "2026-08-01T07:28:00.549Z",
+    "submissionSha256": "fec9a1e31ec7b94a5a2d2a61642aeceb5e244b85dbd876c7f2af70724a41f274",
     "profileSha256": "8be50d40c4672fb406256aafbdd146dae9ed1b0931afb31fdfe3f8efa12dee04",
     "poGateAuthority": {
       "schema": "pipeline.po-gate-authority.v2",
@@ -80,11 +80,11 @@
       "receiptSha256": "5fe71f9583e7389dee5fd48179d84d0faa6bd76783f43910029105ce051613f9",
       "repositoryFingerprint": "5172c023ad31e8e1c82402e4d0a657cc6db16c0ba5538a432d48e8d477f2b16d",
       "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-      "planSha256": "2f4d7e256f1a777a4fa1a07f79031e8c71d9931977038b20bd846e378a3f7c24",
+      "planSha256": "a52c146fb6db526ca17de0fd491bb8d9ef52efd65ae69cca80344993a5005a22",
       "specPath": "specs/sprint-nova-epic/spec.md",
-      "specSha256": "ba27e7a4994a9cd273a00ff4ba7c478f4be8b62e0a60b5d0992286e34d2d55f7"
+      "specSha256": "1b5c9240da0d6c9d5092f14a4938fcfda617776059feaba2a208043299e7cce3"
     },
-    "priorInvalidationSha256": "15c2ead08947c8a8a54460f9f5d844f67ef8b89f5227474e0b34fa3a5f85b955"
+    "priorInvalidationSha256": "ebacd1726d71af5e8c10dfec49655ae3c8e282f65189b4b3495380d1be3d7275"
   },
   "continuity": {
     "schema": "pipeline.continuity.v0",
@@ -130,15 +130,6 @@
       "fallbackPolicy": "defer"
     },
     "closeTransition": null
-  },
-  "planRevocation": {
-    "schema": "pipeline.plan-revocation.v2",
-    "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-    "planSha256": "aeb073d720ec5f2384221b16a6533d32667f47e5a3ebe6c491642564ccccb661",
-    "specPath": "specs/sprint-nova-epic/spec.md",
-    "specSha256": "aa5eba0ce0c251ed90b8a00e94509a73146873f1cfc9f0942203c5dca9fccf17",
-    "revokedBy": "Product Owner (Nova design reconciliation including Issue #98, 2026-08-01)",
-    "revokedAt": "2026-07-31T22:06:34.919Z"
   },
   "planSubmission": {
     "schema": "pipeline.plan-submission.v1",
