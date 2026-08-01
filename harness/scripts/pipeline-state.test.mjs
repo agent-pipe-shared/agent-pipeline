@@ -2604,11 +2604,22 @@ function recoveryBridgeExecutableFixture() {
   const pendingStatus = run(["feature-package-status"], deps);
   const recovery = run(["feature-package-recover", "--request-file", requestFile, "--request-sha256", sha256Canonical(request), "--lock-token", "rb-status-recover"], deps);
   const terminal = JSON.parse(readFileSync(privateJournal, "utf8")); const readyStatus = run(["feature-package-status"], deps);
+  let legacyJournalSymlinkStatus = 2;
+  if (symlinkCapable) {
+    const legacy = structuredClone(terminal);
+    legacy.decision.assurance = "operator-local-attested";
+    legacy.decision.decisionSha256 = recoveryBridgeDecisionDigest(legacy.decision);
+    const externalLegacyJournal = join(fixture.dir, "legacy-terminal-journal.json");
+    writeFileSync(externalLegacyJournal, JSON.stringify(legacy) + "\n");
+    rmSync(privateJournal);
+    symlinkSync(externalLegacyJournal, privateJournal);
+    legacyJournalSymlinkStatus = run(["feature-package-status"], deps);
+  }
   const malformedFixture = recoveryBridgeExecutableFixture(); const malformedPath = join(malformedFixture.gitCommonDir, "agent-pipeline", "recovery-bridge", malformedFixture.decision.decisionId); mkdirSync(malformedPath, { recursive: true }); writeFileSync(join(malformedPath, "journal.json"), "{ malformed");
   const malformedStatus = run(["feature-package-status"], { dir: malformedFixture.dir, now, gitCommonDir: () => ({ ok: true, path: malformedFixture.gitCommonDir }) });
   const symlinkFixture = recoveryBridgeExecutableFixture(); const commonLink = join(symlinkFixture.dir, "common-link"); symlinkSync(symlinkFixture.gitCommonDir, commonLink);
   const symlinkStatus = run(["feature-package-status"], { dir: symlinkFixture.dir, now, gitCommonDir: () => ({ ok: true, path: commonLink }) });
-  ok("TP5 Recovery Bridge status projects private public-committed recovery and fails closed for malformed stores", planned.value === 0 && committed.ok && pendingStatus === 2 && recovery === 0 && terminal.decision.status === "consumed" && readyStatus === 0 && malformedStatus === 2 && symlinkStatus === 2);
+  ok("TP5 Recovery Bridge status projects private public-committed recovery and fails closed for malformed or symlinked journals", planned.value === 0 && committed.ok && pendingStatus === 2 && recovery === 0 && terminal.decision.status === "consumed" && readyStatus === 0 && legacyJournalSymlinkStatus === 2 && malformedStatus === 2 && symlinkStatus === 2);
 }
 // ---- Cleanup ------------------------------------------------------------------------------
 for (const dir of ALL_DIRS) {

@@ -13,17 +13,26 @@ import { run, statePath } from "./pipeline-state.mjs";
 
 const oid = (character, length = 40) => character.repeat(length);
 const sha = (value) => createHash("sha256").update(value).digest("hex");
-const evidence = (name) => ({ path: `evidence/${name}.json`, rawDigest: sha(name), commit: oid("e"), tree: oid("f") });
-const command = ["git", "push", "--porcelain", "origin", `${oid("e")}:refs/heads/main`];
+let candidateOid;
+let candidateTree;
+let command;
+const evidence = (name) => ({ path: `evidence/${name}.json`, rawDigest: sha(name), commit: candidateOid, tree: candidateTree });
 const guardPath = fileURLToPath(new URL("../../plugins/pipeline-core/hooks/guard-push.mjs", import.meta.url));
 const prepareInput = (transactionId) => ({
   channel: "private", transactionId, repositoryFingerprint: oid("a", 64), sourceCommit: oid("b"), sourceTree: oid("c"),
   remoteFingerprint: oid("d", 64), remoteName: "origin", destinationRef: "refs/heads/main", remotePreimageOid: oid("d"),
-  candidateOid: oid("e"), candidateTree: oid("f"), ancestry: { baseOid: oid("d"), candidateOid: oid("e"), descends: true },
+  candidateOid, candidateTree, ancestry: { baseOid: oid("d"), candidateOid, descends: true },
   identityProbe: evidence("i"), verifyEvidence: evidence("v"), securityEvidence: evidence("g"),
 });
 
 const root = mkdtempSync(join(tmpdir(), "publication-state-authority-"));
+assert.equal(spawnSync("git", ["init", "-q"], { cwd: root }).status, 0);
+writeFileSync(join(root, "candidate.txt"), "publication candidate\n");
+assert.equal(spawnSync("git", ["add", "candidate.txt"], { cwd: root }).status, 0);
+assert.equal(spawnSync("git", ["-c", "user.name=publication-test", "-c", "user.email=publication-test@example.invalid", "commit", "-qm", "publication candidate"], { cwd: root }).status, 0);
+candidateOid = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+candidateTree = spawnSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: root, encoding: "utf8" }).stdout.trim();
+command = ["git", "push", "--porcelain", "origin", `${candidateOid}:refs/heads/main`];
 const deps = { dir: root, gitCommonDir: () => ({ ok: true, path: root }), now: () => "2026-07-18T20:00:00.000Z" };
 let count = 0;
 function check(name, fn) { fn(); count++; }
@@ -68,8 +77,8 @@ check("State writer records a candidate-bound single authorization", () => {
   assert.deepEqual(authorization.command, command);
 });
 
-check("Push Guard accepts only the State-Writer's exact projection tuple", () => {
-  assert.equal(spawnSync("git", ["init", "-q"], { cwd: root }).status, 0);
+check("Push Guard rejects a local State-Writer projection without human-ledger authority", () => {
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\ngates:\n  push:\n    mode: blocking\n    type: human\n");
   const guard = (pushCommand) => spawnSync(process.execPath, [guardPath], {
     cwd: root,
     input: JSON.stringify({ tool_name: "Bash", tool_input: { command: pushCommand } }),
@@ -77,7 +86,8 @@ check("Push Guard accepts only the State-Writer's exact projection tuple", () =>
     env: { ...process.env, CLAUDE_PROJECT_DIR: root },
   });
   const exact = guard(command.join(" "));
-  assert.equal(exact.status, 0, exact.stderr);
+  assert.equal(exact.status, 2);
+  assert.match(exact.stderr, /PHX-2 authority unavailable/);
   const shapedDifferently = guard(`git push --porcelain --verbose origin ${command[4]}`);
   assert.equal(shapedDifferently.status, 2);
   assert.match(shapedDifferently.stderr, /publication mode/);

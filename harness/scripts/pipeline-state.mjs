@@ -2669,18 +2669,25 @@ function recoveryBridgeTransaction(dir, decisionId, deps = {}) {
   const store = recoveryBridgePrivateStore(dir, decisionId, deps);
   if (!store.ok) return store;
   if (store.absent) return { ok: true, value: null, store };
+  const journal = readRecoveryBridgeJournal(store);
+  if (!journal.ok) return { ...journal, store };
+  return exactRecoveryBridgeTransaction(journal.value)
+    ? { ok: true, value: journal.value, store }
+    : { ok: false, code: "RB-PRIVATE-STORE-INVALID", store };
+}
+
+/** Read a journal only after proving its local private-store file invariants. */
+function readRecoveryBridgeJournal(store) {
   let stat;
   try { stat = lstatSync(store.journal); } catch (error) {
-    return error?.code === "ENOENT" ? { ok: true, value: null, store } : { ok: false, code: "RB-PRIVATE-STORE-UNAVAILABLE" };
+    return error?.code === "ENOENT" ? { ok: true, value: null } : { ok: false, code: "RB-PRIVATE-STORE-UNAVAILABLE" };
   }
   if (!stat.isFile() || stat.isSymbolicLink() || stat.size < 2 || stat.size > FEATURE_PACKAGE_REQUEST_MAX_BYTES) {
     return { ok: false, code: "RB-PRIVATE-STORE-INVALID" };
   }
   try {
     const value = JSON.parse(readFileSync(store.journal, "utf8"));
-    return exactRecoveryBridgeTransaction(value)
-      ? { ok: true, value, store }
-      : { ok: false, code: "RB-PRIVATE-STORE-INVALID" };
+    return { ok: true, value };
   } catch { return { ok: false, code: "RB-PRIVATE-STORE-INVALID" }; }
 }
 
@@ -2747,9 +2754,8 @@ function recoveryBridgeStatusProjection(dir, deps = {}) {
     } catch { return { ok: false, code: "RB-PRIVATE-STORE-UNAVAILABLE" }; }
     const transaction = recoveryBridgeTransaction(dir, entry.name, deps);
     if (!transaction.ok) {
-      let legacy = null;
-      try { legacy = JSON.parse(readFileSync(join(root, entry.name, "journal.json"), "utf8")); } catch { /* fail closed below */ }
-      if (isConsumedLegacyRecoveryBridgeTransaction(legacy, entry.name)) continue;
+      const legacy = transaction.store ? readRecoveryBridgeJournal(transaction.store) : null;
+      if (legacy?.ok && isConsumedLegacyRecoveryBridgeTransaction(legacy.value, entry.name)) continue;
       return { ok: false, code: transaction.code ?? "RB-PRIVATE-STORE-INVALID" };
     }
     if (transaction.value === null || transaction.value.decision.decisionId !== entry.name) {
