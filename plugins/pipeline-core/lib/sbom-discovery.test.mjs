@@ -9,7 +9,7 @@ const sha = (value) => createHash("sha256").update(value).digest("hex"); let pas
 function test(name, fn) { try { fn(); passed += 1; console.log(`PASS ${name}`); } catch (error) { console.error(`FAIL ${name}: ${error.message}`); process.exitCode = 1; } }
 const digest = (character) => character.repeat(64);
 function canonicalManifest() { return {
-  schema: "pipeline.sbom-manifest.v1", candidate: { repositoryFingerprint: "repo", commit: "a".repeat(40), tree: "b".repeat(40) }, sourceInputs: [{ path: "package-lock.json", sha256: digest("c") }], adapter: { id: "node-reference", version: "1.0.0", configSha256: digest("d") },
+  schema: "pipeline.sbom-manifest.v1", candidate: { repositoryFingerprint: sha("repo"), commit: "a".repeat(40), tree: "b".repeat(40) }, sourceInputs: [{ path: "package-lock.json", sha256: digest("c") }], adapter: { id: "node-reference", version: "1.0.0", configSha256: digest("d") },
   formats: [{ format: "cyclonedx-json", profile: "CycloneDX-1.6", payloadSha256: digest("e") }, { format: "spdx-json", profile: "SPDX-2.3", payloadSha256: digest("f") }], components: [{ id: "internal", scope: "internal/team", provenance: "registry", relationships: ["internal/child"] }],
   completeness: { status: "complete", declared: 1, observed: 1 }, freshness: { status: "fresh", candidateMatches: true, sourceInputsMatch: true }, privacy: { classification: "private", exportPolicy: "private-only" },
   payload: { canonicalSha256: digest("0"), formats: { "cyclonedx-json": { profile: "CycloneDX-1.6", sha256: digest("e") }, "spdx-json": { profile: "SPDX-2.3", sha256: digest("f") } } }, lifecycle: { state: "complete", code: "SBOM-COMPLETE" },

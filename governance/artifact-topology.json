@@ -4,6 +4,6 @@
   "packageRoot": "specs/<feature-id>",
   "states": ["draft", "awaiting-approval", "approved", "implementing", "verifying", "completed", "superseded", "abandoned", "retained"],
   "classes": [
-    "prd", "spec", "design", "plan", "acceptance", "result", "candidate-evidence", "adr", "release", "backlog", "state", "handover", "retention", "supply-chain", "private-local"
+    "prd", "spec", "design", "plan", "acceptance", "result", "candidate-evidence", "adr", "release", "backlog", "state", "handover", "retention", "supply-chain", "threat-model", "private-local"
   ]
 }

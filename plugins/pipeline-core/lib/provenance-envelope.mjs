@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
 import { createHash } from "node:crypto";
+import { verifyAttestation } from "./provenance-attestation.mjs";
 
 export const PROVENANCE_ENVELOPE_SCHEMA = "pipeline.provenance-envelope.v1";
 export const REPRODUCIBILITY_STATES = Object.freeze(["not-assessed", "non-reproducible-expected", "repeatable-in-same-builder", "reproducible-in-independent-builder", "hermetic-evidence-available", "mismatch", "unverifiable"]);
@@ -11,6 +12,22 @@ const digest = (value) => SHA256.test(value ?? "");
 const candidate = (value) => own(value, ["commit", "tree"]) && OID.test(value.commit) && OID.test(value.tree);
 const subject = (value) => own(value, ["id", "sha256"]) && safeText(value.id) && digest(value.sha256);
 const material = (value) => own(value, ["id", "kind", "sha256"]) && safeText(value.id) && safeText(value.kind) && digest(value.sha256);
+const attestationPolicy = (value) => own(value, ["keyReference", "publicKeySha256"]) && safeText(value.keyReference) && digest(value.publicKeySha256);
+
+/** Canonical claims signed by the external key; status and assurance are never claims. */
+export function createProvenanceAttestationPayload(envelope) {
+  if (!validateProvenanceEnvelope(envelope).valid) return null;
+  return JSON.stringify({
+    schema: "pipeline.provenance-attestation-payload.v1",
+    candidate: { commit: envelope.candidate.commit, tree: envelope.candidate.tree },
+    subject: { id: envelope.subject.id, sha256: envelope.subject.sha256 },
+    materials: envelope.materials.map(({ id, kind, sha256 }) => ({ id, kind, sha256 })),
+    builder: { id: envelope.builder.id, digest: envelope.builder.digest },
+    invocation: { id: envelope.invocation.id, parametersSha256: envelope.invocation.parametersSha256 },
+    environment: { kind: envelope.environment.kind, identitySha256: envelope.environment.identitySha256 },
+    reproducibility: envelope.reproducibility,
+  });
+}
 
 /** A closed provenance envelope binds every artifact to one candidate and build. */
 export function validateProvenanceEnvelope(value) {
@@ -26,7 +43,7 @@ export function createArtifactIdentity(kind, bytes) {
 
 /** Produce, promotion and readback share one candidate/subject admission boundary. */
 export function evaluateProvenanceAdmission(input) {
-  if (!own(input, ["boundary", "envelope", "expected"]) || !["produce", "promote", "readback"].includes(input.boundary) || !own(input.expected, ["builderDigest", "candidate", "materials", "subject"]) || !candidate(input.expected.candidate) || !subject(input.expected.subject) || !digest(input.expected.builderDigest) || !Array.isArray(input.expected.materials) || !input.expected.materials.every(material)) return { allowed: false, code: "PROVENANCE-ADMISSION-INVALID" };
+  if (!own(input, ["boundary", "envelope", "expected", "attestation"]) || !["produce", "promote", "readback"].includes(input.boundary) || !own(input.expected, ["attestation", "builderDigest", "candidate", "materials", "subject"]) || !candidate(input.expected.candidate) || !subject(input.expected.subject) || !digest(input.expected.builderDigest) || !Array.isArray(input.expected.materials) || !input.expected.materials.every(material) || !attestationPolicy(input.expected.attestation)) return { allowed: false, code: "PROVENANCE-ADMISSION-INVALID" };
   const checked = validateProvenanceEnvelope(input.envelope);
   if (!checked.valid) return { allowed: false, code: checked.code };
   if (JSON.stringify(input.envelope.candidate) !== JSON.stringify(input.expected.candidate)) return { allowed: false, code: "PROVENANCE-CANDIDATE-MISMATCH" };
@@ -34,6 +51,11 @@ export function evaluateProvenanceAdmission(input) {
   if (JSON.stringify(input.envelope.materials) !== JSON.stringify(input.expected.materials)) return { allowed: false, code: "PROVENANCE-MATERIAL-MISMATCH" };
   if (input.envelope.builder.digest !== input.expected.builderDigest) return { allowed: false, code: "PROVENANCE-BUILDER-MISMATCH" };
   if (input.envelope.assurance !== "verified" || input.envelope.attestation.status !== "verified") return { allowed: false, code: "PROVENANCE-UNVERIFIED" };
+  const verification = verifyAttestation(input.attestation);
+  if (verification.status !== "verified") return { allowed: false, code: "PROVENANCE-ATTESTATION-UNVERIFIED" };
+  if (input.attestation.keyReference !== input.envelope.attestation.keyReference || input.attestation.keyReference !== input.expected.attestation.keyReference || createHash("sha256").update(input.attestation.publicKey).digest("hex") !== input.expected.attestation.publicKeySha256) return { allowed: false, code: "PROVENANCE-ATTESTATION-TRUST-MISMATCH" };
+  if (verification.signatureSha256 !== input.envelope.attestation.signatureSha256) return { allowed: false, code: "PROVENANCE-ATTESTATION-SIGNATURE-MISMATCH" };
+  if (input.attestation.payload !== createProvenanceAttestationPayload(input.envelope)) return { allowed: false, code: "PROVENANCE-ATTESTATION-PAYLOAD-MISMATCH" };
   return { allowed: true, code: "PROVENANCE-ADMISSION-ALLOWED" };
 }
 

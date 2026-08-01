@@ -10,8 +10,12 @@
 
 1. **Data-privacy review done** — for any change touching personal data (PII) fields,
    flows, or storage, a data-privacy reviewer has signed off.
-2. **Threat model updated** — for any change altering trust boundaries, authentication,
-   or authorization, the project's threat model document reflects the new shape.
+2. **Threat model current and authority-bound** — for any change altering trust
+   boundaries, authentication, or authorization, the project's canonical threat-model
+   record reflects the new shape, binds the exact candidate and effective policy
+   revision, and has the required human/policy approval receipt. A lifecycle word in
+   an agent-authored proposal is not approval; an accepted-risk or not-applicable
+   decision likewise requires its own receipt.
 3. **License header present** — every new source file carries the project's required
    license header (or SPDX identifier) per the project's declared license.
 4. **Rollback path documented** — the plan artifact names how this change can be rolled

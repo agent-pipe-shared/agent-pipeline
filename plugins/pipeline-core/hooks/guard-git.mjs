@@ -593,8 +593,18 @@ function overrideTarget() {
   let coordinator;
   try { coordinator = realpathSync(projectDir); } catch { return { ok: false }; }
   const roots = new Set([coordinator]);
-  for (const segment of cmd.split(/[;&|]+/u)) {
+  // An override ledger may be written only when every git invocation is bound to
+  // the coordinator's one physical project root. `-C` can be confirmed with a
+  // realpath comparison below. `--git-dir` and `--work-tree` can each select a
+  // different repository/worktree without a safe root proof in this hook, so an
+  // armed override rejects them before either consumption lookup or append.
+  // (Detection intentionally covers both --option=value and --option <value>.)
+  const targetCommand = inlineArm?.remainder ?? cmd;
+  for (const segment of targetCommand.split(/[;&|]+/u)) {
     if (!/\bgit\b/u.test(segment)) continue;
+    const gitIndex = segment.search(/\bgit\b/u);
+    const gitTail = segment.slice(gitIndex + 3);
+    if (/(?:^|\s)--(?:git-dir|work-tree)(?:\s|=|$)/u.test(gitTail)) return { ok: false };
     for (const match of segment.matchAll(/(?:^|\s)-C\s+((?:"[^"]*"|'[^']*'|[^\s;&|])+)/gu)) {
       const raw = match[1];
       const value = (raw.startsWith("\"") && raw.endsWith("\"")) || (raw.startsWith("'") && raw.endsWith("'")) ? raw.slice(1, -1) : raw;

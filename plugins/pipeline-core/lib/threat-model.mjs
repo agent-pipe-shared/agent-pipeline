@@ -7,6 +7,7 @@ import { validateFeatureTopology } from "./feature-package-topology.mjs";
 
 export const THREAT_MODEL_SCHEMA = "pipeline.threat-model.v1";
 export const SECURITY_REQUIREMENT_SCHEMA = "pipeline.security-requirement.v1";
+export const THREAT_APPROVAL_RECEIPT_SCHEMA = "pipeline.threat-model-approval-receipt.v1";
 export const THREAT_MODEL_APPLICABILITY = Object.freeze(["required", "not-applicable", "deferred", "incomplete", "invalid"]);
 export const THREAT_ENTITY_KINDS = Object.freeze(["asset", "boundary", "threat", "abuse-case", "requirement", "mitigation"]);
 const RISK_INPUTS = Object.freeze(["assurance", "exposure", "data", "privilege", "dependencies", "architecture", "deployment", "agentEgress"]);
@@ -25,6 +26,16 @@ export function validateThreatModel(model) {
 /** Requirement proposals may link obligations, but cannot grant risk authority. */
 export function validateSecurityRequirement(requirement) {
   if (!own(requirement, ["schema", "id", "candidate", "policyRevision", "links", "state"]) || requirement.schema !== SECURITY_REQUIREMENT_SCHEMA || !text(requirement.id) || !own(requirement.candidate, ["commit", "tree"]) || !text(requirement.candidate.commit) || !text(requirement.candidate.tree) || !text(requirement.policyRevision) || !Array.isArray(requirement.links) || !requirement.links.every((link) => own(link, ["kind", "id"]) && ["threat", "baseline", "test", "evidence"].includes(link.kind) && text(link.id)) || !["draft", "proposed", "implementing", "verified", "superseded", "retired"].includes(requirement.state)) return { valid: false, code: "SECURITY-REQUIREMENT-INVALID" };
+  return { valid: true };
+}
+
+/**
+ * Approval is an external human/policy receipt, never a lifecycle assertion in
+ * an agent-authored model. This validates only the closed receipt boundary; a
+ * caller must obtain the receipt from its configured authority.
+ */
+export function validateThreatApprovalReceipt(receipt) {
+  if (!own(receipt, ["schema", "receiptId", "authority", "decision", "candidate", "policyRevision"]) || receipt.schema !== THREAT_APPROVAL_RECEIPT_SCHEMA || !text(receipt.receiptId) || !["human", "policy"].includes(receipt.authority) || !["approved", "accepted-risk", "not-applicable"].includes(receipt.decision) || !own(receipt.candidate, ["commit", "tree"]) || !text(receipt.candidate.commit) || !text(receipt.candidate.tree) || !text(receipt.policyRevision)) return { valid: false, code: "THREAT-APPROVAL-RECEIPT-INVALID" };
   return { valid: true };
 }
 
@@ -57,13 +68,17 @@ export function evaluateThreatImpact(input) {
   return { state: affected.length === 0 ? "current" : "stale", code: affected.length === 0 ? "THREAT-IMPACT-NONE" : "THREAT-IMPACT-REVIEW", affected };
 }
 
-/** Named delivery boundaries fail closed when a required model is not current and approved. */
+/** Named delivery boundaries accept only a fresh model bound to an external approval receipt. */
 export function evaluateThreatBoundary(input) {
-  if (!own(input, ["boundary", "applicability", "lifecycle", "fresh"]) || !text(input.boundary) || !THREAT_MODEL_APPLICABILITY.includes(input.applicability) || typeof input.fresh !== "boolean" || !text(input.lifecycle)) return { allowed: false, code: "THREAT-BOUNDARY-INVALID" };
-  if (input.applicability === "not-applicable") return { allowed: true, code: "THREAT-BOUNDARY-NOT-APPLICABLE" };
+  if (!own(input, ["boundary", "applicability", "model", "approvalReceipt", "fresh"]) || !text(input.boundary) || !THREAT_MODEL_APPLICABILITY.includes(input.applicability) || typeof input.fresh !== "boolean") return { allowed: false, code: "THREAT-BOUNDARY-INVALID" };
+  if (!validateThreatModel(input.model).valid) return { allowed: false, code: "THREAT-BOUNDARY-MODEL-INVALID" };
+  if (!validateThreatApprovalReceipt(input.approvalReceipt).valid) return { allowed: false, code: "THREAT-BOUNDARY-RECEIPT-INVALID" };
+  const receipt = input.approvalReceipt; const model = input.model;
+  if (receipt.candidate.commit !== model.candidate.commit || receipt.candidate.tree !== model.candidate.tree || receipt.policyRevision !== model.policyRevision) return { allowed: false, code: "THREAT-BOUNDARY-RECEIPT-MISMATCH" };
+  if (input.applicability === "not-applicable") return receipt.decision === "not-applicable" ? { allowed: true, code: "THREAT-BOUNDARY-NOT-APPLICABLE" } : { allowed: false, code: "THREAT-BOUNDARY-UNAPPROVED" };
   if (input.applicability !== "required") return { allowed: false, code: "THREAT-BOUNDARY-INCOMPLETE" };
   if (!input.fresh) return { allowed: false, code: "THREAT-BOUNDARY-STALE" };
-  if (!['approved', 'implementing', 'verified', 'accepted-risk'].includes(input.lifecycle)) return { allowed: false, code: "THREAT-BOUNDARY-UNAPPROVED" };
+  if (!((receipt.decision === "approved" && ["approved", "implementing", "verified"].includes(model.lifecycle)) || (receipt.decision === "accepted-risk" && model.lifecycle === "accepted-risk"))) return { allowed: false, code: "THREAT-BOUNDARY-UNAPPROVED" };
   return { allowed: true, code: "THREAT-BOUNDARY-ALLOWED" };
 }
 

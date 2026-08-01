@@ -97,6 +97,27 @@ function checkLedger(id, projectDir, predicate) {
     console.log(`FAIL  ${id} — ${problem}`);
   }
 }
+function checkNoLedgerToken(id, projectDir, rule, token) {
+  let problem = null;
+  try {
+    const entries = readFileSync(join(projectDir, ".claude", "guard-override.log.jsonl"), "utf8")
+      .split("\n")
+      .filter((line) => line.trim() !== "")
+      .map((line) => JSON.parse(line));
+    if (entries.some((entry) => entry?.rule === rule && entry?.token === token)) {
+      problem = "rejected cross-target selector was recorded in the coordinator ledger";
+    }
+  } catch (error) {
+    problem = `ledger could not be read (${error.message})`;
+  }
+  if (problem === null) {
+    pass++;
+    console.log(`PASS  ${id}`);
+  } else {
+    failures.push(`${id}: ${problem}`);
+    console.log(`FAIL  ${id} — ${problem}`);
+  }
+}
 const BLOCK = 2, ALLOW = 0, WARN = 1;
 
 // ---- Rule 1: force-push (common core) ------------------------------------------------
@@ -530,6 +551,29 @@ check(
   BLOCK,
   { projectDir: OV_DIR, stderrIncludes: ["GG-07", "command target and ledger target"] },
 );
+// Target selectors that cannot be physically proven to be the coordinator root
+// must fail closed. A rejected selector never consumes or records its token,
+// proved by the ordinary same-token retry immediately after each rejection.
+for (const [label, selector, token] of [
+  ["--git-dir=", `--git-dir=${OV_ABSOLUTE_TARGET}`, "20260704-15"],
+  ["--git-dir space", `--git-dir ${OV_ABSOLUTE_TARGET}`, "20260704-16"],
+  ["--work-tree=", `--work-tree=${OV_ABSOLUTE_TARGET}`, "20260704-17"],
+  ["--work-tree space", `--work-tree ${OV_ABSOLUTE_TARGET}`, "20260704-18"],
+]) {
+  check(
+    `GO-OV block  override rejects a cross-target ${label} selector`,
+    `PIPELINE_GUARD_OVERRIDE='GG-07|${token}|selector target is intentionally separate' git ${selector} reset --hard HEAD~1`,
+    BLOCK,
+    { projectDir: OV_DIR, stderrIncludes: ["GG-07", "command target and ledger target"] },
+  );
+  checkNoLedgerToken(`GO-OV ledger ${label} rejection records no coordinator token`, OV_DIR, "GG-07", token);
+  check(
+    `GO-OV warn   ${label} rejection leaves token unconsumed`,
+    `PIPELINE_GUARD_OVERRIDE='GG-07|${token}|ordinary same-root reset is intentionally approved' git reset --hard HEAD~1`,
+    WARN,
+    { projectDir: OV_DIR, stderrIncludes: ["GG-07", token, "OVERRIDE APPLIED"] },
+  );
+}
 
 // ---- Rule 14: interpreter/remote wrapper with quoted destructive payload (raw-string rule,
 // <PROJECT_B>-M4-C F1, AP sprint 2026-07-04) -----------------------------------------------------------

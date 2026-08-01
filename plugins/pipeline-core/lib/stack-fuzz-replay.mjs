@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 /** CYB-6 synthetic fuzz-reproducer contract: deterministic, candidate-bound, offline. */
 import { createHash } from "node:crypto";
+import { evaluateDynamicTargetAuthorization } from "./stack-dynamic-boundary.mjs";
 
 const own = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value)
   && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
@@ -38,7 +39,7 @@ export function minimizeSyntheticFuzzCrash(input) {
 
 /** Replays one known synthetic crash against the exact candidate and predicate. */
 export function replaySyntheticFuzzCrash(input) {
-  if (!own(input, ["candidate", "reproducer", "oracle"]) || !candidate(input.candidate)
+  if (!own(input, ["candidate", "reproducer", "oracle", "authorization"]) || !candidate(input.candidate)
     || !own(input.reproducer, ["schema", "candidate", "inputSha256", "requiredTokensSha256", "minimized", "digest"])
     || input.reproducer.schema !== "pipeline.synthetic-fuzz-reproducer.v1"
     || !candidate(input.reproducer.candidate) || !/^[a-f0-9]{64}$/u.test(input.reproducer.inputSha256)
@@ -52,5 +53,8 @@ export function replaySyntheticFuzzCrash(input) {
   if (canonical(input.candidate) !== canonical(input.reproducer.candidate)) return { ok: false, code: "FUZZ-REPLAY-CANDIDATE-MISMATCH" };
   if (sha(canonical(input.oracle.requiredTokens)) !== input.reproducer.requiredTokensSha256) return { ok: false, code: "FUZZ-REPLAY-ORACLE-MISMATCH" };
   if (input.oracle.requiredTokens.join("") !== input.reproducer.minimized) return { ok: false, code: "FUZZ-REPLAY-MINIMIZATION-MISMATCH" };
+  if (!own(input.authorization, ["candidate", "target", "scope", "receipt"])) return { ok: false, code: "FUZZ-REPLAY-VERIFICATION-REQUIRED" };
+  const authorization = evaluateDynamicTargetAuthorization(input.authorization);
+  if (!authorization.allowed || canonical(input.authorization.candidate) !== canonical(input.candidate)) return { ok: false, code: "FUZZ-REPLAY-VERIFICATION-REQUIRED" };
   return { ok: true, reproduces: !input.oracle.fixed, code: input.oracle.fixed ? "FUZZ-REPLAY-CLEAN" : "FUZZ-REPLAY-REPRODUCED" };
 }

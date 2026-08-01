@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { createThreatEntityId, discoverThreatModel, evaluateThreatBoundary, evaluateThreatImpact, evaluateThreatModelApplicability, evaluateThreatTraceability, exportThreatModelView, previewThreatModelMigration, renderThreatModelView, validateSecurityRequirement, validateThreatModel } from "./threat-model.mjs";
+import { createThreatEntityId, discoverThreatModel, evaluateThreatBoundary, evaluateThreatImpact, evaluateThreatModelApplicability, evaluateThreatTraceability, exportThreatModelView, previewThreatModelMigration, renderThreatModelView, validateSecurityRequirement, validateThreatApprovalReceipt, validateThreatModel } from "./threat-model.mjs";
 const complete = { applicability: "required", riskInputs: { assurance: true, exposure: true, data: true, privilege: true, dependencies: true, architecture: true, deployment: true, agentEgress: true } };
 const model = { schema: "pipeline.threat-model.v1", candidate: { commit: "a", tree: "b" }, policyRevision: "p", classification: "private", entities: [{ id: "asset-1", kind: "asset", label: "public-api", relationships: ["boundary-1"] }], lifecycle: "proposed" };
+const receipt = { schema: "pipeline.threat-model-approval-receipt.v1", receiptId: "approval-1", authority: "human", decision: "approved", candidate: { commit: "a", tree: "b" }, policyRevision: "p" };
 assert.deepEqual(evaluateThreatModelApplicability(complete), { state: "required", code: "THREAT-REQUIRED" });
 assert.deepEqual(evaluateThreatModelApplicability({ ...complete, riskInputs: { ...complete.riskInputs, data: false } }), { state: "incomplete", code: "THREAT-RISK-INPUT-MISSING" });
 assert.equal(evaluateThreatModelApplicability({ applicability: "not-applicable", riskInputs: complete.riskInputs }).state, "invalid");
@@ -18,8 +19,17 @@ assert.deepEqual(previewThreatModelMigration({ hasCanonicalModel: false }).write
 assert.equal(validateThreatModel(model).valid, true);
 assert.equal(validateSecurityRequirement({ schema: "pipeline.security-requirement.v1", id: "R1", candidate: { commit: "a", tree: "b" }, policyRevision: "p", links: [{ kind: "threat", id: "T1" }], state: "proposed" }).valid, true);
 assert.equal(validateSecurityRequirement({ schema: "pipeline.security-requirement.v1", id: "R1", candidate: { commit: "a", tree: "b" }, policyRevision: "p", links: [{ kind: "threat", id: "T1" }], state: "proposed", approved: true }).valid, false);
+assert.equal(validateThreatApprovalReceipt(receipt).valid, true);
+assert.equal(validateThreatApprovalReceipt({ ...receipt, approved: true }).valid, false);
+assert.equal(validateThreatApprovalReceipt({ ...receipt, authority: "agent" }).valid, false);
 assert.deepEqual(renderThreatModelView(model), { ok: true, authoritative: false, text: "Threat model a\nPolicy p\nEntities\npublic-api" });
-assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "required", lifecycle: "approved", fresh: false }), { allowed: false, code: "THREAT-BOUNDARY-STALE" });
-assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "required", lifecycle: "approved", fresh: true }), { allowed: true, code: "THREAT-BOUNDARY-ALLOWED" });
+assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "required", lifecycle: "approved", fresh: true }), { allowed: false, code: "THREAT-BOUNDARY-INVALID" });
+assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "required", model: { ...model, lifecycle: "approved" }, approvalReceipt: receipt, fresh: false }), { allowed: false, code: "THREAT-BOUNDARY-STALE" });
+assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "required", model: { ...model, lifecycle: "approved" }, approvalReceipt: receipt, fresh: true }), { allowed: true, code: "THREAT-BOUNDARY-ALLOWED" });
+assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "required", model: { ...model, lifecycle: "proposed" }, approvalReceipt: receipt, fresh: true }), { allowed: false, code: "THREAT-BOUNDARY-UNAPPROVED" });
+assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "required", model: { ...model, lifecycle: "accepted-risk" }, approvalReceipt: receipt, fresh: true }), { allowed: false, code: "THREAT-BOUNDARY-UNAPPROVED" });
+assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "required", model: { ...model, lifecycle: "accepted-risk" }, approvalReceipt: { ...receipt, decision: "accepted-risk", authority: "policy" }, fresh: true }), { allowed: true, code: "THREAT-BOUNDARY-ALLOWED" });
+assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "required", model: { ...model, lifecycle: "approved" }, approvalReceipt: { ...receipt, policyRevision: "other" }, fresh: true }), { allowed: false, code: "THREAT-BOUNDARY-RECEIPT-MISMATCH" });
+assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "not-applicable", model: { ...model, lifecycle: "retired" }, approvalReceipt: { ...receipt, decision: "not-applicable" }, fresh: false }), { allowed: true, code: "THREAT-BOUNDARY-NOT-APPLICABLE" });
 assert.equal(discoverThreatModel(process.cwd()).ok, false);
-console.log("18 threat-model checks passed");
+console.log("27 threat-model checks passed");

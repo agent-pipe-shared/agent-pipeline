@@ -19,6 +19,7 @@ export const SBOM_LIFECYCLE_CODES = Object.freeze({
 });
 
 const HEX = /^[a-f0-9]{64}$/;
+const GIT_OBJECT = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
 const ROOT = ["schema", "candidate", "sourceInputs", "adapter", "formats", "components", "completeness", "freshness", "privacy", "payload", "lifecycle"];
 const CANDIDATE = ["repositoryFingerprint", "commit", "tree"];
 const ADAPTER = ["id", "version", "configSha256"];
@@ -43,6 +44,8 @@ const string = (value) => typeof value === "string" && value.trim() !== "";
 const digest = (value) => createHash("sha256").update(value).digest("hex");
 const objectsWith = (value, fields) => Array.isArray(value) && value.every((entry) => entry !== null && typeof entry === "object" && !Array.isArray(entry) && fields.every((field) => string(entry[field])));
 const stringArray = (value) => Array.isArray(value) && value.length > 0 && value.every(string);
+const unique = (values) => new Set(values).size === values.length;
+const sameStrings = (left, right) => left.length === right.length && left.every((value) => right.includes(value));
 
 /** Stable JSON encoding with lexicographically ordered object keys. */
 export function canonicalJson(value) {
@@ -73,29 +76,46 @@ function normalizedPayload(format, payload) {
 export function validateSbomPayload(format, payload) {
   if (!Object.hasOwn(SBOM_FORMAT_PROFILES, format) || payload === null || typeof payload !== "object" || Array.isArray(payload)) return { valid: false, code: "SBOM-PAYLOAD-FORMAT" };
   if (format === "cyclonedx-json") {
+    const refs = Array.isArray(payload.components) ? payload.components.map((component) => component?.["bom-ref"]) : [];
     const valid = payload.bomFormat === "CycloneDX" && payload.specVersion === "1.6" && Number.isInteger(payload.version) && payload.version >= 1
       && objectsWith(payload.components, ["type", "bom-ref", "name", "version"])
-      && payload.components.every((component) => Array.isArray(component.properties) && component.properties.some((property) => property?.name === "pipeline.scope" && string(property.value)))
-      && Array.isArray(payload.dependencies) && payload.dependencies.length === payload.components.length && payload.dependencies.every((dependency) => string(dependency?.ref) && Array.isArray(dependency.dependsOn) && dependency.dependsOn.every(string));
+      && unique(refs) && payload.components.every((component) => Array.isArray(component.properties) && component.properties.every((property) => own(property, ["name", "value"]) && string(property.name) && string(property.value)) && component.properties.filter((property) => property.name === "pipeline.scope").length === 1)
+      && Array.isArray(payload.dependencies) && payload.dependencies.length === payload.components.length
+      && payload.dependencies.every((dependency) => own(dependency, ["ref", "dependsOn"]) && string(dependency.ref) && refs.includes(dependency.ref) && Array.isArray(dependency.dependsOn) && dependency.dependsOn.every((reference) => string(reference) && reference !== dependency.ref && refs.includes(reference)) && unique(dependency.dependsOn))
+      && unique(payload.dependencies.map((dependency) => dependency.ref));
     return valid ? { valid: true } : { valid: false, code: "SBOM-CYCLONEDX-PROFILE" };
   }
+  const packageIds = Array.isArray(payload.packages) ? payload.packages.map((pkg) => pkg?.SPDXID) : [];
+  const packagePurls = Array.isArray(payload.packages) ? payload.packages.map((pkg) => pkg?.externalRefs?.filter((reference) => reference?.referenceType === "purl").map((reference) => reference.referenceLocator) ?? []) : [];
   const valid = payload.spdxVersion === "SPDX-2.3" && payload.dataLicense === "CC0-1.0" && string(payload.SPDXID) && string(payload.name) && string(payload.documentNamespace)
     && payload.creationInfo !== null && typeof payload.creationInfo === "object" && !Array.isArray(payload.creationInfo) && string(payload.creationInfo.created) && stringArray(payload.creationInfo.creators)
-    && objectsWith(payload.packages, ["SPDXID", "name", "versionInfo"]) && payload.packages.every((pkg) => Array.isArray(pkg.externalRefs) && pkg.externalRefs.some((reference) => reference?.referenceType === "purl" && string(reference.referenceLocator)) && Array.isArray(pkg.annotations) && pkg.annotations.some((annotation) => string(annotation?.comment)))
-    && Array.isArray(payload.relationships) && payload.relationships.every((relationship) => string(relationship?.spdxElementId) && relationship.relationshipType === "DEPENDS_ON" && string(relationship?.relatedSpdxElement));
+    && objectsWith(payload.packages, ["SPDXID", "name", "versionInfo"]) && unique(packageIds) && payload.packages.every((pkg, index) => packagePurls[index].length === 1 && string(packagePurls[index][0]) && Array.isArray(pkg.annotations) && pkg.annotations.every((annotation) => own(annotation, ["comment"]) && string(annotation.comment)) && pkg.annotations.filter((annotation) => annotation.comment.startsWith("scope:") && string(annotation.comment.slice("scope:".length))).length === 1)
+    && unique(packagePurls.map(([purl]) => purl))
+    && Array.isArray(payload.relationships) && payload.relationships.every((relationship) => own(relationship, ["spdxElementId", "relationshipType", "relatedSpdxElement"]) && packageIds.includes(relationship.spdxElementId) && relationship.relationshipType === "DEPENDS_ON" && relationship.spdxElementId !== relationship.relatedSpdxElement && packageIds.includes(relationship.relatedSpdxElement))
+    && unique(payload.relationships.map((relationship) => `${relationship.spdxElementId}\u0000${relationship.relatedSpdxElement}`));
   return valid ? { valid: true } : { valid: false, code: "SBOM-SPDX-PROFILE" };
 }
 
 /** Strip only prescribed volatile serial/timestamp values and bind the logical payload. */
 export function canonicalizeSbomPayload(format, payload) {
-  const profile = validateSbomPayload(format, payload);
-  if (!profile.valid) return profile;
-  const canonical = canonicalJson(normalizedPayload(format, payload));
-  return { valid: true, canonical, sha256: digest(canonical) };
+  try {
+    const profile = validateSbomPayload(format, payload);
+    if (!profile.valid) return profile;
+    const canonical = canonicalJson(normalizedPayload(format, payload));
+    return { valid: true, canonical, sha256: digest(canonical) };
+  } catch {
+    return { valid: false, code: "SBOM-PAYLOAD-MALFORMED" };
+  }
 }
 
 function closed(errors, value, fields, label) { if (!own(value, fields)) errors.push(`${label}: closed field set required`); }
 function sha(value) { return typeof value === "string" && HEX.test(value); }
+function candidateIdentity(value) { return own(value, CANDIDATE) && sha(value.repositoryFingerprint) && GIT_OBJECT.test(value.commit) && GIT_OBJECT.test(value.tree) && value.commit !== value.tree; }
+
+/** A release candidate must be a syntactically valid Git identity and match the independently observed candidate exactly. */
+export function validateSbomCandidateIdentity(candidate, observedCandidate) {
+  return candidateIdentity(candidate) && candidateIdentity(observedCandidate) && CANDIDATE.every((field) => candidate[field] === observedCandidate[field]);
+}
 
 /** Validate the immutable closed manifest shape; malformed data never throws. */
 export function validateSbomManifest(manifest) {
@@ -103,7 +123,7 @@ export function validateSbomManifest(manifest) {
   closed(errors, manifest, ROOT, "$ ");
   if (!own(manifest, ROOT) || manifest.schema !== SBOM_MANIFEST_SCHEMA) errors.push("schema: expected pipeline.sbom-manifest.v1");
   closed(errors, manifest?.candidate, CANDIDATE, "candidate");
-  for (const field of CANDIDATE) if (!string(manifest?.candidate?.[field])) errors.push(`candidate.${field}: non-empty string required`);
+  if (!candidateIdentity(manifest?.candidate)) errors.push("candidate: repository fingerprint and distinct Git commit/tree identities required");
   if (!Array.isArray(manifest?.sourceInputs) || manifest.sourceInputs.length === 0 || !manifest.sourceInputs.every((entry) => own(entry, ["path", "sha256"]) && string(entry.path) && sha(entry.sha256))) errors.push("sourceInputs: non-empty closed digest list required");
   closed(errors, manifest?.adapter, ADAPTER, "adapter");
   if (!(string(manifest?.adapter?.id) && string(manifest?.adapter?.version) && sha(manifest?.adapter?.configSha256))) errors.push("adapter: id, version and config digest required");
@@ -118,6 +138,7 @@ export function validateSbomManifest(manifest) {
   if (!(["public", "private"].includes(manifest?.privacy?.classification) && ["public-redacted", "private-only"].includes(manifest?.privacy?.exportPolicy))) errors.push("privacy: invalid declaration");
   closed(errors, manifest?.payload, PAYLOAD, "payload");
   if (!(sha(manifest?.payload?.canonicalSha256) && own(manifest?.payload?.formats, Object.keys(SBOM_FORMAT_PROFILES)) && Object.entries(SBOM_FORMAT_PROFILES).every(([format, profile]) => manifest.payload.formats[format]?.profile === profile && sha(manifest.payload.formats[format]?.sha256)))) errors.push("payload: canonical and profile digests required");
+  if (Array.isArray(manifest?.formats) && manifest?.payload?.formats && Object.keys(SBOM_FORMAT_PROFILES).some((format) => manifest.formats.find((entry) => entry.format === format)?.payloadSha256 !== manifest.payload.formats[format]?.sha256)) errors.push("payload: format digests must match manifest bindings");
   closed(errors, manifest?.lifecycle, LIFECYCLE, "lifecycle");
   if (!SBOM_LIFECYCLE_STATES.includes(manifest?.lifecycle?.state) || !LIFECYCLE_CODE_BY_STATE[manifest?.lifecycle?.state]?.includes(manifest?.lifecycle?.code)) errors.push("lifecycle: stable state and code required");
   if (manifest?.lifecycle?.state === "complete" && (manifest?.completeness?.status !== "complete" || manifest?.freshness?.status !== "fresh")) errors.push("lifecycle: complete requires complete and fresh inputs");
@@ -125,9 +146,27 @@ export function validateSbomManifest(manifest) {
 }
 
 /** Validate profile payloads, their per-format digests and the aggregate record digest. */
-export function validateSbomRecord(manifest, payloads) {
+function equivalentProfiles(cyclonedx, spdxPayload) {
+  const cdx = new Map(cyclonedx.components.map((component) => [component["bom-ref"], { scope: component.properties.find((property) => property.name === "pipeline.scope").value, dependencies: cyclonedx.dependencies.find((dependency) => dependency.ref === component["bom-ref"]).dependsOn }]));
+  const spdxPurls = new Map(spdxPayload.packages.map((pkg) => [pkg.SPDXID, pkg.externalRefs.find((reference) => reference.referenceType === "purl").referenceLocator]));
+  const spdx = new Map(spdxPayload.packages.map((pkg) => {
+    const id = spdxPurls.get(pkg.SPDXID);
+    const scope = pkg.annotations.find((annotation) => annotation.comment.startsWith("scope:")).comment.slice("scope:".length);
+    const dependencies = spdxPayload.relationships.filter((relationship) => relationship.spdxElementId === pkg.SPDXID).map((relationship) => spdxPurls.get(relationship.relatedSpdxElement));
+    return [id, { scope, dependencies }];
+  }));
+  return cdx.size === spdx.size && [...cdx].every(([id, component]) => spdx.has(id) && component.scope === spdx.get(id).scope && sameStrings(component.dependencies, spdx.get(id).dependencies));
+}
+
+function equivalentManifestComponents(manifest, cyclonedx) {
+  const payloadComponents = new Map(cyclonedx.components.map((component) => [component["bom-ref"], { scope: component.properties.find((property) => property.name === "pipeline.scope").value, relationships: cyclonedx.dependencies.find((dependency) => dependency.ref === component["bom-ref"]).dependsOn }]));
+  return manifest.components.length === payloadComponents.size && manifest.components.every((component) => payloadComponents.has(component.id) && component.scope === payloadComponents.get(component.id).scope && sameStrings(component.relationships, payloadComponents.get(component.id).relationships));
+}
+
+export function validateSbomRecord(manifest, payloads, observedCandidate) {
   const manifestResult = validateSbomManifest(manifest);
   if (!manifestResult.valid) return { valid: false, code: "SBOM-MANIFEST-INVALID", errors: manifestResult.errors };
+  if (!validateSbomCandidateIdentity(manifest.candidate, observedCandidate)) return { valid: false, code: "SBOM-CANDIDATE-UNBOUND" };
   if (payloads === null || typeof payloads !== "object" || Array.isArray(payloads)) return { valid: false, code: "SBOM-PAYLOADS-INVALID" };
   const entries = [];
   for (const format of Object.keys(SBOM_FORMAT_PROFILES)) {
@@ -137,6 +176,8 @@ export function validateSbomRecord(manifest, payloads) {
     if (result.sha256 !== binding.payloadSha256 || result.sha256 !== manifest.payload.formats[format].sha256) return { valid: false, code: "SBOM-PAYLOAD-DIGEST-MISMATCH" };
     entries.push(`${format}:${result.sha256}`);
   }
+  if (!equivalentProfiles(payloads["cyclonedx-json"], payloads["spdx-json"])) return { valid: false, code: "SBOM-PROFILE-CROSS-FORMAT-MISMATCH" };
+  if (!equivalentManifestComponents(manifest, payloads["cyclonedx-json"])) return { valid: false, code: "SBOM-MANIFEST-COMPONENT-MISMATCH" };
   const aggregate = digest(entries.sort().join("\n"));
   return aggregate === manifest.payload.canonicalSha256 ? { valid: true, digest: aggregate } : { valid: false, code: "SBOM-CANONICAL-DIGEST-MISMATCH" };
 }

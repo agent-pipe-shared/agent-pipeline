@@ -7,6 +7,8 @@
 import { createHash } from "node:crypto";
 
 import { validateSecurityEvidenceV2 } from "./security-evidence-evaluator.mjs";
+import { evaluateStackCapabilityPlan, validateStackCapabilityPlan } from "./stack-capability-plan.mjs";
+import { evaluateDynamicTargetAuthorization } from "./stack-dynamic-boundary.mjs";
 
 export const STACK_ADAPTER_KINDS = Object.freeze(["static", "sca", "iac", "container", "ci-workflow", "dast", "fuzz"]);
 export const STACK_ADAPTER_PLATFORMS = Object.freeze(["linux", "darwin", "win32"]);
@@ -73,9 +75,8 @@ export function validateStackAdapter(value) {
  * command, network endpoint, credential, or repository path is accepted.
  */
 export function createStackAdapterEvidence(input) {
-  if (!own(input, ["adapter", "candidate", "policyRevision", "environment", "result"])
-    || !own(input.candidate, ["commit", "tree"]) || !oid(input.candidate.commit) || !oid(input.candidate.tree)
-    || typeof input.policyRevision !== "string" || input.policyRevision === ""
+  if (!own(input, ["adapter", "plan", "environment", "result", "authorization"])
+    || !validateStackCapabilityPlan(input.plan).valid
     || !own(input.environment, ["platform", "nodeVersion"])
     || !STACK_ADAPTER_PLATFORMS.includes(input.environment.platform)
     || !(typeof input.environment.nodeVersion === "string" || input.environment.nodeVersion === null)
@@ -84,16 +85,23 @@ export function createStackAdapterEvidence(input) {
     || !(typeof input.result.reason === "string" || input.result.reason === null)) return { ok: false, code: "STACK-ADAPTER-INPUT-INVALID" };
   const adapterResult = validateStackAdapter(input.adapter);
   if (!adapterResult.ok) return adapterResult;
+  const selection = input.plan.entries.find((entry) => entry.capability === input.adapter.capability);
+  if (!selection || !["selected", "optional-selected"].includes(selection.status)) return { ok: false, code: "STACK-ADAPTER-CAPABILITY-UNSELECTED" };
+  if (input.adapter.dynamic) {
+    if (!own(input.authorization, ["candidate", "target", "scope", "receipt"])) return { ok: false, code: "STACK-ADAPTER-VERIFICATION-REQUIRED" };
+    const authorization = evaluateDynamicTargetAuthorization(input.authorization);
+    if (!authorization.allowed || JSON.stringify(input.authorization.candidate) !== JSON.stringify(input.plan.candidate)) return { ok: false, code: "STACK-ADAPTER-VERIFICATION-REQUIRED" };
+  } else if (input.authorization !== null) return { ok: false, code: "STACK-ADAPTER-AUTHORIZATION-INVALID" };
   if (!input.adapter.supportedPlatforms.includes(input.environment.platform)) {
     return { ok: false, code: "STACK-ADAPTER-PLATFORM-UNSUPPORTED" };
   }
   const evidence = {
     schema: "pipeline.security-evidence.v2",
-    policy: { configurationSha256: digest(input.policyRevision) },
+    policy: { configurationSha256: digest(input.plan.policyRevision) },
     input: {
-      commit: input.candidate.commit,
-      tree: input.candidate.tree,
-      inputSha256: digest(JSON.stringify({ adapter: input.adapter.id, candidate: input.candidate, policyRevision: input.policyRevision })),
+      commit: input.plan.candidate.commit,
+      tree: input.plan.candidate.tree,
+      inputSha256: digest(JSON.stringify({ adapter: input.adapter.id, candidate: input.plan.candidate, policyRevision: input.plan.policyRevision, planDigest: input.plan.digest })),
     },
     environment: structuredClone(input.environment),
     capabilities: [{
@@ -112,13 +120,16 @@ export function createStackAdapterEvidence(input) {
 }
 
 /** Runs the same pure conformance exchange against every representative adapter. */
-export function runRepresentativeAdapterConformance({ candidate, policyRevision, platform = "linux" } = {}) {
-  const results = REPRESENTATIVE_STACK_ADAPTERS.map((item) => createStackAdapterEvidence({
+export function runRepresentativeAdapterConformance({ plan, platform = "linux", authorizations = {} } = {}) {
+  if (!validateStackCapabilityPlan(plan).valid) return { ok: false, code: "STACK-ADAPTER-PLAN-INVALID" };
+  const assessment = evaluateStackCapabilityPlan(plan);
+  if (assessment.code === "STACK-REQUIRED-UNAVAILABLE") return { ok: false, code: "STACK-ADAPTER-REQUIRED-UNAVAILABLE", unavailable: assessment.unavailable };
+  const results = REPRESENTATIVE_STACK_ADAPTERS.filter((item) => plan.entries.some((entry) => entry.capability === item.capability && ["selected", "optional-selected"].includes(entry.status))).map((item) => createStackAdapterEvidence({
     adapter: item,
-    candidate,
-    policyRevision,
+    plan,
     environment: { platform, nodeVersion: null },
     result: { status: "PASS", findings: [], coverage: defaultCoverage(item.id), reason: "synthetic-conformance" },
+    authorization: item.dynamic ? authorizations[item.capability] : null,
   }));
-  return results.every((result) => result.ok) ? { ok: true, results } : { ok: false, code: "STACK-ADAPTER-CONFORMANCE-FAILED", results };
+  return results.length > 0 && results.every((result) => result.ok) ? { ok: true, candidate: structuredClone(plan.candidate), planDigest: plan.digest, results } : { ok: false, code: "STACK-ADAPTER-CONFORMANCE-FAILED", results };
 }
