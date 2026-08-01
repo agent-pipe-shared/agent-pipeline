@@ -7,6 +7,7 @@ assert.deepEqual(evaluateThreatModelApplicability({ ...complete, riskInputs: { .
 assert.equal(evaluateThreatModelApplicability({ applicability: "not-applicable", riskInputs: complete.riskInputs }).state, "invalid");
 assert.equal(createThreatEntityId("asset", "service:api").id, createThreatEntityId("asset", "service:api").id);
 assert.equal(createThreatEntityId("asset", "service:api").id === createThreatEntityId("threat", "service:api").id, false);
+for (const kind of ["asset", "boundary", "threat", "abuse-case", "requirement", "mitigation"]) assert.equal(createThreatEntityId(kind, "canonical:one").id, createThreatEntityId(kind, "canonical:one").id, kind);
 assert.deepEqual(evaluateThreatTraceability({ requirements: ["R1"], links: [{ requirement: "R1", subject: "T1", kind: "threat" }] }), { ok: true });
 assert.deepEqual(evaluateThreatImpact({ changedSubjects: ["boundary:public"], links: [{ subject: "boundary:public", requirement: "R1" }, { subject: "asset:db", requirement: "R2" }] }), { state: "stale", code: "THREAT-IMPACT-REVIEW", affected: ["R1"] });
 assert.deepEqual(exportThreatModelView({ classification: "private", entities: [{ id: "A1", name: "internal api", coordinate: "private/host" }] }).entities[0], { id: "A1", name: "redacted", coordinate: "redacted" });
