@@ -22,7 +22,7 @@ import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import test from "node:test";
 
-import { observeCodexOnboardingCapabilities } from "./codex-onboarding-capabilities.mjs";
+import { diagnoseCodexOnboardingSessionCapability, observeCodexOnboardingCapabilities } from "./codex-onboarding-capabilities.mjs";
 import { hasCodexExistingGitControlMount } from "./codex-host-layout.mjs";
 
 const roots = [];
@@ -584,6 +584,17 @@ test("fault injection after session creation rolls back the exact descriptor and
     sessionCapability: "failed",
     worktreeCapability: "not-required",
   });
+  assert.deepEqual(treeSnapshot(root), before);
+});
+
+test("session capability diagnosis redacts the failed descriptor lifecycle stage", () => {
+  const root = localRepository("session diagnosis");
+  const before = treeSnapshot(root);
+  const result = diagnoseCodexOnboardingSessionCapability({
+    rootDir: root,
+    deps: { faultInjector(step) { if (step === "session-probe-created") throw new Error("fixture failure"); } },
+  });
+  assert.deepEqual(result, { schema: "pipeline.session-capability-diagnosis.v1", status: "unavailable", stage: "descriptor-retirement" });
   assert.deepEqual(treeSnapshot(root), before);
 });
 

@@ -219,7 +219,7 @@ function removeNewEmptyDirectories(paths, existed) {
   if (failure) throw failure;
 }
 
-function sessionProbe(root, repository, spawn, faultInjector) {
+function sessionProbe(root, repository, spawn, faultInjector, stageBox = null) {
   const directories = [
     join(repository.commonDir, "agent-pipeline"),
     join(repository.commonDir, "agent-pipeline", "session-descriptors"),
@@ -232,7 +232,9 @@ function sessionProbe(root, repository, spawn, faultInjector) {
   let started = null;
   let primaryError = null;
   try {
+    if (stageBox) stageBox.stage = "descriptor-publication";
     started = startSessionDescriptor(root, { sessionId, ownerNonce, spawn });
+    if (stageBox) stageBox.stage = "descriptor-retirement";
     faultInjector?.("session-probe-created");
     retireSessionDescriptor(root, started, { spawn });
     started = null;
@@ -242,17 +244,43 @@ function sessionProbe(root, repository, spawn, faultInjector) {
   let cleanupError = null;
   try {
     if (existsSync(descriptorPath)) {
+      if (stageBox && primaryError === null) stageBox.stage = "descriptor-load";
       const loaded = loadSessionDescriptor(root, sessionId, { spawn });
       if (loaded.ownerNonce !== ownerNonce) throw new Error("disposable session descriptor changed owner");
+      if (stageBox && primaryError === null) stageBox.stage = "descriptor-retirement";
       retireSessionDescriptor(root, loaded, { spawn });
     }
+    if (stageBox && primaryError === null) stageBox.stage = "directory-rollback";
     removeNewEmptyDirectories(directories, existed);
   } catch (error) {
     cleanupError = error;
   }
   if (cleanupError) throw cleanupError;
-  if (existsSync(descriptorPath)) throw new Error("disposable session descriptor leaked");
+  if (existsSync(descriptorPath)) { if (stageBox) stageBox.stage = "descriptor-rollback"; throw new Error("disposable session descriptor leaked"); }
   if (primaryError) throw primaryError;
+}
+
+/**
+ * Redacted, runner-neutral diagnosis for a failed disposable session probe.
+ * It never returns descriptor paths, owner nonces, DACLs, or raw platform
+ * errors.  The same bounded probe is used on every supported platform.
+ */
+export function diagnoseCodexOnboardingSessionCapability({ rootDir = process.cwd(), deps = {} } = {}) {
+  const spawn = deps.spawnSync ?? spawnSync;
+  let root;
+  try { root = physicalRoot(rootDir); } catch { return { schema: "pipeline.session-capability-diagnosis.v1", status: "precondition-unavailable", stage: "physical-root" }; }
+  const type = gitEntryType(root);
+  if (type === "absent" || type === "invalid" || gitVersion(spawn) === null) return { schema: "pipeline.session-capability-diagnosis.v1", status: "precondition-unavailable", stage: "repository" };
+  let repository;
+  try { repository = validateLocalRepository(root, type, spawn); disposableWriteProbe(repository.commonDir, "control", deps.faultInjector); }
+  catch { return { schema: "pipeline.session-capability-diagnosis.v1", status: "precondition-unavailable", stage: "repository-private-control" }; }
+  const stageBox = { stage: "descriptor-publication" };
+  try {
+    sessionProbe(root, repository, spawn, deps.faultInjector, stageBox);
+    return { schema: "pipeline.session-capability-diagnosis.v1", status: "ready", stage: "complete" };
+  } catch {
+    return { schema: "pipeline.session-capability-diagnosis.v1", status: "unavailable", stage: stageBox.stage };
+  }
 }
 
 function gitSnapshot(root, spawn) {
