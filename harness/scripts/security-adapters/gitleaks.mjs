@@ -123,7 +123,6 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
     "detect",
     "--source",
     rootDir,
-    "--no-git",
     "--report-format",
     "json",
     "--report-path",
