@@ -62,3 +62,10 @@ export function exportThreatModelView(model) {
 export function previewThreatModelMigration({ hasCanonicalModel } = {}) {
   return { schema: "pipeline.threat-model-migration-preview.v1", status: hasCanonicalModel === true ? "current" : "incomplete", writes: [] };
 }
+
+/** Deterministic human view derived only from the validated machine authority. */
+export function renderThreatModelView(model) {
+  if (!validateThreatModel(model).valid) return { ok: false, code: "THREAT-VIEW-INVALID" };
+  const names = model.entities.map((entity) => text(entity?.name) ? entity.name : entity?.id).filter(text).sort();
+  return { ok: true, authoritative: false, text: `Threat model ${model.candidate.commit}\nPolicy ${model.policyRevision}\nEntities\n${names.join("\n")}` };
+}
