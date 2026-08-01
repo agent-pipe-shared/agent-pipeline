@@ -2,11 +2,14 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Stateful PHX-1 tests for portable governance event storage. */
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { canonicalizeJson, sealGovernanceEvent } from "./governance-event.mjs";
+import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
+import { discoverRepository } from "./worktree-lifecycle.mjs";
 import {
   GovernanceEventStoreError,
   appendPortableGovernanceEvent,
@@ -19,7 +22,7 @@ import {
   verifyPortableGovernanceStream,
 } from "./governance-event-store.mjs";
 
-const fingerprint = "a".repeat(64);
+let fingerprint = "a".repeat(64);
 const candidate = { commit: "b".repeat(40), tree: "c".repeat(40) };
 const unavailable = { state: "not-applicable" };
 
@@ -41,6 +44,9 @@ function registryFixture() {
 
 async function fixtureRoot() {
   const root = await mkdtemp(path.join(os.tmpdir(), "governance-event-store-"));
+  execFileSync("git", ["init", "-q", root]);
+  const repository = discoverRepository(root);
+  fingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: repository.commonDir, primaryRoot: repository.primaryRoot });
   await mkdir(path.join(root, "governance/events"), { recursive: true });
   await writeFile(path.join(root, "governance/events/registry.json"), `${canonicalizeJson(registryFixture())}\n`);
   return root;
@@ -116,8 +122,8 @@ test("verification is checkpoint-aware and queries return only validated chain r
   const complete = await verifyPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", checkpoint: second.checkpoint });
   assert.equal(complete.completeness, "verified");
   const queried = await queryPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", checkpoint: first.checkpoint });
-  assert.deepEqual(queried.events.map((event) => event.sequence), [1, 2]);
-  assert.equal(queried.events[1].previousEventDigest, first.eventDigest);
+  assert.equal(queried.completeness, "unknown");
+  assert.deepEqual(queried.events.map((event) => event.sequence), [1]);
 });
 
 test("tampering, non-canonical bytes, and forks fail before projection or query", async (t) => {

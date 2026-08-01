@@ -18,6 +18,8 @@ import {
   sealGovernanceEvent,
   validateGovernanceEventEnvelope,
 } from "./governance-event.mjs";
+import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
+import { discoverRepository } from "./worktree-lifecycle.mjs";
 
 const REGISTRY_SCHEMA = "pipeline.governance-stream-registry.v1";
 const HEADS_SCHEMA = "pipeline.governance-event-heads.v1";
@@ -72,7 +74,9 @@ async function assertPhysicalRoot(repositoryRoot) {
   if (typeof repositoryRoot !== "string" || !path.isAbsolute(repositoryRoot)) fail("GES-ROOT", "repositoryRoot must be an absolute path.");
   const root = await realpath(repositoryRoot);
   await assertNoSymlink(root, { directory: true });
-  return root;
+  let repository;
+  try { repository = discoverRepository(root); } catch { fail("GES-REPOSITORY", "repositoryRoot is not a physical Git repository."); }
+  return { root, fingerprint: derivePoGateRepositoryFingerprint({ gitCommonDir: repository.commonDir, primaryRoot: repository.primaryRoot }) };
 }
 
 function assertAbsoluteOutsideRepository(repositoryRoot, storeRoot) {
@@ -209,6 +213,7 @@ function validateRegistry(registry) {
 
 async function loadRegistry(root, registryPath = "governance/events/registry.json") {
   const target = repositoryPath(root, registryPath);
+  await assertNoSymlinkAncestry(target);
   await assertNoSymlink(target, { directory: false });
   let parsed;
   try { parsed = parseStrictJson(await readFile(target)); } catch (error) {
@@ -290,6 +295,7 @@ async function readEvent(file) {
 async function scanStream(root, registry, streamId) {
   const stream = streamFor(registry, streamId);
   const streamRoot = repositoryPath(root, `${registry.storageRoot}/${stream.relativeRoot}`);
+  await assertNoSymlinkAncestry(streamRoot);
   const entry = await lstatOrNull(streamRoot);
   if (!entry) return { stream, streamRoot, events: [] };
   await assertNoSymlink(streamRoot, { directory: true });
@@ -394,7 +400,7 @@ async function writeHeads(root, registry, streamId, events) {
 
 /** Read and validate the closed portable stream registry. */
 export async function loadGovernanceEventRegistry({ repositoryRoot, registryPath } = {}) {
-  const root = await assertPhysicalRoot(repositoryRoot);
+  const { root } = await assertPhysicalRoot(repositoryRoot);
   return (await loadRegistry(root, registryPath)).registry;
 }
 
@@ -403,9 +409,9 @@ export async function loadGovernanceEventRegistry({ repositoryRoot, registryPath
  * `intent`; the returned receipt exposes only public metadata and checkpoint.
  */
 export async function appendPortableGovernanceEvent({ repositoryRoot, registryPath, repositoryFingerprint, intent } = {}) {
-  const root = await assertPhysicalRoot(repositoryRoot);
+  const { root, fingerprint } = await assertPhysicalRoot(repositoryRoot);
   const { registry } = await loadRegistry(root, registryPath);
-  if (repositoryFingerprint !== registry.repositoryFingerprint) fail("GES-CROSS-REPOSITORY", "The expected repository fingerprint does not match the registry.");
+  if (repositoryFingerprint !== fingerprint || registry.repositoryFingerprint !== fingerprint) fail("GES-CROSS-REPOSITORY", "The expected repository fingerprint does not match the physical repository.");
   const streamId = intent?.streamId;
   const stream = streamFor(registry, streamId);
   const template = assertIntent(intent, stream, repositoryFingerprint);
@@ -432,30 +438,32 @@ export async function appendPortableGovernanceEvent({ repositoryRoot, registryPa
 
 /** Offline integrity verification. Without an independent checkpoint completeness remains unknown. */
 export async function verifyPortableGovernanceStream({ repositoryRoot, registryPath, repositoryFingerprint, streamId, checkpoint } = {}) {
-  const root = await assertPhysicalRoot(repositoryRoot);
+  const { root, fingerprint } = await assertPhysicalRoot(repositoryRoot);
   const { registry } = await loadRegistry(root, registryPath);
-  if (repositoryFingerprint !== registry.repositoryFingerprint) fail("GES-CROSS-REPOSITORY", "The expected repository fingerprint does not match the registry.");
+  if (repositoryFingerprint !== fingerprint || registry.repositoryFingerprint !== fingerprint) fail("GES-CROSS-REPOSITORY", "The expected repository fingerprint does not match the physical repository.");
   const scanned = await scanStream(root, registry, streamId);
   if (!checkpoint) return Object.freeze({ integrity: "prefix-valid", completeness: "unknown", streamId, eventCount: scanned.events.length });
   const witness = scanned.events.find((event) => event.sequence === checkpoint.sequence);
   if (!witness || !checkpointMatches(witness, checkpoint)) fail("GES-CHECKPOINT", "The retained checkpoint is not present in this stream.");
+  if (witness.sequence !== scanned.events.at(-1)?.sequence) return Object.freeze({ integrity: "prefix-valid", completeness: "unknown", streamId, eventCount: witness.sequence, checkpoint: Object.freeze({ ...checkpoint }) });
   return Object.freeze({ integrity: "valid", completeness: "verified", streamId, eventCount: scanned.events.length, checkpoint: Object.freeze({ ...checkpoint }) });
 }
 
 /** Query is a projection boundary: validation happens before any event is returned. */
 export async function queryPortableGovernanceStream({ repositoryRoot, registryPath, repositoryFingerprint, streamId, checkpoint } = {}) {
   const verification = await verifyPortableGovernanceStream({ repositoryRoot, registryPath, repositoryFingerprint, streamId, checkpoint });
-  const root = await assertPhysicalRoot(repositoryRoot);
+  const { root } = await assertPhysicalRoot(repositoryRoot);
   const { registry } = await loadRegistry(root, registryPath);
   const scanned = await scanStream(root, registry, streamId);
-  return Object.freeze({ ...verification, events: Object.freeze(scanned.events.map((event) => Object.freeze({ ...event }))) });
+  const limit = verification.completeness === "verified" ? scanned.events.length : checkpoint?.sequence ?? scanned.events.length;
+  return Object.freeze({ ...verification, events: Object.freeze(scanned.events.slice(0, limit).map((event) => Object.freeze({ ...event }))) });
 }
 
 /** Rebuild only the replaceable heads projection from an already valid chain. */
 export async function recoverPortableGovernanceProjection({ repositoryRoot, registryPath, repositoryFingerprint, streamId, checkpoint } = {}) {
   const verification = await verifyPortableGovernanceStream({ repositoryRoot, registryPath, repositoryFingerprint, streamId, checkpoint });
   if (verification.integrity !== "valid") fail("GES-RECOVERY-CHECKPOINT", "Projection recovery requires a retained checkpoint.");
-  const root = await assertPhysicalRoot(repositoryRoot);
+  const { root } = await assertPhysicalRoot(repositoryRoot);
   const { registry } = await loadRegistry(root, registryPath);
   const scanned = await scanStream(root, registry, streamId);
   const streamRoot = await ensureSafeDirectory(root, `${registry.storageRoot}/${streamId}`);
@@ -472,7 +480,7 @@ export async function recoverPortableGovernanceProjection({ repositoryRoot, regi
  * portable tree or returned in the operational receipt.
  */
 export async function putRestrictedGovernanceEvent({ repositoryRoot, storeRoot, repositoryFingerprint, authorization, key, keyGeneration, expiresAtEpochMs, event } = {}) {
-  const root = await assertPhysicalRoot(repositoryRoot);
+  const { root } = await assertPhysicalRoot(repositoryRoot);
   assertRestrictedAuthorization(authorization, repositoryFingerprint);
   const restrictedRoot = await assertRestrictedRoot(root, storeRoot, { create: true });
   await restrictedRecordsRoot(restrictedRoot);
@@ -497,7 +505,7 @@ export async function putRestrictedGovernanceEvent({ repositoryRoot, storeRoot, 
 
 /** Read one restricted event only with a repository-bound privileged authorization and its external key. */
 export async function queryRestrictedGovernanceEvent({ repositoryRoot, storeRoot, repositoryFingerprint, authorization, key, recordId } = {}) {
-  const root = await assertPhysicalRoot(repositoryRoot);
+  const { root } = await assertPhysicalRoot(repositoryRoot);
   assertRestrictedAuthorization(authorization, repositoryFingerprint);
   const restrictedRoot = await assertRestrictedRoot(root, storeRoot);
   const target = restrictedRecordPath(restrictedRoot, recordId);
@@ -516,7 +524,7 @@ export async function queryRestrictedGovernanceEvent({ repositoryRoot, storeRoot
  * unrelated key copies.
  */
 export async function eraseRestrictedGovernanceEvent({ repositoryRoot, storeRoot, repositoryFingerprint, authorization, recordId, expectedRecordDigest } = {}) {
-  const root = await assertPhysicalRoot(repositoryRoot);
+  const { root } = await assertPhysicalRoot(repositoryRoot);
   assertRestrictedAuthorization(authorization, repositoryFingerprint);
   const restrictedRoot = await assertRestrictedRoot(root, storeRoot);
   const target = restrictedRecordPath(restrictedRoot, recordId);

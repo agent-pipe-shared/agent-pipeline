@@ -1,14 +1,17 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { canonicalizeJson } from "../lib/governance-event.mjs";
+import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
+import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 import { main } from "./governance-event.mjs";
 
-const fingerprint = "a".repeat(64);
+let fingerprint = "a".repeat(64);
 const candidate = { commit: "b".repeat(40), tree: "c".repeat(40) };
 const absent = { state: "not-applicable" };
 const registry = { schema: "pipeline.governance-stream-registry.v1", repositoryFingerprint: fingerprint, canonicalization: "RFC8785", digestAlgorithm: "sha-256", eventDigestDomain: "pipeline.governance-event.v1\0", storageRoot: "governance/events", streams: [
@@ -17,7 +20,7 @@ const registry = { schema: "pipeline.governance-stream-registry.v1", repositoryF
   { streamId: "lifecycle", origin: "lifecycle", authorityClass: "non-authoritative", relativeRoot: "lifecycle", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
 ] };
 function intent() { return { schema: "pipeline.governance-event-envelope.v1", payloadSchema: "pipeline.lifecycle-governance-event.v1", canonicalization: "RFC8785", digestAlgorithm: "sha-256", eventId: "cli-event", idempotencyKey: "cli-idem", origin: "lifecycle", authorityClass: "non-authoritative", eventType: "lifecycle.tested", occurredAtEpochMs: 1, observedAtEpochMs: 1, timeAssurance: "locally-observed", repositoryFingerprint: fingerprint, sourceUri: `urn:pipeline:repository:${fingerprint}`, streamId: "lifecycle", correlation: { featureId: absent, packageId: absent, requestId: absent, sessionId: absent, dispatchId: absent, traceId: absent }, candidate, artifacts: [absent], policy: { policyDigest: absent, configurationDigest: absent, capturePolicyDigest: absent, redactionPolicyDigest: absent }, classification: "repository-public-safe", storageProfile: "repository-public-safe", retentionCompatibility: "repository-retained", disclosureClass: "repository-visible", payload: {} }; }
-async function fixture() { const root = await mkdtemp(path.join(os.tmpdir(), "governance-event-cli-")); await mkdir(path.join(root, "governance/events"), { recursive: true }); await writeFile(path.join(root, "governance/events/registry.json"), `${canonicalizeJson(registry)}\n`); return root; }
+async function fixture() { const root = await mkdtemp(path.join(os.tmpdir(), "governance-event-cli-")); execFileSync("git", ["init", "-q", root]); const repository = discoverRepository(root); fingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: repository.commonDir, primaryRoot: repository.primaryRoot }); registry.repositoryFingerprint = fingerprint; await mkdir(path.join(root, "governance/events"), { recursive: true }); await writeFile(path.join(root, "governance/events/registry.json"), `${canonicalizeJson(registry)}\n`); return root; }
 async function request(root, name, value) { const file = path.join(root, name); await writeFile(file, `${canonicalizeJson(value)}\n`); return file; }
 
 test("CLI previews without allocating, appends, verifies and queries only closed requests", async (t) => {
