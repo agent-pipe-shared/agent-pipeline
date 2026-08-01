@@ -13,7 +13,7 @@ export function validateNodeDependencyGraph(graph) {
   if (!own(graph, ["schema", "components"]) || graph.schema !== NODE_GRAPH_SCHEMA || !Array.isArray(graph.components) || graph.components.length === 0) return { valid: false, code: "SBOM-NODE-GRAPH-INVALID" };
   const ids = new Set();
   for (const component of graph.components) {
-    if (!own(component, ["id", "scope", "name", "version", "dependencies"]) || !string(component.id) || !string(component.scope) || !string(component.name) || !string(component.version) || !Array.isArray(component.dependencies) || !component.dependencies.every(string) || ids.has(component.id)) return { valid: false, code: "SBOM-NODE-GRAPH-INVALID" };
+    if (!own(component, ["id", "scope", "provenance", "name", "version", "dependencies"]) || !string(component.id) || !string(component.scope) || !string(component.provenance) || !string(component.name) || !string(component.version) || !Array.isArray(component.dependencies) || !component.dependencies.every(string) || ids.has(component.id)) return { valid: false, code: "SBOM-NODE-GRAPH-INVALID" };
     ids.add(component.id);
   }
   if (graph.components.some((component) => component.dependencies.some((id) => !ids.has(id)))) return { valid: false, code: "SBOM-NODE-TRANSITIVE-MISSING" };
@@ -28,13 +28,13 @@ export function generateNodeSbom(graph) {
   const spdxIds = new Map(components.map((component) => [component.id, spdxId(component.id)]));
   const cyclonedx = {
     bomFormat: "CycloneDX", specVersion: "1.6", version: 1,
-    components: components.map((component) => ({ type: "library", "bom-ref": component.id, name: component.name, version: component.version, properties: [{ name: "pipeline.scope", value: component.scope }] })),
+    components: components.map((component) => ({ type: "library", "bom-ref": component.id, name: component.name, version: component.version, properties: [{ name: "pipeline.scope", value: component.scope }, { name: "pipeline.provenance", value: component.provenance }] })),
     dependencies: components.map((component) => ({ ref: component.id, dependsOn: [...component.dependencies].sort() })),
   };
   const spdx = {
     spdxVersion: "SPDX-2.3", dataLicense: "CC0-1.0", SPDXID: "SPDXRef-DOCUMENT", name: "node-dependency-graph", documentNamespace: "https://pipeline.invalid/sbom/node",
     creationInfo: { creators: ["Tool: pipeline-node-reference"], created: "1970-01-01T00:00:00Z" },
-    packages: components.map((component) => ({ SPDXID: spdxIds.get(component.id), name: component.name, versionInfo: component.version, downloadLocation: "NOASSERTION", externalRefs: [{ referenceCategory: "PACKAGE-MANAGER", referenceType: "purl", referenceLocator: component.id }], annotations: [{ annotationType: "OTHER", annotator: "Tool: pipeline-node-reference", annotationDate: "1970-01-01T00:00:00Z", comment: `scope:${component.scope}` }] })),
+    packages: components.map((component) => ({ SPDXID: spdxIds.get(component.id), name: component.name, versionInfo: component.version, downloadLocation: "NOASSERTION", externalRefs: [{ referenceCategory: "PACKAGE-MANAGER", referenceType: "purl", referenceLocator: component.id }], annotations: [{ annotationType: "OTHER", annotator: "Tool: pipeline-node-reference", annotationDate: "1970-01-01T00:00:00Z", comment: `scope:${component.scope}` }, { annotationType: "OTHER", annotator: "Tool: pipeline-node-reference", annotationDate: "1970-01-01T00:00:00Z", comment: `provenance:${component.provenance}` }] })),
     relationships: components.flatMap((component) => component.dependencies.sort().map((dependency) => ({ spdxElementId: spdxIds.get(component.id), relationshipType: "DEPENDS_ON", relatedSpdxElement: spdxIds.get(dependency) }))),
   };
   const cdx = canonicalizeSbomPayload("cyclonedx-json", cyclonedx);

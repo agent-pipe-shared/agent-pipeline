@@ -9,7 +9,7 @@ const digest = (value) => createHash("sha256").update(value).digest("hex");
 const candidate = { repositoryFingerprint: "a".repeat(64), commit: "b".repeat(40), tree: "c".repeat(40) };
 
 function input(release, ids = ["pkg:npm/a@1"]) {
-  const graph = { schema: NODE_GRAPH_SCHEMA, components: ids.map((id) => ({ id, scope: "root", name: id.split("/").at(-1).split("@")[0], version: "1", dependencies: [] })) };
+  const graph = { schema: NODE_GRAPH_SCHEMA, components: ids.map((id) => ({ id, scope: "root", provenance: "lock", name: id.split("/").at(-1).split("@")[0], version: "1", dependencies: [] })) };
   const generated = generateNodeSbom(graph);
   const recordDigest = digest(Object.entries(generated.digests).map(([format, hash]) => `${format}:${hash}`).sort().join("\n"));
   const manifest = {

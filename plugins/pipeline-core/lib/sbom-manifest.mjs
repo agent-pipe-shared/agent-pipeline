@@ -66,6 +66,7 @@ function normalizedPayload(format, payload) {
   if (format === "cyclonedx-json") {
     delete copy.serialNumber;
     if (copy.metadata && typeof copy.metadata === "object") delete copy.metadata.timestamp;
+    if (Array.isArray(copy.components)) copy.components.forEach((component) => { if (Array.isArray(component?.properties)) component.properties.sort((left, right) => left.name.localeCompare(right.name)); });
   } else if (copy.creationInfo && typeof copy.creationInfo === "object") delete copy.creationInfo.created;
   return copy;
 }
@@ -81,7 +82,7 @@ export function validateSbomPayload(format, payload) {
     const refs = Array.isArray(payload.components) ? payload.components.map((component) => component?.["bom-ref"]) : [];
     const valid = payload.bomFormat === "CycloneDX" && payload.specVersion === "1.6" && Number.isInteger(payload.version) && payload.version >= 1
       && objectsWith(payload.components, ["type", "bom-ref", "name", "version"]) && payload.components.every((component) => CYCLONEDX_COMPONENT_TYPES.has(component.type))
-      && unique(refs) && payload.components.every((component) => Array.isArray(component.properties) && component.properties.every((property) => own(property, ["name", "value"]) && string(property.name) && string(property.value)) && component.properties.filter((property) => property.name === "pipeline.scope").length === 1)
+      && unique(refs) && payload.components.every((component) => Array.isArray(component.properties) && component.properties.every((property) => own(property, ["name", "value"]) && string(property.name) && string(property.value)) && component.properties.filter((property) => property.name === "pipeline.scope").length === 1 && component.properties.filter((property) => property.name === "pipeline.provenance").length === 1)
       && Array.isArray(payload.dependencies) && payload.dependencies.length === payload.components.length
       && payload.dependencies.every((dependency) => own(dependency, ["ref", "dependsOn"]) && string(dependency.ref) && refs.includes(dependency.ref) && Array.isArray(dependency.dependsOn) && dependency.dependsOn.every((reference) => string(reference) && reference !== dependency.ref && refs.includes(reference)) && unique(dependency.dependsOn))
       && unique(payload.dependencies.map((dependency) => dependency.ref));
@@ -91,7 +92,7 @@ export function validateSbomPayload(format, payload) {
   const packagePurls = Array.isArray(payload.packages) ? payload.packages.map((pkg) => pkg?.externalRefs?.filter((reference) => reference?.referenceType === "purl").map((reference) => reference.referenceLocator) ?? []) : [];
   const valid = payload.spdxVersion === "SPDX-2.3" && payload.dataLicense === "CC0-1.0" && payload.SPDXID === "SPDXRef-DOCUMENT" && string(payload.name) && string(payload.documentNamespace)
     && payload.creationInfo !== null && typeof payload.creationInfo === "object" && !Array.isArray(payload.creationInfo) && string(payload.creationInfo.created) && stringArray(payload.creationInfo.creators)
-    && objectsWith(payload.packages, ["SPDXID", "name", "versionInfo", "downloadLocation"]) && packageIds.every((id) => SPDX_ID.test(id)) && unique(packageIds) && payload.packages.every((pkg, index) => string(pkg.downloadLocation) && packagePurls[index].length === 1 && string(packagePurls[index][0]) && pkg.externalRefs.every((reference) => own(reference, ["referenceCategory", "referenceType", "referenceLocator"]) && reference.referenceCategory === "PACKAGE-MANAGER" && reference.referenceType === "purl" && string(reference.referenceLocator)) && Array.isArray(pkg.annotations) && pkg.annotations.every((annotation) => own(annotation, ["annotationType", "annotator", "annotationDate", "comment"]) && annotation.annotationType === "OTHER" && string(annotation.annotator) && string(annotation.annotationDate) && string(annotation.comment)) && pkg.annotations.filter((annotation) => annotation.comment.startsWith("scope:") && string(annotation.comment.slice("scope:".length))).length === 1)
+    && objectsWith(payload.packages, ["SPDXID", "name", "versionInfo", "downloadLocation"]) && packageIds.every((id) => SPDX_ID.test(id)) && unique(packageIds) && payload.packages.every((pkg, index) => string(pkg.downloadLocation) && packagePurls[index].length === 1 && string(packagePurls[index][0]) && pkg.externalRefs.every((reference) => own(reference, ["referenceCategory", "referenceType", "referenceLocator"]) && reference.referenceCategory === "PACKAGE-MANAGER" && reference.referenceType === "purl" && string(reference.referenceLocator)) && Array.isArray(pkg.annotations) && pkg.annotations.every((annotation) => own(annotation, ["annotationType", "annotator", "annotationDate", "comment"]) && annotation.annotationType === "OTHER" && string(annotation.annotator) && string(annotation.annotationDate) && string(annotation.comment)) && pkg.annotations.filter((annotation) => annotation.comment.startsWith("scope:") && string(annotation.comment.slice("scope:".length))).length === 1 && pkg.annotations.filter((annotation) => annotation.comment.startsWith("provenance:") && string(annotation.comment.slice("provenance:".length))).length === 1)
     && unique(packagePurls.map(([purl]) => purl))
     && Array.isArray(payload.relationships) && payload.relationships.every((relationship) => own(relationship, ["spdxElementId", "relationshipType", "relatedSpdxElement"]) && packageIds.includes(relationship.spdxElementId) && relationship.relationshipType === "DEPENDS_ON" && relationship.spdxElementId !== relationship.relatedSpdxElement && packageIds.includes(relationship.relatedSpdxElement))
     && unique(payload.relationships.map((relationship) => `${relationship.spdxElementId}\u0000${relationship.relatedSpdxElement}`));
@@ -149,20 +150,21 @@ export function validateSbomManifest(manifest) {
 
 /** Validate profile payloads, their per-format digests and the aggregate record digest. */
 function equivalentProfiles(cyclonedx, spdxPayload) {
-  const cdx = new Map(cyclonedx.components.map((component) => [component["bom-ref"], { name: component.name, version: component.version, scope: component.properties.find((property) => property.name === "pipeline.scope").value, dependencies: cyclonedx.dependencies.find((dependency) => dependency.ref === component["bom-ref"]).dependsOn }]));
+  const cdx = new Map(cyclonedx.components.map((component) => [component["bom-ref"], { name: component.name, version: component.version, scope: component.properties.find((property) => property.name === "pipeline.scope").value, provenance: component.properties.find((property) => property.name === "pipeline.provenance").value, dependencies: cyclonedx.dependencies.find((dependency) => dependency.ref === component["bom-ref"]).dependsOn }]));
   const spdxPurls = new Map(spdxPayload.packages.map((pkg) => [pkg.SPDXID, pkg.externalRefs.find((reference) => reference.referenceType === "purl").referenceLocator]));
   const spdx = new Map(spdxPayload.packages.map((pkg) => {
     const id = spdxPurls.get(pkg.SPDXID);
     const scope = pkg.annotations.find((annotation) => annotation.comment.startsWith("scope:")).comment.slice("scope:".length);
+    const provenance = pkg.annotations.find((annotation) => annotation.comment.startsWith("provenance:")).comment.slice("provenance:".length);
     const dependencies = spdxPayload.relationships.filter((relationship) => relationship.spdxElementId === pkg.SPDXID).map((relationship) => spdxPurls.get(relationship.relatedSpdxElement));
-    return [id, { name: pkg.name, version: pkg.versionInfo, scope, dependencies }];
+    return [id, { name: pkg.name, version: pkg.versionInfo, scope, provenance, dependencies }];
   }));
-  return cdx.size === spdx.size && [...cdx].every(([id, component]) => spdx.has(id) && component.name === spdx.get(id).name && component.version === spdx.get(id).version && component.scope === spdx.get(id).scope && sameStrings(component.dependencies, spdx.get(id).dependencies));
+  return cdx.size === spdx.size && [...cdx].every(([id, component]) => spdx.has(id) && component.name === spdx.get(id).name && component.version === spdx.get(id).version && component.scope === spdx.get(id).scope && component.provenance === spdx.get(id).provenance && sameStrings(component.dependencies, spdx.get(id).dependencies));
 }
 
 function equivalentManifestComponents(manifest, cyclonedx) {
-  const payloadComponents = new Map(cyclonedx.components.map((component) => [component["bom-ref"], { scope: component.properties.find((property) => property.name === "pipeline.scope").value, relationships: cyclonedx.dependencies.find((dependency) => dependency.ref === component["bom-ref"]).dependsOn }]));
-  return manifest.components.length === payloadComponents.size && manifest.components.every((component) => payloadComponents.has(component.id) && component.scope === payloadComponents.get(component.id).scope && sameStrings(component.relationships, payloadComponents.get(component.id).relationships));
+  const payloadComponents = new Map(cyclonedx.components.map((component) => [component["bom-ref"], { scope: component.properties.find((property) => property.name === "pipeline.scope").value, provenance: component.properties.find((property) => property.name === "pipeline.provenance").value, relationships: cyclonedx.dependencies.find((dependency) => dependency.ref === component["bom-ref"]).dependsOn }]));
+  return manifest.components.length === payloadComponents.size && manifest.components.every((component) => payloadComponents.has(component.id) && component.scope === payloadComponents.get(component.id).scope && component.provenance === payloadComponents.get(component.id).provenance && sameStrings(component.relationships, payloadComponents.get(component.id).relationships));
 }
 
 export function validateSbomRecord(manifest, payloads, observedCandidate) {
