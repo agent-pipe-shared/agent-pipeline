@@ -96,9 +96,11 @@ validity, and linked lifecycle disposition. It never records a person name,
 pseudonym, free-form rationale, command, transcript, private path, or secret.
 
 The canonical lifecycle is `requested`, `granted`, `denied`, `cancelled`,
-`consumed`, `revoked`, `expired`, `corrected`, and `superseded`. A grant links
-one request; a consuming, revoking, correcting, or superseding record links
-the granted decision it disposes. No portable record is rewritten. The resolver
+`consumed`, `revoked`, `expired`, `corrected`, and `superseded`. A grant,
+denial, or cancellation links one request; every consuming, revoking, expiry,
+correcting, or superseding record links exactly the granted decision it
+disposes. The event outcome is closed and must match the event (`requested`
+uses `pending`). No portable record is rewritten. The resolver
 returns authority only for one exact grant whose physical repository and
 candidate match, whose validity window contains the evaluation time, and which
 has no terminal disposition. Missing, duplicated, stale, cross-repository, or
