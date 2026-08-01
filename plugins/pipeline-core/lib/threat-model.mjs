@@ -23,3 +23,17 @@ export function createThreatEntityId(kind, canonicalSource) {
   if (!["asset", "boundary", "threat", "abuse-case", "requirement", "mitigation"].includes(kind) || !text(canonicalSource)) return { ok: false, code: "THREAT-ENTITY-INVALID" };
   return { ok: true, id: stableId(kind, canonicalSource) };
 }
+
+/** Resolve required controls to exactly one threat or baseline obligation. */
+export function evaluateThreatTraceability(input) {
+  if (!own(input, ["requirements", "links"]) || !Array.isArray(input.requirements) || !Array.isArray(input.links) || !input.requirements.every(text) || !input.links.every((link) => own(link, ["requirement", "subject", "kind"]) && text(link.requirement) && text(link.subject) && ["threat", "baseline"].includes(link.kind))) return { ok: false, code: "THREAT-TRACEABILITY-INVALID" };
+  const missing = input.requirements.filter((requirement) => input.links.filter((link) => link.requirement === requirement).length !== 1);
+  return missing.length === 0 ? { ok: true } : { ok: false, code: "THREAT-TRACEABILITY-MISSING", missing };
+}
+
+/** Material deltas target only linked subjects; no blanket approval or mutation occurs. */
+export function evaluateThreatImpact(input) {
+  if (!own(input, ["changedSubjects", "links"]) || !Array.isArray(input.changedSubjects) || !input.changedSubjects.every(text) || !Array.isArray(input.links) || !input.links.every((link) => own(link, ["subject", "requirement"]) && text(link.subject) && text(link.requirement))) return { state: "invalid", code: "THREAT-IMPACT-INVALID" };
+  const affected = [...new Set(input.links.filter((link) => input.changedSubjects.includes(link.subject)).map((link) => link.requirement))].sort();
+  return { state: affected.length === 0 ? "current" : "stale", code: affected.length === 0 ? "THREAT-IMPACT-NONE" : "THREAT-IMPACT-REVIEW", affected };
+}
