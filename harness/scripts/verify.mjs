@@ -253,6 +253,7 @@ const TEST_SUITES = [
   { name: "control-evaluation-receipt-tests", file: join(libDir, "control-evaluation-receipt.test.mjs") },
   { name: "control-waiver-lifecycle-tests", file: join(libDir, "control-waiver-lifecycle.test.mjs") },
   { name: "control-catalog-drift-tests", file: join(libDir, "control-catalog-drift.test.mjs") },
+  { name: "sbom-manifest-tests", file: join(libDir, "sbom-manifest.test.mjs") },
   { name: "po-gate-authority-fixture-tests", file: join(libDir, "po-gate-authority.test.mjs") },
   { name: "public-core-observation-tests", file: join(libDir, "public-core-observation.test.mjs") },
   { name: "private-overlay-activation-tests", file: join(libDir, "private-overlay-activation.test.mjs") },
