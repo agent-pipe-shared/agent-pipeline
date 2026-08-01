@@ -18,8 +18,8 @@ let passed = 0;
 function check(name, fn) { fn(); passed += 1; process.stdout.write(`ok ${passed} - ${name}\n`); }
 
 check("active record requires a native active readback", () => assert.equal(validateRunnerNativeContinuation(record()).ok, true));
-check("active pipeline continuity derives a sanitised request and only readback materialises active", () => {
-  const request = buildRunnerNativeContinuationRequest({ continuationId: "nova-b0", activeFeature: { id: "nova", phase: "implementation" }, continuity: { featureId: "nova", revision: 3, blocker: null, queueHead: { packageId: "b0", actionId: "implement" }, authority: { prd: { sha256: D }, plan: { sha256: D }, spec: { sha256: D } } }, runner: { runnerId: "codex", adapterVersion: "v2", capability: "available" }, acceptance: [], evidence: [], progress: [] });
+check("active pipeline continuity derives a sanitised request from canonical PRD authority and only readback materialises active", () => {
+  const request = buildRunnerNativeContinuationRequest({ continuationId: "nova-b0", activeFeature: { id: "nova", phase: "implementation" }, continuity: { featureId: "nova", revision: 3, blocker: null, queueHead: { packageId: "b0", actionId: "implement" }, authority: { prd: { sha256: D }, spec: { sha256: D } } }, runner: { runnerId: "codex", adapterVersion: "v2", capability: "available" }, acceptance: [], evidence: [], progress: [] });
   const materialized = materializeRunnerNativeContinuation({ request, generation: 1, adapterResult: { ok: true, code: "CGH-ACTIVE", status: "active", readback: { goalIdSha256: D, generation: 1, observedAt: "2026-07-25T00:00:00.000Z", status: "active" } }, observedAt: "2026-07-25T00:00:00.000Z" });
   assert.equal(materialized.ok, true); assert.equal(materialized.continuation.status, "active");
   assert.equal(materialized.continuation.subject.planSha256, D);

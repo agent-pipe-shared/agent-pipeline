@@ -128,7 +128,10 @@ export function buildRunnerNativeContinuationRequest({ continuationId, activeFea
   const head = continuity.queueHead;
   const subject = {
     featureId: activeFeature.id, phase: activeFeature.phase,
-    planSha256: continuity.authority.plan?.sha256, specSha256: continuity.authority.spec?.sha256,
+    // The approved PRD is the durable plan authority for an active feature.
+    // `authority.plan` was an optional early fixture field and is not present
+    // in the canonical neutral lifecycle State.
+    planSha256: continuity.authority.prd?.sha256, specSha256: continuity.authority.spec?.sha256,
     queueRevision: continuity.revision, packageId: head.packageId, actionId: head.actionId,
   };
   if (!validSubject(subject)) return { ok: false, code: "RNC-SCHEMA" };

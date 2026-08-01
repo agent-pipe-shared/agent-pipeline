@@ -151,8 +151,7 @@ function validNativeContinuationBinding(value, state) {
   if (value === undefined || value === null) return true;
   return validateRunnerNativeContinuation(value).ok
     && value.subject.featureId === state.featureId
-    && state.authority.plan !== undefined
-    && value.subject.planSha256 === state.authority.plan.sha256
+    && value.subject.planSha256 === state.authority.prd.sha256
     && value.subject.specSha256 === state.authority.spec.sha256
     && value.subject.queueRevision <= state.revision;
 }
@@ -536,7 +535,10 @@ export async function reconcileRunnerNativeContinuation({ continuity, activeFeat
   if (current === null) {
     const progress = projectRunnerNativeProgress({ continuity, acceptance, evidence });
     if (!progress.ok) return { ok: false, code: progress.code };
-    const request = buildRunnerNativeContinuationRequest({ continuationId, activeFeature, continuity, runner, acceptance, evidence, progress: progress.progress });
+    // `activeFeature` is the persisted State object and carries its planPath.
+    // The native-goal record intentionally exposes only its bounded identity.
+    const subjectFeature = { id: activeFeature.id, phase: activeFeature.phase };
+    const request = buildRunnerNativeContinuationRequest({ continuationId, activeFeature: subjectFeature, continuity, runner, acceptance, evidence, progress: progress.progress });
     if (!request.ok) return { ok: false, code: request.code };
     const adapterResult = await adapter({ action: "set", generation: 0, subject: request.request.subject, objective: request.request.objective });
     const materialized = materializeRunnerNativeContinuation({ request, generation: 0, adapterResult, observedAt: adapterResult?.readback?.observedAt, reasonCode: event.kind });
