@@ -1,7 +1,7 @@
 # CYB-4 — threat-model + security-requirement lifecycle (feature spec)
 
-> **Status: DRAFT, design-phase, pre-gate.** Translates issue #43 (fetched
-> verbatim via `gh issue view 43`, 2026-07-25) into checkable form. Phase II,
+> **Status: IMPLEMENTATION, PO-authorized 2026-08-01.** Translates issue #43
+> (fetched verbatim via `gh issue view 43`, 2026-07-25) into checkable form. Phase II,
 > depends on CYB-1 (assurance-level enum + module IDs for applicability, per
 > CYB-1F §9 downstream binding map). Feeds CYB-6 (threat-model inputs to
 > stack-aware verification, spec.md's explicit "plus threat-model inputs from
@@ -90,6 +90,6 @@ Phoenix changes").
 
 ## 8. Gate
 
-Universal package rule. Schema/applicability/fixture work can start once CYB-1
-boundaries are approved (issue's own "Parallelism" note); final gate
-integration needs CYB-1's approved control IDs. No dispatch yet.
+Universal package rule. The Sprint Cyborg PO direction of 2026-08-01 authorizes
+implementation and ordinary verification without an additional chat gate.
+Final gate integration still uses CYB-1's approved control IDs.
