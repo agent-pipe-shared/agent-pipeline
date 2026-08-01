@@ -149,15 +149,15 @@ export function validateSbomManifest(manifest) {
 
 /** Validate profile payloads, their per-format digests and the aggregate record digest. */
 function equivalentProfiles(cyclonedx, spdxPayload) {
-  const cdx = new Map(cyclonedx.components.map((component) => [component["bom-ref"], { scope: component.properties.find((property) => property.name === "pipeline.scope").value, dependencies: cyclonedx.dependencies.find((dependency) => dependency.ref === component["bom-ref"]).dependsOn }]));
+  const cdx = new Map(cyclonedx.components.map((component) => [component["bom-ref"], { name: component.name, version: component.version, scope: component.properties.find((property) => property.name === "pipeline.scope").value, dependencies: cyclonedx.dependencies.find((dependency) => dependency.ref === component["bom-ref"]).dependsOn }]));
   const spdxPurls = new Map(spdxPayload.packages.map((pkg) => [pkg.SPDXID, pkg.externalRefs.find((reference) => reference.referenceType === "purl").referenceLocator]));
   const spdx = new Map(spdxPayload.packages.map((pkg) => {
     const id = spdxPurls.get(pkg.SPDXID);
     const scope = pkg.annotations.find((annotation) => annotation.comment.startsWith("scope:")).comment.slice("scope:".length);
     const dependencies = spdxPayload.relationships.filter((relationship) => relationship.spdxElementId === pkg.SPDXID).map((relationship) => spdxPurls.get(relationship.relatedSpdxElement));
-    return [id, { scope, dependencies }];
+    return [id, { name: pkg.name, version: pkg.versionInfo, scope, dependencies }];
   }));
-  return cdx.size === spdx.size && [...cdx].every(([id, component]) => spdx.has(id) && component.scope === spdx.get(id).scope && sameStrings(component.dependencies, spdx.get(id).dependencies));
+  return cdx.size === spdx.size && [...cdx].every(([id, component]) => spdx.has(id) && component.name === spdx.get(id).name && component.version === spdx.get(id).version && component.scope === spdx.get(id).scope && sameStrings(component.dependencies, spdx.get(id).dependencies));
 }
 
 function equivalentManifestComponents(manifest, cyclonedx) {

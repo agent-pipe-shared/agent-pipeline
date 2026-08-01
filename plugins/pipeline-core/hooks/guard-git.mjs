@@ -602,7 +602,7 @@ function overrideTarget() {
   // through a shell assignment or env wrapper, so they are rejected as well.
   // (Detection intentionally covers both --option=value and --option <value>.)
   const targetCommand = inlineArm?.remainder ?? cmd;
-  if (/(?:^|[\s;&|])(?:GIT_DIR|GIT_WORK_TREE)\s*=/u.test(targetCommand)) return { ok: false };
+  if (/(?:^|[\s;&|])(?:GIT_DIR|GIT_WORK_TREE)\s*=|\$env:(?:GIT_DIR|GIT_WORK_TREE)\s*=/iu.test(targetCommand)) return { ok: false };
   for (const segment of targetCommand.split(/[;&|]+/u)) {
     if (!/\bgit\b/u.test(segment)) continue;
     const gitIndex = segment.search(/\bgit\b/u);

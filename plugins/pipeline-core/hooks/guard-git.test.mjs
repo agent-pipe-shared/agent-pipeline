@@ -577,17 +577,23 @@ for (const [label, selector, token] of [
 for (const [label, assignment, token] of [
   ["GIT_DIR environment", `GIT_DIR=${OV_ABSOLUTE_TARGET}`, "20260704-19"],
   ["GIT_WORK_TREE environment", `GIT_WORK_TREE=${OV_ABSOLUTE_TARGET}`, "20260704-20"],
+  ["PowerShell GIT_DIR environment", `$env:GIT_DIR = '${OV_ABSOLUTE_TARGET}'`, "20260704-21"],
+  ["PowerShell GIT_WORK_TREE environment", `$env:GIT_WORK_TREE = '${OV_ABSOLUTE_TARGET}'`, "20260704-22"],
 ]) {
   check(
     `GO-OV block  override rejects a cross-target ${label} selector`,
-    `PIPELINE_GUARD_OVERRIDE='GG-07|${token}|environment target is intentionally separate' ${assignment} git reset --hard HEAD~1`,
+    label.startsWith("PowerShell")
+      ? `$env:PIPELINE_GUARD_OVERRIDE = 'GG-07|${token}|environment target is intentionally separate'; ${assignment}; git reset --hard HEAD~1`
+      : `PIPELINE_GUARD_OVERRIDE='GG-07|${token}|environment target is intentionally separate' ${assignment} git reset --hard HEAD~1`,
     BLOCK,
     { projectDir: OV_DIR, stderrIncludes: ["GG-07", "command target and ledger target"] },
   );
   checkNoLedgerToken(`GO-OV ledger ${label} rejection records no coordinator token`, OV_DIR, "GG-07", token);
   check(
     `GO-OV warn   ${label} rejection leaves token unconsumed`,
-    `PIPELINE_GUARD_OVERRIDE='GG-07|${token}|ordinary same-root reset is intentionally approved' git reset --hard HEAD~1`,
+    label.startsWith("PowerShell")
+      ? `$env:PIPELINE_GUARD_OVERRIDE = 'GG-07|${token}|ordinary same-root reset is intentionally approved'; git reset --hard HEAD~1`
+      : `PIPELINE_GUARD_OVERRIDE='GG-07|${token}|ordinary same-root reset is intentionally approved' git reset --hard HEAD~1`,
     WARN,
     { projectDir: OV_DIR, stderrIncludes: ["GG-07", token, "OVERRIDE APPLIED"] },
   );

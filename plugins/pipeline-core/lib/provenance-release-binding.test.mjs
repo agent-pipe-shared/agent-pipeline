@@ -1,9 +1,21 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { evaluateReleasePromotionBinding } from "./provenance-release-binding.mjs";
-const sha = "a".repeat(64); const subject = { id: "artifact", sha256: sha }; const valid = { subject, evidence: { sbom: { sha256: "b".repeat(64), subject }, security: { sha256: "c".repeat(64), subject } } };
+import { createProvenanceAttestationPayload } from "./provenance-envelope.mjs";
+const sha = "a".repeat(64); const subject = { id: "artifact", sha256: sha };
+const keyPair = generateKeyPairSync("ed25519");
+const publicKey = keyPair.publicKey.export({ type: "spki", format: "pem" });
+const unsignedEnvelope = { schema: "pipeline.provenance-envelope.v1", candidate: { commit: "d".repeat(40), tree: "e".repeat(40) }, subject, materials: [{ id: "source", kind: "source", sha256: "f".repeat(64) }], builder: { id: "builder", digest: "1".repeat(64) }, invocation: { id: "release", parametersSha256: "2".repeat(64) }, environment: { kind: "test", identitySha256: "3".repeat(64) }, assurance: "verified", attestation: { keyReference: "release-test-key", signatureSha256: "0".repeat(64), status: "verified" }, reproducibility: "repeatable-in-same-builder" };
+const payload = createProvenanceAttestationPayload(unsignedEnvelope);
+const signatureBase64 = sign(null, Buffer.from(payload), keyPair.privateKey).toString("base64");
+const envelope = { ...unsignedEnvelope, attestation: { ...unsignedEnvelope.attestation, signatureSha256: createHash("sha256").update(Buffer.from(signatureBase64, "base64")).digest("hex") } };
+const provenance = { envelope, expected: { candidate: envelope.candidate, subject, materials: envelope.materials, builderDigest: envelope.builder.digest, attestation: { keyReference: "release-test-key", publicKeySha256: createHash("sha256").update(publicKey).digest("hex") } }, attestation: { keyReference: "release-test-key", payload, publicKey, signatureBase64 } };
+const valid = { subject, evidence: { sbom: { sha256: "b".repeat(64), subject }, security: { sha256: "c".repeat(64), subject } }, provenance };
 assert.deepEqual(evaluateReleasePromotionBinding(valid), { allowed: true, code: "RELEASE-BINDING-ALLOWED" });
 assert.equal(evaluateReleasePromotionBinding({ ...valid, evidence: { ...valid.evidence, sbom: { ...valid.evidence.sbom, subject: { ...subject, sha256: "d".repeat(64) } } } }).code, "RELEASE-BINDING-SUBJECT-MISMATCH");
 assert.equal(evaluateReleasePromotionBinding({ ...valid, evidence: { ...valid.evidence, security: { ...valid.evidence.security, subject: { id: "other-artifact", sha256: sha } } } }).code, "RELEASE-BINDING-SUBJECT-MISMATCH");
 assert.equal(evaluateReleasePromotionBinding({ ...valid, evidence: { ...valid.evidence, sbom: { sha256: "b".repeat(64), subjectSha256: sha } } }).allowed, false);
+assert.deepEqual(evaluateReleasePromotionBinding({ ...valid, provenance: { ...provenance, attestation: { ...provenance.attestation, signatureBase64: sign(null, Buffer.from("forged"), keyPair.privateKey).toString("base64") } } }), { allowed: false, code: "RELEASE-BINDING-PROVENANCE-UNVERIFIED", cause: "PROVENANCE-ATTESTATION-UNVERIFIED" });
+assert.equal(evaluateReleasePromotionBinding({ ...valid, provenance: { ...provenance, envelope: { ...envelope, subject: { ...subject, sha256: "9".repeat(64) } } } }).code, "RELEASE-BINDING-PROVENANCE-UNVERIFIED");
 assert.equal(evaluateReleasePromotionBinding({}).allowed, false); console.log("5 release binding checks passed");

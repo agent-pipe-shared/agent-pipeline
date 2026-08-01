@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { createThreatEntityId, discoverThreatModel, evaluateThreatBoundary, evaluateThreatImpact, evaluateThreatModelApplicability, evaluateThreatTraceability, exportThreatModelView, previewThreatModelMigration, renderThreatModelView, threatModelDigest, validateSecurityRequirement, validateThreatApprovalReceipt, validateThreatModel } from "./threat-model.mjs";
+import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "./po-approval-proof.mjs";
 
 const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
 const assetId = createThreatEntityId("asset", "service:api").id;
@@ -9,6 +11,9 @@ const boundaryId = createThreatEntityId("boundary", "service:api:public").id;
 const newBoundaryId = createThreatEntityId("boundary", "service:worker:public").id;
 const model = { schema: "pipeline.threat-model.v1", candidate, policyRevision: "policy-v1", classification: "private", entities: [{ id: assetId, kind: "asset", label: "public-api", relationships: [boundaryId] }, { id: boundaryId, kind: "boundary", label: "public-boundary", relationships: [assetId] }], lifecycle: "proposed" };
 const receiptFor = (subject, decision = "approved", authority = "human") => ({ schema: "pipeline.threat-model-approval-receipt.v1", receiptId: "receipt-one", authority, decision, candidate, policyRevision: "policy-v1", modelDigest: threatModelDigest(subject).digest });
+const pair = generateKeyPairSync("ed25519"); const publicKey = pair.publicKey.export({ type: "spki", format: "pem" });
+const approvalAuthority = { keyReference: "test-key", publicKeySha256: createHash("sha256").update(publicKey).digest("hex") };
+const proofFor = (subject, decision = "approved") => { const intent = createPoApprovalIntent({ kind: "threat-model", featureId: "cyb-4", planSha256: "a".repeat(64), specSha256: "b".repeat(64), candidate: subject.candidate, policyRevision: subject.policyRevision, subjectSha256: threatModelDigest(subject).digest, decision }); return { intent, proof: { schema: PO_APPROVAL_PROOF_SCHEMA, intentSha256: intent.sha256, keyReference: "test-key", publicKey, signatureBase64: sign(null, Buffer.from(intent.sha256), pair.privateKey).toString("base64") } }; };
 const impactFor = (subject, changedSubjects = [], links = []) => evaluateThreatImpact({ model: subject, changedSubjects, links });
 const complete = { applicability: "required", riskInputs: { assurance: true, exposure: true, data: true, privilege: true, dependencies: true, architecture: true, deployment: true, agentEgress: true } };
 
@@ -38,21 +43,22 @@ assert.equal(validateThreatApprovalReceipt({ ...receipt, authority: "agent" }).v
 assert.equal(validateThreatApprovalReceipt({ ...receipt, modelDigest: "not-a-digest" }).valid, false);
 assert.deepEqual(renderThreatModelView(model), { ok: true, authoritative: false, text: `Threat model ${candidate.commit}\nPolicy policy-v1\nEntities\npublic-api\npublic-boundary` });
 assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "required", lifecycle: "approved", fresh: true }), { allowed: false, code: "THREAT-BOUNDARY-INVALID" });
-assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "required", model: approved, approvalReceipt: receipt, fresh: false, impact: impactFor(approved) }), { allowed: false, code: "THREAT-BOUNDARY-STALE" });
-assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "required", model: approved, approvalReceipt: receipt, fresh: true, impact: impactFor(approved) }), { allowed: true, code: "THREAT-BOUNDARY-ALLOWED" });
-assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "required", model: approved, approvalReceipt: receipt, fresh: true, impact: impactFor(approved, [newBoundaryId]) }), { allowed: false, code: "THREAT-BOUNDARY-IMPACT-STALE", affected: [], newBoundaries: [newBoundaryId] });
-assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "required", model: { ...model, lifecycle: "proposed" }, approvalReceipt: receiptFor({ ...model, lifecycle: "proposed" }), fresh: true, impact: impactFor(model) }), { allowed: false, code: "THREAT-BOUNDARY-UNAPPROVED" });
+assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "required", model: approved, approvalReceipt: receipt, approvalProof: proofFor(approved), approvalAuthority, fresh: false, impact: impactFor(approved) }), { allowed: false, code: "THREAT-BOUNDARY-STALE" });
+assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "required", model: approved, approvalReceipt: receipt, approvalProof: proofFor(approved), approvalAuthority, fresh: true, impact: impactFor(approved) }), { allowed: true, code: "THREAT-BOUNDARY-ALLOWED" });
+assert.equal(evaluateThreatBoundary({ boundary: "release", applicability: "required", model: approved, approvalReceipt: receipt, approvalProof: { ...proofFor(approved), trustPolicy: approvalAuthority }, approvalAuthority: { ...approvalAuthority, keyReference: "other-key" }, fresh: true, impact: impactFor(approved) }).allowed, false);
+assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "required", model: approved, approvalReceipt: receipt, approvalProof: proofFor(approved), approvalAuthority, fresh: true, impact: impactFor(approved, [newBoundaryId]) }), { allowed: false, code: "THREAT-BOUNDARY-IMPACT-STALE", affected: [], newBoundaries: [newBoundaryId] });
+assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "required", model: { ...model, lifecycle: "proposed" }, approvalReceipt: receiptFor({ ...model, lifecycle: "proposed" }), approvalProof: proofFor(model), approvalAuthority, fresh: true, impact: impactFor(model) }), { allowed: false, code: "THREAT-BOUNDARY-UNAPPROVED" });
 const acceptedRisk = { ...model, lifecycle: "accepted-risk" };
-assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "required", model: acceptedRisk, approvalReceipt: receiptFor(acceptedRisk, "accepted-risk", "policy"), fresh: true, impact: impactFor(acceptedRisk) }), { allowed: true, code: "THREAT-BOUNDARY-ALLOWED" });
-assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "required", model: approved, approvalReceipt: { ...receipt, policyRevision: "policy-v2" }, fresh: true, impact: impactFor(approved) }), { allowed: false, code: "THREAT-BOUNDARY-RECEIPT-MISMATCH" });
+assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "required", model: acceptedRisk, approvalReceipt: receiptFor(acceptedRisk, "accepted-risk", "policy"), approvalProof: proofFor(acceptedRisk, "accepted-risk"), approvalAuthority, fresh: true, impact: impactFor(acceptedRisk) }), { allowed: true, code: "THREAT-BOUNDARY-ALLOWED" });
+assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "required", model: approved, approvalReceipt: { ...receipt, policyRevision: "policy-v2" }, approvalProof: proofFor(approved), approvalAuthority, fresh: true, impact: impactFor(approved) }), { allowed: false, code: "THREAT-BOUNDARY-RECEIPT-MISMATCH" });
 const retired = { ...model, lifecycle: "retired" };
-assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "not-applicable", model: retired, approvalReceipt: receiptFor(retired, "not-applicable"), fresh: false, impact: impactFor(retired) }), { allowed: true, code: "THREAT-BOUNDARY-NOT-APPLICABLE" });
-assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "not-applicable", model: retired, approvalReceipt: receiptFor(retired, "not-applicable"), fresh: false, impact: impactFor(retired, [newBoundaryId]) }), { allowed: false, code: "THREAT-BOUNDARY-IMPACT-STALE", affected: [], newBoundaries: [newBoundaryId] });
+assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "not-applicable", model: retired, approvalReceipt: receiptFor(retired, "not-applicable"), approvalProof: proofFor(retired, "not-applicable"), approvalAuthority, fresh: false, impact: impactFor(retired) }), { allowed: true, code: "THREAT-BOUNDARY-NOT-APPLICABLE" });
+assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "not-applicable", model: retired, approvalReceipt: receiptFor(retired, "not-applicable"), approvalProof: proofFor(retired, "not-applicable"), approvalAuthority, fresh: false, impact: impactFor(retired, [newBoundaryId]) }), { allowed: false, code: "THREAT-BOUNDARY-IMPACT-STALE", affected: [], newBoundaries: [newBoundaryId] });
 const referenceModel = JSON.parse(readFileSync("specs/cyb-4/threat-model.json", "utf8"));
 const referenceReceipt = JSON.parse(readFileSync("specs/cyb-4/threat-model-approval-receipt.json", "utf8"));
 assert.equal(validateThreatModel(referenceModel).valid, true);
 assert.equal(validateThreatApprovalReceipt(referenceReceipt).valid, true);
 assert.equal(referenceReceipt.modelDigest, threatModelDigest(referenceModel).digest);
 assert.deepEqual(discoverThreatModel(process.cwd()), { ok: true, artifact: { featureId: "cyb-4", path: "specs/cyb-4/threat-model.json", sha256: "e4dd68ea838cabd33f8e746a4805846121cce20852dea4806e5799d878d36acc" } });
-assert.deepEqual(evaluateThreatBoundary({ boundary: "release", applicability: "required", model: referenceModel, approvalReceipt: referenceReceipt, fresh: true, impact: impactFor(referenceModel) }), { allowed: true, code: "THREAT-BOUNDARY-ALLOWED" });
-console.log("37 threat-model checks passed");
+assert.equal(evaluateThreatBoundary({ boundary: "release", applicability: "required", model: referenceModel, approvalReceipt: referenceReceipt, approvalProof: null, approvalAuthority, fresh: true, impact: impactFor(referenceModel) }).allowed, false);
+console.log("38 threat-model checks passed");

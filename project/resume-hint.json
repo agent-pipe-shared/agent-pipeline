@@ -1,0 +1,23 @@
+{
+  "schema": "pipeline.resume-hint.v1",
+  "nonAuthoritative": true,
+  "context": {
+    "intent": "Cyborg Absicherung abschließen.",
+    "scope": [
+      "Der geprüfte lokale Kandidat wartet auf eine frische unabhängige Prüfung."
+    ],
+    "constraints": [
+      "Keine Veröffentlichung oder endgültige Schließung in dieser Session."
+    ],
+    "questions": [
+      "Vor einer Veröffentlichung ist ein menschliches Gate erforderlich."
+    ]
+  },
+  "createdAt": "2026-08-01T20:19:47.138Z",
+  "basis": {
+    "featureId": "sprint-cyborg-epic",
+    "planSha256": "8a61e4fb9d26b49dc6240003bf1b64b0cdde75928e33c2d9d5a3c9002b2be293",
+    "specSha256": "af750a40f2601343dbc66bcfdb76ea40eaec2cc732f30808dd8100c735440ded"
+  },
+  "contentSha256": "5436804c14d03cc05013ee065530973dc41ada72d95ceb3d18a2df01fc5dca6e"
+}

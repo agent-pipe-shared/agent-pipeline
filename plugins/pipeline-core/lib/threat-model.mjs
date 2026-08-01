@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { validateFeatureTopology } from "./feature-package-topology.mjs";
+import { createPoApprovalIntent, verifyPoApprovalProof } from "./po-approval-proof.mjs";
 
 export const THREAT_MODEL_SCHEMA = "pipeline.threat-model.v1";
 export const SECURITY_REQUIREMENT_SCHEMA = "pipeline.security-requirement.v1";
@@ -44,9 +45,10 @@ export function validateSecurityRequirement(requirement) {
 }
 
 /**
- * Approval is an external human/policy receipt, never a lifecycle assertion in
- * an agent-authored model. This validates only the closed receipt boundary; a
- * caller must obtain the receipt from its configured authority.
+ * This legacy decision record is never sufficient on its own: the delivery
+ * boundary also requires a detached proof verified against a separately
+ * configured external authority. It remains a closed candidate binding, not
+ * an agent-authored lifecycle assertion.
  */
 export function validateThreatApprovalReceipt(receipt) {
   if (!own(receipt, ["schema", "receiptId", "authority", "decision", "candidate", "policyRevision", "modelDigest"]) || receipt.schema !== THREAT_APPROVAL_RECEIPT_SCHEMA || !CLOSED_ID.test(receipt.receiptId) || !["human", "policy"].includes(receipt.authority) || !["approved", "accepted-risk", "not-applicable"].includes(receipt.decision) || !candidate(receipt.candidate) || !CLOSED_ID.test(receipt.policyRevision) || !/^[a-f0-9]{64}$/u.test(receipt.modelDigest)) return { valid: false, code: "THREAT-APPROVAL-RECEIPT-INVALID" };
@@ -87,11 +89,16 @@ export function evaluateThreatImpact(input) {
 
 /** Named delivery boundaries accept only a fresh model bound to an external approval receipt. */
 export function evaluateThreatBoundary(input) {
-  if (!own(input, ["boundary", "applicability", "model", "approvalReceipt", "fresh", "impact"]) || !CLOSED_ID.test(input.boundary) || !THREAT_MODEL_APPLICABILITY.includes(input.applicability) || typeof input.fresh !== "boolean" || !own(input.impact, ["state", "code", "affected", "newBoundaries"]) || !["current", "stale"].includes(input.impact.state) || !Array.isArray(input.impact.affected) || !input.impact.affected.every((id) => CLOSED_ID.test(id)) || !Array.isArray(input.impact.newBoundaries) || !input.impact.newBoundaries.every((id) => entityId(id, "boundary"))) return { allowed: false, code: "THREAT-BOUNDARY-INVALID" };
+  if (!own(input, ["boundary", "applicability", "model", "approvalReceipt", "approvalProof", "approvalAuthority", "fresh", "impact"]) || !CLOSED_ID.test(input.boundary) || !THREAT_MODEL_APPLICABILITY.includes(input.applicability) || typeof input.fresh !== "boolean" || !own(input.impact, ["state", "code", "affected", "newBoundaries"]) || !["current", "stale"].includes(input.impact.state) || !Array.isArray(input.impact.affected) || !input.impact.affected.every((id) => CLOSED_ID.test(id)) || !Array.isArray(input.impact.newBoundaries) || !input.impact.newBoundaries.every((id) => entityId(id, "boundary"))) return { allowed: false, code: "THREAT-BOUNDARY-INVALID" };
   if (!validateThreatModel(input.model).valid) return { allowed: false, code: "THREAT-BOUNDARY-MODEL-INVALID" };
   if (!validateThreatApprovalReceipt(input.approvalReceipt).valid) return { allowed: false, code: "THREAT-BOUNDARY-RECEIPT-INVALID" };
   const receipt = input.approvalReceipt; const model = input.model;
   if (receipt.candidate.commit !== model.candidate.commit || receipt.candidate.tree !== model.candidate.tree || receipt.policyRevision !== model.policyRevision) return { allowed: false, code: "THREAT-BOUNDARY-RECEIPT-MISMATCH" };
+  let intent;
+  try { intent = createPoApprovalIntent({ kind: "threat-model", featureId: input.approvalProof?.intent?.value?.featureId, planSha256: input.approvalProof?.intent?.value?.planSha256, specSha256: input.approvalProof?.intent?.value?.specSha256, candidate: model.candidate, policyRevision: model.policyRevision, subjectSha256: threatModelDigest(model).digest, decision: receipt.decision }); } catch { return { allowed: false, code: "THREAT-BOUNDARY-AUTHORIZATION-INVALID" }; }
+  if (intent.sha256 !== input.approvalProof?.intent?.sha256) return { allowed: false, code: "THREAT-BOUNDARY-AUTHORIZATION-MISMATCH" };
+  const proof = verifyPoApprovalProof({ intent, trustPolicy: input.approvalAuthority, proof: input.approvalProof?.proof });
+  if (!proof.verified) return { allowed: false, code: "THREAT-BOUNDARY-EXTERNAL-AUTHORITY-REQUIRED", cause: proof.code };
   if (input.impact.state !== "current") return { allowed: false, code: "THREAT-BOUNDARY-IMPACT-STALE", affected: input.impact.affected, newBoundaries: input.impact.newBoundaries };
   if (input.applicability === "not-applicable") return receipt.decision === "not-applicable" ? { allowed: true, code: "THREAT-BOUNDARY-NOT-APPLICABLE" } : { allowed: false, code: "THREAT-BOUNDARY-UNAPPROVED" };
   if (input.applicability !== "required") return { allowed: false, code: "THREAT-BOUNDARY-INCOMPLETE" };

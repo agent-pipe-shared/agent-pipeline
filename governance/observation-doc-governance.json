@@ -109,6 +109,7 @@
           "docs/human-guard-override-threat-model.md",
           "docs/marketplace-supply-chain-threat-model.md",
           "docs/next-session-setup-prompt.md",
+          "docs/po-approval-proof-contract.md",
           "docs/release-0.4-readiness.md",
           "docs/release-0.4.2-readiness.md",
           "docs/release-0.4.3-readiness.md",
@@ -116,6 +117,7 @@
           "docs/release-0.4.5-readiness.md",
           "docs/release-0.4.6-readiness.md",
           "docs/sentinel-scope-extension-threat-model.md",
+          "docs/sprint-cyborg-tp-waiver.md",
           "docs/state.md"
         ]
       },
