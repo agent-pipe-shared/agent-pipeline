@@ -464,6 +464,11 @@ process.exit(0);
   assertEqual("gitleaks run: clean fixture -> PASS, 0 findings", { status: result.status, count: result.findings.length }, { status: "PASS", count: 0 });
 }
 {
+  const rootDir = makeRootDir("gitleaks-candidate-tree-root"); let observedArgs = null;
+  const result = await gitleaksAdapter.run({ rootDir, config: { binaryPath: gitleaksClean }, timeoutMs: 5000, spawnFn: (_bin, args) => { observedArgs = args; return fixtureSpawnFn(gitleaksClean, args); } });
+  assertEqual("gitleaks run: candidate-tree scan disables Git history", { status: result.status, noGit: observedArgs.includes("--no-git") }, { status: "PASS", noGit: true });
+}
+{
   const rootDir = makeRootDir("gitleaks-findings-root");
   const result = await gitleaksAdapter.run({ rootDir, config: { binaryPath: gitleaksFindings }, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
   assertEqual("gitleaks run: findings fixture -> FINDINGS status", result.status, "FINDINGS");
