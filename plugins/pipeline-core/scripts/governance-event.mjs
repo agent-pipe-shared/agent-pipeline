@@ -7,6 +7,10 @@ import { canonicalSha256, parseStrictJson } from "../lib/governance-event.mjs";
 import {
   GovernanceEventStoreError,
   appendPortableGovernanceEvent,
+  createRestrictedAuthorization,
+  eraseRestrictedGovernanceEvent,
+  putRestrictedGovernanceEvent,
+  queryRestrictedGovernanceEvent,
   queryPortableGovernanceStream,
   recoverPortableGovernanceProjection,
   verifyPortableGovernanceStream,
@@ -38,11 +42,12 @@ function parse(argv) {
     verify: ["--repo", "--request-file"],
     query: ["--repo", "--request-file"],
     recover: ["--repo", "--request-file"],
+    restricted: ["--repo", "--request-file", "--key-file"],
   }[operation];
   if (!allowed || flags.size !== allowed.length || allowed.some((flag) => !flags.has(flag)) || [...flags.keys()].some((flag) => !allowed.includes(flag))) {
     fail("GEC-ARGUMENT", "Usage: governance-event.mjs preview --request-file <file> | append|verify|query|recover --repo <checkout> --request-file <file>");
   }
-  return { operation, repo: flags.get("--repo"), requestFile: flags.get("--request-file") };
+  return { operation, repo: flags.get("--repo"), requestFile: flags.get("--request-file"), keyFile: flags.get("--key-file") };
 }
 
 function appendRequest(value) {
@@ -59,9 +64,23 @@ function recoveryRequest(value) {
   return value;
 }
 
+function restrictedRequest(value) {
+  if (!exactKeys(value, ["schema", "operation", "repositoryFingerprint", "storeRoot", "recordId", "expectedRecordDigest", "keyGeneration", "expiresAtEpochMs", "event"])
+    || value.schema !== "pipeline.governance-event-restricted-request.v1" || !["put", "query", "erase"].includes(value.operation)) fail("GEC-REQUEST", "Restricted request has an invalid closed shape.");
+  return value;
+}
+
 export async function main(argv = process.argv.slice(2)) {
   const parsed = parse(argv);
   const body = await request(parsed.requestFile);
+  if (parsed.operation === "restricted") {
+    const restricted = restrictedRequest(body); const key = await readFile(parsed.keyFile);
+    if (key.byteLength !== 32) fail("GEC-KEY", "Restricted key file must contain exactly 32 bytes.");
+    const authorization = createRestrictedAuthorization({ key, repositoryFingerprint: restricted.repositoryFingerprint, operation: restricted.operation, recordId: restricted.recordId, expectedRecordDigest: restricted.expectedRecordDigest });
+    if (restricted.operation === "put") return putRestrictedGovernanceEvent({ repositoryRoot: parsed.repo, storeRoot: restricted.storeRoot, repositoryFingerprint: restricted.repositoryFingerprint, authorization, key, keyGeneration: restricted.keyGeneration, expiresAtEpochMs: restricted.expiresAtEpochMs, event: restricted.event });
+    if (restricted.operation === "query") return queryRestrictedGovernanceEvent({ repositoryRoot: parsed.repo, storeRoot: restricted.storeRoot, repositoryFingerprint: restricted.repositoryFingerprint, authorization, key, recordId: restricted.recordId });
+    return eraseRestrictedGovernanceEvent({ repositoryRoot: parsed.repo, storeRoot: restricted.storeRoot, repositoryFingerprint: restricted.repositoryFingerprint, authorization, key, recordId: restricted.recordId, expectedRecordDigest: restricted.expectedRecordDigest });
+  }
   if (parsed.operation === "preview") {
     const append = appendRequest(body);
     // Preview remains read-only and never allocates a sequence or event digest.
