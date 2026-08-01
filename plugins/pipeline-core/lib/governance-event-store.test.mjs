@@ -233,6 +233,7 @@ test("restricted storage stays outside the repository, is owner-only encrypted, 
   const keyCustodyRoot = await mkdtemp(path.join(os.tmpdir(), "governance-key-custody-")); t.after(() => cleanup(keyCustodyRoot));
   const custodyFile = path.join(keyCustodyRoot, "material.bin"); await writeFile(custodyFile, key, { mode: 0o600 });
   const keyFileDigest = createHash("sha256").update(key).digest("hex");
+  // gitleaks:allow — this is a deterministic test-operation label and a computed digest, never key material.
   const destroyPlan = await planRestrictedGovernanceOperation({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, operation: "destroy-key", keyGeneration: "key-1", expectedKeyFileDigest: keyFileDigest, idempotencyKey: "destroy-plan-1" });
   assert.equal(destroyPlan.mutation, false);
   const destroyAuthorization = createRestrictedAuthorization({ key, repositoryFingerprint: fingerprint, operation: "destroy-key", expectedRecordDigest: keyFileDigest });
