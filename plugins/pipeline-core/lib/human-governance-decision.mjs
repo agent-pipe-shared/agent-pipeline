@@ -6,6 +6,7 @@ const CODE = /^[A-Z][A-Z0-9._:-]{0,127}$/u;
 const SHA256 = /^[a-f0-9]{64}$/u;
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 const EVENTS = new Set(["requested", "granted", "denied", "cancelled", "consumed", "revoked", "expired", "corrected", "superseded"]);
+const OUTCOMES = new Set(["pending", "granted", "denied", "cancelled", "consumed", "revoked", "expired", "corrected", "superseded"]);
 const AUTHORITIES = new Set(["product-owner", "delegated-reviewer", "security-reviewer", "privacy-reviewer"]);
 const ASSURANCE = new Set(["locally-attributed", "externally-attested", "unknown"]);
 
@@ -20,7 +21,7 @@ function nullableId(value) { return value === null || (typeof value === "string"
 /** Rejects free text, private coordinates, missing target bindings, and invalid lifecycle links. */
 export function validateHumanGovernanceDecision(decision) {
   const keys = ["decisionId", "event", "outcome", "authorityClass", "identityAssurance", "timeAssurance", "scope", "reasonCode", "policyDigest", "ruleDigest", "validity", "links"];
-  if (!exact(decision, keys) || !ID.test(decision.decisionId) || !EVENTS.has(decision.event) || !EVENTS.has(decision.outcome)
+  if (!exact(decision, keys) || !ID.test(decision.decisionId) || !EVENTS.has(decision.event) || !OUTCOMES.has(decision.outcome)
     || !AUTHORITIES.has(decision.authorityClass) || !ASSURANCE.has(decision.identityAssurance) || !new Set(["locally-observed", "externally-attested", "unknown"]).has(decision.timeAssurance)
     || !CODE.test(decision.reasonCode) || !SHA256.test(decision.policyDigest) || !SHA256.test(decision.ruleDigest)) fail("HGL-SHAPE");
   const scope = decision.scope;
@@ -31,11 +32,10 @@ export function validateHumanGovernanceDecision(decision) {
   const validity = decision.validity;
   if (!exact(validity, ["notBeforeEpochMs", "expiresAtEpochMs", "singleUse"]) || !Number.isSafeInteger(validity.notBeforeEpochMs) || !Number.isSafeInteger(validity.expiresAtEpochMs) || validity.notBeforeEpochMs < 0 || validity.expiresAtEpochMs < validity.notBeforeEpochMs || typeof validity.singleUse !== "boolean") fail("HGL-VALIDITY");
   const links = decision.links;
-  const linkKeys = ["requestDecisionId", "consumesDecisionId", "revokesDecisionId", "supersedesDecisionId", "correctsDecisionId"];
+  const linkKeys = ["requestDecisionId", "consumesDecisionId", "revokesDecisionId", "expiresDecisionId", "supersedesDecisionId", "correctsDecisionId"];
   if (!exact(links, linkKeys) || linkKeys.some((key) => !nullableId(links[key]))) fail("HGL-LINKS");
-  const linked = linkKeys.filter((key) => links[key] !== null);
-  if (decision.event === "granted" && linked.length !== 1) fail("HGL-LIFECYCLE");
-  if (["consumed", "revoked", "superseded", "corrected"].includes(decision.event) && linked.length !== 1) fail("HGL-LIFECYCLE");
-  if (["requested", "denied", "cancelled", "expired"].includes(decision.event) && linked.length !== 0) fail("HGL-LIFECYCLE");
+  const requiredLink = { requested: null, granted: "requestDecisionId", denied: "requestDecisionId", cancelled: "requestDecisionId", consumed: "consumesDecisionId", revoked: "revokesDecisionId", expired: "expiresDecisionId", corrected: "correctsDecisionId", superseded: "supersedesDecisionId" }[decision.event];
+  if ((decision.event === "requested" && decision.outcome !== "pending") || (decision.event !== "requested" && decision.outcome !== decision.event)) fail("HGL-OUTCOME");
+  if (linkKeys.filter((key) => links[key] !== null).length !== (requiredLink === null ? 0 : 1) || (requiredLink !== null && links[requiredLink] === null)) fail("HGL-LIFECYCLE");
   return Object.freeze({ ...decision, scope: Object.freeze({ ...scope, candidate: Object.freeze({ ...scope.candidate }), artifacts: Object.freeze(scope.artifacts.map((entry) => Object.freeze({ ...entry }))) }), validity: Object.freeze({ ...validity }), links: Object.freeze({ ...links }) });
 }

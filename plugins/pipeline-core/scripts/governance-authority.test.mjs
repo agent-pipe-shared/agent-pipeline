@@ -44,7 +44,7 @@ async function fixture() {
 }
 
 function decision(fingerprint) {
-  return { decisionId: "grant-1", event: "granted", outcome: "granted", authorityClass: "product-owner", identityAssurance: "locally-attributed", timeAssurance: "locally-observed", scope: { repositoryFingerprint: fingerprint, candidate, packageId: "phoenix-2", action: "APPROVE_PLAN", environment: "local", artifacts: [{ path: "specs/sprint-phoenix-epic/spec.md", sha256: "e".repeat(64) }] }, reasonCode: "APPROVED", policyDigest: "a".repeat(64), ruleDigest: "f".repeat(64), validity: { notBeforeEpochMs: 1, expiresAtEpochMs: 2_000, singleUse: true }, links: { requestDecisionId: "request-1", consumesDecisionId: null, revokesDecisionId: null, supersedesDecisionId: null, correctsDecisionId: null } };
+  return { decisionId: "grant-1", event: "granted", outcome: "granted", authorityClass: "product-owner", identityAssurance: "locally-attributed", timeAssurance: "locally-observed", scope: { repositoryFingerprint: fingerprint, candidate, packageId: "phoenix-2", action: "APPROVE_PLAN", environment: "local", artifacts: [{ path: "specs/sprint-phoenix-epic/spec.md", sha256: "e".repeat(64) }] }, reasonCode: "APPROVED", policyDigest: "a".repeat(64), ruleDigest: "f".repeat(64), validity: { notBeforeEpochMs: 1, expiresAtEpochMs: 2_000, singleUse: true }, links: { requestDecisionId: "request-1", consumesDecisionId: null, revokesDecisionId: null, expiresDecisionId: null, supersedesDecisionId: null, correctsDecisionId: null } };
 }
 
 function intent(fingerprint, capturePolicyDigest) {
