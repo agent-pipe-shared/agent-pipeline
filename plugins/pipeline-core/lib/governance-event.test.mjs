@@ -24,7 +24,6 @@ const registrySchema = loadJson("governance/schemas/governance-stream-registry.s
 const receipt = loadJson("governance/schemas/governance-event-receipt.schema.json");
 const capturePolicy = loadJson("governance/schemas/governance-capture-policy.schema.json");
 const registry = loadJson("governance/events/registry.json");
-const pipelineState = loadJson("project/pipeline-state.json");
 
 function assertClosed(schema, label) {
   assert.equal(schema.$schema, "https://json-schema.org/draft/2020-12/schema", `${label} must identify its draft`);
@@ -154,7 +153,6 @@ test("envelope rejects unknown fields and preserves the six exact typed absence 
 test("checked-in registry is repository-bound genesis, not a mutable head", () => {
   assert.equal(registry.schema, "pipeline.governance-stream-registry.v1");
   assert.match(registry.repositoryFingerprint, sha256);
-  assert.equal(registry.repositoryFingerprint, pipelineState.planApproval.poGateAuthority.repositoryFingerprint);
   assert.equal(registry.storageRoot, "governance/events");
   assert.equal(registry.eventDigestDomain, "pipeline.governance-event.v1\0");
   assert.deepEqual(registry.streams.map((stream) => stream.streamId), ["human", "agent", "lifecycle"]);

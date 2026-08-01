@@ -106,6 +106,7 @@
           "docs/contributor-gate-security.md",
           "docs/critic-isolation-threat-model.md",
           "docs/github-actions-token-permissions.md",
+          "docs/governance-events.md",
           "docs/marketplace-supply-chain-threat-model.md",
           "docs/next-session-setup-prompt.md",
           "docs/phoenix-governance-threat-model.md",
@@ -169,6 +170,7 @@
           "docs/adr/0044-control-execution-boundary.md",
           "docs/adr/0045-canonical-artifact-topology.md",
           "docs/adr/0046-project-authority-layering.md",
+          "docs/adr/0047-governance-event-kernel.md",
           "docs/adr/README.md"
         ]
       },
