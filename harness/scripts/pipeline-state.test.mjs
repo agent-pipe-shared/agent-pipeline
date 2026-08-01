@@ -139,6 +139,8 @@ function recoveryBridgeDecision(overrides = {}) {
     recoveryPostimageSha256: B,
     prdSha256: C,
     specSha256: D,
+    approvedBy: "PO",
+    approvedAt: "2026-08-01T00:00:00.000Z",
     expiresAt: "2026-10-30T00:00:00.000Z",
     status: "issued",
     ...overrides,
@@ -161,6 +163,8 @@ function recoveryBridgeCommitRequest(decision, overrides = {}) {
     recoveryPostimageSha256: decision.recoveryPostimageSha256,
     prdSha256: decision.prdSha256,
     specSha256: decision.specSha256,
+    approvedBy: decision.approvedBy,
+    approvedAt: decision.approvedAt,
     expiresAt: decision.expiresAt,
     ...overrides,
   };
@@ -2450,6 +2454,79 @@ if (symlinkCapable) {
     && changedCommitTarget.ok === false && changedCommitTarget.code === "RB-PUBLIC-COMMIT-BINDING"
     && committed.ok
     && changedReceipt.ok === false && changedReceipt.code === "RB-CONSUME-READBACK-BINDING");
+}
+
+
+function recoveryBridgeExecutableFixture() {
+  const dir = freshDir("recovery-bridge-executable");
+  const base = "specs/sprint-phoenix-epic";
+  const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
+  const put = (path, bytes) => { mkdirSync(dirname(join(dir, path)), { recursive: true }); writeFileSync(join(dir, path), bytes); return digest(bytes); };
+  const prdPath = base + "/prd_phoenix-epic.md"; const specPath = base + "/spec.md"; const recoveryPath = base + "/RECOVERY.md";
+  const prdSha256 = put(prdPath, "# Recovery Bridge PRD\n"); const specSha256 = put(specPath, "# Recovery Bridge Spec\n");
+  put(base + "/acceptance.md", "# Acceptance\n"); const recoveryPostimageSha256 = put(recoveryPath, "# Recovered design\n");
+  const manifestPath = base + "/lifecycle.json";
+  const manifest = { schema: "pipeline.feature-package.v1", feature: { id: "sprint-phoenix-epic", rigor: 2 }, state: "draft", artifacts: [
+    { class: "prd", path: prdPath, sha256: prdSha256, authority: true, mutability: "mutable", retention: "active" },
+    { class: "spec", path: specPath, sha256: specSha256, authority: true, mutability: "mutable", retention: "active" },
+    { class: "acceptance", path: base + "/acceptance.md", sha256: digest("# Acceptance\n"), authority: true, mutability: "mutable", retention: "active" },
+    { class: "design", path: recoveryPath, sha256: digest("stale recovery"), authority: false, mutability: "mutable", retention: "retain" },
+  ], candidate: null, supersedes: null };
+  const manifestBytes = JSON.stringify(manifest, null, 2) + "\n"; writeFileSync(join(dir, manifestPath), manifestBytes);
+  mkdirSync(join(dir, ".claude"), { recursive: true }); writeFileSync(statePath(dir), JSON.stringify({ schema: SCHEMA_ID, planApproved: false, planApproval: { approvedBy: "not-PO" } }));
+  const gitCommonDir = join(dir, "git-common"); mkdirSync(gitCommonDir, { recursive: true });
+  const decision = recoveryBridgeDecision({ manifestPreimageSha256: digest(manifestBytes), recoveryPostimageSha256, prdSha256, specSha256, expiresAt: "2026-09-01T00:00:00.000Z" });
+  return { dir, digest, manifest, manifestBytes, manifestPath, decision, recoveryPath, gitCommonDir };
+}
+
+{
+  const fixture = recoveryBridgeExecutableFixture(); const now = () => "2026-08-01T00:00:00.000Z";
+  const plan = captureConsoleLog(() => run(["recovery-bridge-plan", "--decision-file", writeRequest(fixture.dir, "bridge-decision", fixture.decision)], { dir: fixture.dir, now }));
+  const request = plan.value === 0 ? JSON.parse(plan.text).request : null;
+  const planWith = (decision, name) => run(["recovery-bridge-plan", "--decision-file", writeRequest(fixture.dir, name, decision)], { dir: fixture.dir, now });
+  const attribution = planWith(recoveryBridgeDecision({ ...fixture.decision, approvedBy: "agent" }), "bridge-attribution");
+  const expiry = planWith(recoveryBridgeDecision({ ...fixture.decision, expiresAt: "2026-08-01T00:00:00.000Z" }), "bridge-expiry");
+  const chronology = planWith(recoveryBridgeDecision({ ...fixture.decision, approvedAt: "2026-10-01T00:00:00.000Z" }), "bridge-chronology");
+  const prdDrift = (() => { writeFileSync(join(fixture.dir, "specs/sprint-phoenix-epic/prd_phoenix-epic.md"), "drift\n"); const code = planWith(fixture.decision, "bridge-prd-drift"); writeFileSync(join(fixture.dir, "specs/sprint-phoenix-epic/prd_phoenix-epic.md"), "# Recovery Bridge PRD\n"); return code; })();
+  const specDrift = (() => { writeFileSync(join(fixture.dir, "specs/sprint-phoenix-epic/spec.md"), "drift\n"); const code = planWith(fixture.decision, "bridge-spec-drift"); writeFileSync(join(fixture.dir, "specs/sprint-phoenix-epic/spec.md"), "# Recovery Bridge Spec\n"); return code; })();
+  const recoveryDrift = (() => { writeFileSync(join(fixture.dir, fixture.recoveryPath), "drift\n"); const code = planWith(fixture.decision, "bridge-recovery-drift"); writeFileSync(join(fixture.dir, fixture.recoveryPath), "# Recovered design\n"); return code; })();
+  const manifestDrift = (() => { writeFileSync(join(fixture.dir, fixture.manifestPath), fixture.manifestBytes + "\n"); const code = planWith(fixture.decision, "bridge-manifest-drift"); writeFileSync(join(fixture.dir, fixture.manifestPath), fixture.manifestBytes); return code; })();
+  const generic = run(["feature-package-plan", "--manifest", fixture.manifestPath, "--proposal-file", writeRequest(fixture.dir, "generic-fixed-target", { operation: "reconcile-mutable-design", targetState: "draft", artifactPath: fixture.recoveryPath }), "--idempotency-key", "rb-generic-01", "--expires-at", "2026-09-01T00:00:00.000Z"], { dir: fixture.dir, now });
+  ok("TP5 Recovery Bridge executable planner ignores stale or unapproved State and rejects bound drift", plan.value === 0 && request?.authority?.class === "recovery-bridge" && attribution === 2 && expiry === 2 && chronology === 2 && prdDrift === 2 && specDrift === 2 && recoveryDrift === 2 && manifestDrift === 2 && generic === 2);
+}
+
+{
+  const fixture = recoveryBridgeExecutableFixture(); const now = () => "2026-08-01T00:00:00.000Z";
+  const planned = captureConsoleLog(() => run(["recovery-bridge-plan", "--decision-file", writeRequest(fixture.dir, "bridge-apply-decision", fixture.decision)], { dir: fixture.dir, now }));
+  const request = JSON.parse(planned.text).request; const requestFile = writeRequest(fixture.dir, "bridge-apply-request", request);
+  const deps = { dir: fixture.dir, now, gitCommonDir: () => ({ ok: true, path: fixture.gitCommonDir }) };
+  const forged = structuredClone(request); forged.authority.class = "po-approval";
+  const forgedNormal = run(["feature-package-apply", "--request-file", writeRequest(fixture.dir, "bridge-forged-normal", forged), "--request-sha256", sha256Canonical(forged), "--lock-token", "rb-forged"], deps);
+  const applied = run(["feature-package-apply", "--request-file", requestFile, "--request-sha256", sha256Canonical(request), "--lock-token", "rb-apply"], deps);
+  const after = JSON.parse(readFileSync(join(fixture.dir, fixture.manifestPath), "utf8"));
+  const changed = fixture.manifest.artifacts.map((entry, index) => entry.sha256 === after.artifacts[index].sha256 ? 0 : 1);
+  const journalPath = join(fixture.gitCommonDir, "agent-pipeline", "recovery-bridge", fixture.decision.decisionId, "journal.json");
+  const journal = JSON.parse(readFileSync(journalPath, "utf8"));
+  const replay = run(["feature-package-apply", "--request-file", requestFile, "--request-sha256", sha256Canonical(request), "--lock-token", "rb-replay"], deps);
+  const interruptionJournal = join(fixture.dir, ".claude", "feature-package-transaction.json");
+  writeFileSync(interruptionJournal, JSON.stringify({ request }) + "\n");
+  const recovery = run(["feature-package-recover", "--request-file", requestFile, "--request-sha256", sha256Canonical(request), "--lock-token", "rb-recover"], deps);
+  ok("TP5 Recovery Bridge executable apply changes only RECOVERY, consumes, rejects replay, and recovers exact interruption phases", planned.value === 0 && forgedNormal === 2 && applied === 0 && changed.reduce((sum, value) => sum + value, 0) === 1 && changed[3] === 1 && journal.decision.status === "consumed" && !existsSync(join(fixture.dir, ".claude", "recovery-bridge-transaction.json")) && replay === 2 && recovery === 0);
+}
+
+{
+  const now = () => "2026-08-01T00:00:00.000Z";
+  const refusal = (name, prepare, common) => {
+    const fixture = recoveryBridgeExecutableFixture(); const planned = captureConsoleLog(() => run(["recovery-bridge-plan", "--decision-file", writeRequest(fixture.dir, name + "-decision", fixture.decision)], { dir: fixture.dir, now }));
+    const request = JSON.parse(planned.text).request; const before = readFileSync(join(fixture.dir, fixture.manifestPath), "utf8"); prepare(fixture);
+    const code = run(["feature-package-apply", "--request-file", writeRequest(fixture.dir, name + "-request", request), "--request-sha256", sha256Canonical(request), "--lock-token", name + "-lock"], { dir: fixture.dir, now, gitCommonDir: () => ({ ok: true, path: common(fixture) }) });
+    return code === 2 && readFileSync(join(fixture.dir, fixture.manifestPath), "utf8") === before;
+  };
+  const missing = refusal("rb-private-missing", () => {}, () => join("/tmp", "missing-recovery-private-store"));
+  const relative = refusal("rb-private-relative", () => {}, () => "relative-private-store");
+  const malformed = refusal("rb-private-malformed", (fixture) => { const path = join(fixture.gitCommonDir, "agent-pipeline", "recovery-bridge", fixture.decision.decisionId); mkdirSync(path, { recursive: true }); writeFileSync(join(path, "journal.json"), "{ malformed"); }, (fixture) => fixture.gitCommonDir);
+  const symlinked = refusal("rb-private-symlink", (fixture) => { const link = join(fixture.dir, "common-link"); symlinkSync(fixture.gitCommonDir, link); fixture.privateLink = link; }, (fixture) => fixture.privateLink);
+  ok("TP5 Recovery Bridge private store rejects missing, nonabsolute, malformed, and symlinked stores without manifest mutation", missing && relative && malformed && symlinked);
 }
 
 // ---- Cleanup ------------------------------------------------------------------------------

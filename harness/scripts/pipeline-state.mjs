@@ -297,14 +297,16 @@ export const SCHEMA_ID = "pipeline.state.v0";
 export const CONTINUITY_LOCK_SCHEMA_ID = "pipeline.continuity-lock.v0";
 export const CONTINUITY_LOCK_STALE_MS = 30_000;
 /**
- * Closed, pure Recovery Bridge decision contract.  This is deliberately not a
- * CLI/state-store integration: a later bridge may persist these records only
- * after it has separately performed its own attested public operation.
+ * Closed Recovery Bridge decision contract. The sole executable consumer is
+ * the Phoenix-only adapter below. Its local operator-attested PO attribution
+ * is immutable, and the adapter never treats mutable State as that authority.
  */
 export const RECOVERY_BRIDGE_DECISION_SCHEMA = "pipeline.recovery-bridge-decision.v1";
 export const RECOVERY_BRIDGE_PUBLIC_COMMIT_REQUEST_SCHEMA = "pipeline.recovery-bridge-public-commit-request.v1";
 export const RECOVERY_BRIDGE_CONSUME_RECEIPT_SCHEMA = "pipeline.recovery-bridge-consume-receipt.v1";
 export const RECOVERY_BRIDGE_ISSUANCE_CUTOFF = "2026-10-31T00:00:00.000Z";
+const RECOVERY_BRIDGE_PLAN_SCHEMA = "pipeline.recovery-bridge-plan.v1";
+const RECOVERY_BRIDGE_TRANSACTION_SCHEMA = "pipeline.recovery-bridge-transaction.v1";
 const RECOVERY_BRIDGE_FEATURE_ID = "sprint-phoenix-epic";
 const RECOVERY_BRIDGE_OPERATION = "reconcile-mutable-design";
 const RECOVERY_BRIDGE_MANIFEST = "specs/sprint-phoenix-epic/lifecycle.json";
@@ -313,11 +315,11 @@ const RECOVERY_BRIDGE_ASSURANCE = "operator-local-attested";
 const RECOVERY_BRIDGE_ID_RE = /^rb-[a-f0-9]{16,64}$/u;
 const RECOVERY_BRIDGE_BINDING_KEYS = [
   "decisionId", "featureId", "operation", "manifest", "artifactPath", "assurance",
-  "manifestPreimageSha256", "recoveryPostimageSha256", "prdSha256", "specSha256", "expiresAt",
+  "manifestPreimageSha256", "recoveryPostimageSha256", "prdSha256", "specSha256", "approvedBy", "approvedAt", "expiresAt",
 ];
 const RECOVERY_BRIDGE_DECISION_KEYS = [
   "schema", "decisionId", "decisionSha256", "featureId", "operation", "manifest", "artifactPath", "assurance",
-  "manifestPreimageSha256", "recoveryPostimageSha256", "prdSha256", "specSha256", "expiresAt", "status",
+  "manifestPreimageSha256", "recoveryPostimageSha256", "prdSha256", "specSha256", "approvedBy", "approvedAt", "expiresAt", "status",
 ];
 
 function recoveryBridgeBinding(value) {
@@ -350,6 +352,8 @@ export function validateRecoveryBridgeDecision(value, { now } = {}) {
   if (value.featureId !== RECOVERY_BRIDGE_FEATURE_ID || value.operation !== RECOVERY_BRIDGE_OPERATION
     || value.manifest !== RECOVERY_BRIDGE_MANIFEST || value.artifactPath !== RECOVERY_BRIDGE_ARTIFACT_PATH
     || value.assurance !== RECOVERY_BRIDGE_ASSURANCE) return { ok: false, code: "RB-DECISION-TARGET" };
+  if (value.approvedBy !== "PO" || !safeIso(value.approvedAt)) return { ok: false, code: "RB-DECISION-ATTRIBUTION" };
+  if (Date.parse(value.approvedAt) > Date.parse(value.expiresAt)) return { ok: false, code: "RB-DECISION-CHRONOLOGY" };
   if (!["issued", "public-committed", "consumed"].includes(value.status)) return { ok: false, code: "RB-DECISION-STATUS" };
   if (Date.parse(value.expiresAt) > Date.parse(RECOVERY_BRIDGE_ISSUANCE_CUTOFF)) return { ok: false, code: "RB-DECISION-CUTOFF" };
   if (value.decisionSha256 !== recoveryBridgeDecisionDigest(value)) return { ok: false, code: "RB-DECISION-DIGEST" };
@@ -437,6 +441,9 @@ const FEATURE_PACKAGE_SUBCOMMANDS = new Set([
   "feature-package-apply",
   "feature-package-status",
   "feature-package-recover",
+]);
+const RECOVERY_BRIDGE_SUBCOMMANDS = new Set([
+  "recovery-bridge-plan",
 ]);
 const CONTINUITY_AUTHORITY_REVISION_SUBCOMMANDS = new Set([
   "continuity-authority-revision-plan",
@@ -2361,6 +2368,16 @@ function exactPoDecision(value) {
     && typeof value.planPath === "string" && typeof value.specPath === "string"
     && SHA256_RE.test(value.planSha256) && SHA256_RE.test(value.specSha256) && SHA256_RE.test(value.approvalSha256);
 }
+function isRecoveryBridgeTarget(value) {
+  return value?.operation === RECOVERY_BRIDGE_OPERATION
+    && value.manifest === RECOVERY_BRIDGE_MANIFEST
+    && value.artifactPath === RECOVERY_BRIDGE_ARTIFACT_PATH;
+}
+function exactRecoveryBridgeAuthority(value) {
+  return exactObjectKeys(value, ["class", "decision"])
+    && value.class === "recovery-bridge"
+    && validateRecoveryBridgeDecision(value.decision).ok;
+}
 function exactFeatureRequest(value) {
   const mutableDesign = value?.operation === "reconcile-mutable-design";
   const shared = exactObjectKeys(value, mutableDesign
@@ -2371,10 +2388,14 @@ function exactFeatureRequest(value) {
     && SHA256_RE.test(value.artifactSetSha256) && value.candidate === null && value.evidence === null
     && safePhxId(value.idempotencyKey) && safeIso(value.expiresAt)
     && (!mutableDesign || currentRepoArtifactPath(value.artifactPath));
-  if (!shared || !exactObjectKeys(value.authority, ["class", "decision"])) return false;
+  if (!shared || value.authority === null || typeof value.authority !== "object" || Array.isArray(value.authority)) return false;
   return (value.operation === "bootstrap-draft" && value.manifestPreimage === "absent"
+    && exactObjectKeys(value.authority, ["class", "decision"])
     && value.authority.class === "lifecycle-bootstrap" && value.authority.decision === null)
-    || (["reconcile-draft", "readback-replay", "reconcile-mutable-design"].includes(value.operation) && SHA256_RE.test(value.manifestPreimage)
+    || (isRecoveryBridgeTarget(value) && SHA256_RE.test(value.manifestPreimage)
+      && exactRecoveryBridgeAuthority(value.authority))
+    || (!isRecoveryBridgeTarget(value) && ["reconcile-draft", "readback-replay", "reconcile-mutable-design"].includes(value.operation)
+      && SHA256_RE.test(value.manifestPreimage) && exactObjectKeys(value.authority, ["class", "decision"])
       && value.authority.class === "po-plan-approval" && exactPoDecision(value.authority.decision));
 }
 function samePhxJson(left, right) { return canonicalPhxJson(left) === canonicalPhxJson(right); }
@@ -2500,6 +2521,132 @@ function existingDraftReadbackPreview(dir, manifestPath) {
     return { ok: true, manifest: checked.receipt.manifest, bytes, value, preimage: sha256Bytes(bytes), artifactSetSha256: featureArtifactSetSha256(value.artifacts), receipt: checked.receipt };
   } catch { return { ok: false, code: "PS-FEATURE-READBACK-PREIMAGE" }; }
 }
+function recoveryBridgeFeatureRequest(dir, decision, deps = {}) {
+  const now = deps.now?.() ?? new Date().toISOString();
+  const checked = validateRecoveryBridgeDecision(decision, { now });
+  if (!checked.ok || decision.status !== "issued") return { ok: false, code: checked.ok ? "RB-ISSUANCE-STATE" : checked.code };
+  const prd = currentRepoArtifact(dir, "specs/sprint-phoenix-epic/prd_phoenix-epic.md");
+  const spec = currentRepoArtifact(dir, "specs/sprint-phoenix-epic/spec.md");
+  const recovery = currentRepoArtifact(dir, RECOVERY_BRIDGE_ARTIFACT_PATH);
+  if (!prd || !spec || !recovery || prd.sha256 !== decision.prdSha256 || spec.sha256 !== decision.specSha256
+    || recovery.sha256 !== decision.recoveryPostimageSha256) return { ok: false, code: "RB-ARTIFACT-DRIFT" };
+  const preview = reconcileMutableDesignPreview(dir, decision.manifest, decision.artifactPath);
+  if (!preview.ok || preview.preimage !== decision.manifestPreimageSha256) return { ok: false, code: "RB-MANIFEST-DRIFT" };
+  const request = {
+    schema: FEATURE_PACKAGE_REQUEST_SCHEMA, operation: RECOVERY_BRIDGE_OPERATION,
+    manifest: decision.manifest, manifestPreimage: preview.preimage, targetState: "draft",
+    manifestBytes: preview.nextBytes, planReceipt: preview.receipt,
+    artifactSetSha256: preview.artifactSetSha256,
+    authority: { class: "recovery-bridge", decision: structuredClone(decision) },
+    candidate: null, evidence: null, idempotencyKey: decision.decisionId,
+    expiresAt: decision.expiresAt, artifactPath: decision.artifactPath,
+  };
+  return exactFeatureRequest(request) ? { ok: true, request, preview } : { ok: false, code: "RB-REQUEST-SHAPE" };
+}
+function exactRecoveryBridgeTransaction(value) {
+  return exactObjectKeys(value, ["schema", "decision", "requestSha256"])
+    && value.schema === RECOVERY_BRIDGE_TRANSACTION_SCHEMA && SHA256_RE.test(value.requestSha256)
+    && validateRecoveryBridgeDecision(value.decision).ok;
+}
+function recoveryBridgePrivateStore(dir, decisionId, deps = {}, { create = false } = {}) {
+  if (!RECOVERY_BRIDGE_ID_RE.test(decisionId)) return { ok: false, code: "RB-PRIVATE-STORE-INVALID" };
+  let common;
+  try { common = (deps.gitCommonDir ?? defaultGitCommonDir)(dir); } catch { return { ok: false, code: "RB-PRIVATE-STORE-UNAVAILABLE" }; }
+  if (!common?.ok || typeof common.path !== "string" || !isAbsolute(common.path)) return { ok: false, code: "RB-PRIVATE-STORE-UNAVAILABLE" };
+  let physical;
+  try {
+    const declared = lstatSync(common.path);
+    if (!declared.isDirectory() || declared.isSymbolicLink()) return { ok: false, code: "RB-PRIVATE-STORE-INVALID" };
+    physical = realpathSync(common.path);
+    const stat = lstatSync(physical);
+    if (!stat.isDirectory() || stat.isSymbolicLink()) return { ok: false, code: "RB-PRIVATE-STORE-INVALID" };
+  } catch { return { ok: false, code: "RB-PRIVATE-STORE-UNAVAILABLE" }; }
+  const directory = resolve(physical, "agent-pipeline", "recovery-bridge", decisionId);
+  const rel = relative(physical, directory);
+  if (rel === "" || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return { ok: false, code: "RB-PRIVATE-STORE-INVALID" };
+  const parents = [join(physical, "agent-pipeline"), join(physical, "agent-pipeline", "recovery-bridge"), directory];
+  if (create) {
+    try {
+      for (const path of parents) {
+        mkdirSync(path, { recursive: true, mode: 0o700 });
+        const stat = lstatSync(path);
+        if (!stat.isDirectory() || stat.isSymbolicLink()) return { ok: false, code: "RB-PRIVATE-STORE-INVALID" };
+      }
+    } catch { return { ok: false, code: "RB-PRIVATE-STORE-UNAVAILABLE" }; }
+  } else {
+    for (const path of parents) {
+      try {
+        const stat = lstatSync(path);
+        if (!stat.isDirectory() || stat.isSymbolicLink()) return { ok: false, code: "RB-PRIVATE-STORE-INVALID" };
+      } catch (error) {
+        if (error?.code === "ENOENT") return { ok: true, directory, journal: join(directory, "journal.json"), absent: true };
+        return { ok: false, code: "RB-PRIVATE-STORE-UNAVAILABLE" };
+      }
+    }
+  }
+  return { ok: true, directory, journal: join(directory, "journal.json") };
+}
+function recoveryBridgeCommitBinding(decision) {
+  return { schema: RECOVERY_BRIDGE_PUBLIC_COMMIT_REQUEST_SCHEMA, decisionSha256: decision.decisionSha256, ...recoveryBridgeBinding(decision) };
+}
+function recoveryBridgeConsumeBinding(decision) {
+  return {
+    schema: RECOVERY_BRIDGE_CONSUME_RECEIPT_SCHEMA, decisionSha256: decision.decisionSha256,
+    ...recoveryBridgeBinding(decision),
+    readback: { manifest: decision.manifest, artifactPath: decision.artifactPath, recoveryPostimageSha256: decision.recoveryPostimageSha256 },
+  };
+}
+function recoveryBridgeTransaction(dir, decisionId, deps = {}) {
+  const store = recoveryBridgePrivateStore(dir, decisionId, deps);
+  if (!store.ok) return store;
+  if (store.absent) return { ok: true, value: null, store };
+  let stat;
+  try { stat = lstatSync(store.journal); } catch (error) {
+    return error?.code === "ENOENT" ? { ok: true, value: null, store } : { ok: false, code: "RB-PRIVATE-STORE-UNAVAILABLE" };
+  }
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.size < 2 || stat.size > FEATURE_PACKAGE_REQUEST_MAX_BYTES) {
+    return { ok: false, code: "RB-PRIVATE-STORE-INVALID" };
+  }
+  try {
+    const value = JSON.parse(readFileSync(store.journal, "utf8"));
+    return exactRecoveryBridgeTransaction(value)
+      ? { ok: true, value, store }
+      : { ok: false, code: "RB-PRIVATE-STORE-INVALID" };
+  } catch { return { ok: false, code: "RB-PRIVATE-STORE-INVALID" }; }
+}
+function recoveryBridgePrepareApply(dir, request, lock, deps = {}) {
+  const current = recoveryBridgeTransaction(dir, request.authority.decision.decisionId, deps);
+  if (!current.ok) return current;
+  const requestSha256 = sha256Bytes(canonicalPhxJson(request));
+  if (current.value !== null) {
+    if (current.value.requestSha256 !== requestSha256 || current.value.decision.decisionSha256 !== request.authority.decision.decisionSha256) {
+      return { ok: false, code: "RB-TRANSACTION-CONFLICT" };
+    }
+    if (current.value.decision.status === "consumed") return { ok: false, code: "RB-REPLAY" };
+    const checked = validateRecoveryBridgeDecision(current.value.decision, { now: deps.now?.() });
+    if (!checked.ok) return checked;
+    return current.value.decision.status === "public-committed"
+      ? { ok: true, decision: current.value.decision }
+      : { ok: false, code: "RB-TRANSACTION-STATE" };
+  }
+  const committed = transitionRecoveryBridgeDecision(request.authority.decision, "public-commit", recoveryBridgeCommitBinding(request.authority.decision), { now: deps.now?.() });
+  if (!committed.ok) return committed;
+  const transaction = { schema: RECOVERY_BRIDGE_TRANSACTION_SCHEMA, decision: committed.value, requestSha256 };
+  const store = recoveryBridgePrivateStore(dir, request.authority.decision.decisionId, deps, { create: true });
+  if (!store.ok) return store;
+  const wrote = writeBoundFile(store.journal, `${canonicalPhxJson(transaction)}\n`, lock, store.directory, deps);
+  return wrote.ok ? { ok: true, decision: committed.value } : { ok: false, code: wrote.code };
+}
+function recoveryBridgeConsumeApply(dir, request, lock, deps = {}) {
+  const current = recoveryBridgeTransaction(dir, request.authority.decision.decisionId, deps);
+  if (!current.ok || current.value === null || current.value.requestSha256 !== sha256Bytes(canonicalPhxJson(request))) return { ok: false, code: "RB-TRANSACTION-CONFLICT" };
+  if (current.value.decision.status === "consumed") return { ok: true, consumed: true };
+  const consumed = transitionRecoveryBridgeDecision(current.value.decision, "consume", recoveryBridgeConsumeBinding(current.value.decision), { now: deps.now?.() });
+  if (!consumed.ok) return consumed;
+  const transaction = { ...current.value, decision: consumed.value };
+  const wrote = writeBoundFile(current.store.journal, `${canonicalPhxJson(transaction)}\n`, lock, current.store.directory, deps);
+  return wrote.ok ? { ok: true, consumed: true } : { ok: false, code: wrote.code };
+}
 function validateFeatureRequest(dir, request, deps = {}) {
   if (!exactFeatureRequest(request)) return { ok: false, code: "PS-FEATURE-REQUEST" };
   if (request.operation === "bootstrap-draft") {
@@ -2515,6 +2662,11 @@ function validateFeatureRequest(dir, request, deps = {}) {
     return { ok: true, preview };
   }
   if (request.operation === "reconcile-mutable-design") {
+    if (isRecoveryBridgeTarget(request)) {
+      const bridged = recoveryBridgeFeatureRequest(dir, request.authority.decision, deps);
+      if (!bridged.ok || !samePhxJson(bridged.request, request)) return { ok: false, code: "PS-FEATURE-PLAN-BINDING" };
+      return { ok: true, preview: bridged.preview };
+    }
     const preview = reconcileMutableDesignPreview(dir, request.manifest, request.artifactPath);
     if (!preview.ok || preview.preimage !== request.manifestPreimage || preview.nextBytes !== request.manifestBytes
       || preview.artifactSetSha256 !== request.artifactSetSha256 || !samePhxJson(preview.receipt, request.planReceipt)
@@ -2526,6 +2678,23 @@ function validateFeatureRequest(dir, request, deps = {}) {
     || preview.artifactSetSha256 !== request.artifactSetSha256 || !samePhxJson(preview.receipt, request.planReceipt)
     || !samePhxJson(poApprovalDecision(dir, preview.value, deps) ?? {}, request.authority.decision)) return { ok: false, code: "PS-FEATURE-PLAN-BINDING" };
   return { ok: true, preview };
+}
+function runRecoveryBridgeCommand(sub, argv, deps) {
+  const dir = deps.dir ?? projectDir();
+  if (sub !== "recovery-bridge-plan") return 2;
+  const parsed = parseExactFlags(argv, new Set(["decision-file"]));
+  if (!parsed.ok) return 2;
+  const loaded = readClosedJsonFile(dir, parsed.value["decision-file"]);
+  if (!loaded.ok) return 2;
+  const planned = recoveryBridgeFeatureRequest(dir, loaded.value, deps);
+  if (!planned.ok) { console.error(`Error: Recovery Bridge plan refused (${planned.code}).`); return 2; }
+  console.log(JSON.stringify({
+    schema: RECOVERY_BRIDGE_PLAN_SCHEMA,
+    status: "ready",
+    request: planned.request,
+    requestSha256: sha256Bytes(canonicalPhxJson(planned.request)),
+  }));
+  return 0;
 }
 function runFeaturePackageCommand(sub, argv, deps) {
   const dir = deps.dir ?? projectDir();
@@ -2557,6 +2726,9 @@ function runFeaturePackageCommand(sub, argv, deps) {
       request = { schema: FEATURE_PACKAGE_REQUEST_SCHEMA, operation: "reconcile-draft", manifest: preview.manifest, manifestPreimage: preview.preimage, targetState: "draft", manifestBytes: preview.nextBytes, planReceipt: preview.receipt, artifactSetSha256: preview.artifactSetSha256, authority: { class: "po-plan-approval", decision }, candidate: null, evidence: null, idempotencyKey: parsed.value["idempotency-key"], expiresAt: parsed.value["expires-at"] };
     } else if (source.value.operation === "reconcile-mutable-design") {
       if (!exactObjectKeys(source.value, ["operation", "targetState", "artifactPath"]) || !currentRepoArtifactPath(source.value.artifactPath)) return 2;
+      if (parsed.value.manifest === RECOVERY_BRIDGE_MANIFEST && source.value.artifactPath === RECOVERY_BRIDGE_ARTIFACT_PATH) {
+        console.error("Error: feature package plan refused (RB-BRIDGE-REQUIRED)."); return 2;
+      }
       const preview = reconcileMutableDesignPreview(dir, parsed.value.manifest, source.value.artifactPath);
       if (!preview.ok) { console.error(`Error: feature package plan refused (${preview.code}).`); return 2; }
       const decision = poApprovalDecision(dir, preview.value, deps);
@@ -2594,12 +2766,34 @@ function runFeaturePackageCommand(sub, argv, deps) {
   try {
     const target = resolve(dir, request.manifest ?? "");
     const existing = existsSync(target);
+    const bridge = isRecoveryBridgeTarget(request) && request.authority?.class === "recovery-bridge";
+    if (bridge) {
+      const transaction = recoveryBridgeTransaction(dir, request.authority.decision.decisionId, deps);
+      if (!transaction.ok) { console.error(`Error: Recovery Bridge private store refused (${transaction.code}).`); return 2; }
+      const consumedRecovery = transaction.value?.decision.status === "consumed";
+      if (consumedRecovery && (sub !== "feature-package-recover"
+        || transaction.value.requestSha256 !== sha256Bytes(canonicalPhxJson(request)))) return 2;
+      let postimage = false;
+      try { postimage = existing && readFileSync(target, "utf8") === request.manifestBytes; } catch { return 2; }
+      if (postimage && transaction.value === null) return 2;
+      if (consumedRecovery && !postimage) return 2;
+      if (!postimage) {
+        const valid = validateFeatureRequest(dir, request, deps);
+        if (!valid.ok || Date.parse(request.expiresAt) < Date.now()) return 2;
+      }
+      if (!consumedRecovery) {
+        const prepared = recoveryBridgePrepareApply(dir, request, lock, deps);
+        if (!prepared.ok) { console.error(`Error: Recovery Bridge writer refused (${prepared.code}).`); return 2; }
+      }
+    }
     if (existing) {
       try {
         const postimage = readFileSync(target, "utf8") === request.manifestBytes
           && (request.operation === "reconcile-mutable-design" ? mutableDesignPostimage(dir, request) : validateFeaturePackage(dir, request.manifest).ok);
-        const poCurrent = !["reconcile-draft", "reconcile-mutable-design"].includes(request.operation)
-          || samePhxJson(poApprovalDecision(dir, JSON.parse(readFileSync(target, "utf8")), deps) ?? {}, request.authority?.decision);
+        const poCurrent = bridge
+          ? true
+          : !["reconcile-draft", "reconcile-mutable-design"].includes(request.operation)
+            || samePhxJson(poApprovalDecision(dir, JSON.parse(readFileSync(target, "utf8")), deps) ?? {}, request.authority?.decision);
         if (postimage && poCurrent) {
           const receiptPath = resolve(dir, featureReceiptPath(request));
           const receiptBytes = `${canonicalPhxJson(featureReceipt(request, "committed"))}\n`;
@@ -2609,8 +2803,14 @@ function runFeaturePackageCommand(sub, argv, deps) {
             const repaired = writeBoundFile(receiptPath, receiptBytes, lock, dirname(receiptPath), deps);
             if (!repaired.ok) return 2;
           }
+          if (bridge) {
+            const consumed = recoveryBridgeConsumeApply(dir, request, lock, deps);
+            if (!consumed.ok) { console.error(`Error: Recovery Bridge consume refused (${consumed.code}).`); return 2; }
+          }
           safeUnlink(featureJournalPath(dir));
-          console.log("PS-FEATURE-DUPLICATE: accepted with zero manifest mutation and exact receipt readback.");
+          console.log(bridge
+            ? "RB-CONSUMED: existing writer postimage and exact receipt read back."
+            : "PS-FEATURE-DUPLICATE: accepted with zero manifest mutation and exact receipt readback.");
           return 0;
         }
       } catch { /* fall through to conflict */ }
@@ -2630,8 +2830,14 @@ function runFeaturePackageCommand(sub, argv, deps) {
     const receiptPath = resolve(dir, featureReceiptPath(request));
     const receiptWrite = writeBoundFile(receiptPath, `${canonicalPhxJson(featureReceipt(request, "committed"))}\n`, lock, dirname(receiptPath), deps);
     if (!receiptWrite.ok) return 2;
+    if (bridge) {
+      const consumed = recoveryBridgeConsumeApply(dir, request, lock, deps);
+      if (!consumed.ok) { console.error(`Error: Recovery Bridge consume refused (${consumed.code}).`); return 2; }
+    }
     safeUnlink(featureJournalPath(dir));
-    console.log("PS-FEATURE-COMMITTED: manifest and public-safe receipt read back.");
+    console.log(bridge
+      ? "RB-CONSUMED: existing writer manifest and exact receipt read back."
+      : "PS-FEATURE-COMMITTED: manifest and public-safe receipt read back.");
     return 0;
   } finally { releaseContinuityLock(lock); }
 }
@@ -2961,6 +3167,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
   const [sub, ...rest] = argv;
   const flags = parseFlags(rest);
 
+  if (RECOVERY_BRIDGE_SUBCOMMANDS.has(sub)) return runRecoveryBridgeCommand(sub, rest, { ...deps, dir, now });
   if (FEATURE_PACKAGE_SUBCOMMANDS.has(sub)) return runFeaturePackageCommand(sub, rest, { ...deps, dir, now });
   if (CONTINUITY_AUTHORITY_REVISION_SUBCOMMANDS.has(sub)) return runContinuityAuthorityRevisionCommand(sub, rest, { ...deps, dir, now });
   if (CONTINUITY_SUBCOMMANDS.has(sub)) return runContinuityCommand(sub, flags, { ...deps, dir, now });
@@ -3419,7 +3626,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
 
     default: {
       console.error(
-        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, set-phase, set-gate-estimate, approve-plan, revoke-plan, bind-plan-spec, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy, feature-package-inspect, feature-package-plan, feature-package-apply, feature-package-status, feature-package-recover, continuity-init, continuity-cas, continuity-authority-revision-plan, continuity-authority-revision-apply, continuity-authority-revision-recover, continuity-integrate-final, continuity-record-course-brief, continuity-select-course, continuity-apply-decision, continuity-clear-decision, publication-prepare, publication-approve, publication-authorize, publication-observe, publication-start-readback, publication-close, publication-rearm, publication-block.`,
+        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, set-phase, set-gate-estimate, approve-plan, revoke-plan, bind-plan-spec, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy, recovery-bridge-plan, feature-package-inspect, feature-package-plan, feature-package-apply, feature-package-status, feature-package-recover, continuity-init, continuity-cas, continuity-authority-revision-plan, continuity-authority-revision-apply, continuity-authority-revision-recover, continuity-integrate-final, continuity-record-course-brief, continuity-select-course, continuity-apply-decision, continuity-clear-decision, publication-prepare, publication-approve, publication-authorize, publication-observe, publication-start-readback, publication-close, publication-rearm, publication-block.`,
       );
       return 2;
     }
