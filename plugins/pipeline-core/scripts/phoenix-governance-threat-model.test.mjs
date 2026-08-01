@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 const scriptDirectory = resolve(fileURLToPath(new URL(".", import.meta.url)));
 const document = readFileSync(resolve(scriptDirectory, "../../../docs/phoenix-governance-threat-model.md"), "utf8");
 
-test("PHX-0 governance threat model inventories AC13 transport binding and AC14 privacy recovery", () => {
+test("PHX-0/PHX-1 governance threat model inventories transport and event-store trust boundaries", () => {
   for (const required of [
     "## Assets and trust boundaries",
     "## Abuse cases and mitigations",
@@ -24,5 +24,14 @@ test("PHX-0 governance threat model inventories AC13 transport binding and AC14 
     "Dev-Plan State authority",
     "readProjectAuthority()",
     "legacy-path fallback",
+    "Portable governance events",
+    "Restricted governance record",
+    "Restricted key material",
+    "default-deny capture policy",
+    "prefix-valid",
+    "write-ahead journal",
+    "destroy-key",
+    "K-AC-01 — portable admission",
+    "K-AC-07 — recovery and restricted operations",
   ]) assert.equal(document.includes(required), true, `missing governed threat-model inventory: ${required}`);
 });

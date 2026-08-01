@@ -10,7 +10,7 @@
  */
 import { mkdir, open, readFile, realpath, readdir, rename, unlink, lstat, stat } from "node:fs/promises";
 import path from "node:path";
-import { createCipheriv, createDecipheriv, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import {
   canonicalSha256,
   canonicalizeJson,
@@ -115,7 +115,7 @@ function assertEncryptionKey(key) {
 
 export function createRestrictedAuthorization({ key, repositoryFingerprint, operation, recordId = null, expectedRecordDigest = null } = {}) {
   const encryptionKey = assertEncryptionKey(key);
-  if (!new Set(["put", "query", "erase"]).has(operation) || (recordId !== null && !/^[a-f0-9]{32}$/u.test(recordId)) || (expectedRecordDigest !== null && !SHA256.test(expectedRecordDigest))) fail("GES-RESTRICTED-AUTHORIZATION", "Restricted authorization binding is invalid.");
+  if (!new Set(["put", "query", "erase", "destroy-key"]).has(operation) || (recordId !== null && !/^[a-f0-9]{32}$/u.test(recordId)) || (expectedRecordDigest !== null && !SHA256.test(expectedRecordDigest))) fail("GES-RESTRICTED-AUTHORIZATION", "Restricted authorization binding is invalid.");
   const binding = { authorityClass: RESTRICTED_AUTHORITY, repositoryFingerprint, operation, recordId, expectedRecordDigest };
   return Object.freeze({ ...binding, proof: createHmac("sha256", encryptionKey).update(canonicalizeJson(binding), "utf8").digest("hex") });
 }
@@ -132,13 +132,55 @@ function restrictedRecordPath(storeRoot, recordId) {
   return path.join(storeRoot, "records", `${recordId}.json`);
 }
 
-async function restrictedRecordsRoot(storeRoot) {
+async function restrictedRecordsRoot(storeRoot, { create = true } = {}) {
   const recordsRoot = path.join(storeRoot, "records");
-  await mkdir(recordsRoot, { recursive: true, mode: 0o700 });
+  if (create) await mkdir(recordsRoot, { recursive: true, mode: 0o700 });
   await assertNoSymlink(recordsRoot, { directory: true });
   const metadata = await stat(recordsRoot);
   if ((metadata.mode & 0o077) !== 0) fail("GES-RESTRICTED-PERMISSIONS", "Restricted records must not grant group or other access.");
   return recordsRoot;
+}
+
+async function restrictedAuxiliaryRoot(storeRoot, name) {
+  const target = path.join(storeRoot, name);
+  await mkdir(target, { recursive: true, mode: 0o700 });
+  await assertNoSymlink(target, { directory: true });
+  const metadata = await stat(target);
+  if ((metadata.mode & 0o077) !== 0) fail("GES-RESTRICTED-PERMISSIONS", "Restricted auxiliary storage must not grant group or other access.");
+  return target;
+}
+
+function assertRestrictedIdempotencyKey(idempotencyKey) {
+  if (typeof idempotencyKey !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(idempotencyKey)) fail("GES-RESTRICTED-IDEMPOTENCY", "Restricted mutations require a closed idempotency key.");
+  return idempotencyKey;
+}
+
+function rawSha256(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
+
+async function readRestrictedRecord(storeRoot, recordId) {
+  const target = restrictedRecordPath(storeRoot, recordId);
+  await assertNoSymlink(target, { directory: false });
+  let record;
+  try { record = parseStrictJson(await readFile(target)); } catch { fail("GES-RESTRICTED-RECORD", "The restricted record is not strict JSON."); }
+  return { target, record, digest: canonicalSha256(record) };
+}
+
+async function restrictedStatus(storeRoot) {
+  const expectedRecordsRoot = path.join(storeRoot, "records");
+  if (!await lstatOrNull(expectedRecordsRoot)) return { encryptedRecordCount: 0, expiredRecordCount: 0, keyGenerations: Object.freeze([]) };
+  const recordsRoot = await restrictedRecordsRoot(storeRoot, { create: false });
+  const entries = await readdir(recordsRoot, { withFileTypes: true });
+  const keyGenerations = new Map();
+  let expiredRecordCount = 0;
+  for (const entry of entries) {
+    if (entry.isSymbolicLink()) fail("GES-SYMLINK", "Symbolic links are forbidden in governance storage.");
+    if (!entry.isFile() || !/^[a-f0-9]{32}\.json$/u.test(entry.name)) fail("GES-RESTRICTED-PATH", "Restricted storage contains an unsafe path.");
+    const { record } = await readRestrictedRecord(storeRoot, entry.name.slice(0, -5));
+    if (!exactKeys(record, ["schema", "algorithm", "keyGeneration", "expiresAtEpochMs", "nonce", "ciphertext", "tag"]) || record.schema !== RESTRICTED_RECORD_SCHEMA || record.algorithm !== "aes-256-gcm" || typeof record.keyGeneration !== "string" || !Number.isSafeInteger(record.expiresAtEpochMs)) fail("GES-RESTRICTED-RECORD", "The restricted record shape is invalid.");
+    keyGenerations.set(record.keyGeneration, (keyGenerations.get(record.keyGeneration) ?? 0) + 1);
+    if (record.expiresAtEpochMs <= Date.now()) expiredRecordCount += 1;
+  }
+  return { encryptedRecordCount: entries.length, expiredRecordCount, keyGenerations: Object.freeze([...keyGenerations.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([keyGeneration, recordCount]) => Object.freeze({ keyGeneration, recordCount }))) };
 }
 
 async function findRestrictedIdempotency(restrictedRoot, key, idempotencyKey) {
@@ -425,6 +467,15 @@ async function writeHeads(root, registry, streamId, events) {
   await writeAtomic(headsPath, `${canonicalizeJson(projection)}\n`);
 }
 
+function assertRecoveryReceipt(value, recovery, streamId, checkpoint) {
+  if (!exactKeys(value, ["schema", "idempotencyKey", "streamId", "checkpoint", "preimageDigest", "postimageDigest", "outcome"])
+    || value.schema !== "pipeline.governance-event-recovery-receipt.v1" || value.idempotencyKey !== recovery.idempotencyKey
+    || value.streamId !== streamId || canonicalizeJson(value.checkpoint) !== canonicalizeJson(checkpoint)
+    || value.preimageDigest !== recovery.expectedHeadsDigest || value.postimageDigest !== recovery.requestedPostimageDigest
+    || value.outcome !== "recovered") fail("GES-IDEMPOTENCY-CONFLICT", "Recovery idempotency key identifies a conflicting receipt.");
+  return value;
+}
+
 /** Read and validate the closed portable stream registry. */
 export async function loadGovernanceEventRegistry({ repositoryRoot, registryPath } = {}) {
   const { root } = await assertPhysicalRoot(repositoryRoot);
@@ -495,23 +546,38 @@ export async function recoverPortableGovernanceProjection({ repositoryRoot, regi
   if (verification.integrity !== "valid") fail("GES-RECOVERY-CHECKPOINT", "Projection recovery requires a retained checkpoint.");
   const { root } = await assertPhysicalRoot(repositoryRoot);
   const { registry } = await loadRegistry(root, registryPath);
-  const scanned = await scanStream(root, registry, streamId);
   const streamRoot = await ensureSafeDirectory(root, `${registry.storageRoot}/${streamId}`);
   return withExclusiveStreamLock(streamRoot, async () => {
     const rechecked = await scanStream(root, registry, streamId);
     const headsPath = repositoryPath(root, `${registry.storageRoot}/heads.json`);
+    const receiptRoot = await ensureSafeDirectory(root, `${registry.storageRoot}/recovery`);
+    const receiptPath = path.join(receiptRoot, `${recovery.idempotencyKey}.json`);
+    const existingReceipt = await lstatOrNull(receiptPath);
+    if (existingReceipt) {
+      await assertNoSymlink(receiptPath, { directory: false });
+      let receiptValue;
+      try { receiptValue = parseStrictJson(await readFile(receiptPath)); } catch { fail("GES-RECOVERY-RECEIPT", "Recovery receipt is not strict JSON."); }
+      const receipt = assertRecoveryReceipt(receiptValue, recovery, streamId, verification.checkpoint);
+      const currentHeads = await lstatOrNull(headsPath) ? parseStrictJson(await readFile(headsPath)) : null;
+      if ((currentHeads === null ? null : canonicalSha256(currentHeads)) !== receipt.postimageDigest) fail("GES-RECOVERY-READBACK", "Recovery receipt postimage is no longer present.");
+      return Object.freeze({ status: "idempotent-replay", streamId, eventCount: rechecked.events.length, checkpoint: verification.checkpoint, receipt: Object.freeze(receipt) });
+    }
     const existing = await lstatOrNull(headsPath) ? parseStrictJson(await readFile(headsPath)) : null;
     if ((existing === null ? null : canonicalSha256(existing)) !== recovery.expectedHeadsDigest) fail("GES-RECOVERY-PREIMAGE", "Recovery heads preimage differs from its request.");
     const journalRoot = await ensureSafeDirectory(root, `${registry.storageRoot}/recovery-journal`);
     const journalPath = path.join(journalRoot, `${recovery.idempotencyKey}.json`);
     const journal = { schema: "pipeline.governance-event-recovery-journal.v1", idempotencyKey: recovery.idempotencyKey, streamId, expectedHeadsDigest: recovery.expectedHeadsDigest, requestedPostimageDigest: recovery.requestedPostimageDigest };
-    await writeAtomic(journalPath, `${canonicalizeJson(journal)}\n`);
+    const existingJournal = await lstatOrNull(journalPath);
+    if (existingJournal) {
+      await assertNoSymlink(journalPath, { directory: false });
+      let journalValue;
+      try { journalValue = parseStrictJson(await readFile(journalPath)); } catch { fail("GES-RECOVERY-JOURNAL", "Recovery journal is not strict JSON."); }
+      if (canonicalizeJson(journalValue) !== canonicalizeJson(journal)) fail("GES-IDEMPOTENCY-CONFLICT", "Recovery idempotency key identifies a conflicting journal.");
+    } else await writeAtomic(journalPath, `${canonicalizeJson(journal)}\n`);
     await writeHeads(root, registry, streamId, rechecked.events);
     const rebuilt = parseStrictJson(await readFile(headsPath));
     const postimageDigest = canonicalSha256(rebuilt);
     if (postimageDigest !== recovery.requestedPostimageDigest) fail("GES-RECOVERY-POSTIMAGE", "Recovery postimage differs from its request.");
-    const receiptRoot = await ensureSafeDirectory(root, `${registry.storageRoot}/recovery`);
-    const receiptPath = path.join(receiptRoot, `${recovery.idempotencyKey}.json`);
     const receipt = { schema: "pipeline.governance-event-recovery-receipt.v1", idempotencyKey: recovery.idempotencyKey, streamId, checkpoint: verification.checkpoint, preimageDigest: recovery.expectedHeadsDigest, postimageDigest, outcome: "recovered" };
     await writeAtomic(receiptPath, `${canonicalizeJson(receipt)}\n`);
     await unlink(journalPath);
@@ -548,6 +614,43 @@ export async function putRestrictedGovernanceEvent({ repositoryRoot, storeRoot, 
   return Object.freeze({ status: "stored", recordId, expiresAtEpochMs, keyGeneration });
 }
 
+/** Read-only planning/status boundary for the restricted operator namespace. */
+export async function inspectRestrictedGovernanceStore({ repositoryRoot, storeRoot, repositoryFingerprint } = {}) {
+  const { root, fingerprint } = await assertPhysicalRoot(repositoryRoot);
+  if (repositoryFingerprint !== fingerprint) fail("GES-CROSS-REPOSITORY", "The expected repository fingerprint does not match the physical repository.");
+  const restrictedRoot = await assertRestrictedRoot(root, storeRoot);
+  return Object.freeze({ schema: "pipeline.governance-event-restricted-status.v1", repositoryFingerprint, store: "restricted-machine-local", ...(await restrictedStatus(restrictedRoot)) });
+}
+
+export async function planRestrictedGovernanceOperation({ repositoryRoot, storeRoot, repositoryFingerprint, operation, recordId = null, expectedRecordDigest = null, keyGeneration = null, expiresAtEpochMs = null, event = null, expectedKeyFileDigest = null, idempotencyKey } = {}) {
+  if (!new Set(["put", "erase", "destroy-key"]).has(operation)) fail("GES-RESTRICTED-PLAN", "Restricted planning operation is invalid.");
+  assertRestrictedIdempotencyKey(idempotencyKey);
+  const { root, fingerprint } = await assertPhysicalRoot(repositoryRoot);
+  if (repositoryFingerprint !== fingerprint) fail("GES-CROSS-REPOSITORY", "The expected repository fingerprint does not match the physical repository.");
+  const restrictedRoot = await assertRestrictedRoot(root, storeRoot);
+  const status = await restrictedStatus(restrictedRoot);
+  if (operation === "put") {
+    const validation = validateGovernanceEventEnvelope(event);
+    if (!validation.valid || event.repositoryFingerprint !== repositoryFingerprint || event.storageProfile !== "restricted-machine-local"
+      || event.classification !== "restricted" || event.retentionCompatibility !== "machine-local-expiring"
+      || typeof keyGeneration !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(keyGeneration)
+      || !Number.isSafeInteger(expiresAtEpochMs) || expiresAtEpochMs <= Date.now()) fail("GES-RESTRICTED-PLAN", "Restricted put planning requires a complete valid restricted event and future retention deadline.");
+  }
+  if (operation === "erase") {
+    const { digest } = await readRestrictedRecord(restrictedRoot, recordId);
+    if (!SHA256.test(expectedRecordDigest) || digest !== expectedRecordDigest) fail("GES-RESTRICTED-PREIMAGE", "The restricted erase preimage does not match.");
+  }
+  if (operation === "destroy-key") {
+    if (typeof keyGeneration !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(keyGeneration) || !SHA256.test(expectedKeyFileDigest)) fail("GES-RESTRICTED-PLAN", "Key-destruction planning requires a key generation and exact key-file preimage.");
+  }
+  const plan = {
+    schema: "pipeline.governance-event-restricted-plan.v1", operation, mutation: false, repositoryFingerprint,
+    recordId, expectedRecordDigest, keyGeneration, expiresAtEpochMs, eventDigest: event?.eventDigest ?? null, expectedKeyFileDigest, idempotencyKey,
+    encryptedRecordCount: status.encryptedRecordCount,
+  };
+  return Object.freeze({ ...plan, requestDigest: canonicalSha256(plan) });
+}
+
 /** Read one restricted event only with a repository-bound privileged authorization and its external key. */
 export async function queryRestrictedGovernanceEvent({ repositoryRoot, storeRoot, repositoryFingerprint, authorization, key, recordId } = {}) {
   const { root } = await assertPhysicalRoot(repositoryRoot);
@@ -581,4 +684,54 @@ export async function eraseRestrictedGovernanceEvent({ repositoryRoot, storeRoot
   await unlink(target);
   if (await lstatOrNull(target)) fail("GES-RESTRICTED-ERASE", "Restricted ciphertext remains in the active store.");
   return Object.freeze({ status: "erased-active-store", recordId, preimageDigest: expectedRecordDigest, backupDisclosure: "unknown" });
+}
+
+/**
+ * Destroy exactly the caller-named local key file after an authenticated
+ * preimage proof. This proves only that one active custodian file is gone; it
+ * intentionally makes no claim about backups, copies, or memory remnants.
+ */
+export async function destroyRestrictedGovernanceKey({ repositoryRoot, storeRoot, repositoryFingerprint, authorization, key, keyGeneration, keyFile, expectedKeyFileDigest, idempotencyKey } = {}) {
+  assertRestrictedIdempotencyKey(idempotencyKey);
+  if (typeof keyGeneration !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(keyGeneration) || !SHA256.test(expectedKeyFileDigest)) fail("GES-RESTRICTED-DESTROY", "Key destruction requires a closed key generation and exact key-file preimage.");
+  const { root, fingerprint } = await assertPhysicalRoot(repositoryRoot);
+  if (repositoryFingerprint !== fingerprint) fail("GES-CROSS-REPOSITORY", "The expected repository fingerprint does not match the physical repository.");
+  const restrictedRoot = await assertRestrictedRoot(root, storeRoot);
+  const encryptionKey = assertEncryptionKey(key);
+  assertRestrictedAuthorization(authorization, encryptionKey, repositoryFingerprint, "destroy-key", null, expectedKeyFileDigest);
+  if (typeof keyFile !== "string" || !path.isAbsolute(keyFile)) fail("GES-RESTRICTED-KEY-FILE", "Key destruction requires an absolute local key file.");
+  const resolvedKeyFile = path.resolve(keyFile);
+  if (resolvedKeyFile === root || resolvedKeyFile.startsWith(`${root}${path.sep}`) || resolvedKeyFile === restrictedRoot || resolvedKeyFile.startsWith(`${restrictedRoot}${path.sep}`)) fail("GES-RESTRICTED-KEY-FILE", "Key material must be separately protected outside repository and restricted records.");
+  await assertNoSymlinkAncestry(resolvedKeyFile);
+  const receiptRoot = await restrictedAuxiliaryRoot(restrictedRoot, "receipts");
+  const journalRoot = await restrictedAuxiliaryRoot(restrictedRoot, "key-destruction-journal");
+  const receiptPath = path.join(receiptRoot, `${idempotencyKey}.json`);
+  const receiptEntry = await lstatOrNull(receiptPath);
+  if (receiptEntry) {
+    await assertNoSymlink(receiptPath, { directory: false });
+    const receipt = parseStrictJson(await readFile(receiptPath));
+    if (!exactKeys(receipt, ["schema", "operation", "idempotencyKey", "repositoryFingerprint", "keyGeneration", "preimageDigest", "outcome", "backupDisclosure"])
+      || receipt.schema !== "pipeline.restricted-governance-receipt.v1" || receipt.operation !== "destroy-key" || receipt.idempotencyKey !== idempotencyKey || receipt.repositoryFingerprint !== repositoryFingerprint || receipt.keyGeneration !== keyGeneration || receipt.preimageDigest !== expectedKeyFileDigest || receipt.outcome !== "key-file-unavailable") fail("GES-IDEMPOTENCY-CONFLICT", "Key destruction idempotency key identifies a conflicting receipt.");
+    if (await lstatOrNull(resolvedKeyFile)) fail("GES-RESTRICTED-READBACK", "Destroyed key file is present again.");
+    return Object.freeze({ status: "idempotent-replay", receipt: Object.freeze(receipt) });
+  }
+  const journalPath = path.join(journalRoot, `${idempotencyKey}.json`);
+  const journal = { schema: "pipeline.restricted-governance-key-destruction-journal.v1", idempotencyKey, repositoryFingerprint, keyGeneration, expectedKeyFileDigest };
+  const journalEntry = await lstatOrNull(journalPath);
+  if (journalEntry) {
+    await assertNoSymlink(journalPath, { directory: false });
+    if (canonicalizeJson(parseStrictJson(await readFile(journalPath))) !== canonicalizeJson(journal)) fail("GES-IDEMPOTENCY-CONFLICT", "Key destruction idempotency key identifies a conflicting journal.");
+    if (await lstatOrNull(resolvedKeyFile)) fail("GES-RESTRICTED-RECOVERY", "Key destruction journal exists but the key file is still present.");
+  } else {
+    await assertNoSymlink(resolvedKeyFile, { directory: false });
+    const keyBytes = await readFile(resolvedKeyFile);
+    if (rawSha256(keyBytes) !== expectedKeyFileDigest || !timingSafeEqual(Buffer.from(keyBytes), encryptionKey)) fail("GES-RESTRICTED-PREIMAGE", "Key destruction key-file preimage does not match.");
+    await writeAtomic(journalPath, `${canonicalizeJson(journal)}\n`);
+    await unlink(resolvedKeyFile);
+  }
+  if (await lstatOrNull(resolvedKeyFile)) fail("GES-RESTRICTED-ERASE", "Key file remains available after destruction.");
+  const receipt = { schema: "pipeline.restricted-governance-receipt.v1", operation: "destroy-key", idempotencyKey, repositoryFingerprint, keyGeneration, preimageDigest: expectedKeyFileDigest, outcome: "key-file-unavailable", backupDisclosure: "unknown" };
+  await writeAtomic(receiptPath, `${canonicalizeJson(receipt)}\n`);
+  await unlink(journalPath);
+  return Object.freeze({ status: "key-file-unavailable", receipt: Object.freeze(receipt) });
 }

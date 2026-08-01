@@ -37,11 +37,15 @@ retained candidate-bound checkpoint, a valid hash chain is only
 With a matching checkpoint the result is `valid`/`verified`.  Consumers must
 not infer completeness from `heads.json` or from a successful query alone.
 
-`recover` may rebuild the `heads.json` projection only after the exact retained
-checkpoint validates.  It never changes, removes, or rewrites a published
-portable record.  A fork, a changed canonical interpretation, or an authority
-change requires the later human-ledger disposition flow; it cannot be repaired
-by this kernel.
+`recover` may rebuild the `heads.json` projection only after the exact terminal
+retained checkpoint validates. Its closed recovery request binds an idempotency
+key plus exact heads preimage and requested postimage. The writer stores a
+write-ahead journal before the projection update and retains a sanitized
+receipt after exact readback; an identical replay is zero-write only while the
+receipt's postimage still matches. It never changes, removes, or rewrites a
+published portable record. A fork, a changed canonical interpretation, or an
+authority change requires the later human-ledger disposition flow; it cannot
+be repaired by this kernel.
 
 ## Restricted machine-local records
 
@@ -52,11 +56,28 @@ caller-supplied externally protected AES-256-GCM key, and carry explicit
 expiry.  A random local record ID has no portable counterpart or correlation
 handle.
 
-A privileged, repository-bound `restricted-store-operator` authorization and
-the external key are required to read or erase a record.  Erasure validates an
-exact encrypted preimage and proves only absence from the active store; backup
-status remains explicitly `unknown`.  Key destruction is a separate
-key-management operation and must never be claimed by an erase receipt.
+The closed local operator surface is:
+
+```text
+governance-event restricted plan-put|put|query|plan-erase|erase|plan-destroy-key|destroy-key|status \
+  --repo CHECKOUT --request-file REQUEST.json --key-file KEY.bin
+```
+
+`plan-*` is read-only and binds the physical repository/store, request
+preimages and idempotency key before an operator chooses the mutation.
+`status` returns only encrypted record counts, expired-count, and non-secret
+key-generation identifiers. A privileged, repository-bound
+`restricted-store-operator` HMAC authorization and the external key are
+required to read, erase, or destroy a key. Erasure validates an exact encrypted
+preimage and proves only absence from the active store; backup status remains
+explicitly `unknown`.
+
+`destroy-key` is distinct from erasure. It can destroy only a named absolute
+local key file that is separately protected outside both the checkout and the
+restricted-record root. It journals the exact key-file digest before unlink,
+reads back that the file is absent, and emits a receipt limited to that active
+file. It never claims deletion of backups, copied key material, process-memory
+remnants, or an external key-custodian record.
 
 ## Authority boundary
 

@@ -8,7 +8,10 @@ import {
   GovernanceEventStoreError,
   appendPortableGovernanceEvent,
   createRestrictedAuthorization,
+  destroyRestrictedGovernanceKey,
   eraseRestrictedGovernanceEvent,
+  inspectRestrictedGovernanceStore,
+  planRestrictedGovernanceOperation,
   putRestrictedGovernanceEvent,
   queryRestrictedGovernanceEvent,
   queryPortableGovernanceStream,
@@ -65,8 +68,8 @@ function recoveryRequest(value) {
 }
 
 function restrictedRequest(value) {
-  if (!exactKeys(value, ["schema", "operation", "repositoryFingerprint", "storeRoot", "recordId", "expectedRecordDigest", "keyGeneration", "expiresAtEpochMs", "event"])
-    || value.schema !== "pipeline.governance-event-restricted-request.v1" || !["put", "query", "erase"].includes(value.operation)) fail("GEC-REQUEST", "Restricted request has an invalid closed shape.");
+  if (!exactKeys(value, ["schema", "operation", "repositoryFingerprint", "storeRoot", "recordId", "expectedRecordDigest", "keyGeneration", "expiresAtEpochMs", "event", "idempotencyKey", "expectedKeyFileDigest"])
+    || value.schema !== "pipeline.governance-event-restricted-request.v1" || !["plan-put", "put", "query", "plan-erase", "erase", "plan-destroy-key", "destroy-key", "status"].includes(value.operation)) fail("GEC-REQUEST", "Restricted request has an invalid closed shape.");
   return value;
 }
 
@@ -76,9 +79,18 @@ export async function main(argv = process.argv.slice(2)) {
   if (parsed.operation === "restricted") {
     const restricted = restrictedRequest(body); const key = await readFile(parsed.keyFile);
     if (key.byteLength !== 32) fail("GEC-KEY", "Restricted key file must contain exactly 32 bytes.");
-    const authorization = createRestrictedAuthorization({ key, repositoryFingerprint: restricted.repositoryFingerprint, operation: restricted.operation, recordId: restricted.recordId, expectedRecordDigest: restricted.expectedRecordDigest });
+    if (restricted.operation === "status") return inspectRestrictedGovernanceStore({ repositoryRoot: parsed.repo, storeRoot: restricted.storeRoot, repositoryFingerprint: restricted.repositoryFingerprint });
+    if (restricted.operation.startsWith("plan-")) return planRestrictedGovernanceOperation({
+      repositoryRoot: parsed.repo, storeRoot: restricted.storeRoot, repositoryFingerprint: restricted.repositoryFingerprint,
+      operation: restricted.operation.slice(5), recordId: restricted.recordId, expectedRecordDigest: restricted.expectedRecordDigest,
+      keyGeneration: restricted.keyGeneration, expiresAtEpochMs: restricted.expiresAtEpochMs, event: restricted.event,
+      expectedKeyFileDigest: restricted.expectedKeyFileDigest, idempotencyKey: restricted.idempotencyKey,
+    });
+    const authorizationOperation = restricted.operation;
+    const authorization = createRestrictedAuthorization({ key, repositoryFingerprint: restricted.repositoryFingerprint, operation: authorizationOperation, recordId: restricted.recordId, expectedRecordDigest: authorizationOperation === "destroy-key" ? restricted.expectedKeyFileDigest : restricted.expectedRecordDigest });
     if (restricted.operation === "put") return putRestrictedGovernanceEvent({ repositoryRoot: parsed.repo, storeRoot: restricted.storeRoot, repositoryFingerprint: restricted.repositoryFingerprint, authorization, key, keyGeneration: restricted.keyGeneration, expiresAtEpochMs: restricted.expiresAtEpochMs, event: restricted.event });
     if (restricted.operation === "query") return queryRestrictedGovernanceEvent({ repositoryRoot: parsed.repo, storeRoot: restricted.storeRoot, repositoryFingerprint: restricted.repositoryFingerprint, authorization, key, recordId: restricted.recordId });
+    if (restricted.operation === "destroy-key") return destroyRestrictedGovernanceKey({ repositoryRoot: parsed.repo, storeRoot: restricted.storeRoot, repositoryFingerprint: restricted.repositoryFingerprint, authorization, key, keyGeneration: restricted.keyGeneration, keyFile: parsed.keyFile, expectedKeyFileDigest: restricted.expectedKeyFileDigest, idempotencyKey: restricted.idempotencyKey });
     return eraseRestrictedGovernanceEvent({ repositoryRoot: parsed.repo, storeRoot: restricted.storeRoot, repositoryFingerprint: restricted.repositoryFingerprint, authorization, key, recordId: restricted.recordId, expectedRecordDigest: restricted.expectedRecordDigest });
   }
   if (parsed.operation === "preview") {

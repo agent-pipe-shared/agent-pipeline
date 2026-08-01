@@ -1,6 +1,6 @@
 # Sprint Phoenix governance conformance
 
-Status: design complete; renewed Product Owner gate pending
+Status: PHX-1 implementation evidence in review; final independent candidate review pending
 
 Date: 2026-07-26
 
@@ -36,8 +36,8 @@ No design-stage deviation from the twelve guidelines is proposed.
 
 | # | Policy item | Current state | Required evidence before implementation close/push |
 | --- | --- | --- | --- |
-| 1 | Data-privacy review | MET (design) | After two failed rounds and five accepted findings, the final fixed-candidate re-review passed with no findings and consistent machine trajectory. [privacy-review.md](privacy-review.md) makes Acceptance the normative interpretation, scopes append-only to portable records, and assigns the restricted profile only to Spec-listed files. Implementation and push require their own later privacy review. |
-| 2 | Threat model updated | MET (design) | [architecture.md §15](architecture.md#15-security-and-privacy-posture) defines current threats/controls. Implementation creates and maintains `docs/phoenix-governance-threat-model.md` and obtains blocking Security review. |
+| 1 | Data-privacy review | IN REVIEW (implementation) | [privacy-review.md](privacy-review.md) remains the normative processing contract. The final fixed PHX-1 candidate must receive an independent pass/fail review that traces the portable admission, recovery, restricted query/erase, key-destruction, diagnostics, and backup-limit boundaries; the Critic report is the candidate-bound sign-off artifact. |
+| 2 | Threat model updated | MET (implementation) | [architecture.md §15](architecture.md#15-security-and-privacy-posture) defines the normative controls; [docs/phoenix-governance-threat-model.md](../../../docs/phoenix-governance-threat-model.md) now covers PHX-0 and PHX-1 physical repository binding, capture policy, checkpoint semantics, recovery, encrypted restricted storage, authorization, erase, key destruction, and honest retention limits. |
 | 3 | License header present | NOT APPLICABLE to current Markdown-only design | Every future source/schema file follows the repository's license/SPDX convention; Verify checks the implemented candidate. |
 | 4 | Rollback path documented | MET (design) | `spec.md` migration/compatibility, stateful recovery checklist, architecture crash matrices, and [`RECOVERY.md` R-16](../RECOVERY.md#r-16--recovery-bridge-status-projection-rollback-path) define recovery authority and no-history-fabrication; R-16 names the candidate-specific compensating revert, prohibits manual journal/manifest alteration, and requires fresh post-revert gates. |
 | 5 | Third-party license compliance | NOT APPLICABLE to current design | No package dependency is added. Any implementation dependency/profile library requires exact registry identity, pin, license allowlist check, and evidence before dispatch/merge. |
