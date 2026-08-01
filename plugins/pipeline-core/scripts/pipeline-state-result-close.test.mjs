@@ -209,6 +209,24 @@ test("confirmed apply changes only the bounded continuity fields and exact repla
   assert.deepEqual(readFileSync(f.statePath), postBytes);
 });
 
+test("Result-close finalizes an exact Result previously bound by bootstrap", () => {
+  const f = fixture("bootstrap-bound");
+  const bootstrap = JSON.parse(readFileSync(f.statePath, "utf8"));
+  bootstrap.continuity.revision = f.revision + 1;
+  bootstrap.continuity.resume.sourceRevision = f.revision + 1;
+  bootstrap.continuity.authority.result = { path: f.resultPath, sha256: f.resultSha256 };
+  writeFileSync(f.statePath, JSON.stringify(bootstrap, null, 2) + "\n");
+  f.revision += 1;
+  const planned = plan(f);
+  assert.equal(planned.preimage.nextAction, "review");
+  const applied = invoke(f.root, planned.applyAction.argv.slice(1));
+  assert.equal(applied.status, 0, applied.stderr);
+  const after = JSON.parse(readFileSync(f.statePath, "utf8"));
+  assert.equal(after.continuity.revision, f.revision + 1);
+  assert.equal(after.continuity.queueHead.nextAction, "close");
+  assert.deepEqual(after.continuity.authority.result, { path: f.resultPath, sha256: f.resultSha256 });
+});
+
 test("apply rejects missing activation, stale State and Result byte drift", () => {
   for (const mode of ["activation", "state", "result"]) {
     const f = fixture(mode);

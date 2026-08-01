@@ -674,8 +674,9 @@ export function releaseContinuitySessionCleanup(current, request, activeFeatureI
  *
  * Result bytes and the project approval are I/O-layer concerns.  This pure
  * transition owns only the closed continuity mutation surface: one revision,
- * the previously-null Result authority, review -> close, and the immediate
- * resume marker.  Exact committed replay is a zero-write success.
+ * a Result authority (newly bound or already bootstrap-bound), review -> close,
+ * and the immediate resume marker. Exact committed replay is a zero-write
+ * success.
  */
 export function bindContinuityResultForClose(current, request, activeFeatureId = undefined) {
   const before = validateContinuityState(current, activeFeatureId);
@@ -699,19 +700,24 @@ export function bindContinuityResultForClose(current, request, activeFeatureId =
     reasonCode: "active-turn",
   };
   if (current.authority.result !== null) {
-    return current.revision === request.expectedRevision + 1
+    if (!sameJson(current.authority.result, request.result)) {
+      return result(false, "CS-RESULT-CLOSE-CONFLICT");
+    }
+    if (current.revision === request.expectedRevision + 1
       && current.queueHead.nextAction === "close"
-      && sameJson(current.authority.result, request.result)
-      && sameJson(current.resume, replayResume)
-      ? result(true, "CS-RESULT-CLOSE-REPLAY", structuredClone(current), false)
-      : result(false, "CS-RESULT-CLOSE-CONFLICT");
+      && sameJson(current.resume, replayResume)) {
+      return result(true, "CS-RESULT-CLOSE-REPLAY", structuredClone(current), false);
+    }
+    if (request.expectedRevision !== current.revision || current.queueHead.nextAction !== "review") {
+      return result(false, "CS-RESULT-CLOSE-CONFLICT");
+    }
   }
   if (request.expectedRevision !== current.revision) return result(false, "CS-STALE");
   if (current.queueHead.nextAction !== "review") return result(false, "CS-RESULT-CLOSE-PREIMAGE");
 
   const next = structuredClone(current);
   next.revision += 1;
-  next.authority.result = structuredClone(request.result);
+  if (next.authority.result === null) next.authority.result = structuredClone(request.result);
   next.queueHead.nextAction = "close";
   next.resume = {
     mode: "immediate",

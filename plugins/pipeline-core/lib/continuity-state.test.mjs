@@ -277,6 +277,28 @@ check("Result-close binding accepts only its exact committed replay", () => {
   assert.equal(conflict.code, "CS-RESULT-CLOSE-CONFLICT");
 });
 
+check("Result-close binding makes an exact bootstrap-bound Result close-ready", () => {
+  const current = state({
+    revision: 2,
+    authority: {
+      prd: { path: "specs/prd.md", sha256: A },
+      spec: { path: "specs/spec.md", sha256: B },
+      result: { path: "specs/result.md", sha256: C },
+    },
+    queueHead: queueHead({ nextAction: "review", dispatch: null }),
+    resume: { mode: "immediate", sourceRevision: 2, reasonCode: "active-turn" },
+  });
+  const applied = bindContinuityResultForClose(current, {
+    expectedRevision: 2,
+    result: { path: "specs/result.md", sha256: C },
+  }, FEATURE);
+  assert.equal(applied.ok, true);
+  assert.equal(applied.code, "CS-RESULT-CLOSE-APPLIED");
+  assert.equal(applied.state.revision, 3);
+  assert.equal(applied.state.queueHead.nextAction, "close");
+  assert.deepEqual(applied.state.authority.result, current.authority.result);
+});
+
 check("Result-close binding rejects non-review, retries and active lifecycle work", () => {
   const base = state({
     authority: {
