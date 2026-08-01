@@ -223,6 +223,36 @@ try {
     assert.equal(readFileSync(join(base, LEGACY_GUARD_CONFIG), "utf8"), readFileSync(join(base, NEUTRAL_GUARD_CONFIG), "utf8"));
     assert.equal(readFileSync(join(base, LEGACY_GUARD_AUDIT), "utf8"), readFileSync(join(base, NEUTRAL_GUARD_AUDIT), "utf8"));
   });
+  ok("migration preserves the canonical terminal generated YAML bytes without later drift", () => {
+    const base = root(); legacy(base);
+    const generated = [
+      "modelRouting:",
+      "  generated: true",
+      "",
+      "criticExport:",
+      "  policy: pipeline.critic-export-policy.v1",
+      "  mode: allowlisted",
+      "  policySha256: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "  packetSchema: pipeline.critic-candidate-packet.v1",
+      "  packetBoundary: candidate-diff-and-allowlisted-references",
+      "  hostGate: visible-not-bypassed",
+      "  providerGate: visible-not-bypassed",
+      "",
+    ].join("\n");
+    write(base, LEGACY_MANIFEST, generated);
+
+    const plan = planProjectAuthorityMigration({ rootDir: base });
+    assert.equal(plan.status, "ready");
+    assert.equal(applyProjectAuthorityMigration(plan, { rootDir: base, activate: true }).status, "applied");
+    const legacyBytes = readFileSync(join(base, LEGACY_MANIFEST), "utf8");
+    const neutralBytes = readFileSync(join(base, NEUTRAL_MANIFEST), "utf8");
+    assert.equal(legacyBytes, generated);
+    assert.equal(neutralBytes, generated);
+    assert.equal(legacyBytes.endsWith("\n\n"), false);
+    assert.equal(neutralBytes.endsWith("\n\n"), false);
+    assert.equal(neutralBytes.slice(-"  providerGate: visible-not-bypassed\n".length), "  providerGate: visible-not-bypassed\n");
+    assert.equal(planProjectAuthorityMigration({ rootDir: base }).status, "noop");
+  });
   ok("neutral authority is a no-op", () => {
     const base = root(); legacy(base); assert.equal(applyProjectAuthorityMigration(planProjectAuthorityMigration({ rootDir: base }), { rootDir: base, activate: true }).status, "applied");
     const plan = planProjectAuthorityMigration({ rootDir: base }); assert.equal(plan.status, "noop"); assert.equal(applyProjectAuthorityMigration(plan, { rootDir: base }).status, "noop");

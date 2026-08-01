@@ -65,11 +65,11 @@ function completeIntent() {
   };
 }
 
-function writeFixture(root) {
+function writeFixture(root, { pipelineYaml = `${PREFIX}${OWNED}${LEGACY_RUNNER_ROUTES}${SUFFIX}` } = {}) {
   const files = {
     ".claude/settings.json": "{\n  \"unowned\": true\n}\n",
     ".claude/pipeline.json": "{\n  \"project\": \"fixture\",\n  \"unowned\": true\n}\n",
-    ".claude/pipeline.yaml": `${PREFIX}${OWNED}${LEGACY_RUNNER_ROUTES}${SUFFIX}`,
+    ".claude/pipeline.yaml": pipelineYaml,
     ".codex/config.toml": "profile = \"keep\"\n",
     ".codex/agents/implementor.toml": "model = \"old\"\nmodel_reasoning_effort = \"low\"\nname = \"keep\"\n[metadata]\nmodel = \"nested\"\n",
     ".codex/agents/critic.toml": "model = \"old\"\nmodel_reasoning_effort = \"medium\"\nname = \"keep\"\n[metadata]\nmodel_reasoning_effort = \"nested\"\n",
@@ -82,9 +82,9 @@ function writeFixture(root) {
   }
 }
 
-function fixtureRoot() {
+function fixtureRoot(options) {
   const root = mkdtempSync(join(tmpdir(), "runtime-projection-v3-test-"));
-  writeFixture(root);
+  writeFixture(root, options);
   return root;
 }
 
@@ -201,6 +201,81 @@ test("V3 repeated projection is a no-change plan", () => {
     assert.equal(second.status, "ready");
     assert.ok(second.targets.every((entry) => !entry.changed));
     assert.equal(second.decisionConflicts.length, 0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("V3 YAML rendering uses one final LF for a terminal generated projection", () => {
+  const root = fixtureRoot({ pipelineYaml: `${PREFIX}${OWNED}` });
+  try {
+    const plan = planRuntimeProjectionV3(completeIntent(), { baselines: readRuntimeProjectionV3Baselines(root) });
+    assert.equal(plan.status, "ready");
+    const bytes = target(plan, ".claude/pipeline.yaml").after.bytes;
+    assert.ok(bytes.endsWith("\n"));
+    assert.equal(bytes.endsWith("\n\n"), false);
+    assert.equal(
+      bytes.slice(-"  providerGate: visible-not-bypassed\n".length),
+      "  providerGate: visible-not-bypassed\n",
+      "the terminal owned criticExport block has exactly one final LF",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("V3 YAML rendering keeps the generated separator before an unowned following block", () => {
+  const root = fixtureRoot({ pipelineYaml: `${PREFIX}${OWNED}${SUFFIX}` });
+  try {
+    const plan = planRuntimeProjectionV3(completeIntent(), { baselines: readRuntimeProjectionV3Baselines(root) });
+    assert.equal(plan.status, "ready");
+    const bytes = target(plan, ".claude/pipeline.yaml").after.bytes;
+    assert.ok(bytes.endsWith(SUFFIX));
+    assert.equal(
+      bytes.slice(bytes.indexOf("  providerGate: visible-not-bypassed")),
+      "  providerGate: visible-not-bypassed\n\nunownedAfter: exact\n",
+      "the unowned following header keeps the generated blank-line separator",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("V3 YAML rendering preserves CRLF placement for terminal and nonterminal projections", () => {
+  for (const [name, baseline, expectedEnd] of [
+    ["terminal", `${PREFIX}${OWNED}`, "  providerGate: visible-not-bypassed\r\n"],
+    ["nonterminal", `${PREFIX}${OWNED}${SUFFIX}`, "  providerGate: visible-not-bypassed\r\n\r\nunownedAfter: exact\r\n"],
+  ]) {
+    const root = fixtureRoot({ pipelineYaml: baseline.replace(/\n/gu, "\r\n") });
+    try {
+      const plan = planRuntimeProjectionV3(completeIntent(), { baselines: readRuntimeProjectionV3Baselines(root) });
+      assert.equal(plan.status, "ready", name);
+      const bytes = target(plan, ".claude/pipeline.yaml").after.bytes;
+      assert.equal(/(?<!\r)\n/u.test(bytes), false, `${name} must not introduce LF-only endings`);
+      assert.ok(bytes.endsWith(expectedEnd), name);
+      if (name === "terminal") assert.equal(bytes.endsWith("\r\n\r\n"), false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("V3 regeneration removes manual terminal YAML whitespace drift", () => {
+  const root = fixtureRoot({ pipelineYaml: `${PREFIX}${OWNED}` });
+  try {
+    const first = planRuntimeProjectionV3(completeIntent(), { baselines: readRuntimeProjectionV3Baselines(root) });
+    assert.equal(first.status, "ready");
+    const canonical = target(first, ".claude/pipeline.yaml").after.bytes;
+    const drifted = Object.fromEntries(first.targets.map((entry) => [entry.path, { status: "present", bytes: entry.after.bytes }]));
+    drifted[".claude/pipeline.yaml"] = { status: "present", bytes: `${canonical}\n` };
+    const repaired = planRuntimeProjectionV3(completeIntent(), { baselines: drifted });
+    assert.equal(repaired.status, "ready");
+    assert.equal(target(repaired, ".claude/pipeline.yaml").changed, true);
+    assert.equal(target(repaired, ".claude/pipeline.yaml").after.bytes, canonical);
+    const stable = planRuntimeProjectionV3(completeIntent(), {
+      baselines: Object.fromEntries(repaired.targets.map((entry) => [entry.path, { status: "present", bytes: entry.after.bytes }])),
+    });
+    assert.equal(target(stable, ".claude/pipeline.yaml").changed, false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

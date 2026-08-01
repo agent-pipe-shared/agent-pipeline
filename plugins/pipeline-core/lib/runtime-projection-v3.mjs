@@ -216,7 +216,18 @@ function requestedRoute(cell) {
   };
 }
 
-function renderClaudeModelRouting(target, intent, eol) {
+function renderYamlBlock(lines, eol, { followingTopLevelBlock = false } = {}) {
+  // Generated YAML owns its trailing separator.  A following top-level block
+  // receives one intentional blank line; a terminal generated block receives
+  // exactly one final EOL, so regeneration heals any manual EOF whitespace.
+  return `${lines.join(eol)}${eol}${followingTopLevelBlock ? eol : ""}`;
+}
+
+function hasFollowingTopLevelBlock(bytes, range) {
+  return range.end < bytes.length;
+}
+
+function renderClaudeModelRouting(target, intent, eol, placement = {}) {
   const lines = [
     "modelRouting:",
     "  # Generated V3 Claude compatibility projection; pipeline.user.v3 is the only routing authority.",
@@ -235,11 +246,11 @@ function renderClaudeModelRouting(target, intent, eol) {
     lines.push(`    effort: ${cell.effort}`);
     routes.push({ targetKey: binding.targetKey, cell: describeBinding(binding), ...requestedRoute(cell) });
   }
-  return { bytes: `${lines.join(eol)}${eol}${eol}`, routes };
+  return { bytes: renderYamlBlock(lines, eol, placement), routes };
 }
 
-function renderCriticExport(intent, eol) {
-  return [
+function renderCriticExport(intent, eol, placement = {}) {
+  return renderYamlBlock([
     "criticExport:",
     `  policy: ${intent.critic_export.schema}`,
     `  mode: ${intent.critic_export.mode}`,
@@ -248,9 +259,7 @@ function renderCriticExport(intent, eol) {
     "  packetBoundary: candidate-diff-and-allowlisted-references",
     "  hostGate: visible-not-bypassed",
     "  providerGate: visible-not-bypassed",
-    "",
-    "",
-  ].join(eol);
+  ], eol, placement);
 }
 
 function topLevelBlockRange(bytes, key) {
@@ -363,14 +372,21 @@ function replaceClaudeTarget(v2Target, target, intent, originalBytes) {
   }
   const eol = afterBytes.includes("\r\n") ? "\r\n" : "\n";
   const range = topLevelBlockRange(afterBytes, "modelRouting");
-  const rendered = renderClaudeModelRouting(target, intent, eol);
+  // criticExport is always projected after modelRouting, so modelRouting is
+  // never terminal in the final V3 YAML projection.
+  const rendered = renderClaudeModelRouting(target, intent, eol, { followingTopLevelBlock: true });
   afterBytes = `${afterBytes.slice(0, range.start)}${rendered.bytes}${afterBytes.slice(range.end)}`;
-  const criticExportBytes = renderCriticExport(intent, eol);
   const existingCriticExport = optionalTopLevelBlockRange(afterBytes, "criticExport");
   if (existingCriticExport) {
+    const criticExportBytes = renderCriticExport(intent, eol, {
+      followingTopLevelBlock: hasFollowingTopLevelBlock(afterBytes, existingCriticExport),
+    });
     afterBytes = `${afterBytes.slice(0, existingCriticExport.start)}${criticExportBytes}${afterBytes.slice(existingCriticExport.end)}`;
   } else {
     const projectedRouting = topLevelBlockRange(afterBytes, "modelRouting");
+    const criticExportBytes = renderCriticExport(intent, eol, {
+      followingTopLevelBlock: hasFollowingTopLevelBlock(afterBytes, projectedRouting),
+    });
     afterBytes = `${afterBytes.slice(0, projectedRouting.end)}${criticExportBytes}${afterBytes.slice(projectedRouting.end)}`;
   }
   if (optionalTopLevelBlockRange(afterBytes, "runnerRoutes")) {
