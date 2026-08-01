@@ -53,8 +53,8 @@ false-success boundary this P1 backlog item exists to close.
 Add a random, unpredictable component to the `invocationId` string
 constructed at line ~897 (e.g. via `randomUUID()` from `node:crypto`,
 combined with the existing `state.journalSha256` for correlation/debuggability
-— exact format is your call, `SAFE_ID`'s regex is
-`^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$`, so hyphens are fine). This means a stale
+— exact format is your call. `SAFE_ID` permits an ASCII letter or digit first,
+then up to 99 ASCII letters, digits, dots, underscores, or hyphens). This means a stale
 acknowledgement carrying an old invocation's id will now fail
 `RP-INVOCATION-MISMATCH` on any subsequent call, because each real
 authorization attempt gets a genuinely fresh, unguessable identity that a

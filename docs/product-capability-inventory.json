@@ -779,6 +779,36 @@
       "member": "control-execution-exchange-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:control-catalog-drift-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "control-catalog-drift-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:control-catalog-schema-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "control-catalog-schema-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:control-evaluation-receipt-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "control-evaluation-receipt-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:control-waiver-lifecycle-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "control-waiver-lifecycle-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:security-policy-resolver-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "security-policy-resolver-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:artifact-topology-check",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -891,6 +921,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "guard-push-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-push-v2-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "guard-push-v2-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-testpath-tests",
@@ -1689,7 +1725,11 @@
         "verify-phase:harness/scripts/verify.mjs:continuity-state-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-status-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-status-tests",
+        "verify-phase:harness/scripts/verify.mjs:control-catalog-drift-tests",
+        "verify-phase:harness/scripts/verify.mjs:control-catalog-schema-tests",
+        "verify-phase:harness/scripts/verify.mjs:control-evaluation-receipt-tests",
         "verify-phase:harness/scripts/verify.mjs:control-execution-exchange-tests",
+        "verify-phase:harness/scripts/verify.mjs:control-waiver-lifecycle-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-bare-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-export-policy-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-fail-closed-check",
@@ -1714,6 +1754,7 @@
         "verify-phase:harness/scripts/verify.mjs:guard-git-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-lifecycle-ready-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-push-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-push-v2-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-testpath-tests",
         "verify-phase:harness/scripts/verify.mjs:host-advisor-status-tests",
         "verify-phase:harness/scripts/verify.mjs:host-advisor-workspace-tests",
@@ -1779,6 +1820,7 @@
         "verify-phase:harness/scripts/verify.mjs:schema-lite-tests",
         "verify-phase:harness/scripts/verify.mjs:sdlc-efficiency-metrics-tests",
         "verify-phase:harness/scripts/verify.mjs:sdlc-run-graph-tests",
+        "verify-phase:harness/scripts/verify.mjs:security-policy-resolver-tests",
         "verify-phase:harness/scripts/verify.mjs:security-scan",
         "verify-phase:harness/scripts/verify.mjs:security-scan-tests",
         "verify-phase:harness/scripts/verify.mjs:session-cleanup-binding-tests",

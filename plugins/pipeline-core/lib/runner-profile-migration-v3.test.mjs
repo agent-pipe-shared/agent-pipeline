@@ -630,8 +630,9 @@ record("Issue #58 V0 consumers reach a read-only V3 bootstrap authority without 
     assert.equal(v3BootstrapAuthorityCli(["--root", root], {
       write: (chunk) => { authorityOutput += String(chunk); },
       deps: authorityDeps,
-    }), 1);
-    assert.equal(JSON.parse(authorityOutput).status, "projection-current");
+    }), 0);
+    assert.equal(JSON.parse(authorityOutput).status, "ready");
+    assert.equal(JSON.parse(authorityOutput).runtimeReadback, "not-applicable");
     const followUp = runCli(["plan", "--root", root]);
     assert.equal(followUp.status, 0);
     assert.equal(followUp.json.status, "noop");
