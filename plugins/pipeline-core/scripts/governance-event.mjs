@@ -54,6 +54,11 @@ function streamRequest(value, schema) {
   return value;
 }
 
+function recoveryRequest(value) {
+  if (!exactKeys(value, ["schema", "repositoryFingerprint", "streamId", "checkpoint", "recovery"]) || value.schema !== "pipeline.governance-event-recovery-request.v1") fail("GEC-REQUEST", "Recovery request has an invalid closed shape.");
+  return value;
+}
+
 export async function main(argv = process.argv.slice(2)) {
   const parsed = parse(argv);
   const body = await request(parsed.requestFile);
@@ -66,10 +71,10 @@ export async function main(argv = process.argv.slice(2)) {
     const append = appendRequest(body);
     return appendPortableGovernanceEvent({ repositoryRoot: parsed.repo, repositoryFingerprint: append.repositoryFingerprint, intent: append.intent });
   }
-  const stream = streamRequest(body, parsed.operation === "recover" ? "pipeline.governance-event-recovery-request.v1" : "pipeline.governance-event-stream-request.v1");
+  const stream = parsed.operation === "recover" ? recoveryRequest(body) : streamRequest(body, "pipeline.governance-event-stream-request.v1");
   if (parsed.operation === "verify") return verifyPortableGovernanceStream({ repositoryRoot: parsed.repo, repositoryFingerprint: stream.repositoryFingerprint, streamId: stream.streamId, checkpoint: stream.checkpoint });
   if (parsed.operation === "query") return queryPortableGovernanceStream({ repositoryRoot: parsed.repo, repositoryFingerprint: stream.repositoryFingerprint, streamId: stream.streamId, checkpoint: stream.checkpoint });
-  return recoverPortableGovernanceProjection({ repositoryRoot: parsed.repo, repositoryFingerprint: stream.repositoryFingerprint, streamId: stream.streamId, checkpoint: stream.checkpoint });
+  return recoverPortableGovernanceProjection({ repositoryRoot: parsed.repo, repositoryFingerprint: stream.repositoryFingerprint, streamId: stream.streamId, checkpoint: stream.checkpoint, recovery: stream.recovery });
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

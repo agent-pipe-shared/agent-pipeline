@@ -479,7 +479,9 @@ export async function queryPortableGovernanceStream({ repositoryRoot, registryPa
 }
 
 /** Rebuild only the replaceable heads projection from an already valid chain. */
-export async function recoverPortableGovernanceProjection({ repositoryRoot, registryPath, repositoryFingerprint, streamId, checkpoint } = {}) {
+export async function recoverPortableGovernanceProjection({ repositoryRoot, registryPath, repositoryFingerprint, streamId, checkpoint, recovery } = {}) {
+  if (!exactKeys(recovery, ["idempotencyKey", "expectedHeadsDigest", "requestedPostimageDigest"]) || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(recovery.idempotencyKey)
+    || (recovery.expectedHeadsDigest !== null && !SHA256.test(recovery.expectedHeadsDigest)) || !SHA256.test(recovery.requestedPostimageDigest)) fail("GES-RECOVERY-REQUEST", "Recovery requires a closed idempotent preimage/postimage request.");
   const verification = await verifyPortableGovernanceStream({ repositoryRoot, registryPath, repositoryFingerprint, streamId, checkpoint });
   if (verification.integrity !== "valid") fail("GES-RECOVERY-CHECKPOINT", "Projection recovery requires a retained checkpoint.");
   const { root } = await assertPhysicalRoot(repositoryRoot);
@@ -488,8 +490,23 @@ export async function recoverPortableGovernanceProjection({ repositoryRoot, regi
   const streamRoot = await ensureSafeDirectory(root, `${registry.storageRoot}/${streamId}`);
   return withExclusiveStreamLock(streamRoot, async () => {
     const rechecked = await scanStream(root, registry, streamId);
+    const headsPath = repositoryPath(root, `${registry.storageRoot}/heads.json`);
+    const existing = await lstatOrNull(headsPath) ? parseStrictJson(await readFile(headsPath)) : null;
+    if ((existing === null ? null : canonicalSha256(existing)) !== recovery.expectedHeadsDigest) fail("GES-RECOVERY-PREIMAGE", "Recovery heads preimage differs from its request.");
+    const journalRoot = await ensureSafeDirectory(root, `${registry.storageRoot}/recovery-journal`);
+    const journalPath = path.join(journalRoot, `${recovery.idempotencyKey}.json`);
+    const journal = { schema: "pipeline.governance-event-recovery-journal.v1", idempotencyKey: recovery.idempotencyKey, streamId, expectedHeadsDigest: recovery.expectedHeadsDigest, requestedPostimageDigest: recovery.requestedPostimageDigest };
+    await writeAtomic(journalPath, `${canonicalizeJson(journal)}\n`);
     await writeHeads(root, registry, streamId, rechecked.events);
-    return Object.freeze({ status: "projection-rebuilt", streamId, eventCount: rechecked.events.length, checkpoint: verification.checkpoint });
+    const rebuilt = parseStrictJson(await readFile(headsPath));
+    const postimageDigest = canonicalSha256(rebuilt);
+    if (postimageDigest !== recovery.requestedPostimageDigest) fail("GES-RECOVERY-POSTIMAGE", "Recovery postimage differs from its request.");
+    const receiptRoot = await ensureSafeDirectory(root, `${registry.storageRoot}/recovery`);
+    const receiptPath = path.join(receiptRoot, `${recovery.idempotencyKey}.json`);
+    const receipt = { schema: "pipeline.governance-event-recovery-receipt.v1", idempotencyKey: recovery.idempotencyKey, streamId, checkpoint: verification.checkpoint, preimageDigest: recovery.expectedHeadsDigest, postimageDigest, outcome: "recovered" };
+    await writeAtomic(receiptPath, `${canonicalizeJson(receipt)}\n`);
+    await unlink(journalPath);
+    return Object.freeze({ status: "projection-rebuilt", streamId, eventCount: rechecked.events.length, checkpoint: verification.checkpoint, receipt: Object.freeze(receipt) });
   });
 }
 

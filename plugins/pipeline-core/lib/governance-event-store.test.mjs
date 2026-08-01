@@ -169,8 +169,10 @@ test("projection recovery requires a retained checkpoint and rebuilds a stale he
   const root = await fixtureRoot(); t.after(() => cleanup(root));
   const first = await append(root);
   await writeFile(path.join(root, "governance/events/heads.json"), "{\"broken\":true}\n");
-  await assert.rejects(() => recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" }), (error) => error.code === "GES-RECOVERY-CHECKPOINT");
-  const recovered = await recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", checkpoint: first.checkpoint });
+  const rebuiltHeads = { schema: "pipeline.governance-event-heads.v1", repositoryFingerprint: fingerprint, streams: { human: { sequence: 0, eventDigest: null }, agent: { sequence: 0, eventDigest: null }, lifecycle: { sequence: 1, eventDigest: first.eventDigest } } };
+  const recovery = { idempotencyKey: "recover-1", expectedHeadsDigest: (await import("./governance-event.mjs")).canonicalSha256({ broken: true }), requestedPostimageDigest: (await import("./governance-event.mjs")).canonicalSha256(rebuiltHeads) };
+  await assert.rejects(() => recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", recovery }), (error) => error.code === "GES-RECOVERY-CHECKPOINT");
+  const recovered = await recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", checkpoint: first.checkpoint, recovery });
   assert.equal(recovered.status, "projection-rebuilt");
   const head = JSON.parse(await readFile(path.join(root, "governance/events/heads.json"), "utf8"));
   assert.deepEqual(head.streams.lifecycle, { sequence: 1, eventDigest: first.eventDigest });
