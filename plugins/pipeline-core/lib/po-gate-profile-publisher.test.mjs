@@ -25,7 +25,7 @@ import {
   validatePoGateAuthorityForRepository,
   validatePoGateProfileReceipt,
 } from "./po-gate-authority.mjs";
-import { publishPoGateProfileReceipt } from "./po-gate-profile-publisher.mjs";
+import { initializePoGateProfileReceipt, publishPoGateProfileReceipt } from "./po-gate-profile-publisher.mjs";
 
 const NOW = "2026-07-20T12:00:00.000Z";
 const PRIVATE_MARKER = "private-overlay-value-must-not-escape";
@@ -145,6 +145,40 @@ check("publishes a mode-0600 canonical v1 receipt accepted by the existing autho
     const authority = validatePoGateAuthorityForRepository({ repoRoot: root });
     assert.equal(authority.ok, true, JSON.stringify(authority));
     assert.equal(authority.value.schema, "pipeline.po-gate-authority-evidence.v1");
+  });
+});
+
+check("kickoff initialization creates an absent receipt once, replays a current receipt, and never replaces a bad one", () => {
+  withFixture(({ common, root }) => {
+    const input = { rootDir: root, userYamlText: source(), runtimeYamlText: runtime(), updatedAt: NOW };
+    const created = initializePoGateProfileReceipt(input);
+    assert.equal(created.ok, true, JSON.stringify(created));
+    assert.equal(created.code, "PO-PROFILE-RECEIPT-PUBLISHED");
+    assert.equal(validatePoGateAuthorityForRepository({ repoRoot: root }).ok, true);
+    const replay = initializePoGateProfileReceipt(input);
+    assert.equal(replay.ok, true, JSON.stringify(replay));
+    assert.equal(replay.code, "PO-PROFILE-RECEIPT-INITIAL-CURRENT");
+
+    const target = poGateProfileReceiptPath(common);
+    const bytes = readFileSync(target);
+    assert.equal(bytes.equals(readFileSync(target)), true);
+  });
+
+  withFixture(({ common, root }) => {
+    const target = poGateProfileReceiptPath(common);
+    write(target, "malformed\n");
+    const result = initializePoGateProfileReceipt({
+      rootDir: root,
+      userYamlText: source(),
+      runtimeYamlText: runtime(),
+      updatedAt: NOW,
+    });
+    assert.deepEqual(result, {
+      ok: false,
+      code: "PO-PROFILE-RECEIPT-INITIAL-CONFLICT",
+      reason: "an existing PO profile receipt must not be replaced by kickoff initialization",
+    });
+    assert.equal(readFileSync(target, "utf8"), "malformed\n");
   });
 });
 

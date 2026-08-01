@@ -61,6 +61,7 @@ import {
   resolveProjectAuthorityPaths,
   validatePortablePipelineState,
 } from "./project-authority.mjs";
+import { validatePoGateLanguageProjection } from "./po-gate-authority.mjs";
 import {
   inspectSessionClosure,
   listActiveSessionDescriptors,
@@ -94,8 +95,6 @@ const DEFAULT_ONBOARDING_SCRIPT = join(HERE, "..", "scripts", "project-onboardin
 const DEFAULT_SESSION_CLEANUP_SCRIPT = join(HERE, "..", "scripts", "session-cleanup.mjs");
 const STATE_RELATIVE_PATH = NEUTRAL_STATE;
 const CALIBRATION_RELATIVE_PATH = NEUTRAL_CALIBRATION;
-const INITIAL_PRD_RELATIVE_PATH = "specs/kickoff-initial-prd.md";
-const INITIAL_SPEC_RELATIVE_PATH = "specs/kickoff-initial-spec.md";
 const HISTORY_BASENAME = "continuity-history.json";
 const SESSION_CLEANUP_BINDING_BASENAME = "session-cleanup-binding.json";
 const SESSION_CLEANUP_KEY_BASENAME = "session-cleanup-binding.key";
@@ -2745,8 +2744,33 @@ function projectGoal(goal) {
   return goal.split("\n").map((line) => `> ${line}`).join("\n");
 }
 
-function initialPrdContent(goal, goalSha256) {
+function initialAuthorityPaths(featureId) {
+  const directory = `specs/${featureId}`;
+  return {
+    prd: `${directory}/prd_${featureId}.md`,
+    spec: `${directory}/spec.md`,
+  };
+}
+
+function kickoffLanguage(root) {
+  let projection;
+  try {
+    projection = validatePoGateLanguageProjection(
+      readFileSync(join(root, "pipeline.user.yaml")),
+      readFileSync(join(root, ".claude", "pipeline.yaml")),
+    );
+  } catch {
+    fail("KICKOFF-PLAN-INVALID", "kickoff PO-language projection is unavailable");
+  }
+  if (!projection.ok) fail("KICKOFF-PLAN-INVALID", "kickoff PO-language projection is invalid");
+  return projection.humanFacing;
+}
+
+function initialPrdContent(goal, goalSha256, language, specSha256) {
   return [
+    `<!-- po-language: ${language} -->`,
+    `<!-- technical-spec-sha256: ${specSha256} -->`,
+    "",
     "# Initial product requirements",
     "",
     "## Goal",
@@ -2765,14 +2789,14 @@ function initialPrdContent(goal, goalSha256) {
   ].join("\n");
 }
 
-function initialSpecContent(goalSha256, prdSha256) {
+function initialSpecContent(goalSha256, prdPath) {
   return [
     "# Initial technical specification",
     "",
     "## Authority binding",
     "",
     `- Goal SHA-256: \`${goalSha256}\``,
-    `- Initial PRD SHA-256: \`${prdSha256}\``,
+    `- Canonical PRD: \`${prdPath}\``,
     "",
     "## Initial implementation contract",
     "",
@@ -2803,19 +2827,19 @@ function handoverContent(goal, featureId, prdPath, specPath) {
   ].join("\n");
 }
 
-function initialContinuity({ featureId, prdSha256, specSha256 }) {
+function initialContinuity({ featureId, prdPath, prdSha256, specPath, specSha256, language }) {
   return {
     schema: "pipeline.continuity.v0",
     featureId,
     revision: 0,
     runtime: {
-      humanFacingLanguage: "en",
+      humanFacingLanguage: language,
       activeDuty: "Coordinator",
       sessionCleanup: null,
     },
     authority: {
-      prd: { path: INITIAL_PRD_RELATIVE_PATH, sha256: prdSha256 },
-      spec: { path: INITIAL_SPEC_RELATIVE_PATH, sha256: specSha256 },
+      prd: { path: prdPath, sha256: prdSha256 },
+      spec: { path: specPath, sha256: specSha256 },
       result: null,
     },
     queueHead: {
@@ -2919,8 +2943,6 @@ function validatePlan(plan) {
   if (root !== plan.root
     || plan.targets.state.path !== selectedAuthority.state
     || plan.targets.history.path !== HISTORY_BASENAME
-    || plan.targets.prd.path !== INITIAL_PRD_RELATIVE_PATH
-    || plan.targets.spec.path !== INITIAL_SPEC_RELATIVE_PATH
     || plan.targets.state.beforeSha256 !== null
     || plan.targets.handover.beforeSha256 !== null
     || plan.targets.prd.beforeSha256 !== null
@@ -2934,7 +2956,7 @@ function validatePlan(plan) {
     || state.schema !== "pipeline.state.v0"
     || !exactKeys(state.activeFeature, new Set(["id", "planPath", "phase"]))
     || state.activeFeature.id !== state.continuity?.featureId
-    || state.activeFeature.planPath !== plan.targets.spec.path
+    || state.activeFeature.planPath !== plan.targets.prd.path
     || state.activeFeature.phase !== "design"
     || state.planApproved !== false
     || state.continuity.authority.prd.path !== plan.targets.prd.path
@@ -2945,6 +2967,10 @@ function validatePlan(plan) {
     || state.continuity.authority.spec.path === plan.targets.handover.path
     || !validateContinuityState(state.continuity, state.activeFeature.id).ok) {
     fail("KICKOFF-PLAN-INVALID", "proposed Pipeline state is invalid");
+  }
+  const canonicalPaths = initialAuthorityPaths(state.activeFeature.id);
+  if (plan.targets.prd.path !== canonicalPaths.prd || plan.targets.spec.path !== canonicalPaths.spec) {
+    fail("KICKOFF-PLAN-INVALID", "kickoff authority paths are not canonical");
   }
   const proposedReadback = projectReadContinuityStatus({ status: "ok", state });
   if (proposedReadback.code !== "CS-STATUS-ACTIVE" || proposedReadback.continuity.status !== "valid") {
@@ -3024,9 +3050,12 @@ function buildOnboardingKickoffPlan({
   if (observed.continuity.status !== "absent-pristine" && !replay) {
     fail("KICKOFF-NOT-PRISTINE", "kickoff is permitted only for absent-pristine continuity");
   }
+  const goalSha256 = sha256(Buffer.from(normalizedGoal, "utf8"));
+  const featureId = `kickoff-${goalSha256.slice(0, 16)}`;
+  const authority = initialAuthorityPaths(featureId);
   const authorityObservations = Object.fromEntries([
-    ["prd", INITIAL_PRD_RELATIVE_PATH, "initial PRD"],
-    ["spec", INITIAL_SPEC_RELATIVE_PATH, "initial specification"],
+    ["prd", authority.prd, "initial PRD"],
+    ["spec", authority.spec, "initial specification"],
   ].map(([key, path, label]) => [key, observeOptionalProjectFile(observed.root, path, label)]));
   if (!replay) {
     for (const [key, label] of [["prd", "initial PRD"], ["spec", "initial specification"]]) {
@@ -3035,25 +3064,31 @@ function buildOnboardingKickoffPlan({
       }
     }
   }
-  const goalSha256 = sha256(Buffer.from(normalizedGoal, "utf8"));
-  const featureId = `kickoff-${goalSha256.slice(0, 16)}`;
-  const prdContent = initialPrdContent(normalizedGoal, goalSha256);
-  const prdSha256 = sha256(Buffer.from(prdContent, "utf8"));
-  const specContent = initialSpecContent(goalSha256, prdSha256);
+  const language = kickoffLanguage(observed.root);
+  const specContent = initialSpecContent(goalSha256, authority.prd);
   const specSha256 = sha256(Buffer.from(specContent, "utf8"));
+  const prdContent = initialPrdContent(normalizedGoal, goalSha256, language, specSha256);
+  const prdSha256 = sha256(Buffer.from(prdContent, "utf8"));
   const content = handoverContent(
     normalizedGoal,
     featureId,
-    INITIAL_PRD_RELATIVE_PATH,
-    INITIAL_SPEC_RELATIVE_PATH,
+    authority.prd,
+    authority.spec,
   );
   const handoverSha256 = sha256(Buffer.from(content, "utf8"));
-  const continuity = initialContinuity({ featureId, prdSha256, specSha256 });
+  const continuity = initialContinuity({
+    featureId,
+    prdPath: authority.prd,
+    prdSha256,
+    specPath: authority.spec,
+    specSha256,
+    language,
+  });
   const state = {
     schema: "pipeline.state.v0",
     activeFeature: {
       id: featureId,
-      planPath: INITIAL_SPEC_RELATIVE_PATH,
+      planPath: authority.prd,
       phase: "design",
     },
     planApproved: false,
@@ -3101,13 +3136,13 @@ function buildOnboardingKickoffPlan({
       content,
     },
     prd: {
-      path: INITIAL_PRD_RELATIVE_PATH,
+      path: authority.prd,
       beforeSha256: null,
       afterSha256: prdSha256,
       content: prdContent,
     },
     spec: {
-      path: INITIAL_SPEC_RELATIVE_PATH,
+      path: authority.spec,
       beforeSha256: null,
       afterSha256: specSha256,
       content: specContent,
@@ -3208,22 +3243,23 @@ function recognisedKickoff(observed, spawn = defaultGitSpawn) {
   if (state.schema !== "pipeline.state.v0" || state.planApproved !== false
     || !exactKeys(state.activeFeature, new Set(["id", "planPath", "phase"]))) return null;
   if (!/^kickoff-[a-f0-9]{16}$/u.test(state.activeFeature.id)
-    || state.activeFeature.planPath !== INITIAL_SPEC_RELATIVE_PATH
     || state.activeFeature.phase !== "design"
     || !validateContinuityState(continuity, state.activeFeature.id).ok
     || continuity.runtime.sessionCleanup !== null
     || continuity.authority.result !== null
-    || continuity.authority.prd.path !== INITIAL_PRD_RELATIVE_PATH
-    || continuity.authority.spec.path !== INITIAL_SPEC_RELATIVE_PATH
     || continuity.queueHead?.dispatch !== null
     || continuity.blocker !== null
     || continuity.acknowledgedFinal !== null
     || continuity.recovery !== null
     || continuity.decisionTxn !== null) return null;
+  const authority = initialAuthorityPaths(state.activeFeature.id);
+  if (state.activeFeature.planPath !== authority.prd
+    || continuity.authority.prd.path !== authority.prd
+    || continuity.authority.spec.path !== authority.spec) return null;
   if (!history || history.transactions?.length !== 1 || history.transactions[0]?.kind !== "kickoff") return null;
   const entry = history.transactions[0];
-  const prd = observeOptionalProjectFile(observed.root, INITIAL_PRD_RELATIVE_PATH, "initial PRD");
-  const spec = observeOptionalProjectFile(observed.root, INITIAL_SPEC_RELATIVE_PATH, "initial specification");
+  const prd = observeOptionalProjectFile(observed.root, authority.prd, "initial PRD");
+  const spec = observeOptionalProjectFile(observed.root, authority.spec, "initial specification");
   if (prd.status !== "present" || spec.status !== "present"
     || entry.calibrationSha256 !== observed.calibrationSha256
     || entry.handoverSha256 !== observed.handoverObservation.sha256
@@ -3297,8 +3333,7 @@ function promotionArtifacts(root, input) {
   if (prd.status !== "present" || spec.status !== "present") {
     fail("KICKOFF-PROMOTION-AUTHORITY", "promotion PRD and specification must already exist");
   }
-  if ([INITIAL_PRD_RELATIVE_PATH, INITIAL_SPEC_RELATIVE_PATH].includes(prd.path)
-    || [INITIAL_PRD_RELATIVE_PATH, INITIAL_SPEC_RELATIVE_PATH].includes(spec.path)) {
+  if (prd.path.startsWith("specs/kickoff-") || spec.path.startsWith("specs/kickoff-")) {
     fail("KICKOFF-PROMOTION-AUTHORITY", "promotion authority must not reuse kickoff artifacts");
   }
   return {

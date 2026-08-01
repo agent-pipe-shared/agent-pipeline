@@ -34,6 +34,26 @@ For local development also print:
 
 ## Normal bootstrap command sequence
 
+### One onboarding consent, not a chain of prompts
+
+When the user has directly agreed to use Agent Pipeline for this repository,
+that consent authorizes the complete bounded local onboarding happy path:
+read-only plans and readbacks, portable authority seed, any plan-disclosed local
+Git initialization, runtime initialization, restart-barrier preparation, and
+the first kickoff artifacts. State the bounded effects once, then execute each
+returned digest-bound action and its readback without asking again for the next
+individual digest. `requiresConfirmation` describes the action's safety shape;
+it does not invent a second PO chat gate after this consent exists.
+
+After a required restart, an already seeded repository is evidence that this
+onboarding consent has been exercised; resume its ordinary local bootstrap
+without re-asking. Stop for a new human input only when no usable project goal
+or material design input exists, a configured plan/acceptance gate is reached,
+an action is external or irreversible, or a typed hard block has no supplied
+safe recovery. Never treat this consent as approval for unrelated adoption,
+remote operations, deployment, publication, destructive work, or a scope
+change.
+
 1. **Step 0 / V4 onboarding:** execute the exact read-only
    `project-onboarding-v3.mjs inspect --root "$PWD" --intent bootstrap` action
    returned by preflight. Accept only `pipeline.project-onboarding.v4` ready
@@ -72,9 +92,16 @@ For local development also print:
    diagnosis only, and correct the governed artifact through its reviewed
    recovery path before restarting bootstrap.
 
-6. **Optional restart hint:** after the portable seed and before a first
-   kickoff, capture a bounded, closed context card with
-   `resume-hint.mjs capture --card-file <json>` when the user supplied one.
+6. **Restart hint for visible pre-bootstrap input:** after the portable seed
+   and before a first kickoff, the agent MUST first determine whether the user
+   supplied material design input, scope, constraints, or open questions before
+   pipeline activation. When it did, distil that input into a bounded, closed
+   context card and capture it with `resume-hint.mjs capture --card-file <json>`;
+   do not reduce it to a new short kickoff goal. A short goal with no further
+   material input needs no card. Read back `resume-hint.mjs inspect` after a
+   successful capture and use an `available` card as context for the kickoff.
+   The card is never a gate and capture failure must be surfaced honestly rather
+   than claimed as persisted context.
    Its exact keys are `intent`, `scope`, `constraints`, and `questions`; each
    value is a short distilled statement, never a transcript. Interpret user intent
    rather than keywords: an intended restart/session cut captures it; changed
@@ -113,6 +140,15 @@ Once bootstrap is ready and the required plan gate is recorded, continue the
 approved implementation autonomously: scoped edits, focused tests, state
 readback, one-line commits, Verify, Critic preparation and ordinary block
 continuation are agent work. A standing approval is not a fresh human touch.
+
+A recorded PRD/Spec approval is an execution mandate for its accepted scope.
+Choose ordinary implementation details, task sequencing, bounded recovery,
+test fixes and internal alternatives without asking the human again; record
+material choices and return results for acceptance. Ask only where alternatives
+materially change accepted scope, acceptance criteria, priority, risk, cost,
+an external or irreversible consequence, or a configured decision/acceptance
+gate. Do not turn routine uncertainty or several implementation options into a
+series of PO approvals.
 
 Ask the human decision role only for a configured decision gate, required final
 acceptance, an irreversible or externally consequential action, or a typed hard

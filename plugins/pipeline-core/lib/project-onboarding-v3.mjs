@@ -49,6 +49,7 @@ import {
   validatePoGateAuthorityForRepository,
   validatePoGateProfileForRepository,
 } from "./po-gate-authority.mjs";
+import { initializePoGateProfileReceipt } from "./po-gate-profile-publisher.mjs";
 import { parseYaml } from "./yaml-lite.mjs";
 import { codexCustomAgentSeed, loadRuntimeProjectionV3OwnedKeys, planRuntimeProjectionV3 } from "./runtime-projection-v3.mjs";
 import {
@@ -141,7 +142,9 @@ function deps(overrides = {}) {
   return {
     accessSync, closeSync, constants, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync,
     linkSync, readdirSync, realpathSync, readFileSync, renameSync, rmSync, rmdirSync, unlinkSync, writeFileSync,
-    spawnSync, observeCodexOnboardingCapabilities, observeOnboardingAppServer, ...overrides,
+    spawnSync, observeCodexOnboardingCapabilities, observeOnboardingAppServer,
+    initializePoGateProfileReceipt,
+    ...overrides,
   };
 }
 function safeRoot(rootDir, fs) {
@@ -181,6 +184,20 @@ function projectAuthorityPaths(root, fs) {
     state: neutral ? NEUTRAL_STATE : LEGACY_STATE,
     calibration: neutral ? NEUTRAL_CALIBRATION : LEGACY_CALIBRATION,
   };
+}
+
+function initializeKickoffPoProfile(root, fs) {
+  const sourceBytes = readBoundPhysicalFile(safePath(root, SOURCE, fs), fs);
+  const runtimeBytes = readBoundPhysicalFile(safePath(root, ".claude/pipeline.yaml", fs), fs);
+  const initialized = fs.initializePoGateProfileReceipt({
+    rootDir: root,
+    userYamlText: sourceBytes,
+    runtimeYamlText: runtimeBytes,
+  });
+  if (!initialized?.ok) {
+    throw new Error(`kickoff PO profile initialization failed (${initialized?.code ?? "unavailable"})`);
+  }
+  return initialized;
 }
 function rootEntries(root, fs) {
   return fs.readdirSync(root).sort().map((name) => {
@@ -3554,6 +3571,7 @@ export function applyProjectOnboardingKickoffV4({
     activate,
     deps: { ...overrides, spawn: fs.spawnSync },
   });
+  if (observed.repository.mode === "local") initializeKickoffPoProfile(observed.root, fs);
   return v4Inspection(rootDir, fs, "onboarding");
 }
 

@@ -151,6 +151,29 @@ implementation is autonomous: bounded edits, focused checks, state readback,
 one-line commits, Verify, Critic preparation and the next approved block are
 agent work.
 
+**Plan approval is an execution mandate, not a per-step conversation.** A
+recorded PRD/Spec approval covers every implementation choice and recovery
+needed to meet its accepted scope: normal design details, task ordering, test
+fixes, internal refactors, evidence collection and Critic follow-up. The agent
+must decide those matters, record material decisions in governed artifacts, and
+return outcomes for acceptance. It must not turn ordinary alternatives or
+uncertainty into repeated PO questions. A question is permitted only when
+alternatives materially change approved scope, acceptance criteria, priority,
+risk, cost, an external or irreversible consequence, or a configured gate.
+Present such alternatives together at that boundary; do not serialise them into
+implementation-time approval prompts.
+
+**Pipeline-use consent is likewise one bounded bootstrap consent.** When the
+human agrees to use the Pipeline in a repository, that authorises its disclosed
+local happy path through the first usable kickoff: plans/readbacks, portable
+seed, any plan-disclosed local Git initialization, runtime initialization,
+restart preparation and kickoff artifacts. The agent reports the bounded effect
+once and then executes the digest-bound steps autonomously; it does not ask the
+same human to approve every internal plan digest. A restart resumes this local
+onboarding from its sanctioned state. This consent never covers remote/adoption
+work, publication, deployment, destructive operations, a scope change, or an
+actual configured plan/acceptance gate.
+
 Do not ask the PO to re-approve routine progress, a guard's first denial, a
 test retry, a bounded recovery already returned by the system, or a normal
 commit. Ask only for a configured decision or acceptance gate, an explicit
@@ -412,6 +435,33 @@ entstehen keine zusätzlichen Chat-Bestätigungen. Sobald das nötige Plan-Gate
 aufgezeichnet ist, läuft die gewöhnliche Implementierung autonom: begrenzte
 Änderungen, fokussierte Checks, State-Readback, einzeilige Commits, Verify,
 Critic-Vorbereitung und der nächste freigegebene Block sind Agentenarbeit.
+
+**Eine Planfreigabe ist ein Ausführungsmandat, kein Gespräch für jeden
+Einzelschritt.** Eine aufgezeichnete PRD-/Spec-Freigabe deckt jede
+Umsetzungsentscheidung und Recovery ab, die nötig ist, um den akzeptierten
+Scope zu erfüllen: normale Designdetails, Reihenfolge der Arbeit, Test-Fixes,
+interne Refactors, Evidenzsammlung und Critic-Nacharbeit. Der Agent entscheidet
+diese Punkte, hält materielle Entscheidungen in den governeden Artefakten fest
+und legt Ergebnisse zur Abnahme vor. Er darf gewöhnliche Alternativen oder
+Unsicherheit nicht in wiederholte PO-Fragen verwandeln. Eine Frage ist nur
+zulässig, wenn Alternativen den freigegebenen Scope, Akzeptanzkriterien,
+Priorität, Risiko, Kosten, eine externe oder irreversible Folge oder ein
+konfiguriertes Gate materiell verändern. Solche Alternativen werden an dieser
+Grenze gemeinsam vorgelegt, nicht als Folge von Freigabeaufforderungen während
+der Umsetzung.
+
+**Die Zustimmung zur Pipeline-Nutzung ist ebenso eine einmalige, begrenzte
+Bootstrap-Zustimmung.** Wenn der Mensch der Pipeline-Nutzung in einem
+Repository zustimmt, autorisiert das den offengelegten lokalen Happy Path bis
+zum ersten nutzbaren Kickoff: Pläne/Readbacks, portablen Seed, eine im Plan
+offengelegte lokale Git-Initialisierung, Runtime-Initialisierung,
+Restart-Vorbereitung und Kickoff-Artefakte. Der Agent benennt die begrenzte
+Wirkung einmal und führt die digest-gebundenen Schritte dann autonom aus; er
+fragt nicht nach jeder internen Plan-Prüfsumme erneut. Ein Neustart setzt dieses
+lokale Onboarding aus seinem sanktionierten Zustand fort. Diese Zustimmung
+deckt niemals Remote-/Adoption-Arbeit, Veröffentlichung, Deployment,
+destruktive Operationen, Scope-Änderungen oder ein tatsächlich konfiguriertes
+Plan-/Abnahme-Gate ab.
 
 Den PO nicht erneut für normalen Fortschritt, die erste Guard-Ablehnung, einen
 Test-Repeat, eine bereits zurückgegebene begrenzte Recovery oder einen normalen

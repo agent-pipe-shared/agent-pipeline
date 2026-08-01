@@ -55,6 +55,8 @@ import {
 } from "./project-authority.mjs";
 import { captureResumeHint, discardResumeHint, inspectResumeHint } from "./resume-hint.mjs";
 import { inspectObservationGovernanceBootstrap } from "./observation-governance-bootstrap.mjs";
+import { validatePoGateAuthorityForRepository } from "./po-gate-authority.mjs";
+import { initializePoGateProfileReceipt as initializeActualPoGateProfileReceipt } from "./po-gate-profile-publisher.mjs";
 
 let passed = 0; const failures = [];
 function test(name, run) { try { run(); passed += 1; console.log(`PASS  ${name}`); } catch (error) { failures.push(`${name}: ${error.message}`); console.log(`FAIL  ${name} -- ${error.message}`); } }
@@ -109,6 +111,14 @@ const fakeDeps = {
   observeOnboardingAppServer: fakeAppServer,
   observePersistedPoAuthority() {
     return { status: "absent" };
+  },
+  initializePoGateProfileReceipt() {
+    return {
+      ok: true,
+      code: "PO-PROFILE-RECEIPT-INITIALIZED",
+      humanFacing: "en",
+      receiptSha256: "0".repeat(64),
+    };
   },
   planSessionCleanupRecovery() {
     return {
@@ -2188,6 +2198,17 @@ test("public kickoff plan/apply carries goal as one argv element and reconstruct
     const planned = invoke(["kickoff", "plan", "--root", path, "--goal", goal]);
     assert.equal(planned.code, 0, stderr);
     assert.equal(planned.result.goal, goal);
+    const kickoffId = planned.result.targets.state.value.activeFeature.id;
+    const expectedPrd = `specs/${kickoffId}/prd_${kickoffId}.md`;
+    const expectedSpec = `specs/${kickoffId}/spec.md`;
+    assert.equal(planned.result.targets.prd.path, expectedPrd);
+    assert.equal(planned.result.targets.spec.path, expectedSpec);
+    assert.equal(planned.result.targets.state.value.activeFeature.planPath, expectedPrd);
+    assert.equal(planned.result.targets.state.value.continuity.authority.prd.path, expectedPrd);
+    assert.equal(planned.result.targets.state.value.continuity.authority.spec.path, expectedSpec);
+    assert.match(planned.result.targets.prd.content, /^<!-- po-language: en -->\n<!-- technical-spec-sha256: [a-f0-9]{64} -->/u);
+    assert.equal(planned.result.targets.prd.content.includes(`technical-spec-sha256: ${planned.result.targets.spec.afterSha256}`), true);
+    assert.equal(planned.result.targets.spec.content.includes("Initial PRD SHA-256"), false);
     assert.deepEqual(planned.result.applyAction.argv, [
       ONBOARDING_SCRIPT,
       "kickoff", "apply", "--root", path, "--goal", goal,
@@ -2223,6 +2244,51 @@ test("public kickoff plan/apply carries goal as one argv element and reconstruct
     assert.equal(replayed.result.status, "ready");
     assert.equal(replayed.result.continuity.status, "valid");
     assert.equal(existsSync(join(path, "nope")), false);
+  } finally { dispose(path); }
+});
+
+test("a local kickoff provisions its PO profile inside the confirmed kickoff action", () => {
+  const path = root();
+  const calls = [];
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path, "Provision the first local profile", {
+      ...fakeDeps,
+      initializePoGateProfileReceipt(input) {
+        calls.push(input);
+        return {
+          ok: true,
+          code: "PO-PROFILE-RECEIPT-PUBLISHED",
+          humanFacing: "en",
+          receiptSha256: "1".repeat(64),
+        };
+      },
+    });
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].rootDir, path);
+    assert.match(String(calls[0].userYamlText), /human_facing: "en"/u);
+    assert.match(String(calls[0].runtimeYamlText), /human_facing: en/u);
+  } finally { dispose(path); }
+});
+
+test("a real fresh local kickoff is immediately a valid canonical PO authority", () => {
+  const path = root();
+  try {
+    hostGit(path, ["init", "--initial-branch=main"]);
+    const localDeps = { ...fakeDeps, initializePoGateProfileReceipt: initializeActualPoGateProfileReceipt };
+    const barrier = initializeRestartRequiredRoot(path, localDeps);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path, "Create one canonical fresh feature", localDeps);
+    const authority = validatePoGateAuthorityForRepository({ repoRoot: path });
+    assert.equal(authority.ok, true, JSON.stringify(authority));
+    const stderr = [];
+    const exit = pipelineStateRun(["submit-plan", "--by", "coordinator", "--profile", "feature"], {
+      dir: path,
+      now: () => "2026-08-01T12:00:00.000Z",
+      writeError: (value) => stderr.push(value),
+    });
+    assert.equal(exit, 0, stderr.join(""));
   } finally { dispose(path); }
 });
 

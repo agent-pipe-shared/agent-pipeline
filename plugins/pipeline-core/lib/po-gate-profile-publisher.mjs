@@ -7,6 +7,7 @@ import {
   constants,
   existsSync,
   fsyncSync,
+  linkSync,
   lstatSync,
   mkdirSync,
   openSync,
@@ -22,6 +23,7 @@ import {
   createPoGateProfileReceipt,
   derivePoGateRepositoryFingerprint,
   poGateProfileReceiptPath,
+  validatePoGateProfileForRepository,
   resolvePoGateRepositoryTopology,
   serializePoGateProfileReceipt,
   validatePoGateLanguageProjection,
@@ -34,6 +36,7 @@ const IO_KEYS = Object.freeze([
   "closeSync",
   "existsSync",
   "fsyncSync",
+  "linkSync",
   "lstatSync",
   "mkdirSync",
   "openSync",
@@ -60,6 +63,7 @@ function dependencies(overrides) {
     closeSync,
     existsSync,
     fsyncSync,
+    linkSync,
     lstatSync,
     mkdirSync,
     openSync,
@@ -154,11 +158,12 @@ function syncDirectory(path, io) {
  * therefore retains canonicalPrimaryRoot for compatibility with the existing
  * authority validator. Returned values never expose that path or any input.
  */
-export function publishPoGateProfileReceipt({
+function publishReceipt({
   rootDir,
   userYamlText,
   runtimeYamlText,
   updatedAt = undefined,
+  initialOnly = false,
 } = {}, dependencyOverrides = {}) {
   const deps = dependencies(dependencyOverrides);
   if (deps === null) {
@@ -181,7 +186,7 @@ export function publishPoGateProfileReceipt({
     if (canonicalRoot !== primaryRoot || repositoryRoot !== primaryRoot) {
       return rejected("PO-PROFILE-NOT-PRIMARY", "the publisher must run from the canonical primary checkout");
     }
-  } catch {
+  } catch (error) {
     return rejected("PO-PROFILE-TOPOLOGY-INVALID", "repository topology is unavailable");
   }
 
@@ -203,6 +208,12 @@ export function publishPoGateProfileReceipt({
     const { common, parent } = ensurePhysicalPrivateDirectory(topology.gitCommonDir, relativeParent, deps.io);
     if (!isInside(common, target) || dirname(target) !== parent) throw new Error("unsafe receipt target");
     if (deps.io.existsSync(target)) {
+      if (initialOnly) {
+        return rejected(
+          "PO-PROFILE-RECEIPT-INITIAL-CONFLICT",
+          "an existing PO profile receipt must not be replaced by kickoff initialization",
+        );
+      }
       const current = deps.io.lstatSync(target);
       if (!current.isFile() || current.isSymbolicLink() || deps.io.realpathSync(target) !== target) {
         throw new Error("unsafe receipt target");
@@ -225,8 +236,23 @@ export function publishPoGateProfileReceipt({
       deps.io.closeSync(descriptor);
     }
     deps.io.chmodSync(temporary, 0o600);
-    deps.io.renameSync(temporary, target);
-    temporary = null;
+    if (initialOnly) {
+      try {
+        deps.io.linkSync(temporary, target);
+      } catch (error) {
+        if (error?.code === "EEXIST") {
+          const conflict = new Error("receipt appeared during kickoff initialization");
+          conflict.code = "PO-PROFILE-RECEIPT-INITIAL-CONFLICT";
+          throw conflict;
+        }
+        throw error;
+      }
+      deps.io.unlinkSync(temporary);
+      temporary = null;
+    } else {
+      deps.io.renameSync(temporary, target);
+      temporary = null;
+    }
     published = true;
     if (process.platform === "win32" && assessWindowsPrivatePath(target).status !== "secure") {
       throw new Error("Windows receipt file assurance unavailable");
@@ -238,7 +264,7 @@ export function publishPoGateProfileReceipt({
       humanFacing: receipt.humanFacing,
       receiptSha256: createHash("sha256").update(serializedReceipt).digest("hex"),
     };
-  } catch {
+  } catch (error) {
     if (temporary !== null && deps.io.existsSync(temporary)) {
       try {
         deps.io.unlinkSync(temporary);
@@ -252,9 +278,48 @@ export function publishPoGateProfileReceipt({
         "the atomic receipt rename succeeded but directory durability could not be confirmed",
       );
     }
+    if (initialOnly && error?.code === "PO-PROFILE-RECEIPT-INITIAL-CONFLICT") {
+      return rejected(
+        "PO-PROFILE-RECEIPT-INITIAL-CONFLICT",
+        "an existing PO profile receipt must not be replaced by kickoff initialization",
+      );
+    }
     return rejected(
       "PO-PROFILE-RECEIPT-WRITE-FAILED",
       "the common profile receipt could not be published atomically",
     );
   }
+}
+
+/** Publish a profile receipt only when the kickoff has no receipt yet.
+ *
+ * A valid existing receipt is replay-safe. Any stale, malformed, or raced
+ * receipt is deliberately left untouched for the explicit repair workflow.
+ */
+export function initializePoGateProfileReceipt({
+  rootDir,
+  userYamlText,
+  runtimeYamlText,
+  updatedAt = undefined,
+} = {}, dependencyOverrides = {}) {
+  const current = validatePoGateProfileForRepository({ repoRoot: rootDir });
+  if (current.ok) {
+    return {
+      ok: true,
+      code: "PO-PROFILE-RECEIPT-INITIAL-CURRENT",
+      humanFacing: current.value.humanFacing,
+      receiptSha256: current.value.receiptSha256,
+    };
+  }
+  return publishReceipt({
+    rootDir,
+    userYamlText,
+    runtimeYamlText,
+    updatedAt,
+    initialOnly: true,
+  }, dependencyOverrides);
+}
+
+export function publishPoGateProfileReceipt(options = {}, dependencyOverrides = {}) {
+  return publishReceipt(options, dependencyOverrides);
 }
