@@ -203,10 +203,17 @@ export function resolveControlMigrationStatus(input) {
     if (!isPlainObject(entry) || !isNonEmptyString(entry.id)) {
       throw new TypeError(`resolveControlMigrationStatus: resolvedControls[${index}] must be a plain object with a non-empty "id"`);
     }
-    if (entry.applicability !== "applicable" && entry.applicability !== "unknown") {
+    if (entry.applicability !== "applicable" && entry.applicability !== "not-applicable" && entry.applicability !== "unknown") {
       throw new TypeError(
-        `resolveControlMigrationStatus: resolvedControls[${index}].applicability must be "applicable" or "unknown" (CYB-1b's own output shape), got ${JSON.stringify(entry.applicability)}`
+        `resolveControlMigrationStatus: resolvedControls[${index}].applicability must be "applicable", "not-applicable", or "unknown" (CYB-1b's own output shape), got ${JSON.stringify(entry.applicability)}`
       );
+    }
+
+    // A decisive false applicability result is not missing or inherited
+    // evidence. Preserve it as the control-result vocabulary's explicit
+    // `not-applicable` value, without consulting prior data.
+    if (entry.applicability === "not-applicable") {
+      return { id: entry.id, status: "not-applicable", qualifying: false, reason: "applicability-not-applicable" };
     }
 
     if (entry.applicability === "unknown") {

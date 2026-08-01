@@ -187,6 +187,18 @@ function resolved(id, applicability = "applicable") {
   });
   assert.equal(stillUnknown.migrationStatuses[0].status, "unknown");
   assert.equal(stillUnknown.migrationStatuses[0].reason, "applicability-unknown");
+
+  // A decisive applicability exemption is neither inherited from prior data
+  // nor downgraded to `unknown`; the consumer preserves the resolver's new
+  // closed result in the public control-result vocabulary.
+  const notApplicable = [resolved(controlId, "not-applicable")];
+  const preservedExemption = resolveControlMigrationStatus({
+    resolvedControls: notApplicable,
+    priorEvaluations: { [controlId]: qualifying },
+  });
+  assert.equal(preservedExemption.migrationStatuses[0].status, "not-applicable");
+  assert.equal(preservedExemption.migrationStatuses[0].qualifying, false);
+  assert.equal(preservedExemption.migrationStatuses[0].reason, "applicability-not-applicable");
 }
 
 // --- purity: no mutation of any input, works against deeply frozen input --
