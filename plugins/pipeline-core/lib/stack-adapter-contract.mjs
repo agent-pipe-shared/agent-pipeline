@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: SUL-1.0
 /**
- * CYB-6 adapter contract.  The contract is deliberately provider-neutral and
- * synthetic: it proves the exchange boundary without installing a scanner,
- * executing repository setup, or reaching a network service.
+ * CYB-6 adapter contract.  The exchange stays provider-neutral and offline:
+ * no adapter installs a scanner, executes repository setup, or reaches a
+ * network service.  IaC, container and workflow adapters nevertheless inspect
+ * the supplied candidate-bound source bytes with deterministic local rules.
  */
 import { createHash } from "node:crypto";
 
@@ -22,42 +23,79 @@ const CAPABILITY_BY_KIND = Object.freeze({
   fuzz: "cap.fuzz",
 });
 const STATUS = new Set(["PASS", "FINDINGS", "SKIPPED", "ERROR"]);
+const REAL_STATIC_KINDS = new Set(["iac", "container", "ci-workflow"]);
 const own = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value)
   && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 const safe = (value) => typeof value === "string" && /^[a-z][a-z0-9.-]{0,63}$/u.test(value);
 const oid = (value) => /^[a-f0-9]{40,64}$/u.test(value ?? "");
 const digest = (value) => createHash("sha256").update(value).digest("hex");
 
-function defaultCoverage(subject) {
+function defaultCoverage(subject, scannedFileCount = 1) {
   return {
     subject,
     exclusions: [],
     ignored: [],
     unsupportedScope: [],
-    truncation: { truncated: false, scannedFileCount: 1, totalEligibleFileCount: 1 },
+    truncation: { truncated: false, scannedFileCount, totalEligibleFileCount: scannedFileCount },
     dataAge: { ageSeconds: 0, snapshotAt: null },
   };
 }
 
 function adapter(kind) {
+  const realStatic = REAL_STATIC_KINDS.has(kind);
+  const real = {
+    iac: { id: "offline.iac", tool: "terraform-static", rulePack: "pipeline/iac-static/v1" },
+    container: { id: "offline.container", tool: "dockerfile-static", rulePack: "pipeline/container-static/v1" },
+    "ci-workflow": { id: "offline.ci-workflow", tool: "github-actions-static", rulePack: "pipeline/ci-workflow-static/v1" },
+  }[kind];
+  const ruleRef = realStatic ? real.rulePack : `synthetic/${kind}/v1`;
   return Object.freeze({
-    id: `synthetic.${kind}`,
+    id: realStatic ? real.id : `synthetic.${kind}`,
     capability: CAPABILITY_BY_KIND[kind],
     kind,
-    tool: Object.freeze({ name: `synthetic-${kind}`, version: "1" }),
-    rulePack: Object.freeze({ ref: `synthetic/${kind}/v1`, digest: digest(`synthetic/${kind}/v1`) }),
+    tool: Object.freeze({ name: realStatic ? real.tool : `synthetic-${kind}`, version: "1" }),
+    rulePack: Object.freeze({ ref: ruleRef, digest: digest(ruleRef) }),
     supportedPlatforms: STACK_ADAPTER_PLATFORMS,
     dynamic: kind === "dast" || kind === "fuzz",
+    executionMode: realStatic ? "static-analysis" : "synthetic-conformance",
   });
 }
 
-function executionRecord(adapterValue, plan, environment) {
-  const unsigned = { schema: "pipeline.stack-adapter-execution.v1", adapterId: adapterValue.id, candidate: structuredClone(plan.candidate), planDigest: plan.digest, environment: structuredClone(environment), status: "PASS", findings: [], coverage: defaultCoverage(adapterValue.id), reason: "synthetic-conformance" };
+function lineOf(content, match) {
+  return content.slice(0, match.index).split("\n").length;
+}
+
+function finding(adapterValue, severity, rule, source, match, msg) {
+  return { tool: adapterValue.tool.name, severity, rule, path: source.path, line: lineOf(source.content, match), msg };
+}
+
+function staticFindings(adapterValue, source) {
+  const findings = [];
+  if (adapterValue.kind === "iac") {
+    for (const match of source.content.matchAll(/0\.0\.0\.0\/0/g)) findings.push(finding(adapterValue, "high", "public-ingress", source, match, "public IPv4 ingress must be explicitly constrained"));
+  } else if (adapterValue.kind === "container") {
+    for (const match of source.content.matchAll(/^\s*FROM\s+[^\s]+:latest\s*$/gim)) findings.push(finding(adapterValue, "medium", "mutable-base-image", source, match, "container base image must use an immutable tag or digest"));
+    const root = /^\s*USER\s+root\s*$/gim.exec(source.content);
+    if (root) findings.push(finding(adapterValue, "high", "root-user", source, root, "container must not run as root"));
+    if (!/^\s*USER\s+(?!root\b)[^\s#]+/im.test(source.content)) findings.push({ tool: adapterValue.tool.name, severity: "high", rule: "missing-nonroot-user", path: source.path, line: null, msg: "container must declare a non-root USER" });
+  } else if (adapterValue.kind === "ci-workflow") {
+    for (const match of source.content.matchAll(/^\s*pull_request_target\s*:/gim)) findings.push(finding(adapterValue, "high", "unsafe-pr-target", source, match, "pull_request_target must not run untrusted pull-request code"));
+    for (const match of source.content.matchAll(/^\s*permissions\s*:\s*write-all\s*$/gim)) findings.push(finding(adapterValue, "high", "write-all-permissions", source, match, "workflow must not request write-all permissions"));
+    for (const match of source.content.matchAll(/^\s*(?:-\s*)?uses:\s*([^\s#]+)\s*$/gim)) {
+      if (!/@[a-f0-9]{40}$/i.test(match[1])) findings.push(finding(adapterValue, "medium", "unpinned-action", source, match, "workflow action must be pinned to a full commit SHA"));
+    }
+  }
+  return findings;
+}
+
+function executionRecord(adapterValue, plan, environment, source = null) {
+  const findings = adapterValue.executionMode === "static-analysis" ? staticFindings(adapterValue, source) : [];
+  const unsigned = { schema: "pipeline.stack-adapter-execution.v1", adapterId: adapterValue.id, candidate: structuredClone(plan.candidate), planDigest: plan.digest, sourceSha256: source === null ? null : digest(JSON.stringify(source)), environment: structuredClone(environment), status: findings.length === 0 ? "PASS" : "FINDINGS", findings, coverage: defaultCoverage(source?.path ?? adapterValue.id), reason: adapterValue.executionMode === "static-analysis" ? (findings.length === 0 ? "offline-static-analysis" : "offline-static-analysis-findings") : "synthetic-conformance" };
   return { ...unsigned, digest: digest(JSON.stringify(unsigned)) };
 }
 
-function validExecution(value, adapterValue, plan, environment) {
-  if (!own(value, ["schema", "adapterId", "candidate", "planDigest", "environment", "status", "findings", "coverage", "reason", "digest"]) || value.schema !== "pipeline.stack-adapter-execution.v1" || value.adapterId !== adapterValue.id || JSON.stringify(value.candidate) !== JSON.stringify(plan.candidate) || value.planDigest !== plan.digest || JSON.stringify(value.environment) !== JSON.stringify(environment) || value.status !== "PASS" || !Array.isArray(value.findings) || typeof value.reason !== "string" || !/^[a-f0-9]{64}$/u.test(value.digest)) return false;
+function validExecution(value, adapterValue, plan, environment, source = null) {
+  if (!own(value, ["schema", "adapterId", "candidate", "planDigest", "sourceSha256", "environment", "status", "findings", "coverage", "reason", "digest"]) || value.schema !== "pipeline.stack-adapter-execution.v1" || value.adapterId !== adapterValue.id || JSON.stringify(value.candidate) !== JSON.stringify(plan.candidate) || value.planDigest !== plan.digest || value.sourceSha256 !== (source === null ? null : digest(JSON.stringify(source))) || JSON.stringify(value.environment) !== JSON.stringify(environment) || !STATUS.has(value.status) || !Array.isArray(value.findings) || (value.status === "PASS" && value.findings.length !== 0) || (value.status === "FINDINGS" && value.findings.length === 0) || typeof value.reason !== "string" || !/^[a-f0-9]{64}$/u.test(value.digest)) return false;
   const { digest: executionDigest, ...unsigned } = value;
   return executionDigest === digest(JSON.stringify(unsigned));
 }
@@ -67,7 +105,7 @@ export const REPRESENTATIVE_STACK_ADAPTERS = Object.freeze(STACK_ADAPTER_KINDS.m
 
 /** Validates a declarative adapter; it never probes a provider or executes setup. */
 export function validateStackAdapter(value) {
-  if (!own(value, ["id", "capability", "kind", "tool", "rulePack", "supportedPlatforms", "dynamic"])
+  if (!own(value, ["id", "capability", "kind", "tool", "rulePack", "supportedPlatforms", "dynamic", "executionMode"])
     || !safe(value.id) || !STACK_ADAPTER_KINDS.includes(value.kind)
     || value.capability !== CAPABILITY_BY_KIND[value.kind]
     || !own(value.tool, ["name", "version"]) || !safe(value.tool.name) || typeof value.tool.version !== "string"
@@ -76,19 +114,31 @@ export function validateStackAdapter(value) {
     || !Array.isArray(value.supportedPlatforms) || value.supportedPlatforms.length === 0
     || !value.supportedPlatforms.every((platform) => STACK_ADAPTER_PLATFORMS.includes(platform))
     || new Set(value.supportedPlatforms).size !== value.supportedPlatforms.length
-    || typeof value.dynamic !== "boolean") return { ok: false, code: "STACK-ADAPTER-INVALID" };
+    || typeof value.dynamic !== "boolean"
+    || !["synthetic-conformance", "static-analysis"].includes(value.executionMode)
+    || (value.executionMode === "static-analysis") !== REAL_STATIC_KINDS.has(value.kind)) return { ok: false, code: "STACK-ADAPTER-INVALID" };
   return { ok: true };
+}
+
+function validStaticSource(adapterValue, source, plan) {
+  if (!own(source, ["candidate", "path", "content"]) || JSON.stringify(source.candidate) !== JSON.stringify(plan.candidate) || typeof source.path !== "string" || source.path === "" || typeof source.content !== "string" || Buffer.byteLength(source.content, "utf8") > 1024 * 1024) return false;
+  if (adapterValue.kind === "iac") return /\.tf$/u.test(source.path);
+  if (adapterValue.kind === "container") return /(^|\/)Dockerfile$/u.test(source.path);
+  return /^\.github\/workflows\/[^/]+\.ya?ml$/u.test(source.path);
 }
 
 /**
  * Creates the sole adapter result interchange: a closed CYB-2 evidence-v2
- * envelope.  The caller supplies already-observed synthetic output; no tool
- * command, network endpoint, credential, or repository path is accepted.
+ * envelope.  Synthetic adapters supply no observed output; real static
+ * adapters supply closed, candidate-bound source bytes.  No tool command,
+ * network endpoint, credential, or repository path is accepted.
  */
 export function executeStackAdapterConformance(input) {
-  if (!own(input, ["adapter", "plan", "environment", "authorization"]) || !validateStackCapabilityPlan(input.plan).valid || !own(input.environment, ["platform", "nodeVersion"]) || !STACK_ADAPTER_PLATFORMS.includes(input.environment.platform) || !(typeof input.environment.nodeVersion === "string" || input.environment.nodeVersion === null)) return { ok: false, code: "STACK-ADAPTER-EXECUTION-INVALID" };
+  if (!input || typeof input !== "object" || !validateStackCapabilityPlan(input.plan).valid || !own(input.environment, ["platform", "nodeVersion"]) || !STACK_ADAPTER_PLATFORMS.includes(input.environment.platform) || !(typeof input.environment.nodeVersion === "string" || input.environment.nodeVersion === null)) return { ok: false, code: "STACK-ADAPTER-EXECUTION-INVALID" };
   const adapterResult = validateStackAdapter(input.adapter);
   if (!adapterResult.ok) return adapterResult;
+  const expectedKeys = input.adapter.executionMode === "static-analysis" ? ["adapter", "plan", "environment", "authorization", "source"] : ["adapter", "plan", "environment", "authorization"];
+  if (!own(input, expectedKeys) || (input.adapter.executionMode === "static-analysis" && !validStaticSource(input.adapter, input.source, input.plan))) return { ok: false, code: "STACK-ADAPTER-EXECUTION-INVALID" };
   const selection = input.plan.entries.find((entry) => entry.capability === input.adapter.capability);
   if (!selection || !["selected", "optional-selected"].includes(selection.status)) return { ok: false, code: "STACK-ADAPTER-CAPABILITY-UNSELECTED" };
   if (!input.adapter.supportedPlatforms.includes(input.environment.platform)) return { ok: false, code: "STACK-ADAPTER-PLATFORM-UNSUPPORTED" };
@@ -97,17 +147,19 @@ export function executeStackAdapterConformance(input) {
     const authorization = evaluateDynamicTargetAuthorization(input.authorization);
     if (!authorization.allowed || JSON.stringify(input.authorization.candidate) !== JSON.stringify(input.plan.candidate)) return { ok: false, code: "STACK-ADAPTER-VERIFICATION-REQUIRED" };
   } else if (input.authorization !== null) return { ok: false, code: "STACK-ADAPTER-AUTHORIZATION-INVALID" };
-  return { ok: true, execution: executionRecord(input.adapter, input.plan, input.environment) };
+  return { ok: true, execution: executionRecord(input.adapter, input.plan, input.environment, input.source) };
 }
 
 export function createStackAdapterEvidence(input) {
-  if (!own(input, ["adapter", "plan", "environment", "execution", "authorization"])
+  if (!input || typeof input !== "object"
     || !validateStackCapabilityPlan(input.plan).valid
     || !own(input.environment, ["platform", "nodeVersion"])
     || !STACK_ADAPTER_PLATFORMS.includes(input.environment.platform)
     || !(typeof input.environment.nodeVersion === "string" || input.environment.nodeVersion === null)) return { ok: false, code: "STACK-ADAPTER-INPUT-INVALID" };
   const adapterResult = validateStackAdapter(input.adapter);
   if (!adapterResult.ok) return adapterResult;
+  const expectedKeys = input.adapter.executionMode === "static-analysis" ? ["adapter", "plan", "environment", "execution", "authorization", "source"] : ["adapter", "plan", "environment", "execution", "authorization"];
+  if (!own(input, expectedKeys) || (input.adapter.executionMode === "static-analysis" && !validStaticSource(input.adapter, input.source, input.plan))) return { ok: false, code: "STACK-ADAPTER-INPUT-INVALID" };
   const selection = input.plan.entries.find((entry) => entry.capability === input.adapter.capability);
   if (!selection || !["selected", "optional-selected"].includes(selection.status)) return { ok: false, code: "STACK-ADAPTER-CAPABILITY-UNSELECTED" };
   if (input.adapter.dynamic) {
@@ -118,14 +170,14 @@ export function createStackAdapterEvidence(input) {
   if (!input.adapter.supportedPlatforms.includes(input.environment.platform)) {
     return { ok: false, code: "STACK-ADAPTER-PLATFORM-UNSUPPORTED" };
   }
-  if (!validExecution(input.execution, input.adapter, input.plan, input.environment)) return { ok: false, code: "STACK-ADAPTER-EXECUTION-INVALID" };
+  if (!validExecution(input.execution, input.adapter, input.plan, input.environment, input.adapter.executionMode === "static-analysis" ? input.source : null)) return { ok: false, code: "STACK-ADAPTER-EXECUTION-INVALID" };
   const evidence = {
     schema: "pipeline.security-evidence.v2",
     policy: { configurationSha256: digest(input.plan.policyRevision) },
     input: {
       commit: input.plan.candidate.commit,
       tree: input.plan.candidate.tree,
-      inputSha256: digest(JSON.stringify({ adapter: input.adapter.id, candidate: input.plan.candidate, policyRevision: input.plan.policyRevision, planDigest: input.plan.digest })),
+      inputSha256: digest(JSON.stringify({ adapter: input.adapter.id, candidate: input.plan.candidate, policyRevision: input.plan.policyRevision, planDigest: input.plan.digest, sourceSha256: input.execution.sourceSha256 })),
     },
     environment: structuredClone(input.environment),
     capabilities: [{
@@ -133,7 +185,7 @@ export function createStackAdapterEvidence(input) {
       tool: structuredClone(input.adapter.tool),
       rulePack: structuredClone(input.adapter.rulePack),
       status: input.execution.status,
-      classification: "synthetic-conformance",
+      classification: input.adapter.executionMode,
       findings: structuredClone(input.execution.findings),
       coverage: structuredClone(input.execution.coverage),
       reason: input.execution.reason,
@@ -144,13 +196,17 @@ export function createStackAdapterEvidence(input) {
 }
 
 /** Runs the same pure conformance exchange against every representative adapter. */
-export function runRepresentativeAdapterConformance({ plan, platform = "linux", authorizations = {} } = {}) {
+export function runRepresentativeAdapterConformance({ plan, platform = "linux", authorizations = {}, sources = {} } = {}) {
   if (!validateStackCapabilityPlan(plan).valid) return { ok: false, code: "STACK-ADAPTER-PLAN-INVALID" };
   const assessment = evaluateStackCapabilityPlan(plan);
   if (assessment.code === "STACK-REQUIRED-UNAVAILABLE") return { ok: false, code: "STACK-ADAPTER-REQUIRED-UNAVAILABLE", unavailable: assessment.unavailable };
   const results = REPRESENTATIVE_STACK_ADAPTERS.filter((item) => plan.entries.some((entry) => entry.capability === item.capability && ["selected", "optional-selected"].includes(entry.status))).map((item) => {
-    const execution = executeStackAdapterConformance({ adapter: item, plan, environment: { platform, nodeVersion: null }, authorization: item.dynamic ? authorizations[item.capability] : null });
-    return execution.ok ? createStackAdapterEvidence({ adapter: item, plan, environment: { platform, nodeVersion: null }, execution: execution.execution, authorization: item.dynamic ? authorizations[item.capability] : null }) : execution;
+    const input = { adapter: item, plan, environment: { platform, nodeVersion: null }, authorization: item.dynamic ? authorizations[item.capability] : null };
+    if (item.executionMode === "static-analysis") input.source = sources[item.capability];
+    const execution = executeStackAdapterConformance(input);
+    const evidenceInput = { adapter: item, plan, environment: { platform, nodeVersion: null }, execution: execution.execution, authorization: item.dynamic ? authorizations[item.capability] : null };
+    if (item.executionMode === "static-analysis") evidenceInput.source = sources[item.capability];
+    return execution.ok ? createStackAdapterEvidence(evidenceInput) : execution;
   });
   return results.length > 0 && results.every((result) => result.ok) ? { ok: true, candidate: structuredClone(plan.candidate), planDigest: plan.digest, results } : { ok: false, code: "STACK-ADAPTER-CONFORMANCE-FAILED", results };
 }
