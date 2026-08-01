@@ -37,3 +37,15 @@ export function evaluateThreatImpact(input) {
   const affected = [...new Set(input.links.filter((link) => input.changedSubjects.includes(link.subject)).map((link) => link.requirement))].sort();
   return { state: affected.length === 0 ? "current" : "stale", code: affected.length === 0 ? "THREAT-IMPACT-NONE" : "THREAT-IMPACT-REVIEW", affected };
 }
+
+/** Derive a safe public view; canonical authority and private coordinates stay untouched. */
+export function exportThreatModelView(model) {
+  if (!own(model, ["classification", "entities"]) || !["public", "private"].includes(model.classification) || !Array.isArray(model.entities) || !model.entities.every((entity) => own(entity, ["id", "name", "coordinate"]) && text(entity.id) && text(entity.name) && text(entity.coordinate))) return { ok: false, code: "THREAT-EXPORT-INVALID" };
+  const redact = model.classification === "private";
+  return { ok: true, authoritative: false, entities: model.entities.map((entity) => redact ? { id: entity.id, name: "redacted", coordinate: "redacted" } : { ...entity }) };
+}
+
+/** Migration remains a non-mutating observation until separately activated. */
+export function previewThreatModelMigration({ hasCanonicalModel } = {}) {
+  return { schema: "pipeline.threat-model-migration-preview.v1", status: hasCanonicalModel === true ? "current" : "incomplete", writes: [] };
+}
