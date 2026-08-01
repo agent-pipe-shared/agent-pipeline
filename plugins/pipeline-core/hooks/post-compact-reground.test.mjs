@@ -333,6 +333,9 @@ check("real compact CLI returns host JSON, exit zero, and leaves state byte-iden
   assert.equal(result.status, 0, result.stderr);
   const payload = JSON.parse(result.stdout);
   assert.match(payload.systemMessage, /^Re-Grounding nach \/compact\./);
+  assert.equal(payload.hookSpecificOutput.bootstrapPayloadMeasurement.metric, "utf8-byte-upper-bound");
+  assert.equal(payload.hookSpecificOutput.bootstrapPayloadMeasurement.withinBudget, true);
+  assert.equal(payload.hookSpecificOutput.bootstrapPayloadMeasurement.exactModelTokens, false);
   assert.equal(readFileSync(path, "utf8"), raw);
 });
 
