@@ -502,7 +502,7 @@ function managedRepairInput(root, overrides = {}) {
   const tamperedHistorical = structuredClone(amendment);
   tamperedHistorical.evidence.referenceSha256 = createHash("sha256").update("wrong").digest("hex");
   const rejectedHistorical = reachabilityAmendmentFindings(root, tamperedHistorical);
-  check("BS19 reachability amendment binds its historical blob without pinning current item bytes",
+  check("BS22 reachability amendment binds its historical blob without pinning current item bytes",
     validCurrentDrift.length === 0
       && rejectedHistorical.some((finding) => finding.includes("referenceSha256")),
     [...validCurrentDrift, ...rejectedHistorical].join("; "));
