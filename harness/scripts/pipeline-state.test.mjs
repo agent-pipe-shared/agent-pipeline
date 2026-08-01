@@ -28,7 +28,13 @@ import {
   readState,
   statePath,
   CONTINUITY_LOCK_SCHEMA_ID,
+  RECOVERY_BRIDGE_CONSUME_RECEIPT_SCHEMA,
+  RECOVERY_BRIDGE_DECISION_SCHEMA,
+  RECOVERY_BRIDGE_PUBLIC_COMMIT_REQUEST_SCHEMA,
   SCHEMA_ID,
+  recoveryBridgeDecisionDigest,
+  transitionRecoveryBridgeDecision,
+  validateRecoveryBridgeDecision,
 } from "./pipeline-state.mjs";
 import { computeContinuityFinalDigest } from "../../plugins/pipeline-core/lib/continuity-host-adapter.mjs";
 import { loadManifestSafe } from "../../plugins/pipeline-core/lib/manifest.mjs";
@@ -118,6 +124,60 @@ const COURSE_RESULT_FIXTURE = "```pipeline-result\n{\n  \"decisionBriefs\": [],\
 const C = createHash("sha256").update(RESULT_FIXTURE).digest("hex");
 const D = "d".repeat(64);
 const CONTINUITY_FEATURE = "phase26-test";
+
+function recoveryBridgeDecision(overrides = {}) {
+  const decision = {
+    schema: RECOVERY_BRIDGE_DECISION_SCHEMA,
+    decisionId: "rb-0123456789abcdef",
+    decisionSha256: "0".repeat(64),
+    featureId: "sprint-phoenix-epic",
+    operation: "reconcile-mutable-design",
+    manifest: "specs/sprint-phoenix-epic/lifecycle.json",
+    artifactPath: "specs/sprint-phoenix-epic/RECOVERY.md",
+    assurance: "operator-local-attested",
+    manifestPreimageSha256: A,
+    recoveryPostimageSha256: B,
+    prdSha256: C,
+    specSha256: D,
+    expiresAt: "2026-10-30T00:00:00.000Z",
+    status: "issued",
+    ...overrides,
+  };
+  decision.decisionSha256 = recoveryBridgeDecisionDigest(decision);
+  return decision;
+}
+
+function recoveryBridgeCommitRequest(decision, overrides = {}) {
+  return {
+    schema: RECOVERY_BRIDGE_PUBLIC_COMMIT_REQUEST_SCHEMA,
+    decisionSha256: decision.decisionSha256,
+    decisionId: decision.decisionId,
+    featureId: decision.featureId,
+    operation: decision.operation,
+    manifest: decision.manifest,
+    artifactPath: decision.artifactPath,
+    assurance: decision.assurance,
+    manifestPreimageSha256: decision.manifestPreimageSha256,
+    recoveryPostimageSha256: decision.recoveryPostimageSha256,
+    prdSha256: decision.prdSha256,
+    specSha256: decision.specSha256,
+    expiresAt: decision.expiresAt,
+    ...overrides,
+  };
+}
+
+function recoveryBridgeConsumeReceipt(decision, overrides = {}) {
+  return {
+    ...recoveryBridgeCommitRequest(decision),
+    schema: RECOVERY_BRIDGE_CONSUME_RECEIPT_SCHEMA,
+    readback: {
+      manifest: decision.manifest,
+      artifactPath: decision.artifactPath,
+      recoveryPostimageSha256: decision.recoveryPostimageSha256,
+    },
+    ...overrides,
+  };
+}
 
 function injectedPoGateAuthority(planPath) {
   const planSha256 = createHash("sha256").update(`fixture:${planPath}`).digest("hex");
@@ -2326,6 +2386,70 @@ if (symlinkCapable) {
   writeFileSync(journalPath, `${canonicalFixtureJson(journal)}\n`);
   const refused = run(["continuity-authority-revision-recover", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-time-lock-02", "--mode", "complete"], bound);
   ok("PHX0A6h timestamp-only self-consistent postimage forgery is refused without State mutation", crashed === 2 && refused === 2 && readFileSync(statePath(dir), "utf8") === before && existsSync(journalPath));
+}
+
+
+{
+  const now = "2026-08-01T00:00:00.000Z";
+  const issued = recoveryBridgeDecision();
+  const initial = validateRecoveryBridgeDecision(issued, { now });
+  const committed = transitionRecoveryBridgeDecision(issued, "public-commit", recoveryBridgeCommitRequest(issued), { now });
+  const consumed = transitionRecoveryBridgeDecision(committed.value, "consume", recoveryBridgeConsumeReceipt(committed.value), { now });
+  ok("TP5 Recovery Bridge validates its exact schemas and digest through issued, public-committed, and consumed", initial.ok
+    && issued.decisionSha256 === recoveryBridgeDecisionDigest({ ...issued, status: "consumed" })
+    && committed.ok && committed.value.status === "public-committed"
+    && consumed.ok && consumed.value.status === "consumed"
+    && validateRecoveryBridgeDecision(consumed.value, { now }).ok
+    && issued.status === "issued");
+}
+
+{
+  const now = "2026-08-01T00:00:00.000Z";
+  const issued = recoveryBridgeDecision();
+  const committed = transitionRecoveryBridgeDecision(issued, "public-commit", recoveryBridgeCommitRequest(issued), { now });
+  const publicReplay = transitionRecoveryBridgeDecision(committed.value, "public-commit", recoveryBridgeCommitRequest(committed.value), { now });
+  const consumed = transitionRecoveryBridgeDecision(committed.value, "consume", recoveryBridgeConsumeReceipt(committed.value), { now });
+  const consumeReplay = transitionRecoveryBridgeDecision(consumed.value, "consume", recoveryBridgeConsumeReceipt(consumed.value), { now });
+  ok("TP5 Recovery Bridge rejects public-commit and consume replays", committed.ok && consumed.ok
+    && publicReplay.ok === false && publicReplay.code === "RB-TRANSITION"
+    && consumeReplay.ok === false && consumeReplay.code === "RB-TRANSITION");
+}
+
+{
+  const expiresAt = "2026-08-02T00:00:00.000Z";
+  const expired = recoveryBridgeDecision({ expiresAt });
+  const validation = validateRecoveryBridgeDecision(expired, { now: expiresAt });
+  const transition = transitionRecoveryBridgeDecision(expired, "public-commit", recoveryBridgeCommitRequest(expired), { now: expiresAt });
+  const badSchema = validateRecoveryBridgeDecision({ ...expired, schema: "pipeline.recovery-bridge-decision.v0" });
+  const staleDigest = validateRecoveryBridgeDecision({ ...expired, prdSha256: "e".repeat(64) });
+  ok("TP5 Recovery Bridge rejects expired, schema-drifted, and digest-drifted decisions", validation.ok === false
+    && validation.code === "RB-DECISION-EXPIRED"
+    && transition.ok === false && transition.code === "RB-DECISION-EXPIRED"
+    && badSchema.ok === false && badSchema.code === "RB-DECISION-SCHEMA"
+    && staleDigest.ok === false && staleDigest.code === "RB-DECISION-DIGEST");
+}
+
+{
+  const now = "2026-08-01T00:00:00.000Z";
+  const issued = recoveryBridgeDecision();
+  const retargeted = recoveryBridgeDecision({ artifactPath: "specs/sprint-phoenix-epic/OTHER.md" });
+  const changedTarget = validateRecoveryBridgeDecision(retargeted, { now });
+  const changedCommitTarget = transitionRecoveryBridgeDecision(issued, "public-commit", recoveryBridgeCommitRequest(issued, {
+    artifactPath: "specs/sprint-phoenix-epic/OTHER.md",
+  }), { now });
+  const committed = transitionRecoveryBridgeDecision(issued, "public-commit", recoveryBridgeCommitRequest(issued), { now });
+  const changedReceipt = transitionRecoveryBridgeDecision(committed.value, "consume", recoveryBridgeConsumeReceipt(committed.value, {
+    readback: {
+      manifest: committed.value.manifest,
+      artifactPath: committed.value.artifactPath,
+      recoveryPostimageSha256: "e".repeat(64),
+    },
+  }), { now });
+  ok("TP5 Recovery Bridge rejects changed decision targets, public bindings, and consume readbacks", changedTarget.ok === false
+    && changedTarget.code === "RB-DECISION-TARGET"
+    && changedCommitTarget.ok === false && changedCommitTarget.code === "RB-PUBLIC-COMMIT-BINDING"
+    && committed.ok
+    && changedReceipt.ok === false && changedReceipt.code === "RB-CONSUME-READBACK-BINDING");
 }
 
 // ---- Cleanup ------------------------------------------------------------------------------

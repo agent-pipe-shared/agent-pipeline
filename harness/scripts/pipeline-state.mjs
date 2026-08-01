@@ -296,6 +296,116 @@ import {
 export const SCHEMA_ID = "pipeline.state.v0";
 export const CONTINUITY_LOCK_SCHEMA_ID = "pipeline.continuity-lock.v0";
 export const CONTINUITY_LOCK_STALE_MS = 30_000;
+/**
+ * Closed, pure Recovery Bridge decision contract.  This is deliberately not a
+ * CLI/state-store integration: a later bridge may persist these records only
+ * after it has separately performed its own attested public operation.
+ */
+export const RECOVERY_BRIDGE_DECISION_SCHEMA = "pipeline.recovery-bridge-decision.v1";
+export const RECOVERY_BRIDGE_PUBLIC_COMMIT_REQUEST_SCHEMA = "pipeline.recovery-bridge-public-commit-request.v1";
+export const RECOVERY_BRIDGE_CONSUME_RECEIPT_SCHEMA = "pipeline.recovery-bridge-consume-receipt.v1";
+export const RECOVERY_BRIDGE_ISSUANCE_CUTOFF = "2026-10-31T00:00:00.000Z";
+const RECOVERY_BRIDGE_FEATURE_ID = "sprint-phoenix-epic";
+const RECOVERY_BRIDGE_OPERATION = "reconcile-mutable-design";
+const RECOVERY_BRIDGE_MANIFEST = "specs/sprint-phoenix-epic/lifecycle.json";
+const RECOVERY_BRIDGE_ARTIFACT_PATH = "specs/sprint-phoenix-epic/RECOVERY.md";
+const RECOVERY_BRIDGE_ASSURANCE = "operator-local-attested";
+const RECOVERY_BRIDGE_ID_RE = /^rb-[a-f0-9]{16,64}$/u;
+const RECOVERY_BRIDGE_BINDING_KEYS = [
+  "decisionId", "featureId", "operation", "manifest", "artifactPath", "assurance",
+  "manifestPreimageSha256", "recoveryPostimageSha256", "prdSha256", "specSha256", "expiresAt",
+];
+const RECOVERY_BRIDGE_DECISION_KEYS = [
+  "schema", "decisionId", "decisionSha256", "featureId", "operation", "manifest", "artifactPath", "assurance",
+  "manifestPreimageSha256", "recoveryPostimageSha256", "prdSha256", "specSha256", "expiresAt", "status",
+];
+
+function recoveryBridgeBinding(value) {
+  return Object.fromEntries(RECOVERY_BRIDGE_BINDING_KEYS.map((key) => [key, value?.[key]]));
+}
+
+/** Canonical digest for the immutable, exact Recovery Bridge decision binding. */
+export function recoveryBridgeDecisionDigest(value) {
+  return sha256Bytes(canonicalPhxJson({ schema: RECOVERY_BRIDGE_DECISION_SCHEMA, ...recoveryBridgeBinding(value) }));
+}
+
+function recoveryBridgeNow(now) {
+  return safeIso(now) ? Date.parse(now) : null;
+}
+
+/**
+ * Validates a public-safe Recovery Bridge decision. `now` is optional for
+ * structural inspection; when supplied it also enforces expiry, and for an
+ * uncommitted issuance it enforces the non-extendable issuance cutoff.
+ */
+export function validateRecoveryBridgeDecision(value, { now } = {}) {
+  if (!exactObjectKeys(value, RECOVERY_BRIDGE_DECISION_KEYS) || value.schema !== RECOVERY_BRIDGE_DECISION_SCHEMA) {
+    return { ok: false, code: "RB-DECISION-SCHEMA" };
+  }
+  if (!RECOVERY_BRIDGE_ID_RE.test(value.decisionId) || !SHA256_RE.test(value.decisionSha256)
+    || !SHA256_RE.test(value.manifestPreimageSha256) || !SHA256_RE.test(value.recoveryPostimageSha256)
+    || !SHA256_RE.test(value.prdSha256) || !SHA256_RE.test(value.specSha256) || !safeIso(value.expiresAt)) {
+    return { ok: false, code: "RB-DECISION-FIELDS" };
+  }
+  if (value.featureId !== RECOVERY_BRIDGE_FEATURE_ID || value.operation !== RECOVERY_BRIDGE_OPERATION
+    || value.manifest !== RECOVERY_BRIDGE_MANIFEST || value.artifactPath !== RECOVERY_BRIDGE_ARTIFACT_PATH
+    || value.assurance !== RECOVERY_BRIDGE_ASSURANCE) return { ok: false, code: "RB-DECISION-TARGET" };
+  if (!["issued", "public-committed", "consumed"].includes(value.status)) return { ok: false, code: "RB-DECISION-STATUS" };
+  if (Date.parse(value.expiresAt) > Date.parse(RECOVERY_BRIDGE_ISSUANCE_CUTOFF)) return { ok: false, code: "RB-DECISION-CUTOFF" };
+  if (value.decisionSha256 !== recoveryBridgeDecisionDigest(value)) return { ok: false, code: "RB-DECISION-DIGEST" };
+  if (now !== undefined) {
+    const nowMs = recoveryBridgeNow(now);
+    if (nowMs === null) return { ok: false, code: "RB-DECISION-NOW" };
+    if (value.status === "issued" && nowMs >= Date.parse(RECOVERY_BRIDGE_ISSUANCE_CUTOFF)) return { ok: false, code: "RB-ISSUANCE-CUTOFF" };
+    if (nowMs >= Date.parse(value.expiresAt)) return { ok: false, code: "RB-DECISION-EXPIRED" };
+  }
+  return { ok: true, value };
+}
+
+function exactRecoveryBridgeRequest(value, schema) {
+  return exactObjectKeys(value, ["schema", "decisionSha256", ...RECOVERY_BRIDGE_BINDING_KEYS])
+    && value.schema === schema && SHA256_RE.test(value.decisionSha256);
+}
+
+function exactRecoveryBridgeBinding(record, binding) {
+  return RECOVERY_BRIDGE_BINDING_KEYS.every((key) => binding[key] === record[key]);
+}
+
+function validateRecoveryBridgePublicCommit(record, request) {
+  return exactRecoveryBridgeRequest(request, RECOVERY_BRIDGE_PUBLIC_COMMIT_REQUEST_SCHEMA)
+    && request.decisionSha256 === record.decisionSha256
+    && exactRecoveryBridgeBinding(record, request);
+}
+
+function validateRecoveryBridgeConsumeReceipt(record, receipt) {
+  return exactObjectKeys(receipt, ["schema", "decisionSha256", ...RECOVERY_BRIDGE_BINDING_KEYS, "readback"])
+    && receipt.schema === RECOVERY_BRIDGE_CONSUME_RECEIPT_SCHEMA && SHA256_RE.test(receipt.decisionSha256)
+    && receipt.decisionSha256 === record.decisionSha256 && exactRecoveryBridgeBinding(record, receipt)
+    && exactObjectKeys(receipt.readback, ["manifest", "artifactPath", "recoveryPostimageSha256"])
+    && receipt.readback.manifest === record.manifest && receipt.readback.artifactPath === record.artifactPath
+    && receipt.readback.recoveryPostimageSha256 === record.recoveryPostimageSha256;
+}
+
+/**
+ * Applies one closed Recovery Bridge transition without mutating `record`.
+ * `public-commit` accepts only the exact issued binding; `consume` accepts
+ * only the exact committed receipt plus readback binding.
+ */
+export function transitionRecoveryBridgeDecision(record, action, binding, { now } = {}) {
+  const checked = validateRecoveryBridgeDecision(record, { now });
+  if (!checked.ok) return checked;
+  if (action === "public-commit") {
+    if (record.status !== "issued") return { ok: false, code: "RB-TRANSITION" };
+    if (!validateRecoveryBridgePublicCommit(record, binding)) return { ok: false, code: "RB-PUBLIC-COMMIT-BINDING" };
+    return { ok: true, value: { ...record, status: "public-committed" } };
+  }
+  if (action === "consume") {
+    if (record.status !== "public-committed") return { ok: false, code: "RB-TRANSITION" };
+    if (!validateRecoveryBridgeConsumeReceipt(record, binding)) return { ok: false, code: "RB-CONSUME-READBACK-BINDING" };
+    return { ok: true, value: { ...record, status: "consumed" } };
+  }
+  return { ok: false, code: "RB-TRANSITION" };
+}
 const CONTINUITY_REQUEST_MAX_BYTES = 32_768;
 const CONTINUITY_RESULT_MAX_BYTES = 1_048_576;
 const FINAL_INTEGRATION_MAX_BYTES = 8_192;
