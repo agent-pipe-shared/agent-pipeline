@@ -130,14 +130,15 @@ never imports the other.
 | 17. Complete decision/failure/privacy fixture set | `H-AC-15` |
 
 Coverage: **incomplete at the 2026-08-02 implementation audit**. The canonical
-ledger, resolver, and v3 plan-approval route exist, but `H-AC-12` remains open:
-`guard-devplan`, `guard-push`, deploy/release consumers, and Git-override
-consumption do not yet all dual-read and validate a canonical decision ID.
-The published Cyborg PO-proof contract is the required external-attestation
-input for this migration; Phoenix must consume that contract after final
-integration without treating locally supplied metadata as a verified human
-identity. Git and mutable state remain projections/transport; neither is
-promoted to historical human authority.
+ledger, resolver, v3 plan-approval route, `guard-devplan`, and `guard-push`
+now validate candidate-bound decision references; the latter accepts only a
+separately read immutable consumption receipt, never mutable State alone.
+`H-AC-12` remains open for deploy/release consumers and Git-override
+consumption. The published Cyborg PO-proof contract is the required
+external-attestation input for the final migration; Phoenix must consume that
+contract after integration without treating locally supplied metadata as a
+verified human identity. Git and mutable State remain projections/transport;
+neither is promoted to historical human authority.
 
 ## #31 — Agent Decision and Assumption Journal
 
