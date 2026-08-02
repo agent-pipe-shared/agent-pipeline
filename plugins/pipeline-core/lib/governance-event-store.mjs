@@ -482,8 +482,9 @@ async function acquireStreamLockGuard(lock) {
   const guard = path.join(path.dirname(lock), STREAM_LOCK_GUARD_FILE);
   const entry = await lstatOrNull(guard);
   if (entry && (!entry.isFile() || entry.isSymbolicLink())) fail("GES-UNSAFE-PATH", "The stream contains an unsafe lock-guard path.");
+  const command = nativeStreamLockGuardCommand(guard);
   return new Promise((resolve, reject) => {
-    const child = spawn("flock", ["-n", guard, "sh", "-c", "printf 'ready\\n'; read _"], { stdio: ["pipe", "pipe", "ignore"] });
+    const child = spawn(command.file, command.args, { stdio: ["pipe", "pipe", "ignore"] });
     let ready = false;
     let output = "";
     let settled = false;
@@ -495,13 +496,29 @@ async function acquireStreamLockGuard(lock) {
       if (!ready && output.includes("ready\n")) {
         ready = true;
         settled = true;
-        resolve(Object.freeze({ release: async () => { child.stdin.end(); await waitForExit(); } }));
+        resolve(Object.freeze({ release: async () => { const exited = waitForExit(); child.kill(); await exited; } }));
       }
     });
     child.once("exit", (code) => {
       if (!ready) rejectOnce(new GovernanceEventStoreError(code === 1 ? "GES-LOCKED" : "GES-LOCK-RUNTIME"));
     });
   });
+}
+
+function nativeStreamLockGuardCommand(guard) {
+  if (process.platform === "win32") {
+    // A FileStream opened with FileShare.None is the Windows equivalent of a
+    // non-blocking advisory guard.  The child owns it until stdin closes.
+    const script = "$s=[System.IO.File]::Open($args[0],[System.IO.FileMode]::OpenOrCreate,[System.IO.FileAccess]::ReadWrite,[System.IO.FileShare]::None);[Console]::Out.WriteLine('ready');[Console]::In.ReadLine()|Out-Null;$s.Dispose()";
+    return Object.freeze({ file: "powershell.exe", args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script, guard] });
+  }
+  if (process.platform === "darwin" || process.platform === "linux") {
+    // Perl's built-in flock maps to the host POSIX advisory lock on both
+    // declared Unix platforms, without depending on a Linux-only utility.
+    const script = "$|=1; open my $fh, '+>>', $ARGV[0] or exit 2; flock($fh, 6) or exit 1; print \"ready\\n\"; <STDIN>; close $fh;";
+    return Object.freeze({ file: "/usr/bin/perl", args: ["-e", script, guard] });
+  }
+  fail("GES-LOCK-PLATFORM", "The host platform has no configured native stream-lock guard.");
 }
 
 async function createStreamLock(lock) {
