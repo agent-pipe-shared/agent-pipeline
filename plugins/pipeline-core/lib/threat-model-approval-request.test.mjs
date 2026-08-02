@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -48,7 +48,13 @@ assert.equal(JSON.parse(readFileSync(join(keyDirectory, "trust-policy.json"), "u
 assert.throws(() => runHumanApproval(["setup", "--repo-root", nominalRepo, "--directory", `${nominalRepo}/po`]), /outside the repository/u);
 mkdirSync(join(nominalRepo, "inside")); const linkedDirectory = join(external, "linked-po"); symlinkSync(join(nominalRepo, "inside"), linkedDirectory, "dir");
 assert.throws(() => runHumanApproval(["setup", "--repo-root", nominalRepo, "--directory", linkedDirectory]), /outside the repository/u);
+const linkedParent = join(external, "linked-parent"); symlinkSync(nominalRepo, linkedParent, "dir");
+assert.throws(() => runHumanApproval(["setup", "--repo-root", nominalRepo, "--directory", join(linkedParent, "new-po")]), /outside the repository/u);
+assert.equal(existsSync(join(nominalRepo, "new-po")), false);
+const poisonedDirectory = mkdtempSync(join(tmpdir(), "po-human-poisoned-")); writeFileSync(join(nominalRepo, "poisoned-private.pem"), "must-not-be-read");
+symlinkSync(join(nominalRepo, "poisoned-private.pem"), join(poisonedDirectory, "po-private.pem"));
+assert.throws(() => runHumanApproval(["setup", "--repo-root", nominalRepo, "--directory", poisonedDirectory]), /regular files/u);
 writeFileSync(join(external, "po-private.pem"), "encrypted-private-key-placeholder");
 assert.equal(runHumanApproval(["approve", "--repo-root", nominalRepo, "--directory", external], { spawn: (_executable, args) => { writeFileSync(args[args.indexOf("-out") + 1], "detached-signature"); return { status: 0 }; } }).code, "PO-HUMAN-PROOF-READY");
 assert.equal(JSON.parse(readFileSync(join(external, "proof.json"), "utf8")).intentSha256, request.approvalIntent.sha256);
-console.log("21 threat-model approval request checks passed");
+console.log("24 threat-model approval request checks passed");

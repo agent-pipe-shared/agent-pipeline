@@ -11,8 +11,8 @@
  */
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
-import { isAbsolute, relative, resolve } from "node:path";
+import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { approvalRequestFromExternalJson, observeCleanCandidate, run as runApprovalRequest } from "./po-approval-request.mjs";
@@ -32,13 +32,40 @@ function json(path) { return JSON.parse(readFileSync(path, "utf8")); }
 function publicKeyPolicy(publicKey, keyReference) { return { keyReference, publicKeySha256: createHash("sha256").update(publicKey).digest("hex") }; }
 function externalDirectory(repository, directory, { create = false } = {}) {
   if (!outside(repository, directory)) fail("approval directory must be outside the repository");
-  if (create) mkdirSync(directory, { recursive: true, mode: 0o700 });
-  let canonicalRepository; let canonicalDirectory;
-  try { canonicalRepository = realpathSync(repository); canonicalDirectory = realpathSync(directory); }
+  let canonicalRepository; let ancestor = directory; const missing = [];
+  try { canonicalRepository = realpathSync(repository); }
   catch { fail("approval directory or repository is missing or unreadable"); }
+  for (;;) {
+    try { lstatSync(ancestor); break; }
+    catch (error) {
+      if (error?.code !== "ENOENT") fail("approval directory is unreadable");
+      const parent = dirname(ancestor); if (parent === ancestor) fail("approval directory is missing or unreadable");
+      missing.unshift(basename(ancestor)); ancestor = parent;
+    }
+  }
+  let canonicalAncestor;
+  try { canonicalAncestor = realpathSync(ancestor); }
+  catch { fail("approval directory is missing or unreadable"); }
+  if (!outside(canonicalRepository, canonicalAncestor)) fail("approval directory must be outside the repository");
+  const target = missing.reduce((path, segment) => join(path, segment), canonicalAncestor);
+  if (create) mkdirSync(target, { recursive: true, mode: 0o700 });
+  let canonicalDirectory;
+  try { canonicalDirectory = realpathSync(target); }
+  catch { fail("approval directory is missing or unreadable"); }
   if (!outside(canonicalRepository, canonicalDirectory)) fail("approval directory must be outside the repository");
+  if (!statSync(canonicalDirectory).isDirectory()) fail("approval directory must be a directory");
   if (create) chmodSync(canonicalDirectory, 0o700);
   return canonicalDirectory;
+}
+function artifactPath(directory, name) {
+  const path = join(directory, name);
+  try {
+    const metadata = lstatSync(path);
+    if (!metadata.isFile() || metadata.isSymbolicLink()) fail("approval artifacts must be regular files outside the repository");
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+  return path;
 }
 
 export function parseHumanArgs(argv) {
@@ -64,7 +91,15 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
   const args = parseHumanArgs(argv); if (args.error) fail(args.error);
   const repository = resolve(args.repoRoot);
   const directory = externalDirectory(repository, resolve(args.directory), { create: args.command === "setup" || args.command === "prepare" });
-  const paths = { request: `${directory}/request.json`, privateKey: `${directory}/po-private.pem`, publicKey: `${directory}/po-public.pem`, authority: `${directory}/trust-policy.json`, proof: `${directory}/proof.json`, signature: `${directory}/signature.bin`, intent: `${directory}/intent.txt` };
+  const paths = {
+    request: artifactPath(directory, "request.json"),
+    privateKey: artifactPath(directory, "po-private.pem"),
+    publicKey: artifactPath(directory, "po-public.pem"),
+    authority: artifactPath(directory, "trust-policy.json"),
+    proof: artifactPath(directory, "proof.json"),
+    signature: artifactPath(directory, "signature.bin"),
+    intent: artifactPath(directory, "intent.txt"),
+  };
   const write = dependencies.writeFile ?? writeFileSync; const read = dependencies.readFile ?? readFileSync; const exists = dependencies.exists ?? existsSync;
   if (args.command === "setup") {
     if (exists(paths.privateKey) || exists(paths.publicKey) || exists(paths.authority)) fail("PO authority already exists; refusing to overwrite it");
