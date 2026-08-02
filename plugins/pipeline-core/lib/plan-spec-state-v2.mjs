@@ -725,6 +725,7 @@ function validLegacyV2RevocationRecovery(value) {
 
 function exactLegacyV2RecoveryStateEnvelope(state) {
   if (!isPlainObject(state)
+    || state.schema !== STATE_SCHEMA
     || !Object.keys(state).every((key) => LEGACY_V2_RECOVERY_STATE_KEYS.has(key))) return false;
   if (Object.prototype.hasOwnProperty.call(state, "updatedAt") && !isCanonicalIso(state.updatedAt)) return false;
   if (Object.prototype.hasOwnProperty.call(state, "closedFeatures") && !Array.isArray(state.closedFeatures)) return false;

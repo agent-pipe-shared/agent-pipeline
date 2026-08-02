@@ -93,6 +93,7 @@ test("unknown legacy-state envelopes cannot receive recovery", () => {
     { ...legacyMixedState(), planSubmission: {} },
     { ...legacyMixedState(), planRecovery: { schema: "unrelated" } },
     { ...legacyMixedState(), unrecognisedFutureState: true },
+    { ...legacyMixedState(), schema: "pipeline.state.v1" },
   ]) {
     const { root, path } = fixture(state);
     try {
