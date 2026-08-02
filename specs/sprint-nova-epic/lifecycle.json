@@ -41,7 +41,7 @@
     {
       "class": "design",
       "path": "specs/sprint-nova-epic/design/2026-08-02-human-authorization-extension-input.md",
-      "sha256": "b2a65bfd34d63ab3dacd4916ad445240d41c021acb50a92c92f65123fefb5cd4",
+      "sha256": "a36df7017c6eaab33c9625d55a02fedaa74f4e1139cd348a7063327d117353e4",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"
@@ -145,7 +145,7 @@
     {
       "class": "plan",
       "path": "specs/sprint-nova-epic/plans/2026-08-02-human-authorization-and-cyborg-handover.md",
-      "sha256": "616972117a0d0b9e0e1698f8340e92abfe80a942e663092a326ccf41a925f8c2",
+      "sha256": "519e8f99598e3a5839fffabd6d4f2fce94a62cb38810433fdcf8cf5863d8f3bc",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"
