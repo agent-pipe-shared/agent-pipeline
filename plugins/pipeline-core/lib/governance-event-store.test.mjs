@@ -192,6 +192,25 @@ test("projection recovery requires a retained checkpoint and rebuilds a stale he
   assert.deepEqual(head.streams.lifecycle, { sequence: 1, eventDigest: first.eventDigest });
 });
 
+test("writer-owned orphan temps are invisible to reads and a dead owner lock is recovered only for a later writer", async (t) => {
+  const root = await fixtureRoot(); t.after(() => cleanup(root));
+  const first = await append(root);
+  const streamRoot = path.join(root, "governance/events/lifecycle");
+  const orphan = path.join(streamRoot, ".2-evt-crashed.json.0123456789abcdef01234567.tmp");
+  await writeFile(orphan, "partial writer bytes");
+  const readable = await queryPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", checkpoint: first.checkpoint });
+  assert.deepEqual(readable.events.map((event) => event.sequence), [1], "unpublished writer bytes are never authority");
+  const lock = path.join(streamRoot, ".lock");
+  await writeFile(lock, `${canonicalizeJson({ schema: "pipeline.governance-event-stream-lock.v1", pid: process.pid })}\n`);
+  await assert.rejects(() => append(root, intent({ eventId: "evt-live-lock", idempotencyKey: "idem-live-lock" })), (error) => error.code === "GES-LOCKED");
+  await rm(lock);
+  await writeFile(lock, `${canonicalizeJson({ schema: "pipeline.governance-event-stream-lock.v1", pid: 2147483647 })}\n`);
+  const second = await append(root, intent({ eventId: "evt-2", idempotencyKey: "idem-2", payload: { ...intent().payload, eventId: "lifecycle-2", reasonCode: "RECOVERED" }, occurredAtEpochMs: 2, observedAtEpochMs: 2 }));
+  assert.equal(second.outcome, "appended");
+  await assert.rejects(() => stat(orphan), { code: "ENOENT" });
+  await assert.rejects(() => stat(lock), { code: "ENOENT" });
+});
+
 test("restricted storage stays outside the repository, is owner-only encrypted, and supports exact active-store erasure", async (t) => {
   const root = await fixtureRoot(); t.after(() => cleanup(root));
   const restrictedRoot = await mkdtemp(path.join(os.tmpdir(), "governance-restricted-")); t.after(() => cleanup(restrictedRoot));

@@ -28,6 +28,8 @@ const REGISTRY_SCHEMA = "pipeline.governance-stream-registry.v1";
 const HEADS_SCHEMA = "pipeline.governance-event-heads.v1";
 const SHA256 = /^[a-f0-9]{64}$/u;
 const EVENT_FILE = /^([1-9][0-9]*)-([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\.json$/u;
+const TEMPORARY_EVENT_FILE = /^\.([1-9][0-9]*-[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\.json)\.[a-f0-9]{24}\.tmp$/u;
+const STREAM_LOCK_SCHEMA = "pipeline.governance-event-stream-lock.v1";
 const INTENT_OMITTED_FIELDS = new Set(["sequence", "previousEventDigest", "payloadDigest", "eventDigest"]);
 const STREAMS = new Map([
   ["human", { origin: "human", authorityClass: "human-authority" }],
@@ -401,6 +403,9 @@ async function scanStream(root, registry, streamId) {
   const events = [];
   for (const entry of entries) {
     if (entry.name === ".lock") continue;
+    // A writer publishes only after rename.  Its own unlinked temporary bytes
+    // are never authority and must not make a valid committed prefix unreadable.
+    if (TEMPORARY_EVENT_FILE.test(entry.name) && entry.isFile()) continue;
     if (entry.isSymbolicLink()) fail("GES-SYMLINK", "Symbolic links are forbidden in governance storage.");
     const match = EVENT_FILE.exec(entry.name);
     if (!match || !entry.isFile()) fail("GES-UNSAFE-PATH", "The stream contains an unsafe or unrecognized path.");
@@ -447,18 +452,57 @@ async function writeAtomic(target, bytes) {
 }
 
 async function removeLock(lock) {
-  // Node's rmdir is intentionally imported lazily only on the uncommon path.
-  const { rmdir } = await import("node:fs/promises");
-  await rmdir(lock).catch((error) => { if (error?.code !== "ENOENT") throw error; });
+  await unlink(lock).catch((error) => { if (error?.code !== "ENOENT") throw error; });
+}
+
+async function isRecoverableDeadLock(lock) {
+  const entry = await lstatOrNull(lock);
+  if (!entry || !entry.isFile()) return false;
+  let owner;
+  try { owner = parseStrictJson(await readFile(lock)); } catch { return false; }
+  if (!exactKeys(owner, ["schema", "pid"]) || owner.schema !== STREAM_LOCK_SCHEMA || !Number.isInteger(owner.pid) || owner.pid < 1) return false;
+  try { process.kill(owner.pid, 0); return false; }
+  catch (error) { return error?.code === "ESRCH"; }
+}
+
+async function acquireStreamLock(lock) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    let handle;
+    let created = false;
+    try {
+      handle = await open(lock, "wx", 0o600);
+      created = true;
+      await handle.writeFile(`${canonicalizeJson({ schema: STREAM_LOCK_SCHEMA, pid: process.pid })}\n`, "utf8");
+      await handle.sync();
+      await handle.close();
+      return;
+    } catch (error) {
+      if (handle) await handle.close().catch(() => {});
+      if (created) await removeLock(lock);
+      if (error?.code !== "EEXIST" || attempt !== 0 || !(await isRecoverableDeadLock(lock))) {
+        if (error?.code === "EEXIST") fail("GES-LOCKED", "The stream is already being written.");
+        throw error;
+      }
+      await unlink(lock).catch(() => fail("GES-LOCKED", "The stream lock could not be recovered safely."));
+    }
+  }
+  fail("GES-LOCKED", "The stream is already being written.");
+}
+
+async function removeOrphanedTemporaryEvents(streamRoot) {
+  const entries = await readdir(streamRoot, { withFileTypes: true });
+  for (const entry of entries) {
+    if (TEMPORARY_EVENT_FILE.test(entry.name) && entry.isFile()) await unlink(path.join(streamRoot, entry.name));
+  }
 }
 
 async function withExclusiveStreamLock(streamRoot, operation) {
   const lock = path.join(streamRoot, ".lock");
-  try { await mkdir(lock, { mode: 0o700 }); } catch (error) {
-    if (error?.code === "EEXIST") fail("GES-LOCKED", "The stream is already being written.");
-    throw error;
-  }
-  try { return await operation(); } finally { await removeLock(lock); }
+  await acquireStreamLock(lock);
+  try {
+    await removeOrphanedTemporaryEvents(streamRoot);
+    return await operation();
+  } finally { await removeLock(lock); }
 }
 
 function checkpointMatches(event, checkpoint) {
