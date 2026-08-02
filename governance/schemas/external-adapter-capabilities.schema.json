@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.dev/schemas/pipeline.external-adapter-capabilities.v1.json",
+  "title": "Pipeline external adapter capabilities v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "adapterProfile", "systemClass", "operations"],
+  "properties": {
+    "schema": { "const": "pipeline.external-adapter-capabilities.v1" },
+    "adapterProfile": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "systemClass": { "enum": ["issue-tracker", "knowledge-base", "document-store", "forge"] },
+    "operations": { "type": "array", "uniqueItems": true, "items": { "enum": ["inspect", "preview", "apply", "readback", "reconcile"] } }
+  }
+}
