@@ -19,13 +19,15 @@ const usage = "Usage: po-approval-request.mjs prepare --feature-id cyb-4 --plan 
 export function parseArgs(argv) {
   const [command, ...tokens] = argv;
   const values = { command, repoRoot: process.cwd() };
+  const supplied = new Set();
   for (let index = 0; index < tokens.length; index += 1) {
     const key = tokens[index];
     if (!key.startsWith("--")) return { error: usage };
     const value = tokens[index + 1];
     if (typeof value !== "string" || value.startsWith("--")) return { error: usage };
     const normalized = key.slice(2).replace(/-([a-z])/gu, (_, letter) => letter.toUpperCase());
-    if (!new Set(["featureId", "plan", "spec", "model", "repoRoot", "request", "authority", "proof"]).has(normalized) || Object.hasOwn(values, normalized)) return { error: usage };
+    if (!new Set(["featureId", "plan", "spec", "model", "repoRoot", "request", "authority", "proof"]).has(normalized) || supplied.has(normalized)) return { error: usage };
+    supplied.add(normalized);
     values[normalized] = value; index += 1;
   }
   return values;

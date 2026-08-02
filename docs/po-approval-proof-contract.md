@@ -41,23 +41,31 @@ be the trusted signing boundary when the agent controls that CLI session.
 For Cyborg, the portable command is:
 
 ```sh
-node plugins/pipeline-core/scripts/po-approval-request.mjs prepare \
+REPO="$HOME/src/agent-pipeline-share_cyborg"
+PO_DIR="$HOME/agent-pipeline-po"
+mkdir -p "$PO_DIR"
+
+node "$REPO/plugins/pipeline-core/scripts/po-approval-request.mjs" prepare \
+  --repo-root "$REPO" \
   --feature-id cyb-4 \
   --plan specs/2026-07-24-sprint-cyborg-epic/prd_cyborg-epic.md \
   --spec specs/2026-07-24-sprint-cyborg-epic/spec.md \
-  --model specs/cyb-4/threat-model.json
+  --model specs/cyb-4/threat-model.json \
+  > "$PO_DIR/request.json"
 ```
 
 It requires a clean checkout and emits a public request for the exact current
-commit/tree. Save that output outside the repository and have the trusted
-signer inspect and sign `approvalIntent.sha256`. Afterwards, verify the three
-public files from paths outside the checkout:
+commit/tree. `REPO` makes the command work from any directory; `PO_DIR` stays
+outside the repository. Have the trusted signer inspect and sign
+`approvalIntent.sha256`. Afterwards, verify the three public files from paths
+outside the checkout:
 
 ```sh
-node plugins/pipeline-core/scripts/po-approval-request.mjs verify \
-  --request /secure/path/request.json \
-  --authority /secure/path/trust-policy.json \
-  --proof /secure/path/proof.json
+node "$REPO/plugins/pipeline-core/scripts/po-approval-request.mjs" verify \
+  --repo-root "$REPO" \
+  --request "$PO_DIR/request.json" \
+  --authority "$PO_DIR/trust-policy.json" \
+  --proof "$PO_DIR/proof.json"
 ```
 
 The command does not have a `sign` mode and refuses request/proof/trust-policy

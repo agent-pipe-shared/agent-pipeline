@@ -4,6 +4,7 @@ import { createHash, generateKeyPairSync, sign } from "node:crypto";
 
 import { createThreatModelApprovalRequest, verifyThreatModelApprovalRequest } from "./threat-model-approval-request.mjs";
 import { PO_APPROVAL_PROOF_SCHEMA } from "./po-approval-proof.mjs";
+import { parseArgs } from "../scripts/po-approval-request.mjs";
 
 const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
 const referenceModel = { schema: "pipeline.threat-model.v1", candidate: { commit: "c".repeat(40), tree: "d".repeat(40) }, policyRevision: "policy-v1", classification: "public", entities: [], lifecycle: "approved" };
@@ -18,4 +19,6 @@ assert.notEqual(request.approvalReceipt.modelDigest, createHash("sha256").update
 assert.equal(verifyThreatModelApprovalRequest({ request, trustPolicy, proof }).verified, true);
 assert.equal(verifyThreatModelApprovalRequest({ request: { ...request, candidate: { ...candidate, tree: "e".repeat(40) } }, trustPolicy, proof }).verified, false);
 assert.equal(verifyThreatModelApprovalRequest({ request, trustPolicy: { ...trustPolicy, keyReference: "candidate-key" }, proof }).verified, false);
-console.log("6 threat-model approval request checks passed");
+assert.deepEqual(parseArgs(["prepare", "--repo-root", "/external/repo", "--feature-id", "cyb-4", "--plan", "plan.md", "--spec", "spec.md", "--model", "model.json"]), { command: "prepare", repoRoot: "/external/repo", featureId: "cyb-4", plan: "plan.md", spec: "spec.md", model: "model.json" });
+assert.ok(parseArgs(["prepare", "--repo-root", "/one", "--repo-root", "/two"]).error);
+console.log("8 threat-model approval request checks passed");
