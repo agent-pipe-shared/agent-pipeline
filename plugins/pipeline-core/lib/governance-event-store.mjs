@@ -513,7 +513,7 @@ export async function loadGovernanceEventRegistry({ repositoryRoot, registryPath
  * Append one event intent. Writer-owned sequence/digests must be omitted from
  * `intent`; the returned receipt exposes only public metadata and checkpoint.
  */
-export async function appendPortableGovernanceEvent({ repositoryRoot, registryPath, repositoryFingerprint, intent } = {}) {
+export async function appendPortableGovernanceEvent({ repositoryRoot, registryPath, repositoryFingerprint, intent, assertAppend } = {}) {
   const { root, fingerprint } = await assertPhysicalRoot(repositoryRoot);
   const { registry } = await loadRegistry(root, registryPath);
   if (repositoryFingerprint !== fingerprint || registry.repositoryFingerprint !== fingerprint) fail("GES-CROSS-REPOSITORY", "The expected repository fingerprint does not match the physical repository.");
@@ -528,6 +528,13 @@ export async function appendPortableGovernanceEvent({ repositoryRoot, registryPa
     if (existing) {
       if (eventIntentDigest(existing) !== canonicalSha256(intent)) fail("GES-IDEMPOTENCY-CONFLICT", "Idempotency replay conflicts with the committed event.");
       return receipt(existing, "idempotent-replay", canonicalSha256(intent));
+    }
+    // A caller may bind a domain-specific append precondition to this same
+    // stream lock.  This is required for one-shot authority dispositions: a
+    // separately queried grant must not be consumed twice in a race.
+    if (assertAppend !== undefined) {
+      if (typeof assertAppend !== "function") fail("GES-APPEND-ASSERTION", "Append assertion must be a function.");
+      await assertAppend(Object.freeze(scanned.events.map((event) => Object.freeze({ ...event }))));
     }
     const previous = scanned.events.at(-1) ?? null;
     const event = sealGovernanceEvent({ ...template, sequence: (previous?.sequence ?? 0) + 1, previousEventDigest: previous?.eventDigest ?? null });

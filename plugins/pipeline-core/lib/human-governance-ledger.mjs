@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Pure validation and authority resolution for PHX-2 human decisions. */
-import { canonicalSha256 } from "./governance-event.mjs";
+import { canonicalSha256, validateGovernanceEventEnvelope } from "./governance-event.mjs";
 import { appendPortableGovernanceEvent, queryPortableGovernanceStream } from "./governance-event-store.mjs";
 import { HumanGovernanceLedgerError, createConsumedHumanGovernanceDecision, validateHumanGovernanceDecision } from "./human-governance-decision.mjs";
 
@@ -9,6 +9,7 @@ const SHA256 = /^[a-f0-9]{64}$/u;
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 function record(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
 function exact(value, keys) { return record(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key)); }
+function fail(code) { throw new HumanGovernanceLedgerError(code); }
 
 export { HumanGovernanceLedgerError, createConsumedHumanGovernanceDecision, validateHumanGovernanceDecision };
 
@@ -40,6 +41,73 @@ export async function appendHumanGovernanceDecision({ repositoryRoot, repository
   const decision = validateHumanGovernanceDecision(intent.payload);
   if (intent.repositoryFingerprint !== repositoryFingerprint || decision.scope.repositoryFingerprint !== repositoryFingerprint) fail("HGL-CROSS-REPOSITORY");
   return appendPortableGovernanceEvent({ repositoryRoot, repositoryFingerprint, intent });
+}
+
+/**
+ * Append the only valid disposition of a live single-use grant.  The grant is
+ * re-read under the human-stream append lock, so a stale caller cannot race a
+ * second consumption into the immutable ledger.  Mutable State is deliberately
+ * not touched here; its writer must project the returned receipt afterwards.
+ */
+export async function appendConsumedHumanGovernanceDecision({ repositoryRoot, repositoryFingerprint, grantEvent, decisionId, eventId, idempotencyKey, observedAtEpochMs } = {}) {
+  if (!record(grantEvent) || !validateGovernanceEventEnvelope(grantEvent).valid
+    || grantEvent.origin !== "human" || grantEvent.streamId !== "human"
+    || grantEvent.authorityClass !== "human-authority"
+    || grantEvent.payloadSchema !== "pipeline.human-governance-decision.v1"
+    || !ID.test(decisionId) || !ID.test(eventId) || !ID.test(idempotencyKey)
+    || !Number.isSafeInteger(observedAtEpochMs)) fail("HGL-CONSUME-ENVELOPE");
+  const grant = validateHumanGovernanceDecision(grantEvent.payload);
+  if (grant.event !== "granted" || grant.outcome !== "granted"
+    || grant.scope.repositoryFingerprint !== repositoryFingerprint
+    || grantEvent.repositoryFingerprint !== repositoryFingerprint
+    || decisionId === grant.decisionId) fail("HGL-CONSUME-ENVELOPE");
+  const consumed = createConsumedHumanGovernanceDecision({ grant, decisionId, observedAtEpochMs });
+  const intent = {
+    schema: "pipeline.governance-event-envelope.v1",
+    payloadSchema: "pipeline.human-governance-decision.v1",
+    canonicalization: "RFC8785",
+    digestAlgorithm: "sha-256",
+    eventId,
+    idempotencyKey,
+    origin: "human",
+    authorityClass: "human-authority",
+    eventType: "human.consumed",
+    occurredAtEpochMs: observedAtEpochMs,
+    observedAtEpochMs,
+    timeAssurance: "locally-observed",
+    repositoryFingerprint,
+    sourceUri: grantEvent.sourceUri,
+    streamId: "human",
+    correlation: grantEvent.correlation,
+    candidate: grant.scope.candidate,
+    artifacts: grantEvent.artifacts,
+    policy: grantEvent.policy,
+    classification: "repository-public-safe",
+    storageProfile: "repository-public-safe",
+    retentionCompatibility: "repository-retained",
+    disclosureClass: "repository-visible",
+    payload: consumed,
+  };
+  return appendPortableGovernanceEvent({
+    repositoryRoot,
+    repositoryFingerprint,
+    intent,
+    assertAppend: (events) => {
+      const persisted = events.find((event) => event.eventDigest === grantEvent.eventDigest);
+      if (!persisted || canonicalSha256(persisted) !== canonicalSha256(grantEvent)) fail("HGL-CONSUME-GRANT-STALE");
+      const decisions = events
+        .filter((event) => event.origin === "human" && event.streamId === "human")
+        .map((event) => validateHumanGovernanceDecision(event.payload));
+      const authority = resolveHumanGovernanceAuthority({
+        decisions,
+        decisionId: grant.decisionId,
+        repositoryFingerprint,
+        candidate: grant.scope.candidate,
+        nowEpochMs: observedAtEpochMs,
+      });
+      if (authority.status !== "granted" || authority.singleUse !== true) fail("HGL-CONSUME-NOT-LIVE");
+    },
+  });
 }
 
 /** Return only verified/prefix-valid canonical human decisions, never mutable projection state. */

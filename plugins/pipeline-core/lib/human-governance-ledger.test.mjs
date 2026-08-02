@@ -1,12 +1,42 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
-import { HumanGovernanceLedgerError, createConsumedHumanGovernanceDecision, resolveHumanGovernanceAuthority, validateHumanGovernanceDecision } from "./human-governance-ledger.mjs";
+import { canonicalSha256, canonicalizeJson } from "./governance-event.mjs";
+import { discoverRepository } from "./worktree-lifecycle.mjs";
+import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
+import { HumanGovernanceLedgerError, appendConsumedHumanGovernanceDecision, appendHumanGovernanceDecision, createConsumedHumanGovernanceDecision, queryHumanGovernanceDecisions, resolveHumanGovernanceAuthority, validateHumanGovernanceDecision } from "./human-governance-ledger.mjs";
 
 const sha = "a".repeat(64);
 const candidate = { commit: "b".repeat(40), tree: "c".repeat(40) };
 function decision(overrides = {}) { return { decisionId: "decision-1", event: "granted", outcome: "granted", authorityClass: "product-owner", identityAssurance: "locally-attributed", timeAssurance: "locally-observed", scope: { repositoryFingerprint: sha, candidate, packageId: "sprint-phoenix-epic", action: "PLAN.APPROVE", environment: "local", artifacts: [{ path: "specs/sprint-phoenix-epic/spec.md", sha256: sha }] }, reasonCode: "SCOPE.ACCEPTED", policyDigest: sha, ruleDigest: sha, validity: { notBeforeEpochMs: 10, expiresAtEpochMs: 100, singleUse: true }, links: { requestDecisionId: "request-1", consumesDecisionId: null, revokesDecisionId: null, expiresDecisionId: null, supersedesDecisionId: null, correctsDecisionId: null }, ...overrides }; }
+
+const absent = { state: "not-applicable" };
+function registry(fingerprint) { return { schema: "pipeline.governance-stream-registry.v1", repositoryFingerprint: fingerprint, canonicalization: "RFC8785", digestAlgorithm: "sha-256", eventDigestDomain: "pipeline.governance-event.v1\0", storageRoot: "governance/events", streams: [
+  { streamId: "human", origin: "human", authorityClass: "human-authority", relativeRoot: "human", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+  { streamId: "agent", origin: "agent", authorityClass: "non-authoritative", relativeRoot: "agent", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+  { streamId: "lifecycle", origin: "lifecycle", authorityClass: "non-authoritative", relativeRoot: "lifecycle", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+] }; }
+function capturePolicy() { return { schema: "pipeline.governance-capture-policy.v1", policyId: "fixture", revision: "e".repeat(64), defaultAction: "deny", streams: ["human", "agent", "lifecycle"].map((origin) => ({ origin, purpose: origin === "human" ? "authority-history" : "declared-assumption", materiality: "required", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null })), sanitizedReceipt: { allowEventId: true, allowEventDigest: true, allowCheckpoint: true, allowReasonText: false } }; }
+async function ledgerFixture() {
+  const root = await mkdtemp(path.join(os.tmpdir(), "phoenix-human-ledger-"));
+  execFileSync("git", ["init", "-q", root]);
+  const repository = discoverRepository(root);
+  const fingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: repository.commonDir, primaryRoot: repository.primaryRoot });
+  const policy = capturePolicy();
+  await mkdir(path.join(root, "governance/events"), { recursive: true });
+  await writeFile(path.join(root, "governance/events/registry.json"), `${canonicalizeJson(registry(fingerprint))}\n`);
+  await writeFile(path.join(root, "governance/events/capture-policy.json"), `${canonicalizeJson(policy)}\n`);
+  const grant = decision({ scope: { repositoryFingerprint: fingerprint, candidate, packageId: "sprint-phoenix-epic", action: "PLAN.APPROVE", environment: "local", artifacts: [{ path: "specs/sprint-phoenix-epic/spec.md", sha256: sha }] } });
+  const intent = { schema: "pipeline.governance-event-envelope.v1", payloadSchema: "pipeline.human-governance-decision.v1", canonicalization: "RFC8785", digestAlgorithm: "sha-256", eventId: "grant-event-1", idempotencyKey: "grant-idempotency-1", origin: "human", authorityClass: "human-authority", eventType: "human.granted", occurredAtEpochMs: 20, observedAtEpochMs: 20, timeAssurance: "locally-observed", repositoryFingerprint: fingerprint, sourceUri: `urn:pipeline:repository:${fingerprint}`, streamId: "human", correlation: { featureId: absent, packageId: absent, requestId: absent, sessionId: absent, dispatchId: absent, traceId: absent }, candidate, artifacts: [absent], policy: { policyDigest: absent, configurationDigest: absent, capturePolicyDigest: canonicalSha256(policy), redactionPolicyDigest: absent }, classification: "repository-public-safe", storageProfile: "repository-public-safe", retentionCompatibility: "repository-retained", disclosureClass: "repository-visible", payload: grant };
+  await appendHumanGovernanceDecision({ repositoryRoot: root, repositoryFingerprint: fingerprint, intent });
+  const events = await queryHumanGovernanceDecisions({ repositoryRoot: root, repositoryFingerprint: fingerprint });
+  return { root, fingerprint, grantEvent: events.events[0] };
+}
 
 test("validates a closed portable grant and resolves matching authority", () => {
   const value = validateHumanGovernanceDecision(decision());
@@ -31,6 +61,17 @@ test("derives an append-only consumption disposition without rewriting the grant
   assert.equal(resolveHumanGovernanceAuthority({ decisions: [grant, consumed], decisionId: grant.decisionId, repositoryFingerprint: sha, candidate, nowEpochMs: 50 }).reason, "disposed");
   assert.throws(() => createConsumedHumanGovernanceDecision({ grant, decisionId: grant.decisionId, observedAtEpochMs: 50 }), (error) => error.code === "HGL-CONSUME-REQUEST");
   assert.throws(() => createConsumedHumanGovernanceDecision({ grant, decisionId: "consume-expired", observedAtEpochMs: 101 }), (error) => error.code === "HGL-CONSUME-REQUEST");
+});
+
+test("consumes a persisted single-use grant exactly once under the canonical stream lock", async (t) => {
+  const values = await ledgerFixture();
+  t.after(() => rm(values.root, { recursive: true, force: true }));
+  const receipt = await appendConsumedHumanGovernanceDecision({ repositoryRoot: values.root, repositoryFingerprint: values.fingerprint, grantEvent: values.grantEvent, decisionId: "consumed-1", eventId: "consumed-event-1", idempotencyKey: "consumed-idempotency-1", observedAtEpochMs: 50 });
+  assert.equal(receipt.outcome, "appended");
+  const events = await queryHumanGovernanceDecisions({ repositoryRoot: values.root, repositoryFingerprint: values.fingerprint, checkpoint: receipt.checkpoint });
+  assert.equal(events.decisions.length, 2);
+  assert.equal(events.decisions[1].links.consumesDecisionId, "decision-1");
+  await assert.rejects(() => appendConsumedHumanGovernanceDecision({ repositoryRoot: values.root, repositoryFingerprint: values.fingerprint, grantEvent: values.grantEvent, decisionId: "consumed-2", eventId: "consumed-event-2", idempotencyKey: "consumed-idempotency-2", observedAtEpochMs: 51 }), (error) => error.code === "HGL-CONSUME-NOT-LIVE");
 });
 
 test("rejects open payloads and invalid lifecycle link cardinality", () => {
