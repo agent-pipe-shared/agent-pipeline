@@ -87,10 +87,10 @@
  *                 --max-minutes <integer>
  *                 --by coordinator
  *   approve-plan  --by <name>                     Sets planApproved=true, records
- *                                                 exact v2 planApproval including its
- *                                                 Spec binding; the same profile/PRD/Spec
- *                                                 authority is revalidated under the
- *                                                 writer lock before commit.
+ *                 --human-decision-file <path>    exact v3 planApproval including its
+ *                                                 checkpoint-bound human decision and Spec
+ *                                                 binding; PO and human authority are
+ *                                                 revalidated under the writer lock.
  *                                                 Clears any prior planRevocation.
  *   revoke-plan   --by <name>                     Sets planApproved=false, records
  *                                                 the exact v2 revocation bound to the
@@ -2461,13 +2461,23 @@ function poApprovalDecision(dir, manifest, deps) {
   const state = readState(dir);
   const approval = state.status === "ok" ? state.state.planApproval : null;
   const authority = approval?.poGateAuthority;
+  const v2Approval = exactObjectKeys(approval, ["schema", "approvedBy", "approvedAt", "specBoundBy", "specBoundAt", "poGateAuthority"])
+    && approval.schema === "pipeline.plan-approval.v2";
+  const v3Approval = exactObjectKeys(approval, ["schema", "approvedBy", "approvedAt", "specBoundBy", "specBoundAt", "poGateAuthority", "humanDecision"])
+    && approval.schema === "pipeline.plan-approval.v3";
   if (state.status !== "ok" || state.state.planApproved !== true || state.state.activeFeature?.id === undefined
     || state.state.activeFeature.id !== manifest.feature.id || state.state.activeFeature.planPath !== authority?.planPath
-    || !exactObjectKeys(approval, ["schema", "approvedBy", "approvedAt", "specBoundBy", "specBoundAt", "poGateAuthority"])
-    || approval.schema !== "pipeline.plan-approval.v2"
+    || (!v2Approval && !v3Approval)
     || !exactObjectKeys(authority, ["schema", "humanFacing", "sourceSha256", "runtimeSha256", "receiptSha256", "repositoryFingerprint", "planPath", "planSha256", "specPath", "specSha256"])) return null;
   const observed = (deps.poGateAuthority ?? ((request) => validatePoGateAuthorityForRepository(request)))({ repoRoot: dir, expectedPlanSha256: authority.planSha256, expectedSpecSha256: authority.specSha256 });
   if (!observed?.ok || !samePhxJson(observed.value, authority)) return null;
+  if (v3Approval) {
+    const request = humanAuthorityRequest(approval.humanDecision, Date.now());
+    const resolved = request === null
+      ? { ok: false }
+      : (deps.humanAuthority ?? defaultHumanAuthority)({ repoRoot: dir, request });
+    if (!resolved?.ok || !matchesPlanApprovalHumanAuthority(resolved.value, approval.humanDecision, authority, manifest.feature.id)) return null;
+  }
   return { planPath: authority.planPath, planSha256: authority.planSha256, specPath: authority.specPath, specSha256: authority.specSha256, approvalSha256: sha256CanonicalJson(approval) };
 }
 function exactPoDecision(value) {
