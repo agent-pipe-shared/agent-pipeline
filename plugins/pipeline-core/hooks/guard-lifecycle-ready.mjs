@@ -403,7 +403,7 @@ export function isAgentPoPublicCommand(command, root) {
 
 function isHumanPoSigningCommand(command, root) {
   const args = poApprovalArgs(command, root, PO_HUMAN_APPROVAL_SCRIPT);
-  return args !== null && ["setup", "approve"].includes(args[0]);
+  return args !== null && ["setup", "approve", "approve-all"].includes(args[0]);
 }
 
 /**

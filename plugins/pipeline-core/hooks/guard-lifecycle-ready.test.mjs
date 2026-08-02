@@ -258,6 +258,7 @@ test("agents prepare and verify only public PO artifacts while human signing sta
     ]) assert.equal(isForbiddenCrossRepositoryMutation(command, path), true, command);
     for (const command of [
       `node ${PO_HUMAN_APPROVAL_SCRIPT} approve --repo-root ${path} --directory ${external} --feature-id cyb-4`,
+      `node ${PO_HUMAN_APPROVAL_SCRIPT} approve-all --repo-root ${path} --directory ${external}`,
       `node ${PO_HUMAN_APPROVAL_SCRIPT} setup --repo-root ${path} --directory ${external}`,
     ]) {
       const result = evaluateLifecycleReadyGuard(bash(command), {
