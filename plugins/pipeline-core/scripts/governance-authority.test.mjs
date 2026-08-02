@@ -68,3 +68,25 @@ test("authority CLI grants only a verified checkpoint-bound human decision", asy
   assert.deepEqual(await main(["--repo", values.root, "--request-file", requestFile]), { schema: "pipeline.governance-authority-readback.v1", granted: false, reason: "checkpoint-unverified" });
   assert.deepEqual(await main(["--repo", values.root, "--request-json", canonicalizeJson(request)]), granted);
 });
+
+test("authority CLI consumes a checkpoint-bound single-use grant idempotently", async (t) => {
+  const values = await fixture();
+  t.after(() => rm(values.root, { recursive: true, force: true }));
+  const receipt = await appendHumanGovernanceDecision({ repositoryRoot: values.root, repositoryFingerprint: values.fingerprint, intent: intent(values.fingerprint, values.capturePolicyDigest) });
+  const request = {
+    schema: "pipeline.governance-authority-consume-request.v1",
+    repositoryFingerprint: values.fingerprint,
+    decisionId: "grant-1",
+    decisionDigest: canonicalSha256(decision(values.fingerprint)),
+    candidate,
+    checkpoint: receipt.checkpoint,
+    observedAtEpochMs: 1_000,
+    consumption: { decisionId: "consumed-1", eventId: "consumed-event-1", idempotencyKey: "consumed-idempotency-1" },
+  };
+  const consumed = await main(["--repo", values.root, "--consume-request-json", canonicalizeJson(request)]);
+  assert.equal(consumed.consumed, true);
+  assert.equal(consumed.outcome, "appended");
+  assert.equal(consumed.consumptionDecisionId, "consumed-1");
+  assert.equal((await main(["--repo", values.root, "--consume-request-json", canonicalizeJson(request)])).outcome, "idempotent-replay");
+  await assert.rejects(() => main(["--repo", values.root, "--consume-request-json", canonicalizeJson({ ...request, consumption: { decisionId: "consumed-2", eventId: "consumed-event-2", idempotencyKey: "consumed-idempotency-2" } })]), (error) => error.code === "HGL-CONSUME-NOT-LIVE");
+});
