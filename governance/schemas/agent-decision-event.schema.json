@@ -3,7 +3,62 @@
   "$id": "https://agent-pipeline.dev/schemas/pipeline.agent-decision-event.v1.json",
   "title": "Pipeline agent decision event v1",
   "type": "object",
-  "additionalProperties": false,
-  "required": ["eventId", "kind", "state", "reasonCode", "candidateDigest", "relatedHumanDecisionId", "supersedesEventId"],
-  "properties": { "eventId": { "type": "string" }, "kind": { "enum": ["assumption", "selection", "verification-scope", "fallback", "escalation"] }, "state": { "enum": ["declared", "verified", "contradicted", "expired", "invalidated", "superseded"] }, "reasonCode": { "type": "string" }, "candidateDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "relatedHumanDecisionId": { "type": ["string", "null"] }, "supersedesEventId": { "type": ["string", "null"] } }
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "required": ["eventId", "kind", "state", "reasonCode", "candidateDigest", "relatedHumanDecisionId", "supersedesEventId"],
+      "properties": {
+        "eventId": { "type": "string" },
+        "kind": { "enum": ["assumption", "selection", "verification-scope", "fallback", "escalation"] },
+        "state": { "enum": ["declared", "verified", "contradicted", "expired", "invalidated", "superseded"] },
+        "reasonCode": { "type": "string" },
+        "candidateDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "relatedHumanDecisionId": { "type": ["string", "null"] },
+        "supersedesEventId": { "type": ["string", "null"] }
+      }
+    },
+    {
+      "additionalProperties": false,
+      "required": ["eventId", "kind", "state", "reasonCode", "candidateDigest", "relatedHumanDecisionId", "supersedesEventId", "offerOrigin", "operation", "target", "sideEffectClass", "authorityRequirement", "policyDigest", "redactionPolicyDigest", "executionAssurance", "omissions", "offerEventId", "preEvidenceDigest", "postEvidenceDigest", "recoverability"],
+      "properties": {
+        "eventId": { "type": "string" },
+        "kind": { "const": "command-offer" },
+        "state": { "enum": ["offered", "acknowledged", "authorized", "copied", "attempted", "execution-unobserved", "observed-completed", "readback-verified", "failed", "partial", "cancelled", "unknown", "unavailable", "readback-mismatch", "recovery-proposed", "recovered"] },
+        "reasonCode": { "type": "string" },
+        "candidateDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "relatedHumanDecisionId": { "type": ["string", "null"] },
+        "supersedesEventId": { "type": ["string", "null"] },
+        "offerOrigin": { "enum": ["pipeline-initiated", "user-requested-pipeline-supplied"] },
+        "operation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["operationClass", "version", "governedArtifactSha256"],
+          "properties": {
+            "operationClass": { "type": "string" },
+            "version": { "type": ["string", "null"] },
+            "governedArtifactSha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
+          }
+        },
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["repositoryFingerprint", "scopeDigest"],
+          "properties": {
+            "repositoryFingerprint": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "scopeDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+          }
+        },
+        "sideEffectClass": { "enum": ["non-authoritative", "destructive", "guard-bypass", "authority-changing"] },
+        "authorityRequirement": { "enum": ["not-required", "human-decision-required"] },
+        "policyDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "redactionPolicyDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "executionAssurance": { "enum": ["not-applicable", "attempted", "execution-unobserved", "observed-completed", "readback-verified", "failed", "partial", "cancelled", "unknown", "unavailable", "readback-mismatch"] },
+        "omissions": { "type": "array", "items": { "enum": ["raw-command", "arguments", "private-coordinates", "unrestricted-output", "prompt", "transcript", "credential"] } },
+        "offerEventId": { "type": ["string", "null"] },
+        "preEvidenceDigest": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "postEvidenceDigest": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "recoverability": { "enum": ["not-applicable", "recoverable", "cleanup-required", "rollback-required"] }
+      }
+    }
+  ]
 }

@@ -929,6 +929,30 @@
       "member": "phase3-sdlc-coherence-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:phoenix-agent-decision-journal-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "phoenix-agent-decision-journal-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:phoenix-external-command-offer-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "phoenix-external-command-offer-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:phoenix-external-reference-adapter-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "phoenix-external-reference-adapter-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:phoenix-external-reference-cli-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "phoenix-external-reference-cli-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:phoenix-governance-authority-resolver-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1725,6 +1749,10 @@
         "verify-phase:harness/scripts/verify.mjs:phase26-invariants-tests",
         "verify-phase:harness/scripts/verify.mjs:phase3-sdlc-coherence-check",
         "verify-phase:harness/scripts/verify.mjs:phase3-sdlc-coherence-tests",
+        "verify-phase:harness/scripts/verify.mjs:phoenix-agent-decision-journal-tests",
+        "verify-phase:harness/scripts/verify.mjs:phoenix-external-command-offer-tests",
+        "verify-phase:harness/scripts/verify.mjs:phoenix-external-reference-adapter-tests",
+        "verify-phase:harness/scripts/verify.mjs:phoenix-external-reference-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:phoenix-governance-authority-resolver-tests",
         "verify-phase:harness/scripts/verify.mjs:phoenix-governance-authority-tests",
         "verify-phase:harness/scripts/verify.mjs:phoenix-governance-event-cli-tests",

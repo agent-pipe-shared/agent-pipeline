@@ -46,3 +46,27 @@ reference metadata and never imports external status as a Pipeline transition,
 approval, Critic result, or release authority. Persisting operational
 reconciliation queues, if configured later, remains a separate non-authority
 cache rather than a second canonical record.
+
+## Read-only operator preview
+
+`external-reference.mjs` is deliberately a local preview and reconciliation
+surface, not a generic network client. It accepts closed, repository-relative
+JSON fixtures for a reference, adapter capabilities, desired owned-field
+digests, and the adapter's sanitized inspection/preview observations. It never
+receives credentials, provider endpoints, raw external content, or a command
+to apply a write.
+
+```sh
+node plugins/pipeline-core/scripts/external-reference.mjs preview \
+  --root . \
+  --reference evidence/reference.json \
+  --capabilities evidence/adapter-capabilities.json \
+  --desired evidence/owned-fields.json \
+  --inspection evidence/inspection.json \
+  --preview evidence/preview.json
+```
+
+An adapter implementation must still perform the separately authorized
+apply/readback lifecycle through `applyExternalReferenceWrite`. Its authority
+resolver is the future Cyborg human-attestation integration seam; neither this
+operator preview nor any external status can grant that authority.
