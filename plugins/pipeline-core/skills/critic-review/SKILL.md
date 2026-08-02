@@ -68,11 +68,10 @@ binary verdict. At most, record an immediately safety-relevant item once under
 `Out-of-scope observations` without severity, remediation demand, or a request
 to expand this review. Ordinary scope-adjacent ideas are dropped.
 
-For a fresh re-review after fixes, use the new fixed-candidate diff plus the
-prior Critic report supplied as an evidence path. Recheck only the prior
-findings, their fixes, and direct regressions introduced by those fixes. Do not
-restart a broad hunt, reopen cleared categories, or create a Critic-of-Critic
-loop unless the PO explicitly authorizes a larger new review scope.
+For a fresh re-review after fixes, the diff range MUST start at the exact
+candidate commit reviewed by the immediately preceding Critic and end at the
+new fixed candidate (`PREVIOUS_CRITIC_CANDIDATE..NEW_CANDIDATE`). Supply the
+prior Critic report as an evidence path. Recheck only the prior findings, their fixes, and direct regressions introduced by those fixes. A broad range (for example `main..HEAD`) on a re-review is a dispatch defect unless the PO explicitly authorizes a larger new review scope. Do not restart a broad hunt, reopen cleared categories, or create a Critic-of-Critic loop otherwise.
 
 ## 1. Stage gate (self-enforcing, before any review work)
 
