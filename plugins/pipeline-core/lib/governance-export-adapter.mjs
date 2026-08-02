@@ -110,3 +110,21 @@ export function validateGovernanceExportAcknowledgement(receipt) {
     || (receipt.receiptId !== null && !ID.test(receipt.receiptId))) fail("GEA-ACK");
   return freeze({ ...receipt, acceptedDestinationEventIds: freeze([...receipt.acceptedDestinationEventIds]), rejectedDestinationEventIds: freeze([...receipt.rejectedDestinationEventIds]) });
 }
+
+/**
+ * A local conformance collector. It is deliberately observational: this
+ * acknowledgement only advances an outbound outbox and cannot become Cyborg or
+ * human authority for a Pipeline decision, release, or lifecycle transition.
+ */
+export function createInMemoryGovernanceExportCollector({ profile } = {}) {
+  const active = validateGovernanceExportAdapterProfile(profile); const batches = [];
+  return freeze({
+    profile: active,
+    async deliver({ batchId, mappings } = {}) {
+      if (!ID.test(batchId ?? "") || !Array.isArray(mappings) || mappings.length > active.maxBatchEvents || mappings.some((mapping) => mapping?.profileId !== active.profileId || mapping?.format !== active.format || !SHA.test(mapping?.destinationEventId ?? ""))) fail("GEA-DELIVER");
+      batches.push(freeze({ batchId, mappings: freeze(mappings.map((mapping) => freeze(clone(mapping)))) }));
+      return validateGovernanceExportAcknowledgement({ schema: "pipeline.governance-export-acknowledgement.v1", profileId: active.profileId, batchId, acceptedDestinationEventIds: mappings.map((mapping) => mapping.destinationEventId), rejectedDestinationEventIds: [], receiptId: `memory-${batchId}` });
+    },
+    readback() { return freeze(batches.map((batch) => freeze(clone(batch)))); },
+  });
+}

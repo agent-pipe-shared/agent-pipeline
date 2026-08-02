@@ -56,6 +56,23 @@ validated before it reaches the outbox but remains transport observation only:
 it cannot approve, waive, release, deploy, revoke, or mutate canonical
 Pipeline authority.
 
+## Delivery coordinator and reference collector
+
+`deliverGovernanceExportBatch` accepts a bounded pending outbox batch, maps
+each already-sanitized entry, and accepts only a closed
+`pipeline.governance-export-acknowledgement.v1` receipt whose IDs belong to
+that batch. It then advances the local outbox only through its existing
+contiguous acknowledgement rule. Unknown, forged, duplicate, or mismatched
+acknowledgements fail before an outbox transition.
+
+`createInMemoryGovernanceExportCollector` is the required synthetic reference
+adapter for conformance fixtures. It records mappings locally and acknowledges
+only their stable destination IDs. It has no network, endpoint, credential, or
+authority capability. Production destinations supply the same narrow
+`deliver({ batchId, mappings })` boundary from operator-managed configuration;
+their receipt can describe transport acceptance, never retention, review, or a
+Pipeline authorization decision.
+
 Each destination maintains an independent outbox state: acknowledged entries
 advance its cursor only across a contiguous confirmed prefix. Partial delivery
 leaves unacknowledged entries pending, while quarantined entries preserve their
