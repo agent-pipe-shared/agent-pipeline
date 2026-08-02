@@ -48,7 +48,7 @@ export function transitionFinding({ finding, to, authority, reason, at, candidat
     || !validDigest(candidateSha256) || !validDigest(policySha256)) {
     return Object.freeze({ schema: FINDING_LIFECYCLE_SCHEMA, accepted: false, code: "FINDING-TRANSITION-INVALID" });
   }
-  if (TERMINAL_DISPOSITIONS.has(to) && authority === "agent") return Object.freeze({ schema: FINDING_LIFECYCLE_SCHEMA, accepted: false, code: "FINDING-SELF-APPROVAL-DENIED" });
+  if (TERMINAL_DISPOSITIONS.has(to) && !["human", "policy"].includes(authority)) return Object.freeze({ schema: FINDING_LIFECYCLE_SCHEMA, accepted: false, code: "FINDING-DISPOSITION-AUTHORITY-DENIED" });
   return Object.freeze({ schema: FINDING_LIFECYCLE_SCHEMA, accepted: true, code: "FINDING-TRANSITION-RECORDED", record: { type: "triage", findingId: finding.id, from: finding.state, to, authority, reason, at, candidateSha256, policySha256 } });
 }
 
