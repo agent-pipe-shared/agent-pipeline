@@ -704,7 +704,14 @@ export function planBacklogReachabilityRepair(items, events, input) {
     nextEvents.push(event);
     previousHash = event.entryHash;
   }
-  errors.push(...validateTransitionLedger(nextEvents, items));
+  // This planner deliberately receives a historical ledger prefix. Items
+  // admitted by later append-only events are outside that snapshot; their
+  // absence must not invalidate a replay of these two historical repairs.
+  // The normal state checker still validates every current item against the
+  // complete ledger.
+  const snapshotIds = new Set([...events.map((event) => event?.id), ...expectedIds]);
+  const snapshotItems = items.filter((item) => snapshotIds.has(item?.metadata?.id));
+  errors.push(...validateTransitionLedger(nextEvents, snapshotItems));
   return {
     ok: errors.length === 0,
     errors,

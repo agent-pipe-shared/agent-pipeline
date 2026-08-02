@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-07-25
-source: Self-observation during Sprint Cyborg CYB-0 follow-up (approve-plan dispatch), 2026-07-24/25; direct reproduction via `node -e` against `resolvePoGateRepositoryTopology`.
+source: "Self-observation during Sprint Cyborg CYB-0 follow-up (approve-plan dispatch), 2026-07-24/25; direct reproduction via `node -e` against `resolvePoGateRepositoryTopology`."
 ---
 
 # pipeline.po-gate-authority-path-canonicalization

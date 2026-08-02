@@ -1186,7 +1186,7 @@ function observeReadyAppServer(intent, runner, fs) {
   }
 }
 
-function readyLifecycleResult({ root, intent, repository, runtime, continuity = emptyContinuity() }, fs) {
+function readyLifecycleResult({ root, runner = "codex", intent, repository, runtime, continuity = emptyContinuity() }, fs) {
   // The fresh protected-mount transition is not a ready-state claim.  Its
   // confirmed host repository initializer must be plannable even when the
   // current workspace sandbox cannot reach the host App-Server control

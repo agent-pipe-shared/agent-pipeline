@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-07-25
-source: Decision-D native-Windows verify baseline investigation, 2026-07-24 (docs/state.md "Root-cause classification of the 11 reds"); corrected 2026-07-25 after direct reproduction — see "Correction" below.
+source: "Decision-D native-Windows verify baseline investigation, 2026-07-24 (docs/state.md \"Root-cause classification of the 11 reds\"); corrected 2026-07-25 after direct reproduction — see \"Correction\" below."
 ---
 
 # pipeline.windows-verify-brittle-test-hygiene

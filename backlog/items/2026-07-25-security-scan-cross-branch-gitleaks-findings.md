@@ -1,11 +1,15 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.security-scan-cross-branch-gitleaks-findings
-type: observation
+type: defect
 owner: pipeline
 status: closed
 created: 2026-07-25
-source: Observed during Sprint Cyborg WIN-PGA-2 post-rebase baseline verify (feat/sprint-cyborg-claude rebased onto v0.4.4), 2026-07-25.
+source: "Observed during Sprint Cyborg WIN-PGA-2 post-rebase baseline verify (feat/sprint-cyborg-claude rebased onto v0.4.4), 2026-07-25."
+closed_at: "2026-07-29"
+closure_repository: "self"
+closure_commit: "83111227cb59eff7d186c49aadc6963f78232b77"
+closure_evidence: "backlog/items/2026-07-25-security-scan-cross-branch-gitleaks-findings.md"
 ---
 
 # pipeline.security-scan-cross-branch-gitleaks-findings

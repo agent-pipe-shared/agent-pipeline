@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-07-29
-source: Sprint Cyborg epic, self-application finding #2 (Elephant self-observation while implementing CYB-2E; PO decision Option B recorded in docs/state.md, session 2026-07-29)
+source: "Sprint Cyborg epic, self-application finding #2 (Elephant self-observation while implementing CYB-2E; PO decision Option B recorded in docs/state.md, session 2026-07-29)"
 ---
 
 # `guard-lifecycle-ready.mjs` blocks Claude Code's own auto-memory writes in every governed project

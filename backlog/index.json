@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e295fc3d810c540ffe5f3f6183efbdd6d12778f51ed08d0fdbc2e9fb1dbfdb75"
+    "transitionHead": "735abc4c224e8533fda9082394da50e619705d7580d8cc5c04f2be036d0ec8bf"
   },
   "counts": {
-    "open": 31,
+    "open": 38,
     "in_progress": 3,
-    "closed": 2
+    "closed": 3
   },
   "items": [
     {
@@ -131,6 +131,14 @@
       "tracking": "Sentinel recovery baseline; no completion claim."
     },
     {
+      "id": "pipeline.guard-lifecycle-ready-blocks-claude-memory-writes",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-07-29",
+      "source": "Sprint Cyborg epic, self-application finding #2 (Elephant self-observation while implementing CYB-2E; PO decision Option B recorded in docs/state.md, session 2026-07-29)"
+    },
+    {
       "id": "pipeline.managed-onboarding-success-contract",
       "status": "open",
       "type": "workflow-improvement",
@@ -162,6 +170,22 @@
       "owner": "pipeline",
       "created": "2026-07-20",
       "source": "PO-approved parallel Sentinel work and Critic scope correction"
+    },
+    {
+      "id": "pipeline.po-gate-authority-path-canonicalization",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-07-25",
+      "source": "Self-observation during Sprint Cyborg CYB-0 follow-up (approve-plan dispatch), 2026-07-24/25; direct reproduction via `node -e` against `resolvePoGateRepositoryTopology`."
+    },
+    {
+      "id": "pipeline.po-gate-authority-receipt-readback",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-07-25",
+      "source": "Self-observation during Sprint Cyborg CYB-0 follow-up (approve-plan dispatch), 2026-07-24/25; reproduced a second time 2026-07-25 (see docs/state.md, \"PO GATE ANSWERED\" entry) — repro confirmed, root cause still not isolated."
     },
     {
       "id": "pipeline.po-gate-worktree-authority",
@@ -198,6 +222,14 @@
       "tracking": "Sentinel recovery baseline; no completion claim."
     },
     {
+      "id": "pipeline.recovery-preview-ack-unstable-getter-poisons-replay-ledger",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-07-27",
+      "source": "CYB-A0 round-2 Critic re-review (new-issue N1), found while verifying the fix for round-1 F1-F5 in plugins/pipeline-core/lib/recovery-preview-attestation.mjs"
+    },
+    {
       "id": "pipeline.recovery-preview-callback-attestation",
       "status": "open",
       "type": "defect",
@@ -213,6 +245,26 @@
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.runtime-projection-v2-eager-manifest-load",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-07-27",
+      "source": "discovered as a sibling of Critic finding F4 (CLAUDE-RUNNER-01 delta review round 2) during briefing-i's fix of `plugins/pipeline-core/lib/runtime-projection-v3.mjs` (commit `894261d`)"
+    },
+    {
+      "id": "pipeline.security-scan-cross-branch-gitleaks-findings",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-07-25",
+      "source": "Observed during Sprint Cyborg WIN-PGA-2 post-rebase baseline verify (feat/sprint-cyborg-claude rebased onto v0.4.4), 2026-07-25.",
+      "closedAt": "2026-07-29",
+      "closureRepository": "self",
+      "closureCommit": "83111227cb59eff7d186c49aadc6963f78232b77",
+      "closureEvidence": "backlog/items/2026-07-25-security-scan-cross-branch-gitleaks-findings.md"
     },
     {
       "id": "pipeline.sentinel-go-live-completion",
@@ -270,6 +322,15 @@
       "tracking": "Sentinel recovery baseline; no completion claim."
     },
     {
+      "id": "pipeline.unified-human-authorization-ux",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-02",
+      "source": "PO product-direction decision during Sprint Cyborg CYB-4 PO-proof UX review, 2026-08-02",
+      "tracking": "Current CYB-4 helper is a compatible first adapter only; no programme-wide migration or closure is claimed."
+    },
+    {
       "id": "pipeline.verify-gate-scoped-registration",
       "status": "open",
       "type": "workflow-improvement",
@@ -317,6 +378,14 @@
       "created": "2026-07-22",
       "source": "specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md",
       "tracking": "PO-approved Sentinel scope extension; no implementation or closure claim."
+    },
+    {
+      "id": "pipeline.windows-verify-brittle-test-hygiene",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-07-25",
+      "source": "Decision-D native-Windows verify baseline investigation, 2026-07-24 (docs/state.md \"Root-cause classification of the 11 reds\"); corrected 2026-07-25 after direct reproduction — see \"Correction\" below."
     },
     {
       "id": "pipeline.windows-verify-reproducibility",

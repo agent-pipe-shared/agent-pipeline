@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-07-27
-source: discovered as a sibling of Critic finding F4 (CLAUDE-RUNNER-01 delta review round 2) during briefing-i's fix of `plugins/pipeline-core/lib/runtime-projection-v3.mjs` (commit `894261d`)
+source: "discovered as a sibling of Critic finding F4 (CLAUDE-RUNNER-01 delta review round 2) during briefing-i's fix of `plugins/pipeline-core/lib/runtime-projection-v3.mjs` (commit `894261d`)"
 ---
 
 # `runtime-projection-v2.mjs` has the same eager module-scope manifest-load fail-open pattern F4 fixed in v3

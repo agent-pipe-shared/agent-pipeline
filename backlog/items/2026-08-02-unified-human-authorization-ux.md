@@ -5,7 +5,7 @@ type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-08-02
-source: PO product-direction decision during Sprint Cyborg CYB-4 PO-proof UX review, 2026-08-02
+source: "PO product-direction decision during Sprint Cyborg CYB-4 PO-proof UX review, 2026-08-02"
 tracking: Current CYB-4 helper is a compatible first adapter only; no programme-wide migration or closure is claimed.
 due: 2026-08-30
 ---
