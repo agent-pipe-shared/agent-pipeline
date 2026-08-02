@@ -52,10 +52,12 @@ const SESSION_CAPABILITY_DIAGNOSE_SCRIPT = fileURLToPath(new URL("../scripts/ses
 const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
 const PO_PROFILE_REPAIR_SCRIPT = fileURLToPath(new URL("../scripts/po-gate-profile-repair.mjs", import.meta.url));
 const PROJECT_AUTHORITY_MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/project-authority-migration.mjs", import.meta.url));
+const RESUME_HINT_SCRIPT = fileURLToPath(new URL("../scripts/resume-hint.mjs", import.meta.url));
 const HUMAN_OVERRIDE_SCRIPT = fileURLToPath(new URL("../scripts/guard-human-override.mjs", import.meta.url));
 const PRIVATE_OVERLAY_SCRIPT = fileURLToPath(new URL("../scripts/codex-private-overlay-activation.mjs", import.meta.url));
 const PO_HUMAN_APPROVAL_SCRIPT = fileURLToPath(new URL("../scripts/po-human-approval.mjs", import.meta.url));
 const PO_APPROVAL_GATE_SCRIPT = fileURLToPath(new URL("../scripts/po-approval-gate.mjs", import.meta.url));
+const RESTART_RESUME_HINT_INPUT_PATH = "project/.resume-hint-input.json";
 const HEX = /^[a-f0-9]{64}$/u;
 const HOST_INIT_CROSS_VIEW_STATUSES = new Set([
   "repository-mount-read-only",
@@ -184,6 +186,13 @@ export function isProjectWritePath(filePath, root, dependencies = {}) {
   }
 }
 
+function isRestartResumeHintInputWrite(input, root) {
+  if (!["Edit", "Write"].includes(String(input?.tool_name ?? ""))) return false;
+  const filePath = input?.tool_input?.file_path;
+  return typeof filePath === "string"
+    && resolve(root, filePath) === join(root, RESTART_RESUME_HINT_INPUT_PATH);
+}
+
 function simpleWords(command, root, options = {}) {
   const parsed = parseGuardCommand(command, root, options);
   if (parsed.parseStatus !== "accepted"
@@ -195,6 +204,20 @@ function simpleWords(command, root, options = {}) {
 
 function exactRoot(args, root, index) {
   return args[index] === "--root" && args[index + 1] === root;
+}
+
+function isRestartResumeHintCapture(command, root, options = {}) {
+  const words = simpleWords(command, root, options);
+  const platform = options.platform ?? process.platform;
+  const directNode = platform === "win32" ? ["node", "node.exe"] : ["node"];
+  const trustedNode = options.processExecPath ?? process.execPath;
+  if (!words || ![...directNode, trustedNode].includes(words[0])) return false;
+  const [script, ...args] = words.slice(1);
+  return script === RESUME_HINT_SCRIPT
+    && args[0] === "capture"
+    && args[1] === "--root" && args[2] === root
+    && args[3] === "--card-file" && args[4] === join(root, RESTART_RESUME_HINT_INPUT_PATH)
+    && args[5] === "--consume-card" && args.length === 6;
 }
 
 /**
@@ -815,6 +838,14 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
           ?? hasCodexExistingGitControlMount)(root);
         if (existingControlMount === true) return verdict(0);
       } catch {}
+    }
+    const restartRequired = error instanceof ProjectOnboardingReadyError
+      && error.code === "PORG-NOT-READY"
+      && error.intent === "session"
+      && error.lifecycleStatus === "restart-required";
+    if (restartRequired && (isRestartResumeHintInputWrite(input, root)
+      || (toolName === "Bash" && isRestartResumeHintCapture(input.tool_input.command, root)))) {
+      return verdict(0);
     }
     return toolName === "Bash"
       && isSanctionedLifecycleCommand(input.tool_input.command, root)

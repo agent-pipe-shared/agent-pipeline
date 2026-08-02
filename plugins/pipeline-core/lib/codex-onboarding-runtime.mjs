@@ -211,7 +211,25 @@ export function resolveOnboardingPrivateState(rootDir, repositoryCapability = "l
   let base; let parts;
   if (repositoryCapability === "host-managed") {
     const claude = safeJoin(root, ".claude");
-    physicalDirectory(claude, ".claude", fs);
+    let created = false;
+    // A fresh host-managed root deliberately has no compatibility projection
+    // yet.  Its private restart state still needs a local, physical parent;
+    // create that directory only as part of the private-state transaction,
+    // never as portable authority output.
+    if (create && !fs.existsSync(claude)) {
+      fs.mkdirSync(claude, { mode: 0o700 });
+      created = true;
+      createdDirectories.push(claude);
+      createdDirectoryRecords.push(directoryIdentity(claude, fs));
+    }
+    // Read-only callers may need the logical private paths before the first
+    // host-managed writer creates `.claude`.  Treat that as absent state, not
+    // as a private-state error; once it exists, retain the physical/private
+    // assurance checks without exception.
+    if (created || fs.existsSync(claude)) {
+      physicalDirectory(claude, ".claude", fs);
+      assurePrivateDirectory(claude, created, fs, ".claude");
+    }
     base = claude; parts = [".runtime", "agent-pipeline", "onboarding"];
   } else if (repositoryCapability === "local") {
     base = readGitCommonDirectory(root, spawn, fs);

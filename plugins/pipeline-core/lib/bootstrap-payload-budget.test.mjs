@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   BOOTSTRAP_PAYLOAD_MAX_BYTES,
   boundedPayload,
@@ -27,15 +30,19 @@ assert.ok(over.measurement.upperBoundUnits <= BOOTSTRAP_PAYLOAD_MAX_BYTES);
 
 assert.deepEqual(selectLazyReferences({ code: "PCR-READY", ready: true }), []);
 assert.deepEqual(selectLazyReferences({ code: "PCR-BLOCKED", role: "critic" }), [
-  "references/recovery.md",
+  "references/onboarding-recovery.md",
   "references/role-specific.md",
   "references/continuation.md",
 ]);
 assert.deepEqual(selectLazyReferences({ code: "PCR-DECISION-PENDING", role: "goldfish" }), [
-  "references/recovery.md",
+  "references/onboarding-recovery.md",
   "references/role-specific.md",
   "references/continuation.md",
 ]);
+const skillRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "skills", "pipeline-start");
+for (const reference of selectLazyReferences({ code: "PCR-BLOCKED", role: "critic" })) {
+  assert.equal(existsSync(join(skillRoot, reference)), true, `${reference} must resolve from pipeline-start`);
+}
 for (const runner of ["codex", "claude-code"]) {
   const parity = measureBootstrapPayload({ featureId: "nova", revision: 4 }, { runner, mode: "compact" });
   assert.equal(parity.upperBoundUnits, positive.upperBoundUnits);

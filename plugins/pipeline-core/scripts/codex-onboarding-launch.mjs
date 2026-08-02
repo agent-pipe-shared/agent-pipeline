@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import { spawnSync } from "node:child_process";
+import { realpathSync } from "node:fs";
+import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
@@ -26,6 +28,8 @@ export function main(argv = process.argv.slice(2), {
   spawn = spawnSync,
   write = process.stdout.write.bind(process.stdout),
   env = process.env,
+  cwd = process.cwd(),
+  realpath = realpathSync,
 } = {}) {
   let issued;
   let readbackProduced = false;
@@ -64,6 +68,20 @@ export function main(argv = process.argv.slice(2), {
   };
   try {
     options = parse(argv);
+    // The launch command is deliberately rooted at the attended terminal's
+    // current physical directory.  A digest binds runtime state to a project,
+    // but it must never turn a different --root into an implicit workspace
+    // migration.  This still supports legitimate /tmp workspaces: invoke the
+    // command from that already-attested workspace, with --root .
+    const workspaceRoot = realpath(resolve(cwd));
+    if (realpath(resolve(workspaceRoot, options.rootDir)) !== workspaceRoot) {
+      write(`${canonicalJson({
+        schema: TICKET_SCHEMA,
+        status: "workspace-root-mismatch",
+      })}\n`);
+      return 2;
+    }
+    options = { ...options, rootDir: workspaceRoot };
     if (typeof env.CODEX_THREAD_ID === "string" && env.CODEX_THREAD_ID !== "") {
       write(`${canonicalJson({ schema: TICKET_SCHEMA, status: "external-launch-required" })}\n`);
       return 2;

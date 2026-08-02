@@ -7,9 +7,35 @@ import { readFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { measureBootstrapPayload } from "../lib/bootstrap-payload-budget.mjs";
+
 export const SCHEMA = "pipeline.start-preflight.v1";
 const PLUGIN_ID = "pipeline-core@agent-pipeline";
 const LOCAL_PLUGIN_ID = "pipeline-core@agent-pipeline-local";
+const NORMAL_BOOTSTRAP_CHECKS = Object.freeze([
+  "lifecycle",
+  "authority",
+  "calibration",
+  "handover",
+  "verify",
+  "continuation",
+]);
+
+export function normalBootstrapPayloadReceipt(payload) {
+  const measurement = measureBootstrapPayload(payload, {
+    mode: "normal",
+    runner: "runner-neutral",
+  });
+  return {
+    schema: "pipeline.bootstrap-payload-receipt.v1",
+    mode: "normal",
+    retainedChecks: NORMAL_BOOTSTRAP_CHECKS,
+    originalMeasurement: measurement,
+    emittedMeasurement: measurement,
+    overBudget: !measurement.withinBudget,
+    truncated: false,
+  };
+}
 
 function readInstalledPluginList() {
   const result = spawnSync("codex", ["plugin", "list", "--json"], {
@@ -103,7 +129,7 @@ export function observePipelineStartPreflight({
     : installedIdentity?.ambiguous === true || installedVersion !== null && installedVersion !== version
       ? "plugin-refresh-required"
       : "ready";
-  return {
+  const result = {
     schema: SCHEMA,
     status,
     version,
@@ -132,6 +158,13 @@ export function observePipelineStartPreflight({
           },
         }
       : null,
+  };
+  return {
+    ...result,
+    // This measures the exact normal-bootstrap envelope emitted before the
+    // self-describing receipt. The receipt is retained in the same typed
+    // preflight readback; no cached or static skill-size surrogate is used.
+    bootstrapPayload: normalBootstrapPayloadReceipt(result),
   };
 }
 

@@ -1349,6 +1349,7 @@ function restartCopyCommands(executable, argv) {
   const [launcher, rootFlag, root, barrierFlag, barrierSha256, activate] = argv;
   if (executable !== "node"
     || rootFlag !== "--root"
+    || root !== "."
     || barrierFlag !== "--barrier-sha256"
     || activate !== "--activate"
     || !/^[a-f0-9]{64}$/u.test(barrierSha256)) {
@@ -1421,9 +1422,13 @@ const RESTART_EXPECTED_STATUSES = [
   "worktree-capability-unavailable", "runtime-target-read-only", "runtime-readback-unavailable", "projection-drift", "continuity-damaged",
   "continuity-observation-unavailable", "app-server-execution-denied", "app-server-not-running", "app-server-unavailable",
 ];
-function restartAction(root, barrierSha256) {
+function restartAction(_root, barrierSha256) {
   const executable = "node";
-  const argv = [fileURLToPath(new URL("../scripts/codex-onboarding-launch.mjs", import.meta.url)), "--root", root, "--barrier-sha256", barrierSha256, "--activate"];
+  // Restart commands intentionally use the caller's current physical root.
+  // The launcher rejects a mismatched --root before issuing a ticket, so this
+  // cannot promote a scratch checkout into a new session merely by rendering
+  // an absolute path into a handover command.
+  const argv = [fileURLToPath(new URL("../scripts/codex-onboarding-launch.mjs", import.meta.url)), "--root", ".", "--barrier-sha256", barrierSha256, "--activate"];
   return {
     kind: "restart-process", requiresCurrentProcessExit: true,
     launch: {
@@ -2135,6 +2140,24 @@ export function planProjectOnboardingManifestRepairV4({
       )],
     });
   }
+  // The portable seed establishes `project/pipeline.yaml` as the sole
+  // authority.  A missing runtime projection may be reconstructed below, but
+  // this writer must never treat that as permission to mask or replace a
+  // malformed canonical project manifest.
+  const canonicalManifest = loadManifest(root);
+  if (canonicalManifest.status !== "ok") {
+    return manifestRepairResult({
+      status: "unrepairable",
+      root,
+      source: { path: SOURCE, sha256: inspection.sourceSha256 },
+      diagnostics: [lifecycleDiagnostic(
+        "$.authority.manifest",
+        "canonical_manifest_requires_owner_repair",
+        "the canonical project manifest is absent or invalid",
+        "repair project/pipeline.yaml through its owning authority workflow before repairing a runtime projection",
+      )],
+    });
+  }
   let intent;
   let projection;
   let sourceBytes;
@@ -2574,7 +2597,16 @@ function v4Inspection(rootDir, fs, intent = "onboarding") {
     status: "unsafe", root: legacy.root, runner: legacy.root ? "codex" : null, intent, repository,
     runtime: emptyRuntime(), diagnostics: [lifecycleDiagnostic("$.root", "root_resolution_failed", "the project root could not be resolved safely", "supply one real project directory")],
   });
-  if (legacy.status === "unsafe") return unavailable;
+  if (legacy.status === "unsafe") {
+    // A physical root may be sound while one selected runtime parent is a
+    // symlink.  Keep that distinction: the caller can safely diagnose the
+    // runtime write boundary without being told that the whole project root
+    // is unresolved.
+    if (legacy.root && legacy.diagnostics?.some((entry) => entry?.code === "unsafe_runtime_path")) {
+      return runtimeTargetReadOnlyResult({ root: legacy.root, intent, repository });
+    }
+    return unavailable;
+  }
   if (legacy.status === "fresh" || legacy.status === "fresh-host-managed") {
     return lifecycleResult({
       status: "portable-seed-required", root: legacy.root, intent, repository,
@@ -2956,9 +2988,6 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
     ...[
       NEUTRAL_CALIBRATION,
       NEUTRAL_MANIFEST,
-      ".claude/pipeline.json",
-      ".claude/pipeline.yaml",
-      ".claude/settings.json",
     ].map((path) => ({ path, bytes: baselines[path].bytes })),
     { path: SOURCE, bytes: renderYaml(intent) },
   ].sort((left, right) => left.path.localeCompare(right.path));

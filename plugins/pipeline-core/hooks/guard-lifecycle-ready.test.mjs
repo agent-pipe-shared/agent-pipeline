@@ -42,6 +42,7 @@ const SESSION_CAPABILITY_DIAGNOSE_SCRIPT = fileURLToPath(new URL("../scripts/ses
 const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
 const PO_PROFILE_REPAIR_SCRIPT = fileURLToPath(new URL("../scripts/po-gate-profile-repair.mjs", import.meta.url));
 const PROJECT_AUTHORITY_MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/project-authority-migration.mjs", import.meta.url));
+const RESUME_HINT_SCRIPT = fileURLToPath(new URL("../scripts/resume-hint.mjs", import.meta.url));
 const HUMAN_OVERRIDE_SCRIPT = fileURLToPath(new URL("../scripts/guard-human-override.mjs", import.meta.url));
 const PRIVATE_OVERLAY_SCRIPT = fileURLToPath(new URL("../scripts/codex-private-overlay-activation.mjs", import.meta.url));
 const PO_HUMAN_APPROVAL_SCRIPT = fileURLToPath(new URL("../scripts/po-human-approval.mjs", import.meta.url));
@@ -818,6 +819,33 @@ test("partial lifecycle admits only exact rebase abort plus ordinary readback", 
         projectDir: path,
         requireProjectOnboardingReadyFn() { deny("partial"); },
       }).exitCode, 2, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("restart-required admits only the consumed bounded resume-hint input and capture", () => {
+  const path = root();
+  const inputPath = join(path, "project", ".resume-hint-input.json");
+  const capture = `node '${RESUME_HINT_SCRIPT}' capture --root '${path}' --card-file '${inputPath}' --consume-card`;
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const input of [bash(capture), edit("project/.resume-hint-input.json"), write("project/.resume-hint-input.json")]) {
+      assert.equal(evaluateLifecycleReadyGuard(input, {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("restart-required"); },
+      }).exitCode, 0, input.tool_name);
+    }
+    for (const [input, status] of [
+      [bash(`${capture} --bypass`), "restart-required"],
+      [bash(`node '${RESUME_HINT_SCRIPT}' capture --root '${path}' --card-file '${inputPath}'`), "restart-required"],
+      [bash(`node '${RESUME_HINT_SCRIPT}' capture --root '${path}' --card-file '${join(path, "resume-card.json")}' --consume-card`), "restart-required"],
+      [edit("project/resume-hint.json"), "restart-required"],
+      [write("project/.resume-hint-input.json"), "partial"],
+    ]) {
+      assert.equal(evaluateLifecycleReadyGuard(input, {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny(status); },
+      }).exitCode, 2, `${status}/${input.tool_name}`);
     }
   } finally { rmSync(path, { recursive: true, force: true }); }
 });

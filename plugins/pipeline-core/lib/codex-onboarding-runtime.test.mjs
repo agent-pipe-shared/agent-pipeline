@@ -377,13 +377,24 @@ test("the launch wrapper preserves the interactive Codex process contract withou
 
     const externalEnv = { ...process.env };
     delete externalEnv.CODEX_THREAD_ID;
-    const invoke = (path, stored, spawn, env = externalEnv) => {
+    const invoke = (path, stored, spawn, env = externalEnv, cwd = path, rootArgument = ".") => {
       let stdout = "";
       const status = onboardingLaunchMain([
-        "--root", path, "--barrier-sha256", stored.rawSha256, "--activate",
-      ], { spawn, write: (chunk) => { stdout += chunk; }, env });
+        "--root", rootArgument, "--barrier-sha256", stored.rawSha256, "--activate",
+      ], { spawn, write: (chunk) => { stdout += chunk; }, env, cwd });
       return { status, stdout };
     };
+    let mismatchSpawned = false;
+    const mismatchedWorkspace = invoke(successPath, successBarrier, () => {
+      mismatchSpawned = true;
+      return { status: 0 };
+    }, externalEnv, failurePath, successPath);
+    assert.equal(mismatchedWorkspace.status, 2);
+    assert.deepEqual(JSON.parse(mismatchedWorkspace.stdout), {
+      schema: "pipeline.codex-onboarding-launch.v1", status: "workspace-root-mismatch",
+    });
+    assert.equal(mismatchSpawned, false);
+    assert.equal(nativeFs.existsSync(successBarrier.paths.tickets), false);
     const calls = [];
     const success = invoke(successPath, successBarrier, (childExecutable, argv, options) => {
       calls.push({ executable: childExecutable, argv, options });

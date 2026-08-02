@@ -4,6 +4,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { reconcileRunnerNativeContinuation } from "./continuity-state.mjs";
 import {
   approveSubmittedPlan,
   derivePlanLifecycle,
@@ -329,6 +330,53 @@ test("reopen invalidates exact authority and permits repeated edits before exact
   }).status, "approved");
   assert.notEqual(secondApproval.planApproval.submissionSha256, firstApproval.planApproval.submissionSha256);
   assert.equal(secondApproval.planRevocation, undefined);
+});
+
+test("resubmission clears a native continuation bound to the preceding authority", async () => {
+  const accepted = approved();
+  const implementation = enterPlanImplementation({
+    state: accepted,
+    expectedStateSha256: sha256CanonicalJson(accepted),
+  });
+  assert.equal(implementation.ok, true);
+  const activated = await reconcileRunnerNativeContinuation({
+    continuity: implementation.state.continuity,
+    activeFeature: implementation.state.activeFeature,
+    continuationId: "nova-replan",
+    runner: { runnerId: "codex", adapterVersion: "v2", capability: "available" },
+    event: { kind: "activate", atRevision: implementation.state.continuity.revision },
+    adapter: async () => ({
+      ok: true,
+      code: "CGH-ACTIVE",
+      status: "active",
+      readback: {
+        goalIdSha256: "f".repeat(64),
+        generation: 0,
+        observedAt: REOPENED,
+        status: "active",
+      },
+    }),
+  });
+  assert.equal(activated.ok, true, JSON.stringify(activated));
+  const running = { ...implementation.state, continuity: activated.next };
+  const reopened = reopenPlanDesign({
+    state: running,
+    expectedStateSha256: sha256CanonicalJson(running),
+    by: "PO",
+    at: REOPENED,
+  });
+  assert.equal(reopened.ok, true, JSON.stringify(reopened));
+  const resubmitted = submitPlan({
+    state: reopened.state,
+    expectedStateSha256: sha256CanonicalJson(reopened.state),
+    poGateAuthority: { ...AUTHORITY, planSha256: "a".repeat(64), specSha256: "b".repeat(64) },
+    profile: "feature",
+    profileSha256: PROFILE,
+    by: "Coordinator",
+    at: RESUBMITTED,
+  });
+  assert.equal(resubmitted.ok, true, JSON.stringify(resubmitted));
+  assert.equal(resubmitted.state.continuity.nativeContinuation, null);
 });
 
 test("restart/resume is deterministic and hostile or contradictory states fail closed", () => {

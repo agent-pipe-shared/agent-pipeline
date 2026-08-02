@@ -6,7 +6,7 @@ import test from "node:test";
 
 import {
   installedPipelineIdentity, installedPipelineVersion, observePipelineStartPreflight,
-  pipelineStartPreflightExitCode, SCHEMA,
+  normalBootstrapPayloadReceipt, pipelineStartPreflightExitCode, SCHEMA,
 } from "./pipeline-start-preflight.mjs";
 
 const manifest = JSON.stringify({ version: "0.4.5+test" });
@@ -44,7 +44,7 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
     cwd,
   });
   assert.deepEqual(Object.keys(result).sort(), [
-    "executionBoundary", "handoff", "installedSource", "installedVersion",
+    "bootstrapPayload", "executionBoundary", "handoff", "installedSource", "installedVersion",
     "nextAction", "pluginRoot", "schema", "status", "version",
   ]);
   assert.equal(result.schema, SCHEMA);
@@ -54,6 +54,13 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
   assert.equal(result.installedSource, "remote");
   assert.equal(result.executionBoundary, "default");
   assert.equal(result.handoff, "none");
+  assert.equal(result.bootstrapPayload.schema, "pipeline.bootstrap-payload-receipt.v1");
+  assert.equal(result.bootstrapPayload.mode, "normal");
+  assert.deepEqual(result.bootstrapPayload.retainedChecks, [
+    "lifecycle", "authority", "calibration", "handover", "verify", "continuation",
+  ]);
+  assert.equal(result.bootstrapPayload.originalMeasurement.withinBudget, true);
+  assert.match(result.bootstrapPayload.originalMeasurement.digestSha256, /^[a-f0-9]{64}$/u);
   assert.deepEqual(result.nextAction, {
     kind: "command",
     executable: "node",
@@ -72,6 +79,13 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
       schema: "pipeline.project-onboarding.v4",
     },
   });
+});
+
+test("normal bootstrap receipt retains exact envelope measurement and over-budget state", () => {
+  const receipt = normalBootstrapPayloadReceipt({ schema: "test", payload: "x".repeat(15_001) });
+  assert.equal(receipt.overBudget, true);
+  assert.equal(receipt.truncated, false);
+  assert.equal(receipt.originalMeasurement.withinBudget, false);
 });
 
 test("preflight selects one host-authorized capability boundary for WSL", () => {

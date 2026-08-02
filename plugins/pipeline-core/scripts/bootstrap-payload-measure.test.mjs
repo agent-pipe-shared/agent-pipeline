@@ -7,6 +7,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { measureBootstrapBytes } from "../lib/bootstrap-payload-budget.mjs";
 import { buildReceipt } from "./bootstrap-payload-measure.mjs";
+import { observePipelineStartPreflight } from "./pipeline-start-preflight.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const coreBytes = readFileSync(join(here, "..", "skills", "pipeline-start", "SKILL.md")).byteLength;
@@ -23,6 +24,30 @@ assert.equal(normalReceipt.schema, "pipeline.bootstrap-payload-receipt.v1");
 assert.equal(normalReceipt.segments.length, 2);
 assert.equal(normalReceipt.originalMeasurement.upperBoundUnits,
   normalReceipt.segments.reduce((sum, segment) => sum + segment.utf8Bytes, 0));
+
+const normalPreflight = observePipelineStartPreflight({
+  env: {},
+  cwd: "/tmp/normal-bootstrap-fixture",
+  read: () => JSON.stringify({ version: "0.4.5+test" }),
+  pluginList: () => JSON.stringify({
+    installed: [{
+      pluginId: "pipeline-core@agent-pipeline",
+      name: "pipeline-core",
+      marketplaceName: "agent-pipeline",
+      version: "0.4.5+test",
+      installed: true,
+      enabled: true,
+      source: { source: "local", path: "/cache/agent-pipeline/plugins/pipeline-core" },
+      marketplaceSource: { sourceType: "git", source: "https://example.invalid/agent-pipeline.git" },
+    }],
+  }),
+});
+assert.equal(normalPreflight.bootstrapPayload.schema, "pipeline.bootstrap-payload-receipt.v1");
+assert.equal(normalPreflight.bootstrapPayload.mode, "normal");
+assert.equal(normalPreflight.bootstrapPayload.originalMeasurement.withinBudget, true);
+assert.deepEqual(normalPreflight.bootstrapPayload.retainedChecks, [
+  "lifecycle", "authority", "calibration", "handover", "verify", "continuation",
+]);
 
 const temp = mkdtempSync("/tmp/bootstrap-envelope-");
 const envelopePath = join(temp, "envelope.json");

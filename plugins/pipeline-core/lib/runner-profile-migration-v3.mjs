@@ -261,7 +261,11 @@ function runtimeBaselines(root, deps, sourceKind, { initializeMissingRuntimeForS
       const seed = legacy
         ? LEGACY_V3_RUNTIME_SEEDS[relative]
         : initializeSlimV3 ? SLIM_V3_RUNTIME_SEEDS[relative]
-          : hostManagedCodex && relative.startsWith(".codex/") ? LEGACY_V3_RUNTIME_SEEDS[relative]
+          // A reserved Codex mount supplies `.codex` at runtime.  Missing
+          // Claude compatibility projections are renderer baselines only in
+          // this mode; they must not make a freshly project-seeded root
+          // invalid or become implicit portable output.
+          : hostManagedCodex ? LEGACY_V3_RUNTIME_SEEDS[relative]
             : undefined;
       if (typeof seed !== "string") throw new Error(`declared runtime baseline is missing: ${relative}`);
       baselines[relative] = { status: "present", bytes: seed };
@@ -525,7 +529,10 @@ export function planRunnerProfileMigrationV3({
     return result("invalid-authority-lock", [diagnostic("$.authorityLock", "invalid_authority_lock", "authority lock update is not one accepted core.lock.json", "supply one rendered core.lock.json from the authenticated authority update")], { root, sourceKind: classified.kind, targets: [], changes: [] });
   }
   const renderedSource = classified.kind === "v3" ? classified.source.bytes : renderYaml(classified.intent);
-  const internal = projection.targets.map((target) => ({
+  const projectedTargets = hostManagedCodex
+    ? projection.targets.filter((target) => !target.path.startsWith(".claude/"))
+    : projection.targets;
+  const internal = projectedTargets.map((target) => ({
     path: target.path,
     kind: "runtime",
     bytes: target.after.bytes,

@@ -77,7 +77,7 @@ export function boundedPayload(value, options = {}) {
 
 export function selectLazyReferences({ code, role = "elephant", ready = false } = {}) {
   if (ready || code === "PCR-READY") return [];
-  const refs = ["references/recovery.md"];
+  const refs = ["references/onboarding-recovery.md"];
   if (["critic", "goldfish"].includes(role)) refs.push("references/role-specific.md");
   if (code === "PCR-DECISION-PENDING" || code === "PCR-BLOCKED") refs.push("references/continuation.md");
   return refs;

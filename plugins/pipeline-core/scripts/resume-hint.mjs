@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
-import { readFileSync } from "node:fs";
+import { readFileSync, unlinkSync } from "node:fs";
 import { resolve } from "node:path";
 import { captureResumeHint, discardResumeHint, inspectResumeHint } from "../lib/resume-hint.mjs";
 
@@ -25,6 +25,14 @@ function main() {
   if (command === "discard") return discardResumeHint({ rootDir });
   const cardFile = value(args, "--card-file");
   if (!cardFile) throw new Error("capture requires --card-file");
-  return captureResumeHint({ rootDir, context: contextCard(cardFile), basis: observedBasis });
+  const consumeCard = args.includes("--consume-card");
+  try {
+    return captureResumeHint({ rootDir, context: contextCard(cardFile), basis: observedBasis });
+  } finally {
+    if (consumeCard) {
+      try { unlinkSync(resolve(cardFile)); }
+      catch (error) { if (error?.code !== "ENOENT") throw error; }
+    }
+  }
 }
 try { process.stdout.write(`${JSON.stringify(main())}\n`); } catch (error) { process.stderr.write(`${error.message}\n`); process.exitCode = 2; }

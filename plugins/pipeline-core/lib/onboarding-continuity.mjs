@@ -465,6 +465,34 @@ function observeDetailed({
 
     stateObservation = observeOptionalProjectFile(root, selectedPaths.state, "Pipeline machine state");
     handoverObservation = observeOptionalProjectFile(root, handoverPath, "configured handover");
+    // Fresh host-managed projects intentionally seed only project authority.
+    // Before runtime activation there is no `.claude` private-state parent
+    // from which to observe a history, but absent State and handover already
+    // prove the only safe classification: pristine and awaiting kickoff.
+    // Do not generalize this to an existing or malformed private directory.
+    if (repositoryCapability === "host-managed"
+      && stateObservation.status === "absent"
+      && handoverObservation.status === "absent"
+      && !existsSync(join(root, ".claude"))) {
+      return {
+        continuity: {
+          status: "absent-pristine",
+          stateSha256: stateObservation.sha256,
+          handoverSha256: handoverObservation.sha256,
+          historySha256: null,
+        },
+        root,
+        repositoryCapability,
+        calibration,
+        calibrationSha256: calibrationObservation.sha256,
+        handoverPath,
+        stateObservation,
+        handoverObservation,
+        historyObservation: { status: "absent", sha256: null },
+        history: null,
+        privatePaths: null,
+      };
+    }
     const privatePaths = resolvePrivate(root, repositoryCapability, { spawn });
     if (existsSync(privatePaths.directory) && (lstatSync(privatePaths.directory).mode & 0o777) !== 0o700) {
       fail("KICKOFF-PRIVATE-UNAVAILABLE", "private onboarding state directory is not mode 0700");

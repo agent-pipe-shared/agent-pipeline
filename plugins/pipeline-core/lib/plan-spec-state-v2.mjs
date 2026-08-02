@@ -449,6 +449,7 @@ export function submitPlan({
         spec: { path: poGateAuthority.specPath, sha256: poGateAuthority.specSha256 },
         result: null,
       },
+      nativeContinuation: null,
       resume: {
         mode: "immediate",
         sourceRevision: continuity.revision + 1,

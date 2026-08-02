@@ -191,6 +191,11 @@ function initializeRestartRequiredRoot(path, deps = fakeDeps) {
   return readRestartBarrier({ rootDir: path, spawn: fakeGit });
 }
 
+function initializeRuntimeProjectionRoot(path, deps = fakeDeps) {
+  const barrier = initializeRestartRequiredRoot(path, deps);
+  clearRuntimeBarrier(path, barrier);
+}
+
 function clearRuntimeBarrier(path, barrier) {
   const issued = issueLaunchTicket({
     rootDir: path,
@@ -1481,8 +1486,7 @@ test("blank real root inspect and plan are read-only", () => {
     assert.equal(plan.status, "ready");
     assert.deepEqual(names(path), []);
     assert.deepEqual(plan.targets.map((target) => target.path), [
-      ".claude/pipeline.json", ".claude/pipeline.yaml", ".claude/settings.json", "pipeline.user.yaml",
-      "project/pipeline.json", "project/pipeline.yaml",
+      "pipeline.user.yaml", "project/pipeline.json", "project/pipeline.yaml",
     ]);
   } finally { dispose(path); }
 });
@@ -1533,7 +1537,8 @@ test("a git-only Codex control mount carries host-managed state through the rest
     assert.equal(applyProjectOnboardingLifecycleV4({ rootDir: path, operation: "portable", planSha256: portableDigest, activate: true, deps: runtimeDeps }).status, "runtime-initialization-required");
     const runtime = planProjectOnboardingLifecycleV4({ rootDir: path, operation: "runtime", deps: runtimeDeps });
     const runtimeDigest = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
-    assert.equal(applyProjectOnboardingLifecycleV4({ rootDir: path, operation: "runtime", planSha256: runtimeDigest, activate: true, deps: runtimeDeps }).status, "restart-required");
+    const initialized = applyProjectOnboardingLifecycleV4({ rootDir: path, operation: "runtime", planSha256: runtimeDigest, activate: true, deps: runtimeDeps });
+    assert.equal(initialized.status, "restart-required", JSON.stringify(initialized));
     assert.equal(readRestartBarrier({ rootDir: path, repositoryCapability: "host-managed" }).status, "present");
   } finally {
     try { chmodSync(join(path, ".git"), 0o700); } catch {}
@@ -1884,7 +1889,7 @@ test("a symlinked runtime target parent fails closed without touching its destin
     const projectBefore = treeSnapshot(path);
     const outsideBefore = treeSnapshot(outside);
     const observed = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
-    assert.equal(observed.status, "runtime-target-read-only");
+    assert.equal(observed.status, "runtime-target-read-only", JSON.stringify(observed));
     assertDiagnostic(observed, "runtime_target_read_only");
     assert.equal(observed.nextAction, null);
     assert.deepEqual(treeSnapshot(path), projectBefore);
@@ -1950,7 +1955,7 @@ test("portable and runtime apply replays are zero-write with identical canonical
         argv: [
           ONBOARDING_LAUNCH_SCRIPT,
           "--root",
-          runtimeRoot,
+          ".",
           "--barrier-sha256",
           runtimeApplied.runtime.barrierSha256,
           "--activate",
@@ -1964,7 +1969,7 @@ test("portable and runtime apply replays are zero-write with identical canonical
       requiresConfirmation: true,
       expectedStatuses: runtimeApplied.nextAction.expectedStatuses,
     };
-    assert.match(assertSingleLineAction(runtimeApplied.nextAction, expectedRestart), /'[^']*with spaces[^']*'/u);
+    assertSingleLineAction(runtimeApplied.nextAction, expectedRestart);
     const runtimeBytes = treeSnapshot(runtimeRoot);
     const runtimeReplayed = applyProjectOnboardingLifecycleV4({
       rootDir: runtimeRoot,
@@ -2652,10 +2657,16 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
   const path = root();
   try {
     const plan = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    assert.deepEqual(
+      plan.targets.map((target) => target.path),
+      ["pipeline.user.yaml", "project/pipeline.json", "project/pipeline.yaml"],
+      "fresh onboarding seeds only the canonical project authority; runtime targets are initialized later",
+    );
     assert.equal(applyProjectOnboardingV3(plan, { rootDir: path, activate: false, deps: fakeDeps }).status, "activation-required");
     const applied = applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: fakeDeps });
     assert.equal(applied.status, "applied");
     assert.equal(existsSync(join(path, ".git")), true);
+    assert.equal(existsSync(join(path, ".claude")), false, "portable seed must not create legacy Claude authority files");
     assert.equal(existsSync(join(path, ".codex")), false);
     assert.equal(inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps }).status, "runtime-initialization-required");
     const runtimePlan = planProjectOnboardingLifecycleV4({ rootDir: path, deps: fakeDeps, operation: "runtime" });
@@ -2682,7 +2693,7 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
     assert.equal(source.autonomy.push_policy, "gated");
     assert.equal(source.autonomy.branch_model, "feature-branch");
     assert.equal(source.gates.security, "warn");
-    const calibration = JSON.parse(readFileSync(join(path, ".claude/pipeline.json"), "utf8"));
+    const calibration = JSON.parse(readFileSync(join(path, "project/pipeline.json"), "utf8"));
     assert.equal(calibration.verify, "git diff --check");
     assert.equal(calibration.repositoryMode, "local-only");
     assert.equal(existsSync(join(path, "docs/state.md")), false, "handover stays a project decision; normal bootstrap deliberately remains F4 until it exists");
@@ -2780,8 +2791,7 @@ test("a recognized read-only host control layout receives portable onboarding wi
     assert.equal(planned.git.mode, "host-managed");
     assert.equal(planned.git.initializesGit, false);
     assert.deepEqual(planned.targets.map((target) => target.path), [
-      ".claude/pipeline.json", ".claude/pipeline.yaml", ".claude/settings.json", "pipeline.user.yaml",
-      "project/pipeline.json", "project/pipeline.yaml",
+      "pipeline.user.yaml", "project/pipeline.json", "project/pipeline.yaml",
     ]);
     const applied = applyProjectOnboardingV3(planned, { rootDir: path, activate: true, deps: fakeDeps });
     assert.equal(applied.status, "applied");
@@ -3033,15 +3043,14 @@ test("an invalid generated manifest is never accepted as a current fresh authori
     ]);
     const disposition = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
     assert.equal(disposition.status, "unrepairable");
-    assertDiagnostic(disposition, "manifest_existing_target_requires_owner_repair");
+    assertDiagnostic(disposition, "canonical_manifest_requires_owner_repair");
   } finally { dispose(path); }
 });
 
 test("manifest-only repair is source/preimage/plan bound, confirmed, and read back", () => {
   const path = root();
   try {
-    const seed = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
-    assert.equal(applyProjectOnboardingV3(seed, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+    initializeRuntimeProjectionRoot(path);
     const manifestPath = join(path, ".claude", "pipeline.yaml");
     unlinkSync(manifestPath);
     const invalid = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
@@ -3090,7 +3099,7 @@ test("manifest-only repair is source/preimage/plan bound, confirmed, and read ba
       activate: true,
       deps: fakeDeps,
     });
-    assert.equal(repaired.status, "runtime-initialization-required");
+    assert.equal(repaired.status, "kickoff-required");
     assert.equal(readFileSync(manifestPath, "utf8").includes("human_facing: en"), true);
   } finally { dispose(path); }
 });
@@ -3098,8 +3107,7 @@ test("manifest-only repair is source/preimage/plan bound, confirmed, and read ba
 test("manifest repair never claims ready when post-publication durability is unavailable", () => {
   const path = root();
   try {
-    const seed = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
-    assert.equal(applyProjectOnboardingV3(seed, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+    initializeRuntimeProjectionRoot(path);
     unlinkSync(join(path, ".claude", "pipeline.yaml"));
     const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
     const result = applyProjectOnboardingManifestRepairV4({
@@ -3120,8 +3128,7 @@ test("manifest repair never claims ready when post-publication durability is una
 test("manifest repair rejects non-UTF-8 unowned bytes without rewriting them", () => {
   const path = root();
   try {
-    const seed = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
-    assert.equal(applyProjectOnboardingV3(seed, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+    initializeRuntimeProjectionRoot(path);
     const manifestPath = join(path, ".claude", "pipeline.yaml");
     const original = Buffer.concat([
       readFileSync(manifestPath),
@@ -3140,8 +3147,7 @@ test("manifest repair rejects non-UTF-8 unowned bytes without rewriting them", (
 test("manifest repair rejects source drift before publication and leaves the manifest absent", () => {
   const path = root();
   try {
-    const seed = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
-    assert.equal(applyProjectOnboardingV3(seed, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+    initializeRuntimeProjectionRoot(path);
     const manifestPath = join(path, ".claude", "pipeline.yaml");
     const sourcePath = join(path, "pipeline.user.yaml");
     unlinkSync(manifestPath);
@@ -3173,8 +3179,7 @@ test("manifest repair stays inside its pinned parent when the pathname becomes a
   const path = root();
   const outside = root();
   try {
-    const seed = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
-    assert.equal(applyProjectOnboardingV3(seed, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+    initializeRuntimeProjectionRoot(path);
     const parent = join(path, ".claude");
     const displaced = join(path, ".claude-displaced");
     unlinkSync(join(parent, "pipeline.yaml"));
@@ -3208,8 +3213,7 @@ test("manifest repair stays inside its pinned parent when the pathname becomes a
 test("manifest repair quarantines a publication-boundary source race", () => {
   const path = root();
   try {
-    const seed = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
-    assert.equal(applyProjectOnboardingV3(seed, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+    initializeRuntimeProjectionRoot(path);
     const manifestPath = join(path, ".claude", "pipeline.yaml");
     const sourcePath = join(path, "pipeline.user.yaml");
     unlinkSync(manifestPath);
@@ -3240,8 +3244,7 @@ test("manifest repair quarantines a publication-boundary source race", () => {
 test("manifest repair retains its publication binding through final durability readback", () => {
   const path = root();
   try {
-    const seed = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
-    assert.equal(applyProjectOnboardingV3(seed, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+    initializeRuntimeProjectionRoot(path);
     const manifestPath = join(path, ".claude", "pipeline.yaml");
     const sourcePath = join(path, "pipeline.user.yaml");
     unlinkSync(manifestPath);
@@ -3271,8 +3274,7 @@ test("manifest repair retains its publication binding through final durability r
 test("manifest repair atomically preserves a target that appears at publication", () => {
   const path = root();
   try {
-    const seed = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
-    assert.equal(applyProjectOnboardingV3(seed, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+    initializeRuntimeProjectionRoot(path);
     const manifestPath = join(path, ".claude", "pipeline.yaml");
     unlinkSync(manifestPath);
     const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
@@ -3301,8 +3303,7 @@ test("manifest repair atomically preserves a target that appears at publication"
 test("manifest repair never quarantines a foreign post-publication target", () => {
   const path = root();
   try {
-    const seed = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
-    assert.equal(applyProjectOnboardingV3(seed, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+    initializeRuntimeProjectionRoot(path);
     const manifestPath = join(path, ".claude", "pipeline.yaml");
     unlinkSync(manifestPath);
     const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
@@ -3806,6 +3807,9 @@ test("reinstall quarantines only current V3 authority and leaves legacy calibrat
     const realDeps = { ...fakeDeps, spawnSync };
     const portable = planProjectOnboardingV3({ rootDir: path, deps: realDeps });
     assert.equal(applyProjectOnboardingV3(portable, { rootDir: path, activate: true, deps: realDeps }).status, "applied");
+    const runtime = planProjectOnboardingLifecycleV4({ rootDir: path, deps: realDeps, operation: "runtime" });
+    const runtimeDigest = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
+    assert.equal(applyProjectOnboardingLifecycleV4({ rootDir: path, deps: realDeps, operation: "runtime", planSha256: runtimeDigest, activate: true }).status, "restart-required");
     const legacy = readFileSync(join(path, ".claude", "pipeline.json"), "utf8");
     const plan = planProjectOnboardingReinstall({ rootDir: path, deps: realDeps });
     assert.equal(plan.status, "ready", JSON.stringify(plan));
