@@ -2,7 +2,7 @@
 /** Pure validation and authority resolution for PHX-2 human decisions. */
 import { canonicalSha256 } from "./governance-event.mjs";
 import { appendPortableGovernanceEvent, queryPortableGovernanceStream } from "./governance-event-store.mjs";
-import { HumanGovernanceLedgerError, validateHumanGovernanceDecision } from "./human-governance-decision.mjs";
+import { HumanGovernanceLedgerError, createConsumedHumanGovernanceDecision, validateHumanGovernanceDecision } from "./human-governance-decision.mjs";
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const SHA256 = /^[a-f0-9]{64}$/u;
@@ -10,7 +10,7 @@ const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 function record(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
 function exact(value, keys) { return record(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key)); }
 
-export { HumanGovernanceLedgerError, validateHumanGovernanceDecision };
+export { HumanGovernanceLedgerError, createConsumedHumanGovernanceDecision, validateHumanGovernanceDecision };
 
 /** Returns an immutable authority result; any ambiguity or stale binding fails closed. */
 export function resolveHumanGovernanceAuthority({ decisions, decisionId, repositoryFingerprint, candidate, nowEpochMs = Date.now() } = {}) {

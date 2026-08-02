@@ -39,3 +39,36 @@ export function validateHumanGovernanceDecision(decision) {
   if (linkKeys.filter((key) => links[key] !== null).length !== (requiredLink === null ? 0 : 1) || (requiredLink !== null && links[requiredLink] === null)) fail("HGL-LIFECYCLE");
   return Object.freeze({ ...decision, scope: Object.freeze({ ...scope, candidate: Object.freeze({ ...scope.candidate }), artifacts: Object.freeze(scope.artifacts.map((entry) => Object.freeze({ ...entry }))) }), validity: Object.freeze({ ...validity }), links: Object.freeze({ ...links }) });
 }
+
+/**
+ * Derives the immutable consumption disposition for one previously granted
+ * decision. Writers append this record before projecting a one-shot authority
+ * into mutable State; they never mark the grant itself as consumed in place.
+ */
+export function createConsumedHumanGovernanceDecision({ grant, decisionId, observedAtEpochMs } = {}) {
+  const source = validateHumanGovernanceDecision(grant);
+  if (source.event !== "granted" || source.outcome !== "granted" || decisionId === source.decisionId
+    || !Number.isSafeInteger(observedAtEpochMs) || observedAtEpochMs < source.validity.notBeforeEpochMs
+    || observedAtEpochMs > source.validity.expiresAtEpochMs) fail("HGL-CONSUME-REQUEST");
+  return validateHumanGovernanceDecision({
+    decisionId,
+    event: "consumed",
+    outcome: "consumed",
+    authorityClass: source.authorityClass,
+    identityAssurance: source.identityAssurance,
+    timeAssurance: "locally-observed",
+    scope: source.scope,
+    reasonCode: "AUTHORITY.CONSUMED",
+    policyDigest: source.policyDigest,
+    ruleDigest: source.ruleDigest,
+    validity: source.validity,
+    links: {
+      requestDecisionId: null,
+      consumesDecisionId: source.decisionId,
+      revokesDecisionId: null,
+      expiresDecisionId: null,
+      supersedesDecisionId: null,
+      correctsDecisionId: null,
+    },
+  });
+}

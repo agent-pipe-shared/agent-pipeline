@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import test from "node:test";
-import { HumanGovernanceLedgerError, resolveHumanGovernanceAuthority, validateHumanGovernanceDecision } from "./human-governance-ledger.mjs";
+import { HumanGovernanceLedgerError, createConsumedHumanGovernanceDecision, resolveHumanGovernanceAuthority, validateHumanGovernanceDecision } from "./human-governance-ledger.mjs";
 
 const sha = "a".repeat(64);
 const candidate = { commit: "b".repeat(40), tree: "c".repeat(40) };
@@ -19,6 +19,18 @@ test("fails closed for repository/candidate drift, expiry, and consuming disposi
   assert.equal(resolveHumanGovernanceAuthority({ decisions: [decision()], decisionId: "decision-1", repositoryFingerprint: sha, candidate, nowEpochMs: 101 }).reason, "expired");
   const consumed = decision({ decisionId: "consume-1", event: "consumed", outcome: "consumed", links: { requestDecisionId: null, consumesDecisionId: "decision-1", revokesDecisionId: null, expiresDecisionId: null, supersedesDecisionId: null, correctsDecisionId: null } });
   assert.equal(resolveHumanGovernanceAuthority({ decisions: [decision(), consumed], decisionId: "decision-1", repositoryFingerprint: sha, candidate, nowEpochMs: 50 }).reason, "disposed");
+});
+
+test("derives an append-only consumption disposition without rewriting the grant", () => {
+  const grant = decision();
+  const consumed = createConsumedHumanGovernanceDecision({ grant, decisionId: "consume-1", observedAtEpochMs: 50 });
+  assert.equal(consumed.event, "consumed");
+  assert.equal(consumed.reasonCode, "AUTHORITY.CONSUMED");
+  assert.equal(consumed.links.consumesDecisionId, grant.decisionId);
+  assert.equal(grant.event, "granted");
+  assert.equal(resolveHumanGovernanceAuthority({ decisions: [grant, consumed], decisionId: grant.decisionId, repositoryFingerprint: sha, candidate, nowEpochMs: 50 }).reason, "disposed");
+  assert.throws(() => createConsumedHumanGovernanceDecision({ grant, decisionId: grant.decisionId, observedAtEpochMs: 50 }), (error) => error.code === "HGL-CONSUME-REQUEST");
+  assert.throws(() => createConsumedHumanGovernanceDecision({ grant, decisionId: "consume-expired", observedAtEpochMs: 101 }), (error) => error.code === "HGL-CONSUME-REQUEST");
 });
 
 test("rejects open payloads and invalid lifecycle link cardinality", () => {
