@@ -27,6 +27,12 @@ export function resolveHumanGovernanceAuthority({ decisions, decisionId, reposit
   return Object.freeze({ status: "granted", decisionId, decisionDigest: canonicalSha256(decision), singleUse: decision.validity.singleUse, scope: decision.scope });
 }
 
+/**
+ * Cyborg integration point: its verified-human-attestation adapter belongs
+ * immediately before this admission boundary. A future schema revision may
+ * materialize only the permitted assurance evidence here; this ledger must
+ * never promote an unverified caller claim to a verified human authority.
+ */
 /** Append one already validated human decision through the canonical portable writer. */
 export async function appendHumanGovernanceDecision({ repositoryRoot, repositoryFingerprint, intent } = {}) {
   if (!record(intent) || intent.origin !== "human" || intent.streamId !== "human" || intent.authorityClass !== "human-authority" || intent.payloadSchema !== "pipeline.human-governance-decision.v1") fail("HGL-APPEND-INTENT");

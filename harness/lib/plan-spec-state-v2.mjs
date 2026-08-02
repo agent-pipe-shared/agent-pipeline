@@ -261,6 +261,9 @@ export function bindPlanSpecApproval({
 /**
  * Ledger-first v3 plan-approval transition. The mutable projection preserves
  * the exact authority reference, while a reader independently resolves it.
+ * Cyborg integration point: the caller must supply a reference that was bound
+ * to Cyborg's verified-human-attestation receipt at the admission boundary;
+ * this pure state transition must not attempt identity verification itself.
  */
 export function bindPlanSpecApprovalWithHumanDecision({
   state,
