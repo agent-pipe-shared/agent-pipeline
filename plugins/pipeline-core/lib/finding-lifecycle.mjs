@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Candidate- and component-bound canonical security finding lifecycle. */
 import { createHash } from "node:crypto";
+import { securityAuthorityScopeSha256, verifySecurityAuthority } from "./security-authority-proof.mjs";
 
 export const FINDING_LIFECYCLE_SCHEMA = "pipeline.finding-record.v1";
 export const RECORD_TYPES = Object.freeze(["raw-observation", "normalized-finding", "triage", "vex", "waiver", "remediation", "approval"]);
@@ -29,6 +30,19 @@ const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const validDigest = (value) => typeof value === "string" && SHA256.test(value);
 const required = (value) => typeof value === "string" && value.length > 0;
 
+function verifiedAuthority({ authority, authorityContext, action, candidateSha256, policySha256, scope } = {}) {
+  if (!authorityContext || typeof authorityContext !== "object") return false;
+  return verifySecurityAuthority({
+    ...authorityContext,
+    authority,
+    featureId: "cyb-8",
+    action,
+    candidateSha256,
+    policySha256,
+    scopeSha256: securityAuthorityScopeSha256(scope),
+  }).verified;
+}
+
 /** Stable finding identity intentionally excludes scanner version and finding id. */
 export function normalizeFinding({ component, vulnerability, location, candidateSha256 } = {}) {
   if (![component, vulnerability, location, candidateSha256].every(required)) return Object.freeze({ schema: FINDING_LIFECYCLE_SCHEMA, status: "invalid" });
@@ -43,33 +57,36 @@ export function createRawObservation({ scanner, payloadSha256, observedAt } = {}
 }
 
 /** Every state transition is typed, timestamped, scoped and authority-bound. */
-export function transitionFinding({ finding, to, authority, reason, at, candidateSha256, policySha256 } = {}) {
-  if (!finding || !TRANSITIONS[finding.state]?.includes(to) || !required(authority) || !required(reason) || !required(at)
+export function transitionFinding({ finding, to, authority, authorityContext, reason, at, candidateSha256, policySha256 } = {}) {
+  if (!finding || !TRANSITIONS[finding.state]?.includes(to) || !authority || !required(reason) || !required(at)
     || !validDigest(candidateSha256) || !validDigest(policySha256)) {
     return Object.freeze({ schema: FINDING_LIFECYCLE_SCHEMA, accepted: false, code: "FINDING-TRANSITION-INVALID" });
   }
-  if (TERMINAL_DISPOSITIONS.has(to) && !["human", "policy"].includes(authority)) return Object.freeze({ schema: FINDING_LIFECYCLE_SCHEMA, accepted: false, code: "FINDING-DISPOSITION-AUTHORITY-DENIED" });
+  if (TERMINAL_DISPOSITIONS.has(to) && !verifiedAuthority({ authority, authorityContext, action: to, candidateSha256, policySha256, scope: { findingId: finding.id, to, reason, at } })) return Object.freeze({ schema: FINDING_LIFECYCLE_SCHEMA, accepted: false, code: "FINDING-DISPOSITION-AUTHORITY-DENIED" });
   return Object.freeze({ schema: FINDING_LIFECYCLE_SCHEMA, accepted: true, code: "FINDING-TRANSITION-RECORDED", record: { type: "triage", findingId: finding.id, from: finding.state, to, authority, reason, at, candidateSha256, policySha256 } });
 }
 
 /** VEX is positive, explicit evidence bound to exact component/SBOM/product identities. */
-export function createVexRecord({ findingId, componentPurl, sbomSha256, productVersion, candidateSha256, disposition, authority } = {}) {
-  if (![findingId, componentPurl, productVersion, candidateSha256, disposition, authority].every(required)
-    || !validDigest(sbomSha256) || !["not-affected", "affected", "fixed"].includes(disposition)) {
+export function createVexRecord({ findingId, componentPurl, sbomSha256, productVersion, candidateSha256, policySha256, disposition, authority, authorityContext } = {}) {
+  if (![findingId, componentPurl, productVersion, candidateSha256, disposition].every(required) || !authority
+    || !validDigest(sbomSha256) || !validDigest(policySha256) || !["not-affected", "affected", "fixed"].includes(disposition)
+    || !verifiedAuthority({ authority, authorityContext, action: `vex-${disposition}`, candidateSha256, policySha256, scope: { findingId, componentPurl, sbomSha256, productVersion, disposition } })) {
     return Object.freeze({ schema: FINDING_LIFECYCLE_SCHEMA, accepted: false, code: "VEX-BINDING-INVALID" });
   }
   return Object.freeze({ schema: FINDING_LIFECYCLE_SCHEMA, accepted: true, record: { type: "vex", findingId, componentPurl, sbomSha256, productVersion, candidateSha256, disposition, authority } });
 }
 
 /** Waivers are time-bounded and stale as soon as their scope/policy drift. */
-export function validateWaiver({ waiver, at, candidateSha256, policySha256 } = {}) {
-  const valid = waiver && required(waiver.authority) && required(waiver.reason) && Array.isArray(waiver.compensatingControls)
+export function validateWaiver({ waiver, authorityContext, at, candidateSha256, policySha256 } = {}) {
+  const valid = waiver && waiver.authority && required(waiver.reason) && Array.isArray(waiver.compensatingControls)
     && waiver.compensatingControls.length > 0 && required(waiver.expiresAt) && validDigest(waiver.candidateSha256)
     && validDigest(waiver.policySha256);
   if (!valid) return Object.freeze({ schema: FINDING_LIFECYCLE_SCHEMA, status: "invalid", code: "WAIVER-INVALID" });
   const expired = waiver.expiresAt <= at;
   const drifted = waiver.candidateSha256 !== candidateSha256 || waiver.policySha256 !== policySha256;
-  return Object.freeze({ schema: FINDING_LIFECYCLE_SCHEMA, status: expired || drifted ? "stale" : "current", code: expired ? "WAIVER-EXPIRED" : drifted ? "WAIVER-DRIFTED" : "WAIVER-CURRENT" });
+  if (expired || drifted) return Object.freeze({ schema: FINDING_LIFECYCLE_SCHEMA, status: "stale", code: expired ? "WAIVER-EXPIRED" : "WAIVER-DRIFTED" });
+  if (!verifiedAuthority({ authority: waiver.authority, authorityContext, action: "waive-finding", candidateSha256, policySha256, scope: { reason: waiver.reason, compensatingControls: waiver.compensatingControls, expiresAt: waiver.expiresAt, candidateSha256: waiver.candidateSha256, policySha256: waiver.policySha256 } })) return Object.freeze({ schema: FINDING_LIFECYCLE_SCHEMA, status: "invalid", code: "WAIVER-AUTHORITY-DENIED" });
+  return Object.freeze({ schema: FINDING_LIFECYCLE_SCHEMA, status: "current", code: "WAIVER-CURRENT" });
 }
 
 /** A closure needs patch, original trigger replay, regression and independent confirmation. */

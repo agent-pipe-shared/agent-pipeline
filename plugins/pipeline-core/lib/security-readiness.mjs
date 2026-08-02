@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Product-security readiness is a typed release contract, never a template claim. */
+import { securityAuthorityScopeSha256, verifySecurityAuthority } from "./security-authority-proof.mjs";
 export const SECURITY_READINESS_SCHEMA = "pipeline.security-readiness.v1";
 export const READINESS_ARTIFACTS = Object.freeze({
   "public-package": ["public-disclosure", "support-policy", "response-process", "incident-runbook", "release-evidence"],
@@ -7,14 +8,26 @@ export const READINESS_ARTIFACTS = Object.freeze({
   "documentation-only": [],
 });
 const SHA256 = /^[0-9a-f]{64}$/u;
-const humanOrPolicy = (authority) => ["human", "policy"].includes(authority);
 const validDigest = (value) => typeof value === "string" && SHA256.test(value);
 const required = (value) => typeof value === "string" && value.length > 0;
 
+function verifiedAuthority({ authority, authorityContext, action, candidateSha256, policySha256, scope } = {}) {
+  if (!authorityContext || typeof authorityContext !== "object") return false;
+  return verifySecurityAuthority({
+    ...authorityContext,
+    authority,
+    featureId: "cyb-9",
+    action,
+    candidateSha256,
+    policySha256,
+    scopeSha256: securityAuthorityScopeSha256(scope),
+  }).verified;
+}
+
 /** Unknown product type is incomplete, never an unrecorded exemption. */
-export function evaluateReadinessApplicability({ productType, notApplicableReceipt } = {}) {
+export function evaluateReadinessApplicability({ productType, notApplicableReceipt, authorityContext, candidateSha256, policySha256 } = {}) {
   if (!Object.hasOwn(READINESS_ARTIFACTS, productType)) return Object.freeze({ schema: SECURITY_READINESS_SCHEMA, status: "incomplete", code: "READINESS-PRODUCT-CLASS-UNKNOWN", requiredArtifacts: [] });
-  if (productType === "documentation-only" && (!notApplicableReceipt || !humanOrPolicy(notApplicableReceipt.authority))) return Object.freeze({ schema: SECURITY_READINESS_SCHEMA, status: "incomplete", code: "READINESS-NOT-APPLICABLE-UNAUTHORIZED", requiredArtifacts: [] });
+  if (productType === "documentation-only" && (!validDigest(candidateSha256) || !validDigest(policySha256) || !verifiedAuthority({ authority: notApplicableReceipt, authorityContext, action: "declare-not-applicable", candidateSha256, policySha256, scope: { productType } }))) return Object.freeze({ schema: SECURITY_READINESS_SCHEMA, status: "incomplete", code: "READINESS-NOT-APPLICABLE-UNAUTHORIZED", requiredArtifacts: [] });
   return Object.freeze({ schema: SECURITY_READINESS_SCHEMA, status: productType === "documentation-only" ? "not-applicable" : "required", code: productType === "documentation-only" ? "READINESS-NOT-APPLICABLE" : "READINESS-ARTIFACTS-REQUIRED", requiredArtifacts: READINESS_ARTIFACTS[productType] });
 }
 
@@ -50,9 +63,9 @@ export function validateIncidentRunbook({ steps = [], capabilities = [] } = {}) 
 }
 
 /** Agents cannot publish, accept risk, close incidents, or authorize production change. */
-export function authorizeSecurityAction({ action, authority } = {}) {
+export function authorizeSecurityAction({ action, authority, authorityContext, candidateSha256, policySha256 } = {}) {
   const protectedAction = ["publish-advisory", "accept-risk", "close-incident", "authorize-production-change"].includes(action);
-  const allowed = !protectedAction || humanOrPolicy(authority);
+  const allowed = !protectedAction || (validDigest(candidateSha256) && validDigest(policySha256) && verifiedAuthority({ authority, authorityContext, action, candidateSha256, policySha256, scope: { action } }));
   return Object.freeze({ schema: SECURITY_READINESS_SCHEMA, allowed, code: allowed ? "READINESS-ACTION-AUTHORIZED" : "READINESS-ACTION-HUMAN-OR-POLICY-REQUIRED" });
 }
 
