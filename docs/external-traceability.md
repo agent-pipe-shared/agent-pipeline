@@ -35,3 +35,14 @@ publication mode, or freshness state. In particular, a `reviews` or
 `evidences` link cannot satisfy a Critic result, approve a plan, or authorize a
 release; a `releases` link is only a traceability observation unless a separate
 candidate-bound release authority says otherwise.
+
+## Reconciliation observation
+
+`reconcileExternalReference` performs a read-only adapter inspection for the
+bound object ID. A matching fresh revision returns `current`; changed revision,
+deleted/moved/stale/inaccessible state, or malformed inspection returns a typed
+`reconciliation-required` result. The result carries only the same sanitized
+reference metadata and never imports external status as a Pipeline transition,
+approval, Critic result, or release authority. Persisting operational
+reconciliation queues, if configured later, remains a separate non-authority
+cache rather than a second canonical record.

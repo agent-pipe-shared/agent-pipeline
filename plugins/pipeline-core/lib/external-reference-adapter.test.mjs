@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import test from "node:test";
-import { applyExternalReferenceWrite, planExternalReferenceWrite, validateExternalReference } from "./external-reference-adapter.mjs";
+import { applyExternalReferenceWrite, planExternalReferenceWrite, reconcileExternalReference, validateExternalReference } from "./external-reference-adapter.mjs";
 import { canonicalSha256 } from "./governance-event.mjs";
 
 const reference = () => ({ schema: "pipeline.external-reference.v1", systemClass: "issue-tracker", adapterProfile: "synthetic-issues", objectId: "issue-42", relation: "relates-to", authorityDirection: "pipeline-to-external", pipelineArtifact: { path: "specs/feature/result.md", sha256: "a".repeat(64) }, externalRevision: "rev-1", mode: "controlled-publication", freshness: { state: "fresh", observedAtEpochMs: 1 }, ownership: "pipeline-owned" });
@@ -23,4 +23,9 @@ test("rejects unclosed references and blocks non-pipeline-owned writes", async (
 test("preserves the closed normative relation taxonomy and rejects unknown relation semantics", () => {
   for (const relation of ["tracks", "specifies", "implements", "documents", "mirrors", "reviews", "evidences", "releases", "supersedes"]) assert.equal(validateExternalReference({ ...reference(), relation }).relation, relation);
   assert.throws(() => validateExternalReference({ ...reference(), relation: "looks-complete" }), (error) => error.code === "ERA-REFERENCE");
+});
+test("reconciles external observations without importing them as authority", async () => {
+  const current = await reconcileExternalReference({ reference: reference(), capabilities, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }) }); assert.equal(current.status, "current"); assert.equal(current.reference.authorityDirection, "pipeline-to-external");
+  const moved = await reconcileExternalReference({ reference: reference(), capabilities, inspect: async () => ({ objectId: "issue-42", revision: "rev-2", state: "moved" }) }); assert.equal(moved.status, "reconciliation-required"); assert.equal(moved.reason, "freshness"); assert.equal(moved.reference.externalRevision, "rev-2");
+  const malformed = await reconcileExternalReference({ reference: reference(), capabilities, inspect: async () => ({ objectId: "other", revision: "rev-1", state: "fresh" }) }); assert.equal(malformed.status, "reconciliation-required"); assert.equal(malformed.reference, null);
 });

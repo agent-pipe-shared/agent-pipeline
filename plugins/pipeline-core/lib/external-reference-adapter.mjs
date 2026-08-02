@@ -29,6 +29,17 @@ export async function planExternalReferenceWrite({ reference, capabilities, desi
   return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "preview", reason: null, plan: frozen({ ...plan, planSha256: canonicalSha256(plan) }) });
 }
 
+/** Observe an external target without importing its state as Pipeline authority. */
+export async function reconcileExternalReference({ reference, capabilities, inspect } = {}) {
+  const ref = validateExternalReference(reference); const caps = validateExternalAdapterCapabilities(capabilities);
+  if (ref.adapterProfile !== caps.adapterProfile || ref.systemClass !== caps.systemClass || !caps.operations.includes("inspect") || typeof inspect !== "function") return frozen({ schema: "pipeline.external-reference-reconciliation.v1", status: "rejected", reason: "capability", reference: null });
+  const target = await inspect(frozen({ adapterProfile: ref.adapterProfile, objectId: ref.objectId }));
+  if (!validateTarget(target, ref)) return frozen({ schema: "pipeline.external-reference-reconciliation.v1", status: "reconciliation-required", reason: "invalid-inspection", reference: null });
+  const status = target.revision === ref.externalRevision && target.state === "fresh" ? "current" : "reconciliation-required";
+  const reason = status === "current" ? null : target.state !== "fresh" ? "freshness" : "revision";
+  return frozen({ schema: "pipeline.external-reference-reconciliation.v1", status, reason, reference: frozen({ ...ref, externalRevision: target.revision, freshness: frozen({ state: target.state, observedAtEpochMs: ref.freshness.observedAtEpochMs }) }) });
+}
+
 /** Apply one bound preview with idempotency and mandatory revision/readback comparison. */
 export async function applyExternalReferenceWrite({ plan, authorize, apply, readback } = {}) {
   if (!exact(plan, ["schema", "reference", "requestId", "expectedRevision", "changes", "previewDigest", "planSha256"]) || plan.schema !== "pipeline.external-reference-write-intent.v1" || canonicalSha256({ schema: plan.schema, reference: plan.reference, requestId: plan.requestId, expectedRevision: plan.expectedRevision, changes: plan.changes, previewDigest: plan.previewDigest }) !== plan.planSha256 || typeof authorize !== "function" || typeof apply !== "function" || typeof readback !== "function") fail("ERA-APPLY-REQUEST");
