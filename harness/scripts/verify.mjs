@@ -163,6 +163,7 @@ const TEST_SUITES = [
   { name: "phoenix-external-reference-adapter-tests", file: join(libDir, "external-reference-adapter.test.mjs") },
   { name: "phoenix-external-reference-cli-tests", file: join(pluginScriptsDir, "external-reference.test.mjs") },
   { name: "phoenix-agent-decision-journal-tests", file: join(libDir, "agent-decision-journal.test.mjs") },
+  { name: "phoenix-authority-revision-proof-tests", file: join(libDir, "authority-revision-proof.test.mjs") },
   { name: "phoenix-audit-bundle-tests", file: join(libDir, "audit-bundle.test.mjs") },
   { name: "phoenix-audit-bundle-cli-tests", file: join(pluginScriptsDir, "audit-bundle.test.mjs") },
   { name: "phoenix-change-control-tests", file: join(libDir, "change-control.test.mjs") },

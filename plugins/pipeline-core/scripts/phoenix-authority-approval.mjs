@@ -30,8 +30,8 @@ function run(argv = process.argv.slice(2)) {
     const proof = read(join(dir, "phoenix-authority-revision-proof.json"));
     const checked = verifyAuthorityRevisionProof({ intent: request?.intent, trustPolicy: policy, proof });
     if (!checked.verified) throw new Error(`proof rejected: ${checked.code}`);
-    const { schema: _intentSchema, ...bound } = request.intent.value;
-    return { ok: true, code: "PHOENIX-AUTHORITY-PROOF-VERIFIED", approval: { schema: "pipeline.continuity-authority-revision-approval.v1", ...bound }, proofSha256: checked.proofSha256 };
+    const { schema: _intentSchema, decision, ...bound } = request.intent.value;
+    return { ok: true, code: "PHOENIX-AUTHORITY-PROOF-VERIFIED", approval: { schema: "pipeline.continuity-authority-revision-approval.v1", ...bound, decision, phase: decision.scope.phase }, proofSha256: checked.proofSha256 };
   }
   const intent = request?.intent; if (!intent?.sha256 || !policy?.keyReference) throw new Error("request or trust policy invalid");
   const text = join(dir, "phoenix-authority-revision-intent.txt"); const signature = join(dir, "phoenix-authority-revision-signature.bin");
