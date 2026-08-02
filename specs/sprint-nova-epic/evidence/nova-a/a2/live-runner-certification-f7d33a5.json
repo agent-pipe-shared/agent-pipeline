@@ -1,0 +1,12 @@
+{
+  "schema": "pipeline.live-runner-certification.v1",
+  "status": "passed",
+  "code": "LRC-PREFLIGHT-PASSED",
+  "candidateCommit": "f7d33a5d34b80efce377b109335262a63a664d8a",
+  "adapter": "codex-sandbox-preflight",
+  "compatibilityClass": "codex-sandbox-state-v1",
+  "observedVersion": "0.146.0",
+  "platformClass": "linux",
+  "commandSha256": "703ed3adac8d5c4d6b98355a1f1af97afb44a01c89eb6ab9a1d0ffe958ecbcd3",
+  "resultSha256": "2ab955bbe79c305ba25d7b682339e04e8bc4eea3bcc6cd14962b6ada2b2d7941"
+}
