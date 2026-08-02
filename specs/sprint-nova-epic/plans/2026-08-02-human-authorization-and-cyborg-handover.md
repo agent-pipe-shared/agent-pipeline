@@ -27,7 +27,13 @@
    rebind must return either a digest-bound rebind plan or an explicit safe
    diagnosis route.
 7. Add a current candidate-bound threat model and an explicit rollback path
-   for the critical authorization boundary.
+   for the critical authorization boundary. The push subject must include the
+   fixed model path/digest alongside candidate, source commit, remote and
+   destination; a final detached request is prepared only after the resulting
+   clean candidate exists, then independently checked before the final PO
+   decision. Pre-push rollback is a new candidate; post-push rollback is an
+   ordinary forward revert with fresh evidence and a fresh proof—never a
+   force-push, state deletion or proof reuse.
 
 ## File ownership and tests
 

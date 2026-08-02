@@ -143,9 +143,17 @@
       "retention": "retain"
     },
     {
+      "class": "design",
+      "path": "specs/sprint-nova-epic/implementation/critical-action-authorization-threat-model.md",
+      "sha256": "6a13ff03dfd15f93f15fe845c86edca35445a49a8979275ad35e42a93252a1ae",
+      "authority": false,
+      "mutability": "immutable",
+      "retention": "retain"
+    },
+    {
       "class": "plan",
       "path": "specs/sprint-nova-epic/plans/2026-08-02-human-authorization-and-cyborg-handover.md",
-      "sha256": "51f54d71d1256c5f2d33ae486c1efb486dea21eebe87f039c0e6fa8d943364e1",
+      "sha256": "16ceef88d7eeb860e69af8cd01e4bb949f6a56a9545bba5916a858ca774b5b78",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"

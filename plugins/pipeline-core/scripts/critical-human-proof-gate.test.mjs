@@ -15,13 +15,17 @@ const planSha256 = createHash("sha256").update("plan").digest("hex");
 const specSha256 = createHash("sha256").update("spec").digest("hex");
 const now = "2026-08-02T18:40:00.000Z";
 mkdirSync(join(root, "project"), { recursive: true });
+mkdirSync(join(root, "specs", "sprint-nova-epic", "implementation"), { recursive: true });
+writeFileSync(join(root, "specs", "sprint-nova-epic", "implementation", "critical-action-authorization-threat-model.md"), "fixture threat model\n");
 writeFileSync(join(root, "project", "critical-human-proof.json"), JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push", "deploy", "publication"] }));
 writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({
   schema: "pipeline.state.v0", planApproved: true,
   activeFeature: { id: "sprint-nova-epic", planPath: "specs/sprint-nova-epic/prd.md", phase: "implementation" },
   planApproval: { poGateAuthority: { planSha256, specSha256 } },
 }, null, 2));
-const subjectSha256 = criticalActionSubjectSha256({ kind: "push", candidate, subject: { sourceCommit: candidate.commit } });
+const pushTarget = { remote: "origin", destination: "refs/heads/main" };
+const threatModel = { path: "specs/sprint-nova-epic/implementation/critical-action-authorization-threat-model.md", sha256: createHash("sha256").update("fixture threat model\n").digest("hex") };
+const subjectSha256 = criticalActionSubjectSha256({ kind: "push", candidate, subject: { sourceCommit: candidate.commit, ...pushTarget, threatModel } });
 const request = createCriticalActionApprovalRequest({ candidate, featureId: "sprint-nova-epic", planBytes: Buffer.from("plan"), specBytes: Buffer.from("spec"), action: { kind: "push", subjectSha256, expiresAt: "2026-08-02T18:50:00.000Z" } });
 const keys = generateKeyPairSync("ed25519");
 const publicKey = keys.publicKey.export({ format: "pem", type: "spki" }).toString();
@@ -33,10 +37,17 @@ const deps = { dir: root, now: () => now, gitHead: () => ({ ok: true, commit: ca
 
 assert.equal(run(["approve-push", "--by", "PO"], deps), 2);
 const before = readFileSync(join(root, "project", "pipeline-state.json"), "utf8");
-assert.equal(run(["approve-push", "--by", "PO", "--proof-request", requestPath, "--proof-authority", authorityPath, "--proof", proofPath], deps), 0);
+writeFileSync(join(root, "project", "critical-human-proof.json"), JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["deploy", "publication"] }));
+assert.equal(run(["approve-push", "--by", "PO", "--remote", pushTarget.remote, "--destination", pushTarget.destination, "--proof-request", requestPath, "--proof-authority", authorityPath, "--proof", proofPath], deps), 2);
+writeFileSync(join(root, "project", "critical-human-proof.json"), JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push", "deploy", "publication"] }));
+assert.equal(run(["approve-push", "--by", "PO", "--remote", pushTarget.remote, "--destination", pushTarget.destination, "--proof-request", requestPath, "--proof-authority", authorityPath, "--proof", proofPath], deps), 0);
 const after = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
 assert.equal(after.pushApproval.lastApproved.forCommit, candidate.commit);
 assert.equal(typeof after.pushApproval.lastApproved.criticalProof?.proofSha256, "string");
+assert.equal(after.pushApproval.lastApproved.remote, pushTarget.remote);
+assert.deepEqual(after.pushApproval.lastApproved.threatModel, threatModel);
+assert.equal(after.criticalProofConsumption?.length, 1);
+assert.equal(run(["approve-push", "--by", "PO", "--remote", pushTarget.remote, "--destination", pushTarget.destination, "--proof-request", requestPath, "--proof-authority", authorityPath, "--proof", proofPath], deps), 2);
 assert.notEqual(before, JSON.stringify(after));
 
 const deploySubject = { artifact: "v0.5.1-rc.1", environment: "production" };
@@ -102,4 +113,4 @@ assert.equal(run(["publication-approve", "--request-file", "publication-request.
 assert.equal(run(["publication-approve", "--request-file", "publication-request.json", "--proof-request", publicationProofRequestPath, "--proof-authority", authorityPath, "--proof", publicationProofPath], { ...deps, gitCommonDir: () => ({ ok: true, path: root }) }), 0);
 const published = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
 assert.equal(typeof published.publicationCriticalProofs[transactionId]?.proofSha256, "string");
-console.log("critical-human-proof-gate: 14 assertions passed");
+console.log("critical-human-proof-gate: 20 assertions passed");

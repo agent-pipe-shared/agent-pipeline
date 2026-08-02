@@ -1437,9 +1437,11 @@ if (pushGate.approval === "standing-approved") {
         )}, expected pushed source commit=${JSON.stringify(sourceCommit)}. Record: node harness/scripts/pipeline-state.mjs approve-push --by <name>.`,
       );
     }
-    if (pushGate.approval === "required" && approval?.criticalProof !== undefined) {
+    if (pushGate.approval === "required") {
       const action = approval.criticalProof?.action;
-      if (action?.kind !== "push" || approval.remote !== pushBinding.remote || approval.destination !== pushBinding.destination) {
+      if (action?.kind === "push" && approval.remote === pushBinding.remote && approval.destination === pushBinding.destination) {
+        failures.push("Raw git push cannot consume a critical proof; use the fixed publication executor for the externally attested action.");
+      } else {
         failures.push("Push approval critical proof is not bound to this remote and destination ref.");
       }
     }

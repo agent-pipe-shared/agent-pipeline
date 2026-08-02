@@ -86,9 +86,14 @@ The `pipeline.critical-action-approval-request.v1` companion uses the same
 detached proof primitive for the closed action kinds `push`, `deploy` and
 `publication`. Its signed intent additionally binds the clean candidate,
 current plan/Spec hashes, action kind, exact action-subject digest and expiry.
-The State writer verifies those public bindings before creating durable
-external-effect authority; proof use across kinds, candidates or subjects is
-rejected.
+For `push`, the writer-owned subject also binds the selected remote, full
+destination ref and the byte digest of
+`specs/sprint-nova-epic/implementation/critical-action-authorization-threat-model.md`.
+Push proof is
+non-optional: removing `push` from project policy rejects the writer action
+rather than restoring an attribution-only approval. The State writer verifies
+those public bindings before creating durable external-effect authority; proof
+use across kinds, candidates or subjects is rejected.
 
 Remote provisional receipts are intentionally not this contract. They are
 short-lived, one-time acknowledgements for local continuation only and never

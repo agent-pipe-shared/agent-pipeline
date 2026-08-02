@@ -349,7 +349,7 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   });
 }
 
-// ---- PG12 required + fresh approval -> allow -------------------------------------------
+// ---- PG12 required + fresh approval without a critical proof -> block ------------------
 {
   const { dir, head } = freshRepo("required-fresh");
   writeManifest(dir, manifestPush({ approval: "required" }));
@@ -358,7 +358,27 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
     schema: "pipeline.state.v0",
     pushApproval: { lastApproved: { approvedBy: "po-test", approvedAt: "2026-07-07T20:00:00.000Z", forCommit: head } },
   });
-  check("PG12 allow  required approval, fresh forCommit matches HEAD", PUSH_CMD, dir, ALLOW, { stderrEmpty: true });
+  check("PG12 block required approval without critical proof", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["Push approval critical proof is not bound"],
+  });
+}
+
+// ---- PG12b raw push cannot consume a shaped critical proof ------------------------------
+{
+  const { dir, head } = freshRepo("required-critical-proof");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-07-07T20:00:00.000Z", forCommit: head,
+      remote: "origin", destination: "refs/heads/feature-test",
+      criticalProof: { action: { kind: "push" } },
+    } },
+  });
+  check("PG12b block raw push even with target-bound critical proof", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["Raw git push cannot consume a critical proof"],
+  });
 }
 
 // ---- PG13 all-green (standing-approved + verify + security both fresh) -> allow --------

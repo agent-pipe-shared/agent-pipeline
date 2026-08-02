@@ -1199,18 +1199,12 @@ function canonicalFixtureJson(value) {
   ok("PS09d activeFeature id/planPath untouched by set-phase", state.activeFeature?.id === "f1" && state.activeFeature?.planPath === "p1.md");
 }
 
-// ---- PS10: approve-push records {approvedBy, approvedAt, forCommit} via injected git --
+// ---- PS10: approve-push rejects attribution-only approval ------------------------------
 {
   const dir = freshDir("approve-push-shape");
   const code = run(["approve-push", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
-  ok("PS10a approve-push exit 0", code === 0, `got ${code}`);
-  const state = readState(dir).state;
-  ok(
-    "PS10b pushApproval.lastApproved shape correct",
-    state.pushApproval?.lastApproved?.approvedBy === "po-test" &&
-      state.pushApproval?.lastApproved?.approvedAt === FIXED_NOW() &&
-      state.pushApproval?.lastApproved?.forCommit === "abc123deadbeef",
-  );
+  ok("PS10a approve-push without a critical proof is refused", code === 2, `got ${code}`);
+  ok("PS10b attribution-only approval leaves state absent", readState(dir).status === "absent");
 }
 
 // ---- PS11: approve-push fails cleanly when git rev-parse HEAD fails -------------------
@@ -1265,11 +1259,11 @@ function canonicalFixtureJson(value) {
     encoding: "utf8",
     env: { ...process.env, CLAUDE_PROJECT_DIR: dir },
   });
-  ok("PS12c subprocess approve-push exit 0", res3.status === 0, `stderr: ${res3.stderr}`);
+  ok("PS12c subprocess approve-push without critical proof is refused", res3.status === 2, `stderr: ${res3.stderr}`);
 
   const finalState = JSON.parse(readFileSync(statePath(dir), "utf8"));
   ok("PS12d final state has planApproved true", finalState.planApproved === true);
-  ok("PS12e final state pushApproval.forCommit matches real HEAD", finalState.pushApproval?.lastApproved?.forCommit === head);
+  ok("PS12e final state has no attribution-only pushApproval", finalState.pushApproval === undefined);
   ok("PS12f state file is pretty-printed (contains newline+indent)", readFileSync(statePath(dir), "utf8").includes("\n  "));
 }
 
@@ -1416,7 +1410,6 @@ function canonicalFixtureJson(value) {
     now: FIXED_NOW,
     poGateAuthority: injectedPoGateAuthority("p-close.md"),
   });
-  run(["approve-push", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
   const code = run(["close-feature", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
   ok("PS18a close-feature exit 0", code === 0, `got ${code}`);
   const state = readState(dir).state;
@@ -1435,7 +1428,7 @@ function canonicalFixtureJson(value) {
       state.closedFeatures[0].forCommit === "abc123deadbeef",
     JSON.stringify(state.closedFeatures),
   );
-  ok("PS18g pushApproval preserved", state.pushApproval?.lastApproved?.forCommit === "abc123deadbeef");
+  ok("PS18g close-feature does not synthesize a pushApproval", state.pushApproval === undefined);
 }
 
 // ---- PS19: close-feature best-effort on a git failure (DEVIATION vs. approve-push) -----

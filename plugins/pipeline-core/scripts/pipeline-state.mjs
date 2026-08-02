@@ -23,8 +23,12 @@
  *       "poGateAuthority": <pipeline.po-gate-authority-evidence.v1 object> } | absent,
  *     "planRevocation": { "revokedBy": "<string>", "revokedAt": "<ISO-8601>" } | absent,
  *     "pushApproval": {
- *       "lastApproved": { "approvedBy": "<string>", "approvedAt": "<ISO-8601>", "forCommit": "<sha>" }
+ *       "lastApproved": { "approvedBy": "<string>", "approvedAt": "<ISO-8601>", "forCommit": "<sha>",
+ *         "remote": "<safe-remote>", "destination": "<full-ref>", "criticalProof": <verified-proof> }
  *     } | absent,
+ *     "criticalProofConsumption": [
+ *       { "proofSha256": "<sha256>", "kind": "push", "consumedAt": "<ISO-8601>" }
+ *     ] | absent,
  *     "closedFeatures": [
  *       { "id": "<string>", "planPath": "<string>", "phaseAtClose": "<string>|null",
  *         "closedAt": "<ISO-8601>", "closedBy": "<string>", "forCommit": "<sha>|null" }
@@ -343,6 +347,7 @@ export const CONTINUITY_LOCK_SCHEMA_ID = "pipeline.continuity-lock.v0";
 export const CONTINUITY_LOCK_STALE_MS = 30_000;
 const CONTINUITY_REQUEST_MAX_BYTES = 32_768;
 const CRITICAL_HUMAN_PROOF_POLICY_PATH = "project/critical-human-proof.json";
+const PUSH_THREAT_MODEL_PATH = "specs/sprint-nova-epic/implementation/critical-action-authorization-threat-model.md";
 const EXTERNAL_PUBLIC_ARTIFACT_MAX_BYTES = 1_048_576;
 const CONTINUITY_RESULT_MAX_BYTES = 1_048_576;
 const FINAL_INTEGRATION_MAX_BYTES = 8_192;
@@ -2563,6 +2568,23 @@ function criticalHumanProofPolicy(dir) {
   }
 }
 
+function boundRepositoryArtifact(dir, relativePath) {
+  const root = realpathSync(resolve(dir));
+  const path = resolve(root, relativePath);
+  if (relative(root, path).startsWith(`..${sep}`) || !path.startsWith(`${root}${sep}`)) {
+    return { ok: false, code: "CRITICAL-PROOF-BOUND-ARTIFACT-PATH" };
+  }
+  try {
+    const stat = lstatSync(path);
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > EXTERNAL_PUBLIC_ARTIFACT_MAX_BYTES) {
+      return { ok: false, code: "CRITICAL-PROOF-BOUND-ARTIFACT-UNSAFE" };
+    }
+    return { ok: true, path: relativePath, sha256: sha256Bytes(readFileSync(path)) };
+  } catch {
+    return { ok: false, code: "CRITICAL-PROOF-BOUND-ARTIFACT-UNAVAILABLE" };
+  }
+}
+
 function externalPublicJson(dir, value) {
   if (typeof value !== "string" || !isAbsolute(value)) return { ok: false, code: "CRITICAL-PROOF-EXTERNAL-PATH" };
   const root = realpathSync(resolve(dir));
@@ -2576,10 +2598,12 @@ function externalPublicJson(dir, value) {
   } catch { return { ok: false, code: "CRITICAL-PROOF-EXTERNAL-FILE" }; }
 }
 
-function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags, now }) {
+function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags, now, required = false }) {
   const policy = criticalHumanProofPolicy(dir);
   if (!policy.ok) return policy;
-  if (!policy.requiredKinds.has(kind)) return { ok: true, proof: null };
+  if (!policy.requiredKinds.has(kind)) {
+    return required ? { ok: false, code: "CRITICAL-PROOF-POLICY-KIND-REQUIRED" } : { ok: true, proof: null };
+  }
   const request = externalPublicJson(dir, flags["proof-request"]);
   const authority = externalPublicJson(dir, flags["proof-authority"]);
   const proof = externalPublicJson(dir, flags["proof"]);
@@ -5067,12 +5091,11 @@ export function run(argv = process.argv.slice(2), deps = {}) {
     case "approve-push": {
       const policy = criticalHumanProofPolicy(dir);
       if (!policy.ok) { console.error(`Error: approve-push refused (${policy.code}).`); return 2; }
-      const expectedFlags = new Set(policy.requiredKinds.has("push")
-        ? ["by", "remote", "destination", "proof-request", "proof-authority", "proof"] : ["by"]);
+      const expectedFlags = new Set(["by", "remote", "destination", "proof-request", "proof-authority", "proof"]);
       const parsed = parseExactFlags(rest, expectedFlags);
       const by = parsed.value?.by;
       if (!parsed.ok || isBlank(by)) {
-        console.error('Error: approve-push requires --by <name> and, when critical proof is enabled, exactly --proof-request/--proof-authority/--proof.');
+        console.error('Error: approve-push requires --by, --remote, --destination, --proof-request, --proof-authority and --proof.');
         return 2;
       }
       const head = gitHead(dir);
@@ -5082,37 +5105,42 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         return 2;
       }
       const approvedAt = now();
-      let proof = null;
-      let pushTarget = null;
-      if (policy.requiredKinds.has("push")) {
-        const remote = parsed.value.remote;
-        const destination = parsed.value.destination;
-        if (typeof remote !== "string" || !/^[A-Za-z0-9._-]{1,80}$/u.test(remote)
-          || typeof destination !== "string" || !/^refs\/heads\/[A-Za-z0-9._/-]{1,200}$/u.test(destination)) {
-          console.error("Error: approve-push requires a safe --remote and full --destination ref when critical proof is enabled.");
-          return 2;
-        }
-        const observed = gitCandidate(dir);
-        if (!observed.ok || observed.commit !== head.commit) {
-          console.error("Error: current candidate commit/tree could not be determined; push proof was not recorded.");
-          return 2;
-        }
-        const verified = verifyCriticalHumanProof({
-          dir, state: base, kind: "push", candidate: observed,
-          subject: { sourceCommit: observed.commit, remote, destination }, flags: parsed.value, now: approvedAt,
-        });
-        if (!verified.ok) { console.error(`Error: approve-push refused (${verified.code}); external proof was not consumed.`); return 2; }
-        if (base.pushApproval?.lastApproved?.criticalProof?.proofSha256 === verified.proof.proofSha256) {
-          console.error("Error: approve-push refused (CRITICAL-PROOF-REPLAY); external proof was already consumed.");
-          return 2;
-        }
-        proof = verified.proof;
-        pushTarget = { remote, destination };
+      const remote = parsed.value.remote;
+      const destination = parsed.value.destination;
+      if (typeof remote !== "string" || !/^[A-Za-z0-9._-]{1,80}$/u.test(remote)
+        || typeof destination !== "string" || !/^refs\/heads\/[A-Za-z0-9._/-]{1,200}$/u.test(destination)) {
+        console.error("Error: approve-push requires a safe --remote and full --destination ref.");
+        return 2;
+      }
+      const observed = gitCandidate(dir);
+      if (!observed.ok || observed.commit !== head.commit) {
+        console.error("Error: current candidate commit/tree could not be determined; push proof was not recorded.");
+        return 2;
+      }
+      const threatModel = boundRepositoryArtifact(dir, PUSH_THREAT_MODEL_PATH);
+      if (!threatModel.ok) { console.error(`Error: approve-push refused (${threatModel.code}).`); return 2; }
+      const threatModelBinding = { path: threatModel.path, sha256: threatModel.sha256 };
+      const verified = verifyCriticalHumanProof({
+        dir, state: base, kind: "push", candidate: observed,
+        subject: { sourceCommit: observed.commit, remote, destination, threatModel: threatModelBinding }, flags: parsed.value, now: approvedAt, required: true,
+      });
+      if (!verified.ok) { console.error(`Error: approve-push refused (${verified.code}); external proof was not consumed.`); return 2; }
+      const priorConsumption = base.criticalProofConsumption;
+      if (priorConsumption !== undefined && (!Array.isArray(priorConsumption)
+        || priorConsumption.some((entry) => !entry || typeof entry !== "object" || typeof entry.proofSha256 !== "string"))) {
+        console.error("Error: approve-push refused (CRITICAL-PROOF-CONSUMPTION-INVALID).");
+        return 2;
+      }
+      const consumed = Array.isArray(priorConsumption) ? priorConsumption : [];
+      if (consumed.some((entry) => entry.proofSha256 === verified.proof.proofSha256)) {
+        console.error("Error: approve-push refused (CRITICAL-PROOF-REPLAY); external proof was already consumed.");
+        return 2;
       }
       const next = {
         ...base,
         schema: SCHEMA_ID,
-        pushApproval: { lastApproved: { approvedBy: by, approvedAt, forCommit: head.commit, ...(proof === null ? {} : { criticalProof: proof, ...pushTarget }) } },
+        pushApproval: { lastApproved: { approvedBy: by, approvedAt, forCommit: head.commit, criticalProof: verified.proof, remote, destination, threatModel: threatModelBinding } },
+        criticalProofConsumption: [...consumed, { proofSha256: verified.proof.proofSha256, kind: "push", consumedAt: approvedAt }],
         updatedAt: approvedAt,
       };
       if (!stateWriteSucceeded(writeState(dir, next, base))) {
