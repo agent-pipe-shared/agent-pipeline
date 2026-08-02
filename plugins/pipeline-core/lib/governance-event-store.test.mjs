@@ -216,6 +216,9 @@ test("restricted storage stays outside the repository, is owner-only encrypted, 
   const putAuthorization = createRestrictedAuthorization({ key, repositoryFingerprint: fingerprint, operation: "put" });
   const stored = await putRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization: putAuthorization, key, keyGeneration: "key-1", expiresAtEpochMs: Date.now() + 60_000, event: restricted });
   assert.equal(stored.status, "stored");
+  const foreignFingerprint = "f".repeat(64);
+  const foreignPutAuthorization = createRestrictedAuthorization({ key, repositoryFingerprint: foreignFingerprint, operation: "put" });
+  await assert.rejects(() => putRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: foreignFingerprint, authorization: foreignPutAuthorization, key, keyGeneration: "key-1", expiresAtEpochMs: Date.now() + 60_000, event: restricted }), (error) => error.code === "GES-CROSS-REPOSITORY");
   const status = await inspectRestrictedGovernanceStore({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint });
   assert.deepEqual(status.keyGenerations, [{ keyGeneration: "key-1", recordCount: 1 }]);
   const replay = await putRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization: putAuthorization, key, keyGeneration: "key-1", expiresAtEpochMs: Date.now() + 60_000, event: restricted });
@@ -228,11 +231,15 @@ test("restricted storage stays outside the repository, is owner-only encrypted, 
   const queryAuthorization = createRestrictedAuthorization({ key, repositoryFingerprint: fingerprint, operation: "query", recordId: stored.recordId });
   const queried = await queryRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization: queryAuthorization, key, recordId: stored.recordId });
   assert.equal(queried.event.payload.complete, restricted.payload.complete);
+  const foreignQueryAuthorization = createRestrictedAuthorization({ key, repositoryFingerprint: foreignFingerprint, operation: "query", recordId: stored.recordId });
+  await assert.rejects(() => queryRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: foreignFingerprint, authorization: foreignQueryAuthorization, key, recordId: stored.recordId }), (error) => error.code === "GES-CROSS-REPOSITORY");
   const encrypted = JSON.parse(await readFile(path.join(restrictedRoot, "records", `${stored.recordId}.json`), "utf8"));
   const recordDigest = (await import("./governance-event.mjs")).canonicalSha256(encrypted);
   const erasePlan = await planRestrictedGovernanceOperation({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, operation: "erase", recordId: stored.recordId, expectedRecordDigest: recordDigest, idempotencyKey: "erase-plan-1" });
   assert.equal(erasePlan.mutation, false);
   const eraseAuthorization = createRestrictedAuthorization({ key, repositoryFingerprint: fingerprint, operation: "erase", recordId: stored.recordId, expectedRecordDigest: recordDigest });
+  const foreignEraseAuthorization = createRestrictedAuthorization({ key, repositoryFingerprint: foreignFingerprint, operation: "erase", recordId: stored.recordId, expectedRecordDigest: recordDigest });
+  await assert.rejects(() => eraseRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: foreignFingerprint, authorization: foreignEraseAuthorization, key, recordId: stored.recordId, expectedRecordDigest: recordDigest }), (error) => error.code === "GES-CROSS-REPOSITORY");
   const erased = await eraseRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization: eraseAuthorization, key, recordId: stored.recordId, expectedRecordDigest: recordDigest });
   assert.deepEqual(erased, { status: "erased-active-store", recordId: stored.recordId, preimageDigest: (await import("./governance-event.mjs")).canonicalSha256(encrypted), backupDisclosure: "unknown" });
   await assert.rejects(() => queryRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization: queryAuthorization, key, recordId: stored.recordId }), (error) => error.code === "GES-MISSING");

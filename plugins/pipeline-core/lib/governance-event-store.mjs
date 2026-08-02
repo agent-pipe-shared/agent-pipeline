@@ -618,7 +618,8 @@ export async function recoverPortableGovernanceProjection({ repositoryRoot, regi
  * portable tree or returned in the operational receipt.
  */
 export async function putRestrictedGovernanceEvent({ repositoryRoot, storeRoot, repositoryFingerprint, authorization, key, keyGeneration, expiresAtEpochMs, event } = {}) {
-  const { root } = await assertPhysicalRoot(repositoryRoot);
+  const { root, fingerprint } = await assertPhysicalRoot(repositoryRoot);
+  if (repositoryFingerprint !== fingerprint) fail("GES-CROSS-REPOSITORY", "The expected repository fingerprint does not match the physical repository.");
   const restrictedRoot = await assertRestrictedRoot(root, storeRoot, { create: true });
   await restrictedRecordsRoot(restrictedRoot);
   const encryptionKey = assertEncryptionKey(key);
@@ -680,7 +681,8 @@ export async function planRestrictedGovernanceOperation({ repositoryRoot, storeR
 
 /** Read one restricted event only with a repository-bound privileged authorization and its external key. */
 export async function queryRestrictedGovernanceEvent({ repositoryRoot, storeRoot, repositoryFingerprint, authorization, key, recordId } = {}) {
-  const { root } = await assertPhysicalRoot(repositoryRoot);
+  const { root, fingerprint } = await assertPhysicalRoot(repositoryRoot);
+  if (repositoryFingerprint !== fingerprint) fail("GES-CROSS-REPOSITORY", "The expected repository fingerprint does not match the physical repository.");
   const encryptionKey = assertEncryptionKey(key);
   assertRestrictedAuthorization(authorization, encryptionKey, repositoryFingerprint, "query", recordId);
   const restrictedRoot = await assertRestrictedRoot(root, storeRoot);
@@ -700,7 +702,8 @@ export async function queryRestrictedGovernanceEvent({ repositoryRoot, storeRoot
  * unrelated key copies.
  */
 export async function eraseRestrictedGovernanceEvent({ repositoryRoot, storeRoot, repositoryFingerprint, authorization, key, recordId, expectedRecordDigest } = {}) {
-  const { root } = await assertPhysicalRoot(repositoryRoot);
+  const { root, fingerprint } = await assertPhysicalRoot(repositoryRoot);
+  if (repositoryFingerprint !== fingerprint) fail("GES-CROSS-REPOSITORY", "The expected repository fingerprint does not match the physical repository.");
   const encryptionKey = assertEncryptionKey(key);
   const restrictedRoot = await assertRestrictedRoot(root, storeRoot);
   const target = restrictedRecordPath(restrictedRoot, recordId);
