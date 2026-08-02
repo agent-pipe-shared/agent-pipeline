@@ -1,6 +1,6 @@
 # CYB-9 — product-security readiness (feature spec)
 
-> **Status: DRAFT, design-phase, pre-gate.** Translates issue #48 (fetched
+> **Status: IMPLEMENTATION.** Translates issue #48 (fetched
 > verbatim via `gh issue view 48`, 2026-07-25) into checkable form. Phase IV
 > (final package), depends on CYB-1 (assurance levels) and CYB-8 (finding
 > lifecycle — spec.md §4 dependency spine: "CYB-8 → CYB-9"). Not dispatched.
@@ -69,8 +69,8 @@ evidence, soft — consumed, not blocking) · #24 (ITSM projection — explicitl
 
 ## 6. Gate
 
-Universal package rule — the epic's final package, closes Phase IV alongside
-"integration and close accounting" (spec.md §4). Applicability/schema/fixture/
-projection-rule work can proceed once CYB-1's control IDs are approved
-(issue's own "Parallelism" note); the hard blocker is CYB-8 landing first. No
-dispatch yet.
+The accepted Cyborg sprint plan authorizes normal implementation, focused
+tests, Verify, Critic preparation and corrective work without per-step Human
+authorization. The final package gate is exact Verify + Security, a fresh
+diff-scoped Critic, and the bound PO proof before push/release. A Human decision
+is required only for that configured final gate or a genuine exception.

@@ -1,13 +1,11 @@
 # CYB-1 — control catalog + assurance authority (feature spec)
 
-> **Status: DRAFT, design-phase, pre-gate.** Elephant design work per EL-16
-> (design-phase thinking stays Elephant work) and EL-04 (no silent foundational
-> decisions). Translates issue #41's problem statement and 14 acceptance
+> **Status: IMPLEMENTATION COMPLETE.** Translates issue #41's problem statement and 14 acceptance
 > criteria (fetched verbatim via `gh issue view 41`, 2026-07-25) into checkable
 > form per `backlog-acceptance-matrix.md`'s own instruction. Builds on, and does
 > not duplicate, [`cyb-1f-schema-boundary-draft.md`](cyb-1f-schema-boundary-draft.md)
 > (the frozen identifiers/enums) and [`spec.md`](spec.md) §4's CYB-1 package
-> summary. Not dispatched; no Goldfish briefing yet. Package root
+> summary. The implementation is delivered in the Cyborg candidate. Package root
 > `specs/CYB-1/` per ADR-0045's canonical topology is deliberately NOT created
 > here — that migration needs its own explicit lifecycle-approval decision
 > (ADR-0045 "Migration" section), which is a separate foundational call this
@@ -134,10 +132,8 @@ commits.
 
 ## 8. Gate
 
-CYB-1F (schema-boundary freeze, already drafted) is the mid-package PO
-checkpoint before Phase II dispatches (spec.md §6). This full feature spec is
-additional design-phase depth so CYB-1's *body* work (L0 reference catalog
-content, L1 resolver implementation, receipt, waivers, views) can be briefed
-to a Goldfish quickly once both (a) the epic-level PO gate's open decisions
-A-E and (b) the CYB-1F freeze's open decisions F-1..F-5 are resolved. No
-dispatch happens before then.
+The accepted Cyborg sprint plan authorizes normal implementation, focused
+tests, Verify, Critic preparation and corrective work without per-step Human
+authorization. The final package gate remains exact Verify + Security, a fresh
+diff-scoped Critic, and the bound PO proof before push/release. A Human decision
+is required only for that configured final gate or a genuine exception.

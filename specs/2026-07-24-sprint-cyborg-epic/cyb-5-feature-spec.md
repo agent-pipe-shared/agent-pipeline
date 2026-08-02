@@ -1,6 +1,6 @@
 # CYB-5 — AI-assisted development hardening (feature spec)
 
-> **Status: DRAFT, design-phase, pre-gate.** Translates issue #46 (fetched
+> **Status: IMPLEMENTATION.** Translates issue #46 (fetched
 > verbatim via `gh issue view 46`, 2026-07-25) into checkable form. Phase III
 > per spec.md §4, EXCEPT slice (c)'s override-ledger fix which may start in
 > Phase II (self-contained). Depends on CYB-1 (module/control IDs). Not
@@ -98,7 +98,8 @@ security receipts from the go-live base regardless.
 
 ## 7. Gate
 
-Universal package rule for the full package. Slice (c) can be dispatched
-independently once its own fresh Critic + PO gate pass, without waiting for
-CYB-1. Slices (a)/(b) wait on the CYB-1 boundary. No dispatch yet for any
-slice.
+The accepted Cyborg sprint plan authorizes normal implementation, focused
+tests, Verify, Critic preparation and corrective work without per-step Human
+authorization. The final package gate is exact Verify + Security, a fresh
+diff-scoped Critic, and the bound PO proof before push/release. A Human decision
+is required only for that configured final gate or a genuine exception.

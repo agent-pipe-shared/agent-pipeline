@@ -1,6 +1,6 @@
 # CYB-2 — policy-complete verification (feature spec)
 
-> **Status: DRAFT, design-phase, pre-gate.** Translates issue #42 (fetched
+> **Status: IMPLEMENTATION.** Translates issue #42 (fetched
 > verbatim via `gh issue view 42`, 2026-07-25) into checkable form. Phase II,
 > depends on the CYB-1 boundary (CYB-1F's `cap.*` roots and control-result
 > enum — see [`cyb-1f-schema-boundary-draft.md`](cyb-1f-schema-boundary-draft.md)
@@ -114,7 +114,8 @@ for dependency/release checks) — soft, CYB-2 does not block on CYB-3.
 
 ## 8. Gate
 
-Per spec.md §6: Full Verify + Security green, independent fresh Critic, THEN
-PO gate — same universal package rule. No dispatch before CYB-1F's F-3
-decision is ratified and the epic-level PO gate's relevant open decisions
-are resolved.
+The accepted Cyborg sprint plan authorizes normal implementation, focused
+tests, Verify, Critic preparation and corrective work without per-step Human
+authorization. The final package gate is exact Verify + Security, a fresh
+diff-scoped Critic, and the bound PO proof before push/release. A Human decision
+is required only for that configured final gate or a genuine exception.

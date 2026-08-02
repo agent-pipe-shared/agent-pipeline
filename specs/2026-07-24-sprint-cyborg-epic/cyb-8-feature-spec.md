@@ -1,6 +1,6 @@
 # CYB-8 — finding/exception/VEX lifecycle (feature spec)
 
-> **Status: DRAFT, design-phase, pre-gate.** Translates issue #47 (fetched
+> **Status: IMPLEMENTATION.** Translates issue #47 (fetched
 > verbatim via `gh issue view 47`, 2026-07-25) into checkable form. Phase III,
 > depends on CYB-2 (#42 finding envelope) and CYB-3 (component identity). Not
 > dispatched.
@@ -94,7 +94,8 @@ consumers not prerequisites.
 
 ## 9. Gate
 
-Universal package rule. Schema/state-machine/synthetic-remediation-fixture
-work can proceed with CYB-2/CYB-3 adapters in parallel (issue's own
-"Parallelism" note); external governance/export integration is optional
-follow-up. No dispatch yet.
+The accepted Cyborg sprint plan authorizes normal implementation, focused
+tests, Verify, Critic preparation and corrective work without per-step Human
+authorization. The final package gate is exact Verify + Security, a fresh
+diff-scoped Critic, and the bound PO proof before push/release. A Human decision
+is required only for that configured final gate or a genuine exception.
