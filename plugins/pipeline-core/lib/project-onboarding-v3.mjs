@@ -939,14 +939,15 @@ function persistedPoAuthority(root, fs) {
 }
 
 function observePoAuthorityRebind(root, fs) {
+  const unavailable = (reason) => ({ status: "unavailable", reason });
   const injectedValidator = typeof fs.validatePoGateAuthorityForRepository === "function";
   const validateAuthority = fs.validatePoGateAuthorityForRepository ?? validatePoGateAuthorityForRepository;
   const injectedPersisted = typeof fs.observePersistedPoAuthority === "function";
   const persisted = injectedPersisted
     ? fs.observePersistedPoAuthority(root)
     : persistedPoAuthority(root, fs);
-  if (persisted.status === "drifted") return { status: "unavailable" };
-  if (persisted.status === "unavailable" && !injectedValidator) return { status: "unavailable" };
+  if (persisted.status === "drifted") return unavailable("persisted-authority-drift");
+  if (persisted.status === "unavailable" && !injectedValidator) return unavailable("persisted-authority-unavailable");
   // A pristine kickoff or exact revoke-plan v2 postimage deliberately carries
   // no current approval. Re-validating historical State provenance as though
   // it were live PO authority recreates the design re-entry deadlock.
@@ -960,7 +961,7 @@ function observePoAuthorityRebind(root, fs) {
     : { repoRoot: root });
   if (authority?.ok === true) return { status: "not-needed" };
   if (authority?.code === "PO-GATE-PLAN-DIGEST-STALE") {
-    return { status: "unavailable" };
+    return unavailable("plan-digest-stale");
   }
   if (authority?.code !== "PO-GATE-PRD-SPEC-MISMATCH") {
     return { status: "not-applicable" };
@@ -973,7 +974,7 @@ function observePoAuthorityRebind(root, fs) {
       throw new Error("unsafe PO authority writer");
     }
   } catch {
-    return { status: "unavailable" };
+    return unavailable("writer-unavailable");
   }
   const planned = fs.spawnSync(process.execPath, [writer, "po-authority-rebind-plan"], {
     cwd: root,
@@ -981,14 +982,14 @@ function observePoAuthorityRebind(root, fs) {
     shell: false,
     maxBuffer: 2 * 1024 * 1024,
   });
-  if (planned?.error || planned?.status !== 0 || String(planned.stderr ?? "").trim() !== "") {
-    return { status: "unavailable" };
-  }
+  if (planned?.error) return unavailable("planner-execution-unavailable");
+  if (planned?.status !== 0) return unavailable("planner-rejected");
+  if (String(planned.stderr ?? "").trim() !== "") return unavailable("planner-protocol-violation");
   let plan;
   try {
     plan = JSON.parse(String(planned.stdout ?? ""));
   } catch {
-    return { status: "unavailable" };
+    return unavailable("planner-malformed-output");
   }
   const action = plan?.applyAction;
   const expectedArgv = [
@@ -1013,7 +1014,7 @@ function observePoAuthorityRebind(root, fs) {
     || action.mutation !== true
     || action.requiresConfirmation !== true
     || action.requiresHostBoundary !== true) {
-    return { status: "unavailable" };
+    return unavailable("planner-invalid-plan");
   }
   return {
     status: "required",
@@ -1706,6 +1707,16 @@ function readyLifecycleResult({ root, runner = "codex", intent, repository, runt
         )],
       });
     }
+    const plannerDiagnostics = {
+      "writer-unavailable": ["po_authority_rebind_writer_unavailable", "the PO authority rebind writer could not be observed safely", "restore the sanctioned writer before retrying; do not edit Pipeline State manually"],
+      "planner-execution-unavailable": ["po_authority_rebind_planner_execution_unavailable", "the PO authority rebind planner could not be executed", "repair the planner execution boundary and retry the read-only planner"],
+      "planner-rejected": ["po_authority_rebind_planner_rejected", "the PO authority rebind planner rejected the current authority preimage", "inspect and repair the typed planner precondition; do not edit Pipeline State manually"],
+      "planner-protocol-violation": ["po_authority_rebind_planner_protocol_invalid", "the PO authority rebind planner emitted an invalid protocol response", "repair the planner response contract before retrying"],
+      "planner-malformed-output": ["po_authority_rebind_planner_output_invalid", "the PO authority rebind planner did not emit a valid structured plan", "repair the planner output contract before retrying"],
+      "planner-invalid-plan": ["po_authority_rebind_planner_plan_invalid", "the PO authority rebind planner emitted a plan outside the closed rebind contract", "repair the planner plan binding before retrying"],
+    };
+    const [code, message, repair] = plannerDiagnostics[poAuthorityRebind.reason]
+      ?? ["po_authority_rebind_unavailable", "the PRD and specification authority differ but no closed rebind action could be validated", "retain both authority documents and repair the typed PO rebind planner; do not edit Pipeline State manually"];
     return lifecycleResult({
       status: "partial",
       root,
@@ -1717,9 +1728,9 @@ function readyLifecycleResult({ root, runner = "codex", intent, repository, runt
       nextAction: null,
       diagnostics: [lifecycleDiagnostic(
         "$.authority.poGate",
-        "po_authority_rebind_unavailable",
-        "the PRD and specification authority differ but no closed rebind action could be validated",
-        "retain both authority documents and repair the typed PO rebind planner; do not edit Pipeline State manually",
+        code,
+        message,
+        repair,
       )],
     });
   }

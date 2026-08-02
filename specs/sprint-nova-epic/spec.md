@@ -1,18 +1,19 @@
 # Sprint Nova Epic — Technical Specification
 
-> **Gate status:** Execution is authorized by the recorded PO plan approval
-> for this exact PRD/Spec authority. The prior revocation is historical; this
-> Spec incorporates the exact released `v0.4.7` baseline, Issue `#98` and the
-> standing TP-1-through-TP-5 lift authorization. Implementation remains
-> bounded by the declared slice boundaries; final PO acceptance is still open.
+> **Gate status:** Design was reopened by the PO on 2026-08-02 for the exact
+> `v0.5.0` integration and interim-release scope below. No implementation
+> resumes until this revised PRD/Spec authority is submitted and approved.
+> The prior `v0.4.7` adoption and revocation are historical; final PO
+> acceptance remains open.
 
 ## 1. Bound authority and scope
 
 | Authority | Bound value |
 | --- | --- |
-| Current Design working baseline | released `main` / `v0.4.7`, adopted on the Nova branch |
+| Historical completed adoption base | released `main` / `v0.4.7`, adopted on the Nova branch |
 | Base commit | `89cb12b99e3fd86ac44878d0c23b278f00538921` |
 | Base tree | `b6537dcaa7bee526d9a393e2603b28648f4b0438` |
+| Approved next integration base | released `main` / `v0.5.0`, commit `a8886bcb895d97e1e8f0272d3bd5d8894451227a` |
 | Historical pre-adoption baseline | delivered and closed tag `v0.4.6`; retained only as historical implementation input |
 | Required full Execution baseline | the completed `v0.4.7` adoption above plus its exact conflict, regression and regenerated-binding evidence; no second rebase is implied |
 | Branch | `feat/sprint-nova-codex-v046` |
@@ -34,6 +35,33 @@ Nova A contains `#57`, `#7`, `#8`, `#12`, `#14`, `#29`, `#38`, `#54`,
 and `#49`.
 Nova B cannot begin from a merely latest branch head: it begins from the exact
 Nova A increment receipt accepted by the PO.
+
+### 1.1 Interim operational candidate and Phoenix rebind recovery
+
+Before the full Nova rebase is used for further Epic delivery, an interim
+candidate may be created from the exact `v0.5.0` base. Its slice is limited to
+separable operational happy-path, authorization and Critic corrections, plus
+the following Phoenix-reported recovery defect:
+
+1. The lifecycle guard admits only the exact physical State-writer command
+   `po-authority-rebind-plan` as a read-only recovery while the matching
+   `po_authority_rebind_unavailable` partial condition exists. It does not
+   admit apply, any other writer subcommand, arbitrary Node, Git, shell or
+   lifecycle command.
+2. Bootstrap preserves a typed, sanitized planner failure class and recovery
+   disposition when the planner cannot produce a closed rebind action; it
+   never reports that case as a successful recovery or hides it behind an
+   undifferentiated `unavailable` result.
+3. Regression evidence proves PRD/Spec mismatch, exact read-only plan,
+   digest-bound apply, and a new session/bootstrap inspection at `ready`.
+   Fixtures prove that manual State/bound-authority edits, generic guard
+   overrides and unrelated writer commands remain rejected.
+
+The candidate has its own commit/tree, release scope record and fresh focused
+tests, Full Verify, Security, release preflight and independent delta-correct
+Critic evidence. It may neither claim Nova A/B completion nor borrow earlier
+Nova gates. Phoenix lifecycle closure, runtime transfer and all remote or
+force-backup actions are explicitly excluded.
 
 The completed `v0.4.7` adoption is retained as evidence, not a recurring
 rebase obligation. Issue `#63` is owned by `hotfix:0.4.7` and excluded from

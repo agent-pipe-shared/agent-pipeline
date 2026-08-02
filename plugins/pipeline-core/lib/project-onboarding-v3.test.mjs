@@ -744,7 +744,29 @@ test("PRD/Spec drift exposes only the validated digest-bound PO rebind action", 
     });
     assert.equal(invalidPlan.status, "partial");
     assert.equal(invalidPlan.nextAction, null);
-    assertDiagnostic(invalidPlan, "po_authority_rebind_unavailable");
+    assertDiagnostic(invalidPlan, "po_authority_rebind_planner_plan_invalid");
+
+    const rejectedPlan = inspectProjectOnboardingV3({
+      rootDir: path,
+      intent: "dispatch",
+      deps: {
+        ...fakeDeps,
+        validatePoGateAuthorityForRepository() {
+          return { ok: false, code: "PO-GATE-PRD-SPEC-MISMATCH" };
+        },
+        spawnSync(command, args, options) {
+          if (command === process.execPath
+            && JSON.stringify(args) === JSON.stringify([writer, "po-authority-rebind-plan"])) {
+            assert.equal(options.cwd, path);
+            return { status: 2, stderr: "closed preimage mismatch\n", stdout: "" };
+          }
+          return fakeGit(command, args, options);
+        },
+      },
+    });
+    assert.equal(rejectedPlan.status, "partial");
+    assert.equal(rejectedPlan.nextAction, null);
+    assertDiagnostic(rejectedPlan, "po_authority_rebind_planner_rejected");
   } finally { dispose(path); }
 });
 

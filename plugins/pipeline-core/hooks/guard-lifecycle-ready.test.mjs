@@ -740,6 +740,38 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+test("partial PO authority rebind admits only the exact read-only planner", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const planner = `node '${PIPELINE_STATE_SCRIPT}' po-authority-rebind-plan`;
+    const plannerWithArgument = `${planner} --unexpected`;
+    const partialRebind = {
+      schema: "pipeline.project-onboarding.v4",
+      status: "partial",
+      root: path,
+      intent: "session",
+      nextAction: null,
+      diagnostics: [{ code: "po_authority_rebind_unavailable" }],
+    };
+    const denied = {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("partial"); },
+      inspectProjectOnboardingV3Fn() { return partialRebind; },
+    };
+    assert.equal(isSanctionedLifecycleCommand(planner, path), false);
+    assert.deepEqual(evaluateLifecycleReadyGuard(bash(planner), denied), { exitCode: 0, stderr: "" });
+    assert.equal(evaluateLifecycleReadyGuard(bash(plannerWithArgument), denied).exitCode, 2);
+    assert.equal(evaluateLifecycleReadyGuard(bash(`node '${PIPELINE_STATE_SCRIPT}' po-authority-rebind-apply --plan-sha256 ${"a".repeat(64)} --updated-at 2026-08-02T00:00:00.000Z --activate`), denied).exitCode, 0);
+    assert.equal(evaluateLifecycleReadyGuard(bash(planner), {
+      ...denied,
+      inspectProjectOnboardingV3Fn() {
+        return { ...partialRebind, diagnostics: [{ code: "continuity_damaged" }] };
+      },
+    }).exitCode, 2);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 test("non-ready cleanup recovery and privatization admit only exact closed argv", () => {
   const path = root();
   try {

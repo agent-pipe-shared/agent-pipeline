@@ -19,6 +19,7 @@ import {
   ProjectOnboardingReadyError,
   requireProjectOnboardingReady,
 } from "../lib/project-onboarding-ready-gate.mjs";
+import { inspectProjectOnboardingV3 } from "../lib/project-onboarding-v3.mjs";
 import { loadRuntimeProjectionV3OwnedKeys } from "../lib/runtime-projection-v3.mjs";
 import {
   hasCodexExistingGitControlMount,
@@ -619,6 +620,36 @@ function sanctionedPoAuthorityRebindArgs(args) {
     && args.length === 6;
 }
 
+/**
+ * The rebind planner is read-only but must still be unavailable to every
+ * unrelated partial lifecycle state. This narrowly admits its exact argv only
+ * when the same inspection reports the diagnosis that the planner repairs.
+ */
+function isExactPoAuthorityRebindPlannerRecovery(command, root, dependencies = {}) {
+  const words = simpleWords(command, root);
+  if (!words || words.length !== 3
+    || !["node", process.execPath].includes(words[0])
+    || words[1] !== PIPELINE_STATE_SCRIPT
+    || words[2] !== "po-authority-rebind-plan") return false;
+  let observed;
+  try {
+    observed = (dependencies.inspectProjectOnboardingV3Fn ?? inspectProjectOnboardingV3)({
+      rootDir: root,
+      intent: "session",
+    });
+  } catch {
+    return false;
+  }
+  return observed?.schema === "pipeline.project-onboarding.v4"
+    && observed?.status === "partial"
+    && observed?.root === root
+    && observed?.intent === "session"
+    && observed?.nextAction === null
+    && Array.isArray(observed?.diagnostics)
+    && observed.diagnostics.length === 1
+    && observed.diagnostics[0]?.code === "po_authority_rebind_unavailable";
+}
+
 function sanctionedPipelineStateArgs(args) {
   const validBy = (value) => typeof value === "string"
     && value.trim() !== "" && Buffer.byteLength(value, "utf8") <= 500;
@@ -855,6 +886,13 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
       || (toolName === "Bash" && isRestartResumeHintCapture(input.tool_input.command, root)))) {
       return verdict(0);
     }
+    const exactPoAuthorityRebindRecovery = error instanceof ProjectOnboardingReadyError
+      && error.code === "PORG-NOT-READY"
+      && error.intent === "session"
+      && error.lifecycleStatus === "partial"
+      && toolName === "Bash"
+      && isExactPoAuthorityRebindPlannerRecovery(input.tool_input.command, root, dependencies);
+    if (exactPoAuthorityRebindRecovery) return verdict(0);
     return toolName === "Bash"
       && isSanctionedLifecycleCommand(input.tool_input.command, root)
       ? verdict(0)

@@ -1,19 +1,20 @@
 # Sprint Nova Epic — Product Requirements
 
 <!-- po-language: en -->
-<!-- technical-spec-sha256: f11730c26009018e7bf879878149761fddfc84433f01acffa97727e92d8a210e -->
+<!-- technical-spec-sha256: aa6097c34fed0ce1349d158372dc29cce75142904548697057101a6ed4d13d5b -->
 
 **Feature ID:** `sprint-nova-epic`
 **Profile / rigor / risk:** Epic / 2 / high
 **Gate:** Revised PRD/Spec accepted by the PO; the exact `v0.4.7` adoption and
 the PO emergency-override, WSL Git-routing and copy/paste-recovery amendments
 are bound before implementation resumes
-**Current execution base:** released `main` / `v0.4.7`, commit
+**Current implementation base:** released `main` / `v0.4.7`, commit
 `89cb12b99e3fd86ac44878d0c23b278f00538921`, tree
 `b6537dcaa7bee526d9a393e2603b28648f4b0438`; its completed adoption record is
-`design/rebase-readiness-0.4.7.md`
-**Working branch:** rebased `feat/sprint-nova-codex-v046`; push remains at the
-later PO gate
+`design/rebase-readiness-0.4.7.md`. The approved next integration base is
+released `main` / `v0.5.0`, commit `a8886bcb895d97e1e8f0272d3bd5d8894451227a`.
+**Working branch:** `feat/sprint-nova-codex-v046`; the `v0.5.0` rebase and any
+branch publication remain at their respective gated actions.
 **Sibling workstream:** Sprint Cyborg, independently owned and independently
 closable
 
@@ -29,6 +30,35 @@ Implementation begins only after the sanctioned State submission/approval and
 phase transition bind these exact bytes. That approval grants no external
 access, credentials, provider mutation, merge, push, release, issue closure or
 final increment acceptance.
+
+## 2026-08-02 PO-approved `v0.5.0` integration and interim operational release
+
+The PO has approved a bounded delivery sequence for remote operational use:
+Nova is rebased onto the released `v0.5.0` baseline now, while a separately
+scoped interim candidate may contain only independently useful happy-path,
+authorization and Critic corrections. It is not a Nova A/B acceptance, does
+not close any Nova Issue, and must not reuse historical Nova candidate
+evidence.
+
+The interim candidate additionally includes the Phoenix-reported
+`po_authority_rebind_unavailable` deadlock only as a portable Pipeline repair:
+
+- when the exact partial diagnostic is present, permit the exact
+  `po-authority-rebind-plan` State-writer invocation as read-only lifecycle
+  recovery;
+- preserve fail-closed handling for every other State-writer command or
+  lifecycle condition;
+- emit the rebind planner's typed failure disposition rather than collapsing
+  it to generic `unavailable`; and
+- prove the full mismatch → read-only plan → digest-bound apply → fresh
+  session/bootstrap `ready` sequence without manual State or bound-PRD/Spec
+  edits and without a guard-override bypass.
+
+Runtime transfer, Phoenix close transfer, remote inspection, push, tag,
+publication, Issue action and any force operation remain outside this
+interim scope. A later release action needs a fresh exact candidate binding,
+focused regressions, Full Verify, Security, release preflight, independent
+delta-correct Critic review and its own explicit PO release authorization.
 
 ## Executive decision
 
