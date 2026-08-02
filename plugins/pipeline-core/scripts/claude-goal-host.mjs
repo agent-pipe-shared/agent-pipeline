@@ -13,20 +13,34 @@ function hash(value) { return createHash("sha256").update(value, "utf8").digest(
 function unavailable(code) { return { ok: false, code, status: "unavailable", readback: null }; }
 
 export async function reconcileClaudeGoal({ action, sessionId, objective, generation }, { client } = {}) {
-  if (!new Set(["set", "clear"]).has(action) || typeof sessionId !== "string" || sessionId.length === 0
+  if (!new Set(["set", "pause", "clear"]).has(action) || typeof sessionId !== "string" || sessionId.length === 0
     || typeof objective !== "string" || objective.length === 0 || objective.length > 4_000
     || !Number.isSafeInteger(generation) || generation < 0) return unavailable("CLG-INPUT");
   if (!client || typeof client.setGoal !== "function" || typeof client.getGoal !== "function" || typeof client.clearGoal !== "function") return unavailable("CLG-CAPABILITY");
   try {
     if (action === "set") {
       const current = await client.getGoal({ sessionId });
-      if (!(current && current.sessionId === sessionId && current.objective === objective && current.status === "active")) await client.setGoal({ sessionId, objective, status: "active" });
+      if (current && current.sessionId === sessionId && current.objective !== objective) return unavailable("CLG-GOAL-IDENTITY-MISMATCH");
+      if (current && current.sessionId === sessionId && current.objective === objective && current.status === "blocked") return unavailable("CLG-BLOCKED-RESUME-REQUIRED");
+      if (!(current && current.sessionId === sessionId && current.objective === objective && current.status === "active")) {
+        await client.setGoal({ sessionId, objective, status: "active" });
+      }
+    } else if (action === "pause") {
+      const current = await client.getGoal({ sessionId });
+      if (!(current && current.sessionId === sessionId && current.objective === objective && ["active", "paused"].includes(current.status))) {
+        return unavailable("CLG-PAUSE-IDENTITY-MISMATCH");
+      }
+      if (current.status === "active") await client.setGoal({ sessionId, objective, status: "paused" });
+    } else {
+      const current = await client.getGoal({ sessionId });
+      if (current && (current.sessionId !== sessionId || current.objective !== objective)) return unavailable("CLG-CLEAR-IDENTITY-MISMATCH");
+      if (current !== null) await client.clearGoal({ sessionId });
     }
-    else await client.clearGoal({ sessionId });
     const goal = await client.getGoal({ sessionId });
     if (action === "clear") return goal === null ? { ok: true, code: "CLG-CLEARED", status: "cleared", readback: { goalIdSha256: null, generation, status: "cleared" } } : unavailable("CLG-CLEAR-READBACK");
-    if (!goal || goal.sessionId !== sessionId || goal.objective !== objective || goal.status !== "active") return unavailable("CLG-READBACK");
-    return { ok: true, code: "CLG-ACTIVE", status: "active", readback: { goalIdSha256: hash(`${sessionId}\n${objective}`), generation, observedAt: new Date().toISOString(), status: "active" } };
+    const status = action === "pause" ? "paused" : "active";
+    if (!goal || goal.sessionId !== sessionId || goal.objective !== objective || goal.status !== status) return unavailable("CLG-READBACK");
+    return { ok: true, code: action === "pause" ? "CLG-PAUSED" : "CLG-ACTIVE", status, readback: { goalIdSha256: hash(`${sessionId}\n${objective}`), generation, observedAt: new Date().toISOString(), status } };
   } catch { return unavailable("CLG-TRANSPORT"); }
 }
 

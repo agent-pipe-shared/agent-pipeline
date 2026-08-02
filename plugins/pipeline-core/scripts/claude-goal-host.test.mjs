@@ -18,11 +18,14 @@ await check("matching native readback activates the goal", async () => {
   const client = { setGoal: async (value) => { goal = value; sets += 1; }, getGoal: async () => goal, clearGoal: async () => { goal = null; } };
   const active = await reconcileClaudeGoal(input, { client }); assert.equal(active.status, "active"); assert.match(active.readback.observedAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u);
   await reconcileClaudeGoal(input, { client }); assert.equal(sets, 1);
+  const paused = await reconcileClaudeGoal({ ...input, action: "pause" }, { client }); assert.equal(paused.status, "paused");
+  assert.equal((await reconcileClaudeGoal(input, { client })).status, "active"); assert.equal(sets, 3);
   assert.equal((await reconcileClaudeGoal({ ...input, action: "clear" }, { client })).status, "cleared");
 });
 await check("mismatched native readback is never success", async () => {
   const client = { setGoal: async () => {}, getGoal: async () => ({ sessionId: "session-1", objective: "other", status: "active" }), clearGoal: async () => {} };
-  assert.deepEqual(await reconcileClaudeGoal(input, { client }), { ok: false, code: "CLG-READBACK", status: "unavailable", readback: null });
+  assert.deepEqual(await reconcileClaudeGoal(input, { client }), { ok: false, code: "CLG-GOAL-IDENTITY-MISMATCH", status: "unavailable", readback: null });
+  assert.deepEqual(await reconcileClaudeGoal({ ...input, action: "pause" }, { client }), { ok: false, code: "CLG-PAUSE-IDENTITY-MISMATCH", status: "unavailable", readback: null });
 });
 await check("continuity host binding never substitutes missing Claude capability", async () => {
   const result = await reconcileClaudeNativeContinuation({ continuity: continuity(), activeFeature: { id: "nova-b", phase: "implementation" }, continuationId: "nova-b0", runner: { runnerId: "claude", adapterVersion: "v1", capability: "available" }, event: { kind: "activate", atRevision: 3 } }, { sessionId: "session-1", client: {} });
