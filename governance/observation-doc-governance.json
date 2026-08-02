@@ -68,6 +68,7 @@
         "lifecycle": "maintained",
         "paths": [
           "docs/README.md",
+          "docs/audit-bundles.md",
           "docs/deploy/README.md",
           "docs/design/README.md",
           "docs/design/design-facilitator-prompt.md",

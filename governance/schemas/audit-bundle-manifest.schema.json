@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.dev/schemas/pipeline.audit-bundle-manifest.v1.json",
+  "title": "Pipeline audit bundle manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "bundleId", "candidate", "effectivePolicySha256", "artifacts"],
+  "properties": {
+    "schema": { "const": "pipeline.audit-bundle-manifest.v1" },
+    "bundleId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$" },
+    "candidate": { "type": "object", "additionalProperties": false, "required": ["commit", "tree"], "properties": { "commit": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" }, "tree": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" } } },
+    "effectivePolicySha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "artifacts": { "type": "array", "minItems": 1, "items": { "type": "object", "additionalProperties": false, "required": ["path", "sourcePath", "sha256"], "properties": { "path": { "type": "string", "pattern": "^artifacts/[0-9]{3}-[a-z-]+$" }, "sourcePath": { "type": "string" }, "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" } } } }
+  }
+}
