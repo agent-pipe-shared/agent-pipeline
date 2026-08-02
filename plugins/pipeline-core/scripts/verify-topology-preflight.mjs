@@ -10,7 +10,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { evaluateAiHardeningGate } from "./ai-assisted-hardening-gate.mjs";
+import { evaluateAiHardeningGate, runIndependentChecks } from "./ai-assisted-hardening-gate.mjs";
 
 export const VERIFY_TOPOLOGY_SCHEMA = "pipeline.verify-topology-preflight.v1";
 const OID = /^[0-9a-f]{40}$/u;
@@ -74,6 +74,9 @@ export function preflightVerifyTopology({
   privileged = false,
   isolated = false,
   validated = false,
+  independentChecks = [],
+  authorId = "candidate-author",
+  reviewerId = null,
 } = {}) {
   if (typeof candidateRevision !== "string" || candidateRevision.length === 0 || typeof runGit !== "function") {
     return failure("VTP-INPUT-INVALID");
@@ -105,6 +108,9 @@ export function preflightVerifyTopology({
     privileged,
     isolated,
     validated,
+    independentChecks,
+    authorId,
+    reviewerId,
   });
   if (!hardening.allowed) return failure("VTP-AI-HARDENING-REJECTED", "candidate");
 
@@ -178,6 +184,9 @@ export function runVerifyTopologyCli(argv = process.argv.slice(2)) {
     runGit: (args) => defaultGit(parsed.root, args),
     changedPaths,
     event: process.env.GITHUB_EVENT_NAME ?? "local",
+    independentChecks: runIndependentChecks(parsed.root, changedPaths),
+    authorId: defaultGit(parsed.root, ["log", "-1", "--format=%ae", parsed.candidateRevision]).stdout,
+    reviewerId: process.env.PIPELINE_SECURITY_REVIEWER_ID ?? null,
   });
 }
 

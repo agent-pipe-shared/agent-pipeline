@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.threat-model.v1",
   "candidate": {
-    "commit": "c85b6360c3b9a72e2ee1ea2d0b5c59d28b64399a",
-    "tree": "a4af120a54d5e4b0912bf3d0ad18deeff142304c"
+    "commit": "aee422c80c7f214e9fa41f6bb78b9d8b877c9ad3",
+    "tree": "989cf0a74087b5942f9df97da04d5a7bc9d40846"
   },
   "policyRevision": "cyb-5-policy-v1",
   "classification": "public",
