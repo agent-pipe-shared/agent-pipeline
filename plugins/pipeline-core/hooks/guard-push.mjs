@@ -1428,13 +1428,20 @@ if (pushGate.approval === "standing-approved") {
           `(rewrite only via harness/scripts/pipeline-state.mjs, never by hand).`,
       ]);
     }
-    const forCommit = state?.pushApproval?.lastApproved?.forCommit;
+    const approval = state?.pushApproval?.lastApproved;
+    const forCommit = approval?.forCommit;
     if (!forCommit || forCommit !== sourceCommit) {
       failures.push(
         `Push approval missing or stale: state.pushApproval.lastApproved.forCommit=${JSON.stringify(
           forCommit ?? null,
         )}, expected pushed source commit=${JSON.stringify(sourceCommit)}. Record: node harness/scripts/pipeline-state.mjs approve-push --by <name>.`,
       );
+    }
+    if (pushGate.approval === "required" && approval?.criticalProof !== undefined) {
+      const action = approval.criticalProof?.action;
+      if (action?.kind !== "push" || approval.remote !== pushBinding.remote || approval.destination !== pushBinding.destination) {
+        failures.push("Push approval critical proof is not bound to this remote and destination ref.");
+      }
     }
   }
 }

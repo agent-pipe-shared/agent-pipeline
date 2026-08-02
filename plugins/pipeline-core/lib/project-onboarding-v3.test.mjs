@@ -665,6 +665,14 @@ test("PRD/Spec drift exposes only the validated digest-bound PO rebind action", 
       plannedAt,
       "--activate",
     ];
+    const diagnosticAction = {
+      kind: "command",
+      executable: process.execPath,
+      argv: [writer, "po-authority-rebind-plan"],
+      mutation: false,
+      requiresConfirmation: false,
+      expected: { schema: "pipeline.po-authority-rebind-plan.v1" },
+    };
     const observed = inspectProjectOnboardingV3({
       rootDir: path,
       intent: "dispatch",
@@ -743,7 +751,7 @@ test("PRD/Spec drift exposes only the validated digest-bound PO rebind action", 
       },
     });
     assert.equal(invalidPlan.status, "partial");
-    assert.equal(invalidPlan.nextAction, null);
+    assertSingleLineAction(invalidPlan.nextAction, diagnosticAction);
     assertDiagnostic(invalidPlan, "po_authority_rebind_planner_plan_invalid");
 
     const rejectedPlan = inspectProjectOnboardingV3({
@@ -765,7 +773,7 @@ test("PRD/Spec drift exposes only the validated digest-bound PO rebind action", 
       },
     });
     assert.equal(rejectedPlan.status, "partial");
-    assert.equal(rejectedPlan.nextAction, null);
+    assertSingleLineAction(rejectedPlan.nextAction, diagnosticAction);
     assertDiagnostic(rejectedPlan, "po_authority_rebind_planner_rejected");
   } finally { dispose(path); }
 });

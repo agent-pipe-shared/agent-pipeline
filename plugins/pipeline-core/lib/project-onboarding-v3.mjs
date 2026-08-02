@@ -1728,7 +1728,16 @@ function readyLifecycleResult({ root, runner = "codex", intent, repository, runt
       runtime,
       continuity,
       appServer,
-      nextAction: null,
+      nextAction: {
+        kind: "command",
+        executable: process.execPath,
+        argv: [PO_AUTHORITY_REBIND_WRITER, "po-authority-rebind-plan"],
+        mutation: false,
+        requiresConfirmation: false,
+        expected: {
+          schema: "pipeline.po-authority-rebind-plan.v1",
+        },
+      },
       diagnostics: [lifecycleDiagnostic(
         "$.authority.poGate",
         code,

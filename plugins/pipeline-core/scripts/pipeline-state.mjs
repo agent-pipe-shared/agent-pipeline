@@ -5068,7 +5068,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       const policy = criticalHumanProofPolicy(dir);
       if (!policy.ok) { console.error(`Error: approve-push refused (${policy.code}).`); return 2; }
       const expectedFlags = new Set(policy.requiredKinds.has("push")
-        ? ["by", "proof-request", "proof-authority", "proof"] : ["by"]);
+        ? ["by", "remote", "destination", "proof-request", "proof-authority", "proof"] : ["by"]);
       const parsed = parseExactFlags(rest, expectedFlags);
       const by = parsed.value?.by;
       if (!parsed.ok || isBlank(by)) {
@@ -5083,7 +5083,15 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       }
       const approvedAt = now();
       let proof = null;
+      let pushTarget = null;
       if (policy.requiredKinds.has("push")) {
+        const remote = parsed.value.remote;
+        const destination = parsed.value.destination;
+        if (typeof remote !== "string" || !/^[A-Za-z0-9._-]{1,80}$/u.test(remote)
+          || typeof destination !== "string" || !/^refs\/heads\/[A-Za-z0-9._/-]{1,200}$/u.test(destination)) {
+          console.error("Error: approve-push requires a safe --remote and full --destination ref when critical proof is enabled.");
+          return 2;
+        }
         const observed = gitCandidate(dir);
         if (!observed.ok || observed.commit !== head.commit) {
           console.error("Error: current candidate commit/tree could not be determined; push proof was not recorded.");
@@ -5091,15 +5099,20 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         }
         const verified = verifyCriticalHumanProof({
           dir, state: base, kind: "push", candidate: observed,
-          subject: { sourceCommit: observed.commit }, flags: parsed.value, now: approvedAt,
+          subject: { sourceCommit: observed.commit, remote, destination }, flags: parsed.value, now: approvedAt,
         });
         if (!verified.ok) { console.error(`Error: approve-push refused (${verified.code}); external proof was not consumed.`); return 2; }
+        if (base.pushApproval?.lastApproved?.criticalProof?.proofSha256 === verified.proof.proofSha256) {
+          console.error("Error: approve-push refused (CRITICAL-PROOF-REPLAY); external proof was already consumed.");
+          return 2;
+        }
         proof = verified.proof;
+        pushTarget = { remote, destination };
       }
       const next = {
         ...base,
         schema: SCHEMA_ID,
-        pushApproval: { lastApproved: { approvedBy: by, approvedAt, forCommit: head.commit, ...(proof === null ? {} : { criticalProof: proof }) } },
+        pushApproval: { lastApproved: { approvedBy: by, approvedAt, forCommit: head.commit, ...(proof === null ? {} : { criticalProof: proof, ...pushTarget }) } },
         updatedAt: approvedAt,
       };
       if (!stateWriteSucceeded(writeState(dir, next, base))) {

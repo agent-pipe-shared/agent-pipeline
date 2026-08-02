@@ -1,6 +1,6 @@
 # Nova plan amendment — human authorization and Cyborg handover
 
-**Status:** draft for the reopened Nova design gate
+**Status:** approved by Human on 2026-08-02
 **Staging PRD/Spec:** [`../../2026-08-02_nova-human-authorization/prd_nova-human-authorization.md`](../../2026-08-02_nova-human-authorization/prd_nova-human-authorization.md), [`../../2026-08-02_nova-human-authorization/spec.md`](../../2026-08-02_nova-human-authorization/spec.md)
 
 ## Scope
@@ -22,6 +22,12 @@
 5. Validate each of the six Cyborg handover rows on the final Nova candidate;
    retain evidence tuples and apply only passing canonical transitions through
    the Nova writer.
+6. Repair the Phoenix lifecycle recovery defects: stale PO-profile receipts
+   must have a digest-bound repair path, and an unavailable PO-authority
+   rebind must return either a digest-bound rebind plan or an explicit safe
+   diagnosis route.
+7. Add a current candidate-bound threat model and an explicit rollback path
+   for the critical authorization boundary.
 
 ## File ownership and tests
 
