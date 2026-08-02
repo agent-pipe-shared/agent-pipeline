@@ -1,0 +1,66 @@
+{
+  "schema": "pipeline.backlog-spec-binding.v1",
+  "featureId": "sprint-nova-epic",
+  "specification": {
+    "path": "specs/sprint-nova-epic/spec.md",
+    "sha256": "d465aa628bfeb1184625dd47adb0340570e29119862099da735ea83b9a3273a6"
+  },
+  "backlogSnapshot": {
+    "commit": "8c24a1ff97e18dd58b1211100c48dd77c98b662e",
+    "tree": "a5f0e75ff185d00d02b58e8571d5b18c99e4e8c5",
+    "backlogSubtree": "8497375136175b5d050b0a98e638037ce59c0722ae80f25b2fd933bfc55a7e8b",
+    "ledgerHead": "2e2367b0bcb3feb7cdf27117dae40791f1126f63e999a3b317f9b105bc5d60b1",
+    "indexFileSha256": "e1f10b43fecd5222e1b3ff85bae035bae3c20cc90e20ab54c72228c8ce59716d",
+    "statusFileSha256": "11e1933119a53e4a75086d21558c378ae6fcf67a04e96a5d7520640d23ee6863",
+    "itemFileSha256": [
+      { "id": "pipeline.afk-assumption-mode", "sha256": "45e10a6506790763071c4624e1d9227c967017c208c1196a2073c93895b16f2d" },
+      { "id": "pipeline.backlog-delivery-status-reconciliation", "sha256": "0012edd3419bbef6b98263ecd05b5411deaad46a6591101ebf8854945154f184" },
+      { "id": "pipeline.canonical-worktree-lifecycle", "sha256": "d8320c7d5f4572ebd04ae1cd820b6e683a3c6b17d978dad498d71bb1e33aca2a" },
+      { "id": "pipeline.close-spec-retention-and-consent", "sha256": "159fc3ccd8a4c1181b8e5ca58297cb1c99f9de5d61acd582a56dd6101c4fc291" },
+      { "id": "pipeline.closed-input-channel-review-economics", "sha256": "d4591ff5973808e061bd9aa953c63e4f531e88e77922cc1871a1db805cb1799a" },
+      { "id": "pipeline.codex-plugin-validator-host-parity", "sha256": "187b765846a7e95e4520566c1dd46227bb1489290049745637bb04701577eb6d" },
+      { "id": "pipeline.codex-sandbox-critic-longterm", "sha256": "58fb6176639b6587753a72cf8b058516f2b03138b9926e6fb6d28a97970c5409" },
+      { "id": "pipeline.critic-context-isolation", "sha256": "e0a35706ee6bb91ecdf866d966a6a5e3d5a1bc201c699555d4e093c77f91ec83" },
+      { "id": "pipeline.cross-repository-override-ledger-binding", "sha256": "7b9e4b8d8f52d2e4ae333f462b626a7fb66c46ed3efe70657f288329f7ab2f10" },
+      { "id": "pipeline.dispatch-provenance", "sha256": "afd9f62a024c52b44e7e4e66fa255812c3c3f67aea49e9ca3cc3cce92028f15a" },
+      { "id": "pipeline.documentation-information-architecture", "sha256": "53ab65f2da4c9920cfa347bb33f86efedb8a085e455a8931a67503dd9aa1550a" },
+      { "id": "pipeline.dual-channel-publication", "sha256": "7e9ce85a995a1cddca8de814b3747b239141e298a353540e8f77a96973f64002" },
+      { "id": "pipeline.elephant-direct-implementation-under-afk-authorization", "sha256": "d494f0bfe734ee931d315a2e4d039707c4932f5f09a28729cd70171f76bbc2c8" },
+      { "id": "pipeline.evidence-bound-review-retry-economics", "sha256": "afa742e5c9a8eb7dd0df30898afa0852436b264e99f60ea1ff85ae872968ef36" },
+      { "id": "pipeline.execution-model-switchback", "sha256": "4a9e39d27933aab5754d12798f4ac691fa8e41a01ff65039c2f823d33d0c5a2a" },
+      { "id": "pipeline.managed-onboarding-success-contract", "sha256": "26bbad903617cec9670cf25f0a8b772ce20744f85d7ce569ad9c394d155b5939" },
+      { "id": "pipeline.multi-cli-efficiency-pilots", "sha256": "d9bfe134fd42cf62235015243b1da67ba1b00df97c1329d1720844fc489b9b90" },
+      { "id": "pipeline.nonblocking-interaction-continuity", "sha256": "e1ee35e24d455ce80785ba056f1d923afd553c5f5e75dfd60247fb7649250b1a" },
+      { "id": "pipeline.observation-intake-document-governance", "sha256": "85e185101098b29eb85b2f6054007a741fc652c329793c4ba7e61e57d9d7e701" },
+      { "id": "pipeline.po-gate-worktree-authority", "sha256": "7489c130bad6354cc91d4cb6937cfa68593b31a1fa987ab948d8ef0f9c9d18d3" },
+      { "id": "pipeline.private-overlay-activation-bridge", "sha256": "7a09cb7de1c581d06c431166f8ef5e246cf34b634a6bc70cddb1a43ab474dd2f" },
+      { "id": "pipeline.project-scoped-github-issue-operations", "sha256": "8497d7f492762be52f61574c76df9019b8141b61bcf98b49011072960c1df8eb" },
+      { "id": "pipeline.push-guard-worktree-target", "sha256": "9a041b86dbc4212155e84a4042e352520da1c31fdd58e863789ed034c5f8df7b" },
+      { "id": "pipeline.recovery-preview-callback-attestation", "sha256": "35e0912cfc63f6e7d94e687977093b0d3625392051ba1dbf14256ca512eda39f" },
+      { "id": "pipeline.regulated-document-hooks", "sha256": "bf7335eac24a4b92a070f8406254de0f54ed9641ceb804dfe378db600cf81b2e" },
+      { "id": "pipeline.sentinel-go-live-completion", "sha256": "d4c7680f27dbb453a5e3a43821542196237d38b0a994f0be605b4fc87de0cd80" },
+      { "id": "pipeline.session-keep-awake", "sha256": "de5409539c9d922d50bc991c466997038279eeb0760e35d8fdbeee2ef482738f" },
+      { "id": "pipeline.source-available-commercial-licensing", "sha256": "1106637377822e589df7b01eb7d1c0223030c93722c5cda5d180c3b4ef339f40" },
+      { "id": "pipeline.spec-retention-on-close", "sha256": "ed62a636ab8f2c5067b195b7249ac2d755588128f067e57ddb146bfba3fd0844" },
+      { "id": "pipeline.stateful-design-contract-template", "sha256": "3d19b864531d88e1b28b7f5dbfe3291dad06948561446b8fe8e3e530a40fa5f1" },
+      { "id": "pipeline.t1-governance-path-preflight", "sha256": "a64f0839ba907f29ee30fc205c84070089371b0b44cd36b2026d0e135fbf12e3" },
+      { "id": "pipeline.verify-gate-scoped-registration", "sha256": "2238427c8e785405b4beaff6ba3efdbd8ae9abd93b2dec8e75ab15fc16b5c5a5" },
+      { "id": "pipeline.windows-directory-durability", "sha256": "59ad5dd56c5a16ca20cfeeec08de8b43911ce34abecf50630815efa4c01bdb86" },
+      { "id": "pipeline.windows-private-state-assurance", "sha256": "08a4367f48bbbeda0bf560d91caa3896760d4c153687ff4f61332f3d9bb09b17" },
+      { "id": "pipeline.windows-runtime-baseline-containment", "sha256": "62ac9ead2e3d87d91e3f436778c3f5b73fc6e30ce244044c0da97b105d823dd3" },
+      { "id": "pipeline.windows-trusted-tool-resolution", "sha256": "67ed62667ef72bff6f497edc20d6a244b8b13c762b1cbf9ad269ccb66ad8172b" },
+      { "id": "pipeline.windows-verify-reproducibility", "sha256": "05e2743a7f780eb89bd699f6667cdf9f8eaefb6b4e1e9560939e838fdbd7b005" }
+    ]
+  },
+  "bindings": [
+    {
+      "id": "pipeline.backlog-delivery-status-reconciliation",
+      "issue": 57,
+      "increment": "A",
+      "acceptanceIds": ["NVA-A57-1", "NVA-A57-2", "NVA-A57-3", "NVA-A57-4", "NVA-A57-5", "NVA-A57-6"],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    }
+  ],
+  "recordSha256": "8029eee122f798fb0fb951c859ede6a5a55422a73e6d6f6d5929a929180bc9b3"
+}
