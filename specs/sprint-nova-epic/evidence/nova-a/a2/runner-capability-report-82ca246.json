@@ -1,0 +1,91 @@
+{
+  "schema": "pipeline.runner-capability-report.v1",
+  "reportId": "nova-a2-82ca246",
+  "identity": {
+    "adapterId": "runner-capability-report",
+    "adapterVersion": "v1",
+    "implementationSha256": "01440a5d701544cfc350421b6b5c8f679ad693469ddd4e9be9ca6e4f21b1936e",
+    "requestedRunner": "codex",
+    "requestedModel": "gpt-5.6-sol",
+    "observedRunner": "not-observed",
+    "observedModel": "not-observed"
+  },
+  "environment": {
+    "platformClass": "linux-wsl2",
+    "architectureClass": "x86-64",
+    "hostClass": "host-authorized-wsl",
+    "fingerprintSha256": "365f5540cefdae394cde43ed2c7263f4840c1681c8e1e0fda16676f55ff702d1"
+  },
+  "capacity": [
+    {
+      "unit": "cpu-millicores",
+      "value": 32000,
+      "source": "observed",
+      "status": "known"
+    }
+  ],
+  "cells": [
+    {
+      "capabilityId": "claude-native-review",
+      "mode": "unavailable",
+      "status": "unavailable",
+      "evidence": []
+    },
+    {
+      "capabilityId": "codex-native-readonly",
+      "mode": "native",
+      "status": "observed",
+      "evidence": [
+        {
+          "kind": "sandbox-preflight",
+          "path": "specs/sprint-nova-epic/evidence/nova-a/a2/codex-preflight-82ca246.json",
+          "fileSha256": "a792901f1aabf131867919d192f771618b61c2e284347a3a22b780e4642ce61f",
+          "recordSha256": null
+        }
+      ]
+    },
+    {
+      "capabilityId": "synthetic-contract",
+      "mode": "synthetic",
+      "status": "certified",
+      "evidence": [
+        {
+          "kind": "fixture",
+          "path": "plugins/pipeline-core/lib/runner-capability-report.test.mjs",
+          "fileSha256": "45edf0119ef94c6abe24c72c2b91b9edb0be7625e9f265ccaf648dd29766db86",
+          "recordSha256": null
+        }
+      ]
+    },
+    {
+      "capabilityId": "unsupported-live-worker",
+      "mode": "unsupported",
+      "status": "unsupported",
+      "evidence": []
+    }
+  ],
+  "assurance": {
+    "workspace": { "status": "observed", "evidenceSha256": "a792901f1aabf131867919d192f771618b61c2e284347a3a22b780e4642ce61f" },
+    "process": { "status": "observed", "evidenceSha256": "a792901f1aabf131867919d192f771618b61c2e284347a3a22b780e4642ce61f" },
+    "filesystem": { "status": "observed", "evidenceSha256": "a792901f1aabf131867919d192f771618b61c2e284347a3a22b780e4642ce61f" },
+    "network": { "status": "observed", "evidenceSha256": "a792901f1aabf131867919d192f771618b61c2e284347a3a22b780e4642ce61f" },
+    "os": { "status": "observed", "evidenceSha256": "a792901f1aabf131867919d192f771618b61c2e284347a3a22b780e4642ce61f" }
+  },
+  "bindings": {
+    "suiteVersion": "nova-a2-v1",
+    "candidate": {
+      "commit": "82ca24684302b5421fc1c039aaf4b197c30d62e1",
+      "tree": "e19676477ff82f827cfe56c800341dee036fa01a"
+    },
+    "authorityDigests": [
+      { "kind": "codex-sandbox-policy", "sha256": "ebb9e75f240b3bd08d7a0e92872cbcbdb3295d5c082c376663f1052151f8413c" },
+      { "kind": "runner-capability-report-implementation", "sha256": "01440a5d701544cfc350421b6b5c8f679ad693469ddd4e9be9ca6e4f21b1936e" },
+      { "kind": "sandbox-preflight-implementation", "sha256": "10b3e1cee17e3d77f44395e696102a181b05079ca2fcdd5fc476e8ca6e3f6078" }
+    ],
+    "rawEvidenceSha256": [
+      "45edf0119ef94c6abe24c72c2b91b9edb0be7625e9f265ccaf648dd29766db86",
+      "a792901f1aabf131867919d192f771618b61c2e284347a3a22b780e4642ce61f"
+    ]
+  },
+  "recordSha256": "bbbb138ccbe1654e4dd3dc09e047a37a0d0db75c1e8bef9554d5f146942cc626"
+}
