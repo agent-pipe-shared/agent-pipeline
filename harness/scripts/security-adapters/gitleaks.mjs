@@ -161,6 +161,25 @@ function authorityKey(finding) {
     : `${fingerprint.sha256}\0${fingerprint.path}\0${fingerprint.rule}\0${fingerprint.line}\0${fingerprint.column}`;
 }
 
+// Gitleaks reports absolute filesystem paths when scanning the detached candidate snapshot.
+// Content-v1 authorities deliberately bind repository-relative paths, so normalize only a
+// physical regular candidate descendant before computing that authority key.  External,
+// missing, linked, or otherwise ambiguous paths remain untouched and therefore cannot match
+// an authority entry.
+function normalizeCandidateFindingPath(finding, rootDir) {
+  const field = typeof finding?.File === "string" ? "File" : typeof finding?.file === "string" ? "file" : null;
+  if (field === null || !isAbsolute(finding[field])) return finding;
+  try {
+    const physicalRoot = realpathSync(rootDir);
+    const physicalFile = realpathSync(finding[field]);
+    const repositoryPath = relative(physicalRoot, physicalFile);
+    if (!safeAuthorityPath(repositoryPath)) return finding;
+    return { ...finding, [field]: repositoryPath };
+  } catch {
+    return finding;
+  }
+}
+
 /** Env override -> plain PATH walk. Returns { installed, path? , reason? }. Never throws. */
 function resolveBinary(env) {
   const override = env?.[ENV_VAR];
@@ -315,7 +334,8 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
 
   const retained = [];
   let ignoredFindingCount = 0;
-  for (const finding of parsed) {
+  for (const rawFinding of parsed) {
+    const finding = normalizeCandidateFindingPath(rawFinding, rootDir);
     const key = authorityKey(finding);
     if (key !== null && contentAuthority.entries.has(key)) ignoredFindingCount++;
     else retained.push(finding);

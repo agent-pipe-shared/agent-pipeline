@@ -22,7 +22,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { name, CAPABILITY_CONTRACT_V2, run } from "./gitleaks.mjs";
+import { name, CAPABILITY_CONTRACT_V2, gitleaksContentAuthorityLine, run } from "./gitleaks.mjs";
 import { resolveTrustedSystemExecutable } from "../security-readiness/tool-identity.mjs";
 
 test("CAPABILITY_CONTRACT_V2 exists and is frozen", () => {
@@ -115,6 +115,35 @@ test("run() always passes --no-git to `gitleaks detect`, keeping every existing 
       assert.ok(args.includes(flag), `existing flag ${flag} must remain in args: ${JSON.stringify(args)}`);
     }
     assert.equal(args[args.indexOf("--source") + 1], rootDir, "--source must still point at rootDir");
+  } finally {
+    rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+test("run() matches a content-v1 authority against the detached snapshot's absolute finding path", async () => {
+  const rootDir = mkdtempSync(join(tmpdir(), "gitleaks-snapshot-authority-"));
+  const candidatePath = join(rootDir, "backlog", "fixture.txt");
+  const reportFinding = {
+    File: candidatePath,
+    RuleID: "fixture-rule",
+    StartLine: 7,
+    StartColumn: 3,
+    Secret: "fixture-secret-value",
+    Description: "fixture finding",
+  };
+  try {
+    mkdirSync(join(rootDir, "backlog"), { recursive: true });
+    writeFileSync(candidatePath, "fixture-only content\n");
+    const authorityFinding = { ...reportFinding, File: "backlog/fixture.txt" };
+    writeFileSync(join(rootDir, ".gitleaksignore"), `${gitleaksContentAuthorityLine(authorityFinding)}\n`);
+    const spySpawn = (cmd, args) => {
+      writeFileSync(args[args.indexOf("--report-path") + 1], JSON.stringify([reportFinding]));
+      return { status: 0, stdout: "", stderr: "", error: null };
+    };
+    const result = await run({ rootDir, config: { binaryPath: join(rootDir, "unused-fake-gitleaks") }, spawnFn: spySpawn, timeoutMs: 5000 });
+    assert.equal(result.status, "PASS");
+    assert.equal(result.findings.length, 0);
+    assert.equal(result.ignored.findingCount, 1);
   } finally {
     rmSync(rootDir, { recursive: true, force: true });
   }
