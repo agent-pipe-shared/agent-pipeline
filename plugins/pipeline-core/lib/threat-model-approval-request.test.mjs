@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -28,7 +28,7 @@ assert.ok(parseArgs(["prepare", "--repo-root", "/one", "--repo-root", "/two"]).e
 assert.equal(approvalRequestFromExternalJson({ ok: true, value: request }), request);
 assert.deepEqual(parseHumanArgs(["setup", "--repo-root", "/repo", "--directory", "/human-po"]), { command: "setup", keyReference: "local-po-key", repoRoot: "/repo", directory: "/human-po" });
 assert.ok(parseHumanArgs(["approve", "--directory", "relative"]).error);
-const external = mkdtempSync(join(tmpdir(), "po-human-approval-")); const nominalRepo = `${external}-repo`;
+const external = mkdtempSync(join(tmpdir(), "po-human-approval-")); const nominalRepo = mkdtempSync(join(tmpdir(), "po-human-repo-"));
 writeFileSync(join(external, "request.json"), JSON.stringify({ ok: true, value: request })); writeFileSync(join(external, "authority.json"), JSON.stringify(trustPolicy)); writeFileSync(join(external, "proof.json"), JSON.stringify(proof));
 assert.equal(runApprovalRequest(["verify", "--repo-root", nominalRepo, "--request", join(external, "request.json"), "--authority", join(external, "authority.json"), "--proof", join(external, "proof.json")], { observeCandidate: () => candidate }).value.verified, true);
 assert.throws(() => runApprovalRequest(["verify", "--repo-root", nominalRepo, "--request", join(external, "request.json"), "--authority", join(external, "authority.json"), "--proof", join(external, "proof.json")], { observeCandidate: () => ({ ...candidate, tree: "f".repeat(40) }) }), /current clean candidate/u);
@@ -46,7 +46,9 @@ const setup = runHumanApproval(["setup", "--repo-root", nominalRepo, "--director
 assert.equal(setup.code, "PO-HUMAN-AUTHORITY-READY");
 assert.equal(JSON.parse(readFileSync(join(keyDirectory, "trust-policy.json"), "utf8")).publicKeySha256, trustPolicy.publicKeySha256);
 assert.throws(() => runHumanApproval(["setup", "--repo-root", nominalRepo, "--directory", `${nominalRepo}/po`]), /outside the repository/u);
+mkdirSync(join(nominalRepo, "inside")); const linkedDirectory = join(external, "linked-po"); symlinkSync(join(nominalRepo, "inside"), linkedDirectory, "dir");
+assert.throws(() => runHumanApproval(["setup", "--repo-root", nominalRepo, "--directory", linkedDirectory]), /outside the repository/u);
 writeFileSync(join(external, "po-private.pem"), "encrypted-private-key-placeholder");
 assert.equal(runHumanApproval(["approve", "--repo-root", nominalRepo, "--directory", external], { spawn: (_executable, args) => { writeFileSync(args[args.indexOf("-out") + 1], "detached-signature"); return { status: 0 }; } }).code, "PO-HUMAN-PROOF-READY");
 assert.equal(JSON.parse(readFileSync(join(external, "proof.json"), "utf8")).intentSha256, request.approvalIntent.sha256);
-console.log("20 threat-model approval request checks passed");
+console.log("21 threat-model approval request checks passed");

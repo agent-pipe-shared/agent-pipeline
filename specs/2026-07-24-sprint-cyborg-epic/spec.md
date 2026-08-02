@@ -201,6 +201,17 @@ Canonical records get a new `threat-model` class in
 `governance/artifact-topology.json` (same ADR-0045 extension mechanism as
 `security-finding`). Depends: CYB-1.
 
+**Approval-transport compatibility and rollback.** The public proof schema is
+unchanged: an older external request wrapper remains readable, but verification
+now fails closed unless its request matches the current clean candidate. A
+caller with a stale request must run `prepare` and obtain a new detached human
+approval; it must never replay or rewrite an old proof. The human-terminal
+helper is additive and stores its encrypted Ed25519 key outside the checkout.
+If the helper rollout must be withdrawn, stop invoking the helper, retain the
+external key and public proof files without importing them into the repository,
+and ship the rollback as a new candidate that receives its own PO proof. No
+rollback deletes, migrates, or invalidates a previously issued external proof.
+
 ### CYB-5 — AI-assisted development hardening (#46) (XL, P1)
 Per §2.4, delivered as three slices: (a) trust taxonomy + definition-integrity
 inventory + task-authority manifest & guards + drift requalification

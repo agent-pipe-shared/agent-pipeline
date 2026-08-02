@@ -6,6 +6,16 @@ shell. The encrypted private key and its passphrase live in an external
 directory; they are never placed in the repository. The agent may see the
 public request and public proof, but never the private key or passphrase.
 
+## Start of every terminal session
+
+Run these two lines again whenever you open a new terminal. They only name the
+checkout and the external public-proof/key directory; they contain no secret.
+
+```sh
+REPO="$HOME/src/agent-pipeline-share_cyborg"
+PO_DIR="$HOME/agent-pipeline-po"
+```
+
 ## One-time setup
 
 Choose an external directory and let the helper create an encrypted Ed25519
@@ -13,8 +23,6 @@ key. OpenSSL prompts locally for the passphrase. This is the CLI fallback; it
 does not put a code word into chat, environment variables, or configuration.
 
 ```sh
-REPO="$HOME/src/agent-pipeline-share_cyborg"
-PO_DIR="$HOME/agent-pipeline-po"
 node "$REPO/plugins/pipeline-core/scripts/po-human-approval.mjs" setup --repo-root "$REPO" --directory "$PO_DIR"
 ```
 
@@ -30,7 +38,8 @@ node "$REPO/plugins/pipeline-core/scripts/po-human-approval.mjs" verify --repo-r
 exact current candidate-bound intent, writes only public request/trust/proof
 files to `PO_DIR`, and never accepts a secret by argument, environment, stdin,
 repository file, or pipeline state. A changed Git candidate requires a new
-`prepare` and `approve` step.
+`prepare` and `approve` step. Every helper command resolves symlinks before
+using `PO_DIR` and rejects a directory that reaches the repository.
 
 ## Product direction
 

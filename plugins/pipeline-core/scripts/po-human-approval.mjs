@@ -11,7 +11,7 @@
  */
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -30,6 +30,16 @@ function outside(repoRoot, path) {
 function fail(message) { throw new Error(message); }
 function json(path) { return JSON.parse(readFileSync(path, "utf8")); }
 function publicKeyPolicy(publicKey, keyReference) { return { keyReference, publicKeySha256: createHash("sha256").update(publicKey).digest("hex") }; }
+function externalDirectory(repository, directory, { create = false } = {}) {
+  if (!outside(repository, directory)) fail("approval directory must be outside the repository");
+  if (create) mkdirSync(directory, { recursive: true, mode: 0o700 });
+  let canonicalRepository; let canonicalDirectory;
+  try { canonicalRepository = realpathSync(repository); canonicalDirectory = realpathSync(directory); }
+  catch { fail("approval directory or repository is missing or unreadable"); }
+  if (!outside(canonicalRepository, canonicalDirectory)) fail("approval directory must be outside the repository");
+  if (create) chmodSync(canonicalDirectory, 0o700);
+  return canonicalDirectory;
+}
 
 export function parseHumanArgs(argv) {
   const [command, ...tokens] = argv; const values = { command, keyReference: "local-po-key" }; const supplied = new Set();
@@ -52,20 +62,18 @@ function command(executable, args, dependencies) {
 
 export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}) {
   const args = parseHumanArgs(argv); if (args.error) fail(args.error);
-  const directory = resolve(args.directory); const repository = args.repoRoot === undefined ? null : resolve(args.repoRoot);
-  if (repository !== null && !outside(repository, directory)) fail("approval directory must be outside the repository");
+  const repository = resolve(args.repoRoot);
+  const directory = externalDirectory(repository, resolve(args.directory), { create: args.command === "setup" || args.command === "prepare" });
   const paths = { request: `${directory}/request.json`, privateKey: `${directory}/po-private.pem`, publicKey: `${directory}/po-public.pem`, authority: `${directory}/trust-policy.json`, proof: `${directory}/proof.json`, signature: `${directory}/signature.bin`, intent: `${directory}/intent.txt` };
   const write = dependencies.writeFile ?? writeFileSync; const read = dependencies.readFile ?? readFileSync; const exists = dependencies.exists ?? existsSync;
   if (args.command === "setup") {
     if (exists(paths.privateKey) || exists(paths.publicKey) || exists(paths.authority)) fail("PO authority already exists; refusing to overwrite it");
-    mkdirSync(directory, { recursive: true, mode: 0o700 }); chmodSync(directory, 0o700);
     command("openssl", ["genpkey", "-algorithm", "ED25519", "-aes-256-cbc", "-out", paths.privateKey], dependencies);
     command("openssl", ["pkey", "-in", paths.privateKey, "-pubout", "-out", paths.publicKey], dependencies);
     const authority = publicKeyPolicy(read(paths.publicKey, "utf8"), args.keyReference); write(paths.authority, `${JSON.stringify(authority, null, 2)}\n`, { mode: 0o600 }); chmodSync(paths.privateKey, 0o600);
     return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority };
   }
   if (args.command === "prepare") {
-    mkdirSync(directory, { recursive: true, mode: 0o700 }); chmodSync(directory, 0o700);
     const result = runApprovalRequest(["prepare", "--repo-root", repository, "--feature-id", "cyb-4", "--plan", "specs/2026-07-24-sprint-cyborg-epic/prd_cyborg-epic.md", "--spec", "specs/2026-07-24-sprint-cyborg-epic/spec.md", "--model", "specs/cyb-4/threat-model.json"]);
     write(paths.request, `${JSON.stringify(result, null, 2)}\n`, { mode: 0o600 });
     return { ok: true, code: "PO-HUMAN-REQUEST-READY", candidate: result.value.candidate, intentSha256: result.value.approvalIntent.sha256 };
