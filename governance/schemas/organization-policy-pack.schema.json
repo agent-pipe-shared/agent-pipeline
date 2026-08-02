@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.dev/schemas/pipeline.organization-policy-pack.v1.json",
+  "title": "Pipeline organization policy pack v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "packId", "revision", "compatibility", "governanceFloors", "documentClasses"],
+  "properties": {
+    "schema": { "const": "pipeline.organization-policy-pack.v1" },
+    "packId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{2,63}$" },
+    "revision": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "compatibility": { "type": "object", "additionalProperties": false, "required": ["minimumCoreVersion", "maximumCoreVersion"], "properties": { "minimumCoreVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" }, "maximumCoreVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" } } },
+    "governanceFloors": { "type": "object", "additionalProperties": false, "required": ["requireHumanDecisionLedger", "allowExternalAuthority"], "properties": { "requireHumanDecisionLedger": { "const": true }, "allowExternalAuthority": { "const": false } } },
+    "documentClasses": { "type": "array", "maxItems": 32, "items": { "type": "object", "additionalProperties": false, "required": ["class", "mode", "approvalRequired"], "properties": { "class": { "enum": ["architecture", "operations", "security", "privacy", "continuity", "recovery", "release", "change-management"] }, "mode": { "enum": ["reference-only", "projection", "controlled-publication"] }, "approvalRequired": { "type": "boolean" } } } }
+  }
+}
