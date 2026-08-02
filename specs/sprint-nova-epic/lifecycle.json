@@ -301,6 +301,14 @@
       "authority": false,
       "mutability": "immutable",
       "retention": "retain"
+    },
+    {
+      "class": "candidate-evidence",
+      "path": "specs/sprint-nova-epic/evidence/nova-b/po-49-native-transfer-scope-approval.json",
+      "sha256": "3689069ff2e2d80b08d628961bcdd5fd3dc170664bb80b8a12b37f66553e0016",
+      "authority": false,
+      "mutability": "immutable",
+      "retention": "retain"
     }
   ],
   "candidate": null,
