@@ -41,6 +41,8 @@ const PO_PROFILE_REPAIR_SCRIPT = fileURLToPath(new URL("../scripts/po-gate-profi
 const PROJECT_AUTHORITY_MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/project-authority-migration.mjs", import.meta.url));
 const HUMAN_OVERRIDE_SCRIPT = fileURLToPath(new URL("../scripts/guard-human-override.mjs", import.meta.url));
 const PRIVATE_OVERLAY_SCRIPT = fileURLToPath(new URL("../scripts/codex-private-overlay-activation.mjs", import.meta.url));
+const PO_HUMAN_APPROVAL_SCRIPT = fileURLToPath(new URL("../scripts/po-human-approval.mjs", import.meta.url));
+const PO_APPROVAL_GATE_SCRIPT = fileURLToPath(new URL("../scripts/po-approval-gate.mjs", import.meta.url));
 
 function root() {
   const path = mkdtempSync(join(tmpdir(), "guard-lifecycle-ready-"));
@@ -225,6 +227,49 @@ test("consumer sessions cannot mutate Pipeline sources, cachebusters or plugin i
   } finally {
     rmSync(path, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("agents prepare and verify only public PO artifacts while human signing stays external", () => {
+  const path = root();
+  const external = mkdtempSync(join(tmpdir(), "guard-lifecycle-po-public-"));
+  const readiness = {
+    schema: "pipeline.project-onboarding-ready-gate.v1",
+    status: "ready",
+    intent: "session",
+  };
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const command of [
+      `node ${PO_APPROVAL_GATE_SCRIPT} prepare --repo-root ${path} --directory ${external} --feature-id cyb-4`,
+      `node ${PO_APPROVAL_GATE_SCRIPT} prepare-all --repo-root ${path} --directory ${external}`,
+      `node ${PO_APPROVAL_GATE_SCRIPT} verify-all --repo-root ${path} --directory ${external}`,
+    ]) {
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
+      assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { return readiness; },
+      }), { exitCode: 0, stderr: "" }, command);
+    }
+    for (const command of [
+      `node ${PO_APPROVAL_GATE_SCRIPT} prepare --repo-root ${path} --directory ${external} --feature-id cyb-8`,
+      `node ${PO_APPROVAL_GATE_SCRIPT} prepare-all --repo-root ${path} --directory ${external} --feature-id cyb-4`,
+      `node ${PO_APPROVAL_GATE_SCRIPT} prepare --repo-root ${path} --directory ${path} --feature-id cyb-4`,
+    ]) assert.equal(isForbiddenCrossRepositoryMutation(command, path), true, command);
+    for (const command of [
+      `node ${PO_HUMAN_APPROVAL_SCRIPT} approve --repo-root ${path} --directory ${external} --feature-id cyb-4`,
+      `node ${PO_HUMAN_APPROVAL_SCRIPT} setup --repo-root ${path} --directory ${external}`,
+    ]) {
+      const result = evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { return readiness; },
+      });
+      assert.equal(result.exitCode, 2, command);
+      assert.match(result.stderr, /human-terminal actions/u, command);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(external, { recursive: true, force: true });
   }
 });
 

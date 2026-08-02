@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 /**
- * Human-terminal helper for the PO proof flow.
+ * PO proof helper with a deliberately split responsibility boundary.
  *
- * It is intentionally for a terminal operated by the approving human. The
- * encrypted private key stays outside the checkout and OpenSSL reads its
- * passphrase from that terminal. No password, passphrase, recovery code or
- * private key is accepted as an argument, environment value, stdin payload,
- * repository file, or pipeline state.
+ * `prepare` writes only public candidate-bound requests and is agent work.
+ * `setup` and `approve` are intentionally for a terminal operated by the
+ * approving human. The encrypted private key stays outside the checkout and
+ * OpenSSL reads its passphrase from that terminal. No password, passphrase,
+ * recovery code or private key is accepted as an argument, environment value,
+ * stdin payload, repository file, or pipeline state. `verify` is public
+ * readback and is agent work again.
  */
 import { createHash, createPublicKey } from "node:crypto";
 import { spawnSync } from "node:child_process";
@@ -18,7 +20,7 @@ import { pathToFileURL } from "node:url";
 import { approvalRequestFromExternalJson, observeCleanCandidate, run as runApprovalRequest } from "./po-approval-request.mjs";
 import { verifyThreatModelApprovalRequest } from "../lib/threat-model-approval-request.mjs";
 
-const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>]";
+const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir>";
 const own = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 const SHA = /^[a-f0-9]{64}$/u;
 const text = (value) => typeof value === "string" && value.trim() !== "";
@@ -80,8 +82,9 @@ export function parseHumanArgs(argv) {
     if (!new Set(["directory", "repoRoot", "keyReference", "featureId", "plan", "spec", "model"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
     supplied.add(normalized); values[normalized] = value; index += 1;
   }
-  if (!new Set(["setup", "prepare", "approve", "verify"]).has(command) || !text(values.directory) || !isAbsolute(values.directory)
+  if (!new Set(["setup", "prepare", "prepare-all", "approve", "approve-all", "verify", "verify-all"]).has(command) || !text(values.directory) || !isAbsolute(values.directory)
     || !text(values.repoRoot) || !isAbsolute(values.repoRoot)) return { error: USAGE };
+  if (command.endsWith("-all") && (values.featureId || values.plan || values.spec || values.model)) return { error: USAGE };
   return values;
 }
 
@@ -92,6 +95,25 @@ function command(executable, args, dependencies) {
 
 export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}) {
   const args = parseHumanArgs(argv); if (args.error) fail(args.error);
+  if (args.command.endsWith("-all")) {
+    const action = args.command.slice(0, -4);
+    const results = ["cyb-4", "cyb-5"].map((featureId) => runHumanApproval([
+      action,
+      "--repo-root", args.repoRoot,
+      "--directory", args.directory,
+      "--feature-id", featureId,
+    ], dependencies));
+    const candidates = results.map((result) => result.candidate ?? result.value?.candidate).filter(Boolean);
+    if (candidates.some((candidate) => candidate.commit !== candidates[0]?.commit || candidate.tree !== candidates[0]?.tree)) {
+      fail("all PO approval artifacts must bind the same candidate");
+    }
+    return {
+      ok: true,
+      code: `PO-HUMAN-${action.toUpperCase()}-ALL-READY`,
+      candidate: candidates[0] ?? null,
+      results,
+    };
+  }
   const repository = resolve(args.repoRoot);
   const directory = externalDirectory(repository, resolve(args.directory), { create: args.command === "setup" || args.command === "prepare" });
   const featureId = args.featureId ?? "cyb-4";

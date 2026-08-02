@@ -11,11 +11,11 @@ import { pathToFileURL } from "node:url";
 
 import { parseHumanArgs, runHumanApproval } from "./po-human-approval.mjs";
 
-const USAGE = "Usage: po-approval-gate.mjs prepare --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir>";
+const USAGE = "Usage: po-approval-gate.mjs prepare --repo-root <repo> --directory <external-dir> [--feature-id <id>] | prepare-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir>";
 
 export function parseGateArgs(argv) {
   const parsed = parseHumanArgs(argv);
-  if (parsed.error || !new Set(["prepare", "verify"]).has(parsed.command)) return { error: USAGE };
+  if (parsed.error || !new Set(["prepare", "prepare-all", "verify", "verify-all"]).has(parsed.command)) return { error: USAGE };
   return parsed;
 }
 

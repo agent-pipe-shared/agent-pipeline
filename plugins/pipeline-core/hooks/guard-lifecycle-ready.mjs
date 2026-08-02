@@ -52,6 +52,8 @@ const PO_PROFILE_REPAIR_SCRIPT = fileURLToPath(new URL("../scripts/po-gate-profi
 const PROJECT_AUTHORITY_MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/project-authority-migration.mjs", import.meta.url));
 const HUMAN_OVERRIDE_SCRIPT = fileURLToPath(new URL("../scripts/guard-human-override.mjs", import.meta.url));
 const PRIVATE_OVERLAY_SCRIPT = fileURLToPath(new URL("../scripts/codex-private-overlay-activation.mjs", import.meta.url));
+const PO_HUMAN_APPROVAL_SCRIPT = fileURLToPath(new URL("../scripts/po-human-approval.mjs", import.meta.url));
+const PO_APPROVAL_GATE_SCRIPT = fileURLToPath(new URL("../scripts/po-approval-gate.mjs", import.meta.url));
 const HEX = /^[a-f0-9]{64}$/u;
 const HOST_INIT_CROSS_VIEW_STATUSES = new Set([
   "repository-mount-read-only",
@@ -147,6 +149,14 @@ function crossRepositoryMutationBlocked() {
       + "Pipeline source, another repository, marketplace metadata, cachebuster updates, "
       + "and plugin installation require a separate session rooted at the exact target "
       + "plus their own explicit PO authorization.\n",
+  );
+}
+
+function externalPoSigningOnly() {
+  return verdict(
+    2,
+    "EXTERNAL ACTION REQUIRED (guard-lifecycle-ready, plugin pipeline-core): "
+      + "PO setup and approve are human-terminal actions; the agent may prepare and verify only public request/proof artifacts.\n",
   );
 }
 
@@ -357,6 +367,45 @@ function hasExternalOutputRedirect(command, root) {
   return false;
 }
 
+function poApprovalArgs(command, root, scriptPath) {
+  const words = simpleWords(command, root);
+  if (!words || words.length < 3 || resolve(root, words[1]) !== scriptPath) return null;
+  return words.slice(2);
+}
+
+function externalApprovalDirectory(args, root, index) {
+  return args[index] === "--directory"
+    && typeof args[index + 1] === "string"
+    && isAbsolute(args[index + 1])
+    && !pathInside(root, resolve(args[index + 1]));
+}
+
+/**
+ * Preparation and verification handle public, candidate-bound artifacts only.
+ * They are agent work.  Setup and signing remain excluded below because they
+ * can access the human's private key or terminal passphrase prompt.
+ */
+export function isAgentPoPublicCommand(command, root) {
+  const args = poApprovalArgs(command, root, PO_APPROVAL_GATE_SCRIPT);
+  if (!args) return false;
+  const feature = (index) => args[index] === "--feature-id" && ["cyb-4", "cyb-5"].includes(args[index + 1]);
+  if (["prepare-all", "verify-all"].includes(args[0])) {
+    return args[1] === "--repo-root" && args[2] === root
+      && externalApprovalDirectory(args, root, 3) && args.length === 5;
+  }
+  if (["prepare", "verify"].includes(args[0])
+    && args[1] === "--repo-root" && args[2] === root
+    && externalApprovalDirectory(args, root, 3)) {
+    return args.length === 5 || (feature(5) && args.length === 7);
+  }
+  return false;
+}
+
+function isHumanPoSigningCommand(command, root) {
+  const args = poApprovalArgs(command, root, PO_HUMAN_APPROVAL_SCRIPT);
+  return args !== null && ["setup", "approve"].includes(args[0]);
+}
+
 /**
  * Identify the concrete cross-repository mutation patterns involved in local
  * plugin development. Read-only commands remain handled by the diagnostic
@@ -364,6 +413,8 @@ function hasExternalOutputRedirect(command, root) {
  */
 export function isForbiddenCrossRepositoryMutation(command, root, dependencies = {}) {
   const parsed = parseGuardCommand(command, root);
+  if (isAgentPoPublicCommand(command, root)) return false;
+  if (poApprovalArgs(command, root, PO_APPROVAL_GATE_SCRIPT) !== null) return true;
   if (isBoundedReadOnlyPipeline(parsed, root)) return false;
   if (parsed.parseStatus !== "accepted" && hasExternalOutputRedirect(command, root)) return true;
   if (parsed.parseStatus === "accepted" && parsed.redirects.length > 0) {
@@ -631,6 +682,9 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
     return blocked();
   }
   if (!governed) return verdict(0);
+  if (toolName === "Bash" && isHumanPoSigningCommand(input.tool_input.command, root)) {
+    return externalPoSigningOnly();
+  }
   if (["Edit", "Write"].includes(toolName)) {
     if (!isProjectWritePath(input.tool_input.file_path, root, dependencies)) {
       return crossRepositoryMutationBlocked();

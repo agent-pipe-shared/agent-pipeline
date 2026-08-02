@@ -29,8 +29,11 @@ assert.ok(parseArgs(["prepare", "--repo-root", "/one", "--repo-root", "/two"]).e
 assert.equal(approvalRequestFromExternalJson({ ok: true, value: request }), request);
 assert.deepEqual(parseHumanArgs(["setup", "--repo-root", "/repo", "--directory", "/human-po"]), { command: "setup", keyReference: "local-po-key", repoRoot: "/repo", directory: "/human-po" });
 assert.deepEqual(parseHumanArgs(["prepare", "--repo-root", "/repo", "--directory", "/human-po", "--feature-id", "cyb-5", "--plan", "specs/plan.md", "--spec", "specs/spec.md", "--model", "specs/cyb-5/threat-model.json"]), { command: "prepare", keyReference: "local-po-key", repoRoot: "/repo", directory: "/human-po", featureId: "cyb-5", plan: "specs/plan.md", spec: "specs/spec.md", model: "specs/cyb-5/threat-model.json" });
+assert.deepEqual(parseHumanArgs(["prepare-all", "--repo-root", "/repo", "--directory", "/human-po"]), { command: "prepare-all", keyReference: "local-po-key", repoRoot: "/repo", directory: "/human-po" });
 assert.deepEqual(parseGateArgs(["verify", "--repo-root", "/repo", "--directory", "/human-po"]), { command: "verify", keyReference: "local-po-key", repoRoot: "/repo", directory: "/human-po" });
+assert.deepEqual(parseGateArgs(["verify-all", "--repo-root", "/repo", "--directory", "/human-po"]), { command: "verify-all", keyReference: "local-po-key", repoRoot: "/repo", directory: "/human-po" });
 assert.ok(parseGateArgs(["approve", "--repo-root", "/repo", "--directory", "/human-po"]).error);
+assert.ok(parseGateArgs(["prepare-all", "--repo-root", "/repo", "--directory", "/human-po", "--feature-id", "cyb-4"]).error);
 assert.ok(parseHumanArgs(["approve", "--directory", "relative"]).error);
 const external = mkdtempSync(join(tmpdir(), "po-human-approval-")); const nominalRepo = mkdtempSync(join(tmpdir(), "po-human-repo-"));
 writeFileSync(join(external, "request.json"), JSON.stringify({ ok: true, value: request })); writeFileSync(join(external, "authority.json"), JSON.stringify(trustPolicy)); writeFileSync(join(external, "proof.json"), JSON.stringify(proof));
@@ -69,4 +72,7 @@ assert.throws(() => runHumanApproval(["setup", "--repo-root", nominalRepo, "--di
 writeFileSync(join(external, "po-private.pem"), "encrypted-private-key-placeholder");
 assert.equal(runHumanApproval(["approve", "--repo-root", nominalRepo, "--directory", external], { spawn: (_executable, args) => { writeFileSync(args[args.indexOf("-out") + 1], "detached-signature"); return { status: 0 }; } }).code, "PO-HUMAN-PROOF-READY");
 assert.equal(JSON.parse(readFileSync(join(external, "proof.json"), "utf8")).intentSha256, request.approvalIntent.sha256);
-console.log("31 threat-model approval request checks passed");
+writeFileSync(join(external, "request-cyb-5.json"), JSON.stringify({ ok: true, value: request }));
+assert.equal(runHumanApproval(["approve-all", "--repo-root", nominalRepo, "--directory", external], { spawn: (_executable, args) => { writeFileSync(args[args.indexOf("-out") + 1], "detached-signature"); return { status: 0 }; } }).code, "PO-HUMAN-APPROVE-ALL-READY");
+assert.equal(JSON.parse(readFileSync(join(external, "proof-cyb-5.json"), "utf8")).intentSha256, request.approvalIntent.sha256);
+console.log("36 threat-model approval request checks passed");
