@@ -211,6 +211,30 @@ test("writer-owned orphan temps are invisible to reads and a dead owner lock is 
   await assert.rejects(() => stat(lock), { code: "ENOENT" });
 });
 
+test("competing dead-lock recovery cannot delete a newly acquired writer lock", async (t) => {
+  const root = await fixtureRoot(); t.after(() => cleanup(root));
+  await append(root);
+  const streamRoot = path.join(root, "governance/events/lifecycle");
+  const lock = path.join(streamRoot, ".lock");
+  await writeFile(lock, `${canonicalizeJson({ schema: "pipeline.governance-event-stream-lock.v1", pid: 2147483647 })}\n`);
+  const recovered = (eventId, idempotencyKey, sequence) => append(root, intent({
+    eventId,
+    idempotencyKey,
+    payload: { ...intent().payload, eventId: `lifecycle-${sequence}`, reasonCode: "RECOVERED" },
+    occurredAtEpochMs: sequence,
+    observedAtEpochMs: sequence,
+  }));
+  const results = await Promise.allSettled([
+    recovered("evt-recover-a", "idem-recover-a", 2),
+    recovered("evt-recover-b", "idem-recover-b", 3),
+  ]);
+  assert.ok(results.some((result) => result.status === "fulfilled"));
+  for (const result of results.filter((entry) => entry.status === "rejected")) assert.equal(result.reason.code, "GES-LOCKED");
+  const queried = await queryPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" });
+  assert.deepEqual(queried.events.map((event) => event.sequence), queried.events.map((_, index) => index + 1));
+  await assert.rejects(() => stat(lock), { code: "ENOENT" });
+});
+
 test("restricted storage stays outside the repository, is owner-only encrypted, and supports exact active-store erasure", async (t) => {
   const root = await fixtureRoot(); t.after(() => cleanup(root));
   const restrictedRoot = await mkdtemp(path.join(os.tmpdir(), "governance-restricted-")); t.after(() => cleanup(restrictedRoot));

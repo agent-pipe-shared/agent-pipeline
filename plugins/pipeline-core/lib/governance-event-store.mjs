@@ -29,6 +29,7 @@ const HEADS_SCHEMA = "pipeline.governance-event-heads.v1";
 const SHA256 = /^[a-f0-9]{64}$/u;
 const EVENT_FILE = /^([1-9][0-9]*)-([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\.json$/u;
 const TEMPORARY_EVENT_FILE = /^\.([1-9][0-9]*-[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\.json)\.[a-f0-9]{24}\.tmp$/u;
+const RECLAIMED_LOCK_FILE = /^\.lock\.[a-f0-9]{24}\.reclaim$/u;
 const STREAM_LOCK_SCHEMA = "pipeline.governance-event-stream-lock.v1";
 const INTENT_OMITTED_FIELDS = new Set(["sequence", "previousEventDigest", "payloadDigest", "eventDigest"]);
 const STREAMS = new Map([
@@ -403,6 +404,10 @@ async function scanStream(root, registry, streamId) {
   const events = [];
   for (const entry of entries) {
     if (entry.name === ".lock") continue;
+    // A dead lock is atomically moved to this writer-owned quarantine before
+    // deletion. Readers must not turn that non-authoritative recovery seam
+    // into a stream-integrity failure.
+    if (RECLAIMED_LOCK_FILE.test(entry.name) && entry.isFile()) continue;
     // A writer publishes only after rename.  Its own unlinked temporary bytes
     // are never authority and must not make a valid committed prefix unreadable.
     if (TEMPORARY_EVENT_FILE.test(entry.name) && entry.isFile()) continue;
@@ -465,6 +470,23 @@ async function isRecoverableDeadLock(lock) {
   catch (error) { return error?.code === "ESRCH"; }
 }
 
+/** Atomically retire the exact stale pathname; never unlink a replacement lock. */
+async function reclaimRecoverableDeadLock(lock) {
+  if (!(await isRecoverableDeadLock(lock))) return false;
+  const quarantine = `${lock}.${randomBytes(12).toString("hex")}.reclaim`;
+  try {
+    // rename is the ownership transfer: a competing writer that has already
+    // replaced `.lock` keeps its own pathname and cannot be deleted here.
+    await rename(lock, quarantine);
+  } catch (error) {
+    if (error?.code === "ENOENT") return false;
+    throw error;
+  }
+  try { await unlink(quarantine); }
+  catch (error) { throw error; }
+  return true;
+}
+
 async function acquireStreamLock(lock) {
   for (let attempt = 0; attempt < 2; attempt += 1) {
     let handle;
@@ -479,11 +501,10 @@ async function acquireStreamLock(lock) {
     } catch (error) {
       if (handle) await handle.close().catch(() => {});
       if (created) await removeLock(lock);
-      if (error?.code !== "EEXIST" || attempt !== 0 || !(await isRecoverableDeadLock(lock))) {
+      if (error?.code !== "EEXIST" || attempt !== 0 || !(await reclaimRecoverableDeadLock(lock))) {
         if (error?.code === "EEXIST") fail("GES-LOCKED", "The stream is already being written.");
         throw error;
       }
-      await unlink(lock).catch(() => fail("GES-LOCKED", "The stream lock could not be recovered safely."));
     }
   }
   fail("GES-LOCKED", "The stream is already being written.");

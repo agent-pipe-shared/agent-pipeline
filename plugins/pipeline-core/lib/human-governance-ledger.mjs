@@ -95,12 +95,12 @@ export function verifyExternalHumanGovernanceProof({ intent, trustPolicy, proof 
 }
 
 /**
- * Resolve a live local grant and require an independent Cyborg-compatible
- * proof before reporting external identity assurance.  The ordinary resolver
- * deliberately remains local-only so existing callers cannot be upgraded by
- * attaching unverified metadata.
+ * Resolve a live local grant and verify a Cyborg-compatible detached proof.
+ * A caller-supplied trust policy is not proof of that policy's provenance, so
+ * this result deliberately reports cryptographic proof verification only; it
+ * never upgrades local attribution to externally-attested human identity.
  */
-export function resolveExternallyAttestedHumanGovernanceAuthority({ decisions, decisionId, repositoryFingerprint, candidate, nowEpochMs = Date.now(), plan, spec, trustPolicy, proof } = {}) {
+export function resolveExternallyVerifiedHumanGovernanceAuthority({ decisions, decisionId, repositoryFingerprint, candidate, nowEpochMs = Date.now(), plan, spec, trustPolicy, proof } = {}) {
   const local = resolveHumanGovernanceAuthority({ decisions, decisionId, repositoryFingerprint, candidate, nowEpochMs });
   if (local.status !== "granted") return local;
   const selected = decisions.map(validateHumanGovernanceDecision).find((entry) => entry.decisionId === decisionId);
@@ -108,7 +108,7 @@ export function resolveExternallyAttestedHumanGovernanceAuthority({ decisions, d
     const intent = createExternalHumanGovernanceIntent({ decision: selected, plan, spec });
     const verified = verifyExternalHumanGovernanceProof({ intent, trustPolicy, proof });
     if (!verified.verified) return Object.freeze({ status: "denied", reason: "external-proof-unverified", proofCode: verified.code });
-    return Object.freeze({ ...local, identityAssurance: "externally-attested", approvalIntentSha256: intent.sha256, proofSha256: verified.proofSha256 });
+    return Object.freeze({ ...local, externalProofVerified: true, proofTrustAssurance: "caller-supplied-policy", approvalIntentSha256: intent.sha256, proofSha256: verified.proofSha256 });
   } catch (error) {
     if (error instanceof HumanGovernanceLedgerError) return Object.freeze({ status: "denied", reason: "external-intent-invalid", proofCode: error.code });
     throw error;

@@ -135,11 +135,11 @@ now validate candidate-bound decision references; the latter accepts only a
 separately read immutable consumption receipt, never mutable State alone.
 `H-AC-12` remains open for deploy/release consumers and Git-override
 consumption. The Cyborg-compatible detached PO-proof contract is now consumed
-by an explicit externally-attested resolver: it binds the immutable ledger
-grant, exact candidate, and scoped plan/spec artifacts, and verifies only
-against a trust policy resolved outside the candidate. Existing consumers are
-not silently upgraded; until each migration selects that resolver, local ledger
-attribution remains local attribution. Git and mutable State remain
+by an explicit proof-verification resolver: it binds the immutable ledger
+grant, exact candidate, and scoped plan/spec artifacts. A caller-supplied trust
+policy proves only the detached signature; it cannot by itself establish the
+provenance of that policy or upgrade local attribution to human identity.
+Existing consumers are not silently upgraded. Git and mutable State remain
 projections/transport; neither is promoted to historical human authority.
 
 ## #31 — Agent Decision and Assumption Journal
