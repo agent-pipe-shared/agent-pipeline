@@ -1,0 +1,120 @@
+{
+  "schema": "pipeline.security-evidence.v1",
+  "project": "agent-pipeline",
+  "command": "node harness/scripts/security-scan.mjs",
+  "commit": "7c0b0bedf48ac9fadac5d145504819439c3f2309",
+  "candidate": {
+    "status": "clean",
+    "commit": "7c0b0bedf48ac9fadac5d145504819439c3f2309",
+    "tree": "7089d7c5092c8780dd5188a649bbc9b43dc131c9",
+    "inputSha256": "c30d540fb9aae81dfebe926ef30a0814b70bc582a9d006993d1b66fa1c21bceb",
+    "repositorySha256": "b6137fe69f388c729e9c782159a75c7f1dbf9e3749281fda9f840031e72dfa85",
+    "inventory": {
+      "entries": 1084,
+      "symlinkPolicy": "reject",
+      "submodulePolicy": "reject"
+    },
+    "reason": null,
+    "snapshot": {
+      "method": "git-detached-worktree.v1",
+      "verifiedBeforeAfter": true
+    }
+  },
+  "finishedAt": "2026-08-02T12:11:13.754Z",
+  "thresholds": {
+    "block_on": [
+      "critical",
+      "high"
+    ]
+  },
+  "policy": {
+    "schema": "pipeline.security-policy-binding.v1",
+    "configurationSha256": "fe9d1c31aca7bf7abeead315d3c4320062d589fd25234de5819532f9d2553728",
+    "inputs": {
+      "authoritySource": "neutral",
+      "manifestPath": "project/pipeline.yaml",
+      "manifestSha256": "071b0236f6054bbeea2140830320a88d1c6a9e733d7294ad0bb976fd2e28c897",
+      "gitleaksIgnorePath": ".gitleaksignore",
+      "gitleaksIgnoreSha256": "a3df052c2bf888f094204710b313b37776174b955bda652a2a3801b5b9e8c33a",
+      "declaredLicensesPath": "third-party-licenses.json",
+      "declaredLicensesSha256": "137fd317197b1c9a9753679328944cef4ccfb7ad834efaaa26959e5470f05bd0",
+      "licenseAllowlistPath": "governance/examples/policies/license-allowlist.json",
+      "licenseAllowlistSha256": "8c9921cec73ce68ea9498b47b546820d36d0a63ef604bd39f24061d60b70b016",
+      "semgrepRulesPath": "governance/examples/policies/semgrep"
+    },
+    "sha256": "24d7f3be86369bdd7810a78b50390a83b4e68e9b6f617315643b14407786bd07"
+  },
+  "execution": {
+    "childProcessPreflight": {
+      "status": "PASS",
+      "classification": "success"
+    },
+    "projectAuthority": {
+      "status": "ready",
+      "source": "neutral"
+    },
+    "snapshotCleanup": {
+      "status": "removed"
+    }
+  },
+  "scanners": [
+    {
+      "tool": "gitleaks",
+      "adapter": "pipeline.security-adapter.v1",
+      "executableSha256": "8b95a336428cac9a470dc72744b4475fd50ab9221c7be6b7b776edd4d053540a",
+      "status": "PASS",
+      "classification": "success",
+      "findingCount": 0,
+      "coverage": {
+        "subject": "candidate-tree",
+        "exclusions": []
+      },
+      "ignored": {
+        "policy": "pipeline.gitleaks-content-fingerprint.v1",
+        "authorityPath": ".gitleaksignore",
+        "authoritySha256": "a3df052c2bf888f094204710b313b37776174b955bda652a2a3801b5b9e8c33a",
+        "findingCount": 14
+      }
+    },
+    {
+      "tool": "osv-scanner",
+      "adapter": "pipeline.security-adapter.v1",
+      "executableSha256": "5b67ba474cd164104f04c4de4d575131a827cdff32155bb8930f55700ea2ba12",
+      "status": "SKIPPED",
+      "classification": "success",
+      "findingCount": 0,
+      "coverage": {
+        "subject": "candidate-tree",
+        "exclusions": []
+      },
+      "reason": "no package sources in project (osv-scanner: \"No package sources found\", exit 128)"
+    },
+    {
+      "tool": "semgrep",
+      "adapter": "pipeline.security-adapter.v1",
+      "executableSha256": "0fadb15a6e8932eb6b0af915a7e8fd072c8146804299e0c89d8f275c09acd782",
+      "status": "PASS",
+      "classification": "success",
+      "findingCount": 0,
+      "coverage": {
+        "subject": "candidate-tree",
+        "exclusions": []
+      }
+    },
+    {
+      "tool": "license-check",
+      "adapter": "pipeline.security-adapter.v1",
+      "executableSha256": null,
+      "status": "PASS",
+      "classification": "success",
+      "findingCount": 0,
+      "coverage": {
+        "subject": "candidate-tree",
+        "exclusions": []
+      }
+    }
+  ],
+  "findings": [],
+  "exitCode": 0,
+  "payloadSha256": "9f668740dc6cb69a572b390c6be09f21e7b41d7284d14a842b75e6c40931f514"
+}
