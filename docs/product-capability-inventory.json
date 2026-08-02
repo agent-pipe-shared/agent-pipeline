@@ -929,6 +929,18 @@
       "member": "phase3-sdlc-coherence-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:phoenix-governance-authority-resolver-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "phoenix-governance-authority-resolver-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:phoenix-governance-authority-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "phoenix-governance-authority-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:phoenix-governance-event-cli-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -951,6 +963,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "phoenix-governance-threat-model-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:phoenix-human-governance-ledger-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "phoenix-human-governance-ledger-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:pipeline-start-v3-tests",
@@ -1671,10 +1689,13 @@
         "verify-phase:harness/scripts/verify.mjs:phase26-invariants-tests",
         "verify-phase:harness/scripts/verify.mjs:phase3-sdlc-coherence-check",
         "verify-phase:harness/scripts/verify.mjs:phase3-sdlc-coherence-tests",
+        "verify-phase:harness/scripts/verify.mjs:phoenix-governance-authority-resolver-tests",
+        "verify-phase:harness/scripts/verify.mjs:phoenix-governance-authority-tests",
         "verify-phase:harness/scripts/verify.mjs:phoenix-governance-event-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:phoenix-governance-event-store-tests",
         "verify-phase:harness/scripts/verify.mjs:phoenix-governance-event-tests",
         "verify-phase:harness/scripts/verify.mjs:phoenix-governance-threat-model-tests",
+        "verify-phase:harness/scripts/verify.mjs:phoenix-human-governance-ledger-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-start-preflight-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-start-v3-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-tests",

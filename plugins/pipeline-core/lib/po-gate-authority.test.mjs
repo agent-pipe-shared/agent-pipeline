@@ -68,6 +68,20 @@ function write(path, value, mode = undefined) {
   if (mode !== undefined) chmodSync(path, mode);
 }
 
+function humanDecisionFixture(primary, authority, featureId = "feature") {
+  const candidate = { commit: "b".repeat(40), tree: "c".repeat(40) };
+  const reference = {
+    schema: "pipeline.human-decision-reference.v1",
+    decisionId: `approve-plan-${featureId}`,
+    decisionDigest: "e".repeat(64),
+    candidate,
+    checkpoint: { repositoryFingerprint: authority.repositoryFingerprint, streamId: "human", sequence: 1, eventDigest: "f".repeat(64), candidateCommit: candidate.commit, candidateTree: candidate.tree },
+  };
+  const scope = { repositoryFingerprint: authority.repositoryFingerprint, candidate, packageId: featureId, action: "APPROVE_PLAN", environment: "local", artifacts: [{ path: authority.planPath, sha256: authority.planSha256 }, { path: authority.specPath, sha256: authority.specSha256 }] };
+  const file = "human-decision.json"; write(join(primary, file), JSON.stringify(reference));
+  return { file, candidate, reference, humanAuthority: ({ request }) => request?.decisionId === reference.decisionId ? { ok: true, value: { schema: "pipeline.governance-authority-readback.v1", granted: true, decisionId: reference.decisionId, decisionDigest: reference.decisionDigest, scope, singleUse: true } } : { ok: false, code: "PO-TEST-HUMAN-AUTHORITY" } };
+}
+
 /**
  * The fixture writes the receipt directly (it is not exercising the
  * production publisher), so on win32 it must reproduce the publisher's own
@@ -553,10 +567,13 @@ check("approve-plan binds the validated PO authority and revalidates it inside t
   withFixture({}, ({ primary, validate }) => {
     const authority = validate();
     assert.equal(authority.ok, true);
+    const human = humanDecisionFixture(primary, authority.value);
     const calls = [];
-    const status = runPipelineState(["approve-plan", "--by", "Product Owner"], {
+    const status = runPipelineState(["approve-plan", "--by", "Product Owner", "--human-decision-file", human.file], {
       dir: primary,
       now: () => NOW,
+      gitHead: () => human.candidate,
+      humanAuthority: human.humanAuthority,
       poGateAuthority(request) {
         calls.push(request);
         return authority;
@@ -570,12 +587,13 @@ check("approve-plan binds the validated PO authority and revalidates it inside t
     const observed = JSON.parse(readFileSync(join(primary, ".claude", "pipeline-state.json"), "utf8"));
     assert.equal(observed.planApproved, true);
     assert.deepEqual(observed.planApproval, {
-      schema: "pipeline.plan-approval.v2",
+      schema: "pipeline.plan-approval.v3",
       approvedBy: "Product Owner",
       approvedAt: NOW,
       specBoundBy: "Product Owner",
       specBoundAt: NOW,
       poGateAuthority: authority.value,
+      humanDecision: human.reference,
     });
   });
 });
@@ -584,12 +602,15 @@ check("approve-plan leaves state unchanged when the plan digest becomes stale be
   withFixture({}, ({ primary, validate }) => {
     const authority = validate();
     assert.equal(authority.ok, true);
+    const human = humanDecisionFixture(primary, authority.value);
     const statePath = join(primary, ".claude", "pipeline-state.json");
     const before = readFileSync(statePath, "utf8");
     let calls = 0;
-    const status = runPipelineState(["approve-plan", "--by", "Product Owner"], {
+    const status = runPipelineState(["approve-plan", "--by", "Product Owner", "--human-decision-file", human.file], {
       dir: primary,
       now: () => NOW,
+      gitHead: () => human.candidate,
+      humanAuthority: human.humanAuthority,
       poGateAuthority() {
         calls += 1;
         return calls === 1
