@@ -372,8 +372,11 @@ export const MIGRATED_AGENTS_ADAPTER = `# Agent-Pipeline optional runtime adapte
 
 This file is a pointer, not a second ruleset.
 
-Before project work, invoke \`pipeline-core:pipeline-start\`. It is the required
-methodological entry and loads the calibrated runtime authorities.
+At an actual session start or runtime re-entry, invoke
+\`pipeline-core:pipeline-start\`. It is the required methodological entry and
+loads the calibrated runtime authorities. Do not repeat it for an ordinary new
+task, user message, tool result, commit, test, PO response, or active-goal
+continuation within the same ready session.
 
 Authorities: runtime manifest \`.claude/pipeline.yaml\` and Operating Model
 \`docs/operating-model.md\`. Follow their re-entry rule.
@@ -382,7 +385,7 @@ For Codex and other non-Claude runtimes this is methodology-only. It claims no
 Claude hooks, foreign tool or agent integration, model binding, or global host
 enforcement.
 `;
-export const MIGRATED_AGENTS_ADAPTER_BLOB = "be9380c80a52ae45cfcdcbb3b6e7ebf6e2df01af";
+export const MIGRATED_AGENTS_ADAPTER_BLOB = "12edfb699af33d3bd688f6449870ecef0c6947ba";
 export const PIPELINE_START_AUTHORITY = Object.freeze({
   reference: "pipeline-core:pipeline-start",
   byteLength: 33583,
