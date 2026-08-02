@@ -110,7 +110,10 @@ function matchingCandidateEvidence(bytes, candidateCommit, candidateTree, path) 
   // Verify evidence uses the candidate at its root, whereas Security and gate
   // evidence nest it below `candidate` with additional observation metadata.
   // Both forms are valid only when they bind this exact frozen commit/tree.
-  const binding = isObject(value?.candidate) ? value.candidate : value;
+  const nested = value?.candidate;
+  const binding = isObject(nested) && typeof nested.commit === "string" && typeof nested.tree === "string"
+    ? nested
+    : value;
   if (!isObject(binding) || binding.commit !== candidateCommit || binding.tree !== candidateTree) {
     fail("CDP-EVIDENCE-BINDING", `Evidence is missing or stale for the exact candidate: ${path}`);
   }

@@ -33,6 +33,7 @@ function fixture() {
   const tree = git(root, ["rev-parse", "HEAD^{tree}"]);
   writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify({ candidate: { commit: candidate, tree } })}\n`);
   writeFileSync(join(root, "evidence", "verify-root.json"), `${JSON.stringify({ commit: candidate, tree })}\n`);
+  writeFileSync(join(root, "evidence", "verify-canonical.json"), `${JSON.stringify({ commit: candidate, tree, candidate: { start: { status: "clean" }, finish: { status: "clean" }, binding: "exact" } })}\n`);
   writeFileSync(join(root, "evidence", "prior-critic.json"), `${JSON.stringify({ candidate: { commit: base, tree: git(root, ["rev-parse", `${base}^{tree}`]) } })}\n`);
   return { root, base, candidate, tree };
 }
@@ -75,4 +76,10 @@ test("accepts the root candidate binding used by canonical Verify evidence", () 
   const fx = fixture();
   const result = preflightCriticDispatch(input(fx, { evidencePaths: ["evidence/verify-root.json"] }));
   assert.equal(result.evidence[0].candidate.tree, fx.tree);
+});
+
+test("accepts canonical Verify evidence whose candidate field is only a run-status wrapper", () => {
+  const fx = fixture();
+  const result = preflightCriticDispatch(input(fx, { evidencePaths: ["evidence/verify-canonical.json"] }));
+  assert.equal(result.evidence[0].candidate.commit, fx.candidate);
 });
