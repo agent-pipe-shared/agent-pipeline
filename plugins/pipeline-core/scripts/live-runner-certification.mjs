@@ -8,17 +8,15 @@
  * or runner prerequisites as typed unavailable evidence.
  */
 import { createHash } from "node:crypto";
+import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import {
-  CODEX_CRITIC_ARTIFACTS,
-  CODEX_CRITIC_POLICY,
-  inspectCodexBinary,
   resolveCodexBinary,
-  runProfileBoundIsolation,
 } from "./codex-critic-isolation.mjs";
+import { runCodexSandboxPreflight } from "./codex-sandbox-preflight.mjs";
 
 export const LIVE_CERTIFICATION_SCHEMA = "pipeline.live-runner-certification.v1";
 const OID = /^[0-9a-f]{40}$/u;
@@ -35,18 +33,19 @@ function platformClass(platform) {
   return "other";
 }
 
-function evidence({ status, code, candidateCommit, platform, resultSha256 = null }) {
+function evidence({ status, code, candidateCommit, platform, observedVersion = null, resultSha256 = null }) {
   return Object.freeze({
     schema: LIVE_CERTIFICATION_SCHEMA,
     status,
     code,
     candidateCommit,
-    adapter: CODEX_CRITIC_POLICY.adapter,
-    requiredVersion: CODEX_CRITIC_POLICY.requiredVersion,
+    adapter: "codex-sandbox-preflight",
+    compatibilityClass: "codex-sandbox-state-v1",
+    observedVersion,
     platformClass: platformClass(platform),
     commandSha256: sha256(JSON.stringify({
-      adapter: CODEX_CRITIC_POLICY.adapter,
-      requiredVersion: CODEX_CRITIC_POLICY.requiredVersion,
+      adapter: "codex-sandbox-preflight",
+      compatibilityClass: "codex-sandbox-state-v1",
       candidateCommit,
     })),
     resultSha256,
@@ -61,8 +60,7 @@ export async function certifyLiveRunner({
   pathEnv,
   platform = process.platform,
   resolveBinary = resolveCodexBinary,
-  inspectBinary = inspectCodexBinary,
-  runIsolation = runProfileBoundIsolation,
+  runPreflight = runCodexSandboxPreflight,
 } = {}) {
   if (typeof repoRoot !== "string" || !path.isAbsolute(repoRoot) || !OID.test(candidateCommit ?? "") || !POLICIES.has(policy)) {
     return evidence({ status: "failed", code: "LRC-INPUT-INVALID", candidateCommit: OID.test(candidateCommit ?? "") ? candidateCommit : null, platform });
@@ -72,34 +70,36 @@ export async function certifyLiveRunner({
   }
 
   let binary;
-  let inspection;
   try {
     binary = await resolveBinary({ pathEnv, platform });
-    inspection = await inspectBinary({ codexBinary: binary });
   } catch {
     return evidence({ status: "unavailable", code: "LRC-RUNNER-UNAVAILABLE", candidateCommit, platform });
   }
 
-  let result;
+  let receipt;
   try {
-    result = await runIsolation({
-      repoRoot,
-      candidateCommit,
-      artifactPaths: CODEX_CRITIC_ARTIFACTS,
-      resolvedBinary: binary,
-      binaryInspection: inspection,
-      pathEnv,
-    });
+    const scratch = await mkdtemp(path.join(os.tmpdir(), "agent-pipeline-live-certification-"));
+    try {
+      receipt = await runPreflight({
+        kind: "intermediate",
+        codexPath: binary,
+        receiptPath: path.join(scratch, "receipt.json"),
+      });
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
+    }
   } catch {
-    return evidence({ status: "failed", code: "LRC-EXECUTION-FAILED", candidateCommit, platform });
+    return evidence({ status: "failed", code: "LRC-PREFLIGHT-FAILED", candidateCommit, platform });
   }
-  const { localDiagnostics: _localDiagnostics, ...publicResult } = result && typeof result === "object" ? result : {};
-  const resultSha256 = sha256(JSON.stringify(publicResult));
+  const resultSha256 = sha256(JSON.stringify(receipt));
+  const passed = receipt?.eligibility === "intermediate" && receipt?.terminalCode === "ok"
+    && typeof receipt?.cli?.version === "string";
   return evidence({
-    status: result?.ok === true ? "passed" : "failed",
-    code: result?.ok === true ? "LRC-PASSED" : "LRC-REJECTED",
+    status: passed ? "passed" : "failed",
+    code: passed ? "LRC-PREFLIGHT-PASSED" : "LRC-PREFLIGHT-REJECTED",
     candidateCommit,
     platform,
+    observedVersion: typeof receipt?.cli?.version === "string" ? receipt.cli.version : null,
     resultSha256,
   });
 }

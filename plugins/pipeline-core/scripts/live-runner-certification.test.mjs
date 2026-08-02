@@ -35,7 +35,7 @@ await check("live certification is authority-selected and missing authority is t
   assert.equal(resolutions, 0);
 });
 
-await check("selected lane reports missing pinned runner as unavailable without leaking host data", async () => {
+await check("selected lane reports a missing runner as unavailable without leaking host data", async () => {
   const result = await certifyLiveRunner({
     repoRoot: root,
     candidateCommit: candidate,
@@ -48,58 +48,39 @@ await check("selected lane reports missing pinned runner as unavailable without 
   assert.equal(JSON.stringify(result).includes("/private"), false);
 });
 
-await check("selected live lane binds pinned inspection and sanitized result evidence", async () => {
+await check("selected live lane binds a semantic preflight receipt without a version pin", async () => {
   const calls = [];
-  const inspection = {
-    binarySha256: "1".repeat(64),
-    versionSha256: "2".repeat(64),
-    runtimeRoot: "/private/runtime",
-    runtimeRootSha256: "3".repeat(64),
-    runtimeManifestSha256: "4".repeat(64),
-    runtimeEntries: 2,
-  };
+  const receipt = { schema: "pipeline.codex-sandbox-preflight.v1", eligibility: "intermediate", terminalCode: "ok", cli: { version: "0.146.0" } };
   const result = await certifyLiveRunner({
     repoRoot: root,
     candidateCommit: candidate,
     authority: "approved",
     pathEnv: "/authority/bin",
     resolveBinary: async (input) => { calls.push(["resolve", input]); return "/authority/bin/codex"; },
-    inspectBinary: async (input) => { calls.push(["inspect", input]); return inspection; },
-    runIsolation: async (input) => {
-      calls.push(["run", input]);
-      return {
-        ok: true,
-        envelope: { schema: "public-fixture", pass: true },
-        localDiagnostics: { stderrTail: "/private/runtime credential=private" },
-      };
-    },
+    runPreflight: async (input) => { calls.push(["preflight", input]); return receipt; },
   });
   assert.equal(result.status, "passed");
-  assert.equal(result.code, "LRC-PASSED");
+  assert.equal(result.code, "LRC-PREFLIGHT-PASSED");
+  assert.equal(result.compatibilityClass, "codex-sandbox-state-v1");
+  assert.equal(result.observedVersion, "0.146.0");
   assert.match(result.commandSha256, /^[0-9a-f]{64}$/u);
-  assert.equal(result.resultSha256, createHash("sha256").update(JSON.stringify({
-    ok: true,
-    envelope: { schema: "public-fixture", pass: true },
-  })).digest("hex"));
+  assert.equal(result.resultSha256, createHash("sha256").update(JSON.stringify(receipt)).digest("hex"));
   assert.equal(calls[0][1].pathEnv, "/authority/bin");
-  assert.equal(calls[1][1].codexBinary, "/authority/bin/codex");
-  assert.equal(calls[2][1].resolvedBinary, "/authority/bin/codex");
-  assert.equal(calls[2][1].candidateCommit, candidate);
+  assert.equal(calls[1][1].codexPath, "/authority/bin/codex");
+  assert.equal(calls[1][1].kind, "intermediate");
   assert.equal(JSON.stringify(result).includes("/authority"), false);
-  assert.equal(JSON.stringify(result).includes("/private"), false);
 });
 
-await check("live rejection stays a typed failed result and input parsing is closed", async () => {
+await check("preflight rejection stays a typed failed result and input parsing is closed", async () => {
   const result = await certifyLiveRunner({
     repoRoot: root,
     candidateCommit: candidate,
     authority: "approved",
     resolveBinary: async () => "/runner/codex",
-    inspectBinary: async () => ({ runtimeRoot: "/runner" }),
-    runIsolation: async () => ({ ok: false, reason: "bounded rejection" }),
+    runPreflight: async () => ({ schema: "pipeline.codex-sandbox-preflight.v1", eligibility: "none", terminalCode: "child-stdio-error", cli: { version: "0.146.0" } }),
   });
   assert.equal(result.status, "failed");
-  assert.equal(result.code, "LRC-REJECTED");
+  assert.equal(result.code, "LRC-PREFLIGHT-REJECTED");
   assert.deepEqual(parseLiveCertificationArgs(["--candidate", candidate, "--policy", "advisory"]), {
     candidateCommit: candidate,
     policy: "advisory",
