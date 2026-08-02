@@ -1,0 +1,8 @@
+import assert from "node:assert/strict";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
+import test from "node:test";
+import { createAuthorityRevisionIntent, verifyAuthorityRevisionProof, AUTHORITY_REVISION_PROOF_SCHEMA } from "./authority-revision-proof.mjs";
+
+const hash = "a".repeat(64);
+const request = { featureId: "sprint-phoenix-epic", oldAuthority: { prd: { path: "specs/sprint-phoenix-epic/prd_phoenix-epic.md", sha256: hash }, spec: { path: "specs/sprint-phoenix-epic/spec.md", sha256: hash } }, nextAuthority: { prd: { path: "specs/sprint-phoenix-epic/prd_phoenix-epic.md", sha256: hash }, spec: { path: "specs/sprint-phoenix-epic/spec-revision-20260802.md", sha256: hash } }, decision: { id: "phoenix-section-seven", sha256: hash, scope: { featureId: "sprint-phoenix-epic", phase: "design" } }, candidate: { commit: "b".repeat(40), tree: "c".repeat(40) }, evidence: { sha256: hash }, expiresAt: "2026-12-31T00:00:00.000Z" };
+test("proof binds the complete authority revision intent", () => { const intent = createAuthorityRevisionIntent(request); const { privateKey, publicKey } = generateKeyPairSync("ed25519"); const pem = publicKey.export({ type: "spki", format: "pem" }); const trustPolicy = { keyReference: "fixture", publicKeySha256: createHash("sha256").update(pem).digest("hex") }; const proof = { schema: AUTHORITY_REVISION_PROOF_SCHEMA, intentSha256: intent.sha256, keyReference: "fixture", publicKey: pem, signatureBase64: sign(null, Buffer.from(intent.sha256), privateKey).toString("base64") }; assert.equal(verifyAuthorityRevisionProof({ intent, trustPolicy, proof }).verified, true); assert.equal(verifyAuthorityRevisionProof({ intent, trustPolicy, proof: { ...proof, intentSha256: hash } }).verified, false); });
