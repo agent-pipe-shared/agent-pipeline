@@ -3,7 +3,7 @@
   "title": "pipeline.runner-native-continuation.v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "continuationId", "subject", "objective", "acceptance", "evidence", "terminal", "runner", "generation", "status", "progress", "readback", "reason", "recordSha256"],
+  "required": ["schema", "continuationId", "subject", "objective", "acceptance", "evidence", "terminal", "runner", "generation", "status", "progress", "readback", "reason", "resolution", "recordSha256"],
   "properties": {
     "schema": { "const": "pipeline.runner-native-continuation.v1" },
     "continuationId": { "$ref": "#/$defs/id" },
@@ -18,6 +18,7 @@
     "progress": { "type": "array", "maxItems": 32, "items": { "$ref": "#/$defs/progress" } },
     "readback": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/readback" }] },
     "reason": { "type": "object", "additionalProperties": false, "required": ["code", "evidenceSha256"], "properties": { "code": { "$ref": "#/$defs/id" }, "evidenceSha256": { "$ref": "#/$defs/nullableDigest" } } },
+    "resolution": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/poDecisionReceipt" }] },
     "recordSha256": { "$ref": "#/$defs/digest" }
   },
   "allOf": [
@@ -37,6 +38,7 @@
     "evidence": { "type": "object", "additionalProperties": false, "required": ["kind", "path", "fileSha256", "recordSha256"], "properties": { "kind": { "$ref": "#/$defs/id" }, "path": { "type": "string", "pattern": "^(?!/)(?!.*//)(?!\\.{1,2}(?:/|$))(?!.*\\/\\.{1,2}(?:\\/|$))[A-Za-z0-9._/@:-]{1,512}$" }, "fileSha256": { "$ref": "#/$defs/digest" }, "recordSha256": { "$ref": "#/$defs/nullableDigest" } } },
     "progress": { "type": "object", "additionalProperties": false, "required": ["kind", "status", "evidenceSha256"], "properties": { "kind": { "$ref": "#/$defs/id" }, "status": { "enum": ["known", "unknown", "unavailable"] }, "evidenceSha256": { "$ref": "#/$defs/nullableDigest" } } },
     "readback": { "oneOf": [{ "$ref": "#/$defs/activeReadback" }, { "$ref": "#/$defs/pausedReadback" }, { "$ref": "#/$defs/clearedReadback" }] },
+    "poDecisionReceipt": { "type": "object", "additionalProperties": false, "required": ["schema", "featureId", "continuationId", "pausedRecordSha256", "pauseRevision", "resolvedRevision", "decision", "receiptSha256"], "properties": { "schema": { "const": "pipeline.po-goal-decision-receipt.v1" }, "featureId": { "$ref": "#/$defs/id" }, "continuationId": { "$ref": "#/$defs/id" }, "pausedRecordSha256": { "$ref": "#/$defs/digest" }, "pauseRevision": { "type": "integer", "minimum": 0 }, "resolvedRevision": { "type": "integer", "minimum": 0 }, "decision": { "const": "resume" }, "receiptSha256": { "$ref": "#/$defs/digest" } } },
     "activeReadback": { "type": "object", "additionalProperties": false, "required": ["goalIdSha256", "generation", "observedAt", "status"], "properties": { "goalIdSha256": { "$ref": "#/$defs/digest" }, "generation": { "type": "integer", "minimum": 0 }, "observedAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$" }, "status": { "const": "active" } } },
     "pausedReadback": { "type": "object", "additionalProperties": false, "required": ["goalIdSha256", "generation", "observedAt", "status"], "properties": { "goalIdSha256": { "$ref": "#/$defs/digest" }, "generation": { "type": "integer", "minimum": 0 }, "observedAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$" }, "status": { "const": "paused" } } },
     "clearedReadback": { "type": "object", "additionalProperties": false, "required": ["goalIdSha256", "generation", "status"], "properties": { "goalIdSha256": { "type": "null" }, "generation": { "type": "integer", "minimum": 0 }, "status": { "const": "cleared" } } }

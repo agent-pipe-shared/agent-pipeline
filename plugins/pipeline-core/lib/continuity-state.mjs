@@ -520,7 +520,7 @@ export function applyRunnerNativeContinuation(current, request, activeFeatureId 
   return { ...applied, continuation: structuredClone(request.next.nativeContinuation ?? null) };
 }
 
-function refreshNativeContinuation(current, event, adapterResult, reasonCode = "active-goal-retained", reasonEvidenceSha256 = null) {
+function refreshNativeContinuation(current, event, adapterResult, reasonCode = "active-goal-retained", reasonEvidenceSha256 = null, resolution = null) {
   if (!validateRunnerNativeContinuation(current).ok) return { ok: false, code: "RNC-SCHEMA", continuation: null };
   const request = {
     ok: true,
@@ -534,13 +534,15 @@ function refreshNativeContinuation(current, event, adapterResult, reasonCode = "
       runner: structuredClone(current.runner),
     },
   };
+  const retainedResolution = resolution ?? current.resolution;
   const materialized = materializeRunnerNativeContinuation({
     request,
     generation: current.generation.number,
     adapterResult,
     observedAt: adapterResult?.readback?.observedAt,
-    reasonCode,
+    reasonCode: retainedResolution !== null && resolution === null ? current.reason.code : reasonCode,
     reasonEvidenceSha256: reasonEvidenceSha256 ?? current.reason.evidenceSha256,
+    resolution: retainedResolution,
   });
   if (!materialized.ok) return materialized;
   const continuation = materialized.continuation;
@@ -597,7 +599,7 @@ export async function reconcileRunnerNativeContinuation({ continuity, activeFeat
   }
   if (transition.action === "set") {
     const adapterResult = await adapter({ action: "set", generation: transition.generation, subject: current.subject, objective: current.objective });
-    const resumed = refreshNativeContinuation(current, event, adapterResult, transition.reasonCode, event.evidenceSha256);
+    const resumed = refreshNativeContinuation(current, event, adapterResult, transition.reasonCode, event.evidenceSha256, event.poDecisionReceipt);
     if (!resumed.ok) return { ok: false, code: resumed.code };
     const next = structuredClone(continuity); next.revision += 1; next.nativeContinuation = resumed.continuation;
     return { ok: true, code: transition.code, action: "set", expectedRevision: continuity.revision, next, continuation: next.nativeContinuation };

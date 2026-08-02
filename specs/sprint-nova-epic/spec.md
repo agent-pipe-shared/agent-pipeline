@@ -880,7 +880,14 @@ The lifecycle is `active`, `paused-po-gate`, `blocked`, `achieved`, `cleared`,
 as additive input and the exact current action continues. A named PO gate
 pauses the native goal before the prompt, persists a matching paused identity
 readback and never reports a native `blocked` state. Only a recorded PO
-decision may restore that same native goal. Pause, cancel, replacement and redirect always win over
+decision may restore that same native goal. A resolution supplies one closed
+`pipeline.po-goal-decision-receipt.v1`: its canonical receipt digest, feature,
+continuation ID, exact paused-record digest, pause revision and later resolved
+revision must all match before either adapter receives `set`. The successor
+continuation persists that complete receipt in its closed `resolution` field;
+a bare digest, malformed receipt, foreign feature/continuation, stale revision
+or changed paused record is rejected without a native-goal action. Pause,
+cancel, replacement and redirect always win over
 automatic continuation.
 
 Each runner adapter must activate/update one native goal, obtain a fresh
@@ -1233,6 +1240,7 @@ combined integration remains a later lifecycle.
 | `pipeline.nova-increment-receipt.v1` | A7/B5 | gate assembler | next increment/close |
 | `pipeline.nova-increment-readback.v1` | A7/B5 | independent gate readback | next increment/close |
 | `pipeline.runner-native-continuation.v1` | B0 | continuation adapter | native-goal evaluator/re-entry |
+| `pipeline.po-goal-decision-receipt.v1` | B0 | PO decision admission | paused-goal resolution/re-entry |
 | `pipeline.local-worker-pool.v1` | B1 | pool supervisor | scheduler/importer |
 | `pipeline.async-execution-journal.v1` | B2 | external boundary | reconciler |
 | `pipeline.credential-lease.v1` | B2 | external broker adapter | worker/revoker |

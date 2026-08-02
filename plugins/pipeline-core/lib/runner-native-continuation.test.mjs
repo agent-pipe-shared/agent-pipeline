@@ -2,19 +2,30 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { buildRunnerNativeContinuationRequest, computeRunnerNativeContinuationDigest, materializeRunnerNativeContinuation, materializeRunnerNativeTerminal, planNativeGoalTransition, projectRunnerNativeProgress, recordRunnerNativeAdditiveInput, validateRunnerNativeContinuation } from "./runner-native-continuation.mjs";
+import { buildRunnerNativeContinuationRequest, computePoGoalDecisionReceiptDigest, computeRunnerNativeContinuationDigest, materializeRunnerNativeContinuation, materializeRunnerNativeTerminal, planNativeGoalTransition, projectRunnerNativeProgress, recordRunnerNativeAdditiveInput, validateRunnerNativeContinuation } from "./runner-native-continuation.mjs";
 
 const D = "a".repeat(64);
 function record(overrides = {}) {
   const value = {
-    schema: "pipeline.runner-native-continuation.v1", continuationId: "nova-b0", subject: { featureId: "nova", phase: "implementation", planSha256: D, specSha256: D, queueRevision: 3, packageId: "b0", actionId: "implement" }, objective: { conditionSha256: D, summarySha256: D }, acceptance: [{ criterionId: "goal-readback", status: "pending", evidenceSha256: null }], evidence: [], terminal: { kind: "none", atRevision: 3 }, runner: { runnerId: "codex", adapterVersion: "v2", capability: "available" }, generation: { number: 1, goalSha256: D }, status: "active", progress: [{ kind: "tests", status: "unknown", evidenceSha256: null }], readback: { goalIdSha256: D, generation: 1, observedAt: "2026-07-25T00:00:00.000Z", status: "active" }, reason: { code: "active", evidenceSha256: null }, ...overrides,
+    schema: "pipeline.runner-native-continuation.v1", continuationId: "nova-b0", subject: { featureId: "nova", phase: "implementation", planSha256: D, specSha256: D, queueRevision: 3, packageId: "b0", actionId: "implement" }, objective: { conditionSha256: D, summarySha256: D }, acceptance: [{ criterionId: "goal-readback", status: "pending", evidenceSha256: null }], evidence: [], terminal: { kind: "none", atRevision: 3 }, runner: { runnerId: "codex", adapterVersion: "v2", capability: "available" }, generation: { number: 1, goalSha256: D }, status: "active", progress: [{ kind: "tests", status: "unknown", evidenceSha256: null }], readback: { goalIdSha256: D, generation: 1, observedAt: "2026-07-25T00:00:00.000Z", status: "active" }, reason: { code: "active", evidenceSha256: null }, resolution: null, ...overrides,
   };
   if (value.status !== "active" && value.reason.code === "active") value.reason = { code: "terminal", evidenceSha256: D };
   value.recordSha256 = computeRunnerNativeContinuationDigest(value);
   return value;
 }
 function resolutionEvent(paused, atRevision = 5, evidenceSha256 = D) {
-  return { kind: "po-gate-resolved", atRevision, evidenceSha256, pausedRecordSha256: paused.recordSha256 };
+  const poDecisionReceipt = {
+    schema: "pipeline.po-goal-decision-receipt.v1",
+    featureId: paused.subject.featureId,
+    continuationId: paused.continuationId,
+    pausedRecordSha256: paused.recordSha256,
+    pauseRevision: paused.terminal.atRevision,
+    resolvedRevision: atRevision,
+    decision: "resume",
+    receiptSha256: null,
+  };
+  poDecisionReceipt.receiptSha256 = computePoGoalDecisionReceiptDigest(poDecisionReceipt);
+  return { kind: "po-gate-resolved", atRevision, evidenceSha256: evidenceSha256 === D ? poDecisionReceipt.receiptSha256 : evidenceSha256, pausedRecordSha256: paused.recordSha256, poDecisionReceipt };
 }
 
 let passed = 0;
@@ -129,18 +140,20 @@ check("PO resolution must strictly follow the recorded named gate", () => {
   assert.equal(planNativeGoalTransition({ continuation: paused, event: resolutionEvent(paused) }).action, "set");
   assert.equal(planNativeGoalTransition({ continuation: paused, event: { kind: "po-gate-resolved", atRevision: 5 } }).code, "RNC-EVENT");
   assert.equal(planNativeGoalTransition({ continuation: paused, event: { ...resolutionEvent(paused), pausedRecordSha256: "b".repeat(64) } }).code, "RNC-EVENT");
+  const forged = resolutionEvent(paused); forged.poDecisionReceipt.receiptSha256 = "e".repeat(64); forged.evidenceSha256 = forged.poDecisionReceipt.receiptSha256;
+  assert.equal(planNativeGoalTransition({ continuation: paused, event: forged }).code, "RNC-EVENT");
 });
 check("a PO gate from an earlier work revision is not a valid continuation record", () => {
   const stale = record({ subject: { featureId: "nova", phase: "implementation", planSha256: D, specSha256: D, queueRevision: 4, packageId: "b0", actionId: "implement" }, status: "paused-po-gate", terminal: { kind: "named-po-gate", atRevision: 3 }, readback: null }); stale.recordSha256 = computeRunnerNativeContinuationDigest(stale);
   assert.equal(validateRunnerNativeContinuation(stale).code, "RNC-SCHEMA");
-  assert.equal(planNativeGoalTransition({ continuation: stale, event: { kind: "po-gate-resolved", atRevision: 4, evidenceSha256: D, pausedRecordSha256: D } }).action, "none");
+  assert.equal(planNativeGoalTransition({ continuation: stale, event: { kind: "po-gate-resolved", atRevision: 4, evidenceSha256: D, pausedRecordSha256: D, poDecisionReceipt: {} } }).action, "none");
 });
 check("only an active item or a resolved PO gate may establish a successor goal", () => {
   for (const [status, terminal] of [["achieved", "verified-completion"], ["blocked", "typed-blocker"], ["cleared", "explicit-control-change"]]) {
     const terminalRecord = record({ status, terminal: { kind: terminal, atRevision: 4 }, readback: { goalIdSha256: null, generation: 1, status: "cleared" } });
     terminalRecord.recordSha256 = computeRunnerNativeContinuationDigest(terminalRecord);
     for (const kind of ["resume", "compact-reentry", "po-gate-resolved"]) {
-      const event = kind === "po-gate-resolved" ? { kind, atRevision: 5, evidenceSha256: D, pausedRecordSha256: D } : { kind, atRevision: 5 };
+      const event = kind === "po-gate-resolved" ? { kind, atRevision: 5, evidenceSha256: D, pausedRecordSha256: D, poDecisionReceipt: {} } : { kind, atRevision: 5 };
       assert.equal(planNativeGoalTransition({ continuation: terminalRecord, event }).action, "none");
     }
   }
@@ -150,6 +163,9 @@ check("only an active item or a resolved PO gate may establish a successor goal"
 });
 check("schema closes the typed observation arrays and readback object", () => {
   const schema = JSON.parse(readFileSync(fileURLToPath(new URL("../scripts/runner-native-continuation.schema.json", import.meta.url)), "utf8"));
+  assert.equal(schema.required.includes("resolution"), true);
+  assert.deepEqual(schema.$defs.poDecisionReceipt.required, ["schema", "featureId", "continuationId", "pausedRecordSha256", "pauseRevision", "resolvedRevision", "decision", "receiptSha256"]);
+  assert.equal(schema.$defs.poDecisionReceipt.additionalProperties, false);
   for (const field of ["acceptance", "evidence", "progress"]) {
     const ref = schema.properties[field].items.$ref; const definition = schema.$defs[ref.slice("#/$defs/".length)];
     assert.equal(definition.additionalProperties, false); assert.ok(Array.isArray(definition.required));

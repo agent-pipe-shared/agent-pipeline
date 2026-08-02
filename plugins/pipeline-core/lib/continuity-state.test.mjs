@@ -26,6 +26,7 @@ import {
   applyLegacyContinuityAdoption,
 } from "./continuity-state.mjs";
 import { computeContinuityFinalDigest } from "./continuity-host-adapter.mjs";
+import { computePoGoalDecisionReceiptDigest, computeRunnerNativeContinuationDigest } from "./runner-native-continuation.mjs";
 import { validateAgainstSchema } from "./schema-lite.mjs";
 
 let passed = 0;
@@ -1383,11 +1384,13 @@ await asyncCheck("a recorded PO decision resumes the same native Goal after an e
   const activated = await reconcileRunnerNativeContinuation({ continuity: nativeState(), activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "activate", atRevision: 3 }, adapter: nativeAdapter(calls) });
   const paused = await reconcileRunnerNativeContinuation({ continuity: activated.next, activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "po-gate", atRevision: 4, evidenceSha256: D }, adapter: nativeAdapter(calls) });
   assert.equal(paused.action, "pause"); assert.equal(paused.continuation.status, "paused-po-gate");
-  const resolvedReceipt = "e".repeat(64);
-  const resumed = await reconcileRunnerNativeContinuation({ continuity: paused.next, activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "po-gate-resolved", atRevision: 5, evidenceSha256: resolvedReceipt, pausedRecordSha256: paused.continuation.recordSha256 }, adapter: nativeAdapter(calls) });
+  const poDecisionReceipt = { schema: "pipeline.po-goal-decision-receipt.v1", featureId: FEATURE, continuationId: "nova-b0", pausedRecordSha256: paused.continuation.recordSha256, pauseRevision: paused.continuation.terminal.atRevision, resolvedRevision: 5, decision: "resume", receiptSha256: null };
+  poDecisionReceipt.receiptSha256 = computePoGoalDecisionReceiptDigest(poDecisionReceipt);
+  const resumed = await reconcileRunnerNativeContinuation({ continuity: paused.next, activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "po-gate-resolved", atRevision: 5, evidenceSha256: poDecisionReceipt.receiptSha256, pausedRecordSha256: paused.continuation.recordSha256, poDecisionReceipt }, adapter: nativeAdapter(calls) });
   assert.equal(resumed.action, "set"); assert.equal(resumed.continuation.status, "active");
   assert.equal(resumed.continuation.generation.number, paused.continuation.generation.number);
-  assert.equal(resumed.continuation.reason.evidenceSha256, resolvedReceipt);
+  assert.equal(resumed.continuation.reason.evidenceSha256, poDecisionReceipt.receiptSha256);
+  assert.deepEqual(resumed.continuation.resolution, poDecisionReceipt);
   assert.deepEqual(calls, [{ action: "set", generation: 0 }, { action: "pause", generation: 0 }, { action: "set", generation: 0 }]);
 });
 

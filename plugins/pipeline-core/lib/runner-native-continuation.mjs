@@ -25,7 +25,7 @@ export const RUNNER_NATIVE_CONTINUATION_CODES = Object.freeze([
   "RNC-CODEX-HOST", "RNC-CLAUDE-HOST", "RNC-CLAUDE-OBJECTIVE",
 ]);
 
-const ROOT = new Set(["schema", "continuationId", "subject", "objective", "acceptance", "evidence", "terminal", "runner", "generation", "status", "progress", "readback", "reason", "recordSha256"]);
+const ROOT = new Set(["schema", "continuationId", "subject", "objective", "acceptance", "evidence", "terminal", "runner", "generation", "status", "progress", "readback", "reason", "resolution", "recordSha256"]);
 const SUBJECT = new Set(["featureId", "phase", "planSha256", "specSha256", "queueRevision", "packageId", "actionId"]);
 const OBJECTIVE = new Set(["conditionSha256", "summarySha256"]);
 const ACCEPTANCE = new Set(["criterionId", "status", "evidenceSha256"]);
@@ -36,6 +36,7 @@ const GENERATION = new Set(["number", "goalSha256"]);
 const PROGRESS = new Set(["kind", "status", "evidenceSha256"]);
 const READBACK = new Set(["goalIdSha256", "generation", "observedAt", "status"]);
 const REASON = new Set(["code", "evidenceSha256"]);
+const PO_DECISION_RECEIPT = new Set(["schema", "featureId", "continuationId", "pausedRecordSha256", "pauseRevision", "resolvedRevision", "decision", "receiptSha256"]);
 const ADDITIVE = new Set(["kind", "evidenceSha256"]);
 const EVENTS = new Set(["activate", "resume", "compact-reentry", "po-gate", "po-gate-resolved", "typed-blocker", "verified-completion", "explicit-control", "capability-unavailable", "activation-failed"]);
 const SHA256 = /^[a-f0-9]{64}$/u;
@@ -56,6 +57,12 @@ function canonical(value) {
 export function computeRunnerNativeContinuationDigest(value) {
   const { recordSha256: _recordSha256, ...unsigned } = value;
   return createHash("sha256").update(canonical(unsigned), "utf8").digest("hex");
+}
+
+/** A closed, durable PO decision receipt; only its digest is portable evidence. */
+export function computePoGoalDecisionReceiptDigest(value) {
+  const { receiptSha256: _receiptSha256, ...unsigned } = value;
+  return createHash("sha256").update(`pipeline.po-goal-decision-receipt.v1\0${canonical(unsigned)}`, "utf8").digest("hex");
 }
 
 function validSubject(value) {
@@ -104,6 +111,15 @@ function validReadback(value, generation, active, status) {
     && value.goalIdSha256 === null && value.generation === generation.number && value.status === "cleared";
 }
 function validReason(value) { return exact(value, REASON) && id(value.code) && digest(value.evidenceSha256, true); }
+function validPoGoalDecisionReceipt(value) {
+  return exact(value, PO_DECISION_RECEIPT) && value.schema === "pipeline.po-goal-decision-receipt.v1"
+    && id(value.featureId) && id(value.continuationId) && digest(value.pausedRecordSha256)
+    && Number.isSafeInteger(value.pauseRevision) && value.pauseRevision >= 0
+    && Number.isSafeInteger(value.resolvedRevision) && value.resolvedRevision > value.pauseRevision
+    && value.decision === "resume" && digest(value.receiptSha256)
+    && computePoGoalDecisionReceiptDigest(value) === value.receiptSha256;
+}
+function validResolution(value) { return value === null || validPoGoalDecisionReceipt(value); }
 function validAdditive(value) { return exact(value, ADDITIVE) && ["question", "clarification", "observation"].includes(value.kind) && digest(value.evidenceSha256); }
 
 function terminalEvent(value) {
@@ -112,8 +128,11 @@ function terminalEvent(value) {
     && ((["activate", "resume", "compact-reentry"].includes(value.kind)
       && exact(value, new Set(["kind", "atRevision"])))
       || (value.kind === "po-gate-resolved"
-        && exact(value, new Set(["kind", "atRevision", "evidenceSha256", "pausedRecordSha256"]))
-        && digest(value.evidenceSha256) && digest(value.pausedRecordSha256))
+        && exact(value, new Set(["kind", "atRevision", "evidenceSha256", "pausedRecordSha256", "poDecisionReceipt"]))
+        && digest(value.evidenceSha256) && digest(value.pausedRecordSha256)
+        && validPoGoalDecisionReceipt(value.poDecisionReceipt)
+        && value.evidenceSha256 === value.poDecisionReceipt.receiptSha256
+        && value.pausedRecordSha256 === value.poDecisionReceipt.pausedRecordSha256)
       || (!["activate", "resume", "compact-reentry", "po-gate-resolved"].includes(value.kind)
         && exact(value, new Set(["kind", "atRevision", "evidenceSha256"]))
         && digest(value.evidenceSha256)));
@@ -149,13 +168,13 @@ export function buildRunnerNativeContinuationRequest({ continuationId, activeFea
 }
 
 /** Materialize an evidence-bound record only after an adapter has read it back. */
-export function materializeRunnerNativeContinuation({ request, generation, adapterResult, observedAt, reasonCode = "active", reasonEvidenceSha256 = null }) {
+export function materializeRunnerNativeContinuation({ request, generation, adapterResult, observedAt, reasonCode = "active", reasonEvidenceSha256 = null, resolution = null }) {
   if (!request?.ok || !id(request.request?.continuationId) || !validSubject(request.request.subject)
     || !validObjective(request.request.objective) || !validAcceptance(request.request.acceptance)
     || !validEvidence(request.request.evidence) || !validProgress(request.request.progress)
     || !validRunner(request.request.runner) || !Number.isSafeInteger(generation) || generation < 0
     || !object(adapterResult) || (adapterResult.status === "active" && (typeof observedAt !== "string" || !ISO.test(observedAt)))
-    || !id(reasonCode) || !digest(reasonEvidenceSha256, true)) return { ok: false, code: "RNC-SCHEMA" };
+    || !id(reasonCode) || !digest(reasonEvidenceSha256, true) || !validResolution(resolution)) return { ok: false, code: "RNC-SCHEMA" };
   const active = adapterResult.ok === true && adapterResult.status === "active"
     && exact(adapterResult.readback, READBACK) && digest(adapterResult.readback.goalIdSha256)
     && adapterResult.readback.generation === generation && adapterResult.readback.status === "active"
@@ -179,6 +198,7 @@ export function materializeRunnerNativeContinuation({ request, generation, adapt
     progress: request.request.progress,
     readback: active || blocked ? { ...adapterResult.readback } : null,
     reason: { code: unavailable || blocked ? (typeof adapterResult.code === "string" && id(adapterResult.code) ? adapterResult.code : "adapter-unavailable") : reasonCode, evidenceSha256: reasonEvidenceSha256 ?? (blocked ? request.request.objective.conditionSha256 : null) },
+    resolution: resolution === null ? null : structuredClone(resolution),
     recordSha256: null,
   };
   value.recordSha256 = computeRunnerNativeContinuationDigest(value);
@@ -216,7 +236,7 @@ export function validateRunnerNativeContinuation(value) {
     || !validSubject(value.subject) || !validObjective(value.objective) || !validAcceptance(value.acceptance)
     || !validEvidence(value.evidence) || !validTerminal(value.terminal, value.subject) || !validRunner(value.runner)
     || !validGeneration(value.generation) || !CONTINUATION_STATES.includes(value.status) || !validProgress(value.progress)
-    || !validReason(value.reason) || !digest(value.recordSha256)) return { ok: false, code: "RNC-SCHEMA" };
+    || !validReason(value.reason) || !validResolution(value.resolution) || !digest(value.recordSha256)) return { ok: false, code: "RNC-SCHEMA" };
 
   const active = value.status === "active";
   if (!validReadback(value.readback, value.generation, active, value.status)) return { ok: false, code: "RNC-READBACK" };
@@ -229,6 +249,15 @@ export function validateRunnerNativeContinuation(value) {
     || (value.status === "failed" && value.terminal.kind !== "failed")) return { ok: false, code: "RNC-TERMINAL" };
   if (!active && !["unavailable", "failed"].includes(value.status) && !digest(value.reason.evidenceSha256)) return { ok: false, code: "RNC-TERMINAL" };
   if (value.status === "achieved" && !verifiedAcceptance(value.acceptance)) return { ok: false, code: "RNC-TERMINAL" };
+  if (value.resolution !== null && (
+    value.resolution.featureId !== value.subject.featureId
+    || value.resolution.continuationId !== value.continuationId
+    || value.resolution.pauseRevision < value.subject.queueRevision
+    || value.reason.evidenceSha256 !== value.resolution.receiptSha256
+    || !["active", "unavailable"].includes(value.status)
+    || (value.status === "active" && value.reason.code !== "po-gate-resolved")
+  )) return { ok: false, code: "RNC-TERMINAL" };
+  if (value.status === "active" && value.reason.code === "po-gate-resolved" && value.resolution === null) return { ok: false, code: "RNC-TERMINAL" };
   if (computeRunnerNativeContinuationDigest(value) !== value.recordSha256) return { ok: false, code: "RNC-GENERATION" };
   return { ok: true, code: "RNC-VALID" };
 }
@@ -310,7 +339,11 @@ export function planNativeGoalTransition({ continuation, event }) {
   }
   if (event.kind === "po-gate-resolved") {
     if (continuation.status !== "paused-po-gate" || event.atRevision <= continuation.terminal.atRevision) return decision("none", continuation.status, continuation.terminal.kind, "po-gate-not-pending", continuation.generation.number);
-    if (event.pausedRecordSha256 !== continuation.recordSha256) return { ok: false, code: "RNC-EVENT", action: "none" };
+    if (event.pausedRecordSha256 !== continuation.recordSha256
+      || event.poDecisionReceipt.featureId !== continuation.subject.featureId
+      || event.poDecisionReceipt.continuationId !== continuation.continuationId
+      || event.poDecisionReceipt.pauseRevision !== continuation.terminal.atRevision
+      || event.poDecisionReceipt.resolvedRevision !== event.atRevision) return { ok: false, code: "RNC-EVENT", action: "none" };
     if (continuation.runner.capability !== "available") return decision("none", "unavailable", "unavailable", "capability-unavailable", continuation.generation.number);
     return decision("set", "active", "none", event.kind, continuation.generation.number);
   }
