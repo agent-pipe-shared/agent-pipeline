@@ -12,6 +12,20 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-08-02
+
+### Fixed
+
+- Codex bootstrap now keeps the normal happy path recoverable when the
+  persisted PRD and Spec authority differs from the current bound documents.
+  It admits only the exact read-only rebind planner for that diagnosed partial
+  state, returns a typed planner failure instead of a generic unavailable
+  result, and requires the existing digest-bound approval/apply flow before
+  the session becomes ready.
+- This interim release is rebased on `0.5.0`; its public plugin metadata is
+  `0.5.1`. It does not create a tag, marketplace publication, GitHub Release,
+  or remote readback by itself.
+
 ## [0.5.0] — 2026-08-02
 
 ### Added

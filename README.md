@@ -21,8 +21,15 @@ feature branches and dogfooding rounds. Feedback welcome.*
 > required next document is `SETUP.md`; deeper and conceptual documentation
 > is optional reference.
 
-> **0.5.0:** See [What’s new in 0.5.0](docs/whats-new-0.5.0.md) for the
-> security/readiness delivery and the deliberately small human-approval flow.
+> **0.5.1 interim release:** Codex consumers now retain the `0.5.0`
+> security/readiness delivery while gaining the Nova recovery path for the
+> ordinary bootstrap happy path. If the PRD and Spec authorities drift,
+> bootstrap offers only the exact read-only, digest-bound rebind plan; a
+> separately approved apply then returns the session to `ready`. It never
+> broadens lifecycle writes or silently edits bound documents. See the
+> [consumer onboarding guide](docs/v3-consumer-onboarding.md) for the full
+> lifecycle and [What’s new in 0.5.0](docs/whats-new-0.5.0.md) for the
+> security/readiness baseline.
 
 ## The problem
 
