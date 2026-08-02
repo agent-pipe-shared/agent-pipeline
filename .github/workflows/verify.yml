@@ -44,6 +44,8 @@ jobs:
         run: node --test plugins/pipeline-core/lib/ai-assisted-hardening.test.mjs
       - name: Finding lifecycle conformance
         run: node --test plugins/pipeline-core/lib/finding-lifecycle.test.mjs
+      - name: Product-security readiness conformance
+        run: node --test plugins/pipeline-core/lib/security-readiness.test.mjs
       - name: Runner-free offline Core Verify
         env:
           PIPELINE_LIVE_CERTIFICATION: disabled

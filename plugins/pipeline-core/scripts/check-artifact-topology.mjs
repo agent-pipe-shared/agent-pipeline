@@ -10,7 +10,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = resolve(HERE, "..", "..", "..");
 export const TOPOLOGY_SCHEMA = "pipeline.artifact-topology.v1";
 export const TOPOLOGY_STATES = Object.freeze(["draft", "awaiting-approval", "approved", "implementing", "verifying", "completed", "superseded", "abandoned", "retained"]);
-export const TOPOLOGY_CLASSES = Object.freeze(["prd", "spec", "design", "plan", "acceptance", "result", "candidate-evidence", "adr", "release", "backlog", "state", "handover", "retention", "supply-chain", "threat-model", "private-local"]);
+export const TOPOLOGY_CLASSES = Object.freeze(["prd", "spec", "design", "plan", "acceptance", "result", "candidate-evidence", "adr", "release", "backlog", "state", "handover", "retention", "supply-chain", "threat-model", "security-readiness", "private-local"]);
 
 function inside(root, target) { const rel = relative(root, target); return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel)); }
 function shape(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
