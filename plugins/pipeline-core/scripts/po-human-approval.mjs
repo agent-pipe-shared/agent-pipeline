@@ -61,7 +61,7 @@ function artifactPath(directory, name) {
   const path = join(directory, name);
   try {
     const metadata = lstatSync(path);
-    if (!metadata.isFile() || metadata.isSymbolicLink()) fail("approval artifacts must be regular files outside the repository");
+    if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.nlink !== 1) fail("approval artifacts must be unlinked regular files outside the repository");
   } catch (error) {
     if (error?.code !== "ENOENT") throw error;
   }
