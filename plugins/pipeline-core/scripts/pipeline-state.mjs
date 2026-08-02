@@ -269,7 +269,6 @@ import {
   planLegacyContinuityAdoption,
   applyLegacyContinuityAdoption,
   LEGACY_CONTINUITY_ADOPTION as LEGACY_ADOPTION,
-  CONTINUITY_STATE_MAX_BYTES,
   integrateContinuityFinal,
   recordCourseDecisionBrief,
   validateContinuityState,
@@ -2549,7 +2548,10 @@ function validateLegacyAdoptionEnvironment(dir, state, request, deps = {}) {
 function readStateRaw(dir) {
   try {
     const raw = readFileSync(statePath(dir));
-    if (raw.byteLength > CONTINUITY_STATE_MAX_BYTES) return { status: "malformed" };
+    // The 8 KiB continuity budget applies to the nested continuity record,
+    // not to the complete pipeline State which also retains closed-feature
+    // history. Keep this raw reader aligned with readState() so a valid
+    // historical root cannot make its own PO-authority recovery unavailable.
     const state = JSON.parse(raw.toString("utf8"));
     if (!state || typeof state !== "object" || Array.isArray(state)
       || (state.schema !== undefined && state.schema !== SCHEMA_ID)) return { status: "malformed" };

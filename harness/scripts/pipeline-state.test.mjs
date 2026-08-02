@@ -103,6 +103,19 @@ function seedPoAuthorityRebind(prefix = "po-rebind") {
 
 function runPoAuthorityRebindTests() {
 {
+  const fixture = seedPoAuthorityRebind("po-rebind-retained-history");
+  const state = readState(fixture.dir).state;
+  state.closedFeatures = [{ id: "retained-history", evidence: "x".repeat(8_500) }];
+  writeFileSync(statePath(fixture.dir), JSON.stringify(state, null, 2) + "\n");
+  const planned = captureConsole(() => run(["po-authority-rebind-plan"], fixture.deps));
+  const plan = JSON.parse(planned.text || "{}");
+  ok("PS53a retained root history above the continuity budget remains rebindable", planned.value === 0
+    && plan.schema === "pipeline.po-authority-rebind-plan.v1"
+    && plan.preimage?.state?.sha256
+    && Buffer.byteLength(readFileSync(statePath(fixture.dir))) > 8_192);
+}
+
+{
   const fixture = seedPoAuthorityRebind();
   const beforePrd = readFileSync(join(fixture.dir, fixture.planPath), "utf8");
   const beforeState = readFileSync(statePath(fixture.dir), "utf8");
