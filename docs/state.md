@@ -250,9 +250,12 @@ next-action, branch, and release statement below where they conflict.
   Codex thread must still run the full bootstrap before runtime evidence may
   trust the refresh.
 - Advisor export consent is durably recorded as repository-scoped `approved` in
-  `pipeline.user.yaml`. Setup reports only the bounded approval/disabled state;
-  it never prints raw questions, answers, credentials, paths, or environment
-  details. The approved export remains one-question and allowlist-bound.
+  `pipeline.user.yaml`. It is standing consent for the configured allowlist,
+  not a per-request prompt: setup reports only the bounded approval/disabled
+  state. It never prints raw questions, answers, credentials, paths, or
+  environment details. The approved export remains one-question and
+  allowlist-bound; a different data class, provider, or packet boundary is
+  not approved by it.
 - **0.4.1 authority-update hotfix:** the `#53` observation identified that a
   Slim Private Overlay with a stale but structurally valid Core lock could not
   obtain a digest-bound update preview. The hotfix adds the host-attested

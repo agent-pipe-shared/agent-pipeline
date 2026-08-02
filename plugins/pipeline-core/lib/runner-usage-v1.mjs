@@ -353,7 +353,7 @@ function unbound(reasonCode) {
 
 function requestedShapeValid(runner, requested) {
   if (!exactKeys(requested, ["selector", "effort"]) || !exactKeys(requested.selector, ["kind", "value"])) return false;
-  if (runner === "claude") return requested.selector.kind === "alias" && ["fable", "opus", "sonnet"].includes(requested.selector.value) && ["low", "medium", "high", "xhigh", "max", "not-applicable"].includes(requested.effort);
+  if (runner === "claude") return requested.selector.kind === "alias" && ["fable", "haiku", "opus", "sonnet"].includes(requested.selector.value) && ["low", "medium", "high", "xhigh", "max", "not-applicable"].includes(requested.effort);
   return requested.selector.kind === "model-id"
     && ["gpt-5.6-sol", "gpt-5.6-terra"].includes(requested.selector.value)
     && ["xhigh", "max"].includes(requested.effort)

@@ -624,12 +624,15 @@ function freshIntent() {
     runners: { enabled: ["claude", "codex"], default: "codex" },
     routing: { profiles: clone(registry.profiles), duties: clone(registry.duties) },
     usage: { common_projection: "pipeline.runner-usage.v1", raw_persistence: "none" },
-    autonomy: { push_policy: "gated", branch_model: "feature-branch", wip_limit: 1 },
+    autonomy: { push_policy: "gated", branch_model: "feature-branch", wip_limit: 3 },
     gates: { dev_plan: "blocking", push: "blocking", security: "warn", claude_md_max_lines: 200 },
     critic_export: clone(registry.criticExportPolicy),
-    roles: { po: { display_label: "PO" } },
-    session: { keep_awake: false },
-    advisor_export: { consent: "declined" },
+    roles: { po: { display_label: "Human" } },
+    session: { keep_awake: true },
+    // This is repository-scoped standing consent for the already closed
+    // allowlist. It is not a per-consultation prompt or approval of a wider
+    // data class, provider, or packet boundary.
+    advisor_export: { consent: "approved" },
   };
 }
 function freshBaselines(intent, { hostManaged = false } = {}) {

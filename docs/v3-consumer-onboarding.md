@@ -12,10 +12,15 @@ an authority lock, or a projection plan.
 - Supply one real consumer project root containing `pipeline.user.yaml`.
 - Keep the project writable only for the final, explicit activation. `inspect`
   and `plan` are read-only.
-- Resolve any separately required route and Advisor-export consent before
-  activation. Do not perform a consultation merely to activate or bootstrap;
-  Advisor capability preflight is model-free and consultation is on demand.
-  A migration preview is not an approval, push, or release authorization.
+- Critic export is always limited to the configured allowlist: the bounded
+  candidate packet, listed providers, and listed assurance classes. The fresh
+  default records repository-scoped Advisor-export consent as `approved`, so a
+  matching consultation does not ask again for every export. A different data
+  class, provider, or packet boundary is not covered and remains blocked until
+  it is explicitly configured. Do not perform a consultation merely to
+  activate or bootstrap; Advisor capability preflight is model-free and
+  consultation is on demand. A migration preview is not an approval, push, or
+  release authorization.
 
 ## Fresh Codex lifecycle V4
 

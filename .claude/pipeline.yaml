@@ -12,7 +12,7 @@ language:
 # This repo is docs+guardrails only (no live UI) -- ui-design stays declared but its
 # condition keeps it inactive until flags.has_ui below flips true for a project that has one.
 session:
-  keep_awake: false
+  keep_awake: true
 phases:
   - name: design
     enabled: true
@@ -55,6 +55,7 @@ security:
 modelRouting:
   # Generated V3 Claude compatibility projection; pipeline.user.v3 is the only routing authority.
   # Requested selectors are not advisor-receipt, route-receipt, or effective-model evidence.
+  # Adapter selector catalog — Claude aliases: fable, haiku, opus, sonnet; Codex/OpenAI model IDs: gpt-5.6-luna, gpt-5.6-sol, gpt-5.6-terra.
   elephant_epic_design:
     model: opus
     effort: xhigh
@@ -83,11 +84,11 @@ modelRouting:
     model: sonnet-5
     effort: medium
   goldfish_mechanic:
-    model: sonnet-5
-    effort: low
+    model: haiku
+    effort: medium
   goldfish_deep:
     model: sonnet-5
-    effort: high
+    effort: medium
   critic:
     model: sonnet-5
     effort: high

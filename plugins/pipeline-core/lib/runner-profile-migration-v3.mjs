@@ -310,8 +310,9 @@ function v3IntentFromV2(v2) {
     autonomy: clone(v2.autonomy),
     gates: clone(v2.gates),
     critic_export: clone(registry.criticExportPolicy),
-    roles: { po: { display_label: "PO" } },
-    session: { keep_awake: false },
+    roles: { po: { display_label: "Human" } },
+    session: { keep_awake: true },
+    advisor_export: { consent: "approved" },
   };
 }
 

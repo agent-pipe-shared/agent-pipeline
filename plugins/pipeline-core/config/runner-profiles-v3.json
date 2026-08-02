@@ -40,12 +40,12 @@
       "codex": { "state": "default", "selector": { "kind": "model-id", "value": "gpt-5.6-luna" }, "effort": "medium", "unavailable": "defer", "evidence": "dispatch-receipt" }
     },
     "mechanic": {
-      "claude": { "state": "opt-in", "selector": { "kind": "alias", "value": "sonnet" }, "effort": "low", "unavailable": "defer", "evidence": "dispatch-receipt" },
-      "codex": { "state": "opt-in", "selector": { "kind": "model-id", "value": "gpt-5.6-luna" }, "effort": "low", "unavailable": "defer", "evidence": "dispatch-receipt" }
+      "claude": { "state": "opt-in", "selector": { "kind": "alias", "value": "haiku" }, "effort": "medium", "unavailable": "defer", "evidence": "dispatch-receipt" },
+      "codex": { "state": "opt-in", "selector": { "kind": "model-id", "value": "gpt-5.6-luna" }, "effort": "medium", "unavailable": "defer", "evidence": "dispatch-receipt" }
     },
     "deep": {
-      "claude": { "state": "opt-in", "selector": { "kind": "alias", "value": "sonnet" }, "effort": "high", "unavailable": "defer", "evidence": "dispatch-receipt" },
-      "codex": { "state": "opt-in", "selector": { "kind": "model-id", "value": "gpt-5.6-terra" }, "effort": "high", "unavailable": "defer", "evidence": "dispatch-receipt" }
+      "claude": { "state": "opt-in", "selector": { "kind": "alias", "value": "sonnet" }, "effort": "medium", "unavailable": "defer", "evidence": "dispatch-receipt" },
+      "codex": { "state": "opt-in", "selector": { "kind": "model-id", "value": "gpt-5.6-terra" }, "effort": "medium", "unavailable": "defer", "evidence": "dispatch-receipt" }
     },
     "test_author": {
       "claude": { "state": "opt-in", "selector": { "kind": "alias", "value": "sonnet" }, "effort": "high", "unavailable": "defer", "evidence": "dispatch-receipt" },

@@ -4,7 +4,7 @@ agent_runtime: "claude-code"
 autonomy:
   branch_model: "feature-branch"
   push_policy: "gated"
-  wip_limit: 1
+  wip_limit: 3
 critic_export:
   mode: "allowlisted"
   rules:
@@ -37,7 +37,7 @@ language:
   human_facing: "en"
 roles:
   po:
-    display_label: "PO"
+    display_label: "Human"
 routing:
   duties:
     advisory:
@@ -119,7 +119,7 @@ routing:
         unavailable: "defer"
     deep:
       claude:
-        effort: "high"
+        effort: "medium"
         evidence: "dispatch-receipt"
         selector:
           kind: "alias"
@@ -127,7 +127,7 @@ routing:
         state: "opt-in"
         unavailable: "defer"
       codex:
-        effort: "high"
+        effort: "medium"
         evidence: "dispatch-receipt"
         selector:
           kind: "model-id"
@@ -153,15 +153,15 @@ routing:
         unavailable: "defer"
     mechanic:
       claude:
-        effort: "low"
+        effort: "medium"
         evidence: "dispatch-receipt"
         selector:
           kind: "alias"
-          value: "sonnet"
+          value: "haiku"
         state: "opt-in"
         unavailable: "defer"
       codex:
-        effort: "low"
+        effort: "medium"
         evidence: "dispatch-receipt"
         selector:
           kind: "model-id"
@@ -315,7 +315,7 @@ runners:
     - "codex"
 schema: "pipeline.user.v3"
 session:
-  keep_awake: false
+  keep_awake: true
 usage:
   common_projection: "pipeline.runner-usage.v1"
   raw_persistence: "none"

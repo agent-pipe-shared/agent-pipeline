@@ -228,10 +228,16 @@ function hasFollowingTopLevelBlock(bytes, range) {
 }
 
 function renderClaudeModelRouting(target, intent, eol, placement = {}) {
+  const claudeAliases = Object.keys(target.nativeModelAliases).sort().join(", ");
+  const codexModelIds = [...new Set([
+    ...Object.values(intent.routing.profiles).flatMap((profile) => Object.values(profile).map((phase) => phase.codex?.selector?.value)),
+    ...Object.values(intent.routing.duties).flatMap((duty) => duty.codex?.selector?.value ? [duty.codex.selector.value] : []),
+  ].filter(Boolean))].sort().join(", ");
   const lines = [
     "modelRouting:",
     "  # Generated V3 Claude compatibility projection; pipeline.user.v3 is the only routing authority.",
     "  # Requested selectors are not advisor-receipt, route-receipt, or effective-model evidence.",
+    `  # Adapter selector catalog — Claude aliases: ${claudeAliases}; Codex/OpenAI model IDs: ${codexModelIds}.`,
   ];
   const routes = [];
   for (const binding of target.bindings) {

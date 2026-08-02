@@ -2771,7 +2771,7 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
     assert.equal(planRunnerProfileMigrationV3({ rootDir: path }).status, "noop");
     const source = parseYaml(readFileSync(join(path, "pipeline.user.yaml"), "utf8"));
     assert.deepEqual(source.runners, { enabled: ["claude", "codex"], default: "codex" });
-    assert.equal(source.advisor_export.consent, "declined");
+    assert.equal(source.advisor_export.consent, "approved");
     assert.equal(source.autonomy.push_policy, "gated");
     assert.equal(source.autonomy.branch_model, "feature-branch");
     assert.equal(source.gates.security, "warn");

@@ -109,7 +109,7 @@ function validateRegistry(candidate) {
       add(exactKeys(cell, ["state", "selector", "effort", "unavailable", "evidence"]), `${location}.${runner} routed keys`);
       add(cell.evidence === "dispatch-receipt", `${location}.${runner} evidence`);
       if (runner === "claude") {
-        add(cell.selector?.kind === "alias" && ["fable", "opus", "sonnet"].includes(cell.selector?.value), `${location}.claude selector`);
+        add(cell.selector?.kind === "alias" && ["fable", "haiku", "opus", "sonnet"].includes(cell.selector?.value), `${location}.claude selector`);
         add(["low", "medium", "high", "xhigh", "max", "not-applicable"].includes(cell.effort), `${location}.claude effort`);
         add(location.endsWith(".advisory") ? cell.effort === "not-applicable" : cell.effort !== "not-applicable", `${location}.claude advisory effort boundary`);
       } else {

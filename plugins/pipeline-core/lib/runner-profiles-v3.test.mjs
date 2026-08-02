@@ -74,9 +74,9 @@ const cases = [
       "advisory.claude.native-opus": "opus / not-applicable", "advisory.claude.consult": "fable / max",
       "critic-high-risk.codex": "gpt-5.6-sol / max", "critic-high-risk.claude": "opus / max",
       "critic-normal.codex": "gpt-5.6-terra / high", "critic-normal.claude": "sonnet / high",
-      "deep.codex": "gpt-5.6-terra / high", "deep.claude": "sonnet / high",
+      "deep.codex": "gpt-5.6-terra / medium", "deep.claude": "sonnet / medium",
       "implement.codex": "gpt-5.6-luna / medium", "implement.claude": "sonnet / medium",
-      "mechanic.codex": "gpt-5.6-luna / low", "mechanic.claude": "sonnet / low",
+      "mechanic.codex": "gpt-5.6-luna / medium", "mechanic.claude": "haiku / medium",
       "readiness.codex": "gpt-5.6-terra / high", "readiness.claude": "sonnet / high",
       "test-author.codex": "gpt-5.6-terra / high", "test-author.claude": "sonnet / high",
     });
