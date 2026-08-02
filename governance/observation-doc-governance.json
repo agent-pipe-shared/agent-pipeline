@@ -117,6 +117,8 @@
           "docs/release-0.4.4-readiness.md",
           "docs/release-0.4.5-readiness.md",
           "docs/release-0.4.6-readiness.md",
+          "docs/security-incident-response.md",
+          "docs/security-support-policy.md",
           "docs/sentinel-scope-extension-threat-model.md",
           "docs/sprint-cyborg-tp-waiver.md",
           "docs/state.md"
