@@ -17,6 +17,10 @@ import { chmodSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync 
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { appendConsumedHumanGovernanceDecision, appendHumanGovernanceDecision, queryHumanGovernanceDecisions } from "../lib/human-governance-ledger.mjs";
+import { canonicalSha256, canonicalizeJson } from "../lib/governance-event.mjs";
+import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
+import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 
 const GUARD = fileURLToPath(new URL("./guard-push.mjs", import.meta.url));
 
@@ -60,6 +64,33 @@ function writePushApproval(dir, forCommit) {
       },
     },
   });
+}
+
+function governanceRegistry(fingerprint) {
+  return { schema: "pipeline.governance-stream-registry.v1", repositoryFingerprint: fingerprint, canonicalization: "RFC8785", digestAlgorithm: "sha-256", eventDigestDomain: "pipeline.governance-event.v1\0", storageRoot: "governance/events", streams: [
+    { streamId: "human", origin: "human", authorityClass: "human-authority", relativeRoot: "human", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+    { streamId: "agent", origin: "agent", authorityClass: "non-authoritative", relativeRoot: "agent", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+    { streamId: "lifecycle", origin: "lifecycle", authorityClass: "non-authoritative", relativeRoot: "lifecycle", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+  ] };
+}
+function governanceCapturePolicy() {
+  return { schema: "pipeline.governance-capture-policy.v1", policyId: "fixture", revision: "d".repeat(64), defaultAction: "deny", streams: ["human", "agent", "lifecycle"].map((origin) => ({ origin, purpose: origin === "human" ? "authority-history" : "declared-assumption", materiality: "required", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null })), sanitizedReceipt: { allowEventId: true, allowEventDigest: true, allowCheckpoint: true, allowReasonText: false } };
+}
+async function writeLedgerPushApproval(dir, featureId, head) {
+  const tree = gitAt(dir, "rev-parse", "HEAD^{tree}").stdout.trim();
+  const repository = discoverRepository(dir);
+  const fingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: repository.commonDir, primaryRoot: repository.primaryRoot });
+  const policy = governanceCapturePolicy();
+  mkdirSync(join(dir, "governance", "events"), { recursive: true });
+  writeFileSync(join(dir, "governance", "events", "registry.json"), `${canonicalizeJson(governanceRegistry(fingerprint))}\n`);
+  writeFileSync(join(dir, "governance", "events", "capture-policy.json"), `${canonicalizeJson(policy)}\n`);
+  const candidate = { commit: head, tree };
+  const decision = { decisionId: "approve-push-ledger", event: "granted", outcome: "granted", authorityClass: "product-owner", identityAssurance: "locally-attributed", timeAssurance: "locally-observed", scope: { repositoryFingerprint: fingerprint, candidate, packageId: featureId, action: "APPROVE_PUSH", environment: "local", artifacts: [{ path: "README.md", sha256: createHash("sha256").update(readFileSync(join(dir, "README.md"))).digest("hex") }] }, reasonCode: "APPROVED", policyDigest: "a".repeat(64), ruleDigest: "b".repeat(64), validity: { notBeforeEpochMs: 1, expiresAtEpochMs: 4_102_444_800_000, singleUse: true }, links: { requestDecisionId: "request-ledger", consumesDecisionId: null, revokesDecisionId: null, expiresDecisionId: null, supersedesDecisionId: null, correctsDecisionId: null } };
+  const absent = { state: "not-applicable" };
+  const receipt = await appendHumanGovernanceDecision({ repositoryRoot: dir, repositoryFingerprint: fingerprint, intent: { schema: "pipeline.governance-event-envelope.v1", payloadSchema: "pipeline.human-governance-decision.v1", canonicalization: "RFC8785", digestAlgorithm: "sha-256", eventId: "ledger-grant-event", idempotencyKey: "ledger-grant-idempotency", origin: "human", authorityClass: "human-authority", eventType: "human.granted", occurredAtEpochMs: 2, observedAtEpochMs: 2, timeAssurance: "locally-observed", repositoryFingerprint: fingerprint, sourceUri: `urn:pipeline:repository:${fingerprint}`, streamId: "human", correlation: { featureId: absent, packageId: absent, requestId: absent, sessionId: absent, dispatchId: absent, traceId: absent }, candidate, artifacts: [absent], policy: { policyDigest: absent, configurationDigest: absent, capturePolicyDigest: canonicalSha256(policy), redactionPolicyDigest: absent }, classification: "repository-public-safe", storageProfile: "repository-public-safe", retentionCompatibility: "repository-retained", disclosureClass: "repository-visible", payload: decision } });
+  const grantEvent = (await queryHumanGovernanceDecisions({ repositoryRoot: dir, repositoryFingerprint: fingerprint, checkpoint: receipt.checkpoint })).events[0];
+  const consumed = await appendConsumedHumanGovernanceDecision({ repositoryRoot: dir, repositoryFingerprint: fingerprint, grantEvent, decisionId: "consume-push-ledger", eventId: "ledger-consumed-event", idempotencyKey: "ledger-consumed-idempotency", observedAtEpochMs: 3 });
+  writeState(dir, { schema: "pipeline.state.v0", activeFeature: { id: featureId, planPath: "specs/test/prd.md", phase: "implementation" }, pushApproval: { schema: "pipeline.push-approval.v2", lastApproved: { approvedBy: "po-test", approvedAt: "2026-08-02T00:00:00.000Z", candidate, humanDecision: { schema: "pipeline.human-decision-reference.v1", decisionId: decision.decisionId, decisionDigest: canonicalSha256(decision), candidate, checkpoint: receipt.checkpoint }, consumption: { schema: "pipeline.human-decision-consumption.v1", decisionId: "consume-push-ledger", decisionDigest: canonicalSha256(decision), checkpoint: consumed.checkpoint } } } });
 }
 function writeEvidence(dir, relPath, obj) {
   const full = join(dir, relPath);
@@ -228,6 +259,19 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
     dir,
     BLOCK,
     { stderrIncludes: ["not unambiguous"] },
+  );
+}
+{
+  const { dir, head } = freshRepo("ledger-backed-push");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  await writeLedgerPushApproval(dir, "ledger-feature", head);
+  check(
+    "PG03aa allow  exact consumed ledger receipt authorizes the matching candidate",
+    `git push origin ${head}:refs/heads/main`,
+    dir,
+    ALLOW,
+    { stderrEmpty: true },
   );
 }
 {

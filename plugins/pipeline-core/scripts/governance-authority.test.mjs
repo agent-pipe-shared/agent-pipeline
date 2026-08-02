@@ -88,5 +88,14 @@ test("authority CLI consumes a checkpoint-bound single-use grant idempotently", 
   assert.equal(consumed.outcome, "appended");
   assert.equal(consumed.consumptionDecisionId, "consumed-1");
   assert.equal((await main(["--repo", values.root, "--consume-request-json", canonicalizeJson(request)])).outcome, "idempotent-replay");
+  const status = await main(["--repo", values.root, "--consumption-readback-json", canonicalizeJson({
+    schema: "pipeline.governance-authority-consumption-readback-request.v1",
+    repositoryFingerprint: values.fingerprint,
+    candidate,
+    decisionId: "grant-1",
+    decisionDigest: request.decisionDigest,
+    consumption: { schema: "pipeline.human-decision-consumption.v1", decisionId: "consumed-1", decisionDigest: request.decisionDigest, checkpoint: consumed.checkpoint },
+  })]);
+  assert.deepEqual(status, { schema: "pipeline.governance-authority-consumption-status.v1", consumed: true, decisionId: "grant-1", decisionDigest: request.decisionDigest, consumptionDecisionId: "consumed-1", scope: decision(values.fingerprint).scope });
   await assert.rejects(() => main(["--repo", values.root, "--consume-request-json", canonicalizeJson({ ...request, consumption: { decisionId: "consumed-2", eventId: "consumed-event-2", idempotencyKey: "consumed-idempotency-2" } })]), (error) => error.code === "HGL-CONSUME-NOT-LIVE");
 });

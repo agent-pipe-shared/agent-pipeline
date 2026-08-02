@@ -10,13 +10,15 @@ import { requireGovernanceAuthority } from "../lib/governance-authority-resolver
 function fail(code, message) { const error = new Error(message); error.code = code; throw error; }
 function exact(value, keys) { return value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key)); }
 function parse(argv) {
-  if (argv.length !== 4 || argv[0] !== "--repo" || !new Set(["--request-file", "--request-json", "--consume-request-file", "--consume-request-json"]).has(argv[2])) fail("GAC-ARGUMENT", "Usage: governance-authority.mjs --repo <checkout> (--request-file <file>|--request-json <canonical-json>|--consume-request-file <file>|--consume-request-json <canonical-json>)");
+  if (argv.length !== 4 || argv[0] !== "--repo" || !new Set(["--request-file", "--request-json", "--consume-request-file", "--consume-request-json", "--consumption-readback-file", "--consumption-readback-json"]).has(argv[2])) fail("GAC-ARGUMENT", "Usage: governance-authority.mjs --repo <checkout> (--request-file <file>|--request-json <canonical-json>|--consume-request-file <file>|--consume-request-json <canonical-json>|--consumption-readback-file <file>|--consumption-readback-json <canonical-json>)");
   return {
     repositoryRoot: argv[1],
     requestFile: argv[2] === "--request-file" ? argv[3] : null,
     requestJson: argv[2] === "--request-json" ? argv[3] : null,
     consumeRequestFile: argv[2] === "--consume-request-file" ? argv[3] : null,
     consumeRequestJson: argv[2] === "--consume-request-json" ? argv[3] : null,
+    consumptionReadbackFile: argv[2] === "--consumption-readback-file" ? argv[3] : null,
+    consumptionReadbackJson: argv[2] === "--consumption-readback-json" ? argv[3] : null,
   };
 }
 
@@ -26,14 +28,41 @@ function exactConsumptionRequest(request) {
     && exact(request.consumption, ["decisionId", "eventId", "idempotencyKey"]);
 }
 
+function exactConsumptionReadbackRequest(request) {
+  return exact(request, ["schema", "repositoryFingerprint", "candidate", "decisionId", "decisionDigest", "consumption"])
+    && request.schema === "pipeline.governance-authority-consumption-readback-request.v1"
+    && exact(request.candidate, ["commit", "tree"])
+    && exact(request.consumption, ["schema", "decisionId", "decisionDigest", "checkpoint"])
+    && request.consumption.schema === "pipeline.human-decision-consumption.v1";
+}
+
 export async function main(argv = process.argv.slice(2)) {
-  const { repositoryRoot, requestFile, requestJson, consumeRequestFile, consumeRequestJson } = parse(argv);
+  const { repositoryRoot, requestFile, requestJson, consumeRequestFile, consumeRequestJson, consumptionReadbackFile, consumptionReadbackJson } = parse(argv);
   const consumption = consumeRequestFile !== null || consumeRequestJson !== null;
+  const consumptionReadback = consumptionReadbackFile !== null || consumptionReadbackJson !== null;
   let request; try {
-    request = parseStrictJson(consumption
+    request = parseStrictJson(consumptionReadback
+      ? consumptionReadbackFile === null ? consumptionReadbackJson : await readFile(consumptionReadbackFile)
+      : consumption
       ? consumeRequestFile === null ? consumeRequestJson : await readFile(consumeRequestFile)
       : requestFile === null ? requestJson : await readFile(requestFile));
   } catch { fail("GAC-REQUEST", "Authority request must be strict JSON."); }
+  if (consumptionReadback) {
+    if (!exactConsumptionReadbackRequest(request)) fail("GAC-CONSUMPTION-READBACK-REQUEST", "Consumption readback request has an invalid closed shape.");
+    const queried = await queryHumanGovernanceDecisions({ repositoryRoot, repositoryFingerprint: request.repositoryFingerprint, checkpoint: request.consumption.checkpoint });
+    if (queried.completeness !== "verified") return Object.freeze({ schema: "pipeline.governance-authority-consumption-status.v1", consumed: false, reason: "checkpoint-unverified" });
+    const grant = queried.decisions.find((decision) => decision.decisionId === request.decisionId);
+    const disposition = queried.decisions.find((decision) => decision.decisionId === request.consumption.decisionId);
+    if (!grant || !disposition || canonicalSha256(grant) !== request.decisionDigest
+      || canonicalSha256(grant) !== request.consumption.decisionDigest
+      || canonicalSha256(grant.scope.candidate) !== canonicalSha256(request.candidate)
+      || disposition.event !== "consumed" || disposition.outcome !== "consumed"
+      || disposition.links.consumesDecisionId !== grant.decisionId
+      || canonicalSha256(disposition.scope) !== canonicalSha256(grant.scope)) {
+      return Object.freeze({ schema: "pipeline.governance-authority-consumption-status.v1", consumed: false, reason: "consumption-unavailable" });
+    }
+    return Object.freeze({ schema: "pipeline.governance-authority-consumption-status.v1", consumed: true, decisionId: grant.decisionId, decisionDigest: request.decisionDigest, consumptionDecisionId: disposition.decisionId, scope: grant.scope });
+  }
   if (consumption) {
     if (!exactConsumptionRequest(request)) fail("GAC-CONSUME-REQUEST", "Consumption request has an invalid closed shape.");
     const queried = await queryHumanGovernanceDecisions({ repositoryRoot, repositoryFingerprint: request.repositoryFingerprint, checkpoint: request.checkpoint });

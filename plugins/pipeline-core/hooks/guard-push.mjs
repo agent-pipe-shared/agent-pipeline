@@ -86,10 +86,15 @@ import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { isAbsolute, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 import { loadManifest, gateConfig, loadDeployPolicy } from "../lib/manifest.mjs";
 import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv, refMatchesPattern } from "../lib/git-cmd.mjs";
 import { readProjectAuthority } from "../lib/project-authority.mjs";
+
+const GOVERNANCE_AUTHORITY_CLI = fileURLToPath(new URL("../scripts/governance-authority.mjs", import.meta.url));
+const HUMAN_DECISION_REFERENCE_SCHEMA = "pipeline.human-decision-reference.v1";
+const HUMAN_DECISION_CONSUMPTION_SCHEMA = "pipeline.human-decision-consumption.v1";
 
 function resolvedStatePath(dir) {
   const authority = readProjectAuthority({ rootDir: dir });
@@ -585,6 +590,67 @@ function exactObjectKeys(value, keys) {
   const actual = Object.keys(value).sort();
   const expected = [...keys].sort();
   return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
+}
+
+function sha256Oid(value) { return typeof value === "string" && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(value); }
+
+/**
+ * PHX-2’s read-only admission.  State is merely a compact projection: this
+ * guard independently asks the canonical Ledger whether the exact grant was
+ * consumed for this candidate.  Cyborg’s detached PO proof is deliberately
+ * verified in the Authority CLI’s admission boundary, not inferred here.
+ */
+function checkLedgerPushAuthority(sourceCommit) {
+  const path = resolvedStatePath(projectDir);
+  let state;
+  try { state = JSON.parse(readFileSync(path, "utf8")); }
+  catch { return ["PHX-2 authority unavailable: pipeline State has no readable ledger-backed push projection."]; }
+  const approval = state?.pushApproval;
+  const entry = approval?.lastApproved;
+  if (!exactObjectKeys(approval, ["schema", "lastApproved"]) || approval.schema !== "pipeline.push-approval.v2"
+    || !exactObjectKeys(entry, ["approvedBy", "approvedAt", "candidate", "humanDecision", "consumption"])
+    || !exactObjectKeys(entry.candidate, ["commit", "tree"])
+    || !exactObjectKeys(entry.humanDecision, ["schema", "decisionId", "decisionDigest", "candidate", "checkpoint"])
+    || entry.humanDecision.schema !== HUMAN_DECISION_REFERENCE_SCHEMA
+    || !exactObjectKeys(entry.consumption, ["schema", "decisionId", "decisionDigest", "checkpoint"])
+    || entry.consumption.schema !== HUMAN_DECISION_CONSUMPTION_SCHEMA
+    || !sha256Oid(entry.candidate.commit) || !sha256Oid(entry.candidate.tree)
+    || !sha256Oid(entry.humanDecision.candidate?.commit) || !sha256Oid(entry.humanDecision.candidate?.tree)) {
+    return ["PHX-2 authority unavailable: pushApproval is not an exact ledger-backed v2 projection."];
+  }
+  const tree = spawnSync("git", ["-C", projectDir, "rev-parse", `${sourceCommit}^{tree}`], { encoding: "utf8", timeout: 5000 });
+  const sourceTree = tree.status === 0 ? tree.stdout.trim() : null;
+  if (!sourceTree || entry.candidate.commit !== sourceCommit || entry.candidate.tree !== sourceTree
+    || entry.humanDecision.candidate.commit !== sourceCommit || entry.humanDecision.candidate.tree !== sourceTree) {
+    return ["PHX-2 authority unavailable: the ledger projection is not bound to this exact pushed candidate."];
+  }
+  const request = {
+    schema: "pipeline.governance-authority-consumption-readback-request.v1",
+    repositoryFingerprint: entry.humanDecision.checkpoint?.repositoryFingerprint,
+    candidate: entry.candidate,
+    decisionId: entry.humanDecision.decisionId,
+    decisionDigest: entry.humanDecision.decisionDigest,
+    consumption: entry.consumption,
+  };
+  const invoked = spawnSync(process.execPath, [GOVERNANCE_AUTHORITY_CLI, "--repo", projectDir, "--consumption-readback-json", JSON.stringify(request)], { encoding: "utf8", timeout: 5000 });
+  if (invoked.status !== 0) return ["PHX-2 authority unavailable: the canonical human-governance ledger could not be read."];
+  let readback;
+  try { readback = JSON.parse(invoked.stdout); } catch { return ["PHX-2 authority unavailable: the canonical human-governance ledger returned an invalid readback."]; }
+  const scope = readback?.scope;
+  if (!exactObjectKeys(readback, ["schema", "consumed", "decisionId", "decisionDigest", "consumptionDecisionId", "scope"])
+    || readback.schema !== "pipeline.governance-authority-consumption-status.v1"
+    || readback.consumed !== true
+    || readback.decisionId !== entry.humanDecision.decisionId
+    || readback.decisionDigest !== entry.humanDecision.decisionDigest
+    || readback.consumptionDecisionId !== entry.consumption.decisionId
+    || !exactObjectKeys(scope, ["repositoryFingerprint", "candidate", "packageId", "action", "environment", "artifacts"])
+    || scope.repositoryFingerprint !== request.repositoryFingerprint
+    || scope.candidate.commit !== sourceCommit || scope.candidate.tree !== sourceTree
+    || scope.packageId !== state.activeFeature?.id || scope.action !== "APPROVE_PUSH" || scope.environment !== "local"
+    || !Array.isArray(scope.artifacts) || scope.artifacts.length === 0) {
+    return ["PHX-2 authority unavailable: the ledger consumption does not authorize this push tuple."];
+  }
+  return [];
 }
 
 /**
@@ -1254,17 +1320,13 @@ if (securityGate && securityGate.mode !== "off") {
 // the actual network operation, then fetches the pushed ref from a fresh repository.
 failures.push(...checkAnonymousPublicPush(pushBinding, sourceCommit));
 
-// (c) PHX-2 transition. A local publication projection is coordination data,
-// not human authority: its writer receipt and State bytes cannot substitute for
-// the Human Governance Decision Ledger and Authority Resolver required by the
-// Phoenix contract. Keep the active Push-Gate unconditionally fail-closed until
-// that immutable authority source is available.
-failures.push(
-  "PHX-2 authority unavailable: mutable pipeline State approvals cannot authorize a push; " +
-    "require the Human Governance Decision Ledger and Authority Resolver.",
-);
+// (c) PHX-2 ledger-backed human authority. The State projection is accepted
+// only after the immutable consumed decision independently resolves for this
+// exact source candidate; malformed, absent, stale, or unverified evidence is
+// fail-closed as a normal collected Push-Gate finding.
+failures.push(...checkLedgerPushAuthority(sourceCommit));
 
-if (failures.length === 0) process.exit(0); // defensive: active Push-Gates add the PHX-2 transition finding
+if (failures.length === 0) process.exit(0);
 
 const message = [
   invalidityNote, // case B: non-null only for a semantic-invalid manifest with a release
