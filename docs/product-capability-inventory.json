@@ -1061,6 +1061,12 @@
       "member": "critic-fail-closed-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:critic-dispatch-preflight-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "critic-dispatch-preflight-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:critic-packet-governance-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1245,6 +1251,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "pipeline-start-preflight-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:pipeline-state-revocation-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "pipeline-state-revocation-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:pipeline-state-tests",
@@ -2071,6 +2083,7 @@
         "verify-phase:harness/scripts/verify.mjs:control-execution-exchange-tests",
         "verify-phase:harness/scripts/verify.mjs:control-waiver-lifecycle-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-bare-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-dispatch-preflight-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-export-policy-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-fail-closed-check",
         "verify-phase:harness/scripts/verify.mjs:critic-fail-closed-tests",
@@ -2146,6 +2159,7 @@
         "verify-phase:harness/scripts/verify.mjs:phase3-sdlc-coherence-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-start-preflight-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-start-v3-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-state-revocation-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-tests",
         "verify-phase:harness/scripts/verify.mjs:po-approval-proof-tests",
         "verify-phase:harness/scripts/verify.mjs:po-gate-authority-fixture-tests",
