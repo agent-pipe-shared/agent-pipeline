@@ -1,0 +1,23 @@
+// SPDX-License-Identifier: SUL-1.0
+/** Pure per-destination outbox state machine; persistence is an adapter concern. */
+const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u; const SHA = /^[a-f0-9]{64}$/u;
+function fail(code) { const error = new Error("Governance export outbox is invalid."); error.code = code; throw error; }
+function exact(value, keys) { return value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key)); }
+function projection(value) { return exact(value, ["schema", "destinationEventId", "destinationProfile", "format", "policyRevision", "sourceEventDigest", "fields"]) && value.schema === "pipeline.governance-export-event.v1" && SHA.test(value.destinationEventId) && ID.test(value.destinationProfile) && SHA.test(value.policyRevision) && SHA.test(value.sourceEventDigest) && value.fields !== null && typeof value.fields === "object" && !Array.isArray(value.fields); }
+function state(value) { return exact(value, ["schema", "destinationProfile", "policyRevision", "cursor", "entries"]) && value.schema === "pipeline.governance-export-outbox.v1" && ID.test(value.destinationProfile) && SHA.test(value.policyRevision) && Number.isSafeInteger(value.cursor) && value.cursor >= 0 && Array.isArray(value.entries) && value.entries.every((entry, index) => exact(entry, ["sequence", "projection", "attempts", "status"]) && entry.sequence === index + 1 && projection(entry.projection) && Number.isSafeInteger(entry.attempts) && entry.attempts >= 0 && new Set(["pending", "acknowledged", "quarantined"]).has(entry.status)); }
+function freeze(value) { return Object.freeze(value); }
+function frozenState(value) { return freeze({ ...value, entries: freeze(value.entries.map((entry) => freeze({ ...entry, projection: freeze({ ...entry.projection, fields: freeze({ ...entry.projection.fields }) }) }))) }); }
+export function createGovernanceExportOutbox({ destinationProfile, policyRevision } = {}) { if (!ID.test(destinationProfile ?? "") || !SHA.test(policyRevision ?? "")) fail("GEO-CREATE"); return frozenState({ schema: "pipeline.governance-export-outbox.v1", destinationProfile, policyRevision, cursor: 0, entries: [] }); }
+export function enqueueGovernanceExport(outbox, item) {
+  if (!state(outbox) || !projection(item) || item.destinationProfile !== outbox.destinationProfile || item.policyRevision !== outbox.policyRevision) fail("GEO-ENQUEUE"); if (outbox.entries.some((entry) => entry.projection.sourceEventDigest === item.sourceEventDigest)) return outbox;
+  return frozenState({ ...outbox, entries: [...outbox.entries, { sequence: outbox.entries.length + 1, projection: item, attempts: 0, status: "pending" }] });
+}
+/** Acknowledgements advance only the contiguous confirmed prefix; all other entries remain recoverable. */
+export function applyGovernanceExportDelivery(outbox, { attempt, acceptedDestinationEventIds, quarantinedDestinationEventIds = [] } = {}) {
+  if (!state(outbox) || !Number.isSafeInteger(attempt) || attempt < 1 || !Array.isArray(acceptedDestinationEventIds) || !Array.isArray(quarantinedDestinationEventIds) || new Set(acceptedDestinationEventIds).size !== acceptedDestinationEventIds.length || new Set(quarantinedDestinationEventIds).size !== quarantinedDestinationEventIds.length || [...acceptedDestinationEventIds, ...quarantinedDestinationEventIds].some((id) => !SHA.test(id))) fail("GEO-DELIVERY");
+  const accepted = new Set(acceptedDestinationEventIds); const quarantined = new Set(quarantinedDestinationEventIds); if ([...accepted].some((id) => quarantined.has(id))) fail("GEO-DELIVERY"); const known = new Set(outbox.entries.map((entry) => entry.projection.destinationEventId)); if ([...accepted, ...quarantined].some((id) => !known.has(id))) fail("GEO-DELIVERY");
+  const entries = outbox.entries.map((entry) => entry.status !== "pending" ? entry : { ...entry, attempts: Math.max(entry.attempts, attempt), status: accepted.has(entry.projection.destinationEventId) ? "acknowledged" : quarantined.has(entry.projection.destinationEventId) ? "quarantined" : "pending" }); let cursor = outbox.cursor;
+  while (entries[cursor]?.status === "acknowledged") cursor += 1;
+  return frozenState({ ...outbox, cursor, entries });
+}
+export function nextGovernanceExportBatch(outbox, { maxEvents } = {}) { if (!state(outbox) || !Number.isSafeInteger(maxEvents) || maxEvents < 1 || maxEvents > 1000) fail("GEO-BATCH"); return freeze(outbox.entries.filter((entry) => entry.status === "pending").slice(0, maxEvents).map((entry) => freeze({ sequence: entry.sequence, projection: entry.projection, attempts: entry.attempts }))); }

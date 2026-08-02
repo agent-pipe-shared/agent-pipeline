@@ -12,3 +12,9 @@ contain only profile, policy revision, batch and acknowledgement state, cursor,
 and lag. They do not prove retention, immutability, analyst review, compliance,
 or any human/Pipeline authority. Export responses are never consumed as a
 Pipeline authority source.
+
+Each destination maintains an independent outbox state: acknowledged entries
+advance its cursor only across a contiguous confirmed prefix. Partial delivery
+leaves unacknowledged entries pending, while quarantined entries preserve their
+source binding for reconciliation. The export core uses at-least-once semantics
+and never claims exactly-once delivery.
