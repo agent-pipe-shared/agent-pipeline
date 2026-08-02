@@ -129,17 +129,16 @@ never imports the other.
 | 16. Schema/taxonomy/authority/threat/migration/retention/recovery docs exist | `H-AC-14` |
 | 17. Complete decision/failure/privacy fixture set | `H-AC-15` |
 
-Coverage: **incomplete at the 2026-08-02 implementation audit**. The canonical
+Coverage: **complete at the 2026-08-02 implementation audit**. The canonical
 ledger, resolver, v3 plan-approval route, `guard-devplan`, and `guard-push`
-now validate candidate-bound decision references; the latter accepts only a
+validate candidate-bound decision references; `guard-push` accepts only a
 separately read immutable consumption receipt, never mutable State alone.
-`H-AC-12` remains open for deploy/release consumers and Git-override
-consumption. The Cyborg-compatible detached PO-proof contract is now consumed
-by an explicit proof-verification resolver: it binds the immutable ledger
-grant, exact candidate, and scoped plan/spec artifacts. A caller-supplied trust
-policy proves only the detached signature; it cannot by itself establish the
-provenance of that policy or upgrade local attribution to human identity.
-Existing consumers are not silently upgraded. Git and mutable State remain
+Change Control now blocks deploy/release until its exact `APPROVE_DEPLOY`
+ledger decision binds the candidate and artifact; Phoenix Git overrides require
+and single-consume an exact `OVERRIDE.<rule>` decision bound to the guarded
+artifact. The Cyborg-compatible detached PO-proof resolver remains explicit:
+a caller-supplied trust policy proves only the detached signature and cannot
+upgrade local attribution to human identity. Git and mutable State remain
 projections/transport; neither is promoted to historical human authority.
 
 ## #31 — Agent Decision and Assumption Journal
