@@ -597,8 +597,9 @@ function sha256Oid(value) { return typeof value === "string" && /^(?:[a-f0-9]{40
 /**
  * PHX-2’s read-only admission.  State is merely a compact projection: this
  * guard independently asks the canonical Ledger whether the exact grant was
- * consumed for this candidate.  Cyborg’s detached PO proof is deliberately
- * verified in the Authority CLI’s admission boundary, not inferred here.
+ * consumed for this candidate.  After Cyborg integration its detached PO proof
+ * must be verified in the Authority CLI’s admission boundary; this guard never
+ * infers or labels a local ledger attribution as an externally verified human.
  */
 function checkLedgerPushAuthority(sourceCommit) {
   const path = resolvedStatePath(projectDir);
