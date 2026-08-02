@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.threat-model.v1",
   "candidate": {
-    "commit": "e7cca89b0e166eac3711d4173a67f261c7229938",
-    "tree": "7afe1851e8baefadd97aa126c0a548e8b3b4cdfa"
+    "commit": "ca74ab71b09a5f102bcb1ee858e5a95434ac4d5e",
+    "tree": "5a5364a52192501d672d03c691e4df5eb44358f8"
   },
   "policyRevision": "cyb-5-policy-v1",
   "classification": "public",
@@ -11,7 +11,7 @@
       "id": "asset-2f7120eb99d780aa",
       "kind": "asset",
       "label": "pipeline-authority-and-evidence",
-      "relationships": ["boundary-797b3b8fa078a88b", "boundary-31a6cbe7f7a5e8c2"]
+      "relationships": ["boundary-797b3b8fa078a88b", "boundary-31a6cbe7f7a5e8c2", "boundary-7c0a3d27b5e19a44"]
     },
     {
       "id": "boundary-797b3b8fa078a88b",
@@ -47,6 +47,24 @@
       "id": "mitigation-2f8d532f0d052f83",
       "kind": "mitigation",
       "label": "isolation-validation-and-receipt-bound-fallback",
+      "relationships": []
+    },
+    {
+      "id": "boundary-7c0a3d27b5e19a44",
+      "kind": "boundary",
+      "label": "agent-to-external-security-authority",
+      "relationships": ["threat-9db14f6e33a72c10"]
+    },
+    {
+      "id": "threat-9db14f6e33a72c10",
+      "kind": "threat",
+      "label": "self-labeled-security-exception",
+      "relationships": ["mitigation-7e9234c8a0df2b61"]
+    },
+    {
+      "id": "mitigation-7e9234c8a0df2b61",
+      "kind": "mitigation",
+      "label": "detached-proof-and-external-trust-policy",
       "relationships": []
     }
   ],
