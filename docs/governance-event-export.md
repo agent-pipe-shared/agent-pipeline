@@ -18,3 +18,8 @@ advance its cursor only across a contiguous confirmed prefix. Partial delivery
 leaves unacknowledged entries pending, while quarantined entries preserve their
 source binding for reconciliation. The export core uses at-least-once semantics
 and never claims exactly-once delivery.
+
+The local outbox store is a sanitized, non-authority cache with a
+compare-and-swap preimage. A stale writer receives a typed conflict rather than
+replacing newer destination state; it cannot modify the canonical source event
+stream.

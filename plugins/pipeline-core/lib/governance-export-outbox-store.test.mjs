@@ -1,0 +1,11 @@
+// SPDX-License-Identifier: SUL-1.0
+import assert from "node:assert/strict";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
+import { createGovernanceExportOutbox, enqueueGovernanceExport } from "./governance-export-outbox.mjs";
+import { loadGovernanceExportOutbox, persistGovernanceExportOutbox } from "./governance-export-outbox-store.mjs";
+const revision = "a".repeat(64); const item = { schema: "pipeline.governance-export-event.v1", destinationEventId: "b".repeat(64), destinationProfile: "test-siem", format: "ndjson", policyRevision: revision, sourceEventDigest: "c".repeat(64), fields: { eventId: "event-1" } };
+test("persists one destination outbox with an exact preimage and reloads it", async () => { const root = mkdtempSync(join(tmpdir(), "export-outbox-store-")); const absent = await loadGovernanceExportOutbox({ repositoryRoot: root, destinationProfile: "test-siem", policyRevision: revision }); const next = enqueueGovernanceExport(absent.outbox, item); const stored = await persistGovernanceExportOutbox({ repositoryRoot: root, destinationProfile: "test-siem", policyRevision: revision, expectedSha256: absent.sha256, outbox: next }); const loaded = await loadGovernanceExportOutbox({ repositoryRoot: root, destinationProfile: "test-siem", policyRevision: revision }); assert.equal(stored.status, "stored"); assert.equal(loaded.outbox.entries.length, 1); assert.equal(loaded.sha256, stored.sha256); });
+test("does not overwrite a changed outbox from a stale preimage", async () => { const root = mkdtempSync(join(tmpdir(), "export-outbox-store-")); const first = await loadGovernanceExportOutbox({ repositoryRoot: root, destinationProfile: "test-siem", policyRevision: revision }); const next = enqueueGovernanceExport(first.outbox, item); await persistGovernanceExportOutbox({ repositoryRoot: root, destinationProfile: "test-siem", policyRevision: revision, expectedSha256: null, outbox: next }); const stale = await persistGovernanceExportOutbox({ repositoryRoot: root, destinationProfile: "test-siem", policyRevision: revision, expectedSha256: null, outbox: createGovernanceExportOutbox({ destinationProfile: "test-siem", policyRevision: revision }) }); assert.equal(stale.status, "conflict"); });
