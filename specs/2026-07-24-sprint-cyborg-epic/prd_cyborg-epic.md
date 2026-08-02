@@ -1,7 +1,7 @@
 # PRD — Sprint Cyborg: Post-go-live security assurance
 
 <!-- po-language: en -->
-<!-- technical-spec-sha256: af750a40f2601343dbc66bcfdb76ea40eaec2cc732f30808dd8100c735440ded -->
+<!-- technical-spec-sha256: 3cac4741233892fc5cbe37c8c295ca21906d67620e88279c3d173d91c4a9ab2e -->
 
 > Status: **APPROVED** (EL-19 gate). PO approved decision D + CYB-1F F-1..F-5
 > "wie empfohlen" 2026-07-25 (see `docs/state.md`, "PO GATE ANSWERED"); the

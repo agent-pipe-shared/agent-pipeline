@@ -240,4 +240,23 @@ check("legacy source callers remain compatible only when bytes match the candida
   } finally { process.chdir(previous); }
 });
 
+check("v1 execution records keep their pre-bound scanned-source digest", () => {
+  const iac = REPRESENTATIVE_STACK_ADAPTERS.find((adapter) => adapter.kind === "iac");
+  const execution = executeStackAdapterConformance(executionInput(iac));
+  const legacySources = [
+    { path: "infra/main.tf", content: readFileSync(join(fixture.root, "infra/main.tf"), "utf8") },
+    { path: "infra/public.tf", content: readFileSync(join(fixture.root, "infra/public.tf"), "utf8") },
+  ];
+  assert.equal(execution.execution.sourceSha256, createHash("sha256").update(JSON.stringify(legacySources)).digest("hex"));
+  assert.equal(createStackAdapterEvidence({
+    adapter: iac,
+    plan,
+    environment: { platform: "linux", nodeVersion: null },
+    execution: execution.execution,
+    authorization: null,
+    repositoryRoot: fixture.root,
+    sourcePath: "infra/main.tf",
+  }).ok, true);
+});
+
 console.log(`${pass} stack adapter contract checks passed`);

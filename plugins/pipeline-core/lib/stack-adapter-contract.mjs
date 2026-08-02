@@ -102,7 +102,9 @@ function staticFindings(adapterValue, sources) {
 
 function executionRecord(adapterValue, plan, environment, sourceSet = null) {
   const findings = adapterValue.executionMode === "static-analysis" ? staticFindings(adapterValue, sourceSet.sources) : [];
-  const sourceSha256 = sourceSet === null ? null : digest(JSON.stringify(sourceSet));
+  // Keep the v1 source binding stable: coverage remains in the signed record,
+  // while sourceSha256 continues to name the scanned source array.
+  const sourceSha256 = sourceSet === null ? null : digest(JSON.stringify(sourceSet.sources));
   const incomplete = adapterValue.executionMode === "static-analysis" && !sourceSet.complete;
   const coverage = sourceSet === null
     ? defaultCoverage(adapterValue.id)
@@ -118,7 +120,7 @@ function executionRecord(adapterValue, plan, environment, sourceSet = null) {
 
 function validExecution(value, adapterValue, plan, environment, sourceSet = null) {
   const expectedStatus = sourceSet !== null && adapterValue.executionMode === "static-analysis" && !sourceSet.complete ? "ERROR" : null;
-  if (!own(value, ["schema", "adapterId", "candidate", "planDigest", "sourceSha256", "environment", "status", "findings", "coverage", "reason", "digest"]) || value.schema !== "pipeline.stack-adapter-execution.v1" || value.adapterId !== adapterValue.id || JSON.stringify(value.candidate) !== JSON.stringify(plan.candidate) || value.planDigest !== plan.digest || value.sourceSha256 !== (sourceSet === null ? null : digest(JSON.stringify(sourceSet))) || JSON.stringify(value.environment) !== JSON.stringify(environment) || !STATUS.has(value.status) || value.status !== (expectedStatus ?? value.status) || !Array.isArray(value.findings) || (value.status === "PASS" && value.findings.length !== 0) || (value.status === "FINDINGS" && value.findings.length === 0) || typeof value.reason !== "string" || !/^[a-f0-9]{64}$/u.test(value.digest)) return false;
+  if (!own(value, ["schema", "adapterId", "candidate", "planDigest", "sourceSha256", "environment", "status", "findings", "coverage", "reason", "digest"]) || value.schema !== "pipeline.stack-adapter-execution.v1" || value.adapterId !== adapterValue.id || JSON.stringify(value.candidate) !== JSON.stringify(plan.candidate) || value.planDigest !== plan.digest || value.sourceSha256 !== (sourceSet === null ? null : digest(JSON.stringify(sourceSet.sources))) || JSON.stringify(value.environment) !== JSON.stringify(environment) || !STATUS.has(value.status) || value.status !== (expectedStatus ?? value.status) || !Array.isArray(value.findings) || (value.status === "PASS" && value.findings.length !== 0) || (value.status === "FINDINGS" && value.findings.length === 0) || typeof value.reason !== "string" || !/^[a-f0-9]{64}$/u.test(value.digest)) return false;
   const { digest: executionDigest, ...unsigned } = value;
   return executionDigest === digest(JSON.stringify(unsigned));
 }
