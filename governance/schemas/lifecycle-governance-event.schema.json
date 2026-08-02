@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.dev/schemas/pipeline.lifecycle-governance-event.v1.json",
+  "title": "Pipeline lifecycle governance event v1",
+  "description": "Closed, non-authoritative lifecycle event payload. It carries no free-form messages, prompts, paths, or authority claim.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "kind", "status", "reasonCode", "correlation", "candidate", "invalidatesEventId", "supersedesEventId"],
+  "properties": {
+    "eventId": { "$ref": "#/$defs/id" },
+    "kind": { "enum": ["dispatch", "status", "cancellation", "candidate-invalidation", "verification", "review", "gate", "recovery", "reconciliation"] },
+    "status": { "enum": ["proposed", "active", "completed", "failed", "cancelled", "unknown", "unavailable", "invalidated"] },
+    "reasonCode": { "$ref": "#/$defs/code" },
+    "correlation": { "$ref": "#/$defs/correlation" },
+    "candidate": { "$ref": "#/$defs/candidate" },
+    "invalidatesEventId": { "$ref": "#/$defs/nullableId" },
+    "supersedesEventId": { "$ref": "#/$defs/nullableId" }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "nullableId": { "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+    "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9._:-]{0,127}$" },
+    "candidate": { "type": "object", "additionalProperties": false, "required": ["commit", "tree"], "properties": { "commit": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" }, "tree": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" } } },
+    "correlation": { "type": "object", "additionalProperties": false, "required": ["packageId", "dispatchId", "attemptId", "workerId"], "properties": { "packageId": { "$ref": "#/$defs/id" }, "dispatchId": { "$ref": "#/$defs/id" }, "attemptId": { "$ref": "#/$defs/id" }, "workerId": { "$ref": "#/$defs/id" } } }
+  }
+}

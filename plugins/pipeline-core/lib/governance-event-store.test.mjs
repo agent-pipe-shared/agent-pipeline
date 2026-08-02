@@ -76,14 +76,14 @@ function intent(overrides = {}) {
     idempotencyKey: "idem-1",
     origin: "lifecycle",
     authorityClass: "non-authoritative",
-    eventType: "lifecycle.started",
+    eventType: "lifecycle.dispatch",
     occurredAtEpochMs: 1,
     observedAtEpochMs: 1,
     timeAssurance: "locally-observed",
     repositoryFingerprint: fingerprint,
     sourceUri: `urn:pipeline:repository:${fingerprint}`,
     streamId: "lifecycle",
-    correlation: { featureId: unavailable, packageId: unavailable, requestId: unavailable, sessionId: unavailable, dispatchId: unavailable, traceId: unavailable },
+    correlation: { featureId: unavailable, packageId: "phoenix-3", requestId: unavailable, sessionId: unavailable, dispatchId: "dispatch-1", traceId: unavailable },
     candidate,
     artifacts: [unavailable],
     policy: { policyDigest: unavailable, configurationDigest: unavailable, capturePolicyDigest, redactionPolicyDigest: unavailable },
@@ -91,7 +91,7 @@ function intent(overrides = {}) {
     storageProfile: "repository-public-safe",
     retentionCompatibility: "repository-retained",
     disclosureClass: "repository-visible",
-    payload: { phase: "started" },
+    payload: { eventId: "lifecycle-1", kind: "dispatch", status: "active", reasonCode: "DISPATCHED", correlation: { packageId: "phoenix-3", dispatchId: "dispatch-1", attemptId: "attempt-1", workerId: "worker-1" }, candidate, invalidatesEventId: null, supersedesEventId: null },
     ...overrides,
   };
 }
@@ -121,7 +121,7 @@ test("exact idempotency is a zero-write replay while a conflicting key fails clo
   const replay = await append(root);
   assert.equal(replay.outcome, "idempotent-replay");
   assert.equal(replay.eventDigest, first.eventDigest);
-  const conflict = intent({ payload: { phase: "different" } });
+  const conflict = intent({ payload: { ...intent().payload, reasonCode: "CHANGED" } });
   await assert.rejects(() => append(root, conflict), (error) => error instanceof GovernanceEventStoreError && error.code === "GES-IDEMPOTENCY-CONFLICT");
   const result = await verifyPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" });
   assert.equal(result.eventCount, 1);
@@ -130,13 +130,13 @@ test("exact idempotency is a zero-write replay while a conflicting key fails clo
 test("portable admission requires the exact effective policy and closed safe payload", async (t) => {
   const root = await fixtureRoot(); t.after(() => cleanup(root));
   await assert.rejects(() => append(root, intent({ policy: { ...intent().policy, capturePolicyDigest: "d".repeat(64) } })), (error) => error.code === "GES-CAPTURE-POLICY-BINDING");
-  await assert.rejects(() => append(root, intent({ payload: { phase: "started", privateReason: "no" } })), (error) => error.code === "GES-PAYLOAD-SCHEMA");
+  await assert.rejects(() => append(root, intent({ payload: { ...intent().payload, privateReason: "no" } })), (error) => error.code === "GES-PAYLOAD-SCHEMA");
 });
 
 test("verification is checkpoint-aware and queries return only validated chain records", async (t) => {
   const root = await fixtureRoot(); t.after(() => cleanup(root));
   const first = await append(root);
-  const second = await append(root, intent({ eventId: "evt-2", idempotencyKey: "idem-2", payload: { phase: "continued" }, occurredAtEpochMs: 2, observedAtEpochMs: 2 }));
+  const second = await append(root, intent({ eventId: "evt-2", idempotencyKey: "idem-2", payload: { ...intent().payload, eventId: "lifecycle-2", reasonCode: "CONTINUED" }, occurredAtEpochMs: 2, observedAtEpochMs: 2 }));
   const prefix = await verifyPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" });
   assert.deepEqual(prefix, { integrity: "prefix-valid", completeness: "unknown", streamId: "lifecycle", eventCount: 2 });
   const complete = await verifyPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", checkpoint: second.checkpoint });
