@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   NOVA_B5_CANDIDATE_FREEZE_SCHEMA,
   NOVA_B5_CANDIDATE_FREEZE_SCHEMA_V2,
@@ -40,6 +41,11 @@ const changed = structuredClone(freeze); changed.candidate.tree = oid("c");
 assert.equal(validateNovaB5CandidateFreeze(changed).code, "NBF-DIGEST");
 const wrongPostRebaseBase = structuredClone(postRebaseFreeze); wrongPostRebaseBase.base.commit = oid("c");
 assert.equal(validateNovaB5CandidateFreeze(wrongPostRebaseBase).code, "NBF-BASE");
+assert.deepEqual(validateNovaB5CandidateFreeze(null), { ok: false, code: "NBF-SHAPE" });
+const v2Schema = JSON.parse(readFileSync(new URL("../scripts/nova-b5-candidate-freeze-v2.schema.json", import.meta.url), "utf8"));
+assert.equal(v2Schema.$comment, "SPDX-License-Identifier: SUL-1.0");
+for (const key of ["candidate", "base", "portfolio", "backlog", "gates"]) assert.equal(v2Schema.properties[key].additionalProperties, false);
+assert.equal(v2Schema.properties.deferred.items, false);
 const unsorted = structuredClone(manifest); [unsorted.sources[0], unsorted.sources[1]] = [unsorted.sources[1], unsorted.sources[0]];
 assert.equal(validateNovaB5EvidenceManifest(unsorted).code, "NBM-SHAPE");
 console.log("nova-candidate-freeze: 8/8 checks passed.");

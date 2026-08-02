@@ -35,7 +35,7 @@ const digest = (schema, record) => {
 };
 
 function freezeBaseCode(record) {
-  if (!exact(record.base, ["release", "commit"])) return "NBF-SHAPE";
+  if (!object(record) || !exact(record.base, ["release", "commit"])) return "NBF-SHAPE";
   if (record.schema === NOVA_B5_CANDIDATE_FREEZE_SCHEMA_V1) {
     return record.base.release === "v0.4.6" && OID.test(record.base.commit ?? "") ? null : "NBF-SHAPE";
   }
