@@ -41,3 +41,14 @@ should prefer a native Passkey/WebAuthn adapter. CLI consoles keep the
 external encrypted Ed25519/SSH-style key path as their portable fallback.
 IAM, hardware-key, and password-manager adapters may also produce the same
 detached public proof; `prepare` and `verify` remain unchanged.
+
+## Deutsche Kurzhilfe (nicht normativ)
+
+Diese Zusammenfassung erklärt nur die englische Anleitung oben; bei einem
+Widerspruch gilt der englische Text. Die Befehle werden in einem eigenen,
+vom Menschen bedienten Terminal ausgeführt. Der Agent darf weder die lokale
+Passphrase noch den privaten Schlüssel sehen. Einmalig wird mit `setup` ein
+verschlüsselter Ed25519-Schlüssel außerhalb des Repositories angelegt. Für
+jede Freigabe folgen danach nur `prepare`, `approve` und `verify` in dieser
+Reihenfolge. `approve` fragt lokal nach der Passphrase und erzeugt den
+öffentlichen, an den aktuellen Kandidaten gebundenen Nachweis.
