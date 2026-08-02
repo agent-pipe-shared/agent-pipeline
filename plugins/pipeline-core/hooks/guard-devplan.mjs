@@ -126,13 +126,90 @@
  *
  * VERIFY: node plugins/pipeline-core/hooks/guard-devplan.test.mjs
  */
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join, relative, isAbsolute, posix } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { loadManifest, gateConfig } from "../lib/manifest.mjs";
 import { readProjectAuthority } from "../lib/project-authority.mjs";
 
 const DEFAULT_EXEMPT_PREFIXES = ["docs/", "specs/", ".claude/", "backlog/"];
+const GOVERNANCE_AUTHORITY_CLI = fileURLToPath(new URL("../scripts/governance-authority.mjs", import.meta.url));
+const SHA256 = /^[a-f0-9]{64}$/u;
+const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
+
+function exact(value, keys) {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+}
+
+/**
+ * H-AC-12 migration boundary. A mutable `planApproved` projection is never
+ * authority by itself: the exact v3 reference must still resolve from the
+ * canonical human ledger at the current read. Cyborg's PO-proof verification
+ * is deliberately owned by that authority CLI rather than this hook.
+ */
+function hasLedgerBackedPlanApproval(state, projectDir) {
+  const approval = state?.planApproval;
+  const feature = state?.activeFeature;
+  if (state?.planApproved !== true
+    || !exact(approval, ["schema", "approvedBy", "approvedAt", "specBoundBy", "specBoundAt", "poGateAuthority", "humanDecision"])
+    || approval.schema !== "pipeline.plan-approval.v3"
+    || !exact(feature, ["id", "planPath", "phase"])
+    || !exact(approval.poGateAuthority, ["schema", "humanFacing", "sourceSha256", "runtimeSha256", "receiptSha256", "repositoryFingerprint", "planPath", "planSha256", "specPath", "specSha256"])
+    || approval.poGateAuthority.planPath !== feature.planPath
+    || !SHA256.test(approval.poGateAuthority.planSha256 ?? "")
+    || !SHA256.test(approval.poGateAuthority.specSha256 ?? "")) return false;
+  const reference = approval.humanDecision;
+  if (!exact(reference, ["schema", "decisionId", "decisionDigest", "candidate", "checkpoint"])
+    || reference.schema !== "pipeline.human-decision-reference.v1"
+    || typeof reference.decisionId !== "string"
+    || !SHA256.test(reference.decisionDigest ?? "")
+    || !exact(reference.candidate, ["commit", "tree"])
+    || !OID.test(reference.candidate.commit ?? "")
+    || !OID.test(reference.candidate.tree ?? "")
+    || !exact(reference.checkpoint, ["repositoryFingerprint", "streamId", "sequence", "eventDigest", "candidateCommit", "candidateTree"])
+    || !SHA256.test(reference.checkpoint.repositoryFingerprint ?? "")
+    || reference.checkpoint.candidateCommit !== reference.candidate.commit
+    || reference.checkpoint.candidateTree !== reference.candidate.tree
+    || reference.checkpoint.repositoryFingerprint !== approval.poGateAuthority.repositoryFingerprint) return false;
+  const request = {
+    schema: "pipeline.governance-authority-request.v1",
+    repositoryFingerprint: reference.checkpoint.repositoryFingerprint,
+    decisionId: reference.decisionId,
+    candidate: reference.candidate,
+    checkpoint: reference.checkpoint,
+    nowEpochMs: Date.now(),
+  };
+  const invoked = spawnSync(process.execPath, [
+    GOVERNANCE_AUTHORITY_CLI,
+    "--repo", projectDir,
+    "--request-json", JSON.stringify(request),
+  ], { encoding: "utf8", timeout: 5000, shell: false });
+  if (invoked.status !== 0) return false;
+  let readback;
+  try { readback = JSON.parse(invoked.stdout); } catch { return false; }
+  if (!exact(readback, ["schema", "granted", "decisionId", "decisionDigest", "scope", "singleUse"])
+    || readback.schema !== "pipeline.governance-authority-readback.v1"
+    || readback.granted !== true
+    || readback.decisionId !== reference.decisionId
+    || readback.decisionDigest !== reference.decisionDigest
+    || readback.singleUse !== true
+    || !exact(readback.scope, ["repositoryFingerprint", "candidate", "packageId", "action", "environment", "artifacts"])
+    || readback.scope.repositoryFingerprint !== reference.checkpoint.repositoryFingerprint
+    || JSON.stringify(readback.scope.candidate) !== JSON.stringify(reference.candidate)
+    || readback.scope.packageId !== feature.id
+    || readback.scope.action !== "APPROVE_PLAN"
+    || readback.scope.environment !== "local"
+    || !Array.isArray(readback.scope.artifacts)) return false;
+  const expected = [
+    { path: approval.poGateAuthority.planPath, sha256: approval.poGateAuthority.planSha256 },
+    { path: approval.poGateAuthority.specPath, sha256: approval.poGateAuthority.specSha256 },
+  ];
+  return expected.every((artifact) => readback.scope.artifacts.some((entry) => exact(entry, ["path", "sha256"])
+    && entry.path === artifact.path && entry.sha256 === artifact.sha256));
+}
 
 function emit(code, lines) {
   process.stderr.write(lines.filter(Boolean).join("\n") + "\n");
@@ -236,7 +313,8 @@ if (!activeFeature || typeof activeFeature !== "object" || typeof activeFeature.
   process.exit(0); // no active feature -- nothing to enforce
 }
 
-if (state.planApproved === true) process.exit(0); // approved -- allow
+const ledgerBackedPlanApproval = hasLedgerBackedPlanApproval(state, projectDir);
+if (ledgerBackedPlanApproval) process.exit(0); // ledger-backed approval -- allow
 
 // ---- exempt paths -------------------------------------------------------------------
 const exemptPrefixes = [...DEFAULT_EXEMPT_PREFIXES];
@@ -252,12 +330,13 @@ if (isExempt) process.exit(0);
 
 // ---- verdict --------------------------------------------------------------------------
 const message = [
-  `BLOCKED (guard-devplan, plugin pipeline-core): Feature "${activeFeature.id}" has no approved plan yet.`,
+  `BLOCKED (guard-devplan, plugin pipeline-core): Feature "${activeFeature.id}" has no current ledger-backed plan approval.`,
   `Plan: ${typeof activeFeature.planPath === "string" ? activeFeature.planPath : "(no planPath recorded in state)"}`,
   `File: ${filePath}`,
   `Why: The Dev-Plan gate (.claude/pipeline.yaml, gate "dev-plan") requires a recorded approval BEFORE ` +
-    `implementation edits (docs/operating-model.md §3.2 step 3b). Record approval: ` +
-    `node harness/scripts/pipeline-state.mjs approve-plan --by <name>.`,
+    `implementation edits (docs/operating-model.md §3.2 step 3b). Record a checkpoint-bound ` +
+    `human decision and approve through: node harness/scripts/pipeline-state.mjs approve-plan ` +
+    `--by <name> --human-decision-file <repo-relative-reference>.`,
 ];
 
 if (gate.mode === "warn") emit(1, message);

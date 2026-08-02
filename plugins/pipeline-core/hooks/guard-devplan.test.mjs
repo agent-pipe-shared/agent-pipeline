@@ -9,11 +9,15 @@
  * Hermetics: every spawn sets CLAUDE_PROJECT_DIR to a fresh temp dir so this machine's
  * real .claude/pipeline.yaml / pipeline-state.json can never leak into these cases.
  */
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { appendHumanGovernanceDecision } from "../lib/human-governance-ledger.mjs";
+import { canonicalSha256, canonicalizeJson } from "../lib/governance-event.mjs";
+import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
+import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 
 const GUARD = fileURLToPath(new URL("./guard-devplan.mjs", import.meta.url));
 
@@ -128,12 +132,15 @@ const NO_FEATURE_STATE = { schema: "pipeline.state.v0" };
   check("DP05 allow  no activeFeature in state", "Edit", "src/foo.ts", ALLOW, { projectDir: dir, stderrEmpty: true });
 }
 
-// ---- DP06 gate blocking, planApproved true -> allow -------------------------------------
+// ---- DP06 mutable legacy planApproved must not become authority --------------------------
 {
   const dir = freshDir("approved");
   writeManifest(dir, MANIFEST_BLOCKING);
   writeState(dir, APPROVED_STATE);
-  check("DP06 allow  planApproved true", "Edit", "src/foo.ts", ALLOW, { projectDir: dir, stderrEmpty: true });
+  check("DP06 block  legacy planApproved true without ledger decision", "Edit", "src/foo.ts", BLOCK, {
+    projectDir: dir,
+    stderrIncludes: ["ledger-backed plan approval"],
+  });
 }
 
 // ---- DP07 gate blocking, unapproved, non-exempt path -> block, names feature id ---------
@@ -372,6 +379,86 @@ const NO_FEATURE_STATE = { schema: "pipeline.state.v0" };
   check("DP25 block  unapproved neutral State without legacy State", "Edit", "src/foo.ts", BLOCK, {
     projectDir: dir,
     stderrIncludes: ["ap1-pipeline-tuning", "guard-devplan"],
+  });
+}
+
+// ---- DP26 v3 state must still resolve its exact ledger decision -------------------------
+function humanRegistry(fingerprint) {
+  return {
+    schema: "pipeline.governance-stream-registry.v1",
+    repositoryFingerprint: fingerprint,
+    canonicalization: "RFC8785",
+    digestAlgorithm: "sha-256",
+    eventDigestDomain: "pipeline.governance-event.v1\0",
+    storageRoot: "governance/events",
+    streams: [
+      { streamId: "human", origin: "human", authorityClass: "human-authority", relativeRoot: "human", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+      { streamId: "agent", origin: "agent", authorityClass: "non-authoritative", relativeRoot: "agent", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+      { streamId: "lifecycle", origin: "lifecycle", authorityClass: "non-authoritative", relativeRoot: "lifecycle", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+    ],
+  };
+}
+function humanCapturePolicy() {
+  return {
+    schema: "pipeline.governance-capture-policy.v1",
+    policyId: "guard-devplan-fixture",
+    revision: "d".repeat(64),
+    defaultAction: "deny",
+    streams: [
+      { origin: "human", purpose: "authority-history", materiality: "required", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
+      { origin: "agent", purpose: "declared-assumption", materiality: "policy-selected", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
+      { origin: "lifecycle", purpose: "deterministic-lifecycle", materiality: "required", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
+    ],
+    sanitizedReceipt: { allowEventId: true, allowEventDigest: true, allowCheckpoint: true, allowReasonText: false },
+  };
+}
+async function ledgerBackedState(dir) {
+  execFileSync("git", ["init", "-q", dir]);
+  const planPath = "specs/ap1/plan.md";
+  const repository = discoverRepository(dir);
+  const fingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: repository.commonDir, primaryRoot: repository.primaryRoot });
+  const policy = humanCapturePolicy();
+  mkdirSync(join(dir, "governance", "events"), { recursive: true });
+  writeFileSync(join(dir, "governance", "events", "registry.json"), `${canonicalizeJson(humanRegistry(fingerprint))}\n`);
+  writeFileSync(join(dir, "governance", "events", "capture-policy.json"), `${canonicalizeJson(policy)}\n`);
+  const candidate = { commit: "b".repeat(40), tree: "c".repeat(40) };
+  const authority = {
+    schema: "pipeline.po-gate-authority.v2", humanFacing: "en", sourceSha256: "1".repeat(64), runtimeSha256: "2".repeat(64), receiptSha256: "3".repeat(64), repositoryFingerprint: fingerprint,
+    planPath, planSha256: "4".repeat(64), specPath: "specs/ap1/spec.md", specSha256: "5".repeat(64),
+  };
+  const decision = {
+    decisionId: "grant-devplan-1", event: "granted", outcome: "granted", authorityClass: "product-owner", identityAssurance: "locally-attributed", timeAssurance: "locally-observed",
+    scope: { repositoryFingerprint: fingerprint, candidate, packageId: "ap1-pipeline-tuning", action: "APPROVE_PLAN", environment: "local", artifacts: [{ path: authority.planPath, sha256: authority.planSha256 }, { path: authority.specPath, sha256: authority.specSha256 }] },
+    reasonCode: "APPROVED", policyDigest: "6".repeat(64), ruleDigest: "7".repeat(64), validity: { notBeforeEpochMs: 1, expiresAtEpochMs: 2_000_000_000_000, singleUse: true },
+    links: { requestDecisionId: "request-devplan-1", consumesDecisionId: null, revokesDecisionId: null, expiresDecisionId: null, supersedesDecisionId: null, correctsDecisionId: null },
+  };
+  const receipt = await appendHumanGovernanceDecision({
+    repositoryRoot: dir,
+    repositoryFingerprint: fingerprint,
+    intent: {
+      schema: "pipeline.governance-event-envelope.v1", payloadSchema: "pipeline.human-governance-decision.v1", canonicalization: "RFC8785", digestAlgorithm: "sha-256", eventId: "human-devplan-event-1", idempotencyKey: "human-devplan-idempotency-1", origin: "human", authorityClass: "human-authority", eventType: "human.granted", occurredAtEpochMs: 2, observedAtEpochMs: 2, timeAssurance: "locally-observed", repositoryFingerprint: fingerprint, sourceUri: `urn:pipeline:repository:${fingerprint}`, streamId: "human", correlation: { featureId: { state: "not-applicable" }, packageId: { state: "not-applicable" }, requestId: { state: "not-applicable" }, sessionId: { state: "not-applicable" }, dispatchId: { state: "not-applicable" }, traceId: { state: "not-applicable" } }, candidate, artifacts: [{ state: "not-applicable" }], policy: { policyDigest: { state: "not-applicable" }, configurationDigest: { state: "not-applicable" }, capturePolicyDigest: canonicalSha256(policy), redactionPolicyDigest: { state: "not-applicable" } }, classification: "repository-public-safe", storageProfile: "repository-public-safe", retentionCompatibility: "repository-retained", disclosureClass: "repository-visible", payload: decision,
+    },
+  });
+  return {
+    schema: "pipeline.state.v0", activeFeature: { id: "ap1-pipeline-tuning", planPath, phase: "implementation" }, planApproved: true,
+    planApproval: { schema: "pipeline.plan-approval.v3", approvedBy: "PO", approvedAt: "2026-08-02T00:00:00.000Z", specBoundBy: "PO", specBoundAt: "2026-08-02T00:00:00.000Z", poGateAuthority: authority, humanDecision: { schema: "pipeline.human-decision-reference.v1", decisionId: decision.decisionId, decisionDigest: canonicalSha256(decision), candidate, checkpoint: receipt.checkpoint } },
+  };
+}
+{
+  const dir = freshDir("ledger-approved");
+  writeManifest(dir, MANIFEST_BLOCKING);
+  writeState(dir, await ledgerBackedState(dir));
+  check("DP26 allow  v3 plan approval resolves exact ledger decision", "Edit", "src/foo.ts", ALLOW, { projectDir: dir, stderrEmpty: true });
+}
+{
+  const dir = freshDir("ledger-checkpoint-drift");
+  writeManifest(dir, MANIFEST_BLOCKING);
+  const state = structuredClone(await ledgerBackedState(dir));
+  state.planApproval.humanDecision.checkpoint.eventDigest = "f".repeat(64);
+  writeState(dir, state);
+  check("DP27 block  v3 decision checkpoint drift cannot authorize", "Edit", "src/foo.ts", BLOCK, {
+    projectDir: dir,
+    stderrIncludes: ["ledger-backed plan approval"],
   });
 }
 
