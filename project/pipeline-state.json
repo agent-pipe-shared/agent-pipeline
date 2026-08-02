@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
-  "planApproved": true,
-  "updatedAt": "2026-08-01T13:52:07.387Z",
+  "planApproved": false,
+  "updatedAt": "2026-08-02T06:09:53.900Z",
   "closedFeatures": [
     {
       "id": "sprint-sentinel-epic",
@@ -64,7 +64,7 @@
   "activeFeature": {
     "id": "sprint-nova-epic",
     "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-    "phase": "implementation"
+    "phase": "design"
   },
   "planApproval": {
     "schema": "pipeline.plan-approval.v4",
@@ -232,10 +232,10 @@
   "planInvalidation": {
     "schema": "pipeline.plan-invalidation.v1",
     "featureId": "sprint-nova-epic",
-    "invalidatedSubmissionSha256": "fec9a1e31ec7b94a5a2d2a61642aeceb5e244b85dbd876c7f2af70724a41f274",
-    "invalidatedApprovalSha256": "0972fb861060486e3fa14840a18656daf826e2283c3f75586e8a58ef472af3c0",
-    "invalidatedBy": "PO-NOVA-R1-recovery-authorization",
-    "invalidatedAt": "2026-08-01T11:42:05.711Z",
+    "invalidatedSubmissionSha256": "e2ad4cb6dcef16bbdccfcd0a1ca17d129fa514cbb24e462abcfd27fac31bb3a2",
+    "invalidatedApprovalSha256": "1c3b33e629540b127c6987f17e0c24f0d828216f8d89bc049d7d08f90b750ffe",
+    "invalidatedBy": "PO-State-Budget-Authority-Reconciliation",
+    "invalidatedAt": "2026-08-02T06:09:53.900Z",
     "reason": "reopen-design"
   }
 }
