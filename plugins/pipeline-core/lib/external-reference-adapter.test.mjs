@@ -20,3 +20,7 @@ test("does not report success for revision, capability, authority, or readback c
 test("rejects unclosed references and blocks non-pipeline-owned writes", async () => {
   assert.throws(() => validateExternalReference({ ...reference(), privateUrl: "https://secret" }), (error) => error.code === "ERA-REFERENCE"); const rejected = await planExternalReferenceWrite({ reference: { ...reference(), ownership: "external-owned" }, capabilities, desired, inspect: async () => ({}), preview: async () => ({}) }); assert.equal(rejected.status, "rejected");
 });
+test("preserves the closed normative relation taxonomy and rejects unknown relation semantics", () => {
+  for (const relation of ["tracks", "specifies", "implements", "documents", "mirrors", "reviews", "evidences", "releases", "supersedes"]) assert.equal(validateExternalReference({ ...reference(), relation }).relation, relation);
+  assert.throws(() => validateExternalReference({ ...reference(), relation: "looks-complete" }), (error) => error.code === "ERA-REFERENCE");
+});

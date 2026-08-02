@@ -20,3 +20,18 @@ External data is untrusted observation data. It cannot execute commands,
 alter Pipeline lifecycle, or establish human authority. Provider-specific
 fields remain inside the adapter profile; they are not added to this core
 contract.
+
+## Closed relationship meanings
+
+Portable references use explicit relationship semantics rather than treating a
+link as authority. The normative values are `tracks`, `specifies`,
+`implements`, `documents`, `mirrors`, `reviews`, `evidences`, `releases`, and
+`supersedes`. Legacy-compatible `relates-to`, `evidence-for`, and
+`published-from` retain their previous narrow meaning. Unknown relation names
+are rejected rather than coerced into prose or a generic completion state.
+
+The relation never changes the separate authority direction, ownership class,
+publication mode, or freshness state. In particular, a `reviews` or
+`evidences` link cannot satisfy a Critic result, approve a plan, or authorize a
+release; a `releases` link is only a traceability observation unless a separate
+candidate-bound release authority says otherwise.
