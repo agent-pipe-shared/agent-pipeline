@@ -206,6 +206,7 @@ const TEST_SUITES = [
   { name: "session-cleanup-binding-tests", file: join(pluginScriptsDir, "session-cleanup-binding.test.mjs") },
   { name: "review-economy-tests", file: join(libDir, "review-economy.test.mjs") },
   { name: "guard-git-tests", file: join(hooksDir, "guard-git.test.mjs") },
+  { name: "phoenix-guard-git-authority-tests", file: join(hooksDir, "guard-git-phoenix.test.mjs") },
   { name: "guard-apply-patch-tests", file: join(hooksDir, "guard-apply-patch.test.mjs") },
   { name: "guard-testpath-tests", file: join(hooksDir, "guard-testpath.test.mjs") },
   { name: "staleness-check-tests", file: join(hooksDir, "staleness-check.test.mjs") },
