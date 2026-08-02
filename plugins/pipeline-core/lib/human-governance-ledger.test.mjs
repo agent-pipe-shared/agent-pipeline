@@ -10,7 +10,7 @@ import test from "node:test";
 import { canonicalSha256, canonicalizeJson } from "./governance-event.mjs";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
 import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
-import { HumanGovernanceLedgerError, appendConsumedHumanGovernanceDecision, appendHumanGovernanceDecision, createConsumedHumanGovernanceDecision, createExternalHumanGovernanceIntent, queryHumanGovernanceDecisions, resolveExternallyAttestedHumanGovernanceAuthority, resolveHumanGovernanceAuthority, validateHumanGovernanceDecision } from "./human-governance-ledger.mjs";
+import { HumanGovernanceLedgerError, appendConsumedHumanGovernanceDecision, appendHumanGovernanceDecision, createConsumedHumanGovernanceDecision, createExternalHumanGovernanceIntent, queryHumanGovernanceDecisions, resolveExternallyAttestedHumanGovernanceAuthority, resolveHumanGovernanceAuthority, validateHumanGovernanceDecision, verifyExternalHumanGovernanceProof } from "./human-governance-ledger.mjs";
 
 const sha = "a".repeat(64);
 const candidate = { commit: "b".repeat(40), tree: "c".repeat(40) };
@@ -87,6 +87,7 @@ test("requires an external detached proof before reporting externally-attested h
   assert.equal(unsigned.status, "denied");
   assert.equal(unsigned.reason, "external-proof-unverified");
   assert.equal(unsigned.proofCode, "HGL-EXTERNAL-PROOF-MISMATCH");
+  assert.equal(verifyExternalHumanGovernanceProof({ intent: { sha256: intent.sha256 }, trustPolicy, proof }).code, "HGL-EXTERNAL-PROOF-INVALID");
 });
 
 test("binds an external proof to the ledger grant, its candidate, and both scoped artifacts", () => {

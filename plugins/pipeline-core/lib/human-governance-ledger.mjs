@@ -14,6 +14,17 @@ const EXTERNAL_PROOF_SCHEMA = "pipeline.po-approval-proof.v1";
 function record(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
 function exact(value, keys) { return record(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key)); }
 function text(value) { return typeof value === "string" && value.trim() !== ""; }
+function validExternalIntent(intent) {
+  return exact(intent, ["value", "sha256"])
+    && exact(intent.value, ["schema", "kind", "featureId", "planSha256", "specSha256", "candidate", "policyRevision", "subjectSha256", "decision"])
+    && intent.value.schema === EXTERNAL_INTENT_SCHEMA && EXTERNAL_ID.test(intent.value.kind)
+    && EXTERNAL_ID.test(intent.value.featureId) && SHA256.test(intent.value.planSha256)
+    && SHA256.test(intent.value.specSha256) && exact(intent.value.candidate, ["commit", "tree"])
+    && OID.test(intent.value.candidate.commit) && OID.test(intent.value.candidate.tree)
+    && intent.value.candidate.commit !== intent.value.candidate.tree && EXTERNAL_ID.test(intent.value.policyRevision)
+    && SHA256.test(intent.value.subjectSha256) && EXTERNAL_ID.test(intent.value.decision)
+    && SHA256.test(intent.sha256) && canonicalSha256(intent.value) === intent.sha256;
+}
 function fail(code) { throw new HumanGovernanceLedgerError(code); }
 
 export { HumanGovernanceLedgerError, createConsumedHumanGovernanceDecision, validateHumanGovernanceDecision };
@@ -68,7 +79,7 @@ export function createExternalHumanGovernanceIntent({ decision, plan, spec } = {
  * proof validity and never treats the proof itself as a ledger decision.
  */
 export function verifyExternalHumanGovernanceProof({ intent, trustPolicy, proof } = {}) {
-  if (!record(intent) || !SHA256.test(intent.sha256) || !exact(trustPolicy, ["keyReference", "publicKeySha256"])
+  if (!validExternalIntent(intent) || !exact(trustPolicy, ["keyReference", "publicKeySha256"])
     || !text(trustPolicy.keyReference) || !SHA256.test(trustPolicy.publicKeySha256)
     || !exact(proof, ["schema", "intentSha256", "keyReference", "publicKey", "signatureBase64"])
     || proof.schema !== EXTERNAL_PROOF_SCHEMA || proof.intentSha256 !== intent.sha256
