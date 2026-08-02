@@ -1091,6 +1091,12 @@
       "member": "phoenix-governance-threat-model-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:phoenix-guard-git-authority-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "phoenix-guard-git-authority-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:phoenix-lifecycle-governance-events-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1860,6 +1866,7 @@
         "verify-phase:harness/scripts/verify.mjs:phoenix-governance-replay-view-tests",
         "verify-phase:harness/scripts/verify.mjs:phoenix-governance-replay-viewer-tests",
         "verify-phase:harness/scripts/verify.mjs:phoenix-governance-threat-model-tests",
+        "verify-phase:harness/scripts/verify.mjs:phoenix-guard-git-authority-tests",
         "verify-phase:harness/scripts/verify.mjs:phoenix-human-governance-ledger-tests",
         "verify-phase:harness/scripts/verify.mjs:phoenix-lifecycle-governance-events-tests",
         "verify-phase:harness/scripts/verify.mjs:phoenix-organization-policy-activation-tests",
