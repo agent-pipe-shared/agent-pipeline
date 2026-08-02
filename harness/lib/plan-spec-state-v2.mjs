@@ -299,8 +299,8 @@ export function bindPlanSpecApprovalWithHumanDecision({
 }
 
 /**
- * Pure v2-only revocation. Legacy approvals/revocations are history, never an
- * authorization source for this transition.
+ * Pure current-approval revocation. Legacy approvals/revocations are history;
+ * an exact v2 or ledger-first v3 approval supplies the bound authority.
  */
 export function revokePlanV2({
   state,
@@ -313,7 +313,7 @@ export function revokePlanV2({
   if (!currentStateMatches(state, expectedStateSha256)) return fail("PS-V2-STATE-STALE");
   if (!isNonBlankString(by) || !isCanonicalIso(at)) return fail("PS-V2-REVOCATION-REQUEST-INVALID");
   const approval = state?.planApproval;
-  if (!validV2Approval(approval)) return fail("PS-V2-APPROVAL-INVALID");
+  if (!validV2Approval(approval) && !validV3Approval(approval)) return fail("PS-V2-APPROVAL-INVALID");
   const authority = approval.poGateAuthority;
   if (
     !matchingAuthority(authority, expectedPlanSha256, expectedSpecSha256)

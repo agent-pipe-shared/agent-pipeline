@@ -266,6 +266,7 @@ import {
 import { validatePoGateAuthorityForRepository } from "../../plugins/pipeline-core/lib/po-gate-authority.mjs";
 import {
   bindPlanSpecApproval,
+  bindPlanSpecApprovalWithHumanDecision,
   canonicalJson as canonicalPhxJson,
   revokePlanV2,
   sha256CanonicalJson,
@@ -315,6 +316,9 @@ export const RECOVERY_BRIDGE_CONSUME_RECEIPT_SCHEMA = "pipeline.recovery-bridge-
 export const RECOVERY_BRIDGE_ISSUANCE_CUTOFF = "2026-10-31T00:00:00.000Z";
 const RECOVERY_BRIDGE_PLAN_SCHEMA = "pipeline.recovery-bridge-plan.v1";
 const RECOVERY_BRIDGE_TRANSACTION_SCHEMA = "pipeline.recovery-bridge-transaction.v1";
+const GOVERNANCE_AUTHORITY_CLI = fileURLToPath(new URL("../../plugins/pipeline-core/scripts/governance-authority.mjs", import.meta.url));
+const HUMAN_DECISION_REFERENCE_SCHEMA = "pipeline.human-decision-reference.v1";
+const GOVERNANCE_AUTHORITY_READBACK_SCHEMA = "pipeline.governance-authority-readback.v1";
 const RECOVERY_BRIDGE_FEATURE_ID = "sprint-phoenix-epic";
 const RECOVERY_BRIDGE_OPERATION = "reconcile-mutable-design";
 const RECOVERY_BRIDGE_MANIFEST = "specs/sprint-phoenix-epic/lifecycle.json";
@@ -880,6 +884,66 @@ function readContinuityRequest(dir, requestFile) {
   } catch {
     return { ok: false, code: "PS-CONTINUITY-REQUEST" };
   }
+}
+
+function readHumanDecisionReference(dir, requestFile) {
+  const parsed = readContinuityRequest(dir, requestFile);
+  return parsed.ok
+    ? parsed
+    : { ok: false, code: "PS-HUMAN-DECISION-FILE" };
+}
+
+function humanAuthorityRequest(reference, nowEpochMs) {
+  if (!exactObjectKeys(reference, ["schema", "decisionId", "decisionDigest", "candidate", "checkpoint"])
+    || reference.schema !== HUMAN_DECISION_REFERENCE_SCHEMA
+    || !Number.isSafeInteger(nowEpochMs)) return null;
+  return {
+    schema: "pipeline.governance-authority-request.v1",
+    repositoryFingerprint: reference.checkpoint?.repositoryFingerprint,
+    decisionId: reference.decisionId,
+    candidate: reference.candidate,
+    checkpoint: reference.checkpoint,
+    nowEpochMs,
+  };
+}
+
+function defaultHumanAuthority({ repoRoot, request }) {
+  const invoked = spawnSync(process.execPath, [
+    GOVERNANCE_AUTHORITY_CLI,
+    "--repo", repoRoot,
+    "--request-json", canonicalPhxJson(request),
+  ], { encoding: "utf8" });
+  if (invoked.status !== 0) return { ok: false, code: "PS-HUMAN-AUTHORITY-READBACK" };
+  try {
+    const value = JSON.parse(invoked.stdout);
+    return value !== null && typeof value === "object" && !Array.isArray(value)
+      ? { ok: true, value }
+      : { ok: false, code: "PS-HUMAN-AUTHORITY-READBACK" };
+  } catch {
+    return { ok: false, code: "PS-HUMAN-AUTHORITY-READBACK" };
+  }
+}
+
+function matchesPlanApprovalHumanAuthority(readback, reference, authority, featureId) {
+  if (!exactObjectKeys(readback, ["schema", "granted", "decisionId", "decisionDigest", "scope", "singleUse"])
+    || readback.schema !== GOVERNANCE_AUTHORITY_READBACK_SCHEMA
+    || readback.granted !== true
+    || readback.decisionId !== reference.decisionId
+    || readback.decisionDigest !== reference.decisionDigest
+    || readback.singleUse !== true
+    || !exactObjectKeys(readback.scope, ["repositoryFingerprint", "candidate", "packageId", "action", "environment", "artifacts"])
+    || readback.scope.repositoryFingerprint !== authority.repositoryFingerprint
+    || canonicalPhxJson(readback.scope.candidate) !== canonicalPhxJson(reference.candidate)
+    || readback.scope.packageId !== featureId
+    || readback.scope.action !== "APPROVE_PLAN"
+    || readback.scope.environment !== "local"
+    || !Array.isArray(readback.scope.artifacts)) return false;
+  const expectedArtifacts = [
+    { path: authority.planPath, sha256: authority.planSha256 },
+    { path: authority.specPath, sha256: authority.specSha256 },
+  ];
+  return expectedArtifacts.every((expected) => readback.scope.artifacts.some((artifact) => exactObjectKeys(artifact, ["path", "sha256"])
+    && artifact.path === expected.path && artifact.sha256 === expected.sha256));
 }
 
 function hashBoundRepoFile(dir, binding, maxBytes = 1_048_576) {
@@ -3470,8 +3534,10 @@ function runResultReconciliationCommand(sub, rest, deps) {
 export function run(argv = process.argv.slice(2), deps = {}) {
   const dir = deps.dir ?? projectDir();
   const now = deps.now ?? (() => new Date().toISOString());
+  const nowEpochMs = deps.nowEpochMs ?? (() => Date.now());
   const gitHead = deps.gitHead ?? defaultGitHead;
   const poGateAuthority = deps.poGateAuthority ?? ((request) => validatePoGateAuthorityForRepository(request));
+  const humanAuthority = deps.humanAuthority ?? defaultHumanAuthority;
 
   const [sub, ...rest] = argv;
   const flags = parseFlags(rest);
@@ -3608,6 +3674,20 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       }
       const expectedPlanSha256 = authority.value.planSha256;
       const expectedSpecSha256 = authority.value.specSha256;
+      const humanDecision = readHumanDecisionReference(dir, flags["human-decision-file"]);
+      const authorityRequest = humanDecision.ok ? humanAuthorityRequest(humanDecision.value, nowEpochMs()) : null;
+      const resolvedHumanAuthority = authorityRequest === null
+        ? { ok: false, code: "PS-HUMAN-DECISION-INVALID" }
+        : humanAuthority({ repoRoot: dir, request: authorityRequest });
+      if (!humanDecision.ok || !resolvedHumanAuthority?.ok || !matchesPlanApprovalHumanAuthority(
+        resolvedHumanAuthority.value,
+        humanDecision.value,
+        authority.value,
+        base.activeFeature?.id,
+      )) {
+        console.error("Error: approve-plan requires a verified, checkpoint-bound --human-decision-file scoped to this plan and Spec; no approval was recorded.");
+        return 2;
+      }
       let approvedAt;
       const written = writeState(dir, undefined, base, {
         transition: (observed) => {
@@ -3620,21 +3700,31 @@ export function run(argv = process.argv.slice(2), deps = {}) {
             updatedAt: approvedAt,
           };
           delete legacyApproval.planRevocation;
-          return bindPlanSpecApproval({
+          return bindPlanSpecApprovalWithHumanDecision({
             state: legacyApproval,
             expectedStateSha256: sha256CanonicalJson(legacyApproval),
             poGateAuthority: authority.value,
             expectedPlanSha256,
             expectedSpecSha256,
+            humanDecision: humanDecision.value,
             by,
             at: approvedAt,
           });
         },
         beforeCommit: () => {
           const observed = poGateAuthority({ repoRoot: dir, expectedPlanSha256, expectedSpecSha256 });
-          return observed?.ok && JSON.stringify(observed.value) === JSON.stringify(authority.value)
+          if (!observed?.ok || JSON.stringify(observed.value) !== JSON.stringify(authority.value)) {
+            return { ok: false, code: observed?.code ?? "PO-GATE-AUTHORITY-STALE" };
+          }
+          const reread = humanAuthority({ repoRoot: dir, request: authorityRequest });
+          return reread?.ok && matchesPlanApprovalHumanAuthority(
+            reread.value,
+            humanDecision.value,
+            authority.value,
+            base.activeFeature?.id,
+          )
             ? { ok: true }
-            : { ok: false, code: observed?.code ?? "PO-GATE-AUTHORITY-STALE" };
+            : { ok: false, code: reread?.code ?? "PS-HUMAN-AUTHORITY-STALE" };
         },
       });
       if (!stateWriteSucceeded(written)) {
@@ -3671,7 +3761,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         },
       });
       if (!stateWriteSucceeded(written)) {
-        console.error(`Error: revoke-plan requires a current exact v2 approval (${written.code}); no revocation was recorded.`);
+        console.error(`Error: revoke-plan requires a current exact v2 or v3 approval (${written.code}); no revocation was recorded.`);
         return 2;
       }
       console.log(written.replay

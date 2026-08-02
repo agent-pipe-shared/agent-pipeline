@@ -53,6 +53,8 @@ import {
   serializePoGateProfileReceipt,
 } from "../../plugins/pipeline-core/lib/po-gate-authority.mjs";
 import { hardenWindowsPrivateDirectory } from "../../plugins/pipeline-core/lib/windows-private-state.mjs";
+import { canonicalSha256, canonicalizeJson } from "../../plugins/pipeline-core/lib/governance-event.mjs";
+import { appendHumanGovernanceDecision } from "../../plugins/pipeline-core/lib/human-governance-ledger.mjs";
 
 const CLI = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
 const ALL_DIRS = [];
@@ -214,6 +216,41 @@ function injectedPoGateAuthority(planPath) {
       : { ok: false, code: "PO-GATE-AUTHORITY-STALE" };
 }
 
+function humanDecisionFixture(dir, authority, featureId) {
+  const candidate = { commit: "b".repeat(40), tree: "c".repeat(40) };
+  const reference = {
+    schema: "pipeline.human-decision-reference.v1",
+    decisionId: `approve-plan-${featureId}`,
+    decisionDigest: "e".repeat(64),
+    candidate,
+    checkpoint: {
+      repositoryFingerprint: authority.repositoryFingerprint,
+      streamId: "human",
+      sequence: 1,
+      eventDigest: "f".repeat(64),
+      candidateCommit: candidate.commit,
+      candidateTree: candidate.tree,
+    },
+  };
+  const scope = {
+    repositoryFingerprint: authority.repositoryFingerprint,
+    candidate,
+    packageId: featureId,
+    action: "APPROVE_PLAN",
+    environment: "local",
+    artifacts: [
+      { path: authority.planPath, sha256: authority.planSha256 },
+      { path: authority.specPath, sha256: authority.specSha256 },
+    ],
+  };
+  return {
+    file: writeRequest(dir, `human-decision-${featureId}`, reference),
+    humanAuthority: ({ request }) => request?.decisionId === reference.decisionId
+      ? { ok: true, value: { schema: "pipeline.governance-authority-readback.v1", granted: true, decisionId: reference.decisionId, decisionDigest: reference.decisionDigest, scope, singleUse: true } }
+      : { ok: false, code: "PS-HUMAN-AUTHORITY-READBACK" },
+  };
+}
+
 function seedSubprocessPoGateAuthority(dir, planPath) {
   const sourcePath = join(dir, "pipeline.user.yaml");
   const runtimePath = join(dir, ".claude", "pipeline.yaml");
@@ -250,6 +287,38 @@ function seedSubprocessPoGateAuthority(dir, planPath) {
   }
   writeFileSync(receiptPath, serializePoGateProfileReceipt(receipt));
   chmodSync(receiptPath, 0o600);
+}
+
+function governanceRegistry(fingerprint) {
+  return { schema: "pipeline.governance-stream-registry.v1", repositoryFingerprint: fingerprint, canonicalization: "RFC8785", digestAlgorithm: "sha-256", eventDigestDomain: "pipeline.governance-event.v1\0", storageRoot: "governance/events", streams: [
+    { streamId: "human", origin: "human", authorityClass: "human-authority", relativeRoot: "human", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+    { streamId: "agent", origin: "agent", authorityClass: "non-authoritative", relativeRoot: "agent", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+    { streamId: "lifecycle", origin: "lifecycle", authorityClass: "non-authoritative", relativeRoot: "lifecycle", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+  ] };
+}
+
+function governanceCapturePolicy() {
+  return { schema: "pipeline.governance-capture-policy.v1", policyId: "fixture", revision: "d".repeat(64), defaultAction: "deny", streams: [
+    { origin: "human", purpose: "authority-history", materiality: "required", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
+    { origin: "agent", purpose: "declared-assumption", materiality: "policy-selected", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
+    { origin: "lifecycle", purpose: "deterministic-lifecycle", materiality: "required", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
+  ], sanitizedReceipt: { allowEventId: true, allowEventDigest: true, allowCheckpoint: true, allowReasonText: false } };
+}
+
+async function seedSubprocessHumanAuthority(dir, planPath, featureId) {
+  const git = (...args) => spawnSync("git", args, { cwd: dir, encoding: "utf8" }).stdout.trim();
+  const fingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: join(dir, ".git"), primaryRoot: dir });
+  const candidate = { commit: git("rev-parse", "HEAD"), tree: git("rev-parse", "HEAD^{tree}") };
+  const policy = governanceCapturePolicy();
+  mkdirSync(join(dir, "governance", "events"), { recursive: true });
+  writeFileSync(join(dir, "governance", "events", "registry.json"), `${canonicalizeJson(governanceRegistry(fingerprint))}\n`);
+  writeFileSync(join(dir, "governance", "events", "capture-policy.json"), `${canonicalizeJson(policy)}\n`);
+  const specPath = `${planPath.slice(0, planPath.lastIndexOf("/") + 1)}spec.md`;
+  const decision = { decisionId: `approve-plan-${featureId}`, event: "granted", outcome: "granted", authorityClass: "product-owner", identityAssurance: "locally-attributed", timeAssurance: "locally-observed", scope: { repositoryFingerprint: fingerprint, candidate, packageId: featureId, action: "APPROVE_PLAN", environment: "local", artifacts: [{ path: planPath, sha256: createHash("sha256").update(readFileSync(join(dir, planPath))).digest("hex") }, { path: specPath, sha256: createHash("sha256").update(readFileSync(join(dir, specPath))).digest("hex") }] }, reasonCode: "APPROVED", policyDigest: "a".repeat(64), ruleDigest: "f".repeat(64), validity: { notBeforeEpochMs: 1, expiresAtEpochMs: 4_102_444_800_000, singleUse: true }, links: { requestDecisionId: "request-1", consumesDecisionId: null, revokesDecisionId: null, expiresDecisionId: null, supersedesDecisionId: null, correctsDecisionId: null } };
+  const unavailable = { state: "not-applicable" };
+  const intent = { schema: "pipeline.governance-event-envelope.v1", payloadSchema: "pipeline.human-governance-decision.v1", canonicalization: "RFC8785", digestAlgorithm: "sha-256", eventId: `human-event-${featureId}`, idempotencyKey: `human-idempotency-${featureId}`, origin: "human", authorityClass: "human-authority", eventType: "human.granted", occurredAtEpochMs: 2, observedAtEpochMs: 2, timeAssurance: "locally-observed", repositoryFingerprint: fingerprint, sourceUri: `urn:pipeline:repository:${fingerprint}`, streamId: "human", correlation: { featureId: unavailable, packageId: unavailable, requestId: unavailable, sessionId: unavailable, dispatchId: unavailable, traceId: unavailable }, candidate, artifacts: [unavailable], policy: { policyDigest: unavailable, configurationDigest: unavailable, capturePolicyDigest: canonicalSha256(policy), redactionPolicyDigest: unavailable }, classification: "repository-public-safe", storageProfile: "repository-public-safe", retentionCompatibility: "repository-retained", disclosureClass: "repository-visible", payload: decision };
+  const receipt = await appendHumanGovernanceDecision({ repositoryRoot: dir, repositoryFingerprint: fingerprint, intent });
+  return writeRequest(dir, `human-decision-${featureId}`, { schema: "pipeline.human-decision-reference.v1", decisionId: decision.decisionId, decisionDigest: canonicalSha256(decision), candidate, checkpoint: receipt.checkpoint });
 }
 
 function continuityIdentity(overrides = {}) {
@@ -461,6 +530,16 @@ function canonicalFixtureJson(value) {
   ok("PS02 approve-plan with empty --by refused (exit 2)", code === 2, `got ${code}`);
 }
 
+// ---- PS02b: approve-plan requires a checkpoint-bound human decision -------------------
+{
+  const dir = freshDir("refuse-approve-no-human-decision");
+  const poGateAuthority = injectedPoGateAuthority("p.md");
+  run(["set-feature", "--id", "missing-human-decision", "--plan-path", "p.md"], { dir, now: FIXED_NOW });
+  const code = run(["approve-plan", "--by", "po-test"], { dir, now: FIXED_NOW, poGateAuthority });
+  ok("PS02b approve-plan without --human-decision-file refused (exit 2)", code === 2, `got ${code}`);
+  ok("PS02c missing human decision leaves plan unapproved", readState(dir).state?.planApproved === false);
+}
+
 // ---- PS03: revoke-plan without --by is refused -----------------------------------------
 {
   const dir = freshDir("refuse-revoke-no-by");
@@ -504,24 +583,28 @@ function canonicalFixtureJson(value) {
 // ---- PS06: approve-plan shape correct ---------------------------------------------------
 {
   const dir = freshDir("approve-shape");
+  const poGateAuthority = injectedPoGateAuthority(".claude/plans/x.md");
+  const human = humanDecisionFixture(dir, poGateAuthority().value, "ap1-pipeline-tuning");
   run(["set-feature", "--id", "ap1-pipeline-tuning", "--plan-path", ".claude/plans/x.md"], { dir, now: FIXED_NOW });
-  const code = run(["approve-plan", "--by", "po-test"], {
+  const code = run(["approve-plan", "--by", "po-test", "--human-decision-file", human.file], {
     dir,
     now: FIXED_NOW,
-    poGateAuthority: injectedPoGateAuthority(".claude/plans/x.md"),
+    poGateAuthority,
+    humanAuthority: human.humanAuthority,
   });
   ok("PS06a approve-plan exit 0", code === 0, `got ${code}`);
   const state = readState(dir).state;
   ok("PS06b schema field correct", state.schema === SCHEMA_ID);
   ok("PS06c planApproved true", state.planApproved === true);
   ok(
-    "PS06d planApproval is exact v2 and binds the injected Plan and Spec authority",
-    state.planApproval?.schema === "pipeline.plan-approval.v2"
+    "PS06d planApproval is exact v3 and binds the verified human decision, Plan and Spec authority",
+    state.planApproval?.schema === "pipeline.plan-approval.v3"
       && state.planApproval?.approvedBy === "po-test"
       && state.planApproval?.approvedAt === FIXED_NOW()
       && state.planApproval?.specBoundBy === "po-test"
       && state.planApproval?.specBoundAt === FIXED_NOW()
-      && state.planApproval?.poGateAuthority?.schema === PO_GATE_AUTHORITY_EVIDENCE_V2_SCHEMA,
+      && state.planApproval?.poGateAuthority?.schema === PO_GATE_AUTHORITY_EVIDENCE_V2_SCHEMA
+      && state.planApproval?.humanDecision?.decisionId === "approve-plan-ap1-pipeline-tuning",
   );
   ok("PS06e activeFeature preserved from set-feature", state.activeFeature?.id === "ap1-pipeline-tuning");
 }
@@ -529,11 +612,14 @@ function canonicalFixtureJson(value) {
 // ---- PS07: set-feature resets planApproved to false + phase design ---------------------
 {
   const dir = freshDir("set-feature-reset");
+  const poGateAuthority = injectedPoGateAuthority("p1.md");
+  const human = humanDecisionFixture(dir, poGateAuthority().value, "f1");
   run(["set-feature", "--id", "f1", "--plan-path", "p1.md"], { dir, now: FIXED_NOW });
-  run(["approve-plan", "--by", "po-test"], {
+  run(["approve-plan", "--by", "po-test", "--human-decision-file", human.file], {
     dir,
     now: FIXED_NOW,
-    poGateAuthority: injectedPoGateAuthority("p1.md"),
+    poGateAuthority,
+    humanAuthority: human.humanAuthority,
   });
   run(["set-feature", "--id", "f2", "--plan-path", "p2.md"], { dir, now: FIXED_NOW });
   const state = readState(dir).state;
@@ -546,11 +632,14 @@ function canonicalFixtureJson(value) {
 // ---- PS08: revoke-plan sets planApproved=false + records revocation -------------------
 {
   const dir = freshDir("revoke");
+  const poGateAuthority = injectedPoGateAuthority("p1.md");
+  const human = humanDecisionFixture(dir, poGateAuthority().value, "f1");
   run(["set-feature", "--id", "f1", "--plan-path", "p1.md"], { dir, now: FIXED_NOW });
-  run(["approve-plan", "--by", "po-test"], {
+  run(["approve-plan", "--by", "po-test", "--human-decision-file", human.file], {
     dir,
     now: FIXED_NOW,
-    poGateAuthority: injectedPoGateAuthority("p1.md"),
+    poGateAuthority,
+    humanAuthority: human.humanAuthority,
   });
   const code = run(["revoke-plan", "--by", "po-test"], { dir, now: FIXED_NOW });
   ok("PS08a revoke-plan exit 0", code === 0, `got ${code}`);
@@ -593,11 +682,14 @@ function canonicalFixtureJson(value) {
 // ---- PS09: set-phase updates only phase ------------------------------------------------
 {
   const dir = freshDir("set-phase");
+  const poGateAuthority = injectedPoGateAuthority("p1.md");
+  const human = humanDecisionFixture(dir, poGateAuthority().value, "f1");
   run(["set-feature", "--id", "f1", "--plan-path", "p1.md"], { dir, now: FIXED_NOW });
-  run(["approve-plan", "--by", "po-test"], {
+  run(["approve-plan", "--by", "po-test", "--human-decision-file", human.file], {
     dir,
     now: FIXED_NOW,
-    poGateAuthority: injectedPoGateAuthority("p1.md"),
+    poGateAuthority,
+    humanAuthority: human.humanAuthority,
   });
   const code = run(["set-phase", "--phase", "implementation"], { dir, now: FIXED_NOW });
   ok("PS09a set-phase exit 0", code === 0, `got ${code}`);
@@ -646,13 +738,14 @@ function canonicalFixtureJson(value) {
 
   const planPath = "specs/e2e/prd_e2e.md";
   seedSubprocessPoGateAuthority(dir, planPath);
+  const humanDecisionFile = await seedSubprocessHumanAuthority(dir, planPath, "e2e");
   const res1 = spawnSync(process.execPath, [CLI, "set-feature", "--id", "e2e", "--plan-path", planPath], {
     encoding: "utf8",
     env: { ...process.env, CLAUDE_PROJECT_DIR: dir },
   });
   ok("PS12a subprocess set-feature exit 0", res1.status === 0, `stderr: ${res1.stderr}`);
 
-  const res2 = spawnSync(process.execPath, [CLI, "approve-plan", "--by", "po-test"], {
+  const res2 = spawnSync(process.execPath, [CLI, "approve-plan", "--by", "po-test", "--human-decision-file", humanDecisionFile], {
     encoding: "utf8",
     env: { ...process.env, CLAUDE_PROJECT_DIR: dir },
   });
@@ -733,6 +826,7 @@ function canonicalFixtureJson(value) {
 
   const planPath = "specs/f1-integration/prd_f1-integration.md";
   seedSubprocessPoGateAuthority(dir, planPath);
+  const humanDecisionFile = await seedSubprocessHumanAuthority(dir, planPath, "f1-integration-test");
 
   const env = { ...process.env, CLAUDE_PROJECT_DIR: dir };
   const r1 = spawnSync(process.execPath, [CLI, "set-feature", "--id", "f1-integration-test", "--plan-path", planPath], {
@@ -740,7 +834,7 @@ function canonicalFixtureJson(value) {
     env,
   });
   ok("PS14a F1-integration: real set-feature subprocess exit 0", r1.status === 0, `stderr: ${r1.stderr}`);
-  const r2 = spawnSync(process.execPath, [CLI, "approve-plan", "--by", "po-test"], { encoding: "utf8", env });
+  const r2 = spawnSync(process.execPath, [CLI, "approve-plan", "--by", "po-test", "--human-decision-file", humanDecisionFile], { encoding: "utf8", env });
   ok("PS14b F1-integration: real approve-plan subprocess exit 0", r2.status === 0, `stderr: ${r2.stderr}`);
   const r3 = spawnSync(process.execPath, [CLI, "set-phase", "--phase", "implementation"], { encoding: "utf8", env });
   ok("PS14c F1-integration: real set-phase subprocess exit 0", r3.status === 0, `stderr: ${r3.stderr}`);
@@ -796,11 +890,14 @@ function canonicalFixtureJson(value) {
 // ---- PS18: close-feature with an activeFeature -- full shape assertion -----------------
 {
   const dir = freshDir("close-feature-shape");
+  const poGateAuthority = injectedPoGateAuthority("p-close.md");
+  const human = humanDecisionFixture(dir, poGateAuthority().value, "f-close");
   run(["set-feature", "--id", "f-close", "--plan-path", "p-close.md"], { dir, now: FIXED_NOW });
-  run(["approve-plan", "--by", "po-test"], {
+  run(["approve-plan", "--by", "po-test", "--human-decision-file", human.file], {
     dir,
     now: FIXED_NOW,
-    poGateAuthority: injectedPoGateAuthority("p-close.md"),
+    poGateAuthority,
+    humanAuthority: human.humanAuthority,
   });
   run(["approve-push", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
   const code = run(["close-feature", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
