@@ -15,3 +15,15 @@ separate explicit emergency authority and cannot be used as a generic bypass.
 External state is observation data. Provider-specific fields and credentials
 remain in adapter profiles and approved machine-local configuration; the core
 stores only the provider-neutral binding and gate result.
+
+Evaluate one promotion tuple explicitly:
+
+```bash
+node plugins/pipeline-core/scripts/change-control.mjs gate \
+  --profile-file <profile.json> \
+  --pipeline-authority-file <local-authority.json> \
+  --external-receipt-file <receipt.json|none> \
+  --now-ms <epoch-ms>
+```
+
+The command is read-only. Its output is a gate result, not a deployment action.
