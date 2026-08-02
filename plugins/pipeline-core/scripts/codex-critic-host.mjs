@@ -40,6 +40,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
+import { validateTaskAuthority } from "../lib/ai-assisted-hardening.mjs";
 import { loadManifest } from "../lib/manifest.mjs";
 import { deriveCriticPacketGovernance, validateCriticPacketGovernance } from "../lib/critic-packet-governance.mjs";
 import {
@@ -83,6 +84,10 @@ const MAX_REVIEW_COMMITS = 256;
 const SHA40 = /^[0-9a-f]{40}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{2,79}$/;
+const CRITIC_PARENT_AUTHORITY = Object.freeze({
+  operations: Object.freeze(["read"]),
+  paths: Object.freeze([".claude/**", "docs/**", "evidence/**", "governance/**", "plugins/**", "policies/**", "roles/**", "specs/**", "templates/**"]),
+});
 
 export const ASSURANCE = "normal-contractual-read-only; OS isolation not asserted";
 export const T1_ASSURANCE = "functional-equivalent-read-only; OS isolation not asserted";
@@ -472,6 +477,18 @@ export function validateCriticRequest(request) {
   if (new Set(allPaths).size !== allPaths.length) fail("request reference paths must be unique");
   if (allPaths.includes(DIFF_REFERENCE_PATH)) {
     fail("request must not claim the coordinator-reserved diff reference path");
+  }
+  const authority = validateTaskAuthority({
+    manifest: request.task_authority.manifest,
+    request: request.task_authority.request,
+    parentManifest: CRITIC_PARENT_AUTHORITY,
+  });
+  if (!authority.allowed || request.task_authority.request.operations.length !== 1 || request.task_authority.request.operations[0] !== "read") {
+    fail("Critic task authority is not bounded to the host read-only parent manifest");
+  }
+  const requestedPaths = [...request.task_authority.request.paths].sort();
+  if (JSON.stringify(requestedPaths) !== JSON.stringify([...allPaths].sort())) {
+    fail("Critic task authority must bind exactly the declared reference paths");
   }
   admitCriticReview(request);
   return request;

@@ -213,6 +213,10 @@ function requestFor(candidate, ruleset) {
     rigor: "2",
     risk: "high",
     trigger_row: "T1",
+    task_authority: {
+      manifest: { operations: ["read"], paths: [".claude/**", "docs/**", "evidence/**", "governance/**", "plugins/**", "policies/**", "roles/**", "specs/**", "templates/**"] },
+      request: { operations: ["read"], paths: [".claude/pipeline.json", "specs/review.md", "policies/guard.md", "evidence/verify-latest.json"] },
+    },
     review_economy: {
       round: 1,
       correction_commits: 0,

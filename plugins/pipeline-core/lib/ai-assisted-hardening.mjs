@@ -27,7 +27,8 @@ const CHANGE_CLASSES = Object.freeze({
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const canonical = (value) => JSON.stringify(value, Object.keys(value).sort());
 const validDigest = (digest) => typeof digest === "string" && SHA256.test(digest);
-const isSubset = (requested, allowed) => requested.every((value) => allowed.includes(value));
+const isSubset = (requested, allowed) => requested.every((value) => allowed.some((rule) => rule === value
+  || (typeof rule === "string" && rule.endsWith("/**") && value.startsWith(rule.slice(0, -2)))));
 
 /** Classify every external/repository-derived input as untrusted by default. */
 export function classifyInput({ source, content = "" } = {}) {

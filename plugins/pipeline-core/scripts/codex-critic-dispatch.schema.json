@@ -18,6 +18,7 @@
     "rigor",
     "risk",
     "trigger_row",
+    "task_authority",
     "review_economy"
   ],
   "additionalProperties": false,
@@ -36,6 +37,15 @@
     "rigor": { "type": "string", "enum": ["0", "1", "2"] },
     "risk": { "type": "string", "enum": ["low", "medium", "high"] },
     "trigger_row": { "type": "string", "enum": ["T1", "T2", "T3", "T4", "T6"] },
+    "task_authority": {
+      "type": "object",
+      "required": ["manifest", "request"],
+      "additionalProperties": false,
+      "properties": {
+        "manifest": { "$ref": "#/$defs/authority" },
+        "request": { "$ref": "#/$defs/authority" }
+      }
+    },
     "review_economy": {
       "type": "object",
       "required": ["round", "correction_commits", "requested_mode", "changed_paths", "changed_behavior_claims", "prior_receipt", "path_invariant_map", "path_invariant_map_sha256", "coordinator_impact_confirmed", "trust_boundary_changed", "impact_ambiguous"],
@@ -75,6 +85,17 @@
         "scope": { "type": "string" },
         "evidence_sha256": { "type": "string" },
         "candidate_commit": { "type": "string" }
+      }
+    }
+  },
+  "$defs": {
+    "authority": {
+      "type": "object",
+      "required": ["operations", "paths"],
+      "additionalProperties": false,
+      "properties": {
+        "operations": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "paths": { "type": "array", "minItems": 1, "items": { "type": "string" } }
       }
     }
   }
