@@ -48,6 +48,12 @@ function externalJson(repoRoot, path) {
   return JSON.parse(readFileSync(source, "utf8"));
 }
 
+/** Accept the public wrapper emitted by this CLI as well as the bare request. */
+export function approvalRequestFromExternalJson(value) {
+  if (value && typeof value === "object" && !Array.isArray(value) && value.ok === true && Object.keys(value).length === 2 && Object.hasOwn(value, "value")) return value.value;
+  return value;
+}
+
 export function run(argv = process.argv.slice(2)) {
   const args = parseArgs(argv);
   if (args.error) throw new Error(args.error);
@@ -65,7 +71,7 @@ export function run(argv = process.argv.slice(2)) {
   }
   if (args.command === "verify") {
     if (!args.request || !args.authority || !args.proof) throw new Error(usage);
-    return { ok: true, value: verifyThreatModelApprovalRequest({ request: externalJson(args.repoRoot, args.request), trustPolicy: externalJson(args.repoRoot, args.authority), proof: externalJson(args.repoRoot, args.proof) }) };
+    return { ok: true, value: verifyThreatModelApprovalRequest({ request: approvalRequestFromExternalJson(externalJson(args.repoRoot, args.request)), trustPolicy: externalJson(args.repoRoot, args.authority), proof: externalJson(args.repoRoot, args.proof) }) };
   }
   throw new Error(usage);
 }

@@ -1,0 +1,43 @@
+# PO approval: the short human flow
+
+This is for a person operating their own terminal. Do not run the approval
+commands through an agent, CI worker, chat prompt, repository hook, or shared
+shell. The encrypted private key and its passphrase live in an external
+directory; they are never placed in the repository. The agent may see the
+public request and public proof, but never the private key or passphrase.
+
+## One-time setup
+
+Choose an external directory and let the helper create an encrypted Ed25519
+key. OpenSSL prompts locally for the passphrase. This is the CLI fallback; it
+does not put a code word into chat, environment variables, or configuration.
+
+```sh
+REPO="$HOME/src/agent-pipeline-share_cyborg"
+PO_DIR="$HOME/agent-pipeline-po"
+node "$REPO/plugins/pipeline-core/scripts/po-human-approval.mjs" setup --directory "$PO_DIR"
+```
+
+## Each approval
+
+```sh
+node "$REPO/plugins/pipeline-core/scripts/po-human-approval.mjs" prepare --repo-root "$REPO" --directory "$PO_DIR"
+node "$REPO/plugins/pipeline-core/scripts/po-human-approval.mjs" approve --directory "$PO_DIR"
+node "$REPO/plugins/pipeline-core/scripts/po-human-approval.mjs" verify --repo-root "$REPO" --directory "$PO_DIR"
+```
+
+`approve` is the only regular step that asks for the local passphrase. It signs the
+exact current candidate-bound intent, writes only public request/trust/proof
+files to `PO_DIR`, and never accepts a secret by argument, environment, stdin,
+repository file, or pipeline state. A changed Git candidate requires a new
+`prepare` and `approve` step.
+
+## Product direction
+
+This helper is the first adapter for one shared Human-Authorization contract,
+not a CYB-4-only mechanism. Existing human intents/gates must migrate to that
+contract and future sprints must use it from the start. Desktop applications
+should prefer a native Passkey/WebAuthn adapter. CLI consoles keep the
+external encrypted Ed25519/SSH-style key path as their portable fallback.
+IAM, hardware-key, and password-manager adapters may also produce the same
+detached public proof; `prepare` and `verify` remain unchanged.
