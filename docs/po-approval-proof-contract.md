@@ -80,6 +80,20 @@ then return a detached proof for `intentSha256`. This keeps initial setup light
 for solo developers while allowing richer adapters later without changing the
 receipt format or the PO approval process.
 
+## Critical-action binding
+
+The `pipeline.critical-action-approval-request.v1` companion uses the same
+detached proof primitive for the closed action kinds `push`, `deploy` and
+`publication`. Its signed intent additionally binds the clean candidate,
+current plan/Spec hashes, action kind, exact action-subject digest and expiry.
+The State writer verifies those public bindings before creating durable
+external-effect authority; proof use across kinds, candidates or subjects is
+rejected.
+
+Remote provisional receipts are intentionally not this contract. They are
+short-lived, one-time acknowledgements for local continuation only and never
+provide an external-effect authorization.
+
 ## Candidate-bound reference records
 
 The checked-in CYB-4 threat-model and legacy receipt are immutable historical

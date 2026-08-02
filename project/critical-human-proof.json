@@ -1,0 +1,8 @@
+{
+  "schema": "pipeline.critical-human-proof-policy.v1",
+  "requiredKinds": [
+    "push",
+    "deploy",
+    "publication"
+  ]
+}

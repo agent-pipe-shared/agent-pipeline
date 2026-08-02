@@ -50,6 +50,37 @@ node "$REPO/plugins/pipeline-core/scripts/po-approval-gate.mjs" prepare-all --re
 node "$REPO/plugins/pipeline-core/scripts/po-approval-gate.mjs" verify-all --repo-root "$REPO" --directory "$PO_DIR"
 ```
 
+## Critical external effects
+
+For a remote push, a human-gated deployment or a publication, the control
+plane prepares a separate `critical-action` request. It binds the clean
+candidate commit/tree, current plan and Spec, one closed action kind and the
+digest of the exact writer-owned action subject. The human signs it on the
+hardened terminal with `approve-critical`; the agent can prepare and verify,
+but cannot sign.
+
+The repository policy enables this check only for `push`, `deploy` and
+`publication`. Planning, implementation, normal review and other chat-approved
+decisions do not require the external signer. A proof is single-purpose: a
+push proof cannot approve a deploy or publication, and candidate, subject or
+expiry drift requires a new request.
+
+```sh
+# Agent/control plane: creates public external files only.
+node "$REPO/plugins/pipeline-core/scripts/po-approval-gate.mjs" prepare-critical \
+  --repo-root "$REPO" --directory "$PO_DIR" --feature-id sprint-nova-epic \
+  --plan specs/sprint-nova-epic/prd_sprint-nova-epic.md --spec specs/sprint-nova-epic/spec.md \
+  --kind publication --subject-sha256 "$SUBJECT_SHA256" --expires-at "$EXPIRES_AT"
+
+# Human-operated hardened terminal: the sole signing step.
+node "$REPO/plugins/pipeline-core/scripts/po-human-approval.mjs" approve-critical \
+  --repo-root "$REPO" --directory "$PO_DIR" --kind publication
+```
+
+The subsequent State-writer transition verifies the same public request,
+authority and proof before it writes durable approval. A chat message or an
+attribution string is not a substitute at these three boundaries.
+
 ## Adapter boundary
 
 This helper is the first adapter for one shared Human-Authorization contract,
@@ -60,12 +91,17 @@ detached public proof; they are not bundled in 0.5.0.
 
 ## Remote work and provisional codes
 
-0.5.0 intentionally ships no remote-code mechanism. A code pasted into the
-same chat as the agent is visible to that agent, so it is not a secret and
-cannot safely act as final authorization. A future remote adapter may record
-a one-time provisional acknowledgement, but it must not authorize push,
-release, override, or another irreversible action. Final local proof remains
-required.
+The interim candidate adds a deliberately limited external-store helper for a
+remote-app acknowledgement. Its code is hashed, one-time, candidate-and-scope
+bound and expires within 30 minutes. It permits only the named local
+continuation check. A code pasted into the same chat remains visible to the
+agent and therefore is not a secret or identity proof.
+
+The receipt is structurally rejected by push, deploy, publication, release,
+override, merge and deletion flows. Final local detached proof remains
+required even after a valid provisional acknowledgement. The helper does not
+ship a remote provider, credential or app integration; a remote app can use it
+only as an unprivileged acknowledgement store.
 
 ## Deutsche Kurzhilfe (nicht normativ)
 

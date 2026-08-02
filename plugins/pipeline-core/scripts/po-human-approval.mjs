@@ -18,9 +18,10 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from "node:pat
 import { pathToFileURL } from "node:url";
 
 import { approvalRequestFromExternalJson, observeCleanCandidate, run as runApprovalRequest } from "./po-approval-request.mjs";
-import { verifyThreatModelApprovalRequest } from "../lib/threat-model-approval-request.mjs";
+import { readPublicRepositoryFile, verifyThreatModelApprovalRequest } from "../lib/threat-model-approval-request.mjs";
+import { CRITICAL_ACTION_KINDS, createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
 
-const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir>";
+const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication> --subject-sha256 <sha256> --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication>";
 const own = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 const SHA = /^[a-f0-9]{64}$/u;
 const text = (value) => typeof value === "string" && value.trim() !== "";
@@ -79,12 +80,13 @@ export function parseHumanArgs(argv) {
     const key = tokens[index]; const value = tokens[index + 1];
     if (!key?.startsWith("--") || typeof value !== "string" || value.startsWith("--")) return { error: USAGE };
     const normalized = key.slice(2).replace(/-([a-z])/gu, (_, letter) => letter.toUpperCase());
-    if (!new Set(["directory", "repoRoot", "keyReference", "featureId", "plan", "spec", "model"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
+    if (!new Set(["directory", "repoRoot", "keyReference", "featureId", "plan", "spec", "model", "kind", "subjectSha256", "expiresAt"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
     supplied.add(normalized); values[normalized] = value; index += 1;
   }
-  if (!new Set(["setup", "prepare", "prepare-all", "approve", "approve-all", "verify", "verify-all"]).has(command) || !text(values.directory) || !isAbsolute(values.directory)
+  if (!new Set(["setup", "prepare", "prepare-all", "approve", "approve-all", "verify", "verify-all", "prepare-critical", "approve-critical", "verify-critical"]).has(command) || !text(values.directory) || !isAbsolute(values.directory)
     || !text(values.repoRoot) || !isAbsolute(values.repoRoot)) return { error: USAGE };
   if (command.endsWith("-all") && (values.featureId || values.plan || values.spec || values.model)) return { error: USAGE };
+  if (command.endsWith("-critical") && !CRITICAL_ACTION_KINDS.includes(values.kind)) return { error: USAGE };
   return values;
 }
 
@@ -115,10 +117,12 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
     };
   }
   const repository = resolve(args.repoRoot);
-  const directory = externalDirectory(repository, resolve(args.directory), { create: args.command === "setup" || args.command === "prepare" });
+  const directory = externalDirectory(repository, resolve(args.directory), { create: args.command === "setup" || args.command === "prepare" || args.command === "prepare-critical" });
+  const critical = args.command.endsWith("-critical");
+  if (critical && args.command === "prepare-critical" && !text(args.featureId)) fail("critical approval requires a feature id");
   const featureId = args.featureId ?? "cyb-4";
   if (!/^[a-z][a-z0-9-]{0,63}$/u.test(featureId)) fail("feature id is invalid");
-  const suffix = featureId === "cyb-4" ? "" : `-${featureId}`;
+  const suffix = critical ? `-critical-${args.kind}` : (featureId === "cyb-4" ? "" : `-${featureId}`);
   const paths = {
     request: artifactPath(directory, `request${suffix}.json`),
     privateKey: artifactPath(directory, "po-private.pem"),
@@ -147,7 +151,22 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
     const authority = publicKeyPolicy(read(paths.publicKey, "utf8"), args.keyReference); write(paths.authority, `${JSON.stringify(authority, null, 2)}\n`, { mode: 0o600 }); chmodSync(paths.privateKey, 0o600);
     return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority };
   }
-  if (args.command === "prepare") {
+  if (args.command === "prepare" || args.command === "prepare-critical") {
+    if (critical) {
+      if (!text(args.plan) || !text(args.spec) || !SHA.test(args.subjectSha256 ?? "")
+        || !text(args.expiresAt) || !Number.isFinite(Date.parse(args.expiresAt)) || new Date(args.expiresAt).toISOString() !== args.expiresAt) {
+        fail("critical approval request is invalid");
+      }
+      const request = createCriticalActionApprovalRequest({
+        candidate: (dependencies.observeCandidate ?? observeCleanCandidate)(repository),
+        featureId,
+        planBytes: readPublicRepositoryFile(repository, args.plan),
+        specBytes: readPublicRepositoryFile(repository, args.spec),
+        action: { kind: args.kind, subjectSha256: args.subjectSha256, expiresAt: args.expiresAt },
+      });
+      write(paths.request, `${JSON.stringify(request, null, 2)}\n`, { mode: 0o600 });
+      return { ok: true, code: "PO-HUMAN-CRITICAL-REQUEST-READY", candidate: request.candidate, intentSha256: request.approvalIntent.sha256, action: request.action };
+    }
     const result = runApprovalRequest(["prepare", "--repo-root", repository, "--feature-id", featureId, "--plan", args.plan ?? "specs/2026-07-24-sprint-cyborg-epic/prd_cyborg-epic.md", "--spec", args.spec ?? "specs/2026-07-24-sprint-cyborg-epic/spec.md", "--model", args.model ?? `specs/${featureId}/threat-model.json`]);
     write(paths.request, `${JSON.stringify(result, null, 2)}\n`, { mode: 0o600 });
     return { ok: true, code: "PO-HUMAN-REQUEST-READY", candidate: result.value.candidate, intentSha256: result.value.approvalIntent.sha256 };
@@ -156,7 +175,7 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
   const request = approvalRequestFromExternalJson(json(paths.request));
   const intentSha256 = request?.approvalIntent?.sha256;
   if (!SHA.test(intentSha256 ?? "")) fail("request has no valid approval intent");
-  if (args.command === "approve") {
+  if (args.command === "approve" || args.command === "approve-critical") {
     if (!exists(paths.privateKey)) fail("private key is unavailable");
     write(paths.intent, intentSha256, { mode: 0o600 });
     try { command("openssl", ["pkeyutl", "-sign", "-rawin", "-inkey", paths.privateKey, "-in", paths.intent, "-out", paths.signature], dependencies); }
@@ -172,7 +191,9 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
   if (!exists(paths.proof)) fail("run approve before verify");
   const candidate = (dependencies.observeCandidate ?? observeCleanCandidate)(repository);
   if (request?.candidate?.commit !== candidate.commit || request?.candidate?.tree !== candidate.tree) fail("proof request is not bound to the current clean candidate");
-  const verified = verifyThreatModelApprovalRequest({ request, trustPolicy: json(paths.authority), proof: json(paths.proof) });
+  const verified = critical
+    ? verifyCriticalActionApprovalRequest({ request, trustPolicy: json(paths.authority), proof: json(paths.proof), expectedCandidate: candidate, expectedAction: request.action })
+    : verifyThreatModelApprovalRequest({ request, trustPolicy: json(paths.authority), proof: json(paths.proof) });
   return { ok: true, value: verified };
 }
 

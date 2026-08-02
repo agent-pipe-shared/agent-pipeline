@@ -11,11 +11,11 @@ import { pathToFileURL } from "node:url";
 
 import { parseHumanArgs, runHumanApproval } from "./po-human-approval.mjs";
 
-const USAGE = "Usage: po-approval-gate.mjs prepare --repo-root <repo> --directory <external-dir> [--feature-id <id>] | prepare-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir>";
+const USAGE = "Usage: po-approval-gate.mjs prepare --repo-root <repo> --directory <external-dir> [--feature-id <id>] | prepare-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication> --subject-sha256 <sha256> --expires-at <ISO-8601> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication>";
 
 export function parseGateArgs(argv) {
   const parsed = parseHumanArgs(argv);
-  if (parsed.error || !new Set(["prepare", "prepare-all", "verify", "verify-all"]).has(parsed.command)) return { error: USAGE };
+  if (parsed.error || !new Set(["prepare", "prepare-all", "verify", "verify-all", "prepare-critical", "verify-critical"]).has(parsed.command)) return { error: USAGE };
   return parsed;
 }
 

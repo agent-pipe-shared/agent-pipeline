@@ -329,6 +329,11 @@ import {
 } from "../lib/publication-authority.mjs";
 import { publicationDigest } from "../lib/publication-bundle.mjs";
 import {
+  CRITICAL_ACTION_KINDS,
+  criticalActionSubjectSha256,
+  verifyCriticalActionApprovalRequest,
+} from "../lib/critical-action-approval-request.mjs";
+import {
   lifecycleDigest as closeCoordinatorDigest,
   readCloseCoordinator,
 } from "./publication-close-journal.mjs";
@@ -337,6 +342,8 @@ export const SCHEMA_ID = "pipeline.state.v0";
 export const CONTINUITY_LOCK_SCHEMA_ID = "pipeline.continuity-lock.v0";
 export const CONTINUITY_LOCK_STALE_MS = 30_000;
 const CONTINUITY_REQUEST_MAX_BYTES = 32_768;
+const CRITICAL_HUMAN_PROOF_POLICY_PATH = "project/critical-human-proof.json";
+const EXTERNAL_PUBLIC_ARTIFACT_MAX_BYTES = 1_048_576;
 const CONTINUITY_RESULT_MAX_BYTES = 1_048_576;
 const FINAL_INTEGRATION_MAX_BYTES = 8_192;
 const POST_RESULT_SENTINEL = "$POST_RESULT_SHA256";
@@ -2244,6 +2251,7 @@ function runPublicationCommand(sub, flags, deps) {
     const input = request.value.input;
     let authority;
     let replay = false;
+    let criticalProof = null;
     try {
       if (sub === "publication-prepare") {
         if (expected.value !== "absent" || input?.transactionId !== request.value.transactionId) throw new Error("prepare stale");
@@ -2282,6 +2290,28 @@ function runPublicationCommand(sub, flags, deps) {
         replay = alreadyProjected;
       } else {
         if (expected.value === "absent") throw new Error("stale publication CAS");
+        if (sub === "publication-approve") {
+          const policy = criticalHumanProofPolicy(dir);
+          if (!policy.ok) throw new Error(policy.code);
+          if (policy.requiredKinds.has("publication")) {
+            if (prior === null) throw new Error("publication proof requires a prepared State projection");
+            const candidate = { commit: prior.candidateOid, tree: prior.candidateTree };
+            const verified = verifyCriticalHumanProof({
+              dir, state: base, kind: "publication", candidate,
+              subject: {
+                transactionId: request.value.transactionId,
+                channel: prior.channel,
+                expectedRevision: expected.value,
+                expectedStateSha256: request.value.expectedStateSha256,
+                input,
+              },
+              flags,
+              now: new Date().toISOString(),
+            });
+            if (!verified.ok) throw new Error(verified.code);
+            criticalProof = verified.proof;
+          }
+        }
         if (prior !== null) {
           if (prior.publicationStateSha256 !== request.value.expectedStateSha256) throw new Error("State publication reference stale");
           const observed = readPublicationAuthority({ gitCommonDir: common.path, transactionId: request.value.transactionId, channel: prior.channel });
@@ -2339,11 +2369,18 @@ function runPublicationCommand(sub, flags, deps) {
     }
     let projection;
     try { projection = projectPublication(base, authority); } catch { console.error("Error: State publication projection invalid."); return 2; }
-    if (sameJson(base.publication, projection)) {
+    const proofProjection = criticalProof === null
+      ? base.publicationCriticalProofs
+      : { ...(base.publicationCriticalProofs ?? {}), [request.value.transactionId]: criticalProof };
+    if (sameJson(base.publication, projection) && sameJson(base.publicationCriticalProofs, proofProjection)) {
       console.log(`${sub}: exact durable replay accepted; State projection already matches ${authority.record.publication.revision}.`);
       return 0;
     }
-    const nextState = { ...base, schema: SCHEMA_ID, publication: projection, updatedAt: (deps.now ?? (() => new Date().toISOString()))() };
+    const nextState = {
+      ...base, schema: SCHEMA_ID, publication: projection,
+      ...(criticalProof === null ? {} : { publicationCriticalProofs: proofProjection }),
+      updatedAt: (deps.now ?? (() => new Date().toISOString()))(),
+    };
     const written = atomicWriteContinuityState(dir, nextState, lock, deps);
     if (!written.ok) {
       console.error(`Error: local publication authority is durable but State projection is unresolved (${written.code}); retry only with the exact same CAS tuple to repair State.`);
@@ -2494,6 +2531,79 @@ function defaultGitHead(dir) {
     return { ok: false, error: (res.stderr || `git rev-parse HEAD exited ${res.status}`).trim() };
   }
   return { ok: true, commit: res.stdout.trim() };
+}
+
+function defaultGitCandidate(dir) {
+  const commit = defaultGitHead(dir);
+  if (!commit.ok) return commit;
+  const tree = spawnSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: dir, encoding: "utf8" });
+  if (tree.error || tree.status !== 0 || !/^[0-9a-f]{40,64}$/u.test(tree.stdout?.trim() ?? "")) {
+    return { ok: false, error: tree.error?.message ?? (tree.stderr || "git rev-parse HEAD^{tree} failed").trim() };
+  }
+  return { ok: true, commit: commit.commit, tree: tree.stdout.trim() };
+}
+
+function criticalHumanProofPolicy(dir) {
+  const path = resolve(dir, CRITICAL_HUMAN_PROOF_POLICY_PATH);
+  try {
+    const stat = lstatSync(path);
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 32_768) return { ok: false, code: "CRITICAL-PROOF-POLICY-UNSAFE" };
+    const value = JSON.parse(readFileSync(path, "utf8"));
+    if (!exactObjectKeys(value, ["schema", "requiredKinds"])
+      || value.schema !== "pipeline.critical-human-proof-policy.v1"
+      || !Array.isArray(value.requiredKinds)
+      || value.requiredKinds.length === 0
+      || new Set(value.requiredKinds).size !== value.requiredKinds.length
+      || value.requiredKinds.some((kind) => !CRITICAL_ACTION_KINDS.includes(kind))) {
+      return { ok: false, code: "CRITICAL-PROOF-POLICY-INVALID" };
+    }
+    return { ok: true, requiredKinds: new Set(value.requiredKinds) };
+  } catch (error) {
+    return error?.code === "ENOENT" ? { ok: true, requiredKinds: new Set() } : { ok: false, code: "CRITICAL-PROOF-POLICY-UNREADABLE" };
+  }
+}
+
+function externalPublicJson(dir, value) {
+  if (typeof value !== "string" || !isAbsolute(value)) return { ok: false, code: "CRITICAL-PROOF-EXTERNAL-PATH" };
+  const root = realpathSync(resolve(dir));
+  let path;
+  try { path = realpathSync(value); } catch { return { ok: false, code: "CRITICAL-PROOF-EXTERNAL-PATH" }; }
+  if (path === root || !relative(root, path).startsWith("..")) return { ok: false, code: "CRITICAL-PROOF-EXTERNAL-PATH" };
+  try {
+    const stat = lstatSync(path);
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || stat.size > EXTERNAL_PUBLIC_ARTIFACT_MAX_BYTES) return { ok: false, code: "CRITICAL-PROOF-EXTERNAL-FILE" };
+    return { ok: true, value: JSON.parse(readFileSync(path, "utf8")) };
+  } catch { return { ok: false, code: "CRITICAL-PROOF-EXTERNAL-FILE" }; }
+}
+
+function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags, now }) {
+  const policy = criticalHumanProofPolicy(dir);
+  if (!policy.ok) return policy;
+  if (!policy.requiredKinds.has(kind)) return { ok: true, proof: null };
+  const request = externalPublicJson(dir, flags["proof-request"]);
+  const authority = externalPublicJson(dir, flags["proof-authority"]);
+  const proof = externalPublicJson(dir, flags["proof"]);
+  if (!request.ok || !authority.ok || !proof.ok) return { ok: false, code: request.code ?? authority.code ?? proof.code };
+  const active = state.activeFeature;
+  const gate = state.planApproval?.poGateAuthority;
+  if (!active?.id || !gate?.planSha256 || !gate?.specSha256 || !candidate?.commit || !candidate?.tree) return { ok: false, code: "CRITICAL-PROOF-STATE" };
+  const action = request.value?.action;
+  const expectedSubject = criticalActionSubjectSha256({ kind, candidate, subject });
+  if (!action || action.kind !== kind || action.subjectSha256 !== expectedSubject) return { ok: false, code: "CRITICAL-PROOF-SUBJECT" };
+  const result = verifyCriticalActionApprovalRequest({
+    request: request.value,
+    trustPolicy: authority.value,
+    proof: proof.value,
+    expectedCandidate: candidate,
+    expectedAction: action,
+    now,
+  });
+  if (!result.verified) return { ok: false, code: result.code };
+  const intent = request.value.approvalIntent?.value;
+  if (intent?.featureId !== active.id || intent?.planSha256 !== gate.planSha256 || intent?.specSha256 !== gate.specSha256) {
+    return { ok: false, code: "CRITICAL-PROOF-AUTHORITY" };
+  }
+  return { ok: true, proof: { proofSha256: result.proofSha256, intentSha256: request.value.approvalIntent.sha256, action: result.action } };
 }
 
 function legacyRegularArtifact(dir, artifact, expectedPath, expectedSha) {
@@ -4406,6 +4516,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
   const dir = deps.dir ?? projectDir();
   const now = deps.now ?? (() => new Date().toISOString());
   const gitHead = deps.gitHead ?? defaultGitHead;
+  const gitCandidate = deps.gitCandidate ?? defaultGitCandidate;
   const poGateAuthority = deps.poGateAuthority ?? ((request) => validatePoGateAuthorityForRepository(request));
 
   const [sub, ...rest] = argv;
@@ -4953,9 +5064,14 @@ export function run(argv = process.argv.slice(2), deps = {}) {
     }
 
     case "approve-push": {
-      const by = flags.by;
-      if (isBlank(by)) {
-        console.error('Error: approve-push requires --by <name> (non-empty) -- an unattributed approval is refused.');
+      const policy = criticalHumanProofPolicy(dir);
+      if (!policy.ok) { console.error(`Error: approve-push refused (${policy.code}).`); return 2; }
+      const expectedFlags = new Set(policy.requiredKinds.has("push")
+        ? ["by", "proof-request", "proof-authority", "proof"] : ["by"]);
+      const parsed = parseExactFlags(rest, expectedFlags);
+      const by = parsed.value?.by;
+      if (!parsed.ok || isBlank(by)) {
+        console.error('Error: approve-push requires --by <name> and, when critical proof is enabled, exactly --proof-request/--proof-authority/--proof.');
         return 2;
       }
       const head = gitHead(dir);
@@ -4965,10 +5081,24 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         return 2;
       }
       const approvedAt = now();
+      let proof = null;
+      if (policy.requiredKinds.has("push")) {
+        const observed = gitCandidate(dir);
+        if (!observed.ok || observed.commit !== head.commit) {
+          console.error("Error: current candidate commit/tree could not be determined; push proof was not recorded.");
+          return 2;
+        }
+        const verified = verifyCriticalHumanProof({
+          dir, state: base, kind: "push", candidate: observed,
+          subject: { sourceCommit: observed.commit }, flags: parsed.value, now: approvedAt,
+        });
+        if (!verified.ok) { console.error(`Error: approve-push refused (${verified.code}); external proof was not consumed.`); return 2; }
+        proof = verified.proof;
+      }
       const next = {
         ...base,
         schema: SCHEMA_ID,
-        pushApproval: { lastApproved: { approvedBy: by, approvedAt, forCommit: head.commit } },
+        pushApproval: { lastApproved: { approvedBy: by, approvedAt, forCommit: head.commit, ...(proof === null ? {} : { criticalProof: proof }) } },
         updatedAt: approvedAt,
       };
       if (!stateWriteSucceeded(writeState(dir, next, base))) {
@@ -5108,12 +5238,18 @@ export function run(argv = process.argv.slice(2), deps = {}) {
     }
 
     case "approve-deploy": {
-      const env = flags.env;
-      const artifact = flags.artifact;
-      const by = flags.by;
-      if (isBlank(env) || isBlank(artifact) || isBlank(by)) {
+      const policy = criticalHumanProofPolicy(dir);
+      if (!policy.ok) { console.error(`Error: approve-deploy refused (${policy.code}).`); return 2; }
+      const expectedFlags = new Set(policy.requiredKinds.has("deploy")
+        ? ["env", "artifact", "by", "proof-request", "proof-authority", "proof"]
+        : ["env", "artifact", "by"]);
+      const parsed = parseExactFlags(rest, expectedFlags);
+      const env = parsed.value?.env;
+      const artifact = parsed.value?.artifact;
+      const by = parsed.value?.by;
+      if (!parsed.ok || isBlank(env) || isBlank(artifact) || isBlank(by)) {
         console.error(
-          'Error: approve-deploy requires --env <environment>, --artifact <tag-or-sha> and --by <name> (all three non-empty).',
+          'Error: approve-deploy requires --env, --artifact and --by and, when critical proof is enabled, exactly --proof-request/--proof-authority/--proof.',
         );
         return 2;
       }
@@ -5122,8 +5258,19 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         return 2;
       }
       const approvedAt = now();
+      let proof = null;
+      if (policy.requiredKinds.has("deploy")) {
+        const candidate = gitCandidate(dir);
+        if (!candidate.ok) { console.error("Error: current candidate commit/tree could not be determined; deploy proof was not recorded."); return 2; }
+        const verified = verifyCriticalHumanProof({
+          dir, state: base, kind: "deploy", candidate,
+          subject: { artifact, environment: env }, flags: parsed.value, now: approvedAt,
+        });
+        if (!verified.ok) { console.error(`Error: approve-deploy refused (${verified.code}); external proof was not consumed.`); return 2; }
+        proof = verified.proof;
+      }
       const priorApprovals = Array.isArray(base.deployApprovals) ? base.deployApprovals : [];
-      const entry = { forArtifact: artifact, forEnvironment: env, approvedBy: by, approvedAt };
+      const entry = { forArtifact: artifact, forEnvironment: env, approvedBy: by, approvedAt, ...(proof === null ? {} : { criticalProof: proof }) };
       const next = {
         ...base,
         schema: SCHEMA_ID,

@@ -9,7 +9,7 @@
     {
       "class": "prd",
       "path": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-      "sha256": "272d9ae631e8a0a60fa5af6bdc746044cd00a153d2d922766bd2d1e22e71401c",
+      "sha256": "164cadc6d175b6d7105404d1e7d84d197864d8be84a6dd20bd7a97d02dadf110",
       "authority": true,
       "mutability": "mutable",
       "retention": "active"
@@ -17,7 +17,7 @@
     {
       "class": "spec",
       "path": "specs/sprint-nova-epic/spec.md",
-      "sha256": "f11730c26009018e7bf879878149761fddfc84433f01acffa97727e92d8a210e",
+      "sha256": "e9f020f746c7fd880cfbdac355316a0d0d12ee0fd12edd3474c38328371bd4a5",
       "authority": true,
       "mutability": "mutable",
       "retention": "active"
@@ -25,7 +25,7 @@
     {
       "class": "acceptance",
       "path": "specs/sprint-nova-epic/acceptance.md",
-      "sha256": "02ba9b5c93d2a026c52ce2192d60a981b4e4c3dddb30bc8be1bc850406566808",
+      "sha256": "7ef4ec02d0876e3511d787f62036f6d57b4a63c9c147cdee4c81e4a7aa8342cc",
       "authority": true,
       "mutability": "mutable",
       "retention": "active"
@@ -36,6 +36,14 @@
       "sha256": "6a12e4f2e3651b614cda6bfe08d312c3aa2d1d32c20e8bc11e1109c40d1360a9",
       "authority": true,
       "mutability": "append-only",
+      "retention": "retain"
+    },
+    {
+      "class": "design",
+      "path": "specs/sprint-nova-epic/design/2026-08-02-human-authorization-extension-input.md",
+      "sha256": "b2a65bfd34d63ab3dacd4916ad445240d41c021acb50a92c92f65123fefb5cd4",
+      "authority": false,
+      "mutability": "mutable",
       "retention": "retain"
     },
     {
@@ -130,6 +138,14 @@
       "class": "design",
       "path": "specs/sprint-nova-epic/design/post-v0.4.7-authority-reconciliation.md",
       "sha256": "bc01cdd3bdc8a4694b94b28c46e9a62df2e23afd065b81eb4e8eb223562da5d9",
+      "authority": false,
+      "mutability": "mutable",
+      "retention": "retain"
+    },
+    {
+      "class": "plan",
+      "path": "specs/sprint-nova-epic/plans/2026-08-02-human-authorization-and-cyborg-handover.md",
+      "sha256": "616972117a0d0b9e0e1698f8340e92abfe80a942e663092a326ccf41a925f8c2",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"
