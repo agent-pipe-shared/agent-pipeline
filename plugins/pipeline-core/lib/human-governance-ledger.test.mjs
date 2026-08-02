@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -9,7 +10,7 @@ import test from "node:test";
 import { canonicalSha256, canonicalizeJson } from "./governance-event.mjs";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
 import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
-import { HumanGovernanceLedgerError, appendConsumedHumanGovernanceDecision, appendHumanGovernanceDecision, createConsumedHumanGovernanceDecision, queryHumanGovernanceDecisions, resolveHumanGovernanceAuthority, validateHumanGovernanceDecision } from "./human-governance-ledger.mjs";
+import { HumanGovernanceLedgerError, appendConsumedHumanGovernanceDecision, appendHumanGovernanceDecision, createConsumedHumanGovernanceDecision, createExternalHumanGovernanceIntent, queryHumanGovernanceDecisions, resolveExternallyAttestedHumanGovernanceAuthority, resolveHumanGovernanceAuthority, validateHumanGovernanceDecision } from "./human-governance-ledger.mjs";
 
 const sha = "a".repeat(64);
 const candidate = { commit: "b".repeat(40), tree: "c".repeat(40) };
@@ -60,6 +61,47 @@ test("fails closed for repository/candidate drift, expiry, and consuming disposi
   assert.equal(resolveHumanGovernanceAuthority({ decisions: [decision()], decisionId: "decision-1", repositoryFingerprint: sha, candidate, nowEpochMs: 101 }).reason, "expired");
   const consumed = decision({ decisionId: "consume-1", event: "consumed", outcome: "consumed", links: { requestDecisionId: null, consumesDecisionId: "decision-1", revokesDecisionId: null, expiresDecisionId: null, supersedesDecisionId: null, correctsDecisionId: null } });
   assert.equal(resolveHumanGovernanceAuthority({ decisions: [decision(), consumed], decisionId: "decision-1", repositoryFingerprint: sha, candidate, nowEpochMs: 50 }).reason, "disposed");
+});
+
+test("requires an external detached proof before reporting externally-attested human authority", () => {
+  const plan = { path: "specs/sprint-phoenix-epic/prd_phoenix-epic.md", sha256: "d".repeat(64) };
+  const spec = { path: "specs/sprint-phoenix-epic/spec.md", sha256: "e".repeat(64) };
+  const grant = decision({ scope: { repositoryFingerprint: sha, candidate, packageId: "sprint-phoenix-epic", action: "PLAN.APPROVE", environment: "local", artifacts: [plan, spec] } });
+  const intent = createExternalHumanGovernanceIntent({ decision: grant, plan, spec });
+  const keys = generateKeyPairSync("ed25519");
+  const publicKey = keys.publicKey.export({ type: "spki", format: "pem" });
+  const proof = {
+    schema: "pipeline.po-approval-proof.v1",
+    intentSha256: intent.sha256,
+    keyReference: "external-po-v1",
+    publicKey,
+    signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), keys.privateKey).toString("base64"),
+  };
+  const trustPolicy = { keyReference: proof.keyReference, publicKeySha256: createHash("sha256").update(publicKey).digest("hex") };
+  const verified = resolveExternallyAttestedHumanGovernanceAuthority({ decisions: [grant], decisionId: grant.decisionId, repositoryFingerprint: sha, candidate, nowEpochMs: 50, plan, spec, trustPolicy, proof });
+  assert.equal(verified.status, "granted");
+  assert.equal(verified.identityAssurance, "externally-attested");
+  assert.equal(verified.approvalIntentSha256, intent.sha256);
+  assert.equal(resolveHumanGovernanceAuthority({ decisions: [grant], decisionId: grant.decisionId, repositoryFingerprint: sha, candidate, nowEpochMs: 50 }).identityAssurance, undefined);
+  const unsigned = resolveExternallyAttestedHumanGovernanceAuthority({ decisions: [grant], decisionId: grant.decisionId, repositoryFingerprint: sha, candidate, nowEpochMs: 50, plan, spec, trustPolicy, proof: { ...proof, signatureBase64: "AA==" } });
+  assert.equal(unsigned.status, "denied");
+  assert.equal(unsigned.reason, "external-proof-unverified");
+  assert.equal(unsigned.proofCode, "HGL-EXTERNAL-PROOF-MISMATCH");
+});
+
+test("binds an external proof to the ledger grant, its candidate, and both scoped artifacts", () => {
+  const plan = { path: "specs/sprint-phoenix-epic/prd_phoenix-epic.md", sha256: "d".repeat(64) };
+  const spec = { path: "specs/sprint-phoenix-epic/spec.md", sha256: "e".repeat(64) };
+  const grant = decision({ scope: { repositoryFingerprint: sha, candidate, packageId: "sprint-phoenix-epic", action: "PLAN.APPROVE", environment: "local", artifacts: [plan, spec] } });
+  assert.throws(() => createExternalHumanGovernanceIntent({ decision: grant, plan: { ...plan, sha256: "f".repeat(64) }, spec }), (error) => error.code === "HGL-EXTERNAL-ARTIFACT");
+  const keys = generateKeyPairSync("ed25519");
+  const intent = createExternalHumanGovernanceIntent({ decision: grant, plan, spec });
+  const publicKey = keys.publicKey.export({ type: "spki", format: "pem" });
+  const proof = { schema: "pipeline.po-approval-proof.v1", intentSha256: intent.sha256, keyReference: "external-po-v1", publicKey, signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), keys.privateKey).toString("base64") };
+  const trustPolicy = { keyReference: proof.keyReference, publicKeySha256: createHash("sha256").update(publicKey).digest("hex") };
+  const wrongCandidate = resolveExternallyAttestedHumanGovernanceAuthority({ decisions: [grant], decisionId: grant.decisionId, repositoryFingerprint: sha, candidate: { ...candidate, tree: "f".repeat(40) }, nowEpochMs: 50, plan, spec, trustPolicy, proof });
+  assert.equal(wrongCandidate.status, "denied");
+  assert.equal(wrongCandidate.reason, "scope-mismatch");
 });
 
 test("derives an append-only consumption disposition without rewriting the grant", () => {

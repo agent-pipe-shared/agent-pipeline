@@ -1,14 +1,19 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Pure validation and authority resolution for PHX-2 human decisions. */
+import { createHash, verify } from "node:crypto";
 import { canonicalSha256, validateGovernanceEventEnvelope } from "./governance-event.mjs";
 import { appendPortableGovernanceEvent, queryPortableGovernanceStream } from "./governance-event-store.mjs";
 import { HumanGovernanceLedgerError, createConsumedHumanGovernanceDecision, validateHumanGovernanceDecision } from "./human-governance-decision.mjs";
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+const EXTERNAL_ID = /^[a-z][a-z0-9-]{0,63}$/u;
 const SHA256 = /^[a-f0-9]{64}$/u;
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
+const EXTERNAL_INTENT_SCHEMA = "pipeline.po-approval-intent.v1";
+const EXTERNAL_PROOF_SCHEMA = "pipeline.po-approval-proof.v1";
 function record(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
 function exact(value, keys) { return record(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key)); }
+function text(value) { return typeof value === "string" && value.trim() !== ""; }
 function fail(code) { throw new HumanGovernanceLedgerError(code); }
 
 export { HumanGovernanceLedgerError, createConsumedHumanGovernanceDecision, validateHumanGovernanceDecision };
@@ -29,12 +34,76 @@ export function resolveHumanGovernanceAuthority({ decisions, decisionId, reposit
 }
 
 /**
- * Cyborg integration point: the published `po-approval-proof` verifier belongs
- * immediately before this admission boundary, using a trust policy resolved
- * outside the candidate. A future schema revision may materialize only the
- * permitted assurance evidence here; this ledger must never promote an
- * unverified caller claim to a verified human authority.
+ * Create the Cyborg-compatible detached-approval intent for one already valid
+ * Phoenix ledger grant.  The hashed subject binds the complete immutable grant
+ * plus the exact plan/spec artifacts; callers cannot substitute an arbitrary
+ * feature, candidate, policy revision, or decision after a person signs it.
  */
+export function createExternalHumanGovernanceIntent({ decision, plan, spec } = {}) {
+  const grant = validateHumanGovernanceDecision(decision);
+  if (grant.event !== "granted" || grant.outcome !== "granted" || !EXTERNAL_ID.test(grant.scope.packageId)
+    || !exact(plan, ["path", "sha256"]) || !exact(spec, ["path", "sha256"])
+    || typeof plan.path !== "string" || typeof spec.path !== "string" || !SHA256.test(plan.sha256) || !SHA256.test(spec.sha256)) fail("HGL-EXTERNAL-INTENT");
+  const artifacts = grant.scope.artifacts;
+  if (!artifacts.some((artifact) => artifact.path === plan.path && artifact.sha256 === plan.sha256)
+    || !artifacts.some((artifact) => artifact.path === spec.path && artifact.sha256 === spec.sha256)) fail("HGL-EXTERNAL-ARTIFACT");
+  const value = {
+    schema: EXTERNAL_INTENT_SCHEMA,
+    kind: "human-authority",
+    featureId: grant.scope.packageId,
+    planSha256: plan.sha256,
+    specSha256: spec.sha256,
+    candidate: grant.scope.candidate,
+    policyRevision: `policy-${grant.policyDigest.slice(0, 16)}`,
+    subjectSha256: canonicalSha256({ decision: grant, plan, spec }),
+    decision: "granted",
+  };
+  return Object.freeze({ value: Object.freeze(value), sha256: canonicalSha256(value) });
+}
+
+/**
+ * Verify an externally produced Detached Proof.  The trust policy is an input
+ * from an authority outside this checkout; neither a ledger field nor mutable
+ * State may supply or override it.  This function only reports cryptographic
+ * proof validity and never treats the proof itself as a ledger decision.
+ */
+export function verifyExternalHumanGovernanceProof({ intent, trustPolicy, proof } = {}) {
+  if (!record(intent) || !SHA256.test(intent.sha256) || !exact(trustPolicy, ["keyReference", "publicKeySha256"])
+    || !text(trustPolicy.keyReference) || !SHA256.test(trustPolicy.publicKeySha256)
+    || !exact(proof, ["schema", "intentSha256", "keyReference", "publicKey", "signatureBase64"])
+    || proof.schema !== EXTERNAL_PROOF_SCHEMA || proof.intentSha256 !== intent.sha256
+    || proof.keyReference !== trustPolicy.keyReference || !text(proof.publicKey) || !text(proof.signatureBase64)) return Object.freeze({ verified: false, code: "HGL-EXTERNAL-PROOF-INVALID" });
+  if (createHash("sha256").update(proof.publicKey).digest("hex") !== trustPolicy.publicKeySha256) return Object.freeze({ verified: false, code: "HGL-EXTERNAL-TRUST-MISMATCH" });
+  let signature;
+  try { signature = Buffer.from(proof.signatureBase64, "base64"); } catch { return Object.freeze({ verified: false, code: "HGL-EXTERNAL-PROOF-INVALID" }); }
+  if (signature.length === 0) return Object.freeze({ verified: false, code: "HGL-EXTERNAL-PROOF-INVALID" });
+  try {
+    if (!verify(null, Buffer.from(intent.sha256, "utf8"), proof.publicKey, signature)) return Object.freeze({ verified: false, code: "HGL-EXTERNAL-PROOF-MISMATCH" });
+  } catch { return Object.freeze({ verified: false, code: "HGL-EXTERNAL-PROOF-INVALID" }); }
+  return Object.freeze({ verified: true, code: "HGL-EXTERNAL-PROOF-VERIFIED", proofSha256: canonicalSha256(proof) });
+}
+
+/**
+ * Resolve a live local grant and require an independent Cyborg-compatible
+ * proof before reporting external identity assurance.  The ordinary resolver
+ * deliberately remains local-only so existing callers cannot be upgraded by
+ * attaching unverified metadata.
+ */
+export function resolveExternallyAttestedHumanGovernanceAuthority({ decisions, decisionId, repositoryFingerprint, candidate, nowEpochMs = Date.now(), plan, spec, trustPolicy, proof } = {}) {
+  const local = resolveHumanGovernanceAuthority({ decisions, decisionId, repositoryFingerprint, candidate, nowEpochMs });
+  if (local.status !== "granted") return local;
+  const selected = decisions.map(validateHumanGovernanceDecision).find((entry) => entry.decisionId === decisionId);
+  try {
+    const intent = createExternalHumanGovernanceIntent({ decision: selected, plan, spec });
+    const verified = verifyExternalHumanGovernanceProof({ intent, trustPolicy, proof });
+    if (!verified.verified) return Object.freeze({ status: "denied", reason: "external-proof-unverified", proofCode: verified.code });
+    return Object.freeze({ ...local, identityAssurance: "externally-attested", approvalIntentSha256: intent.sha256, proofSha256: verified.proofSha256 });
+  } catch (error) {
+    if (error instanceof HumanGovernanceLedgerError) return Object.freeze({ status: "denied", reason: "external-intent-invalid", proofCode: error.code });
+    throw error;
+  }
+}
+
 /** Append one already validated human decision through the canonical portable writer. */
 export async function appendHumanGovernanceDecision({ repositoryRoot, repositoryFingerprint, intent } = {}) {
   if (!record(intent) || intent.origin !== "human" || intent.streamId !== "human" || intent.authorityClass !== "human-authority" || intent.payloadSchema !== "pipeline.human-governance-decision.v1") fail("HGL-APPEND-INTENT");
