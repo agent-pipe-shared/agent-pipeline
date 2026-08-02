@@ -1,0 +1,54 @@
+{
+  "schema": "pipeline.threat-model.v1",
+  "candidate": {
+    "commit": "0000000000000000000000000000000000000000",
+    "tree": "0000000000000000000000000000000000000000"
+  },
+  "policyRevision": "cyb-5-policy-v1",
+  "classification": "public",
+  "entities": [
+    {
+      "id": "asset-2f7120eb99d780aa",
+      "kind": "asset",
+      "label": "pipeline-authority-and-evidence",
+      "relationships": ["boundary-797b3b8fa078a88b", "boundary-31a6cbe7f7a5e8c2"]
+    },
+    {
+      "id": "boundary-797b3b8fa078a88b",
+      "kind": "boundary",
+      "label": "untrusted-context-to-agent-authority",
+      "relationships": ["threat-a5d0ad1c6a7d81e5"]
+    },
+    {
+      "id": "threat-a5d0ad1c6a7d81e5",
+      "kind": "threat",
+      "label": "context-injection-and-authority-laundering",
+      "relationships": ["mitigation-39b1d514df203ba7"]
+    },
+    {
+      "id": "mitigation-39b1d514df203ba7",
+      "kind": "mitigation",
+      "label": "untrusted-by-default-and-bounded-task-manifest",
+      "relationships": []
+    },
+    {
+      "id": "boundary-31a6cbe7f7a5e8c2",
+      "kind": "boundary",
+      "label": "untrusted-ci-event-to-privileged-execution",
+      "relationships": ["threat-94cb1d4a0f1dc949"]
+    },
+    {
+      "id": "threat-94cb1d4a0f1dc949",
+      "kind": "threat",
+      "label": "ci-confused-deputy-and-host-fallback",
+      "relationships": ["mitigation-2f8d532f0d052f83"]
+    },
+    {
+      "id": "mitigation-2f8d532f0d052f83",
+      "kind": "mitigation",
+      "label": "isolation-validation-and-receipt-bound-fallback",
+      "relationships": []
+    }
+  ],
+  "lifecycle": "approved"
+}
