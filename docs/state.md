@@ -3,12 +3,46 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-07-31
-**Project status:** ACTIVE
-**Current block:** `0.4.7` final release-candidate qualification; implementation
-is complete and publication remains gated on fresh candidate-bound evidence
+**Last updated:** 2026-08-02
+**Project status:** PAUSED on `feat/sprint-nightwing`; the Nightwing design
+intake is prepared, but no PO decision or implementation authority exists yet
+**Current block:** wait for the selected-sandbox Advisor runtime/policy fix;
+after that fix, obtain a fresh RFD-1–RFD-11 Advisor risk review before opening
+the Nightwing PO design gate
 **Repair baseline:** `83640cec22d494d227eebc82929370277ce926b9`
 **Release version:** `0.4.6` released; `0.4.7` final corrective candidate
+
+## 2026-08-02 Nightwing design handover — authoritative for this branch
+
+- The collision-safe Nightwing preparation is committed and remotely read back
+  at `0606f82559e71f1dcd447d6a345b4bcaf3728023` on
+  `feat/sprint-nightwing`. The worktree was clean and synchronized with the
+  remote before this handover-only update.
+- The proposal in `specs/2026-08-02_sprint-nightwing-epic/` classifies
+  RFD-1 through RFD-11 as early-design blocks and records HLD-1 through HLD-3
+  as integration-held boundaries. It remains pre-authority design input.
+- The authorized host-bound Advisor attempt ended with
+  `selected-sandbox-required`, `attempts: []`, no child, no answer, and no
+  diff. Therefore no Advisor recommendation, selected-sandbox execution, OS
+  isolation, model identity, PO approval, or implementation authorization is
+  claimed.
+- **Pause condition:** perform no further Nightwing design decision or
+  implementation while the required Advisor execution lane remains
+  unavailable. The expected prerequisite is the selected-sandbox
+  runtime/policy correction associated with the Nova follow-up.
+- **Mandatory resume order:** (1) start a fresh session with
+  `pipeline-core:pipeline-start`; (2) verify that the Advisor execution-lane
+  fix is present and re-ground Nightwing against the then-current
+  Nova/Cyborg/Phoenix/main heads; (3) run a fresh, evidence-bound Advisor review
+  of RFD-1 through RFD-11 and record its attested outcome; (4) disposition any
+  required reclassification or held-boundary changes in the design package;
+  (5) only then present the resulting Nightwing preparation model at the PO
+  gate. The Advisor step must not be skipped or replaced by a premature PO
+  decision.
+- Re-entry must treat the current public proposal and the local private
+  consultation receipt as evidence, not as approval. If the candidate files or
+  parallel sprint heads changed, regenerate the Advisor evidence digest rather
+  than reusing the prior one.
 
 ## 2026-07-31 PO session authorization — temporary protected-test lifts
 

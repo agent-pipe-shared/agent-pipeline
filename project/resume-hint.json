@@ -1,0 +1,23 @@
+{
+  "schema": "pipeline.resume-hint.v1",
+  "nonAuthoritative": true,
+  "context": {
+    "intent": "Resume Nightwing design intake only after the Advisor execution lane fix is available.",
+    "scope": [
+      "Reground the collision safe RFD design against current sprint heads.",
+      "Obtain a fresh Advisor risk review and disposition its findings.",
+      "Open the PO design gate only after the Advisor review."
+    ],
+    "constraints": [
+      "Keep Nightwing paused until the execution lane fix is present.",
+      "Advisor review must precede the PO gate.",
+      "No implementation mandate exists during the pause."
+    ],
+    "questions": [
+      "Which RFD blocks or held boundaries require reclassification after review?"
+    ]
+  },
+  "createdAt": "2026-08-02T10:00:27.154Z",
+  "basis": null,
+  "contentSha256": "1680bfbfeb049a9926ce557ee92d4816814a784a5e463194a1bba943685ba341"
+}
