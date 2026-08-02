@@ -25,9 +25,9 @@ phases:
     condition: has_ui
 
 # Exactly 2 blocking human gates (dev-plan, push) plus 1 blocking automated gate
-# (security) -- the PO's tuning directive. push carries a standing
-# approval (ADR-0017 precedent: the PO is PO/CEO, not a developer -- pushing main at
-# work-package boundaries is pre-approved, never a per-push live human touch).
+# (security) -- the PO's tuning directive. The final push requires its own
+# candidate- and target-bound detached Human proof; implementation approval
+# never substitutes for that external-effect authorization.
 gates:
   dev-plan:
     mode: blocking
