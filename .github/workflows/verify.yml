@@ -40,6 +40,8 @@ jobs:
         run: node plugins/pipeline-core/scripts/verify-topology-preflight.mjs
       - name: Offline security-evidence conformance
         run: node --import ./harness/scripts/network-lockdown.mjs --test plugins/pipeline-core/lib/security-evidence-evaluator.test.mjs
+      - name: AI-assisted-development conformance
+        run: node --test plugins/pipeline-core/lib/ai-assisted-hardening.test.mjs
       - name: Runner-free offline Core Verify
         env:
           PIPELINE_LIVE_CERTIFICATION: disabled
