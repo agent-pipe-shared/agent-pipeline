@@ -134,11 +134,13 @@ ledger, resolver, v3 plan-approval route, `guard-devplan`, and `guard-push`
 now validate candidate-bound decision references; the latter accepts only a
 separately read immutable consumption receipt, never mutable State alone.
 `H-AC-12` remains open for deploy/release consumers and Git-override
-consumption. The published Cyborg PO-proof contract is the required
-external-attestation input for the final migration; Phoenix must consume that
-contract after integration without treating locally supplied metadata as a
-verified human identity. Git and mutable State remain projections/transport;
-neither is promoted to historical human authority.
+consumption. The Cyborg-compatible detached PO-proof contract is now consumed
+by an explicit externally-attested resolver: it binds the immutable ledger
+grant, exact candidate, and scoped plan/spec artifacts, and verifies only
+against a trust policy resolved outside the candidate. Existing consumers are
+not silently upgraded; until each migration selects that resolver, local ledger
+attribution remains local attribution. Git and mutable State remain
+projections/transport; neither is promoted to historical human authority.
 
 ## #31 — Agent Decision and Assumption Journal
 
