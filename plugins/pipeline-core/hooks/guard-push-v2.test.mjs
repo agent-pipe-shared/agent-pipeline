@@ -214,7 +214,9 @@ function check(id, command, dir, expectExit, { stderrIncludes, stderrNotIncludes
 const BLOCK = 2,
   ALLOW = 0;
 
-const PUSH_CMD = "git push origin main";
+// Exercise the evidence gate without crossing the executor-only main
+// publication boundary introduced by the current branch protection.
+const PUSH_CMD = "git push origin HEAD:refs/heads/fixture";
 
 function manifestPush({ mode = "blocking", approval = "required", security = null }) {
   let y = `schema: pipeline.manifest.v0\ngates:\n  push:\n    mode: ${mode}\n    type: human\n    approval: ${approval}\n`;
