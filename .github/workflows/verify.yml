@@ -38,6 +38,8 @@ jobs:
         run: node plugins/pipeline-core/scripts/verify-topology-preflight.test.mjs && node plugins/pipeline-core/scripts/live-runner-certification.test.mjs
       - name: Typed Git topology preflight
         run: node plugins/pipeline-core/scripts/verify-topology-preflight.mjs
+      - name: Offline security-evidence conformance
+        run: node --import ./harness/scripts/network-lockdown.mjs --test plugins/pipeline-core/lib/security-evidence-evaluator.test.mjs
       - name: Runner-free offline Core Verify
         env:
           PIPELINE_LIVE_CERTIFICATION: disabled
