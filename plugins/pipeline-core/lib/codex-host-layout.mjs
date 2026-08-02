@@ -48,7 +48,6 @@ function hostInitAuthorityPaths(root) {
     "pipeline.user.yaml",
     authority.calibration,
     authority.manifest,
-    ".claude/settings.json",
   ];
 }
 

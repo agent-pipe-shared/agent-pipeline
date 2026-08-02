@@ -47,7 +47,6 @@ function fixture() {
       constraints: [],
     }, null, 2)}\n`,
     ".claude/pipeline.yaml": "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\n",
-    ".claude/settings.json": "{}\n",
   };
   for (const [path, bytes] of Object.entries(files)) writeFileSync(join(root, path), bytes);
   const kickoff = planOnboardingKickoff({

@@ -99,7 +99,6 @@ function requiredPortablePaths(root, read = readFileSync) {
     "pipeline.user.yaml",
     authority.calibration,
     authority.manifest,
-    ".claude/settings.json",
     authority.state,
     "docs/state.md",
     prdPath,
