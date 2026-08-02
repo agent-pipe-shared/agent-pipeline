@@ -6,7 +6,13 @@ function fail(code) { const error = new Error("Governance replay is invalid."); 
 function record(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
 function exact(value, keys) { return record(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key)); }
 
-/** Projects only validated lifecycle envelopes into per-dispatch, non-authoritative timelines. */
+/**
+ * Projects only validated lifecycle envelopes into per-dispatch, non-authoritative timelines.
+ *
+ * Cyborg's future human-authority attestation may be correlated beside a replay
+ * event at a separate, signed authority boundary.  It must never be inferred
+ * from this projection or from an event's displayed status.
+ */
 export function projectGovernanceReplay(events) {
   if (!Array.isArray(events)) fail("GR-INPUT");
   const dispatches = new Map();
@@ -19,7 +25,7 @@ export function projectGovernanceReplay(events) {
     if (payload.candidate.commit !== envelope.candidate?.commit || payload.candidate.tree !== envelope.candidate?.tree) fail("GR-CANDIDATE");
     const key = payload.correlation.dispatchId;
     const timeline = dispatches.get(key) ?? { dispatchId: key, invalidated: false, events: [] };
-    timeline.events.push(Object.freeze({ sequence: envelope.sequence, eventDigest: envelope.eventDigest, occurredAtEpochMs: envelope.occurredAtEpochMs, kind: payload.kind, status: payload.status, reasonCode: payload.reasonCode, candidate: payload.candidate, eventId: payload.eventId }));
+    timeline.events.push(Object.freeze({ sequence: envelope.sequence, eventDigest: envelope.eventDigest, occurredAtEpochMs: envelope.occurredAtEpochMs, kind: payload.kind, status: payload.status, reasonCode: payload.reasonCode, correlation: payload.correlation, candidate: payload.candidate, eventId: payload.eventId, invalidatesEventId: payload.invalidatesEventId, supersedesEventId: payload.supersedesEventId }));
     if (payload.kind === "candidate-invalidation") timeline.invalidated = true;
     dispatches.set(key, timeline);
   }

@@ -953,6 +953,30 @@
       "member": "phoenix-governance-event-store-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:phoenix-governance-replay-cli-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "phoenix-governance-replay-cli-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:phoenix-governance-replay-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "phoenix-governance-replay-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:phoenix-governance-replay-view-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "phoenix-governance-replay-view-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:phoenix-governance-replay-viewer-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "phoenix-governance-replay-viewer-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:phoenix-governance-export-adapter-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1708,6 +1732,10 @@
         "verify-phase:harness/scripts/verify.mjs:phoenix-governance-event-tests",
         "verify-phase:harness/scripts/verify.mjs:phoenix-governance-export-adapter-tests",
         "verify-phase:harness/scripts/verify.mjs:phoenix-governance-export-delivery-tests",
+        "verify-phase:harness/scripts/verify.mjs:phoenix-governance-replay-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:phoenix-governance-replay-tests",
+        "verify-phase:harness/scripts/verify.mjs:phoenix-governance-replay-view-tests",
+        "verify-phase:harness/scripts/verify.mjs:phoenix-governance-replay-viewer-tests",
         "verify-phase:harness/scripts/verify.mjs:phoenix-governance-threat-model-tests",
         "verify-phase:harness/scripts/verify.mjs:phoenix-human-governance-ledger-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-start-preflight-tests",
