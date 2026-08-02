@@ -17,3 +17,9 @@ test("candidate invalidation remains visible and duplicate sequences fail closed
   assert.equal(invalidated[0].status, "invalidated");
   assert.throws(() => projectGovernanceReplay([event(1), event(1)]), (error) => error.code === "GR-SEQUENCE-FORK");
 });
+
+test("replay refuses an uncorrelated candidate change", () => {
+  const changed = { commit: "c".repeat(40), tree: "d".repeat(40) };
+  const second = event(2, { eventId: "event-2", candidate: changed });
+  assert.throws(() => projectGovernanceReplay([event(1), { ...second, candidate: changed }]), (error) => error.code === "GR-CANDIDATE-DRIFT");
+});

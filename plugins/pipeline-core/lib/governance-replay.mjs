@@ -26,6 +26,11 @@ export function projectGovernanceReplay(events) {
   const projected = [...dispatches.values()].map((timeline) => {
     timeline.events.sort((left, right) => left.sequence - right.sequence);
     for (let index = 1; index < timeline.events.length; index += 1) if (timeline.events[index - 1].sequence === timeline.events[index].sequence) fail("GR-SEQUENCE-FORK");
+    for (let index = 1; index < timeline.events.length; index += 1) {
+      const previous = timeline.events[index - 1]; const current = timeline.events[index];
+      const candidateChanged = previous.candidate.commit !== current.candidate.commit || previous.candidate.tree !== current.candidate.tree;
+      if (candidateChanged && current.kind !== "candidate-invalidation") fail("GR-CANDIDATE-DRIFT");
+    }
     return Object.freeze({ schema: "pipeline.governance-replay.v1", authority: "non-authoritative", dispatchId: timeline.dispatchId, status: timeline.invalidated ? "invalidated" : "observed", events: Object.freeze(timeline.events) });
   });
   return Object.freeze(projected.sort((left, right) => left.dispatchId.localeCompare(right.dispatchId)));
