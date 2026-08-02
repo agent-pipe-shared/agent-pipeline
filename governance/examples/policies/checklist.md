@@ -13,11 +13,15 @@
 2. **Threat model current and authority-bound** — for any change altering trust
    boundaries, authentication, or authorization, the checked-in reference model reflects
    the new shape and effective policy revision. The exact delivery candidate is bound by
-   the model snapshot in the detached approval request and its required human/policy
-   proof, which are verified together against the externally configured trust policy.
+   the model snapshot in a detached approval request. Before the final PO decision,
+   the Critic verifies that prepared request and its exact candidate/policy bindings.
+   The push or release gate then requires the matching human/policy proof and verifies
+   it against the externally configured trust policy immediately before the external
+   action.
    This two-part record is necessary because a Git commit cannot truthfully embed its own
    object ID; a reference model alone is never an approval. An accepted-risk or
-   not-applicable decision likewise requires its own detached receipt.
+   not-applicable decision likewise requires its own detached receipt before its
+   protected action can proceed.
 3. **License header present** — every new source file carries the project's required
    license header (or SPDX identifier) per the project's declared license.
 4. **Rollback path documented** — the plan artifact names how this change can be rolled
