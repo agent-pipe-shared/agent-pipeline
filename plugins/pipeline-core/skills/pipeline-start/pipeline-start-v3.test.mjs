@@ -12,6 +12,9 @@ const refs = ["onboarding-recovery.md", "private-overlay.md", "roles.md", "fresh
   .map((name) => readFileSync(join(here, "references", name), "utf8")).join("\n");
 const all = `${core}\n${refs}`;
 assert.ok(Buffer.byteLength(core, "utf8") <= 15_000);
+assert.match(core, /full Elephant bootstrap is session-bound/u);
+assert.match(core, /never for an ordinary task, message, tool result, commit, test,/u);
+assert.match(core, /does not trigger a second full Elephant bootstrap unless a real SessionStart or\n+typed recovery follows/u);
 assert.match(core, /No happy-path reference is mandatory/u);
 assert.match(core, /project-onboarding-v3\.mjs inspect --root "\$PWD" --intent bootstrap/u);
 assert.match(core, /Agent Pipeline start: version/u);

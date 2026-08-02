@@ -8,9 +8,11 @@ argument-hint: "[elephant|goldfish|critic]"
 
 NVA-B60-17 uses `lib/bootstrap-payload-budget.mjs`: the privacy-safe metric is
 `utf8-byte-upper-bound` (one UTF-8 byte is a conservative upper-bound unit, not
-an exact model-token count). Normal bootstrap and Compact re-entry target
-10–15k units and reject an original payload over the hard 15,000-unit maximum.
-Compact preserves the same goal and revision and records its own measurement.
+an exact model-token count). A full Elephant bootstrap is session-bound: run it
+at `startup|resume|clear`, an actual runtime re-entry, or a typed recovery that
+requires it — never for an ordinary task, message, tool result, commit, test,
+PO response, or active-goal continuation in the same ready session. Normal
+bootstrap targets 10–15k units and rejects an original payload over 15,000.
 ## Role and runtime identity
 
 Resolve the plugin root from this skill and run exactly:
@@ -236,8 +238,6 @@ automated evidence failure into an invented PO approval.
 
 ## Compact
 
-Compact re-enters bootstrap, validates the persisted goal/revision and emits a
-bounded machine-readback envelope plus a `pipeline.bootstrap-payload-measurement.v1`
-receipt. `PCR-READY` does not load recovery references. An over-budget original
-payload is surfaced as typed over-budget/truncated while the bounded message
-still preserves feature, phase, revision and resumability facts.
+Compact preserves the active goal/revision and emits bounded re-grounding. It
+does not trigger a second full Elephant bootstrap unless a real SessionStart or
+typed recovery follows; `PCR-READY` loads no recovery references.
