@@ -2,7 +2,7 @@
 
 Status: design audit
 
-Date: 2026-07-26
+Date: 2026-07-26; implementation audit refreshed 2026-08-02
 
 Source: the eight open issues in the public
 [`sprint:phoenix` query](https://github.com/agent-pipe-shared/agent-pipeline/issues?q=is%3Aissue%20state%3Aopen%20label%3Asprint%3Aphoenix),
@@ -129,8 +129,15 @@ never imports the other.
 | 16. Schema/taxonomy/authority/threat/migration/retention/recovery docs exist | `H-AC-14` |
 | 17. Complete decision/failure/privacy fixture set | `H-AC-15` |
 
-Coverage: complete. Git and mutable state remain projections/transport; neither
-is promoted to historical human authority.
+Coverage: **incomplete at the 2026-08-02 implementation audit**. The canonical
+ledger, resolver, and v3 plan-approval route exist, but `H-AC-12` remains open:
+`guard-devplan`, `guard-push`, deploy/release consumers, and Git-override
+consumption do not yet all dual-read and validate a canonical decision ID.
+The published Cyborg PO-proof contract is the required external-attestation
+input for this migration; Phoenix must consume that contract after final
+integration without treating locally supplied metadata as a verified human
+identity. Git and mutable state remain projections/transport; neither is
+promoted to historical human authority.
 
 ## #31 — Agent Decision and Assumption Journal
 
@@ -193,3 +200,9 @@ name a test/Verify step and exact candidate evidence. An issue remains open if
 any mapped criterion is unimplemented, unverified, dependent on unpublished
 sibling work, or deferred without explicit Product Owner disposition,
 owner, and expiry.
+
+Current 2026-08-02 audit result: **Phoenix is not closeable yet**. In addition
+to the open #30 migration above, the bound Spec §7 inventory omits six already
+implemented Phoenix modules and their tests. That inventory correction needs a
+candidate-bound human design decision and sanctioned authority revision; it
+must not be hand-edited as a documentation-only workaround.
