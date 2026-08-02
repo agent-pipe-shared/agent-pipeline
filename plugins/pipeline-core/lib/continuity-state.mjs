@@ -520,7 +520,7 @@ export function applyRunnerNativeContinuation(current, request, activeFeatureId 
   return { ...applied, continuation: structuredClone(request.next.nativeContinuation ?? null) };
 }
 
-function refreshNativeContinuation(current, event, adapterResult) {
+function refreshNativeContinuation(current, event, adapterResult, reasonCode = "active-goal-retained") {
   if (!validateRunnerNativeContinuation(current).ok) return { ok: false, code: "RNC-SCHEMA", continuation: null };
   const request = {
     ok: true,
@@ -539,7 +539,7 @@ function refreshNativeContinuation(current, event, adapterResult) {
     generation: current.generation.number,
     adapterResult,
     observedAt: adapterResult?.readback?.observedAt,
-    reasonCode: "active-goal-retained",
+    reasonCode,
   });
   if (!materialized.ok) return materialized;
   const continuation = materialized.continuation;
@@ -594,11 +594,18 @@ export async function reconcileRunnerNativeContinuation({ continuity, activeFeat
     }
     return { ok: true, code: transition.code, action: "none", expectedRevision: continuity.revision, next: structuredClone(continuity), continuation: structuredClone(current) };
   }
-  const adapterResult = await adapter({ action: "clear", generation: current.generation.number, subject: current.subject, objective: current.objective });
+  if (transition.action === "set") {
+    const adapterResult = await adapter({ action: "set", generation: transition.generation, subject: current.subject, objective: current.objective });
+    const resumed = refreshNativeContinuation(current, event, adapterResult, transition.reasonCode);
+    if (!resumed.ok) return { ok: false, code: resumed.code };
+    const next = structuredClone(continuity); next.revision += 1; next.nativeContinuation = resumed.continuation;
+    return { ok: true, code: transition.code, action: "set", expectedRevision: continuity.revision, next, continuation: next.nativeContinuation };
+  }
+  const adapterResult = await adapter({ action: transition.action, generation: current.generation.number, subject: current.subject, objective: current.objective });
   const terminal = materializeRunnerNativeTerminal({ continuation: current, transition, event, adapterResult });
   if (!terminal.ok) return { ok: false, code: terminal.code };
   const next = structuredClone(continuity); next.revision += 1; next.nativeContinuation = terminal.continuation;
-  return { ok: true, code: terminal.code, action: "clear", expectedRevision: continuity.revision, next, continuation: next.nativeContinuation };
+  return { ok: true, code: terminal.code, action: transition.action, expectedRevision: continuity.revision, next, continuation: next.nativeContinuation };
 }
 
 /**

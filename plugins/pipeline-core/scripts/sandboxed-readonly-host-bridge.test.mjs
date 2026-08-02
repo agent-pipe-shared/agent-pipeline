@@ -13,6 +13,9 @@ import { buildSandboxRequest, createSandboxSelectionStore, sandboxSelectionDiges
 import { executeSandboxedReadonlyDuty, recoverSandboxJournal, runSandboxedReadonlyHostBridge, showSandboxSelection } from "./sandboxed-readonly-host-bridge.mjs";
 import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 
+const CLI_VERSION = "0.146.0";
+const CLI_SHA256 = "d".repeat(64);
+
 // On native Windows a fresh mkdtemp dir inherits SYSTEM/Administrators ACEs, so the
 // sandbox store correctly refuses it as insecure. A real caller supplies a hardened
 // private root; harden every fixture root to match that contract (no-op on POSIX).
@@ -58,17 +61,17 @@ function currentHostEvidence() {
   const { value: policy } = loadCompatibilityPolicy();
   const entry = policy.entries.find((candidate) => candidate.filesystemClass === "wsl-native");
   const receipt = {
-    schema: "pipeline.codex-sandbox-preflight.v1", cli: { version: entry.cliVersion, artifactSha256: entry.releasedArtifactSha256 },
+    schema: "pipeline.codex-sandbox-preflight.v1", cli: { version: CLI_VERSION, artifactSha256: CLI_SHA256 },
     sandboxTransport: { selection: "codex-cli-owned" }, observedHelper: { role: "diagnostic-only", artifactSha256: "1".repeat(64) }, platform: { os: "linux", kernelClass: entry.kernelClass, filesystemClass: entry.filesystemClass },
     profile: { id: entry.permissionProfileId, rawSha256: entry.permissionProfileSha256, compiledStateSha256: "2".repeat(64) }, networkEnabled: true,
     vectors: { allowedRead: true, externalReadDenied: true, sensitiveReadDenied: true, writeDenied: true, scratchWriteAllowed: true, networkDenied: false, childStdioEquivalent: true, stdinEofEquivalent: true, childExitEquivalent: true, appServerInitEquivalent: true, lifecycleComplete: true },
     canaries: { count: 1, manifestSha256: "3".repeat(64), unchanged: true }, eventChainSha256: "4".repeat(64), durationMs: 1, eligibility: "intermediate", terminalCode: "ok",
   };
   return {
-    cliVersion: entry.cliVersion, cliSha256: entry.releasedArtifactSha256, observedHelperSha256: "1".repeat(64), selectionSchemaSha256: SELECTION_SCHEMA_SHA256,
+    cliVersion: CLI_VERSION, cliSha256: CLI_SHA256, observedHelperSha256: "1".repeat(64), selectionSchemaSha256: SELECTION_SCHEMA_SHA256,
     platformClass: "linux-wsl2", kernel: { sysname: "Linux", release: "6", machine: "x86_64" }, filesystemClass: "wsl2-native", bootIdSha256: sha("boot"),
     compatibilityObservation: {
-      runnerId: "codex", cliVersion: entry.cliVersion, releasedArtifactSha256: entry.releasedArtifactSha256, kernelClass: entry.kernelClass, filesystemClass: entry.filesystemClass,
+      runnerId: "codex", cliVersion: CLI_VERSION, releasedArtifactSha256: CLI_SHA256, kernelClass: entry.kernelClass, filesystemClass: entry.filesystemClass,
       permissionProfileId: entry.permissionProfileId, permissionProfileSha256: entry.permissionProfileSha256, bootId: "boot", nowMs: 1_784_563_200_000,
       preflight: { bootId: "boot", observedAtMs: 1_784_563_200_000, rawSha256: sha(Buffer.from(canonicalJson(receipt))), schemaSha256: entry.preflightSchemaSha256, receipt }, runner: null, shadow: null, activation: null, routePostimageSha256: null,
     },

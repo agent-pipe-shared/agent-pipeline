@@ -39,6 +39,7 @@ import { planRunnerProfileMigrationV3 } from "./runner-profile-migration-v3.mjs"
 import { validateV3BootstrapAuthority } from "../scripts/v3-bootstrap-authority.mjs";
 import { parseYaml } from "./yaml-lite.mjs";
 import { validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
+import { validCurrentPlanApproval, validPlanSubmission } from "./plan-spec-state-v2.mjs";
 import { main as onboardingCli } from "../scripts/project-onboarding-v3.mjs";
 import { main as sessionCleanupCli } from "../scripts/session-cleanup.mjs";
 import { run as pipelineStateRun } from "../scripts/pipeline-state.mjs";
@@ -1213,6 +1214,65 @@ test("neutral PO decision apply requires all transactional V4 postimage readback
     assert.equal(Object.values(postimageEvidence.predicates).flat().every((predicate) => predicate.ok), true);
     assert.equal(readFileSync(join(path, planPath), "utf8"), beforePrd);
     assert.notEqual(readFileSync(join(path, "project/pipeline-state.json"), "utf8"), beforeState);
+  } finally { dispose(path); }
+});
+
+test("V4 authority drift reopens the historical approval instead of rebinding it", () => {
+  const path = root();
+  const profile = {
+    schema: "pipeline.po-gate-authority-evidence.v1", humanFacing: "en",
+    sourceSha256: "a".repeat(64), runtimeSha256: "b".repeat(64), receiptSha256: "c".repeat(64), repositoryFingerprint: "d".repeat(64),
+  };
+  const capture = (invoke) => {
+    let stdout = ""; const log = console.log;
+    console.log = (...values) => { stdout += `${values.join(" ")}\n`; };
+    try { return { exit: invoke(), stdout }; } finally { console.log = log; }
+  };
+  try {
+    mkdirSync(join(path, "project"), { recursive: true });
+    const featureDir = join(path, "specs", "v4-drift"); mkdirSync(featureDir, { recursive: true });
+    const planPath = "specs/v4-drift/prd_v4.md"; const specPath = "specs/v4-drift/spec.md";
+    const oldSpecSha = sha256("# prior Spec\n"); writeFileSync(join(path, specPath), "# changed Spec\n");
+    const currentSpecSha = sha256(readFileSync(join(path, specPath)));
+    writeFileSync(join(path, planPath), `<!-- po-language: en -->\n<!-- technical-spec-sha256: ${oldSpecSha} -->\n# V4 PRD\n`);
+    const planSha = sha256(readFileSync(join(path, planPath)));
+    const historicalAuthority = { ...profile, schema: "pipeline.po-gate-authority.v2", planPath, planSha256: planSha, specPath, specSha256: oldSpecSha };
+    const submission = { schema: "pipeline.plan-submission.v1", featureId: "v4-drift", planPath, planSha256: planSha, specPath, specSha256: oldSpecSha, profile: "epic", profileSha256: "e".repeat(64), submittedBy: "Coordinator", submittedAt: "2026-08-02T09:00:00.000Z" };
+    const continuity = { schema: "pipeline.continuity.v0", featureId: "v4-drift", revision: 3, runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator" }, authority: { prd: { path: planPath, sha256: planSha }, spec: { path: specPath, sha256: oldSpecSha }, result: null }, queueHead: { packageId: "v4", actionId: "review", nextAction: "review", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null }, blocker: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" }, recovery: null, decisionTxn: null, capacity: { concurrencyLimit: 4, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" } };
+    const approval = { schema: "pipeline.plan-approval.v4", approvedBy: "PO", approvedAt: "2026-08-02T09:05:00.000Z", submissionSha256: sha256(canonicalJson(submission)), profileSha256: submission.profileSha256, poGateAuthority: historicalAuthority, priorInvalidationSha256: null };
+    assert.equal(validPlanSubmission(submission), true);
+    assert.equal(validCurrentPlanApproval(approval), true);
+    writeFileSync(join(path, "project/pipeline-state.json"), `${JSON.stringify({ schema: "pipeline.state.v0", activeFeature: { id: "v4-drift", planPath, phase: "implementation" }, planApproved: true, planSubmission: submission, planApproval: approval, continuity, updatedAt: "2026-08-02T09:06:00.000Z" }, null, 2)}\n`);
+    const authority = ({ expectedPlanSha256, expectedSpecSha256 }) => expectedSpecSha256 === currentSpecSha
+      ? { ok: true, value: { ...profile, schema: "pipeline.po-gate-authority.v2", planPath, planSha256: expectedPlanSha256, specPath, specSha256: currentSpecSha } }
+      : { ok: false, code: "PO-GATE-AUTHORITY-STALE" };
+    const writerDeps = {
+      dir: path,
+      now: () => "2026-08-02T10:00:00.000Z",
+      ownerNonce: () => "v4-reopen-0001",
+      poGateProfile: () => ({ ok: true, value: profile }),
+      poGateAuthority: authority,
+    };
+    const result = capture(() => pipelineStateRun(["po-authority-decision-plan"], writerDeps));
+    assert.equal(result.exit, 0);
+    const plan = JSON.parse(result.stdout);
+    const selectionAction = plan.selectionActions.find((action) => action.selectedCandidate === "spec");
+    const selection = JSON.parse(capture(() => pipelineStateRun(selectionAction.argv.slice(1), writerDeps)).stdout);
+    const applied = capture(() => pipelineStateRun(selection.applyAction.argv.slice(1), {
+      ...writerDeps,
+      v4Inspection: () => ({ status: "ready", diagnostics: [] }),
+    }));
+    assert.equal(plan.status, "planned"); assert.equal(plan.transition.toPhase, "design");
+    assert.equal(selection.selectedCandidate, "spec");
+    assert.equal(applied.exit, 0, applied.stdout);
+    assert.equal(plan.preimage.planApproval.schema, "pipeline.plan-approval.v4");
+    const state = JSON.parse(readFileSync(join(path, "project/pipeline-state.json"), "utf8"));
+    assert.equal(state.activeFeature.phase, "design");
+    assert.equal(state.planApproved, false);
+    assert.equal(state.planApproval.schema, "pipeline.plan-approval.v4");
+    assert.equal(state.planApproval.poGateAuthority.specSha256, oldSpecSha);
+    assert.equal(state.planInvalidation.reason, "reopen-design");
+    assert.equal(state.continuity.revision, 4);
   } finally { dispose(path); }
 });
 

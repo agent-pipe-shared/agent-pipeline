@@ -22,6 +22,29 @@ await check("matching active goal is read back without a duplicate set", async (
   const result = await reconcileCodexGoal(input, { request: async (method) => { calls.push(method); return { goal: { threadId: "thread-1", objective, status: "active" } }; } });
   assert.equal(result.ok, true); assert.deepEqual(calls, ["thread/goal/get", "thread/goal/get"]);
 });
+await check("a named PO gate pauses only the matching active Goal and reads the pause back", async () => {
+  const calls = []; let goal = { threadId: "thread-1", objective, status: "active" };
+  const result = await reconcileCodexGoal({ ...input, action: "pause" }, { request: async (method, params) => {
+    calls.push([method, params]);
+    if (method === "thread/goal/get") return { goal };
+    assert.equal(method, "thread/goal/set"); assert.equal(params.status, "paused");
+    goal = { threadId: "thread-1", objective, status: "paused" }; return { goal };
+  } });
+  assert.equal(result.ok, true); assert.equal(result.status, "paused");
+  assert.equal(result.readback.status, "paused");
+  assert.deepEqual(calls.map(([method]) => method), ["thread/goal/get", "thread/goal/set", "thread/goal/get"]);
+});
+await check("a recorded PO resolution restores the same paused Goal without replacing it", async () => {
+  const calls = []; let goal = { threadId: "thread-1", objective, status: "paused" };
+  const result = await reconcileCodexGoal(input, { request: async (method, params) => {
+    calls.push([method, params]);
+    if (method === "thread/goal/get") return { goal };
+    assert.equal(method, "thread/goal/set"); assert.equal(params.objective, objective); assert.equal(params.status, "active");
+    goal = { threadId: "thread-1", objective, status: "active" }; return { goal };
+  } });
+  assert.equal(result.ok, true); assert.equal(result.status, "active");
+  assert.deepEqual(calls.map(([method]) => method), ["thread/goal/get", "thread/goal/set", "thread/goal/get"]);
+});
 await check("blocked native goal stops automation and gives an explicit CLI-resume notice", async () => {
   const calls = [];
   const result = await reconcileCodexGoal(input, { request: async (method) => {
@@ -64,6 +87,12 @@ await check("an active user-controlled goal is never overwritten by Pipeline act
   } });
   assert.deepEqual(calls, ["thread/goal/get"]);
   assert.deepEqual(result, { ok: false, code: "CGH-ACTIVE-IDENTITY-MISMATCH", status: "unavailable", readback: null });
+});
+await check("a paused user-controlled goal is never overwritten by Pipeline activation or pause", async () => {
+  for (const action of ["set", "pause"]) {
+    const result = await reconcileCodexGoal({ ...input, action }, { request: async () => ({ goal: { threadId: "thread-1", objective: "User objective", status: "paused" } }) });
+    assert.equal(result.ok, false); assert.equal(result.status, "unavailable");
+  }
 });
 await check("wrong readback never claims protected continuation", async () => {
   let getCount = 0;

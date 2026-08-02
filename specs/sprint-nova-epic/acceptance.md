@@ -122,6 +122,12 @@ No prior gate implies a later gate.
   nonce-bound positive receipt; no-child, wrong child/attempt/profile/
   fingerprint, replay, host-only observation, CAS health or fallback fixtures
   cannot produce `available-attested`.
+- NVA-A29-7: The selected-sandbox policy SHALL select a closed semantic
+  compatibility class, not a fixed Codex CLI version or released-binary hash.
+  The current version and binary hash SHALL instead match a fresh,
+  integrity-bound preflight receipt for the same boot, profile, platform,
+  network and preflight schema. Any missing, stale or mismatched identity or
+  semantic field SHALL fail closed.
 
 ### `#38` Invocation reliability
 
@@ -311,8 +317,10 @@ Nova A is accepted only when:
   bound readback.
 - NVA-B60-5: Session activation, resume and Compact re-entry preserve the same
   goal generation while the bound executable item remains unchanged.
-- NVA-B60-6: A named PO gate pauses or clears native continuation before the
-  prompt and persists `paused-po-gate` with the exact gate binding.
+- NVA-B60-6: A named PO gate pauses native continuation before the prompt,
+  confirms the same Goal's paused identity readback and persists
+  `paused-po-gate` with the exact gate binding; it never maps that gate to a
+  native blocked Goal.
 - NVA-B60-7: Only a recorded PO resolution may restore that paused item; a
   successor generation is never created merely for ordinary autonomous work.
 - NVA-B60-8: A typed blocker is distinct from a PO gate, stops automation and

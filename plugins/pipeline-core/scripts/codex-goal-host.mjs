@@ -7,7 +7,7 @@ import { reconcileRunnerNativeContinuation } from "../lib/continuity-state.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/u;
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
-const ACTIONS = new Set(["set", "clear"]);
+const ACTIONS = new Set(["set", "pause", "clear"]);
 const GOAL_STATES = new Set(["active", "paused", "blocked", "complete"]);
 const APP_SERVER_TIMEOUT_MS = 3_000;
 // Client frames use the bounded 16-bit WebSocket length form; keep the limit
@@ -219,12 +219,22 @@ export async function reconcileCodexGoal(input, { request } = {}) {
       if (object(goal) && goal.threadId === input.threadId && goal.status === "blocked") {
         return unavailable("CGH-BLOCKED-IDENTITY-MISMATCH");
       }
-      if (object(goal) && goal.threadId === input.threadId && goal.status === "active" && !sameNativeGoal(goal, input.threadId, objective)) {
-        return unavailable("CGH-ACTIVE-IDENTITY-MISMATCH");
+      if (object(goal) && goal.threadId === input.threadId && !sameNativeGoal(goal, input.threadId, objective)) {
+        return unavailable(goal.status === "active" ? "CGH-ACTIVE-IDENTITY-MISMATCH" : "CGH-GOAL-IDENTITY-MISMATCH");
       }
       if (!(sameNativeGoal(goal, input.threadId, objective) && goal.status === "active")) {
         const set = await request("thread/goal/set", { threadId: input.threadId, objective, status: "active", tokenBudget: null });
         if (!object(set?.goal)) return unavailable("CGH-SET");
+      }
+    } else if (input.action === "pause") {
+      const current = await request("thread/goal/get", { threadId: input.threadId });
+      const goal = current?.goal ?? null;
+      if (!sameNativeGoal(goal, input.threadId, objective) || !["active", "paused"].includes(goal.status)) {
+        return unavailable("CGH-PAUSE-IDENTITY-MISMATCH");
+      }
+      if (goal.status === "active") {
+        const paused = await request("thread/goal/set", { threadId: input.threadId, objective, status: "paused", tokenBudget: null });
+        if (!object(paused?.goal)) return unavailable("CGH-PAUSE");
       }
     } else {
       const cleared = await request("thread/goal/clear", { threadId: input.threadId });
@@ -235,9 +245,10 @@ export async function reconcileCodexGoal(input, { request } = {}) {
     if (input.action === "clear") {
       return goal === null ? { ok: true, code: "CGH-CLEARED", status: "cleared", readback: { goalIdSha256: null, generation: input.generation, status: "cleared" } } : unavailable("CGH-CLEAR-READBACK");
     }
-    if (!object(goal) || !sameNativeGoal(goal, input.threadId, objective) || goal.status !== "active"
+    const expectedStatus = input.action === "pause" ? "paused" : "active";
+    if (!object(goal) || !sameNativeGoal(goal, input.threadId, objective) || goal.status !== expectedStatus
       || !GOAL_STATES.has(goal.status)) return unavailable("CGH-READBACK");
-    return { ok: true, code: "CGH-ACTIVE", status: "active", readback: { goalIdSha256: hash(`${goal.threadId}\n${goal.objective}`), generation: input.generation, observedAt: new Date().toISOString(), status: "active" } };
+    return { ok: true, code: input.action === "pause" ? "CGH-PAUSED" : "CGH-ACTIVE", status: expectedStatus, readback: { goalIdSha256: hash(`${goal.threadId}\n${goal.objective}`), generation: input.generation, observedAt: new Date().toISOString(), status: expectedStatus } };
   } catch { return unavailable("CGH-TRANSPORT"); }
 }
 

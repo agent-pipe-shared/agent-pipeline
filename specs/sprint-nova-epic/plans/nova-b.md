@@ -44,7 +44,7 @@ watchdog, external supervisor or permission grant.
 4. retain the same goal and generation on resume and compact re-entry while
    the same item remains active; only a recorded PO-gate resolution may create
    its successor;
-5. pause/clear it for a named PO gate, restore it only after recorded gate
+5. pause it for a named PO gate, restore that same native Goal only after recorded gate
    resolution, and honour explicit pause/cancel/replace/redirect first; and
 6. run cross-runner fixtures for premature completion, intermediate questions,
    PO wait/resume, typed blocker, explicit control, compact/resume, read-only

@@ -295,6 +295,8 @@ import {
   sealCurrentPlanApproval,
   sha256CanonicalJson,
   submitPlan,
+  validCurrentPlanApproval,
+  validPlanSubmission,
 } from "../lib/plan-spec-state-v2.mjs";
 import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
 import {
@@ -3614,11 +3616,8 @@ function validPriorAuthority(state, prd, spec) {
   const authority = approval?.poGateAuthority;
   const approvalKeys = ["schema", "approvedBy", "approvedAt", "specBoundBy", "specBoundAt", "poGateAuthority"];
   const authorityKeys = ["schema","humanFacing","sourceSha256","runtimeSha256","receiptSha256","repositoryFingerprint","planPath","planSha256","specPath","specSha256"];
-  if (!exactObjectKeys(approval, approvalKeys) || !exactObjectKeys(authority, authorityKeys)
-    || approval.schema !== "pipeline.plan-approval.v2"
-    || isBlank(approval.approvedBy) || isBlank(approval.specBoundBy)
+  if (!exactObjectKeys(authority, authorityKeys)
     || authority.schema !== "pipeline.po-gate-authority.v2"
-    || !canonicalIso(approval.approvedAt) || !canonicalIso(approval.specBoundAt)
     || authority.planPath !== prd.path || authority.specPath !== spec.path
     || !SHA256_RE.test(authority.planSha256) || !SHA256_RE.test(authority.specSha256)
     || !new Set(["de", "en"]).has(authority.humanFacing)
@@ -3626,6 +3625,17 @@ function validPriorAuthority(state, prd, spec) {
     || !SHA256_RE.test(authority.runtimeSha256)
     || !SHA256_RE.test(authority.receiptSha256)
     || !SHA256_RE.test(authority.repositoryFingerprint)) return null;
+  if (exactObjectKeys(approval, approvalKeys)
+    && approval.schema === "pipeline.plan-approval.v2"
+    && !isBlank(approval.approvedBy) && !isBlank(approval.specBoundBy)
+    && canonicalIso(approval.approvedAt) && canonicalIso(approval.specBoundAt)) return authority;
+  const submission = state?.planSubmission;
+  if (!validCurrentPlanApproval(approval) || !validPlanSubmission(submission)
+    || approval.submissionSha256 !== sha256CanonicalJson(submission)
+    || approval.profileSha256 !== submission.profileSha256
+    || submission.featureId !== state.activeFeature?.id
+    || submission.planPath !== authority.planPath || submission.planSha256 !== authority.planSha256
+    || submission.specPath !== authority.specPath || submission.specSha256 !== authority.specSha256) return null;
   return authority;
 }
 
@@ -3698,10 +3708,17 @@ function buildPoAuthorityRebindPlan(dir, deps, existing, plannedAt = deps.now?.(
   nextContinuity.authority.prd.sha256 = nextPrdSha256;
   nextContinuity.authority.spec.sha256 = spec.sha256;
   if (!validateContinuityState(nextContinuity, state.activeFeature.id).ok) return { ok: false, code: "PO-REBIND-CONTINUITY" };
-  const nextState = structuredClone(state);
+  const v4Approval = state.planApproval?.schema === "pipeline.plan-approval.v4";
+  const reopened = v4Approval
+    ? reopenPlanDesign({ state, expectedStateSha256: sha256CanonicalJson(state), by: "PO", at: plannedAt })
+    : null;
+  if (v4Approval && (!reopened?.ok || reopened.replay)) return { ok: false, code: "PO-DECISION-PRIOR-AUTHORITY" };
+  const nextState = v4Approval ? structuredClone(reopened.state) : structuredClone(state);
   nextState.activeFeature.phase = "design";
-  nextState.planApproval.specBoundAt = plannedAt;
-  nextState.planApproval.poGateAuthority = nextAuthority;
+  if (!v4Approval) {
+    nextState.planApproval.specBoundAt = plannedAt;
+    nextState.planApproval.poGateAuthority = nextAuthority;
+  }
   nextState.continuity = nextContinuity;
   nextState.updatedAt = plannedAt;
   if (nextState.gateEstimate !== undefined) return { ok: false, code: "PO-REBIND-STATE" };
@@ -3737,6 +3754,7 @@ function buildPoAuthorityDecisionPlan(dir, deps, existing, plannedAt = deps.now?
   const stateFile = physicalRebindFile(dir, stateRelativePath(dir));
   if (prd === null) return { ok: false, code: "PO-DECISION-PRD-IDENTITY" };
   if (stateFile === null || stateFile.sha256 !== sha256Bytes(existing.raw)) return { ok: false, code: "PO-DECISION-STATE-IDENTITY" };
+  const stateSha256 = sha256Bytes(existing.raw);
   const specPath = `${dirname(state.activeFeature.planPath).split(sep).join("/")}/spec.md`;
   const spec = physicalRebindFile(dir, specPath);
   if (spec === null) return { ok: false, code: "PO-DECISION-SPEC-IDENTITY" };
@@ -3785,14 +3803,20 @@ function buildPoAuthorityDecisionPlan(dir, deps, existing, plannedAt = deps.now?
   nextContinuity.authority.prd.sha256 = nextPrdSha256;
   nextContinuity.authority.spec.sha256 = spec.sha256;
   if (!validateContinuityState(nextContinuity, state.activeFeature.id).ok) return { ok: false, code: "PO-DECISION-CONTINUITY" };
-  const nextState = structuredClone(state);
+  const v4Approval = state.planApproval?.schema === "pipeline.plan-approval.v4";
+  const reopened = v4Approval
+    ? reopenPlanDesign({ state, expectedStateSha256: sha256CanonicalJson(state), by: "PO", at: plannedAt })
+    : null;
+  if (v4Approval && (!reopened?.ok || reopened.replay)) return { ok: false, code: "PO-DECISION-PRIOR-AUTHORITY" };
+  const nextState = v4Approval ? structuredClone(reopened.state) : structuredClone(state);
   nextState.activeFeature.phase = "design";
-  nextState.planApproval.specBoundAt = plannedAt;
-  nextState.planApproval.poGateAuthority = nextAuthority;
+  if (!v4Approval) {
+    nextState.planApproval.specBoundAt = plannedAt;
+    nextState.planApproval.poGateAuthority = nextAuthority;
+  }
   nextState.continuity = nextContinuity;
   nextState.updatedAt = plannedAt;
   if (nextState.gateEstimate !== undefined) return { ok: false, code: "PO-DECISION-STATE" };
-  const stateSha256 = sha256Bytes(existing.raw);
   const basePayload = {
     schema: PO_DECISION_PLAN_SCHEMA,
     status: "planned",

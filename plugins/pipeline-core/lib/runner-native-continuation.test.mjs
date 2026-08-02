@@ -73,7 +73,7 @@ check("cross-runner conformance fixture executes each bounded lifecycle disposit
     const paused = entry.initialStatus === "paused-po-gate";
     const source = record({
       runner: { runnerId, adapterVersion: "v1", capability: "available" },
-      ...(paused ? { status: "paused-po-gate", terminal: { kind: "named-po-gate", atRevision: 4 }, readback: { goalIdSha256: null, generation: 1, status: "cleared" } } : {}),
+      ...(paused ? { status: "paused-po-gate", terminal: { kind: "named-po-gate", atRevision: 4 }, readback: { goalIdSha256: D, generation: 1, observedAt: "2026-07-25T00:00:00.000Z", status: "paused" } } : {}),
       ...(entry.event === "verified-completion" ? { acceptance: [{ criterionId: "goal-readback", status: "passed", evidenceSha256: D }] } : {}),
     });
     if (entry.event === "additive-question") {
@@ -106,10 +106,10 @@ check("progress is projected from state and evidence without a diff requirement"
   assert.equal(progress.progress.find(({ kind }) => kind === "dispatch").status, "unknown");
   assert.equal(progress.progress.some(({ kind }) => kind === "diff"), false);
 });
-check("resume creates a fresh generation", () => {
-  const paused = record({ status: "paused-po-gate", terminal: { kind: "named-po-gate", atRevision: 4 }, readback: { goalIdSha256: null, generation: 1, status: "cleared" } });
+check("PO resolution restores the paused native Goal without advancing its generation", () => {
+  const paused = record({ status: "paused-po-gate", terminal: { kind: "named-po-gate", atRevision: 4 }, readback: { goalIdSha256: D, generation: 1, observedAt: "2026-07-25T00:00:00.000Z", status: "paused" } });
   paused.recordSha256 = computeRunnerNativeContinuationDigest(paused);
-  assert.deepEqual(planNativeGoalTransition({ continuation: paused, event: { kind: "po-gate-resolved", atRevision: 5 } }), { ok: true, code: "RNC-SET", action: "set", state: "active", terminal: "none", reasonCode: "po-gate-resolved", generation: 2 });
+  assert.deepEqual(planNativeGoalTransition({ continuation: paused, event: { kind: "po-gate-resolved", atRevision: 5 } }), { ok: true, code: "RNC-SET", action: "set", state: "active", terminal: "none", reasonCode: "po-gate-resolved", generation: 1 });
 });
 check("active resume and compact retain one native goal generation", () => {
   const active = record();
@@ -118,7 +118,7 @@ check("active resume and compact retain one native goal generation", () => {
   }
 });
 check("PO resolution must strictly follow the recorded named gate", () => {
-  const paused = record({ status: "paused-po-gate", terminal: { kind: "named-po-gate", atRevision: 4 }, readback: { goalIdSha256: null, generation: 1, status: "cleared" } }); paused.recordSha256 = computeRunnerNativeContinuationDigest(paused);
+  const paused = record({ status: "paused-po-gate", terminal: { kind: "named-po-gate", atRevision: 4 }, readback: { goalIdSha256: D, generation: 1, observedAt: "2026-07-25T00:00:00.000Z", status: "paused" } }); paused.recordSha256 = computeRunnerNativeContinuationDigest(paused);
   for (const atRevision of [3, 4]) assert.equal(planNativeGoalTransition({ continuation: paused, event: { kind: "po-gate-resolved", atRevision } }).action, "none");
   assert.equal(planNativeGoalTransition({ continuation: paused, event: { kind: "po-gate-resolved", atRevision: 5 } }).action, "set");
 });
@@ -133,7 +133,7 @@ check("only an active item or a resolved PO gate may establish a successor goal"
     terminalRecord.recordSha256 = computeRunnerNativeContinuationDigest(terminalRecord);
     for (const kind of ["resume", "compact-reentry", "po-gate-resolved"]) assert.equal(planNativeGoalTransition({ continuation: terminalRecord, event: { kind, atRevision: 5 } }).action, "none");
   }
-  const paused = record({ status: "paused-po-gate", terminal: { kind: "named-po-gate", atRevision: 4 }, readback: { goalIdSha256: null, generation: 1, status: "cleared" } }); paused.recordSha256 = computeRunnerNativeContinuationDigest(paused);
+  const paused = record({ status: "paused-po-gate", terminal: { kind: "named-po-gate", atRevision: 4 }, readback: { goalIdSha256: D, generation: 1, observedAt: "2026-07-25T00:00:00.000Z", status: "paused" } }); paused.recordSha256 = computeRunnerNativeContinuationDigest(paused);
   assert.equal(planNativeGoalTransition({ continuation: paused, event: { kind: "resume", atRevision: 5 } }).action, "none");
   assert.equal(planNativeGoalTransition({ continuation: paused, event: { kind: "po-gate-resolved", atRevision: 5 } }).action, "set");
 });
@@ -160,13 +160,21 @@ check("schema and runtime both reject an active record with a cleared readback",
   const active = schema.allOf.find((entry) => entry.if?.properties?.status?.const === "active");
   assert.equal(active.then.properties.readback.allOf[1].properties.status.const, "active");
 });
-for (const [event, state, terminal] of [["po-gate", "paused-po-gate", "named-po-gate"], ["typed-blocker", "blocked", "typed-blocker"], ["verified-completion", "achieved", "verified-completion"], ["explicit-control", "cleared", "explicit-control-change"]]) {
-  check(`${event} clears rather than continues`, () => {
+for (const [event, state, terminal, action, code] of [["po-gate", "paused-po-gate", "named-po-gate", "pause", "RNC-PAUSE"], ["typed-blocker", "blocked", "typed-blocker", "clear", "RNC-CLEAR"], ["verified-completion", "achieved", "verified-completion", "clear", "RNC-CLEAR"], ["explicit-control", "cleared", "explicit-control-change", "clear", "RNC-CLEAR"]]) {
+  check(`${event} transitions with the required native-goal action`, () => {
     const source = event === "verified-completion" ? record({ acceptance: [{ criterionId: "goal-readback", status: "passed", evidenceSha256: D }] }) : record();
     const result = planNativeGoalTransition({ continuation: source, event: { kind: event, atRevision: 4, evidenceSha256: D } });
-    assert.deepEqual(result, { ok: true, code: "RNC-CLEAR", action: "clear", state, terminal, reasonCode: event, generation: 1 });
+    assert.deepEqual(result, { ok: true, code, action, state, terminal, reasonCode: event, generation: 1 });
   });
 }
+check("a named PO gate persists a matching paused readback and retains runner capability", () => {
+  const source = record();
+  const transition = planNativeGoalTransition({ continuation: source, event: { kind: "po-gate", atRevision: 4, evidenceSha256: D } });
+  const paused = materializeRunnerNativeTerminal({ continuation: source, transition, event: { kind: "po-gate", atRevision: 4, evidenceSha256: D }, adapterResult: { ok: true, status: "paused", readback: { goalIdSha256: D, generation: 1, observedAt: "2026-07-25T00:00:00.000Z", status: "paused" } } });
+  assert.equal(paused.ok, true); assert.equal(paused.continuation.status, "paused-po-gate");
+  assert.equal(paused.continuation.runner.capability, "available");
+  assert.equal(paused.continuation.readback.status, "paused");
+});
 check("terminal clear is evidence-bound and failed clear is typed unavailable", () => {
   const source = record({ acceptance: [{ criterionId: "goal-readback", status: "passed", evidenceSha256: D }] });
   const transition = planNativeGoalTransition({ continuation: source, event: { kind: "verified-completion", atRevision: 4, evidenceSha256: D } });

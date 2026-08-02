@@ -188,7 +188,7 @@ export function validateCodexSandboxState(state) {
     || !new Set(["restricted", "enabled"]).has(state.permissionProfile.network)
     || !Array.isArray(state.permissionProfile.file_system.entries) || state.permissionProfile.file_system.entries.length < 1
     || typeof state.sandboxCwd !== "string" || !state.sandboxCwd.startsWith("file://")
-    || state.useLegacyLandlock !== false) fail("profile-error", "Codex sandbox state is not the closed 0.144.6 interface");
+    || state.useLegacyLandlock !== false) fail("profile-error", "Codex sandbox state is not the closed semantic v1 interface");
   for (const entry of state.permissionProfile.file_system.entries) {
     exactKeys(entry, ["path", "access"], "Codex filesystem entry");
     if (!new Set(["read", "write", "deny"]).has(entry.access) || !entry.path || typeof entry.path !== "object") fail("profile-error", "Codex filesystem entry is invalid");

@@ -83,7 +83,10 @@ transition path and byte-bound parallel-runner snapshot.
 **Issues:** `#7`, `#29`
 
 **Outcome:** one runner-capability report contract and one fingerprinted,
-no-repeat selected-sandbox disposition used by deterministic fixtures.
+no-repeat selected-sandbox disposition used by deterministic fixtures. The
+closed compatibility policy is semantic-class based; volatile Codex version
+and binary identities are accepted only from the same fresh, integrity-bound
+preflight receipt and are never static policy pins.
 
 **Order:**
 

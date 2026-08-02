@@ -475,6 +475,18 @@ report projects only validated cells into it at integration.
 - state, failure class, observation receipt digest and expiry policy; and
 - requested versus observed assurance.
 
+The closed sandbox-compatibility policy selects a named semantic class
+(`codex-sandbox-state-v1`) from runner, kernel, filesystem, profile,
+profile-digest, network and preflight-schema facts. It deliberately does not
+pin a Codex CLI version or released-binary hash: those are volatile toolchain
+identities. A current version and binary hash are accepted only when the same
+fresh, raw-digest-bound preflight receipt attests both values together with the
+selected semantic class. A missing, stale, foreign-boot, malformed or
+mismatched receipt remains `diagnostic-only` or requires a fresh preflight;
+it cannot yield `available-attested`. Thus an upgrade with unchanged observed
+sandbox semantics remains usable, while any semantic or identity drift stays
+fail-closed.
+
 States are:
 
 ```text
@@ -865,9 +877,10 @@ The lifecycle is `active`, `paused-po-gate`, `blocked`, `achieved`, `cleared`,
 `unavailable` or `failed`. Only `verified-completion`, `named-po-gate`,
 `typed-blocker` and `explicit-control-change` are terminal reasons. While
 `active`, an informational question, clarification or observation is recorded
-as additive input and the exact current action continues. A PO gate clears or
-pauses the native goal before the prompt and may reactivate only from a
-recorded resolution. Pause, cancel, replacement and redirect always win over
+as additive input and the exact current action continues. A named PO gate
+pauses the native goal before the prompt, persists a matching paused identity
+readback and never reports a native `blocked` state. Only a recorded PO
+decision may restore that same native goal. Pause, cancel, replacement and redirect always win over
 automatic continuation.
 
 Each runner adapter must activate/update one native goal, obtain a fresh

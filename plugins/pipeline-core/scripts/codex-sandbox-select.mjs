@@ -208,7 +208,7 @@ function defaultCompatibilityProjection(observed) {
   const actual = toolchain(observed);
   const actualHost = host(observed);
   const preflightReceipt = observed.compatibilityObservation.preflight?.receipt;
-  if (actual.cliVersion !== entry.cliVersion || actual.cliSha256 !== entry.releasedArtifactSha256
+  if (actual.cliVersion !== preflightReceipt?.cli?.version || actual.cliSha256 !== preflightReceipt?.cli?.artifactSha256
     || actual.selectionSchemaSha256 !== SELECTION_SCHEMA_SHA256 || actual.observedHelperSha256 !== preflightReceipt?.observedHelper?.artifactSha256
     || actualHost.platformClass !== "linux-wsl2" || actualHost.filesystemClass !== expectedFilesystem
     || actualHost.bootIdSha256 !== sha256(String(observed.compatibilityObservation.bootId))) {

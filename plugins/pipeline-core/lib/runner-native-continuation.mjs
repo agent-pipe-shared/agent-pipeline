@@ -3,7 +3,7 @@
  * Closed, provider-neutral continuation record and transition planner.
  *
  * This module is deliberately pure: adapters own their runner transport, while
- * this contract decides whether a native goal may be set, cleared or reported
+ * this contract decides whether a native goal may be set, paused, cleared or reported
  * unavailable. Nothing here starts a process, changes permissions or stores a
  * prompt.
  */
@@ -16,10 +16,10 @@ export const CONTINUATION_STATES = Object.freeze([
 export const CONTINUATION_TERMINALS = Object.freeze([
   "none", "verified-completion", "named-po-gate", "typed-blocker", "explicit-control-change", "unavailable", "failed",
 ]);
-export const NATIVE_GOAL_ACTIONS = Object.freeze(["set", "clear", "none"]);
+export const NATIVE_GOAL_ACTIONS = Object.freeze(["set", "pause", "clear", "none"]);
 export const RUNNER_NATIVE_CONTINUATION_CODES = Object.freeze([
   "RNC-VALID", "RNC-SCHEMA", "RNC-TERMINAL", "RNC-GENERATION", "RNC-READBACK",
-  "RNC-EVENT", "RNC-TRANSITION", "RNC-SET", "RNC-CLEAR", "RNC-NOOP", "RNC-INPUT", "RNC-PROGRESS",
+  "RNC-EVENT", "RNC-TRANSITION", "RNC-SET", "RNC-PAUSE", "RNC-CLEAR", "RNC-NOOP", "RNC-INPUT", "RNC-PROGRESS",
   "RNC-REFRESH",
   "RNC-CONTROLLER-INPUT", "RNC-CONTROLLER-FEATURE", "RNC-CONTROLLER-EVENT", "RNC-CONTROLLER-STATE",
   "RNC-CODEX-HOST", "RNC-CLAUDE-HOST", "RNC-CLAUDE-OBJECTIVE",
@@ -95,6 +95,10 @@ function validReadback(value, generation, active, status) {
   if (status === "blocked") {
     return exact(value, READBACK) && digest(value.goalIdSha256) && value.generation === generation.number
       && typeof value.observedAt === "string" && ISO.test(value.observedAt) && value.status === "blocked";
+  }
+  if (status === "paused-po-gate") {
+    return exact(value, READBACK) && digest(value.goalIdSha256) && value.generation === generation.number
+      && typeof value.observedAt === "string" && ISO.test(value.observedAt) && value.status === "paused";
   }
   return exact(value, new Set(["goalIdSha256", "generation", "status"]))
     && value.goalIdSha256 === null && value.generation === generation.number && value.status === "cleared";
@@ -244,13 +248,13 @@ export function recordRunnerNativeAdditiveInput({ continuation, input }) {
 }
 
 /**
- * Materialize a cleared terminal only after the adapter has confirmed it.
- * A failed clear becomes typed unavailable evidence rather than a false claim
- * that continuation was safely stopped.
+ * Materialize a paused or cleared terminal only after the adapter confirms the
+ * exact state. A failed operation becomes typed unavailable evidence rather
+ * than a false claim about the native Goal.
  */
 export function materializeRunnerNativeTerminal({ continuation, transition, event, adapterResult }) {
   const checked = validateRunnerNativeContinuation(continuation);
-  if (!checked.ok || !object(transition) || transition.action !== "clear" || !terminalEvent(event)
+  if (!checked.ok || !object(transition) || !["pause", "clear"].includes(transition.action) || !terminalEvent(event)
     || event.atRevision < continuation.subject.queueRevision || !object(adapterResult)) {
     return { ok: false, code: "RNC-SCHEMA", continuation: null };
   }
@@ -261,8 +265,14 @@ export function materializeRunnerNativeTerminal({ continuation, transition, even
     && exact(adapterResult.readback, new Set(["goalIdSha256", "generation", "status"]))
     && adapterResult.readback.goalIdSha256 === null && adapterResult.readback.generation === continuation.generation.number
     && adapterResult.readback.status === "cleared";
+  const paused = adapterResult.ok === true && adapterResult.status === "paused"
+    && exact(adapterResult.readback, READBACK) && digest(adapterResult.readback.goalIdSha256)
+    && adapterResult.readback.generation === continuation.generation.number
+    && typeof adapterResult.readback.observedAt === "string" && ISO.test(adapterResult.readback.observedAt)
+    && adapterResult.readback.status === "paused";
+  const confirmed = transition.action === "pause" ? paused : cleared;
   const next = structuredClone(continuation);
-  if (cleared) {
+  if (confirmed) {
     next.status = transition.state;
     next.terminal = { kind: transition.terminal, atRevision: event.atRevision };
     next.readback = { ...adapterResult.readback };
@@ -276,12 +286,12 @@ export function materializeRunnerNativeTerminal({ continuation, transition, even
   }
   next.recordSha256 = computeRunnerNativeContinuationDigest(next);
   return validateRunnerNativeContinuation(next).ok
-    ? { ok: true, code: cleared ? "RNC-CLEAR" : "RNC-VALID", continuation: next }
+    ? { ok: true, code: confirmed ? (transition.action === "pause" ? "RNC-PAUSE" : "RNC-CLEAR") : "RNC-VALID", continuation: next }
     : { ok: false, code: "RNC-SCHEMA", continuation: null };
 }
 
 function decision(action, state, terminal, reasonCode, generation) {
-  return { ok: true, code: action === "set" ? "RNC-SET" : action === "clear" ? "RNC-CLEAR" : "RNC-NOOP", action, state, terminal, reasonCode, generation };
+  return { ok: true, code: action === "set" ? "RNC-SET" : action === "pause" ? "RNC-PAUSE" : action === "clear" ? "RNC-CLEAR" : "RNC-NOOP", action, state, terminal, reasonCode, generation };
 }
 
 /**
@@ -298,13 +308,13 @@ export function planNativeGoalTransition({ continuation, event }) {
   if (event.kind === "po-gate-resolved") {
     if (continuation.status !== "paused-po-gate" || event.atRevision <= continuation.terminal.atRevision) return decision("none", continuation.status, continuation.terminal.kind, "po-gate-not-pending", continuation.generation.number);
     if (continuation.runner.capability !== "available") return decision("none", "unavailable", "unavailable", "capability-unavailable", continuation.generation.number);
-    return decision("set", "active", "none", event.kind, continuation.generation.number + 1);
+    return decision("set", "active", "none", event.kind, continuation.generation.number);
   }
   if (["activate", "resume", "compact-reentry"].includes(event.kind)) {
     if (continuation.status !== "active") return decision("none", continuation.status, continuation.terminal.kind, "not-active", continuation.generation.number);
     if (continuation.runner.capability !== "available") return decision("none", "unavailable", "unavailable", "capability-unavailable", continuation.generation.number);
     // An active native goal spans ordinary resumes and compaction.  Only a
-    // named PO gate clears it and its recorded resolution creates a successor.
+    // named PO gate pauses it and its recorded resolution restores that same Goal.
     return decision("none", "active", "none", "active-goal-retained", continuation.generation.number);
   }
   if (continuation.status !== "active") return decision("none", continuation.status, continuation.terminal.kind, "terminal-or-paused", continuation.generation.number);
@@ -317,5 +327,5 @@ export function planNativeGoalTransition({ continuation, event }) {
     "activation-failed": ["failed", "failed"],
   }[event.kind];
   if (!mapping) return { ok: false, code: "RNC-TRANSITION", action: "none" };
-  return decision("clear", mapping[0], mapping[1], event.kind, continuation.generation.number);
+  return decision(event.kind === "po-gate" ? "pause" : "clear", mapping[0], mapping[1], event.kind, continuation.generation.number);
 }

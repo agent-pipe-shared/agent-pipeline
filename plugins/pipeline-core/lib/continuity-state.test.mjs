@@ -1342,6 +1342,7 @@ function nativeAdapter(calls) {
   return async ({ action, generation }) => {
     calls.push({ action, generation });
     if (action === "clear") return { ok: true, code: "CGH-CLEARED", status: "cleared", readback: { goalIdSha256: null, generation, status: "cleared" } };
+    if (action === "pause") return { ok: true, code: "CGH-PAUSED", status: "paused", readback: { goalIdSha256: D, generation, observedAt: NATIVE_NOW, status: "paused" } };
     return { ok: true, code: "CGH-ACTIVE", status: "active", readback: { goalIdSha256: D, generation, observedAt: NATIVE_NOW, status: "active" } };
   };
 }
@@ -1375,6 +1376,17 @@ await asyncCheck("resume refreshes the active native-goal readback without advan
   assert.equal(resumed.next.nativeContinuation.status, "active");
   assert.equal(resumed.next.nativeContinuation.generation.number, 0);
   assert.equal(resumed.next.nativeContinuation.readback.observedAt, NATIVE_NOW);
+});
+
+await asyncCheck("a recorded PO decision resumes the same native Goal after an exact paused readback", async () => {
+  const calls = [];
+  const activated = await reconcileRunnerNativeContinuation({ continuity: nativeState(), activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "activate", atRevision: 3 }, adapter: nativeAdapter(calls) });
+  const paused = await reconcileRunnerNativeContinuation({ continuity: activated.next, activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "po-gate", atRevision: 4, evidenceSha256: D }, adapter: nativeAdapter(calls) });
+  assert.equal(paused.action, "pause"); assert.equal(paused.continuation.status, "paused-po-gate");
+  const resumed = await reconcileRunnerNativeContinuation({ continuity: paused.next, activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "po-gate-resolved", atRevision: 5 }, adapter: nativeAdapter(calls) });
+  assert.equal(resumed.action, "set"); assert.equal(resumed.continuation.status, "active");
+  assert.equal(resumed.continuation.generation.number, paused.continuation.generation.number);
+  assert.deepEqual(calls, [{ action: "set", generation: 0 }, { action: "pause", generation: 0 }, { action: "set", generation: 0 }]);
 });
 
 await asyncCheck("resume degrades stale active-goal identity instead of trusting it or overwriting user control", async () => {
