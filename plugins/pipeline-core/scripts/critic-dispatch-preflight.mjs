@@ -107,9 +107,11 @@ function localEvidence(root, path) {
 function matchingCandidateEvidence(bytes, candidateCommit, candidateTree, path) {
   let value;
   try { value = JSON.parse(bytes); } catch { fail("CDP-EVIDENCE-JSON", `Evidence is not JSON: ${path}`); }
-  if (!isObject(value) || !isObject(value.candidate)
-    || Object.keys(value.candidate).length !== 2
-    || value.candidate.commit !== candidateCommit || value.candidate.tree !== candidateTree) {
+  // Verify evidence uses the candidate at its root, whereas Security and gate
+  // evidence nest it below `candidate` with additional observation metadata.
+  // Both forms are valid only when they bind this exact frozen commit/tree.
+  const binding = isObject(value?.candidate) ? value.candidate : value;
+  if (!isObject(binding) || binding.commit !== candidateCommit || binding.tree !== candidateTree) {
     fail("CDP-EVIDENCE-BINDING", `Evidence is missing or stale for the exact candidate: ${path}`);
   }
   return { path, sha256: sha256(bytes), candidate: { commit: candidateCommit, tree: candidateTree } };

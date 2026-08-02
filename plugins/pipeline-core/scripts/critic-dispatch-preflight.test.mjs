@@ -32,6 +32,7 @@ function fixture() {
   const candidate = commit(root, "candidate");
   const tree = git(root, ["rev-parse", "HEAD^{tree}"]);
   writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify({ candidate: { commit: candidate, tree } })}\n`);
+  writeFileSync(join(root, "evidence", "verify-root.json"), `${JSON.stringify({ commit: candidate, tree })}\n`);
   writeFileSync(join(root, "evidence", "prior-critic.json"), `${JSON.stringify({ candidate: { commit: base, tree: git(root, ["rev-parse", `${base}^{tree}`]) } })}\n`);
   return { root, base, candidate, tree };
 }
@@ -68,4 +69,10 @@ test("rejects missing candidate-bound evidence, missing governance, and prior-ev
   assert.throws(() => preflightCriticDispatch(input(fx)), (error) => error instanceof CriticDispatchPreflightError && error.code === "CDP-EVIDENCE-BINDING");
   assert.throws(() => preflightCriticDispatch(input(fx, { priorCriticEvidencePath: "evidence/verify.json" })), (error) => error instanceof CriticDispatchPreflightError && error.code === "CDP-PRIOR-ALIASED");
   assert.throws(() => preflightCriticDispatch(input(fx, { guardrailPaths: ["governance/policies/missing.md"] })), (error) => error instanceof CriticDispatchPreflightError && error.code === "CDP-CANDIDATE-PATH");
+});
+
+test("accepts the root candidate binding used by canonical Verify evidence", () => {
+  const fx = fixture();
+  const result = preflightCriticDispatch(input(fx, { evidencePaths: ["evidence/verify-root.json"] }));
+  assert.equal(result.evidence[0].candidate.tree, fx.tree);
 });
