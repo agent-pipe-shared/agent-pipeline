@@ -185,3 +185,29 @@ Issue #3 is intentionally split into an early navigation/contract skeleton and
 a late evidence-backed content completion. Issue #67 is intentionally split
 into entry and exit gates. Each issue still has one owner and one final close
 decision.
+
+## DI-11 — Collision-safe early design
+
+The PO requested an explicit preparation track for Nightwing work that can be
+designed before the prerequisite sprints merge because it has no semantic
+overlap, or only a narrow consumer dependency, with Nova, Cyborg, and Phoenix.
+
+The classification is made at **issue-slice level**, never by declaring a whole
+issue independent merely because one part of it is. Early design may define:
+
+- Nightwing-owned domain vocabulary, user journeys, decision tables, and
+  failure semantics;
+- privacy and threat boundaries that constrain any later implementation;
+- black-box acceptance scenarios and synthetic, provider-neutral test vectors;
+- capability-shaped consumer expectations without choosing an upstream schema,
+  writer, file path, command name, or receipt format.
+
+Early design may not implement shared behavior, bind speculative upstream
+identifiers, create compatibility forks, freeze evidence-backed product claims,
+or bypass the #67 contract-revalidation gate. Every early block must name both
+its collision-safe output and the integration-held surface that remains open.
+
+In this context, `risk-free` means **collision-safe within the declared design
+boundary**. It does not mean exempt from later review: every block is compared
+with the accepted integrated contracts before it can receive implementation
+authority.

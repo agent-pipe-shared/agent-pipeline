@@ -50,6 +50,7 @@ portfolio without erasing provenance or inventing parallel contracts.
 | Measure | Target |
 | --- | --- |
 | Issue coverage | 23/23 open Nightwing issues mapped to a package and acceptance evidence |
+| Design-ahead safety | Every early design slice names its allowed output, integration-held surface, upstream dependencies, and revalidation evidence |
 | Integration provenance | Exact accepted Nova, Cyborg, and Phoenix commits/trees recorded before feature implementation |
 | First value | Median documented fresh-user path to a verified sample is no more than 10 minutes on the supported matrix |
 | Configuration safety | 100% of declared user-mutable fields use one schema, validator, transaction, provenance readback, and rollback contract |
@@ -225,6 +226,35 @@ Acceptance:
 | Phoenix | Evidence viewer, policy packs, events/replay, external traceability, human ledger, agent journal, exports | Second evidence identity, policy hierarchy, human-approval store, or event schema |
 | Nightwing | UX transactions, onboarding, distribution, human-readable trust and docs, lifecycle amendments | Changes to upstream ownership merely to simplify presentation |
 
+## Early-design safety contract
+
+Nightwing SHALL classify pre-integration work at issue-slice granularity:
+
+- `green-design-now`: Nightwing owns the semantics and the output has no
+  physical or authority binding to a moving upstream contract;
+- `amber-envelope-only`: Nightwing may define consumer-visible behavior,
+  failure handling, and black-box acceptance, while upstream identifiers and
+  implementation remain unresolved;
+- `integration-held`: the work needs an accepted upstream schema, writer,
+  evidence primitive, topology, or candidate and therefore waits for #67.
+
+The classification grants design authority only. It never authorizes shared
+implementation. A green or amber slice SHALL declare its upstream assumptions,
+allowed artifact, forbidden binding, synthetic acceptance evidence, and the
+exact contract evidence required at revalidation. No whole issue becomes green
+merely because one slice is independently designable.
+
+Acceptance:
+
+- Every early block has one explicit collision-safe deliverable and one
+  integration-held boundary.
+- Early artifacts use capability roles and logical fields, not speculative
+  upstream schema names, writers, file locations, or command surfaces.
+- A changed upstream contract can invalidate only the declared seam; hidden
+  dependencies or locally forked compatibility behavior fail the block.
+- All early blocks return through the #67 contract-revalidation gate before
+  implementation or final product claims.
+
 ## User flow
 
 ```mermaid
@@ -253,22 +283,25 @@ branches; no unclosed subgraph or unsupported syntax is used.
 1. **Design-only preparation:** commit the Nightwing authority package and the
    sanctioned retirement of obsolete duplicate lifecycle state. Do not change
    shared implementation surfaces.
-2. **Rebase readiness:** after all prerequisite sprints merge, record exact
+2. **Collision-safe design wave:** complete the green design blocks and the
+   bounded consumer envelopes defined in the Spec. Keep every upstream-owned
+   identifier and all implementation explicitly unresolved.
+3. **Rebase readiness:** after all prerequisite sprints merge, record exact
    accepted commits/trees and regenerate the shared-contract inventory.
-3. **NW-0 entry gate:** assemble and qualify the integrated baseline (#67).
-4. **Contract-revalidation gate:** bind every Nightwing seam to the accepted
+4. **NW-0 entry gate:** assemble and qualify the integrated baseline (#67).
+5. **Contract-revalidation gate:** bind every Nightwing seam to the accepted
    upstream contract inventory, reconcile material design drift, and renew
    PRD/Spec approval when required. No Nightwing implementation authority
    crosses this gate on the early 0.4.7 design alone.
-5. **Foundation wave:** implement NW-1 and the #80/#79 lifecycle semantics used
+6. **Foundation wave:** implement NW-1 and the #80/#79 lifecycle semantics used
    by later onboarding and authority work.
-6. **Authority and experience wave:** implement NW-3, then #61/#68/#4 and the
+7. **Authority and experience wave:** implement NW-3, then #61/#68/#4 and the
    installed-artifact path. Establish the #3 navigation skeleton before #4;
    finalize its claims later.
-7. **Assurance wave:** implement #75 before #74, then exact-candidate #6 checks.
-8. **Documentation completion:** perform #78 migration, finalize #3, #19, #20,
+8. **Assurance wave:** implement #75 before #74, then exact-candidate #6 checks.
+9. **Documentation completion:** perform #78 migration, finalize #3, #19, #20,
    #50, and all behavior-derived task paths.
-9. **Distribution close and NW-0 exit gate:** close #96 from the final behavior,
+10. **Distribution close and NW-0 exit gate:** close #96 from the final behavior,
    run #65 smoke and all gates, obtain fresh Critic evidence, complete #67
    accounting, and hand off one release candidate.
 
@@ -297,6 +330,9 @@ candidate verification.
   revision is expected and must use the reviewed authority-change path.
 - Documentation architecture is designed now, but behavioral claims are frozen
   only after implementation evidence exists.
+- Collision-safe early design deliberately optimizes stable Nightwing-owned
+  semantics first. If an accepted upstream contract changes that semantic core,
+  the block is reclassified or rebaselined rather than defended as sunk work.
 - Release version, final platform matrix, and unsupported-runner limitations
   are explicit integrated-baseline decisions, not design-time guesses.
 
@@ -313,3 +349,4 @@ candidate verification.
 | DI-8 | Risks | Failure modes and mitigations |
 | DI-9 | Integrated-baseline decisions | Rebase readiness checklist |
 | DI-10 | Delivery sequence | Package graph and component ownership |
+| DI-11 | Early-design safety contract and collision-safe wave | Risk model, readiness matrix, and early design blocks |

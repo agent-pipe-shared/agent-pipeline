@@ -76,6 +76,102 @@ Mermaid self-check: the graph is acyclic except for the intentionally shared
 NW-0 ownership represented by distinct entry and exit nodes; identifiers and
 edges use supported flowchart syntax.
 
+### 3.1 Design-ahead safety model
+
+Pre-integration work is classified at slice level:
+
+| Class | Meaning | Allowed now | Not allowed now |
+| --- | --- | --- | --- |
+| `green-design-now` | Nightwing owns the semantic decision and no moving upstream authority is needed | Domain model, UX flow, decision table, threat boundary, synthetic acceptance vectors | Shared implementation, final behavior claim, upstream schema/path/writer binding |
+| `amber-envelope-only` | Nightwing owns consumer behavior but an upstream provider owns the concrete contract | Logical capability input/output, typed failure behavior, black-box fixtures, compatibility expectation | Provider identifiers, receipt shape, storage, transport, CLI, adapter, or migration implementation |
+| `integration-held` | The slice depends on an accepted candidate, topology, evidence primitive, or authority writer | Dependency and acceptance-gate documentation only | Detailed binding, implementation, migration, final evidence, or completion claim |
+
+`Risk-free` means collision-safe inside the declared boundary, not immune to
+revision. Every early block remains provisional until #67 binds its external
+seams and returns `design-still-valid` or an accepted revision result.
+
+An early block is admissible only when all of these are true:
+
+1. its semantic owner is Nightwing;
+2. every upstream interaction is expressed as a capability role, not a guessed
+   schema, path, command, writer, or receipt;
+3. its output can be reviewed using documents, decision tables, threat cases,
+   or synthetic black-box vectors without changing shared runtime behavior;
+4. it names the exact integration-held surface that is intentionally absent;
+5. deleting or replacing one upstream adapter would not invalidate its domain
+   decisions; and
+6. it names the accepted upstream evidence needed during revalidation.
+
+### 3.2 Current public integration snapshot
+
+This read-only snapshot was observed on 2026-08-02. It records planning inputs,
+not accepted integration candidates or release authority.
+
+| Line | Public branch | Observed head | Relationship to observed `main` |
+| --- | --- | --- | --- |
+| Main | `main` | `89cb12b99e3fd86ac44878d0c23b278f00538921` | protected baseline |
+| Nova | `feat/sprint-nova-codex-v046` | `fa185072495739f61fa7fb567a072dddbaa8f48b` | ahead |
+| Cyborg | `feat/sprint-cyborg-claude` | `377aca8f336b290250c84037bce36494e2ce57f1` | diverged |
+| Phoenix | `sprint_phoenix` | `5c208e5337972ef703bb606861e41606cf00a2f9` | diverged |
+| Nightwing | `feat/sprint-nightwing` | `9443ae21871eec13edd31230cb6f88893e7a6d79` | design snapshot |
+
+The observed deltas confirm simultaneous edits around project authority,
+pipeline state, onboarding, lifecycle guards, push guards, Verify, operating
+model/state documentation, and release/evidence surfaces. A clean textual
+rebase therefore cannot establish semantic compatibility.
+
+### 3.3 Integration-readiness seam matrix
+
+| Seam | Upstream owner/evidence expected | Nightwing consumers | Early status | Revalidation requirement |
+| --- | --- | --- | --- | --- |
+| Runner, sandbox, invocation, scheduling, Critic execution | Nova accepted capability and conformance evidence | #65, #68, #75, #80 | `amber-envelope-only` | Bind active capability identities, failure vocabulary, isolation evidence, and supported-runner matrix |
+| Security controls, hostile context, provenance, findings, release security | Cyborg accepted catalog, evaluation, provenance, and completeness evidence | #6, #74, #75, #76 | `amber-envelope-only` | Bind control identifiers, non-waivable floor, CI permissions, evidence completeness, and exception semantics |
+| Policy, events, evidence viewing, human decisions, journals, external traceability | Phoenix accepted policy, event, evidence, and human-ledger contracts | #74, #75, #76, #99 | `amber-envelope-only` | Bind identity, provenance, applicability, privacy, event transport, and human-decision references |
+| Project authority, topology, lifecycle state, approval and change writers | Integrated Cyborg/Phoenix/Nova topology and lifecycle result | #61, #78, #79, #97, #99 | `integration-held` | Name one canonical authority boundary and writer for every transition; reject duplicate state or approval stores |
+| Verify, release, publication, channel source, install/update provenance | Integrated Nova release loop plus Cyborg security and shared evidence contracts | #4, #6, #65, #66, #96 | `integration-held` | Bind exact candidate identity, channel metadata, publication authority, rollback evidence, and final gate registration |
+| Product language, display brand, comparison rubric, roadmap semantics, information architecture | Nightwing; final claims consume qualified evidence | #3, #19, #20, #50, #78 | `green-design-now` | Confirm final capabilities, links, evidence coverage, ownership, and staleness before publication |
+| Configuration and adoption interaction semantics | Nightwing; effective values consume integrated policy and runtime authority | #25, #26, #96 | `green-design-now` for UX, `integration-held` for binding | Bind the accepted canonical source, field registry, policy result, projector, writer, and migration |
+| Delivery-route and architecture-decision semantics | Nightwing; control floors and durable decisions consume Cyborg/Phoenix | #11, #74, #76, #97, #99 | `green-design-now` for domain rules, `amber-envelope-only` for consumers | Bind control, ledger, topology, exception, and applicability evidence |
+
+### 3.4 Collision-safe early design blocks
+
+The following blocks are the efficient pre-integration design queue. Their
+outputs stay inside this three-file package until a later governed package is
+opened; they do not create new document authority.
+
+| Block | Issue slices | Collision-safe deliverable now | Explicitly integration-held |
+| --- | --- | --- | --- |
+| RFD-1 Product decision layer | #3, #19, #20, #50 | Audience and task information architecture; product/brand compatibility language; symmetric comparison rubric; roadmap prioritization and staleness rules; comprehension scenarios | Final capability claims, measured strengths/limitations, live links, release/version statements, and migration completion |
+| RFD-2 Configuration and adoption UX | #25, #26 plus user-intent slice of #96 | Field-metadata requirements; inspect/propose/preview/CAS/readback/rollback journey; provenance explanation; portable/local privacy classes; adopt/keep decision cases | Actual field set, canonical source paths, policy resolver, compiler/projector, writers, install schema, and migrations |
+| RFD-3 Delivery-route and human-authority semantics | #11, #74, #76 | Route discriminator; eligibility and escalation examples; human-facing authorization content; expiry/reconciliation behavior; invariant that evidence remains honestly non-green | Cyborg control IDs and security floor; Phoenix decision-ledger receipt; guard wiring; close/release enforcement |
+| RFD-4 Design and Advisor interaction | #79, #80 | Material-input readiness logic; offer/skip/stop/later UX; explicit consultation reason/consent/evidence flow; no-implicit-call and honest-unavailability cases | Nova selected-sandbox and invocation statuses; transport, model/provider selection, dispatch, receipt, and runner wiring |
+| RFD-5 Architecture-decision semantics | #99 | Architecture-significance rubric; applicability and conflict decision tables; ADR/exception/supersession UX; semantic Critic scenarios | Phoenix policy-pack resolver and human ledger; canonical topology; lifecycle writer; inherited-source transport |
+| RFD-6 Scratch negative-security contract | #68 | Capability boundaries; forbidden repository/authority markers; expiry and cleanup outcomes; adversarial property vectors; explicit non-workspace language | Nova sandbox/worktree allocator, physical root placement, cleanup writer, session binding, and platform implementation |
+| RFD-7 Black-box onboarding and smoke journeys | #4, #61, #65 | Ten-minute journey budget; fresh/restart/resume decision scenarios; idempotence and remediation matrix; exact-candidate smoke lifecycle and cleanup expectations | Real onboarding state writer, install source, active-runner adapter, artifact topology, isolated execution, and receipt schema |
+| RFD-8 Measurement and claim vocabulary | #74, #75 | Observable-versus-derived metric rules; units and provenance; unavailable/unknown semantics; privacy exclusions; coverage-to-public-claim admissibility table | Nova runner adapters and Critic lineage; Phoenix event/evidence schemas; storage, aggregation, and viewer projection |
+| RFD-9 Repository-check trust model | #6 | Untrusted verification versus narrow publication job boundary; least-authority permission matrix; stale/tamper/cancel/rerun scenarios | Final Verify/evidence schemas, Cyborg control mapping, forge adapter, workflow/check names, branch-protection wiring |
+| RFD-10 Authority Revision vectors | #97 | Rebase-stability properties; canonical ordering/path/content test vectors; bounded-versus-material change classification; invalidation decision examples | Accepted authority boundary/topology; actual hash schema version; approval/ledger writer; lifecycle and guard integration |
+| RFD-11 Documentation inventory policy | #78 plus #3 completion | Artifact purpose/audience/owner/authority/staleness taxonomy; inventory and migration decision rules; link/duplicate/orphan test cases | Final file inventory, physical moves/removals, redirects, behavior-derived task paths, and authoritative link targets |
+
+Core channel and integration work remains held:
+
+| Hold | Issues | Reason |
+| --- | --- | --- |
+| HLD-1 Portfolio assembly and qualification | #67 | It requires accepted candidates and exact acceptance evidence; only its checklist and logical receipt requirements are designable now |
+| HLD-2 Channel/install/update binding | #66, #96 | Source identity, release metadata, artifact provenance, runtime projection, and rollback must consume the integrated release and security contracts |
+| HLD-3 Shared lifecycle and final evidence wiring | Integration portions of #4, #6, #61, #65, #74, #75, #78, #97, #99 | These surfaces share writers, topology, Verify, evidence, or final behavior and cannot be frozen from branch-local assumptions |
+
+Recommended preparation order is RFD-1, RFD-4, RFD-5, and RFD-11 first
+because they are predominantly Nightwing-owned semantics. RFD-2, RFD-3,
+RFD-6, RFD-8, RFD-9, and RFD-10 follow as bounded consumer envelopes. RFD-7
+then composes those decisions into black-box journeys without implementing the
+held orchestration.
+
+An RFD block is complete only when it has a decision table or flow, positive
+and negative black-box examples, explicit privacy/security constraints, an
+upstream seam list, and a revalidation checklist. Completion means
+`design-prepared`; it never means `implemented`, `integrated`, or `accepted`.
+
 ## 4. NW-0 — Integration baseline and portfolio qualification (#67)
 
 ### 4.1 Entry manifest
@@ -403,6 +499,7 @@ coordinates until a separately accepted migration says otherwise.
 
 Before editing implementation code after the prerequisite merges:
 
+- refresh the dated public snapshot and retire it as planning-only input;
 - record exact accepted `main`, Nova, Cyborg, and Phoenix identities;
 - confirm the Nightwing branch contains only its reviewed design/migration
   commits before rebase;
@@ -410,6 +507,8 @@ Before editing implementation code after the prerequisite merges:
   state, lifecycle guard, push guard, Verify registration, release, and handover;
 - diff schema versions and migration/compatibility promises;
 - map each changed seam to its upstream owner and acceptance evidence;
+- reclassify every RFD slice against the accepted seam matrix and reject any
+  hidden schema, path, writer, command, or receipt dependency;
 - replace provisional interface names in this Spec with accepted names;
 - run baseline Full Verify and Security;
 - complete the contract-revalidation gate and submit any material PRD/Spec
@@ -458,5 +557,6 @@ after the candidate tree changes.
 | R-4 evidence/trust/checks | 8, 10–13 |
 | R-5 product/docs | 9–13 |
 | Cross-sprint boundaries | 2–4, 11 |
+| Early-design safety contract | 3.1–3.4, 4.3, 11 |
 | Success measures | 10, 12 |
 | Privacy and public-only constraint | 2, 5, 6, 8, 13 |
