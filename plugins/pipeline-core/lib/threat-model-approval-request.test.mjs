@@ -28,6 +28,7 @@ assert.deepEqual(parseArgs(["prepare", "--repo-root", "/external/repo", "--featu
 assert.ok(parseArgs(["prepare", "--repo-root", "/one", "--repo-root", "/two"]).error);
 assert.equal(approvalRequestFromExternalJson({ ok: true, value: request }), request);
 assert.deepEqual(parseHumanArgs(["setup", "--repo-root", "/repo", "--directory", "/human-po"]), { command: "setup", keyReference: "local-po-key", repoRoot: "/repo", directory: "/human-po" });
+assert.deepEqual(parseHumanArgs(["prepare", "--repo-root", "/repo", "--directory", "/human-po", "--feature-id", "cyb-5", "--plan", "specs/plan.md", "--spec", "specs/spec.md", "--model", "specs/cyb-5/threat-model.json"]), { command: "prepare", keyReference: "local-po-key", repoRoot: "/repo", directory: "/human-po", featureId: "cyb-5", plan: "specs/plan.md", spec: "specs/spec.md", model: "specs/cyb-5/threat-model.json" });
 assert.deepEqual(parseGateArgs(["verify", "--repo-root", "/repo", "--directory", "/human-po"]), { command: "verify", keyReference: "local-po-key", repoRoot: "/repo", directory: "/human-po" });
 assert.ok(parseGateArgs(["approve", "--repo-root", "/repo", "--directory", "/human-po"]).error);
 assert.ok(parseHumanArgs(["approve", "--directory", "relative"]).error);

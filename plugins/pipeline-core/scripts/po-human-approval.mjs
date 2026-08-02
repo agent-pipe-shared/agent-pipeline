@@ -18,7 +18,7 @@ import { pathToFileURL } from "node:url";
 import { approvalRequestFromExternalJson, observeCleanCandidate, run as runApprovalRequest } from "./po-approval-request.mjs";
 import { verifyThreatModelApprovalRequest } from "../lib/threat-model-approval-request.mjs";
 
-const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir>";
+const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>]";
 const own = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 const SHA = /^[a-f0-9]{64}$/u;
 const text = (value) => typeof value === "string" && value.trim() !== "";
@@ -77,7 +77,7 @@ export function parseHumanArgs(argv) {
     const key = tokens[index]; const value = tokens[index + 1];
     if (!key?.startsWith("--") || typeof value !== "string" || value.startsWith("--")) return { error: USAGE };
     const normalized = key.slice(2).replace(/-([a-z])/gu, (_, letter) => letter.toUpperCase());
-    if (!new Set(["directory", "repoRoot", "keyReference"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
+    if (!new Set(["directory", "repoRoot", "keyReference", "featureId", "plan", "spec", "model"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
     supplied.add(normalized); values[normalized] = value; index += 1;
   }
   if (!new Set(["setup", "prepare", "approve", "verify"]).has(command) || !text(values.directory) || !isAbsolute(values.directory)
@@ -94,14 +94,17 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
   const args = parseHumanArgs(argv); if (args.error) fail(args.error);
   const repository = resolve(args.repoRoot);
   const directory = externalDirectory(repository, resolve(args.directory), { create: args.command === "setup" || args.command === "prepare" });
+  const featureId = args.featureId ?? "cyb-4";
+  if (!/^[a-z][a-z0-9-]{0,63}$/u.test(featureId)) fail("feature id is invalid");
+  const suffix = featureId === "cyb-4" ? "" : `-${featureId}`;
   const paths = {
-    request: artifactPath(directory, "request.json"),
+    request: artifactPath(directory, `request${suffix}.json`),
     privateKey: artifactPath(directory, "po-private.pem"),
     publicKey: artifactPath(directory, "po-public.pem"),
     authority: artifactPath(directory, "trust-policy.json"),
-    proof: artifactPath(directory, "proof.json"),
-    signature: artifactPath(directory, "signature.bin"),
-    intent: artifactPath(directory, "intent.txt"),
+    proof: artifactPath(directory, `proof${suffix}.json`),
+    signature: artifactPath(directory, `signature${suffix}.bin`),
+    intent: artifactPath(directory, `intent${suffix}.txt`),
   };
   const write = dependencies.writeFile ?? writeFileSync; const read = dependencies.readFile ?? readFileSync; const exists = dependencies.exists ?? existsSync;
   if (args.command === "setup") {
@@ -123,7 +126,7 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
     return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority };
   }
   if (args.command === "prepare") {
-    const result = runApprovalRequest(["prepare", "--repo-root", repository, "--feature-id", "cyb-4", "--plan", "specs/2026-07-24-sprint-cyborg-epic/prd_cyborg-epic.md", "--spec", "specs/2026-07-24-sprint-cyborg-epic/spec.md", "--model", "specs/cyb-4/threat-model.json"]);
+    const result = runApprovalRequest(["prepare", "--repo-root", repository, "--feature-id", featureId, "--plan", args.plan ?? "specs/2026-07-24-sprint-cyborg-epic/prd_cyborg-epic.md", "--spec", args.spec ?? "specs/2026-07-24-sprint-cyborg-epic/spec.md", "--model", args.model ?? `specs/${featureId}/threat-model.json`]);
     write(paths.request, `${JSON.stringify(result, null, 2)}\n`, { mode: 0o600 });
     return { ok: true, code: "PO-HUMAN-REQUEST-READY", candidate: result.value.candidate, intentSha256: result.value.approvalIntent.sha256 };
   }
