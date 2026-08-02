@@ -22,6 +22,7 @@ import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
 import { validateHumanGovernanceDecision } from "./human-governance-decision.mjs";
 import { validateLifecycleGovernanceEvent } from "./lifecycle-governance-events.mjs";
+import { validateAgentDecisionEvent } from "./agent-decision-journal.mjs";
 
 const REGISTRY_SCHEMA = "pipeline.governance-stream-registry.v1";
 const HEADS_SCHEMA = "pipeline.governance-event-heads.v1";
@@ -302,6 +303,14 @@ function assertPortablePayload(event, policy) {
     if (lifecycle.candidate.commit !== event.candidate.commit || lifecycle.candidate.tree !== event.candidate.tree
       || lifecycle.correlation.packageId !== event.correlation.packageId
       || event.eventType !== `lifecycle.${lifecycle.kind}`) fail("GES-PAYLOAD-SCHEMA", "Lifecycle payload does not bind its envelope.");
+    if (typeof event.policy.capturePolicyDigest !== "string" || event.policy.capturePolicyDigest !== canonicalSha256(policy)) fail("GES-CAPTURE-POLICY-BINDING", "Event does not bind the effective capture policy.");
+    return;
+  }
+  if (event.origin === "agent") {
+    let journal;
+    try { journal = validateAgentDecisionEvent(event.payload); }
+    catch { fail("GES-PAYLOAD-SCHEMA", "Agent decision payload is not closed or valid."); }
+    if (journal.candidateDigest !== canonicalSha256(event.candidate) || event.eventType !== `agent.${journal.kind}`) fail("GES-PAYLOAD-SCHEMA", "Agent decision payload does not bind its envelope.");
     if (typeof event.policy.capturePolicyDigest !== "string" || event.policy.capturePolicyDigest !== canonicalSha256(policy)) fail("GES-CAPTURE-POLICY-BINDING", "Event does not bind the effective capture policy.");
     return;
   }

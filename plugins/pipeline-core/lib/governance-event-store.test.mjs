@@ -127,6 +127,15 @@ test("exact idempotency is a zero-write replay while a conflicting key fails clo
   assert.equal(result.eventCount, 1);
 });
 
+test("agent journal payloads persist only as candidate-bound, closed observational events", async (t) => {
+  const root = await fixtureRoot(); t.after(() => cleanup(root));
+  const payload = { eventId: "agent-decision-1", kind: "assumption", state: "declared", reasonCode: "ASSUMPTION.DECLARED", candidateDigest: canonicalSha256(candidate), relatedHumanDecisionId: null, supersedesEventId: null };
+  const observed = await append(root, intent({ payloadSchema: "pipeline.agent-decision-event.v1", eventId: "agent-event-1", idempotencyKey: "agent-idem-1", origin: "agent", authorityClass: "non-authoritative", eventType: "agent.assumption", streamId: "agent", payload }));
+  assert.equal(observed.eventPath, "governance/events/agent/1-agent-event-1.json");
+  const mismatched = { ...payload, candidateDigest: "d".repeat(64) };
+  await assert.rejects(() => append(root, intent({ payloadSchema: "pipeline.agent-decision-event.v1", eventId: "agent-event-2", idempotencyKey: "agent-idem-2", origin: "agent", authorityClass: "non-authoritative", eventType: "agent.assumption", streamId: "agent", payload: mismatched })), (error) => error.code === "GES-PAYLOAD-SCHEMA");
+});
+
 test("portable admission requires the exact effective policy and closed safe payload", async (t) => {
   const root = await fixtureRoot(); t.after(() => cleanup(root));
   await assert.rejects(() => append(root, intent({ policy: { ...intent().policy, capturePolicyDigest: "d".repeat(64) } })), (error) => error.code === "GES-CAPTURE-POLICY-BINDING");
