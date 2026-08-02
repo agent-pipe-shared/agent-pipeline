@@ -77,7 +77,8 @@
           "docs/observation-intake.md",
           "docs/operating-model.md",
           "docs/runtime-boundary.md",
-          "docs/v3-consumer-onboarding.md"
+          "docs/v3-consumer-onboarding.md",
+          "docs/whats-new-0.5.0.md"
         ]
       },
       {
@@ -117,6 +118,7 @@
           "docs/release-0.4.4-readiness.md",
           "docs/release-0.4.5-readiness.md",
           "docs/release-0.4.6-readiness.md",
+          "docs/release-0.5.0-readiness.md",
           "docs/security-incident-response.md",
           "docs/security-support-policy.md",
           "docs/sentinel-scope-extension-threat-model.md",
