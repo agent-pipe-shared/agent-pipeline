@@ -13,6 +13,18 @@ and lag. They do not prove retention, immutability, analyst review, compliance,
 or any human/Pipeline authority. Export responses are never consumed as a
 Pipeline authority source.
 
+Use the read-only sanitation preview before a destination-specific outbox or
+transport operation:
+
+```bash
+node plugins/pipeline-core/scripts/governance-export.mjs preview \
+  --event-file <canonical-event.json> \
+  --policy-file <export-policy.json|none>
+```
+
+`none` returns an explicit denial. The command has no queue, credential, or
+network side effect.
+
 Each destination maintains an independent outbox state: acknowledged entries
 advance its cursor only across a contiguous confirmed prefix. Partial delivery
 leaves unacknowledged entries pending, while quarantined entries preserve their
