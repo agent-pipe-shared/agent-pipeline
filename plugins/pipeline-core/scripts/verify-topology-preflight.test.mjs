@@ -77,6 +77,20 @@ check("typed preflight resolves candidate, exact parent and every baseline befor
       commit: baseline,
       tree: baselineTree,
     }],
+    hardening: {
+      schema: "pipeline.ai-assisted-hardening-gate.v1",
+      allowed: true,
+      code: "AIH-CANDIDATE-ADMITTED",
+      changedPaths: [],
+      checks: {
+        input: { schema: "pipeline.ai-assisted-hardening.v1", source: "repository", trust: "untrusted", contentSha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", authority: "none" },
+        authority: { schema: "pipeline.ai-assisted-hardening.v1", allowed: true, code: "AIH-AUTHORITY-BOUND", manifestSha256: "c7585c5416a413139d3dcf3585b82837e50cc180748998be537c7b5c3498a422" },
+        integrity: { schema: "pipeline.ai-assisted-hardening.v1", changed: [], missing: [], allowed: true, code: "AIH-INTEGRITY-CHECKED" },
+        review: { schema: "pipeline.ai-assisted-hardening.v1", required: false, allowed: true, code: "AIH-REVIEW-ROUTED" },
+        ci: { schema: "pipeline.ai-assisted-hardening.v1", allowed: true, code: "AIH-CI-AUTHORITY-BOUND" },
+        hygiene: { schema: "pipeline.ai-assisted-hardening.v1", allowed: true, forbidden: [], code: "AIH-EVIDENCE-HYGIENE-PASSED" },
+      },
+    },
   });
   assert.deepEqual(git.calls, [
     "rev-parse --verify HEAD^{commit}",

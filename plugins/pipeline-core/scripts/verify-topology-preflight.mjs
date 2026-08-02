@@ -10,6 +10,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { evaluateAiHardeningGate } from "./ai-assisted-hardening-gate.mjs";
 
 export const VERIFY_TOPOLOGY_SCHEMA = "pipeline.verify-topology-preflight.v1";
 const OID = /^[0-9a-f]{40}$/u;
@@ -68,6 +69,11 @@ export function preflightVerifyTopology({
   candidateRevision = "HEAD",
   inventory,
   runGit,
+  changedPaths = [],
+  event = "local",
+  privileged = false,
+  isolated = false,
+  validated = false,
 } = {}) {
   if (typeof candidateRevision !== "string" || candidateRevision.length === 0 || typeof runGit !== "function") {
     return failure("VTP-INPUT-INVALID");
@@ -89,6 +95,18 @@ export function preflightVerifyTopology({
   if (parentCommit === null) return failure("VTP-PARENT-UNRESOLVABLE", "parent");
   const parentTree = resolveObject(runGit, parentCommit, "tree");
   if (parentTree === null) return failure("VTP-PARENT-TREE-UNRESOLVABLE", "parent");
+
+  // The candidate's repository-derived diff remains untrusted.  This invokes
+  // CYB-5's admission controls at the same CI boundary that resolves the
+  // exact candidate and parent used for Core Verify.
+  const hardening = evaluateAiHardeningGate({
+    changedPaths,
+    event,
+    privileged,
+    isolated,
+    validated,
+  });
+  if (!hardening.allowed) return failure("VTP-AI-HARDENING-REJECTED", "candidate");
 
   const baselines = [];
   for (const declaration of declarations) {
@@ -115,6 +133,7 @@ export function preflightVerifyTopology({
     candidate: Object.freeze({ commit: candidateCommit, tree: candidateTree }),
     parent: Object.freeze({ commit: parentCommit, tree: parentTree }),
     baselines: Object.freeze(baselines),
+    hardening,
   });
 }
 
@@ -148,10 +167,17 @@ export function runVerifyTopologyCli(argv = process.argv.slice(2)) {
   } catch {
     return failure("VTP-DECLARATION-UNAVAILABLE");
   }
+  const candidateCommit = defaultGit(parsed.root, ["rev-parse", "--verify", `${parsed.candidateRevision}^{commit}`]).stdout;
+  const parentCommit = candidateCommit ? defaultGit(parsed.root, ["rev-parse", "--verify", `${candidateCommit}^^{commit}`]).stdout : "";
+  const changedPaths = candidateCommit && parentCommit
+    ? defaultGit(parsed.root, ["diff", "--name-only", "--diff-filter=ACMR", parentCommit, candidateCommit]).stdout.split("\n")
+    : [];
   return preflightVerifyTopology({
     candidateRevision: parsed.candidateRevision,
     inventory,
     runGit: (args) => defaultGit(parsed.root, args),
+    changedPaths,
+    event: process.env.GITHUB_EVENT_NAME ?? "local",
   });
 }
 
