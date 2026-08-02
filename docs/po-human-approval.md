@@ -15,14 +15,14 @@ does not put a code word into chat, environment variables, or configuration.
 ```sh
 REPO="$HOME/src/agent-pipeline-share_cyborg"
 PO_DIR="$HOME/agent-pipeline-po"
-node "$REPO/plugins/pipeline-core/scripts/po-human-approval.mjs" setup --directory "$PO_DIR"
+node "$REPO/plugins/pipeline-core/scripts/po-human-approval.mjs" setup --repo-root "$REPO" --directory "$PO_DIR"
 ```
 
 ## Each approval
 
 ```sh
 node "$REPO/plugins/pipeline-core/scripts/po-human-approval.mjs" prepare --repo-root "$REPO" --directory "$PO_DIR"
-node "$REPO/plugins/pipeline-core/scripts/po-human-approval.mjs" approve --directory "$PO_DIR"
+node "$REPO/plugins/pipeline-core/scripts/po-human-approval.mjs" approve --repo-root "$REPO" --directory "$PO_DIR"
 node "$REPO/plugins/pipeline-core/scripts/po-human-approval.mjs" verify --repo-root "$REPO" --directory "$PO_DIR"
 ```
 

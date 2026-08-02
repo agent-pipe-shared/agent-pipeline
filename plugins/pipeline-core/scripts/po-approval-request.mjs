@@ -54,7 +54,11 @@ export function approvalRequestFromExternalJson(value) {
   return value;
 }
 
-export function run(argv = process.argv.slice(2)) {
+function currentCandidateMatches(request, candidate) {
+  return request?.candidate?.commit === candidate.commit && request?.candidate?.tree === candidate.tree;
+}
+
+export function run(argv = process.argv.slice(2), dependencies = {}) {
   const args = parseArgs(argv);
   if (args.error) throw new Error(args.error);
   if (args.command === "prepare") {
@@ -71,7 +75,10 @@ export function run(argv = process.argv.slice(2)) {
   }
   if (args.command === "verify") {
     if (!args.request || !args.authority || !args.proof) throw new Error(usage);
-    return { ok: true, value: verifyThreatModelApprovalRequest({ request: approvalRequestFromExternalJson(externalJson(args.repoRoot, args.request)), trustPolicy: externalJson(args.repoRoot, args.authority), proof: externalJson(args.repoRoot, args.proof) }) };
+    const request = approvalRequestFromExternalJson(externalJson(args.repoRoot, args.request));
+    const candidate = (dependencies.observeCandidate ?? observeCleanCandidate)(args.repoRoot);
+    if (!currentCandidateMatches(request, candidate)) throw new Error("proof request is not bound to the current clean candidate");
+    return { ok: true, value: verifyThreatModelApprovalRequest({ request, trustPolicy: externalJson(args.repoRoot, args.authority), proof: externalJson(args.repoRoot, args.proof) }) };
   }
   throw new Error(usage);
 }

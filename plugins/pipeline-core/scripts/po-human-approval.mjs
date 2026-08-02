@@ -15,10 +15,10 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync }
 import { isAbsolute, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { approvalRequestFromExternalJson, run as runApprovalRequest } from "./po-approval-request.mjs";
+import { approvalRequestFromExternalJson, observeCleanCandidate, run as runApprovalRequest } from "./po-approval-request.mjs";
 import { verifyThreatModelApprovalRequest } from "../lib/threat-model-approval-request.mjs";
 
-const USAGE = "Usage: po-human-approval.mjs setup --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> | approve --directory <external-dir> | verify --repo-root <repo> --directory <external-dir>";
+const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir>";
 const own = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 const SHA = /^[a-f0-9]{64}$/u;
 const text = (value) => typeof value === "string" && value.trim() !== "";
@@ -41,7 +41,7 @@ export function parseHumanArgs(argv) {
     supplied.add(normalized); values[normalized] = value; index += 1;
   }
   if (!new Set(["setup", "prepare", "approve", "verify"]).has(command) || !text(values.directory) || !isAbsolute(values.directory)
-    || ((command === "prepare" || command === "verify") && (!text(values.repoRoot) || !isAbsolute(values.repoRoot)))) return { error: USAGE };
+    || !text(values.repoRoot) || !isAbsolute(values.repoRoot)) return { error: USAGE };
   return values;
 }
 
@@ -88,6 +88,8 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
     return { ok: true, code: "PO-HUMAN-PROOF-READY", intentSha256 };
   }
   if (!exists(paths.proof)) fail("run approve before verify");
+  const candidate = (dependencies.observeCandidate ?? observeCleanCandidate)(repository);
+  if (request?.candidate?.commit !== candidate.commit || request?.candidate?.tree !== candidate.tree) fail("proof request is not bound to the current clean candidate");
   const verified = verifyThreatModelApprovalRequest({ request, trustPolicy: json(paths.authority), proof: json(paths.proof) });
   return { ok: true, value: verified };
 }
