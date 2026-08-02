@@ -1394,6 +1394,17 @@ await asyncCheck("a recorded PO decision resumes the same native Goal after an e
   assert.deepEqual(calls, [{ action: "set", generation: 0 }, { action: "pause", generation: 0 }, { action: "set", generation: 0 }]);
 });
 
+await asyncCheck("a later named PO gate clears the prior resolution receipt before persisting its new pause", async () => {
+  const calls = [];
+  const activated = await reconcileRunnerNativeContinuation({ continuity: nativeState(), activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "activate", atRevision: 3 }, adapter: nativeAdapter(calls) });
+  const firstPause = await reconcileRunnerNativeContinuation({ continuity: activated.next, activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "po-gate", atRevision: 4, evidenceSha256: D }, adapter: nativeAdapter(calls) });
+  const receipt = { schema: "pipeline.po-goal-decision-receipt.v1", featureId: FEATURE, continuationId: "nova-b0", pausedRecordSha256: firstPause.continuation.recordSha256, pauseRevision: firstPause.continuation.terminal.atRevision, resolvedRevision: 5, decision: "resume", receiptSha256: null };
+  receipt.receiptSha256 = computePoGoalDecisionReceiptDigest(receipt);
+  const resumed = await reconcileRunnerNativeContinuation({ continuity: firstPause.next, activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "po-gate-resolved", atRevision: 5, evidenceSha256: receipt.receiptSha256, pausedRecordSha256: firstPause.continuation.recordSha256, poDecisionReceipt: receipt }, adapter: nativeAdapter(calls) });
+  const secondPause = await reconcileRunnerNativeContinuation({ continuity: resumed.next, activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "po-gate", atRevision: 6, evidenceSha256: E }, adapter: nativeAdapter(calls) });
+  assert.equal(secondPause.ok, true); assert.equal(secondPause.continuation.status, "paused-po-gate"); assert.equal(secondPause.continuation.resolution, null);
+});
+
 await asyncCheck("resume degrades stale active-goal identity instead of trusting it or overwriting user control", async () => {
   const calls = [];
   const activated = await reconcileRunnerNativeContinuation({ continuity: nativeState(), activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "activate", atRevision: 3 }, adapter: nativeAdapter(calls) });

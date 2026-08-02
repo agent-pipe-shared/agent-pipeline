@@ -304,6 +304,10 @@ export function materializeRunnerNativeTerminal({ continuation, transition, even
     && adapterResult.readback.status === "paused";
   const confirmed = transition.action === "pause" ? paused : cleared;
   const next = structuredClone(continuation);
+  // A resolution receipt attests only the active successor it created.  A later
+  // terminal transition starts a new lifecycle boundary and must not carry the
+  // prior PO decision into pause, clear, blocker or completion evidence.
+  next.resolution = null;
   if (confirmed) {
     next.status = transition.state;
     next.terminal = { kind: transition.terminal, atRevision: event.atRevision };
