@@ -11,6 +11,11 @@
       "reason": "guard-testpath test suite gates this very guard (E5/QG-04) — no ad-hoc edits outside a briefed test-change task."
     },
     {
+      "id": "TP-3",
+      "pattern": "harness/scripts/verify\\.mjs$",
+      "reason": "verify.mjs is the single verify-gate script (QG-02) that stop hook, Goldfish submission, and CI all run identically — no ad-hoc edits outside a briefed test-change task."
+    },
+    {
       "id": "TP-4",
       "pattern": "plugins/pipeline-core/hooks/hooks\\.json$",
       "reason": "hooks.json wires the guard family itself (git-guard union, E11) — no ad-hoc edits outside a briefed test-change task."

@@ -1,6 +1,6 @@
 # Technical Spec — Nova human authorization and Cyborg handover extension
 
-**Product document:** [PRD](prd_nova-human-authorization.md)  
+**Product document:** [PRD](prd_nova-human-authorization.md)
 **Source evidence:** [design input](design-input.md)
 
 ## Critical-proof flow
@@ -52,4 +52,3 @@ leaves the canonical item unchanged.
 - remote-provisional one-time, expiry, scope and final-gate rejection cases;
 - the six named Cyborg handover suites and canonical reconciliation readback;
 - `git diff --check`, Full Verify, Security and a fresh diff-scoped Critic.
-

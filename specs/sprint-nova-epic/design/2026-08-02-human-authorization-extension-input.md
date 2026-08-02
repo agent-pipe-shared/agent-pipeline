@@ -1,6 +1,6 @@
 # Nova human-authorization and Cyborg-handover extension — design input
 
-**Captured:** 2026-08-02  
+**Captured:** 2026-08-02
 **Source:** Product-Owner direction, sanitised for repository use
 
 ## Context
@@ -62,4 +62,3 @@ requires every resulting transition to use Nova's canonical writer.
 - A final proof remains required even after a provisional acknowledgement. The
   trusted-terminal Ed25519 path is the first supported final-proof adapter.
 - A new candidate invalidates all prepared proofs and provisional receipts.
-

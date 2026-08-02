@@ -1,6 +1,6 @@
 # Nova plan amendment — human authorization and Cyborg handover
 
-**Status:** draft for the reopened Nova design gate  
+**Status:** draft for the reopened Nova design gate
 **Staging PRD/Spec:** [`../../2026-08-02_nova-human-authorization/prd_nova-human-authorization.md`](../../2026-08-02_nova-human-authorization/prd_nova-human-authorization.md), [`../../2026-08-02_nova-human-authorization/spec.md`](../../2026-08-02_nova-human-authorization/spec.md)
 
 ## Scope
@@ -50,4 +50,3 @@ for the final clean candidate and separately authorized external execution.
    evidence.
 5. Only then prepare the final external proof and seek the distinct release
    authorization for the fixed publication path.
-

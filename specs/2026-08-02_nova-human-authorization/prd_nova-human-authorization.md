@@ -1,6 +1,6 @@
 # PRD — Nova human authorization and Cyborg handover extension
 
-**Profile:** feature extension to `sprint-nova-epic`  
+**Profile:** feature extension to `sprint-nova-epic`
 **Source evidence:** [design input](design-input.md)
 
 ## Outcome
@@ -39,4 +39,3 @@ rejection. The six handover rows produce candidate-bound evidence tuples; any
 stale or failing row remains open with a narrow follow-up. Full Verify,
 Security and an independent Critic rerun on the final candidate precede a
 separately authorized release.
-

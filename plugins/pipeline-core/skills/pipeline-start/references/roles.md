@@ -6,4 +6,3 @@ never default to Elephant or execute onboarding. Goldfish receives a sealed
 dispatch, cannot delegate or widen authority, and validates the preflight action
 without executing onboarding. Model identity is never independent attestation;
 Advisor capability is model-free preflight only.
-

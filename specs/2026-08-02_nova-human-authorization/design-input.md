@@ -25,4 +25,3 @@ the Cyborg handover's six evidence-bound canonical backlog transitions.
 This package is a focused staging view of
 [`../sprint-nova-epic/design/2026-08-02-human-authorization-extension-input.md`](../sprint-nova-epic/design/2026-08-02-human-authorization-extension-input.md),
 which contains the detailed decisions, limits and rationale.
-

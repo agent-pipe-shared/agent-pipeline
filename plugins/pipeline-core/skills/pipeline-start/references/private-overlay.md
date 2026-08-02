@@ -7,4 +7,3 @@ the same physical root and plan digest, `mutation:true`,
 `requiresConfirmation:true`, and host boundary. Present unchanged; wait for
 the PO; execute exactly once; restart Step 0. Never edit Consumer State,
 delete descriptors or claim readiness before a repeated V4 `ready` result.
-
