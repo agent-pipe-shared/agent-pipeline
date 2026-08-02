@@ -70,6 +70,8 @@ test("legacy V2 recovery is attended, digest-bound and zero-write on replay", ()
     const plan = JSON.parse(logs.at(-1));
     assert.equal(plan.recoveryClass, "legacy-v2-revocation-implementation-to-design");
     assert.equal(plan.nextAction.requiresConfirmation, true);
+    assert.equal(plan.nextAction.requiresAttendedHumanOverride, true);
+    assert.equal(plan.nextAction.humanAuthority.kind, "one-time-guard-override");
     assert.equal(plan.nextAction.argv.at(-2), "--activate");
     assert.equal(run(plan.nextAction.argv.slice(1), { dir: root, now: () => NOW }), 0);
     const recovered = JSON.parse(readFileSync(path, "utf8"));
@@ -86,14 +88,19 @@ test("legacy V2 recovery is attended, digest-bound and zero-write on replay", ()
   }
 });
 
-test("unknown legacy-state shape cannot receive recovery", () => {
-  const state = { ...legacyMixedState(), planSubmission: {} };
-  const { root, path } = fixture(state);
-  try {
-    const before = readFileSync(path, "utf8");
-    assert.equal(run(["plan-legacy-v2-revocation-recovery", "--by", "Phoenix PO"], { dir: root, now: () => NOW }), 2);
-    assert.equal(readFileSync(path, "utf8"), before);
-  } finally {
-    rmSync(root, { recursive: true, force: true });
+test("unknown legacy-state envelopes cannot receive recovery", () => {
+  for (const state of [
+    { ...legacyMixedState(), planSubmission: {} },
+    { ...legacyMixedState(), planRecovery: { schema: "unrelated" } },
+    { ...legacyMixedState(), unrecognisedFutureState: true },
+  ]) {
+    const { root, path } = fixture(state);
+    try {
+      const before = readFileSync(path, "utf8");
+      assert.equal(run(["plan-legacy-v2-revocation-recovery", "--by", "Phoenix PO"], { dir: root, now: () => NOW }), 2);
+      assert.equal(readFileSync(path, "utf8"), before);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   }
 });

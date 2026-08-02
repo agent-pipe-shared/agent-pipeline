@@ -1,7 +1,7 @@
 # Sprint Nova Epic — Product Requirements
 
 <!-- po-language: en -->
-<!-- technical-spec-sha256: 44d47aa6f1a3b20200aedc1679c24d1a461c641218ab0baf3986377e147fb28d -->
+<!-- technical-spec-sha256: f11730c26009018e7bf879878149761fddfc84433f01acffa97727e92d8a210e -->
 
 **Feature ID:** `sprint-nova-epic`
 **Profile / rigor / risk:** Epic / 2 / high
@@ -265,11 +265,21 @@ and cannot retroactively redefine either Sprint's acceptance.
   active feature to Design and can never leave `planApproved=false` in
   implementation.
 - Provide an attended, evidence-bound plan/apply recovery for the sole known
-  older V2 mixed state. It accepts only the exact no-submission/no-invalidation
-  shape with matching V2 approval/revocation and unchanged valid Continuity,
-  then clears the spent approval/revocation into a durable recovery receipt and
-  moves to Design. Every other state remains typed unavailable; manual JSON
-  changes, rebases, cache patches and cross-root state transfer are not routes.
+  older V2 mixed state. It accepts only the closed legacy envelope (no unknown
+  State fields, submission, invalidation or prior recovery receipt), matching
+  V2 approval/revocation and unchanged valid Continuity. The read-only plan
+  binds preimage/postimage, actor, timestamp and recovery class; the apply is
+  admitted only after a fresh one-time Human Guard Override consumes its exact
+  tool input. It then clears the spent approval/revocation into a durable
+  recovery receipt and moves to Design. Every other state remains typed
+  unavailable; manual JSON changes, rebases, cache patches and cross-root
+  state transfer are not routes.
+- Before every independent Critic dispatch, run a read-only admission that
+  binds the exact base/candidate commit and tree, Spec, declared guardrails and
+  required governance paths. Candidate evidence must carry the same commit/tree
+  binding; prior Critic evidence may be retained only as a separate re-review
+  input. Invalid paths, omitted governance or stale/unbound evidence stop
+  before a Critic slot is consumed.
 - Emit bounded machine-readable Full Verify progress, retain complete logs
   outside the interactive tool channel and resume only completed suites whose
   candidate tree, suite identity/version, inputs, environment contract and

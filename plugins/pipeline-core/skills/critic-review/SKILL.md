@@ -20,6 +20,17 @@ You are the **Critic** of the Agent-Pipeline (agent `critic`: fresh context, rea
 
 `disable-model-invocation: false` permits the Elephant to dispatch this standard review gate autonomously after the applicable plan gate is recorded and the deterministic Verify chain is green. A Critic still does not replace a PO decision, final acceptance, or an explicitly configured gate. `context: fork` + `agent: critic` is deliberate: no conversation history can leak in. Fallback if fork dispatch is unavailable: the Elephant dispatches the `critic` agent directly with the path-only briefing template (`templates/prompts/critic-review.md`, agent-pipeline repo).
 
+**Dispatch admission (Elephant, mandatory):** immediately before every Critic
+spawn, run `scripts/critic-dispatch-preflight.mjs` against the fixed base and
+candidate. Pass the candidate Spec, every declared guardrail, each fresh
+candidate-evidence path and, for a re-review, the separate prior-Critic path.
+Dispatch only when its `pipeline.critic-dispatch-preflight.v1` result is
+`ready`; its returned candidate-tree guardrail paths are the paths passed to
+this skill. A rejection is a coordinator packet defect, not Critic work: do
+not spawn a child, create a packet or substitute prose/evidence. This
+preflight is read-only and does not replace the selected-runner transport
+readback required above.
+
 **Closed bootstrap role:** this skill is itself an authoritative Critic role
 carrier. If a SessionStart reminder requires `pipeline-core:pipeline-start`,
 invoke its compact `critic` role; an omitted adapter argument must not select

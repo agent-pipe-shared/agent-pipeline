@@ -335,6 +335,18 @@ test("V2 revocation atomically returns the feature to design and the exact legac
     by: "Phoenix PO",
     at: REOPENED,
   }).code, "PS-V2-LEGACY-RECOVERY-INELIGIBLE");
+  for (const state of [
+    { ...legacyMixed, planRecovery: { schema: "unrelated" } },
+    { ...legacyMixed, unrecognisedFutureState: true },
+    { ...legacyMixed, updatedAt: "not-an-iso-time" },
+  ]) {
+    assert.equal(planLegacyV2RevocationRecovery({
+      state,
+      expectedStateSha256: sha256CanonicalJson(state),
+      by: "Phoenix PO",
+      at: REOPENED,
+    }).code, "PS-V2-LEGACY-RECOVERY-INELIGIBLE");
+  }
 });
 
 test("repeated draft edits remain writable while edit-after-submit requires reopen", () => {

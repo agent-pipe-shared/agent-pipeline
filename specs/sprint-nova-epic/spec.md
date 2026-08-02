@@ -635,6 +635,18 @@ delta-review inputs required by those records. Issue `#75` owns any
 cross-runner usage/cost aggregation and the shared distinction between
 configured Critic independence and actually executed assurance.
 
+`pipeline.critic-dispatch-preflight.v1` is the required read-only Elephant
+admission immediately before every Critic spawn. It resolves the exact base and
+candidate commit/tree, reads the Spec and every declared guardrail from the
+candidate tree, derives the existing candidate-blob-bound governance packet,
+and rejects a dispatch that omits any required governance path. Each claimed
+candidate-evidence artifact must be readable candidate JSON and contain the
+same exact candidate commit/tree. A prior Critic report is a separately typed
+re-review input: it is retained and hashed but cannot masquerade as fresh
+candidate evidence. The preflight never creates a packet, checkout, child,
+State mutation or success claim. It returns the complete path/blob/digest
+readback only when the subsequent path-only dispatch is formally coherent.
+
 ### 5.6 A6 — Benchmark and release preflight (`#8`, `#56`)
 
 `pipeline.multi-cli-benchmark.v1` defines versioned task classes `mini`,
@@ -843,18 +855,27 @@ entrypoint remains narrow and admits no arbitrary State patch.
 
 For the already-created legacy mixed postimage, recovery is separately closed
 and attended. `plan-legacy-v2-revocation-recovery --by <human-actor>` is
-read-only and succeeds only for this exact shape: no plan submission or
-invalidation; `planApproved:false`; implementation phase; a valid V2 approval
-and matching V2 revocation; matching active plan path; and valid, unchanged
+read-only and succeeds only for this exact closed legacy envelope: no plan
+submission, invalidation, prior recovery receipt or unknown top-level State
+field; `planApproved:false`; implementation phase; a valid V2 approval and
+matching V2 revocation; matching active plan path; and valid, unchanged
 Continuity. It returns the preimage hash, computed postimage hash, actor,
 timestamp, recovery class and the sole exact
-`apply-legacy-v2-revocation-recovery ... --activate true` action. Apply
-revalidates the digest-bound preimage and postimage under the writer lock,
-sets phase `design`, removes the spent V2 approval/revocation and retains an
-exact recovery receipt. Replay is zero-write. Every other State shape,
-changed input, plan digest, actor, timestamp or postimage remains typed
-unavailable; neither JSON hand-editing, rebase, cache patch nor cross-root
-transfer is a recovery route.
+`apply-legacy-v2-revocation-recovery ... --activate true` action.
+
+That apply argv is deliberately *not* a sanctioned non-ready lifecycle action.
+The central PreTool adapter first denies it and can admit it only by consuming a
+fresh, one-time, exact-input Human Guard Override whose authorization is bound
+to the current repository/plugin/denial preimages and audit record. A claimed
+actor string, `--activate`, plan digest, or agent-issued command alone is not
+Human authority. The capability is consumed before execution and cannot replay;
+the State writer then revalidates the digest-bound preimage and postimage under
+the writer lock, sets phase `design`, removes the spent V2 approval/revocation
+and retains an exact recovery receipt. The corresponding security analysis is
+in `docs/human-guard-override-threat-model.md`. Replay is zero-write. Every
+other State shape, changed input, plan digest, actor, timestamp or postimage
+remains typed unavailable; neither JSON hand-editing, rebase, cache patch nor
+cross-root transfer is a recovery route.
 
 The regression matrix covers atomic normal V2 revocation, exact attended
 legacy recovery, stale/postimage/plan-digest rejection, zero-write replay,
@@ -1484,7 +1505,7 @@ gate with collision review. In this table, “schemas `<name>` under
 | A2 | `plugins/pipeline-core/lib/runner-capability-report.mjs`, matching `.test.mjs`; `plugins/pipeline-core/lib/selected-sandbox-disposition.mjs`, matching `.test.mjs`; `plugins/pipeline-core/lib/codex-sandbox-compatibility.mjs`, matching `.test.mjs`; `plugins/pipeline-core/config/codex-sandbox-compatibility.v2.json`; `plugins/pipeline-core/config/codex-sandbox-compatibility.v2.schema.json`; `plugins/pipeline-core/scripts/runner-capability-report.schema.json`; `plugins/pipeline-core/scripts/selected-sandbox-disposition.schema.json`; `plugins/pipeline-core/scripts/codex-sandbox-select.mjs`, matching `.test.mjs` | `plugins/pipeline-core/harness/scripts/codex-sandbox-preflight.mjs`; `plugins/pipeline-core/scripts/sandboxed-readonly-host-bridge.test.mjs`, only for semantic raw-receipt binding |
 | A3 | `plugins/pipeline-core/lib/invocation-reliability.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/invocation-preflight.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/invocation-request.schema.json`; `plugins/pipeline-core/scripts/invocation-attempt.schema.json` | none |
 | A4 | `plugins/pipeline-core/lib/execution-plane-contract.mjs`, matching `.test.mjs`; `plugins/pipeline-core/lib/scheduling-lifecycle.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/nova-execution-subject.schema.json`; `plugins/pipeline-core/scripts/execution-plane-request.schema.json`; `plugins/pipeline-core/scripts/nova-execution-state.schema.json`; `plugins/pipeline-core/scripts/scheduling-lifecycle.schema.json` | none; frozen planner/exchange/workflow files are test inputs only |
-| A5 | `plugins/pipeline-core/lib/critic-review-lineage.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/critic-review-lineage.schema.json` | `plugins/pipeline-core/scripts/critic-packet-preflight.mjs`, matching `.test.mjs`, only for closed lineage admission; `plugins/pipeline-core/lib/review-economy.mjs`, matching `.test.mjs`, only for projection |
+| A5 | `plugins/pipeline-core/lib/critic-review-lineage.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/critic-review-lineage.schema.json`; `plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs`, matching `.test.mjs` | `plugins/pipeline-core/scripts/critic-packet-preflight.mjs`, matching `.test.mjs`, only for closed lineage admission; `plugins/pipeline-core/lib/review-economy.mjs`, matching `.test.mjs`, only for projection |
 | A6 | `plugins/pipeline-core/lib/multi-cli-benchmark.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/multi-cli-benchmark.schema.json`; `plugins/pipeline-core/scripts/release-preflight.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/release-preflight.schema.json`; exact fixtures `plugins/pipeline-core/scripts/fixtures/nova-benchmark/mini.json`, `feature.json`, `review.json`, `migration.json`, `failure-recovery.json` | none |
 | A6R / #98 | `plugins/pipeline-core/lib/publication-capability-preflight.mjs`, matching `.test.mjs`; versioned v2 publication-bundle/authority schemas and matching tests within the existing publication family/store; `plugins/pipeline-core/lib/verify-resume.mjs`, matching `.test.mjs`; schemas `publication-capability-preflight`, `verify-progress`, `verify-suite-receipt`, `verify-resume-plan` and `public-release-state` under `plugins/pipeline-core/scripts/`; `harness/scripts/check-release-state-consistency.mjs`, matching `.test.mjs`; `docs/release-state.json`; exact candidate evidence under `specs/sprint-nova-epic/evidence/nova-a/delivery-loop/` | released v1 publication bundle/authority remain byte-stable; released `plugins/pipeline-core/scripts/publication-executor.mjs`, matching `.test.mjs` and schema, only to add the fixed productive operations and v2 selection around the existing authority family; `plugins/pipeline-core/scripts/release-preflight.mjs`, matching `.test.mjs` and schema, only for early capability admission; `harness/scripts/verify.mjs` and `plugins/pipeline-core/scripts/verify-journal.mjs`, each with matching tests, only for bounded progress/journal/resume orchestration; `plugins/pipeline-core/lib/critic-review-lineage.mjs`, matching `.test.mjs`, only for release-path delta enforcement; `docs/state.md`; `harness/scripts/verify.mjs` registration; this PRD/Spec/acceptance/plan/lifecycle set |
 | A6S / #98 | `plugins/pipeline-core/lib/plan-spec-state-v2.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/pipeline-state.mjs`; `plugins/pipeline-core/scripts/pipeline-state-revocation.test.mjs`; `harness/scripts/pipeline-state.mjs`, matching `.test.mjs` | `plugins/pipeline-core/lib/project-onboarding-v3.mjs`, matching `.test.mjs`, only to reject the mixed legacy revocation postimage; this PRD/Spec/acceptance/plan/lifecycle set; no publication, generic Human-override, remote, cache or workspace-root path |

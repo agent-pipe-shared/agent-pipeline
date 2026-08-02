@@ -64,6 +64,8 @@ test("Critic policy permits autonomous review only after the standard green Veri
   assert.match(skill, /applicable plan gate is recorded/);
   assert.match(skill, /deterministic Verify chain is green/);
   assert.doesNotMatch(skill, /only the PO \(or the Elephant relaying the PO's explicit instruction/);
+  assert.match(skill, /immediately before every Critic\s+spawn, run `scripts\/critic-dispatch-preflight\.mjs`/);
+  assert.match(skill, /not Critic work: do\s+not spawn a child, create a packet or substitute prose\/evidence/);
 });
 
 class MemoryPersistence {

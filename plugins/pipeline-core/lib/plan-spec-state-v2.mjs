@@ -56,6 +56,23 @@ const LEGACY_V2_RECOVERY_KEYS = [
   "recoveredAt",
   "preimageSha256",
 ];
+// The historical V2 writer predates submissions/invalidation.  These are the
+// only stable State envelope fields it could carry alongside the defective
+// approval/revocation pair.  New or unrecognised fields are not passive here:
+// accepting one could overwrite a later recovery receipt or reinterpret a
+// newer State shape as this narrow historical case.
+const LEGACY_V2_RECOVERY_STATE_KEYS = new Set([
+  "schema",
+  "activeFeature",
+  "planApproved",
+  "planApproval",
+  "planRevocation",
+  "continuity",
+  "updatedAt",
+  "closedFeatures",
+  "pushApproval",
+  "deployApprovals",
+]);
 const ACTIVE_FEATURE_KEYS = ["id", "planPath", "phase"];
 const SUBMISSION_KEYS = [
   "schema",
@@ -706,6 +723,15 @@ function validLegacyV2RevocationRecovery(value) {
     && SHA256.test(value.preimageSha256);
 }
 
+function exactLegacyV2RecoveryStateEnvelope(state) {
+  if (!isPlainObject(state)
+    || !Object.keys(state).every((key) => LEGACY_V2_RECOVERY_STATE_KEYS.has(key))) return false;
+  if (Object.prototype.hasOwnProperty.call(state, "updatedAt") && !isCanonicalIso(state.updatedAt)) return false;
+  if (Object.prototype.hasOwnProperty.call(state, "closedFeatures") && !Array.isArray(state.closedFeatures)) return false;
+  if (Object.prototype.hasOwnProperty.call(state, "pushApproval") && !isPlainObject(state.pushApproval)) return false;
+  return !(Object.prototype.hasOwnProperty.call(state, "deployApprovals") && !Array.isArray(state.deployApprovals));
+}
+
 function legacyV2RevocationRecoveryPostimage(state, { by, at, preimageSha256 }) {
   const next = {
     ...state,
@@ -740,6 +766,8 @@ export function planLegacyV2RevocationRecovery({
 
   const preimageSha256 = sha256CanonicalJson(state);
   if (
+    !exactLegacyV2RecoveryStateEnvelope(state)
+    ||
     state?.planSubmission !== undefined
     || state?.planInvalidation !== undefined
     || state?.planApproved !== false

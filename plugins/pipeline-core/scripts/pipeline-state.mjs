@@ -4808,6 +4808,12 @@ export function run(argv = process.argv.slice(2), deps = {}) {
           })],
           mutation: true,
           requiresConfirmation: true,
+          requiresAttendedHumanOverride: true,
+          humanAuthority: {
+            kind: "one-time-guard-override",
+            admission: "the exact non-ready apply remains guard-denied until the central adapter consumes a fresh Human-authorized capability",
+            replay: "the capability is consumed before execution; the State writer separately accepts only the matching zero-write replay",
+          },
         },
       }));
       return 0;

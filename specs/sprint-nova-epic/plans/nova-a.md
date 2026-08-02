@@ -167,17 +167,21 @@ bounded delta review lineages.
 
 **Order:**
 
-1. request compiler/admission;
-2. coverage and verdict contracts;
-3. finding lineage;
-4. delta/impact invalidation;
-5. hard review/correction course budgets; and
-6. reconciliation fixtures for the named backlog items.
+1. read-only dispatch admission that binds candidate paths/evidence and derives
+   required governance before a Critic slot is consumed;
+2. request compiler/admission;
+3. coverage and verdict contracts;
+4. finding lineage;
+5. delta/impact invalidation;
+6. hard review/correction course budgets; and
+7. reconciliation fixtures for the named backlog items.
 
 **DoD:**
 
 - valid `No findings` is distinct from every transport/failure class;
 - fresh Critic independence remains unchanged;
+- omitted governance, missing candidate paths and unbound fresh evidence fail
+  before dispatch rather than consuming a Critic slot;
 - broad rerun requires typed invalidation; and
 - Nova supplies Critic request/convergence/delta inputs without claiming
   #75's cross-runner reporting scope; and
@@ -275,16 +279,20 @@ typed unavailable result.
 2. define the closed attended plan/apply payload for the sole legacy V2 mixed
    shape;
 3. bind preimage/postimage, actor, timestamp, recovery class and `--activate`
-   under the existing writer lock;
+   under the existing writer lock, while requiring a fresh one-time attended
+   Human Guard Override for the exact non-ready apply tool input;
 4. retain unchanged Continuity, clear spent V2 approval/revocation into a
    durable receipt and accept only zero-write replay;
-5. reject mixed postimages in onboarding and permit only the exact recovery
-   argv while lifecycle is non-ready; and
+5. reject mixed postimages in onboarding, permit only the read-only recovery
+   plan while lifecycle is non-ready, and route the exact apply through the
+   consumed Human capability; and
 6. run normal, malformed, stale, replay and legacy-writer regressions.
 
 **DoD:** all NVA-A98-4b/4c cases pass; no manual JSON edit, remote action,
-cache patch, cross-root input/output or generic override appears in the
-implementation; every mutation is revalidated under the existing writer lock.
+cache patch, cross-root input/output or general State override appears in the
+implementation; every mutation is revalidated under the existing writer lock
+and the legacy apply is admitted only through the exact one-use Human
+capability.
 
 ## Slice A7 — Nova A integration and gate
 

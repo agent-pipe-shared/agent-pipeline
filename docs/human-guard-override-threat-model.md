@@ -69,6 +69,9 @@ Three boundaries remain separate and non-substitutable:
 - the exact publication candidate OID/tree, destination ref/channel,
   approval expiry, fixed executor identity, one-use execution state, and
   remote readback receipt;
+- the closed legacy-V2 revocation-recovery State envelope, its exact
+  preimage/postimage hashes, recovery receipt, and the one-use capability that
+  admits its attended apply;
 - blocking Security findings and the narrow, separately governed,
   content-bound scanner-exception policy, if one exists.
 
@@ -92,6 +95,8 @@ Three boundaries remain separate and non-substitutable:
 | A crash, forged journal, or replay turns a partial Phoenix migration into success | The private Git-common-dir journal is owner-private, physical-path checked, HMAC authenticated, and bound to the exact plan/pre/postimage. Recovery accepts only the same plan and the expected preimage-or-postimage at every step; conflicting, missing, malformed, or tampered journal/State/lifecycle/archive bytes fail closed. |
 | A caller publishes another candidate, reuses a publication approval, or substitutes an executor | The fixed publication executor must first durably consume the exact `push-authorized` authority under raw-digest CAS. The authority binds candidate OID/tree, channel, destination ref, approval interval, attempt ID, and executor digest; subsequent observation and fetch/readback are bound transitions, not inferred success. |
 | A recovery or publication path suppresses a Security finding | There is no `security-ignore` authority in these paths. A blocking finding remains blocking unless a separate exact content-bound scanner policy applies to that finding; broad/rule-wide suppression, a changed value or position, missing policy, and any attempt to route the exception through a Human override fail closed. |
+| An agent claims that a legacy V2 recovery is attended merely by supplying `--by` or `--activate` | The non-ready lifecycle guard admits only the read-only recovery plan. The exact apply is denied, records the complete denial set, and proceeds only after a fresh Human Guard Override binds and consumes that exact tool input. |
+| A future or previously recovered State is mistaken for the historical V2 defect | Recovery accepts a closed allowlist of legacy envelope keys, rejects submissions, invalidations, an existing recovery receipt and every unknown top-level field, and rechecks the exact preimage under the writer lock. |
 
 ## Crash and ambiguity rules
 

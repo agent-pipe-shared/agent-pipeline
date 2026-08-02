@@ -171,6 +171,11 @@ No prior gate implies a later gate.
 - NVA-A54-11: A correction finding identifies a changed line or direct
   consequence of the correction delta; unchanged historical findings remain
   dispositions in the existing lineage rather than new findings.
+- NVA-A54-12: Before every Critic spawn, a read-only dispatch preflight binds
+  base/candidate commit and tree, candidate Spec and declared guardrails;
+  derives and requires all governance paths; and rejects missing, unreadable,
+  stale or candidate-unbound evidence. Prior Critic evidence is separately
+  labelled and cannot satisfy fresh candidate-evidence admission.
 
 ### `#56` Release preflight
 
@@ -261,12 +266,16 @@ No prior gate implies a later gate.
   same writer-lock postimage as `planApproved=false` and the exact V2
   revocation. It can never emit an unapproved implementation phase.
 - NVA-A98-4c: Recovery accepts only the exact old V2 mixed shape: no
-  submission/invalidation, matching V2 approval/revocation and active plan
-  path, implementation phase and unchanged valid Continuity. Its read-only
-  plan binds preimage/postimage, actor, time and recovery class; its exact
-  `--activate true` apply clears the spent approval/revocation into a durable
-  receipt and moves to Design. Unknown input, drift or replay is fail-closed
-  or zero-write; onboarding rejects every mixed postimage.
+  submission, invalidation, prior recovery receipt or unknown top-level State
+  field; matching V2 approval/revocation and active plan path; implementation
+  phase; and unchanged valid Continuity. Its read-only plan binds
+  preimage/postimage, actor, time and recovery class. The exact `--activate
+  true` apply is first denied in a non-ready lifecycle and can execute only
+  when a fresh, one-time Human Guard Override consumes its exact tool input;
+  actor text and activation alone are insufficient. It clears the spent
+  approval/revocation into a durable receipt and moves to Design. Unknown
+  input, drift or replay is fail-closed or zero-write; onboarding rejects every
+  mixed postimage.
 - NVA-A98-5: An isolated disposable-remote suite covers success, stale
   preimage, already-published convergence, ambiguous transport, replay and
   denied operations.
