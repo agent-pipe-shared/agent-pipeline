@@ -460,8 +460,18 @@ process.exit(0);
 
 {
   const rootDir = makeRootDir("gitleaks-clean-root");
-  const result = await gitleaksAdapter.run({ rootDir, config: { binaryPath: gitleaksClean }, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  const invocations = [];
+  const result = await gitleaksAdapter.run({
+    rootDir,
+    config: { binaryPath: gitleaksClean },
+    spawnFn: (command, args, options) => {
+      invocations.push(args);
+      return fixtureSpawnFn(command, args, options);
+    },
+    timeoutMs: 5000,
+  });
   assertEqual("gitleaks run: clean fixture -> PASS, 0 findings", { status: result.status, count: result.findings.length }, { status: "PASS", count: 0 });
+  assertTrue("gitleaks run: candidate-tree scan disables Git history", invocations.length === 1 && invocations[0].includes("--no-git"), JSON.stringify(invocations));
 }
 {
   const rootDir = makeRootDir("gitleaks-findings-root");

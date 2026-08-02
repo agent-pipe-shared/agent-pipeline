@@ -26,5 +26,5 @@ export function probeGitleaks({ executablePath, rootDir, tempDir }, deps = {}) {
   // in the executable build metadata; accept only the canonical v8 module.
   const detectedVersion = directVersion ?? embeddedGoVersion(observed.identity.realPath, { cwd: rootDir, tempDir }, deps);
   const help = runProbe(observed.identity.realPath, ["detect", "--help"], { cwd: rootDir, tempDir, ...deps }); if (!help.ok) return help;
-  return { ok: true, status: "ready", handle: buildHandle("gitleaks", observed.identity, detectedVersion, ["--source", "--report-format", "--report-path", "--no-banner", "--exit-code"].filter((flag) => help.stdout.includes(flag) || help.stderr.includes(flag)), (deps.now ?? new Date()).toISOString()) };
+  return { ok: true, status: "ready", handle: buildHandle("gitleaks", observed.identity, detectedVersion, ["--source", "--no-git", "--report-format", "--report-path", "--no-banner", "--exit-code"].filter((flag) => help.stdout.includes(flag) || help.stderr.includes(flag)), (deps.now ?? new Date()).toISOString()) };
 }

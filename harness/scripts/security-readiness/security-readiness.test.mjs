@@ -20,9 +20,9 @@ await check("Gitleaks probe binds version, required detect capabilities and fixe
   try {
     const result = probeGitleaks({ executablePath: f.path, rootDir: f.root, tempDir: f.root }, { spawnFn: spawnSequence([
       { status: 0, stdout: "gitleaks version 8.28.0\n", stderr: "" },
-      { status: 0, stdout: "--source --report-format --report-path --no-banner --exit-code", stderr: "" },
+      { status: 0, stdout: "--source --no-git --report-format --report-path --no-banner --exit-code", stderr: "" },
     ], calls), now: new Date("2026-07-18T12:00:00.000Z") });
-    assert.equal(result.handle.version, "8.28.0"); assert.equal(result.handle.capabilities.length, 5);
+    assert.equal(result.handle.version, "8.28.0"); assert.equal(result.handle.capabilities.length, 6);
     assert.deepEqual(calls.map(({ args }) => args), [["version"], ["detect", "--help"]]);
     assert.equal(calls.every(({ options }) => options.shell === false && options.timeout === 5000 && typeof options.env.PATH === "string" && !("HOME" in options.env)), true);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
@@ -34,7 +34,7 @@ await check("Go-installed Gitleaks binds the canonical embedded module version w
       spawnFn: spawnSequence([
         { status: 0, stdout: "version is set by build process\n", stderr: "" },
         { status: 0, stdout: `${f.path}: go1.26.0\n\tpath\tgithub.com/zricethezav/gitleaks/v8\n\tmod\tgithub.com/zricethezav/gitleaks/v8\tv8.30.1\th1:test=\n`, stderr: "" },
-        { status: 0, stdout: "--source --report-format --report-path --no-banner --exit-code", stderr: "" },
+        { status: 0, stdout: "--source --no-git --report-format --report-path --no-banner --exit-code", stderr: "" },
       ], calls),
       resolveExecutableFn: (name) => name === "go" ? "/usr/bin/go" : null,
       now: new Date("2026-07-20T00:00:00.000Z"),
