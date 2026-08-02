@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
   "planApproved": false,
-  "updatedAt": "2026-08-02T06:09:53.900Z",
+  "updatedAt": "2026-08-02T06:23:32.524Z",
   "closedFeatures": [
     {
       "id": "sprint-sentinel-epic",
@@ -89,7 +89,7 @@
   "continuity": {
     "schema": "pipeline.continuity.v0",
     "featureId": "sprint-nova-epic",
-    "revision": 8,
+    "revision": 9,
     "runtime": {
       "humanFacingLanguage": "en",
       "activeDuty": "Elephant",
@@ -118,7 +118,7 @@
     "acknowledgedFinal": null,
     "resume": {
       "mode": "immediate",
-      "sourceRevision": 7,
+      "sourceRevision": 9,
       "reasonCode": "active-turn"
     },
     "recovery": null,
@@ -226,8 +226,8 @@
     "specSha256": "ab67354e3da744150729b46c418347ce3e0fd4d4d17100f4b51a83ae465dcf52",
     "profile": "epic",
     "profileSha256": "8be50d40c4672fb406256aafbdd146dae9ed1b0931afb31fdfe3f8efa12dee04",
-    "submittedBy": "PO-NOVA-R1-recovery-authorization",
-    "submittedAt": "2026-08-01T11:49:11.789Z"
+    "submittedBy": "PO",
+    "submittedAt": "2026-08-02T06:23:32.524Z"
   },
   "planInvalidation": {
     "schema": "pipeline.plan-invalidation.v1",
