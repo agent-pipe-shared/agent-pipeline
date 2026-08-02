@@ -25,6 +25,37 @@ node plugins/pipeline-core/scripts/governance-export.mjs preview \
 `none` returns an explicit denial. The command has no queue, credential, or
 network side effect.
 
+## Interchange profiles
+
+`pipeline.governance-export-adapter-profile.v1` describes a non-secret
+destination capability: profile/version, supported format, payload and batch
+limits, acknowledgement granularity, ordering declaration, and deduplication.
+It deliberately does not contain an endpoint, token, certificate, tenant, or
+provider name. Those remain operator-managed adapter configuration.
+
+The mapping command is also read-only and accepts only a prior sanitized
+projection, never a canonical payload:
+
+```bash
+node plugins/pipeline-core/scripts/governance-export.mjs map \
+  --projection-file <sanitized-projection.json> \
+  --profile-file <adapter-profile.json>
+```
+
+| Profile | Deterministic mapping | Declared loss / boundary |
+| --- | --- | --- |
+| `cloudevents-json` | CloudEvents 1.0 `id`, stable Pipeline source, type, subject, optional occurrence time, and the sanitized projection as `data`. | Source/type fall back to typed `unknown` when policy omitted them; free-form source payload is never reconstructed. |
+| `otlp-json` | OpenTelemetry JSON resource logs with `service.name`, destination profile, event name, source digest, policy revision, and sanitized body. | No trace/span is invented; omitted correlation stays omitted. |
+| `ndjson` | One canonical projection JSON object followed by one newline. | Intended for offline/air-gapped transfer; it does not imply delivery or retention. |
+| `rfc5424` | RFC 5424-compatible single message with escaped structured data for profile, source digest, and policy revision. | It is a constrained legacy profile; only the stable event type enters the message text. |
+
+Mappings reject fields outside the export policy's closed allowlist, mismatched
+profile/format pairs, payloads above the declared byte limit, malformed
+profiles, and forged or duplicated acknowledgement IDs. An acknowledgement is
+validated before it reaches the outbox but remains transport observation only:
+it cannot approve, waive, release, deploy, revoke, or mutate canonical
+Pipeline authority.
+
 Each destination maintains an independent outbox state: acknowledged entries
 advance its cursor only across a contiguous confirmed prefix. Partial delivery
 leaves unacknowledged entries pending, while quarantined entries preserve their
