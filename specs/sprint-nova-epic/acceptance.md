@@ -253,6 +253,20 @@ No prior gate implies a later gate.
 - NVA-A98-4: Wrong candidate, tree, repository/remote fingerprint,
   destination ref, preimage, gate evidence, approval digest, expiry, replay or
   non-fast-forward state rejects before mutation.
+- NVA-A98-4a: A proven non-fast-forward feature-ref update produces only a
+  sanitized attended-human `--force-with-lease` handover plus a required fresh
+  remote readback. No Agent executor, Human-override capability or raw-push
+  bypass may execute the force operation or claim it succeeded.
+- NVA-A98-4b: V2 plan revocation atomically sets active phase `design` in the
+  same writer-lock postimage as `planApproved=false` and the exact V2
+  revocation. It can never emit an unapproved implementation phase.
+- NVA-A98-4c: Recovery accepts only the exact old V2 mixed shape: no
+  submission/invalidation, matching V2 approval/revocation and active plan
+  path, implementation phase and unchanged valid Continuity. Its read-only
+  plan binds preimage/postimage, actor, time and recovery class; its exact
+  `--activate true` apply clears the spent approval/revocation into a durable
+  receipt and moves to Design. Unknown input, drift or replay is fail-closed
+  or zero-write; onboarding rejects every mixed postimage.
 - NVA-A98-5: An isolated disposable-remote suite covers success, stale
   preimage, already-published convergence, ambiguous transport, replay and
   denied operations.

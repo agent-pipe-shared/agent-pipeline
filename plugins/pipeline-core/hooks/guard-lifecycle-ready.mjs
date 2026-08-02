@@ -622,6 +622,19 @@ function sanctionedPoAuthorityRebindArgs(args) {
 function sanctionedPipelineStateArgs(args) {
   const validBy = (value) => typeof value === "string"
     && value.trim() !== "" && Buffer.byteLength(value, "utf8") <= 500;
+  if (args[0] === "plan-legacy-v2-revocation-recovery") {
+    return args[1] === "--by" && validBy(args[2]) && args.length === 3;
+  }
+  if (args[0] === "apply-legacy-v2-revocation-recovery") {
+    return args[1] === "--by" && validBy(args[2])
+      && args[3] === "--prepared-at"
+      && typeof args[4] === "string" && Number.isFinite(Date.parse(args[4]))
+      && new Date(args[4]).toISOString() === args[4]
+      && args[5] === "--preimage-sha256" && HEX.test(args[6] ?? "")
+      && args[7] === "--postimage-sha256" && HEX.test(args[8] ?? "")
+      && args[9] === "--plan-sha256" && HEX.test(args[10] ?? "")
+      && args[11] === "--activate" && args[12] === "true" && args.length === 13;
+  }
   if (args[0] === "reopen-design") {
     return args[1] === "--by" && validBy(args[2]) && args.length === 3;
   }

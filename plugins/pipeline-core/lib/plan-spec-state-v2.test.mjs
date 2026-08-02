@@ -6,10 +6,13 @@ import test from "node:test";
 
 import { reconcileRunnerNativeContinuation } from "./continuity-state.mjs";
 import {
+  applyLegacyV2RevocationRecovery,
   approveSubmittedPlan,
   derivePlanLifecycle,
   enterPlanImplementation,
+  planLegacyV2RevocationRecovery,
   reopenPlanDesign,
+  revokePlanV2,
   sealCurrentPlanApproval,
   sha256CanonicalJson,
   submitPlan,
@@ -262,6 +265,76 @@ test("submission fails closed for malformed, busy, overflow, path, and State-CAS
     at: NOW,
   });
   assert.equal(stale.code, "PLAN-LIFECYCLE-STATE-STALE");
+});
+
+test("V2 revocation atomically returns the feature to design and the exact legacy mixed postimage recovers", () => {
+  const approval = {
+    schema: "pipeline.plan-approval.v2",
+    approvedBy: "PO",
+    approvedAt: NOW,
+    specBoundBy: "PO",
+    specBoundAt: NOW,
+    poGateAuthority: AUTHORITY,
+  };
+  const original = {
+    schema: "pipeline.state.v0",
+    activeFeature: { id: "feature", planPath: AUTHORITY.planPath, phase: "implementation" },
+    planApproved: true,
+    planApproval: approval,
+    continuity: continuity(),
+  };
+  const revocation = revokePlanV2({
+    state: original,
+    expectedStateSha256: sha256CanonicalJson(original),
+    expectedPlanSha256: PLAN,
+    expectedSpecSha256: SPEC,
+    by: "PO",
+    at: LATER,
+  });
+  assert.equal(revocation.ok, true, JSON.stringify(revocation));
+  assert.equal(revocation.state.activeFeature.phase, "design");
+
+  const legacyMixed = {
+    ...revocation.state,
+    activeFeature: { ...revocation.state.activeFeature, phase: "implementation" },
+  };
+  const planned = planLegacyV2RevocationRecovery({
+    state: legacyMixed,
+    expectedStateSha256: sha256CanonicalJson(legacyMixed),
+    by: "Phoenix PO",
+    at: REOPENED,
+  });
+  assert.equal(planned.ok, true, JSON.stringify(planned));
+  assert.equal(planned.state.activeFeature.phase, "design");
+  assert.equal(planned.state.planApproval, undefined);
+  assert.equal(planned.state.planRevocation, undefined);
+  assert.deepEqual(planned.state.continuity, legacyMixed.continuity);
+  assert.equal(derivePlanLifecycle(planned.state).status, "draft");
+
+  const applied = applyLegacyV2RevocationRecovery({
+    state: legacyMixed,
+    expectedPreimageSha256: planned.preimageSha256,
+    expectedPostimageSha256: planned.postimageSha256,
+    by: "Phoenix PO",
+    at: REOPENED,
+  });
+  assert.equal(applied.ok, true, JSON.stringify(applied));
+  assert.equal(applied.replay, false);
+  const replay = applyLegacyV2RevocationRecovery({
+    state: applied.state,
+    expectedPreimageSha256: planned.preimageSha256,
+    expectedPostimageSha256: planned.postimageSha256,
+    by: "Phoenix PO",
+    at: REOPENED,
+  });
+  assert.equal(replay.ok, true, JSON.stringify(replay));
+  assert.equal(replay.replay, true);
+  assert.equal(planLegacyV2RevocationRecovery({
+    state: { ...legacyMixed, planSubmission: {} },
+    expectedStateSha256: sha256CanonicalJson({ ...legacyMixed, planSubmission: {} }),
+    by: "Phoenix PO",
+    at: REOPENED,
+  }).code, "PS-V2-LEGACY-RECOVERY-INELIGIBLE");
 });
 
 test("repeated draft edits remain writable while edit-after-submit requires reopen", () => {

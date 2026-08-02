@@ -15,6 +15,8 @@ export const PLAN_SUBMISSION_SCHEMA = "pipeline.plan-submission.v1";
 export const PLAN_INVALIDATION_SCHEMA = "pipeline.plan-invalidation.v1";
 const AUTHORITY_SCHEMA = "pipeline.po-gate-authority.v2";
 const REVOCATION_SCHEMA = "pipeline.plan-revocation.v2";
+export const LEGACY_V2_REVOCATION_RECOVERY_SCHEMA = "pipeline.plan-legacy-v2-revocation-recovery.v1";
+export const LEGACY_V2_REVOCATION_RECOVERY_CLASS = "legacy-v2-revocation-implementation-to-design";
 const STATE_SCHEMA = "pipeline.state.v0";
 const SHA256 = /^[a-f0-9]{64}$/u;
 const AUTHORITY_KEYS = [
@@ -46,6 +48,13 @@ const REVOCATION_KEYS = [
   "specSha256",
   "revokedBy",
   "revokedAt",
+];
+const LEGACY_V2_RECOVERY_KEYS = [
+  "schema",
+  "recoveryClass",
+  "recoveredBy",
+  "recoveredAt",
+  "preimageSha256",
 ];
 const ACTIVE_FEATURE_KEYS = ["id", "planPath", "phase"];
 const SUBMISSION_KEYS = [
@@ -688,6 +697,104 @@ function matchingRevocation(revocation, approval) {
     && revocation.specSha256 === approval.poGateAuthority.specSha256;
 }
 
+function validLegacyV2RevocationRecovery(value) {
+  return hasExactKeys(value, LEGACY_V2_RECOVERY_KEYS)
+    && value.schema === LEGACY_V2_REVOCATION_RECOVERY_SCHEMA
+    && value.recoveryClass === LEGACY_V2_REVOCATION_RECOVERY_CLASS
+    && isNonBlankString(value.recoveredBy)
+    && isCanonicalIso(value.recoveredAt)
+    && SHA256.test(value.preimageSha256);
+}
+
+function legacyV2RevocationRecoveryPostimage(state, { by, at, preimageSha256 }) {
+  const next = {
+    ...state,
+    planApproved: false,
+    activeFeature: { ...state.activeFeature, phase: "design" },
+    planRecovery: {
+      schema: LEGACY_V2_REVOCATION_RECOVERY_SCHEMA,
+      recoveryClass: LEGACY_V2_REVOCATION_RECOVERY_CLASS,
+      recoveredBy: by,
+      recoveredAt: at,
+      preimageSha256,
+    },
+  };
+  delete next.planApproval;
+  delete next.planRevocation;
+  return next;
+}
+
+/**
+ * Narrow recovery for the sole historical writer defect that emitted a valid
+ * V2 revocation while leaving its feature in implementation. This never
+ * generalizes to arbitrary state repair: the exact legacy shape is required.
+ */
+export function planLegacyV2RevocationRecovery({
+  state,
+  expectedStateSha256,
+  by,
+  at,
+}) {
+  if (!currentStateMatches(state, expectedStateSha256)) return fail("PS-V2-LEGACY-RECOVERY-STATE-STALE");
+  if (!isNonBlankString(by) || !isCanonicalIso(at)) return fail("PS-V2-LEGACY-RECOVERY-REQUEST-INVALID");
+
+  const preimageSha256 = sha256CanonicalJson(state);
+  if (
+    state?.planSubmission !== undefined
+    || state?.planInvalidation !== undefined
+    || state?.planApproved !== false
+    || state?.activeFeature?.phase !== "implementation"
+    || !validV2Approval(state?.planApproval)
+    || !validV2Revocation(state?.planRevocation)
+    || !matchingRevocation(state.planRevocation, state.planApproval)
+    || state.activeFeature.planPath !== state.planApproval.poGateAuthority.planPath
+    || !validateContinuityState(state.continuity, state.activeFeature.id).ok
+  ) return fail("PS-V2-LEGACY-RECOVERY-INELIGIBLE");
+
+  const nextState = legacyV2RevocationRecoveryPostimage(state, { by, at, preimageSha256 });
+  return {
+    ok: true,
+    recoveryClass: LEGACY_V2_REVOCATION_RECOVERY_CLASS,
+    preimageSha256,
+    postimageSha256: sha256CanonicalJson(nextState),
+    state: nextState,
+  };
+}
+
+/** Apply/readback verifier for the digest-bound legacy recovery plan. */
+export function applyLegacyV2RevocationRecovery({
+  state,
+  expectedPreimageSha256,
+  expectedPostimageSha256,
+  by,
+  at,
+}) {
+  if (!SHA256.test(expectedPreimageSha256 ?? "") || !SHA256.test(expectedPostimageSha256 ?? "")) {
+    return fail("PS-V2-LEGACY-RECOVERY-PLAN-INVALID");
+  }
+  if (!isNonBlankString(by) || !isCanonicalIso(at)) return fail("PS-V2-LEGACY-RECOVERY-REQUEST-INVALID");
+  if (sha256CanonicalJson(state) === expectedPostimageSha256
+    && state?.planApproved === false
+    && state?.activeFeature?.phase === "design"
+    && state.planApproval === undefined
+    && state.planRevocation === undefined
+    && validLegacyV2RevocationRecovery(state.planRecovery)
+    && state.planRecovery.recoveredBy === by
+    && state.planRecovery.recoveredAt === at
+    && state.planRecovery.preimageSha256 === expectedPreimageSha256) {
+    return { ok: true, replay: true, state };
+  }
+  const planned = planLegacyV2RevocationRecovery({
+    state,
+    expectedStateSha256: expectedPreimageSha256,
+    by,
+    at,
+  });
+  if (!planned.ok) return planned;
+  if (planned.postimageSha256 !== expectedPostimageSha256) return fail("PS-V2-LEGACY-RECOVERY-POSTIMAGE-STALE");
+  return { ok: true, replay: false, state: planned.state };
+}
+
 /**
  * Atomically-ready pure transition from one exact legacy plan approval to v2.
  * Callers must apply the returned state under their existing writer lock.
@@ -786,7 +893,12 @@ export function revokePlanV2({
   return {
     ok: true,
     replay: false,
-    state: { ...state, planApproved: false, planRevocation: revocation },
+    state: {
+      ...state,
+      planApproved: false,
+      planRevocation: revocation,
+      activeFeature: { ...state.activeFeature, phase: "design" },
+    },
     revocation,
     planRevocationSha256: sha256CanonicalJson(revocation),
   };

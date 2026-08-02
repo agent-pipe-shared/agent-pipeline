@@ -792,6 +792,14 @@ typed non-success. Already-published state converges without another push;
 stale preimage, replay, wrong candidate/tree/evidence/approval/expiry and
 non-fast-forward state reject before mutation.
 
+A proven non-fast-forward destination is never an Agent force-push route. The
+Elephant reports the compared candidate, destination and observed remote
+preimage, then hands over the exact `--force-with-lease` operation to the
+attended human operator. The handover remains a non-success until a fresh
+remote readback proves the exact intended ref. No Human-override capability,
+publication executor or generic shell/Git override may execute or synthesize
+that force operation.
+
 Full Verify uses a machine-local run journal under the physical Git common
 directory, never a tracked result or second project authority. The journal
 emits bounded `pipeline.verify-progress.v1` JSON events to the interactive
@@ -818,7 +826,43 @@ ambiguous-transport, replay and denied-operation fixtures; Verify interruption
 and drift fixtures; correction-delta lineage fixtures; release-state
 consistency checks; and one exact candidate-bound publication/readback record.
 
-### 5.8 A7 — Immutable Nova A increment
+### 5.8 A6S — Atomic plan-revocation and legacy-state recovery (`#98`)
+
+Plan revocation is a state transition, not a boolean edit. A valid revocation
+may have only the postimage `planApproved: false`, an exact V2 revocation
+record and `activeFeature.phase: "design"`. The inverse combination—an
+implementation phase with no active approval—is invalid at every writer,
+onboarding readback and lifecycle admission boundary. The legacy harness
+writer either delegates to this contract or refuses before a mutation; it may
+not emit the mixed postimage.
+
+The current V2 reducer makes its existing revocation postimage atomic by
+setting the active feature to `design` in the same writer-lock transaction; a
+current local writer can therefore never create the mixed state. The historic
+entrypoint remains narrow and admits no arbitrary State patch.
+
+For the already-created legacy mixed postimage, recovery is separately closed
+and attended. `plan-legacy-v2-revocation-recovery --by <human-actor>` is
+read-only and succeeds only for this exact shape: no plan submission or
+invalidation; `planApproved:false`; implementation phase; a valid V2 approval
+and matching V2 revocation; matching active plan path; and valid, unchanged
+Continuity. It returns the preimage hash, computed postimage hash, actor,
+timestamp, recovery class and the sole exact
+`apply-legacy-v2-revocation-recovery ... --activate true` action. Apply
+revalidates the digest-bound preimage and postimage under the writer lock,
+sets phase `design`, removes the spent V2 approval/revocation and retains an
+exact recovery receipt. Replay is zero-write. Every other State shape,
+changed input, plan digest, actor, timestamp or postimage remains typed
+unavailable; neither JSON hand-editing, rebase, cache patch nor cross-root
+transfer is a recovery route.
+
+The regression matrix covers atomic normal V2 revocation, exact attended
+legacy recovery, stale/postimage/plan-digest rejection, zero-write replay,
+unknown-state refusal and onboarding rejection of every mixed state. Evidence
+uses digests and repository-relative paths only—never a host path, account or
+credential-store path.
+
+### 5.9 A7 — Immutable Nova A increment
 
 `pipeline.nova-increment-receipt.v1` has exact keys `schema`, `increment`,
 `base`, `candidate`, `specification`, `acceptance`, `issues`, `backlog`,
@@ -1443,6 +1487,7 @@ gate with collision review. In this table, “schemas `<name>` under
 | A5 | `plugins/pipeline-core/lib/critic-review-lineage.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/critic-review-lineage.schema.json` | `plugins/pipeline-core/scripts/critic-packet-preflight.mjs`, matching `.test.mjs`, only for closed lineage admission; `plugins/pipeline-core/lib/review-economy.mjs`, matching `.test.mjs`, only for projection |
 | A6 | `plugins/pipeline-core/lib/multi-cli-benchmark.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/multi-cli-benchmark.schema.json`; `plugins/pipeline-core/scripts/release-preflight.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/release-preflight.schema.json`; exact fixtures `plugins/pipeline-core/scripts/fixtures/nova-benchmark/mini.json`, `feature.json`, `review.json`, `migration.json`, `failure-recovery.json` | none |
 | A6R / #98 | `plugins/pipeline-core/lib/publication-capability-preflight.mjs`, matching `.test.mjs`; versioned v2 publication-bundle/authority schemas and matching tests within the existing publication family/store; `plugins/pipeline-core/lib/verify-resume.mjs`, matching `.test.mjs`; schemas `publication-capability-preflight`, `verify-progress`, `verify-suite-receipt`, `verify-resume-plan` and `public-release-state` under `plugins/pipeline-core/scripts/`; `harness/scripts/check-release-state-consistency.mjs`, matching `.test.mjs`; `docs/release-state.json`; exact candidate evidence under `specs/sprint-nova-epic/evidence/nova-a/delivery-loop/` | released v1 publication bundle/authority remain byte-stable; released `plugins/pipeline-core/scripts/publication-executor.mjs`, matching `.test.mjs` and schema, only to add the fixed productive operations and v2 selection around the existing authority family; `plugins/pipeline-core/scripts/release-preflight.mjs`, matching `.test.mjs` and schema, only for early capability admission; `harness/scripts/verify.mjs` and `plugins/pipeline-core/scripts/verify-journal.mjs`, each with matching tests, only for bounded progress/journal/resume orchestration; `plugins/pipeline-core/lib/critic-review-lineage.mjs`, matching `.test.mjs`, only for release-path delta enforcement; `docs/state.md`; `harness/scripts/verify.mjs` registration; this PRD/Spec/acceptance/plan/lifecycle set |
+| A6S / #98 | `plugins/pipeline-core/lib/plan-spec-state-v2.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/pipeline-state.mjs`; `plugins/pipeline-core/scripts/pipeline-state-revocation.test.mjs`; `harness/scripts/pipeline-state.mjs`, matching `.test.mjs` | `plugins/pipeline-core/lib/project-onboarding-v3.mjs`, matching `.test.mjs`, only to reject the mixed legacy revocation postimage; this PRD/Spec/acceptance/plan/lifecycle set; no publication, generic Human-override, remote, cache or workspace-root path |
 | A7 | `plugins/pipeline-core/lib/nova-increment-receipt.mjs`, matching `.test.mjs`; schemas `nova-increment-receipt` and `nova-increment-readback` under `plugins/pipeline-core/scripts/`; exact evidence paths `specs/sprint-nova-epic/evidence/nova-a/evidence-manifest.json`, `increment-receipt.json`, `increment-readback.json`, `verify.json`, `security.json`, `critic.json`, `po-activation.json` | `harness/scripts/verify.mjs`; `specs/sprint-nova-epic/lifecycle.json`; `specs/sprint-nova-epic/plans/nova-a.md`; `specs/sprint-nova-epic/plans/nova-b.md`; append-only `specs/sprint-nova-epic/result.md` |
 | B0 | `plugins/pipeline-core/lib/runner-native-continuation.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/runner-native-continuation.schema.json` including its closed `poDecisionReceipt` definition; `plugins/pipeline-core/scripts/codex-goal-host.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/claude-goal-host.mjs`, matching `.test.mjs`; cross-runner fixtures under `plugins/pipeline-core/scripts/fixtures/runner-native-continuation/` | `plugins/pipeline-core/lib/continuity-state.mjs`, matching `.test.mjs`; `plugins/pipeline-core/lib/continuity-status.mjs`, matching `.test.mjs`; `plugins/pipeline-core/lib/interaction-continuity.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/continuity-status.mjs`, matching `.test.mjs`; `plugins/pipeline-core/hooks/stop-suggest.mjs`, matching `.test.mjs`; append-only `specs/sprint-nova-epic/result.md` for sanitized activation/readback evidence |
 | B1-C | `plugins/pipeline-core/lib/local-worker-pool.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/local-worker-pool.schema.json`; `specs/sprint-nova-epic/design/execution-state-authority-proposal.md` | none; pure contract/synthetic reducer only |

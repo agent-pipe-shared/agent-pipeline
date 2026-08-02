@@ -1,7 +1,7 @@
 # Sprint Nova Epic — Product Requirements
 
 <!-- po-language: en -->
-<!-- technical-spec-sha256: 03f8769f37387086fb78680edcb56dc5d332d51dd83afa3de3f00b25a4892468 -->
+<!-- technical-spec-sha256: 44d47aa6f1a3b20200aedc1679c24d1a461c641218ab0baf3986377e147fb28d -->
 
 **Feature ID:** `sprint-nova-epic`
 **Profile / rigor / risk:** Epic / 2 / high
@@ -256,6 +256,20 @@ and cannot retroactively redefine either Sprint's acceptance.
   remote preimage, fast-forward proof, gate evidence, approval digest and
   expiry. Reject wrong binding, replay, force, delete, broad refspec or
   non-fast-forward state before mutation.
+- When a fresh comparison proves that a feature-ref update is non-fast-forward,
+  report the exact candidate/destination/preimage and hand the lease-protected
+  force operation to the attended human operator. The Agent never executes a
+  force push, creates a force capability or treats the handover as publication
+  success; a fresh remote readback remains required.
+- Make V2 plan revocation atomic: its writer-lock postimage always moves the
+  active feature to Design and can never leave `planApproved=false` in
+  implementation.
+- Provide an attended, evidence-bound plan/apply recovery for the sole known
+  older V2 mixed state. It accepts only the exact no-submission/no-invalidation
+  shape with matching V2 approval/revocation and unchanged valid Continuity,
+  then clears the spent approval/revocation into a durable recovery receipt and
+  moves to Design. Every other state remains typed unavailable; manual JSON
+  changes, rebases, cache patches and cross-root state transfer are not routes.
 - Emit bounded machine-readable Full Verify progress, retain complete logs
   outside the interactive tool channel and resume only completed suites whose
   candidate tree, suite identity/version, inputs, environment contract and

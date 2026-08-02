@@ -286,10 +286,13 @@ import {
 } from "../lib/po-gate-authority.mjs";
 import { inspectProjectOnboardingV3 } from "../lib/project-onboarding-v3.mjs";
 import {
+  applyLegacyV2RevocationRecovery,
   approveSubmittedPlan,
   bindPlanSpecApproval,
   derivePlanLifecycle,
   enterPlanImplementation,
+  LEGACY_V2_REVOCATION_RECOVERY_CLASS,
+  planLegacyV2RevocationRecovery,
   reopenPlanDesign,
   revokePlanV2,
   sealCurrentPlanApproval,
@@ -2379,6 +2382,32 @@ function parseExactFlags(argv, names) {
     i++;
   }
   return Object.keys(out).length === names.size ? { ok: true, value: out } : { ok: false };
+}
+
+const LEGACY_V2_REVOCATION_RECOVERY_PLAN_SCHEMA = "pipeline.plan-legacy-v2-revocation-recovery-plan.v1";
+const LEGACY_V2_RECOVERY_PLAN_FLAGS = new Set(["by", "prepared-at", "preimage-sha256", "postimage-sha256", "plan-sha256", "activate"]);
+
+function legacyV2RecoveryPlanRecord({ by, preparedAt, preimageSha256, postimageSha256 }) {
+  return {
+    schema: LEGACY_V2_REVOCATION_RECOVERY_PLAN_SCHEMA,
+    recoveryClass: LEGACY_V2_REVOCATION_RECOVERY_CLASS,
+    actor: by,
+    preparedAt,
+    preimageSha256,
+    postimageSha256,
+  };
+}
+
+function legacyV2RecoveryApplyAction({ by, preparedAt, preimageSha256, postimageSha256, planSha256 }) {
+  return [
+    "apply-legacy-v2-revocation-recovery",
+    "--by", by,
+    "--prepared-at", preparedAt,
+    "--preimage-sha256", preimageSha256,
+    "--postimage-sha256", postimageSha256,
+    "--plan-sha256", planSha256,
+    "--activate", "true",
+  ];
 }
 
 const GATE_ESTIMATE_ID_RE = /^[a-z0-9][a-z0-9._-]{1,79}$/;
@@ -4737,6 +4766,91 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         return 2;
       }
       console.log(`Plan approved by "${by}" on ${approvedAt}; lifecycle="approved".`);
+      return 0;
+    }
+
+    case "plan-legacy-v2-revocation-recovery": {
+      const parsed = parseExactFlags(rest, new Set(["by"]));
+      if (!parsed.ok || isBlank(parsed.value.by)) {
+        console.error("Error: plan-legacy-v2-revocation-recovery requires exactly --by <human-actor>.");
+        return 2;
+      }
+      const preparedAt = now();
+      const planned = planLegacyV2RevocationRecovery({
+        state: base,
+        expectedStateSha256: sha256CanonicalJson(base),
+        by: parsed.value.by,
+        at: preparedAt,
+      });
+      if (!planned.ok) {
+        console.error(`Error: legacy V2 revocation recovery is unavailable (${planned.code}); no state was changed.`);
+        return 2;
+      }
+      const record = legacyV2RecoveryPlanRecord({
+        by: parsed.value.by,
+        preparedAt,
+        preimageSha256: planned.preimageSha256,
+        postimageSha256: planned.postimageSha256,
+      });
+      const planSha256 = sha256CanonicalJson(record);
+      console.log(JSON.stringify({
+        ...record,
+        planSha256,
+        nextAction: {
+          kind: "command",
+          executable: "node",
+          argv: ["plugins/pipeline-core/scripts/pipeline-state.mjs", ...legacyV2RecoveryApplyAction({
+            by: parsed.value.by,
+            preparedAt,
+            preimageSha256: planned.preimageSha256,
+            postimageSha256: planned.postimageSha256,
+            planSha256,
+          })],
+          mutation: true,
+          requiresConfirmation: true,
+        },
+      }));
+      return 0;
+    }
+
+    case "apply-legacy-v2-revocation-recovery": {
+      const parsed = parseExactFlags(rest, LEGACY_V2_RECOVERY_PLAN_FLAGS);
+      if (!parsed.ok || parsed.value.activate !== "true" || isBlank(parsed.value.by)) {
+        console.error("Error: apply-legacy-v2-revocation-recovery requires the exact planned --by, --prepared-at, --preimage-sha256, --postimage-sha256, --plan-sha256 and --activate true arguments.");
+        return 2;
+      }
+      const value = parsed.value;
+      const record = legacyV2RecoveryPlanRecord({
+        by: value.by,
+        preparedAt: value["prepared-at"],
+        preimageSha256: value["preimage-sha256"],
+        postimageSha256: value["postimage-sha256"],
+      });
+      if (sha256CanonicalJson(record) !== value["plan-sha256"]) {
+        console.error("Error: legacy V2 revocation recovery plan digest is invalid; no state was changed.");
+        return 2;
+      }
+      const written = writeState(dir, undefined, base, {
+        transition: (observed) => applyLegacyV2RevocationRecovery({
+          state: observed,
+          expectedPreimageSha256: value["preimage-sha256"],
+          expectedPostimageSha256: value["postimage-sha256"],
+          by: value.by,
+          at: value["prepared-at"],
+        }),
+      });
+      if (!stateWriteSucceeded(written)) {
+        console.error(`Error: legacy V2 revocation recovery failed before commit (${written.code}); no recovery was recorded.`);
+        return 2;
+      }
+      const persisted = readState(dir);
+      if (persisted.status !== "ok" || sha256CanonicalJson(persisted.state) !== value["postimage-sha256"]) {
+        console.error("Error: legacy V2 revocation recovery postimage readback failed; inspect State before retry.");
+        return 2;
+      }
+      console.log(written.replay
+        ? "Legacy V2 revocation recovery already applied; zero-write replay accepted."
+        : `Legacy V2 revocation recovery applied by "${value.by}"; lifecycle=\"draft\".`);
       return 0;
     }
 

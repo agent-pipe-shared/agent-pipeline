@@ -258,11 +258,39 @@ recovery before R3 implementation.
 The exact contracts, path manifest and negative matrix are in
 `specs/sprint-nova-epic/design/post-v0.4.7-delivery-loop.md`.
 
+## Slice A6S — Atomic plan revocation and recovery
+
+**Issue:** `#98`
+
+**Dependencies:** the existing V2 plan/Spec writer and current onboarding
+state admission.
+
+**Outcome:** no writer can create a revoked implementation phase; a previously
+created legacy mixed state has one evidence-bound recovery route or an honest
+typed unavailable result.
+
+**Order:**
+
+1. make the pure V2 reducer express the atomic Design postimage;
+2. define the closed attended plan/apply payload for the sole legacy V2 mixed
+   shape;
+3. bind preimage/postimage, actor, timestamp, recovery class and `--activate`
+   under the existing writer lock;
+4. retain unchanged Continuity, clear spent V2 approval/revocation into a
+   durable receipt and accept only zero-write replay;
+5. reject mixed postimages in onboarding and permit only the exact recovery
+   argv while lifecycle is non-ready; and
+6. run normal, malformed, stale, replay and legacy-writer regressions.
+
+**DoD:** all NVA-A98-4b/4c cases pass; no manual JSON edit, remote action,
+cache patch, cross-root input/output or generic override appears in the
+implementation; every mutation is revalidated under the existing writer lock.
+
 ## Slice A7 — Nova A integration and gate
 
 **Outcome:** one candidate-bound Nova A Result.
 
-**Entry:** A1–A6R are complete, the exact v0.4.7 adoption record is valid and
+**Entry:** A1–A6S are complete, the exact v0.4.7 adoption record is valid and
 Issue `#98` has no remaining blocker criterion.
 
 **Shared later-integration resources:** central Verify registration, ADR
