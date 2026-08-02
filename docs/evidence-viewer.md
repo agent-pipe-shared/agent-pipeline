@@ -31,3 +31,24 @@ The output is intentionally create-only: choose a fresh output path for every
 build. This prevents the report writer from silently replacing an earlier
 artifact. Reports contain no JavaScript, network dependency, or external asset;
 the embedded CSP permits only their own inline stylesheet.
+
+## Governance export observation
+
+An optional local status file can make outbound governance-export lag,
+delivery state, and a sanitized receipt class visible in the report:
+
+```bash
+node plugins/pipeline-core/scripts/evidence-viewer.mjs build \
+  --root "$PWD" \
+  --manifest specs/<feature-id>/lifecycle.json \
+  --output evidence/<feature-id>.html \
+  --export-status-file <relative-status.json>
+```
+
+The file must be a closed `pipeline.governance-export-view-status.v1` value.
+It contains only destination profile, typed delivery state, cursor, lag, and a
+bounded batch/acknowledgement/disposition summary. Endpoints, credentials,
+external coordinates, payloads, and raw responses are rejected. The report
+labels this section as a non-authoritative transport observation: an accepted,
+failed, or unavailable export never changes candidate, approval, release, or
+Pipeline authority state.

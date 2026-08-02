@@ -16,6 +16,7 @@ const SHA = /^[a-f0-9]{64}$/u;
 const VIEW_STATUSES = new Set(["pass", "fail", "unknown", "tampered", "misplaced", "orphaned", "legacy", "invalid", "unavailable"]);
 const ARTIFACT_STATES = new Set(["verified", "unknown", "tampered", "misplaced", "orphaned", "legacy", "invalid", "unavailable"]);
 const PACKAGE_STATES = new Set(["draft", "awaiting-approval", "approved", "implementing", "verifying", "completed", "superseded", "abandoned", "retained"]);
+const EXPORT_STATES = new Set(["unavailable", "pending", "delivered", "retryable-failure", "quarantined"]);
 
 function fail(code) { const error = new Error("Evidence view input is invalid."); error.code = code; throw error; }
 function record(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
@@ -34,6 +35,12 @@ function publicPath(path, index, sharing) { return sharing === "redacted" ? `art
 function notice(valueClass, code, message) { return frozen({ valueClass, code, message }); }
 function unavailableCandidate() { return frozen({ state: "unavailable", commit: null, tree: null }); }
 function boundCandidate(value) { return frozen({ state: "fact", commit: value.commit, tree: value.tree }); }
+function unavailableExportStatus() { return frozen({ state: "unavailable", destinationProfile: null, cursor: null, lag: null, receipt: null }); }
+function exportStatus(value) {
+  if (value === null || value === undefined) return unavailableExportStatus();
+  if (!exact(value, ["schema", "destinationProfile", "state", "cursor", "lag", "receipt"]) || value.schema !== "pipeline.governance-export-view-status.v1" || typeof value.destinationProfile !== "string" || value.destinationProfile === "" || !EXPORT_STATES.has(value.state) || !Number.isSafeInteger(value.cursor) || value.cursor < 0 || !Number.isSafeInteger(value.lag) || value.lag < 0 || !(value.receipt === null || exact(value.receipt, ["batchId", "acknowledgementClass", "terminalDisposition"]))) fail("EVM-EXPORT");
+  return frozen({ state: value.state, destinationProfile: value.destinationProfile, cursor: value.cursor, lag: value.lag, receipt: value.receipt === null ? null : frozen({ ...value.receipt }) });
+}
 
 /** Backwards-compatible pure builder for explicitly supplied, already validated facts. */
 export function buildEvidenceViewModel(input) {
@@ -54,8 +61,9 @@ export function buildEvidenceViewModel(input) {
  * Build a canonical package projection. Invalid topology produces an explicit
  * invalid view instead of a deceptive success or a partially trusted report.
  */
-export function buildEvidenceViewModelFromFeaturePackage({ rootDir = process.cwd(), manifestPath, sharing = "private" } = {}) {
+export function buildEvidenceViewModelFromFeaturePackage({ rootDir = process.cwd(), manifestPath, sharing = "private", exportObservation = null } = {}) {
   if (typeof rootDir !== "string" || typeof manifestPath !== "string" || !["private", "redacted"].includes(sharing)) fail("EVM-REQUEST");
+  const observedExport = exportStatus(exportObservation);
   const root = resolve(rootDir);
   const checked = validateFeaturePackage(root, manifestPath);
   if (!checked.ok || !checked.receipt) {
@@ -67,13 +75,14 @@ export function buildEvidenceViewModelFromFeaturePackage({ rootDir = process.cwd
       candidate: unavailableCandidate(),
       status: "invalid",
       sharing,
+      exportStatus: observedExport,
       artifacts: frozen([]),
       notices: frozen([notice("invalid", "EVM-TOPOLOGY", "Canonical package validation failed; no approval or pass claim is rendered.")]),
     });
   }
   let manifest;
   try { manifest = JSON.parse(readFileSync(join(root, checked.receipt.manifest), "utf8")); }
-  catch { return frozen({ schema: "pipeline.evidence-view-model.v2", authority: "non-authoritative", source: frozen({ manifest: null, manifestSha256: null, topology: "invalid" }), feature: frozen({ id: null, lifecycleState: "unavailable" }), candidate: unavailableCandidate(), status: "invalid", sharing, artifacts: frozen([]), notices: frozen([notice("invalid", "EVM-MANIFEST", "Canonical manifest became unavailable after validation.")]) }); }
+  catch { return frozen({ schema: "pipeline.evidence-view-model.v2", authority: "non-authoritative", source: frozen({ manifest: null, manifestSha256: null, topology: "invalid" }), feature: frozen({ id: null, lifecycleState: "unavailable" }), candidate: unavailableCandidate(), status: "invalid", sharing, exportStatus: observedExport, artifacts: frozen([]), notices: frozen([notice("invalid", "EVM-MANIFEST", "Canonical manifest became unavailable after validation.")]) }); }
   const hasCandidate = candidate(manifest.candidate);
   const artifacts = manifest.artifacts.map((artifact, index) => frozen({
     id: `artifact-${index + 1}`,
@@ -96,6 +105,7 @@ export function buildEvidenceViewModelFromFeaturePackage({ rootDir = process.cwd
     candidate: hasCandidate ? boundCandidate(manifest.candidate) : unavailableCandidate(),
     status: statusForPackage(manifest.state, hasCandidate),
     sharing,
+    exportStatus: observedExport,
     artifacts: frozen(artifacts),
     notices: frozen(notices),
   });

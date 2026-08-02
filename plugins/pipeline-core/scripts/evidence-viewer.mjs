@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 /** Build one new, static, offline Evidence Viewer report. */
-import { lstat, mkdir, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createHash } from "node:crypto";
@@ -16,15 +16,15 @@ function safeRelative(root, value, code) {
   return target;
 }
 function parse(argv) {
-  if (argv[0] !== "build") fail("EVC-ARGUMENT", "Usage: evidence-viewer.mjs build --root <checkout> --manifest <relative-manifest> --output <relative-report> [--sharing private|redacted]");
+  if (argv[0] !== "build") fail("EVC-ARGUMENT", "Usage: evidence-viewer.mjs build --root <checkout> --manifest <relative-manifest> --output <relative-report> [--sharing private|redacted] [--export-status-file <relative-json>]");
   const values = new Map();
   for (let index = 1; index < argv.length; index += 2) {
     const key = argv[index]; const value = argv[index + 1];
-    if (!new Set(["--root", "--manifest", "--output", "--sharing"]).has(key) || value === undefined || values.has(key)) fail("EVC-ARGUMENT", "Viewer arguments are invalid.");
+    if (!new Set(["--root", "--manifest", "--output", "--sharing", "--export-status-file"]).has(key) || value === undefined || values.has(key)) fail("EVC-ARGUMENT", "Viewer arguments are invalid.");
     values.set(key, value);
   }
   if (!["--root", "--manifest", "--output"].every((key) => values.has(key)) || (values.has("--sharing") && !["private", "redacted"].includes(values.get("--sharing")))) fail("EVC-ARGUMENT", "Viewer arguments are incomplete or invalid.");
-  return { root: resolve(values.get("--root")), manifestPath: values.get("--manifest"), outputPath: values.get("--output"), sharing: values.get("--sharing") ?? "private" };
+  return { root: resolve(values.get("--root")), manifestPath: values.get("--manifest"), outputPath: values.get("--output"), sharing: values.get("--sharing") ?? "private", exportStatusFile: values.get("--export-status-file") ?? null };
 }
 async function ensurePhysicalParent(root, target) {
   const rootEntry = await lstat(root); if (!rootEntry.isDirectory() || rootEntry.isSymbolicLink()) fail("EVC-ROOT", "Repository root must be a physical directory.");
@@ -40,9 +40,12 @@ export async function main(argv = process.argv.slice(2)) {
   const options = parse(argv);
   const output = safeRelative(options.root, options.outputPath, "EVC-OUTPUT");
   safeRelative(options.root, options.manifestPath, "EVC-MANIFEST");
+  const exportStatusPath = options.exportStatusFile === null ? null : safeRelative(options.root, options.exportStatusFile, "EVC-EXPORT");
   await ensurePhysicalParent(options.root, output);
   try { const existing = await lstat(output); if (existing) fail("EVC-OUTPUT-EXISTS", "Refusing to overwrite an existing report."); } catch (error) { if (error?.code !== "ENOENT") throw error; }
-  const model = buildEvidenceViewModelFromFeaturePackage({ rootDir: options.root, manifestPath: options.manifestPath, sharing: options.sharing });
+  let exportObservation = null;
+  if (exportStatusPath !== null) { try { exportObservation = JSON.parse(await readFile(exportStatusPath, "utf8")); } catch { fail("EVC-EXPORT", "Export status input is invalid."); } }
+  const model = buildEvidenceViewModelFromFeaturePackage({ rootDir: options.root, manifestPath: options.manifestPath, sharing: options.sharing, exportObservation });
   const html = renderEvidenceView(model, { sourceHref: (source) => relative(dirname(output), resolve(options.root, source)).split(sep).join("/") });
   await writeFile(output, html, { encoding: "utf8", flag: "wx", mode: 0o644 });
   return Object.freeze({ schema: "pipeline.evidence-viewer-build-receipt.v1", authority: "non-authoritative", output: options.outputPath, outputSha256: createHash("sha256").update(html, "utf8").digest("hex"), status: model.status, candidate: model.candidate.state === "fact" ? { commit: model.candidate.commit, tree: model.candidate.tree } : null, sharing: options.sharing });

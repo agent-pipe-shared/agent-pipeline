@@ -38,3 +38,9 @@ test("redacted package projection is deterministic and withholds artifact paths"
   const fixture = packageFixture(); const model = buildEvidenceViewModelFromFeaturePackage({ rootDir: fixture.root, manifestPath: fixture.manifest, sharing: "redacted" });
   assert.equal(model.source.manifest, null); assert.equal(model.artifacts[0].path, "artifact-1"); assert.equal(model.artifacts[0].sourcePath, null); assert.ok(model.notices.some((entry) => entry.valueClass === "redacted"));
 });
+test("projects explicitly supplied delivery observation without changing the candidate claim", () => {
+  const fixture = packageFixture(); const exportObservation = { schema: "pipeline.governance-export-view-status.v1", destinationProfile: "audit", state: "retryable-failure", cursor: 2, lag: 3, receipt: { batchId: "batch-1", acknowledgementClass: "partial", terminalDisposition: "retryable-failure" } };
+  const model = buildEvidenceViewModelFromFeaturePackage({ rootDir: fixture.root, manifestPath: fixture.manifest, exportObservation });
+  assert.equal(model.status, "unknown"); assert.equal(model.exportStatus.state, "retryable-failure"); assert.equal(model.exportStatus.lag, 3);
+  assert.throws(() => buildEvidenceViewModelFromFeaturePackage({ rootDir: fixture.root, manifestPath: fixture.manifest, exportObservation: { ...exportObservation, receipt: { raw: "forbidden" } } }), (error) => error.code === "EVM-EXPORT");
+});

@@ -11,3 +11,7 @@ test("renders an offline, accessible static report with candidate before summary
 test("rejects an authority-bearing or unknown view shape", () => {
   assert.throws(() => renderEvidenceView({ schema: "pipeline.evidence-view-model.v2", authority: "authoritative", artifacts: [] }), /EVR-MODEL/);
 });
+test("renders export lag and receipts as a separate non-authoritative observation", () => {
+  const model = { schema: "pipeline.evidence-view-model.v2", authority: "non-authoritative", source: { topology: "valid" }, feature: { id: "f", lifecycleState: "completed" }, candidate: { state: "fact", commit: "a".repeat(40), tree: "b".repeat(40) }, status: "unknown", sharing: "private", exportStatus: { state: "retryable-failure", destinationProfile: "audit", cursor: 2, lag: 3, receipt: { batchId: "batch-1", acknowledgementClass: "partial", terminalDisposition: "retryable-failure" } }, artifacts: [], notices: [] };
+  const html = renderEvidenceView(model); assert.match(html, /Governance export observation/); assert.match(html, /retryable-failure/); assert.match(html, /Lag/); assert.match(html, /non-authoritative transport observation/);
+});

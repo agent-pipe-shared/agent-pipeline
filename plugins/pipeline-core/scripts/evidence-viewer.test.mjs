@@ -21,3 +21,8 @@ test("builds a new offline report with source links and a candidate-bound receip
 test("creates a redacted report without canonical paths", async () => {
   const input = fixture(); await main(["build", "--root", input.root, "--manifest", input.manifest, "--output", "shared.html", "--sharing", "redacted"]); const html = readFileSync(join(input.root, "shared.html"), "utf8"); assert.match(html, /artifact-1/); assert.doesNotMatch(html, /specs\/viewer-cli\/prd\.md/);
 });
+test("renders a supplied local export observation without turning it into authority", async () => {
+  const input = fixture(); writeFileSync(join(input.root, "export-status.json"), JSON.stringify({ schema: "pipeline.governance-export-view-status.v1", destinationProfile: "audit", state: "retryable-failure", cursor: 2, lag: 3, receipt: { batchId: "batch-1", acknowledgementClass: "partial", terminalDisposition: "retryable-failure" } }));
+  await main(["build", "--root", input.root, "--manifest", input.manifest, "--output", "export.html", "--export-status-file", "export-status.json"]);
+  const html = readFileSync(join(input.root, "export.html"), "utf8"); assert.match(html, /Governance export observation/); assert.match(html, /retryable-failure/); assert.match(html, /non-authoritative transport observation/);
+});
