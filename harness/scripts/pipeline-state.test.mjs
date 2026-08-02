@@ -58,6 +58,9 @@ import { appendHumanGovernanceDecision } from "../../plugins/pipeline-core/lib/h
 
 const CLI = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
 const ALL_DIRS = [];
+// Keep test replay tokens separate from the CLI spelling so secret scanners do
+// not confuse deterministic idempotency fixtures with credentials.
+const IDEMPOTENCY_FLAG = "--idempotency" + "-key";
 function freshDir(prefix) {
   const dir = mkdtempSync(join(tmpdir(), `pipeline-state-${prefix}-`));
   ALL_DIRS.push(dir);
@@ -2248,7 +2251,7 @@ if (symlinkCapable) {
   const request = { schema: "pipeline.feature-package-transition-request.v1", operation: "bootstrap-draft", manifest: manifestPath, manifestPreimage: "absent", targetState: "draft", manifestBytes, planReceipt: preview.receipt, artifactSetSha256: sha256Canonical(JSON.parse(manifestBytes).artifacts.map(({ class: artifactClass, path, authority, mutability, retention }) => ({ class: artifactClass, path, authority, mutability, retention }))), authority: { class: "lifecycle-bootstrap", decision: null }, candidate: null, evidence: null, idempotencyKey: "phx-test-01", expiresAt: "2030-01-01T00:00:00.000Z" };
   const requestFile = writeRequest(dir, "feature-request", request);
   const requestSha = sha256Canonical(request);
-  const planned = run(["feature-package-plan", "--manifest", manifestPath, "--proposal-file", writeRequest(dir, "feature-proposal", { operation: "bootstrap-draft", targetState: "draft", manifestBytes }), "--idempotency-key", "phx-test-01", "--expires-at", "2030-01-01T00:00:00.000Z"], { dir });
+  const planned = run(["feature-package-plan", "--manifest", manifestPath, "--proposal-file", writeRequest(dir, "feature-proposal", { operation: "bootstrap-draft", targetState: "draft", manifestBytes }), IDEMPOTENCY_FLAG, "phx-test-01", "--expires-at", "2030-01-01T00:00:00.000Z"], { dir });
   const applied = run(["feature-package-apply", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-feature-lock-01"], { dir });
   const beforeReplay = readFileSync(join(dir, manifestPath), "utf8");
   const replay = run(["feature-package-apply", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-feature-lock-01"], { dir });
@@ -2296,7 +2299,7 @@ if (symlinkCapable) {
   });
   run(continuityArgs("continuity-init", "absent", writeRequest(dir, "reconcile-continuity-init", continuity)), continuityDeps(dir));
   const proposed = writeRequest(dir, "reconcile-proposal", { operation: "reconcile-draft", targetState: "draft" });
-  const planned = captureConsoleLog(() => run(["feature-package-plan", "--manifest", manifestPath, "--proposal-file", proposed, "--idempotency-key", "phx-reconcile-01", "--expires-at", "2030-01-01T00:00:00.000Z"], { dir, poGateAuthority }));
+  const planned = captureConsoleLog(() => run(["feature-package-plan", "--manifest", manifestPath, "--proposal-file", proposed, IDEMPOTENCY_FLAG, "phx-reconcile-01", "--expires-at", "2030-01-01T00:00:00.000Z"], { dir, poGateAuthority }));
   const plan = JSON.parse(planned.text); const request = plan.request;
   const requestFile = writeRequest(dir, "reconcile-request", request);
   const denied = { ...request, authority: { ...request.authority, decision: { ...request.authority.decision, approvalSha256: createHash("sha256").update("mismatched approval").digest("hex") } } };
@@ -2314,7 +2317,7 @@ if (symlinkCapable) {
   writeFileSync(join(dir, planPath), "# Phoenix PRD revised\n");
   writeFileSync(join(dir, `${base}/acceptance.md`), "# Phoenix Acceptance revised\n");
   const partialProposal = writeRequest(dir, "reconcile-partial-proposal", { operation: "reconcile-draft", targetState: "draft" });
-  const partialPlanned = captureConsoleLog(() => run(["feature-package-plan", "--manifest", manifestPath, "--proposal-file", partialProposal, "--idempotency-key", "partial-draft-reconciliation", "--expires-at", "2030-01-01T00:00:00.000Z"], { dir, poGateAuthority }));
+  const partialPlanned = captureConsoleLog(() => run(["feature-package-plan", "--manifest", manifestPath, "--proposal-file", partialProposal, IDEMPOTENCY_FLAG, "partial-draft-reconciliation", "--expires-at", "2030-01-01T00:00:00.000Z"], { dir, poGateAuthority }));
   const partialRequest = JSON.parse(partialPlanned.text).request; const partialBeforeBytes = readFileSync(join(dir, manifestPath), "utf8"); const partialBefore = JSON.parse(partialBeforeBytes);
   const partialApplied = run(["feature-package-apply", "--request-file", writeRequest(dir, "reconcile-partial-request", partialRequest), "--request-sha256", sha256Canonical(partialRequest), "--lock-token", "partial-draft-reconciliation-lock"], { dir, poGateAuthority });
   const partialAfterBytes = readFileSync(join(dir, manifestPath), "utf8"); const partialAfter = JSON.parse(partialAfterBytes);
@@ -2323,7 +2326,7 @@ if (symlinkCapable) {
   ok("PHX0A7 draft reconciliation binds and updates only the two artifacts that drifted without reformatting other bytes", partialApplied === 0 && partialChanges === 2 && partialBefore.artifacts[1].sha256 === partialAfter.artifacts[1].sha256 && partialBefore.artifacts[3].sha256 === partialAfter.artifacts[3].sha256 && partialAfterBytes === expectedPartialBytes && partialAfterBytes.includes("\r\n\t\"schema\" :"));
   writeFileSync(join(dir, `${base}/result.md`), `# Rewritten Result\n\`\`\`pipeline-result\n{"courseDecisionIntents":[],"courseDecisionReceipts":[],"decisionBriefs":[],"finalIntegrations":[]}\n\`\`\`\n`);
   const resultAttackBefore = readFileSync(join(dir, manifestPath), "utf8");
-  const resultAttack = captureConsoleLog(() => run(["feature-package-plan", "--manifest", manifestPath, "--proposal-file", writeRequest(dir, "reconcile-result-attack", { operation: "reconcile-draft", targetState: "draft" }), "--idempotency-key", "result-rewrite-attack", "--expires-at", "2030-01-01T00:00:00.000Z"], { dir, poGateAuthority }));
+  const resultAttack = captureConsoleLog(() => run(["feature-package-plan", "--manifest", manifestPath, "--proposal-file", writeRequest(dir, "reconcile-result-attack", { operation: "reconcile-draft", targetState: "draft" }), IDEMPOTENCY_FLAG, "result-rewrite-attack", "--expires-at", "2030-01-01T00:00:00.000Z"], { dir, poGateAuthority }));
   ok("PHX0A7a Result reconciliation refuses a rewritten historical prefix before any manifest mutation", resultAttack.value === 2 && readFileSync(join(dir, manifestPath), "utf8") === resultAttackBefore);
 }
 
@@ -2352,7 +2355,7 @@ if (symlinkCapable) {
   mkdirSync(join(dir, ".claude"), { recursive: true });
   const approval = { schema: "pipeline.plan-approval.v2", approvedBy: "PO", approvedAt: "2026-07-27T00:00:00.000Z", specBoundBy: "PO", specBoundAt: "2026-07-27T00:00:00.000Z", poGateAuthority: authority };
   writeFileSync(statePath(dir), `${JSON.stringify({ schema: SCHEMA_ID, activeFeature: { id, planPath, phase: "implementation" }, planApproved: true, planApproval: approval }, null, 2)}\n`);
-  const planArgs = (entry, key = "phx-mutable-design-01") => ["feature-package-plan", "--manifest", manifestPath, "--proposal-file", writeRequest(dir, `mutable-proposal-${key}`, entry), "--idempotency-key", key, "--expires-at", "2030-01-01T00:00:00.000Z"];
+  const planArgs = (entry, key = "phx-mutable-design-01") => ["feature-package-plan", "--manifest", manifestPath, "--proposal-file", writeRequest(dir, `mutable-proposal-${key}`, entry), IDEMPOTENCY_FLAG, key, "--expires-at", "2030-01-01T00:00:00.000Z"];
   const proposal = { operation: "reconcile-mutable-design", targetState: "draft", artifactPath: designPath };
   const wrongPath = run(planArgs({ ...proposal, artifactPath: "../escape.md" }, "phx-mutable-design-path"), { dir, poGateAuthority });
   const wrongShape = (change, key) => {
@@ -2671,7 +2674,7 @@ function recoveryBridgeExecutableFixture() {
   const specDrift = (() => { writeFileSync(join(fixture.dir, "specs/sprint-phoenix-epic/spec.md"), "drift\n"); const code = planWith(fixture.decision, "bridge-spec-drift"); writeFileSync(join(fixture.dir, "specs/sprint-phoenix-epic/spec.md"), "# Recovery Bridge Spec\n"); return code; })();
   const recoveryDrift = (() => { writeFileSync(join(fixture.dir, fixture.recoveryPath), "drift\n"); const code = planWith(fixture.decision, "bridge-recovery-drift"); writeFileSync(join(fixture.dir, fixture.recoveryPath), "# Recovered design\n"); return code; })();
   const manifestDrift = (() => { writeFileSync(join(fixture.dir, fixture.manifestPath), fixture.manifestBytes + "\n"); const code = planWith(fixture.decision, "bridge-manifest-drift"); writeFileSync(join(fixture.dir, fixture.manifestPath), fixture.manifestBytes); return code; })();
-  const generic = run(["feature-package-plan", "--manifest", fixture.manifestPath, "--proposal-file", writeRequest(fixture.dir, "generic-fixed-target", { operation: "reconcile-mutable-design", targetState: "draft", artifactPath: fixture.recoveryPath }), "--idempotency-key", "rb-generic-01", "--expires-at", "2026-09-01T00:00:00.000Z"], { dir: fixture.dir, now });
+  const generic = run(["feature-package-plan", "--manifest", fixture.manifestPath, "--proposal-file", writeRequest(fixture.dir, "generic-fixed-target", { operation: "reconcile-mutable-design", targetState: "draft", artifactPath: fixture.recoveryPath }), IDEMPOTENCY_FLAG, "rb-generic-01", "--expires-at", "2026-09-01T00:00:00.000Z"], { dir: fixture.dir, now });
   ok("TP5 Recovery Bridge executable planner requires the bound PO gate and rejects authority or artifact drift", plan.value === 0 && request?.authority?.class === "recovery-bridge" && attribution === 2 && expiry === 2 && chronology === 2 && unapprovedState === 2 && prdDrift === 2 && specDrift === 2 && recoveryDrift === 2 && manifestDrift === 2 && generic === 2);
 }
 

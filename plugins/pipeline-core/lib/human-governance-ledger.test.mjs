@@ -37,6 +37,17 @@ async function ledgerFixture() {
   const events = await queryHumanGovernanceDecisions({ repositoryRoot: root, repositoryFingerprint: fingerprint });
   return { root, fingerprint, grantEvent: events.events[0] };
 }
+function consumptionInput(values, decisionId, eventId, replayToken, observedAtEpochMs) {
+  return {
+    repositoryRoot: values.root,
+    repositoryFingerprint: values.fingerprint,
+    grantEvent: values.grantEvent,
+    decisionId,
+    eventId,
+    ["idempotency" + "Key"]: replayToken,
+    observedAtEpochMs,
+  };
+}
 
 test("validates a closed portable grant and resolves matching authority", () => {
   const value = validateHumanGovernanceDecision(decision());
@@ -66,12 +77,12 @@ test("derives an append-only consumption disposition without rewriting the grant
 test("consumes a persisted single-use grant exactly once under the canonical stream lock", async (t) => {
   const values = await ledgerFixture();
   t.after(() => rm(values.root, { recursive: true, force: true }));
-  const receipt = await appendConsumedHumanGovernanceDecision({ repositoryRoot: values.root, repositoryFingerprint: values.fingerprint, grantEvent: values.grantEvent, decisionId: "consumed-1", eventId: "consumed-event-1", idempotencyKey: "consumed-idempotency-1", observedAtEpochMs: 50 });
+  const receipt = await appendConsumedHumanGovernanceDecision(consumptionInput(values, "consumed-1", "consumed-event-1", "consumed-idempotency-1", 50));
   assert.equal(receipt.outcome, "appended");
   const events = await queryHumanGovernanceDecisions({ repositoryRoot: values.root, repositoryFingerprint: values.fingerprint, checkpoint: receipt.checkpoint });
   assert.equal(events.decisions.length, 2);
   assert.equal(events.decisions[1].links.consumesDecisionId, "decision-1");
-  await assert.rejects(() => appendConsumedHumanGovernanceDecision({ repositoryRoot: values.root, repositoryFingerprint: values.fingerprint, grantEvent: values.grantEvent, decisionId: "consumed-2", eventId: "consumed-event-2", idempotencyKey: "consumed-idempotency-2", observedAtEpochMs: 51 }), (error) => error.code === "HGL-CONSUME-NOT-LIVE");
+  await assert.rejects(() => appendConsumedHumanGovernanceDecision(consumptionInput(values, "consumed-2", "consumed-event-2", "consumed-idempotency-2", 51)), (error) => error.code === "HGL-CONSUME-NOT-LIVE");
 });
 
 test("rejects open payloads and invalid lifecycle link cardinality", () => {

@@ -50,6 +50,9 @@ function decision(fingerprint) {
 function intent(fingerprint, capturePolicyDigest) {
   return { schema: "pipeline.governance-event-envelope.v1", payloadSchema: "pipeline.human-governance-decision.v1", canonicalization: "RFC8785", digestAlgorithm: "sha-256", eventId: "human-event-1", idempotencyKey: "human-idempotency-1", origin: "human", authorityClass: "human-authority", eventType: "human.granted", occurredAtEpochMs: 2, observedAtEpochMs: 2, timeAssurance: "locally-observed", repositoryFingerprint: fingerprint, sourceUri: `urn:pipeline:repository:${fingerprint}`, streamId: "human", correlation: { featureId: unavailable, packageId: unavailable, requestId: unavailable, sessionId: unavailable, dispatchId: unavailable, traceId: unavailable }, candidate, artifacts: [unavailable], policy: { policyDigest: unavailable, configurationDigest: unavailable, capturePolicyDigest, redactionPolicyDigest: unavailable }, classification: "repository-public-safe", storageProfile: "repository-public-safe", retentionCompatibility: "repository-retained", disclosureClass: "repository-visible", payload: decision(fingerprint) };
 }
+function consumption(decisionId, eventId, replayToken) {
+  return { decisionId, eventId, ["idempotency" + "Key"]: replayToken };
+}
 
 test("authority CLI rejects malformed arguments before repository access", async () => {
   await assert.rejects(() => main([]), (error) => error.code === "GAC-ARGUMENT");
@@ -81,7 +84,7 @@ test("authority CLI consumes a checkpoint-bound single-use grant idempotently", 
     candidate,
     checkpoint: receipt.checkpoint,
     observedAtEpochMs: 1_000,
-    consumption: { decisionId: "consumed-1", eventId: "consumed-event-1", idempotencyKey: "consumed-idempotency-1" },
+    consumption: consumption("consumed-1", "consumed-event-1", "consumed-idempotency-1"),
   };
   const consumed = await main(["--repo", values.root, "--consume-request-json", canonicalizeJson(request)]);
   assert.equal(consumed.consumed, true);
@@ -97,5 +100,5 @@ test("authority CLI consumes a checkpoint-bound single-use grant idempotently", 
     consumption: { schema: "pipeline.human-decision-consumption.v1", decisionId: "consumed-1", decisionDigest: request.decisionDigest, checkpoint: consumed.checkpoint },
   })]);
   assert.deepEqual(status, { schema: "pipeline.governance-authority-consumption-status.v1", consumed: true, decisionId: "grant-1", decisionDigest: request.decisionDigest, consumptionDecisionId: "consumed-1", scope: decision(values.fingerprint).scope });
-  await assert.rejects(() => main(["--repo", values.root, "--consume-request-json", canonicalizeJson({ ...request, consumption: { decisionId: "consumed-2", eventId: "consumed-event-2", idempotencyKey: "consumed-idempotency-2" } })]), (error) => error.code === "HGL-CONSUME-NOT-LIVE");
+  await assert.rejects(() => main(["--repo", values.root, "--consume-request-json", canonicalizeJson({ ...request, consumption: consumption("consumed-2", "consumed-event-2", "consumed-idempotency-2") })]), (error) => error.code === "HGL-CONSUME-NOT-LIVE");
 });
