@@ -12,6 +12,27 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-08-02
+
+### Added
+
+- Policy-complete security evidence, AI-assisted hardening, finding lifecycle,
+  and security readiness now run through the shared Verify gate.
+- A portable human-approval path keeps the encrypted Ed25519 private key and
+  its passphrase outside the repository. The human normally runs only
+  `approve-all` at an actually configured decision gate.
+- A concise upgrade guide explains the security delivery and the scope of the
+  current CLI approval adapter.
+
+### Changed
+
+- The supported security-release line is now `0.5.x`.
+
+### Security
+
+- Required missing, skipped, stale, or candidate-mismatched evidence now fails
+  explicitly instead of producing a green security result.
+
 ## [0.4.6] — 2026-07-26
 
 ### Fixed

@@ -383,6 +383,29 @@ begins. For a material feature, it also follows the V3 profile and advisory
 rules before writable work. A reminder hook is not a substitute for the
 bootstrap itself.
 
+### 5. Optional human-approval key (one-time setup)
+
+Routine implementation, tests, and Critic review remain agent work after the
+approved plan. When a project configures a real human decision gate, create
+the portable external Ed25519 key once:
+
+```sh
+node "$REPO/plugins/pipeline-core/scripts/po-human-approval.mjs" setup --repo-root "$REPO" --directory "$HOME/agent-pipeline-po"
+```
+
+The directory stays outside the repository. OpenSSL asks for the passphrase
+locally; the agent never receives the key or passphrase. The agent prepares
+and refreshes public candidate-bound requests. The regular human action is:
+
+```sh
+node "$REPO/plugins/pipeline-core/scripts/po-human-approval.mjs" approve-all --repo-root "$REPO" --directory "$HOME/agent-pipeline-po"
+```
+
+Passkey/WebAuthn, IAM/hardware-key adapters, and remote provisional codes are
+future adapter work, not 0.5.0 CLI features. A code pasted into the same agent
+chat is visible to that agent and cannot replace final local proof for an
+irreversible action. See [PO approval](docs/po-human-approval.md).
+
 ## C. Bring an existing repository under the pipeline
 
 Do this on a normal change branch and adopt one control at a time:

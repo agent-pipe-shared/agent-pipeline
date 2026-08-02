@@ -50,15 +50,22 @@ node "$REPO/plugins/pipeline-core/scripts/po-approval-gate.mjs" prepare-all --re
 node "$REPO/plugins/pipeline-core/scripts/po-approval-gate.mjs" verify-all --repo-root "$REPO" --directory "$PO_DIR"
 ```
 
-## Product direction
+## Adapter boundary
 
 This helper is the first adapter for one shared Human-Authorization contract,
-not a CYB-4-only mechanism. Existing human intents/gates must migrate to that
-contract and future sprints must use it from the start. Desktop applications
-should prefer a native Passkey/WebAuthn adapter. CLI consoles keep the
-external encrypted Ed25519/SSH-style key path as their portable fallback.
-IAM, hardware-key, and password-manager adapters may also produce the same
-detached public proof; `prepare` and `verify` remain unchanged.
+not a CYB-4-only mechanism. The shipped 0.5.0 adapter is the external
+encrypted Ed25519/SSH-style key path above. Passkey/WebAuthn, IAM,
+hardware-key, and password-manager adapters may later produce the same
+detached public proof; they are not bundled in 0.5.0.
+
+## Remote work and provisional codes
+
+0.5.0 intentionally ships no remote-code mechanism. A code pasted into the
+same chat as the agent is visible to that agent, so it is not a secret and
+cannot safely act as final authorization. A future remote adapter may record
+a one-time provisional acknowledgement, but it must not authorize push,
+release, override, or another irreversible action. Final local proof remains
+required.
 
 ## Deutsche Kurzhilfe (nicht normativ)
 

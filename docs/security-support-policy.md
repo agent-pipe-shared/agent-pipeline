@@ -1,7 +1,7 @@
 # Security support policy
 
 This document is the public projection of the versioned support decision for
-Agent Pipeline. The currently supported release line is `0.4.x`; older lines
+Agent Pipeline. The currently supported release line is `0.5.x`; older lines
 are end-of-life unless a later, versioned policy revision explicitly says
 otherwise.
 

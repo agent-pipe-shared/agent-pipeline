@@ -21,6 +21,9 @@ feature branches and dogfooding rounds. Feedback welcome.*
 > required next document is `SETUP.md`; deeper and conceptual documentation
 > is optional reference.
 
+> **0.5.0:** See [What’s new in 0.5.0](docs/whats-new-0.5.0.md) for the
+> security/readiness delivery and the deliberately small human-approval flow.
+
 ## The problem
 
 Teams building with coding agents tend to reinvent the same conventions per repo —
