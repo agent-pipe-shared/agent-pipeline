@@ -203,8 +203,8 @@ any mapped criterion is unimplemented, unverified, dependent on unpublished
 sibling work, or deferred without explicit Product Owner disposition,
 owner, and expiry.
 
-Current 2026-08-02 audit result: **Phoenix is not closeable yet**. In addition
-to the open #30 migration above, the bound Spec §7 inventory omits six already
-implemented Phoenix modules and their tests. That inventory correction needs a
-candidate-bound human design decision and sanctioned authority revision; it
-must not be hand-edited as a documentation-only workaround.
+Current 2026-08-02 audit result: **Phoenix is not closeable yet**. The bound
+Spec §7 inventory omits six already implemented Phoenix modules and their
+tests. That inventory correction needs a candidate-bound human design decision
+and sanctioned authority revision; it must not be hand-edited as a
+documentation-only workaround.

@@ -81,7 +81,7 @@
     {
       "class": "design",
       "path": "specs/sprint-phoenix-epic/design/issue-coverage.md",
-      "sha256": "9fcfb4d0922c58a4c5556158ff2bc08db7a75fbe1b451c71112d8ab64a771d1c",
+      "sha256": "8a9de8604a656ec5a2e0a19dce2103179045711c36023db6c98dc733ede1bb2b",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"
