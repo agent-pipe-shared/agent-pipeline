@@ -54,3 +54,13 @@ e32f34c5aa03f2498844a7fa5d35be5b612c051b:harness/scripts/pipeline-state.test.mjs
 6f4fe95ad267e0c35f34f6dbdb90379dcc1d2dc7:specs/sprint-phoenix-epic/evidence/lifecycle/feature-package-phx-0a-r3-reconcile.json:generic-api-key:1
 6f4fe95ad267e0c35f34f6dbdb90379dcc1d2dc7:harness/scripts/pipeline-state.test.mjs:generic-api-key:2080
 bd9eaaae25ab9cf64cd16ed3e4d8906cd526912d:harness/scripts/pipeline-state.test.mjs:generic-api-key:2204
+# Exact candidate-tree false positives: deterministic idempotency identifiers
+# and sealed evidence digests. Keep these line-specific; no rule or path-wide
+# exception is permitted.
+plugins/pipeline-core/lib/review-economy.test.mjs:generic-api-key:279
+plugins/pipeline-core/lib/continuity-state.test.mjs:generic-api-key:720
+plugins/pipeline-core/lib/continuity-state.test.mjs:generic-api-key:782
+plugins/pipeline-core/lib/continuity-state.test.mjs:generic-api-key:807
+specs/sprint-phoenix-epic/evidence/lifecycle/feature-package-phx-0a-r3-reconcile.json:generic-api-key:1
+harness/scripts/pipeline-state.test.mjs:generic-api-key:2294
+harness/scripts/pipeline-state.test.mjs:generic-api-key:2488
