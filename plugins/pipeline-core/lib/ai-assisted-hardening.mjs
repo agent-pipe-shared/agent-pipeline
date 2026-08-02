@@ -16,8 +16,8 @@ const SHA256 = /^[0-9a-f]{64}$/u;
 const TRUST_RANK = Object.freeze({ untrusted: 0, bounded: 1, policy: 2 });
 const CHANGE_CLASSES = Object.freeze({
   scope: /(^|\/)(specs?|docs)\//u,
-  test: /(^|\/)(test|tests|harness)\//u,
-  guard: /(^|\/)(hooks|guard-)/u,
+  test: /(^|\/)(test|tests|harness)\/|\.test\.[cm]?js$/u,
+  guard: /(^|\/)(hooks|guard-|pipeline-core\/scripts\/(?:ai-assisted-hardening-gate|verify-topology-preflight))/u,
   policy: /(^|\/)(\.claude|project)\//u,
   dependency: /(^|\/)(package-lock\.json|package\.json|pnpm-lock\.yaml|yarn\.lock)$/u,
   workflow: /^\.github\/workflows\//u,
@@ -122,7 +122,7 @@ export function evaluateChangeIntegrity({ paths = [], independentChecks = [] } =
 }
 
 export function routeSecurityReview({ changedPaths = [], authorId, reviewerId } = {}) {
-  const sensitive = changedPaths.some((path) => /(^|\/)(hooks|\.claude|project|workflows|security)/u.test(path));
+  const sensitive = changedPaths.some((path) => /(^|\/)(hooks|\.claude|project|workflows|security|pipeline-core\/scripts\/(?:ai-assisted-hardening-gate|verify-topology-preflight))|\.test\.[cm]?js$/u.test(path));
   const allowed = !sensitive || (typeof reviewerId === "string" && reviewerId !== authorId);
   return Object.freeze({ schema: AI_HARDENING_SCHEMA, required: sensitive, allowed, code: allowed ? "AIH-REVIEW-ROUTED" : "AIH-INDEPENDENT-REVIEW-REQUIRED" });
 }

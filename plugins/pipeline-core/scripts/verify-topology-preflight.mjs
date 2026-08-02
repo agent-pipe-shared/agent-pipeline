@@ -174,9 +174,9 @@ export function runVerifyTopologyCli(argv = process.argv.slice(2)) {
     return failure("VTP-DECLARATION-UNAVAILABLE");
   }
   const candidateCommit = defaultGit(parsed.root, ["rev-parse", "--verify", `${parsed.candidateRevision}^{commit}`]).stdout;
-  const parentCommit = candidateCommit ? defaultGit(parsed.root, ["rev-parse", "--verify", `${candidateCommit}^^{commit}`]).stdout : "";
-  const changedPaths = candidateCommit && parentCommit
-    ? defaultGit(parsed.root, ["diff", "--name-only", "--diff-filter=ACMR", parentCommit, candidateCommit]).stdout.split("\n")
+  const deliveryBase = inventory?.sourceBaseline?.commit;
+  const changedPaths = candidateCommit && typeof deliveryBase === "string"
+    ? defaultGit(parsed.root, ["diff", "--name-only", "--diff-filter=ACMR", deliveryBase, candidateCommit]).stdout.split("\n")
     : [];
   return preflightVerifyTopology({
     candidateRevision: parsed.candidateRevision,
