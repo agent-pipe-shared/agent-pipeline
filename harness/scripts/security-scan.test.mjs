@@ -503,13 +503,13 @@ process.exit(0);
   const reviewEconomy = readFileSync(join(REPO_ROOT, "plugins", "pipeline-core", "lib", "review-economy.test.mjs"), "utf8");
   const continuityState = readFileSync(join(REPO_ROOT, "plugins", "pipeline-core", "lib", "continuity-state.test.mjs"), "utf8");
   assertEqual(
-    "gitleaks ignore: stale fixture fingerprints are replaced by inline exact suppressions",
+    "gitleaks ignore: stale fixture fingerprints are replaced by content authorities",
     {
       staleEntriesPresent: OBSOLETE_NO_GIT_FIXTURE_IGNORES.filter((entry) => ignoreLines.includes(entry)),
       reviewEconomyAllowCount: (reviewEconomy.match(/idempotencyKey: "decision-key-01", \/\/ gitleaks:allow/g) ?? []).length,
       continuityStateAllowCount: (continuityState.match(/idempotencyKey: "decision-txn-01",.*\/\/ gitleaks:allow/g) ?? []).length,
     },
-    { staleEntriesPresent: [], reviewEconomyAllowCount: 1, continuityStateAllowCount: 3 },
+    { staleEntriesPresent: [], reviewEconomyAllowCount: 0, continuityStateAllowCount: 0 },
   );
 }
 {
@@ -543,8 +543,8 @@ process.exit(0);
       return { status: 0, stdout: "", stderr: "" };
     },
   });
-  assertEqual("gitleaks run: candidate tree uses explicit no-git invocation", invocation.args, [
-    "detect", "--source", ".", "--no-git", "--report-format", "json",
+  assertEqual("gitleaks run: candidate tree uses its verified physical root", invocation.args, [
+    "detect", "--source", rootDir, "--no-git", "--report-format", "json",
     "--report-path", invocation.args[invocation.args.indexOf("--report-path") + 1], "--no-banner", "--exit-code", "0",
   ]);
   assertEqual("gitleaks run: candidate tree source resolves from candidate cwd", invocation.opts.cwd, rootDir);

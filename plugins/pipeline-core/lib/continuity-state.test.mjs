@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
   CONTINUITY_STATE_CODES,
+  applyRunnerNativeContinuation,
   applyCourseDecisionIntent,
   applyDecisionSelection,
   beginCloseTransition,
@@ -20,6 +21,7 @@ import {
   recordCloseFinalVerify,
   recordCloseReadback,
   recordCourseDecisionBrief,
+  reconcileRunnerNativeContinuation,
   releaseContinuitySessionCleanup,
   validateContinuityState,
   planLegacyContinuityAdoption,
