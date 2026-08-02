@@ -2,13 +2,18 @@
 /** Closed, candidate-bound Nova B5 freeze and evidence-manifest contracts. */
 import { canonicalJson, sha256Canonical } from "./review-economy.mjs";
 
-export const NOVA_B5_CANDIDATE_FREEZE_SCHEMA = "pipeline.nova-b5-candidate-freeze.v1";
+export const NOVA_B5_CANDIDATE_FREEZE_SCHEMA_V1 = "pipeline.nova-b5-candidate-freeze.v1";
+export const NOVA_B5_CANDIDATE_FREEZE_SCHEMA_V2 = "pipeline.nova-b5-candidate-freeze.v2";
+// V1 remains the historical pre-v0.4.7 record. New callers choose V2
+// explicitly, so a legacy base cannot be emitted by accident.
+export const NOVA_B5_CANDIDATE_FREEZE_SCHEMA = NOVA_B5_CANDIDATE_FREEZE_SCHEMA_V1;
 export const NOVA_B5_EVIDENCE_MANIFEST_SCHEMA = "pipeline.nova-b5-evidence-manifest.v1";
 
 const SHA = /^[a-f0-9]{64}$/u;
 const OID = /^[a-f0-9]{40}$/u;
 const PATH = /^(?!\/)(?!.*\\\\)[A-Za-z0-9._@+/-]{1,512}$/u;
 const BRANCH = /^feat\/sprint-nova-codex-v046$/u;
+const POST_V047_BASE = "89cb12b99e3fd86ac44878d0c23b278f00538921";
 const DEFERRED = Object.freeze([
   "B2-I remote broker integration",
   "B3-I direct Antigravity implementation",
@@ -29,9 +34,21 @@ const digest = (schema, record) => {
   return sha256Canonical({ schema, ...core });
 };
 
+function freezeBaseCode(record) {
+  if (!exact(record.base, ["release", "commit"])) return "NBF-SHAPE";
+  if (record.schema === NOVA_B5_CANDIDATE_FREEZE_SCHEMA_V1) {
+    return record.base.release === "v0.4.6" && OID.test(record.base.commit ?? "") ? null : "NBF-SHAPE";
+  }
+  if (record.schema === NOVA_B5_CANDIDATE_FREEZE_SCHEMA_V2) {
+    return record.base.release === "v0.4.7" && record.base.commit === POST_V047_BASE ? null : "NBF-BASE";
+  }
+  return "NBF-SHAPE";
+}
+
 function freezeCode(record) {
-  if (!exact(record, FREEZE_ROOT) || record.schema !== NOVA_B5_CANDIDATE_FREEZE_SCHEMA || !candidate(record.candidate, true)
-    || !exact(record.base, ["release", "commit"]) || record.base.release !== "v0.4.6" || !OID.test(record.base.commit ?? "")
+  const baseCode = freezeBaseCode(record);
+  if (!exact(record, FREEZE_ROOT) || !new Set([NOVA_B5_CANDIDATE_FREEZE_SCHEMA_V1, NOVA_B5_CANDIDATE_FREEZE_SCHEMA_V2]).has(record.schema)
+    || !candidate(record.candidate, true)
     || !exact(record.portfolio, ["bindingPath", "bindingSha256", "issueCount", "cyborgInput"])
     || record.portfolio.bindingPath !== "specs/sprint-nova-epic/design/backlog-spec-bindings.json" || !SHA.test(record.portfolio.bindingSha256 ?? "")
     || record.portfolio.issueCount !== 17 || record.portfolio.cyborgInput !== "none"
@@ -41,7 +58,8 @@ function freezeCode(record) {
       && PATH.test(gate.path ?? "") && SHA.test(gate.sha256 ?? "") && gate.exitCode === 0 && ["exact-clean-candidate", "clean-exact-candidate"].includes(gate.binding))
     || !Array.isArray(record.deferred) || record.deferred.length !== DEFERRED.length || !record.deferred.every((value, index) => value === DEFERRED[index])
     || record.status !== "frozen-awaiting-external-native-gates" || !SHA.test(record.recordSha256 ?? "")) return "NBF-SHAPE";
-  return record.recordSha256 === digest(NOVA_B5_CANDIDATE_FREEZE_SCHEMA, record) ? null : "NBF-DIGEST";
+  if (baseCode !== null) return baseCode;
+  return record.recordSha256 === digest(record.schema, record) ? null : "NBF-DIGEST";
 }
 
 function manifestCode(record) {
@@ -56,8 +74,14 @@ export function validateNovaB5CandidateFreeze(record) { const code = freezeCode(
 export function validateNovaB5EvidenceManifest(record) { const code = manifestCode(record); return { ok: code === null, code }; }
 export function sealNovaB5CandidateFreeze(draft) {
   if (!object(draft) || Object.hasOwn(draft, "schema") || Object.hasOwn(draft, "recordSha256")) throw new TypeError("NBF-DRAFT");
-  const record = { schema: NOVA_B5_CANDIDATE_FREEZE_SCHEMA, ...structuredClone(draft), recordSha256: "0".repeat(64) };
-  const { recordSha256, ...core } = record; record.recordSha256 = sha256Canonical({ schema: NOVA_B5_CANDIDATE_FREEZE_SCHEMA, ...core });
+  const record = { schema: NOVA_B5_CANDIDATE_FREEZE_SCHEMA_V1, ...structuredClone(draft), recordSha256: "0".repeat(64) };
+  const { recordSha256, ...core } = record; record.recordSha256 = sha256Canonical({ schema: record.schema, ...core });
+  if (!validateNovaB5CandidateFreeze(record).ok) throw new TypeError("NBF-DRAFT"); return freeze(record);
+}
+export function sealNovaB5CandidateFreezeV2(draft) {
+  if (!object(draft) || Object.hasOwn(draft, "schema") || Object.hasOwn(draft, "recordSha256")) throw new TypeError("NBF-DRAFT");
+  const record = { schema: NOVA_B5_CANDIDATE_FREEZE_SCHEMA_V2, ...structuredClone(draft), recordSha256: "0".repeat(64) };
+  const { recordSha256, ...core } = record; record.recordSha256 = sha256Canonical({ schema: record.schema, ...core });
   if (!validateNovaB5CandidateFreeze(record).ok) throw new TypeError("NBF-DRAFT"); return freeze(record);
 }
 export function sealNovaB5EvidenceManifest(draft) {

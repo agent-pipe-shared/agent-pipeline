@@ -1171,6 +1171,13 @@ implementation authority or acceptance ID.
 ### 6.7 B5 — Candidate freeze and macOS boundary (`#49` → `#72`)
 
 Nova B first assembles one Nova-only candidate and freezes its commit/tree.
+Historical `pipeline.nova-b5-candidate-freeze.v1` records remain readable for
+the pre-`v0.4.7` B5 line. A current Nova candidate uses the closed successor
+`pipeline.nova-b5-candidate-freeze.v2`: it has the same evidence shape, but
+its base is exactly released `v0.4.7` commit
+`89cb12b99e3fd86ac44878d0c23b278f00538921`. V1 can neither validate nor be
+relabelled as a post-rebase candidate; V2 rejects a release or base-commit
+substitution before its digest is considered.
 No unpublished Cyborg bytes are an input. The 17-Issue acceptance mapping,
 focused suites, backlog previews and artifact inventory must be complete
 before a close claim.
@@ -1248,7 +1255,8 @@ combined integration remains a later lifecycle.
 | `pipeline.antigravity-contract-decision.v1` | B3-R | research slice | ADR/PO gate |
 | `pipeline.forge-capability.v1` | B4 | forge adapters | operations/conformance |
 | `pipeline.external-mutation.v1` | B4 | forge operation | operator/readback |
-| `pipeline.nova-b5-candidate-freeze.v1` | B5 | candidate-freeze compiler | native-gate operator |
+| `pipeline.nova-b5-candidate-freeze.v1` | B5 historical | candidate-freeze compiler | legacy-evidence reader |
+| `pipeline.nova-b5-candidate-freeze.v2` | B5 post-v0.4.7 | candidate-freeze compiler | native-gate operator |
 | `pipeline.nova-b5-evidence-manifest.v1` | B5 | evidence-manifest compiler | native-gate operator |
 | `pipeline.macos-acceptance.v1` | B5 | synthetic contract harness | candidate-bound boundary check |
 
