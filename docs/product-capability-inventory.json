@@ -953,6 +953,12 @@
       "member": "phoenix-governance-event-store-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:phoenix-governance-export-adapter-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "phoenix-governance-export-adapter-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:phoenix-governance-event-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1694,6 +1700,7 @@
         "verify-phase:harness/scripts/verify.mjs:phoenix-governance-event-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:phoenix-governance-event-store-tests",
         "verify-phase:harness/scripts/verify.mjs:phoenix-governance-event-tests",
+        "verify-phase:harness/scripts/verify.mjs:phoenix-governance-export-adapter-tests",
         "verify-phase:harness/scripts/verify.mjs:phoenix-governance-threat-model-tests",
         "verify-phase:harness/scripts/verify.mjs:phoenix-human-governance-ledger-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-start-preflight-tests",

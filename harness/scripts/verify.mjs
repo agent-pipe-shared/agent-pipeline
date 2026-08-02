@@ -161,6 +161,7 @@ const TEST_SUITES = [
   { name: "phoenix-governance-threat-model-tests", file: join(pluginScriptsDir, "phoenix-governance-threat-model.test.mjs") },
   { name: "phoenix-governance-event-tests", file: join(libDir, "governance-event.test.mjs") },
   { name: "phoenix-governance-event-store-tests", file: join(libDir, "governance-event-store.test.mjs") },
+  { name: "phoenix-governance-export-adapter-tests", file: join(libDir, "governance-export-adapter.test.mjs") },
   { name: "phoenix-governance-event-cli-tests", file: join(pluginScriptsDir, "governance-event.test.mjs") },
   { name: "phoenix-human-governance-ledger-tests", file: join(libDir, "human-governance-ledger.test.mjs") },
   { name: "phoenix-governance-authority-resolver-tests", file: join(libDir, "governance-authority-resolver.test.mjs") },
