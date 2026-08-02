@@ -3669,10 +3669,12 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         console.error('Error: approve-plan requires --by <name> (non-empty) -- an unattributed approval is refused.');
         return 2;
       }
-      // Cyborg integration point: this writer is the future input boundary for
-      // a verified-human-attestation-bound decision reference. Until that
-      // adapter lands, `--by` remains attribution only, never proof of a real
-      // human authority.
+      // Cyborg integration point: this writer is the consumer boundary for a
+      // `po-approval-proof`-verified decision reference. Its detached proof
+      // and trust policy stay outside the repository and must bind this exact
+      // plan, Spec, candidate, and policy revision before the ledger reference
+      // is accepted as externally attested. `--by` is display attribution only,
+      // never proof of a real human authority.
       const authority = poGateAuthority({ repoRoot: dir });
       if (
         !authority?.ok

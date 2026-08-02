@@ -18,10 +18,12 @@ export async function main(argv = process.argv.slice(2)) {
   const { repositoryRoot, requestFile, requestJson } = parse(argv);
   let request; try { request = parseStrictJson(requestFile === null ? requestJson : await readFile(requestFile)); } catch { fail("GAC-REQUEST", "Authority request must be strict JSON."); }
   if (!exact(request, ["schema", "repositoryFingerprint", "decisionId", "candidate", "checkpoint", "nowEpochMs"]) || request.schema !== "pipeline.governance-authority-request.v1") fail("GAC-REQUEST", "Authority request has an invalid closed shape.");
-  // Cyborg integration point: once its human-attestation receipt exists, this
-  // request-admission boundary must bind and verify that receipt before a
-  // caller can rely on the returned authority. Existing ledger assurance is
-  // intentionally not treated as a Cyborg-verified human attestation here.
+  // Cyborg integration point: the published `po-approval-proof` contract must
+  // be verified at this admission boundary against its externally configured
+  // trust policy before a caller can rely on a human authority result. The
+  // proof intent must bind this decision's candidate and governed artifacts;
+  // existing ledger assurance alone is intentionally not a Cyborg-verified
+  // human attestation.
   const queried = await queryHumanGovernanceDecisions({ repositoryRoot, repositoryFingerprint: request.repositoryFingerprint, checkpoint: request.checkpoint });
   if (queried.completeness !== "verified") return Object.freeze({ schema: "pipeline.governance-authority-readback.v1", granted: false, reason: "checkpoint-unverified" });
   return Object.freeze({ schema: "pipeline.governance-authority-readback.v1", ...requireGovernanceAuthority({ decisions: queried.decisions, decisionId: request.decisionId, repositoryFingerprint: request.repositoryFingerprint, candidate: request.candidate, nowEpochMs: request.nowEpochMs }) });
