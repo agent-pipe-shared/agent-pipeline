@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -33,6 +33,22 @@ function candidateFixture() {
   execFileSync("git", ["-C", root, "add", "."]);
   execFileSync("git", ["-C", root, "-c", "user.name=stack-test", "-c", "user.email=stack-test@example.invalid", "commit", "--quiet", "-m", "fixture"]);
   return { root, candidate: { commit: execFileSync("git", ["-C", root, "rev-parse", "HEAD"], { encoding: "utf8" }).trim(), tree: execFileSync("git", ["-C", root, "rev-parse", "HEAD^{tree}"], { encoding: "utf8" }).trim() } };
+}
+
+function committedStaticFixture(files, symlinks = {}) {
+  const root = mkdtempSync(join(tmpdir(), "stack-static-boundary-"));
+  for (const [path, content] of Object.entries(files)) { mkdirSync(join(root, dirname(path)), { recursive: true }); writeFileSync(join(root, path), content); }
+  for (const [path, target] of Object.entries(symlinks)) { mkdirSync(join(root, dirname(path)), { recursive: true }); symlinkSync(target, join(root, path)); }
+  execFileSync("git", ["init", "--quiet", root]);
+  execFileSync("git", ["-C", root, "add", "."]);
+  execFileSync("git", ["-C", root, "-c", "user.name=stack-test", "-c", "user.email=stack-test@example.invalid", "commit", "--quiet", "-m", "fixture"]);
+  return { root, candidate: { commit: execFileSync("git", ["-C", root, "rev-parse", "HEAD"], { encoding: "utf8" }).trim(), tree: execFileSync("git", ["-C", root, "rev-parse", "HEAD^{tree}"], { encoding: "utf8" }).trim() } };
+}
+
+function staticPlan(candidate) {
+  const observations = [];
+  const discovery = { ok: true, schema: "pipeline.stack-discovery.v1", candidate, observations, digest: createHash("sha256").update(JSON.stringify({ candidate, observations })).digest("hex") };
+  return buildStackCapabilityPlan({ candidate, discovery, policyRevision: "policy-v1", threatModel: { candidate, digest: "d".repeat(64) }, observations: STACK_CAPABILITIES.map((capability) => ({ capability, present: true })), requirements: [] });
 }
 const fixture = candidateFixture();
 const candidate = fixture.candidate;
@@ -170,6 +186,31 @@ check("real adapters scan every eligible candidate file despite a legacy selecte
     assert.equal(execution.execution.findings.some((item) => item.rule === expectedRules[adapter.kind] && item.path === expectedPaths[adapter.kind]), true, adapter.kind);
     assert.deepEqual(execution.execution.coverage.truncation, { truncated: false, scannedFileCount: 2, totalEligibleFileCount: 2 }, adapter.kind);
   }
+});
+
+check("a static-source symlink is typed as incomplete coverage, never scanned as its target bytes", () => {
+  const fixture = committedStaticFixture({ "container-source": "FROM nginx:latest\nUSER root\n" }, { Dockerfile: "container-source" });
+  const adapter = REPRESENTATIVE_STACK_ADAPTERS.find((item) => item.kind === "container");
+  const plan = staticPlan(fixture.candidate);
+  const execution = executeStackAdapterConformance({ adapter, plan, environment: { platform: "linux", nodeVersion: null }, authorization: null, repositoryRoot: fixture.root, sourcePath: "Dockerfile" });
+  assert.equal(execution.ok, true);
+  assert.equal(execution.execution.status, "ERROR");
+  assert.deepEqual(execution.execution.coverage.truncation, { truncated: false, scannedFileCount: 0, totalEligibleFileCount: 1 });
+  assert.equal(execution.execution.coverage.unsupportedScope.some((item) => item.startsWith("Dockerfile: non-regular git entry (120000 blob)")), true);
+  assert.equal(createStackAdapterEvidence({ adapter, plan, environment: { platform: "linux", nodeVersion: null }, execution: execution.execution, authorization: null, repositoryRoot: fixture.root, sourcePath: "Dockerfile" }).ok, true);
+});
+
+check("static-source limits report typed incomplete coverage instead of a false pass", () => {
+  const files = Object.fromEntries(Array.from({ length: 129 }, (_, index) => [`infra/${String(index).padStart(3, "0")}.tf`, "resource \"aws_s3_bucket\" \"safe\" {}\n"]));
+  const fixture = committedStaticFixture(files);
+  const adapter = REPRESENTATIVE_STACK_ADAPTERS.find((item) => item.kind === "iac");
+  const plan = staticPlan(fixture.candidate);
+  const execution = executeStackAdapterConformance({ adapter, plan, environment: { platform: "linux", nodeVersion: null }, authorization: null, repositoryRoot: fixture.root, sourcePath: "infra/000.tf" });
+  assert.equal(execution.ok, true);
+  assert.equal(execution.execution.status, "ERROR");
+  assert.deepEqual(execution.execution.coverage.truncation, { truncated: true, scannedFileCount: 128, totalEligibleFileCount: 129 });
+  assert.deepEqual(execution.execution.coverage.unsupportedScope, []);
+  assert.equal(createStackAdapterEvidence({ adapter, plan, environment: { platform: "linux", nodeVersion: null }, execution: execution.execution, authorization: null, repositoryRoot: fixture.root, sourcePath: "infra/000.tf" }).ok, true);
 });
 
 check("real adapters reject missing or mismatched source without creating evidence", () => {

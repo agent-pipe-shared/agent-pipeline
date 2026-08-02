@@ -26,19 +26,27 @@ const CAPABILITY_BY_KIND = Object.freeze({
 });
 const STATUS = new Set(["PASS", "FINDINGS", "SKIPPED", "ERROR"]);
 const REAL_STATIC_KINDS = new Set(["iac", "container", "ci-workflow"]);
+const MAX_STATIC_SOURCE_FILES = 128;
+const MAX_STATIC_SOURCE_BYTES = 8 * 1024 * 1024;
+const MAX_STATIC_FILE_BYTES = 1024 * 1024;
 const own = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value)
   && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 const safe = (value) => typeof value === "string" && /^[a-z][a-z0-9.-]{0,63}$/u.test(value);
 const oid = (value) => /^[a-f0-9]{40,64}$/u.test(value ?? "");
 const digest = (value) => createHash("sha256").update(value).digest("hex");
 
-function defaultCoverage(subject, scannedFileCount = 1) {
+function defaultCoverage(subject, {
+  scannedFileCount = 1,
+  totalEligibleFileCount = scannedFileCount,
+  truncated = false,
+  unsupportedScope = [],
+} = {}) {
   return {
     subject,
     exclusions: [],
     ignored: [],
-    unsupportedScope: [],
-    truncation: { truncated: false, scannedFileCount, totalEligibleFileCount: scannedFileCount },
+    unsupportedScope,
+    truncation: { truncated, scannedFileCount, totalEligibleFileCount },
     dataAge: { ageSeconds: 0, snapshotAt: null },
   };
 }
@@ -92,18 +100,25 @@ function staticFindings(adapterValue, sources) {
   return findings;
 }
 
-function executionRecord(adapterValue, plan, environment, sources = null) {
-  const findings = adapterValue.executionMode === "static-analysis" ? staticFindings(adapterValue, sources) : [];
-  const sourceSha256 = sources === null ? null : digest(JSON.stringify(sources));
-  const coverage = sources === null
+function executionRecord(adapterValue, plan, environment, sourceSet = null) {
+  const findings = adapterValue.executionMode === "static-analysis" ? staticFindings(adapterValue, sourceSet.sources) : [];
+  const sourceSha256 = sourceSet === null ? null : digest(JSON.stringify(sourceSet));
+  const incomplete = adapterValue.executionMode === "static-analysis" && !sourceSet.complete;
+  const coverage = sourceSet === null
     ? defaultCoverage(adapterValue.id)
-    : defaultCoverage(`candidate-tree:${adapterValue.kind}`, sources.length);
-  const unsigned = { schema: "pipeline.stack-adapter-execution.v1", adapterId: adapterValue.id, candidate: structuredClone(plan.candidate), planDigest: plan.digest, sourceSha256, environment: structuredClone(environment), status: findings.length === 0 ? "PASS" : "FINDINGS", findings, coverage, reason: adapterValue.executionMode === "static-analysis" ? (findings.length === 0 ? "offline-static-analysis" : "offline-static-analysis-findings") : "synthetic-conformance" };
+    : defaultCoverage(`candidate-tree:${adapterValue.kind}`, sourceSet.coverage);
+  const status = incomplete ? "ERROR" : findings.length === 0 ? "PASS" : "FINDINGS";
+  const reason = adapterValue.executionMode !== "static-analysis"
+    ? "synthetic-conformance"
+    : incomplete ? "offline-static-analysis-incomplete"
+    : findings.length === 0 ? "offline-static-analysis" : "offline-static-analysis-findings";
+  const unsigned = { schema: "pipeline.stack-adapter-execution.v1", adapterId: adapterValue.id, candidate: structuredClone(plan.candidate), planDigest: plan.digest, sourceSha256, environment: structuredClone(environment), status, findings, coverage, reason };
   return { ...unsigned, digest: digest(JSON.stringify(unsigned)) };
 }
 
-function validExecution(value, adapterValue, plan, environment, sources = null) {
-  if (!own(value, ["schema", "adapterId", "candidate", "planDigest", "sourceSha256", "environment", "status", "findings", "coverage", "reason", "digest"]) || value.schema !== "pipeline.stack-adapter-execution.v1" || value.adapterId !== adapterValue.id || JSON.stringify(value.candidate) !== JSON.stringify(plan.candidate) || value.planDigest !== plan.digest || value.sourceSha256 !== (sources === null ? null : digest(JSON.stringify(sources))) || JSON.stringify(value.environment) !== JSON.stringify(environment) || !STATUS.has(value.status) || !Array.isArray(value.findings) || (value.status === "PASS" && value.findings.length !== 0) || (value.status === "FINDINGS" && value.findings.length === 0) || typeof value.reason !== "string" || !/^[a-f0-9]{64}$/u.test(value.digest)) return false;
+function validExecution(value, adapterValue, plan, environment, sourceSet = null) {
+  const expectedStatus = sourceSet !== null && adapterValue.executionMode === "static-analysis" && !sourceSet.complete ? "ERROR" : null;
+  if (!own(value, ["schema", "adapterId", "candidate", "planDigest", "sourceSha256", "environment", "status", "findings", "coverage", "reason", "digest"]) || value.schema !== "pipeline.stack-adapter-execution.v1" || value.adapterId !== adapterValue.id || JSON.stringify(value.candidate) !== JSON.stringify(plan.candidate) || value.planDigest !== plan.digest || value.sourceSha256 !== (sourceSet === null ? null : digest(JSON.stringify(sourceSet))) || JSON.stringify(value.environment) !== JSON.stringify(environment) || !STATUS.has(value.status) || value.status !== (expectedStatus ?? value.status) || !Array.isArray(value.findings) || (value.status === "PASS" && value.findings.length !== 0) || (value.status === "FINDINGS" && value.findings.length === 0) || typeof value.reason !== "string" || !/^[a-f0-9]{64}$/u.test(value.digest)) return false;
   const { digest: executionDigest, ...unsigned } = value;
   return executionDigest === digest(JSON.stringify(unsigned));
 }
@@ -140,13 +155,32 @@ function readCandidateSources(adapterValue, repositoryRoot, candidate) {
   try {
     const tree = execFileSync("git", ["-C", resolve(repositoryRoot), "rev-parse", `${candidate.commit}^{tree}`], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
     if (tree !== candidate.tree) return null;
-    const paths = execFileSync("git", ["-C", resolve(repositoryRoot), "ls-tree", "-r", "-z", "--name-only", candidate.commit], { encoding: "buffer", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 8 * 1024 * 1024 })
-      .toString("utf8").split("\0").filter((path) => path !== "" && validStaticSourcePath(adapterValue, path));
-    const sources = paths.map((path) => {
-      const content = execFileSync("git", ["-C", resolve(repositoryRoot), "show", `${candidate.commit}:${path}`], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1024 * 1024 });
-      return Buffer.byteLength(content, "utf8") <= 1024 * 1024 ? { path, content } : null;
-    });
-    return sources.every((source) => source !== null) ? sources : null;
+    const entries = execFileSync("git", ["-C", resolve(repositoryRoot), "ls-tree", "-r", "-z", candidate.commit], { encoding: "buffer", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 8 * 1024 * 1024 })
+      .toString("utf8").split("\0").filter((entry) => entry !== "").map((entry) => {
+        const split = entry.indexOf("\t");
+        const [mode, type, object] = entry.slice(0, split).split(" ");
+        return { mode, type, object, path: entry.slice(split + 1) };
+      }).filter((entry) => validStaticSourcePath(adapterValue, entry.path));
+    const unsupportedScope = entries.filter((entry) => entry.type !== "blob" || !["100644", "100755"].includes(entry.mode))
+      .map((entry) => `${entry.path}: non-regular git entry (${entry.mode} ${entry.type})`);
+    const eligible = entries.filter((entry) => entry.type === "blob" && ["100644", "100755"].includes(entry.mode));
+    let truncated = eligible.length > MAX_STATIC_SOURCE_FILES;
+    let bytes = 0;
+    const sources = [];
+    for (const entry of eligible) {
+      if (sources.length >= MAX_STATIC_SOURCE_FILES) { truncated = true; break; }
+      const size = Number(execFileSync("git", ["-C", resolve(repositoryRoot), "cat-file", "-s", `${candidate.commit}:${entry.path}`], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim());
+      if (!Number.isSafeInteger(size) || size < 0 || size > MAX_STATIC_FILE_BYTES || bytes + size > MAX_STATIC_SOURCE_BYTES) { truncated = true; break; }
+      const content = execFileSync("git", ["-C", resolve(repositoryRoot), "show", `${candidate.commit}:${entry.path}`], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: MAX_STATIC_FILE_BYTES });
+      bytes += size;
+      sources.push({ path: entry.path, content });
+    }
+    return {
+      sources,
+      eligiblePaths: entries.map((entry) => entry.path),
+      complete: !truncated && unsupportedScope.length === 0,
+      coverage: { scannedFileCount: sources.length, totalEligibleFileCount: entries.length, truncated, unsupportedScope },
+    };
   } catch { return null; }
 }
 
@@ -154,14 +188,14 @@ function resolveStaticInput(adapterValue, input, plan, phase) {
   const base = phase === "execution" ? ["adapter", "plan", "environment", "authorization"] : ["adapter", "plan", "environment", "execution", "authorization"];
   const currentKeys = [...base, "repositoryRoot", "sourcePath"];
   if (own(input, currentKeys)) {
-    const sources = readCandidateSources(adapterValue, input.repositoryRoot, plan.candidate);
-    return sources !== null && sources.some((source) => source.path === input.sourcePath) ? sources : null;
+    const sourceSet = readCandidateSources(adapterValue, input.repositoryRoot, plan.candidate);
+    return sourceSet !== null && sourceSet.eligiblePaths.includes(input.sourcePath) ? sourceSet : null;
   }
   const legacyKeys = [...base, "source"];
   if (!own(input, legacyKeys) || !own(input.source, ["candidate", "path", "content"]) || JSON.stringify(input.source.candidate) !== JSON.stringify(plan.candidate) || typeof input.source.content !== "string") return null;
-  const sources = readCandidateSources(adapterValue, process.cwd(), plan.candidate);
-  const actual = sources?.find((source) => source.path === input.source.path);
-  return actual !== undefined && actual.content === input.source.content ? sources : null;
+  const sourceSet = readCandidateSources(adapterValue, process.cwd(), plan.candidate);
+  const actual = sourceSet?.sources.find((source) => source.path === input.source.path);
+  return actual !== undefined && actual.content === input.source.content ? sourceSet : null;
 }
 
 /**
