@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
   "planApproved": true,
-  "updatedAt": "2026-08-02T17:22:33.964Z",
+  "updatedAt": "2026-08-02T18:27:35.857Z",
   "closedFeatures": [
     {
       "id": "sprint-sentinel-epic",
@@ -68,9 +68,9 @@
   },
   "planApproval": {
     "schema": "pipeline.plan-approval.v4",
-    "approvedBy": "Product Owner",
-    "approvedAt": "2026-08-02T17:22:19.626Z",
-    "submissionSha256": "f8095ecaf19edc42976c8be8b4ccebb9e39641201a844ce62c7923f31d09c540",
+    "approvedBy": "PO",
+    "approvedAt": "2026-08-02T18:27:17.328Z",
+    "submissionSha256": "f2e7c3d9f02546c45cd57aca4e9765e925b7b14ca6adc75d86ead4a85f245364",
     "profileSha256": "8be50d40c4672fb406256aafbdd146dae9ed1b0931afb31fdfe3f8efa12dee04",
     "poGateAuthority": {
       "schema": "pipeline.po-gate-authority.v2",
@@ -80,16 +80,16 @@
       "receiptSha256": "5fe71f9583e7389dee5fd48179d84d0faa6bd76783f43910029105ce051613f9",
       "repositoryFingerprint": "5172c023ad31e8e1c82402e4d0a657cc6db16c0ba5538a432d48e8d477f2b16d",
       "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-      "planSha256": "1c335e47a6eb09206fd73fe1cae1751a7c4f1ae8f17053a48584001685cb0134",
+      "planSha256": "164cadc6d175b6d7105404d1e7d84d197864d8be84a6dd20bd7a97d02dadf110",
       "specPath": "specs/sprint-nova-epic/spec.md",
-      "specSha256": "aa6097c34fed0ce1349d158372dc29cce75142904548697057101a6ed4d13d5b"
+      "specSha256": "e9f020f746c7fd880cfbdac355316a0d0d12ee0fd12edd3474c38328371bd4a5"
     },
-    "priorInvalidationSha256": "d0a02f8c49a22ac6a0eb1974427128d29d1527421c7875d7f0fb790fbe296715"
+    "priorInvalidationSha256": "694bfb63462a762dc1ded0f1950f4ae3eb57ec437df242fdff293f4975a9e64e"
   },
   "continuity": {
     "schema": "pipeline.continuity.v0",
     "featureId": "sprint-nova-epic",
-    "revision": 22,
+    "revision": 23,
     "runtime": {
       "humanFacingLanguage": "en",
       "activeDuty": "Elephant",
@@ -98,11 +98,11 @@
     "authority": {
       "prd": {
         "path": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-        "sha256": "1c335e47a6eb09206fd73fe1cae1751a7c4f1ae8f17053a48584001685cb0134"
+        "sha256": "164cadc6d175b6d7105404d1e7d84d197864d8be84a6dd20bd7a97d02dadf110"
       },
       "spec": {
         "path": "specs/sprint-nova-epic/spec.md",
-        "sha256": "aa6097c34fed0ce1349d158372dc29cce75142904548697057101a6ed4d13d5b"
+        "sha256": "e9f020f746c7fd880cfbdac355316a0d0d12ee0fd12edd3474c38328371bd4a5"
       },
       "result": null
     },
@@ -118,7 +118,7 @@
     "acknowledgedFinal": null,
     "resume": {
       "mode": "immediate",
-      "sourceRevision": 22,
+      "sourceRevision": 23,
       "reasonCode": "active-turn"
     },
     "recovery": null,
@@ -136,21 +136,21 @@
     "schema": "pipeline.plan-submission.v1",
     "featureId": "sprint-nova-epic",
     "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-    "planSha256": "1c335e47a6eb09206fd73fe1cae1751a7c4f1ae8f17053a48584001685cb0134",
+    "planSha256": "164cadc6d175b6d7105404d1e7d84d197864d8be84a6dd20bd7a97d02dadf110",
     "specPath": "specs/sprint-nova-epic/spec.md",
-    "specSha256": "aa6097c34fed0ce1349d158372dc29cce75142904548697057101a6ed4d13d5b",
+    "specSha256": "e9f020f746c7fd880cfbdac355316a0d0d12ee0fd12edd3474c38328371bd4a5",
     "profile": "epic",
     "profileSha256": "8be50d40c4672fb406256aafbdd146dae9ed1b0931afb31fdfe3f8efa12dee04",
-    "submittedBy": "Product Owner",
-    "submittedAt": "2026-08-02T17:22:04.459Z"
+    "submittedBy": "PO",
+    "submittedAt": "2026-08-02T18:27:09.420Z"
   },
   "planInvalidation": {
     "schema": "pipeline.plan-invalidation.v1",
     "featureId": "sprint-nova-epic",
-    "invalidatedSubmissionSha256": "ce091cbfd3519e595a557f1afe577f270601b647663395444036cd828cc59935",
-    "invalidatedApprovalSha256": "e2b1ccce646a9578c8afc4891053669fc76753bcfbf6812265066d594d461e3b",
-    "invalidatedBy": "Product Owner",
-    "invalidatedAt": "2026-08-02T17:20:07.230Z",
+    "invalidatedSubmissionSha256": "f8095ecaf19edc42976c8be8b4ccebb9e39641201a844ce62c7923f31d09c540",
+    "invalidatedApprovalSha256": "d11804e9839f106d5f81e5c7180f487a2e62878f90c5f565a285bf51a8541e0e",
+    "invalidatedBy": "PO",
+    "invalidatedAt": "2026-08-02T18:20:37.800Z",
     "reason": "reopen-design"
   }
 }

@@ -1,7 +1,7 @@
 # Sprint Nova Epic — Product Requirements
 
 <!-- po-language: en -->
-<!-- technical-spec-sha256: aa6097c34fed0ce1349d158372dc29cce75142904548697057101a6ed4d13d5b -->
+<!-- technical-spec-sha256: e9f020f746c7fd880cfbdac355316a0d0d12ee0fd12edd3474c38328371bd4a5 -->
 
 **Feature ID:** `sprint-nova-epic`
 **Profile / rigor / risk:** Epic / 2 / high
@@ -59,6 +59,36 @@ publication, Issue action and any force operation remain outside this
 interim scope. A later release action needs a fresh exact candidate binding,
 focused regressions, Full Verify, Security, release preflight, independent
 delta-correct Critic review and its own explicit PO release authorization.
+
+## 2026-08-02 approved human-authorization and Cyborg-handover amendment
+
+The PO approved the staged extension package
+[`../2026-08-02_nova-human-authorization/`](../2026-08-02_nova-human-authorization/)
+and its source evidence
+[`design/2026-08-02-human-authorization-extension-input.md`](design/2026-08-02-human-authorization-extension-input.md).
+It expands the interim candidate only as follows:
+
+1. The existing detached Ed25519/SSH human proof becomes mandatory at the
+   sanctioned durable authorization actions for remote push, human-gated deploy
+   and publication. An attribution string or chat approval alone cannot create
+   one of those external-effect authorizations.
+2. Plan/design/review and all other non-final gates continue to use the
+   existing chat approval path. No blanket external-signer requirement is
+   introduced.
+3. A remote-app one-time code records only a short-lived, candidate-and-scope
+   bound provisional acknowledgement for an explicitly local continuation. It
+   is visible to the agent by design and therefore is not identity proof. It
+   must never authorize push, deploy, publication, release, override, merge,
+   deletion or another irreversible action; final proof on the hardened
+   terminal remains mandatory.
+4. Nova validates Cyborg's six handover rows on the selected final candidate,
+   retains `{ itemId, spec, candidateCommit, evidence }` for each, and uses the
+   canonical Nova writer only for an acceptance-backed transition. A stale or
+   failed row stays open with a narrow follow-up.
+
+This amendment supplies neither a remote application/provider nor credentials,
+passkey/IAM/hardware-key support, a remote mutation, tag, push, release or
+automatic backlog transition. Those effects remain individually gated.
 
 ## Executive decision
 

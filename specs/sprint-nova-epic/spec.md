@@ -69,6 +69,28 @@ Nova delivery. The former bounded pre-adoption lane is closed; historical Nova
 B4R material remains retained but is not a current implementation slice,
 acceptance claimant or delivery result.
 
+### 1.2 Human-authorization and Cyborg-handover extension
+
+The approved staging package is
+[`../2026-08-02_nova-human-authorization/`](../2026-08-02_nova-human-authorization/).
+Its immutable design input is mirrored in
+[`design/2026-08-02-human-authorization-extension-input.md`](design/2026-08-02-human-authorization-extension-input.md).
+The PRD requirements HAO-1 through HAO-6 map to this implementation boundary:
+
+| Requirement | Technical boundary |
+| --- | --- |
+| HAO-1 / HAO-2 | A generic critical-action request wraps the existing detached-proof primitive with a closed kind (`push`, `deploy`, `publication`) and an exact writer-owned subject digest. The State writer verifies it atomically before durable authorization. |
+| HAO-3 | No planning, implementation, Critic or ordinary review caller imports the new critical-proof verifier. Their chat approval contract is unchanged. |
+| HAO-4 / HAO-5 | The provisional receipt stores only candidate, scope, nonce digest, expiry and consumption state. A constant-time code check consumes it atomically; final/override paths reject the type before any authorization lookup. |
+| HAO-6 | Cyborg handover validation records exact tuple evidence in Nova's work package and invokes only the existing canonical reconciliation writer after passing readback. |
+
+The critical-action verifier rejects a malformed public trust policy, signature,
+kind, candidate, bound plan/Spec digest, action-subject digest, expiry or
+one-use authorization transition. The external signer and all private key
+material remain outside the repository. The provisional receipt has a maximum
+30-minute lifetime and is invalidated by candidate drift; it has no conversion
+path into a final proof.
+
 ## 2. Normative conventions
 
 ### 2.1 Closed records
