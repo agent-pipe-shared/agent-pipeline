@@ -71,33 +71,39 @@ function finding(adapterValue, severity, rule, source, match, msg) {
   return { tool: adapterValue.tool.name, severity, rule, path: source.path, line: lineOf(source.content, match), msg };
 }
 
-function staticFindings(adapterValue, source) {
+function staticFindings(adapterValue, sources) {
   const findings = [];
-  if (adapterValue.kind === "iac") {
-    for (const match of source.content.matchAll(/0\.0\.0\.0\/0/g)) findings.push(finding(adapterValue, "high", "public-ingress", source, match, "public IPv4 ingress must be explicitly constrained"));
-  } else if (adapterValue.kind === "container") {
-    for (const match of source.content.matchAll(/^\s*FROM\s+[^\s]+:latest\s*$/gim)) findings.push(finding(adapterValue, "medium", "mutable-base-image", source, match, "container base image must use an immutable tag or digest"));
-    const root = /^\s*USER\s+root\s*$/gim.exec(source.content);
-    if (root) findings.push(finding(adapterValue, "high", "root-user", source, root, "container must not run as root"));
-    if (!/^\s*USER\s+(?!root\b)[^\s#]+/im.test(source.content)) findings.push({ tool: adapterValue.tool.name, severity: "high", rule: "missing-nonroot-user", path: source.path, line: null, msg: "container must declare a non-root USER" });
-  } else if (adapterValue.kind === "ci-workflow") {
-    for (const match of source.content.matchAll(/^\s*pull_request_target\s*:/gim)) findings.push(finding(adapterValue, "high", "unsafe-pr-target", source, match, "pull_request_target must not run untrusted pull-request code"));
-    for (const match of source.content.matchAll(/^\s*permissions\s*:\s*write-all\s*$/gim)) findings.push(finding(adapterValue, "high", "write-all-permissions", source, match, "workflow must not request write-all permissions"));
-    for (const match of source.content.matchAll(/^\s*(?:-\s*)?uses:\s*([^\s#]+)\s*$/gim)) {
-      if (!/@[a-f0-9]{40}$/i.test(match[1])) findings.push(finding(adapterValue, "medium", "unpinned-action", source, match, "workflow action must be pinned to a full commit SHA"));
+  for (const source of sources) {
+    if (adapterValue.kind === "iac") {
+      for (const match of source.content.matchAll(/0\.0\.0\.0\/0/g)) findings.push(finding(adapterValue, "high", "public-ingress", source, match, "public IPv4 ingress must be explicitly constrained"));
+    } else if (adapterValue.kind === "container") {
+      for (const match of source.content.matchAll(/^\s*FROM\s+[^\s]+:latest\s*$/gim)) findings.push(finding(adapterValue, "medium", "mutable-base-image", source, match, "container base image must use an immutable tag or digest"));
+      const root = /^\s*USER\s+root\s*$/gim.exec(source.content);
+      if (root) findings.push(finding(adapterValue, "high", "root-user", source, root, "container must not run as root"));
+      if (!/^\s*USER\s+(?!root\b)[^\s#]+/im.test(source.content)) findings.push({ tool: adapterValue.tool.name, severity: "high", rule: "missing-nonroot-user", path: source.path, line: null, msg: "container must declare a non-root USER" });
+    } else if (adapterValue.kind === "ci-workflow") {
+      for (const match of source.content.matchAll(/^\s*pull_request_target\s*:/gim)) findings.push(finding(adapterValue, "high", "unsafe-pr-target", source, match, "pull_request_target must not run untrusted pull-request code"));
+      for (const match of source.content.matchAll(/^\s*permissions\s*:\s*write-all\s*$/gim)) findings.push(finding(adapterValue, "high", "write-all-permissions", source, match, "workflow must not request write-all permissions"));
+      for (const match of source.content.matchAll(/^\s*(?:-\s*)?uses:\s*([^\s#]+)(?:\s+#.*)?\s*$/gim)) {
+        if (!/@[a-f0-9]{40}$/i.test(match[1])) findings.push(finding(adapterValue, "medium", "unpinned-action", source, match, "workflow action must be pinned to a full commit SHA"));
+      }
     }
   }
   return findings;
 }
 
-function executionRecord(adapterValue, plan, environment, source = null) {
-  const findings = adapterValue.executionMode === "static-analysis" ? staticFindings(adapterValue, source) : [];
-  const unsigned = { schema: "pipeline.stack-adapter-execution.v1", adapterId: adapterValue.id, candidate: structuredClone(plan.candidate), planDigest: plan.digest, sourceSha256: source === null ? null : digest(JSON.stringify(source)), environment: structuredClone(environment), status: findings.length === 0 ? "PASS" : "FINDINGS", findings, coverage: defaultCoverage(source?.path ?? adapterValue.id), reason: adapterValue.executionMode === "static-analysis" ? (findings.length === 0 ? "offline-static-analysis" : "offline-static-analysis-findings") : "synthetic-conformance" };
+function executionRecord(adapterValue, plan, environment, sources = null) {
+  const findings = adapterValue.executionMode === "static-analysis" ? staticFindings(adapterValue, sources) : [];
+  const sourceSha256 = sources === null ? null : digest(JSON.stringify(sources));
+  const coverage = sources === null
+    ? defaultCoverage(adapterValue.id)
+    : defaultCoverage(`candidate-tree:${adapterValue.kind}`, sources.length);
+  const unsigned = { schema: "pipeline.stack-adapter-execution.v1", adapterId: adapterValue.id, candidate: structuredClone(plan.candidate), planDigest: plan.digest, sourceSha256, environment: structuredClone(environment), status: findings.length === 0 ? "PASS" : "FINDINGS", findings, coverage, reason: adapterValue.executionMode === "static-analysis" ? (findings.length === 0 ? "offline-static-analysis" : "offline-static-analysis-findings") : "synthetic-conformance" };
   return { ...unsigned, digest: digest(JSON.stringify(unsigned)) };
 }
 
-function validExecution(value, adapterValue, plan, environment, source = null) {
-  if (!own(value, ["schema", "adapterId", "candidate", "planDigest", "sourceSha256", "environment", "status", "findings", "coverage", "reason", "digest"]) || value.schema !== "pipeline.stack-adapter-execution.v1" || value.adapterId !== adapterValue.id || JSON.stringify(value.candidate) !== JSON.stringify(plan.candidate) || value.planDigest !== plan.digest || value.sourceSha256 !== (source === null ? null : digest(JSON.stringify(source))) || JSON.stringify(value.environment) !== JSON.stringify(environment) || !STATUS.has(value.status) || !Array.isArray(value.findings) || (value.status === "PASS" && value.findings.length !== 0) || (value.status === "FINDINGS" && value.findings.length === 0) || typeof value.reason !== "string" || !/^[a-f0-9]{64}$/u.test(value.digest)) return false;
+function validExecution(value, adapterValue, plan, environment, sources = null) {
+  if (!own(value, ["schema", "adapterId", "candidate", "planDigest", "sourceSha256", "environment", "status", "findings", "coverage", "reason", "digest"]) || value.schema !== "pipeline.stack-adapter-execution.v1" || value.adapterId !== adapterValue.id || JSON.stringify(value.candidate) !== JSON.stringify(plan.candidate) || value.planDigest !== plan.digest || value.sourceSha256 !== (sources === null ? null : digest(JSON.stringify(sources))) || JSON.stringify(value.environment) !== JSON.stringify(environment) || !STATUS.has(value.status) || !Array.isArray(value.findings) || (value.status === "PASS" && value.findings.length !== 0) || (value.status === "FINDINGS" && value.findings.length === 0) || typeof value.reason !== "string" || !/^[a-f0-9]{64}$/u.test(value.digest)) return false;
   const { digest: executionDigest, ...unsigned } = value;
   return executionDigest === digest(JSON.stringify(unsigned));
 }
@@ -129,24 +135,33 @@ function validStaticSourcePath(adapterValue, sourcePath) {
   return /^\.github\/workflows\/[^/]+\.ya?ml$/u.test(sourcePath);
 }
 
-function readCandidateSource(adapterValue, repositoryRoot, sourcePath, candidate) {
-  if (typeof repositoryRoot !== "string" || repositoryRoot === "" || !validStaticSourcePath(adapterValue, sourcePath)) return null;
+function readCandidateSources(adapterValue, repositoryRoot, candidate) {
+  if (typeof repositoryRoot !== "string" || repositoryRoot === "") return null;
   try {
     const tree = execFileSync("git", ["-C", resolve(repositoryRoot), "rev-parse", `${candidate.commit}^{tree}`], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
     if (tree !== candidate.tree) return null;
-    const content = execFileSync("git", ["-C", resolve(repositoryRoot), "show", `${candidate.commit}:${sourcePath}`], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1024 * 1024 });
-    return Buffer.byteLength(content, "utf8") <= 1024 * 1024 ? { path: sourcePath, content } : null;
+    const paths = execFileSync("git", ["-C", resolve(repositoryRoot), "ls-tree", "-r", "-z", "--name-only", candidate.commit], { encoding: "buffer", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 8 * 1024 * 1024 })
+      .toString("utf8").split("\0").filter((path) => path !== "" && validStaticSourcePath(adapterValue, path));
+    const sources = paths.map((path) => {
+      const content = execFileSync("git", ["-C", resolve(repositoryRoot), "show", `${candidate.commit}:${path}`], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1024 * 1024 });
+      return Buffer.byteLength(content, "utf8") <= 1024 * 1024 ? { path, content } : null;
+    });
+    return sources.every((source) => source !== null) ? sources : null;
   } catch { return null; }
 }
 
 function resolveStaticInput(adapterValue, input, plan, phase) {
   const base = phase === "execution" ? ["adapter", "plan", "environment", "authorization"] : ["adapter", "plan", "environment", "execution", "authorization"];
   const currentKeys = [...base, "repositoryRoot", "sourcePath"];
-  if (own(input, currentKeys)) return readCandidateSource(adapterValue, input.repositoryRoot, input.sourcePath, plan.candidate);
+  if (own(input, currentKeys)) {
+    const sources = readCandidateSources(adapterValue, input.repositoryRoot, plan.candidate);
+    return sources !== null && sources.some((source) => source.path === input.sourcePath) ? sources : null;
+  }
   const legacyKeys = [...base, "source"];
   if (!own(input, legacyKeys) || !own(input.source, ["candidate", "path", "content"]) || JSON.stringify(input.source.candidate) !== JSON.stringify(plan.candidate) || typeof input.source.content !== "string") return null;
-  const actual = readCandidateSource(adapterValue, process.cwd(), input.source.path, plan.candidate);
-  return actual !== null && actual.content === input.source.content ? actual : null;
+  const sources = readCandidateSources(adapterValue, process.cwd(), plan.candidate);
+  const actual = sources?.find((source) => source.path === input.source.path);
+  return actual !== undefined && actual.content === input.source.content ? sources : null;
 }
 
 /**

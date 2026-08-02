@@ -26,7 +26,7 @@ function candidateFixture() {
     Dockerfile: "FROM alpine@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\nUSER 10001\n",
     "bad/Dockerfile": "FROM nginx:latest\nUSER root\n",
     ".github/workflows/ci.yml": "on: [push]\njobs:\n  verify:\n    steps:\n      - uses: actions/checkout@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
-    ".github/workflows/pr.yml": "on:\n  pull_request_target:\npermissions: write-all\njobs:\n  x:\n    steps:\n      - uses: actions/checkout@v4\n",
+    ".github/workflows/pr.yml": "on:\n  pull_request_target:\npermissions: write-all\njobs:\n  x:\n    steps:\n      - uses: actions/checkout@v4 # temporary pin\n",
   };
   for (const [path, content] of Object.entries(files)) { mkdirSync(join(root, dirname(path)), { recursive: true }); writeFileSync(join(root, path), content); }
   execFileSync("git", ["init", "--quiet", root]);
@@ -156,6 +156,19 @@ check("real offline adapters produce typed findings from candidate source bytes"
     const result = createStackAdapterEvidence({ adapter, plan, environment: { platform: "linux", nodeVersion: null }, execution: execution.execution, authorization: null, repositoryRoot: fixture.root, sourcePath: fixtures[adapter.kind] });
     assert.equal(result.ok, true, adapter.kind);
     assert.equal(result.evidence.capabilities[0].classification, "static-analysis", adapter.kind);
+  }
+});
+
+check("real adapters scan every eligible candidate file despite a legacy selected source path", () => {
+  const selectedSafePaths = { iac: "infra/main.tf", container: "Dockerfile", "ci-workflow": ".github/workflows/ci.yml" };
+  const expectedRules = { iac: "public-ingress", container: "mutable-base-image", "ci-workflow": "unpinned-action" };
+  const expectedPaths = { iac: "infra/public.tf", container: "bad/Dockerfile", "ci-workflow": ".github/workflows/pr.yml" };
+  for (const adapter of REPRESENTATIVE_STACK_ADAPTERS.filter((item) => item.executionMode === "static-analysis")) {
+    const execution = executeStackAdapterConformance({ adapter, plan, environment: { platform: "linux", nodeVersion: null }, authorization: null, repositoryRoot: fixture.root, sourcePath: selectedSafePaths[adapter.kind] });
+    assert.equal(execution.ok, true, adapter.kind);
+    assert.equal(execution.execution.status, "FINDINGS", adapter.kind);
+    assert.equal(execution.execution.findings.some((item) => item.rule === expectedRules[adapter.kind] && item.path === expectedPaths[adapter.kind]), true, adapter.kind);
+    assert.deepEqual(execution.execution.coverage.truncation, { truncated: false, scannedFileCount: 2, totalEligibleFileCount: 2 }, adapter.kind);
   }
 });
 
