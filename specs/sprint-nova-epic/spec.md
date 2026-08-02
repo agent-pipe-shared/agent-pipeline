@@ -890,6 +890,14 @@ or changed paused record is rejected without a native-goal action. Pause,
 cancel, replacement and redirect always win over
 automatic continuation.
 
+The PO decision receipt has exactly
+`schema,featureId,continuationId,pausedRecordSha256,pauseRevision,resolvedRevision,decision,receiptSha256`.
+It is the closed `poDecisionReceipt` definition in
+`runner-native-continuation.schema.json` and the semantic admission contract in
+`runner-native-continuation.mjs`; it is deliberately embedded rather than a
+second, drifting standalone file. Both runner adapters consume this same
+closed shape and reject any foreign, stale or additional-field receipt.
+
 Each runner adapter must activate/update one native goal, obtain a fresh
 identity-and-generation-bound readback, and emit a bounded progress projection
 from phase/revision, deadline, test/dispatch, candidate/evidence and read-only
@@ -1214,6 +1222,21 @@ evidence only; any runtime/schema/test/gate/configuration change invalidates
 the applicable gates. Every issue gets an individual disposition. Nova/Cyborg
 combined integration remains a later lifecycle.
 
+#### Deferred-risk ownership register
+
+The following deliberate non-Nova or live-boundary gaps are recorded as risks,
+not acceptance blockers. Their accountable owner is the **Nova PO / backlog
+owner**; each must be revalidated on the next affected candidate mutation or
+by **2026-09-30**, whichever occurs first.
+
+| Deferred risk | Owner | Expiry / required action |
+| --- | --- | --- |
+| B2-I live GitLab-CI broker integration | Nova PO / backlog owner | 2026-09-30; select or renew a dedicated live-pilot scope before activation. |
+| B3-I direct Antigravity execution (#69) | Nova PO / backlog owner | 2026-09-30; assign the dedicated AGY sprint or renew the transfer. |
+| Live B4 forge mutation | Nova PO / backlog owner | 2026-09-30; retain the separate target, credential preview and confirmation gate. |
+| B1-I provider-backed `N+1 >= 2` observation | Nova PO / backlog owner | 2026-09-30; either activate a bounded provider study or renew the deferred disposition. |
+| Native Apple-Silicon lifecycle and evidence (#72) | Nova PO / backlog owner | 2026-09-30; assign eligible hardware and renew the follow-up evidence plan. |
+
 ## 7. Schema and file registry
 
 ### 7.1 Schema registry
@@ -1363,6 +1386,7 @@ Schema-specific nested shapes:
 | increment `base/candidate` | `GitCandidate`; `evidenceManifest` is `path,fileSha256,treeDigest`; issues are sorted `{issue,acceptanceIds,status,evidenceSha256}[]` |
 | continuation `subject/objective/acceptance/evidence` | closed `featureId,phase,planSha256,specSha256,queueRevision,packageId,actionId` / `conditionSha256,summarySha256` / sorted `{criterionId,status,evidenceSha256}[]` / sorted `EvidenceRef[]`; no raw prompt/message/path |
 | continuation `terminal/runner/generation/status/progress/readback/reason` | `kind,atRevision` / `runnerId,adapterVersion,capability` / non-negative integer and goal digest / lifecycle enum in §6.1 / sorted typed observations with `known|unknown|unavailable` / `goalIdSha256,generation,observedAt,status` / typed code plus optional evidence digest |
+| PO-goal decision receipt | `schema,featureId,continuationId,pausedRecordSha256,pauseRevision,resolvedRevision,decision,receiptSha256`; embedded as `poDecisionReceipt` in the continuation schema and semantically checked before native-goal action |
 | pool `capacity` | `configured,operator,certified,observed,pressure,reserved,effective`, each `CapacityValue` in `concurrent-tasks` |
 | pool `workers` | sorted `{workerId,subjectSha256,workspaceLease,processIdentitySha256,state,heartbeatMonotonicMs,resultSha256}[]` |
 | pool `cleanup` | `ownerNonce,requested,completed,blocked,receipts`; receipt list is sorted `EvidenceRef[]` |
@@ -1372,7 +1396,7 @@ Schema-specific nested shapes:
 | forge `cells` | sorted `{capabilityId,mode,status,evidence}[]`; target is `provider,baseUrlClass,projectCoordinatesSha256,objectType,objectIdSha256` |
 | external mutation `preview/confirmation/readback` | `previewSha256,expiresAt` / `authoritySha256,previewSha256,confirmedAt` / `observedSha256,expectedSha256,status,observedAt` |
 | macOS `os/toolchain` | `version,build,architecture` / sorted `{tool,version,executableSha256}[]`; private host serial/account data prohibited |
-| macOS `filesystem` | sorted `{capability,status,evidenceSha256}[]`; lifecycle continuity is closed in §6.6 |
+| macOS `filesystem` | sorted `{capability,status,evidenceSha256}[]`; lifecycle continuity is closed in §6.7 |
 
 Closed discriminators:
 
@@ -1420,7 +1444,7 @@ gate with collision review. In this table, “schemas `<name>` under
 | A6 | `plugins/pipeline-core/lib/multi-cli-benchmark.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/multi-cli-benchmark.schema.json`; `plugins/pipeline-core/scripts/release-preflight.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/release-preflight.schema.json`; exact fixtures `plugins/pipeline-core/scripts/fixtures/nova-benchmark/mini.json`, `feature.json`, `review.json`, `migration.json`, `failure-recovery.json` | none |
 | A6R / #98 | `plugins/pipeline-core/lib/publication-capability-preflight.mjs`, matching `.test.mjs`; versioned v2 publication-bundle/authority schemas and matching tests within the existing publication family/store; `plugins/pipeline-core/lib/verify-resume.mjs`, matching `.test.mjs`; schemas `publication-capability-preflight`, `verify-progress`, `verify-suite-receipt`, `verify-resume-plan` and `public-release-state` under `plugins/pipeline-core/scripts/`; `harness/scripts/check-release-state-consistency.mjs`, matching `.test.mjs`; `docs/release-state.json`; exact candidate evidence under `specs/sprint-nova-epic/evidence/nova-a/delivery-loop/` | released v1 publication bundle/authority remain byte-stable; released `plugins/pipeline-core/scripts/publication-executor.mjs`, matching `.test.mjs` and schema, only to add the fixed productive operations and v2 selection around the existing authority family; `plugins/pipeline-core/scripts/release-preflight.mjs`, matching `.test.mjs` and schema, only for early capability admission; `harness/scripts/verify.mjs` and `plugins/pipeline-core/scripts/verify-journal.mjs`, each with matching tests, only for bounded progress/journal/resume orchestration; `plugins/pipeline-core/lib/critic-review-lineage.mjs`, matching `.test.mjs`, only for release-path delta enforcement; `docs/state.md`; `harness/scripts/verify.mjs` registration; this PRD/Spec/acceptance/plan/lifecycle set |
 | A7 | `plugins/pipeline-core/lib/nova-increment-receipt.mjs`, matching `.test.mjs`; schemas `nova-increment-receipt` and `nova-increment-readback` under `plugins/pipeline-core/scripts/`; exact evidence paths `specs/sprint-nova-epic/evidence/nova-a/evidence-manifest.json`, `increment-receipt.json`, `increment-readback.json`, `verify.json`, `security.json`, `critic.json`, `po-activation.json` | `harness/scripts/verify.mjs`; `specs/sprint-nova-epic/lifecycle.json`; `specs/sprint-nova-epic/plans/nova-a.md`; `specs/sprint-nova-epic/plans/nova-b.md`; append-only `specs/sprint-nova-epic/result.md` |
-| B0 | `plugins/pipeline-core/lib/runner-native-continuation.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/runner-native-continuation.schema.json`; `plugins/pipeline-core/scripts/codex-goal-host.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/claude-goal-host.mjs`, matching `.test.mjs`; cross-runner fixtures under `plugins/pipeline-core/scripts/fixtures/runner-native-continuation/` | `plugins/pipeline-core/lib/continuity-state.mjs`, matching `.test.mjs`; `plugins/pipeline-core/lib/continuity-status.mjs`, matching `.test.mjs`; `plugins/pipeline-core/lib/interaction-continuity.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/continuity-status.mjs`, matching `.test.mjs`; `plugins/pipeline-core/hooks/stop-suggest.mjs`, matching `.test.mjs`; append-only `specs/sprint-nova-epic/result.md` for sanitized activation/readback evidence |
+| B0 | `plugins/pipeline-core/lib/runner-native-continuation.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/runner-native-continuation.schema.json` including its closed `poDecisionReceipt` definition; `plugins/pipeline-core/scripts/codex-goal-host.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/claude-goal-host.mjs`, matching `.test.mjs`; cross-runner fixtures under `plugins/pipeline-core/scripts/fixtures/runner-native-continuation/` | `plugins/pipeline-core/lib/continuity-state.mjs`, matching `.test.mjs`; `plugins/pipeline-core/lib/continuity-status.mjs`, matching `.test.mjs`; `plugins/pipeline-core/lib/interaction-continuity.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/continuity-status.mjs`, matching `.test.mjs`; `plugins/pipeline-core/hooks/stop-suggest.mjs`, matching `.test.mjs`; append-only `specs/sprint-nova-epic/result.md` for sanitized activation/readback evidence |
 | B1-C | `plugins/pipeline-core/lib/local-worker-pool.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/local-worker-pool.schema.json`; `specs/sprint-nova-epic/design/execution-state-authority-proposal.md` | none; pure contract/synthetic reducer only |
 | B1-I | `docs/adr/0048-local-goldfish-supervisor.md`; `plugins/pipeline-core/lib/local-worker-supervisor.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/local-worker-supervisor.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/local-worker-supervisor.schema.json`; `plugins/pipeline-core/scripts/fixtures/local-worker-supervisor-worker.mjs` | `.claude/pipeline-state.json`; `docs/adr/README.md`; `docs/local-supervisor-state-threat-model.md`; `docs/product-capability-inventory.json`; `docs/state.md`; `governance/observation-doc-governance.json`; `harness/scripts/verify.mjs`; `plugins/pipeline-core/lib/local-supervisor-state.mjs`, matching `.test.mjs`, only for ADR-0047 ownership/mode/link-count repair hardening; this Spec; `acceptance.md`; `plans/nova-b.md`; `prd_sprint-nova-epic.md`; append-only `result.md`; `lifecycle.json`, exactly as accepted in ADR-0048 |
 | B2-C | `plugins/pipeline-core/lib/async-execution.mjs`, matching `.test.mjs`; `plugins/pipeline-core/lib/credential-lease.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/async-execution-journal.schema.json`; `plugins/pipeline-core/scripts/credential-lease.schema.json`; `specs/sprint-nova-epic/evidence/nova-b/execution-state-authority-decision.json` | none; synthetic contract only |

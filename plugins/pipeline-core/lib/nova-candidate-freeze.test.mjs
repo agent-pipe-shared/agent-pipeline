@@ -46,6 +46,13 @@ const v2Schema = JSON.parse(readFileSync(new URL("../scripts/nova-b5-candidate-f
 assert.equal(v2Schema.$comment, "SPDX-License-Identifier: SUL-1.0");
 for (const key of ["candidate", "base", "portfolio", "backlog", "gates"]) assert.equal(v2Schema.properties[key].additionalProperties, false);
 assert.equal(v2Schema.properties.deferred.items, false);
+const manifestSchema = JSON.parse(readFileSync(new URL("../scripts/nova-b5-evidence-manifest.schema.json", import.meta.url), "utf8"));
+assert.equal(manifestSchema.$comment, "SPDX-License-Identifier: SUL-1.0");
+assert.equal(manifestSchema.properties.candidate.additionalProperties, false);
+assert.equal(manifestSchema.properties.sources.minItems, 7);
+assert.equal(manifestSchema.properties.sources.maxItems, 7);
+assert.equal(manifestSchema.properties.sources.items.$ref, "#/$defs/source");
+assert.equal(manifestSchema.$defs.source.additionalProperties, false);
 const unsorted = structuredClone(manifest); [unsorted.sources[0], unsorted.sources[1]] = [unsorted.sources[1], unsorted.sources[0]];
 assert.equal(validateNovaB5EvidenceManifest(unsorted).code, "NBM-SHAPE");
 console.log("nova-candidate-freeze: 8/8 checks passed.");
