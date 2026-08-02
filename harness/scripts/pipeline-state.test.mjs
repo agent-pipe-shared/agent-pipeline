@@ -216,11 +216,10 @@ function injectedPoGateAuthority(planPath) {
       : { ok: false, code: "PO-GATE-AUTHORITY-STALE" };
 }
 
-function humanDecisionFixture(dir, authority, featureId) {
-  const candidate = { commit: "b".repeat(40), tree: "c".repeat(40) };
+function humanDecisionFixture(dir, authority, featureId, { action = "APPROVE_PLAN", candidate = { commit: "b".repeat(40), tree: "c".repeat(40) } } = {}) {
   const reference = {
     schema: "pipeline.human-decision-reference.v1",
-    decisionId: `approve-plan-${featureId}`,
+    decisionId: `${action.toLowerCase().replaceAll("_", "-")}-${featureId}`,
     decisionDigest: "e".repeat(64),
     candidate,
     checkpoint: {
@@ -236,7 +235,7 @@ function humanDecisionFixture(dir, authority, featureId) {
     repositoryFingerprint: authority.repositoryFingerprint,
     candidate,
     packageId: featureId,
-    action: "APPROVE_PLAN",
+    action,
     environment: "local",
     artifacts: [
       { path: authority.planPath, sha256: authority.planSha256 },
@@ -248,6 +247,9 @@ function humanDecisionFixture(dir, authority, featureId) {
     humanAuthority: ({ request }) => request?.decisionId === reference.decisionId
       ? { ok: true, value: { schema: "pipeline.governance-authority-readback.v1", granted: true, decisionId: reference.decisionId, decisionDigest: reference.decisionDigest, scope, singleUse: true } }
       : { ok: false, code: "PS-HUMAN-AUTHORITY-READBACK" },
+    humanConsumption: ({ request }) => request?.decisionId === reference.decisionId
+      ? { ok: true, value: { schema: "pipeline.governance-authority-consumption-readback.v1", consumed: true, decisionId: reference.decisionId, decisionDigest: reference.decisionDigest, consumptionDecisionId: request.consumption.decisionId, checkpoint: { repositoryFingerprint: authority.repositoryFingerprint, streamId: "human", sequence: 2, eventDigest: "a".repeat(64), candidateCommit: candidate.commit, candidateTree: candidate.tree }, outcome: "appended" } }
+      : { ok: false, code: "PS-HUMAN-CONSUMPTION-READBACK" },
   };
 }
 
@@ -305,7 +307,7 @@ function governanceCapturePolicy() {
   ], sanitizedReceipt: { allowEventId: true, allowEventDigest: true, allowCheckpoint: true, allowReasonText: false } };
 }
 
-async function seedSubprocessHumanAuthority(dir, planPath, featureId) {
+async function seedSubprocessHumanAuthority(dir, planPath, featureId, action = "APPROVE_PLAN") {
   const git = (...args) => spawnSync("git", args, { cwd: dir, encoding: "utf8" }).stdout.trim();
   const fingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: join(dir, ".git"), primaryRoot: dir });
   const candidate = { commit: git("rev-parse", "HEAD"), tree: git("rev-parse", "HEAD^{tree}") };
@@ -314,11 +316,11 @@ async function seedSubprocessHumanAuthority(dir, planPath, featureId) {
   writeFileSync(join(dir, "governance", "events", "registry.json"), `${canonicalizeJson(governanceRegistry(fingerprint))}\n`);
   writeFileSync(join(dir, "governance", "events", "capture-policy.json"), `${canonicalizeJson(policy)}\n`);
   const specPath = `${planPath.slice(0, planPath.lastIndexOf("/") + 1)}spec.md`;
-  const decision = { decisionId: `approve-plan-${featureId}`, event: "granted", outcome: "granted", authorityClass: "product-owner", identityAssurance: "locally-attributed", timeAssurance: "locally-observed", scope: { repositoryFingerprint: fingerprint, candidate, packageId: featureId, action: "APPROVE_PLAN", environment: "local", artifacts: [{ path: planPath, sha256: createHash("sha256").update(readFileSync(join(dir, planPath))).digest("hex") }, { path: specPath, sha256: createHash("sha256").update(readFileSync(join(dir, specPath))).digest("hex") }] }, reasonCode: "APPROVED", policyDigest: "a".repeat(64), ruleDigest: "f".repeat(64), validity: { notBeforeEpochMs: 1, expiresAtEpochMs: 4_102_444_800_000, singleUse: true }, links: { requestDecisionId: "request-1", consumesDecisionId: null, revokesDecisionId: null, expiresDecisionId: null, supersedesDecisionId: null, correctsDecisionId: null } };
+  const decision = { decisionId: `${action.toLowerCase().replaceAll("_", "-")}-${featureId}`, event: "granted", outcome: "granted", authorityClass: "product-owner", identityAssurance: "locally-attributed", timeAssurance: "locally-observed", scope: { repositoryFingerprint: fingerprint, candidate, packageId: featureId, action, environment: "local", artifacts: [{ path: planPath, sha256: createHash("sha256").update(readFileSync(join(dir, planPath))).digest("hex") }, { path: specPath, sha256: createHash("sha256").update(readFileSync(join(dir, specPath))).digest("hex") }] }, reasonCode: "APPROVED", policyDigest: "a".repeat(64), ruleDigest: "f".repeat(64), validity: { notBeforeEpochMs: 1, expiresAtEpochMs: 4_102_444_800_000, singleUse: true }, links: { requestDecisionId: "request-1", consumesDecisionId: null, revokesDecisionId: null, expiresDecisionId: null, supersedesDecisionId: null, correctsDecisionId: null } };
   const unavailable = { state: "not-applicable" };
-  const intent = { schema: "pipeline.governance-event-envelope.v1", payloadSchema: "pipeline.human-governance-decision.v1", canonicalization: "RFC8785", digestAlgorithm: "sha-256", eventId: `human-event-${featureId}`, idempotencyKey: `human-idempotency-${featureId}`, origin: "human", authorityClass: "human-authority", eventType: "human.granted", occurredAtEpochMs: 2, observedAtEpochMs: 2, timeAssurance: "locally-observed", repositoryFingerprint: fingerprint, sourceUri: `urn:pipeline:repository:${fingerprint}`, streamId: "human", correlation: { featureId: unavailable, packageId: unavailable, requestId: unavailable, sessionId: unavailable, dispatchId: unavailable, traceId: unavailable }, candidate, artifacts: [unavailable], policy: { policyDigest: unavailable, configurationDigest: unavailable, capturePolicyDigest: canonicalSha256(policy), redactionPolicyDigest: unavailable }, classification: "repository-public-safe", storageProfile: "repository-public-safe", retentionCompatibility: "repository-retained", disclosureClass: "repository-visible", payload: decision };
+  const intent = { schema: "pipeline.governance-event-envelope.v1", payloadSchema: "pipeline.human-governance-decision.v1", canonicalization: "RFC8785", digestAlgorithm: "sha-256", eventId: `human-event-${action.toLowerCase().replaceAll("_", "-")}-${featureId}`, idempotencyKey: `human-idempotency-${action.toLowerCase().replaceAll("_", "-")}-${featureId}`, origin: "human", authorityClass: "human-authority", eventType: "human.granted", occurredAtEpochMs: 2, observedAtEpochMs: 2, timeAssurance: "locally-observed", repositoryFingerprint: fingerprint, sourceUri: `urn:pipeline:repository:${fingerprint}`, streamId: "human", correlation: { featureId: unavailable, packageId: unavailable, requestId: unavailable, sessionId: unavailable, dispatchId: unavailable, traceId: unavailable }, candidate, artifacts: [unavailable], policy: { policyDigest: unavailable, configurationDigest: unavailable, capturePolicyDigest: canonicalSha256(policy), redactionPolicyDigest: unavailable }, classification: "repository-public-safe", storageProfile: "repository-public-safe", retentionCompatibility: "repository-retained", disclosureClass: "repository-visible", payload: decision };
   const receipt = await appendHumanGovernanceDecision({ repositoryRoot: dir, repositoryFingerprint: fingerprint, intent });
-  return writeRequest(dir, `human-decision-${featureId}`, { schema: "pipeline.human-decision-reference.v1", decisionId: decision.decisionId, decisionDigest: canonicalSha256(decision), candidate, checkpoint: receipt.checkpoint });
+  return writeRequest(dir, `human-decision-${action.toLowerCase().replaceAll("_", "-")}-${featureId}`, { schema: "pipeline.human-decision-reference.v1", decisionId: decision.decisionId, decisionDigest: canonicalSha256(decision), candidate, checkpoint: receipt.checkpoint });
 }
 
 function continuityIdentity(overrides = {}) {
@@ -699,29 +701,35 @@ function canonicalFixtureJson(value) {
   ok("PS09d activeFeature id/planPath untouched by set-phase", state.activeFeature?.id === "f1" && state.activeFeature?.planPath === "p1.md");
 }
 
-// ---- PS10: approve-push records {approvedBy, approvedAt, forCommit} via injected git --
+// ---- PS10: approve-push projects a consumed, candidate-bound human decision ------------
 {
   const dir = freshDir("approve-push-shape");
-  const code = run(["approve-push", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
+  const authority = injectedPoGateAuthority("p-push.md")().value;
+  const candidate = { commit: "b".repeat(40), tree: "c".repeat(40) };
+  const human = humanDecisionFixture(dir, authority, "push-feature", { action: "APPROVE_PUSH", candidate });
+  run(["set-feature", "--id", "push-feature", "--plan-path", "p-push.md"], { dir, now: FIXED_NOW });
+  const code = run(["approve-push", "--by", "po-test", "--human-decision-file", human.file], { dir, now: FIXED_NOW, nowEpochMs: () => 50, gitCandidate: () => ({ ok: true, candidate }), humanAuthority: human.humanAuthority, humanConsumption: human.humanConsumption });
   ok("PS10a approve-push exit 0", code === 0, `got ${code}`);
   const state = readState(dir).state;
   ok(
-    "PS10b pushApproval.lastApproved shape correct",
+    "PS10b pushApproval stores only a candidate-bound human-decision receipt",
     state.pushApproval?.lastApproved?.approvedBy === "po-test" &&
       state.pushApproval?.lastApproved?.approvedAt === FIXED_NOW() &&
-      state.pushApproval?.lastApproved?.forCommit === "abc123deadbeef",
+      state.pushApproval?.lastApproved?.candidate?.commit === candidate.commit &&
+      state.pushApproval?.lastApproved?.humanDecision?.decisionId === human.humanAuthority({ request: { decisionId: "approve-push-push-feature" } }).value.decisionId &&
+      state.pushApproval?.lastApproved?.consumption?.schema === "pipeline.human-decision-consumption.v1",
   );
 }
 
-// ---- PS11: approve-push fails cleanly when git rev-parse HEAD fails -------------------
+// ---- PS11: approve-push fails cleanly when the exact candidate is unavailable ----------
 {
   const dir = freshDir("approve-push-no-git");
   const code = run(["approve-push", "--by", "po-test"], {
     dir,
     now: FIXED_NOW,
-    gitHead: () => ({ ok: false, error: "not a git repository" }),
+    gitCandidate: () => ({ ok: false, error: "not a git repository" }),
   });
-  ok("PS11 approve-push without a resolvable HEAD refused (exit 2)", code === 2, `got ${code}`);
+  ok("PS11 approve-push without a resolvable candidate refused (exit 2)", code === 2, `got ${code}`);
 }
 
 // ---- PS12: real subprocess invocation end-to-end (real git repo) ----------------------
@@ -751,7 +759,9 @@ function canonicalFixtureJson(value) {
   });
   ok("PS12b subprocess approve-plan exit 0", res2.status === 0, `stderr: ${res2.stderr}`);
 
-  const res3 = spawnSync(process.execPath, [CLI, "approve-push", "--by", "po-test"], {
+  const pushDecisionFile = await seedSubprocessHumanAuthority(dir, planPath, "e2e", "APPROVE_PUSH");
+
+  const res3 = spawnSync(process.execPath, [CLI, "approve-push", "--by", "po-test", "--human-decision-file", pushDecisionFile], {
     encoding: "utf8",
     env: { ...process.env, CLAUDE_PROJECT_DIR: dir },
   });
@@ -759,7 +769,7 @@ function canonicalFixtureJson(value) {
 
   const finalState = JSON.parse(readFileSync(statePath(dir), "utf8"));
   ok("PS12d final state has planApproved true", finalState.planApproved === true);
-  ok("PS12e final state pushApproval.forCommit matches real HEAD", finalState.pushApproval?.lastApproved?.forCommit === head);
+  ok("PS12e final state pushApproval candidate matches real HEAD", finalState.pushApproval?.lastApproved?.candidate?.commit === head);
   ok("PS12f state file is pretty-printed (contains newline+indent)", readFileSync(statePath(dir), "utf8").includes("\n  "));
 }
 
@@ -891,15 +901,10 @@ function canonicalFixtureJson(value) {
 {
   const dir = freshDir("close-feature-shape");
   const poGateAuthority = injectedPoGateAuthority("p-close.md");
-  const human = humanDecisionFixture(dir, poGateAuthority().value, "f-close");
+  const candidate = { commit: "b".repeat(40), tree: "c".repeat(40) };
+  const pushHuman = humanDecisionFixture(dir, poGateAuthority().value, "f-close", { action: "APPROVE_PUSH", candidate });
   run(["set-feature", "--id", "f-close", "--plan-path", "p-close.md"], { dir, now: FIXED_NOW });
-  run(["approve-plan", "--by", "po-test", "--human-decision-file", human.file], {
-    dir,
-    now: FIXED_NOW,
-    poGateAuthority,
-    humanAuthority: human.humanAuthority,
-  });
-  run(["approve-push", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
+  run(["approve-push", "--by", "po-test", "--human-decision-file", pushHuman.file], { dir, now: FIXED_NOW, nowEpochMs: () => 50, gitCandidate: () => ({ ok: true, candidate }), humanAuthority: pushHuman.humanAuthority, humanConsumption: pushHuman.humanConsumption });
   const code = run(["close-feature", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
   ok("PS18a close-feature exit 0", code === 0, `got ${code}`);
   const state = readState(dir).state;
@@ -918,7 +923,7 @@ function canonicalFixtureJson(value) {
       state.closedFeatures[0].forCommit === "abc123deadbeef",
     JSON.stringify(state.closedFeatures),
   );
-  ok("PS18g pushApproval preserved", state.pushApproval?.lastApproved?.forCommit === "abc123deadbeef");
+  ok("PS18g pushApproval preserved", state.pushApproval?.lastApproved?.candidate?.commit === candidate.commit);
 }
 
 // ---- PS19: close-feature best-effort on a git failure (DEVIATION vs. approve-push) -----

@@ -319,6 +319,8 @@ const RECOVERY_BRIDGE_TRANSACTION_SCHEMA = "pipeline.recovery-bridge-transaction
 const GOVERNANCE_AUTHORITY_CLI = fileURLToPath(new URL("../../plugins/pipeline-core/scripts/governance-authority.mjs", import.meta.url));
 const HUMAN_DECISION_REFERENCE_SCHEMA = "pipeline.human-decision-reference.v1";
 const GOVERNANCE_AUTHORITY_READBACK_SCHEMA = "pipeline.governance-authority-readback.v1";
+const GOVERNANCE_AUTHORITY_CONSUMPTION_READBACK_SCHEMA = "pipeline.governance-authority-consumption-readback.v1";
+const HUMAN_DECISION_CONSUMPTION_SCHEMA = "pipeline.human-decision-consumption.v1";
 const RECOVERY_BRIDGE_FEATURE_ID = "sprint-phoenix-epic";
 const RECOVERY_BRIDGE_OPERATION = "reconcile-mutable-design";
 const RECOVERY_BRIDGE_MANIFEST = "specs/sprint-phoenix-epic/lifecycle.json";
@@ -922,6 +924,77 @@ function defaultHumanAuthority({ repoRoot, request }) {
   } catch {
     return { ok: false, code: "PS-HUMAN-AUTHORITY-READBACK" };
   }
+}
+
+function humanConsumptionRequest(reference, action, observedAtEpochMs) {
+  if (!exactObjectKeys(reference, ["schema", "decisionId", "decisionDigest", "candidate", "checkpoint"])
+    || reference.schema !== HUMAN_DECISION_REFERENCE_SCHEMA
+    || typeof action !== "string" || !/^[A-Z][A-Z0-9_]{2,63}$/.test(action)
+    || !Number.isSafeInteger(observedAtEpochMs)) return null;
+  const suffix = sha256CanonicalJson({ schema: "pipeline.state-human-consumption.v1", action, reference }).slice(0, 40);
+  return {
+    schema: "pipeline.governance-authority-consume-request.v1",
+    repositoryFingerprint: reference.checkpoint?.repositoryFingerprint,
+    decisionId: reference.decisionId,
+    decisionDigest: reference.decisionDigest,
+    candidate: reference.candidate,
+    checkpoint: reference.checkpoint,
+    observedAtEpochMs,
+    consumption: {
+      decisionId: `consume-${suffix}`,
+      eventId: `state-consume-${suffix}`,
+      idempotencyKey: `state-consume-${suffix}`,
+    },
+  };
+}
+
+function defaultHumanConsumption({ repoRoot, request }) {
+  const invoked = spawnSync(process.execPath, [
+    GOVERNANCE_AUTHORITY_CLI,
+    "--repo", repoRoot,
+    "--consume-request-json", canonicalPhxJson(request),
+  ], { encoding: "utf8" });
+  if (invoked.status !== 0) return { ok: false, code: "PS-HUMAN-CONSUMPTION-READBACK" };
+  try {
+    const value = JSON.parse(invoked.stdout);
+    return value !== null && typeof value === "object" && !Array.isArray(value)
+      ? { ok: true, value }
+      : { ok: false, code: "PS-HUMAN-CONSUMPTION-READBACK" };
+  } catch {
+    return { ok: false, code: "PS-HUMAN-CONSUMPTION-READBACK" };
+  }
+}
+
+function matchesHumanAuthorityScope(readback, reference, { featureId, action, environment, candidate }) {
+  return exactObjectKeys(readback, ["schema", "granted", "decisionId", "decisionDigest", "scope", "singleUse"])
+    && readback.schema === GOVERNANCE_AUTHORITY_READBACK_SCHEMA
+    && readback.granted === true
+    && readback.decisionId === reference.decisionId
+    && readback.decisionDigest === reference.decisionDigest
+    && readback.singleUse === true
+    && exactObjectKeys(readback.scope, ["repositoryFingerprint", "candidate", "packageId", "action", "environment", "artifacts"])
+    && readback.scope.repositoryFingerprint === reference.checkpoint?.repositoryFingerprint
+    && canonicalPhxJson(readback.scope.candidate) === canonicalPhxJson(candidate)
+    && readback.scope.packageId === featureId
+    && readback.scope.action === action
+    && readback.scope.environment === environment
+    && Array.isArray(readback.scope.artifacts)
+    && readback.scope.artifacts.length > 0;
+}
+
+function matchesHumanConsumption(readback, request) {
+  return exactObjectKeys(readback, ["schema", "consumed", "decisionId", "decisionDigest", "consumptionDecisionId", "checkpoint", "outcome"])
+    && readback.schema === GOVERNANCE_AUTHORITY_CONSUMPTION_READBACK_SCHEMA
+    && readback.consumed === true
+    && readback.decisionId === request.decisionId
+    && readback.decisionDigest === request.decisionDigest
+    && readback.consumptionDecisionId === request.consumption.decisionId
+    && (readback.outcome === "appended" || readback.outcome === "idempotent-replay")
+    && exactObjectKeys(readback.checkpoint, ["repositoryFingerprint", "streamId", "sequence", "eventDigest", "candidateCommit", "candidateTree"])
+    && readback.checkpoint.repositoryFingerprint === request.repositoryFingerprint
+    && readback.checkpoint.streamId === "human"
+    && readback.checkpoint.candidateCommit === request.candidate.commit
+    && readback.checkpoint.candidateTree === request.candidate.tree;
 }
 
 function matchesPlanApprovalHumanAuthority(readback, reference, authority, featureId) {
@@ -3438,6 +3511,17 @@ function defaultGitHead(dir) {
   return { ok: true, commit: res.stdout.trim() };
 }
 
+/** Current commit/tree tuple for candidate-bound human authority; never guesses a tree. */
+function defaultGitCandidate(dir) {
+  const head = spawnSync("git", ["rev-parse", "HEAD"], { cwd: dir, encoding: "utf8" });
+  const tree = spawnSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: dir, encoding: "utf8" });
+  if (head.error || tree.error || head.status !== 0 || tree.status !== 0
+    || !/^[a-f0-9]{40}$/.test(head.stdout?.trim() ?? "") || !/^[a-f0-9]{40}$/.test(tree.stdout?.trim() ?? "")) {
+    return { ok: false, error: (head.stderr || tree.stderr || head.error?.message || tree.error?.message || "git candidate unavailable").trim() };
+  }
+  return { ok: true, candidate: { commit: head.stdout.trim(), tree: tree.stdout.trim() } };
+}
+
 function observeHistoricalResultForReconciliation(dir, relativePath) {
   const resolved = resolveResultPathWithoutSymlinks(dir, relativePath);
   if (resolved === null) return null;
@@ -3546,8 +3630,10 @@ export function run(argv = process.argv.slice(2), deps = {}) {
   const now = deps.now ?? (() => new Date().toISOString());
   const nowEpochMs = deps.nowEpochMs ?? (() => Date.now());
   const gitHead = deps.gitHead ?? defaultGitHead;
+  const gitCandidate = deps.gitCandidate ?? defaultGitCandidate;
   const poGateAuthority = deps.poGateAuthority ?? ((request) => validatePoGateAuthorityForRepository(request));
   const humanAuthority = deps.humanAuthority ?? defaultHumanAuthority;
+  const humanConsumption = deps.humanConsumption ?? defaultHumanConsumption;
 
   const [sub, ...rest] = argv;
   const flags = parseFlags(rest);
@@ -3845,23 +3931,61 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         console.error('Error: approve-push requires --by <name> (non-empty) -- an unattributed approval is refused.');
         return 2;
       }
-      const head = gitHead(dir);
-      if (!head.ok) {
-        console.error(`Error: current commit (git rev-parse HEAD) could not be determined: ${head.error}`);
-        console.error("Push approval NOT recorded -- forCommit is meaningless without a known commit.");
+      const candidate = gitCandidate(dir);
+      if (!candidate.ok) {
+        console.error(`Error: current commit/tree could not be determined: ${candidate.error}`);
+        console.error("Push approval NOT recorded -- a human decision must bind an exact candidate.");
+        return 2;
+      }
+      const humanDecision = readHumanDecisionReference(dir, flags["human-decision-file"]);
+      const authorityRequest = humanDecision.ok ? humanAuthorityRequest(humanDecision.value, nowEpochMs()) : null;
+      const resolvedHumanAuthority = authorityRequest === null
+        ? { ok: false, code: "PS-HUMAN-DECISION-INVALID" }
+        : humanAuthority({ repoRoot: dir, request: authorityRequest });
+      const featureId = base.activeFeature?.id;
+      if (!humanDecision.ok || typeof featureId !== "string" || !resolvedHumanAuthority?.ok
+        || !matchesHumanAuthorityScope(resolvedHumanAuthority.value, humanDecision.value, {
+          featureId,
+          action: "APPROVE_PUSH",
+          environment: "local",
+          candidate: candidate.candidate,
+        })) {
+        console.error("Error: approve-push requires a verified, checkpoint-bound --human-decision-file scoped to this exact candidate; no approval was recorded.");
+        return 2;
+      }
+      const consumptionRequest = humanConsumptionRequest(humanDecision.value, "APPROVE_PUSH", nowEpochMs());
+      const consumed = consumptionRequest === null
+        ? { ok: false, code: "PS-HUMAN-CONSUMPTION-INVALID" }
+        : humanConsumption({ repoRoot: dir, request: consumptionRequest });
+      if (!consumed?.ok || !matchesHumanConsumption(consumed.value, consumptionRequest)) {
+        console.error("Error: approve-push could not record the immutable one-shot human-decision consumption; no mutable approval was recorded.");
         return 2;
       }
       const approvedAt = now();
       const next = {
         ...base,
         schema: SCHEMA_ID,
-        pushApproval: { lastApproved: { approvedBy: by, approvedAt, forCommit: head.commit } },
+        pushApproval: {
+          schema: "pipeline.push-approval.v2",
+          lastApproved: {
+            approvedBy: by,
+            approvedAt,
+            candidate: candidate.candidate,
+            humanDecision: humanDecision.value,
+            consumption: {
+              schema: HUMAN_DECISION_CONSUMPTION_SCHEMA,
+              decisionId: consumptionRequest.consumption.decisionId,
+              decisionDigest: humanDecision.value.decisionDigest,
+              checkpoint: consumed.value.checkpoint,
+            },
+          },
+        },
         updatedAt: approvedAt,
       };
       if (!stateWriteSucceeded(writeState(dir, next, base))) {
         return 2;
       }
-      console.log(`Push approved by "${by}" for commit ${head.commit} (${approvedAt}).`);
+      console.log(`Push approved by "${by}" for candidate ${candidate.candidate.commit} (${approvedAt}).`);
       return 0;
     }
 
