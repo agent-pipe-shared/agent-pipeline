@@ -26,6 +26,10 @@ does not put a code word into chat, environment variables, or configuration.
 node "$REPO/plugins/pipeline-core/scripts/po-human-approval.mjs" setup --repo-root "$REPO" --directory "$PO_DIR"
 ```
 
+`setup` is idempotent. If an older attempt already left an encrypted private
+key plus public key in `PO_DIR` but no `trust-policy.json`, it creates only
+that missing public policy file; it never overwrites the existing key.
+
 ## Each approval
 
 ```sh

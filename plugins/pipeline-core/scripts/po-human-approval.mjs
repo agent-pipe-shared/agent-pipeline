@@ -9,7 +9,7 @@
  * private key is accepted as an argument, environment value, stdin payload,
  * repository file, or pipeline state.
  */
-import { createHash } from "node:crypto";
+import { createHash, createPublicKey } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
@@ -29,7 +29,10 @@ function outside(repoRoot, path) {
 }
 function fail(message) { throw new Error(message); }
 function json(path) { return JSON.parse(readFileSync(path, "utf8")); }
-function publicKeyPolicy(publicKey, keyReference) { return { keyReference, publicKeySha256: createHash("sha256").update(publicKey).digest("hex") }; }
+function publicKeyPolicy(publicKey, keyReference) {
+  createPublicKey(publicKey);
+  return { keyReference, publicKeySha256: createHash("sha256").update(publicKey).digest("hex") };
+}
 function externalDirectory(repository, directory, { create = false } = {}) {
   if (!outside(repository, directory)) fail("approval directory must be outside the repository");
   let canonicalRepository; let ancestor = directory; const missing = [];
@@ -102,7 +105,18 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
   };
   const write = dependencies.writeFile ?? writeFileSync; const read = dependencies.readFile ?? readFileSync; const exists = dependencies.exists ?? existsSync;
   if (args.command === "setup") {
-    if (exists(paths.privateKey) || exists(paths.publicKey) || exists(paths.authority)) fail("PO authority already exists; refusing to overwrite it");
+    const present = { privateKey: exists(paths.privateKey), publicKey: exists(paths.publicKey), authority: exists(paths.authority) };
+    if (present.privateKey && present.publicKey && !present.authority) {
+      const authority = publicKeyPolicy(read(paths.publicKey, "utf8"), args.keyReference);
+      write(paths.authority, `${JSON.stringify(authority, null, 2)}\n`, { mode: 0o600 });
+      return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority, recovered: true };
+    }
+    if (present.privateKey && present.publicKey && present.authority) {
+      const authority = json(paths.authority); const publicKey = read(paths.publicKey, "utf8");
+      if (!own(authority, ["keyReference", "publicKeySha256"]) || authority.publicKeySha256 !== publicKeyPolicy(publicKey, authority.keyReference).publicKeySha256) fail("existing trust policy does not match the local public key");
+      return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority, recovered: false };
+    }
+    if (present.privateKey || present.publicKey || present.authority) fail("partial PO authority exists; refusing to overwrite it");
     command("openssl", ["genpkey", "-algorithm", "ED25519", "-aes-256-cbc", "-out", paths.privateKey], dependencies);
     command("openssl", ["pkey", "-in", paths.privateKey, "-pubout", "-out", paths.publicKey], dependencies);
     const authority = publicKeyPolicy(read(paths.publicKey, "utf8"), args.keyReference); write(paths.authority, `${JSON.stringify(authority, null, 2)}\n`, { mode: 0o600 }); chmodSync(paths.privateKey, 0o600);

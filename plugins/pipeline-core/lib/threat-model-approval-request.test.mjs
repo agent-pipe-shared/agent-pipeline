@@ -45,6 +45,11 @@ const setup = runHumanApproval(["setup", "--repo-root", nominalRepo, "--director
 });
 assert.equal(setup.code, "PO-HUMAN-AUTHORITY-READY");
 assert.equal(JSON.parse(readFileSync(join(keyDirectory, "trust-policy.json"), "utf8")).publicKeySha256, trustPolicy.publicKeySha256);
+const recoveryDirectory = mkdtempSync(join(tmpdir(), "po-human-recovery-")); writeFileSync(join(recoveryDirectory, "po-private.pem"), "encrypted-private-key-placeholder"); writeFileSync(join(recoveryDirectory, "po-public.pem"), publicKey);
+const recovered = runHumanApproval(["setup", "--repo-root", nominalRepo, "--directory", recoveryDirectory]);
+assert.equal(recovered.recovered, true);
+assert.equal(JSON.parse(readFileSync(join(recoveryDirectory, "trust-policy.json"), "utf8")).publicKeySha256, trustPolicy.publicKeySha256);
+assert.equal(runHumanApproval(["setup", "--repo-root", nominalRepo, "--directory", recoveryDirectory]).recovered, false);
 assert.throws(() => runHumanApproval(["setup", "--repo-root", nominalRepo, "--directory", `${nominalRepo}/po`]), /outside the repository/u);
 mkdirSync(join(nominalRepo, "inside")); const linkedDirectory = join(external, "linked-po"); symlinkSync(join(nominalRepo, "inside"), linkedDirectory, "dir");
 assert.throws(() => runHumanApproval(["setup", "--repo-root", nominalRepo, "--directory", linkedDirectory]), /outside the repository/u);
@@ -59,4 +64,4 @@ assert.throws(() => runHumanApproval(["setup", "--repo-root", nominalRepo, "--di
 writeFileSync(join(external, "po-private.pem"), "encrypted-private-key-placeholder");
 assert.equal(runHumanApproval(["approve", "--repo-root", nominalRepo, "--directory", external], { spawn: (_executable, args) => { writeFileSync(args[args.indexOf("-out") + 1], "detached-signature"); return { status: 0 }; } }).code, "PO-HUMAN-PROOF-READY");
 assert.equal(JSON.parse(readFileSync(join(external, "proof.json"), "utf8")).intentSha256, request.approvalIntent.sha256);
-console.log("25 threat-model approval request checks passed");
+console.log("28 threat-model approval request checks passed");
