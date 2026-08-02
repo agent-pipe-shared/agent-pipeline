@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import test from "node:test";
 import { createExternalHumanGovernanceIntent } from "./human-governance-ledger.mjs";
-import { requireExternallyVerifiedGovernanceAuthority, requireGovernanceAuthority } from "./governance-authority-resolver.mjs";
+import { requireExternallyAttestedGovernanceAuthority, requireExternallyVerifiedGovernanceAuthority, requireGovernanceAuthority } from "./governance-authority-resolver.mjs";
 
 const sha = "a".repeat(64); const candidate = { commit: "b".repeat(40), tree: "c".repeat(40) };
 const decision = { decisionId: "decision-1", event: "granted", outcome: "granted", authorityClass: "product-owner", identityAssurance: "locally-attributed", timeAssurance: "locally-observed", scope: { repositoryFingerprint: sha, candidate, packageId: "sprint-phoenix-epic", action: "PLAN.APPROVE", environment: "local", artifacts: [{ path: "specs/sprint-phoenix-epic/spec.md", sha256: sha }] }, reasonCode: "SCOPE.ACCEPTED", policyDigest: sha, ruleDigest: sha, validity: { notBeforeEpochMs: 0, expiresAtEpochMs: 100, singleUse: true }, links: { requestDecisionId: "request-1", consumesDecisionId: null, revokesDecisionId: null, expiresDecisionId: null, supersedesDecisionId: null, correctsDecisionId: null } };
@@ -24,5 +24,9 @@ test("external resolver reports proof verification without claiming human identi
   const request = { decisions: [grant], decisionId: grant.decisionId, repositoryFingerprint: sha, candidate, nowEpochMs: 1, plan, spec, trustPolicy: { keyReference: proof.keyReference, publicKeySha256: createHash("sha256").update(publicKey).digest("hex") }, proof };
   assert.deepEqual(requireExternallyVerifiedGovernanceAuthority(request).proofTrustAssurance, "caller-supplied-policy");
   assert.equal(requireExternallyVerifiedGovernanceAuthority(request).identityAssurance, undefined);
+  const compatibility = requireExternallyAttestedGovernanceAuthority(request);
+  assert.equal(compatibility.granted, true);
+  assert.equal(compatibility.identityAssurance, "local-human");
+  assert.equal(compatibility.externalAttestationDeprecated, true);
   assert.deepEqual(requireExternallyVerifiedGovernanceAuthority({ ...request, proof: { ...proof, signatureBase64: "AA==" } }), { granted: false, reason: "external-proof-unverified", proofCode: "HGL-EXTERNAL-PROOF-MISMATCH" });
 });

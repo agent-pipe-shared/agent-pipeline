@@ -228,9 +228,11 @@ test("competing dead-lock recovery cannot delete a newly acquired writer lock", 
     recovered("evt-recover-a", "idem-recover-a", 2),
     recovered("evt-recover-b", "idem-recover-b", 3),
   ]);
-  assert.ok(results.some((result) => result.status === "fulfilled"));
+  const fulfilled = results.filter((result) => result.status === "fulfilled");
+  assert.ok(fulfilled.length > 0);
   for (const result of results.filter((entry) => entry.status === "rejected")) assert.equal(result.reason.code, "GES-LOCKED");
   const queried = await queryPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" });
+  assert.equal(queried.events.length, 1 + fulfilled.length, "every successful recovery writer has one durable event");
   assert.deepEqual(queried.events.map((event) => event.sequence), queried.events.map((_, index) => index + 1));
   await assert.rejects(() => stat(lock), { code: "ENOENT" });
 });

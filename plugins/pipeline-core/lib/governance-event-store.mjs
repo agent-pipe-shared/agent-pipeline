@@ -9,6 +9,7 @@
  * route restricted data through this portable writer.
  */
 import { mkdir, open, readFile, realpath, readdir, rename, unlink, lstat, stat } from "node:fs/promises";
+import { spawn } from "node:child_process";
 import path from "node:path";
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import {
@@ -29,7 +30,7 @@ const HEADS_SCHEMA = "pipeline.governance-event-heads.v1";
 const SHA256 = /^[a-f0-9]{64}$/u;
 const EVENT_FILE = /^([1-9][0-9]*)-([A-Za-z0-9][A-Za-z0-9._:-]{0,127})\.json$/u;
 const TEMPORARY_EVENT_FILE = /^\.([1-9][0-9]*-[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\.json)\.[a-f0-9]{24}\.tmp$/u;
-const RECLAIMED_LOCK_FILE = /^\.lock\.[a-f0-9]{24}\.reclaim$/u;
+const STREAM_LOCK_GUARD_FILE = ".lock.guard";
 const STREAM_LOCK_SCHEMA = "pipeline.governance-event-stream-lock.v1";
 const INTENT_OMITTED_FIELDS = new Set(["sequence", "previousEventDigest", "payloadDigest", "eventDigest"]);
 const STREAMS = new Map([
@@ -404,10 +405,10 @@ async function scanStream(root, registry, streamId) {
   const events = [];
   for (const entry of entries) {
     if (entry.name === ".lock") continue;
-    // A dead lock is atomically moved to this writer-owned quarantine before
-    // deletion. Readers must not turn that non-authoritative recovery seam
-    // into a stream-integrity failure.
-    if (RECLAIMED_LOCK_FILE.test(entry.name) && entry.isFile()) continue;
+    // The advisory acquisition guard is deliberately non-authoritative.  It
+    // serializes lock acquisition and stale-lock recovery only; a lingering
+    // regular guard file must never make a committed event prefix unreadable.
+    if (entry.name === STREAM_LOCK_GUARD_FILE && entry.isFile()) continue;
     // A writer publishes only after rename.  Its own unlinked temporary bytes
     // are never authority and must not make a valid committed prefix unreadable.
     if (TEMPORARY_EVENT_FILE.test(entry.name) && entry.isFile()) continue;
@@ -470,44 +471,69 @@ async function isRecoverableDeadLock(lock) {
   catch (error) { return error?.code === "ESRCH"; }
 }
 
-/** Atomically retire the exact stale pathname; never unlink a replacement lock. */
-async function reclaimRecoverableDeadLock(lock) {
-  if (!(await isRecoverableDeadLock(lock))) return false;
-  const quarantine = `${lock}.${randomBytes(12).toString("hex")}.reclaim`;
+/**
+ * Hold a host advisory lock only while inspecting/reclaiming `.lock` or
+ * creating a replacement.  POSIX releases it if this process crashes, so a
+ * dead recovery owner cannot strand the stream.  Every stream acquirer uses
+ * this same guard; therefore a dead `.lock` can be unlinked only while no
+ * competing acquirer can replace it.
+ */
+async function acquireStreamLockGuard(lock) {
+  const guard = path.join(path.dirname(lock), STREAM_LOCK_GUARD_FILE);
+  const entry = await lstatOrNull(guard);
+  if (entry && (!entry.isFile() || entry.isSymbolicLink())) fail("GES-UNSAFE-PATH", "The stream contains an unsafe lock-guard path.");
+  return new Promise((resolve, reject) => {
+    const child = spawn("flock", ["-n", guard, "sh", "-c", "printf 'ready\\n'; read _"], { stdio: ["pipe", "pipe", "ignore"] });
+    let ready = false;
+    let output = "";
+    let settled = false;
+    const rejectOnce = (error) => { if (!settled) { settled = true; reject(error); } };
+    const waitForExit = () => new Promise((done) => child.once("exit", () => done()));
+    child.once("error", (error) => rejectOnce(new GovernanceEventStoreError("GES-LOCK-RUNTIME", error.message)));
+    child.stdout.on("data", (chunk) => {
+      output += chunk.toString("utf8");
+      if (!ready && output.includes("ready\n")) {
+        ready = true;
+        settled = true;
+        resolve(Object.freeze({ release: async () => { child.stdin.end(); await waitForExit(); } }));
+      }
+    });
+    child.once("exit", (code) => {
+      if (!ready) rejectOnce(new GovernanceEventStoreError(code === 1 ? "GES-LOCKED" : "GES-LOCK-RUNTIME"));
+    });
+  });
+}
+
+async function createStreamLock(lock) {
+  let handle;
+  let created = false;
   try {
-    // rename is the ownership transfer: a competing writer that has already
-    // replaced `.lock` keeps its own pathname and cannot be deleted here.
-    await rename(lock, quarantine);
+    handle = await open(lock, "wx", 0o600);
+    created = true;
+    await handle.writeFile(`${canonicalizeJson({ schema: STREAM_LOCK_SCHEMA, pid: process.pid })}\n`, "utf8");
+    await handle.sync();
+    await handle.close();
   } catch (error) {
-    if (error?.code === "ENOENT") return false;
+    if (handle) await handle.close().catch(() => {});
+    if (created) await removeLock(lock);
     throw error;
   }
-  try { await unlink(quarantine); }
-  catch (error) { throw error; }
-  return true;
 }
 
 async function acquireStreamLock(lock) {
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    let handle;
-    let created = false;
-    try {
-      handle = await open(lock, "wx", 0o600);
-      created = true;
-      await handle.writeFile(`${canonicalizeJson({ schema: STREAM_LOCK_SCHEMA, pid: process.pid })}\n`, "utf8");
-      await handle.sync();
-      await handle.close();
-      return;
-    } catch (error) {
-      if (handle) await handle.close().catch(() => {});
-      if (created) await removeLock(lock);
-      if (error?.code !== "EEXIST" || attempt !== 0 || !(await reclaimRecoverableDeadLock(lock))) {
-        if (error?.code === "EEXIST") fail("GES-LOCKED", "The stream is already being written.");
-        throw error;
-      }
+  const guard = await acquireStreamLockGuard(lock);
+  try {
+    try { await createStreamLock(lock); return; }
+    catch (error) {
+      if (error?.code !== "EEXIST") throw error;
     }
-  }
-  fail("GES-LOCKED", "The stream is already being written.");
+    // No peer can acquire or replace `.lock` while this advisory guard is
+    // held.  A live owner therefore fails closed; only an observed-dead owner
+    // is reclaimed, and its pathname cannot be stolen between check/unlink.
+    if (!(await isRecoverableDeadLock(lock))) fail("GES-LOCKED", "The stream is already being written.");
+    await removeLock(lock);
+    await createStreamLock(lock);
+  } finally { await guard.release(); }
 }
 
 async function removeOrphanedTemporaryEvents(streamRoot) {

@@ -115,6 +115,11 @@ export function resolveExternallyVerifiedHumanGovernanceAuthority({ decisions, d
   }
 }
 
+/** @deprecated Compatibility alias; its result never claims external human identity. */
+export function resolveExternallyAttestedHumanGovernanceAuthority(request) {
+  return resolveExternallyVerifiedHumanGovernanceAuthority(request);
+}
+
 /** Append one already validated human decision through the canonical portable writer. */
 export async function appendHumanGovernanceDecision({ repositoryRoot, repositoryFingerprint, intent } = {}) {
   if (!record(intent) || intent.origin !== "human" || intent.streamId !== "human" || intent.authorityClass !== "human-authority" || intent.payloadSchema !== "pipeline.human-governance-decision.v1") fail("HGL-APPEND-INTENT");
