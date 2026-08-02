@@ -3,21 +3,13 @@
 // Negative-gate test suite for the CYB-2A fixture matrix
 // (specs/2026-07-24-sprint-cyborg-epic/cyb-2-feature-spec.md §4, AC12).
 //
-// EXPECTED TO FAIL RIGHT NOW, ON PURPOSE (`node --test` must exit non-zero):
-// the fourteen "negative gate: <id> ..." subtests below each assert that
-// `evaluateFixturePlaceholder(fixture)` equals `fixture.expectedOutcome`.
-// The stub in security-evidence-fixture-matrix.mjs always returns a fixed
-// sentinel that matches none of them, so all fourteen fail today with a
-// readable per-fixture actual-vs-expected message. CYB-2B replaces the stub
-// with a real evaluator and should flip these green ONE AT A TIME as each
-// capability class's real classification logic lands -- not all at once.
-//
-// The two "structural" test blocks above them are permanent regression
-// checks and are expected to PASS today and forever (they do not depend on
-// the not-yet-built evaluator at all).
+// Every fixture is exercised through the one CYB-2B evaluator. A permanent
+// intentionally-red fixture suite would conceal regressions from normal
+// verification once that evaluator has shipped.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { FIXTURE_MATRIX, RUN_OUTCOMES, evaluateFixturePlaceholder } from "./security-evidence-fixture-matrix.mjs";
+import { FIXTURE_MATRIX, RUN_OUTCOMES } from "./security-evidence-fixture-matrix.mjs";
+import { evaluateCapability } from "./security-evidence-evaluator.mjs";
 
 // Exact class labels from cyb-2-feature-spec.md §4, in order, verbatim --
 // do not rename/merge/drop; see this repo's own §4 quote for the count note.
@@ -88,13 +80,14 @@ test("structural: every fixture has a plausible v1-shaped candidate, a well-form
 });
 
 for (const fixture of FIXTURE_MATRIX) {
-  test(`negative gate: ${fixture.id} does not yet resolve to its expected outcome (stub not implemented)`, () => {
-    const actual = evaluateFixturePlaceholder(fixture);
-    assert.strictEqual(
-      actual,
-      fixture.expectedOutcome,
-      `fixture "${fixture.id}" expects "${fixture.expectedOutcome}" but the CYB-2B evaluator does not exist yet ` +
-        `(stub returned "${actual}") -- this fixture should flip green once CYB-2B implements its real classification`
-    );
+  test(`fixture: ${fixture.id} resolves through the real evaluator`, () => {
+    const capabilityIds = fixture.focusCapabilityId === null
+      ? fixture.candidate.capabilities.map(({ id }) => id)
+      : [fixture.focusCapabilityId];
+    for (const capabilityId of capabilityIds) {
+      const actual = evaluateCapability(fixture.candidate, capabilityId, fixture.plan).outcome;
+      assert.strictEqual(actual, fixture.expectedOutcome,
+        `fixture "${fixture.id}" capability "${capabilityId}" expected "${fixture.expectedOutcome}" but got "${actual}"`);
+    }
   });
 }

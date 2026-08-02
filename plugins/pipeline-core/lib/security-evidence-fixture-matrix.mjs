@@ -2,12 +2,9 @@
 //
 // CYB-2A -- fixture matrix for the failure/compatibility classes named in
 // specs/2026-07-24-sprint-cyborg-epic/cyb-2-feature-spec.md §4 (AC12).
-// FOUNDATION ONLY (Wave 1 of the CYB-2 body-slicing plan): this module builds
-// the fixtures and a deliberately-not-yet-passing test harness around them.
-// It does NOT build the real evaluator, capability-plan resolution, or the
-// `security-evidence.v2` schema -- that is CYB-2B, a separate later
-// sub-package. See plugins/pipeline-core/lib/security-evidence-fixture-matrix.test.mjs
-// for the negative-gate test suite that consumes this module.
+// This module owns the closed fixture corpus. The real evaluator, capability-
+// plan resolution, and `security-evidence.v2` schema live in CYB-2B; both its
+// suite and this suite exercise this same corpus through that evaluator.
 //
 // Exports:
 //   RUN_OUTCOMES            -> the frozen 10-member L3 per-capability run-
@@ -17,8 +14,6 @@
 //                               local copy for fixture annotation only.
 //   FIXTURE_MATRIX           -> frozen array of the fixture objects (see
 //                               shape below).
-//   evaluateFixturePlaceholder(fixture) -> the temporary stub (see STUB
-//                               section near the bottom of this file).
 //
 // 14-vs-15 count (report this, do not silently resolve it): cyb-2-feature-
 // spec.md §4 lists exactly FOURTEEN dot-separated failure/compatibility
@@ -85,21 +80,10 @@
 // is a simple observation, not a defect (the DoD requires a valid enum
 // member per fixture, not coverage of every member).
 //
-// STUB MECHANISM (temporary, replaced by CYB-2B): `evaluateFixturePlaceholder`
-// always returns the fixed sentinel string "not-yet-implemented", which is
-// deliberately NOT a member of RUN_OUTCOMES. Every fixture's test therefore
-// asserts `evaluateFixturePlaceholder(fixture) === fixture.expectedOutcome`,
-// which is guaranteed to fail today with a clear actual-vs-expected mismatch
-// naming the sentinel and the real expected value -- not a generic
-// import-crash. See the clearly marked "REPLACE WHEN CYB-2B LANDS" section
-// near the bottom of this file. NEXT READER: when CYB-2B's real evaluator
-// lands, delete/replace ONLY that one function (and the sentinel constant);
-// nothing else in this file should need to change. The fixtures and their
-// `expectedOutcome` annotations are permanent regression material -- CYB-2B
-// should make these tests pass ONE AT A TIME as each capability class is
-// implemented, never all fifteen^H^H^Hfourteen at once by accident (a
-// sudden all-green flip on this suite is itself a smell worth investigating,
-// not a milestone to celebrate uncritically).
+// The fixtures and their `expectedOutcome` annotations are permanent
+// regression material. They must be executed through the single real
+// evaluator; a fixture may not retain a deliberately-red placeholder after
+// the evaluator is available.
 //
 // Purity: this module does no fs/network I/O -- every fixture is an in-memory
 // literal. Nothing here reads a real file or spawns a process.
@@ -368,31 +352,3 @@ export const FIXTURE_MATRIX = Object.freeze([
     expectedOutcome: "execution-unavailable",
   }),
 ]);
-
-// ---------------------------------------------------------------------------------------------
-// REPLACE WHEN CYB-2B LANDS -- temporary stub only, not a real evaluator.
-// ---------------------------------------------------------------------------------------------
-
-/**
- * Fixed sentinel the stub always returns. Deliberately NOT a member of
- * RUN_OUTCOMES, so every fixture's round-trip assertion
- * (`evaluateFixturePlaceholder(fixture) === fixture.expectedOutcome`) is
- * guaranteed to fail today with a readable actual-vs-expected mismatch.
- */
-export const NOT_YET_IMPLEMENTED_OUTCOME = "not-yet-implemented";
-
-/**
- * REPLACE WHEN CYB-2B LANDS.
- *
- * Temporary placeholder standing in for the real capability-plan-matching
- * evaluator (CYB-2B, a separate later sub-package). It deliberately never
- * inspects `fixture.candidate`/`fixture.plan` and always returns the fixed
- * `NOT_YET_IMPLEMENTED_OUTCOME` sentinel -- this is the whole point of a
- * negative-gate fixture matrix: every fixture must fail meaningfully now,
- * before the real evaluator exists, then flip green one at a time as CYB-2B
- * implements each capability class's real classification logic. Do not add
- * real logic here; do not scatter evaluator behavior elsewhere in this file.
- */
-export function evaluateFixturePlaceholder(_fixture) {
-  return NOT_YET_IMPLEMENTED_OUTCOME;
-}
