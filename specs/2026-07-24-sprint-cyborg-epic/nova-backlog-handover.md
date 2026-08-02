@@ -8,10 +8,10 @@
 
 | Field | Value |
 | --- | --- |
-| Delivery baseline | `fec77b901a04cdae3ae3b6233e5c1f4b72f62bcb` |
-| Delivery tree | `c9530f94adaba76759617af81c7c7791e3e96f20` |
-| Deterministic evidence | exact-candidate Full Verify passed; security scan clean |
-| Independent review | final Cyborg delta Critic: pass, no findings |
+| Code delivery baseline | `fec77b901a04cdae3ae3b6233e5c1f4b72f62bcb` |
+| Code delivery tree | `c9530f94adaba76759617af81c7c7791e3e96f20` |
+| Release-candidate evidence | deliberately not copied here; use the exact candidate selected by Nova and its current Verify, Security, and Critic records |
+| Independent review | Cyborg code-delta Critic passed; a later release-documentation Critic is a separate candidate gate |
 | Canonical status authority | Nova ledger and its sanctioned writer |
 
 The six items below were assigned to Cyborg in
