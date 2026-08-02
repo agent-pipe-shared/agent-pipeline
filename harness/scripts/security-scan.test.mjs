@@ -472,6 +472,7 @@ process.exit(0);
   });
   assertEqual("gitleaks run: clean fixture -> PASS, 0 findings", { status: result.status, count: result.findings.length }, { status: "PASS", count: 0 });
   assertTrue("gitleaks run: candidate-tree scan disables Git history", invocations.length === 1 && invocations[0].includes("--no-git"), JSON.stringify(invocations));
+  assertTrue("gitleaks run: candidate-tree scan keeps repository-relative fingerprints", invocations.length === 1 && invocations[0][invocations[0].indexOf("--source") + 1] === ".", JSON.stringify(invocations));
 }
 {
   const rootDir = makeRootDir("gitleaks-findings-root");
