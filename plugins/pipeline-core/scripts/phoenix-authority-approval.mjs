@@ -25,13 +25,15 @@ function run(argv = process.argv.slice(2)) {
     writeFileSync(path, `${JSON.stringify(request, null, 2)}\n`, { mode: 0o600 });
     return { ok: true, code: "PHOENIX-AUTHORITY-REQUEST-READY", intentSha256: intent.sha256 };
   }
-  const request = read(join(dir, "phoenix-authority-revision-request.json")); const policy = read(join(dir, "trust-policy.json"));
+  const request = read(join(dir, "phoenix-authority-revision-request.json")); const proposal = read(resolve(repo, value.proposal)); const policy = read(join(dir, "trust-policy.json"));
+  const recomputed = createAuthorityRevisionIntent(proposal);
+  if (request?.intent?.sha256 !== recomputed.sha256 || JSON.stringify(request.intent.value) !== JSON.stringify(recomputed.value)) throw new Error("request does not bind the supplied proposal");
   if (value.command === "verify") {
     const proof = read(join(dir, "phoenix-authority-revision-proof.json"));
     const checked = verifyAuthorityRevisionProof({ intent: request?.intent, trustPolicy: policy, proof });
     if (!checked.verified) throw new Error(`proof rejected: ${checked.code}`);
-    const { schema: _intentSchema, decision, ...bound } = request.intent.value;
-    return { ok: true, code: "PHOENIX-AUTHORITY-PROOF-VERIFIED", approval: { schema: "pipeline.continuity-authority-revision-approval.v1", ...bound, decision, phase: decision.scope.phase }, proofSha256: checked.proofSha256 };
+    const { featureId, oldAuthority, nextAuthority, decision, candidate, evidence, expiresAt } = request.intent.value;
+    return { ok: true, code: "PHOENIX-AUTHORITY-PROOF-VERIFIED", approval: { schema: "pipeline.continuity-authority-revision-approval.v1", featureId, phase: decision.scope.phase, oldAuthority, nextAuthority, decision, candidate, evidence, expiresAt }, proofSha256: checked.proofSha256 };
   }
   const intent = request?.intent; if (!intent?.sha256 || !policy?.keyReference) throw new Error("request or trust policy invalid");
   const text = join(dir, "phoenix-authority-revision-intent.txt"); const signature = join(dir, "phoenix-authority-revision-signature.bin");
