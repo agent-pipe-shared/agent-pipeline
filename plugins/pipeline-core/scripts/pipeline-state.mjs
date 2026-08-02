@@ -2587,14 +2587,15 @@ function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags,
   const active = state.activeFeature;
   const gate = state.planApproval?.poGateAuthority;
   if (!active?.id || !gate?.planSha256 || !gate?.specSha256 || !candidate?.commit || !candidate?.tree) return { ok: false, code: "CRITICAL-PROOF-STATE" };
+  const candidateIdentity = { commit: candidate.commit, tree: candidate.tree };
   const action = request.value?.action;
-  const expectedSubject = criticalActionSubjectSha256({ kind, candidate, subject });
+  const expectedSubject = criticalActionSubjectSha256({ kind, candidate: candidateIdentity, subject });
   if (!action || action.kind !== kind || action.subjectSha256 !== expectedSubject) return { ok: false, code: "CRITICAL-PROOF-SUBJECT" };
   const result = verifyCriticalActionApprovalRequest({
     request: request.value,
     trustPolicy: authority.value,
     proof: proof.value,
-    expectedCandidate: candidate,
+    expectedCandidate: candidateIdentity,
     expectedAction: action,
     now,
   });
