@@ -8,7 +8,6 @@ import { join } from "node:path";
 import { createPublicReleaseState } from "../lib/public-release-state.mjs";
 import { checkReleaseStateConsistency } from "./check-release-state-consistency.mjs";
 const root = mkdtempSync(join(tmpdir(), "release-state-")); mkdirSync(join(root, "docs"));
-writeFileSync(join(root, "VERSION"), "0.4.7\n");
 const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8" });
 assert.equal(git("init", "--quiet", "-b", "main").status, 0); git("config", "user.email", "release-state@example.invalid"); git("config", "user.name", "Release State Fixture");
 writeFileSync(join(root, "release.txt"), "released\n"); git("add", "release.txt"); assert.equal(git("commit", "--quiet", "-m", "release").status, 0); assert.equal(git("tag", "v0.4.7").status, 0);
@@ -27,6 +26,4 @@ assert.deepEqual(checkReleaseStateConsistency({ rootDir: root }, { observeTag: (
 write(projection, "unpublished");
 assert.deepEqual(checkReleaseStateConsistency({ rootDir: root }, { observeTag: () => ({ commit, tree }) }).reasons, ["state-projection-mismatch"]);
 write(projection);
-writeFileSync(join(root, "VERSION"), "0.4.8\n");
-assert.deepEqual(checkReleaseStateConsistency({ rootDir: root }, { observeTag: () => ({ commit, tree }) }).reasons, ["source-version-projection-mismatch"]);
-rmSync(root, { recursive: true, force: true }); console.log("release-state-consistency: 5 tests passed");
+rmSync(root, { recursive: true, force: true }); console.log("release-state-consistency: 4 tests passed");

@@ -3,17 +3,17 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-01
+**Last updated:** 2026-08-03
 **Project status:** ACTIVE
-**Current block:** Sprint Nova execution on the released `v0.4.7` baseline
-**Repair baseline:** `83640cec22d494d227eebc82929370277ce926b9`
-**Release version:** `0.4.7` released
-**Release state:** version `0.4.7` · tag `v0.4.7` · commit `89cb12b99e3fd86ac44878d0c23b278f00538921` · tree `b6537dcaa7bee526d9a393e2603b28648f4b0438` · status `published`
+**Current block:** 0.5.2 patch-candidate recovery on the released `v0.5.1` baseline
+**Repair baseline:** `5d2b83dcc765d50801f4491e1bd9bed32090112b`
+**Release version:** `0.5.1` released; `0.5.2` is the next local candidate
+**Release state:** version `0.5.1` · tag `v0.5.1` · commit `5d2b83dcc765d50801f4491e1bd9bed32090112b` · tree `86357b12e9366d65b20d682b4079e656a60e1415` · status `published`
 
 The machine-readable public projection is [`release-state.json`](release-state.json).
 Its `observedAt` is the UTC time when this public projection was produced from
 the supplied authoritative release identity; it is not a claimed release time.
-The historical 0.4.7 candidate-qualification section below is retained as
+The historical candidate-qualification sections below are retained as
 session history and no longer describes the current publication disposition.
 
 ## 2026-08-01 Nova — handover-only session cut (current)
