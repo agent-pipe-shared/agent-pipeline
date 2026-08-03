@@ -170,6 +170,25 @@ check("GitHub readiness rejects mismatched transport tokens and unobserved branc
   assert.equal(observation.policy.status, "insufficient");
 });
 
+check("GitHub readiness accepts an SSH identity registered to the active GitHub account", () => {
+  const result = (status, stdout = "", stderr = "") => ({ status, stdout, stderr });
+  const publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMockBoundPublicKey material";
+  const runGh = (args) => {
+    if (args[0] === "auth") return result(0, "gh-token\n");
+    if (args[1] === "user/keys?per_page=100") return result(0, JSON.stringify([{ key: publicKey }]));
+    if (args[1]?.endsWith("/protection")) return result(1, "", "HTTP 404: Branch not protected");
+    if (args[1]?.endsWith("/rules/branches/main")) return result(0, "[]\n");
+    return result(0, JSON.stringify({ permissions: { push: true } }));
+  };
+  const observation = githubCapabilityObservation({
+    root: "/fixture", endpoint: "git@github.com:owner/repository.git",
+    destinationRef: "refs/heads/main", workflowRequired: false, remoteFingerprint: "f".repeat(64),
+  }, { runGh, sshPublicKeys: [publicKey] });
+  assert.equal(observation.credential.status, "available");
+  assert.equal(observation.permissions.status, "available");
+  assert.equal(observation.policy.status, "available");
+});
+
 check("ambiguous post-push transport converges only through fresh readback", () => {
   const value = fixture("ambiguous"); let pushes = 0;
   const runGit = (args, options) => { const result = spawnSync("git", args, { ...options, encoding: "utf8" }); if (args[0] === "push") { pushes += 1; return { ...result, status: 128, stderr: "sanitized synthetic ambiguity" }; } return result; };

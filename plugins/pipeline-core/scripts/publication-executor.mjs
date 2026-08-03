@@ -12,7 +12,7 @@ import {
   accessSync, closeSync, constants, fstatSync, lstatSync, mkdtempSync, openSync,
   readFileSync, realpathSync, rmSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -314,8 +314,10 @@ function workflowUpdateRequired(root, preimage, candidate, runGit) {
 }
 
 function githubCoordinates(endpoint) {
-  const match = String(endpoint).match(/^(?:https:\/\/github\.com\/|git@github\.com:)([^/\s]+)\/([^/\s]+?)(?:\.git)?$/u);
-  return match ? { owner: match[1], repository: match[2] } : null;
+  const https = String(endpoint).match(/^https:\/\/github\.com\/([^/\s]+)\/([^/\s]+?)(?:\.git)?$/u);
+  if (https) return { owner: https[1], repository: https[2], transport: "https", host: "github.com" };
+  const ssh = String(endpoint).match(/^git@([^:\s]+):([^/\s]+)\/([^/\s]+?)(?:\.git)?$/u);
+  return ssh ? { owner: ssh[2], repository: ssh[3], transport: "ssh", host: ssh[1] } : null;
 }
 
 function nativeGh(args, options = {}) {
@@ -335,7 +337,7 @@ function commandJson(runCommand, args, options) {
   catch { return null; }
 }
 
-function gitCredentialToken(runGit, root, endpoint) {
+function httpsCredentialToken(runGit, root, endpoint) {
   let url;
   try { url = new URL(endpoint); } catch { return null; }
   if (url.protocol !== "https:" || url.hostname !== "github.com") return null;
@@ -351,13 +353,37 @@ function gitCredentialToken(runGit, root, endpoint) {
   return password?.slice("password=".length) || null;
 }
 
+function normalizedSshPublicKey(value) {
+  const fields = String(value ?? "").trim().split(/\s+/u);
+  return fields.length >= 2 && /^(?:ssh|ecdsa)-[A-Za-z0-9@._+-]+$/u.test(fields[0]) && fields[1].length >= 16
+    ? `${fields[0]} ${fields[1]}` : null;
+}
+
+function resolvedSshIdentityPublicKeys(runSsh, root, host) {
+  const result = runSsh(["-G", host], { cwd: root, timeout: 5_000, env: process.env });
+  if (result?.status !== 0) return [];
+  const identities = String(result.stdout ?? "").split(/\r?\n/u)
+    .filter((line) => line.startsWith("identityfile "))
+    .map((line) => line.slice("identityfile ".length).trim())
+    .filter((path) => path !== "" && path !== "none")
+    .map((path) => path.startsWith("~/") ? join(homedir(), path.slice(2)) : path);
+  const keys = [];
+  for (const identity of identities) {
+    try {
+      const key = normalizedSshPublicKey(readFileSync(`${identity}.pub`, "utf8"));
+      if (key) keys.push(key);
+    } catch { /* a missing public sidecar cannot attest this identity */ }
+  }
+  return [...new Set(keys)];
+}
+
 function targetBranch(destinationRef) {
   return destinationRef.startsWith("refs/heads/") ? destinationRef.slice("refs/heads/".length) : null;
 }
 
 export function githubCapabilityObservation({
   root, endpoint, destinationRef, workflowRequired, remoteFingerprint,
-}, { runGit = nativeGit, runGh = nativeGh } = {}) {
+}, { runGit = nativeGit, runGh = nativeGh, runSsh = (args, options) => spawnSync("ssh", args, { encoding: "utf8", ...options }), sshPublicKeys = null } = {}) {
   const coordinates = githubCoordinates(endpoint);
   if (!coordinates) return null;
   const repository = commandJson(runGh, ["api", `repos/${coordinates.owner}/${coordinates.repository}`], {
@@ -366,10 +392,18 @@ export function githubCapabilityObservation({
   const ghToken = runGh(["auth", "token", "--hostname", "github.com"], {
     cwd: root, timeout: 5_000, env: process.env,
   });
-  const gitToken = gitCredentialToken(runGit, root, endpoint);
-  const transportCredential = typeof ghToken?.stdout === "string" && typeof gitToken === "string"
+  const gitToken = coordinates.transport === "https" ? httpsCredentialToken(runGit, root, endpoint) : null;
+  const httpsCredential = typeof ghToken?.stdout === "string" && typeof gitToken === "string"
     && ghToken.stdout.trim() !== "" && gitToken !== ""
     && sha256(ghToken.stdout.trim()) === sha256(gitToken);
+  const githubKeys = commandJson(runGh, ["api", "user/keys?per_page=100"], {
+    cwd: root, timeout: 10_000, env: process.env,
+  });
+  const configuredSshKeys = coordinates.transport === "ssh"
+    ? (Array.isArray(sshPublicKeys) ? sshPublicKeys.map(normalizedSshPublicKey).filter(Boolean) : resolvedSshIdentityPublicKeys(runSsh, root, coordinates.host)) : [];
+  const sshCredential = Array.isArray(githubKeys) && configuredSshKeys.some((key) => githubKeys
+    .some((entry) => normalizedSshPublicKey(entry?.key) === key));
+  const transportCredential = httpsCredential || sshCredential;
   const branch = targetBranch(destinationRef);
   const protectionResult = branch ? runGh(["api", `repos/${coordinates.owner}/${coordinates.repository}/branches/${branch}/protection`], {
     cwd: root, timeout: 10_000, env: process.env,
