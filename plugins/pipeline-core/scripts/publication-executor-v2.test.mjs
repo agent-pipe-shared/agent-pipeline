@@ -10,7 +10,7 @@ import { createReleasePreflight } from "./release-preflight.mjs";
 import { readPublicationAuthority } from "../lib/publication-authority.mjs";
 import {
   applyPublicationAuthorization, executePublication, parseProductivePublicationCli,
-  planPublicationAuthorization, preflightPublication, preparePublicationTransaction,
+  githubCapabilityObservation, planPublicationAuthorization, preflightPublication, preparePublicationTransaction,
   readbackPublication,
 } from "./publication-executor.mjs";
 
@@ -130,6 +130,44 @@ check("non-local provider read access remains typed unavailable without authorit
   const result = preflightPublication({ rootDir: value.root, preflightId: "pf-network", candidateOid: value.candidate, remoteName: "origin", destinationRef: value.destinationRef }, { runGit });
   assert.equal(result.status, "blocked");
   assert.deepEqual(result.reasons, ["credentials-unavailable", "ref-permission-insufficient", "repository-policy-rejected"]);
+});
+
+check("GitHub readiness binds the HTTPS Git credential and an unprotected target branch", () => {
+  const result = (status, stdout = "", stderr = "") => ({ status, stdout, stderr });
+  const runGit = (args) => {
+    assert.deepEqual(args, ["credential", "fill"]);
+    return result(0, "protocol=https\nhost=github.com\nusername=ci\npassword=bound-token\n");
+  };
+  const runGh = (args) => {
+    if (args[0] === "auth") return result(0, "bound-token\n");
+    if (args[1]?.endsWith("/protection")) return result(1, "", "HTTP 404: Branch not protected");
+    if (args[1]?.endsWith("/rules/branches/main")) return result(0, "[]\n");
+    return result(0, JSON.stringify({ permissions: { push: true } }));
+  };
+  const observation = githubCapabilityObservation({
+    root: "/fixture", endpoint: "https://github.com/owner/repository.git",
+    destinationRef: "refs/heads/main", workflowRequired: false, remoteFingerprint: "f".repeat(64),
+  }, { runGit, runGh });
+  assert.equal(observation.credential.status, "available");
+  assert.equal(observation.permissions.status, "available");
+  assert.equal(observation.policy.status, "available");
+});
+
+check("GitHub readiness rejects mismatched transport tokens and unobserved branch rules", () => {
+  const result = (status, stdout = "", stderr = "") => ({ status, stdout, stderr });
+  const runGit = () => result(0, "password=git-token\n");
+  const runGh = (args) => {
+    if (args[0] === "auth") return result(0, "gh-token\n");
+    if (args[1]?.endsWith("/protection")) return result(1, "", "HTTP 404: Branch not protected");
+    if (args[1]?.endsWith("/rules/branches/main")) return result(0, JSON.stringify([{ type: "pull_request" }]));
+    return result(0, JSON.stringify({ permissions: { push: true } }));
+  };
+  const observation = githubCapabilityObservation({
+    root: "/fixture", endpoint: "https://github.com/owner/repository.git",
+    destinationRef: "refs/heads/main", workflowRequired: false, remoteFingerprint: "f".repeat(64),
+  }, { runGit, runGh });
+  assert.equal(observation.credential.status, "unavailable");
+  assert.equal(observation.policy.status, "insufficient");
 });
 
 check("ambiguous post-push transport converges only through fresh readback", () => {

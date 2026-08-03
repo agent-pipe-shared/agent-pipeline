@@ -1422,11 +1422,10 @@ if (pushGate.approval === "standing-approved") {
     try {
       state = JSON.parse(stateRaw);
     } catch (e) {
-      emit(1, [
-        `[guard-push] WARN: ${stateRelPath} contains invalid JSON (${e.message}).`,
-        `Push-Gate is being skipped (fail-open, never silently marked blocking/passing) -- please fix ` +
-          `(rewrite only via harness/scripts/pipeline-state.mjs, never by hand).`,
-      ]);
+      failures.push(
+        `Push approval state is malformed: ${stateRelPath} contains invalid JSON (${e.message}). ` +
+        `Rewrite only via harness/scripts/pipeline-state.mjs; publication remains blocked.`,
+      );
     }
     const approval = state?.pushApproval?.lastApproved;
     const forCommit = approval?.forCommit;

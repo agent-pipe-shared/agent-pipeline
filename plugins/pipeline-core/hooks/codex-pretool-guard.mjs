@@ -306,6 +306,16 @@ for (const guardName of guardNames) {
   }
 }
 if (lifecycleShouldRun) {
+  const lifecycleGuard = "guard-lifecycle-ready.mjs";
+  const lifecycleMemoryInput = {
+    rootDir: projectRoot, sessionId: hookSessionId, toolName,
+    toolInput: input?.tool_input ?? {}, guard: lifecycleGuard,
+  };
+  const remembered = rememberedNativeHookFailure(lifecycleMemoryInput);
+  if (remembered) {
+    denials.push({ guard: lifecycleGuard, reason: remembered.reason });
+    diagnostic("native-hook-failure-suppressed", { guard: lifecycleGuard, code: remembered.code });
+  } else {
   const lifecycle = boundedSpawn(process.execPath, [LIFECYCLE_GUARD], {
     cwd: projectRoot,
     env: { ...process.env, CLAUDE_PROJECT_DIR: projectRoot },
@@ -314,7 +324,7 @@ if (lifecycleShouldRun) {
   }, { capMs: 3_000, reserveMs: 1_500 });
   const detail = String(lifecycle.stderr ?? "").trim();
   if (lifecycle.status === 2) denials.push({
-    guard: "guard-lifecycle-ready.mjs",
+    guard: lifecycleGuard,
     reason: detail || "guard-lifecycle-ready denied the tool call.",
   });
   else if (lifecycle.status === 1) warnings.push(detail || "guard-lifecycle-ready returned a warning.");
@@ -322,10 +332,13 @@ if (lifecycleShouldRun) {
     const failure = lifecycle.error?.code ?? lifecycle.error?.name
       ?? lifecycle.signal ?? `exit-${String(lifecycle.status)}`;
     diagnostic("lifecycle-guard-failed", { failure });
+    const reason = `${lifecycleGuard} failed within the hook budget (${failure}); pipeline guards fail closed.`;
+    rememberNativeHookFailure(lifecycleMemoryInput, { code: failure, reason });
     denials.push({
-      guard: "guard-lifecycle-ready.mjs",
-      reason: `guard-lifecycle-ready failed within the hook budget (${failure}); pipeline guards fail closed.`,
+      guard: lifecycleGuard,
+      reason,
     });
+  }
   }
 }
 const GRAMMAR_DENIAL = /\bGUARD-(?:PARSE|OPERATOR|REDIRECT)-UNAPPROVED\b/u;

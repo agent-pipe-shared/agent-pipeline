@@ -79,6 +79,7 @@ function nativeGit(args, options = {}) {
     encoding: "utf8",
     timeout: options.timeout ?? 15_000,
     env: options.env,
+    input: options.input,
   });
 }
 
@@ -317,36 +318,93 @@ function githubCoordinates(endpoint) {
   return match ? { owner: match[1], repository: match[2] } : null;
 }
 
-function githubCapabilityObservation({ endpoint, workflowRequired, remoteFingerprint }) {
+function nativeGh(args, options = {}) {
+  return spawnSync("gh", args, {
+    cwd: options.cwd,
+    encoding: "utf8",
+    timeout: options.timeout ?? 10_000,
+    env: options.env,
+    windowsHide: true,
+  });
+}
+
+function commandJson(runCommand, args, options) {
+  const result = runCommand(args, options);
+  if (result?.status !== 0) return null;
+  try { return JSON.parse(String(result.stdout ?? "")); }
+  catch { return null; }
+}
+
+function gitCredentialToken(runGit, root, endpoint) {
+  let url;
+  try { url = new URL(endpoint); } catch { return null; }
+  if (url.protocol !== "https:" || url.hostname !== "github.com") return null;
+  const result = runGit(["credential", "fill"], {
+    cwd: root,
+    timeout: 5_000,
+    env: gitEnvironment(),
+    input: `protocol=https\nhost=${url.hostname}\n\n`,
+  });
+  if (result?.status !== 0) return null;
+  const password = String(result.stdout ?? "").split(/\r?\n/u)
+    .find((line) => line.startsWith("password="));
+  return password?.slice("password=".length) || null;
+}
+
+function targetBranch(destinationRef) {
+  return destinationRef.startsWith("refs/heads/") ? destinationRef.slice("refs/heads/".length) : null;
+}
+
+export function githubCapabilityObservation({
+  root, endpoint, destinationRef, workflowRequired, remoteFingerprint,
+}, { runGit = nativeGit, runGh = nativeGh } = {}) {
   const coordinates = githubCoordinates(endpoint);
   if (!coordinates) return null;
-  const api = spawnSync("gh", ["api", `repos/${coordinates.owner}/${coordinates.repository}`], {
-    encoding: "utf8", timeout: 10_000, windowsHide: true,
+  const repository = commandJson(runGh, ["api", `repos/${coordinates.owner}/${coordinates.repository}`], {
+    cwd: root, timeout: 10_000, env: process.env,
   });
-  if (api.status !== 0) return {
+  const ghToken = runGh(["auth", "token", "--hostname", "github.com"], {
+    cwd: root, timeout: 5_000, env: process.env,
+  });
+  const gitToken = gitCredentialToken(runGit, root, endpoint);
+  const transportCredential = typeof ghToken?.stdout === "string" && typeof gitToken === "string"
+    && ghToken.stdout.trim() !== "" && gitToken !== ""
+    && sha256(ghToken.stdout.trim()) === sha256(gitToken);
+  const branch = targetBranch(destinationRef);
+  const protectionResult = branch ? runGh(["api", `repos/${coordinates.owner}/${coordinates.repository}/branches/${branch}/protection`], {
+    cwd: root, timeout: 10_000, env: process.env,
+  }) : null;
+  const rulesResult = branch ? runGh(["api", `repos/${coordinates.owner}/${coordinates.repository}/rules/branches/${branch}`], {
+    cwd: root, timeout: 10_000, env: process.env,
+  }) : null;
+  if (!repository) return {
     credential: cell("unavailable", "credential"), permissions: cell("unavailable", "permissions"),
     workflowUpdate: cell(workflowRequired ? "unavailable" : "not-required", "workflow-update", workflowRequired ? "required" : "not-required"),
     policy: cell("unavailable", "policy"),
   };
-  let repository;
-  try { repository = JSON.parse(api.stdout); } catch { repository = null; }
   const canPush = repository?.permissions?.push === true;
+  const unprotected = protectionResult?.status !== 0 && /\b404\b/u.test(String(protectionResult?.stderr ?? ""));
+  let rules = null;
+  try { rules = rulesResult?.status === 0 ? JSON.parse(String(rulesResult.stdout ?? "")) : null; }
+  catch { rules = null; }
+  const noRules = Array.isArray(rules) && rules.length === 0;
+  const policyAvailable = Boolean(branch) && unprotected && noRules;
   // The repository endpoint is an authenticated GitHub observation.  It proves
-  // credential usability and GitHub's current ref-write permission, but never
-  // substitutes a workflow write scope: workflow changes retain a distinct
-  // capability requirement until a provider supplies that evidence.
+  // current API permission only.  Mark a GitHub path ready only when its exact
+  // HTTPS Git credential is bound to the active gh token and branch protection
+  // plus ruleset observations prove that no policy rejects a direct update.
   return {
-    credential: cell("available", "credential", remoteFingerprint),
+    credential: cell(transportCredential ? "available" : "unavailable", "credential", remoteFingerprint),
     permissions: cell(canPush ? "available" : "insufficient", "permissions", remoteFingerprint),
     workflowUpdate: cell(workflowRequired ? "unavailable" : "not-required", "workflow-update", workflowRequired ? "workflow-scope-unobserved" : "not-required"),
-    policy: cell("available", "policy", remoteFingerprint),
+    policy: cell(policyAvailable ? "available" : "insufficient", "policy", remoteFingerprint),
   };
 }
 
-function defaultCapabilityObservation({ endpoint, workflowRequired, remoteFingerprint }) {
+function defaultCapabilityObservation({ root, endpoint, destinationRef, workflowRequired, remoteFingerprint }, dependencies) {
   const local = isAbsolute(endpoint) || endpoint.startsWith("file://");
   if (!local) {
-    const github = githubCapabilityObservation({ endpoint, workflowRequired, remoteFingerprint });
+    const github = githubCapabilityObservation({ root, endpoint, destinationRef, workflowRequired, remoteFingerprint }, dependencies);
     if (github) return github;
     // A configured endpoint, authenticated read, or advertised credential does
     // not prove ref-write, workflow-write, or branch-policy admission. The
@@ -412,7 +470,10 @@ export function preflightPublication({ rootDir, preflightId, candidateOid, remot
   }
   const workflowRequired = workflowUpdateRequired(repository.root, preimage, candidateOid, runGit);
   const observe = dependencies.observeCapabilities ?? defaultCapabilityObservation;
-  const capabilities = observe({ root: repository.root, endpoint: remote.endpoint, remoteName, remoteFingerprint: remote.fingerprint, destinationRef, preimage, candidateOid, candidateTree, workflowRequired });
+  const capabilities = observe(
+    { root: repository.root, endpoint: remote.endpoint, remoteName, remoteFingerprint: remote.fingerprint, destinationRef, preimage, candidateOid, candidateTree, workflowRequired },
+    { runGit, runGh: dependencies.runGh ?? nativeGh },
+  );
   return createPublicationCapabilityPreflight({
     preflightId, candidate: { commit: candidateOid, tree: candidateTree },
     remote: { name: remoteName, fingerprint: remote.fingerprint, ...cell("available", "remote", remote.fingerprint) },

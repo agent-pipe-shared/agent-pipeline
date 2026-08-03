@@ -45,7 +45,10 @@ export function rememberNativeHookFailure(input, { code, reason }, now = Date.no
   if (!path || !CODES.has(code) || typeof reason !== "string") return false;
   try {
     mkdirSync(ROOT, { recursive: true, mode: 0o700 });
-    writeFileSync(path, JSON.stringify({ code, reason, expiresAt: now + TTL_MS }), { encoding: "utf8", flag: "wx", mode: 0o600 });
+    // An expired disposition must not permanently consume its filename.  This
+    // is operational performance memory rather than authority state, so a
+    // fresh classified failure may safely replace a stale or corrupt record.
+    writeFileSync(path, JSON.stringify({ code, reason, expiresAt: now + TTL_MS }), { encoding: "utf8", flag: "w", mode: 0o600 });
     return true;
   } catch { return false; }
 }

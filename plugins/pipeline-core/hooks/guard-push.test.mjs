@@ -360,6 +360,17 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   });
 }
 
+// ---- PG11d required + malformed approval state fails closed ----------------------------
+{
+  const { dir, head } = freshRepo("required-malformed-state");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeState(dir, "{not valid JSON");
+  check("PG11d block required approval with malformed state", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["pipeline State is malformed", "publication authority cannot be excluded"],
+  });
+}
+
 // ---- PG12 required + fresh approval without a critical proof -> block ------------------
 {
   const { dir, head } = freshRepo("required-fresh");
