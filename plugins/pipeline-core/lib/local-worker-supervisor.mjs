@@ -999,7 +999,7 @@ async function waitForWorkers({ request, runtimes, record, recordPath, cancelPat
   };
   const cancellationPoll = setInterval(observeCancellation, 100);
   cancellationPoll.unref();
-  const heartbeat = setInterval(() => {
+  const heartbeatTick = () => {
     if (persistenceFailure) return;
     try {
       observeCancellation();
@@ -1021,7 +1021,12 @@ async function waitForWorkers({ request, runtimes, record, recordPath, cancelPat
     } catch (error) {
       persistenceFailure = error;
     }
-  }, request.supervisor.heartbeatMs);
+  };
+  // Short-lived workers may all finish before the first interval fires. Publish
+  // one post-launch heartbeat so the persisted lease proves that supervision
+  // was live for this wave, rather than retaining its pre-launch timestamp.
+  heartbeatTick();
+  const heartbeat = setInterval(heartbeatTick, request.supervisor.heartbeatMs);
   heartbeat.unref();
 
   const promises = runtimes.map((runtime) => new Promise((resolvePromise) => {
