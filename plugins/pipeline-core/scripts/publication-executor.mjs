@@ -381,6 +381,15 @@ function targetBranch(destinationRef) {
   return destinationRef.startsWith("refs/heads/") ? destinationRef.slice("refs/heads/".length) : null;
 }
 
+function rulesPermitDirectFastForward(rules) {
+  // GitHub reports repository rules that protect history integrity even when
+  // they do not constrain an ordinary exact fast-forward publication.  Only
+  // the closed set below is compatible with this executor's fixed operation;
+  // every other or malformed rule remains a fail-closed policy rejection.
+  const compatible = new Set(["deletion", "non_fast_forward", "required_linear_history"]);
+  return Array.isArray(rules) && rules.every((rule) => compatible.has(rule?.type));
+}
+
 export function githubCapabilityObservation({
   root, endpoint, destinationRef, workflowRequired, remoteFingerprint,
 }, { runGit = nativeGit, runGh = nativeGh, runSsh = (args, options) => spawnSync("ssh", args, { encoding: "utf8", ...options }), sshPublicKeys = null } = {}) {
@@ -421,8 +430,7 @@ export function githubCapabilityObservation({
   let rules = null;
   try { rules = rulesResult?.status === 0 ? JSON.parse(String(rulesResult.stdout ?? "")) : null; }
   catch { rules = null; }
-  const noRules = Array.isArray(rules) && rules.length === 0;
-  const policyAvailable = Boolean(branch) && unprotected && noRules;
+  const policyAvailable = Boolean(branch) && unprotected && rulesPermitDirectFastForward(rules);
   // The repository endpoint is an authenticated GitHub observation.  It proves
   // current API permission only.  Mark a GitHub path ready only when its exact
   // HTTPS Git credential is bound to the active gh token and branch protection

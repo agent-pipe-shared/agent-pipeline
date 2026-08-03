@@ -189,6 +189,25 @@ check("GitHub readiness accepts an SSH identity registered to the active GitHub 
   assert.equal(observation.policy.status, "available");
 });
 
+check("GitHub history-integrity rules permit the executor's exact fast-forward", () => {
+  const result = (status, stdout = "", stderr = "") => ({ status, stdout, stderr });
+  const runGh = (args) => {
+    if (args[0] === "auth") return result(0, "bound-token\n");
+    if (args[1] === "user/keys?per_page=100") return result(0, "[]\n");
+    if (args[1]?.endsWith("/protection")) return result(1, "", "HTTP 404: Branch not protected");
+    if (args[1]?.endsWith("/rules/branches/main")) return result(0, JSON.stringify([
+      { type: "deletion" }, { type: "non_fast_forward" }, { type: "required_linear_history" },
+    ]));
+    return result(0, JSON.stringify({ permissions: { push: true } }));
+  };
+  const runGit = () => result(0, "password=bound-token\n");
+  const observation = githubCapabilityObservation({
+    root: "/fixture", endpoint: "https://github.com/owner/repository.git",
+    destinationRef: "refs/heads/main", workflowRequired: false, remoteFingerprint: "f".repeat(64),
+  }, { runGit, runGh });
+  assert.equal(observation.policy.status, "available");
+});
+
 check("ambiguous post-push transport converges only through fresh readback", () => {
   const value = fixture("ambiguous"); let pushes = 0;
   const runGit = (args, options) => { const result = spawnSync("git", args, { ...options, encoding: "utf8" }); if (args[0] === "push") { pushes += 1; return { ...result, status: 128, stderr: "sanitized synthetic ambiguity" }; } return result; };
