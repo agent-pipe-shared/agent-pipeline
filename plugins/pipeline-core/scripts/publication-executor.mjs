@@ -312,9 +312,42 @@ function workflowUpdateRequired(root, preimage, candidate, runGit) {
   return checkedGit(runGit, args, { cwd: root, code: "PX-WORKFLOW-OBSERVATION" }).split(/\r?\n/u).some(Boolean);
 }
 
+function githubCoordinates(endpoint) {
+  const match = String(endpoint).match(/^(?:https:\/\/github\.com\/|git@github\.com:)([^/\s]+)\/([^/\s]+?)(?:\.git)?$/u);
+  return match ? { owner: match[1], repository: match[2] } : null;
+}
+
+function githubCapabilityObservation({ endpoint, workflowRequired, remoteFingerprint }) {
+  const coordinates = githubCoordinates(endpoint);
+  if (!coordinates) return null;
+  const api = spawnSync("gh", ["api", `repos/${coordinates.owner}/${coordinates.repository}`], {
+    encoding: "utf8", timeout: 10_000, windowsHide: true,
+  });
+  if (api.status !== 0) return {
+    credential: cell("unavailable", "credential"), permissions: cell("unavailable", "permissions"),
+    workflowUpdate: cell(workflowRequired ? "unavailable" : "not-required", "workflow-update", workflowRequired ? "required" : "not-required"),
+    policy: cell("unavailable", "policy"),
+  };
+  let repository;
+  try { repository = JSON.parse(api.stdout); } catch { repository = null; }
+  const canPush = repository?.permissions?.push === true;
+  // The repository endpoint is an authenticated GitHub observation.  It proves
+  // credential usability and GitHub's current ref-write permission, but never
+  // substitutes a workflow write scope: workflow changes retain a distinct
+  // capability requirement until a provider supplies that evidence.
+  return {
+    credential: cell("available", "credential", remoteFingerprint),
+    permissions: cell(canPush ? "available" : "insufficient", "permissions", remoteFingerprint),
+    workflowUpdate: cell(workflowRequired ? "unavailable" : "not-required", "workflow-update", workflowRequired ? "workflow-scope-unobserved" : "not-required"),
+    policy: cell("available", "policy", remoteFingerprint),
+  };
+}
+
 function defaultCapabilityObservation({ endpoint, workflowRequired, remoteFingerprint }) {
   const local = isAbsolute(endpoint) || endpoint.startsWith("file://");
   if (!local) {
+    const github = githubCapabilityObservation({ endpoint, workflowRequired, remoteFingerprint });
+    if (github) return github;
     // A configured endpoint, authenticated read, or advertised credential does
     // not prove ref-write, workflow-write, or branch-policy admission. The
     // fixed default therefore reports non-local providers unavailable. A

@@ -14,6 +14,11 @@ import {
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
 import { loadRuntimeProjectionV3OwnedKeys } from "../lib/runtime-projection-v3.mjs";
+import {
+  nativeHookSessionId,
+  rememberedNativeHookFailure,
+  rememberNativeHookFailure,
+} from "../lib/native-hook-failure-memory.mjs";
 import { parseGuardCommand } from "./guard-command-grammar.mjs";
 
 const DEBUG_PREFIX = "[pipeline.codex-pretool.v1]";
@@ -21,9 +26,17 @@ const PLUGIN_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const PIPELINE_START_SKILL = join(PLUGIN_ROOT, "skills", "pipeline-start", "SKILL.md");
 const LIFECYCLE_GUARD = join(PLUGIN_ROOT, "hooks", "guard-lifecycle-ready.mjs");
 const HOOK_STARTED_AT = Date.now();
-const HOOK_BUDGET_MS = 9_000;
+// `apply_patch` delegates its path checks to two sequential legacy guards for
+// every touched file.  The provider timeout therefore needs room for the
+// complete bounded chain plus a final typed-recovery window; a 9s adapter
+// budget made a multi-file patch impossible even when every guard was healthy.
+const HOOK_BUDGET_MS = 42_000;
 const STDIN_TIMEOUT_MS = 1_000;
 const STDIN_MAX_BYTES = 1024 * 1024;
+const NESTED_GUARD_BUDGETS = Object.freeze({
+  "guard-apply-patch.mjs": { capMs: 36_000, reserveMs: 5_000 },
+  default: { capMs: 8_000, reserveMs: 5_000 },
+});
 let completed = false;
 
 function diagnostic(code, fields = {}) {
@@ -230,6 +243,7 @@ if (toolName === "Bash" && (typeof input?.tool_input?.command !== "string" || in
 if (["Edit", "Write"].includes(toolName) && (typeof filePath !== "string" || filePath.trim() === "")) {
   deny(`${toolName} input has no unambiguous file_path; pipeline write guards fail closed.`);
 }
+const hookSessionId = nativeHookSessionId(input);
 
 const guardNames = toolName === "Bash"
   ? [
@@ -250,6 +264,16 @@ const guardNames = toolName === "Bash"
 const denials = [];
 const warnings = [];
 for (const guardName of guardNames) {
+  const memoryInput = {
+    rootDir: projectRoot, sessionId: hookSessionId, toolName,
+    toolInput: input?.tool_input ?? {}, guard: guardName,
+  };
+  const remembered = rememberedNativeHookFailure(memoryInput);
+  if (remembered) {
+    denials.push({ guard: guardName, reason: remembered.reason });
+    diagnostic("native-hook-failure-suppressed", { guard: guardName, code: remembered.code });
+    continue;
+  }
   const guard = fileURLToPath(new URL(`./${guardName}`, import.meta.url));
   const result = boundedSpawn(process.execPath, [guard], {
     cwd: projectRoot,
@@ -263,7 +287,7 @@ for (const guardName of guardNames) {
     },
     encoding: "utf8",
     input: rawInput,
-  }, { capMs: 2_000, reserveMs: 4_000 });
+  }, NESTED_GUARD_BUDGETS[guardName] ?? NESTED_GUARD_BUDGETS.default);
   const detail = String(result.stderr ?? "").trim();
   if (result.status === 2) denials.push({
     guard: guardName,
@@ -273,9 +297,11 @@ for (const guardName of guardNames) {
   else if (result.status !== 0) {
     const failure = result.error?.code ?? result.error?.name ?? result.signal ?? `exit-${String(result.status)}`;
     diagnostic("nested-guard-failed", { guard: guardName, failure });
+    const reason = `${guardName} failed unexpectedly (${failure}); pipeline guards fail closed.`;
+    rememberNativeHookFailure(memoryInput, { code: failure, reason });
     denials.push({
       guard: guardName,
-      reason: `${guardName} failed unexpectedly (${failure}); pipeline guards fail closed.`,
+      reason,
     });
   }
 }

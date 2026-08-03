@@ -95,7 +95,7 @@ check("descriptor uses quoted PLUGIN_ROOT with Windows parity for both routing f
     const hook = entry.hooks[0];
     assert.equal(hook.command, "node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"");
     assert.equal(hook.commandWindows, hook.command);
-    assert.equal(hook.timeout, 10);
+    assert.equal(hook.timeout, 45);
     assert.match(hook.statusMessage, /^Checking Agent-Pipeline /);
   }
 });

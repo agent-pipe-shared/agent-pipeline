@@ -16,13 +16,18 @@ function nativeObserve(root, tag) {
   return { commit: commit.stdout.trim(), tree: tree.stdout.trim() };
 }
 export function checkReleaseStateConsistency({ rootDir, projectionPath = "docs/release-state.json", statePath = "docs/state.md" }, dependencies = {}) {
-  const root = resolve(rootDir); let projection; let state;
-  try { projection = JSON.parse(readFileSync(resolve(root, projectionPath), "utf8")); state = readFileSync(resolve(root, statePath), "utf8"); }
+  const root = resolve(rootDir); let projection; let state; let version;
+  try {
+    projection = JSON.parse(readFileSync(resolve(root, projectionPath), "utf8"));
+    state = readFileSync(resolve(root, statePath), "utf8");
+    version = readFileSync(resolve(root, "VERSION"), "utf8").trim();
+  }
   catch { return { schema: RELEASE_STATE_CHECK_SCHEMA, status: "blocked", reasons: ["documentation-unavailable"], version: null, tag: null, commit: null, tree: null }; }
   try { validatePublicReleaseState(projection); }
   catch { return { schema: RELEASE_STATE_CHECK_SCHEMA, status: "blocked", reasons: ["projection-invalid"], version: null, tag: null, commit: null, tree: null }; }
   const observed = (dependencies.observeTag ?? nativeObserve)(root, projection.tag); const reasons = [];
   if (projection.tag !== `v${projection.version}`) reasons.push("version-tag-mismatch");
+  if (version !== projection.version) reasons.push("source-version-projection-mismatch");
   if (projection.publicationStatus === "published") {
     if (observed === null) reasons.push("published-tag-unobserved");
     else if (observed.commit !== projection.commit || observed.tree !== projection.tree) reasons.push("published-identity-mismatch");

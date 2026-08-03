@@ -349,6 +349,17 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   });
 }
 
+// ---- PG11c required + state lacks lastApproved -> typed block, never throw ------------
+{
+  const { dir, head } = freshRepo("required-missing-last-approved");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeState(dir, { schema: "pipeline.state.v0", pushApproval: {} });
+  check("PG11c block required approval, state lacks lastApproved", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["Push approval missing or stale", "Push approval critical proof is not bound"],
+  });
+}
+
 // ---- PG12 required + fresh approval without a critical proof -> block ------------------
 {
   const { dir, head } = freshRepo("required-fresh");
