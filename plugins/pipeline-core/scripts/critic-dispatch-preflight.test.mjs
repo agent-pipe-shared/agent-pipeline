@@ -53,7 +53,7 @@ function input(fx, overrides = {}) {
 test("read-only dispatch preflight binds candidate, candidate-tree governance, and separate evidence", () => {
   const fx = fixture();
   const result = preflightCriticDispatch(input(fx));
-  assert.equal(result.status, "ready");
+  assert.equal(result.status, "packet-ready");
   assert.equal(result.candidate.commit, fx.candidate);
   assert.equal(result.candidate.tree, fx.tree);
   assert.equal(result.spec.path, "specs/spec.md");
@@ -61,6 +61,8 @@ test("read-only dispatch preflight binds candidate, candidate-tree governance, a
   assert.equal(result.evidence[0].candidate.commit, fx.candidate);
   assert.equal(result.priorCriticEvidence.path, "evidence/prior-critic.json");
   assert.equal(result.dispatch.childCreated, false);
+  assert.equal(result.dispatch.spawnAuthorized, false);
+  assert.equal(result.dispatch.requiredNextGate, "selected-runner-transport");
 });
 
 test("rejects missing candidate-bound evidence, missing governance, and prior-evidence aliasing", () => {

@@ -7,7 +7,8 @@
  * This intentionally does less than critic-packet-preflight: it never creates
  * a checkout, packet, child, or receipt.  Its only job is to prove that the
  * Elephant's proposed request is internally coherent before an independent
- * Critic is asked to spend a turn on it.
+ * Critic is asked to spend a turn on it.  It does not probe or select a
+ * runner, so a packet-ready result is deliberately not a spawn authorization.
  */
 import { createHash } from "node:crypto";
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
@@ -177,7 +178,11 @@ export function preflightCriticDispatch({ root, base, candidate, specPath, guard
 
   return {
     schema: CRITIC_DISPATCH_PREFLIGHT_SCHEMA,
-    status: "ready",
+    // The selected Codex transport is a separate, mandatory no-child
+    // preflight.  Calling this result "ready" caused coordinators to mistake
+    // packet integrity for a runnable Critic lane and to start an unbounded
+    // generic child when that lane was unavailable.
+    status: "packet-ready",
     base: { commit: baseCommit, tree: baseTree },
     candidate: { commit: candidateCommit, tree: candidateTree },
     spec: specReadback,
@@ -185,7 +190,10 @@ export function preflightCriticDispatch({ root, base, candidate, specPath, guard
     governance,
     evidence: evidenceReadback,
     priorCriticEvidence: priorReadback,
-    dispatch: { mode: "path-only", childCreated: false, packetCreated: false, stateMutated: false },
+    dispatch: {
+      mode: "path-only", childCreated: false, packetCreated: false, stateMutated: false,
+      spawnAuthorized: false, requiredNextGate: "selected-runner-transport",
+    },
   };
 }
 

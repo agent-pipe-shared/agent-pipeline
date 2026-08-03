@@ -25,11 +25,13 @@ spawn, run `scripts/critic-dispatch-preflight.mjs` against the fixed base and
 candidate. Pass the candidate Spec, every declared guardrail, each fresh
 candidate-evidence path and, for a re-review, the separate prior-Critic path.
 Dispatch only when its `pipeline.critic-dispatch-preflight.v1` result is
-`ready`; its returned candidate-tree guardrail paths are the paths passed to
-this skill. A rejection is a coordinator packet defect, not Critic work: do
-not spawn a child, create a packet or substitute prose/evidence. This
-preflight is read-only and does not replace the selected-runner transport
-readback required above.
+`packet-ready` **and** the separately selected-runner transport has returned a
+usable, candidate-bound execution-readiness result. `packet-ready` has
+`spawnAuthorized: false`: it is never authority to start a generic fallback
+child. Its returned candidate-tree guardrail paths are the paths passed to this
+skill. A rejection or unavailable transport is a coordinator defect, not Critic work: do not spawn a child, create a packet or substitute prose/evidence.
+This preflight is read-only and does not replace the
+selected-runner transport readback required above.
 
 **Closed bootstrap role:** this skill is itself an authoritative Critic role
 carrier. If a SessionStart reminder requires `pipeline-core:pipeline-start`,
