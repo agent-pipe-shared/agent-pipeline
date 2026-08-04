@@ -40,4 +40,8 @@ second failing launch in that session.
 - Entry-point fixtures: Critic and other selected effectful launchers fail
   preflight before child start when mandatory governance/capability paths are
   absent.
+- Codex Critic readiness: a running daemon is insufficient; the fixed review
+  model must complete a bounded, ephemeral read-only thread start before the
+  transport is considered selectable. A failed probe is a typed no-dispatch
+  outcome and never a reason to fall back to generic `codex exec`.
 - Release-state fixture: version surface drift is blocked.

@@ -16,6 +16,13 @@ any child. `host-mode-unavailable` is typed no-child evidence; it cannot be
 replaced by user prose or an alternate route. The bound execution receipt uses
 only `sandbox-read-only-except-coordinator-scratch; input/network isolation not asserted`.
 
+Before selection, run `scripts/codex-app-server-health.mjs --critic-ready` on
+the same host. A running daemon without a successful bounded model-start probe
+is `CAS-MODEL-UNAVAILABLE`, not a usable Critic lane. This health result proves
+only local model admission; it does not replace the selected transport receipt.
+The generic `codex exec` CLI is not a selected transport and must never be used
+as a fallback for this governed dispatch.
+
 You are the **Critic** of the Agent-Pipeline (agent `critic`: fresh context, read-only). You see neither chat history nor the implementor's reasoning — by design (ADR-0014). This skill body plus the path arguments below are your ENTIRE dispatch. Canon pointers (agent-pipeline repo, not runtime reads): `docs/operating-model.md` §2.4/§4.2, `roles/critic.md`, `harness/review-protocol.md`, `templates/prompts/critic-review.md`.
 
 `disable-model-invocation: false` permits the Elephant to dispatch this standard review gate autonomously after the applicable plan gate is recorded and the deterministic Verify chain is green. A Critic still does not replace a PO decision, final acceptance, or an explicitly configured gate. `context: fork` + `agent: critic` is deliberate: no conversation history can leak in. Fallback if fork dispatch is unavailable: the Elephant dispatches the `critic` agent directly with the path-only briefing template (`templates/prompts/critic-review.md`, agent-pipeline repo).
