@@ -3,7 +3,7 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-03
+**Last updated:** 2026-08-04
 **Project status:** ACTIVE
 **Current block:** 0.5.2 patch-candidate recovery on the released `v0.5.1` baseline
 **Repair baseline:** `5d2b83dcc765d50801f4491e1bd9bed32090112b`
@@ -16,7 +16,53 @@ the supplied authoritative release identity; it is not a claimed release time.
 The historical candidate-qualification sections below are retained as
 session history and no longer describes the current publication disposition.
 
-## 2026-08-01 Nova — handover-only session cut (current)
+## 2026-08-04 Nova — Claude-session runner-routing fix + ADR-0051 (current)
+
+- **Bootstrap defect found and fixed.** A Claude Code `pipeline-start` on this
+  exact repo failed `CAS-DAEMON-INVALID-OBSERVATION`: `pipeline-start-preflight.mjs`
+  never told `project-onboarding-v3.mjs` which runner was actually
+  bootstrapping, so every session silently defaulted to `runner: "codex"` and
+  inherited a Codex-only App-Server/native-readback requirement — even though
+  this repo's own `pipeline.user.yaml` already declares
+  `runners.default: "claude"` and the code already defines
+  `RUNNERS_WITHOUT_APP_SERVER`/`RUNNERS_WITHOUT_NATIVE_READBACK` exemption sets
+  naming `"claude"`. Ten `lifecycleResult()` call sites in the ready path were
+  silently dropping the caller-supplied runner back to the `"codex"` default.
+  Fixed in commit `7f5ac97` (`fix(onboarding): route the invoking session's
+  own runner through the App-Server gate`): `pipeline-start-preflight.mjs`
+  detects `CLAUDECODE=1` and passes `--runner claude|codex` through
+  `project-onboarding-v3.mjs` end to end. Focused tests updated/added in the
+  same commit (all green); omitting `--runner` keeps the historical Codex-CLI
+  default, so no behavior change for existing Codex callers. Live-verified
+  end to end on this checkout: a Claude Code bootstrap now reaches `status:
+  "ready"` with `appServer: not-applicable` instead of failing closed.
+- **Known follow-up left out of scope for that fix (not blocking, no evidenced
+  failure yet):** the same ready path still calls `readRestartBarrier`
+  unconditionally regardless of `runner` — a genuinely fresh Claude-only
+  project (no `.codex/` runtime ever materialized) has not been proven to
+  clear that call. This repo's own runtime happened to already have a
+  materialized `.codex/` projection (dual-runner history), so the real
+  session that surfaced this bug never exercised that edge. Tracked in
+  ADR-0051's Follow-up.
+- **ADR-0051 adopted** (commit `d622dc3`): PO directive, 2026-08-04 —
+  Agent-Pipeline development is always built for both Claude Code and Codex
+  as runners, and must support Windows, macOS, and Unix/WSL as platforms,
+  whenever something is built. A third runner, Antigravity, is planned but
+  not yet realized and is explicitly out of scope for this hard requirement
+  until it lands. See
+  [`docs/adr/0051-dual-runner-tri-platform-development-contract.md`](adr/0051-dual-runner-tri-platform-development-contract.md).
+- **Next:** full Verify against the `7f5ac97`/`d622dc3` candidate; independent
+  Critic review of the runner-routing fix per the self-application hard rule
+  (CLAUDE.md) before this is considered closed; then a local-development
+  plugin reinstall so the fix is actually loaded for future sessions/PO
+  request. Not yet pushed.
+- **Also raised this session, not yet actioned:** the four `fix(release)`/
+  `fix(critic)`/`chore(codex)` commits already on this branch (`8ace400`,
+  `78be1ed`, `349b442`, `c1faad3`, `6382e82`, dated through 2026-08-04) have no
+  corresponding dated section in this file — this predates and is unrelated to
+  the work above; flagged here rather than silently left unreconciled.
+
+## 2026-08-01 Nova — handover-only session cut
 
 - This is a normal continuation of Sprint Nova, **not** a durable block or
   feature closure. The next session must run the ordinary pipeline bootstrap
