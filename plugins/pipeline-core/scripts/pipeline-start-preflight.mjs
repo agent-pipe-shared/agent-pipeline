@@ -124,6 +124,13 @@ export function observePipelineStartPreflight({
   const wsl = [env.WSL_DISTRO_NAME, env.WSL_INTEROP]
     .some((value) => typeof value === "string" && value.trim() !== "");
   const executionBoundary = wsl ? "host-authorized-wsl" : "default";
+  // CLAUDECODE is set by every Claude Code session (main and subagent); its
+  // absence keeps the historical Codex-CLI default. This is the one place a
+  // session's own runner identity enters the onboarding chain -- without it,
+  // a Claude session silently inherits Codex-only gates (App-Server health,
+  // native runtime readback) that RUNNERS_WITHOUT_APP_SERVER/
+  // RUNNERS_WITHOUT_NATIVE_READBACK exist specifically to exempt it from.
+  const runner = env.CLAUDECODE === "1" ? "claude" : "codex";
   const status = !version
     ? "plugin-identity-unavailable"
     : installedIdentity?.ambiguous === true || installedVersion !== null && installedVersion !== version
@@ -149,6 +156,8 @@ export function observePipelineStartPreflight({
             resolve(cwd),
             "--intent",
             "bootstrap",
+            "--runner",
+            runner,
           ],
           mutation: false,
           requiresConfirmation: false,

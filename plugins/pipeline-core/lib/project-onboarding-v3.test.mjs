@@ -1557,6 +1557,48 @@ test("host-bound ready-path App-Server health smoke is read-only and typed", () 
   } finally { dispose(path); }
 });
 
+test("a Claude Code session never observes the Codex App-Server and reports not-applicable", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path);
+    let calls = 0;
+    const observed = inspectProjectOnboardingV3({
+      rootDir: path,
+      intent: "bootstrap",
+      runner: "claude",
+      deps: {
+        ...fakeDeps,
+        observeOnboardingAppServer(options) {
+          calls += 1;
+          return observeOnboardingAppServer(options);
+        },
+      },
+    });
+    assert.equal(calls, 0);
+    assert.equal(observed.runner, "claude");
+    assert.equal(observed.status, "ready");
+    assert.deepEqual(observed.appServer, { required: false, status: "not-applicable", code: null });
+  } finally { dispose(path); }
+});
+
+test("omitting --runner keeps the historical Codex App-Server requirement", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path);
+    const observed = inspectProjectOnboardingV3({
+      rootDir: path,
+      intent: "bootstrap",
+      deps: fakeDeps,
+    });
+    assert.equal(observed.runner, "codex");
+    assert.equal(observed.appServer.required, true);
+  } finally { dispose(path); }
+});
+
 test("blank real root inspect and plan are read-only", () => {
   const path = root();
   try {

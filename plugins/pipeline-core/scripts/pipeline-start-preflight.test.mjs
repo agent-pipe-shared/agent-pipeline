@@ -71,6 +71,8 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
       cwd,
       "--intent",
       "bootstrap",
+      "--runner",
+      "codex",
     ],
     mutation: false,
     requiresConfirmation: false,
@@ -79,6 +81,29 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
       schema: "pipeline.project-onboarding.v4",
     },
   });
+});
+
+test("preflight declares the Claude runner when CLAUDECODE marks the session", () => {
+  const cwd = "/projects/current";
+  const result = observePipelineStartPreflight({
+    env: { CLAUDECODE: "1" },
+    pluginList: pluginList(),
+    read: () => manifest,
+    cwd,
+  });
+  assert.deepEqual(result.nextAction.argv.slice(-2), ["--runner", "claude"]);
+});
+
+test("preflight keeps the Codex runner default for any non-Claude-Code session", () => {
+  for (const env of [{}, { CLAUDECODE: "0" }, { CLAUDECODE: "true" }]) {
+    const result = observePipelineStartPreflight({
+      env,
+      pluginList: pluginList(),
+      read: () => manifest,
+      cwd: "/projects/current",
+    });
+    assert.deepEqual(result.nextAction.argv.slice(-2), ["--runner", "codex"], JSON.stringify(env));
+  }
 });
 
 test("normal bootstrap receipt retains exact envelope measurement and over-budget state", () => {

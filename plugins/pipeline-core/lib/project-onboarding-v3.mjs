@@ -818,6 +818,7 @@ function cleanupHumanRecoveryAction(root) {
 
 function partialCleanupRecoveryResult({
   root,
+  runner = "codex",
   intent,
   repository,
   runtime = emptyRuntime(),
@@ -840,6 +841,7 @@ function partialCleanupRecoveryResult({
       return lifecycleResult({
         status: "partial",
         root,
+        runner,
         intent,
         repository,
         runtime,
@@ -860,6 +862,7 @@ function partialCleanupRecoveryResult({
       return lifecycleResult({
         status: "partial",
         root,
+        runner,
         intent,
         repository,
         runtime,
@@ -877,6 +880,7 @@ function partialCleanupRecoveryResult({
       return lifecycleResult({
         status: "partial",
         root,
+        runner,
         intent,
         repository,
         runtime,
@@ -1521,6 +1525,7 @@ function readyLifecycleResult({ root, runner = "codex", intent, repository, runt
     return lifecycleResult({
       status: "host-repository-init-required",
       root,
+      runner,
       intent,
       repository,
       runtime,
@@ -1549,6 +1554,7 @@ function readyLifecycleResult({ root, runner = "codex", intent, repository, runt
   if (repository.mode === "local" && continuity.status === "valid") {
     const cleanupRecovery = partialCleanupRecoveryResult({
       root,
+      runner,
       intent,
       repository,
       runtime,
@@ -1591,6 +1597,7 @@ function readyLifecycleResult({ root, runner = "codex", intent, repository, runt
     return lifecycleResult({
       status,
       root,
+      runner,
       intent,
       repository,
       runtime,
@@ -1604,6 +1611,7 @@ function readyLifecycleResult({ root, runner = "codex", intent, repository, runt
     return lifecycleResult({
       status: "kickoff-required",
       root,
+      runner,
       intent,
       repository,
       runtime,
@@ -1622,6 +1630,7 @@ function readyLifecycleResult({ root, runner = "codex", intent, repository, runt
     return lifecycleResult({
       status: "continuity-damaged",
       root,
+      runner,
       intent,
       repository,
       runtime,
@@ -1640,6 +1649,7 @@ function readyLifecycleResult({ root, runner = "codex", intent, repository, runt
     return lifecycleResult({
       status: "continuity-observation-unavailable",
       root,
+      runner,
       intent,
       repository,
       runtime,
@@ -1658,6 +1668,7 @@ function readyLifecycleResult({ root, runner = "codex", intent, repository, runt
     return lifecycleResult({
       status: "partial",
       root,
+      runner,
       intent,
       repository,
       runtime,
@@ -1678,6 +1689,7 @@ function readyLifecycleResult({ root, runner = "codex", intent, repository, runt
       return lifecycleResult({
         status: "partial",
         root,
+        runner,
         intent,
         repository,
         runtime,
@@ -1696,6 +1708,7 @@ function readyLifecycleResult({ root, runner = "codex", intent, repository, runt
       return lifecycleResult({
         status: "partial",
         root,
+        runner,
         intent,
         repository,
         runtime,
@@ -1723,6 +1736,7 @@ function readyLifecycleResult({ root, runner = "codex", intent, repository, runt
     return lifecycleResult({
       status: "partial",
       root,
+      runner,
       intent,
       repository,
       runtime,
@@ -1749,6 +1763,7 @@ function readyLifecycleResult({ root, runner = "codex", intent, repository, runt
   return lifecycleResult({
     status: "ready",
     root,
+    runner,
     intent,
     repository,
     runtime,
@@ -1758,7 +1773,7 @@ function readyLifecycleResult({ root, runner = "codex", intent, repository, runt
   });
 }
 
-function afterRuntimeLifecycleResult({ root, intent, repository, runtime }, fs) {
+function afterRuntimeLifecycleResult({ root, intent, repository, runtime, runner = "codex" }, fs) {
   let continuity;
   try {
     continuity = (fs.classifyOnboardingContinuity ?? classifyOnboardingContinuity)({
@@ -1769,7 +1784,7 @@ function afterRuntimeLifecycleResult({ root, intent, repository, runtime }, fs) 
   } catch {
     continuity = emptyContinuity();
   }
-  return readyLifecycleResult({ root, intent, repository, runtime, continuity }, fs);
+  return readyLifecycleResult({ root, runner, intent, repository, runtime, continuity }, fs);
 }
 
 function lifecyclePlanDigest(plan) {
@@ -2588,7 +2603,7 @@ function repositoryFailureResult(rootDir, fs, intent, repository) {
   });
 }
 
-function v4Inspection(rootDir, fs, intent = "onboarding") {
+function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
   try {
     const requestedRoot = resolve(rootDir);
     const requestedInfo = fs.lstatSync(requestedRoot);
@@ -2703,6 +2718,7 @@ function v4Inspection(rootDir, fs, intent = "onboarding") {
             root: legacy.root,
             intent,
             repository,
+            runner,
             runtime: {
               ...emptyRuntime(pluginRuntime === "receipt-attested"
                 ? "plugin-managed"
@@ -2745,7 +2761,7 @@ function v4Inspection(rootDir, fs, intent = "onboarding") {
         }
       }
     }
-    const cleanupRecovery = partialCleanupRecoveryResult({ root: legacy.root, intent, repository });
+    const cleanupRecovery = partialCleanupRecoveryResult({ root: legacy.root, runner, intent, repository });
     if (cleanupRecovery !== null) return cleanupRecovery;
     const partialPlan = planProjectPartialAuthorityAdoption({ rootDir: legacy.root, deps: fs });
     const reparable = partialPlan.status === "selection-required";
@@ -2859,12 +2875,13 @@ function v4Inspection(rootDir, fs, intent = "onboarding") {
         )],
       });
     }
-    const authority = validateV3BootstrapAuthority({ rootDir: legacy.root, deps: fs });
+    const authority = validateV3BootstrapAuthority({ rootDir: legacy.root, deps: fs, runner });
     if (authority.status === "ready" && authority.runtimeProjection === "plugin-managed") {
       return afterRuntimeLifecycleResult({
         root: legacy.root,
         intent,
         repository,
+        runner,
         runtime: { ...emptyRuntime("plugin-managed"), sourceSha256: authority.sourceSha256 ?? null },
       }, fs);
     }
@@ -2874,6 +2891,7 @@ function v4Inspection(rootDir, fs, intent = "onboarding") {
         root: legacy.root,
         intent,
         repository,
+        runner,
         runtime: {
           ...emptyRuntime("plugin-managed-unattested"),
           sourceSha256: authority.sourceSha256 ?? null,
@@ -2898,6 +2916,7 @@ function v4Inspection(rootDir, fs, intent = "onboarding") {
             return lifecycleResult({
               status: "runtime-attestation-required",
               root: legacy.root,
+              runner,
               intent,
               repository,
               runtime: {
@@ -2922,7 +2941,7 @@ function v4Inspection(rootDir, fs, intent = "onboarding") {
               )],
             });
           }
-          return lifecycleResult({ status: "restart-required", root: legacy.root, intent, repository,
+          return lifecycleResult({ status: "restart-required", root: legacy.root, runner, intent, repository,
             runtime: { status: "restart-required", sourceSha256: barrier.barrier.sourceSha256, targetsSha256: barrier.barrier.runtimeTargetsSha256, barrierSha256: barrier.rawSha256, readbackSha256: null },
             nextAction: restartAction(legacy.root, barrier.rawSha256),
             diagnostics: [lifecycleDiagnostic("$.runtime", "restart_required", "Codex runtime targets changed and require a fresh effective-runtime readback", "confirm the one-use restart action")],
@@ -2935,7 +2954,7 @@ function v4Inspection(rootDir, fs, intent = "onboarding") {
             deps: fs,
           });
           if (current.status !== "current") throw new Error("cleared runtime readback marker is absent");
-          return afterRuntimeLifecycleResult({ root: legacy.root, intent, repository,
+          return afterRuntimeLifecycleResult({ root: legacy.root, intent, repository, runner,
             runtime: {
               status: "readback-current",
               sourceSha256: current.barrier.sourceSha256,
@@ -2949,6 +2968,7 @@ function v4Inspection(rootDir, fs, intent = "onboarding") {
           return lifecycleResult({
             status: "runtime-attestation-required",
             root: legacy.root,
+            runner,
             intent,
             repository,
             runtime: {
@@ -2992,8 +3012,8 @@ function v4Inspection(rootDir, fs, intent = "onboarding") {
     diagnostics: [lifecycleDiagnostic("$.authority", "partial_authority", "the Pipeline authority is incomplete", reparable ? "run the typed partial-authority planner and bind an explicit PO selection" : "inspect the source and generated targets")] });
 }
 
-export function inspectProjectOnboardingV3({ rootDir = process.cwd(), deps: overrides = {}, intent = "onboarding" } = {}) {
-  return v4Inspection(rootDir, deps(overrides), intent);
+export function inspectProjectOnboardingV3({ rootDir = process.cwd(), deps: overrides = {}, intent = "onboarding", runner = "codex" } = {}) {
+  return v4Inspection(rootDir, deps(overrides), intent, runner);
 }
 
 export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrides = {} } = {}) {
