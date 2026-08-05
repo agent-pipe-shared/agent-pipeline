@@ -248,7 +248,7 @@ test("worktree-create binds dispatch once and preserves each existing operation"
         writeFn(value) { output.push(value); },
       }), 0);
       assert.deepEqual(order, [
-        ["gate", { rootDir: root, intent: "dispatch" }],
+        ["gate", { rootDir: root, intent: "dispatch", runner: "codex" }],
         ["mutation"],
       ]);
       assert.equal(JSON.parse(output.join("")).status, "ready");
