@@ -17,6 +17,22 @@ The following rows are the only inventory deltas. They record existing Phoenix
 implementation groups that were delivered before the bound inventory was
 reconciled; they do not authorize unrelated files or a broader scope change.
 
+Amended 2026-08-05, unsigned and still proposed: the 2026-08-02 draft omitted
+six files that already exist on this branch, including the signed §7 bridge
+itself, which was authored after that draft. The omission was found by
+comparing every `.mjs` file created between the branch base
+`9d1b3dc108eb77629ace5b82002120f5539abd8d` and the current candidate against
+both the bound predecessor inventory and this revision. Signing the 2026-08-02
+draft unchanged would have left the same inventory gap open. The amendment adds
+only files that demonstrably exist and belong to an already inventoried Phoenix
+group; it changes no normative contract and grants no new scope.
+
+### 7.3 Governance event kernel
+
+| File | Change | Rationale |
+| --- | --- | --- |
+| `governance/events/capture-policy.json` | create the portable capture-policy instance for the already inventoried policy schema and stream registry | Make the deny-by-default capture and redaction contract an auditable repository artifact rather than implicit behaviour. |
+
 ### 7.4 Human ledger and authority integration
 
 | File | Change | Rationale |
@@ -24,6 +40,11 @@ reconciled; they do not authorize unrelated files or a broader scope change.
 | `plugins/pipeline-core/lib/human-governance-decision.mjs` | create closed decision taxonomy and lifecycle-link validation | Keep authority decisions distinct, complete, and fail-closed before any ledger read/write. |
 | `plugins/pipeline-core/scripts/governance-authority.mjs` | create checkpoint-bound canonical authority readback and one-shot consumption CLI | Let existing synchronous guard/state consumers independently verify a ledger decision rather than trust mutable projection State. |
 | `plugins/pipeline-core/scripts/governance-authority.test.mjs` | cover canonical readback, scope/candidate drift, consumption, and consumption readback | Preserve direct-reader migration guarantees. |
+| `plugins/pipeline-core/lib/authority-revision-proof.mjs` | create the external public-key proof boundary for a continuity authority revision | Bind an authority transition to a verifiable human signature instead of a mutable local claim. |
+| `plugins/pipeline-core/lib/authority-revision-proof.test.mjs` | cover intent binding, trust-policy rejection, forged and replayed proofs | Prove the signature boundary is fail-closed. |
+| `plugins/pipeline-core/scripts/phoenix-authority-approval.mjs` | create the human-terminal prepare/approve/verify helper for a signed §7 revision | Keep private keys and signing outside the repository and outside agent reach. |
+| `plugins/pipeline-core/scripts/phoenix-authority-revision.mjs` | create the proof-gated wrapper around the existing continuity authority revision writer | Admit the sanctioned writer only after an exact verified proof binding. |
+| `plugins/pipeline-core/hooks/guard-git-phoenix.test.mjs` | cover ledger-bound Git override authority, target-repository binding, and replay | Keep the override path provable against the ledger rather than against mutable state. |
 
 ### 7.5 Agent journal and lifecycle replay
 
@@ -43,6 +64,12 @@ reconciled; they do not authorize unrelated files or a broader scope change.
 | `plugins/pipeline-core/lib/governance-export-delivery.test.mjs` | cover acknowledgement, failure, retry, and independent destination behavior | Prove delivery receipts do not overclaim external retention or authority. |
 | `plugins/pipeline-core/lib/governance-export-outbox-store.mjs` | create durable machine-local outbox persistence | Isolate transport state from portable canonical records. |
 | `plugins/pipeline-core/lib/governance-export-outbox-store.test.mjs` | cover interruption, corruption, replay, and cursor persistence | Prove recovery remains explicit and non-authoritative. |
+
+### 7.10 Phoenix package and integration documentation
+
+| File | Change | Rationale |
+| --- | --- | --- |
+| `plugins/pipeline-core/scripts/phoenix-governance-threat-model.test.mjs` | cover the maintained threat-model document's required trust boundaries, abuse cases, and recovery sections | Keep the threat-model obligation machine-checked instead of asserted. |
 
 ### 7.11 Governed external execution handoff
 
