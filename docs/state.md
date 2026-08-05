@@ -3,7 +3,7 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-04
+**Last updated:** 2026-08-05
 **Project status:** ACTIVE
 **Current block:** 0.5.2 patch-candidate recovery on the released `v0.5.1` baseline
 **Repair baseline:** `5d2b83dcc765d50801f4491e1bd9bed32090112b`
@@ -16,7 +16,134 @@ the supplied authoritative release identity; it is not a claimed release time.
 The historical candidate-qualification sections below are retained as
 session history and no longer describes the current publication disposition.
 
-## 2026-08-04 Nova — Claude-session runner-routing fix + ADR-0051 (current)
+## 2026-08-05 Nova — preflight runner-identity fix, Claude local-dev doc, marketplace-collision finding (current)
+
+Landed this session, in order, all on branch `feat/sprint-nova-codex-v046`:
+
+- `4221989` `fix(preflight): resolve plugin identity through the invoking
+  session's own runner` — dispatched as goldfish-deep briefing
+  `CLAUDE-PREFLIGHT-01`. `pipeline-start-preflight.mjs` previously read the
+  source version from `.codex-plugin/plugin.json` and the installed version
+  via `codex plugin list --json`, on both runners. On Claude the freshness
+  check was therefore inverted: the stale `0.5.1` build reported `ready`
+  while the current build reported `plugin-refresh-required`. The runner
+  resolution (`env.CLAUDECODE === "1"`) is now hoisted above both reads;
+  Claude reads `.claude-plugin/plugin.json` and `claude plugin list --json`
+  (a bare array with no `source`/`marketplaceSource` fields), Codex keeps
+  its existing path unchanged with `codex` remaining the default when the
+  variable is absent. Claude's `local-development` attestation could not
+  reuse the Codex `exactLocalSource` check, so it is attested separately
+  against `~/.claude/plugins/known_marketplaces.json` through an injectable
+  reader, failing closed to `installedSource: "unknown"` rather than
+  asserting on weak evidence. Elephant post-commit verification, independent
+  of the dispatch report: Claude path returns `ready` with matching
+  `version`/`installedVersion` and `local-development`; Codex path returns
+  `plugin-refresh-required` (correct — that registry is genuinely stale);
+  the three affected test suites each exit 0.
+- `247e084` `chore(plugin): bump the Claude cachebuster to
+  20260805231810.4221989` — Elephant-authored version-string bump (release
+  mechanics, no production code authored). Record the mechanism, since it
+  was not previously written down anywhere for Claude: `claude plugin
+  install` materializes a build into a cache directory named after the
+  manifest version string with `+` replaced by `-`, so an installed build is
+  pinned and never follows new commits until that string changes. Version
+  convention adopted: `<semver>+claude.<YYYYMMDDHHMMSS>.<short-oid>`, where
+  the OID names the functional commit whose content the build carries.
+- `3ab1a56`, `a8e9ac0`, `6ee97fc` — `docs/claude-local-plugin-development.md`,
+  the Claude counterpart to the Codex-only local plugin development
+  document, which this file had tracked as "still open and never started".
+  Dispatched as goldfish-implementor briefing `CLAUDE-LOCALDEV-DOC-01`. The
+  first commit needed two Elephant-found corrections before it was sound: it
+  had invented a `--ref main` flag that `claude plugin marketplace add` does
+  not have, and its exit sequence contradicted the document's own
+  name-collision section by telling the operator to reach a selector that
+  cannot resolve. Both were fixed by resuming the same dispatch rather than
+  by an Elephant edit; the third commit added the verified `uninstall`
+  command and the scope model. Record that the goldfish's report had claimed
+  "no CLI behavior was invented" while an invented flag was present — the
+  post-commit review is what caught it.
+
+**Verify status — recorded honestly, NOT as green.** `node
+harness/scripts/verify.mjs` at exact candidate `6ee97fc`, tree
+`91a32c3e8e15e2ac6f07023ffef0b6d5c58ef35f`, binding `exact`, working tree
+clean at start and finish. Result: **exit 1**. 235 of 236 suites exit 0;
+exactly one fails: `codex-advisory-bootstrap-tests`. The failure is
+environmental, not candidate-caused: the suite asserts against a temp path
+from a 2026-08-01 session that no longer exists after a reboot, and it fails
+with `ENOENT ... lstat`. Same class as the tracked item
+`backlog/items/2026-07-25-windows-verify-brittle-test-hygiene.md`. Noted as a
+brittle-fixture failure requiring its own decision; no green Verify is
+claimed for this candidate. A first Verify run was started and deliberately
+stopped mid-run at suite 37/236 because a documentation defect was found
+that would have invalidated the candidate; the recorded run above is the
+complete one.
+
+**Two findings recorded as dated backlog items, not fixed this session**
+(both facts supplied verbatim by the PO/session, investigated no further
+here):
+
+- **Marketplace name collision.** `setup.mjs:855-858` in
+  `compileSettingsJson()` unconditionally writes `marketplaces["agent-pipeline"]`
+  as a `github` source into every onboarded project's `.claude/settings.json`.
+  Because a Claude Code marketplace registers under its manifest's own
+  `name` field (`agent-pipeline-local` for this repo's
+  `.claude-plugin/marketplace.json`), not under the declaration key, this
+  silently clobbers any local `directory`-source registration of that name
+  with the published GitHub release, and makes `enabledPlugins:
+  {"pipeline-core@agent-pipeline": true}` unresolvable (no marketplace named
+  `agent-pipeline` can ever exist from this manifest). **Reproduced live
+  twice on this machine** this session: once at session start (registry
+  already clobbered to `github`, loading the stale `0.5.1`/`5d2b83d` build
+  and bootstrapping as `runner: "codex"`), and again after a manual repair,
+  when `claude plugin install` run from a sibling checkout re-clobbered the
+  registration within two seconds. Fix is an ADR-scale identity decision
+  (rename the published manifest vs. suppress the `setup.mjs` write), not
+  attempted here. Interim mitigation applied on this machine: exactly one
+  marketplace (`agent-pipeline-local`, `directory` source at the dev
+  checkout) and exactly one plugin install (`--scope user`), so no
+  per-repository plugin command is needed and the clobber has no routine
+  trigger. Tracked:
+  `backlog/items/2026-08-05-setup-mjs-marketplace-name-collision-defeats-local-dev-installs.md`
+  (owner PO, due 2026-09-05).
+- **No Claude-side start-time adoption opt-in.** Codex has a bootstrap
+  adoption path via `project-onboarding-v3.mjs` (V4 onboarding); Claude Code
+  has none, so an operator must register the marketplace and install the
+  plugin by hand — exactly the manual sequence that exposed the finding
+  above. Feature work needing its own PRD/Spec, not 0.5.2 hardening; not
+  scoped or designed here. Tracked:
+  `backlog/items/2026-08-05-claude-has-no-start-time-opt-in-adoption-path.md`
+  (owner PO, due 2026-09-05).
+
+**Host state left behind on this machine** (machine-local, not repository
+state):
+
+- Exactly one registered marketplace, `agent-pipeline-local`, as a
+  `directory` source at the development checkout.
+- Exactly one plugin install, `pipeline-core@agent-pipeline-local`, version
+  `0.5.2+claude.20260805231810.4221989`, `scope: user`, enabled, its
+  registry `gitCommitSha` equal to `6ee97fc`.
+- The previously registered `claude-plugins-official` marketplace was
+  removed at PO request; nothing was installed from it.
+- Readback confirmed: the preflight run from the installed cache returns
+  `ready`, `version` equal to `installedVersion`, `installedSource:
+  "local-development"`, and routes `--runner claude`.
+- A session restart is required for the new build to take effect and had
+  not yet happened when this section was written.
+
+**Open and carried forward:**
+
+- The restart itself, plus a check immediately afterwards of whether a
+  session start alone re-triggers the marketplace collision — this is
+  UNKNOWN and was not determined; the two observed clobbers both followed
+  explicit plugin commands. Open question, not a safe assumption.
+- A minor hardening opportunity in `4221989`, recorded not as a defect: the
+  Claude attestation verifies the marketplace is a `directory` source but,
+  unlike the Codex path, does not additionally cross-check the install
+  entry's own `projectPath` against that path.
+- Everything the `2026-08-04` section below already lists as open stays
+  open, in particular F-A, F-C, F-E and the release-gate simulation.
+
+## 2026-08-04 Nova — Claude-session runner-routing fix + ADR-0051
 
 - **Bootstrap defect found and fixed.** A Claude Code `pipeline-start` on this
   exact repo failed `CAS-DAEMON-INVALID-OBSERVATION`: `pipeline-start-preflight.mjs`
