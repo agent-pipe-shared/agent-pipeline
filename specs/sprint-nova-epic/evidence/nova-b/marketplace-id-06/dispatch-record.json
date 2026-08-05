@@ -1,0 +1,8 @@
+{
+  "schema": "pipeline.dispatch-record.v1",
+  "taskId": "MARKETPLACE-ID-06",
+  "model": "sonnet",
+  "rulesetSha": "2914a55713d714d95323231edaddccec5e1d6c2e5a4fbfaaaaa9d913a5fb1efc",
+  "dispatcher": "goldfish-deep",
+  "outcome": "restored \"name\": \"agent-pipeline\" in the published root .claude-plugin/marketplace.json (regression traced via git log -p to commit 60df4e5, reverting the original name from 4375585); confirmed setup.mjs needs no change; authored docs/adr/0052-marketplace-identity-restoration-and-local-dev-separation.md recording the decision to give local development a separate marketplace root (symlink on Unix/macOS/Unix-WSL, junction on native Windows) outside this checkout; re-ran both design probes (.. rejection and symlink-root acceptance, confirmed exactly as briefed including the cosmetic missing-description warning) under the system temp directory; indexed the ADR in docs/adr/README.md and governance/observation-doc-governance.json; rewrote docs/claude-local-plugin-development.md and minimally corrected docs/codex-local-plugin-development.md for the new arrangement, resolving the former 'Known limitation'; claude plugin validate ., check-doc-contracts.mjs, check-observation-governance.mjs and setup.test.mjs all exit 0; classified every remaining agent-pipeline-local grep hit, flagging two present-tense category-(ii) leftovers in backlog/items/2026-08-05-setup-mjs-marketplace-name-collision-defeats-local-dev-installs.md (lines 25/28) and one in backlog/items/2026-08-05-pipeline-state-rebind-codex-default-runner.md (line 69) as out-of-scope for report rather than fix"
+}

@@ -10,19 +10,20 @@ host-wide (`~/.claude/plugins/known_marketplaces.json`) and keyed by
 marketplace **name**, not by the key an operator used to declare it. A
 project- or user-scope declaration that resolves to a marketplace manifest
 whose `name` field collides with an existing registration silently
-overwrites that registration — see "The name-collision hazard" below.
+overwrites that registration — see "The name-collision hazard" below, which
+this repository once suffered from directly.
 
 ## Identities
 
 | Purpose | Plugin selector | Marketplace source |
 | --- | --- | --- |
-| Local development and pre-release live tests | `pipeline-core@agent-pipeline-local` | One explicitly registered local marketplace, `--scope user`, source type `directory`, named `agent-pipeline-local` |
-| Normal operation, consumer repositories, and post-release validation | `pipeline-core@agent-pipeline` | The official Git marketplace |
+| Local development and pre-release live tests | `pipeline-core@agent-pipeline-local` | A separate local marketplace root (a directory outside this checkout; see "Create the local marketplace root" below), `--scope user`, source type `directory`, named `agent-pipeline-local` |
+| Normal operation, consumer repositories, and post-release validation | `pipeline-core@agent-pipeline` | The official Git marketplace, or this checkout's own root registered directly (its manifest now correctly self-names `agent-pipeline` — see "Reaching the released selector from this checkout" below) |
 
 Exactly one selector should be enabled locally while testing, installed
 `--scope local` from the marketplace named `agent-pipeline-local`. Do not
-repoint the `agent-pipeline` marketplace name to a checkout and do not use a
-local candidate through the released selector.
+repoint the `agent-pipeline` marketplace name to a local-development source
+and do not use a local candidate through the released selector.
 
 The local selector is only a source-topology override. It does not waive
 candidate-bound Verify, Security, Critic, PO, push, release, or remote-readback
@@ -38,16 +39,19 @@ automatically.
 ## The name-collision hazard
 
 This repository's published marketplace manifest (root
-`.claude-plugin/marketplace.json`) self-names `agent-pipeline-local`. A
-Claude Code marketplace registers under that `name` field, **not** under the
-key an operator used to declare it. Therefore a project-scope declaration
-such as
+`.claude-plugin/marketplace.json`) once self-named `agent-pipeline-local`
+instead of the published identity `agent-pipeline` — a regression introduced
+by a metadata-refresh commit and fixed by
+[ADR-0052](adr/0052-marketplace-identity-restoration-and-local-dev-separation.md).
+While that defect stood, a Claude Code marketplace registered under that
+`name` field, **not** under the key an operator used to declare it. A
+project-scope declaration such as
 
 ```json
 "extraKnownMarketplaces": { "agent-pipeline": { "source": { "source": "github", "repo": "<org>/<repo>" } } }
 ```
 
-resolves, then registers itself under the name `agent-pipeline-local` —
+resolved, then registered itself under the name `agent-pipeline-local` —
 **silently overwriting** a correct user-scope declaration of that same name
 that pointed at a local checkout. The observed result on two machines:
 `~/.claude/plugins/known_marketplaces.json` held `agent-pipeline-local` with
@@ -56,23 +60,81 @@ instead of the local checkout, and the release-selector plugin id declared
 in project settings (`pipeline-core@agent-pipeline`) could never resolve
 because no marketplace of that name survived registration. Sessions ran
 pre-fix code while `claude plugin list` truthfully reported a newer version
-installed — the two disagree because the registry records the last install
-while the session resolves through the marketplace.
+installed — the two disagreed because the registry recorded the last
+install while the session resolved through the marketplace.
 
-### Recovery
+**This is why local development now uses a marketplace root that is
+physically separate from this checkout** (see below), rather than the
+checkout itself: it is the only arrangement in which the published identity
+(`agent-pipeline`, this checkout's own manifest) and the local-development
+identity (`agent-pipeline-local`, a distinct root) can both be registered on
+the same host at the same time without either overwriting the other.
 
-In order, each confirmed by readback:
+### Migrating an existing pre-fix registration
+
+If `~/.claude/plugins/known_marketplaces.json` currently holds
+`agent-pipeline-local` sourced directly from this checkout (the only
+arrangement possible before ADR-0052), the next marketplace refresh
+(`claude plugin marketplace update agent-pipeline-local`, or any operation
+that re-resolves it) will register it as `agent-pipeline` instead, because
+this checkout's manifest now correctly self-names the published identity.
+Migrate deliberately instead of waiting for that surprise:
 
 ```text
 claude plugin marketplace remove agent-pipeline-local
-claude plugin marketplace add <absolute-checkout-root> --scope user
-claude plugin install pipeline-core@agent-pipeline-local --scope local
 ```
 
-`claude plugin marketplace remove` with no `--scope` removes the declaration
-from **every** scope, including a correct one; the `add` re-establishes it.
-After the `add`, `known_marketplaces.json` must show `source.source:
-"directory"` with `path` equal to the checkout root.
+Then create the separate local marketplace root below and re-register from
+there.
+
+## Create the local marketplace root
+
+The local marketplace root is a directory **outside this checkout** — never a
+committed artifact of this repository, and never a sibling directory nested
+inside it (`claude plugin validate` rejects a plugin `source` that escapes the
+marketplace root via `..`; a nested sibling has no other way to reach
+`plugins/pipeline-core`). Pick any convenient location, for example a sibling
+of the checkout itself, and record its path as `<local-marketplace-root>`.
+
+Unix / macOS / Unix-WSL:
+
+```text
+mkdir -p <local-marketplace-root>/.claude-plugin
+mkdir -p <local-marketplace-root>/plugins
+ln -s <absolute-checkout-root>/plugins/pipeline-core <local-marketplace-root>/plugins/pipeline-core
+```
+
+Native Windows (no elevation required):
+
+```text
+mkdir <local-marketplace-root>\.claude-plugin
+mkdir <local-marketplace-root>\plugins
+mklink /J <local-marketplace-root>\plugins\pipeline-core <absolute-checkout-root>\plugins\pipeline-core
+```
+
+Write `<local-marketplace-root>/.claude-plugin/marketplace.json`:
+
+```json
+{
+  "name": "agent-pipeline-local",
+  "description": "Local development marketplace root for agent-pipeline, symlinked to a checkout.",
+  "owner": { "name": "agent-pipeline" },
+  "plugins": [
+    {
+      "name": "pipeline-core",
+      "source": "./plugins/pipeline-core",
+      "description": "Local-development candidate, symlinked/junctioned to a real checkout."
+    }
+  ]
+}
+```
+
+`claude plugin validate <local-marketplace-root>` should pass (this exact
+shape was confirmed by probe 2 in ADR-0052). Switching which checkout the
+local root serves is then a matter of repointing the symlink/junction to a
+different checkout's `plugins/pipeline-core` and restarting the session — the
+marketplace registration itself (`agent-pipeline-local`, pointed at
+`<local-marketplace-root>`) does not need to be removed and re-added.
 
 ## The cachebuster mechanism and version convention
 
@@ -100,7 +162,7 @@ The registry separately records the actual installed commit in its
 ## Enter local test mode
 
 ```text
-claude plugin marketplace add <absolute-checkout-root> --scope user
+claude plugin marketplace add <local-marketplace-root> --scope user
 claude plugin install pipeline-core@agent-pipeline-local --scope local
 ```
 
@@ -132,7 +194,8 @@ change.
 Verified on a correct local-development installation:
 
 - `claude plugin marketplace list` shows the marketplace with a
-  directory/path source, not a GitHub source.
+  directory/path source (the local marketplace root, not this checkout's
+  path), not a GitHub source.
 - `claude plugin list --json` returns a bare array; the single enabled entry
   has `id: "pipeline-core@agent-pipeline-local"`, the expected candidate
   `version`, `scope: "local"`, and an `installPath` under the cache
@@ -148,6 +211,26 @@ Verified on a correct local-development installation:
 - A plugin change takes effect only after a **Claude Code session restart**;
   the update command says so explicitly.
 
+## Reaching the released selector from this checkout
+
+Since ADR-0052, this checkout's own root manifest correctly self-names
+`agent-pipeline` (the published identity), so registering this checkout
+directly — instead of through the separate local marketplace root above —
+resolves under the released selector:
+
+```text
+claude plugin marketplace add <absolute-checkout-root> --scope user
+claude plugin install pipeline-core@agent-pipeline --scope local
+```
+
+The readback should show `pipeline-core@agent-pipeline` at the version
+carried by this checkout's `plugins/pipeline-core/.claude-plugin/plugin.json`.
+This exercises the released selector's name resolution using this checkout's
+own content; it is not a substitute for validating an actual GitHub-sourced
+release, and it must not be run at the same time as local-development testing
+through `agent-pipeline-local` from the same checkout — the two exercise
+different purposes and should not be combined.
+
 ## Scope model
 
 A local-scope install is per-repository: it is recorded in
@@ -156,13 +239,11 @@ the single checkout it applies to, and it does not affect any other checkout
 on the host. A marketplace declaration, by contrast, lives at `--scope user`
 in `~/.claude/settings.json` and is host-wide: every repository on the host
 can see the marketplace, but only repositories with their own install and
-enablement actually load the plugin. Because a marketplace registers under
-its manifest's `name` field, two different local checkouts of this
-repository cannot both be registered as sources at the same time — they
-would each register as `agent-pipeline-local` and overwrite one another.
-Switching which checkout is the development source is a deliberate
-`marketplace remove` + `marketplace add` operation, not something that can
-be held in parallel.
+enablement actually load the plugin. The local marketplace root and the
+symlink/junction it contains are what let a single `agent-pipeline-local`
+registration serve any checkout on the host: switching which checkout is the
+development source means repointing that symlink/junction and restarting the
+session, not removing and re-adding the marketplace declaration.
 
 ## Exit / retire local test mode
 
@@ -178,28 +259,20 @@ too, so a `local`-scope install requires the explicit `--scope local` (or
 (measured from its `--help` output) rather than an observed success output:
 unlike the sequences elsewhere in this document, this command has not been
 confirmed by readback. The subsequent `marketplace remove` (unqualified,
-removing from every scope) drops the local checkout's marketplace
-registration, so the local selector `pipeline-core@agent-pipeline-local` can
-no longer resolve. Restart the session after these changes.
+removing from every scope) drops the local marketplace root's registration,
+so the local selector `pipeline-core@agent-pipeline-local` can no longer
+resolve. Restart the session after these changes.
 
-### Known limitation
+### Known limitation (resolved by ADR-0052)
 
-There is no verified command sequence in this document for reaching the
-released identity (`pipeline-core@agent-pipeline`) by re-adding this
-repository's own GitHub source. This repository's own published
-`.claude-plugin/marketplace.json` self-names `agent-pipeline-local` (see
-"The name-collision hazard" above): a marketplace added from this
-repository's GitHub source registers under the name `agent-pipeline-local`,
-not `agent-pipeline`, so the selector `pipeline-core@agent-pipeline` cannot
-resolve from it. `claude plugin marketplace list` renders such a
-GitHub-sourced entry as `Source: GitHub (<org>/<repo>)`, distinguishable
-from a directory-sourced entry showing its path — but no add sequence
-starting from this repository's own manifest reaches the released selector
-id as it currently stands. The released row of the Identities table above
-describes the intended target state of normal operation (a marketplace
-already registered under the name `agent-pipeline` from an authoritative
-distribution source), not a sequence an operator can reach today by
-re-adding this checkout's own remote.
+Before ADR-0052, there was no verified command sequence in this document for
+reaching the released identity (`pipeline-core@agent-pipeline`) by re-adding
+this repository's own GitHub source, because this repository's own published
+manifest self-named `agent-pipeline-local` instead. That limitation is
+resolved: this checkout's manifest now correctly self-names `agent-pipeline`,
+so both the official GitHub-sourced marketplace and a directory-sourced
+registration of this checkout itself resolve under the released selector —
+see "Reaching the released selector from this checkout" above.
 
 Restart the session after any marketplace or install change and re-run the
 readback contract before starting further sessions. Repository state and

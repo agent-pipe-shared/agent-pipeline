@@ -18,11 +18,15 @@ release and delete the candidate cache while another session is using it.
 | Normal operation, consumer repositories, and post-release validation | `pipeline-core@agent-pipeline` | The official Git marketplace |
 
 Exactly one selector may be enabled while testing. The local marketplace root
-must be an absolute physical directory containing
-`.claude-plugin/marketplace.json` with name `agent-pipeline-local` and the
-candidate at `plugins/pipeline-core`. Its plugin manifest must carry a fresh
-Codex cachebuster. Do not repoint the `agent-pipeline` marketplace name to a
-checkout and do not use a local candidate through the released selector.
+must be an absolute physical directory **separate from any checkout** (a
+checkout's own root now correctly self-names `agent-pipeline`, the released
+identity — see [ADR-0052](adr/0052-marketplace-identity-restoration-and-local-dev-separation.md))
+containing `.claude-plugin/marketplace.json` with name `agent-pipeline-local`
+and `plugins/pipeline-core` as a symlink (or, on native Windows, a directory
+junction via `mklink /J`) to the checkout's real `plugins/pipeline-core`. Its
+plugin manifest must carry a fresh Codex cachebuster. Do not repoint the
+`agent-pipeline` marketplace name to a checkout and do not use a local
+candidate through the released selector.
 
 This is a host-wide selection for every repository served by the shared Codex
 App Server. It is not an onboarding choice and cannot provide simultaneous
