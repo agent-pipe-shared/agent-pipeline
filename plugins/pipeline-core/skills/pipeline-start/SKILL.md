@@ -32,7 +32,7 @@ Print only after a ready result:
 
 For local development also print:
 
-`Agent Pipeline source: local-development · registered local Codex marketplace`
+`Agent Pipeline source: local-development · registered local marketplace`
 
 ## Normal bootstrap command sequence
 
@@ -71,9 +71,9 @@ change.
    `rg … | rg …` or `rg … | head -n 1..500` diagnostics. Treat
    `executionBoundary: "host-authorized-wsl"` as a mandatory
    host execution profile: submit the exact returned action directly at that
-   boundary, including every Git observation, and never first retry it in the
-   Codex workspace sandbox. Keep that routing authoritative and never probe
-   both sandbox and host views. Runner-owned structured `executable`/`argv`
+   boundary, including every Git observation, and keep that routing
+   authoritative. For Codex, never first retry it in the Codex workspace
+   sandbox and never probe both sandbox and host views. Runner-owned structured `executable`/`argv`
    actions are primary; any human copy-only rendering must use a tested native
    Bash/zsh, PowerShell or cmd.exe renderer with explicit safe continuation,
    not a visually wrapped long command.

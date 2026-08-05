@@ -3670,6 +3670,7 @@ const PO_DECISION_PLAN_SCHEMA = "pipeline.po-authority-decision-plan.v1";
 const PO_DECISION_SELECTION_SCHEMA = "pipeline.po-authority-selection.v1";
 const PO_REBIND_LOCK_TOKEN = "pipeline-po-authority-rebind-v1";
 const PO_REBIND_TXN_SCHEMA = "pipeline.po-authority-rebind-transaction.v1";
+const PO_REBIND_RUNNERS = new Set(["claude", "codex"]);
 const TECHNICAL_SPEC_MARKER_RE = /^<!-- technical-spec-sha256: ([a-f0-9]{64}) -->$/gmu;
 const PO_LANGUAGE_MARKER_RE = /^<!-- po-language: (de|en) -->$/gmu;
 const PO_PROFILE_SCHEMA = "pipeline.po-gate-authority-evidence.v1";
@@ -4075,10 +4076,21 @@ function buildPoAuthorityDecisionPlan(dir, deps, existing, plannedAt = deps.now?
   };
 }
 
+/**
+ * `--runner claude|codex` is optional and, unlike planSha256/plannedAt, is
+ * never part of the CAS/transaction digest tuple: it only tells this apply
+ * which lifecycle the in-transaction V4 readback observes (ADR-0051 class),
+ * never what the recovery writes. Absent, the caller falls back to its own
+ * CLI-entry-boundary environment read (mirrors worktree-create.mjs); present,
+ * an invalid value fails closed here rather than silently defaulting.
+ */
 function parsePoRebindApply(argv) {
-  if (argv.length !== 5 || argv[0] !== "--plan-sha256" || !SHA256_RE.test(argv[1])
+  if (argv.length !== 5 && argv.length !== 7) return null;
+  if (argv[0] !== "--plan-sha256" || !SHA256_RE.test(argv[1])
     || argv[2] !== "--updated-at" || !canonicalIso(argv[3]) || argv[4] !== "--activate") return null;
-  return { planSha256: argv[1], plannedAt: argv[3] };
+  if (argv.length === 5) return { planSha256: argv[1], plannedAt: argv[3] };
+  if (argv[5] !== "--runner" || !PO_REBIND_RUNNERS.has(argv[6])) return null;
+  return { planSha256: argv[1], plannedAt: argv[3], runner: argv[6] };
 }
 
 function parsePoDecisionSelection(argv) {
@@ -4208,15 +4220,28 @@ function recoverRebindTransaction(dir, planSha256, nonce, io, stateIo) {
   return { ok: true, kind: "rolled-back" };
 }
 
+/**
+ * Resolve the invoking runner for the rebind-apply recovery (ADR-0051 class)
+ * at this CLI entry boundary: an explicit --runner (already validated by
+ * parsePoRebindApply) always wins; absent one, the ambient CLAUDECODE marker
+ * is the legitimate source here, mirroring worktree-create.mjs's
+ * resolveRunner. The in-transaction V4 inspection itself never reads the
+ * environment -- it only receives this already-resolved value.
+ */
+function resolvePoRebindRunner(explicitRunner, env) {
+  return explicitRunner ?? (env.CLAUDECODE === "1" ? "claude" : "codex");
+}
+
 function runPoAuthorityRebindCommand(sub, rest, deps) {
   if (sub === "po-authority-rebind-plan" && rest.length !== 0) { console.error("Error: PO authority rebind plan takes no arguments."); return 2; }
   const apply = sub === "po-authority-rebind-apply" ? parsePoRebindApply(rest) : null;
-  if (sub === "po-authority-rebind-apply" && apply === null) { console.error("Error: PO authority rebind apply requires --plan-sha256 <sha256> --updated-at <ISO-8601> --activate."); return 2; }
+  if (sub === "po-authority-rebind-apply" && apply === null) { console.error("Error: PO authority rebind apply requires --plan-sha256 <sha256> --updated-at <ISO-8601> --activate [--runner claude|codex]."); return 2; }
   if (sub === "po-authority-rebind-plan" && existsSync(rebindTransactionPath(deps.dir))) {
     console.error("Error: PO authority rebind recovery is pending; replay the exact previously confirmed apply action.");
     return 2;
   }
   if (sub === "po-authority-rebind-apply") {
+    const runner = resolvePoRebindRunner(apply.runner, deps.env ?? process.env);
     const lock = acquireContinuityLock(deps.dir, PO_REBIND_LOCK_TOKEN, deps);
     if (!lock.ok) { console.error(`Error: PO authority rebind refused (${lock.code}); zero mutation.`); return 2; }
     try {
@@ -4225,7 +4250,7 @@ function runPoAuthorityRebindCommand(sub, rest, deps) {
       const recovered = recoverRebindTransaction(deps.dir, apply.planSha256, lock.ownerNonce, io, stateIo);
       if (!recovered.ok) { console.error(`Error: PO authority rebind recovery refused (${recovered.code}); zero new mutation.`); return 2; }
       if (recovered.kind === "rolled-back") { console.error("Error: PO authority rebind recovered its interrupted transaction; regenerate and confirm a new plan."); return 2; }
-      return runPoAuthorityRebindApply(apply, deps, lock, io, stateIo);
+      return runPoAuthorityRebindApply(apply, deps, lock, io, stateIo, { runner });
     } finally { releaseContinuityLock(lock); }
   }
   const existing = readStateRaw(deps.dir);
@@ -4389,6 +4414,10 @@ function runPoAuthorityRebindApply(apply, deps, lock, io, stateIo, {
   buildPlan = buildPoAuthorityRebindPlan,
   resultSchema = "pipeline.po-authority-rebind-apply.v1",
   resultCode = "PO-REBIND-APPLIED",
+  // Left undefined for the po-authority-decision-apply caller, which passes
+  // no runner: inspectV4 below then falls through to inspectProjectOnboardingV3's
+  // own "codex" default, preserving that path's prior behavior unchanged.
+  runner,
 } = {}) {
   const existing = readStateRaw(deps.dir);
   const planned = buildPlan(deps.dir, deps, existing, apply.plannedAt);
@@ -4470,7 +4499,7 @@ function runPoAuthorityRebindApply(apply, deps, lock, io, stateIo, {
     const inspectV4 = deps.v4Inspection
       ?? ((request) => inspectProjectOnboardingV3({ ...request, deps: inTransactionV4Deps }));
     const v4Readbacks = ["bootstrap", "session", "dispatch"]
-      .map((intent) => inspectV4({ rootDir: deps.dir, intent, deps: inTransactionV4Deps }));
+      .map((intent) => inspectV4({ rootDir: deps.dir, intent, runner, deps: inTransactionV4Deps }));
     const expectedAuthority = postimage.poGateAuthority ?? postimage.authority;
     const postimageEvidence = {
       schema: "pipeline.po-authority-postimage-readback.v1",
@@ -4534,8 +4563,8 @@ function runPoAuthorityRebindApply(apply, deps, lock, io, stateIo, {
 
 /**
  * Runs the CLI logic. Never calls process.exit itself (testable); returns the exit
- * code. `deps` allows tests to inject `dir`, `now`, and `gitHead` without touching the
- * real filesystem/clock/git.
+ * code. `deps` allows tests to inject `dir`, `now`, `gitHead`, and `env` without
+ * touching the real filesystem/clock/git/environment.
  */
 export function run(argv = process.argv.slice(2), deps = {}) {
   const dir = deps.dir ?? projectDir();
