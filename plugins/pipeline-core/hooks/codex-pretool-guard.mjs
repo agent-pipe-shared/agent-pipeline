@@ -316,7 +316,12 @@ if (lifecycleShouldRun) {
     denials.push({ guard: lifecycleGuard, reason: remembered.reason });
     diagnostic("native-hook-failure-suppressed", { guard: lifecycleGuard, code: remembered.code });
   } else {
-  const lifecycle = boundedSpawn(process.execPath, [LIFECYCLE_GUARD], {
+  // Authoritative, not inferred (ADR-0051): guard-lifecycle-ready.mjs is
+  // registered only as a Codex hook target (codex-hooks.json), never a
+  // Claude Code one, and this boundedSpawn is its only production caller.
+  // A stray CLAUDECODE=1 inherited from the propagated environment below
+  // must not silently reassign the runner the spawned guard admits under.
+  const lifecycle = boundedSpawn(process.execPath, [LIFECYCLE_GUARD, "--runner", "codex"], {
     cwd: projectRoot,
     env: { ...process.env, CLAUDE_PROJECT_DIR: projectRoot },
     encoding: "utf8",

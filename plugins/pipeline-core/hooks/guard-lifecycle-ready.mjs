@@ -60,6 +60,7 @@ const PO_HUMAN_APPROVAL_SCRIPT = fileURLToPath(new URL("../scripts/po-human-appr
 const PO_APPROVAL_GATE_SCRIPT = fileURLToPath(new URL("../scripts/po-approval-gate.mjs", import.meta.url));
 const RESTART_RESUME_HINT_INPUT_PATH = "project/.resume-hint-input.json";
 const HEX = /^[a-f0-9]{64}$/u;
+const VALID_RUNNERS = new Set(["claude", "codex"]);
 const HOST_INIT_CROSS_VIEW_STATUSES = new Set([
   "repository-mount-read-only",
   "repository-control-path-invalid",
@@ -164,6 +165,12 @@ function externalPoSigningOnly() {
     "EXTERNAL ACTION REQUIRED (guard-lifecycle-ready, plugin pipeline-core): "
       + "PO setup and approve are human-terminal actions; the agent may prepare and verify only public request/proof artifacts.\n",
   );
+}
+
+/** Read an explicit `--runner <value>` from this process's own argv (ADR-0051). */
+function runnerFromArgv(argv) {
+  const index = argv.indexOf("--runner");
+  return index === -1 ? null : (argv[index + 1] ?? null);
 }
 
 function pathInside(root, target) {
@@ -850,6 +857,7 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
     receipt = (dependencies.requireProjectOnboardingReadyFn ?? requireProjectOnboardingReady)({
       rootDir: root,
       intent: "session",
+      runner: dependencies.runner,
     });
   } catch (error) {
     // Codex 0.145 may execute PreToolUse against the physical host Git
@@ -909,18 +917,32 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
 }
 
 export function main(rawInput = undefined, dependencies = {}) {
+  const writeError = dependencies.writeErrorFn ?? ((value) => process.stderr.write(value));
   let input;
   try {
     const raw = rawInput ?? readFileSync(0, "utf8");
     input = typeof raw === "string" ? JSON.parse(raw) : raw;
   } catch {
     const result = blocked();
-    (dependencies.writeErrorFn ?? ((value) => process.stderr.write(value)))(result.stderr);
+    writeError(result.stderr);
     return result.exitCode;
   }
-  const result = evaluateLifecycleReadyGuard(input, dependencies);
+  // Runner identity is threaded explicitly at this CLI boundary (ADR-0051):
+  // read from this process's own argv, never from the ambient environment.
+  // guard-lifecycle-ready.mjs has exactly one production caller
+  // (codex-pretool-guard.mjs's boundedSpawn), which always supplies
+  // `--runner codex`. An absent or invalid flag fails closed the same way
+  // any other unmet lifecycle precondition does -- it never silently
+  // defaults (backlog: ready-gate-env-var-runner-authority).
+  const runner = dependencies.runner ?? runnerFromArgv(dependencies.argv ?? process.argv.slice(2));
+  if (!VALID_RUNNERS.has(runner)) {
+    const result = blocked();
+    writeError(result.stderr);
+    return result.exitCode;
+  }
+  const result = evaluateLifecycleReadyGuard(input, { ...dependencies, runner });
   if (result.stderr) {
-    (dependencies.writeErrorFn ?? ((value) => process.stderr.write(value)))(result.stderr);
+    writeError(result.stderr);
   }
   return result.exitCode;
 }

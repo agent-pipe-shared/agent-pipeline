@@ -25,6 +25,7 @@ import {
   isProjectWritePath,
   isReadOnlyDiagnosticCommand,
   isSanctionedLifecycleCommand,
+  main,
   retryActionsForDeniedCommand,
 } from "./guard-lifecycle-ready.mjs";
 import {
@@ -120,19 +121,20 @@ test("source, calibration, lock, and runtime-only markers activate exact session
   }
 });
 
-test("exact session readiness allows the governed project write", () => {
+test("exact session readiness allows the governed project write and threads the caller-supplied runner explicitly", () => {
   const path = root();
   const calls = [];
   try {
     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
     assert.deepEqual(evaluateLifecycleReadyGuard(edit(), {
       projectDir: path,
+      runner: "codex",
       requireProjectOnboardingReadyFn(options) {
         calls.push(options);
         return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
       },
     }), { exitCode: 0, stderr: "" });
-    assert.deepEqual(calls, [{ rootDir: path, intent: "session" }]);
+    assert.deepEqual(calls, [{ rootDir: path, intent: "session", runner: "codex" }]);
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
@@ -1001,5 +1003,51 @@ test("H3 recovery commands admit only exact plugin-local argv and reject lookali
       `${base} plan-manifest-repair --root ${path}; touch ${path}/x`,
       `node ${join(path, "plugins/pipeline-core/scripts/project-onboarding-v3.mjs")} plan-manifest-repair --root ${path}`,
     ]) assert.equal(isSanctionedLifecycleCommand(hostile, path), false, hostile);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("main() reads --runner from its own argv and reaches the gate with codex even when CLAUDECODE=1 is present in its environment (regression pin for ready-gate-env-var-runner-authority)", () => {
+  const path = root();
+  const had = Object.prototype.hasOwnProperty.call(process.env, "CLAUDECODE");
+  const previous = process.env.CLAUDECODE;
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    // A Codex session spawned from inside a Claude Code Bash tool inherits
+    // CLAUDECODE=1 in its ambient environment; this must not change which
+    // runner's exemptions this invocation is admitted under.
+    process.env.CLAUDECODE = "1";
+    let seenRunner = null;
+    const exitCode = main(JSON.stringify(edit()), {
+      argv: ["--runner", "codex"],
+      projectDir: path,
+      requireProjectOnboardingReadyFn(options) {
+        seenRunner = options.runner;
+        return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+      },
+      writeErrorFn() {},
+    });
+    assert.equal(seenRunner, "codex");
+    assert.equal(exitCode, 0);
+  } finally {
+    if (had) process.env.CLAUDECODE = previous; else delete process.env.CLAUDECODE;
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+test("main() fails closed on an absent or invalid --runner without ever inspecting lifecycle readiness", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const argv of [[], ["--runner"], ["--runner", "claude-code"], ["--runner", ""], ["--runner", "windows"]]) {
+      let calls = 0;
+      const exitCode = main(JSON.stringify(edit()), {
+        argv,
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { calls += 1; },
+        writeErrorFn() {},
+      });
+      assert.equal(exitCode, 2, JSON.stringify(argv));
+      assert.equal(calls, 0, JSON.stringify(argv));
+    }
   } finally { rmSync(path, { recursive: true, force: true }); }
 });

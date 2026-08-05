@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -120,6 +120,37 @@ check("Move to is accepted only after Update File", () => {
   blocked(run("*** Begin Patch\n*** Move to: src/new.mjs\n*** End Patch"), /without a preceding Update File/);
   blocked(run("*** Begin Patch\n*** Add File: src/a.mjs\n*** Move to: src/b.mjs\n*** End Patch"), /without a preceding Update File/);
   blocked(run("*** Begin Patch\n*** Update File: src/a.mjs\n*** Move to: src/b.mjs\n*** Move to: src/c.mjs\n*** End Patch"), /without a preceding Update File/);
+});
+
+check("only guard-lifecycle-ready.mjs receives an explicit --runner codex argument; guard-testpath.mjs and guard-devplan.mjs keep their bare argv", () => {
+  const source = readFileSync(guard, "utf8");
+  const guardsBlock = source.slice(source.indexOf("const GUARDS ="), source.indexOf("function block("));
+  assert.match(guardsBlock, /guard-testpath\.mjs.*args:\s*\[\]/su);
+  assert.match(guardsBlock, /guard-devplan\.mjs.*args:\s*\[\]/su);
+  assert.match(guardsBlock, /guard-lifecycle-ready\.mjs.*args:\s*\["--runner",\s*"codex"\]/su);
+});
+
+check("the lifecycle guard is invoked per patched path with an explicit codex runner even when CLAUDECODE=1 is present in its environment (regression pin for ready-gate-env-var-runner-authority, second production caller)", () => {
+  const root = fixture();
+  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  const patch = "*** Begin Patch\n*** Update File: src/a.mjs\n*** End Patch";
+  const input = JSON.stringify({ tool_name: "apply_patch", tool_input: { command: patch } });
+  const result = spawnSync(process.execPath, [guard], {
+    cwd: root,
+    env: { ...process.env, CLAUDE_PROJECT_DIR: root, CLAUDECODE: "1" },
+    encoding: "utf8",
+    input,
+  });
+  // A malformed/absent --runner makes guard-lifecycle-ready.mjs's own main()
+  // fail closed before ever reaching the gate, which surfaces only the
+  // generic "exact V4 ready result" message with no typed lifecycle status.
+  // Reaching the specific "session readiness is <status>" message proves an
+  // explicit, valid runner was threaded through and the gate was actually
+  // consulted -- despite CLAUDECODE=1 being present in the environment.
+  assert.equal(result.status, 2, result.stderr);
+  assert.match(result.stderr, /guard-lifecycle-ready/);
+  assert.match(result.stderr, /Pipeline session readiness is/u);
+  assert.doesNotMatch(result.stderr, /exact V4 ready result for session intent/u);
 });
 
 if (process.exitCode) process.exit(process.exitCode);

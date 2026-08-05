@@ -87,6 +87,16 @@ function invoke(argv, dependencies = {}) {
   return { code, output: output === "" ? null : JSON.parse(output) };
 }
 
+function invokeWithEnv(argv, env, dependencies = {}) {
+  let output = "";
+  const code = sessionCleanupMain(argv, env, {
+    requireProjectOnboardingReadyFn() { return { status: "ready" }; },
+    writeFn(value) { output += value; },
+    ...dependencies,
+  });
+  return { code, output: output === "" ? null : JSON.parse(output) };
+}
+
 test("human recovery plan is read-only when automatic cleanup observation is unavailable", () => {
   const root = fixture("human-recovery-plan");
   try {
@@ -195,6 +205,74 @@ test("start binds once, resumes the exact descriptor and rotates only after clos
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("start honors an explicit --runner over the CLAUDECODE-derived boundary default", () => {
+  const root = fixture("runner-flag");
+  try {
+    let seenRunner = null;
+    invokeWithEnv(["start", "--repo", root, "--session", "session-runner-flag", "--runner", "claude"], { CLAUDECODE: "1" }, {
+      requireProjectOnboardingReadyFn(options) { seenRunner = options.runner; return { status: "ready" }; },
+    });
+    assert.equal(seenRunner, "claude", "explicit --runner is honored regardless of what CLAUDECODE would derive");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("start derives the boundary runner from CLAUDECODE when --runner is absent, and fails closed on an invalid explicit value", () => {
+  const claudeRoot = fixture("runner-default-claude");
+  const codexRoot = fixture("runner-default-codex");
+  const invalidRoot = fixture("runner-default-invalid");
+  try {
+    let seenRunner = null;
+    invokeWithEnv(["start", "--repo", claudeRoot, "--session", "session-runner-default-claude"], { CLAUDECODE: "1" }, {
+      requireProjectOnboardingReadyFn(options) { seenRunner = options.runner; return { status: "ready" }; },
+    });
+    assert.equal(seenRunner, "claude", "absent --runner derives claude from CLAUDECODE=1");
+
+    seenRunner = null;
+    invokeWithEnv(["start", "--repo", codexRoot, "--session", "session-runner-default-codex"], {}, {
+      requireProjectOnboardingReadyFn(options) { seenRunner = options.runner; return { status: "ready" }; },
+    });
+    assert.equal(seenRunner, "codex", "absent --runner and absent CLAUDECODE derives codex");
+
+    let calls = 0;
+    assert.throws(
+      () => invokeWithEnv(["start", "--repo", invalidRoot, "--session", "session-runner-bad", "--runner", "windows"], {}, {
+        requireProjectOnboardingReadyFn() { calls += 1; return { status: "ready" }; },
+      }),
+      /Invalid --runner/,
+    );
+    assert.equal(calls, 0, "an invalid explicit --runner must fail before readiness is ever inspected");
+  } finally {
+    rmSync(claudeRoot, { recursive: true, force: true });
+    rmSync(codexRoot, { recursive: true, force: true });
+    rmSync(invalidRoot, { recursive: true, force: true });
+  }
+});
+
+test("apply-privatization threads the explicit runner into its own bootstrap-intent readiness check", () => {
+  const root = fixture("apply-privatization-runner");
+  try {
+    let seenRunner = null;
+    const result = invokeWithEnv([
+      "apply-privatization", "--repo", root, "--plan-sha256", "a".repeat(64), "--activate", "--runner", "claude",
+    ], {}, {
+      applyOnboardingSessionCleanupPrivatizationFn() {
+        return { recovery: "owner-observation-recovery" };
+      },
+      requireProjectOnboardingReadyFn(options) {
+        seenRunner = options.runner;
+        throw new Error("simulate not-ready for this narrow observation branch");
+      },
+      readOnboardingSessionCleanupBindingFn() {
+        return { status: "unbound" };
+      },
+    });
+    assert.equal(seenRunner, "claude");
+    assert.equal(result.output.status, "blocked");
+    assert.equal(result.output.lifecycleStatus, "unavailable");
+    assert.equal(result.output.ownerObservation, "unavailable");
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 test("release-binding completes an interrupted post-cleanup State release", () => {

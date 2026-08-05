@@ -68,64 +68,74 @@ test("exact V4 ready is bound to the requested intent and returns one sanitized 
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
-test("an absent runner resolves from process.env.CLAUDECODE, not inspectProjectOnboardingV3's own Codex default", () => {
+test("the gate never reads process.env; a missing runner fails closed as PORG-RUNNER even with CLAUDECODE=1 set (regression pin for ready-gate-env-var-runner-authority)", () => {
   const path = root();
   try {
     withClaudecode("1", () => {
+      let calls = 0;
+      assert.throws(() => requireProjectOnboardingReady({
+        rootDir: path,
+        intent: "dispatch",
+        inspect() { calls += 1; return readyResult(path, "dispatch", "claude"); },
+      }), (error) => {
+        assert(error instanceof ProjectOnboardingReadyError);
+        assert.equal(error.code, "PORG-RUNNER");
+        assert.equal(error.intent, "dispatch");
+        return true;
+      });
+      assert.equal(calls, 0);
+    });
+
+    withClaudecode(undefined, () => {
+      let calls = 0;
+      assert.throws(() => requireProjectOnboardingReady({
+        rootDir: path,
+        intent: "dispatch",
+        inspect() { calls += 1; },
+      }), (error) => error instanceof ProjectOnboardingReadyError && error.code === "PORG-RUNNER");
+      assert.equal(calls, 0);
+    });
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("an unknown or malformed runner string fails closed as PORG-RUNNER", () => {
+  const path = root();
+  try {
+    for (const runner of [null, "", "Codex", "CLAUDE", "claude ", "windows", "claudecode", 42, {}, []]) {
+      let calls = 0;
+      assert.throws(() => requireProjectOnboardingReady({
+        rootDir: path,
+        intent: "dispatch",
+        runner,
+        inspect() { calls += 1; },
+      }), (error) => {
+        assert(error instanceof ProjectOnboardingReadyError);
+        assert.equal(error.code, "PORG-RUNNER");
+        assert.equal(error.intent, "dispatch");
+        return true;
+      });
+      assert.equal(calls, 0);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("the gate accepts \"claude\" and \"codex\" explicitly and threads the exact caller-supplied value to inspection", () => {
+  const path = root();
+  try {
+    for (const runner of ["claude", "codex"]) {
       let seenRunner = null;
       const result = requireProjectOnboardingReady({
         rootDir: path,
         intent: "dispatch",
+        runner,
         inspect(options) {
           seenRunner = options.runner;
-          return readyResult(path, "dispatch", "claude");
+          return readyResult(path, "dispatch", runner);
         },
       });
-      assert.equal(seenRunner, "claude");
+      assert.equal(seenRunner, runner);
       assert.equal(result.status, "ready");
-    });
-
-    withClaudecode(undefined, () => {
-      let seenRunner = null;
-      requireProjectOnboardingReady({
-        rootDir: path,
-        intent: "dispatch",
-        inspect(options) {
-          seenRunner = options.runner;
-          return readyResult(path, "dispatch", "codex");
-        },
-      });
-      assert.equal(seenRunner, "codex");
-    });
-
-    withClaudecode("0", () => {
-      let seenRunner = null;
-      requireProjectOnboardingReady({
-        rootDir: path,
-        intent: "dispatch",
-        inspect(options) {
-          seenRunner = options.runner;
-          return readyResult(path, "dispatch", "codex");
-        },
-      });
-      assert.equal(seenRunner, "codex");
-    });
-
-    // An explicit `runner` argument still wins over the env-derived default,
-    // even inside a session where CLAUDECODE=1 would otherwise resolve "claude".
-    withClaudecode("1", () => {
-      let seenRunner = null;
-      requireProjectOnboardingReady({
-        rootDir: path,
-        intent: "dispatch",
-        runner: "codex",
-        inspect(options) {
-          seenRunner = options.runner;
-          return readyResult(path, "dispatch", "codex");
-        },
-      });
-      assert.equal(seenRunner, "codex");
-    });
+    }
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
@@ -137,6 +147,7 @@ test("every controlling non-ready lifecycle status is preserved and denied witho
       assert.throws(() => requireProjectOnboardingReady({
         rootDir: path,
         intent: "session",
+        runner: "codex",
         inspect: () => ({
           ...readyResult(path, "session"),
           status,
@@ -173,12 +184,14 @@ test("exceptions, malformed envelopes, intent/root mismatch, and false-ready act
       assert.throws(() => requireProjectOnboardingReady({
         rootDir: path,
         intent: "dispatch",
+        runner: "codex",
         inspect: () => value,
       }), (error) => error instanceof ProjectOnboardingReadyError && error.code === "PORG-INVALID-OBSERVATION");
     }
     assert.throws(() => requireProjectOnboardingReady({
       rootDir: path,
       intent: "dispatch",
+      runner: "codex",
       inspect: () => { throw new Error("secret absolute path /private/repo"); },
     }), (error) => {
       assert(error instanceof ProjectOnboardingReadyError);

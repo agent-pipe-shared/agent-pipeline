@@ -7,9 +7,15 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const GUARDS = [
-  fileURLToPath(new URL("./guard-testpath.mjs", import.meta.url)),
-  fileURLToPath(new URL("./guard-devplan.mjs", import.meta.url)),
-  fileURLToPath(new URL("./guard-lifecycle-ready.mjs", import.meta.url)),
+  { path: fileURLToPath(new URL("./guard-testpath.mjs", import.meta.url)), args: [] },
+  { path: fileURLToPath(new URL("./guard-devplan.mjs", import.meta.url)), args: [] },
+  // Authoritative, not inferred (ADR-0051): guard-lifecycle-ready.mjs is
+  // reachable only through this script, which is itself spawned only from
+  // codex-pretool-guard.mjs (a Codex-only hook target, registered in no hook
+  // config of either runner). A stray CLAUDECODE=1 inherited via the
+  // propagated environment below must not silently reassign the runner this
+  // per-file admission decision is made for.
+  { path: fileURLToPath(new URL("./guard-lifecycle-ready.mjs", import.meta.url)), args: ["--runner", "codex"] },
 ];
 function block(reason) {
   process.stderr.write(`BLOCKED (guard-apply-patch, plugin pipeline-core): ${reason}\n`);
@@ -62,7 +68,7 @@ let exitCode = 0;
 const stderr = [];
 for (const filePath of paths) {
   for (const guard of GUARDS) {
-    const result = spawnSync(process.execPath, [guard], {
+    const result = spawnSync(process.execPath, [guard.path, ...guard.args], {
       cwd: process.cwd(), env: process.env, encoding: "utf8",
       input: JSON.stringify({ tool_name: "Edit", tool_input: { file_path: filePath } }),
       shell: false,

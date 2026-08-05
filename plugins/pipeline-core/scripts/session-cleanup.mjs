@@ -68,6 +68,12 @@ Mutating commands require a local --session-descriptor or
 PIPELINE_SESSION_OWNER_NONCE/--owner-nonce-file <0600-file>. Cleanup validates
 the complete manifest before removing any target. Hygiene is read-only and emits
 a redacted receipt.
+
+Every command accepts an optional --runner claude|codex, naming the invoking
+runner explicitly for the project-onboarding readiness gate (ADR-0051). When
+omitted, this CLI entry boundary derives it from CLAUDECODE in its own
+environment, mirroring pipeline-start-preflight.mjs; an explicit --runner
+always wins and an invalid explicit value fails closed.
 `;
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SESSION_POWER_SCRIPT = join(HERE, "session-power.mjs");
@@ -196,14 +202,14 @@ function parseArgs(argv) {
     if (name in flags) throw new Error(`Duplicate option: ${key}`);
     flags[name] = value;
   }
-  const common = new Set(["repo", "session", "session-descriptor", "expected-descriptor-sha256", "owner-nonce-file"]);
+  const common = new Set(["repo", "session", "session-descriptor", "expected-descriptor-sha256", "owner-nonce-file", "runner"]);
   const extra = command === "register-intent" ? ["resource-id", "type", "path", "content-class", "policy"]
     : new Set(["finalize", "seal"]).has(command) ? ["resource-id", "canary"] : [];
-  const allowed = command === "start" ? new Set(["repo", "session"])
-    : new Set(["status", "release-binding"]).has(command) ? new Set(["repo"])
-      : new Set(["plan-recovery", "plan-human-recovery", "plan-privatization"]).has(command) ? new Set(["repo"])
-      : command === "confirm-privatization" ? new Set(["repo", "plan-sha256", "accept"])
-      : new Set(["apply-recovery", "apply-privatization"]).has(command) ? new Set(["repo", "plan-sha256", "activate"])
+  const allowed = command === "start" ? new Set(["repo", "session", "runner"])
+    : new Set(["status", "release-binding"]).has(command) ? new Set(["repo", "runner"])
+      : new Set(["plan-recovery", "plan-human-recovery", "plan-privatization"]).has(command) ? new Set(["repo", "runner"])
+      : command === "confirm-privatization" ? new Set(["repo", "plan-sha256", "accept", "runner"])
+      : new Set(["apply-recovery", "apply-privatization"]).has(command) ? new Set(["repo", "plan-sha256", "activate", "runner"])
       : new Set([...common, ...extra]);
   for (const name of Object.keys(flags)) if (!allowed.has(name)) throw new Error(`Unknown option: --${name}`);
   return { command, flags };
@@ -212,6 +218,24 @@ function parseArgs(argv) {
 function required(flags, name) {
   if (!flags[name]) throw new Error(`Missing --${name}\n${USAGE}`);
   return flags[name];
+}
+
+const RUNNERS = new Set(["claude", "codex"]);
+
+/**
+ * Resolve the invoking runner at this CLI entry boundary (ADR-0051): an
+ * explicit --runner always wins; absent one, the ambient CLAUDECODE marker is
+ * the legitimate source here (mirrors pipeline-start-preflight.mjs), and the
+ * resolved value becomes an explicit argument to the gate from this point on
+ * -- the gate itself never reads the environment
+ * (ready-gate-env-var-runner-authority).
+ */
+function resolveRunner(flags, env) {
+  if (flags.runner !== undefined) {
+    if (!RUNNERS.has(flags.runner)) throw new Error(`Invalid --runner: ${flags.runner}\n${USAGE}`);
+    return flags.runner;
+  }
+  return env.CLAUDECODE === "1" ? "claude" : "codex";
 }
 
 function ownerNonce(flags, env) {
@@ -245,6 +269,7 @@ function sessionOwner(repo, flags, env) {
 export function main(argv = process.argv.slice(2), env = process.env, dependencies = {}) {
   const { command, flags } = parseArgs(argv);
   const repo = required(flags, "repo");
+  const runner = resolveRunner(flags, env);
   const requireReady = dependencies.requireProjectOnboardingReadyFn ?? requireProjectOnboardingReady;
   const startDescriptor = dependencies.startSessionDescriptorFn ?? startSessionDescriptor;
   const checkHygiene = dependencies.checkSessionHygieneFn ?? checkSessionHygiene;
@@ -306,7 +331,7 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
     if (output.recovery === "owner-observation-recovery") {
       let lifecycleReady = false;
       try {
-        requireReady({ rootDir: repo, intent: "bootstrap" });
+        requireReady({ rootDir: repo, intent: "bootstrap", runner });
         lifecycleReady = true;
       } catch {
         lifecycleReady = false;
@@ -345,7 +370,7 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
       accept: flags.accept === true,
     });
   } else if (command === "start") {
-    requireReady({ rootDir: repo, intent: "session" });
+    requireReady({ rootDir: repo, intent: "session", runner });
     const readBinding = dependencies.readOnboardingSessionCleanupBindingFn
       ?? readOnboardingSessionCleanupBinding;
     const bindCleanup = dependencies.bindOnboardingSessionCleanupFn

@@ -43,6 +43,7 @@ import {
   sealTemporaryResource,
   startSessionDescriptor,
 } from "./worktree-lifecycle.mjs";
+import { main as worktreeCreateMain } from "../scripts/worktree-create.mjs";
 
 let passed = 0;
 let failed = 0;
@@ -557,6 +558,45 @@ check("D0 worktree CLI denies unmanaged dispatch before creation while cleanup s
   assert.equal(receipt.status, "complete");
   assert.equal(existsSync(owned), false);
   assert.equal(JSON.stringify(receipt).includes(scratch), false);
+});
+
+check("D0 worktree CLI honors an explicit --runner over the CLAUDECODE-derived boundary default", () => {
+  const { primary } = repoFixture();
+  let seenRunner = null;
+  worktreeCreateMain(["branch", "--repo", primary, "--branch", "feat/runner-flag"], { CLAUDECODE: "1" }, {
+    requireProjectOnboardingReadyFn(options) { seenRunner = options.runner; },
+    createBranchWorktreeFn: () => ({}),
+    writeFn() {},
+  });
+  assert.equal(seenRunner, "claude", "absent --runner derives claude from CLAUDECODE=1");
+
+  seenRunner = null;
+  worktreeCreateMain(["branch", "--repo", primary, "--branch", "feat/runner-flag-2", "--runner", "codex"], { CLAUDECODE: "1" }, {
+    requireProjectOnboardingReadyFn(options) { seenRunner = options.runner; },
+    createBranchWorktreeFn: () => ({}),
+    writeFn() {},
+  });
+  assert.equal(seenRunner, "codex", "explicit --runner wins even when CLAUDECODE=1 would derive claude");
+});
+
+check("D0 worktree CLI derives the boundary runner from an absent CLAUDECODE and fails closed on an invalid explicit --runner", () => {
+  const { primary } = repoFixture();
+  let seenRunner = null;
+  worktreeCreateMain(["branch", "--repo", primary, "--branch", "feat/runner-default"], {}, {
+    requireProjectOnboardingReadyFn(options) { seenRunner = options.runner; },
+    createBranchWorktreeFn: () => ({}),
+    writeFn() {},
+  });
+  assert.equal(seenRunner, "codex", "absent --runner and absent CLAUDECODE derives codex");
+
+  let calls = 0;
+  assert.throws(
+    () => worktreeCreateMain(["branch", "--repo", primary, "--branch", "feat/runner-bad", "--runner", "windows"], {}, {
+      requireProjectOnboardingReadyFn() { calls += 1; },
+    }),
+    /Invalid --runner/,
+  );
+  assert.equal(calls, 0, "an invalid explicit --runner must fail before readiness is ever inspected");
 });
 
 check("D0 session descriptor is private, bound to one common dir and retires only after cleanup", () => {
