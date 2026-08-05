@@ -929,11 +929,12 @@ export function main(rawInput = undefined, dependencies = {}) {
   }
   // Runner identity is threaded explicitly at this CLI boundary (ADR-0051):
   // read from this process's own argv, never from the ambient environment.
-  // guard-lifecycle-ready.mjs has exactly one production caller
-  // (codex-pretool-guard.mjs's boundedSpawn), which always supplies
-  // `--runner codex`. An absent or invalid flag fails closed the same way
-  // any other unmet lifecycle precondition does -- it never silently
-  // defaults (backlog: ready-gate-env-var-runner-authority).
+  // guard-lifecycle-ready.mjs has exactly two production callers --
+  // codex-pretool-guard.mjs's boundedSpawn and guard-apply-patch.mjs's GUARDS
+  // spawn list -- both of which always supply `--runner codex`. An absent or
+  // invalid flag fails closed the same way any other unmet lifecycle
+  // precondition does -- it never silently defaults (backlog:
+  // ready-gate-env-var-runner-authority).
   const runner = dependencies.runner ?? runnerFromArgv(dependencies.argv ?? process.argv.slice(2));
   if (!VALID_RUNNERS.has(runner)) {
     const result = blocked();

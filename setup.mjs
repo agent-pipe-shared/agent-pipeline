@@ -173,10 +173,19 @@ const SETTINGS_JSON_PATH = join(ROOT_DIR, ".claude", "settings.json");
  *   its compiled files in `.claude/` -- running setup never silently
  *   migrates a consumer to the neutral tier -- and a neutral-tier project's
  *   compiled files land in `project/`.
- * - `missing` (a pristine project with no authority manifest at either tier
- *   yet): deliberately seeded at the neutral tier. The runner-neutral tier
- *   is the direction of travel, and no code path was found that requires a
- *   brand-new project to start on the legacy tier.
+ * - `missing` (per the resolver, no *manifest* -- pipeline.yaml -- exists at
+ *   either tier yet): the resolver keys this status off the manifest only
+ *   (`readLayer`/`authority()` in project-authority.mjs), so it does not by
+ *   itself distinguish a genuinely pristine project from a project that
+ *   already has a legacy *calibration* (`.claude/pipeline.json`) but never
+ *   adopted the optional manifest (CLAUDE.md documents the manifest as
+ *   "optional, additive" -- a legacy consumer that skipped it is the
+ *   expected case, not an exotic one). Seeding such a project at the neutral
+ *   tier would orphan that live, still-read `.claude/pipeline.json` -- the
+ *   exact drift class this ADR's Context section exists to prevent -- so a
+ *   present legacy calibration file keeps this project on the legacy tier;
+ *   the neutral tier is used only when no legacy calibration exists either,
+ *   i.e. the project is genuinely pristine. Covered by dedicated tests.
  * - any other resolver status (`unsafe`, `migration-required`, `mixed`,
  *   `invalid-root`, `invalid`): the on-disk authority state is already
  *   ambiguous or broken. This generator does not attempt to repair that
@@ -193,6 +202,13 @@ export function resolveCompiledRuntimeTargets(rootDir = ROOT_DIR) {
     };
   }
   if (resolved.status === "missing") {
+    if (existsSync(join(rootDir, LEGACY_CALIBRATION))) {
+      return {
+        source: "legacy",
+        calibrationPath: join(rootDir, LEGACY_CALIBRATION),
+        manifestPath: join(rootDir, LEGACY_MANIFEST),
+      };
+    }
     return {
       source: "neutral",
       calibrationPath: join(rootDir, NEUTRAL_CALIBRATION),

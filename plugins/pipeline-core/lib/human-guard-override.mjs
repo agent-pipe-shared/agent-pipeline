@@ -153,6 +153,23 @@ function controlPathTopology(root) {
   return { root: physical, common };
 }
 
+// Reachability note (Critic finding F1, dispatch CRITIC-REMEDY-09): the
+// separate local marketplace root ADR-0052 prescribes for local development
+// carries a symlink at ITS OWN `plugins/pipeline-core` entry, pointing back
+// at a checkout's real source directory. That symlink is never walked here.
+// `sourceRoot` below is always `<repo.root>/plugins/pipeline-core` where
+// `repo.root` is the checkout's own physical top-level (`physicalRoot()`
+// above always resolves and rejects a symlinked result), and
+// `localPluginInstallSourceObservation()` already requires that exact
+// directory itself to be a real, non-symlinked entry before calling this
+// function. The external local-marketplace root can never become `repo.root`
+// either: `isPipelineSourceRoot()` also requires `harness/scripts/verify.mjs`
+// to exist alongside it, which the local-marketplace root (containing only
+// `.claude-plugin/marketplace.json` and the symlink) never has. So the
+// ADR-0052 symlink arrangement is structurally outside the tree this
+// function ever walks; the hard-fail on an internal symlink stays exactly as
+// strict as before -- it still fail-closes if a checkout's own source tree
+// is tampered with to contain one.
 function pluginSourceTreeSha256(sourceRoot) {
   const entries = [];
   const visit = (directory, prefix = "") => {
@@ -195,7 +212,17 @@ function localPluginInstallSourceObservation(repo) {
   let marketplaceValue;
   try { marketplaceValue = JSON.parse(readFileSync(marketplace, "utf8")); }
   catch { fail("HGO-PLUGIN-SOURCE", "local marketplace declaration is malformed"); }
-  const registered = marketplaceValue?.name === "agent-pipeline-local"
+  // ADR-0052: this checkout's OWN `.claude-plugin/marketplace.json` self-names
+  // the published identity `agent-pipeline`, never `agent-pipeline-local` --
+  // that name is reserved for the separate, external local-marketplace root
+  // the ADR mandates, which is deliberately not a committed path this
+  // function can discover or inspect. This check therefore attests that the
+  // checkout's own manifest is intact and still declares the exact
+  // `pipeline-core` -> `./plugins/pipeline-core` binding, not that it IS the
+  // local marketplace consulted by `codex plugin add
+  // pipeline-core@agent-pipeline-local` (the tree hash below is the actual
+  // content attestation; this is the checkout-identity attestation).
+  const registered = marketplaceValue?.name === "agent-pipeline"
     && Array.isArray(marketplaceValue?.plugins)
     && marketplaceValue.plugins.some((entry) => entry?.name === "pipeline-core" && entry?.source === "./plugins/pipeline-core");
   if (!registered) fail("HGO-PLUGIN-SOURCE", "local marketplace does not bind pipeline-core");
@@ -1632,4 +1659,11 @@ export const humanGuardOverrideInternals = {
   eligibility,
   secureDirectory,
   safePrivateFile,
+  // Exposed only so Full Verify can directly exercise the local-plugin-install
+  // attestation against THIS repository's own, real .claude-plugin/marketplace.json
+  // and plugins/pipeline-core tree (Critic finding F1, dispatch CRITIC-REMEDY-09) --
+  // without this, the suite's synthetic fixtures could never observe a regression
+  // in the real repository manifest.
+  isPipelineSourceRoot,
+  localPluginInstallSourceObservation,
 };

@@ -623,6 +623,27 @@ for (const [name, source] of [
   rmSync(root, { recursive: true, force: true });
 }
 {
+  // F2 (Critic dispatch CRITIC-REMEDY-09): the resolver's "missing" status is
+  // keyed off the manifest (pipeline.yaml) only -- a project holding only a
+  // legacy calibration (.claude/pipeline.json), never having adopted the
+  // optional manifest, also resolves as "missing". Seeding that project at
+  // the neutral tier would orphan its live .claude/pipeline.json; it must
+  // stay on the legacy tier instead, exactly like a "ready"/legacy project.
+  const root = mkdtempSync(join(tmpdir(), "setup-targets-missing-with-legacy-calibration-"));
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  writeFileSync(join(root, ".claude", "pipeline.json"), "{}\n");
+  const targets = resolveCompiledRuntimeTargets(root);
+  ok(
+    "resolveCompiledRuntimeTargets: a 'missing'-status project with only a legacy calibration (no manifest anywhere) still gets .claude/ write targets, not orphaned onto project/",
+    targets.source === "legacy"
+      && targets.calibrationPath === join(root, ".claude", "pipeline.json")
+      && targets.manifestPath === join(root, ".claude", "pipeline.yaml")
+      && !existsSync(join(root, "project")),
+    JSON.stringify(targets),
+  );
+  rmSync(root, { recursive: true, force: true });
+}
+{
   const root = mkdtempSync(join(tmpdir(), "setup-targets-pristine-"));
   const targets = resolveCompiledRuntimeTargets(root);
   ok(

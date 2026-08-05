@@ -63,6 +63,29 @@ independent of its write path: `migrateAgentsAdapter()` (the
 flow, both of which `readFileSync(join(rootDir, ".claude", "pipeline.yaml"))`
 directly rather than through the resolver.
 
+**Remediation note (2026-08-06, Critic finding F2, dispatch
+CRITIC-REMEDY-09):** an independent T1 Critic review established that the
+resolver's `missing` status (`project-authority.mjs`, `readLayer()`/
+`authority()`) is keyed off the *manifest* (`pipeline.yaml`) alone at both
+tiers; it does not by itself distinguish a genuinely pristine project from a
+project that already holds a legacy *calibration* (`.claude/pipeline.json`)
+but never adopted the optional manifest (CLAUDE.md documents the manifest as
+"optional, additive" -- a legacy consumer that skipped it is the expected
+case, not an exotic one; reproduced with a fixture holding only
+`.claude/pipeline.json` and `.claude/settings.json`). Decision 1's `missing`
+mapping, read literally against `resolveProjectAuthorityPaths()`'s status
+alone, would have seeded such a project at the neutral tier and orphaned its
+live `.claude/pipeline.json` -- exactly the drift class this ADR's Context
+above exists to prevent, and in direct tension with this ADR's own
+Consequences claim that "a legacy-tier consumer project is never silently
+migrated by running `setup.mjs`". `resolveCompiledRuntimeTargets()` now checks
+directly for a present legacy calibration file before honoring a `missing`
+status as pristine, keeping such a project on the legacy tier; a `missing`
+status is treated as the neutral-seeding case from Decision 1 only when no
+legacy calibration exists either, i.e. the project is genuinely pristine.
+This keeps the Consequences claim above literally true rather than requiring
+it to be corrected. Covered by a dedicated test in `setup.test.mjs`.
+
 ## Decision
 
 1. **`setup.mjs` derives its compiled write targets from

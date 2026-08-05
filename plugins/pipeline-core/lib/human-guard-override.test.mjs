@@ -155,7 +155,11 @@ test("a host-Git-unavailable hook can consume only the exact audited local plugi
       version: "0.0.0-test",
     }));
     writeFileSync(join(root, ".claude-plugin", "marketplace.json"), JSON.stringify({
-      name: "agent-pipeline-local",
+      // ADR-0052: a legitimate Pipeline source checkout's OWN marketplace
+      // self-names the published identity "agent-pipeline"; the
+      // "agent-pipeline-local" name is reserved for the separate, external
+      // local-marketplace root, never a committed file inside a checkout.
+      name: "agent-pipeline",
       plugins: [{ name: "pipeline-core", source: "./plugins/pipeline-core" }],
     }));
     const toolInput = { command: "codex plugin add pipeline-core@agent-pipeline-local" };
@@ -242,7 +246,9 @@ test("local plugin installation capability rejects a changed candidate source", 
     }));
     writeFileSync(join(root, "plugins", "pipeline-core", "candidate.mjs"), "export const candidate = 1;\n");
     writeFileSync(join(root, ".claude-plugin", "marketplace.json"), JSON.stringify({
-      name: "agent-pipeline-local",
+      // See the sibling fixture above: the checkout's OWN manifest self-names
+      // "agent-pipeline" (ADR-0052), not "agent-pipeline-local".
+      name: "agent-pipeline",
       plugins: [{ name: "pipeline-core", source: "./plugins/pipeline-core" }],
     }));
     const toolInput = { command: "codex plugin add pipeline-core@agent-pipeline-local" };
@@ -947,6 +953,21 @@ test("native Windows private-state assurance is injected and fail-closed", () =>
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("F1 (dispatch CRITIC-REMEDY-09): the local-plugin-install attestation succeeds against THIS repository's own, real marketplace manifest and plugin source tree", () => {
+  // Every other local-plugin-install test above uses a synthetic fixture and
+  // therefore can never observe a regression in the real, committed
+  // .claude-plugin/marketplace.json or plugins/pipeline-core -- that
+  // blindness let a marketplace-identity rename silently break the sanctioned
+  // override for this repository while Full Verify stayed green. This test
+  // exercises the same attestation the guard uses, directly against the real
+  // checkout, so a future regression here fails Full Verify.
+  const repoRoot = join(PLUGIN_ROOT, "..", "..");
+  assert.equal(humanGuardOverrideInternals.isPipelineSourceRoot(repoRoot), true);
+  const observation = humanGuardOverrideInternals.localPluginInstallSourceObservation({ root: repoRoot });
+  assert.match(observation.statusSha256, /^[a-f0-9]{64}$/u);
+  assert.match(observation.fingerprintSha256, /^[a-f0-9]{64}$/u);
 });
 
 test("repository identity failures name the sanitized Git operation", () => {
