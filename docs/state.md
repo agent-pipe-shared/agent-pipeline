@@ -187,12 +187,101 @@ session history and no longer describes the current publication disposition.
   discover it during ordinary bootstrap. PO decision: document only this
   session, no code fix — `backlog/items/2026-08-05-critical-human-proof-not-wired-to-push-and-prd-gates.md`
   (owner PO, due 2026-09-05).
-  Next session/turn: second T1 Critic round on F3/F4/F6 + the wipLimit
-  change (bundled review, but flagged as two unrelated concerns per the
-  Critic's own scope-mixing check — `guardrails/git.md` vs. the onboarding
-  gate); then branch push (`feat/sprint-nova-codex-v046` only, per the PO's
-  standing scope limit) → release-gate simulation → local plugin reinstall
-  (task #3).
+  **Second T1 Critic round: run, verdict FAIL** (Opus, T1,
+  `functional-equivalent-read-only`, candidate `8d9b3df`, base `6152fff`;
+  preflight `packet-ready`; reviewed-diff snapshot
+  `evidence/critic/2026-08-05-runner-gate-wiplimit-8d9b3df.diff`, which the
+  Critic independently reconstructed byte-identically). Both concern groups
+  were dispatched as one bundled review with an explicit factual scope note,
+  because the wipLimit change has no independent spec artifact to review
+  against; the Critic confirmed no accidental scope mixing. Trajectory check
+  `consistent`; Verify 236/236 exit 0 and security CLEAN both independently
+  re-verified against the candidate. Group A's core remediation of F3/F4/F6
+  was confirmed **correct and complete** (runner genuinely threaded through
+  every result path in `v4Inspection`; `sourceEnablesRunner` properly bounded
+  to one call site with its negative direction tested; `24dbe58` duplicate-key
+  fixup right). Four new findings:
+  - **F-A (major, NOT fixed — tracked):** commit `9167175` made
+    `process.env.CLAUDECODE` the runner authority for four mutating admission
+    entrypoints (`project-onboarding-ready-gate.mjs:106`), because none of the
+    four callers (`worktree-create.mjs`, `session-cleanup.mjs` ×2,
+    `guard-lifecycle-ready.mjs`) passes an explicit runner. A Codex session
+    spawned from inside a Claude Code Bash tool inherits `CLAUDECODE=1` and
+    thereby skips both the App-Server requirement and the native-readback
+    attestation. The gate's own check is self-confirming
+    (`observed.runner !== resolvedRunner` where `inspect` was called with
+    `resolvedRunner`). Rated major not blocker because the prior state was
+    itself defective (a real Claude session could not pass at all), so it is
+    net-positive on ADR-0051's primary goal while still weakening attestation.
+    **PO directive 2026-08-05: implement only critical items under time
+    pressure; F-A is gate-semantics work across four files and is deliberately
+    NOT hot-fixed here.** Tracked:
+    `backlog/items/2026-08-05-ready-gate-env-var-runner-authority.md`
+    (due 2026-08-12, shortest correct fix recorded verbatim from the Critic:
+    have the four callers derive and pass an explicit runner at their own
+    boundaries, removing the gate's env fallback). Needs `goldfish-deep` plus
+    its own T1 Critic round.
+  - **F-B (major, FIXED):** the live audit finding
+    (`pipeline-state.mjs:4470-4473`) was recorded here as prose with no owner
+    and no expiry, and disposed with an "either … or" permitting neither —
+    a QG-06 violation, especially against the sibling finding in the same
+    commit that did get a dated item. Now tracked properly:
+    `backlog/items/2026-08-05-pipeline-state-rebind-codex-default-runner.md`
+    (due 2026-09-05; also absorbs the two cosmetic `pipeline-start/SKILL.md`
+    siblings from the same audit).
+  - **F-C (minor, NOT fixed — recorded):** two artifacts still assert the old
+    wipLimit default of 1, contradicting the two guardrail files amended in
+    the same commit — `templates/prompts/elephant-kickoff.md:125`
+    (`{{WIP_LIMIT default: 1}}`) and `setup.mjs:720-727` (a generated-config
+    comment claiming `setup.mjs` writes `wip_limit: 1` for the autonomous
+    preset, which `setup.mjs:557` no longer does). Mechanical but touches
+    generated downstream config text; deferred under the same PO
+    time-pressure directive rather than hot-fixed.
+  - **F-D (minor, FIXED):** the human-proof backlog item embedded an unmarked,
+    untranslated German PO quote in an English-canonical Public Core artifact
+    (ADR-0011). Replaced with an English rendering in this commit.
+  **Branch pushed** at `8d9b3df` to `origin/feat/sprint-nova-codex-v046`
+  (remote confirmed) before this documentation commit, on the PO's explicit
+  request ahead of a machine switch — the state was verify-green and
+  security-clean at exact HEAD, and a feature branch is neither `main` nor a
+  release. This commit adds the Critic results the pushed state was missing.
+  - **F-E (major, addendum after the PO raised the same point independently;
+    NOT fixed — tracked):** the runner-neutral `project/` migration is
+    incomplete. `.claude/` copies survive, are still git-tracked, and this very
+    candidate hand-synced *both* mirrors (`31d3a6b` applied wipLimit to
+    `.claude/pipeline.json` **and** `project/pipeline.json` as two hunks) —
+    dual maintenance of a mirror the typed `planProjectAuthorityMigration` was
+    built to eliminate. The mirrors materially disagree:
+    `gates.push.approval` `standing-approved` vs. `required`;
+    `session.keep_awake` `false` vs. `true`; `displayLabel` `PO` vs. `Human`;
+    `pipelineUpdateChannel` present only in the neutral file; and — most
+    seriously — **divergent model routing** (`sonnet-5`/`low` vs.
+    `haiku`/`medium`; `high` vs. `medium`), which collides with the mandatory
+    MP-05/MP-07 model discipline. **14 normative documents** point agents at
+    the non-authoritative `.claude/pipeline.json`, including a `guardrails/git.md:80`
+    **MUST** five lines above the line `31d3a6b` amended, and
+    `close-block/SKILL.md:83`. This session's own Critic dispatch briefing
+    named the legacy paths as guardrails, so the misdirection propagated into
+    the review itself. The Critic explicitly **withdrew** its own earlier
+    "correctly dispositioned" rubric entry for this drift as too generous.
+    Tracked: `backlog/items/2026-08-05-claude-dir-leftovers-defeat-runner-neutral-project-migration.md`
+    (due 2026-09-05). Fix guidance retained verbatim: do **not** re-sync the
+    mirrors by hand again — either retire the legacy tier via the existing
+    migration and repoint the 14 documents, or make it a generated projection
+    with a fail-closed drift check in `verify`. Both are ADR-scale. The PO's
+    note that `project/` is itself a poor name is recorded as a separate
+    observation, to be decided before any migration runs (so a rename does not
+    cost a second migration) but not bundled into the drift fix.
+  Next session/turn (on the other machine): local plugin reinstall (task #3 —
+  fully scoped: bump the cachebuster in
+  `plugins/pipeline-core/.claude-plugin/plugin.json`, currently
+  `0.5.2+claude.20260804205244` from before this session's fixes, to
+  `0.5.2+claude.<YYYYMMDDHHMMSS>`; commit; refresh the `agent-pipeline-local`
+  marketplace, which points at this checkout; read back `claude plugin list`).
+  Then F-A's fix dispatch, then the remaining backlog triage. Still open and
+  never started: the release-gate simulation, and a Claude-side equivalent of
+  the Codex-only `docs/codex-local-plugin-development.md` (PO explicitly
+  deferred the latter to a follow-up hardening pass).
 - **PO goal set 2026-08-04/05 (broader scope, supersedes the narrow "fix this
   one bug" framing above):** fix all Claude-Code invocation/routing errors by
   hardening the Pipeline's workflows and skills generally, not just this one

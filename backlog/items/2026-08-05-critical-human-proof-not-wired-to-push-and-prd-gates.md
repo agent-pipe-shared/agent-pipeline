@@ -52,11 +52,11 @@ one-time out-of-repo setup step.
 
 ## Triggering situation
 
-PO asked (2026-08-05, Sprint Nova session, verbatim): "wir haben mit dem
-cyborg sprint einen weg entwickelt um die beiden kritischen Human Gates (PRD
-Freigabe und PUSH) mit einem wirklich beweisbaren human audit zu belegen, den
-eine session nicht faken kann... prüfe warum das unbekannt ist und nicht
-vertraglich abgesichert wird." Investigated by reading `guard-push.mjs` in
+PO asked (2026-08-05, Sprint Nova session): Sprint Cyborg produced a way to
+back the two critical human gates — PRD release and PUSH — with a genuinely
+provable human audit that a session cannot fake; the PO asked why this is
+unknown to sessions and not contractually secured. Investigated by reading
+`guard-push.mjs` in
 full, `pipeline-state.mjs`'s `approve-push`/`approve-plan` handlers,
 `project-authority.mjs`'s authority resolution, and empirically confirming
 via a direct `guard-push.mjs` stdin invocation (exit 0, not blocked) plus
