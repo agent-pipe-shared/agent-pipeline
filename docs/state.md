@@ -82,8 +82,51 @@ session history and no longer describes the current publication disposition.
   entrypoint reachable by the Elephant, so native isolation was judged
   unusable in this host setup rather than attempted ad hoc. Reviewed diff
   snapshot archived at `evidence/critic/2026-08-04-runner-routing-b14391c.diff`
-  (git-ignored, not committed). Next session/turn: read the Critic's
-  findings and act on them before anything else in this block.
+  (git-ignored, not committed). **Attempt 3 result: FAIL**, 5 major + 2 minor,
+  no blockers (the agent stopped mid-investigation once after finding 13
+  under-scoped `lifecycleResult` sites, was resumed via `SendMessage`, then
+  delivered the full Phase B report). Disposition (EL-03(c), each is mine to
+  make):
+  - **F1** (major — production diff authored directly in this orchestrator
+    session, no Goldfish dispatch; fails every rigor-0 fast-path criterion) —
+    **escalated to the PO** (2026-08-05): the landed code is verify-green/
+    correct, PO directly instructed hands-on "analysieren und fixen" for the
+    original bug, but the process violation is real and its disposition
+    (accept-and-record vs. redo via Goldfish) is a PO call, not mine alone.
+  - **F2** (major — all four commits end `Co-Authored-By: Claude Sonnet 5
+    <noreply@anthropic.com>`, which `guardrails/git.md` GIT-03 explicitly
+    forbids; the mandatory `AI-Assisted: true` marker is absent) —
+    **escalated to the PO** (2026-08-05): the four commits are unpushed
+    (`git status` confirms `ahead N` of `origin/feat/sprint-nova-codex-v046`
+    with none of the four SHAs on the remote), and GIT-04's rewrite ban is
+    textually scoped to commits "that have been pushed/shared" — so amending
+    them is not itself a guard violation — but the general session harness
+    separately requires an explicit user request before any `commit --amend`,
+    so PO confirmation is needed either way. Also noted for the PO: the
+    pre-existing base commit `8ace400` (outside this review's scope) already
+    carries the same prohibited trailer, so "fixing the four" would not by
+    itself make the branch trailer-clean.
+  - **F3** (major — `sourceEnablesCodex` at `project-onboarding-v3.mjs:2693-2697`
+    hard-rejects a V3 source with `runners.enabled: ["claude"]` even when
+    `runner === "claude"`), **F4** (major — the shared admission gate
+    `requireProjectOnboardingReady` in `project-onboarding-ready-gate.mjs`
+    takes no `runner` at all, so `worktree-create`/`session-cleanup`/
+    `guard-lifecycle-ready` all still silently default to `"codex"`), **F6**
+    (minor — 12 `lifecycleResult` sites + 3 helper functions inside
+    `v4Inspection` don't carry the in-scope `runner` value) — **fix,
+    dispatched** to `goldfish-deep` (briefing `RUNNER-GATE-01`, task #5) this
+    session; F4 is the one that actually blocks the branch push and the local
+    plugin reinstall (task #3) — installing now would ship a build where the
+    shared gate still defaults to Codex.
+  - **F5** (major — ADR-0051 mandates dated backlog items for discovered
+    gaps; none were created) — **fixed**: `backlog/items/2026-08-05-adr-0051-follow-up-gaps-untracked.md`
+    (owner PO, due 2026-09-05).
+  - **F7** (minor — this file said "the four … commits" while listing five
+    SHAs) — **fixed** in this edit (now correctly says "five").
+  Next session/turn: read the PO's F1/F2 decision and the `RUNNER-GATE-01`
+  Goldfish result; only after both are resolved does a second T1 Critic round
+  run (F3/F4/F6 touch a gate + hook surface, so A/G/S applies again), then
+  branch push → local plugin reinstall.
 - **PO goal set 2026-08-04/05 (broader scope, supersedes the narrow "fix this
   one bug" framing above):** fix all Claude-Code invocation/routing errors by
   hardening the Pipeline's workflows and skills generally, not just this one
@@ -99,7 +142,7 @@ session history and no longer describes the current publication disposition.
   the one runner-routing defect already fixed — no other skill/script has
   been systematically checked yet for the same class of Codex-only-default
   assumption.
-- **Also raised this session, not yet actioned:** the four `fix(release)`/
+- **Also raised this session, not yet actioned:** the five `fix(release)`/
   `fix(critic)`/`chore(codex)` commits already on this branch (`8ace400`,
   `78be1ed`, `349b442`, `c1faad3`, `6382e82`, dated through 2026-08-04) have no
   corresponding dated section in this file — this predates and is unrelated to
