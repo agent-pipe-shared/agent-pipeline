@@ -51,11 +51,54 @@ session history and no longer describes the current publication disposition.
   not yet realized and is explicitly out of scope for this hard requirement
   until it lands. See
   [`docs/adr/0051-dual-runner-tri-platform-development-contract.md`](adr/0051-dual-runner-tri-platform-development-contract.md).
-- **Next:** full Verify against the `7f5ac97`/`d622dc3` candidate; independent
-  Critic review of the runner-routing fix per the self-application hard rule
-  (CLAUDE.md) before this is considered closed; then a local-development
-  plugin reinstall so the fix is actually loaded for future sessions/PO
-  request. Not yet pushed.
+- **Progress since the paragraph above:** full Verify passed clean at exact
+  HEAD `b14391c` (236/236 suites, exit 0, candidate-bound, no drift —
+  `evidence/verify-latest.json`). `security-scan` is CLEAN at the same HEAD
+  (`evidence/security-latest.json`). One additional commit landed in between:
+  `b14391c` `chore(governance): classify ADR-0051 in the observation-doc
+  inventory` — `check-observation-governance.mjs`/`check-doc-contracts.mjs`
+  correctly fail-closed (`OG-DOC-UNCLASSIFIED`) on the new ADR file until it
+  was registered in `governance/observation-doc-governance.json`'s ADR
+  inventory group; both checks are clean now.
+- **Independent Critic review — in progress, blocking.** First two dispatch
+  attempts were Elephant process errors, not Critic findings: attempt 1 used
+  an invalid free-form `key=value` argument shape for the
+  `pipeline-core:critic-review` skill's strict positional grammar (dispatch
+  rejected, no review performed); attempt 2 correctly used the strict
+  grammar but the Critic's own stage-gate (`harness/review-protocol.md`)
+  classified the diff as T1 (architecture/guardrail/security — it changes
+  the session-bootstrap gating logic itself, and ADR-0051 self-declares as a
+  binding architecture-principle contract), which the generic
+  `critic-review` skill fork cannot serve (dispatch rejected: T1 needs
+  `verdict:yes` + an `assurance:` argument). Both required the mandatory
+  `critic-dispatch-preflight.mjs` admission check, which was skipped on
+  attempt 1 — a process gap, corrected before attempt 2. **Attempt 3** (in
+  flight at session-cut time): dispatched per MP-07's T1 rule directly as
+  the `critic` agent (no skill fork — "one agent, model raised per dispatch")
+  with `model: opus` (the `critic_high_risk` tier) and assurance
+  `functional-equivalent-read-only; OS isolation not asserted` — the native
+  `claude -p --bare` isolation lane (`plugins/pipeline-core/scripts/critic-claude-host.mjs`
+  + `critic-native-bare.mjs`) exists only as a library with no CLI/orchestrator
+  entrypoint reachable by the Elephant, so native isolation was judged
+  unusable in this host setup rather than attempted ad hoc. Reviewed diff
+  snapshot archived at `evidence/critic/2026-08-04-runner-routing-b14391c.diff`
+  (git-ignored, not committed). Next session/turn: read the Critic's
+  findings and act on them before anything else in this block.
+- **PO goal set 2026-08-04/05 (broader scope, supersedes the narrow "fix this
+  one bug" framing above):** fix all Claude-Code invocation/routing errors by
+  hardening the Pipeline's workflows and skills generally, not just this one
+  script — "harden all workflows/skills so they run cleanly with Claude,
+  including in future sessions." Includes running the full remaining
+  sequence (Critic → push → release gate → local plugin reinstall) for real,
+  not a dry run — **with one explicit scope limit the PO gave**: push the
+  current feature branch (`feat/sprint-nova-codex-v046`) only; do **not**
+  push/merge to `main` or run an actual release yet, that stays a separate
+  later decision. Local plugin reinstall (this session's task #3) is
+  in-scope and still pending, blocked on the Critic clearing first.
+  **Not yet scoped/started:** the broader "harden all skills" audit beyond
+  the one runner-routing defect already fixed — no other skill/script has
+  been systematically checked yet for the same class of Codex-only-default
+  assumption.
 - **Also raised this session, not yet actioned:** the four `fix(release)`/
   `fix(critic)`/`chore(codex)` commits already on this branch (`8ace400`,
   `78be1ed`, `349b442`, `c1faad3`, `6382e82`, dated through 2026-08-04) have no
