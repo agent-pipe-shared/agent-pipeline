@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import test from "node:test";
 
 import { resolveSystemExecutable } from "../../../harness/scripts/security-readiness/tool-identity.mjs";
@@ -14,6 +14,7 @@ import { derivePoGateRepositoryFingerprint, resolvePoGateRepositoryTopology } fr
 import {
   PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES,
   ProjectOnboardingReadyError,
+  requireProjectOnboardingReady,
 } from "../lib/project-onboarding-ready-gate.mjs";
 import { runCodexAdvisoryBootstrap } from "./codex-advisory-bootstrap.mjs";
 
@@ -47,7 +48,7 @@ test("closed launcher requires a concrete reason and constructs one demand-bound
     },
   });
   assert.equal(code, 0);
-  assert.deepEqual(gateCalls, [{ rootDir: process.cwd(), intent: "dispatch" }]);
+  assert.deepEqual(gateCalls, [{ rootDir: process.cwd(), intent: "dispatch", runner: "codex" }]);
   assert.deepEqual(captured.advisorExport, { consent: "approved" });
   assert.equal(captured.runner, "codex");
   assert.equal(captured.question, "Which bootstrap boundary is safe?");
@@ -155,4 +156,37 @@ test("dispatch readiness failure precedes question, temporary input, executable 
     executables: 0,
     consults: 0,
   });
+});
+
+test("the exact runner value the launcher sends the gate is accepted by the real onboarding readiness gate, not merely present in a captured argument", () => {
+  // The injected requireProjectOnboardingReadyFn substitute above accepts any
+  // arguments, so a captured-argument assertion alone cannot prove that the
+  // literal string the launcher sends ("codex") is a value the real gate's
+  // own validation accepts. Drive the real gate directly, with only its own
+  // `inspect` dependency replaced, to prove that.
+  const rootDir = process.cwd();
+  let inspected;
+  const result = requireProjectOnboardingReady({
+    rootDir,
+    intent: "dispatch",
+    runner: "codex",
+    inspect(options) {
+      inspected = options;
+      return {
+        schema: "pipeline.project-onboarding.v4",
+        status: "ready",
+        root: realpathSync(rootDir),
+        runner: options.runner,
+        intent: options.intent,
+        repository: {},
+        runtime: {},
+        continuity: {},
+        appServer: {},
+        nextAction: null,
+        diagnostics: [],
+      };
+    },
+  });
+  assert.deepEqual(inspected, { rootDir, intent: "dispatch", runner: "codex" });
+  assert.equal(result.status, "ready");
 });

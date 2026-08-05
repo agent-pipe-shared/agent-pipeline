@@ -85,6 +85,7 @@ export async function runCodexAdvisoryBootstrap(argv = process.argv.slice(2), de
   (dependencies.requireProjectOnboardingReadyFn ?? requireProjectOnboardingReady)({
     rootDir: repoRoot,
     intent: "dispatch",
+    runner: "codex",
   });
   const source = parseYaml(readFileSync(join(repoRoot, "pipeline.user.yaml"), "utf8"));
   const authority = validatePipelineUserV3(source, { source: "pipeline.user.yaml" });

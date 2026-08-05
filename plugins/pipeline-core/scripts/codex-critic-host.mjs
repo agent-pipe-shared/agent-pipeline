@@ -1084,6 +1084,7 @@ export function prepareNativeCritic(options, deps = {}) {
   (deps.requireProjectOnboardingReadyFn ?? requireProjectOnboardingReady)({
     rootDir: options.repoRoot,
     intent: "dispatch",
+    runner: "codex",
   });
   const pipelineRoot = assertGitRepository(options.pipelineRoot, "pipeline root");
   const repoRoot = assertGitRepository(options.repoRoot, "candidate repository");

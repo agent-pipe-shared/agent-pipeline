@@ -1,0 +1,7 @@
+{
+  "taskId": "RUNNER-AUTHORITY-03",
+  "model": "sonnet",
+  "rulesetSha": "2914a55713d714d95323231edaddccec5e1d6c2e5a4fbfaaaaa9d913a5fb1efc",
+  "dispatcher": "elephant",
+  "outcome": "codex-advisory-bootstrap.mjs and codex-critic-host.mjs now pass runner: \"codex\" explicitly to requireProjectOnboardingReady; both test files gained a capture-and-assert-on-arguments check plus a second check that drives the real gate (own inspect injected) to prove \"codex\" is accepted, not merely present; red-then-green proof performed on the bootstrap call site. Exhaustiveness check found no caller beyond the two named. Stop condition triggered: DoD check 5 and field 2's counterpart-file claim name plugins/pipeline-core/scripts/claude-critic-host.mjs/.test.mjs, which do not exist; the actual file has the words swapped (critic-claude-host.mjs/.test.mjs) and its substance (does not call the gate) checks out, but the literal path in the briefing is false, so this is reported rather than silently corrected."
+}
