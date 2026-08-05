@@ -406,7 +406,7 @@ export function buildDefaultAnswers() {
     // compatibility projections for the still-stable Claude manifest only.
     routing: directRouting,
     ...legacyProjection,
-    autonomy: { push_policy: "gated", branch_model: "feature-branch", wip_limit: 1 },
+    autonomy: { push_policy: "gated", branch_model: "feature-branch", wip_limit: 3 },
     gates: { dev_plan: "blocking", push: "blocking", security: "blocking", claude_md_max_lines: 200 },
   };
 }
