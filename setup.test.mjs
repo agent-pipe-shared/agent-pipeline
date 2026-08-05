@@ -669,7 +669,7 @@ for (const [name, source] of [
   const a = applyAutonomyPreset("konservativ");
   ok(
     "applyAutonomyPreset konservativ: gated / feature-branch",
-    a.push_policy === "gated" && a.branch_model === "feature-branch" && a.wip_limit === 1,
+    a.push_policy === "gated" && a.branch_model === "feature-branch" && a.wip_limit === 3,
     JSON.stringify(a),
   );
 }
@@ -677,7 +677,7 @@ for (const [name, source] of [
   const a = applyAutonomyPreset("autonom");
   ok(
     "applyAutonomyPreset autonom: standing-approved / direct-main",
-    a.push_policy === "standing-approved" && a.branch_model === "direct-main" && a.wip_limit === 1,
+    a.push_policy === "standing-approved" && a.branch_model === "direct-main" && a.wip_limit === 3,
     JSON.stringify(a),
   );
 }
