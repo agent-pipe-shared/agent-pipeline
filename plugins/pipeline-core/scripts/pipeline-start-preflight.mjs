@@ -4,6 +4,7 @@
 /** Report loaded distribution identity and restart-handoff presence without secrets. */
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -37,8 +38,9 @@ export function normalBootstrapPayloadReceipt(payload) {
   };
 }
 
-function readInstalledPluginList() {
-  const result = spawnSync("codex", ["plugin", "list", "--json"], {
+function readInstalledPluginList(runner) {
+  const executable = runner === "claude" ? "claude" : "codex";
+  const result = spawnSync(executable, ["plugin", "list", "--json"], {
     encoding: "utf8",
     shell: false,
     timeout: 5_000,
@@ -49,13 +51,12 @@ function readInstalledPluginList() {
   return result.stdout;
 }
 
-export function installedPipelineIdentity(pluginList = readInstalledPluginList) {
-  let payload;
-  try {
-    payload = JSON.parse(pluginList());
-  } catch {
-    return null;
-  }
+/** Reads the host's own `~/.claude/plugins/known_marketplaces.json` (Claude-only registry). */
+function readClaudeKnownMarketplaces() {
+  return readFileSync(resolve(homedir(), ".claude", "plugins", "known_marketplaces.json"), "utf8");
+}
+
+function installedPipelineIdentityCodex(payload) {
   if (!Array.isArray(payload?.installed)) return null;
   const eligible = (entry) =>
     [PLUGIN_ID, LOCAL_PLUGIN_ID].includes(entry?.pluginId)
@@ -94,28 +95,110 @@ export function installedPipelineIdentity(pluginList = readInstalledPluginList) 
   return { version: entry.version, source };
 }
 
-export function installedPipelineVersion(pluginList = readInstalledPluginList) {
-  return installedPipelineIdentity(pluginList)?.version ?? null;
+/**
+ * The registered marketplace name is the substring of `id`/`pluginId` after
+ * the `@` -- the same convention both runners use (`pipeline-core@<name>`).
+ */
+function claudeMarketplaceName(id) {
+  const at = id.indexOf("@");
+  return at === -1 ? "" : id.slice(at + 1);
+}
+
+/**
+ * Claude's `plugin list --json` carries no source/marketplaceSource fields
+ * (unlike Codex), so a `local-development` claim can only be attested via
+ * the host's own `known_marketplaces.json` registry: the marketplace this
+ * id was installed from must be a `directory` source with an absolute,
+ * normalized path. `projectPath` on the list entry is NOT usable for this --
+ * it was measured to be populated identically for a github-sourced install.
+ */
+function claudeLocalDevelopmentAttested(entry, knownMarketplaces) {
+  let registry;
+  try {
+    registry = JSON.parse(knownMarketplaces());
+  } catch {
+    return false;
+  }
+  if (registry === null || typeof registry !== "object" || Array.isArray(registry)) return false;
+  const source = registry[claudeMarketplaceName(entry.id)]?.source;
+  return source?.source === "directory"
+    && typeof source.path === "string"
+    && isAbsolute(source.path)
+    && resolve(source.path) === source.path;
+}
+
+function installedPipelineIdentityClaude(payload, knownMarketplaces) {
+  if (!Array.isArray(payload)) return null;
+  const eligible = (entry) =>
+    [PLUGIN_ID, LOCAL_PLUGIN_ID].includes(entry?.id)
+    && entry?.enabled === true
+    && typeof entry?.version === "string"
+    && entry.version.trim() !== "";
+  const localMatches = payload.filter((entry) => eligible(entry) && entry.id === LOCAL_PLUGIN_ID);
+  const officialMatches = payload.filter((entry) => eligible(entry) && entry.id === PLUGIN_ID);
+  if (localMatches.length + officialMatches.length > 1) {
+    return { version: null, source: "unknown", ambiguous: true };
+  }
+  if (localMatches.length + officialMatches.length !== 1) return null;
+  const matches = localMatches.length === 1 ? localMatches : officialMatches;
+  const entry = matches[0];
+  const isLocalId = entry.id === LOCAL_PLUGIN_ID;
+  const attestedLocal = isLocalId && claudeLocalDevelopmentAttested(entry, knownMarketplaces);
+  if (isLocalId && !attestedLocal) return null;
+  return { version: entry.version, source: attestedLocal ? "local-development" : "unknown" };
+}
+
+export function installedPipelineIdentity(
+  pluginList = () => readInstalledPluginList("codex"),
+  runner = "codex",
+  knownMarketplaces = readClaudeKnownMarketplaces,
+) {
+  let payload;
+  try {
+    payload = JSON.parse(pluginList());
+  } catch {
+    return null;
+  }
+  return runner === "claude"
+    ? installedPipelineIdentityClaude(payload, knownMarketplaces)
+    : installedPipelineIdentityCodex(payload);
+}
+
+export function installedPipelineVersion(pluginList = () => readInstalledPluginList("codex"), runner = "codex") {
+  return installedPipelineIdentity(pluginList, runner)?.version ?? null;
 }
 
 export function observePipelineStartPreflight({
   env = process.env,
-  pluginList = readInstalledPluginList,
+  pluginList,
   read = readFileSync,
   scriptUrl = import.meta.url,
   cwd = process.cwd(),
+  knownMarketplaces = readClaudeKnownMarketplaces,
 } = {}) {
   const pluginRoot = resolve(dirname(fileURLToPath(scriptUrl)), "..");
+  // CLAUDECODE is set by every Claude Code session (main and subagent); its
+  // absence keeps the historical Codex-CLI default. This is the one place a
+  // session's own runner identity enters the onboarding chain -- without it,
+  // a Claude session silently inherits Codex-only gates (App-Server health,
+  // native runtime readback) that RUNNERS_WITHOUT_APP_SERVER/
+  // RUNNERS_WITHOUT_NATIVE_READBACK exist specifically to exempt it from.
+  // Resolved BEFORE the reads below: both the source-manifest read and the
+  // installed-plugin-list read must resolve through this same runner
+  // identity, so each runner reads and reports its own distribution only.
+  const runner = env.CLAUDECODE === "1" ? "claude" : "codex";
+  const manifestRelativePath = runner === "claude" ? ".claude-plugin/plugin.json" : ".codex-plugin/plugin.json";
   let version;
   try {
-    const manifest = JSON.parse(read(resolve(pluginRoot, ".codex-plugin/plugin.json"), "utf8"));
+    const manifest = JSON.parse(read(resolve(pluginRoot, manifestRelativePath), "utf8"));
     version = typeof manifest?.version === "string" && manifest.version.trim() !== ""
       ? manifest.version
       : null;
   } catch {
     version = null;
   }
-  const installedIdentity = installedPipelineIdentity(pluginList);
+  const resolvedPluginList = pluginList ?? (() => readInstalledPluginList(runner));
+  const installedIdentity = installedPipelineIdentity(resolvedPluginList, runner, knownMarketplaces);
   const installedVersion = installedIdentity?.version ?? null;
   const ticket = Object.prototype.hasOwnProperty.call(env, "PIPELINE_CODEX_ONBOARDING_TICKET_ID")
     && String(env.PIPELINE_CODEX_ONBOARDING_TICKET_ID) !== "";
@@ -124,13 +207,6 @@ export function observePipelineStartPreflight({
   const wsl = [env.WSL_DISTRO_NAME, env.WSL_INTEROP]
     .some((value) => typeof value === "string" && value.trim() !== "");
   const executionBoundary = wsl ? "host-authorized-wsl" : "default";
-  // CLAUDECODE is set by every Claude Code session (main and subagent); its
-  // absence keeps the historical Codex-CLI default. This is the one place a
-  // session's own runner identity enters the onboarding chain -- without it,
-  // a Claude session silently inherits Codex-only gates (App-Server health,
-  // native runtime readback) that RUNNERS_WITHOUT_APP_SERVER/
-  // RUNNERS_WITHOUT_NATIVE_READBACK exist specifically to exempt it from.
-  const runner = env.CLAUDECODE === "1" ? "claude" : "codex";
   const status = !version
     ? "plugin-identity-unavailable"
     : installedIdentity?.ambiguous === true || installedVersion !== null && installedVersion !== version

@@ -35,6 +35,31 @@ const pluginList = (
   available: [],
 });
 
+const claudeManifest = JSON.stringify({ version: "0.5.2+claude.test" });
+const claudePluginList = (
+  version = "0.5.2+claude.test",
+  id = "pipeline-core@agent-pipeline-local",
+) => () => JSON.stringify([{
+  id,
+  version,
+  scope: "local",
+  enabled: true,
+  installPath: "/cache/claude/plugins/cache/agent-pipeline-local/pipeline-core",
+  installedAt: "2026-08-05T21:06:31.445Z",
+  lastUpdated: "2026-08-05T21:06:31.445Z",
+  projectPath: "/projects/current",
+}]);
+const claudeKnownMarketplaces = (
+  marketplaceName = "agent-pipeline-local",
+  path = "/repo",
+) => () => JSON.stringify({
+  [marketplaceName]: {
+    source: { source: "directory", path },
+    installLocation: path,
+    lastUpdated: "2026-08-05T21:05:40.967Z",
+  },
+});
+
 test("preflight reports exact identity and no-handoff without secret fields", () => {
   const cwd = "/projects/current";
   const result = observePipelineStartPreflight({
@@ -272,4 +297,126 @@ test("missing or malformed manifest fails identity closed", () => {
     assert.equal(result.version, null);
     assert.equal(pipelineStartPreflightExitCode(result), 2);
   }
+});
+
+test("a Claude session reads the Claude source manifest, never the Codex one", () => {
+  const result = observePipelineStartPreflight({
+    env: { CLAUDECODE: "1" },
+    pluginList: () => JSON.stringify([]),
+    read: (path) => {
+      if (String(path).endsWith(".claude-plugin/plugin.json")) return claudeManifest;
+      throw new Error(`unexpected manifest path for the Claude runner: ${path}`);
+    },
+    cwd: "/projects/current",
+  });
+  assert.equal(result.version, "0.5.2+claude.test");
+});
+
+test("a non-Claude-Code session still reads the Codex source manifest, never the Claude one", () => {
+  const result = observePipelineStartPreflight({
+    env: {},
+    pluginList: pluginList(),
+    read: (path) => {
+      if (String(path).endsWith(".codex-plugin/plugin.json")) return manifest;
+      throw new Error(`unexpected manifest path for the Codex runner: ${path}`);
+    },
+    cwd: "/projects/current",
+  });
+  assert.equal(result.version, "0.4.5+test");
+});
+
+test("a Claude bare-array registry resolves an attested local-development installation", () => {
+  const result = observePipelineStartPreflight({
+    env: { CLAUDECODE: "1" },
+    pluginList: claudePluginList(),
+    knownMarketplaces: claudeKnownMarketplaces(),
+    read: () => claudeManifest,
+    cwd: "/projects/current",
+  });
+  assert.equal(result.status, "ready");
+  assert.equal(result.installedVersion, "0.5.2+claude.test");
+  assert.equal(result.installedSource, "local-development");
+  assert.deepEqual(
+    installedPipelineIdentity(claudePluginList(), "claude", claudeKnownMarketplaces()),
+    { version: "0.5.2+claude.test", source: "local-development" },
+  );
+});
+
+test("a Claude registry with two eligible entries fails closed as ambiguous", () => {
+  const both = () => JSON.stringify([
+    { id: "pipeline-core@agent-pipeline-local", version: "0.5.2+claude.a", scope: "local", enabled: true },
+    { id: "pipeline-core@agent-pipeline", version: "0.5.1+claude.b", scope: "local", enabled: true },
+  ]);
+  assert.deepEqual(
+    installedPipelineIdentity(both, "claude", claudeKnownMarketplaces()),
+    { version: null, source: "unknown", ambiguous: true },
+  );
+  const result = observePipelineStartPreflight({
+    env: { CLAUDECODE: "1" },
+    pluginList: both,
+    knownMarketplaces: claudeKnownMarketplaces(),
+    read: () => claudeManifest,
+  });
+  assert.equal(result.status, "plugin-refresh-required");
+  assert.equal(result.installedVersion, null);
+  assert.equal(result.installedSource, "unknown");
+});
+
+test("a malformed, non-array, or empty Claude registry yields no identity without crashing", () => {
+  for (const invalid of [
+    () => { throw new Error("unavailable"); },
+    () => "{",
+    () => JSON.stringify({}),
+    () => JSON.stringify([]),
+  ]) {
+    assert.equal(installedPipelineIdentity(invalid, "claude", claudeKnownMarketplaces()), null);
+    const result = observePipelineStartPreflight({
+      env: { CLAUDECODE: "1" },
+      pluginList: invalid,
+      knownMarketplaces: claudeKnownMarketplaces(),
+      read: () => claudeManifest,
+    });
+    assert.equal(result.status, "ready");
+    assert.equal(result.installedVersion, null);
+    assert.equal(result.installedSource, "unknown");
+  }
+});
+
+test("a Claude version mismatch between loaded and installed identity requires refresh", () => {
+  const result = observePipelineStartPreflight({
+    env: { CLAUDECODE: "1" },
+    pluginList: claudePluginList("0.5.2+claude.other"),
+    knownMarketplaces: claudeKnownMarketplaces(),
+    read: () => claudeManifest,
+  });
+  assert.equal(result.status, "plugin-refresh-required");
+  assert.equal(result.version, "0.5.2+claude.test");
+  assert.equal(result.installedVersion, "0.5.2+claude.other");
+  assert.equal(pipelineStartPreflightExitCode(result), 0);
+});
+
+test("the Claude local-development id is accepted only from an attested directory-source marketplace", () => {
+  for (const knownMarketplaces of [
+    claudeKnownMarketplaces("agent-pipeline-local", "relative/path"),
+    () => JSON.stringify({ "agent-pipeline-local": { source: { source: "github", path: "/repo" } } }),
+    () => JSON.stringify({}),
+    () => JSON.stringify({ "agent-pipeline-local": { source: { source: "directory", path: "/repo/./x/.." } } }),
+    () => { throw new Error("registry unavailable"); },
+    () => "{",
+  ]) {
+    assert.equal(
+      installedPipelineIdentity(claudePluginList(), "claude", knownMarketplaces),
+      null,
+    );
+  }
+});
+
+test("a non-local Claude installation id reports unknown source without touching the host marketplace registry", () => {
+  const officialList = claudePluginList("0.5.2+claude.test", "pipeline-core@agent-pipeline");
+  assert.deepEqual(
+    installedPipelineIdentity(officialList, "claude", () => {
+      throw new Error("must not read the host marketplace registry for a non-local id");
+    }),
+    { version: "0.5.2+claude.test", source: "unknown" },
+  );
 });
