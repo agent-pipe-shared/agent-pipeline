@@ -130,10 +130,69 @@ session history and no longer describes the current publication disposition.
     (owner PO, due 2026-09-05).
   - **F7** (minor — this file said "the four … commits" while listing five
     SHAs) — **fixed** in this edit (now correctly says "five").
-  Next session/turn: read the PO's F1/F2 decision and the `RUNNER-GATE-01`
-  Goldfish result; only after both are resolved does a second T1 Critic round
-  run (F3/F4/F6 touch a gate + hook surface, so A/G/S applies again), then
-  branch push → local plugin reinstall.
+  **F3/F4/F6 fix landed and verified:** `RUNNER-GATE-01` (goldfish-deep)
+  delivered commit `9167175`, plus a self-caught follow-up fixup `24dbe58`
+  (a duplicate `runner` object key from its own bulk edit, found in Elephant
+  post-commit review, fixed by resuming the same dispatch). Full Verify green
+  236/236 at the final candidate `f7910cc` (`evidence/verify-latest.json`).
+  **wipLimit standardized to 3** in the same window (`31d3a6b`, `24dbe58`
+  cross-dispatch drift note, `f7910cc`) — unrelated PO-directed config/doc
+  fix (drift: `project-onboarding-v3.mjs`'s `freshIntent()` already used `3`;
+  everywhere else still said `1`); also clarified the field's description
+  (it caps concurrently open blocks/worktrees — Kanban WIP limit — not
+  parallel Goldfish dispatch within one block, which stays separately
+  uncapped by the file/state-conflict rule alone).
+  **Disposition, `f7910cc` self-commit (accepted, PO decision 2026-08-05):**
+  this commit (the two stale `wip_limit === 1` test assertions →`=== 3`) was
+  committed directly by the Elephant, not by a Goldfish. Context: `WIPLIMIT-01`
+  authored the exact diff, but the auto-mode permission classifier blocked
+  *its* `git commit` attempt twice; a fresh, independently-scoped
+  `WIPLIMIT-02` dispatch then confirmed the same file content already
+  matched the intended change byte-for-byte. The Elephant performed only the
+  `git commit` mechanic on already-goldfish-authored, twice-independently-
+  verified content — no code was authored by the Elephant. PO accepted this
+  as F1-equivalent, recorded rather than reworked, on that basis.
+  **Broader "harden all skills" audit — done, findings triaged:** a read-only
+  Explore recon (task #7) found the same Codex-default class beyond the
+  fixed files: (1) **live** — `pipeline-state.mjs:4471-4472`'s
+  `po-authority-rebind-apply` recovery transaction calls `inspectV4` with no
+  `runner`, so a Claude session running that recovery path force-rolls-back
+  on a false App-Server failure; (2)/(3) **live, cosmetic-but-wrong** —
+  `pipeline-start/SKILL.md:35,72-75` prints Codex-specific claims/vocabulary
+  unconditionally in every local-dev bootstrap, including Claude sessions;
+  (4) **latent, currently neutralized** — `v3-bootstrap-authority.mjs`'s own
+  `runner="codex"` defaults, real but not currently reachable because its
+  only unguarded caller's accept condition happens to be satisfied
+  regardless (already covered by the same restart-barrier gap ADR-0051's
+  Follow-up names); (5) redundant/dead in current usage; (6) confirmed dead
+  code from Claude Code's perspective (wired only via `codex-hooks.json`).
+  Not yet dispatched for a fix — next session should either dispatch (1)-(3)
+  as a bounded follow-up or record them as dated backlog items per the same
+  ADR-0051 pattern.
+  **New, separate finding (not part of the runner-routing defect class):**
+  investigating a PO question about the Ed25519 critical-human-proof
+  mechanism (built in Sprint Cyborg) found it is fully implemented
+  (`po-approval-proof.mjs`, `pipeline-state.mjs approve-push`,
+  `docs/po-approval-proof-contract.md`) but **not actually enforced** for
+  either of the two human gates it was meant to secure in this repo: push
+  gate approval resolves (via the live `project/pipeline.yaml` authority,
+  confirmed empirically — a direct `guard-push.mjs` stdin invocation exits 0)
+  to `standing-approved`, which skips the proof check entirely despite
+  `project/critical-human-proof.json` declaring `push` mandatory; PRD
+  approval (`approve-plan`) takes a bare unattributed `--by <name>` string
+  with no cryptographic binding at all. `.claude/pipeline.yaml` is a stale,
+  disagreeing duplicate (`approval: required`) of the live
+  `project/pipeline.yaml` (`approval: standing-approved`). Neither CLAUDE.md
+  nor `guardrails/git.md` mention the mechanism, so a session cannot
+  discover it during ordinary bootstrap. PO decision: document only this
+  session, no code fix — `backlog/items/2026-08-05-critical-human-proof-not-wired-to-push-and-prd-gates.md`
+  (owner PO, due 2026-09-05).
+  Next session/turn: second T1 Critic round on F3/F4/F6 + the wipLimit
+  change (bundled review, but flagged as two unrelated concerns per the
+  Critic's own scope-mixing check — `guardrails/git.md` vs. the onboarding
+  gate); then branch push (`feat/sprint-nova-codex-v046` only, per the PO's
+  standing scope limit) → release-gate simulation → local plugin reinstall
+  (task #3).
 - **PO goal set 2026-08-04/05 (broader scope, supersedes the narrow "fix this
   one bug" framing above):** fix all Claude-Code invocation/routing errors by
   hardening the Pipeline's workflows and skills generally, not just this one
