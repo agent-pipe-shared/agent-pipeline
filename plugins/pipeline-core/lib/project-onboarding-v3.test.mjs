@@ -1599,6 +1599,31 @@ test("omitting --runner keeps the historical Codex App-Server requirement", () =
   } finally { dispose(path); }
 });
 
+test("a V3 source enabling only Claude admits a Claude Code session instead of hard-failing as Codex-disabled", () => {
+  const path = root();
+  try {
+    const portable = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    assert.equal(applyProjectOnboardingV3(portable, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+    const sourcePath = join(path, "pipeline.user.yaml");
+    const claudeOnlySource = readFileSync(sourcePath, "utf8")
+      .replace(/enabled:\n(\s*-\s*"[^"]*"\n)+/u, 'enabled:\n    - "claude"\n')
+      .replace(/default: "?codex"?/u, 'default: "claude"');
+    writeFileSync(sourcePath, claudeOnlySource);
+    const observedClaude = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, intent: "bootstrap", runner: "claude" });
+    assert.notEqual(observedClaude.status, "invalid");
+    assert.equal(observedClaude.status, "runtime-initialization-required");
+    assert.equal(observedClaude.runner, "claude");
+    assert.equal(observedClaude.diagnostics.every((entry) => entry.code !== "source_invalid"), true);
+    // The same claude-only source still hard-fails an invoking Codex session:
+    // admission is bound to the real invoking runner, not opened up generally.
+    const observedCodex = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, intent: "bootstrap", runner: "codex" });
+    assert.equal(observedCodex.status, "invalid");
+    assert.equal(observedCodex.runner, "codex");
+    assert.equal(observedCodex.diagnostics[0].code, "source_invalid");
+    assert.equal(observedCodex.diagnostics[0].message, "codex is not enabled by the source authority");
+  } finally { dispose(path); }
+});
+
 test("blank real root inspect and plan are read-only", () => {
   const path = root();
   try {

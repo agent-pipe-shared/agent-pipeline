@@ -785,6 +785,7 @@ function runtimeFailureResult(base, error, {
   return lifecycleResult({
     status: "runtime-readback-unavailable",
     root: base.root,
+    runner: base.runner,
     intent: base.intent,
     repository: base.repository,
     runtime: emptyRuntime("readback-unavailable"),
@@ -1167,10 +1168,11 @@ function observePoProfileRepair(root, fs) {
   };
 }
 
-function runtimeTargetReadOnlyResult({ root, intent, repository }) {
+function runtimeTargetReadOnlyResult({ root, runner = "codex", intent, repository }) {
   return lifecycleResult({
     status: "runtime-target-read-only",
     root,
+    runner,
     intent,
     repository,
     runtime: emptyRuntime("target-read-only"),
@@ -1256,10 +1258,11 @@ function pluginManagedCodexRuntime(root, fs) {
   return admission.status === "invalid" ? "receipt-invalid" : "reserved-unattested";
 }
 
-function pluginManagedAdmissionDriftResult({ root, intent, repository, sourceSha256 }) {
+function pluginManagedAdmissionDriftResult({ root, runner = "codex", intent, repository, sourceSha256 }) {
   return lifecycleResult({
     status: "projection-drift",
     root,
+    runner,
     intent,
     repository,
     runtime: {
@@ -1944,6 +1947,20 @@ function selectedRunnerIsCodex(root, fs) {
     return parsed?.runners?.default === "codex"
       && Array.isArray(parsed.runners.enabled)
       && parsed.runners.enabled.includes("codex");
+  } catch { return false; }
+}
+
+/**
+ * General, runner-aware form of `sourceEnablesCodex`. Used only where the
+ * caller's own invoking runner (not always "codex") controls admission; the
+ * two Codex-specific helpers above stay untouched for their existing call
+ * sites.
+ */
+function sourceEnablesRunner(root, fs, runner) {
+  try {
+    const parsed = parseYaml(fs.readFileSync(safePath(root, SOURCE, fs), "utf8"));
+    return Array.isArray(parsed?.runners?.enabled)
+      && parsed.runners.enabled.includes(runner);
   } catch { return false; }
 }
 
@@ -2632,8 +2649,13 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
   if (repositoryFailure) return repositoryFailure;
   const legacy = legacyInspection(rootDir, fs);
   const unavailable = lifecycleResult({
-    status: "unsafe", root: legacy.root, runner: legacy.root ? "codex" : null, intent, repository,
-    runtime: emptyRuntime(), diagnostics: [lifecycleDiagnostic("$.root", "root_resolution_failed", "the project root could not be resolved safely", "supply one real project directory")],
+    status: "unsafe",
+    root: legacy.root,
+    runner: legacy.root ? runner : null,
+    intent,
+    repository,
+    runtime: emptyRuntime(),
+    diagnostics: [lifecycleDiagnostic("$.root", "root_resolution_failed", "the project root could not be resolved safely", "supply one real project directory")],
   });
   if (legacy.status === "unsafe") {
     // A physical root may be sound while one selected runtime parent is a
@@ -2641,13 +2663,17 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
     // runtime write boundary without being told that the whole project root
     // is unresolved.
     if (legacy.root && legacy.diagnostics?.some((entry) => entry?.code === "unsafe_runtime_path")) {
-      return runtimeTargetReadOnlyResult({ root: legacy.root, intent, repository });
+      return runtimeTargetReadOnlyResult({ root: legacy.root, runner, intent, repository });
     }
     return unavailable;
   }
   if (legacy.status === "fresh" || legacy.status === "fresh-host-managed") {
     return lifecycleResult({
-      status: "portable-seed-required", root: legacy.root, intent, repository,
+      status: "portable-seed-required",
+      root: legacy.root,
+      runner,
+      intent,
+      repository,
       runtime: emptyRuntime(),
       nextAction: commandAction([ONBOARDING_SCRIPT, "plan", "--root", legacy.root], false, false, SCHEMA, ["portable-seed-required"]),
       diagnostics: [lifecycleDiagnostic("$.source", "portable_seed_missing", "no portable V3 source and calibration seed exists", "review the portable seed plan")],
@@ -2655,7 +2681,11 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
   }
   if (legacy.status === "existing-unmanaged") {
     return lifecycleResult({
-      status: "adoption-required", root: legacy.root, intent, repository,
+      status: "adoption-required",
+      root: legacy.root,
+      runner,
+      intent,
+      repository,
       runtime: emptyRuntime(),
       nextAction: commandAction([ONBOARDING_SCRIPT, "plan", "--root", legacy.root], false, false, SCHEMA, ["adoption-required"]),
       diagnostics: [lifecycleDiagnostic("$.source", "adoption_required", "the local project has no Pipeline authority", "review the additive adoption plan")],
@@ -2664,7 +2694,11 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
   if (legacy.status === "migration-required") {
     const refresh = legacy.sourceKind === "v3-refresh";
     return lifecycleResult({
-      status: "migration-required", root: legacy.root, intent, repository,
+      status: "migration-required",
+      root: legacy.root,
+      runner,
+      intent,
+      repository,
       runtime: emptyRuntime(),
       nextAction: commandAction(
         [MIGRATION_SCRIPT, refresh ? "plan" : "inspect", "--root", legacy.root],
@@ -2686,18 +2720,42 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
     if (sourcePath && fs.existsSync(sourcePath)) {
       const migrated = inspectRunnerProfileMigrationV3({ rootDir: legacy.root, deps: fs });
       if (migrated.status !== "ready") {
-        return lifecycleResult({ status: "invalid", root: legacy.root, runner: null, intent, repository, runtime: emptyRuntime(),
+        return lifecycleResult({
+          status: "invalid",
+          root: legacy.root,
+          runner: null,
+          intent,
+          repository,
+          runtime: emptyRuntime(),
           nextAction: commandAction([ONBOARDING_SCRIPT, "plan-source-recovery", "--root", legacy.root], false, false, SOURCE_RECOVERY_SCHEMA, ["recoverable", "unrepairable"]),
-          diagnostics: [lifecycleDiagnostic("$.source", "source_invalid", "pipeline.user.yaml is not a valid V3 source", "review the closed source recovery disposition")] });
+          diagnostics: [lifecycleDiagnostic("$.source", "source_invalid", "pipeline.user.yaml is not a valid V3 source", "review the closed source recovery disposition")],
+        });
       }
       if (migrated.sourceKind === "v3") {
-        if (!sourceEnablesCodex(legacy.root, fs)) {
-          return lifecycleResult({ status: "invalid", root: legacy.root, runner: null, intent, repository, runtime: emptyRuntime(), nextAction: null,
-            diagnostics: [lifecycleDiagnostic("$.source.runners.enabled", "source_invalid", "Codex is not enabled by the source authority", "enable Codex through the source authority") ] });
+        // Admission is bound to the invoking session's own runner (ADR-0051),
+        // not always Codex: a V3 source that enables only Claude is a valid
+        // authority for a Claude Code session. `sourceEnablesCodex` stays
+        // reserved for its own three existing call sites.
+        if (!sourceEnablesRunner(legacy.root, fs, runner)) {
+          return lifecycleResult({
+            status: "invalid",
+            root: legacy.root,
+            runner,
+            intent,
+            repository,
+            runtime: emptyRuntime(),
+            nextAction: null,
+            diagnostics: [lifecycleDiagnostic(
+              "$.source.runners.enabled",
+              "source_invalid",
+              `${runner} is not enabled by the source authority`,
+              `enable ${runner} through the source authority`,
+            )],
+          });
         }
         const manifest = loadManifest(legacy.root);
         if (manifest.status !== "ok") {
-          return lifecycleResult({ status: "partial", root: legacy.root, intent, repository, runtime: emptyRuntime(),
+          return lifecycleResult({ status: "partial", root: legacy.root, runner, intent, repository, runtime: emptyRuntime(),
             nextAction: commandAction([ONBOARDING_SCRIPT, "plan-manifest-repair", "--root", legacy.root], false, false, MANIFEST_REPAIR_PLAN_SCHEMA, ["ready", "unrepairable"]),
             diagnostics: [lifecycleDiagnostic("$.manifest", "manifest_invalid", "the generated pipeline manifest is absent or invalid", "review the digest-bound manifest-only repair plan")] });
         }
@@ -2709,6 +2767,7 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
           if (pluginRuntime === "receipt-invalid") {
             return pluginManagedAdmissionDriftResult({
               root: legacy.root,
+              runner,
               intent,
               repository,
               sourceSha256: migrated.sourceSha256,
@@ -2728,12 +2787,12 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
           }, fs);
         }
         if (persistedHostManagedLayout(legacy.root, fs)) {
-          return runtimeTargetReadOnlyResult({ root: legacy.root, intent, repository });
+          return runtimeTargetReadOnlyResult({ root: legacy.root, runner, intent, repository });
         }
         try {
           selectedRuntimeTargetParents(legacy.root, fs);
         } catch {
-          return runtimeTargetReadOnlyResult({ root: legacy.root, intent, repository });
+          return runtimeTargetReadOnlyResult({ root: legacy.root, runner, intent, repository });
         }
         const runtimePlan = planRunnerProfileMigrationV3({ rootDir: legacy.root, deps: fs, initializeMissingRuntimeForSlimV3: true });
         if (runtimePlan.status === "ready") {
@@ -2749,12 +2808,17 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
             try {
               probeSelectedRuntimeTargets(legacy.root, fs);
             } catch {
-              return runtimeTargetReadOnlyResult({ root: legacy.root, intent, repository });
+              return runtimeTargetReadOnlyResult({ root: legacy.root, runner, intent, repository });
             }
           }
           const runtime = { ...emptyRuntime(initialize ? "missing" : "projection-drift"), sourceSha256: runtimePlan.sourceSha256 ?? null };
           return lifecycleResult({
-            status: initialize ? "runtime-initialization-required" : "projection-drift", root: legacy.root, intent, repository, runtime,
+            status: initialize ? "runtime-initialization-required" : "projection-drift",
+            root: legacy.root,
+            runner,
+            intent,
+            repository,
+            runtime,
             nextAction: commandAction([ONBOARDING_SCRIPT, initialize ? "plan-runtime" : "plan-repair", "--root", legacy.root], false, false, SCHEMA, [initialize ? "runtime-initialization-required" : "projection-drift"]),
             diagnostics: [lifecycleDiagnostic("$.runtime", initialize ? "runtime_missing" : "projection_drift", initialize ? "required Codex runtime targets are absent" : "generated runtime bytes differ from the V3 projection", "review the lifecycle runtime plan")],
           });
@@ -2765,9 +2829,16 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
     if (cleanupRecovery !== null) return cleanupRecovery;
     const partialPlan = planProjectPartialAuthorityAdoption({ rootDir: legacy.root, deps: fs });
     const reparable = partialPlan.status === "selection-required";
-    return lifecycleResult({ status: "partial", root: legacy.root, intent, repository, runtime: emptyRuntime(),
+    return lifecycleResult({
+      status: "partial",
+      root: legacy.root,
+      runner,
+      intent,
+      repository,
+      runtime: emptyRuntime(),
       nextAction: reparable ? commandAction([ONBOARDING_SCRIPT, "plan-partial-authority", "--root", legacy.root], false, false, PARTIAL_AUTHORITY_PLAN_SCHEMA, ["selection-required", "ready"]) : null,
-      diagnostics: [lifecycleDiagnostic("$.authority", "partial_authority", "the project has an incomplete Pipeline authority", reparable ? "run the typed partial-authority planner and bind an explicit PO selection" : "inspect the existing source and generated targets")] });
+      diagnostics: [lifecycleDiagnostic("$.authority", "partial_authority", "the project has an incomplete Pipeline authority", reparable ? "run the typed partial-authority planner and bind an explicit PO selection" : "inspect the existing source and generated targets")],
+    });
   }
   if (legacy.status === "ready") {
     const projectAuthority = readProjectAuthority({ rootDir: legacy.root });
@@ -2775,6 +2846,7 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
       return lifecycleResult({
         status: "migration-required",
         root: legacy.root,
+        runner,
         intent,
         repository,
         runtime: emptyRuntime(),
@@ -2804,6 +2876,7 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
         return lifecycleResult({
           status: "migration-required",
           root: legacy.root,
+          runner,
           intent,
           repository,
           runtime: emptyRuntime(),
@@ -2847,6 +2920,7 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
       return lifecycleResult({
         status: "invalid",
         root: legacy.root,
+        runner,
         intent,
         repository,
         runtime: emptyRuntime(),
@@ -2902,6 +2976,7 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
       && authority.runtimeProjection === "plugin-managed-invalid") {
       return pluginManagedAdmissionDriftResult({
         root: legacy.root,
+        runner,
         intent,
         repository,
         sourceSha256: authority.sourceSha256,
@@ -2941,7 +3016,12 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
               )],
             });
           }
-          return lifecycleResult({ status: "restart-required", root: legacy.root, runner, intent, repository,
+          return lifecycleResult({
+            status: "restart-required",
+            root: legacy.root,
+            runner,
+            intent,
+            repository,
             runtime: { status: "restart-required", sourceSha256: barrier.barrier.sourceSha256, targetsSha256: barrier.barrier.runtimeTargetsSha256, barrierSha256: barrier.rawSha256, readbackSha256: null },
             nextAction: restartAction(legacy.root, barrier.rawSha256),
             diagnostics: [lifecycleDiagnostic("$.runtime", "restart_required", "Codex runtime targets changed and require a fresh effective-runtime readback", "confirm the one-use restart action")],
@@ -2954,7 +3034,7 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
             deps: fs,
           });
           if (current.status !== "current") throw new Error("cleared runtime readback marker is absent");
-          return afterRuntimeLifecycleResult({ root: legacy.root, intent, repository, runner,
+          return afterRuntimeLifecycleResult({ root: legacy.root, runner, intent, repository, runner,
             runtime: {
               status: "readback-current",
               sourceSha256: current.barrier.sourceSha256,
@@ -2994,7 +3074,7 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
           });
         }
       } catch (error) {
-        return runtimeFailureResult({ root: legacy.root, intent, repository }, error, {
+        return runtimeFailureResult({ root: legacy.root, runner, intent, repository }, error, {
           phase: "native-runtime-readback",
           code: "native_runtime_readback_unavailable",
           message: "private runtime readback state could not be observed safely",
@@ -3003,13 +3083,20 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
       }
     }
   }
-  const cleanupRecovery = partialCleanupRecoveryResult({ root: legacy.root, intent, repository });
+  const cleanupRecovery = partialCleanupRecoveryResult({ root: legacy.root, runner, intent, repository });
   if (cleanupRecovery !== null) return cleanupRecovery;
   const partialPlan = planProjectPartialAuthorityAdoption({ rootDir: legacy.root, deps: fs });
   const reparable = partialPlan.status === "selection-required";
-  return lifecycleResult({ status: "partial", root: legacy.root, intent, repository, runtime: emptyRuntime(),
+  return lifecycleResult({
+    status: "partial",
+    root: legacy.root,
+    runner,
+    intent,
+    repository,
+    runtime: emptyRuntime(),
     nextAction: reparable ? commandAction([ONBOARDING_SCRIPT, "plan-partial-authority", "--root", legacy.root], false, false, PARTIAL_AUTHORITY_PLAN_SCHEMA, ["selection-required", "ready"]) : null,
-    diagnostics: [lifecycleDiagnostic("$.authority", "partial_authority", "the Pipeline authority is incomplete", reparable ? "run the typed partial-authority planner and bind an explicit PO selection" : "inspect the source and generated targets")] });
+    diagnostics: [lifecycleDiagnostic("$.authority", "partial_authority", "the Pipeline authority is incomplete", reparable ? "run the typed partial-authority planner and bind an explicit PO selection" : "inspect the source and generated targets")],
+  });
 }
 
 export function inspectProjectOnboardingV3({ rootDir = process.cwd(), deps: overrides = {}, intent = "onboarding", runner = "codex" } = {}) {

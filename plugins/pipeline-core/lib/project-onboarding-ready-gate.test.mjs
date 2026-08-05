@@ -16,12 +16,12 @@ import {
 
 function root() { return mkdtempSync(join(tmpdir(), "project-ready-gate-")); }
 
-function readyResult(rootDir, intent) {
+function readyResult(rootDir, intent, runner = "codex") {
   return {
     schema: "pipeline.project-onboarding.v4",
     status: "ready",
     root: realpathSync(rootDir),
-    runner: "codex",
+    runner,
     intent,
     repository: {},
     runtime: {},
@@ -32,6 +32,19 @@ function readyResult(rootDir, intent) {
   };
 }
 
+function withClaudecode(value, run) {
+  const had = Object.prototype.hasOwnProperty.call(process.env, "CLAUDECODE");
+  const previous = process.env.CLAUDECODE;
+  try {
+    if (value === undefined) delete process.env.CLAUDECODE;
+    else process.env.CLAUDECODE = value;
+    run();
+  } finally {
+    if (had) process.env.CLAUDECODE = previous;
+    else delete process.env.CLAUDECODE;
+  }
+}
+
 test("exact V4 ready is bound to the requested intent and returns one sanitized receipt", () => {
   const path = root();
   const calls = [];
@@ -39,18 +52,80 @@ test("exact V4 ready is bound to the requested intent and returns one sanitized 
     const result = requireProjectOnboardingReady({
       rootDir: path,
       intent: "dispatch",
+      runner: "codex",
       inspect(options) {
         calls.push(options);
         return readyResult(path, "dispatch");
       },
     });
-    assert.deepEqual(calls, [{ rootDir: path, intent: "dispatch" }]);
+    assert.deepEqual(calls, [{ rootDir: path, intent: "dispatch", runner: "codex" }]);
     assert.deepEqual(result, {
       schema: PROJECT_ONBOARDING_READY_GATE_SCHEMA,
       status: "ready",
       intent: "dispatch",
     });
     assert.equal(JSON.stringify(result).includes(path), false);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("an absent runner resolves from process.env.CLAUDECODE, not inspectProjectOnboardingV3's own Codex default", () => {
+  const path = root();
+  try {
+    withClaudecode("1", () => {
+      let seenRunner = null;
+      const result = requireProjectOnboardingReady({
+        rootDir: path,
+        intent: "dispatch",
+        inspect(options) {
+          seenRunner = options.runner;
+          return readyResult(path, "dispatch", "claude");
+        },
+      });
+      assert.equal(seenRunner, "claude");
+      assert.equal(result.status, "ready");
+    });
+
+    withClaudecode(undefined, () => {
+      let seenRunner = null;
+      requireProjectOnboardingReady({
+        rootDir: path,
+        intent: "dispatch",
+        inspect(options) {
+          seenRunner = options.runner;
+          return readyResult(path, "dispatch", "codex");
+        },
+      });
+      assert.equal(seenRunner, "codex");
+    });
+
+    withClaudecode("0", () => {
+      let seenRunner = null;
+      requireProjectOnboardingReady({
+        rootDir: path,
+        intent: "dispatch",
+        inspect(options) {
+          seenRunner = options.runner;
+          return readyResult(path, "dispatch", "codex");
+        },
+      });
+      assert.equal(seenRunner, "codex");
+    });
+
+    // An explicit `runner` argument still wins over the env-derived default,
+    // even inside a session where CLAUDECODE=1 would otherwise resolve "claude".
+    withClaudecode("1", () => {
+      let seenRunner = null;
+      requireProjectOnboardingReady({
+        rootDir: path,
+        intent: "dispatch",
+        runner: "codex",
+        inspect(options) {
+          seenRunner = options.runner;
+          return readyResult(path, "dispatch", "codex");
+        },
+      });
+      assert.equal(seenRunner, "codex");
+    });
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 

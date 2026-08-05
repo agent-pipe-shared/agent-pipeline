@@ -91,11 +91,19 @@ function safeLifecycleStatus(value) {
 export function requireProjectOnboardingReady({
   rootDir,
   intent,
+  runner,
   inspect = inspectProjectOnboardingV3,
 } = {}) {
   if (!INTENTS.has(intent)) {
     fail("PORG-INTENT", "Project onboarding readiness requires an exact lifecycle intent.", { intent: null });
   }
+
+  // Session/runner identity is threaded explicitly (ADR-0051), never
+  // defaulted silently to "codex": an explicit `runner` argument always wins;
+  // absent one, resolve the real invoking runner from the one Claude Code
+  // sets in every session (main and subagent) rather than falling through to
+  // inspectProjectOnboardingV3's own historical Codex-CLI default.
+  const resolvedRunner = runner ?? (process.env.CLAUDECODE === "1" ? "claude" : "codex");
 
   let physicalRoot;
   try {
@@ -111,7 +119,7 @@ export function requireProjectOnboardingReady({
 
   let observed;
   try {
-    observed = inspect({ rootDir, intent });
+    observed = inspect({ rootDir, intent, runner: resolvedRunner });
   } catch {
     fail(
       "PORG-OBSERVATION-UNAVAILABLE",
@@ -147,7 +155,7 @@ export function requireProjectOnboardingReady({
     );
   }
 
-  if (observed.runner !== "codex"
+  if (observed.runner !== resolvedRunner
     || !plainObject(observed.repository)
     || !plainObject(observed.runtime)
     || !plainObject(observed.continuity)
