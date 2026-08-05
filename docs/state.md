@@ -89,23 +89,30 @@ session history and no longer describes the current publication disposition.
   make):
   - **F1** (major — production diff authored directly in this orchestrator
     session, no Goldfish dispatch; fails every rigor-0 fast-path criterion) —
-    **escalated to the PO** (2026-08-05): the landed code is verify-green/
-    correct, PO directly instructed hands-on "analysieren und fixen" for the
-    original bug, but the process violation is real and its disposition
-    (accept-and-record vs. redo via Goldfish) is a PO call, not mine alone.
-  - **F2** (major — all four commits end `Co-Authored-By: Claude Sonnet 5
-    <noreply@anthropic.com>`, which `guardrails/git.md` GIT-03 explicitly
-    forbids; the mandatory `AI-Assisted: true` marker is absent) —
-    **escalated to the PO** (2026-08-05): the four commits are unpushed
-    (`git status` confirms `ahead N` of `origin/feat/sprint-nova-codex-v046`
-    with none of the four SHAs on the remote), and GIT-04's rewrite ban is
-    textually scoped to commits "that have been pushed/shared" — so amending
-    them is not itself a guard violation — but the general session harness
-    separately requires an explicit user request before any `commit --amend`,
-    so PO confirmation is needed either way. Also noted for the PO: the
-    pre-existing base commit `8ace400` (outside this review's scope) already
-    carries the same prohibited trailer, so "fixing the four" would not by
-    itself make the branch trailer-clean.
+    **escalated to the PO, decision: accept and record** (2026-08-05). The
+    landed code stays as-is; the PO directly instructed hands-on "analysieren
+    und fixen" for the original bug, which is recorded as the mitigating
+    context for this exception. No rework.
+  - **F2** (major — all five commits `7f5ac97`/`d622dc3`/`9429b94`/`b14391c`/
+    `660f3f6` ended `Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>`,
+    which `guardrails/git.md` GIT-03 explicitly forbids; the mandatory
+    `AI-Assisted: true` marker was absent) — **escalated to the PO, decision:
+    amend, fixed** (2026-08-05). All five were unpushed (none on
+    `origin/feat/sprint-nova-codex-v046`), so the rewrite is a pure local
+    history edit, not a GIT-04 violation (its rewrite ban is textually scoped
+    to commits "that have been pushed/shared"). The PO ran the rewrite
+    directly in their own terminal (the auto-mode permission classifier
+    denied `git filter-branch` from this session regardless of push-status
+    context, so the PO executed `git filter-branch -f --msg-filter
+    'sed "s/^Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>$/AI-Assisted: true/"'
+    8ace400..HEAD` themselves). Verified after: all six commits in
+    `8ace400..HEAD` now carry exactly `AI-Assisted: true`, `git diff` between
+    the old and new tip is empty (content byte-identical, only messages
+    changed). New SHAs: `cc272ea` (was `7f5ac97`), `589d55d` (was `d622dc3`),
+    `cc6c4ce` (was `9429b94`), `2ac3c28` (was `b14391c`), `8743131` (was
+    `660f3f6`), `657716c` (was `21a555c`, this file). The pre-existing base
+    commit `8ace400` (outside this review's scope, predates this session)
+    still carries the same trailer — noted, not fixed, out of scope.
   - **F3** (major — `sourceEnablesCodex` at `project-onboarding-v3.mjs:2693-2697`
     hard-rejects a V3 source with `runners.enabled: ["claude"]` even when
     `runner === "claude"`), **F4** (major — the shared admission gate
