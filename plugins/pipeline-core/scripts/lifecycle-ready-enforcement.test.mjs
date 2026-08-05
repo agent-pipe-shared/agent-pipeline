@@ -129,7 +129,7 @@ test("session start calls the gate once before its mutation while hygiene remain
     );
     assert.equal(code, 0);
     assert.deepEqual(order, [
-      ["gate", { rootDir: root, intent: "session" }],
+      ["gate", { rootDir: root, intent: "session", runner: "codex" }],
       ["read-binding", { rootDir: root }],
       ["list-descriptors", { startPath: root }],
       ["start", { sessionId: "gate-positive" }],
