@@ -4,12 +4,16 @@
  * setup.mjs — the Shareable Edition's personalization compiler.
  *
  * The historical legacy v1 compiler turned its ONE source-of-intent config
- * (`pipeline.user.yaml`) into the three runtime-canonical configs this repo
- * already ships and reads at every session
- * (`.claude/settings.json`, `.claude/pipeline.json`, `.claude/pipeline.yaml`) — see
- * the PRD §5/§5a/§6/§7 (Config-Schichtenmodell: user.yaml = source of intent,
- * this script = compiler, the three existing files stay runtime-canonical; no hook/skill
- * ever reads pipeline.user.yaml directly — zero code change to the guard/gate mechanics).
+ * (`pipeline.user.yaml`) into the runtime-canonical configs this repo already
+ * ships and reads at every session: `.claude/settings.json` (Claude Code's
+ * own settings, never project authority) plus a calibration/manifest pair at
+ * whichever configuration tier `resolveProjectAuthorityPaths()`
+ * (`plugins/pipeline-core/lib/project-authority.mjs`) reports as authoritative
+ * -- see the PRD §5/§5a/§6/§7 (Config-Schichtenmodell: user.yaml = source of
+ * intent, this script = compiler, the resolved calibration/manifest pair stays
+ * runtime-canonical; no hook/skill ever reads pipeline.user.yaml directly --
+ * zero code change to the guard/gate mechanics) and ADR-0053 (the generator
+ * derives its write target from the resolver instead of hardcoding a tier).
  *
  * DEPENDENCY-FREE (pure Node >=24, no npm packages): imports only Node builtins plus the
  * two EXISTING plugin libs this repo already ships for exactly this purpose
@@ -143,6 +147,13 @@ import {
   serializePoGateProfileReceipt,
   validatePoGateLanguageProjection,
 } from "./plugins/pipeline-core/lib/po-gate-authority.mjs";
+import {
+  LEGACY_CALIBRATION,
+  LEGACY_MANIFEST,
+  NEUTRAL_CALIBRATION,
+  NEUTRAL_MANIFEST,
+  resolveProjectAuthorityPaths,
+} from "./plugins/pipeline-core/lib/project-authority.mjs";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 export const ROOT_DIR = SCRIPT_DIR; // setup.mjs lives at the export root -- resolve relative
@@ -152,8 +163,48 @@ export const ROOT_DIR = SCRIPT_DIR; // setup.mjs lives at the export root -- res
 const USER_YAML_PATH = join(ROOT_DIR, "pipeline.user.yaml");
 const USER_SCHEMA_PATH = join(ROOT_DIR, "pipeline.user.schema.json");
 const SETTINGS_JSON_PATH = join(ROOT_DIR, ".claude", "settings.json");
-const PIPELINE_JSON_PATH = join(ROOT_DIR, ".claude", "pipeline.json");
-const PIPELINE_YAML_PATH = join(ROOT_DIR, ".claude", "pipeline.yaml");
+
+/**
+ * Resolve where the compiled calibration (pipeline.json-shaped) and manifest
+ * (pipeline.yaml-shaped) runtime targets belong (ADR-0053). Defers entirely
+ * to the project-authority resolver instead of a hardcoded legacy path:
+ *
+ * - `ready` (neutral or legacy): honored as-is. A legacy-tier project keeps
+ *   its compiled files in `.claude/` -- running setup never silently
+ *   migrates a consumer to the neutral tier -- and a neutral-tier project's
+ *   compiled files land in `project/`.
+ * - `missing` (a pristine project with no authority manifest at either tier
+ *   yet): deliberately seeded at the neutral tier. The runner-neutral tier
+ *   is the direction of travel, and no code path was found that requires a
+ *   brand-new project to start on the legacy tier.
+ * - any other resolver status (`unsafe`, `migration-required`, `mixed`,
+ *   `invalid-root`, `invalid`): the on-disk authority state is already
+ *   ambiguous or broken. This generator does not attempt to repair that
+ *   itself and keeps the previously established legacy target rather than
+ *   guessing which tier the operator intended.
+ */
+export function resolveCompiledRuntimeTargets(rootDir = ROOT_DIR) {
+  const resolved = resolveProjectAuthorityPaths({ rootDir });
+  if (resolved.status === "ready") {
+    return {
+      source: resolved.source,
+      calibrationPath: join(rootDir, resolved.calibration),
+      manifestPath: join(rootDir, resolved.manifest),
+    };
+  }
+  if (resolved.status === "missing") {
+    return {
+      source: "neutral",
+      calibrationPath: join(rootDir, NEUTRAL_CALIBRATION),
+      manifestPath: join(rootDir, NEUTRAL_MANIFEST),
+    };
+  }
+  return {
+    source: "legacy",
+    calibrationPath: join(rootDir, LEGACY_CALIBRATION),
+    manifestPath: join(rootDir, LEGACY_MANIFEST),
+  };
+}
 
 export const GENERATED_MARKER_PREFIX = "GENERATED from pipeline.user.yaml — edit there, then re-run setup";
 export const HUMAN_FACING_LANGUAGES = Object.freeze(["de", "en"]);
@@ -645,8 +696,9 @@ export function renderUserYaml(answers) {
 # The ONE file that makes the Pipeline "yours". The methodology core stays generic.
 #
 # Change it → re-run \`node setup.mjs\` (recompiles the runtime configs:
-# .claude/settings.json, .claude/pipeline.json, .claude/pipeline.yaml). This file is
-# the SOURCE of intent — the three compiled files are runtime-canonical and each
+# .claude/settings.json plus the calibration/manifest pair at whichever tier is
+# authoritative -- ADR-0053). This file is
+# the SOURCE of intent — the compiled files are runtime-canonical and each
 # carries a "GENERATED from pipeline.user.yaml" header; hand-edits THERE are detected
 # as drift on the next \`setup.mjs\` run and overwritten only after confirmation
 # (layer model).
@@ -884,7 +936,7 @@ export function compilePipelineJson(existing, answers, sourceHash) {
 }
 
 /** Fully regenerated from a fixed template on every compile (see file header "COMPILE MODEL"). */
-/** Renders the compiled `release:` section for .claude/pipeline.yaml -- ONLY called with a
+/** Renders the compiled `release:` section for the runtime manifest -- ONLY called with a
  * present object by renderPipelineYaml() below (ADR-0033/0034 anti-bloat guarantee: an absent
  * `release` in pipeline.user.yaml means the compiled manifest carries no release: section at
  * all, zero behavior change). Targeted serializer for the known release shape
@@ -974,9 +1026,9 @@ export function renderDirectRoutingProjectionsYaml(routing) {
 
 export function renderPipelineYaml(answers, sourceHash) {
   const pushApproval = answers.autonomy.push_policy === "standing-approved" ? "standing-approved" : "required";
-  const base = `# pipeline.yaml -- declarative pipeline manifest (.claude/pipeline.yaml, schema pipeline.manifest.v0).
+  const base = `# pipeline.yaml -- declarative pipeline manifest (project-authority-resolved location, schema pipeline.manifest.v0).
 # ${generatedMarker(sourceHash)}
-# ADDITIVE to .claude/pipeline.json (project calibration) -- disjoint field sets.
+# ADDITIVE to the project-authority calibration file (project calibration) -- disjoint field sets.
 # Validate with: node harness/scripts/validate-manifest.mjs
 
 schema: pipeline.manifest.v0
@@ -1637,11 +1689,16 @@ Legacy v0/v1/v2 sources are never compiled. Review and activate their one-way V3
   }
 
   const sourceHash = shortHash(userYamlText);
+  const renderPipelineYamlFn = deps.renderPipelineYamlFn ?? renderPipelineYaml;
   const pipelineYamlWanted = renderPipelineYamlFn(answers, sourceHash);
   const manifestPreflight = validateCompiledPipelineYaml(pipelineYamlWanted, rootDir);
+  const compiledTargets = (deps.resolveCompiledRuntimeTargets ?? resolveCompiledRuntimeTargets)(rootDir);
+  const settingsJsonPath = join(rootDir, ".claude", "settings.json");
+  const pipelineJsonPath = compiledTargets.calibrationPath;
+  const pipelineYamlPath = compiledTargets.manifestPath;
   if (manifestPreflight.status !== "ok") {
     if (rl) rl.close();
-    console.error("setup.mjs: generated .claude/pipeline.yaml failed canonical validation; no files were written:");
+    console.error(`setup.mjs: generated ${relative(rootDir, pipelineYamlPath)} failed canonical validation; no files were written:`);
     for (const error of manifestPreflight.errors) {
       console.error(`  ${error.reason ?? error.message ?? `${error.path}: expected ${error.expected}, got ${error.got}`}`);
     }
@@ -1678,7 +1735,7 @@ Legacy v0/v1/v2 sources are never compiled. Review and activate their one-way V3
   const settingsState = readJsonSafe(settingsJsonPath);
   const settingsWanted = JSON.stringify(compileSettingsJson(settingsState.parsed, answers, sourceHash), null, 2) + "\n";
   await applyCompileDecision({
-    label: ".claude/settings.json",
+    label: relative(rootDir, settingsJsonPath),
     path: settingsJsonPath,
     existingState: settingsState,
     wantedText: settingsWanted,
@@ -1691,7 +1748,7 @@ Legacy v0/v1/v2 sources are never compiled. Review and activate their one-way V3
   const pipelineJsonState = readJsonSafe(pipelineJsonPath);
   const pipelineJsonWanted = JSON.stringify(compilePipelineJson(pipelineJsonState.parsed, answers, sourceHash), null, 2) + "\n";
   await applyCompileDecision({
-    label: ".claude/pipeline.json",
+    label: relative(rootDir, pipelineJsonPath),
     path: pipelineJsonPath,
     existingState: pipelineJsonState,
     wantedText: pipelineJsonWanted,
@@ -1704,7 +1761,7 @@ Legacy v0/v1/v2 sources are never compiled. Review and activate their one-way V3
   const pipelineYamlExists = existsSync(pipelineYamlPath);
   const pipelineYamlRaw = pipelineYamlExists ? readFileSync(pipelineYamlPath, "utf8") : null;
   await applyCompileDecision({
-    label: ".claude/pipeline.yaml",
+    label: relative(rootDir, pipelineYamlPath),
     path: pipelineYamlPath,
     existingState: { existsOnDisk: pipelineYamlExists, parsedOk: true, raw: pipelineYamlRaw, parsed: null },
     wantedText: pipelineYamlWanted,

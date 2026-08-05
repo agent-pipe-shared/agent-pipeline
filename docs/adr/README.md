@@ -65,6 +65,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0050](0050-candidate-bound-verify-run-journal.md) | Candidate-bound private Verify run journal | accepted | 2026-08-01 |
 | [0051](0051-dual-runner-tri-platform-development-contract.md) | Dual-runner (Claude Code + Codex), tri-platform (Windows/macOS/Unix-WSL) development contract | accepted | 2026-08-04 |
 | [0052](0052-marketplace-identity-restoration-and-local-dev-separation.md) | Restore the published marketplace identity and give local development its own | accepted | 2026-08-06 |
+| [0053](0053-setup-generator-authority-resolved-targets.md) | `setup.mjs` writes to the resolved project-authority tier, not a hardcoded legacy path | accepted (generator fix), partially deferred (stale-mirror removal) | 2026-08-06 |
 
 ### Resubmissions
 
@@ -79,6 +80,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0023](0023-elephant-context-diet.md) | Measurement-goal check at the next feature session (Elephant share ≤50%, feature session <$30, wall time −30%, first-pass unchanged) |
 | [0051](0051-dual-runner-tri-platform-development-contract.md) | Revisit/supersede when the planned Antigravity runner is actually realized |
 | [0052](0052-marketplace-identity-restoration-and-local-dev-separation.md) | PO acceptance required before publication (published supply-chain surface); first confirmed `claude plugin install` against the separate local marketplace root should be recorded here or in a successor entry |
+| [0053](0053-setup-generator-authority-resolved-targets.md) | Repository-wide legacy-path migration (Full Verify plus roughly a dozen other files) must land before the deferred `.claude/pipeline.json`/`.claude/pipeline.yaml` stale-mirror removal can be completed |
 
 ### Conventions
 

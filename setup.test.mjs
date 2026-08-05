@@ -45,6 +45,7 @@ import {
   compileSettingsJson,
   compilePipelineJson,
   renderPipelineYaml,
+  resolveCompiledRuntimeTargets,
   validateCompiledPipelineYaml,
   publishPoGateProfileReceipt,
   validateSharedLock,
@@ -587,6 +588,74 @@ for (const [name, source] of [
     result.status === "invalid" && result.errors.some((error) => error.path === "release.environments.prod.adapter"),
     JSON.stringify(result.errors),
   );
+}
+
+// ======================================================================================
+// resolveCompiledRuntimeTargets — ADR-0053: generator writes to the resolved
+// project-authority tier instead of a hardcoded legacy path.
+// ======================================================================================
+{
+  const root = mkdtempSync(join(tmpdir(), "setup-targets-neutral-"));
+  mkdirSync(join(root, "project"), { recursive: true });
+  writeFileSync(join(root, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  const targets = resolveCompiledRuntimeTargets(root);
+  ok(
+    "resolveCompiledRuntimeTargets: a neutral-authority project gets project/ write targets",
+    targets.source === "neutral"
+      && targets.calibrationPath === join(root, "project", "pipeline.json")
+      && targets.manifestPath === join(root, "project", "pipeline.yaml"),
+    JSON.stringify(targets),
+  );
+  rmSync(root, { recursive: true, force: true });
+}
+{
+  const root = mkdtempSync(join(tmpdir(), "setup-targets-legacy-"));
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  const targets = resolveCompiledRuntimeTargets(root);
+  ok(
+    "resolveCompiledRuntimeTargets: a legacy-authority project still gets .claude/ write targets (never silently migrated by running setup)",
+    targets.source === "legacy"
+      && targets.calibrationPath === join(root, ".claude", "pipeline.json")
+      && targets.manifestPath === join(root, ".claude", "pipeline.yaml"),
+    JSON.stringify(targets),
+  );
+  rmSync(root, { recursive: true, force: true });
+}
+{
+  const root = mkdtempSync(join(tmpdir(), "setup-targets-pristine-"));
+  const targets = resolveCompiledRuntimeTargets(root);
+  ok(
+    "resolveCompiledRuntimeTargets: a pristine project (no authority manifest at either tier) is deliberately seeded at the neutral tier",
+    targets.source === "neutral"
+      && targets.calibrationPath === join(root, "project", "pipeline.json")
+      && targets.manifestPath === join(root, "project", "pipeline.yaml")
+      && !existsSync(join(root, "project"))
+      && !existsSync(join(root, ".claude")),
+    JSON.stringify(targets),
+  );
+  rmSync(root, { recursive: true, force: true });
+}
+{
+  // ADR-0053's documented fallback for an ambiguous/broken on-disk authority state
+  // (here: `mixed` -- a neutral manifest present alongside orphaned legacy calibration
+  // with no neutral calibration of its own -- see project-authority.mjs `authority()`):
+  // this generator does not attempt to repair it and keeps the legacy target rather
+  // than guessing.
+  const root = mkdtempSync(join(tmpdir(), "setup-targets-mixed-"));
+  mkdirSync(join(root, "project"), { recursive: true });
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  writeFileSync(join(root, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  writeFileSync(join(root, ".claude", "pipeline.json"), "{}\n");
+  const targets = resolveCompiledRuntimeTargets(root);
+  ok(
+    "resolveCompiledRuntimeTargets: an ambiguous/broken authority state (e.g. mixed) falls back to the legacy target instead of guessing",
+    targets.source === "legacy"
+      && targets.calibrationPath === join(root, ".claude", "pipeline.json")
+      && targets.manifestPath === join(root, ".claude", "pipeline.yaml"),
+    JSON.stringify(targets),
+  );
+  rmSync(root, { recursive: true, force: true });
 }
 
 // ======================================================================================
