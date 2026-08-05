@@ -148,18 +148,39 @@ Verified on a correct local-development installation:
 - A plugin change takes effect only after a **Claude Code session restart**;
   the update command says so explicitly.
 
+## Scope model
+
+A local-scope install is per-repository: it is recorded in
+`~/.claude/plugins/installed_plugins.json` with a `projectPath` field naming
+the single checkout it applies to, and it does not affect any other checkout
+on the host. A marketplace declaration, by contrast, lives at `--scope user`
+in `~/.claude/settings.json` and is host-wide: every repository on the host
+can see the marketplace, but only repositories with their own install and
+enablement actually load the plugin. Because a marketplace registers under
+its manifest's `name` field, two different local checkouts of this
+repository cannot both be registered as sources at the same time — they
+would each register as `agent-pipeline-local` and overwrite one another.
+Switching which checkout is the development source is a deliberate
+`marketplace remove` + `marketplace add` operation, not something that can
+be held in parallel.
+
 ## Exit / retire local test mode
 
 ```text
+claude plugin uninstall pipeline-core@agent-pipeline-local --scope local
 claude plugin marketplace remove agent-pipeline-local
 ```
 
-This removes the local checkout's marketplace registration, so the local
-selector `pipeline-core@agent-pipeline-local` can no longer resolve. This
-document does not state a verified command for removing the local-scope
-plugin install entry itself — the measured commands available to this
-document are `install` and `update`, not a removal/uninstall command; do not
-infer one. Restart the session after the marketplace removal.
+`claude plugin uninstall` defaults to `--scope user`, exactly like `claude
+plugin update` — the same scope-mismatch trap documented above applies here
+too, so a `local`-scope install requires the explicit `--scope local` (or
+`-s local`). This document records the documented interface of `uninstall`
+(measured from its `--help` output) rather than an observed success output:
+unlike the sequences elsewhere in this document, this command has not been
+confirmed by readback. The subsequent `marketplace remove` (unqualified,
+removing from every scope) drops the local checkout's marketplace
+registration, so the local selector `pipeline-core@agent-pipeline-local` can
+no longer resolve. Restart the session after these changes.
 
 ### Known limitation
 
