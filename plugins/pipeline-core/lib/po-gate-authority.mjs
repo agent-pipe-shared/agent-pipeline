@@ -274,7 +274,14 @@ function gitWorktreeRootCandidate(root) {
   return process.platform === "win32" ? root.replaceAll("/", sep) : root;
 }
 
-/** Parse `git worktree list --porcelain -z` without exposing paths in errors. */
+/**
+ * Parse `git worktree list --porcelain -z` without exposing paths in errors.
+ * A record may carry a `prunable <reason>` field when Git itself has already
+ * determined the registration's working directory no longer exists (the
+ * reason text is Git's own and is not a stable contract -- only the field's
+ * presence is the signal). Surface that as `prunable: boolean` on the entry;
+ * never drop the entry or fail the parse over it.
+ */
 export function parseGitWorktreeList(raw) {
   if (typeof raw !== "string" || !raw.endsWith("\0")) return null;
   const records = raw.split("\0\0").filter((record) => record.length > 0);
@@ -287,8 +294,9 @@ export function parseGitWorktreeList(raw) {
     const head = fields.find((field) => field.startsWith("HEAD "))?.slice(5);
     const branch = fields.find((field) => field.startsWith("branch "))?.slice(7) ?? null;
     const detached = fields.includes("detached");
+    const prunable = fields.some((field) => field.startsWith("prunable "));
     if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/u.test(head ?? "") || (branch === null) === !detached) return null;
-    entries.push({ root, head, branch, detached });
+    entries.push({ root, head, branch, detached, prunable });
   }
   if (entries.length === 0 || new Set(entries.map(({ root }) => root)).size !== entries.length) return null;
   return entries;
@@ -346,7 +354,19 @@ export function resolvePoGateRepositoryTopology(repoRoot, deps = {}) {
   const worktrees = parseGitWorktreeList(gitObservation(start, ["worktree", "list", "--porcelain", "-z"], deps.spawn));
   const primary = selectPrimaryWorktree(worktrees);
   if (worktrees === null || primary === null) throw new Error("Git worktree topology unavailable");
-  const registeredWorktreeRoots = worktrees.map(({ root }) => assertPhysicalDirectory(realpathSync(root)));
+  // Exclude registrations Git itself has already marked `prunable` (their working
+  // directory no longer physically exists) before the physical-directory assertion,
+  // rather than letting a stale registration's ENOENT abort topology resolution
+  // entirely. This is fail-CLOSED, not fail-open: `registeredWorktreeRoots` is only
+  // ever consumed to check that the *current* root is a member of it, so removing
+  // entries can only shrink that set and can only turn a would-be acceptance into a
+  // rejection, never the reverse -- a stale registration can never legitimately be
+  // the current root, because the current root demonstrably exists (it was just
+  // realpath'd above). Non-prunable entries still go through the unrelaxed
+  // assertPhysicalDirectory/realpathSync check below and still throw on failure.
+  const registeredWorktreeRoots = worktrees
+    .filter((entry) => !entry.prunable)
+    .map(({ root }) => assertPhysicalDirectory(realpathSync(root)));
   return {
     repoRoot: observedRoot,
     gitCommonDir,

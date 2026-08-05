@@ -674,8 +674,27 @@ check("detached worktree porcelain is parsed without branch inference", () => {
   const entries = parseGitWorktreeList(raw);
   assert.equal(entries.length, 2);
   assert.equal(selectPrimaryWorktree(entries).root, primaryRoot);
-  assert.deepEqual(entries[1], { root: detachedRoot, head: oid, branch: null, detached: true });
+  assert.deepEqual(entries[1], { root: detachedRoot, head: oid, branch: null, detached: true, prunable: false });
   assert.equal(parseGitWorktreeList(`worktree relative\0HEAD ${oid}\0detached\0\0`), null);
+});
+
+check("parseGitWorktreeList surfaces the prunable state per entry without dropping the record or its validation", () => {
+  const oid = "a".repeat(40);
+  const primaryRoot = process.platform === "win32" ? "D:/repo" : "/repo";
+  const staleRoot = process.platform === "win32" ? "D:/repo/stale" : "/repo/stale";
+  const raw = `worktree ${primaryRoot}\0HEAD ${oid}\0branch refs/heads/main\0\0worktree ${staleRoot}\0HEAD ${oid}\0detached\0prunable gitdir file points to non-existent location\0\0`;
+  const entries = parseGitWorktreeList(raw);
+  assert.equal(entries.length, 2);
+  assert.equal(entries[0].prunable, false, "a live entry must not be reported as prunable");
+  assert.equal(entries[1].prunable, true, "a prunable entry must surface prunable: true, never be dropped");
+  assert.equal(entries[1].root, staleRoot, "the prunable entry's root must still be reported");
+  // The reason text after `prunable ` is Git's own and not a stable contract --
+  // only the field's presence is the signal, per the module contract above.
+  const differentReason = raw.replace(
+    "prunable gitdir file points to non-existent location",
+    "prunable ??? some other future Git reason ???",
+  );
+  assert.equal(parseGitWorktreeList(differentReason)[1].prunable, true);
 });
 
 check("topology accepts only a status-zero Git observation carrying the documented EPERM false-positive", () => {
@@ -693,6 +712,58 @@ check("topology accepts only a status-zero Git observation carrying the document
     const topology = resolvePoGateRepositoryTopology(current, { spawn });
     assert.equal(topology.repoRoot, current);
     assert.equal(topology.primaryRoot, primary);
+  });
+});
+
+check("a prunable worktree registration is excluded from registeredWorktreeRoots without aborting topology resolution", () => {
+  withFixture({ linkedLanguage: "en" }, ({ common, primary, current }) => {
+    const oid = "a".repeat(40);
+    const staleRoot = process.platform === "win32" ? "D:/pipeline-stale/prunable" : "/pipeline-stale/prunable";
+    const spawn = (_command, args) => {
+      if (args.join(" ") === "rev-parse --show-toplevel") return { status: 0, stdout: `${current}\n` };
+      if (args.join(" ") === "rev-parse --path-format=absolute --git-common-dir") return { status: 0, stdout: `${common}\n` };
+      if (args.join(" ") === "worktree list --porcelain -z") {
+        return {
+          status: 0,
+          // primary first (as Git always emits it), then the live linked worktree,
+          // then a prunable registration whose directory does not exist on disk --
+          // the fix must never call realpathSync/assertPhysicalDirectory on it.
+          stdout: `worktree ${primary}\0HEAD ${oid}\0branch refs/heads/main\0\0worktree ${current}\0HEAD ${oid}\0detached\0\0worktree ${staleRoot}\0HEAD ${oid}\0detached\0prunable gitdir file points to non-existent location\0\0`,
+        };
+      }
+      throw new Error(`unexpected git command: ${args.join(" ")}`);
+    };
+    const topology = resolvePoGateRepositoryTopology(current, { spawn });
+    // (d) the primary worktree is still selected correctly even though a prunable
+    // entry follows it in the porcelain list.
+    assert.equal(topology.primaryRoot, primary);
+    // (b) a mixed live+prunable set resolves to exactly the live roots.
+    assert.deepEqual(topology.registeredWorktreeRoots, [primary, current]);
+    assert.equal(topology.worktrees.length, 3);
+    assert.equal(topology.worktrees[2].root, staleRoot);
+    assert.equal(topology.worktrees[2].prunable, true);
+  });
+});
+
+check("a stale worktree registration that Git has NOT marked prunable still throws (fail-closed baseline preserved)", () => {
+  withFixture({ linkedLanguage: "en" }, ({ common, primary, current }) => {
+    const oid = "a".repeat(40);
+    const staleRoot = process.platform === "win32" ? "D:/pipeline-stale/not-prunable" : "/pipeline-stale/not-prunable";
+    const spawn = (_command, args) => {
+      if (args.join(" ") === "rev-parse --show-toplevel") return { status: 0, stdout: `${current}\n` };
+      if (args.join(" ") === "rev-parse --path-format=absolute --git-common-dir") return { status: 0, stdout: `${common}\n` };
+      if (args.join(" ") === "worktree list --porcelain -z") {
+        return {
+          status: 0,
+          stdout: `worktree ${primary}\0HEAD ${oid}\0branch refs/heads/main\0\0worktree ${current}\0HEAD ${oid}\0detached\0\0worktree ${staleRoot}\0HEAD ${oid}\0detached\0\0`,
+        };
+      }
+      throw new Error(`unexpected git command: ${args.join(" ")}`);
+    };
+    // (c) no `prunable` field means the entry is still fed into the unrelaxed
+    // physical-directory assertion, exactly as before this fix -- this is the
+    // security property that must not be relaxed.
+    assert.throws(() => resolvePoGateRepositoryTopology(current, { spawn }), /ENOENT/u);
   });
 });
 
