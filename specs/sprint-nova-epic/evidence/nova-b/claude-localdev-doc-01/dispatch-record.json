@@ -1,0 +1,8 @@
+{
+  "schema": "pipeline.dispatch-record.v1",
+  "taskId": "CLAUDE-LOCALDEV-DOC-01",
+  "model": "sonnet",
+  "rulesetSha": "2914a55713d714d95323231edaddccec5e1d6c2e5a4fbfaaaaa9d913a5fb1efc",
+  "dispatcher": "goldfish-deep",
+  "outcome": "authored docs/claude-local-plugin-development.md as the Claude-runner counterpart of docs/codex-local-plugin-development.md, covering identities, the marketplace name-collision hazard and its recovery, the cachebuster/version convention, enter/update/exit local test mode, and the readback contract; added a one-line cross-reference in the Codex sibling; classified the new doc in governance/observation-doc-governance.json alongside its sibling; check-doc-contracts.mjs, check-observation-governance.mjs and check-claude-md-lines.mjs all exit 0"
+}

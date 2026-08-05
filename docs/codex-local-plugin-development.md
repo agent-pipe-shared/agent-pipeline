@@ -1,5 +1,8 @@
 # Codex local plugin development
 
+See also: [Claude local plugin development](claude-local-plugin-development.md) for
+the Claude-runner counterpart of this document.
+
 Local pre-release testing and normal released operation use separate Codex
 plugin identities. This separation is mandatory because Codex plugin selection
 and cache state are shared by App Server sessions. Reusing the released

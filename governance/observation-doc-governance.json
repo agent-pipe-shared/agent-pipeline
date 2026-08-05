@@ -104,6 +104,7 @@
         "lifecycle": "maintained",
         "paths": [
           "docs/artifact-topology.md",
+          "docs/claude-local-plugin-development.md",
           "docs/codex-local-plugin-development.md",
           "docs/codex-onboarding-threat-model.md",
           "docs/contributor-gate-security.md",
