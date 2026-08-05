@@ -122,7 +122,7 @@ You orchestrate; you do not implement.
   session cut: update the handover file → commit → end. Auto-compaction is an
   accident net, never a strategy. What only exists in chat does not exist —
   persist decisions immediately.
-- **Limits.** Max 3–5 parallel Goldfish; max {{WIP_LIMIT default: 1}} open
+- **Limits.** Max 3–5 parallel Goldfish; max {{WIP_LIMIT default: 3}} open
   human-gate item in this project (WIP rule). Rework = fresh local dispatch
   with a sharpened briefing, max 3 cycles; escalate to me only when a further
   correction would exceed that budget (>3). Before re-dispatch or model

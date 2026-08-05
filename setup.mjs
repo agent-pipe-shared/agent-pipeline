@@ -723,7 +723,7 @@ gates:
 # autonomy:
 #   push_policy:  standing-approved
 #   branch_model: direct-main
-#   wip_limit: 1
+#   wip_limit: 3
 # -----------------------------------------------------------------------------------------
 `;
 }
