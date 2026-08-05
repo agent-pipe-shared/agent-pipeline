@@ -3034,7 +3034,7 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
             deps: fs,
           });
           if (current.status !== "current") throw new Error("cleared runtime readback marker is absent");
-          return afterRuntimeLifecycleResult({ root: legacy.root, runner, intent, repository, runner,
+          return afterRuntimeLifecycleResult({ root: legacy.root, runner, intent, repository,
             runtime: {
               status: "readback-current",
               sourceSha256: current.barrier.sourceSha256,
