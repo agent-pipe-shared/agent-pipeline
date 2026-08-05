@@ -554,8 +554,8 @@ export function applyAboPreset(tier) {
 /** @param {string} preset - "autonom"/"autonomous" or anything else ("conservative") */
 export function applyAutonomyPreset(preset) {
   const p = String(preset ?? "").toLowerCase();
-  if (p.startsWith("autonom")) return { push_policy: "standing-approved", branch_model: "direct-main", wip_limit: 1 };
-  return { push_policy: "gated", branch_model: "feature-branch", wip_limit: 1 };
+  if (p.startsWith("autonom")) return { push_policy: "standing-approved", branch_model: "direct-main", wip_limit: 3 };
+  return { push_policy: "gated", branch_model: "feature-branch", wip_limit: 3 };
 }
 
 /**

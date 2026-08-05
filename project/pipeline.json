@@ -7,7 +7,7 @@
   "autonomy": "standing-approved",
   "branchModel": "direct-main",
   "verification": "docs+tests",
-  "wipLimit": 1,
+  "wipLimit": 3,
   "worktree": "optional",
   "claudeMdMaxLines": 200,
   "stakes": "hoch (Guardrail-Quelle aller Projekte)",

@@ -82,7 +82,7 @@ Rule IDs: `GIT-xx`.
 - Push/merge autonomy is whatever the calibration grants — and no more; consent for outward-effective actions never carries across contexts (`guardrails/global.md` GL-04). In this repo: pushing `main` at work-package boundaries is standing-approved by PO directive; destructive push forms remain guard-blocked.
 - Writing tasks run in a worktree per project calibration (ADR-0008); OPEN (Phase 4): validated worktree tier + fallback per project.
 - **Why:** The gate is the central invariant, the form is calibrated — <PROJECT_C>'s PR flow and <PROJECT_A>/<PROJECT_B> direct-push are deliberate differences, not drift.
-- **Verification:** Calibration file names the branch model; gate evidence exists before merge; the WIP rule (max 1 open human-gate item per project) is checked at dispatch time.
+- **Verification:** Calibration file names the branch model; gate evidence exists before merge; the WIP rule (a Kanban-style cap on concurrently open blocks/worktrees, calibration wipLimit, base default 3 -- not a cap on parallel Goldfish dispatch within one already-open block, which stays ungated as long as files/state don't conflict) is checked at dispatch time.
 
 ## GIT-06 — Merge-completion gate
 

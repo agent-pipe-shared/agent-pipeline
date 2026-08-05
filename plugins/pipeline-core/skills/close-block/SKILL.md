@@ -88,7 +88,7 @@ Read `.claude/pipeline.json` of the current project. Keys starting with `$` are 
 | `verify` | step 3 gate run (the ONE verify command) | — (required) |
 | `claudeMdMaxLines` | step 4 length gate | warn "uncalibrated length gate" (no silent number) |
 | `handover` | step 5 target file | `docs/state.md` (convention, operating-model §6) |
-| `wipLimit` | step 4 stale-worktree/WIP check | 1 (base rule) |
+| `wipLimit` | step 4 stale-worktree/WIP check | 3 (base rule) -- caps concurrently open blocks/worktrees, not parallel Goldfish within one block |
 | `ritualExtensions` | steps 1 and 9 extension points | none |
 
 **File missing or required fields missing → fail-safe, no silent guessing (operating-model §8):** announce explicitly that the project is **"uncalibrated"**, STOP for all writing steps of this ritual, offer to draft the calibration from the field table above (canonical filled example: `templates/pipeline.json.example` in the agent-pipeline repo; an installed plugin cannot read repo templates, so generate the draft from the field list) and name the new file to the PO for confirmation. Read-only reporting of the session state stays allowed.
