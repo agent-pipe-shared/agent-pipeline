@@ -152,14 +152,34 @@ Verified on a correct local-development installation:
 
 ```text
 claude plugin marketplace remove agent-pipeline-local
-claude plugin marketplace add https://github.com/agent-pipe-shared/agent-pipeline.git --ref main
-claude plugin install pipeline-core@agent-pipeline --scope local
 ```
 
-Restart the session. Re-run the readback contract, expecting
-`installedSource: "unknown"` or the released identity's own attestation
-(this document does not assert Codex-style `sourceType` fields for the
-released path; Claude's `plugin list --json` carries no source field, so the
-released identity is confirmed by selector id and version alone). Only then
-reopen critical existing sessions. Their repository state and continuity
-remain unchanged by this host plugin-source switch.
+This removes the local checkout's marketplace registration, so the local
+selector `pipeline-core@agent-pipeline-local` can no longer resolve. This
+document does not state a verified command for removing the local-scope
+plugin install entry itself — the measured commands available to this
+document are `install` and `update`, not a removal/uninstall command; do not
+infer one. Restart the session after the marketplace removal.
+
+### Known limitation
+
+There is no verified command sequence in this document for reaching the
+released identity (`pipeline-core@agent-pipeline`) by re-adding this
+repository's own GitHub source. This repository's own published
+`.claude-plugin/marketplace.json` self-names `agent-pipeline-local` (see
+"The name-collision hazard" above): a marketplace added from this
+repository's GitHub source registers under the name `agent-pipeline-local`,
+not `agent-pipeline`, so the selector `pipeline-core@agent-pipeline` cannot
+resolve from it. `claude plugin marketplace list` renders such a
+GitHub-sourced entry as `Source: GitHub (<org>/<repo>)`, distinguishable
+from a directory-sourced entry showing its path — but no add sequence
+starting from this repository's own manifest reaches the released selector
+id as it currently stands. The released row of the Identities table above
+describes the intended target state of normal operation (a marketplace
+already registered under the name `agent-pipeline` from an authoritative
+distribution source), not a sequence an operator can reach today by
+re-adding this checkout's own remote.
+
+Restart the session after any marketplace or install change and re-run the
+readback contract before starting further sessions. Repository state and
+continuity remain unchanged by this host plugin-source switch.
