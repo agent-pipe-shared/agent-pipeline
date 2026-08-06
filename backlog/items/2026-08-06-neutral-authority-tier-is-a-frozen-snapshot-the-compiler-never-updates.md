@@ -105,3 +105,32 @@ resolver serves is the tier the compiler writes.
 - [ADR-0054](../../docs/adr/0054-arbitheon-authority-directory-and-precedence-chain.md) — the precedence chain this defect lives in.
 - [ADR-0053](../../docs/adr/0053-setup-generator-authority-resolved-targets.md) — named this drift class but recorded the direction backwards (it reads `.claude/*` as the stale mirror; the evidence above shows the reverse).
 - [`2026-08-05-critical-human-proof-not-wired-to-push-and-prd-gates`](2026-08-05-critical-human-proof-not-wired-to-push-and-prd-gates.md) — the observed symptom.
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** partially accepted and delivered; stays open, narrowed to
+  step 3 only.
+- **Rationale:** steps 1, 2, and 4 of "Proposed fix" above were delivered
+  the same session this item was filed: `dc52c66`/`f3c2702` set
+  `gates.push.approval: required` per the PO's explicit decision (step 1)
+  and reconciled `session.keep_awake`, both `modelRouting` rows, and
+  `humanRoles.po.displayLabel` from `pipeline.user.yaml` while preserving
+  `pipelineUpdateChannel: alpha` (step 2); `d4b2fcc`/`2c24ec7` added the
+  tier-agreement check to Verify (step 4) — re-run live 2026-08-06 night,
+  exit 0. **Step 3 (make the tier the resolver serves the tier the compiler
+  writes — ADR-0054 step 3) is confirmed NOT done:**
+  `plugins/pipeline-core/config/runtime-projection-v3-owned-keys.json` still
+  lists only `.claude/*`/`.codex/*` targets; the compiler has no `project/*`
+  write target. `project/pipeline.yaml`/`project/pipeline.json` were fixed
+  by the one-time hand commit `dc52c66`, not by the compiler — so this
+  item's own title claim is still literally true; only its *consequence*
+  (silent push-gate defeat) is fixed, and future drift is now caught (by
+  the step-4 check), not prevented. This exact remaining step is already
+  independently tracked in `docs/state.md`'s "Explicitly deferred to 0.5.3"
+  section as "ADR-0054 steps 2–4 ... staged and NOT started" — this item
+  should be read as the concrete defect-report half of that tracking entry,
+  not a duplicate.
+- **Assignment (if accepted):** steps 1/2/4 delivered `dc52c66`/`f3c2702`/
+  `d4b2fcc`/`2c24ec7`, Sprint Nova session, 2026-08-06. Step 3 unassigned;
+  sequenced after 0.5.2 per `docs/state.md`.
+- **Date:** 2026-08-06

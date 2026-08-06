@@ -9,9 +9,14 @@ source: "PO question during Sprint Nova session, 2026-08-05: asked whether the e
 due: 2026-09-05
 ---
 
-# The Ed25519 critical-human-proof mechanism is not actually enforced for either "push" or PRD approval
+# The Ed25519 critical-human-proof mechanism is not proof-bound for PRD approval
 
-## Description
+**Narrowed 2026-08-06 — see Triage.** The `push` half of this item's original
+title is resolved; only the PRD-approval half remains. Original Description
+kept below for the historical record of what was found; do not read it as
+describing the current `push` state.
+
+## Description (as filed, 2026-08-05 — push half now resolved, see Triage)
 
 Agent-Pipeline has a fully implemented, tested, cryptographic proof-of-human
 primitive (`plugins/pipeline-core/lib/po-approval-proof.mjs`,
@@ -69,34 +74,54 @@ via a direct `guard-push.mjs` stdin invocation (exit 0, not blocked) plus
 proof binding), `project/pipeline.yaml` vs. `.claude/pipeline.yaml` (manifest
 drift), `CLAUDE.md` / `guardrails/git.md` (missing contract reference).
 
-## Proposal
+## Proposal (narrowed 2026-08-06 — only step 3 remains; see Triage)
 
-1. Decide, as a PO-level policy call, whether `push` should actually require
-   the Ed25519 proof for this repo (switch `project/pipeline.yaml`'s
-   `gates.push.approval` to `required`, complete the one-time `$PO_DIR` setup
-   described in `docs/po-approval-proof-contract.md`) or whether
-   `standing-approved` is the deliberately chosen posture for this
-   self-application repo specifically — if the latter, `project/
-   critical-human-proof.json` listing `push` as a required kind is itself the
-   thing to correct (remove it, or document the standing-approved carve-out
-   explicitly).
-2. Reconcile `.claude/pipeline.yaml` vs. `project/pipeline.yaml` — a stale,
-   disagreeing duplicate manifest is a hazard independent of the proof
-   question.
-3. If PRD approval is meant to be proof-secured too, extend
+~~1. Decide, as a PO-level policy call, whether `push` should actually require
+   the Ed25519 proof for this repo~~ — done: `gates.push.approval: required`,
+   `signature` clearance mode, ADR-0056.
+~~2. Reconcile `.claude/pipeline.yaml` vs. `project/pipeline.yaml`~~ — done,
+   both now agree on `required`.
+3. **Remaining:** if PRD approval is meant to be proof-secured too, extend
    `critical-action-approval-request.mjs`'s bound kinds (or a parallel
-   primitive) to `approve-plan`, replacing the bare `--by <name>` string.
-4. Add an explicit pointer to `docs/po-approval-proof-contract.md` from
-   `CLAUDE.md` and/or `guardrails/git.md` so a session doing normal bootstrap
-   can discover the mechanism exists at all.
+   primitive) to `approve-plan` (`pipeline-state.mjs:4894-4957`), replacing
+   the bare `--by <name>` string with the same verified-Ed25519 pattern now
+   used for `push`/`deploy`.
+~~4. Add an explicit pointer to `docs/po-approval-proof-contract.md` from
+   CLAUDE.md / guardrails/git.md~~ — done, both now document
+   `gates.push_approval`/ADR-0056 explicitly.
 
-This is architecture/guardrail-class work (touches `guard-push.mjs`,
-manifest authority resolution, possibly a new ADR) — not a same-session
-mechanical fix.
+Step 3 is still architecture/guardrail-class work (touches
+`pipeline-state.mjs`'s `approve-plan` handler, PO-gate-authority's own
+path/profile/SHA binding mechanism, possibly a new ADR) — not a
+same-session mechanical fix, and itself opens a design question: should PRD
+approval get the same Ed25519 treatment as push/deploy, or is PO-gate-
+authority's existing path/profile/SHA binding an intentionally different,
+sufficient mechanism for that gate? That question is unanswered and is a PO
+call, not something to resolve by just porting the push mechanism over.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** partially accepted and delivered; narrowed, stays open.
+- **Rationale:** steps 1, 2, and 4 of the original proposal were delivered
+  today by ADR-0055 (`docs/adr/0055-critical-human-proof-waiver.md`) and
+  ADR-0056 (`docs/adr/0056-push-approval-mode.md`) as part of unrelated
+  session work, not as a direct response to this item — found and
+  reconciled by an autonomous backlog-triage pass, 2026-08-06 night.
+  Independently verified live (not just documented): `project/pipeline.yaml`
+  and `.claude/pipeline.yaml` both read `approval: required`;
+  `guard-push.mjs:1599-1694` demands a verified Ed25519 proof via
+  `authorizeRecordedPush` whenever the gate is `required` and no waiver
+  applies; `pipeline.user.yaml` sets `push_approval: "signature"`, the
+  strongest mode; `CLAUDE.md`'s "Push policy" bullet and
+  `guardrails/git.md:82` both cite ADR-0056 by name. ADR-0055's own
+  Follow-up section already names this exact item and states in so many
+  words that it closes only the push half: *"That is the remaining half of
+  `backlog/items/2026-08-05-critical-human-proof-not-wired-to-push-and-prd-
+  gates.md` and is out of scope here — this ADR closes the push half."*
+  Step 3 (PRD/`approve-plan` proof binding) is confirmed still unimplemented:
+  `pipeline-state.mjs:4894-4897`'s `approve-plan` handler still takes a bare
+  `--by <name>` with no cryptographic binding.
+- **Assignment (if accepted):** steps 1/2/4 delivered by ADR-0055/ADR-0056,
+  Sprint Nova session, 2026-08-06. Step 3 unassigned — needs the PO design
+  call above before dispatch.
+- **Date:** 2026-08-06

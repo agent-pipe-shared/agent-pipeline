@@ -3,9 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.windows-verify-brittle-test-hygiene
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-07-25
 source: "Decision-D native-Windows verify baseline investigation, 2026-07-24 (docs/state.md \"Root-cause classification of the 11 reds\"); corrected 2026-07-25 after direct reproduction — see \"Correction\" below."
+closed_at: 2026-08-06
+closure_repository: self
+closure_commit: 79da4a76c985ea512764dde2894865a5c7ccf816
+closure_evidence: backlog/evidence/2026-08-06-third-reconciliation-pass.md
 ---
 
 # pipeline.windows-verify-brittle-test-hygiene
@@ -93,3 +97,18 @@ earlier in the same function) instead of round-tripping through
 `path.posix.normalize` for the comparison. Add a Windows-specific fixture
 (or run the existing fixture under a forced win32 code path) asserting a
 clean forward-slash artifact path still validates OK. No fix applied yet.
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** accepted, delivered, closed.
+- **Rationale:** fixed by `79da4a7` ("fix(pipeline-core): use posix.normalize
+  in canonicalRelative for native Windows"), dated the same day this item
+  was filed. Current code imports `posix` explicitly and uses
+  `posix.normalize(value)`, exactly the fix this item's Proposal names.
+  Independently re-verified 2026-08-06:
+  `node --test plugins/pipeline-core/lib/feature-package-topology.test.mjs`
+  → the forward-slash regression fixture passes, 1/1. Full evidence:
+  `backlog/evidence/2026-08-06-third-reconciliation-pass.md`.
+- **Assignment (if accepted):** delivered, `79da4a7`, Sprint Nova session,
+  2026-07-25.
+- **Date:** 2026-08-06

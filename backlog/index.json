@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "09c307766779a8fdcca707c5d8d07c4eedd982ea7b5454337c585acb4d333d59"
+    "transitionHead": "c312a267810b2c091028f7d8cdd68450fb1764b358aaa7a4587605d298c7b27e"
   },
   "counts": {
-    "open": 22,
+    "open": 20,
     "in_progress": 21,
-    "closed": 16
+    "closed": 18
   },
   "items": [
     {
@@ -64,11 +64,15 @@
     },
     {
       "id": "pipeline.close-spec-retention-and-consent",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-21",
-      "source": "2026-07-21 full-close retro: Spec-retention authority drift and durable advisor-export consent readback"
+      "source": "2026-07-21 full-close retro: Spec-retention authority drift and durable advisor-export consent readback",
+      "closedAt": "2026-08-06",
+      "closureRepository": "self",
+      "closureCommit": "00fcc336cfd163d85fed20aa0a7ec2dbcfb6c31a",
+      "closureEvidence": "backlog/evidence/2026-08-06-third-reconciliation-pass.md"
     },
     {
       "id": "pipeline.closed-input-channel-review-economics",
@@ -550,11 +554,15 @@
     },
     {
       "id": "pipeline.windows-verify-brittle-test-hygiene",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-07-25",
-      "source": "Decision-D native-Windows verify baseline investigation, 2026-07-24 (docs/state.md \"Root-cause classification of the 11 reds\"); corrected 2026-07-25 after direct reproduction — see \"Correction\" below."
+      "source": "Decision-D native-Windows verify baseline investigation, 2026-07-24 (docs/state.md \"Root-cause classification of the 11 reds\"); corrected 2026-07-25 after direct reproduction — see \"Correction\" below.",
+      "closedAt": "2026-08-06",
+      "closureRepository": "self",
+      "closureCommit": "79da4a76c985ea512764dde2894865a5c7ccf816",
+      "closureEvidence": "backlog/evidence/2026-08-06-third-reconciliation-pass.md"
     },
     {
       "id": "pipeline.windows-verify-reproducibility",

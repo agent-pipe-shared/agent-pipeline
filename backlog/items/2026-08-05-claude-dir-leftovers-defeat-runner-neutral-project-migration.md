@@ -145,10 +145,12 @@ angle rather than the migration-completeness angle).
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** Partially addressed; the item stays open. **Option 1
-  (retire the legacy `.claude/*` tier) is now proven impossible as written**
-  and is withdrawn from the Proposal's option set. Only Option 2 (generated
-  projection plus a fail-closed drift check) remains viable.
+- **Decision:** Partially addressed; the item stays open, narrowed further.
+  **Option 1 (retire the legacy `.claude/*` tier) is proven impossible as
+  written** and is withdrawn from the Proposal's option set. Only Option 2
+  (generated projection plus a fail-closed drift check) remains viable — and
+  Option 2's drift check is now delivered; only the documentation-repointing
+  half remains, and it is now a short, exact list rather than an estimate.
 - **Rationale:** ADR-0053's investigation, done while implementing
   `AUTHORITY-GEN-07` (commit `32cfc85`), established that roughly a dozen
   executable files — including `harness/scripts/verify.mjs` — genuinely
@@ -157,12 +159,29 @@ angle rather than the migration-completeness angle).
   `planProjectAuthorityMigration` would therefore break live gate execution,
   not just stale documentation. `setup.mjs` was changed in `32cfc85` to
   derive its compiled write targets from `resolveProjectAuthorityPaths()`
-  instead of hardcoded `.claude/` paths, which addresses the generator half
-  of this item's own guidance ("the fix belongs in the generator, never in a
-  hand edit of the generated file") but does not retire the legacy tier
-  itself, nor does it add the fail-closed drift check Option 2 requires, nor
-  repoint the 14 normative documents.
-- **Assignment (if accepted):** Not assigned this session. Remaining work —
-  the fail-closed drift check and the documentation repointing — is carried
-  forward per `docs/state.md`'s 2026-08-06 section.
+  instead of hardcoded `.claude/` paths, addressing the generator half of
+  this item's own guidance.
+  **Fail-closed drift check — DELIVERED 2026-08-06** (found by tonight's
+  autonomous backlog reconciliation, not originally assigned to this item):
+  `d4b2fcc`/`2c24ec7` ("feat(verify): gate on authority tiers agreeing with
+  each other") added `harness/scripts/check-authority-tier-agreement.mjs`,
+  registered in `verify.mjs:367-368`. Re-run live tonight: exit 0, "Authority
+  tiers agree across 3 artifact(s) held at more than one tier." Every
+  divergence in this item's own table would now be caught.
+  **Documentation repointing — MOSTLY done, narrowed to 5 files.** `896a7a0`
+  repointed 22 of the ~14+ operative files this item and its own
+  investigation named, to tier-neutral wording ("the project calibration at
+  its resolved authority tier") — `CLAUDE.md`, `docs/operating-model.md`,
+  `guardrails/*`, `roles/goldfish.md`, `harness/session-bootstrap.md`, every
+  `templates/prompts/*` file, etc. Confirmed still hardcoded to
+  `.claude/pipeline.json` and NOT covered by `896a7a0`:
+  `plugins/pipeline-core/skills/close-block/SKILL.md:83,98,179` (the exact
+  file this item names as an affected artifact),
+  `plugins/pipeline-core/agents/goldfish-{mechanic,implementor,deep}.md:11`,
+  `SETUP.md:275,333`, `PIPELINE_FLOW.md:9`.
+- **Assignment (if accepted):** drift check delivered, `d4b2fcc`/`2c24ec7`,
+  Sprint Nova session, 2026-08-06. Remaining work is now exactly the 5-file,
+  ~7-line repointing list above — small enough for a `goldfish-mechanic`
+  dispatch (uniform doc-sync edit following the `896a7a0` pattern), not
+  assigned this session.
 - **Date:** 2026-08-06

@@ -41,12 +41,49 @@ anything being wrong with the candidate.
 
 ## What is needed
 
-1. Capture the failing case. Verify keeps per-suite stdout in owner-private
-   bounded logs and surfaces only `exitCode` in the evidence artifact; the
-   journal's `diagnosticDigest` did not identify a case either. Something has
-   to name WHICH of LWSC01–LWSC09 failed before this can be fixed.
+1. ~~Capture the failing case.~~ **DONE 2026-08-06 night** — see Triage.
 2. Then remove the timing dependency in that case rather than widening a
-   timeout, so the suite proves the same property deterministically.
+   timeout, so the suite proves the same property deterministically. **Fix
+   identified, not yet applied — see Triage** (blocked by GS-6 in this
+   session, needs the PO or a source-checkout review session).
 3. Until then, treat a lone `local-worker-supervisor-cli-tests` failure as
    unconfirmed: re-run once, and if it goes green, record BOTH runs rather than
    only the green one.
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** root cause found and reproduced; fix identified but not yet
+  applied. Stays open.
+- **Rationale:** reproduced deterministically 2026-08-06 night by running 6
+  copies of `local-worker-supervisor.test.mjs` concurrently (simulating Full
+  Verify's machine contention) — 1 of 6 failed with
+  `SyntaxError: Unexpected end of JSON input` inside `waitForRecord()`
+  (`local-worker-supervisor.test.mjs:297`), at LWSC04. Traced to a real race,
+  but in the **test harness, not production code**:
+  `local-worker-supervisor.mjs`'s `persistNewRecord()` creates
+  `supervisor.json` for the first time via `createJsonExclusive()` — an
+  `openSync(path, "wx")` directly on the final path, then `writeFileSync` +
+  `fsyncSync` — so the file exists at 0 bytes for a real (schedule-widened)
+  window between open and write completion. Every subsequent update instead
+  uses `atomicWriteJson()` (temp file + `renameSync`), which has no such
+  window. Every production reader is already safe against this: all real
+  call sites go through `readBoundedJson()`, which wraps `JSON.parse` in
+  try/catch and returns `null` on failure (treated as "no record yet"). The
+  test's own `waitForRecord()` helper is the **only** unsafe reader — a bare
+  `JSON.parse(readFileSync(...))` with no try/catch, so it crashes instead of
+  polling again.
+  **Fix (small, test-only, no production risk):** wrap the read/parse in
+  `waitForRecord` (`local-worker-supervisor.test.mjs:296-298`) in try/catch,
+  treating a parse failure the same as "not written yet, keep polling" —
+  mirroring the `readBoundedJson` pattern already used everywhere in
+  production. Drafted and verified to match the actual code during this
+  investigation, but **not committed**: editing this file is refused by
+  GS-6 in this session (`plugins/pipeline-core/**` is this session's live
+  enforcing plugin root — self-application means the checkout and the
+  installed copy coincide here — and GS-6 has deliberately no in-session
+  override). Per GS-6's own stated escape hatch, this needs the PO editing
+  outside an agent session, or a review in a differently-rooted session.
+- **Assignment (if accepted):** diagnosis and fix design complete,
+  2026-08-06. Applying the two-line try/catch in `waitForRecord` is
+  unassigned, blocked on the GS-6 escape hatch above.
+- **Date:** 2026-08-06
