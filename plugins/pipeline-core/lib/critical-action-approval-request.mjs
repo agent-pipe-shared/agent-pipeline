@@ -34,6 +34,19 @@ export function criticalActionSubjectSha256({ kind, candidate: subjectCandidate,
   return digest({ schema: "pipeline.critical-action-subject.v1", kind, candidate: subjectCandidate, subject });
 }
 
+/**
+ * The digest the approval intent carries as its `subjectSha256`.
+ *
+ * Exported because a verifier that only has the recorded action — the push guard — has
+ * to rebuild the same intent the signer signed, and rebuilding it by copying this one
+ * line would be a second definition of the binding, which is exactly the class of
+ * duplication that produced earlier findings in this file's neighbourhood.
+ */
+export function criticalActionSha256(action) {
+  if (!actionValid(action)) throw new TypeError("critical action is invalid");
+  return digest(action);
+}
+
 function actionValid(value) {
   return own(value, ["kind", "subjectSha256", "expiresAt"])
     && CRITICAL_ACTION_KINDS.includes(value.kind) && SHA.test(value.subjectSha256 ?? "")

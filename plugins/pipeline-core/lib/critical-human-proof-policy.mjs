@@ -166,8 +166,35 @@ function exactKeys(value, keys) {
     && keys.every((key) => Object.hasOwn(value, key));
 }
 
+const SHA256 = /^[a-f0-9]{64}$/u;
+const KEY_REFERENCE = /^[A-Za-z0-9._:@/-]{1,200}$/u;
+
 /**
- * @returns {{ok: true, requiredKinds: Set<string>, waivers: Map<string, string>}
+ * The committed identity of the key whose signature authorizes a critical action.
+ *
+ * WHY IT LIVES HERE and nowhere else: this file is gate-strength protected (GS-2), so an
+ * agent can reach neither the Edit/Write lane nor the shell lane to install a key of its
+ * own. Every other candidate location was writable by the thing being gated. The anchor
+ * is public data — a key reference and the digest of a public key — so committing it
+ * costs nothing and is what lets a verifier that holds no external directory (the push
+ * guard) decide whether a recorded proof is the operator's or a forgery.
+ *
+ * Optional on purpose. A project that never authorizes a raw push does not need one, and
+ * its absence is not an error — it simply means that route is unavailable.
+ */
+function readTrustAnchor(value) {
+  if (!Object.hasOwn(value, "trustAnchor")) return { ok: true, trustAnchor: null };
+  const anchor = value.trustAnchor;
+  if (!exactKeys(anchor, ["keyReference", "publicKeySha256"])
+    || typeof anchor.keyReference !== "string" || !KEY_REFERENCE.test(anchor.keyReference)
+    || typeof anchor.publicKeySha256 !== "string" || !SHA256.test(anchor.publicKeySha256)) {
+    return { ok: false, code: "CRITICAL-PROOF-POLICY-TRUST-ANCHOR-INVALID" };
+  }
+  return { ok: true, trustAnchor: Object.freeze({ ...anchor }) };
+}
+
+/**
+ * @returns {{ok: true, requiredKinds: Set<string>, waivers: Map<string, string>, trustAnchor: object|null}
  *          | {ok: false, code: string}}
  */
 export function readCriticalHumanProofPolicy(dir) {
@@ -179,9 +206,17 @@ export function readCriticalHumanProofPolicy(dir) {
     }
     const value = JSON.parse(readFileSync(path, "utf8"));
     const v2 = value?.schema === CRITICAL_HUMAN_PROOF_POLICY_V2;
+    // `trustAnchor` is admitted as an optional key on BOTH schema versions rather than
+    // minting a `.v3` for it: it adds no rule and changes no existing field's meaning, so
+    // a version bump would force every consumer project to migrate a policy file for a
+    // capability it may never use. The shape stays exact — the key is either absent or
+    // present, never partially specified.
     const shapeOk = v2
       ? exactKeys(value, ["schema", "requiredKinds", "waivedKinds"])
-      : exactKeys(value, ["schema", "requiredKinds"]) && value?.schema === CRITICAL_HUMAN_PROOF_POLICY_V1;
+        || exactKeys(value, ["schema", "requiredKinds", "waivedKinds", "trustAnchor"])
+      : (exactKeys(value, ["schema", "requiredKinds"])
+        || exactKeys(value, ["schema", "requiredKinds", "trustAnchor"]))
+        && value?.schema === CRITICAL_HUMAN_PROOF_POLICY_V1;
     if (!shapeOk
       || !Array.isArray(value.requiredKinds)
       || value.requiredKinds.length === 0
@@ -204,13 +239,15 @@ export function readCriticalHumanProofPolicy(dir) {
         waivers.set(entry.kind, entry.reason.trim());
       }
     }
-    return { ok: true, requiredKinds: new Set(value.requiredKinds), waivers };
+    const anchor = readTrustAnchor(value);
+    if (!anchor.ok) return { ok: false, code: anchor.code };
+    return { ok: true, requiredKinds: new Set(value.requiredKinds), waivers, trustAnchor: anchor.trustAnchor };
   } catch (error) {
     // No policy file at all is the ordinary consumer case: nothing is required, and
     // nothing is waived either. Anything else is a policy we cannot read, which must
     // never read as "not required".
     return error?.code === "ENOENT"
-      ? { ok: true, requiredKinds: new Set(), waivers: new Map() }
+      ? { ok: true, requiredKinds: new Set(), waivers: new Map(), trustAnchor: null }
       : { ok: false, code: "CRITICAL-PROOF-POLICY-UNREADABLE" };
   }
 }
