@@ -67,8 +67,12 @@
  *   falling back to the process cwd — same lookup as guard-git.mjs.
  *
  * NOT COVERED (gate honesty, QG-05)
- *   - Only Edit/Write are matched — MultiEdit/NotebookEdit tool calls are NOT seen by
- *     this hook (accepted gap; add a matcher entry if that gap is ever exploited).
+ *   - MultiEdit tool calls are NOT seen by this hook (accepted gap; add a matcher entry
+ *     if that gap is ever exploited). NotebookEdit WAS in this list and no longer belongs:
+ *     the matcher is Edit|Write|NotebookEdit and `notebook_path` is read via
+ *     lib/tool-write-target.mjs. The stale sentence contradicted this file's own MATCHING
+ *     block and was found by the T2 Critic (C4) — QG-05 asks the blind-spot statement to
+ *     be accurate, and one that understates coverage still misleads the next reader.
  *   - Plain shell file writes are not seen either: `hooks.json` routes Bash/PowerShell
  *     tool calls only through `guard-git.mjs` (matcher `Bash|PowerShell`), which does
  *     NOT check test paths — a Bash/PowerShell redirect (`>`, `Set-Content` etc.)
@@ -86,7 +90,8 @@
  *
  * MECHANICS
  *   Claude Code pipes the tool-input JSON to stdin: { tool_input: { file_path, ... } }.
- *   Wired via plugins/pipeline-core/hooks/hooks.json (PreToolUse, matcher Edit|Write).
+ *   Wired via plugins/pipeline-core/hooks/hooks.json (PreToolUse, matcher
+ *   Edit|Write|NotebookEdit).
  *
  * VERIFY: node plugins/pipeline-core/hooks/guard-testpath.test.mjs
  * Manual smoke (from the repo root; expect exit 0 — no config in this repo's own
@@ -208,9 +213,17 @@ if (matched) {
   // ordinary commands, so an agent could arm its own override and the refusal below would
   // be theatre. Only `chat` admits it, and then it is labelled for what it is.
   //
-  // The setting lives in pipeline.user.yaml, which GS-1 refuses to the agent through both
-  // the write lane and the shell lane. That is what makes this a gate rather than a
-  // request: an agent cannot reach `chat` by writing it.
+  // The setting lives in pipeline.user.yaml. An earlier version of this comment claimed
+  // GS-1 refuses that file "through both the write lane and the shell lane", and that the
+  // agent therefore could not reach `chat` by writing it. The second half was false, and
+  // the T2 Critic found it: the shell lane matches the literal filename in the command
+  // text, so a name assembled at runtime walks past it — and no string matching closes
+  // that, since an interpreter fed inline code is opaque to a guard reading a command line.
+  //
+  // What makes this a gate is therefore NOT the shell lane. It is that readPushApprovalMode
+  // ignores a working-tree copy that differs from HEAD and returns the strongest mode
+  // instead, so an in-session write can only strengthen this gate, never weaken it. See the
+  // reasoning, and the honest residual, on committedUnchanged in critical-human-proof-policy.
   let approvalMode = "signature";
   try { approvalMode = readPushApprovalMode(projectDir)?.mode ?? "signature"; } catch { approvalMode = "signature"; }
   const overrideAdmitted = approvalMode === "chat";

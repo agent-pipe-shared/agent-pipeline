@@ -28,6 +28,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { criticalProofWaiverFor } from "../lib/critical-human-proof-policy.mjs";
 import {
   authorizeHumanGuardOverride,
   planHumanGuardOverride,
@@ -271,6 +272,58 @@ try {
     assert.equal(ordinary.blocked, true);
     assert.match(ordinary.stderr, /--request-sha256\s+[a-f0-9]{64}\b/u,
       "the fixture produces no route at all, so the assertion above proves nothing");
+  });
+
+  // ---- C1: an in-session write to the setting must not weaken this gate ------------
+
+  check("OT15 an uncommitted chat setting does not admit the override", () => {
+    // The T2 Critic's blocker, as a test. The shell lane refuses the literal filename but
+    // not a name assembled at runtime, so the write itself is assumed to succeed -- the
+    // fixture simply performs it. What must hold is that the write buys nothing.
+    const root = fixture({ mode: "signature" });
+    writeFileSync(join(root, "pipeline.user.yaml"),
+      'schema: "pipeline.user.v3"\ngates:\n  push_approval: "chat"\n');
+    const { blocked, stderr } = ask(root, PROTECTED);
+    assert.equal(blocked, true, "an uncommitted flip to chat opened the gate");
+    assert.match(stderr, /no in-session override is admitted/u);
+    assert.doesNotMatch(stderr, /--request-sha256/u, "an uncommitted flip offered a route");
+  });
+
+  check("OT16 the same setting, committed, is honoured", () => {
+    // The other half, so OT15 cannot pass by the reader being broken outright: identical
+    // content, the only difference being that HEAD carries it.
+    const root = fixture({ mode: "chat" });
+    assert.match(ask(root, PROTECTED).stderr, /--request-sha256\s+[a-f0-9]{64}\b/u,
+      "a committed chat setting was ignored, so OT15 proves nothing");
+  });
+
+  check("OT17 modifying a committed chat setting drops it to the strongest mode", () => {
+    // The asymmetry, from the only starting point where it can be observed: HEAD says
+    // chat, so the gate is open, and ANY in-session modification closes it again. Writing
+    // the identical bytes back is deliberately not included -- that is not a modification,
+    // and asserting it would pin the wrong property.
+    for (const written of ["signature", "nonsense", ""]) {
+      const root = fixture({ mode: "chat" });
+      assert.match(ask(root, PROTECTED).stderr, /--request-sha256/u, "precondition: open");
+      writeFileSync(join(root, "pipeline.user.yaml"),
+        `schema: "pipeline.user.v3"\ngates:\n  push_approval: "${written}"\n`);
+      const { blocked, stderr } = ask(root, PROTECTED);
+      assert.equal(blocked, true, `written=${written}`);
+      assert.match(stderr, /no in-session override is admitted/u, `written=${written}`);
+    }
+  });
+
+  check("OT18 the push proof is not waived by an uncommitted setting either", () => {
+    // The write's second and worse consequence: the same file also decides whether `push`
+    // demands a detached Ed25519 proof. Checked through the policy reader directly.
+    const root = fixture({ mode: "signature" });
+    writeFileSync(join(root, "project", "critical-human-proof.json"), JSON.stringify({
+      schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push"],
+    }));
+    writeFileSync(join(root, "pipeline.user.yaml"),
+      'schema: "pipeline.user.v3"\ngates:\n  push_approval: "chat"\n');
+    assert.equal(criticalProofWaiverFor(root, "push").waived, false,
+      "an uncommitted flip to chat stood the push proof down");
   });
 
   console.log(`\nguard-testpath-override: ${passed} passed, ${failed} failed`);

@@ -16,6 +16,7 @@
  * stays in `requiredKinds`: the action remains gated, only the private-key proof is
  * no longer demanded.
  */
+import { spawnSync } from "node:child_process";
 import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
@@ -27,6 +28,51 @@ export const USER_SOURCE_PATH = "pipeline.user.yaml";
 export const DEFAULT_PUSH_APPROVAL_MODE = "signature";
 
 /**
+ * Does the working tree's copy of the setting match the one that is committed?
+ *
+ * WHY THIS EXISTS — the T2 Critic's C1 blocker on `62de980`. The guard family defends
+ * this file through two lanes, and the write lane (GS-1) is sound. The shell lane is not:
+ * it refuses a command whose *text* contains the literal filename, so any command that
+ * assembles the name at runtime walks straight past it, and no amount of better string
+ * matching fixes that — an interpreter given inline code, or a script the agent wrote a
+ * moment earlier, is opaque to a guard that can only read the command line.
+ *
+ * That mattered far more than "one config file is writable". A single such write set
+ * `gates.push_approval: chat`, which both admitted the in-session guard-testpath override
+ * AND, through `criticalProofWaiverFor` below, stood down the detached Ed25519 proof for
+ * `push`. The agent could clear its own push gate.
+ *
+ * So the decision no longer rests on the working tree alone. A copy that differs from
+ * `HEAD` is treated as unverified and yields the strongest mode, never the weakest. The
+ * asymmetry is the point: an in-session edit can only ever STRENGTHEN the gate, so the
+ * attack produces the opposite of what it wants, whichever route wrote the file.
+ *
+ * Be precise about the residual, because overselling this is how the previous claim got
+ * written: an agent that writes AND commits the file makes the two agree again. What that
+ * costs it is invisibility — the change becomes a diffable commit inside the candidate the
+ * push request binds to, in front of Verify, the Critic and the PO. This lowers an
+ * unobservable in-session flip to a recorded one; it does not make the file unreachable.
+ *
+ * Fails closed on everything: no Git, no commit, an unreadable object, a non-zero exit or
+ * a throw all mean "not verified".
+ *
+ * Consequence for the operator, stated because it changes a workflow: setting `chat` now
+ * requires committing the change. An uncommitted edit reads as `signature`.
+ */
+function committedUnchanged(root, raw, spawn) {
+  try {
+    const result = spawn("git", ["-C", root, "show", `HEAD:${USER_SOURCE_PATH}`], {
+      encoding: "buffer",
+      maxBuffer: 1024 * 1024,
+    });
+    if (result.error || result.status !== 0 || !result.stdout) return false;
+    return Buffer.compare(Buffer.from(result.stdout), Buffer.from(raw, "utf8")) === 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Read `gates.push_approval` from the project's own source of truth (ADR-0056).
  *
  * This is read directly rather than through a compiled projection because `gates` is
@@ -36,13 +82,17 @@ export const DEFAULT_PUSH_APPROVAL_MODE = "signature";
  * mean the fail-closed default: a gate whose configuration cannot be read is at its
  * strongest setting, never its weakest.
  */
-export function readPushApprovalMode(dir) {
+export function readPushApprovalMode(dir, { spawn = spawnSync } = {}) {
   const path = join(resolve(dir), USER_SOURCE_PATH);
   if (!existsSync(path)) return { mode: DEFAULT_PUSH_APPROVAL_MODE, source: "default" };
   try {
     const info = lstatSync(path);
     if (!info.isFile() || info.isSymbolicLink()) return { mode: DEFAULT_PUSH_APPROVAL_MODE, source: "unsafe" };
-    const value = parseYaml(readFileSync(path, "utf8"));
+    const raw = readFileSync(path, "utf8");
+    if (!committedUnchanged(resolve(dir), raw, spawn)) {
+      return { mode: DEFAULT_PUSH_APPROVAL_MODE, source: "uncommitted" };
+    }
+    const value = parseYaml(raw);
     const configured = value?.gates?.push_approval;
     if (configured === undefined) return { mode: DEFAULT_PUSH_APPROVAL_MODE, source: "default" };
     return PUSH_APPROVAL_MODES.includes(configured)

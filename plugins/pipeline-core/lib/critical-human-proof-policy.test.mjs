@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -13,8 +14,22 @@ import {
   readPushApprovalMode,
 } from "./critical-human-proof-policy.mjs";
 
+/**
+ * Write the source AND commit it.
+ *
+ * The commit is not decoration. Since the T2 Critic's C1 blocker, `readPushApprovalMode`
+ * ignores a working-tree copy that differs from HEAD and returns the strongest mode, so a
+ * merely-written fixture no longer exercises the configured value at all — it exercises
+ * the fail-closed path, and every "chat is honoured" check below would have passed for
+ * the wrong reason or not at all. CHP21/CHP22 cover the uncommitted case deliberately.
+ */
 function userYaml(base, text) {
   writeFileSync(join(base, "pipeline.user.yaml"), text);
+  spawnSync("git", ["init", "-q", base]);
+  spawnSync("git", ["-C", base, "config", "user.email", "fixture@example.invalid"]);
+  spawnSync("git", ["-C", base, "config", "user.name", "fixture"]);
+  spawnSync("git", ["-C", base, "add", "-A"]);
+  spawnSync("git", ["-C", base, "commit", "-qm", "fixture"]);
   return base;
 }
 const GATES = (mode) => `schema: "pipeline.user.v3"\ngates:\n  claude_md_max_lines: 200\n  dev_plan: "blocking"\n  push: "blocking"\n${mode === null ? "" : `  push_approval: "${mode}"\n`}  security: "blocking"\n`;
@@ -209,6 +224,34 @@ try {
     const result = criticalProofWaiverFor(base, "push");
     assert.equal(result.waived, false);
     assert.equal(result.code, "CRITICAL-PROOF-MODE-CONFLICT");
+  });
+
+  check("CHP21 a working-tree copy that differs from HEAD is not trusted", () => {
+    // The T2 Critic's C1: the shell lane refuses the literal filename but not a name
+    // assembled at runtime, so an in-session write to this file must be assumed possible.
+    // What must hold is that it cannot WEAKEN the gate. Committed chat, then modified.
+    const base = userYaml(root(V1()), GATES("chat"));
+    assert.equal(readPushApprovalMode(base).mode, "chat", "precondition: committed chat is honoured");
+    writeFileSync(join(base, "pipeline.user.yaml"), GATES("chat").replace("chat", "chat "));
+    assert.deepEqual(readPushApprovalMode(base), { mode: "signature", source: "uncommitted" });
+    assert.equal(criticalProofWaiverFor(base, "push").waived, false,
+      "an uncommitted edit stood the push proof down");
+  });
+
+  check("CHP22 an uncommitted flip to chat buys nothing, in either consumer", () => {
+    // The attack in its intended direction: signature committed, chat written.
+    const base = userYaml(root(V1()), GATES("signature"));
+    writeFileSync(join(base, "pipeline.user.yaml"), GATES("chat"));
+    assert.equal(readPushApprovalMode(base).mode, "signature");
+    assert.equal(criticalProofWaiverFor(base, "push").waived, false);
+  });
+
+  check("CHP23 no repository at all is not a clearance", () => {
+    // Without Git there is nothing to compare against, so the mode is unverifiable. That
+    // must read as the strongest setting, never as the configured one.
+    const base = join(root(V1()), "");
+    writeFileSync(join(base, "pipeline.user.yaml"), GATES("chat"));
+    assert.deepEqual(readPushApprovalMode(base), { mode: "signature", source: "uncommitted" });
   });
 
   check("CHP13 this repository ships the gate ON", () => {
