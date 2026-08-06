@@ -515,7 +515,28 @@ export function isForbiddenCrossRepositoryMutation(command, root, dependencies =
   return false;
 }
 
-function sanctionedOnboardingArgs(args, root) {
+/**
+ * Strip an optional trailing `--runner <claude|codex>` before the shape checks.
+ *
+ * ADR-0051 requires the invoking runner to be threaded explicitly, and the onboarding
+ * CLI now honours it — but this allowlist predated that and accepted only the
+ * runner-LESS forms. The effect was inverted enforcement: the guard refused the
+ * identity-carrying command and permitted only the one that silently defaults the
+ * runner, i.e. it pushed every caller onto the exact path ADR-0051 exists to prevent,
+ * and the refusal it printed named a command it would itself deny.
+ *
+ * Narrow by construction: only the two registered runner values, only as the final
+ * pair, and the remaining shape is still matched exactly as before.
+ */
+function withoutRunnerFlag(args) {
+  if (args.length >= 2 && args[args.length - 2] === "--runner" && ["claude", "codex"].includes(args[args.length - 1])) {
+    return args.slice(0, -2);
+  }
+  return args;
+}
+
+function sanctionedOnboardingArgs(rawArgs, root) {
+  const args = withoutRunnerFlag(rawArgs);
   if (args[0] === "inspect"
     && exactRoot(args, root, 1)
     && (args.length === 3

@@ -259,6 +259,9 @@ const TEST_SUITES = [
   { name: "codex-plugin-validator-parity-tests", file: join(pluginScriptsDir, "codex-plugin-validator-parity.test.mjs") },
   { name: "worktree-lifecycle-tests", file: join(libDir, "worktree-lifecycle.test.mjs") },
   { name: "lifecycle-ready-enforcement-tests", file: join(pluginScriptsDir, "lifecycle-ready-enforcement.test.mjs") },
+  // Walks the gate: mandatory AND satisfiable, for both runners. Unit suites were
+  // green while the gate was unwired on Claude and its own remediation was refused.
+  { name: "lifecycle-gate-satisfiability-tests", file: join(hooksDir, "lifecycle-gate-satisfiability.test.mjs") },
   { name: "advisor-consult-v3-tests", file: join(repoRoot, "plugins", "pipeline-core", "skills", "advisor-consult", "advisor-consult-v3.test.mjs") },
   { name: "sandboxed-readonly-duty-tests", file: join(libDir, "sandboxed-readonly-duty.test.mjs") },
   { name: "sandboxed-readonly-host-bridge-tests", file: join(pluginScriptsDir, "sandboxed-readonly-host-bridge.test.mjs") },

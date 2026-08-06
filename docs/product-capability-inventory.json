@@ -1205,6 +1205,12 @@
       "member": "license-contract-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:lifecycle-gate-satisfiability-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "lifecycle-gate-satisfiability-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:lifecycle-ready-enforcement-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1941,6 +1947,18 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "public-core-observation-tests"
+    },
+    {
+      "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude",
+      "kind": "hook",
+      "path": "plugins/pipeline-core/hooks/hooks.json",
+      "member": "PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude"
+    },
+    {
+      "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude",
+      "kind": "hook",
+      "path": "plugins/pipeline-core/hooks/hooks.json",
+      "member": "PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude"
     }
   ],
   "capabilities": [
@@ -1957,8 +1975,10 @@
         "guard:plugins/pipeline-core/hooks/guard-push.mjs:guard-push",
         "guard:plugins/pipeline-core/hooks/guard-testpath.mjs:guard-testpath",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-git.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-push.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-devplan.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-testpath.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:compact:node \"${CLAUDE_PLUGIN_ROOT}/hooks/post-compact-reground.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\"",
@@ -2178,6 +2198,7 @@
         "verify-phase:harness/scripts/verify.mjs:language-canon-tests",
         "verify-phase:harness/scripts/verify.mjs:license-contract-check",
         "verify-phase:harness/scripts/verify.mjs:license-contract-tests",
+        "verify-phase:harness/scripts/verify.mjs:lifecycle-gate-satisfiability-tests",
         "verify-phase:harness/scripts/verify.mjs:lifecycle-ready-enforcement-tests",
         "verify-phase:harness/scripts/verify.mjs:local-supervisor-setup-tests",
         "verify-phase:harness/scripts/verify.mjs:local-supervisor-state-tests",
@@ -2362,9 +2383,9 @@
         "plugins/pipeline-core/lib/security-evidence-evaluator.test.mjs",
         "plugins/pipeline-core/lib/security-evidence-fixture-matrix.test.mjs",
         "plugins/pipeline-core/lib/security-readiness.test.mjs",
-    "plugins/pipeline-core/lib/threat-model-approval-request.test.mjs",
-    "plugins/pipeline-core/lib/threat-model-discovery.test.mjs",
-    "plugins/pipeline-core/lib/threat-model-fixture-matrix.test.mjs",
+        "plugins/pipeline-core/lib/threat-model-approval-request.test.mjs",
+        "plugins/pipeline-core/lib/threat-model-discovery.test.mjs",
+        "plugins/pipeline-core/lib/threat-model-fixture-matrix.test.mjs",
         "plugins/pipeline-core/lib/threat-model.test.mjs",
         "plugins/pipeline-core/scripts/sbom-discovery.test.mjs"
       ],
