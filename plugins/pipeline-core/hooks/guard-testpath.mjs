@@ -36,8 +36,10 @@
  *     escape hatch instead.
  *
  * MATCHING
- *   - Only the `Edit` and `Write` tools are covered (hooks.json matcher `Edit|Write`);
- *     `tool_input.file_path` is read per the documented PreToolUse contract.
+ *   - The write-capable tools are covered (hooks.json matcher
+ *     `Edit|Write|NotebookEdit`); the target is read through
+ *     `lib/tool-write-target.mjs`, because NotebookEdit names it `notebook_path`
+ *     while Edit/Write use `file_path`, and reading only the latter fails OPEN.
  *   - `file_path` is normalized (backslashes -> forward slashes) before matching so
  *     patterns are Windows/POSIX independent; patterns are plain JS regex bodies
  *     matched case-insensitively against the normalized path — write a pattern that
@@ -93,12 +95,13 @@ import {
   NEUTRAL_GUARD_CONFIG,
   resolveProjectAuthorityPaths,
 } from "../lib/project-authority.mjs";
+import { writeTargetPath } from "../lib/tool-write-target.mjs";
 
 // ---- read tool input (fail-open) --------------------------------------------------
 let filePath = "";
 try {
   const input = JSON.parse(readFileSync(0, "utf8"));
-  filePath = String(input?.tool_input?.file_path ?? "");
+  filePath = writeTargetPath(input?.tool_input);
 } catch {
   process.exit(0); // fail-open: guard is a safety net, not a prison
 }

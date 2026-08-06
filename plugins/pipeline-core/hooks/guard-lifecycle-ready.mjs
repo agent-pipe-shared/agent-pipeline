@@ -26,6 +26,7 @@ import {
   readCodexHostRepositoryInitAdmission,
 } from "../lib/codex-host-layout.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { writeTargetPath } from "../lib/tool-write-target.mjs";
 import {
   isBoundedReadOnlyPipeline,
   parseGuardCommand,
@@ -62,6 +63,11 @@ const PO_APPROVAL_GATE_SCRIPT = fileURLToPath(new URL("../scripts/po-approval-ga
 const RESTART_RESUME_HINT_INPUT_PATH = "project/.resume-hint-input.json";
 const HEX = /^[a-f0-9]{64}$/u;
 const VALID_RUNNERS = new Set(["claude", "codex"]);
+// Every write-capable tool this gate admits. NotebookEdit was absent from both this list
+// and from every hooks.json matcher until 2026-08-06, so a .ipynb write returned verdict(0)
+// -- allow -- without the session ever proving a ready bootstrap. Its target arrives as
+// `notebook_path`, not `file_path`; see lib/tool-write-target.mjs.
+const WRITE_TOOLS = ["Edit", "Write", "NotebookEdit"];
 const HOST_INIT_CROSS_VIEW_STATUSES = new Set([
   "repository-mount-read-only",
   "repository-control-path-invalid",
@@ -196,9 +202,9 @@ export function isProjectWritePath(filePath, root, dependencies = {}) {
 }
 
 function isRestartResumeHintInputWrite(input, root) {
-  if (!["Edit", "Write"].includes(String(input?.tool_name ?? ""))) return false;
-  const filePath = input?.tool_input?.file_path;
-  return typeof filePath === "string"
+  if (!WRITE_TOOLS.includes(String(input?.tool_name ?? ""))) return false;
+  const filePath = writeTargetPath(input?.tool_input);
+  return filePath !== ""
     && resolve(root, filePath) === join(root, RESTART_RESUME_HINT_INPUT_PATH);
 }
 
@@ -807,10 +813,10 @@ export function isSanctionedLifecycleCommand(command, root, options = {}) {
 
 export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
   const toolName = String(input?.tool_name ?? "");
-  if (!["Bash", "Edit", "Write"].includes(toolName)) return verdict(0);
-  if (["Edit", "Write"].includes(toolName)) {
-    const filePath = input?.tool_input?.file_path;
-    if (typeof filePath !== "string" || filePath.trim() === "" || filePath.includes("\0")) return blocked();
+  if (!["Bash", ...WRITE_TOOLS].includes(toolName)) return verdict(0);
+  if (WRITE_TOOLS.includes(toolName)) {
+    const filePath = writeTargetPath(input?.tool_input);
+    if (filePath.trim() === "" || filePath.includes("\0")) return blocked();
   } else {
     const command = input?.tool_input?.command;
     if (typeof command !== "string" || command.trim() === "" || command.includes("\0")) return blocked();
@@ -835,11 +841,12 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
   if (toolName === "Bash" && isHumanPoSigningCommand(input.tool_input.command, root)) {
     return externalPoSigningOnly();
   }
-  if (["Edit", "Write"].includes(toolName)) {
-    if (!isProjectWritePath(input.tool_input.file_path, root, dependencies)) {
+  if (WRITE_TOOLS.includes(toolName)) {
+    const target = writeTargetPath(input.tool_input);
+    if (!isProjectWritePath(target, root, dependencies)) {
       return crossRepositoryMutationBlocked();
     }
-    const requested = resolve(root, input.tool_input.file_path);
+    const requested = resolve(root, target);
     if (requested === join(root, ".claude", "pipeline-state.json")
       || requested === join(root, "project", "pipeline-state.json")) {
       return protectedStateWriterOnly();

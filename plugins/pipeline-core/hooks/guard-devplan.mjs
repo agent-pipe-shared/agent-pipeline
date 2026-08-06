@@ -52,7 +52,8 @@
  *     if present — project-specific additional exemptions.
  *
  * ABSOLUTE PATHS AND THE PROJECT ROOT (C1 fix, from a critic review):
- * Claude Code's Edit/Write PreToolUse contract typically delivers `tool_input.file_path`
+ * Claude Code's write PreToolUse contract typically delivers the target path (read via
+ * `lib/tool-write-target.mjs`: `file_path` for Edit/Write, `notebook_path` for NotebookEdit)
  * ABSOLUTE (e.g. `{{REPO_ROOT}}\docs\state.md`), which never starts with a relative
  * prefix like `docs/` — matching from character 0 against the exempt list above would
  * therefore never exempt anything, blocking even the plan file and docs/specs/backlog
@@ -140,6 +141,7 @@ import {
   validatePortablePipelineState,
 } from "../lib/project-authority.mjs";
 import { derivePlanLifecycle } from "../lib/plan-spec-state-v2.mjs";
+import { writeTargetPath } from "../lib/tool-write-target.mjs";
 
 const DEFAULT_EXEMPT_PREFIXES = ["docs/", "specs/", ".claude/", "backlog/"];
 
@@ -156,7 +158,7 @@ function normalize(p) {
 let filePath = "";
 try {
   const input = JSON.parse(readFileSync(0, "utf8"));
-  filePath = String(input?.tool_input?.file_path ?? "");
+  filePath = writeTargetPath(input?.tool_input);
 } catch {
   process.exit(0); // fail-open: guard is a safety net, not a prison
 }

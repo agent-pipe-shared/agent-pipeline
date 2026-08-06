@@ -82,8 +82,14 @@ try {
     const pre = hooks.hooks?.PreToolUse ?? [];
     const wired = pre.filter((entry) => (entry.hooks ?? []).some((hook) => String(hook.command).includes("guard-lifecycle-ready.mjs")));
     assert.ok(wired.length >= 2, `guard-lifecycle-ready appears in ${wired.length} PreToolUse entries`);
-    const matchers = wired.map((entry) => entry.matcher).sort();
-    assert.deepEqual(matchers, ["Bash|PowerShell", "Edit|Write"]);
+    // Asserted per tool name rather than against exact matcher strings: a newly
+    // discovered write tool must be a one-line wiring change, not a test rewrite.
+    // NotebookEdit was added on 2026-08-06 after it was found to reach no matcher at all,
+    // which meant a .ipynb write never had to prove a ready bootstrap.
+    const tools = new Set(wired.flatMap((entry) => String(entry.matcher).split("|")));
+    for (const tool of ["Bash", "PowerShell", "Edit", "Write", "NotebookEdit"]) {
+      assert.ok(tools.has(tool), `no PreToolUse matcher names ${tool}`);
+    }
     for (const entry of wired) {
       assert.match(entry.hooks[0].command, /--runner\s+claude/u, "the Claude wiring must name its runner explicitly (ADR-0051)");
     }

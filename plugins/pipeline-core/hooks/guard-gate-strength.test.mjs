@@ -108,14 +108,20 @@ try {
     assert.equal(gateStrengthRuleFor("project/pipeline-state.json", root), null);
   });
 
-  check("GST07 the guard is actually wired into PreToolUse for Edit and Write", () => {
+  check("GST07 the guard is actually wired into PreToolUse for every write tool", () => {
     // A guard that is correct and unwired protects nothing. This is the half that the
-    // prior review assumed and that did not exist.
+    // prior review assumed and that did not exist. Asserted per tool name rather than
+    // against an exact matcher string, so adding a newly discovered write tool is a
+    // one-line wiring change and not a test rewrite -- NotebookEdit was added on
+    // 2026-08-06 after it was found to be covered by no matcher at all.
     const hooks = JSON.parse(readFileSync(join(HOOKS, "hooks.json"), "utf8"));
     const wired = (hooks.hooks?.PreToolUse ?? []).filter((entry) =>
       (entry.hooks ?? []).some((hook) => String(hook.command).includes("guard-gate-strength.mjs")));
     assert.equal(wired.length, 1, `expected exactly one wiring, found ${wired.length}`);
-    assert.equal(wired[0].matcher, "Edit|Write");
+    const tools = String(wired[0].matcher).split("|");
+    for (const tool of ["Edit", "Write", "NotebookEdit"]) {
+      assert.ok(tools.includes(tool), `matcher "${wired[0].matcher}" does not name ${tool}`);
+    }
   });
 
   check("GST08 this repository's own gate is not currently weakened", () => {

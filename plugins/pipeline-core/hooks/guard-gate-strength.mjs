@@ -35,6 +35,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { writeTargetPath } from "../lib/tool-write-target.mjs";
+
 export const GATE_STRENGTH_PATHS = Object.freeze([
   Object.freeze({
     id: "GS-1",
@@ -120,7 +122,7 @@ if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mj
   let filePath = "";
   try {
     const input = JSON.parse(readFileSync(0, "utf8"));
-    filePath = String(input?.tool_input?.file_path ?? "");
+    filePath = writeTargetPath(input?.tool_input);
   } catch {
     process.exit(0); // fail-open: malformed input is not this guard's business
   }

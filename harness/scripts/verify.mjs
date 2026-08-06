@@ -264,6 +264,13 @@ const TEST_SUITES = [
   { name: "lifecycle-gate-satisfiability-tests", file: join(hooksDir, "lifecycle-gate-satisfiability.test.mjs") },
   // An agent that can weaken the gate authorizing its own actions has no gate.
   { name: "gate-strength-guard-tests", file: join(hooksDir, "guard-gate-strength.test.mjs") },
+  // ...and a guard that never runs is not a guard either. Executes the wired hooks and
+  // the bootstrap chain through a real symlink -- the layout that silently disarmed six
+  // of them, exiting 0 with no output, which for a PreToolUse guard means ALLOW.
+  { name: "entrypoint-reachability-tests", file: join(libDir, "entrypoint.test.mjs") },
+  // A write-capable tool that no matcher names is not gated at all: NotebookEdit reached
+  // none of the four write guards, and they read file_path while it supplies notebook_path.
+  { name: "notebook-write-coverage-tests", file: join(hooksDir, "notebook-write-coverage.test.mjs") },
   { name: "advisor-consult-v3-tests", file: join(repoRoot, "plugins", "pipeline-core", "skills", "advisor-consult", "advisor-consult-v3.test.mjs") },
   { name: "sandboxed-readonly-duty-tests", file: join(libDir, "sandboxed-readonly-duty.test.mjs") },
   { name: "sandboxed-readonly-host-bridge-tests", file: join(pluginScriptsDir, "sandboxed-readonly-host-bridge.test.mjs") },
