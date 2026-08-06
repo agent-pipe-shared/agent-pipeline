@@ -271,6 +271,9 @@ const TEST_SUITES = [
   // A write-capable tool that no matcher names is not gated at all: NotebookEdit reached
   // none of the four write guards, and they read file_path while it supplies notebook_path.
   { name: "notebook-write-coverage-tests", file: join(hooksDir, "notebook-write-coverage.test.mjs") },
+  // The audited escape hatch for guard-testpath. Its own suite is TP-2 protected, so the
+  // override's checks live in a separate file; the safety half is what is gated here.
+  { name: "guard-testpath-override-tests", file: join(hooksDir, "guard-testpath-override.test.mjs") },
   { name: "advisor-consult-v3-tests", file: join(repoRoot, "plugins", "pipeline-core", "skills", "advisor-consult", "advisor-consult-v3.test.mjs") },
   { name: "sandboxed-readonly-duty-tests", file: join(libDir, "sandboxed-readonly-duty.test.mjs") },
   { name: "sandboxed-readonly-host-bridge-tests", file: join(pluginScriptsDir, "sandboxed-readonly-host-bridge.test.mjs") },

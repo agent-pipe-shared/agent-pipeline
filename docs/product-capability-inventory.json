@@ -1073,6 +1073,12 @@
       "member": "guard-push-v2-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-testpath-override-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "guard-testpath-override-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-testpath-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -2222,6 +2228,7 @@
         "verify-phase:harness/scripts/verify.mjs:guard-lifecycle-ready-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-push-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-push-v2-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-testpath-override-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-testpath-tests",
         "verify-phase:harness/scripts/verify.mjs:host-advisor-status-tests",
         "verify-phase:harness/scripts/verify.mjs:host-advisor-workspace-tests",
