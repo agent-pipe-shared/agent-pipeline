@@ -2538,9 +2538,19 @@ function poApprovalDecision(dir, manifest, deps) {
     && approval.schema === "pipeline.plan-approval.v2";
   const v3Approval = exactObjectKeys(approval, ["schema", "approvedBy", "approvedAt", "specBoundBy", "specBoundAt", "poGateAuthority", "humanDecision"])
     && approval.schema === "pipeline.plan-approval.v3";
+  // v4 replaces the specBound* pair with the submission digest that the approval
+  // discharges. Accepting it is strictly narrower than v2/v3: the approval must
+  // also bind the exact plan submission currently recorded, so an approval that
+  // survived a later resubmission can no longer authorize a manifest write.
+  const v4Approval = exactObjectKeys(approval, ["schema", "approvedBy", "approvedAt", "submissionSha256", "profileSha256", "poGateAuthority", "priorInvalidationSha256"])
+    && approval.schema === "pipeline.plan-approval.v4"
+    && SHA256_RE.test(approval.submissionSha256 ?? "")
+    && state.status === "ok"
+    && state.state.planSubmission !== undefined
+    && sha256CanonicalJson(state.state.planSubmission) === approval.submissionSha256;
   if (state.status !== "ok" || state.state.planApproved !== true || state.state.activeFeature?.id === undefined
     || state.state.activeFeature.id !== manifest.feature.id || state.state.activeFeature.planPath !== authority?.planPath
-    || (!v2Approval && !v3Approval)
+    || (!v2Approval && !v3Approval && !v4Approval)
     || !exactObjectKeys(authority, ["schema", "humanFacing", "sourceSha256", "runtimeSha256", "receiptSha256", "repositoryFingerprint", "planPath", "planSha256", "specPath", "specSha256"])) return null;
   const observed = (deps.poGateAuthority ?? ((request) => validatePoGateAuthorityForRepository(request)))({ repoRoot: dir, expectedPlanSha256: authority.planSha256, expectedSpecSha256: authority.specSha256 });
   if (!observed?.ok || !samePhxJson(observed.value, authority)) return null;
