@@ -340,21 +340,30 @@ FAIL**, five findings.
   **PO's stated rationale:** the block is at its end, and the episode reads as a useful
   negative test of the Operating Model — the model held. That is supported by what actually
   happened, stated with the counts measured (the first version of this paragraph inflated
-  both, T4 Critic N2/N3): **two** of the four rounds found a blocker or major in the
-  *previous round's remediation* — T2 in T1's, T3 in T2's; T1 was the block's first round
-  and had no remediation to examine, and T4 found defects in T3's remediation as well, which
-  makes it three of four once T4 is counted. And the block's genuine runtime holes are **not
-  two but at least four**: T1's F1 (BLOCKER, the override armable by the agent it
+  both, T4 Critic N2/N3, and then bolded a figure its own sentence refuted — T5 Critic F5):
+  **four** of the five rounds found a blocker or major in the *previous round's
+  remediation* — T2 in T1's, T3 in T2's, T4 in T3's, T5 in T4's. Only T1 did not, because it
+  was the block's first round and had no remediation to examine. And the block's genuine
+  runtime holes are **at least five**: T1's F1 (BLOCKER, the override armable by the agent it
   constrained), T1's F4 (PowerShell returning `verdict(0)`, the Windows bypass `efe452c`
-  claimed to have closed), C1 and K1. Every one of them was caught by review, none by a
-  gate. The role separation was absent and the review layer compensated. Recorded as
-  evidence for the review system, **not** as a precedent that the implementor may be the
-  reviewer's author.
-  **The cost, stated so the acceptance is not mistaken for a clean bill:** C1 and K1 share
-  one root cause — mechanism claims written into comments and this register without being
-  measured. `git rev-parse` twice would have prevented K1. Standing correction from here:
-  no "X cannot happen because Y" in code or register without a test or a measured probe
-  behind it; absent that, it is written as an open question.
+  claimed to have closed), C1, K1, and T5's F2 (deleting the setting file reached the one
+  source value that lets a policy waiver stand the Ed25519 proof down). Every one of them was
+  caught by review, none by a gate. The role separation was absent and the review layer
+  compensated. Recorded as evidence for the review system, **not** as a precedent that the
+  implementor may be the reviewer's author.
+  **The cost, stated so the acceptance is not mistaken for a clean bill:** C1, K1 and F2
+  share one root cause — the author reasoned about what the code should do instead of
+  measuring what it does, then wrote the conclusion into a comment or into this register.
+  Two `git rev-parse` calls would have prevented K1; reading the first line of
+  `readPushApprovalMode` would have prevented F2.
+  **And the rule that would have caught three of them was already here.** QG-07 requires the
+  test to run RED against the unfixed code before the fix lands. It was not followed: each
+  fix was committed first and its tests written afterwards, against the repaired
+  implementation — which is precisely why T5's F1 could exist, a three-case loop whose three
+  cases all collapse to one because nobody watched it fail. The correction is therefore not
+  "be more careful" but "apply QG-07", plus the standing rule from the previous round: no
+  "X cannot happen because Y" in code or register without a test or a measured probe behind
+  it; absent that, it is written as an open question.
 
 The T2 Critic's stated coverage boundary: it read ~200 of 1699 Spec lines and did **not**
 map this delta onto a numbered acceptance criterion; it read only `quality-gates.md` in
@@ -473,6 +482,54 @@ suite, executed a write, or armed a capability, so F1 rests on source reading pl
 Git measurements rather than a failing test; neither read the Spec or the guardrail files in
 full; the behaviour lens did not read this register and the record lens did not assess
 runtime behaviour — by design, and it means neither verdict covers the other's ground.
+
+### The T5 round — the last, and it found the deletion bypass
+
+PO decision: one final Critic on the new diff only. Base `a81a697` → candidate `cc6ea6a`.
+**Verdict: FAIL**, three majors and two minors. Every one is fixed here.
+
+- **F2 (major, FIXED in `8439afa`) — the one that mattered.** The tightening shipped in the
+  T4 remediation made `default` the only source value that lets a policy waiver govern, and
+  `readPushApprovalMode` returned `default` the instant the working-tree file was missing,
+  *before consulting Git at all*. So every state that tightening refuses was reachable by
+  **deleting** the file rather than editing it: `rm pipeline.user.yaml`, and a `.v2` push
+  waiver stands the detached Ed25519 proof down. `committedBytes` now checks absence against
+  HEAD exactly as it checks content — a missing copy whose blob exists at HEAD is a
+  modification. Only where Git has no blob either does the source have no opinion.
+  Unreachable here (`.v1` policy, no `waivedKinds`), but it would have shipped.
+- **F1 (major, FIXED in `5e31708`)** — CHP28 overwrote its fixture without committing, so
+  `readPushApprovalMode` returned before parsing and all three loop cases collapsed onto
+  `uncommitted`. `invalid` and `unreadable` were never reached, and re-narrowing the conflict
+  guard would have left the suite green. Each case now commits its text and **asserts the
+  source it claims to reach**.
+- **F3 (major, FIXED here)** — the N1 remediation promised, in the present tense, that the
+  final candidate's gate result "is recorded at the end of this section". It was not. N1's
+  own fix reintroduced N1's defect class. Now kept below, written after the run.
+- **F4 (minor, RECORDED not fixed)** — the widened conflict fires for `uncommitted`,
+  `invalid`, `unreadable` and `unsafe`, where ADR-0056 §5 scopes it to an *explicit*
+  `signature`. The direction is fail-closed, so this is not a security defect, but it is
+  wider than the ADR describes and the ADR was not amended. Consequence for a consumer: a
+  project with a committed `.v2` push waiver whose `pipeline.user.yaml` differs from HEAD for
+  any reason cannot record a push approval at all. **Open item, owner PO:** either amend
+  ADR-0056 §5 to match, or narrow the branch back and cover the gap another way. Also noted
+  by the Critic: `guard-push.mjs` reports the conflict as if `project/critical-human-proof.json`
+  were at fault when the cause is `pipeline.user.yaml` — a misleading diagnosis, not a hole.
+- **F5 (minor, FIXED here)** — the N2 correction bolded "two of four" and then refuted itself
+  two clauses later. Now stated once, measured: **four of five**.
+
+**What changed in how this was fixed, and it is the finding behind the findings.** T5 also
+observed that QG-07 — run the test RED against the unfixed code before the fix lands — had
+not been followed for any remediation in this block: each fix was committed first and its
+tests written afterwards, against the repaired implementation. That is exactly how F1 could
+exist. This round did it the other way: with the F2 fix stashed, CHP30 fails with
+`source: 'default'` where `'uncommitted'` is expected; restored, 31/31. Recorded because the
+rule was already in the guardrails and the failure was not knowing it, it was not applying it.
+
+T5's coverage boundary: it executed no code and ran no suite, so every behavioural claim rests
+on source reading plus one read-only probe through `/proc/self/cwd`; Linux/WSL only; it read
+`quality-gates.md` in full and none of the other four guardrail files; and it found no
+numbered Spec acceptance criterion this range maps to, since the Spec never mentions
+`push_approval` or either ADR.
 
 ### Open
 
