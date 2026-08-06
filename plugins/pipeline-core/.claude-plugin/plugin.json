@@ -1,6 +1,6 @@
 {
   "name": "pipeline-core",
-  "version": "0.5.2+claude.20260806153526.3982210",
+  "version": "0.5.2+claude.20260806160359.d7b70d8",
   "description": "Agent-Pipeline operating model as an installable unit: session bootstrap (pipeline-start), independent review dispatch (critic-review), session close ritual (close-block), Goldfish/Critic subagents, and git-guard union hooks.",
   "author": {
     "name": "agent-pipeline"
