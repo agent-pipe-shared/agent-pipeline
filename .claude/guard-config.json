@@ -24,6 +24,31 @@
       "id": "TP-5",
       "pattern": "(?:plugins/pipeline-core/hooks/guard-push(?:-v2)?|harness/scripts/pipeline-state)\\.test\\.mjs$",
       "reason": "guard-push and guard-push-v2 test suites gate the release/deploy push-enforcement hook (v1 severity-based + v2 policy-completeness checks), and pipeline-state test suite gates the deployApprovals state writer (E5/QG-04) — no ad-hoc edits outside a briefed test-change task."
+    },
+    {
+      "id": "TP-6",
+      "pattern": "plugins/pipeline-core/hooks/guard-gate-strength\\.test\\.mjs$",
+      "reason": "guard-gate-strength test suite gates GS-1..GS-7, the rules that stop an agent weakening the gate that authorizes it (E5/QG-04) — no ad-hoc edits outside a briefed test-change task."
+    },
+    {
+      "id": "TP-7",
+      "pattern": "plugins/pipeline-core/hooks/guard-testpath-override\\.test\\.mjs$",
+      "reason": "this suite pins the override's own fail-closed behaviour, including that signature mode admits no in-session clearance and that an uncommitted setting buys nothing (E5/QG-04) — no ad-hoc edits outside a briefed test-change task."
+    },
+    {
+      "id": "TP-8",
+      "pattern": "plugins/pipeline-core/lib/entrypoint\\.test\\.mjs$",
+      "reason": "entrypoint test suite proves every wired hook still runs through a symlinked install — the failure class that left the whole guard family silently disarmed (E5/QG-04) — no ad-hoc edits outside a briefed test-change task."
+    },
+    {
+      "id": "TP-9",
+      "pattern": "plugins/pipeline-core/lib/critical-human-proof-policy\\.test\\.mjs$",
+      "reason": "this suite gates how gates.push_approval is resolved, including that an uncommitted or borrowed copy never stands the Ed25519 push proof down (ADR-0055/ADR-0056, E5/QG-04) — no ad-hoc edits outside a briefed test-change task."
+    },
+    {
+      "id": "TP-10",
+      "pattern": "plugins/pipeline-core/hooks/notebook-write-coverage\\.test\\.mjs$",
+      "reason": "notebook-write suite pins that every write matcher covers NotebookEdit and that its notebook_path target is read (E5/QG-04) — no ad-hoc edits outside a briefed test-change task."
     }
   ]
 }
