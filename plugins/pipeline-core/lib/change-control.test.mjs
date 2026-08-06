@@ -57,6 +57,21 @@ test("C-AC-06 enters reconciliation-required instead of claiming completed chang
   const completed = projectChangeControlState(appendChangeControlEntry(deployed, externalEvent("validated", "published", 4, "receipt-2")));
   assert.equal(completed.status, "completed");
   assert.equal(completed.reason, "composed-change-control");
+  // An earlier success must not mask a later failure. Every case above appends
+  // the failure before any successful publish, which an order-blind projection
+  // passes; this is the same journal with the two in the other order.
+  for (const disposition of ["publish-failed", "readback-failed", "readback-mismatch", "unavailable"]) {
+    const regressed = appendChangeControlEntry(
+      appendChangeControlEntry(deployed, externalEvent("validated", "published", 4, "receipt-2")),
+      externalEvent("validated", disposition, 5),
+    );
+    const state = projectChangeControlState(regressed);
+    assert.equal(state.status, "reconciliation-required", `late ${disposition}`);
+    assert.equal(state.reason, "external-update-outstanding");
+    // The successful attempt stays in the record; it just stops being current.
+    assert.equal(state.attempts.length, 3);
+    assert.equal(state.failedAttempts, 1);
+  }
   // A published update for a different transition never completes this one.
   assert.equal(projectChangeControlState(appendChangeControlEntry(deployed, externalEvent("began", "published", 4))).status, "reconciliation-required");
   assert.equal(projectChangeControlState(createChangeControlJournal(binding)).status, "not-started");

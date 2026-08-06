@@ -95,7 +95,15 @@ export function projectChangeControlState(journal) {
   // not be able to hide that the external system was ever out of step.
   const attempts = Object.freeze(externals.map((entry) => Object.freeze({ forEvent: entry.forEvent, disposition: entry.disposition, occurredAtEpochMs: entry.occurredAtEpochMs, receiptId: entry.receiptId })));
   const failedAttempts = attempts.filter((entry) => entry.disposition !== "published").length;
-  const published = (event) => attempts.some((entry) => entry.forEvent === event && entry.disposition === "published");
+  // Only the latest attempt for an event says whether the external system is
+  // currently in step. `.some()` here was order-blind: one early success would
+  // mask every later failure, so a publish followed by a readback mismatch still
+  // projected as completed change control. Append order is authoritative --
+  // `appendChangeControlEntry` refuses an entry that moves time backwards.
+  const published = (event) => {
+    const forEvent = attempts.filter((entry) => entry.forEvent === event);
+    return forEvent.length > 0 && forEvent[forEvent.length - 1].disposition === "published";
+  };
   const projection = (status, reason) => Object.freeze({ schema: "pipeline.change-control-state.v1", status, reason, deploymentEvent: current, deploymentEvidenceRetained: locals.length > 0, attempts, failedAttempts });
   if (current === null) return projection("not-started", "no-local-event");
   if (current === "began") return projection("in-progress", "deployment-began");
