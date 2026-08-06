@@ -42,19 +42,31 @@ valid.
 The authority approval helper's `approve` command, its usage text, and the
 operator-facing signing documentation.
 
+## Product Owner disposition
+
+Signing outside the agent session is **intended behaviour and must stay**. The
+passphrase prompt is what keeps the credential out of the session's reach; an
+agent that could satisfy it would hold the signing authority it exists to be
+denied. The problem is therefore purely one of explanation, not of access.
+
+This supersedes the original draft of this item, which also proposed a
+pass-through for OpenSSL's passphrase source specification. Even the restricted
+`file:` and `fd:` forms move the secret closer to a context the session can
+observe, for a convenience gain that does not justify eroding the one boundary
+that demonstrably held. Do not implement it.
+
 ## Proposal
 
 State the human-only terminal requirement in the helper's own usage output and
-in the operator guidance, and fail with a typed, self-explaining error when no
-controlling terminal is available rather than surfacing a raw OpenSSL decode
-error.
+in the operator guidance, so the requirement is discoverable before the first
+attempt rather than after it.
 
-Additionally accept an optional pass-through for OpenSSL's passphrase *source
-specification* — the `file:` and `fd:` forms only — so an operator can sign from
-a non-interactive but still human-controlled context without exposing the
-passphrase. Reject the `pass:` and `env:` forms explicitly, because both would
-place the secret where an agent session can read it. Keep the default behaviour
-unchanged: no source specified means the interactive terminal prompt.
+Fail with a typed, self-explaining error when no controlling terminal is
+available — naming the cause and the required environment — instead of
+surfacing a raw OpenSSL decode error that reads like a corrupt key.
+
+Keep the passphrase interactive and terminal-bound. Accept no argument,
+environment variable, file, or descriptor as a passphrase source.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
