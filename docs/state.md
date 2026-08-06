@@ -153,7 +153,8 @@ checkout.
 
 Full Verify **exit 0, 250/250** on `511d7d7` / tree `ed467380`, candidate-bound, tree
 clean before and after; `security-scan` ran as step 250 and is `exit 0, findings 0` on the
-same commit. An earlier run on `5fa2548` was 248/249 with one real failure —
+same commit. Re-run after the F3/F5 remediation: **exit 0, 250/250** on `d7b70d8` / tree
+`e7a0b991`, likewise candidate-bound. An earlier run on `5fa2548` was 248/249 with one real failure —
 `product-capability-inventory-tests`, because a hook's surfaceId embeds its matcher and
 the write matchers had gained `NotebookEdit`; fixed in `469233a`.
 
@@ -185,19 +186,55 @@ once at its tool budget mid-hunt and was resumed. **Verdict: FAIL**, eight findi
   a path the call was not about to touch.
 - **F2 (major, FIXED here)** — this register and `project/resume-hint.json` still denied
   what the candidate does. Corrected above; the resume hint is recaptured.
-- **F3 (major, PARTIALLY fixed)** — no test walked the new block→allow path. OT04 now
-  proves the route is really produced and OT02/OT03 pin the refusal in signature mode, but
-  **no test arms a capability and shows the guard allows exactly the bound edit, nor that
-  a capability bound to a different input is refused through this guard.** Recorded, not
-  claimed as covered.
-- **F5 (minor, NOT fixed)** — the shell lane matches a basename substring while the write
-  lane matches the exact repo-relative path. Consequence: on a legacy-tier project an
-  **Edit** to `.claude/guard-config.json` is not a gate-strength path at all, while the
-  shell lane refuses it by basename. Legacy-tier consumers only; this repo resolves the
-  neutral tier.
-- **F7 (minor, NOT fixed)** — the three new gating suites carry no TP entry, so the suite
-  pinning the override's fail-closed behaviour is itself agent-editable. Closing it means
-  editing `project/guard-config.json`, which GS-4 refuses to the agent; it is a PO action.
+- **F3 (major, FIXED in `e767fe7`)** — no test walked the new block→allow path. OT10–OT13
+  now arm a real capability through the whole v2 chain (denial → plan →
+  prepare-authorization → authorize `--activate`) and then run the wired guard: the bound
+  edit is admitted with the override marker on stderr, an edit bound elsewhere is refused,
+  the capability is single-use, and `signature` mode ignores an armed capability outright.
+  Each walks block→allow→block rather than asserting a single state.
+- **F5 (minor, FIXED in `d7b70d8`)** — the shell lane matches a basename substring while
+  the write lane matches the exact repo-relative path. GS-3 got its legacy sibling as GS-5,
+  but GS-4 never did, so on a legacy-tier project an **Edit** to `.claude/guard-config.json`
+  was not a gate-strength path at all while the shell lane refused the same file by
+  basename — the write lane was the weaker of the two. Closed as **GS-7** (not GS-6: that id
+  is the live-plugin rule and renumbering would break every reference). The legacy marker
+  now also counts as evidence the Pipeline governs the repository. The differing matching
+  styles are kept deliberately — the shell lane cannot tell which tier a bare token means,
+  and over-blocking there is fail-closed — so GST17 pins the property that matters instead:
+  no basename the shell lane refuses may be left without a write-lane rule.
+- **F7 (minor, NOT fixed — PO action, prepared)** — the new gating suites carry no TP
+  entry, so the suite pinning the override's own fail-closed behaviour is agent-editable.
+  Closing it means editing `project/guard-config.json`, which GS-4 refuses to the agent by
+  design, and that refusal is the point rather than an obstacle to route around. The
+  entries below are prepared for the PO to paste into `protectedTestPaths`; a fifth,
+  `guard-gate-strength.test.mjs`, was unprotected before this block and is included:
+
+  ```json
+  {
+    "id": "TP-6",
+    "pattern": "plugins/pipeline-core/hooks/guard-gate-strength\\.test\\.mjs$",
+    "reason": "guard-gate-strength suite gates GS-1..GS-7, the rules that keep an agent from weakening the gate that authorizes it (E5/QG-04)."
+  },
+  {
+    "id": "TP-7",
+    "pattern": "plugins/pipeline-core/hooks/guard-testpath-override\\.test\\.mjs$",
+    "reason": "this suite pins the override's own fail-closed behaviour, including that signature mode admits no in-session clearance (E5/QG-04)."
+  },
+  {
+    "id": "TP-8",
+    "pattern": "plugins/pipeline-core/lib/entrypoint\\.test\\.mjs$",
+    "reason": "entrypoint suite proves every wired hook still runs through a symlinked install — the class that left the guards silently disarmed (E5/QG-04)."
+  },
+  {
+    "id": "TP-9",
+    "pattern": "plugins/pipeline-core/hooks/notebook-write-coverage\\.test\\.mjs$",
+    "reason": "notebook-write suite pins that every write matcher covers NotebookEdit and that its notebook_path target is read (E5/QG-04)."
+  }
+  ```
+
+  Note the honest limit: TP protection binds *agents*, not the PO, and all four paths sit
+  under `plugins/pipeline-core/**`, so per OT14 the override cannot serve them either — a
+  genuine future test change to any of them is a PO edit outside the session.
 - **F8 (major, DISCLOSED, not fixable)** — every production diff in this block was
   authored by the orchestrating session; no Goldfish dispatch record exists. Same standing
   session constraint as the two preceding blocks. The block began as incident response to
@@ -211,7 +248,20 @@ F4 rests on this repo's own contract rather than on observed PowerShell behaviou
 
 ### Open
 
-- **F3, F5 and F7 above**, each named with its owner.
+- **F7 above** — the only Critic finding still open, and it is the PO's to close because
+  GS-4 refuses `project/guard-config.json` to the agent. Exact entries prepared below.
+- **The guard-testpath override serves exactly one of this repository's five TP entries.**
+  Found while closing F3, pinned as OT14. `human-guard-override` eligibility routes every
+  `plugins/pipeline-core/**` write to Pipeline-author repair, which needs an explicitly
+  selected source root and so never reaches `planned` — and TP-1, TP-2, TP-4 and TP-5 all
+  live there. Only TP-3 (`harness/scripts/verify.mjs`) can be served. Not a defect of the
+  guard, but the escape hatch is far narrower than "the override exists" suggests, and the
+  gap is invisible unless someone tries it.
+- **`guard-gate-strength.mjs` still detects direct invocation by `argv[1].endsWith(...)`.**
+  It is wired, so EP09 covers it — and EP09 does not flag this spelling, correctly: unlike
+  the three it does hunt, this one never compares against `import.meta.url` and so is not
+  symlink-fragile. Functionally sound, but it is a fourth spelling of a thing the codebase
+  otherwise routes through `isDirectInvocation`.
 - **The override is bound to the clearance MODE, not to a proof of its own.** In
   `signature` mode the human still acts outside the session rather than signing a
   testpath-kind proof. Adding that kind is schema work in `critical-human-proof-policy`.
