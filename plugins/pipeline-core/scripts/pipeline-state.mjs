@@ -2606,6 +2606,15 @@ function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags,
   const authority = externalPublicJson(dir, flags["proof-authority"]);
   const proof = externalPublicJson(dir, flags["proof"]);
   if (!request.ok || !authority.ok || !proof.ok) return { ok: false, code: request.code ?? authority.code ?? proof.code };
+  // When the project has committed a trust anchor, the external authority handed in here
+  // must BE that key. Checked at approval time rather than only at consumption time:
+  // otherwise the operator records a proof that looks accepted and then discovers at the
+  // push or deploy itself that the guard cannot verify it, with no indication why.
+  if (policy.trustAnchor !== null
+    && (authority.value?.keyReference !== policy.trustAnchor.keyReference
+      || authority.value?.publicKeySha256 !== policy.trustAnchor.publicKeySha256)) {
+    return { ok: false, code: "CRITICAL-PROOF-TRUST-ANCHOR-MISMATCH" };
+  }
   const active = state.activeFeature;
   const gate = state.planApproval?.poGateAuthority;
   if (!active?.id || !gate?.planSha256 || !gate?.specSha256 || !candidate?.commit || !candidate?.tree) return { ok: false, code: "CRITICAL-PROOF-STATE" };
@@ -2626,7 +2635,20 @@ function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags,
   if (intent?.featureId !== active.id || intent?.planSha256 !== gate.planSha256 || intent?.specSha256 !== gate.specSha256) {
     return { ok: false, code: "CRITICAL-PROOF-AUTHORITY" };
   }
-  return { ok: true, proof: { proofSha256: result.proofSha256, intentSha256: request.value.approvalIntent.sha256, action: result.action } };
+  // The proof object itself travels into State alongside its digest. It is public data --
+  // a key reference, a public key and a signature -- and recording it is what lets a
+  // verifier holding no external directory (the push guard, the release branch) check the
+  // signature instead of trusting this record's word. Before this, State kept only the
+  // digest, so the only thing downstream could do with an approval was believe it.
+  return {
+    ok: true,
+    proof: {
+      proofSha256: result.proofSha256,
+      intentSha256: request.value.approvalIntent.sha256,
+      action: result.action,
+      proof: proof.value,
+    },
+  };
 }
 
 function legacyRegularArtifact(dir, artifact, expectedPath, expectedSha) {

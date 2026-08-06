@@ -125,7 +125,8 @@ import { isAbsolute, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { loadManifest, gateConfig, loadDeployPolicy } from "../lib/manifest.mjs";
-import { criticalProofWaiverFor } from "../lib/critical-human-proof-policy.mjs";
+import { authorizeRecordedDeploy, authorizeRecordedPush } from "../lib/critical-action-authorization.mjs";
+import { criticalProofWaiverFor, readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
 import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv, refMatchesPattern } from "../lib/git-cmd.mjs";
 import {
   LEGACY_CALIBRATION,
@@ -665,13 +666,59 @@ function checkAnonymousPublicPush(binding, sourceCommit) {
   return failures;
 }
 
+/**
+ * The one thing that opens the main boundary: a detached proof, verified here.
+ *
+ * This runs BEFORE the manifest is read, which is why it is self-contained rather than
+ * reusing the later state/candidate plumbing. That eagerness is deliberate and must not
+ * be traded away for tidier code: the boundary below applies even to a repository with
+ * no manifest and no push gate at all, so deferring it to the gate section would hand
+ * every ungoverned checkout a free push to main.
+ *
+ * Deliberately narrower than the boundary it excepts. Only the EXPLICIT destination form
+ * is admitted; `git push origin main`, where the destination is implied by the remote's
+ * configuration rather than written down, stays refused. An attestation names a ref, and
+ * a command that does not name one cannot be matched against it without guessing.
+ *
+ * Failure of any kind — no state, no anchor, unreadable candidate — is not an exception.
+ */
+function attestedMainPublication(binding) {
+  if (!binding.ok || typeof binding.remote !== "string" || binding.destination !== "refs/heads/main") return false;
+  const commit = resolveSourceCommit(binding);
+  if (commit === null) return false;
+  const tree = spawnSync("git", ["-C", binding.projectDir, "rev-parse", `${commit}^{tree}`], { encoding: "utf8", timeout: 5000 });
+  if (tree.status !== 0 || !/^[0-9a-f]{40,64}$/i.test(tree.stdout?.trim() ?? "")) return false;
+  let state;
+  try {
+    state = JSON.parse(readFileSync(join(binding.projectDir, projectStateRelPath(binding.projectDir)), "utf8"));
+  } catch {
+    return false;
+  }
+  return authorizeRecordedPush({
+    projectDir: binding.projectDir,
+    state,
+    candidate: { commit, tree: tree.stdout.trim() },
+    remote: binding.remote,
+    destination: binding.destination,
+    now: new Date().toISOString(),
+  }).authorized === true;
+}
+
 const pushBinding = parsePushBinding(cmd);
 if (pushBinding.ok
   && (pushBinding.destination === "refs/heads/main"
-    || (pushBinding.destination === null && new Set(["main", "refs/heads/main"]).has(pushBinding.source)))) {
+    || (pushBinding.destination === null && new Set(["main", "refs/heads/main"]).has(pushBinding.source)))
+  // ADR-0056 §6. main was previously unreachable by any route except the fixed
+  // publication executor, which made "push without a release" impossible on the branch
+  // that matters most. It is now reachable by exactly one route: a push the key holder
+  // signed for this commit, this tree, this remote and this ref. Nothing else changes —
+  // the executor keeps its exclusive claim on exact-candidate publication authority, and
+  // the anonymous-public delivery path refuses main independently a few hundred lines up.
+  && !attestedMainPublication(pushBinding)) {
   emit(2, [
     "BLOCKED (guard-push publication boundary): raw Bash/Git cannot publish refs/heads/main.",
     "Only the plugin-owned fixed publication executor may consume exact-candidate main authority; GG-03 and Human Guard Override do not widen it.",
+    "The one exception is a push the human attested for this exact commit, tree, remote and ref (ADR-0056 §6); no such proof verified here.",
   ]);
 }
 function fallbackProjectDir() {
@@ -1017,6 +1064,16 @@ function isolatePushSegment(rawCmd) {
  * silent-block, never silent-pass" convention the existing approval check (c) already
  * uses for this same file elsewhere in this hook.
  */
+/** The pushed candidate, resolved without the module-level bindings (see the call site). */
+function deployCandidate() {
+  const commit = resolveSourceCommit(pushBinding);
+  if (commit === null) return null;
+  const tree = spawnSync("git", ["-C", pushBinding.projectDir, "rev-parse", `${commit}^{tree}`], { encoding: "utf8", timeout: 5000 });
+  return tree.status === 0 && /^[0-9a-f]{40,64}$/i.test(tree.stdout?.trim() ?? "")
+    ? { commit, tree: tree.stdout.trim() }
+    : null;
+}
+
 function checkDeployApprovals(required) {
   const path = join(projectDir, projectStateRelPath(projectDir));
   let raw = null;
@@ -1026,8 +1083,11 @@ function checkDeployApprovals(required) {
     // absent -- treated as "no approvals recorded at all" below, not malformed.
   }
   let deployApprovals = [];
+  // Hoisted out of the block below: the attestation check further down needs the whole
+  // state object, not just its `deployApprovals` array, because the signed intent binds
+  // the plan/spec authority that lives elsewhere in the same file.
+  let parsed = null;
   if (raw !== null) {
-    let parsed;
     try {
       parsed = JSON.parse(raw);
     } catch (e) {
@@ -1048,6 +1108,28 @@ function checkDeployApprovals(required) {
       deployApprovals = parsed.deployApprovals;
     }
   }
+  // ADR-0056 §6, release half. The tuple match below is what this check has always been:
+  // a recorded approval naming this artifact and environment, not yet consumed. What it
+  // never did was look at `criticalProof` at all — so where the project demands a detached
+  // proof for `deploy`, the strongest thing the release path could say about an approval
+  // was that somebody had written one down. That is now the weaker of two conditions.
+  //
+  // Fails closed on an unreadable policy, unlike the state handling above. The two answer
+  // different questions: a broken state file is a local accident and warns, while a policy
+  // that cannot be read is a gate whose strength is unknown, and ADR-0055 already settles
+  // that case as "required".
+  const policy = readCriticalHumanProofPolicy(projectDir);
+  if (!policy.ok) {
+    return [`Deploy approval policy cannot be read (${policy.code}); a gate of unknown strength is treated as demanding proof.`];
+  }
+  const proofDemanded = policy.requiredKinds.has("deploy") && !policy.waivers.has("deploy");
+  // Resolved locally rather than through the module-level `sourceCommit`/`resolveSourceTree`
+  // pair: this function runs from the deploy branch, which executes BEFORE either of those
+  // bindings is initialized. Reaching for them here would be a temporal-dead-zone throw on
+  // every deploy-triggering push, i.e. a crash rather than a decision.
+  const candidate = proofDemanded ? deployCandidate() : null;
+  const now = new Date().toISOString();
+
   const reasons = [];
   for (const req of required) {
     const match = deployApprovals.find(
@@ -1057,6 +1139,24 @@ function checkDeployApprovals(required) {
       reasons.push(
         `Environment '${req.environment}': no unused deployApproval for artifact '${req.display}' -- record it: ` +
           `node harness/scripts/pipeline-state.mjs approve-deploy --env ${req.environment} --artifact <tag-or-sha> --by <name>.`,
+      );
+      continue;
+    }
+    if (!proofDemanded) continue;
+    const attested = candidate === null || parsed === null
+      ? { authorized: false, code: "DEPLOY-PROOF-CANDIDATE-UNRESOLVED" }
+      : authorizeRecordedDeploy({
+        projectDir,
+        state: parsed,
+        candidate,
+        artifact: req.bareArtifact,
+        environment: req.environment,
+        now,
+      });
+    if (!attested.authorized) {
+      reasons.push(
+        `Environment '${req.environment}': the deployApproval for artifact '${req.display}' is not externally attested ` +
+          `for this exact candidate (${attested.code}). Re-record it with --proof-request/--proof-authority/--proof.`,
       );
     }
   }
@@ -1510,13 +1610,33 @@ if (pushGate.approval === "standing-approved") {
     // publication executor to carry the push. An unreadable policy answers "required".
     const pushWaiver = criticalProofWaiverFor(projectDir, "push");
     if (pushGate.approval === "required" && !pushWaiver.waived) {
-      const action = approval?.criticalProof?.action;
-      if (action?.kind === "push" && approval.remote === pushBinding.remote && approval.destination === pushBinding.destination) {
-        failures.push("Raw git push cannot consume a critical proof; use the fixed publication executor for the externally attested action.");
-      } else {
+      // ADR-0056 §6. This branch used to refuse EVERY agent-issued push and point at the
+      // fixed publication executor. That was safe and unusable: publication is a release
+      // path, and an ordinary feature branch needs to be pushable without one, so
+      // `signature` mode meant "no session can ever push" rather than "a session can push
+      // what the human signed".
+      //
+      // The permission is granted by verification, never by the record's word. See
+      // ../lib/critical-action-authorization.mjs for why believing
+      // `pushApproval.lastApproved` would have silently demoted `signature` to `chat`.
+      // A policy failure keeps its own code so the operator sees which half is broken.
+      const sourceTree = resolveSourceTree();
+      const attested = sourceTree === null
+        ? { authorized: false, code: "PUSH-PROOF-CANDIDATE-UNRESOLVED" }
+        : authorizeRecordedPush({
+          projectDir,
+          state,
+          candidate: { commit: sourceCommit, tree: sourceTree },
+          remote: pushBinding.remote,
+          destination: pushBinding.destination,
+          now: new Date().toISOString(),
+        });
+      if (!attested.authorized) {
         failures.push(
           pushWaiver.code === null
-            ? "Push approval critical proof is not bound to this remote and destination ref."
+            ? `Push approval is not externally attested for this exact action (${attested.code}). `
+              + `Record one: node harness/scripts/pipeline-state.mjs approve-push --by <name> --remote ${pushBinding.remote} `
+              + `--destination ${pushBinding.destination} --proof-request <path> --proof-authority <path> --proof <path>.`
             : `Push approval critical proof is unavailable: project/critical-human-proof.json is ${pushWaiver.code}.`,
         );
       }
