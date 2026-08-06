@@ -34,6 +34,21 @@ function userYaml(base, text) {
 }
 const GATES = (mode) => `schema: "pipeline.user.v3"\ngates:\n  claude_md_max_lines: 200\n  dev_plan: "blocking"\n  push: "blocking"\n${mode === null ? "" : `  push_approval: "${mode}"\n`}  security: "blocking"\n`;
 
+/**
+ * Reach an existing fixture root through a real directory symlink.
+ *
+ * The one shape no fixture had, and the reason the suite stayed green while
+ * `committedUnchanged` compared a physical path against a lexical one: `mkdtempSync` under
+ * `os.tmpdir()` is symlink-free on Linux, so every root here happened to be its own realpath.
+ */
+function linkedRoot(target) {
+  const base = mkdtempSync(join(tmpdir(), "critical-human-proof-link-"));
+  roots.push(base);
+  const link = join(base, "root");
+  symlinkSync(target, link, "dir");
+  return link;
+}
+
 const roots = [];
 function root(policy) {
   const base = mkdtempSync(join(tmpdir(), "critical-human-proof-policy-"));
@@ -287,6 +302,63 @@ try {
     spawnSync("git", ["-C", base, "commit", "-qm", "fixture"]);
     assert.equal(readPushApprovalMode(sub).mode, "chat",
       "a sub-project's own committed setting was ignored");
+  });
+
+  check("CHP26 a root reached through a symlink still honours its committed setting", () => {
+    // T4 Critic F1, half one. `git rev-parse --show-toplevel` is physical; `resolve()` is
+    // lexical. Relating them directly made `relative()` emit a `..` path for any symlinked
+    // root, so a correctly committed file read as uncommitted. No fixture used a symlinked
+    // root, which is exactly why the whole suite stayed green through the defect.
+    const real = userYaml(root(V1()), GATES("chat"));
+    assert.equal(readPushApprovalMode(real).mode, "chat", "precondition: the direct path is chat");
+    assert.equal(readPushApprovalMode(linkedRoot(real)).mode, "chat",
+      "a symlinked root reported its committed setting as uncommitted");
+  });
+
+  check("CHP27 a symlinked root does not suppress the mode conflict", () => {
+    // F1, half two, and the half that decided the verdict: degrading the source silently
+    // skipped CRITICAL-PROOF-MODE-CONFLICT, so a policy waiver applied and approve-push
+    // stopped demanding the detached proof. Reached here through the symlink; CHP28 pins
+    // the same property without one.
+    const base = userYaml(
+      root(V2([{ kind: "push", reason: "policy-file waiver contradicting the source" }])),
+      GATES("signature"),
+    );
+    const result = criticalProofWaiverFor(linkedRoot(base), "push");
+    assert.equal(result.waived, false, "a symlinked root let a policy waiver stand the proof down");
+    assert.equal(result.code, "CRITICAL-PROOF-MODE-CONFLICT");
+  });
+
+  check("CHP28 no unestablished source lets a policy waiver stand the proof down", () => {
+    // The general property. `default` -- absent file, or a file without the key -- is the
+    // ONLY value meaning the source has no opinion; everything else means "could not be
+    // established" and must fail closed. Written against the safe value rather than against
+    // a list of unsafe ones, so a source value added later fails closed by default. That is
+    // precisely how the C1 fix opened this hole: it added `uncommitted` to a branch that
+    // enumerated the unsafe cases.
+    const waiver = () => V2([{ kind: "push", reason: "policy-file waiver contradicting the source" }]);
+    for (const [label, text] of [
+      ["uncommitted", GATES("signature").replace('push: "blocking"', 'push:  "blocking"')],
+      ["invalid", 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "whatever"\n'],
+      ["unreadable", ": : not yaml\n  - [\n"],
+    ]) {
+      const base = userYaml(root(waiver()), GATES("signature"));
+      writeFileSync(join(base, "pipeline.user.yaml"), text);
+      const result = criticalProofWaiverFor(base, "push");
+      assert.equal(result.waived, false, `${label}: a waiver was honoured`);
+      assert.equal(result.code, "CRITICAL-PROOF-MODE-CONFLICT", `${label}: wrong code`);
+    }
+  });
+
+  check("CHP29 an absent key still lets an explicit policy waiver govern", () => {
+    // The other side of CHP28, so the tightening cannot pass by refusing everything.
+    const base = userYaml(
+      root(V2([{ kind: "push", reason: "the operator stood the proof down deliberately" }])),
+      GATES(null),
+    );
+    assert.equal(readPushApprovalMode(base).source, "default");
+    assert.equal(criticalProofWaiverFor(base, "push").waived, true,
+      "a deliberate waiver was refused although the source has no opinion");
   });
 
   check("CHP13 this repository ships the gate ON", () => {
