@@ -191,6 +191,7 @@
           "docs/adr/0051-dual-runner-tri-platform-development-contract.md",
           "docs/adr/0052-marketplace-identity-restoration-and-local-dev-separation.md",
           "docs/adr/0053-setup-generator-authority-resolved-targets.md",
+          "docs/adr/0054-arbitheon-authority-directory-and-precedence-chain.md",
           "docs/adr/README.md"
         ]
       },
