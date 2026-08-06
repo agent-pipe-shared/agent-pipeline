@@ -63,12 +63,13 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0048](0048-local-goldfish-supervisor.md) | Local Goldfish supervisor | accepted | 2026-07-26 |
 | [0049](0049-gitlab-ci-constrained-remote-executor-pilot.md) | GitLab CI constrained remote-executor pilot | accepted | 2026-07-27 |
 | [0050](0050-candidate-bound-verify-run-journal.md) | Candidate-bound private Verify run journal | accepted | 2026-08-01 |
-| [0051](0051-dual-runner-tri-platform-development-contract.md) | Dual-runner (Claude Code + Codex), tri-platform (Windows/macOS/Unix-WSL) development contract | accepted | 2026-08-04 |
+| [0051](0051-dual-runner-tri-platform-development-contract.md) | Dual-runner (Claude Code + Codex), tri-platform (Windows/macOS/Unix-WSL) development contract | accepted; its "support" clause clarified by 0057 | 2026-08-04 |
 | [0052](0052-marketplace-identity-restoration-and-local-dev-separation.md) | Restore the published marketplace identity and give local development its own | accepted | 2026-08-06 |
 | [0053](0053-setup-generator-authority-resolved-targets.md) | `setup.mjs` writes to the resolved project-authority tier, not a hardcoded legacy path | accepted (generator fix), partially deferred (stale-mirror removal) | 2026-08-06 |
 | [0054](0054-arbitheon-authority-directory-and-precedence-chain.md) | `.arbitheon/` authority directory, three-tier precedence chain, configurable location | accepted (design + sequencing), implementation staged | 2026-08-06 |
 | [0055](0055-critical-human-proof-waiver.md) | The Ed25519 human hard gate gets a sanctioned off-switch | accepted, refined by 0056 | 2026-08-06 |
 | [0056](0056-push-approval-mode.md) | The push gate stays; how a human clears it becomes a configured mode | accepted | 2026-08-06 |
+| [0057](0057-runner-platform-support-is-an-implementation-obligation.md) | Runner/platform support is an implementation obligation, not a per-cell evidence duty | accepted | 2026-08-06 |
 
 ### Resubmissions
 
@@ -87,6 +88,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0054](0054-arbitheon-authority-directory-and-precedence-chain.md) | Steps 2–4 (third tier + configurable name, writes to the top tier, completeness-gated cleanup) each need their own dispatch; the lower tiers may not be deleted until the completeness check is green |
 | [0055](0055-critical-human-proof-waiver.md) | PRD approval (`approve-plan`) is still unattributed and not proof-bound — the remaining half of the 2026-08-05 backlog item |
 | [0056](0056-push-approval-mode.md) | `deploy` and `publication` have no source-of-truth mode; add one only if an operator asks |
+| [0057](0057-runner-platform-support-is-an-implementation-obligation.md) | Build the mechanical R1/R2 checks — a literal-runner-default check first, then a both-shell-rendering check |
 
 ### Conventions
 

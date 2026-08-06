@@ -1,111 +1,106 @@
-# Runner × platform conformance
+# Runner and platform conformance
 
-> Agent-Pipeline · as of 2026-08-06 · governed by [ADR-0051](adr/0051-dual-runner-tri-platform-development-contract.md)
+> Agent-Pipeline · as of 2026-08-06 · governed by
+> [ADR-0051](adr/0051-dual-runner-tri-platform-development-contract.md) as clarified by
+> [ADR-0057](adr/0057-runner-platform-support-is-an-implementation-obligation.md)
 
-ADR-0051 defines support precisely:
+## The claim
 
-> "Support" means focused tests exist and pass for the claimed runner/platform
-> combination, or a dated, explicit, PO-accepted gap is recorded — an unverified
-> claim of support is not support.
+Agent-Pipeline supports **Claude Code and Codex**, on **Windows, macOS and Unix/WSL**.
 
-This file is that record. It exists because the ADR's own Follow-up asked for gap
-tracking and none was ever instantiated: the ADR pointed at backlog items that did
-not exist and `docs/state.md` pointed back at the ADR — a closed loop with no owner
-(`backlog/items/2026-08-05-adr-0051-follow-up-gaps-untracked.md`). Every cell below
-is either **evidenced** with a runnable artifact, or an **accepted gap** with a date
-and an owner. There is no third state, and "the suite is green" is not by itself
-evidence — see the warning below.
+That claim is not qualified by which machine a release happened to be developed on. A
+release is always built on one machine; requiring a fresh manual run of every
+runner/platform combination before the claim may be made would be unmaintainable, and
+self-defeating besides — verify one combination, fix what it finds, and every other
+combination is suddenly "unevidenced" against the new candidate. ADR-0057 records why
+that reading was rejected.
 
-## Matrix
+## What actually carries the claim
 
-| Runner | Unix / WSL | macOS | Windows (native) |
-| --- | --- | --- | --- |
-| **Claude Code** | evidenced — see C1 | accepted gap G2 | accepted gap G3 |
-| **Codex** | accepted gap G1 | accepted gap G2 | accepted gap G3 |
-| **Antigravity (agy)** | out of scope — see A1 | out of scope — see A1 | out of scope — see A1 |
+Not a matrix somebody fills in. **Properties of the code**, which hold for every
+change on whatever machine is at hand.
 
-## What green suites do and do not prove
+### R1 — Runner neutrality by construction
 
-`nova-macos-acceptance-tests` and the Windows-assurance registration pass in every
-Verify run, on Unix/WSL, and they are **not** platform evidence. The macOS suite
-runs entirely on synthetic fixtures (`hardwareClass: "synthetic"`,
-`acceptanceId: "nova-b5-synthetic-01"`): it proves the acceptance-record contract is
-enforced, not that anything ran on macOS. Reading those greens as platform support
-is exactly the "unverified claim of support" the ADR names.
+Anything built works under both runners: genuinely runner-neutral, or explicitly
+routed per runner. A runner-specific path is acceptable only with an explicit, tested
+path for the other runner.
 
-## Evidenced cells
+**Never a silent single-runner default.** No literal fallback runner, no environment
+sniff standing in for a threaded identity. This is the strongest clause in ADR-0051
+and the defect class it was written for:
 
-### C1 — Claude Code × Unix/WSL
+- `7f5ac97` — preflight never told the onboarding script which runner was
+  bootstrapping; every session silently defaulted to `codex` and inherited a
+  Codex-only App-Server requirement it could not satisfy.
+- F-A, this sprint — an environment variable serving as runner authority in the
+  shared admission gate.
+- `RUNNER-THREAD-17`, in flight — eight literal `runner = "codex"` defaults in the V4
+  onboarding lifecycle, plus a CLI that parsed `--runner` and discarded it. Found by a
+  consumer smoke test, not by a matrix.
 
-- **Method:** fresh session, empty directory, installed candidate plugin (not the
-  checkout), consumer path only — `pipeline-start-preflight` → onboarding inspect →
-  each returned `nextAction` executed verbatim → guard hook sanity.
-- **First run, 2026-08-06:** FAILED. It found the runner-identity defect recorded in
-  `backlog/items/2026-08-06-onboarding-lifecycle-plan-hardcodes-the-codex-runner.md`
-  — a Claude consumer following the tool's own instructions was routed onto the Codex
-  rail. This is what the cell is for.
-- **Status:** re-run pending after dispatch `RUNNER-THREAD-17`. **This row is not
-  evidenced until that re-run is recorded here with its candidate commit.** Do not
-  read the table above as settled for C1 before then.
+Each of these was a *code* defect, found by exercising code — which is the argument
+for R1 over per-cell evidence.
 
-## Accepted gaps
+### R2 — Shell portability by construction
 
-Each gap is accepted by the PO on 2026-08-06 as a deliberate release decision for
-0.5.2: the evidence is to be produced against the released artifact rather than
-before it, and the PO creates the tracking issues afterwards.
+Every script, invocation and human-copyable command works under PowerShell **and** an
+ordinary POSIX shell. A command rendered for one shell family only is a defect, not a
+platform gap.
 
-### G1 — Codex × Unix/WSL, not exercised this sprint
+Reference shape: `restartCopyCommands` in
+`plugins/pipeline-core/lib/project-onboarding-v3.mjs`, which renders a POSIX and a
+PowerShell form of the same bounded action, with the argv shape validated before
+either is emitted.
 
-- **What is missing:** no Codex-side install was refreshed against this candidate and
-  no Codex consumer path was run. The `.codex-plugin/plugin.json` build metadata is
-  from 2026-08-03 and has not tracked this sprint's content.
-- **Why it is a gap and not a failure:** nothing indicates Codex is broken; it is
-  simply unverified against this candidate, which under ADR-0051 is the same thing as
-  unsupported until recorded.
-- **Accepted by:** PO, 2026-08-06. **To be evidenced against the release.**
-- **What would close it:** the C1 procedure, run with the Codex runner and a
-  refreshed Codex cachebuster, recorded as a C-row here.
+### R3 — Path and filesystem neutrality
 
-### G2 — macOS, both runners
+No assumption of a path separator, case-folding rule, or permission model that holds
+on only one platform. Windows private-state handling (`windows-private-state.mjs`,
+DACL assurance) is the reference shape for the permission side.
 
-- **What is missing:** no native macOS execution of Verify or the consumer path. The
-  green `nova-macos-acceptance-tests` is fixture-based and does not close this.
-- **Constraint:** cannot be produced from the development machine used this sprint
-  (Unix/WSL). This is a hard limit, not a scheduling choice.
-- **Accepted by:** PO, 2026-08-06. **To be evidenced against the release.**
+## Enforcement status, stated honestly
 
-### G3 — Windows (native), both runners
+R1–R3 are the obligation. Most of them are **not yet mechanically enforced**, which
+means they currently rest on review — weaker than a check, and worth saying plainly
+rather than implying a rigour that is not there.
 
-- **What is missing:** no native-Windows execution. `docs/state.md`'s Cyborg-sprint
-  history records a known shell-dependent red set (11 suites red in both Git-Bash and
-  PowerShell, 25 red in PowerShell alone), a trusted-tool-resolution gap that makes
-  `security-scan` "clean because skipped" rather than "clean because scanned" outside
-  an immutable Windows root allowlist, and DACL/durability gaps in
-  `afk-ledger` / `advisory-host-bridge` / `codex-isolated-critic-contract`.
-- **Note:** this gap is *older and larger* than G1/G2 — it has known red suites, not
-  merely absent evidence. ADR-0051 names it explicitly as a starting gap.
-- **Constraint:** same as G2.
-- **Accepted by:** PO, 2026-08-06. **To be evidenced against the release.**
+| Property | Enforced how, today |
+| --- | --- |
+| No literal runner default in gate-critical paths | review only — a check is the highest-value thing to build next |
+| Runner identity threaded through the onboarding lifecycle | in progress (`RUNNER-THREAD-17`); a consumer-chain regression test is part of it |
+| Human-copyable commands carry both shell renderings | implemented for the restart action; no general check |
+| Verify suites runnable under both shell families | partially — see the known defect class below |
 
-## Out of scope
+## Known defect class, unchanged
 
-### A1 — Antigravity (agy)
+Native Windows carries a real red set from the Cyborg sprint, recorded in
+`docs/state.md`: 11 suites red under both Git-Bash and PowerShell, 25 under PowerShell
+alone; a trusted-tool-resolution gap that makes `security-scan` "clean because
+skipped" rather than "clean because scanned" outside an immutable Windows root
+allowlist; and DACL/durability gaps in `afk-ledger` / `advisory-host-bridge` /
+`codex-isolated-critic-contract`.
 
-ADR-0051 places Antigravity explicitly out of the hard requirement "until it lands",
-and its Follow-up states that when it lands the ADR is **revisited and superseded**.
-The PO's stated direction (2026-08-06) is an initial demo adapter, after which all
-three runners must work on all three platforms — nine cells instead of six.
+This is a **defect class, not a missing-evidence gap**. Reclassifying evidence duty
+does not make known-red suites green, and ADR-0057 explicitly retains it.
 
-That is a successor ADR, not an amendment to this file: landing agy changes the
-contract, not just the matrix. Not in 0.5.2.
+## Optional evidence log
 
-## Maintenance
+The PO performs manual runner/platform verification independently and in parallel with
+development, and creates issues from what it finds. This is **valuable and
+non-mandatory**: it gates nothing, its absence retracts nothing, and a finding from it
+is an ordinary defect.
 
-A cell moves from gap to evidenced only by adding a C-row with a method, a candidate
-commit, and a date. A gap with no owner and no date is the failure mode this file was
-created to end — do not add one.
+Runs may be recorded here when they happen. An empty section means nobody has recorded
+one recently — it does not mean anything is unsupported.
 
-**Known weakness of this artifact:** nothing enforces it. It can rot exactly the way
-ADR-0051's Follow-up rotted. Turning it into a Verify check — a gate that fails when
-a claimed-supported cell has no evidence row, or when an accepted gap passes its
-review date — is the obvious next step and is deliberately not in 0.5.2.
+| Date | Runner | Platform | Candidate | Outcome |
+| --- | --- | --- | --- | --- |
+| 2026-08-06 | Claude Code | Unix/WSL | `cc91243` | Consumer smoke test in an empty directory found the `RUNNER-THREAD-17` runner-identity defect; re-run pending after the fix. |
+
+## What this file is not
+
+It is not a gate, and it must not become one: gating on manual work the PO has
+designated optional would fail on whichever machine is not currently in front of the
+developer. What *should* become gates are the R1/R2 checks in the enforcement table —
+those run anywhere.

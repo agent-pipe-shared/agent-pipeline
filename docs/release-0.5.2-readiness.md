@@ -202,31 +202,39 @@ evidence that the registered suites pass, not that the full corpus does.
 occurrence sits below the `DE-REFERENCE-BELOW` marker that declares those sections
 redundant and non-authoritative; the English above them is corrected.
 
-## Runner and platform scope, decided 2026-08-06
+## Runner and platform scope, clarified 2026-08-06
 
-ADR-0051 requires that every claimed runner/platform combination is either evidenced
-or recorded as a dated, PO-accepted gap. The PO's decision for 0.5.2: **everything
-ships except the hard evidence for Codex, macOS, Windows and Antigravity** — those
-are produced against the released artifact, with tracking issues created afterwards.
+**The support claim stands: Claude Code and Codex, on Windows, macOS and Unix/WSL.**
 
-That is the ADR's own second clause, not an exception to it. The record lives in
-[`docs/runner-platform-conformance.md`](runner-platform-conformance.md), which is the
-artifact ADR-0051's Follow-up asked for and never got — the reason those gaps went
-untracked is that no file was ever responsible for them.
+An earlier revision of this document read ADR-0051's "support" clause literally and
+concluded 0.5.2 was evidenced for one runner on one platform with three accepted gaps.
+The PO rejected that reading and [ADR-0057](adr/0057-runner-platform-support-is-an-implementation-obligation.md)
+records why: a release is always developed on one machine, and under that reading
+verifying one combination and fixing what it finds would leave every *other*
+combination unevidenced against the new candidate. A definition under which improving
+the product shrinks its claim is not usable.
 
-| Cell | 0.5.2 status |
+The obligation ADR-0051 actually carries is on the **implementation** — runner
+neutrality by construction with no silent single-runner default, shell portability for
+both PowerShell and POSIX, and path/filesystem neutrality. Manual cross-platform
+verification is optional, performed independently by the PO, and gates nothing.
+
+For 0.5.2 this means:
+
+| | 0.5.2 |
 | --- | --- |
-| Claude × Unix/WSL | evidenced, pending the post-`RUNNER-THREAD-17` re-run |
-| Codex × Unix/WSL | accepted gap G1 |
-| macOS, both runners | accepted gap G2 |
-| Windows native, both runners | accepted gap G3 — known red suites, not merely absent evidence |
+| Support claim | unchanged and unqualified |
+| Runner-neutrality defect found this sprint | `RUNNER-THREAD-17`, in flight — must land |
+| Manual Codex / macOS / Windows runs | optional, PO-scheduled, not release gates |
+| Native-Windows red-suite class | retained as a tracked defect class, unchanged |
 | Antigravity | out of scope; landing it supersedes ADR-0051 |
 
-**One thing this changes about how the release reads:** 0.5.2 must not be described
-as "works on Codex and Claude across three platforms". Under the definition this
-repository itself adopted, it is evidenced for one runner on one platform, with three
-accepted gaps and a successor runner out of scope. The release notes should say that
-plainly.
+The honest caveat, carried from ADR-0057: the mechanical checks that would make the
+implementation obligation self-enforcing mostly **do not exist yet**, so it currently
+rests on review. Building them — a literal-runner-default check first — is worth more
+than any number of manual matrix runs and is the named follow-up.
+
+Details and the optional evidence log: [`docs/runner-platform-conformance.md`](runner-platform-conformance.md).
 
 ## Explicitly deferred to 0.5.3, with reasons
 
