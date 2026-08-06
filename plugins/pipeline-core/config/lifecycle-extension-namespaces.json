@@ -1,0 +1,24 @@
+{
+  "schema": "pipeline.lifecycle-extension-namespaces.v1",
+  "$comment": "Registered namespaces for durable, exportable PHX-3 lifecycle records, with a closed value domain per entry. Deliberately NOT the control/execution registry: that one serves a live exchange between two cooperating processes and includes `pipeline.credentials`, which has no place in a record that is written once and exported. Every domain here is incapable of carrying entropy -- booleans, bounded counts, and listed vocabularies only. There is no open string domain, because an identifier grammar wide enough to be useful is also wide enough to hold an access key or a digest of arbitrary private text.",
+  "namespaces": {
+    "pipeline.event-projection": {
+      "projected": { "domain": "boolean" },
+      "sequence": { "domain": "count", "max": 1048576 }
+    },
+    "pipeline.isolation": {
+      "isolated": { "domain": "boolean" },
+      "degraded": { "domain": "boolean" }
+    },
+    "pipeline.remote-execution": {
+      "runnerId": { "domain": "enum", "values": ["agy", "claude", "codex"] },
+      "attempt": { "domain": "count", "max": 1024 },
+      "degraded": { "domain": "boolean" },
+      "outcomeCode": { "domain": "enum", "values": ["CANCELLED", "COMPLETED", "FAILED", "SANDBOX_UNAVAILABLE", "TIMED_OUT", "UNAVAILABLE"] }
+    },
+    "pipeline.result-import": {
+      "imported": { "domain": "boolean" },
+      "outcomeCode": { "domain": "enum", "values": ["ACCEPTED", "MALFORMED", "REJECTED", "UNAVAILABLE"] }
+    }
+  }
+}

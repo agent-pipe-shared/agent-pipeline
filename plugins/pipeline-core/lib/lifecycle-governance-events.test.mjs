@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import test from "node:test";
-import { EXTENSION_NAMESPACES, isRegisteredExtensionNamespace } from "./extension-namespaces.mjs";
-import { LifecycleGovernanceEventError, validateLifecycleGovernanceEvent } from "./lifecycle-governance-events.mjs";
+import { LIFECYCLE_EXTENSION_NAMESPACES, LifecycleGovernanceEventError, isRegisteredLifecycleExtensionNamespace, validateLifecycleGovernanceEvent } from "./lifecycle-governance-events.mjs";
 
 const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
 function event(overrides = {}) {
@@ -28,31 +27,52 @@ test("requires explicit, exclusive invalidation semantics", () => {
 // L-AC-03: runner-specific detail belongs under a registered namespaced
 // extension, and an unknown namespace is rejected rather than retained.
 test("L-AC-03 retains runner detail only under a registered namespace", () => {
-  const namespace = EXTENSION_NAMESPACES[0];
-  const accepted = validateLifecycleGovernanceEvent(event({ extensions: { [namespace]: { runnerId: "codex", attempt: 2, degraded: false, outcomeCode: "SANDBOX_UNAVAILABLE", tree: "c".repeat(64), detail: null } } }));
-  assert.equal(accepted.extensions[namespace].runnerId, "codex");
+  const accepted = validateLifecycleGovernanceEvent(event({ extensions: { "pipeline.remote-execution": { runnerId: "codex", attempt: 2, degraded: false, outcomeCode: "SANDBOX_UNAVAILABLE" } } }));
+  assert.equal(accepted.extensions["pipeline.remote-execution"].runnerId, "codex");
   assert.equal(Object.isFrozen(accepted.extensions), true);
-  assert.equal(Object.isFrozen(accepted.extensions[namespace]), true);
-  // Every registered namespace is admissible; nothing else is.
-  for (const registered of EXTENSION_NAMESPACES) assert.equal(validateLifecycleGovernanceEvent(event({ extensions: { [registered]: {} } })).extensions[registered].runnerId, undefined);
+  assert.equal(Object.isFrozen(accepted.extensions["pipeline.remote-execution"]), true);
+  for (const registered of LIFECYCLE_EXTENSION_NAMESPACES) assert.equal(validateLifecycleGovernanceEvent(event({ extensions: { [registered]: {} } })).extensions[registered].runnerId, undefined);
   for (const unknown of ["provider.injected", "pipeline.unregistered", "PIPELINE.CREDENTIALS", "pipeline", "__proto__", ""]) {
-    assert.equal(isRegisteredExtensionNamespace(unknown), false);
+    assert.equal(isRegisteredLifecycleExtensionNamespace(unknown), false);
     assert.throws(() => validateLifecycleGovernanceEvent(event({ extensions: { [unknown]: {} } })), (error) => error instanceof LifecycleGovernanceEventError, `admitted namespace ${unknown}`);
   }
 });
 
-test("L-AC-03 keeps a namespace from becoming a free-text or unbounded escape hatch", () => {
-  const namespace = EXTENSION_NAMESPACES[0];
+// A durable lifecycle record is written once and later exported, so the one
+// field a provider controls must not be closable only by shape. These are the
+// values the previous identifier/code/object-id grammar admitted.
+test("L-AC-03 admits no namespace under which a credential could be filed", () => {
+  assert.equal(isRegisteredLifecycleExtensionNamespace("pipeline.credentials"), false);
+  assert.throws(() => validateLifecycleGovernanceEvent(event({ extensions: { "pipeline.credentials": {} } })), (error) => error instanceof LifecycleGovernanceEventError);
+});
+
+test("L-AC-03 admits no value that could carry a secret or an opaque digest", () => {
+  const namespace = "pipeline.remote-execution";
   for (const detail of [
+    // Credential-shaped: every one of these satisfied the identifier or reason-code grammar.
+    { runnerId: "AKIAIOSFODNN7EXAMPLE" },
+    { runnerId: "ghp_0123456789abcdefghijklmnopqrstuvwxyz" },
+    { outcomeCode: "AKIAIOSFODNN7EXAMPLE" },
+    // A 64-hex object id is a digest of arbitrary private text.
+    { runnerId: "c".repeat(64) },
+    { outcomeCode: "C".repeat(64) },
+    // Off-vocabulary values of the right shape are refused, not just malformed ones.
+    { runnerId: "cursor" },
+    { outcomeCode: "SANDBOX_MISSING" },
+    // Unregistered keys are refused rather than silently dropped.
+    { tree: "c".repeat(64) },
+    { detail: null },
     { transcript: "a full session transcript" },
     { path: "/home/fixture/secret" },
     { nested: { runnerId: "codex" } },
     { list: ["codex"] },
-    { size: 1.5 },
+    { attempt: 1.5 },
+    { attempt: -1 },
+    { attempt: 1025 },
+    { degraded: "false" },
     // Parsed rather than written as a literal: only JSON.parse gives this an
     // own key, which is exactly how an untrusted payload would arrive.
     JSON.parse('{"__proto__":"codex"}'),
-    Object.fromEntries(Array.from({ length: 17 }, (_, index) => [`entry${index}`, "value"])),
   ]) assert.throws(() => validateLifecycleGovernanceEvent(event({ extensions: { [namespace]: detail } })), (error) => error instanceof LifecycleGovernanceEventError, `admitted ${JSON.stringify(detail)}`);
   for (const value of [null, [], "codex", 1]) assert.throws(() => validateLifecycleGovernanceEvent(event({ extensions: value })), (error) => error instanceof LifecycleGovernanceEventError);
   // An event that retains no runner detail keeps the base shape exactly.
