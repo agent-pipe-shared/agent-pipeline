@@ -16,7 +16,55 @@ the supplied authoritative release identity; it is not a claimed release time.
 The historical candidate-qualification sections below are retained as
 session history and no longer describes the current publication disposition.
 
-## 2026-08-06 Nova II (evening) — the guards that were never running (current)
+## 2026-08-06 Nova III (night) — push executed, autonomous AFK prep (current)
+
+Continues `feat/sprint-nova-codex-v046` from `5ba7ee0`. The PO reviewed and
+signed a push approval for `5ba7ee0` (remote `origin`, destination
+`refs/heads/feat/sprint-nova-codex-v046`) outside the session per the
+`signature`-mode protocol; the session executed the actual `git push` once a
+Claude Code auto-mode permission classifier (a harness-level control distinct
+from the Pipeline's own guards) admitted it. Verified landed on both `origin`
+and `upstream` (same remote URL) at `5ba7ee0`.
+
+**PO decision, 2026-08-06 night:** the 0.5.2 candidate releases to `main`
+tomorrow (2026-08-07); the PO went AFK and authorized autonomous overnight
+work on open backlog items and Nova B preparation in the meantime. The actual
+`main` release/publication was explicitly deferred to when the PO returns —
+not attempted tonight (it needs its own separate signed approval scoped to
+`main`/`publication`, which does not yet exist, and this repo's `main`
+boundary is intentionally the strictest gate in the system).
+
+**Backlog: the readiness doc's stated release blocker turned out to already
+be fixed.** Re-verifying `docs/release-0.5.2-readiness.md`'s "blocks the
+release" onboarding-runner defect against current HEAD found it was fixed
+same-day by `c860e1d` and never reconciled back to the backlog item or the
+readiness doc. Independently re-run end to end (fresh empty-directory chain,
+`--runner claude` throughout, plus the registered `onboarding-runner-identity`
+suite, 8/8) — closed with evidence in `0e4ba2b`. A narrower, non-blocking
+residual (Codex-named diagnostic/launcher at the `restart-required` step,
+unexecuted since it exits the process) was filed separately rather than
+folded into the same closure:
+`backlog/items/2026-08-06-restart-launch-is-codex-only-for-every-runner.md`.
+
+**Nova B: the entry gate is not met, so no slice was implemented.**
+`nova-b.md`'s entry gate needs an accepted Nova A Result and explicit PO
+activation; `nova-a.md`'s own text shows Nova A was mid-revocation, not
+accepted, and none of tonight's/today's actual work maps to a Nova A issue
+number — it is a separate "0.5.2 patch-candidate recovery" track that happens
+to share the branch. Recorded as a full readiness snapshot rather than
+guessed past: `specs/sprint-nova-epic/plans/nova-b-readiness-2026-08-06.md`
+(`13712ea`) — what already exists under the recorded B1-I PO exception, the
+2026-08-09 disposition-renewal deadline, an ADR-0047 numbering collision
+found in passing, and a per-slice status table.
+
+A wider backlog reconciliation pass (five parallel read-only investigation
+agents across the ~24 other open items, checking each against today's
+guard/push/authority-tier work for the same "already fixed, never closed"
+pattern) was dispatched and is recorded separately once it completes, per
+this same evening's session; see the entry immediately below if it landed
+before this one, or the next session's entry if it lands after.
+
+## 2026-08-06 Nova II (evening) — the guards that were never running
 
 Continues `feat/sprint-nova-codex-v046` from `0c21c31`. Scope limit unchanged:
 feature branch only, no `main` merge, no release. The session began as "check the
