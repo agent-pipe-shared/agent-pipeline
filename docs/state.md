@@ -695,11 +695,60 @@ blocked this session repeatedly (`GUARD-PARSE-UNSUPPORTED`, `GUARD-CROSS-REPO-MU
 the Critic dispatch contract, QG-07. Agent discipline is the only thing holding them, and
 it degrades over a long session — exactly when the stakes are highest.
 
-**Open, and being built in this block rather than filed:** a GIT-03 gate in the existing
-`Bash|PowerShell` matcher (refuse a `git commit` whose message carries a provider trailer or
-session URL, or lacks `AI-Assisted: true`), and a dispatch gate on the Agent tool (refuse a
-`pipeline-core:critic` dispatch carrying sections beyond the references-only set). The first
-would have blocked all 74 commits; the second would have blocked the briefing above.
+**Both gates are built, not filed.** `e4d4fa3` and `47c6d7f`.
+
+**GIT-03 (`e4d4fa3`).** The rule is split along its own nature, because its two halves are
+not the same kind of rule. Correlation data in commit metadata cannot false-positive on an
+ordinary message and cannot be undone once published, so it blocks unconditionally and is
+**deliberately not overridable** — the override mechanism exists for violations that are
+recoverable. The `AI-Assisted: true` marker is a convention, so switching it on
+unconditionally would refuse every ordinary commit in every consumer project that has not
+adopted it; it is config-gated (`commitTrailerPolicy`) and defaults to off. The check reads
+`-m`, `--message=`, `-F`, `--file=` and heredoc bodies — `-F` mattering most, since it is
+the route this repository actually uses and a check that only saw `-m` would have missed
+every commit it was written for.
+
+Found while building it, by a test written to prove something else: `GIT03-5` was meant to
+show the override cannot open the rule, and instead showed that a leading `FOO=bar ` made
+the first token something other than `git`, so the commit went uninspected and the whole
+rule was one env assignment from silent. Both the assignment-prefix and `env`-wrapper forms
+are closed.
+
+**Dispatch preflight (`47c6d7f`).** The first hook matcher in this plugin that covers the
+subagent tool at all. Critic-family dispatches are checked for the five contamination
+patterns the template names plus the task frame it requires; Goldfish-family for the six
+fields without which a briefing is not dispatchable. `Task|Agent` are both matched because a
+matcher naming the wrong tool is a silent no-op — the failure class this file already paid
+for with NotebookEdit. Blocking rather than warning: a warning arrives after the subagent
+has already spent its budget on a contaminated briefing.
+
+**Stated as a test, not as prose** (`DP10`): the check is structural. The same steer written
+in fresh words passes. It raises the cost of the accident — the failure that actually
+happened — not of a determined evasion, and it is not a substitute for reading the template.
+
+**And the instruction itself is now binding** (`4ed4fc6`, CLAUDE.md): a Critic dispatch is
+built by filling `templates/prompts/critic-review.md`, a Goldfish dispatch by filling
+`goldfish-task.md`. Hand-writing one is the failure mode. The templates were never wrong —
+`critic-review.md` §2 forbids a claims list in those exact words, its `EVIDENCE_PATHS` field
+asks for paths rather than commands, and its skip rules already tell the Critic to drop what
+CI enforces. They simply had no reader at the moment of dispatch: `roles/critic.md` is read
+by the Critic, not by the Elephant dispatching it.
+
+**Open at this cut:**
+
+- The four new suites (`commit-message-policy`, `dispatch-policy`, `guard-dispatch`, and the
+  `critical-action-authorization` suite from the earlier block) are **not registered in
+  `harness/scripts/verify.mjs`**. A test Verify does not know about protects nothing.
+  Needs a TP-3 lift.
+- Neither gate is live: the installed plugin is the older candidate. They enforce only after
+  a version bump and reinstall.
+- A Critic round on the full diff with a **template-conforming** dispatch — the point being
+  to see what an unsteered search surface finds, which the T6 round cannot answer.
+- The backlog item on ADR discipline (drafted, parked out of the candidate at the PO's
+  instruction so the reviewed tree stayed clean) still to be written, together with the
+  sanctioned route for `backlog/index.json` — it carries `generatedFrom` and a
+  `transitionHead` digest over `transitions.ndjson`, so it is generated and ledger-bound,
+  not hand-editable.
 
 **Also open:** a second Critic round with a contract-conforming dispatch, to find out what
 an independent search surface sees. The TP-5 lift taken for these test edits must be
