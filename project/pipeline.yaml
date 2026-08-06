@@ -1,5 +1,5 @@
 # pipeline.yaml -- declarative pipeline manifest for THIS repo.
-# ADDITIVE to .claude/pipeline.json (project calibration) -- disjoint field sets, see
+# ADDITIVE to project/pipeline.json (project calibration) -- disjoint field sets, see
 # plugins/pipeline-core/lib/manifest.mjs file header for the dedup confirmation.
 # Schema: pipeline.manifest.v0 (plugins/pipeline-core/scripts/pipeline-manifest.schema.json).
 # Validate with: node harness/scripts/validate-manifest.mjs
@@ -12,7 +12,7 @@ language:
 # This repo is docs+guardrails only (no live UI) -- ui-design stays declared but its
 # condition keeps it inactive until flags.has_ui below flips true for a project that has one.
 session:
-  keep_awake: false
+  keep_awake: true
 phases:
   - name: design
     enabled: true
@@ -25,9 +25,9 @@ phases:
     condition: has_ui
 
 # Exactly 2 blocking human gates (dev-plan, push) plus 1 blocking automated gate
-# (security) -- the PO's tuning directive. push carries a standing
-# approval (ADR-0017 precedent: the PO is PO/CEO, not a developer -- pushing main at
-# work-package boundaries is pre-approved, never a per-push live human touch).
+# (security) -- the PO's tuning directive. The final push requires its own
+# candidate- and target-bound detached Human proof; implementation approval
+# never substitutes for that external-effect authorization.
 gates:
   dev-plan:
     mode: blocking
@@ -35,7 +35,7 @@ gates:
   push:
     mode: blocking
     type: human
-    approval: standing-approved # ADR-0017
+    approval: required
   security:
     mode: blocking
     type: automated
@@ -55,6 +55,7 @@ security:
 modelRouting:
   # Generated V3 Claude compatibility projection; pipeline.user.v3 is the only routing authority.
   # Requested selectors are not advisor-receipt, route-receipt, or effective-model evidence.
+  # Adapter selector catalog — Claude aliases: fable, haiku, opus, sonnet; Codex/OpenAI model IDs: gpt-5.6-luna, gpt-5.6-sol, gpt-5.6-terra.
   elephant_epic_design:
     model: opus
     effort: xhigh
@@ -83,11 +84,11 @@ modelRouting:
     model: sonnet-5
     effort: medium
   goldfish_mechanic:
-    model: sonnet-5
-    effort: low
+    model: haiku
+    effort: medium
   goldfish_deep:
     model: sonnet-5
-    effort: high
+    effort: medium
   critic:
     model: sonnet-5
     effort: high

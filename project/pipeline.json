@@ -24,7 +24,7 @@
   },
   "humanRoles": {
     "po": {
-      "displayLabel": "PO"
+      "displayLabel": "Human"
     }
   },
   "pipelineUpdateChannel": "alpha"
