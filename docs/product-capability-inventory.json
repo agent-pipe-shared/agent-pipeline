@@ -551,6 +551,18 @@
       "member": "agents-adapter-migration-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:backlog-ledger-reconciliation-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "backlog-ledger-reconciliation-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:backlog-state-check",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "backlog-state-check"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:authority-tier-agreement-check",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -2066,6 +2078,8 @@
         "verify-phase:harness/scripts/verify.mjs:artifact-topology-tests",
         "verify-phase:harness/scripts/verify.mjs:authority-tier-agreement-check",
         "verify-phase:harness/scripts/verify.mjs:authority-tier-agreement-tests",
+        "verify-phase:harness/scripts/verify.mjs:backlog-ledger-reconciliation-tests",
+        "verify-phase:harness/scripts/verify.mjs:backlog-state-check",
         "verify-phase:harness/scripts/verify.mjs:backlog-state-tests",
         "verify-phase:harness/scripts/verify.mjs:bootstrap-env-check-tests",
         "verify-phase:harness/scripts/verify.mjs:bootstrap-payload-budget-tests",

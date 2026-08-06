@@ -21,6 +21,11 @@
  * never blocks, so machines without the scanner binaries stay green — QG-05 honesty
  * lives in the evidence artifact, not in a false red). No manifest -> step list stays
  * suites-only, so manifest-less projects keep the pre-AP1 verify shape (regression guard).
+ * NOTE on how absence is detected: `resolveAuthorityArtifactPath` deliberately ALWAYS
+ * returns a path — it falls back to the legacy relpath when nothing resolves, so a
+ * reader is never made stricter by being routed (ADR-0054 step 1). It therefore never
+ * signals absence. The manifest-less case is decided solely by the ENOENT branch below;
+ * do not rewrite that branch to trust `.path` or `.exists` as the opt-out signal.
  *
  * Full chain note (QG-01/QG-02): this repo's calibration (`project/pipeline.json` at
  * the resolved tier, field `verification: "docs+tests"`) has no separate format/lint/typecheck/build
@@ -349,6 +354,12 @@ const TEST_SUITES = [
   { name: "sdlc-efficiency-metrics-tests", file: join(scriptDir, "sdlc-efficiency-metrics.test.mjs") },
   { name: "check-ownership-tests", file: join(scriptDir, "check-ownership.test.mjs") },
   { name: "backlog-state-tests", file: join(libDir, "backlog-state.test.mjs") },
+  // Distinct from nova-backlog-reconciliation-tests below (delivery-status
+  // reconciliation); this one covers the transition-LEDGER reconciliation.
+  { name: "backlog-ledger-reconciliation-tests", file: join(pluginScriptsDir, "reconcile-backlog-ledger.test.mjs") },
+  // The ledger drifted for weeks because nothing gated it. Remedy when this goes red:
+  // node plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs --activate
+  { name: "backlog-state-check", file: join(pluginScriptsDir, "check-backlog-state.mjs") },
   { name: "parallel-dispatch-planner-tests", file: join(libDir, "parallel-dispatch-planner.test.mjs") },
   { name: "parallel-sprint-integration-tests", file: join(libDir, "parallel-sprint-integration.test.mjs") },
   { name: "continuity-status-tests", file: join(libDir, "continuity-status.test.mjs") },

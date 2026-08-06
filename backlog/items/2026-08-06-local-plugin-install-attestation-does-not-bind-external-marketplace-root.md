@@ -4,6 +4,7 @@ id: pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace
 type: defect
 owner: pipeline
 status: open
+created: 2026-08-06
 source: "GATE-HONESTY-11 dispatch briefing, finding N1 (major), Sprint Nova session 2026-08-06"
 due: 2026-09-06
 ---

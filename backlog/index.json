@@ -3,14 +3,22 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "735abc4c224e8533fda9082394da50e619705d7580d8cc5c04f2be036d0ec8bf"
+    "transitionHead": "056cfb4be8aff270dc202b5ca3b582986d2413835c822ff3cf32344ea14fbcac"
   },
   "counts": {
-    "open": 38,
-    "in_progress": 3,
-    "closed": 3
+    "open": 24,
+    "in_progress": 20,
+    "closed": 11
   },
   "items": [
+    {
+      "id": "pipeline.adr-0051-follow-up-gaps-untracked",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-05",
+      "source": "T1 Critic review (Opus, functional-equivalent-read-only) of commits 7f5ac97/d622dc3/9429b94/b14391c, finding F5, Sprint Nova session 2026-08-04/05"
+    },
     {
       "id": "pipeline.afk-assumption-mode",
       "status": "in_progress",
@@ -37,6 +45,22 @@
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.claude-dir-leftovers-defeat-runner-neutral-project-migration",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-05",
+      "source": "PO observation, Sprint Nova session 2026-08-05, plus a concrete misdiagnosis it caused in that same session (Elephant read .claude/pipeline.yaml as authority and drew the wrong conclusion about the push gate); independently confirmed and extended by the T1 Critic of candidate 8d9b3df as finding F-E (major), which withdrew its own earlier, too-generous disposition of the same drift"
+    },
+    {
+      "id": "pipeline.claude-has-no-start-time-opt-in-adoption-path",
+      "status": "open",
+      "type": "idea",
+      "owner": "pipeline",
+      "created": "2026-08-05",
+      "source": "PO observation, Sprint Nova session 2026-08-05, in the same session that reproduced the setup.mjs marketplace collision by hand"
     },
     {
       "id": "pipeline.close-spec-retention-and-consent",
@@ -79,6 +103,14 @@
       "owner": "pipeline",
       "created": "2026-07-20",
       "source": "Public V3 Foundation stabilization close retro: an independent Critic run was discarded after an out-of-band coordinator status message reached its context"
+    },
+    {
+      "id": "pipeline.critical-human-proof-not-wired-to-push-and-prd-gates",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-05",
+      "source": "PO question during Sprint Nova session, 2026-08-05: asked whether the ed25519 human-proof mechanism (built for Sprint Cyborg) needed one-time setup before this session's branch push. Investigation found it exists but is not enforced for either of the two human gates it was meant to secure."
     },
     {
       "id": "pipeline.cross-repository-override-ledger-binding",
@@ -148,6 +180,22 @@
       "source": "Sprint Cyborg epic, self-application finding #2 (Elephant self-observation while implementing CYB-2E; PO decision Option B recorded in docs/state.md, session 2026-07-29)"
     },
     {
+      "id": "pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-06",
+      "source": "GATE-HONESTY-11 dispatch briefing, finding N1 (major), Sprint Nova session 2026-08-06"
+    },
+    {
+      "id": "pipeline.local-worker-supervisor-cli-suite-flakes-under-full-verify",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-06",
+      "source": "Sprint Nova session, 2026-08-06: Full Verify on candidate 9f5bfc9 failed with local-worker-supervisor-cli-tests=1, the same suite passed 9/9 standalone immediately afterwards, and an unchanged re-run of Full Verify on the same candidate and clean tree went green."
+    },
+    {
       "id": "pipeline.managed-onboarding-success-contract",
       "status": "open",
       "type": "workflow-improvement",
@@ -162,6 +210,14 @@
       "owner": "pipeline",
       "created": "2026-07-20",
       "source": "Public transfer completeness review of post-v0.3 Multi-CLI design and measurement work"
+    },
+    {
+      "id": "pipeline.neutral-authority-tier-is-a-frozen-snapshot-the-compiler-never-updates",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-06",
+      "source": "Sprint Nova session, 2026-08-06, ADR-0054 step 1 (routing hardcoded readers through resolveProjectAuthorityPaths). Comparing the two authority tiers before routing more readers to the resolver revealed that the tier the resolver PREFERS is the one nothing maintains."
     },
     {
       "id": "pipeline.nonblocking-interaction-continuity",
@@ -183,6 +239,14 @@
       "closureRepository": "self",
       "closureCommit": "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb",
       "closureEvidence": "backlog/evidence/2026-07-24-completed-companion-deliveries.md"
+    },
+    {
+      "id": "pipeline.pipeline-state-rebind-codex-default-runner",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-05",
+      "source": "Read-only skills audit, Sprint Nova session 2026-08-05 (finding 1 of 6); re-raised as T1 Critic finding F-B (major) against candidate 8d9b3df for lacking a dated tracking artifact"
     },
     {
       "id": "pipeline.po-gate-authority-path-canonicalization",
@@ -241,6 +305,14 @@
       "closureRepository": "self",
       "closureCommit": "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb",
       "closureEvidence": "backlog/evidence/2026-07-24-po-sentinel-closure-disposition.md"
+    },
+    {
+      "id": "pipeline.ready-gate-env-var-runner-authority",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-05",
+      "source": "T1 Critic review of candidate 8d9b3df, finding F-A (major), Sprint Nova session 2026-08-05"
     },
     {
       "id": "pipeline.recovery-preview-ack-unstable-getter-poisons-replay-ledger",
@@ -307,6 +379,14 @@
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.setup-mjs-marketplace-name-collision-defeats-local-dev-installs",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-05",
+      "source": "Live reproduction on this machine, Sprint Nova session 2026-08-05 (two separate clobbers of the local marketplace registration, both traced to setup.mjs's compileSettingsJson() output)"
     },
     {
       "id": "pipeline.source-available-commercial-licensing",
