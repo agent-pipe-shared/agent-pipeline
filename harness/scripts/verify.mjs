@@ -274,6 +274,7 @@ const TEST_SUITES = [
   // The audited escape hatch for guard-testpath. Its own suite is TP-2 protected, so the
   // override's checks live in a separate file; the safety half is what is gated here.
   { name: "guard-testpath-override-tests", file: join(hooksDir, "guard-testpath-override.test.mjs") },
+  { name: "guard-dispatch-tests", file: join(hooksDir, "guard-dispatch.test.mjs") },
   { name: "advisor-consult-v3-tests", file: join(repoRoot, "plugins", "pipeline-core", "skills", "advisor-consult", "advisor-consult-v3.test.mjs") },
   { name: "sandboxed-readonly-duty-tests", file: join(libDir, "sandboxed-readonly-duty.test.mjs") },
   { name: "sandboxed-readonly-host-bridge-tests", file: join(pluginScriptsDir, "sandboxed-readonly-host-bridge.test.mjs") },
@@ -310,6 +311,12 @@ const TEST_SUITES = [
   { name: "threat-model-tests", file: join(libDir, "threat-model.test.mjs") },
   { name: "po-approval-proof-tests", file: join(libDir, "po-approval-proof.test.mjs") },
   { name: "critical-human-proof-policy-tests", file: join(libDir, "critical-human-proof-policy.test.mjs") },
+  // Registered in the same commit that created them. An unregistered suite is not a test
+  // Verify forgot to run -- it is a test that protects nothing, and the gap is invisible
+  // precisely because the file exists and passes when run by hand.
+  { name: "critical-action-authorization-tests", file: join(libDir, "critical-action-authorization.test.mjs") },
+  { name: "commit-message-policy-tests", file: join(libDir, "commit-message-policy.test.mjs") },
+  { name: "dispatch-policy-tests", file: join(libDir, "dispatch-policy.test.mjs") },
   { name: "threat-model-approval-request-tests", file: join(libDir, "threat-model-approval-request.test.mjs") },
   { name: "sbom-lifecycle-tests", file: join(libDir, "sbom-lifecycle.test.mjs") },
   { name: "sbom-manifest-tests", file: join(libDir, "sbom-manifest.test.mjs") },
