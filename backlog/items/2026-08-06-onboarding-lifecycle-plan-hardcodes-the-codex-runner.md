@@ -3,10 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.onboarding-lifecycle-plan-hardcodes-the-codex-runner
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-06
 source: "Smoke test of the 0.5.2 release candidate in an empty directory, 2026-08-06: a fresh consumer following the tool's OWN printed next actions ends up with a Codex-configured project inside a Claude bootstrap."
-due: 2026-09-06
+closed_at: 2026-08-06
+closure_repository: self
+closure_commit: c860e1dd5bb11f2f02c5d9ade2aeb84c1787107a
+closure_evidence: backlog/evidence/2026-08-06-onboarding-runner-identity-reverification.md
 ---
 
 # The V4 onboarding lifecycle plan hardcodes `runner: "codex"`, and `--runner` is accepted then discarded
@@ -133,8 +136,25 @@ point, not a resumable state.
 
 There are 24 `v4Inspection` call sites; most do not thread identity today.
 
+## Resolution
+
+Closed by re-verification, 2026-08-06: the bounded fix was already implemented
+and merged as `c860e1d` ("fix(onboarding): thread runner identity through the
+whole consumer chain"), landed after this item was written but never linked
+back to it. Independently re-run against the exact empty-directory scenario
+in `source` above; the reported harm no longer reproduces, and the dedicated
+regression suite (`onboarding-runner-identity.test.mjs`, ORI01–ORI05, both
+runners) is registered in Verify and passes. Full details and a narrower
+residual finding (Codex-named restart-launch message/target, unaffected by
+this fix) in `backlog/evidence/2026-08-06-onboarding-runner-identity-reverification.md`
+and its follow-up item
+[`2026-08-06-restart-launch-is-codex-only-for-every-runner`](2026-08-06-restart-launch-is-codex-only-for-every-runner.md).
+The full 24-call-site refactor described above as "its own work" remains
+undone and is not required for this closure — the release-blocking consumer
+harm was the bounded fix's exact scope.
+
 ## Related
 
 - [ADR-0051](../../docs/adr/0051-dual-runner-tri-platform-development-contract.md) — the contract this violates.
 - [`2026-08-05-ready-gate-env-var-runner-authority`](2026-08-05-ready-gate-env-var-runner-authority.md) — same class, different path, already fixed.
-- `docs/release-0.5.2-readiness.md` — carries this as the open release decision.
+- `docs/release-0.5.2-readiness.md` — carried this as the open release decision; updated alongside this closure.

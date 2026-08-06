@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "51570c44183e2ef6f83b8d4a96f3805908e75b9059f0db793fc2a7afd42a7811"
+    "transitionHead": "38dee5301a500ae597fe0ba164068a476c95a38dadd03d7caa13db7cd79d6db1"
   },
   "counts": {
     "open": 26,
     "in_progress": 21,
-    "closed": 11
+    "closed": 12
   },
   "items": [
     {
@@ -250,11 +250,15 @@
     },
     {
       "id": "pipeline.onboarding-lifecycle-plan-hardcodes-the-codex-runner",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-06",
-      "source": "Smoke test of the 0.5.2 release candidate in an empty directory, 2026-08-06: a fresh consumer following the tool's OWN printed next actions ends up with a Codex-configured project inside a Claude bootstrap."
+      "source": "Smoke test of the 0.5.2 release candidate in an empty directory, 2026-08-06: a fresh consumer following the tool's OWN printed next actions ends up with a Codex-configured project inside a Claude bootstrap.",
+      "closedAt": "2026-08-06",
+      "closureRepository": "self",
+      "closureCommit": "c860e1dd5bb11f2f02c5d9ade2aeb84c1787107a",
+      "closureEvidence": "backlog/evidence/2026-08-06-onboarding-runner-identity-reverification.md"
     },
     {
       "id": "pipeline.pipeline-state-rebind-codex-default-runner",
@@ -362,6 +366,14 @@
       "owner": "pipeline",
       "created": "2026-08-06",
       "source": "sprint_phoenix handover finding 1, 2026-08-06. The gate-evidence half was closed by publication-gate-evidence.mjs; the release-preflight half was not, and is recorded separately so the remainder is not lost inside a partly-fixed finding."
+    },
+    {
+      "id": "pipeline.restart-launch-is-codex-only-for-every-runner",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-06",
+      "source": "Manual re-run of the empty-directory onboarding smoke test in scratch/onboarding-smoke-test while re-verifying backlog/items/2026-08-06-onboarding-lifecycle-plan-hardcodes-the-codex-runner.md (see backlog/evidence/2026-08-06-onboarding-runner-identity-reverification.md), 2026-08-06."
     },
     {
       "id": "pipeline.runtime-projection-v2-eager-manifest-load",

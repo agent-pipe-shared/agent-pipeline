@@ -55,44 +55,45 @@ suite must also appear in `docs/product-capability-inventory.json`.
 confirmed `claude plugin install` against a separate local marketplace root. That
 ran successfully on 2026-08-06.
 
-## The smoke test ran, and it found a blocker
+## The smoke test found a blocker, and it is now fixed and re-verified
 
 A fresh session installed the candidate into an empty directory and followed only
 the tool's own printed next actions. Every step returned exit 0 and well-formed
-JSON; the guard hook passed; no crash, no stack trace. And the result is wrong.
+JSON; the guard hook passed; no crash, no stack trace. And the result was wrong.
 
-**A Claude consumer following the tool's own instructions is silently routed onto
-the Codex rail.** `inspect --runner claude --intent bootstrap` correctly reports
-`runner: "claude"`, but the `nextAction` it prints drops `--runner` and `--intent`,
-and the `plan` subcommand accepts `--runner claude` and then discards it:
+**A Claude consumer following the tool's own instructions was silently routed
+onto the Codex rail.** `inspect --runner claude --intent bootstrap` correctly
+reported `runner: "claude"`, but the `nextAction` it printed dropped `--runner`
+and `--intent`, and the `plan` subcommand accepted `--runner claude` and then
+discarded it, ending with `pipeline.user.yaml` carrying `runners.default:
+"codex"` and `runtime_missing: "required Codex runtime targets are absent"` —
+inside what was nominally a Claude bootstrap. This was the exact failure mode
+ADR-0051 exists to prevent, on the primary consumer onboarding path.
 
-```
-plan --root <dir>                                     → runner: codex | intent: onboarding
-plan --root <dir> --runner claude --intent bootstrap  → runner: codex | intent: onboarding
-```
-
-`CLAUDECODE=1` was set in both. The chain then writes `pipeline.user.yaml` with
-`runners.default: "codex"` and ends at `runtime_missing: "required Codex runtime
-targets are absent"` — inside what is nominally a Claude bootstrap.
-
-Root cause is a parsed-then-discarded option plus a literal default:
-`planProjectOnboardingLifecycleV4` takes no `runner` at all, and
-`v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex")` supplies one.
-
-**Assessment: this blocks the release.** It is the exact failure mode ADR-0051
-exists to prevent, on the primary consumer onboarding path, in the release whose
-stated purpose is that the hardened Codex work also runs cleanly on Claude. It is
-the same class as the F-A finding fixed earlier this sprint — that fix corrected
-the ready gate and never reached this path.
-
-**Not fixed in this candidate, deliberately.** There are 24 `v4Inspection` call
-sites and most do not thread identity; correcting it is a real change to runner
-threading through the whole V4 lifecycle, not a release-commit edit. Doing that
-un-reviewed immediately before the gate — in a block the Critic has already
-flagged as having no dispatch provenance — would be the worst possible moment.
-Tracked as
+**Fixed same-day by `c860e1d`** ("fix(onboarding): thread runner identity
+through the whole consumer chain") — landed after this section was first
+written, which is why the two went out of sync. **Re-verified independently
+2026-08-06 evening**, on this candidate: `onboarding-runner-identity.test.mjs`
+(registered in Verify) passes 8/8, and the exact empty-directory chain above
+was re-run end to end with `--runner claude` all the way to
+`restart-required`, staying `runner: "claude"` and writing `runners.default:
+"claude"` throughout. Full evidence and closure in
 `backlog/items/2026-08-06-onboarding-lifecycle-plan-hardcodes-the-codex-runner.md`
-with a four-part proposed fix.
+(now `status: closed`) and
+`backlog/evidence/2026-08-06-onboarding-runner-identity-reverification.md`.
+**This no longer blocks the release.**
+
+A narrower, separate residual surfaced while re-verifying: at
+`restart-required`, the diagnostic message text and the `nextAction.launch`
+target still name Codex regardless of the active runner (`codex-onboarding-
+launch.mjs`, unexecuted here since it exits the current process). Not shown to
+cause consumer harm — the `runner` field itself stays correct — but not
+proven harmless either. Filed separately, not release-blocking:
+`backlog/items/2026-08-06-restart-launch-is-codex-only-for-every-runner.md`.
+
+The full 24-call-site `v4Inspection` default-removal refactor remains
+deliberately undone (its own multi-session work, not a release-commit edit);
+it was never required to close the measured consumer harm above.
 
 Two secondary observations from the same run, neither a defect: the CLI is still
 named `project-onboarding-v3.mjs` while its schema is `pipeline.project-onboarding.v4`;
