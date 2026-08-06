@@ -66,6 +66,34 @@ test("C-AC-06 enters reconciliation-required instead of claiming completed chang
   assert.equal(projectChangeControlState(appendChangeControlEntry(rolledBack, externalEvent("rolled-back", "published", 5))).status, "rolled-back");
 });
 
+// C-AC-10: an automatically created external record is an observation. It never
+// becomes external approval by virtue of existing.
+test("C-AC-10 keeps an automatically created external record as draft or observation", () => {
+  for (const state of ["draft", "rejected", "expired", "conflicting", "unknown", "unavailable"]) {
+    const result = evaluateChangeControlGate({ profile: profile(), pipelineAuthority: local(), externalReceipt: receipt({ state }), nowEpochMs: 15 });
+    assert.equal(result.status, "blocked", state);
+    assert.equal(result.reason, "external-authority");
+  }
+  // Approval alone is not enough: it must also be authenticated.
+  assert.equal(evaluateChangeControlGate({ profile: profile(), pipelineAuthority: local(), externalReceipt: receipt({ state: "approved", authenticated: false }), nowEpochMs: 15 }).reason, "external-authority");
+  // And an approval state outside the taxonomy is never inferred into one.
+  assert.throws(() => evaluateChangeControlGate({ profile: profile(), pipelineAuthority: local(), externalReceipt: receipt({ state: "looks-approved" }), nowEpochMs: 15 }), (error) => error.code === "CC-RECEIPT");
+});
+
+// C-AC-11: provider product names and fields belong to adapter profiles, never
+// to the provider-neutral deploy or change-control core.
+test("C-AC-11 keeps provider names and fields out of the provider-neutral core schemas", () => {
+  for (const field of ["serviceNowSysId", "jiraServiceDeskId", "remedyChangeType", "providerFields", "customFields"]) {
+    assert.throws(() => validateChangeControlProfile(profile({ [field]: "provider-fixture" })), (error) => error.code === "CC-PROFILE", field);
+    assert.throws(() => evaluateChangeControlGate({ profile: profile(), pipelineAuthority: local(), externalReceipt: receipt({ [field]: "provider-fixture" }), nowEpochMs: 15 }), (error) => error.code === "CC-RECEIPT", field);
+    assert.throws(() => evaluateChangeControlGate({ profile: profile(), pipelineAuthority: { ...local(), [field]: "provider-fixture" }, externalReceipt: receipt(), nowEpochMs: 15 }), (error) => error.code === "CC-GATE", field);
+    assert.throws(() => createChangeControlJournal({ ...binding, [field]: "provider-fixture" }), (error) => error.code === "CC-JOURNAL", field);
+  }
+  assert.deepEqual(Object.keys(validateChangeControlProfile(profile())).sort(), ["artifact", "candidate", "changeClass", "environment", "mandatory", "policySha256", "profileId", "schema", "scopeSha256", "window"]);
+  // The change class vocabulary is closed; a provider class cannot widen it.
+  assert.throws(() => validateChangeControlProfile(profile({ changeClass: "expedited" })), (error) => error.code === "CC-PROFILE");
+});
+
 test("requires explicit emergency authority and keeps not-required independent", () => {
   assert.equal(evaluateChangeControlGate({ profile: profile({ changeClass: "emergency" }), pipelineAuthority: local(), externalReceipt: receipt(), nowEpochMs: 15 }).reason, "emergency-authority");
   assert.equal(evaluateChangeControlGate({ profile: profile({ changeClass: "not-required", mandatory: false }), pipelineAuthority: local(), externalReceipt: null, nowEpochMs: 15 }).reason, "not-required");

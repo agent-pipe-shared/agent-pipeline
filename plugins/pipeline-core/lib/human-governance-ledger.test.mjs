@@ -135,6 +135,39 @@ test("rejects open payloads and invalid lifecycle link cardinality", () => {
   assert.throws(() => validateHumanGovernanceDecision(decision({ links: { requestDecisionId: null, consumesDecisionId: null, revokesDecisionId: null, expiresDecisionId: null, supersedesDecisionId: null, correctsDecisionId: null } })), (error) => error instanceof HumanGovernanceLedgerError && error.code === "HGL-LIFECYCLE");
 });
 
+// H-AC-11: a reviewer must be able to reconstruct the whole decision from the
+// portable record, while natural-person attribution and free-form rationale
+// stay out of it entirely. The second half holds by construction -- the record
+// is closed-key, so neither is representable and neither has a join handle.
+test("H-AC-11 exposes the full reconstruction surface and admits no attribution or rationale", () => {
+  const granted = validateHumanGovernanceDecision(decision());
+  // Every element the criterion enumerates, and nothing else.
+  assert.deepEqual(Object.keys(granted).sort(), ["authorityClass", "decisionId", "event", "identityAssurance", "links", "outcome", "policyDigest", "reasonCode", "ruleDigest", "scope", "timeAssurance", "validity"]);
+  assert.equal(granted.links.requestDecisionId, "request-1");            // request
+  assert.equal(granted.authorityClass, "product-owner");                  // authority class
+  assert.equal(granted.identityAssurance, "locally-attributed");          // its assurance
+  assert.equal(granted.timeAssurance, "locally-observed");                // time assurance
+  assert.equal(granted.validity.notBeforeEpochMs, 10);                    // time
+  assert.equal(granted.reasonCode, "SCOPE.ACCEPTED");                     // stable reason code
+  assert.equal(granted.policyDigest, sha); assert.equal(granted.ruleDigest, sha);
+  assert.deepEqual(Object.keys(granted.scope).sort(), ["action", "artifacts", "candidate", "environment", "packageId", "repositoryFingerprint"]);
+  assert.equal(granted.scope.artifacts[0].path, "specs/sprint-phoenix-epic/spec.md"); // evidence
+  assert.equal(granted.outcome, "granted");
+  // Consumption, revocation, expiry, correction and supersession each have a
+  // dedicated link, so a reviewer reconstructs the chain without inference.
+  assert.deepEqual(Object.keys(granted.links).sort(), ["consumesDecisionId", "correctsDecisionId", "expiresDecisionId", "requestDecisionId", "revokesDecisionId", "supersedesDecisionId"]);
+  // No natural-person attribution, free-form rationale, or join handle to one.
+  for (const field of ["approvedBy", "actor", "personName", "email", "userId", "rationale", "comment", "note", "restrictedRecordId", "localDecisionRef"]) {
+    assert.throws(() => validateHumanGovernanceDecision({ ...decision(), [field]: "person-fixture" }), (error) => error instanceof HumanGovernanceLedgerError && error.code === "HGL-SHAPE", field);
+    assert.throws(() => validateHumanGovernanceDecision(decision({ scope: { ...decision().scope, [field]: "person-fixture" } })), (error) => error instanceof HumanGovernanceLedgerError && error.code === "HGL-SCOPE", field);
+  }
+  // The reason code is a code, never a sentence.
+  for (const free of ["approved because the risk looked acceptable", "ok", "Approved By Alice"]) {
+    assert.throws(() => validateHumanGovernanceDecision(decision({ reasonCode: free })), (error) => error.code === "HGL-SHAPE", free);
+  }
+  assert.equal(JSON.stringify(granted).includes("person-fixture"), false);
+});
+
 test("requires one event-specific link and outcome for every authority lifecycle disposition", () => {
   const variants = [
     ["requested", "pending", null], ["denied", "denied", "requestDecisionId"], ["cancelled", "cancelled", "requestDecisionId"],
