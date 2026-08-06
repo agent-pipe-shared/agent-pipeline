@@ -49,6 +49,19 @@ push policy forbids, and the guard's own hint to run it does not change
 that. Writing the two missing evidence files by hand would equally be
 fabricating gate evidence. Neither was done.
 
+**On the PO signature (checked against the cached 0.5.2 build).** A
+detached PO proof is the designed way to satisfy findings 3 and 4, but
+three specifics matter. It must bind `action.kind = "push"` plus the
+remote plus the destination ref, not the candidate alone. Even a correct
+proof does not unblock `git push`: the guard refuses a raw push against a
+critical proof by design and routes it to the publication executor. And
+the executor still only *reads* its gate evidence — no script in 0.5.2
+emits `pipeline.publication-gate-evidence.v1`, and `tool-identity.mjs` /
+`release-preflight.mjs` remain CLI-less libraries there. So the rebase and
+a signature together still stop at the missing evidence producers.
+Re-measure this after the rebase before investing in a signature; the
+0.5.2 builds are moving.
+
 **Next session starts with the rebase onto 0.5.2**, not with more feature
 work. Three separate blockers now trace to the 474-commit gap — the v4
 plan lifecycle, the dev-plan gate that never enforced here, and the v2
