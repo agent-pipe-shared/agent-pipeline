@@ -27,13 +27,17 @@
  *     own union rules, not to this project-config-only hook).
  *   - EXIT SEMANTICS (shared with guard-git.mjs): 0 allow, 2 block (stderr to the
  *     agent as plain-text reason), 1 allow + non-blocking WARN (broken config).
- *   - SCOPE (deliberately reduced for this delivery): a blanket,
- *     always-active block per configured path — no task-type distinction (e.g. "is
- *     this Goldfish briefed to update tests right now?") and no override mechanism.
- *     The backlog item explicitly flagged that distinction as an open design
- *     question ("Briefing marker, environment variable, or calibration field?"); resolving it
- *     is out of scope here (scope burst) — see NOT COVERED below for the accepted
- *     escape hatch instead.
+ *   - SCOPE: a blanket, always-active block per configured path — no task-type
+ *     distinction (e.g. "is this Goldfish briefed to update tests right now?"). The
+ *     backlog item flagged that distinction as an open design question ("Briefing marker,
+ *     environment variable, or calibration field?") and it is still open.
+ *   - OVERRIDE (PO decision, 2026-08-06): the audited v2 human-guard-override protocol —
+ *     attended, bound to this exact tool call, single-use, carrying the human's stated
+ *     reason, appended to the audit chain. It is attribution and an audit trail, not
+ *     proof. Until then this guard had no override at all, which left the repository
+ *     holding an authorization ("a genuine test change is its own briefed task") that
+ *     nothing could exercise: the documented escape via the guard config is itself
+ *     refused to an agent by GS-4.
  *
  * MATCHING
  *   - The write-capable tools are covered (hooks.json matcher
@@ -70,11 +74,12 @@
  *     NOT check test paths — a Bash/PowerShell redirect (`>`, `Set-Content` etc.)
  *     reaching a protected path is unguarded (accepted gap, same tripwire-not-a-sandbox
  *     framing as below).
- *   - No override mechanism (see SCOPE above): a genuinely intended test change is its
- *     own, explicitly briefed task (GF-04) — the escape hatch is a deliberate,
- *     git-tracked edit of `.claude/guard-config.json` to (temporarily) remove the
- *     entry, or the PO editing the file directly outside the Claude Code session (the
- *     guard binds agents, not humans — same principle as guard-git.mjs).
+ *   - Task-type awareness (see SCOPE above): the guard still cannot tell whether this
+ *     agent is briefed to change tests right now. The audited override answers that with
+ *     a human decision per action instead of with inference. The older escape hatches
+ *     remain: a deliberate, git-tracked edit of the guard config to remove the entry, or
+ *     the PO editing the file directly outside the session (the guard binds agents, not
+ *     humans — same principle as guard-git.mjs).
  *   - Obfuscation (symlinks, path traversal `..`, case-only path variants beyond the
  *     case-insensitive match already applied): not defended against — a regex guard
  *     is a tripwire, not a sandbox (same accepted trade-off as guard-git.mjs).
@@ -89,7 +94,12 @@
  *   printf '{"tool_input":{"file_path":"plugins/pipeline-core/hooks/guard-git.test.mjs"}}' | node plugins/pipeline-core/hooks/guard-testpath.mjs; echo $?
  */
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import {
+  consumeHumanGuardOverride,
+  recordHumanGuardDenial,
+} from "../lib/human-guard-override.mjs";
 import {
   LEGACY_GUARD_CONFIG,
   NEUTRAL_GUARD_CONFIG,
@@ -97,11 +107,17 @@ import {
 } from "../lib/project-authority.mjs";
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
 
+const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
 // ---- read tool input (fail-open) --------------------------------------------------
 let filePath = "";
+let toolName = "";
+let toolInput = {};
 try {
   const input = JSON.parse(readFileSync(0, "utf8"));
   filePath = writeTargetPath(input?.tool_input);
+  toolName = String(input?.tool_name ?? "");
+  toolInput = input?.tool_input ?? {};
 } catch {
   process.exit(0); // fail-open: guard is a safety net, not a prison
 }
@@ -162,16 +178,67 @@ function emit(code, lines) {
   process.exit(code);
 }
 
+/**
+ * The audited escape hatch (PO decision, 2026-08-06).
+ *
+ * This guard previously had NO override of any kind. That was deliberate, but it left the
+ * repository with an authorization it could not exercise: a "briefed test-change task" is
+ * a real, sanctioned reason to touch these files, and the only route was the PO editing
+ * the guard config outside the session — which GS-4 refuses to the agent, so every such
+ * change cost a human round trip with no record of why.
+ *
+ * It reuses the existing v2 `human-guard-override` protocol rather than inventing a
+ * second mechanism: attended, bound to this exact tool call, single-use, carrying the
+ * human's stated reason, and appended to the audit chain. Be precise about what that is
+ * worth — it is attribution and an audit trail, NOT proof. The same distinction ADR-0056
+ * draws between a signature and a chat approval applies here.
+ *
+ * Fail-closed everywhere: an override that cannot be read, validated or consumed leaves
+ * the refusal exactly as it was.
+ */
 const matched = PROTECTED_PATHS.find((rule) => rule.re.test(normalizedPath));
 if (matched) {
+  const denials = [{ guard: "guard-testpath.mjs", reason: `${matched.id}: ${matched.reason}` }];
+
+  let consumed = { status: "absent" };
+  try {
+    consumed = consumeHumanGuardOverride({ rootDir: projectDir, pluginRoot: PLUGIN_ROOT, toolName, toolInput, denials });
+  } catch {
+    consumed = { status: "absent" }; // an unusable capability is not an authorization
+  }
+  if (consumed.status === "consumed") {
+    process.stderr.write(
+      `[pipeline-human-override] guard-testpath ${matched.id}: exact one-time capability consumed; plan=${consumed.planSha256}.\n`,
+    );
+    process.exit(0);
+  }
+
+  // Offering the route is a convenience, never a gate: if the request cannot be recorded
+  // the refusal still stands, it just carries no copyable next step.
+  let overrideGuidance = "";
+  if (consumed.status === "absent" || consumed.status === "replan") {
+    try {
+      const planned = recordHumanGuardDenial({ rootDir: projectDir, pluginRoot: PLUGIN_ROOT, toolName, toolInput, denials });
+      if (planned.status === "planned") {
+        overrideGuidance = [
+          "",
+          "Human override available for this exact edit (one use; audited; the human confirms):",
+          `${process.execPath} ${JSON.stringify(join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"))} plan --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256}`,
+        ].join("\n");
+      }
+    } catch { /* no route offered; the refusal below is unchanged */ }
+  }
+
   emit(2, [
     `BLOCKED (guard-testpath, plugin pipeline-core): ${matched.reason}`,
     `Rule ID: ${matched.id}`,
     `File: ${filePath}`,
     `Why: an implementing Goldfish MUST NOT modify, weaken, skip or delete the tests/checks ` +
       `that gate its own implementation (QG-04 / roles/goldfish.md GF-04). A genuine test ` +
-      `change is its own, explicitly briefed task — escape hatch: the PO edits ` +
-      `${guardConfigRelPath} (or the test file itself) directly, outside this session.`,
+      `change is its own, explicitly briefed task — either take the audited override below, ` +
+      `or the PO edits ${guardConfigRelPath} (or the test file itself) directly, outside ` +
+      `this session.`,
+    overrideGuidance,
   ]);
 }
 
