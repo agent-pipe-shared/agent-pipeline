@@ -253,6 +253,21 @@ test("H-AC-10 admits no attribution, rationale or provider field, exactly like t
   assert.throws(() => validateHumanRoleExceptionDecision(exception({ reasonCode: "granted because it was late and we were in a hurry" })), (error) => error.code === "HRE-SHAPE");
 });
 
+// H-AC-10 regression: both shipped guards identify their own authority purely
+// by `scope.action`, and `scope` is byte-identical across the two human classes.
+// If the exception class shared the action vocabulary, a bounded exception could
+// name a guard's verb and be matched by it. The grammar closes that off at the
+// point of record, independently of what any consumer checks.
+test("H-AC-10 an exception cannot name another consumer's authority verb", () => {
+  for (const action of ["OVERRIDE.GG_03", "OVERRIDE.GG_01", "APPROVE_PLAN", "PLAN.APPROVE", "PUBLISH", "PUSH"]) {
+    assert.throws(() => validateHumanRoleExceptionDecision(exception({ scope: { ...exception().scope, action } })), (error) => error.code === "HRE-SCOPE", action);
+  }
+  // Its own namespace stays available, and the prefix is required, not merely
+  // conventional -- a bare verb is refused however plausible it reads.
+  assert.equal(validateHumanRoleExceptionDecision(exception({ scope: { ...exception().scope, action: "ROLE.SELF_REVIEW" } })).scope.action, "ROLE.SELF_REVIEW");
+  assert.throws(() => validateHumanRoleExceptionDecision(exception({ scope: { ...exception().scope, action: "ROLEX.EXCEPTION" } })), (error) => error.code === "HRE-SCOPE");
+});
+
 test("H-AC-10 keeps the two decision classes apart in both directions", () => {
   assert.equal(isHumanRoleExceptionDecision(exception()), true);
   // A role exception cannot be validated as a plan decision, so it cannot be

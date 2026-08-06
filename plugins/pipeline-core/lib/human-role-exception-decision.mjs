@@ -32,6 +32,14 @@ const EXCEPTIONS = new Set(["direct-elephant-implementation", "self-review", "sk
 // A follow-up is a named review that must still occur. `waived` is not a value.
 const FOLLOW_UP_REVIEWS = new Set(["critic-review", "security-review", "privacy-review", "product-owner-acceptance"]);
 const CONSTRAINT_KINDS = new Set(["max-artifacts", "max-commits", "no-guard-override", "no-remote-action", "no-schema-change", "no-authority-change", "single-work-package"]);
+// The action of a role exception lives in its own namespace, and the grammar --
+// not a convention -- keeps it there. `scope` is byte-identical across the two
+// human decision classes, so a consumer that matches on `scope.action` alone
+// cannot tell them apart. Sharing the action vocabulary would let an exception
+// name another consumer's authority verb (`OVERRIDE.<rule>` for the git guard,
+// `APPROVE_PLAN` for the dev-plan guard) and be matched by it. Requiring the
+// `ROLE.` prefix makes that collision unrepresentable rather than unlikely.
+const ROLE_ACTION = /^ROLE\.[A-Z][A-Z0-9._:-]{0,120}$/u;
 
 function fail(code, message) { throw new HumanGovernanceLedgerError(code, message); }
 function record(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
@@ -55,7 +63,7 @@ export function validateHumanRoleExceptionDecision(decision) {
   const scope = decision.scope;
   if (!exact(scope, ["repositoryFingerprint", "candidate", "packageId", "action", "environment", "artifacts"])
     || !SHA256.test(scope.repositoryFingerprint) || !exact(scope.candidate, ["commit", "tree"]) || !OID.test(scope.candidate.commit) || !OID.test(scope.candidate.tree)
-    || !ID.test(scope.packageId) || !CODE.test(scope.action) || !ID.test(scope.environment)
+    || !ID.test(scope.packageId) || !ROLE_ACTION.test(scope.action) || !ID.test(scope.environment)
     || !Array.isArray(scope.artifacts) || scope.artifacts.length === 0 || scope.artifacts.length > 128) fail("HRE-SCOPE");
   for (const artifact of scope.artifacts) {
     if (!exact(artifact, ["path", "sha256"]) || typeof artifact.path !== "string"
