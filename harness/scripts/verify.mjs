@@ -262,6 +262,8 @@ const TEST_SUITES = [
   // Walks the gate: mandatory AND satisfiable, for both runners. Unit suites were
   // green while the gate was unwired on Claude and its own remediation was refused.
   { name: "lifecycle-gate-satisfiability-tests", file: join(hooksDir, "lifecycle-gate-satisfiability.test.mjs") },
+  // An agent that can weaken the gate authorizing its own actions has no gate.
+  { name: "gate-strength-guard-tests", file: join(hooksDir, "guard-gate-strength.test.mjs") },
   { name: "advisor-consult-v3-tests", file: join(repoRoot, "plugins", "pipeline-core", "skills", "advisor-consult", "advisor-consult-v3.test.mjs") },
   { name: "sandboxed-readonly-duty-tests", file: join(libDir, "sandboxed-readonly-duty.test.mjs") },
   { name: "sandboxed-readonly-host-bridge-tests", file: join(pluginScriptsDir, "sandboxed-readonly-host-bridge.test.mjs") },

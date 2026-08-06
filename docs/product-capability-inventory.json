@@ -131,22 +131,28 @@
       "member": "guard-command-grammar"
     },
     {
-      "surfaceId": "guard:plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs:guard-lifecycle-ready",
-      "kind": "guard",
-      "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
-      "member": "guard-lifecycle-ready"
-    },
-    {
       "surfaceId": "guard:plugins/pipeline-core/hooks/guard-devplan.mjs:guard-devplan",
       "kind": "guard",
       "path": "plugins/pipeline-core/hooks/guard-devplan.mjs",
       "member": "guard-devplan"
     },
     {
+      "surfaceId": "guard:plugins/pipeline-core/hooks/guard-gate-strength.mjs:guard-gate-strength",
+      "kind": "guard",
+      "path": "plugins/pipeline-core/hooks/guard-gate-strength.mjs",
+      "member": "guard-gate-strength"
+    },
+    {
       "surfaceId": "guard:plugins/pipeline-core/hooks/guard-git.mjs:guard-git",
       "kind": "guard",
       "path": "plugins/pipeline-core/hooks/guard-git.mjs",
       "member": "guard-git"
+    },
+    {
+      "surfaceId": "guard:plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs:guard-lifecycle-ready",
+      "kind": "guard",
+      "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+      "member": "guard-lifecycle-ready"
     },
     {
       "surfaceId": "guard:plugins/pipeline-core/hooks/guard-push.mjs:guard-push",
@@ -185,6 +191,12 @@
       "member": "PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-git.mjs\""
     },
     {
+      "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude",
+      "kind": "hook",
+      "path": "plugins/pipeline-core/hooks/hooks.json",
+      "member": "PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude"
+    },
+    {
       "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-push.mjs\"",
       "kind": "hook",
       "path": "plugins/pipeline-core/hooks/hooks.json",
@@ -195,6 +207,18 @@
       "kind": "hook",
       "path": "plugins/pipeline-core/hooks/hooks.json",
       "member": "PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-devplan.mjs\""
+    },
+    {
+      "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-gate-strength.mjs\"",
+      "kind": "hook",
+      "path": "plugins/pipeline-core/hooks/hooks.json",
+      "member": "PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-gate-strength.mjs\""
+    },
+    {
+      "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude",
+      "kind": "hook",
+      "path": "plugins/pipeline-core/hooks/hooks.json",
+      "member": "PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude"
     },
     {
       "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-testpath.mjs\"",
@@ -329,6 +353,12 @@
       "member": "advisor-consult"
     },
     {
+      "surfaceId": "skill:plugins/pipeline-core/skills/capture-observation/SKILL.md:capture-observation",
+      "kind": "skill",
+      "path": "plugins/pipeline-core/skills/capture-observation/SKILL.md",
+      "member": "capture-observation"
+    },
+    {
       "surfaceId": "skill:plugins/pipeline-core/skills/close-block/SKILL.md:close-block",
       "kind": "skill",
       "path": "plugins/pipeline-core/skills/close-block/SKILL.md",
@@ -351,6 +381,12 @@
       "kind": "skill",
       "path": "plugins/pipeline-core/skills/critic-review/SKILL.md",
       "member": "critic-review"
+    },
+    {
+      "surfaceId": "skill:plugins/pipeline-core/skills/github-issue-operations/SKILL.md:github-issue-operations",
+      "kind": "skill",
+      "path": "plugins/pipeline-core/skills/github-issue-operations/SKILL.md",
+      "member": "github-issue-operations"
     },
     {
       "surfaceId": "skill:plugins/pipeline-core/skills/pipeline-start/SKILL.md:pipeline-start",
@@ -497,28 +533,16 @@
       "member": "three-scope-fixtures.md"
     },
     {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:afk-ledger-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "afk-ledger-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:advisor-consult-v3-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "advisor-consult-v3-tests"
-    },
-    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:advisor-capability-preflight-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "advisor-capability-preflight-tests"
     },
     {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:advisory-lifecycle-v2-tests",
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:advisor-consult-v3-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
-      "member": "advisory-lifecycle-v2-tests"
+      "member": "advisor-consult-v3-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:advisory-coordinator-tests",
@@ -533,10 +557,22 @@
       "member": "advisory-host-bridge-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:advisory-lifecycle-v2-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "advisory-lifecycle-v2-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:advisory-receipt-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "advisory-receipt-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:afk-ledger-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "afk-ledger-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:agents-adapter-migration-check",
@@ -551,16 +587,34 @@
       "member": "agents-adapter-migration-tests"
     },
     {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:backlog-ledger-reconciliation-tests",
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:ai-assisted-hardening-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
-      "member": "backlog-ledger-reconciliation-tests"
+      "member": "ai-assisted-hardening-tests"
     },
     {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:backlog-state-check",
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:artifact-lifecycle-check",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
-      "member": "backlog-state-check"
+      "member": "artifact-lifecycle-check"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:artifact-lifecycle-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "artifact-lifecycle-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:artifact-topology-check",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "artifact-topology-check"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:artifact-topology-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "artifact-topology-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:authority-tier-agreement-check",
@@ -575,16 +629,16 @@
       "member": "authority-tier-agreement-tests"
     },
     {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:artifact-lifecycle-check",
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:backlog-ledger-reconciliation-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
-      "member": "artifact-lifecycle-check"
+      "member": "backlog-ledger-reconciliation-tests"
     },
     {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:artifact-lifecycle-tests",
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:backlog-state-check",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
-      "member": "artifact-lifecycle-tests"
+      "member": "backlog-state-check"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:backlog-state-tests",
@@ -611,22 +665,28 @@
       "member": "bootstrap-payload-measure-cli-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:capture-observation-intake-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "capture-observation-intake-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:check-ownership-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "check-ownership-tests"
     },
     {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:claude-goal-host-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "claude-goal-host-tests"
-    },
-    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:claude-critic-host-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "claude-critic-host-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:claude-goal-host-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "claude-goal-host-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:close-coordinator-tests",
@@ -645,6 +705,438 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "codex-advisory-bootstrap-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-app-server-health-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-app-server-health-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-critic-host-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-critic-host-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-critic-isolation-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-critic-isolation-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-goal-host-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-goal-host-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-host-advisor-route-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-host-advisor-route-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-host-repository-init-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-host-repository-init-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-isolated-critic-contract-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-isolated-critic-contract-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-onboarding-app-server-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-onboarding-app-server-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-onboarding-capabilities-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-onboarding-capabilities-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-onboarding-runtime-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-onboarding-runtime-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-plugin-validator-parity-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-plugin-validator-parity-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-pretool-guard-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-pretool-guard-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-private-overlay-activation-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-private-overlay-activation-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-sandbox-compatibility-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-sandbox-compatibility-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-sandbox-preflight-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-sandbox-preflight-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-sandbox-runtime-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-sandbox-runtime-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-sandbox-select-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-sandbox-select-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-session-start-hint-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-session-start-hint-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-host-adapter-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "continuity-host-adapter-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-result-bootstrap-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "continuity-result-bootstrap-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-result-case-migration-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "continuity-result-case-migration-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-result-close-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "continuity-result-close-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-result-rebind-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "continuity-result-rebind-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-state-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "continuity-state-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-status-cli-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "continuity-status-cli-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-status-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "continuity-status-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:control-catalog-drift-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "control-catalog-drift-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:control-catalog-schema-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "control-catalog-schema-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:control-evaluation-receipt-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "control-evaluation-receipt-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:control-execution-exchange-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "control-execution-exchange-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:control-waiver-lifecycle-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "control-waiver-lifecycle-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:critic-bare-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "critic-bare-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:critic-dispatch-preflight-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "critic-dispatch-preflight-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:critic-export-policy-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "critic-export-policy-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:critic-fail-closed-check",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "critic-fail-closed-check"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:critic-fail-closed-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "critic-fail-closed-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:critic-packet-governance-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "critic-packet-governance-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:critical-human-proof-policy-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "critical-human-proof-policy-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:delivery-course-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "delivery-course-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:doc-contract-check",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "doc-contract-check"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:doc-contract-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "doc-contract-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:document-hooks-manifest-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "document-hooks-manifest-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:document-hooks-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "document-hooks-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:document-identifier-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "document-identifier-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:document-lifecycle-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "document-lifecycle-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:error-register-check",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "error-register-check"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:error-register-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "error-register-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:feature-package-topology-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "feature-package-topology-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:finding-lifecycle-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "finding-lifecycle-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:gate-strength-guard-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "gate-strength-guard-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:git-cmd-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "git-cmd-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:github-actions-permissions-check",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "github-actions-permissions-check"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:github-actions-permissions-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "github-actions-permissions-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:github-issue-operations-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "github-issue-operations-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-apply-patch-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "guard-apply-patch-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-devplan-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "guard-devplan-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-git-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "guard-git-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-lifecycle-ready-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "guard-lifecycle-ready-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-push-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "guard-push-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-push-v2-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "guard-push-v2-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-testpath-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "guard-testpath-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:host-advisor-status-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "host-advisor-status-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:host-advisor-workspace-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "host-advisor-workspace-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:human-guard-override-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "human-guard-override-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:human-role-label-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "human-role-label-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:human-role-rendering-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "human-role-rendering-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:language-canon-check",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "language-canon-check"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:language-canon-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "language-canon-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:license-contract-check",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "license-contract-check"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:license-contract-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "license-contract-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:lifecycle-gate-satisfiability-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "lifecycle-gate-satisfiability-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:lifecycle-ready-enforcement-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "lifecycle-ready-enforcement-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:local-supervisor-setup-tests",
@@ -669,6 +1161,54 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "local-worker-supervisor-core-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:main-session-route-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "main-session-route-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:migrate-backlog-state-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "migrate-backlog-state-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:no-autoupdate-key-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "no-autoupdate-key-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-b2-gitlab-ci-broker-cli-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "nova-b2-gitlab-ci-broker-cli-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-b2-gitlab-ci-broker-core-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "nova-b2-gitlab-ci-broker-core-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-b4-git-transport-contract-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "nova-b4-git-transport-contract-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-b4-github-forge-adapter-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "nova-b4-github-forge-adapter-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-b4-gitlab-forge-adapter-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "nova-b4-gitlab-forge-adapter-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-backlog-reconciler-cli-tests",
@@ -731,36 +1271,6 @@
       "member": "nova-invocation-reliability-tests"
     },
     {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-b2-gitlab-ci-broker-core-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "nova-b2-gitlab-ci-broker-core-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-b2-gitlab-ci-broker-cli-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "nova-b2-gitlab-ci-broker-cli-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-b4-git-transport-contract-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "nova-b4-git-transport-contract-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-b4-github-forge-adapter-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "nova-b4-github-forge-adapter-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-b4-gitlab-forge-adapter-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "nova-b4-gitlab-forge-adapter-tests"
-    },
-    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-macos-acceptance-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -803,436 +1313,22 @@
       "member": "nova-verify-resume-tests"
     },
     {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:runner-native-continuation-tests",
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:observation-governance-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
-      "member": "runner-native-continuation-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-goal-host-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "codex-goal-host-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-app-server-health-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "codex-app-server-health-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-critic-host-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "codex-critic-host-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-critic-isolation-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "codex-critic-isolation-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-isolated-critic-contract-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "codex-isolated-critic-contract-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-onboarding-app-server-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "codex-onboarding-app-server-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-onboarding-capabilities-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "codex-onboarding-capabilities-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-onboarding-runtime-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "codex-onboarding-runtime-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-plugin-validator-parity-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "codex-plugin-validator-parity-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-sandbox-compatibility-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "codex-sandbox-compatibility-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-sandbox-preflight-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "codex-sandbox-preflight-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-sandbox-runtime-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "codex-sandbox-runtime-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-sandbox-select-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "codex-sandbox-select-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-host-advisor-route-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "codex-host-advisor-route-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-host-repository-init-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "codex-host-repository-init-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-pretool-guard-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "codex-pretool-guard-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-session-start-hint-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "codex-session-start-hint-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-host-adapter-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "continuity-host-adapter-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-result-bootstrap-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "continuity-result-bootstrap-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-result-case-migration-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "continuity-result-case-migration-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-result-close-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "continuity-result-close-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-result-rebind-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "continuity-result-rebind-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:host-advisor-status-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "host-advisor-status-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:host-advisor-workspace-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "host-advisor-workspace-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:human-guard-override-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "human-guard-override-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-state-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "continuity-state-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-status-cli-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "continuity-status-cli-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-status-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "continuity-status-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:control-execution-exchange-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "control-execution-exchange-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:control-catalog-drift-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "control-catalog-drift-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:control-catalog-schema-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "control-catalog-schema-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:control-evaluation-receipt-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "control-evaluation-receipt-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:control-waiver-lifecycle-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "control-waiver-lifecycle-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:ai-assisted-hardening-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "ai-assisted-hardening-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:finding-lifecycle-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "finding-lifecycle-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:security-evidence-evaluator-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "security-evidence-evaluator-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:security-evidence-fixture-matrix-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "security-evidence-fixture-matrix-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:security-readiness-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "security-readiness-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:security-policy-resolver-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "security-policy-resolver-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:artifact-topology-check",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "artifact-topology-check"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:artifact-topology-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "artifact-topology-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:feature-package-topology-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "feature-package-topology-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:critical-human-proof-policy-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "critical-human-proof-policy-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:critic-bare-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "critic-bare-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:critic-export-policy-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "critic-export-policy-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:critic-fail-closed-check",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "critic-fail-closed-check"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:critic-fail-closed-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "critic-fail-closed-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:critic-dispatch-preflight-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "critic-dispatch-preflight-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:critic-packet-governance-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "critic-packet-governance-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:delivery-course-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "delivery-course-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:doc-contract-check",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "doc-contract-check"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:doc-contract-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "doc-contract-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:error-register-check",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "error-register-check"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:error-register-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "error-register-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:git-cmd-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "git-cmd-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-devplan-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "guard-devplan-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-apply-patch-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "guard-apply-patch-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-git-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "guard-git-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-lifecycle-ready-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "guard-lifecycle-ready-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-push-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "guard-push-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-push-v2-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "guard-push-v2-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-testpath-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "guard-testpath-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:language-canon-check",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "language-canon-check"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:language-canon-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "language-canon-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:license-contract-check",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "license-contract-check"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:license-contract-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "license-contract-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:lifecycle-gate-satisfiability-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "lifecycle-gate-satisfiability-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:lifecycle-ready-enforcement-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "lifecycle-ready-enforcement-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:main-session-route-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "main-session-route-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:no-autoupdate-key-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "no-autoupdate-key-tests"
+      "member": "observation-governance-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:onboarding-continuity-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "onboarding-continuity-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:onboarding-runner-identity-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "onboarding-runner-identity-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:p3b-runner-conformance-tests",
@@ -1277,16 +1373,16 @@
       "member": "phase3-sdlc-coherence-tests"
     },
     {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:pipeline-start-v3-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "pipeline-start-v3-tests"
-    },
-    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:pipeline-start-preflight-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "pipeline-start-preflight-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:pipeline-start-v3-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "pipeline-start-v3-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:pipeline-state-rebind-runner-tests",
@@ -1319,16 +1415,16 @@
       "member": "po-approval-proof-tests"
     },
     {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:threat-model-approval-request-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "threat-model-approval-request-tests"
-    },
-    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:po-gate-authority-fixture-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "po-gate-authority-fixture-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:po-gate-profile-publisher-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "po-gate-profile-publisher-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:po-language-projection-check",
@@ -1355,10 +1451,136 @@
       "member": "pr-contributor-gate-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:private-document-binding-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "private-document-binding-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:private-overlay-activation-cli-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "private-overlay-activation-cli-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:private-overlay-activation-e2e-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "private-overlay-activation-e2e-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:private-overlay-activation-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "private-overlay-activation-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:private-overlay-bootstrap-status-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "private-overlay-bootstrap-status-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:private-overlay-runtime-projection-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "private-overlay-runtime-projection-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:product-capability-inventory-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "product-capability-inventory-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:project-authority-migration-cli-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "project-authority-migration-cli-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:project-authority-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "project-authority-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:project-onboarding-e2e-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "project-onboarding-e2e-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:project-onboarding-ready-gate-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "project-onboarding-ready-gate-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:project-onboarding-v3-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "project-onboarding-v3-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:provenance-attestation-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "provenance-attestation-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:provenance-envelope-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "provenance-envelope-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:provenance-fixture-matrix-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "provenance-fixture-matrix-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:provenance-local-builder-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "provenance-local-builder-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:public-core-observation-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "public-core-observation-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:publication-executor-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "publication-executor-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:publication-gate-evidence-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "publication-gate-evidence-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:recovery-preview-attestation-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "recovery-preview-attestation-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:release-preflight-cli-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "release-preflight-cli-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:release-version-plan-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "release-version-plan-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:repository-freshness-tests",
@@ -1391,64 +1613,16 @@
       "member": "routing-projection-tests"
     },
     {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:provenance-attestation-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "provenance-attestation-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:provenance-envelope-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "provenance-envelope-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:provenance-fixture-matrix-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "provenance-fixture-matrix-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:provenance-local-builder-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "provenance-local-builder-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:stack-adapter-contract-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "stack-adapter-contract-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:stack-dynamic-boundary-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "stack-dynamic-boundary-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:stack-fuzz-replay-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "stack-fuzz-replay-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:stack-discovery-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "stack-discovery-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:stack-run-outcome-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "stack-run-outcome-tests"
-    },
-    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:ruleset-freshness-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "ruleset-freshness-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:runner-native-continuation-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "runner-native-continuation-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:runner-profile-migration-v2-tests",
@@ -1505,24 +1679,6 @@
       "member": "sandboxed-readonly-host-bridge-tests"
     },
     {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:schema-lite-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "schema-lite-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:sdlc-efficiency-metrics-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "sdlc-efficiency-metrics-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:sdlc-run-graph-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "sdlc-run-graph-tests"
-    },
-    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:sbom-discovery-cli-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1565,6 +1721,48 @@
       "member": "sbom-release-binding-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:schema-lite-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "schema-lite-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:sdlc-efficiency-metrics-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "sdlc-efficiency-metrics-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:sdlc-run-graph-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "sdlc-run-graph-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:security-evidence-evaluator-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "security-evidence-evaluator-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:security-evidence-fixture-matrix-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "security-evidence-fixture-matrix-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:security-policy-resolver-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "security-policy-resolver-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:security-readiness-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "security-readiness-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:security-scan",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1575,6 +1773,36 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "security-scan-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:session-cleanup-binding-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "session-cleanup-binding-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:session-cleanup-power-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "session-cleanup-power-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:session-power-cli-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "session-power-cli-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:session-power-controller-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "session-power-controller-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:session-power-core-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "session-power-core-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:setup-check-tests",
@@ -1593,6 +1821,48 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "spec-readiness-host-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:spec-retention-check",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "spec-retention-check"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:spec-retention-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "spec-retention-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:stack-adapter-contract-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "stack-adapter-contract-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:stack-discovery-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "stack-discovery-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:stack-dynamic-boundary-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "stack-dynamic-boundary-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:stack-fuzz-replay-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "stack-fuzz-replay-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:stack-run-outcome-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "stack-run-outcome-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:staleness-check-tests",
@@ -1631,10 +1901,10 @@
       "member": "symlink-capability-tests"
     },
     {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:v3-bootstrap-authority-tests",
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:threat-model-approval-request-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
-      "member": "v3-bootstrap-authority-tests"
+      "member": "threat-model-approval-request-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:threat-model-discovery-tests",
@@ -1653,6 +1923,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "threat-model-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:v3-bootstrap-authority-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "v3-bootstrap-authority-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:validate-manifest",
@@ -1685,6 +1961,12 @@
       "member": "workflow-writer-preflight-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:worktree-lifecycle-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "worktree-lifecycle-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:wsl-ipc-compatibility-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1695,270 +1977,6 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "yaml-lite-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:document-identifier-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "document-identifier-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:document-hooks-manifest-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "document-hooks-manifest-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:document-hooks-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "document-hooks-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:document-lifecycle-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "document-lifecycle-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:private-document-binding-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "private-document-binding-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:human-role-label-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "human-role-label-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:human-role-rendering-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "human-role-rendering-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:product-capability-inventory-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "product-capability-inventory-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:release-preflight-cli-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "release-preflight-cli-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:publication-gate-evidence-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "publication-gate-evidence-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:publication-executor-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "publication-executor-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:project-authority-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "project-authority-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:project-authority-migration-cli-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "project-authority-migration-cli-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:onboarding-runner-identity-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "onboarding-runner-identity-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:project-onboarding-e2e-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "project-onboarding-e2e-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:project-onboarding-ready-gate-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "project-onboarding-ready-gate-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:project-onboarding-v3-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "project-onboarding-v3-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:release-version-plan-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "release-version-plan-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:session-cleanup-binding-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "session-cleanup-binding-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:session-cleanup-power-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "session-cleanup-power-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:session-power-cli-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "session-power-cli-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:session-power-controller-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "session-power-controller-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:session-power-core-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "session-power-core-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:worktree-lifecycle-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "worktree-lifecycle-tests"
-    },
-    {
-      "surfaceId": "skill:plugins/pipeline-core/skills/capture-observation/SKILL.md:capture-observation",
-      "kind": "skill",
-      "path": "plugins/pipeline-core/skills/capture-observation/SKILL.md",
-      "member": "capture-observation"
-    },
-    {
-      "surfaceId": "skill:plugins/pipeline-core/skills/github-issue-operations/SKILL.md:github-issue-operations",
-      "kind": "skill",
-      "path": "plugins/pipeline-core/skills/github-issue-operations/SKILL.md",
-      "member": "github-issue-operations"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:capture-observation-intake-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "capture-observation-intake-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:github-actions-permissions-check",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "github-actions-permissions-check"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:github-actions-permissions-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "github-actions-permissions-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:github-issue-operations-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "github-issue-operations-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:migrate-backlog-state-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "migrate-backlog-state-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-private-overlay-activation-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "codex-private-overlay-activation-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:observation-governance-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "observation-governance-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:spec-retention-check",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "spec-retention-check"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:spec-retention-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "spec-retention-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:po-gate-profile-publisher-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "po-gate-profile-publisher-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:private-overlay-activation-cli-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "private-overlay-activation-cli-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:private-overlay-activation-e2e-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "private-overlay-activation-e2e-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:private-overlay-activation-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "private-overlay-activation-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:private-overlay-bootstrap-status-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "private-overlay-bootstrap-status-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:private-overlay-runtime-projection-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "private-overlay-runtime-projection-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:public-core-observation-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "public-core-observation-tests"
-    },
-    {
-      "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude",
-      "kind": "hook",
-      "path": "plugins/pipeline-core/hooks/hooks.json",
-      "member": "PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude"
-    },
-    {
-      "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude",
-      "kind": "hook",
-      "path": "plugins/pipeline-core/hooks/hooks.json",
-      "member": "PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude"
     }
   ],
   "capabilities": [
@@ -1971,6 +1989,7 @@
       "surfaceIds": [
         "guard:plugins/pipeline-core/hooks/guard-apply-patch.mjs:guard-apply-patch",
         "guard:plugins/pipeline-core/hooks/guard-devplan.mjs:guard-devplan",
+        "guard:plugins/pipeline-core/hooks/guard-gate-strength.mjs:guard-gate-strength",
         "guard:plugins/pipeline-core/hooks/guard-git.mjs:guard-git",
         "guard:plugins/pipeline-core/hooks/guard-push.mjs:guard-push",
         "guard:plugins/pipeline-core/hooks/guard-testpath.mjs:guard-testpath",
@@ -1978,6 +1997,7 @@
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-push.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-devplan.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-gate-strength.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-testpath.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:compact:node \"${CLAUDE_PLUGIN_ROOT}/hooks/post-compact-reground.mjs\"",
@@ -2178,6 +2198,7 @@
         "verify-phase:harness/scripts/verify.mjs:error-register-tests",
         "verify-phase:harness/scripts/verify.mjs:feature-package-topology-tests",
         "verify-phase:harness/scripts/verify.mjs:finding-lifecycle-tests",
+        "verify-phase:harness/scripts/verify.mjs:gate-strength-guard-tests",
         "verify-phase:harness/scripts/verify.mjs:git-cmd-tests",
         "verify-phase:harness/scripts/verify.mjs:github-actions-permissions-check",
         "verify-phase:harness/scripts/verify.mjs:github-actions-permissions-tests",
