@@ -16,7 +16,85 @@ the supplied authoritative release identity; it is not a claimed release time.
 The historical candidate-qualification sections below are retained as
 session history and no longer describes the current publication disposition.
 
-## 2026-08-06 Nova — autonomous overnight session, marketplace-rename remediation, T1 Critic FAIL with three findings fixed (current)
+## 2026-08-06 Nova (afternoon) — authority-tier drift found and closed, ADR-0054 step 1, ADR-0055 (current)
+
+Continues the same branch `feat/sprint-nova-codex-v046`. Base for this block
+`f1dd7cf` (the remote tip). The PO's standing scope limit is unchanged: feature
+branch only, no `main` merge, no release.
+
+### The finding that reordered the block
+
+Routing hardcoded readers onto `resolveProjectAuthorityPaths()` (ADR-0054
+step 1) required first comparing the two tiers. That comparison found that
+**the tier the resolver prefers is the tier nothing maintains.**
+
+`git log --oneline -- project/pipeline.yaml` returns exactly one commit — the
+migration that created it. `.claude/pipeline.yaml` has eight, because it is a
+V3 projection target (`plugins/pipeline-core/config/runtime-projection-v3-owned-keys.json`)
+and the `project/*` pair is not.
+
+Measured, not inferred: `gateConfig(loadManifest(cwd).manifest, "push")`
+returned `approval: "standing-approved"`. Commit `fb0e9ac` (2026-08-02, "bind
+critical push proofs and recovery routes") deliberately set it to `required`,
+but only in the legacy copy. `guard-push.mjs:1403` auto-passes on exactly that
+value, so **that hardening had never taken effect.** Three further
+compiler-owned keys were stale the same way (`session.keep_awake`,
+`goldfish_mechanic`, `goldfish_deep`, plus the PO display label); the two
+routing rows were an MP-05/MP-07 violation, since a dispatch naming its model
+from the resolved manifest named a model the source never selected. One field
+drifted the other way — `pipelineUpdateChannel: alpha` exists only in the
+neutral copy — which is why this could not be fixed by copying one file over
+the other.
+
+**PO decision, 2026-08-06:** `gates.push.approval` is `required`. Recorded with
+the consequence stated at decision time: raw `git push` is refused until the
+proof path is exercised. Tracked in
+`backlog/items/2026-08-06-neutral-authority-tier-is-a-frozen-snapshot-the-compiler-never-updates.md`.
+
+### Landed
+
+- `995fda9` — `resolveAuthorityArtifactPath(kind)` in `project-authority.mjs`:
+  one resolve-then-fall-back implementation, replacing three hand-rolled ones.
+  A reader never becomes stricter by being routed.
+- `afa2de5` — eleven category-A readers routed. Two sites deliberately left as
+  tier unions, documented in ADR-0054.
+- `1602bdd` — ADR-0054: `.arbitheon/` > `project/` > `.claude/`, configurable
+  directory, cleanup gated on a completeness check and never automatic. Records
+  why not `.agent-pipeline/`: that name is already the private overlay root.
+- `fe4e127` — the frozen-tier finding, and `docs/state.md`'s calibration
+  backlink repointed (the doc-contracts gate caught it the moment it was
+  routed).
+- `9e60ede` — SVR28's minimal verify fixture carries the resolver; verify.mjs's
+  own header corrected.
+- `f3c2702` — the tiers reconciled, `approval: required` in force.
+- `2c24ec7` — `check-authority-tier-agreement.mjs` + 9 tests, registered in
+  Verify. Compiler-owned keys must be identical across tiers; shared keys too;
+  a key at one tier only is allowed and reported. ATA04 reproduces the exact
+  regression.
+- `d0f5286` — `validate-manifest.test.mjs` asserted `standing-approved` and
+  passed only because the resolver served the frozen tier.
+- `636fb09` — ADR-0055: `pipeline.critical-human-proof-policy.v2` adds
+  `waivedKinds`. There was no off-switch and the obvious move was a trap
+  (deleting a kind *rejects*). A waiver names its kind and a reason, is never
+  inferred, and the recorded approval carries `criticalProofWaiver` so it never
+  claims authority no proof gave it. Policy reader extracted to
+  `lib/critical-human-proof-policy.mjs` so the guard and the writer read one
+  implementation — previously the guard could not see the policy at all.
+  Default on here; `CHP13` fails if a waiver is ever committed in this repo.
+- `e4618e9` — the pinning claim corrected (it holds for git sources, not
+  directory sources — `/reload-plugins` proved it), and the readiness doc's
+  registration blocker closed.
+
+### Open
+
+- ADR-0054 steps 2–4 (third tier, configurable name, writes to the top tier,
+  completeness-gated cleanup) are staged and not started. Step 1 is a clean
+  boundary; nothing depends on step 2 landing.
+- PRD approval (`approve-plan`) is still unattributed and not proof-bound — the
+  remaining half of the 2026-08-05 human-proof backlog item.
+- Backlog ledger: `check-backlog-state.mjs` still exits 2. Not a Verify gate.
+
+## 2026-08-06 Nova — autonomous overnight session, marketplace-rename remediation, T1 Critic FAIL with three findings fixed
 
 One continuous autonomous session, 2026-08-05 evening into 2026-08-06, run
 under a PO directive to work through all 0.5.2 findings while the PO was
