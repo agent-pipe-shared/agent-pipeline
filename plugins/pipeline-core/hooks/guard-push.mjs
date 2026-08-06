@@ -694,19 +694,38 @@ function attestedMainPublication(binding) {
   } catch {
     return false;
   }
-  return authorizeRecordedPush({
+  // The anchor comes from the GOVERNED session, never from the repository the command
+  // named. T6 Critic F1: `<root>/sub/project/critical-human-proof.json` is not a
+  // gate-strength path, so reading the anchor from the push target let an agent mint
+  // its own. PG12s13 exited 0 before this line existed.
+  const anchorDir = fallbackProjectDir();
+  const candidate = { commit, tree: tree.stdout.trim() };
+  const attested = authorizeRecordedPush({
     projectDir: binding.projectDir,
-    // The anchor comes from the GOVERNED session, never from the repository the command
-    // named. T6 Critic F1: `<root>/sub/project/critical-human-proof.json` is not a
-    // gate-strength path, so reading the anchor from the push target let an agent mint
-    // its own. PG12s13 exited 0 before this line existed.
-    anchorDir: fallbackProjectDir(),
+    anchorDir,
     state,
-    candidate: { commit, tree: tree.stdout.trim() },
+    candidate,
     remote: binding.remote,
     destination: binding.destination,
     now: new Date().toISOString(),
-  }).authorized === true;
+  });
+  if (attested.authorized === true) return true;
+
+  // ADR-0056 §7: "every session must be able to push, on every branch and on main, when the
+  // human clears it -- by signature or by chat, depending on the config." The Ed25519 lane
+  // above is `signature` mode's clearance; `chat` mode clears the SAME boundary the same way
+  // it already clears the ordinary branch route below -- a commit-bound approval record,
+  // attributed rather than cryptographically proved, IF the record itself states it was
+  // backed by this waiver. Before this, `chat` mode opened every branch except the one that
+  // matters most (2026-08-06 Critic round, F4): this call was the only route into `main` and
+  // it consulted no waiver at all.
+  const waiver = criticalProofWaiverFor(anchorDir, "push");
+  if (!waiver.waived) return false;
+  const approval = state?.pushApproval?.lastApproved;
+  return approval?.forCommit === candidate.commit
+    && approval?.remote === binding.remote
+    && approval?.destination === binding.destination
+    && approval?.criticalProofWaiver?.kind === "push";
 }
 
 const pushBinding = parsePushBinding(cmd);

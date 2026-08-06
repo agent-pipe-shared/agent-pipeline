@@ -590,6 +590,60 @@ const PUSH_WAIVER = {
     stderrIncludes: ["is not externally attested for this exact action"],
   });
 }
+{
+  // PG12c-main -- F4, 2026-08-06 Critic round. ADR-0056 §7: "every session must be able to
+  // push, on every branch and on main, when the human clears it -- by signature or by chat,
+  // depending on the config." Before this fix, `attestedMainPublication` consulted only the
+  // Ed25519 signature lane and never the chat waiver at all, so `chat` mode opened every
+  // branch except the one that matters most. Same fixture shape as PG12c; destination is
+  // main instead of feature-test.
+  const { dir } = freshRepo("required-chat-mode-main");
+  writeFileSync(join(dir, "pipeline.user.yaml"),
+    'schema: "pipeline.user.v3"\ngates:\n  claude_md_max_lines: 200\n  dev_plan: "blocking"\n  push: "blocking"\n  push_approval: "chat"\n  security: "blocking"\n');
+  gitAt(dir, "add", "pipeline.user.yaml");
+  gitAt(dir, "commit", "-q", "-m", "chat mode");
+  const head = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-06T06:00:00.000Z", forCommit: head,
+      remote: "origin", destination: "refs/heads/main",
+      criticalProof: null,
+      criticalProofWaiver: { kind: "push", reason: "gates.push_approval: chat (pipeline.user.yaml)", mode: "chat", source: "pipeline.user.yaml" },
+    } },
+  });
+  check("PG12c-main allow a chat-mode push to main -- the boundary that used to refuse it regardless",
+    "git push origin main:refs/heads/main", dir, ALLOW);
+}
+{
+  // PG12c-main-mismatch -- the destination binding inside the new chat lane. A chat-mode
+  // approval recorded for a DIFFERENT destination (the ordinary branch from PG12c) must not
+  // authorize main just because the commit matches -- proves the new lane binds to the exact
+  // action, not only to the commit.
+  const { dir } = freshRepo("required-chat-mode-main-mismatch");
+  writeFileSync(join(dir, "pipeline.user.yaml"),
+    'schema: "pipeline.user.v3"\ngates:\n  claude_md_max_lines: 200\n  dev_plan: "blocking"\n  push: "blocking"\n  push_approval: "chat"\n  security: "blocking"\n');
+  gitAt(dir, "add", "pipeline.user.yaml");
+  gitAt(dir, "commit", "-q", "-m", "chat mode");
+  const head = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-06T06:00:00.000Z", forCommit: head,
+      remote: "origin", destination: "refs/heads/feature-test",
+      criticalProof: null,
+      criticalProofWaiver: { kind: "push", reason: "gates.push_approval: chat (pipeline.user.yaml)", mode: "chat", source: "pipeline.user.yaml" },
+    } },
+  });
+  check("PG12c-main-mismatch block a chat-mode approval for another destination does not cover main",
+    "git push origin main:refs/heads/main", dir, BLOCK, {
+      stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main"],
+    });
+}
 // ---- PG12s* signature mode: a raw push the key holder actually attested ---------------
 //
 // Until ADR-0056 §6 this whole family was unreachable: `signature` mode refused every
