@@ -156,7 +156,20 @@ clean before and after; `security-scan` ran as step 250 and is `exit 0, findings
 same commit. Re-run after the F3/F5 remediation: **exit 0, 250/250**, likewise
 candidate-bound. Final run of this block, after the C1/C2/C4 remediation, the PG12c fix and
 the GIT-03 history cleanup: **exit 0, 250/250, 0 failures** on `a3920f6` / tree `0654fc1`,
-`binding: exact`, tree clean at start and finish. Note on the SHAs this block cites from
+`binding: exact`, tree clean at start and finish.
+
+**That paragraph was NOT the final run, and the commit it names is unreachable.** T4 Critic
+N1, and the sharpest register finding of this block: `a3920f6` is reached by no ref after the
+history rewrite, and six commits landed after it — including `0cbd3f5`, which changes shipped
+plugin behaviour, and the two guard-config commits. A reader taking "final run of this block,
+binding: exact" at face value would believe the K1 fix and TP-6..TP-10 were covered by a gate
+run. They were not covered by *that* one. The rule this violated is the register's own
+standing correction below: no claim without a measurement behind it. The durable record must
+name the candidate it actually covers, and `evidence/` is git-ignored by design (QG-03), so
+the register is the only durable place for it. The gate result for the final candidate of
+this block is recorded at the end of this section, written after that run rather than before.
+
+Note on the SHAs this block cites from
 before the GIT-03 cleanup: the unpushed range was rewritten, so `511d7d7`, `d7b70d8`,
 `62de980` and their siblings are no longer reachable from any ref and will be dropped at
 `gc`/reflog expiry — but they still **resolve locally** until then, and the reflog retains
@@ -247,7 +260,14 @@ once at its tool budget mid-hunt and was resumed. **Verdict: FAIL**, eight findi
   }
   ```
 
-  Note the honest limit: TP protection binds *agents*, not the PO, and all four paths sit
+  **This draft is superseded and its ids do NOT match what was applied.** T4 Critic N6: the
+  applied configuration inserted `critical-human-proof-policy.test.mjs` as TP-9 — the suite
+  gating the very property C1 and K1 were about, which this draft omitted — and moved
+  notebook-write-coverage to **TP-10**. The draft is kept for the reasoning, not for its
+  numbering; the authority is `project/guard-config.json` and its legacy twin, which carry
+  TP-1..TP-10. A reader following the block above would protect the wrong path under TP-9.
+
+  Note the honest limit: TP protection binds *agents*, not the PO, and every path here sits
   under `plugins/pipeline-core/**`, so per OT14 the override cannot serve them either — a
   genuine future test change to any of them is a PO edit outside the session.
 - **F8 (major, DISCLOSED, not fixable)** — every production diff in this block was
@@ -308,15 +328,28 @@ FAIL**, five findings.
   in this range was authored by the orchestrating session; no Goldfish dispatch record
   exists. Same standing constraint as F8 and the blocks before it. The Critic could find no
   §3.3 stage-0 fast path in `docs/operating-model.md` that would carve this out, so this is
-  a named exception, not a covered case. Second time this disposition has been taken (see
-  Attempt-3 F1, 2026-08-05); a third should not be routine.
+  a named exception, not a covered case. **How often this has now happened, counted rather
+  than asserted** (an earlier version of this line said "second time", which the T4 Critic
+  refuted as N4): the register records lifecycle deviations of this shape at four places —
+  "Lifecycle deviation, disclosed (Critic F1)", "Lifecycle deviation, second block
+  (CRITIC-NOVA-PM-02 F3)", Attempt-3 F1 (2026-08-05, "accept and record"), and F8/C5 of this
+  block. Formal PO acceptances: this is the second. Occurrences: at least the fourth. The
+  threshold sentence that used to stand here ("a third should not be routine") was therefore
+  already passed when it was written; what remains true is the substance — this is a
+  recurring deviation, not an isolated one.
   **PO's stated rationale:** the block is at its end, and the episode reads as a useful
   negative test of the Operating Model — the model held. That is supported by what actually
-  happened: three independent Critic rounds each found a blocker or major in the *previous
-  round's remediation*, and the two genuine runtime holes of this block (C1, K1) were both
-  caught by review rather than reaching a push. The role separation was absent and the
-  review layer compensated. Recorded as evidence for the review system, **not** as a
-  precedent that the implementor may be the reviewer's author.
+  happened, stated with the counts measured (the first version of this paragraph inflated
+  both, T4 Critic N2/N3): **two** of the four rounds found a blocker or major in the
+  *previous round's remediation* — T2 in T1's, T3 in T2's; T1 was the block's first round
+  and had no remediation to examine, and T4 found defects in T3's remediation as well, which
+  makes it three of four once T4 is counted. And the block's genuine runtime holes are **not
+  two but at least four**: T1's F1 (BLOCKER, the override armable by the agent it
+  constrained), T1's F4 (PowerShell returning `verdict(0)`, the Windows bypass `efe452c`
+  claimed to have closed), C1 and K1. Every one of them was caught by review, none by a
+  gate. The role separation was absent and the review layer compensated. Recorded as
+  evidence for the review system, **not** as a precedent that the implementor may be the
+  reviewer's author.
   **The cost, stated so the acceptance is not mistaken for a clean bill:** C1 and K1 share
   one root cause — mechanism claims written into comments and this register without being
   measured. `git rev-parse` twice would have prevented K1. Standing correction from here:
@@ -373,6 +406,74 @@ than on a demonstrated bypass; it hash-verified but did **not read** the Spec or
 five guardrail files, and read none of ADR-0012/0014/0055/0056; and it could not verify that
 the TP-5 lift happened as recorded, since a lift leaves no artefact by design.
 
+### The T4 round — two Critics in parallel, two different lenses
+
+PO decision: run the fourth round with parallel reviewers rather than one, each given a
+distinct lens, because redundancy finds less than difference. Base `144e93d` → candidate
+`a81a697`. **Both returned FAIL**, and they failed on disjoint grounds — which is the
+result that justifies the split.
+
+**Behaviour and reachability lens.**
+- **F1 (major, FIXED here)** — the K1 fix related a *physically* resolved path
+  (`git rev-parse --show-toplevel` resolves symlinks) to a *lexically* resolved one
+  (`path.resolve` does not). On any root reached through a symlink the two disagree,
+  `relative()` emits a `..` path, and a correctly committed file reads as uncommitted.
+  Half one is a fail-closed regression: `chat` stops working there. **Half two is a
+  fail-open and is not really about symlinks at all:** `criticalProofWaiverFor` fired
+  `CRITICAL-PROOF-MODE-CONFLICT` only when `source === "pipeline.user.yaml"`, and the C1 fix
+  had introduced a NEW source value, `uncommitted`, without extending that branch. So any
+  state where the mode could not be established let a `.v2` policy waiver through, and
+  `approve-push` stopped demanding the detached Ed25519 proof. Fixed by realpathing the root
+  and by enumerating the one SAFE source (`default`) instead of the unsafe ones, so a future
+  source value fails closed by default. CHP26–CHP29 pin all four corners, using a real
+  symlinked fixture root — no fixture had one, which is exactly why Verify stayed green.
+- **F2 (minor, recorded)** — `chat` remains agent-reachable: write under a runtime-assembled
+  name, then `git add -A` / `git commit -a`, neither of which contains a needle the shell
+  lane matches. The gate costs a visible commit, not capability. That is what the corrected
+  comments now say; it is recorded here so the risk has an owner rather than only a mention.
+
+What that lens checked and found sound, recorded because it bounds what the FAIL means: the
+K1 premise (measured, correct), the sub-root borrowed-blob attack (closed, CHP24/CHP25 both
+falsifiable), TP-6..TP-10 binding under absolute/relative/backslash/case variants, real tier
+agreement on the *consumed* path, and — the strongest escalation hypothesis — steering
+`projectDir` at a subdirectory, which does **not** work because `guard-push.mjs` normalises
+through `rev-parse --show-toplevel` first. Bare repo, detached HEAD, linked worktree,
+submodule, symlinked `pipeline.user.yaml`, spaces, non-ASCII and rev-spec argument injection
+all fail closed.
+
+**Record and claim-accuracy lens.** One major and seven minor, all in this register, all the
+same defect class the standing correction above names — and it found that the correction had
+been applied to the code but not to the register that states it.
+- **N1 (major, FIXED here)** — the gates paragraph claimed a final, exactly-bound run on
+  `a3920f6`, a commit no ref reaches, predating the shipped K1 fix and both guard-config
+  commits. Corrected in place; the candidate's own run is recorded at the end of this
+  section, written after it rather than before.
+- **N2, N3 (minor, FIXED here)** — the C5 rationale inflated both counts: "three rounds"
+  where two applied, and "two genuine runtime holes" where at least four exist. Both sat in
+  the paragraph carrying a PO decision.
+- **N4 (minor, FIXED here)** — "second time this disposition has been taken" was wrong under
+  every reading, and its forward threshold had already been passed when written.
+- **N5 (minor, FIXED here)** — the pass-1 commit count, already corrected once as K3, was
+  still wrong; the K3 fix repaired the parenthetical and broke the figure.
+- **N6, N7 (minor, FIXED here)** — the retained F7 draft defines TP-9 as a different suite
+  than the applied configuration and was labelled "still holds"; the OT14 bullet still said
+  five TP entries after the count became ten.
+- **N8 (minor, NOT fixable)** — commit `0d5c7e8`'s message re-asserts that `9f91c86` "no
+  longer exists", a claim the register had retracted three commits earlier as K4. It is in
+  published-shaped history now; rewriting it again for a wording defect is not worth another
+  rewrite. Recorded so the record is not silently better than the history.
+
+That lens's measured counts on the unpushed range (`f1dd7cf..a81a697`, **72** commits, not
+the 64 the earlier paragraphs discuss — those are time-scoped snapshots): **72/72 carry
+exactly one `AI-Assisted: true`**, 0 provider co-author trailers, 0 session URLs, 0
+machine-specific absolute paths in the diff, 0 secrets. GIT-01 and GIT-03 are clean.
+
+Both Critics' coverage boundaries, recorded because they bound the FAIL: neither ran a test
+suite, executed a write, or armed a capability, so F1 rests on source reading plus read-only
+Git measurements rather than a failing test; neither read the Spec or the guardrail files in
+full; the behaviour lens did not read this register and the record lens did not assess
+runtime behaviour — by design, and it means neither verdict covers the other's ground.
+
 ### Open
 
 - **GIT-03 violated on every commit this session — a REPEAT of an already-fixed defect.**
@@ -393,11 +494,15 @@ the TP-5 lift happened as recorded, since a lift leaves no artefact by design.
   remedy, which is the PO's hand in their own terminal, not the agent's. Going forward this
   session uses `AI-Assisted: true` and no session URL.
   **Substance resolved, form still defective (2026-08-06):** the PO ran the cleanup in two
-  passes. Pass 1 removed both forbidden trailers but left 22 commits with **no**
+  passes. Pass 1 removed both forbidden trailers but left **21** commits with **no**
   `AI-Assisted:` marker at all — `sed`'s `d` starts the next cycle and discards the queued
   `$a` append, so every message that *ended* with a deleted line silently lost it. Caught by
-  counting (63 commits then, only 42 carrying the marker), not by a gate. Pass 2 appended
-  the marker only where absent, which fixed those 22.
+  counting (63 commits then, 42 carrying the marker; 63 − 42 = 21), not by a gate. Pass 2
+  appended the marker only where absent, which fixed those 21.
+  (This count has now been wrong twice. The original text said 21 with a wrong parenthetical;
+  the K3 correction fixed the parenthetical and broke the count to 22. The 22 was real but
+  belonged to a different moment — after pass 2, when one further commit had entered the
+  range. T4 Critic N5 reconstructed both generations from the branch reflog.)
   **What pass 1 also did, and this register missed until the T3 Critic raised it as K3:** it
   appended the marker *unconditionally* to every message whose last line it had NOT deleted
   — including the commits that already ended with `AI-Assisted: true`. So **42 of the 64
@@ -439,7 +544,10 @@ the TP-5 lift happened as recorded, since a lift leaves no artefact by design.
   The honest limit, unchanged: TP binds agents, not the PO, and all five new paths sit under
   `plugins/pipeline-core/**` or `lib/`, so per OT14 the override cannot serve them either —
   a genuine future test change to any of them is a PO-cleared task.
-- **The guard-testpath override serves exactly one of this repository's five TP entries.**
+- **The guard-testpath override serves exactly one of this repository's ten TP entries.**
+  (Was written as "five" and left stale when F7 raised the count to ten — T4 Critic N7. The
+  substance is unchanged and in fact widened: the five new entries all live under
+  `plugins/pipeline-core/**` too, so TP-3 remains the only servable one.)
   Found while closing F3, pinned as OT14. `human-guard-override` eligibility routes every
   `plugins/pipeline-core/**` write to Pipeline-author repair, which needs an explicitly
   selected source root and so never reaches `planned` — and TP-1, TP-2, TP-4 and TP-5 all
