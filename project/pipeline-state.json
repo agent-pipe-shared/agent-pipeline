@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
   "planApproved": true,
-  "updatedAt": "2026-08-02T20:29:31.774Z",
+  "updatedAt": "2026-08-06T18:31:29.192Z",
   "closedFeatures": [
     {
       "id": "sprint-sentinel-epic",
@@ -152,5 +152,34 @@
     "invalidatedBy": "coordinator",
     "invalidatedAt": "2026-08-02T20:25:08.223Z",
     "reason": "reopen-design"
-  }
+  },
+  "pushApproval": {
+    "lastApproved": {
+      "approvedBy": "Human",
+      "approvedAt": "2026-08-06T18:31:29.192Z",
+      "forCommit": "50ec0a0aea46fe3a349c180c1e59d1095d2803fa",
+      "criticalProof": {
+        "proofSha256": "0f38b42586f51c6c3900a22e18bd580611d98be2b79f454995a11719945fbc40",
+        "intentSha256": "9440e433f9a1c900d10dca220cb4198678e97d26f07316a66d5f0220ae849666",
+        "action": {
+          "kind": "push",
+          "subjectSha256": "57105a0696a882cb5f7eed828acdbe8bec14c6dc53a2fc7b6b77ee48c6d9ae59",
+          "expiresAt": "2026-08-07T06:00:00.000Z"
+        }
+      },
+      "remote": "upstream",
+      "destination": "refs/heads/feat/sprint-nova-codex-v046",
+      "threatModel": {
+        "path": "specs/sprint-nova-epic/implementation/critical-action-authorization-threat-model.md",
+        "sha256": "6a13ff03dfd15f93f15fe845c86edca35445a49a8979275ad35e42a93252a1ae"
+      }
+    }
+  },
+  "criticalProofConsumption": [
+    {
+      "proofSha256": "0f38b42586f51c6c3900a22e18bd580611d98be2b79f454995a11719945fbc40",
+      "kind": "push",
+      "consumedAt": "2026-08-06T18:31:29.192Z"
+    }
+  ]
 }
