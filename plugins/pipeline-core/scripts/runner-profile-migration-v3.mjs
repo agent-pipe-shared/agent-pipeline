@@ -3,7 +3,6 @@
 
 /** Project-local inspect/plan/apply surface for the V3 authority cutover. */
 import { writeSync } from "node:fs";
-import { pathToFileURL } from "node:url";
 
 import {
   applyPendingTransactionRecoveryV3,
@@ -14,6 +13,7 @@ import {
   planRunnerProfileMigrationV3,
 } from "../lib/runner-profile-migration-v3.mjs";
 import { RECOVERY_PREVIEW_ACK_SCHEMA } from "../lib/recovery-preview-attestation.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const PREVIEW_FD = 2;
 const MAX_PREVIEW_BYTES = 64 * 1024;
@@ -155,4 +155,4 @@ export function main(args = process.argv.slice(2), {
   return ["ready", "noop", "applied"].includes(output.status) ? 0 : 1;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) process.exit(main());
+if (isDirectInvocation(import.meta.url)) process.exit(main());

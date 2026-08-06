@@ -13,11 +13,11 @@ import { execFileSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { canonicalJson, planBacklogDeliveryReconciliation } from "../lib/backlog-delivery-reconciliation.mjs";
 import { checkBacklogState, DEFAULT_ROOT, loadBacklogState } from "./check-backlog-state.mjs";
 import { projectBacklog, renderBacklogItem, transitionHash } from "../lib/backlog-state.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const PATH = /^(?!\/)(?!.*\\)(?!.*\/\/)(?!.*\/$)(?!\.{1,2}$)(?!\.{1,2}\/)(?!.*\/\.{1,2}(?:\/|$))[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u;
 const SHA = /^[a-f0-9]{64}$/u;
@@ -504,7 +504,7 @@ function parseCli(argv) {
   return { ok: true, options };
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isDirectInvocation(import.meta.url)) {
   const parsed = parseCli(process.argv.slice(2));
   if (!parsed.ok) { console.error(`reconcile-backlog-delivery: ${parsed.error}`); process.exitCode = 2; }
   else if (parsed.options.help) console.log("Usage: node reconcile-backlog-delivery.mjs --intent <repo-path> --binding <repo-path> [--root <directory>]\n       node reconcile-backlog-delivery.mjs --apply --preview-sha256 <64-lowercase-hex> --intent <repo-path> --binding <repo-path> [--root <directory>]\nThe first form emits a read-only preview. --apply requires its exact current preview digest, rematerializes canonical bytes, and rechecks CAS under the transaction lock.");

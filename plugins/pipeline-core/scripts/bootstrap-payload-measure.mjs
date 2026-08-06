@@ -3,6 +3,7 @@
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { measureBootstrapBytes, BOOTSTRAP_PAYLOAD_MAX_BYTES } from "../lib/bootstrap-payload-budget.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const DEFAULT_ENVELOPE = {
   schema: "pipeline.bootstrap-happy-path-envelope.v1",
@@ -43,4 +44,4 @@ export function main(argv = process.argv) {
   return output;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === resolve(new URL(import.meta.url).pathname)) main();
+if (isDirectInvocation(import.meta.url)) main();

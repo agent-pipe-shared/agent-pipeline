@@ -35,10 +35,10 @@
  * VERIFY: node plugins/pipeline-core/scripts/check-close-security-completeness.test.mjs
  */
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
 
 import { loadManifest, gateConfig } from "../lib/manifest.mjs";
 import { checkSecurityCompleteness } from "../lib/security-completeness-gate.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 /**
  * Runs the Close-site completeness check against `root`. Returns:
@@ -68,7 +68,7 @@ export function checkCloseSecurityCompleteness(root) {
   return { skipped: false, commit, failures };
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+if (isDirectInvocation(import.meta.url)) {
   const root = process.env.CLAUDE_PROJECT_DIR || process.cwd();
   const result = checkCloseSecurityCompleteness(root);
   if (!result.skipped) {

@@ -18,6 +18,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const PREFLIGHT_SCHEMA = "pipeline.codex-sandbox-preflight.v1";
 export const PROFILE_SCHEMA = "pipeline.codex-sandbox-profile-intent.v1";
@@ -692,7 +693,7 @@ function parseCli(argv) {
   return { kind: argv[2], codexPath: argv[4], observedHelperPath: argv.length === 9 ? argv[6] : null, receiptPath: argv[argv.length - 1] };
 }
 
-if (process.argv[1] && realpathSync(resolve(process.argv[1])) === fileURLToPath(import.meta.url)) {
+if (isDirectInvocation(import.meta.url)) {
   try {
     const receipt = await runCodexSandboxPreflight(parseCli(process.argv.slice(2)));
     process.stdout.write(`${JSON.stringify({ schema: PREFLIGHT_SCHEMA, eligibility: receipt.eligibility, terminalCode: receipt.terminalCode })}\n`);

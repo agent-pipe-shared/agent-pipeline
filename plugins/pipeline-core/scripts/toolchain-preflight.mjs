@@ -59,7 +59,6 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { loadManifest } from "../lib/manifest.mjs";
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
@@ -67,6 +66,7 @@ import { probeGitleaks } from "./security-readiness/gitleaks-readiness.mjs";
 import { probeOsvScanner } from "./security-readiness/osv-scanner-readiness.mjs";
 import { probeSemgrep } from "./security-readiness/semgrep-readiness.mjs";
 import { buildHandle, executableIdentity, resolveSystemExecutable, resolveTrustedSystemExecutable, runProbe, sha256 } from "./tool-identity.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const TOOLCHAIN_SCHEMA = "pipeline.toolchain-preflight.v1";
 export const FIXED_TOOLS = Object.freeze(["node", "git", "gitleaks", "osv-scanner", "semgrep", "license-check"]);
@@ -314,7 +314,7 @@ function parseArgs(argv) {
   }
   return { rootDir };
 }
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isDirectInvocation(import.meta.url)) {
   try { const output = runToolchainPreflight(parseArgs(process.argv.slice(2))); process.stdout.write(`${JSON.stringify(output, null, 2)}\n`); process.exitCode = output.exitCode; }
   catch (error) { process.stderr.write(`toolchain-preflight: ${error.message}\n`); process.exitCode = 2; }
 }

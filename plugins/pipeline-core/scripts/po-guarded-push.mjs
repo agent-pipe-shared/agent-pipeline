@@ -61,7 +61,7 @@ import { appendFileSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
-import { pathToFileURL } from "node:url";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const FORBIDDEN_BRANCHES = new Set(["main", "master"]);
 const MIN_REASON_LENGTH = 20;
@@ -210,6 +210,6 @@ export async function run(argv = process.argv, env = process.env) {
   return 0;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectInvocation(import.meta.url)) {
   run().then((code) => process.exit(code));
 }

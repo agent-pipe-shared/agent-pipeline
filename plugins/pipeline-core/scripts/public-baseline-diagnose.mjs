@@ -13,7 +13,7 @@ import {
 } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { StringDecoder } from "node:string_decoder";
-import { fileURLToPath } from "node:url";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const DIAGNOSIS_SCHEMA = "pipeline.public-baseline-diagnosis.v1";
 export const HOST_SCHEMA = "pipeline.public-baseline-host-calibration.v1";
@@ -451,7 +451,7 @@ function parseCli(argv) {
   return { rootDir, receiptPath, focusedRelativeFile, requiredToolsReady };
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isDirectInvocation(import.meta.url)) {
   try {
     const { receiptPath, ...options } = parseCli(process.argv.slice(2));
     const receipt = await runPublicBaselineProcesses(options);

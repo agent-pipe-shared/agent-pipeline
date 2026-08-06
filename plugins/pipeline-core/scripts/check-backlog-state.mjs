@@ -36,6 +36,7 @@ import {
   validateTransitionLedger,
 } from "../lib/backlog-state.mjs";
 import { validateBacklogDeliveryIntent } from "../lib/backlog-delivery-reconciliation.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = resolve(HERE, "..", "..", "..");
@@ -813,4 +814,4 @@ function cli() {
     : "Backlog state, transition ledger, closure evidence, and generated projections are valid.");
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) cli();
+if (isDirectInvocation(import.meta.url)) cli();

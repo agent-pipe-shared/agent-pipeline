@@ -10,7 +10,6 @@ import { spawn } from "node:child_process";
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { StringDecoder } from "node:string_decoder";
-import { pathToFileURL } from "node:url";
 
 import {
   HELPER_PATH, LAUNCHER_PATH, READBACK_SCHEMA, authenticateLaunchTicket,
@@ -21,6 +20,7 @@ import {
   loadRuntimeProjectionV3OwnedKeys,
   parseRuntimeProjectionV3TomlRoute,
 } from "../lib/runtime-projection-v3.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const READBACK_STATUS_SCHEMA = "pipeline.codex-project-runtime-readback-status.v1";
 const READBACK_STATUS_CODES = new Set([
@@ -459,6 +459,6 @@ export async function main(argv = process.argv.slice(2), {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectInvocation(import.meta.url)) {
   main().then((code) => { process.exitCode = code; });
 }

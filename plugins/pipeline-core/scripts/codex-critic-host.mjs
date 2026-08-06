@@ -51,6 +51,7 @@ import { projectHostDuty, routingProvenance } from "../lib/routing-projection.mj
 import { PROGRESS_COMPONENTS, admitReviewAttempt, evaluateProgress } from "../lib/review-economy.mjs";
 import { executeSandboxedReadonlyDuty, runSandboxedReadonlyHostBridge } from "./sandboxed-readonly-host-bridge.mjs";
 import { createCodexSandboxRuntimeTransport } from "./codex-sandbox-runtime.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_PIPELINE_ROOT = resolve(HERE, "..", "..", "..");
@@ -1849,4 +1850,4 @@ async function main() {
   }
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) await main();
+if (isDirectInvocation(import.meta.url)) await main();

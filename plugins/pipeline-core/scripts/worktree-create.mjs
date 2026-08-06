@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import { lstatSync, readFileSync } from "node:fs";
-import { pathToFileURL } from "node:url";
 
 import {
   ProjectOnboardingReadyError,
@@ -15,6 +14,7 @@ import {
   createDetachedWorktree,
   migrateBranchWorktree,
 } from "../lib/worktree-lifecycle.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const USAGE = `Usage:
   worktree-create.mjs branch --repo <checkout> --branch <branch> [--runner claude|codex]
@@ -129,7 +129,7 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
   return 0;
 }
 
-const invokedDirectly = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+const invokedDirectly = isDirectInvocation(import.meta.url);
 if (invokedDirectly) {
   try {
     process.exitCode = main();

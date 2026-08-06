@@ -5,7 +5,7 @@
 import { createHash } from "node:crypto";
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 import {
   LEGACY_MANIFEST,
@@ -17,6 +17,7 @@ import {
   validatePoGateProfileForRepository,
 } from "../lib/po-gate-authority.mjs";
 import { publishPoGateProfileReceipt } from "../lib/po-gate-profile-publisher.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const PLAN_SCHEMA = "pipeline.po-gate-profile-repair-plan.v1";
 const APPLY_SCHEMA = "pipeline.po-gate-profile-repair-apply.v1";
@@ -166,4 +167,4 @@ export function main(argv = process.argv.slice(2), write = process.stdout.write.
   return applied ? 0 : 2;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) process.exitCode = main();
+if (isDirectInvocation(import.meta.url)) process.exitCode = main();

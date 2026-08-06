@@ -10,7 +10,6 @@ import { execFileSync } from "node:child_process";
 import { existsSync, lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 import { TextDecoder } from "node:util";
 
 import {
@@ -27,6 +26,7 @@ import { validatePipelineUserV3 } from "../lib/runner-profiles-v3.mjs";
 import { parseYaml } from "../lib/yaml-lite.mjs";
 import { resolveSystemExecutable } from "./tool-identity.mjs";
 import { runAdvisoryHostBridge } from "./advisory-host-bridge.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/;
 const USAGE = "usage: codex-advisory-bootstrap.mjs --profile <epic|feature> --reason <trigger> --evidence-sha256 <sha256> --dispatch-id <id> --queue-revision <n> --session-id <id> --expected-descriptor-sha256 <sha256> --receipt <path> --reference <repo-relative-path> [--reference <repo-relative-path> ...] < question.txt";
@@ -139,7 +139,7 @@ export async function runCodexAdvisoryBootstrap(argv = process.argv.slice(2), de
   } finally { rmSync(temp, { recursive: true, force: true }); }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectInvocation(import.meta.url)) {
   runCodexAdvisoryBootstrap().then((code) => { process.exitCode = code; }, (error) => {
     const detail = error instanceof ProjectOnboardingReadyError
       ? `${error.code}: project onboarding readiness denied advisory dispatch`

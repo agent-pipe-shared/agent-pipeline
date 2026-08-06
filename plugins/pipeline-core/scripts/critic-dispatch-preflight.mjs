@@ -20,6 +20,7 @@ import {
   CRITIC_PACKET_GOVERNANCE_INPUT_SCHEMA,
   deriveCriticPacketGovernance,
 } from "../lib/critic-packet-governance.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const CRITIC_DISPATCH_PREFLIGHT_SCHEMA = "pipeline.critic-dispatch-preflight.v1";
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
@@ -216,7 +217,7 @@ function parseArgs(argv) {
   return values;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isDirectInvocation(import.meta.url)) {
   try {
     const result = preflightCriticDispatch(parseArgs(process.argv.slice(2)));
     process.stdout.write(`${JSON.stringify(result)}\n`);

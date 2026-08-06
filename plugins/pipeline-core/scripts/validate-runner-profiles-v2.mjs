@@ -3,7 +3,6 @@
 
 import { readFileSync } from "node:fs";
 import { extname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { parseYaml } from "../lib/yaml-lite.mjs";
 import {
@@ -11,6 +10,7 @@ import {
   validatePipelineUserV2,
   validateRunnerProfilesV2Registry,
 } from "../lib/runner-profiles-v2.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 function usage() {
   return [
@@ -86,6 +86,6 @@ export function main(argv = process.argv.slice(2)) {
   return results.every((checked) => checked.ok) ? 0 : 1;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isDirectInvocation(import.meta.url)) {
   process.exitCode = main();
 }

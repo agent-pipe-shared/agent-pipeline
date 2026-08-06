@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import process from 'node:process';
-import { pathToFileURL } from 'node:url';
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const OBSERVATION_SCHEMA = 'pipeline.codex-plugin-validator-observation.v1';
 const OUTCOME_SCHEMA = 'pipeline.codex-plugin-validator-parity.v1';
@@ -91,6 +91,6 @@ async function main() {
   process.exitCode = result.status === 'aligned' ? 0 : 1;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectInvocation(import.meta.url)) {
   await main();
 }

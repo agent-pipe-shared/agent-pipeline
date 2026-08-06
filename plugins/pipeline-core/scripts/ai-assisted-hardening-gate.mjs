@@ -8,7 +8,6 @@
  * candidate's actual changed-path set.
  */
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
 import {
   classifyInput,
   evaluateChangeIntegrity,
@@ -17,6 +16,7 @@ import {
   validateEvidenceHygiene,
   validateTaskAuthority,
 } from "../lib/ai-assisted-hardening.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const AI_HARDENING_GATE_SCHEMA = "pipeline.ai-assisted-hardening-gate.v1";
 export const INDEPENDENT_CHECK_COMMANDS = Object.freeze({
@@ -108,4 +108,4 @@ function main() {
   process.exitCode = result.allowed ? 0 : 1;
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) main();
+if (isDirectInvocation(import.meta.url)) main();

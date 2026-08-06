@@ -10,9 +10,9 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 
 import { createThreatModelApprovalRequest, readPublicRepositoryFile, verifyThreatModelApprovalRequest } from "../lib/threat-model-approval-request.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const usage = "Usage: po-approval-request.mjs prepare --feature-id cyb-4 --plan <repo-path> --spec <repo-path> --model <repo-path> [--repo-root <path>] | verify --request <external-public-json> --authority <external-public-json> --proof <external-public-json> [--repo-root <path>]";
 
@@ -83,6 +83,6 @@ export function run(argv = process.argv.slice(2), dependencies = {}) {
   throw new Error(usage);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectInvocation(import.meta.url)) {
   try { process.stdout.write(`${JSON.stringify(run(), null, 2)}\n`); } catch (error) { process.stderr.write(`PO-APPROVAL-REQUEST-FAILED: ${error.message}\n`); process.exitCode = 2; }
 }

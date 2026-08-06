@@ -3,7 +3,7 @@
 /** Preview-first CLI for the runner-neutral project-authority migration. */
 import { createHash } from "node:crypto";
 import { writeSync } from "node:fs";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import {
   applyPendingProjectAuthorityRecovery, applyProjectAuthorityMigration,
   applyProjectAuthoritySessionCleanupRecovery,
@@ -12,6 +12,7 @@ import {
   planProjectAuthoritySessionCleanupRecovery,
   readProjectAuthority,
 } from "../lib/project-authority.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 function parse(args) {
   const output = { activate: false };
@@ -114,4 +115,4 @@ export function main(args = process.argv.slice(2), { write = process.stdout.writ
   }
   write(`${JSON.stringify(output, null, 2)}\n`); return ["ready", "noop", "applied", "recovered"].includes(output.status) ? 0 : 1;
 }
-if (import.meta.url === pathToFileURL(process.argv[1]).href) process.exit(main());
+if (isDirectInvocation(import.meta.url)) process.exit(main());

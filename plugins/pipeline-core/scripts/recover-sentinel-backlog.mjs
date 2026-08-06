@@ -5,9 +5,9 @@
  * Import the public Sentinel baseline catalog into the canonical backlog.
  * Preview is the default. Only --write performs the recoverable transaction.
  */
-import { fileURLToPath } from "node:url";
 
 import { applySentinelBacklogRecovery, planSentinelBacklogRecovery } from "./check-backlog-state.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 function printFindings(result) {
   for (const finding of result.findings) console.error(`FAIL Sentinel backlog recovery: ${finding}`);
@@ -33,4 +33,4 @@ function cli() {
   }
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) cli();
+if (isDirectInvocation(import.meta.url)) cli();

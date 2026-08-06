@@ -5,6 +5,7 @@ import { lstatSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { validateFeatureTopology } from "../lib/feature-package-topology.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = resolve(HERE, "..", "..", "..");
@@ -38,7 +39,7 @@ export function checkArtifactTopology(root = DEFAULT_ROOT, path = "governance/ar
   return { ok: findings.length === 0, status: findings.length === 0 ? "valid" : "invalid", findings, mode: topology?.mode ?? null, packages: { inventory: packages.inventory, receipts: packages.receipts } };
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isDirectInvocation(import.meta.url)) {
   const result = checkArtifactTopology(process.cwd());
   process.stdout.write(`${JSON.stringify(result)}\n`);
   process.exitCode = result.ok ? 0 : 2;

@@ -3,9 +3,9 @@
 /** External-store helper for an explicitly non-authorizing remote acknowledgement. */
 import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 
 import { consumeRemoteProvisionalReceipt, createRemoteProvisionalReceipt } from "../lib/remote-provisional-receipt.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const USAGE = "Usage: remote-provisional-approval.mjs issue --repo-root <repo> --directory <external-dir> --candidate-commit <oid> --candidate-tree <oid> --scope-sha256 <sha256> --code <code> --expires-at <ISO-8601> | consume --repo-root <repo> --directory <external-dir> --candidate-commit <oid> --candidate-tree <oid> --scope-sha256 <sha256> --code <code>";
 
@@ -52,6 +52,6 @@ export function run(argv = process.argv.slice(2), dependencies = {}) {
   if (!result.ok) throw new Error(result.code);
   store(path, result.value); return { ok: true, code: "REMOTE-PROVISIONAL-CONSUMED", candidate, scopeSha256: args.scopeSha256, consumedAt: now };
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectInvocation(import.meta.url)) {
   try { process.stdout.write(`${JSON.stringify(run(), null, 2)}\n`); } catch (error) { process.stderr.write(`REMOTE-PROVISIONAL-FAILED: ${error.message}\n`); process.exitCode = 2; }
 }

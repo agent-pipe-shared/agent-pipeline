@@ -12,7 +12,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { DOCUMENT_CLASS_IDS } from "../lib/document-hooks.mjs";
 import { issueDocumentId, readDocumentIdReservation } from "../lib/document-identifiers.mjs";
@@ -25,6 +24,7 @@ import {
 } from "../lib/private-boundary.mjs";
 import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const PRIVATE_DOCUMENT_BINDING_SCHEMA = "pipeline.private-document-binding.v1";
 const BINDING_ID = /^dh_[a-z2-7]{25}[aeimquy4]$/u;
@@ -201,7 +201,7 @@ export function main(argv = process.argv.slice(2)) {
   return 0;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectInvocation(import.meta.url)) {
   try { process.exitCode = main(); }
   catch (error) { process.stderr.write(`${error instanceof DocumentBindingError ? error.code : "DB-ARGUMENT"}: ${error.message}\n`); process.exitCode = 2; }
 }

@@ -4,13 +4,13 @@
 import { spawnSync as nodeSpawnSync } from "node:child_process";
 import { lstatSync as nodeLstatSync, realpathSync as nodeRealpathSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import {
   resolveCodexLocalMarketplacePluginPath,
 } from "../lib/codex-host-plugin-list.mjs";
 import { resolveTrustedSystemExecutable } from "../lib/trusted-tool-resolution.mjs";
 
 import { mainCodexHost as activationMain } from "./private-overlay-activation.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const SCHEMA = "pipeline.codex-private-overlay-source-resolution.v1";
 const ROUTE_SCHEMA = "pipeline.codex-private-overlay-route.v1";
@@ -295,6 +295,6 @@ export function main(argv, dependencyOverrides = {}) {
   }
 }
 
-if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isDirectInvocation(import.meta.url)) {
   process.exitCode = main(process.argv.slice(2));
 }

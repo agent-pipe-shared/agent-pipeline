@@ -51,7 +51,7 @@
 import { createHash } from "node:crypto";
 import { lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const PUBLICATION_GATE_EVIDENCE_SCHEMA = "pipeline.publication-gate-evidence.v1";
 export const DERIVABLE_GATES = Object.freeze(["identity", "verify", "security"]);
@@ -172,7 +172,7 @@ function parseArgs(argv) {
   return { rootDir: value["--root"] ?? process.cwd(), gate: value["--gate"], sourcePath: value["--source"], outPath: value["--out"] };
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
+if (isDirectInvocation(import.meta.url)) {
   try {
     const written = writeGateEvidence(parseArgs(process.argv.slice(2)));
     process.stdout.write(`${JSON.stringify({ ...written.evidence, derivedFrom: written.source, writtenTo: written.outPath }, null, 2)}\n`);

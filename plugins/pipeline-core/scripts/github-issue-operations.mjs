@@ -7,6 +7,8 @@
  * keeps credentials out of the pipeline and makes every mutation previewable
  * and read-back verifiable.
  */
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
+
 export const ISSUE_OPERATIONS_SCHEMA = "pipeline.github-issue-operations.v1";
 const REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u;
 const ISSUE_NUMBER = /^[1-9][0-9]*$/u;
@@ -74,7 +76,7 @@ export function validateIssueReadback({ preview, readback } = {}) {
   return { ok: true, issueNumber: readback.issueNumber };
 }
 
-if (process.argv[1] && new URL(import.meta.url).pathname === process.argv[1]) {
+if (isDirectInvocation(import.meta.url)) {
   if (process.argv.includes("--schema")) console.log(JSON.stringify({ schema: ISSUE_OPERATIONS_SCHEMA, operations: [...OPERATIONS], editableFields: [...EDITABLE_FIELDS] }, null, 2));
   else { console.error("Usage: node plugins/pipeline-core/scripts/github-issue-operations.mjs --schema"); process.exitCode = 2; }
 }

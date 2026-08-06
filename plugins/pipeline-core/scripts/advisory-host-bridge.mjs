@@ -13,7 +13,6 @@ import { createHash, randomUUID } from "node:crypto";
 import { readFile, unlink } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import { createInterface } from "node:readline";
-import { pathToFileURL } from "node:url";
 
 import { coordinateAdvisory } from "../lib/advisory-coordinator.mjs";
 import {
@@ -33,6 +32,7 @@ import { createCodexSandboxRuntimeTransport } from "./codex-sandbox-runtime.mjs"
 import { sandboxSelectionDigest } from "./codex-sandbox-select.mjs";
 import { executeSandboxedReadonlyDuty } from "./sandboxed-readonly-host-bridge.mjs";
 import { observeHostAdvisorWorkspace } from "./host-advisor-workspace.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const USAGE = "usage: advisory-host-bridge.mjs --input <json> --receipt <json> [--timeout-ms <1000..600000>]";
 
@@ -508,7 +508,7 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
   }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectInvocation(import.meta.url)) {
   runAdvisoryHostBridge().then(
     (code) => { process.exitCode = code; },
     (error) => {

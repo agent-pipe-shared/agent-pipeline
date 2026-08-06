@@ -16,7 +16,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import net from "node:net";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 import { parseYaml } from "../lib/yaml-lite.mjs";
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
@@ -40,6 +40,7 @@ import {
   validateStartupAcknowledgement,
   writeFrame,
 } from "./session-power-controller.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const USAGE = "Usage: session-power.mjs <start|status|recover|stop> --session-id <id> --expected-descriptor-sha256 <sha256>";
 const OPERATIONS = new Set(["start", "status", "recover", "stop"]);
@@ -284,7 +285,7 @@ export async function main(argv = process.argv.slice(2), { rootDir = process.cwd
   return resultExit(record);
 }
 
-const direct = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+const direct = isDirectInvocation(import.meta.url);
 if (direct) {
   main().then((code) => { process.exitCode = code; }).catch((error) => {
     process.stderr.write(`${error instanceof SessionPowerError ? error.code : "SP-ARGUMENT"}: ${error.message}\n`);

@@ -15,6 +15,7 @@ import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = resolve(HERE, "..", "..", "..");
@@ -422,7 +423,7 @@ function cliArgs(argv) {
   return index === -1 ? null : argv[index + 1] ?? null;
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+if (isDirectInvocation(import.meta.url)) {
   const resultPath = cliArgs(process.argv.slice(2));
   if (!resultPath) {
     console.log("SKIP artifact lifecycle: no --result metadata supplied (explicit rigor-1/2 opt-in only).");

@@ -9,10 +9,11 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { evaluateAiHardeningGate, runIndependentChecks } from "./ai-assisted-hardening-gate.mjs";
 import { definitionInventoryRecord } from "../lib/ai-definition-inventory.mjs";
 import { requalifyForDrift } from "../lib/ai-assisted-hardening.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const VERIFY_TOPOLOGY_SCHEMA = "pipeline.verify-topology-preflight.v1";
 const OID = /^[0-9a-f]{40}$/u;
@@ -208,7 +209,7 @@ export function runVerifyTopologyCli(argv = process.argv.slice(2)) {
   });
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectInvocation(import.meta.url)) {
   const result = runVerifyTopologyCli();
   process.stdout.write(`${JSON.stringify(result)}\n`);
   process.exitCode = result.status === "ready" ? 0 : 2;

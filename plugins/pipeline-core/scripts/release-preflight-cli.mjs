@@ -39,10 +39,10 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { createReleasePreflight, validateReleasePreflight } from "./release-preflight.mjs";
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const DOCUMENTS = Object.freeze(["prd", "spec", "acceptance", "result"]);
 const FINAL_GATES = Object.freeze(["verify", "security", "critic", "remote", "human"]);
@@ -203,7 +203,7 @@ function parseArgs(argv) {
   };
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
+if (isDirectInvocation(import.meta.url)) {
   try {
     const options = parseArgs(process.argv.slice(2));
     const built = buildReleasePreflight(options);

@@ -20,6 +20,7 @@ import {
   transitionHash,
 } from "../lib/backlog-state.mjs";
 import { writeBacklogProjections } from "./check-backlog-state.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const ITEMS = join(ROOT, "backlog", "items");
@@ -119,7 +120,7 @@ export function applyBacklogMigration(root = ROOT, options = {}) {
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isDirectInvocation(import.meta.url)) {
   const write = process.argv.includes("--write");
   const plan = planBacklogMigration();
   if (!plan.ok) { for (const finding of plan.findings) console.error(`FAIL backlog migration: ${finding}`); process.exitCode = 2; }

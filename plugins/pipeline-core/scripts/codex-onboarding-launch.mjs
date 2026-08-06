@@ -4,7 +4,6 @@
 import { spawnSync } from "node:child_process";
 import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 
 import {
   HELPER_PATH,
@@ -14,6 +13,7 @@ import {
   issueLaunchTicket,
 } from "../lib/codex-onboarding-runtime.mjs";
 import { READBACK_STATUS_SCHEMA } from "./codex-project-runtime-readback-host.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const READBACK_TIMEOUT_MS = 35_000;
 const READBACK_MAX_BUFFER = 128 * 1024;
@@ -139,4 +139,4 @@ export function main(argv = process.argv.slice(2), {
     return readbackProduced ? 0 : 2;
   }
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) process.exitCode = main();
+if (isDirectInvocation(import.meta.url)) process.exitCode = main();

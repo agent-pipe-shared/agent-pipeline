@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: SUL-1.0
 
 /** Model-free route authority used only after a valid on-demand trigger. */
-import { pathToFileURL } from "node:url";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
+
 export const ROUTES = Object.freeze({
   HOST: "host-bound-consult",
   NO_CONSENT: "disabled-no-consent",
@@ -78,7 +79,7 @@ function writeRoute(input, write) {
   write(`${JSON.stringify(resolveHostAdvisorRoute(input))}\n`);
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectInvocation(import.meta.url)) {
   const argv = process.argv.slice(2);
   if (argv.length > 0) {
     if (argv.length === 1 && argv[0] === "--help") {

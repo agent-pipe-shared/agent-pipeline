@@ -10,7 +10,6 @@ import { existsSync, lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync 
 import { tmpdir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
 
 import {
   hasCodexHostControlLayout,
@@ -21,6 +20,7 @@ import {
   NEUTRAL_CALIBRATION,
   resolveProjectAuthorityPaths,
 } from "../lib/project-authority.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const SCHEMA = "pipeline.repository-freshness.v0";
 const FETCH_TIMEOUT_MS = 8000;
@@ -319,7 +319,7 @@ function parseArgs(argv) {
   return null;
 }
 
-const isCli = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+const isCli = isDirectInvocation(import.meta.url);
 if (isCli) {
   const repo = parseArgs(process.argv.slice(2));
   if (!repo) {

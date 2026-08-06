@@ -9,7 +9,6 @@
  */
 import { lstatSync, readFileSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 
 import {
   cancelLocalWorkerSupervisor,
@@ -18,6 +17,7 @@ import {
   planLocalWorkerSupervisor,
   runLocalWorkerSupervisor,
 } from "../lib/local-worker-supervisor.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const MAX_REQUEST_BYTES = 65_536;
 const SHA256 = /^[a-f0-9]{64}$/u;
@@ -116,6 +116,6 @@ export async function run(argv = process.argv.slice(2)) {
   }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectInvocation(import.meta.url)) {
   process.exitCode = await run();
 }

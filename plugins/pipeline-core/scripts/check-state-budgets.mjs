@@ -3,9 +3,9 @@
 /** Measure Phase-2.6's explicitly declared operational hot-head budgets. */
 import { readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { DEFAULT_ROOT, loadLifecycleMetadata, CANONICAL_HUMAN_STATE_PATH, canonicalMachineStatePath } from "./check-artifact-lifecycle.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const MAX_NORMAL_BOOTSTRAP_BYTES = 15360;
 export const MAX_OPERATIONAL_HEAD_BYTES = 8192;
@@ -92,7 +92,7 @@ function resultArg(argv) {
   return index === -1 ? null : argv[index + 1] ?? null;
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+if (isDirectInvocation(import.meta.url)) {
   const resultPath = resultArg(process.argv.slice(2));
   if (!resultPath) {
     console.log("SKIP state budgets: no --result metadata supplied (explicit rigor-1/2 opt-in only).");

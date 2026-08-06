@@ -24,6 +24,7 @@ import {
   routingProvenance,
   validateDirectRouting,
 } from "../lib/routing-projection.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = join(HERE, "..", "..", "..");
@@ -215,7 +216,7 @@ export function checkCodexNormalCriticDuty() {
   return { ok: findings.length === 0, findings };
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+if (isDirectInvocation(import.meta.url)) {
   const repository = checkRepository();
   const codex = checkCodexPartialMappingContract();
   const normalCritic = checkCodexNormalCriticDuty();

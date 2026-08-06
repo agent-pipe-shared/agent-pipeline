@@ -10,6 +10,7 @@
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const CODEX_APP_SERVER_HEALTH_SCHEMA = "pipeline.codex-app-server-health.v1";
 export const CODEX_APP_SERVER_DOCTOR_SCHEMA = "pipeline.codex-app-server-doctor.v1";
@@ -187,4 +188,4 @@ export function run(argv = process.argv.slice(2), deps = {}) {
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = run();
+if (isDirectInvocation(import.meta.url)) process.exitCode = run();

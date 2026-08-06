@@ -23,6 +23,7 @@ import {
   readProjectPipelineUpdateChannel,
   resolvePipelineUpdateChannel,
 } from "./pipeline-update-channel.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const PIPELINE_UPDATE_AVAILABILITY_SCHEMA =
   "pipeline.pipeline-update-availability.v1";
@@ -435,7 +436,7 @@ export function runPipelineUpdateAvailabilityCli(argv, deps = {}) {
   return { exitCode: inspected.blocking ? 2 : 0, result: inspected };
 }
 
-const isCli = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+const isCli = isDirectInvocation(import.meta.url);
 if (isCli) {
   const execution = runPipelineUpdateAvailabilityCli(process.argv.slice(2));
   process.exitCode = execution.exitCode;

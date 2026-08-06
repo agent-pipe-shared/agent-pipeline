@@ -6,6 +6,7 @@ import {
   canonicalForgeJson,
   sealForgeCapabilityReport,
 } from "../lib/forge-capability.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const EXTERNAL_MUTATION_SCHEMA = "pipeline.external-mutation.v1";
 export const GITLAB_FORGE_ADAPTER_VERSION = "1.0.0";
@@ -458,7 +459,7 @@ export function reconcileExternalMutationRetry(record, input = {}) {
   return { ok: true, code: "MUTATION:retry-admissible", retry: true };
 }
 
-if (process.argv[1] && new URL(import.meta.url).pathname === process.argv[1]) {
+if (isDirectInvocation(import.meta.url)) {
   if (process.argv.length === 3 && process.argv[2] === "--schema") {
     console.log(JSON.stringify({
       adapter: "gitlab",

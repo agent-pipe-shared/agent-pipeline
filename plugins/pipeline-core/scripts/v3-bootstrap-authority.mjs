@@ -8,7 +8,6 @@
  * the source and every runtime projection, while this common reader also
  * requires the current private native Codex readback before returning ready.
  */
-import { pathToFileURL } from "node:url";
 import { lstatSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -31,6 +30,7 @@ import {
   resolveProjectAuthorityPaths,
 } from "../lib/project-authority.mjs";
 import { parseYaml } from "../lib/yaml-lite.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const SCHEMA = "pipeline.v3-bootstrap-authority.v1";
 /**
@@ -391,4 +391,4 @@ export function main(args = process.argv.slice(2), {
   return result.status === "ready" ? 0 : 1;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) process.exit(main());
+if (isDirectInvocation(import.meta.url)) process.exit(main());

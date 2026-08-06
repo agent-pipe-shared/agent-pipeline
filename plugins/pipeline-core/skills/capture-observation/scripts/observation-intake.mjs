@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import { readFile } from "node:fs/promises";
-import { pathToFileURL } from "node:url";
+import { isDirectInvocation } from "../../../lib/entrypoint.mjs";
 
 export const INPUT_SCHEMA = Object.freeze({
   schema: "pipeline.capture-observation-input.v1",
@@ -374,7 +374,7 @@ export async function runCli(argv, {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectInvocation(import.meta.url)) {
   process.exitCode = await runCli(process.argv.slice(2));
 }
 

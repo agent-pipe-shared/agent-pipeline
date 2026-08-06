@@ -342,6 +342,7 @@ import {
   lifecycleDigest as closeCoordinatorDigest,
   readCloseCoordinator,
 } from "./publication-close-journal.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const SCHEMA_ID = "pipeline.state.v0";
 export const CONTINUITY_LOCK_SCHEMA_ID = "pipeline.continuity-lock.v0";
@@ -5470,7 +5471,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
 
 const isDirectRun = (() => {
   try {
-    return Boolean(process.argv[1]) && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+    return isDirectInvocation(import.meta.url);
   } catch {
     return false;
   }

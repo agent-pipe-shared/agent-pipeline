@@ -44,6 +44,7 @@
 import { readFileSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const HERE = new URL(".", import.meta.url);
 export const DEFAULT_ROOT = resolve(fileURLToPath(new URL("../../../", HERE)));
@@ -187,4 +188,4 @@ function runCli() {
   process.stdout.write(`Completeness-vocabulary doc-lint clean: ${DEFAULT_SCANNED_FILES.length} file(s) scanned, no unavailable/not-applicable conflation found.\n`);
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) runCli();
+if (isDirectInvocation(import.meta.url)) runCli();

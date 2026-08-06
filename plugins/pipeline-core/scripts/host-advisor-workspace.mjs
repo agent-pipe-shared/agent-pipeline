@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export function canonicalJson(v) {
   if (Array.isArray(v)) return `[${v.map(canonicalJson).join(",")}]`;
@@ -67,7 +68,7 @@ export function observeHostAdvisorWorkspace(governedRoot, deps = {}) {
   return deepFreeze({ manifest, workspaceSha256 });
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isDirectInvocation(import.meta.url)) {
   try { const root = process.argv[2]; if (!root) throw new Error("governed root required"); process.stdout.write(JSON.stringify(observeHostAdvisorWorkspace(root)) + "\n"); }
   catch (e) { process.stderr.write(JSON.stringify({ error: "workspace-observation-failed" }) + "\n"); process.exitCode = 1; }
 }

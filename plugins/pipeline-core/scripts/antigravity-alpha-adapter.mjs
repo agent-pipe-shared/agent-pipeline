@@ -7,6 +7,8 @@
  * This is intentionally not an AGY executor.  It never discovers, installs,
  * authenticates, invokes, or otherwise probes `agy`.
  */
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
+
 export const ANTIGRAVITY_ALPHA_ADAPTER_SCHEMA = "pipeline.antigravity-alpha-adapter.v1";
 export const ANTIGRAVITY_ALPHA_ADAPTER_VERSION = "0.1.0-alpha";
 
@@ -76,7 +78,7 @@ export function main(argv = process.argv.slice(2)) {
   process.stdout.write(`${JSON.stringify(describeAntigravityAlpha())}\n`);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isDirectInvocation(import.meta.url)) {
   try {
     main();
   } catch (error) {

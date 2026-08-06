@@ -5,7 +5,6 @@ import { randomBytes as nodeRandomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { readFile as nodeReadFile } from "node:fs/promises";
 import { isAbsolute, resolve, sep } from "node:path";
-import { pathToFileURL } from "node:url";
 
 import {
   SUPPORTED_ADAPTER,
@@ -24,6 +23,7 @@ import {
   NEUTRAL_STATE,
   resolveProjectAuthorityPaths,
 } from "../lib/project-authority.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const EXIT = Object.freeze({ OK: 0, BLOCKED: 2 });
 export const MAX_STDIN_BYTES = 262_144;
@@ -234,6 +234,6 @@ export async function main(argv = process.argv.slice(2), io = {}) {
   return outcome.ok ? EXIT.OK : EXIT.BLOCKED;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectInvocation(import.meta.url)) {
   process.exitCode = await main();
 }

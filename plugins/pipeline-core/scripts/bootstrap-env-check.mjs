@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const VARIABLE = "CLAUDE_CODE_SUBAGENT_MODEL";
 
@@ -16,7 +16,7 @@ export function inspectBootstrapEnvironment(env = process.env) {
   };
 }
 
-const isCli = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+const isCli = isDirectInvocation(import.meta.url);
 if (isCli) {
   const receipt = inspectBootstrapEnvironment();
   process.stdout.write(`${JSON.stringify(receipt)}\n`);

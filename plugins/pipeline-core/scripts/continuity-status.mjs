@@ -14,7 +14,6 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 
 import { projectReadContinuityStatus } from "../lib/continuity-status.mjs";
 import { readGateEstimateEvidence } from "../lib/gate-estimate.mjs";
@@ -24,6 +23,7 @@ import {
   NEUTRAL_STATE,
   resolveProjectAuthorityPaths,
 } from "../lib/project-authority.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 /**
  * Installed-plugin read path.  The plugin may run without the Public Core
@@ -107,6 +107,6 @@ export function run(argv = process.argv.slice(2), { read = readState, write = pr
   return result.stateStatus === "malformed" ? 2 : 0;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectInvocation(import.meta.url)) {
   process.exitCode = run();
 }

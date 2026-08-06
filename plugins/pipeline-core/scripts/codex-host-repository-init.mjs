@@ -42,6 +42,7 @@ import {
   NEUTRAL_STATE,
   resolveProjectAuthorityPaths,
 } from "../lib/project-authority.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const PLAN_SCHEMA = "pipeline.codex-host-repository-init-plan.v1";
 const APPLY_SCHEMA = "pipeline.codex-host-repository-init-apply.v1";
@@ -1233,5 +1234,5 @@ export function main(argv = process.argv.slice(2)) {
   return ["ready", "restart-required"].includes(result.status) ? 0 : 2;
 }
 
-const invokedDirectly = process.argv[1] && resolve(fileURLToPath(import.meta.url)) === resolve(process.argv[1]);
+const invokedDirectly = isDirectInvocation(import.meta.url);
 if (invokedDirectly) process.exitCode = main();

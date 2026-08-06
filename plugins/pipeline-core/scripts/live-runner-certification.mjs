@@ -11,12 +11,12 @@ import { createHash } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 
 import {
   resolveCodexBinary,
 } from "./codex-critic-isolation.mjs";
 import { runCodexSandboxPreflight } from "./codex-sandbox-preflight.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const LIVE_CERTIFICATION_SCHEMA = "pipeline.live-runner-certification.v1";
 const OID = /^[0-9a-f]{40}$/u;
@@ -111,7 +111,7 @@ export function parseLiveCertificationArgs(argv) {
   return Object.freeze({ candidateCommit: argv[1], policy: argv[3] });
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectInvocation(import.meta.url)) {
   let result;
   let policy = "blocking";
   try {

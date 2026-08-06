@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: SUL-1.0
 
 /** Model-free Advisor capability preflight for pipeline-start. */
-import { pathToFileURL } from "node:url";
 
 import { preflightAdvisoryCapability } from "../lib/advisory-lifecycle-v2.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const USAGE = "Usage: advisor-capability-preflight.mjs --runner <claude|codex> --profile <epic|feature|mini> --consent <default|approved|declined>";
 
@@ -28,7 +28,7 @@ export function runAdvisorCapabilityPreflight(argv = process.argv.slice(2), writ
   return 0;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectInvocation(import.meta.url)) {
   try {
     process.exitCode = runAdvisorCapabilityPreflight();
   } catch (error) {

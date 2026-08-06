@@ -50,6 +50,7 @@ import {
   projectBacklog,
   transitionHash,
 } from "../lib/backlog-state.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = resolve(HERE, "..", "..", "..");
@@ -240,7 +241,7 @@ export function applyBacklogReconciliation(root = DEFAULT_ROOT, options = {}) {
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
+if (isDirectInvocation(import.meta.url)) {
   const args = process.argv.slice(2);
   const activate = args.includes("--activate");
   const unsupported = args.filter((arg) => arg !== "--activate");

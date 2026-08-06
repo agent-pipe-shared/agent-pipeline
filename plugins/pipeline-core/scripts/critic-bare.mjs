@@ -101,6 +101,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_SCHEMA_PATH = join(SCRIPT_DIR, "critic-verdict.schema.json");
@@ -546,7 +547,7 @@ export async function main(argv = process.argv.slice(2)) {
 
 const isDirectRun = (() => {
   try {
-    return Boolean(process.argv[1]) && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+    return isDirectInvocation(import.meta.url);
   } catch {
     return false;
   }
