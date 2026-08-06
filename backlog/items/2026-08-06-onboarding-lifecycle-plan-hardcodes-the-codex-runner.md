@@ -103,9 +103,35 @@ ready gate and did not reach this path.
 4. A regression test that runs the chain as a consumer does — execute each
    returned `nextAction` verbatim and assert the runner never changes.
 
-There are 24 `v4Inspection` call sites; most do not thread identity today, so
-(1) is larger than it first looks and should be scoped as its own dispatch rather
-than folded into a release commit.
+**Attempt 1 (dispatch `RUNNER-THREAD-17`, 2026-08-06) established the real size and
+was reverted.** Three resumed rounds, roughly 650k tokens, produced: eight literal
+defaults removed and identity threaded into ~16 `nextAction` emissions (87 insertions
+/ 67 deletions) — and **100 failing tests** with `Cannot read properties of null
+(reading 'argv')`, plus runner-expectation failures such as "Codex bootstrap accepts a
+dual-runner source whose default runner is Claude". The CLI, which is where the
+observed consumer harm actually lives, was never reached.
+
+The cause is the part the briefing named as a stop condition and that was never
+reported: removing the defaults cascades to internal callers that have **no explicit
+runner source available**. Each of those is a genuine design question — where does
+this call site's runner legitimately come from? — and there are enough of them that
+this is a multi-session change, not a dispatch. The partial diff is preserved at
+`runner-thread-17-partial.patch` in the session scratchpad; it is a useful starting
+point, not a resumable state.
+
+**Revised proposal: split it.**
+
+- **Bounded fix, release-sized.** Thread `intent`/`runner` through `planLifecycle` and
+  the four `plan*` CLI call sites, and carry `--runner`/`--intent` in the `nextAction`
+  those emit. This fixes the measured consumer harm — a Claude consumer being routed
+  onto the Codex rail — without touching the internal call sites, so the defaults stay
+  and nothing cascades.
+- **Full refactor, its own work.** Removing the literal defaults everywhere requires
+  answering the "explicit runner source" question per call site. That is the ADR-0051
+  ideal and it is worth doing; the evidence above is that it cannot be bolted onto a
+  release.
+
+There are 24 `v4Inspection` call sites; most do not thread identity today.
 
 ## Related
 
