@@ -4,7 +4,7 @@
 > repository state only; durable decisions remain in the ADR register.
 
 **Last updated:** 2026-08-06
-**Project status:** ACTIVE
+**Project status:** PAUSED — resumes with the rebase onto the 0.5.2 release
 **Current block:** Implementation against the approved §7 inventory. Phase `implementation`, lifecycle `implementing`, continuity revision `3`, authority PRD `303586c8…` + Spec `f7e32bb7…`. 18 of the 35 criterion gaps are closed; 2 are classified as needing implementation; 15 remain unclassified
 **Branch:** `sprint_phoenix`, based on public `origin/main`
 `9d1b3dc108eb77629ace5b82002120f5539abd8d`
@@ -19,6 +19,45 @@ six Critic findings have been fixed on top of it, so Verify is owed again on the
 new candidate before any publication attempt
 
 ## Operational head
+
+### PAUSED — 2026-08-06, resumes on the 0.5.2 rebase
+
+PO decision: pause here and rebase onto the 0.5.2 release before doing
+anything further. Content is complete and verified for this stage; the
+publication path is not, and cannot be from this checkout.
+
+**Resume candidate:** `7885206` (tree `c7a12ec8`). Verify green — all
+steps exit 0, security `CLEAN`, candidate binding `exact`. Working tree
+carries only the three conventionally-dirty state/config files.
+
+**Push attempted twice, once before and once after a plugin reload, with
+identical results.** Not delegated — the attempt is the agent's own, and
+it fails closed:
+
+| Finding | Nature | Resolved by the rebase? |
+| --- | --- | --- |
+| `evidence/security-latest.v2.json` missing | this checkout has no producer for the v2 shape | yes — `origin/main:harness/scripts/security-scan.mjs` emits it |
+| `evidence/security-latest.v2.verdict.json` missing | same | yes |
+| push approval stale for this commit | PHX-2 authority | no |
+| approval proof not bound to this remote and ref | PHX-2 authority | no |
+
+The first two are the version skew: the enforcing guard wants evidence
+this 0.4.6-era checkout cannot emit. The last two are the PO gate itself
+and stay a gate at any version. `approve-push` was **not** run: recording
+a `pushApproval` to authorize the agent's own push is precisely what the
+push policy forbids, and the guard's own hint to run it does not change
+that. Writing the two missing evidence files by hand would equally be
+fabricating gate evidence. Neither was done.
+
+**Next session starts with the rebase onto 0.5.2**, not with more feature
+work. Three separate blockers now trace to the 474-commit gap — the v4
+plan lifecycle, the dev-plan gate that never enforced here, and the v2
+security evidence shape.
+
+Still open after the rebase: Critic findings F-8, F-9, F-10; the F-1
+regression test (belongs in `pipeline-state.test.mjs`, which TP-5
+protects with no in-session path); X-AC-11, H-AC-08; 15 unclassified
+criteria; issue reconciliation for eight `sprint:phoenix` issues.
 
 ### Critic findings worked — 2026-08-06
 
