@@ -59,7 +59,20 @@ export const DEFAULT_PUSH_APPROVAL_MODE = "signature";
  * Consequence for the operator, stated because it changes a workflow: setting `chat` now
  * requires committing the change. An uncommitted edit reads as `signature`.
  */
-function committedUnchanged(root, raw, spawn) {
+/**
+ * The bytes Git has for this file at HEAD, or null when it has none.
+ *
+ * Split out from the comparison because ABSENCE has to be checked against HEAD too. The
+ * previous version returned `source: "default"` the moment the working-tree file was
+ * missing, before consulting Git at all — so an agent could delete the file instead of
+ * editing it and land in the one source value that lets a policy waiver govern. The T5
+ * Critic found it (F2): every state the tightening refuses was reachable by `rm`.
+ *
+ * `null` therefore means "Git has nothing here either", which is the only case where the
+ * source genuinely has no opinion. A missing working-tree file whose blob exists at HEAD is
+ * a modification like any other, and is treated as one.
+ */
+function committedBytes(root, spawn) {
   try {
     // The path in a `<rev>:<path>` spec resolves against the REPOSITORY TOP LEVEL, not
     // against `-C`. The first version of this function ignored that and asked for
@@ -71,9 +84,9 @@ function committedUnchanged(root, raw, spawn) {
     // case was just as wrong: a sub-project that DID commit its own copy could never reach
     // `chat`, because Git looked for the blob at the top level.
     const top = spawn("git", ["-C", root, "rev-parse", "--show-toplevel"], { encoding: "utf8" });
-    if (top.error || top.status !== 0 || typeof top.stdout !== "string") return false;
+    if (top.error || top.status !== 0 || typeof top.stdout !== "string") return null;
     const repoRoot = top.stdout.trim();
-    if (repoRoot === "") return false;
+    if (repoRoot === "") return null;
     // Ask for the blob at the path this file actually occupies, expressed from the top
     // level and with POSIX separators, which is the only form Git accepts in a rev spec.
     //
@@ -88,15 +101,15 @@ function committedUnchanged(root, raw, spawn) {
     // Only the DIRECTORY is resolved. A symlinked `pipeline.user.yaml` must not be followed,
     // and is not: readPushApprovalMode rejects it by `lstatSync` long before this runs.
     const relPath = relative(repoRoot, join(realpathSync(resolve(root)), USER_SOURCE_PATH));
-    if (relPath === "" || relPath.startsWith("..") || isAbsolute(relPath)) return false;
+    if (relPath === "" || relPath.startsWith("..") || isAbsolute(relPath)) return null;
     const result = spawn("git", ["-C", root, "show", `HEAD:${relPath.split(sep).join("/")}`], {
       encoding: "buffer",
       maxBuffer: 1024 * 1024,
     });
-    if (result.error || result.status !== 0 || !result.stdout) return false;
-    return Buffer.compare(Buffer.from(result.stdout), Buffer.from(raw, "utf8")) === 0;
+    if (result.error || result.status !== 0 || !result.stdout) return null;
+    return Buffer.from(result.stdout);
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -112,12 +125,21 @@ function committedUnchanged(root, raw, spawn) {
  */
 export function readPushApprovalMode(dir, { spawn = spawnSync } = {}) {
   const path = join(resolve(dir), USER_SOURCE_PATH);
-  if (!existsSync(path)) return { mode: DEFAULT_PUSH_APPROVAL_MODE, source: "default" };
+  if (!existsSync(path)) {
+    // Absence is a claim too, and it needs the same evidence. If HEAD carries this file, an
+    // absent working-tree copy is a modification -- the deletion route the T5 Critic found
+    // (F2), which reached `default` and let a policy waiver govern without touching a byte
+    // of content. Only a file Git does not have either means the source has no opinion.
+    return committedBytes(resolve(dir), spawn) === null
+      ? { mode: DEFAULT_PUSH_APPROVAL_MODE, source: "default" }
+      : { mode: DEFAULT_PUSH_APPROVAL_MODE, source: "uncommitted" };
+  }
   try {
     const info = lstatSync(path);
     if (!info.isFile() || info.isSymbolicLink()) return { mode: DEFAULT_PUSH_APPROVAL_MODE, source: "unsafe" };
     const raw = readFileSync(path, "utf8");
-    if (!committedUnchanged(resolve(dir), raw, spawn)) {
+    const committed = committedBytes(resolve(dir), spawn);
+    if (committed === null || Buffer.compare(committed, Buffer.from(raw, "utf8")) !== 0) {
       return { mode: DEFAULT_PUSH_APPROVAL_MODE, source: "uncommitted" };
     }
     const value = parseYaml(raw);
