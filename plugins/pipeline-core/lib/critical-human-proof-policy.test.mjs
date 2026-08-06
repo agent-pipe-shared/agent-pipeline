@@ -254,6 +254,41 @@ try {
     assert.deepEqual(readPushApprovalMode(base), { mode: "signature", source: "uncommitted" });
   });
 
+  check("CHP24 a sub-root copy is not cleared by the top level's committed blob", () => {
+    // T3 Critic K1. `<rev>:<path>` resolves against the repository top level, not against
+    // `-C`, so asking for `HEAD:pipeline.user.yaml` from a sub-directory returned the ROOT's
+    // blob. An agent could copy the root's committed `chat` file into a sub-project and have
+    // it accepted as unchanged though it was never committed there.
+    const base = userYaml(root(V1()), GATES("chat"));
+    assert.equal(readPushApprovalMode(base).mode, "chat", "precondition: the top level is chat");
+    const sub = join(base, "sub");
+    mkdirSync(join(sub, "project"), { recursive: true });
+    writeFileSync(join(sub, CRITICAL_HUMAN_PROOF_POLICY_PATH), `${JSON.stringify(V1(), null, 2)}\n`);
+    // Byte-identical to the committed top-level file, but never committed at THIS path.
+    writeFileSync(join(sub, "pipeline.user.yaml"), GATES("chat"));
+    assert.deepEqual(readPushApprovalMode(sub), { mode: "signature", source: "uncommitted" },
+      "a sub-root copy borrowed the top level's committed blob");
+    assert.equal(criticalProofWaiverFor(sub, "push").waived, false);
+  });
+
+  check("CHP25 a sub-root copy that IS committed at its own path is honoured", () => {
+    // The mirror of K1, which the same defect broke in the other direction: a sub-project
+    // that legitimately committed its own file could never reach `chat`. Without this the
+    // fix could be "always false for sub-roots" and CHP24 would still pass.
+    const base = root(V1());
+    const sub = join(base, "sub");
+    mkdirSync(join(sub, "project"), { recursive: true });
+    writeFileSync(join(sub, CRITICAL_HUMAN_PROOF_POLICY_PATH), `${JSON.stringify(V1(), null, 2)}\n`);
+    writeFileSync(join(sub, "pipeline.user.yaml"), GATES("chat"));
+    spawnSync("git", ["init", "-q", base]);
+    spawnSync("git", ["-C", base, "config", "user.email", "fixture@example.invalid"]);
+    spawnSync("git", ["-C", base, "config", "user.name", "fixture"]);
+    spawnSync("git", ["-C", base, "add", "-A"]);
+    spawnSync("git", ["-C", base, "commit", "-qm", "fixture"]);
+    assert.equal(readPushApprovalMode(sub).mode, "chat",
+      "a sub-project's own committed setting was ignored");
+  });
+
   check("CHP13 this repository ships the gate ON", () => {
     // The PO's standing decision: default on here, switchable off elsewhere.
     const repoRoot = new URL("../../..", import.meta.url).pathname;

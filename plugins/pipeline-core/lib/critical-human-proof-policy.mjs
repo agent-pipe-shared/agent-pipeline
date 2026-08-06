@@ -18,7 +18,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, lstatSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { CRITICAL_ACTION_KINDS } from "./critical-action-approval-request.mjs";
 import { PUSH_APPROVAL_MODES } from "./runner-profiles-v3.mjs";
@@ -61,7 +61,24 @@ export const DEFAULT_PUSH_APPROVAL_MODE = "signature";
  */
 function committedUnchanged(root, raw, spawn) {
   try {
-    const result = spawn("git", ["-C", root, "show", `HEAD:${USER_SOURCE_PATH}`], {
+    // The path in a `<rev>:<path>` spec resolves against the REPOSITORY TOP LEVEL, not
+    // against `-C`. The first version of this function ignored that and asked for
+    // `HEAD:pipeline.user.yaml` while reading `<root>/pipeline.user.yaml`, which is only
+    // the same file when root IS the top level. The T3 Critic found it (K1): in a checkout
+    // holding more than one project root, an agent could make `<subdir>/pipeline.user.yaml`
+    // byte-equal to the ROOT's committed copy and have it accepted as "unchanged" though it
+    // was never committed at that path -- reopening exactly the C1 escalation. The mirror
+    // case was just as wrong: a sub-project that DID commit its own copy could never reach
+    // `chat`, because Git looked for the blob at the top level.
+    const top = spawn("git", ["-C", root, "rev-parse", "--show-toplevel"], { encoding: "utf8" });
+    if (top.error || top.status !== 0 || typeof top.stdout !== "string") return false;
+    const repoRoot = top.stdout.trim();
+    if (repoRoot === "") return false;
+    // Ask for the blob at the path this file actually occupies, expressed from the top
+    // level and with POSIX separators, which is the only form Git accepts in a rev spec.
+    const relPath = relative(repoRoot, join(resolve(root), USER_SOURCE_PATH));
+    if (relPath === "" || relPath.startsWith("..") || isAbsolute(relPath)) return false;
+    const result = spawn("git", ["-C", root, "show", `HEAD:${relPath.split(sep).join("/")}`], {
       encoding: "buffer",
       maxBuffer: 1024 * 1024,
     });
