@@ -371,6 +371,23 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   });
 }
 
+// ---- PG-HD heredoc/message bodies are DATA, not push commands -------------------------
+// A commit whose message mentions the phrase used to be classified as a push and then
+// rejected as an ambiguous shell bundle -- fail-closed, so never unsafe, but it made
+// working ON the push gate impossible. Detection now reads the command region only.
+{
+  const { dir, head } = freshRepo("heredoc-body");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG-HD1 allow a commit whose heredoc body mentions git push",
+    "git commit -q -F - <<EOF\nfix: note that a raw git push cannot consume it\nEOF", dir, ALLOW);
+  check("PG-HD2 allow a commit whose quoted message mentions git push",
+    'git commit -m "docs: explain why git push is refused"', dir, ALLOW);
+  // The forms the whole-string test carries must keep blocking.
+  check("PG-HD3 block a --git-dir override push", "git --git-dir=/tmp/x push origin main", dir, BLOCK);
+  check("PG-HD4 block an env-prefixed push", "FOO=bar git push origin main", dir, BLOCK);
+}
+
 // ---- PG12 required + fresh approval without a critical proof -> block ------------------
 {
   const { dir, head } = freshRepo("required-fresh");

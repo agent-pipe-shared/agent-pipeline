@@ -209,7 +209,42 @@ if (!cmd) process.exit(0);
 // ---- push detection (shared normalization with guard-git.mjs) ----------------------
 const stripped = stripQuotedSegments(cmd);
 const normalized = normalizeGlobalGitOptions(stripped.toLowerCase());
-const detectionTokens = tokenizeArgv(cmd);
+/**
+ * Everything a here-document feeds to a command is DATA, not command text, but it
+ * still arrives inside the raw command string and survives quote-stripping. Remove
+ * each heredoc body (`<<TAG`, `<<-TAG`, `<<'TAG'`, `<<"TAG"`) up to its terminator so
+ * push detection reads the command, not its payload.
+ */
+const commandRegion = (() => {
+  let text = normalized;
+  const opener = /<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/g;
+  let match;
+  while ((match = opener.exec(text)) !== null) {
+    const tag = match[2];
+    const bodyStart = text.indexOf("\n", match.index);
+    if (bodyStart === -1) { text = text.slice(0, match.index); break; }
+    const terminator = new RegExp(`\\n[ \\t]*${tag}[ \\t]*(?:\\n|$)`, "u");
+    const rest = text.slice(bodyStart);
+    const end = rest.search(terminator);
+    text = end === -1 ? text.slice(0, bodyStart) : text.slice(0, bodyStart) + rest.slice(end + rest.match(terminator)[0].length);
+    opener.lastIndex = 0;
+  }
+  return text;
+})();
+const rawDetectionTokens = tokenizeArgv(cmd);
+// Skip a leading `NAME=value` run and an optional `env`, so `FOO=bar git push` and
+// `env git push` are still detected POSITIONALLY.  These were previously caught only
+// by the whole-string substring test removed below; dropping that test without this
+// would have weakened detection rather than narrowed it.
+const detectionTokens = (() => {
+  let index = 0;
+  while (/^[A-Za-z_][A-Za-z0-9_]*=/u.test(rawDetectionTokens[index] ?? "")) index += 1;
+  if (/^env(?:\.exe)?$/i.test(rawDetectionTokens[index] ?? "")) {
+    index += 1;
+    while (/^[A-Za-z_][A-Za-z0-9_]*=/u.test(rawDetectionTokens[index] ?? "")) index += 1;
+  }
+  return index === 0 ? rawDetectionTokens : rawDetectionTokens.slice(index);
+})();
 const directExecutable = /^(?:git|git\.exe)$/i.test(detectionTokens[0] ?? "");
 const directPush =
   directExecutable &&
@@ -217,7 +252,14 @@ const directPush =
     (detectionTokens[1] === "-C" && detectionTokens[2] && detectionTokens[3]?.toLowerCase() === "push"));
 const shellWrapperPush = /^(?:(?:ba|z|da)?sh|pwsh|powershell|cmd|ssh)(?:\.exe)?$/i.test(detectionTokens[0] ?? "") &&
   detectionTokens.some((token) => /\bgit(?:\.exe)?(?:\s+-C\s+\S+)?\s+push\b/i.test(token));
-const isPush = /\bgit\s+push\b/.test(normalized) || directPush || shellWrapperPush;
+// The whole-string test below is load-bearing: it catches forms the positional
+// detectors cannot see, such as `git --git-dir=<path> push` and repeated `-C`
+// overrides, which `normalizeGlobalGitOptions` folds away for exactly this purpose.
+// It is applied to `commandRegion` rather than the raw normalization so that a
+// heredoc BODY -- data, not command -- can no longer be mistaken for a push. That
+// misclassification made it impossible to commit or document push policy in one
+// command; it was fail-closed, so never unsafe, only obstructive.
+const isPush = /\bgit\s+push\b/.test(commandRegion) || directPush || shellWrapperPush;
 if (!isPush) process.exit(0); // fast path: not a push at all
 
 /**
@@ -1434,7 +1476,7 @@ if (pushGate.approval === "standing-approved") {
       failures.push(
         `Push approval missing or stale: state.pushApproval.lastApproved.forCommit=${JSON.stringify(
           forCommit ?? null,
-        )}, expected pushed source commit=${JSON.stringify(sourceCommit)}. Record: node harness/scripts/pipeline-state.mjs approve-push --by <name>.`,
+        )}, expected pushed source commit=${JSON.stringify(sourceCommit)}. Record: node harness/scripts/pipeline-state.mjs approve-push --by <name> --remote <remote> --destination <full-ref>. NOTE: with gates.push.approval "required" this state record is NECESSARY BUT NOT SUFFICIENT -- the critical-proof check below is independent and also applies. A pushApproval in mutable state is never executable authority on its own.`,
       );
     }
     // ADR-0055: the project may stand the private-key proof down for `push` with an
