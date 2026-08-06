@@ -156,10 +156,14 @@ clean before and after; `security-scan` ran as step 250 and is `exit 0, findings
 same commit. Re-run after the F3/F5 remediation: **exit 0, 250/250**, likewise
 candidate-bound. Final run of this block, after the C1/C2/C4 remediation, the PG12c fix and
 the GIT-03 history cleanup: **exit 0, 250/250, 0 failures** on `a3920f6` / tree `0654fc1`,
-`binding: exact`, tree clean at start and finish. Note that every SHA this block cites from
-before the cleanup is gone — the unpushed range was rewritten, so `511d7d7`, `d7b70d8`,
-`62de980` and their siblings no longer resolve; they are kept as written because they name
-what the Critic rounds actually reviewed. An earlier run on `5fa2548` was 248/249 with one real failure —
+`binding: exact`, tree clean at start and finish. Note on the SHAs this block cites from
+before the GIT-03 cleanup: the unpushed range was rewritten, so `511d7d7`, `d7b70d8`,
+`62de980` and their siblings are no longer reachable from any ref and will be dropped at
+`gc`/reflog expiry — but they still **resolve locally** until then, and the reflog retains
+the whole pre-rewrite chain, so those candidates remain diffable for now. They never existed
+on the remote. An earlier version of this note claimed they "no longer resolve", which the
+T3 Critic corrected as K4. They are kept as written because they name what the Critic rounds
+actually reviewed. An earlier run on `5fa2548` was 248/249 with one real failure —
 `product-capability-inventory-tests`, because a hook's surfaceId embeds its matcher and
 the write matchers had gained `NotebookEdit`; fixed in `469233a`.
 
@@ -207,8 +211,12 @@ once at its tool budget mid-hunt and was resumed. **Verdict: FAIL**, eight findi
   is the live-plugin rule and renumbering would break every reference). The legacy marker
   now also counts as evidence the Pipeline governs the repository. The differing matching
   styles are kept deliberately — the shell lane cannot tell which tier a bare token means,
-  and over-blocking there is fail-closed — so GST17 pins the property that matters instead:
-  no basename the shell lane refuses may be left without a write-lane rule.
+  and over-blocking there is fail-closed. An earlier version of this line said GST17 pins
+  "no basename the shell lane refuses may be left without a write-lane rule"; it does not,
+  and never did (T3 Critic, K5). GST17 iterates the write-lane table and checks both lanes
+  refuse each entry — the converse direction, which cannot see a tier the shell lane covers
+  by basename while the table omits it, i.e. F5's own shape. The property F5 named is closed
+  by **GST18/GST19**, which name both tiers explicitly instead of deriving them.
 - **F7 (minor, NOT fixed — PO action, prepared)** — the new gating suites carry no TP
   entry, so the suite pinning the override's own fail-closed behaviour is agent-editable.
   Closing it means editing `project/guard-config.json`, which GS-4 refuses to the agent by
@@ -307,6 +315,42 @@ full; it read none of ADR-0014/0055/0056 themselves; it ran no test suite and ar
 capability; and it did **not** chain C1 end to end into an actual write, establishing each
 link separately instead, because doing so would breach its read-only contract.
 
+### The T3 Critic round — the C1 fix was itself fail-open
+
+T3 Critic (`critic` agent, Opus, same T1 assurance), base `0f5eaa4` → candidate `144e93d`.
+**Verdict: FAIL**, seven findings. Third round running, third blocker-or-major found in the
+*previous round's remediation*. That pattern is the finding behind the findings.
+
+- **K1 (major, FIXED here)** — the C1 fix did not do what it claimed. In a `<rev>:<path>`
+  spec the path resolves against the **repository top level**, not against `git -C`. So
+  `committedUnchanged` read `<root>/pipeline.user.yaml` but compared it against the TOP
+  LEVEL's blob — the same file only when `root` *is* the top level. Two consequences, one
+  fail-open: in a checkout holding more than one project root an agent could copy the root's
+  committed `chat` file into a sub-project and have it accepted as "unchanged" though it was
+  never committed there, reopening the exact C1 escalation; and the mirror case, a
+  sub-project that legitimately committed its own copy could never reach `chat`. Not
+  reachable in this repository (project dir is the top level, mode is `signature`), but
+  `pipeline-core` ships to other projects, so the defect shipped. Now resolved against the
+  actual top level; CHP24 pins the borrowed-blob case and CHP25 the mirror, so the fix
+  cannot degrade to "always false".
+- **K2 (major, FIXED here)** — the false C1 claim survived verbatim in
+  `guard-testpath-override.test.mjs`'s header, 260 lines above the very tests premised on
+  its opposite. C4 was raised and fixed for exactly this defect class one round earlier and
+  this instance was missed: the correction had been applied to one file, not to the finding.
+- **K3 (major, PARTLY fixed)** — this register's account of the trailer cleanup. Corrected
+  above; the remaining duplicate-marker cleanup is the PO's.
+- **K4, K5 (minor, FIXED here)** — two more register claims stronger than the artefacts.
+- **K6, K7 (minor, FIXED here)** — GST17's honesty note was incomplete, and
+  `guard-testpath.mjs` still carried an absolute "can only strengthen, never weaken" that
+  its own implementation contradicts. K7 is the same overselling shape that caused C1, in
+  the same spot.
+
+The T3 Critic's coverage boundary: it ran no suite, armed no capability and executed no
+write, so K1 rests on Git's documented rev-spec semantics plus four read-only probes rather
+than on a demonstrated bypass; it hash-verified but did **not read** the Spec or four of the
+five guardrail files, and read none of ADR-0012/0014/0055/0056; and it could not verify that
+the TP-5 lift happened as recorded, since a lift leaves no artefact by design.
+
 ### Open
 
 - **GIT-03 violated on every commit this session — a REPEAT of an already-fixed defect.**
@@ -326,15 +370,24 @@ link separately instead, because doing so would breach its read-only contract.
   remaining **21 are unpushed** and can still be cleaned by the same `filter-branch`
   remedy, which is the PO's hand in their own terminal, not the agent's. Going forward this
   session uses `AI-Assisted: true` and no session URL.
-  **Resolved (2026-08-06):** the PO ran the cleanup in two passes. The first pass removed
-  both forbidden trailers but left 21 commits with **no** `AI-Assisted:` marker at all —
-  `sed`'s `d` command starts the next cycle and discards the queued `$a` append, so on every
-  message that *ended* with the deleted line the marker was never added. Caught by counting
-  (64 commits, only 42 carrying the marker) rather than by a gate. A second pass appended
-  the marker only where absent. Final state on the unpushed range: **64/64 carry
-  `AI-Assisted: true`, 0 session URLs, 0 provider co-author trailers**, and
-  `git diff` against the pre-rewrite tip is empty — content byte-identical, messages only.
-  The 53 already-published commits are untouched and stay as they are.
+  **Substance resolved, form still defective (2026-08-06):** the PO ran the cleanup in two
+  passes. Pass 1 removed both forbidden trailers but left 22 commits with **no**
+  `AI-Assisted:` marker at all — `sed`'s `d` starts the next cycle and discards the queued
+  `$a` append, so every message that *ended* with a deleted line silently lost it. Caught by
+  counting (63 commits then, only 42 carrying the marker), not by a gate. Pass 2 appended
+  the marker only where absent, which fixed those 22.
+  **What pass 1 also did, and this register missed until the T3 Critic raised it as K3:** it
+  appended the marker *unconditionally* to every message whose last line it had NOT deleted
+  — including the commits that already ended with `AI-Assisted: true`. So **42 of the 64
+  commits now carry the trailer twice.** Verified: `1d444b2` and `33f5796` both print
+  `true|true` under `%(trailers:key=AI-Assisted)`, and `33f5796`'s own body claims to be
+  "the first to carry the correct trailer" while carrying it doubled.
+  What IS true: **0 session URLs, 0 provider co-author trailers, 64/64 carry the marker at
+  least once**, and `git diff` against the pre-rewrite tip is empty — content byte-identical,
+  messages only. The GIT-03 *substance* (no correlation data) is met; the duplication is a
+  GIT-01 parseability defect, not a privacy one, which is why it is not a blocker. **Open,
+  PO action:** one more `--msg-filter` pass to collapse consecutive duplicate markers before
+  these 42 commits are pushed. The 53 already-published commits are untouched.
 - **PG12c — CLOSED under an explicit PO lift of TP-5.** The C1 fix landed on a fixture that
   encoded the old contract: PG12c wrote `push_approval: chat` into `pipeline.user.yaml`
   **without committing it** and asserted the push was allowed, i.e. it asserted precisely

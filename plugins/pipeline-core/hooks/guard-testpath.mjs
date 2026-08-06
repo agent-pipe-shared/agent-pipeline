@@ -221,9 +221,12 @@ if (matched) {
   // that, since an interpreter fed inline code is opaque to a guard reading a command line.
   //
   // What makes this a gate is therefore NOT the shell lane. It is that readPushApprovalMode
-  // ignores a working-tree copy that differs from HEAD and returns the strongest mode
-  // instead, so an in-session write can only strengthen this gate, never weaken it. See the
-  // reasoning, and the honest residual, on committedUnchanged in critical-human-proof-policy.
+  // ignores a working-tree copy that differs from the blob committed at that file's own
+  // path, and returns the strongest mode instead. So an in-session WRITE cannot weaken this
+  // gate -- but a write followed by a COMMIT can, and saying "can only strengthen, never
+  // weaken" without that qualifier is the same overselling that produced C1 in this exact
+  // spot. What the commit costs an agent is invisibility, not capability. Full reasoning on
+  // committedUnchanged in critical-human-proof-policy.
   let approvalMode = "signature";
   try { approvalMode = readPushApprovalMode(projectDir)?.mode ?? "signature"; } catch { approvalMode = "signature"; }
   const overrideAdmitted = approvalMode === "chat";

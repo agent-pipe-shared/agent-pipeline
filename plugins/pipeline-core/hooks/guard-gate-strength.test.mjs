@@ -252,8 +252,16 @@ try {
     // What is actually checked now: both lanes refuse every path in the table. That can
     // fail -- if the shell lane stopped deriving its needles from GATE_STRENGTH_PATHS, or
     // a rule were added whose exact path the write lane matches but whose spelling the
-    // shell lane misses, this goes red. It still cannot catch a tier that is in NEITHER
-    // lane, which is why GST18 names the tiers explicitly rather than deriving them.
+    // shell lane misses, this goes red.
+    //
+    // Its limits, stated in full because the T3 Critic found the earlier version of this
+    // note too generous (K6). It cannot catch a tier absent from BOTH lanes, and -- the
+    // case that matters, since it is F5's own shape -- it cannot catch a tier the SHELL
+    // lane refuses while the write lane does not. The shell needle is
+    // `basename(rule.path)`, so `guard-config.json` covers both `project/` and `.claude/`
+    // spellings whether or not the table lists them, and only paths already in the table
+    // are iterated here. GST18 names the tiers explicitly for exactly that reason, and the
+    // write-lane half below largely duplicates GST01.
     const root = governed();
     for (const rule of GATE_STRENGTH_PATHS) {
       const write = spawnSync(process.execPath, [GUARD], {

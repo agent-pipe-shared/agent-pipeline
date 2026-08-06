@@ -16,9 +16,19 @@
  * Only an explicit `chat` admits the audited capability, and then the refusal says on its
  * face that it is attribution rather than proof.
  *
- * The setting lives in `pipeline.user.yaml`, which GS-1 refuses to the agent through both
- * the write lane and (since efe452c) the shell lane. That is what makes this a gate: an
- * agent cannot reach `chat` by writing it.
+ * The setting lives in `pipeline.user.yaml`. This header used to claim that GS-1 refuses
+ * that file "through both the write lane and the shell lane", so an agent could not reach
+ * `chat` by writing it. That was the T2 Critic's C1 blocker and it is false: the shell lane
+ * matches the literal filename in the command text, so a name assembled at runtime walks
+ * past it, and no string matching fixes that. The correction landed in guard-testpath.mjs
+ * but this copy of the claim survived, which the T3 Critic then found as K2 -- the same
+ * sentence, still asserting the wrong mechanism, in the very suite that tests it.
+ *
+ * What actually makes this a gate: `readPushApprovalMode` refuses to trust a working-tree
+ * copy that differs from the blob committed at that file's own path, and returns the
+ * strongest mode instead. An in-session write therefore cannot weaken this gate -- though a
+ * write FOLLOWED BY A COMMIT can, which is recorded rather than papered over. OT15..OT18
+ * below exercise exactly that boundary.
  *
  * Lives in its own file because `guard-testpath.test.mjs` is TP-2 protected.
  */
