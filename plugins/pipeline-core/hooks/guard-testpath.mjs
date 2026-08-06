@@ -96,6 +96,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readPushApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import {
   consumeHumanGuardOverride,
   recordHumanGuardDenial,
@@ -200,11 +201,27 @@ const matched = PROTECTED_PATHS.find((rule) => rule.re.test(normalizedPath));
 if (matched) {
   const denials = [{ guard: "guard-testpath.mjs", reason: `${matched.id}: ${matched.reason}` }];
 
+  // Which clearances count is one setting, and it is not this guard's to decide
+  // (ADR-0056). `signature` -- the value here and the fail-closed default for anything
+  // unreadable or unrecognised -- means an in-session capability is NOT a clearance:
+  // the v2 protocol's activation step is an ordinary command, and a ready session may run
+  // ordinary commands, so an agent could arm its own override and the refusal below would
+  // be theatre. Only `chat` admits it, and then it is labelled for what it is.
+  //
+  // The setting lives in pipeline.user.yaml, which GS-1 refuses to the agent through both
+  // the write lane and the shell lane. That is what makes this a gate rather than a
+  // request: an agent cannot reach `chat` by writing it.
+  let approvalMode = "signature";
+  try { approvalMode = readPushApprovalMode(projectDir)?.mode ?? "signature"; } catch { approvalMode = "signature"; }
+  const overrideAdmitted = approvalMode === "chat";
+
   let consumed = { status: "absent" };
-  try {
-    consumed = consumeHumanGuardOverride({ rootDir: projectDir, pluginRoot: PLUGIN_ROOT, toolName, toolInput, denials });
-  } catch {
-    consumed = { status: "absent" }; // an unusable capability is not an authorization
+  if (overrideAdmitted) {
+    try {
+      consumed = consumeHumanGuardOverride({ rootDir: projectDir, pluginRoot: PLUGIN_ROOT, toolName, toolInput, denials });
+    } catch {
+      consumed = { status: "absent" }; // an unusable capability is not an authorization
+    }
   }
   if (consumed.status === "consumed") {
     process.stderr.write(
@@ -216,7 +233,7 @@ if (matched) {
   // Offering the route is a convenience, never a gate: if the request cannot be recorded
   // the refusal still stands, it just carries no copyable next step.
   let overrideGuidance = "";
-  if (consumed.status === "absent" || consumed.status === "replan") {
+  if (overrideAdmitted && (consumed.status === "absent" || consumed.status === "replan")) {
     try {
       const planned = recordHumanGuardDenial({ rootDir: projectDir, pluginRoot: PLUGIN_ROOT, toolName, toolInput, denials });
       if (planned.status === "planned") {
@@ -235,9 +252,15 @@ if (matched) {
     `File: ${filePath}`,
     `Why: an implementing Goldfish MUST NOT modify, weaken, skip or delete the tests/checks ` +
       `that gate its own implementation (QG-04 / roles/goldfish.md GF-04). A genuine test ` +
-      `change is its own, explicitly briefed task — either take the audited override below, ` +
-      `or the PO edits ${guardConfigRelPath} (or the test file itself) directly, outside ` +
-      `this session.`,
+      `change is its own, explicitly briefed task.`,
+    overrideAdmitted
+      ? `Clearance: gates.push_approval is "chat", so an in-session audited override is ` +
+        `admitted for this exact edit — see below. It is attribution, not proof.`
+      : `Clearance: gates.push_approval is "${approvalMode}", so no in-session override is ` +
+        `admitted — the v2 activation step is an ordinary command and a ready session may ` +
+        `run ordinary commands, so accepting it here would let an agent clear its own gate. ` +
+        `The PO edits ${guardConfigRelPath} (or the test file itself) directly, outside ` +
+        `this session.`,
     overrideGuidance,
   ]);
 }
