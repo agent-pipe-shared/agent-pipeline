@@ -57,12 +57,83 @@ guessed past: `specs/sprint-nova-epic/plans/nova-b-readiness-2026-08-06.md`
 2026-08-09 disposition-renewal deadline, an ADR-0047 numbering collision
 found in passing, and a per-slice status table.
 
-A wider backlog reconciliation pass (five parallel read-only investigation
-agents across the ~24 other open items, checking each against today's
+**Wider backlog reconciliation, completed.** Five parallel read-only
+investigation agents checked the ~24 other open items against today's
 guard/push/authority-tier work for the same "already fixed, never closed"
-pattern) was dispatched and is recorded separately once it completes, per
-this same evening's session; see the entry immediately below if it landed
-before this one, or the next session's entry if it lands after.
+pattern the release blocker turned out to be an instance of. Net result,
+independently re-verified before each action (never trusted on an agent's
+word alone) and recorded across commits `5b02cb3`, `14f61be`, `bee2f41`,
+`80d790d`, with the investigation evidence in
+`backlog/evidence/2026-08-06-second-reconciliation-pass.md` and
+`.../2026-08-06-third-reconciliation-pass.md`:
+
+- **6 items closed** as already-fixed-but-never-reconciled:
+  `po-gate-authority-path-canonicalization`,
+  `ready-gate-env-var-runner-authority`,
+  `pipeline-state-rebind-codex-default-runner`,
+  `setup-mjs-marketplace-name-collision-defeats-local-dev-installs`,
+  `windows-verify-brittle-test-hygiene`,
+  `close-spec-retention-and-consent`. Four of the six already carried a
+  written, evidenced Triage naming the fixing commit — only the frontmatter
+  `status:` field and the ledger had never been updated to match, the same
+  narrow process gap the onboarding-runner item surfaced.
+- **1 item closed** by executing its own proposal:
+  `adr-0051-follow-up-gaps-untracked` asked for two dated tracking items
+  referencing ADR-0051; both were created
+  (`onboarding-ready-path-unconditional-restart-barrier-read`,
+  `native-windows-verify-red-suite-class`) after confirming ADR-0057 (which
+  landed after this item was filed) does not itself close the loop.
+- **5 items narrowed** to their genuine remaining scope, each with an
+  evidence-backed Triage: `critical-human-proof-not-wired-to-push-and-prd-gates`
+  (push half resolved by ADR-0055/0056; only PRD/`approve-plan` proof
+  binding remains), `unified-human-authorization-ux` (same ADRs deliver
+  push/deploy migration; PRD/publication/adapter-inventory gaps remain,
+  named explicitly), `claude-dir-leftovers-defeat-runner-neutral-project-migration`
+  (the fail-closed drift check landed; doc-repointing narrowed to 5 exact
+  files), `neutral-authority-tier-is-a-frozen-snapshot-the-compiler-never-updates`
+  (3 of 4 proposal steps delivered same-session; only ADR-0054 step 3
+  remains), `no-gate-is-tested-end-to-end-for-satisfiability` (credited
+  `lifecycle-gate-satisfiability.test.mjs` as a first delivered instance of
+  its own proposal).
+- **1 flake root-caused, fix drafted but not applied:**
+  `local-worker-supervisor-cli-suite-flakes-under-full-verify` — reproduced
+  deterministically (6 concurrent suite copies, 1/6 failed), traced to a
+  torn-read race in the *test's own* polling helper against a non-atomic
+  first write in production code (every real reader already tolerates this
+  via `readBoundedJson`; the test helper does not). The two-line try/catch
+  fix is recorded in the item, but `plugins/pipeline-core/**` is this
+  session's live enforcing plugin root (self-application: checkout and
+  installed copy coincide), and **GS-6 refused the edit with no in-session
+  override, by design** — needs the PO editing outside a session, per GS-6's
+  own stated escape hatch.
+- **2 items flagged, deliberately not resolved either way:**
+  `spec-retention-on-close` (4 of 5 acceptance criteria delivered; narrowed
+  to the one remaining transfer-time classification gap; its `expires`
+  date has already passed) and
+  `guard-lifecycle-ready-blocks-claude-memory-writes` (technical gap
+  reconfirmed unchanged; **a citation gap found and flagged** — the item
+  cites a 2026-07-29 PO decision "recorded `docs/state.md`" that an
+  extensive multi-term search plus `git log -S` could not locate; not
+  overridden, just surfaced for re-confirmation).
+- **Remaining ~10 items** (Sentinel-recovery-era stubs with an existing
+  "functionally complete, release-pending" PO disposition elsewhere —
+  `dual-channel-publication`, `stateful-design-contract-template`,
+  `managed-onboarding-success-contract`, `regulated-document-hooks`,
+  `documentation-information-architecture` — plus
+  `recovery-preview-ack-unstable-getter-poisons-replay-ledger`,
+  `runtime-projection-v2-eager-manifest-load`,
+  `local-plugin-install-attestation-does-not-bind-external-marketplace-root`,
+  `po-gate-authority-receipt-readback`,
+  `claude-has-no-start-time-opt-in-adoption-path`) were investigated by the
+  same five agents and confirmed either accurately scoped already or
+  genuinely a PO call (the Sentinel-stub cluster needs one bulk decision:
+  execute their long-deferred HAW-E closure batch now that the product line
+  has moved well past the `0.4.0` baseline they were written against, or
+  decide otherwise) — **not edited**, to stop at a defensible boundary
+  rather than grind every last item at declining evidence quality this deep
+  into an unattended session. Their individual findings are not
+  transcribed here; re-run the same investigation pattern if picked up
+  next, rather than trusting this summary as a substitute.
 
 ## 2026-08-06 Nova II (evening) — the guards that were never running
 
