@@ -275,7 +275,14 @@ FAIL**, five findings.
   that writes *and commits* makes the two agree again. What it loses is invisibility — the
   change becomes a diffable commit inside the candidate the push request binds to. This
   lowers an unobservable flip to a recorded one; it does not make the file unreachable.
-  **Operator consequence:** setting `chat` now requires committing it.
+  **Operator consequence:** setting `chat` now requires committing it. Checked afterwards,
+  because the fix would be wrong if the file were a local-only user file: `setup.mjs` calls
+  `pipeline.user.yaml` "the committed TEMPLATE state" and "the portable project source" and
+  already reasons about it being "no longer byte-identical to the committed V3 source", and
+  nothing ignores it here. So the fix follows the existing design rather than imposing a new
+  expectation. The honest edge it does introduce: a consumer with no Git repository at all,
+  or who deliberately ignores the file, can no longer reach `chat` — fail-closed, pinned by
+  CHP23, and defensible, but a real behaviour change for that setup.
 - **C2 (minor, FIXED in `d3cf7ed`)** — GST17 derived a basename from `GATE_STRENGTH_PATHS`
   and then searched that same array for a covering rule, so it could not fail; deleting
   GS-7 left it byte-identical in outcome. It was named for F5 and could not have caught F5.
