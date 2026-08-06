@@ -202,6 +202,7 @@
         "lifecycle": "review-candidate",
         "paths": [
           "docs/codex-isolated-critic-foundation.md",
+          "docs/handover-0.5.2-findings.md",
           "docs/known-issues.md"
         ]
       },
