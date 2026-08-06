@@ -96,12 +96,15 @@ marketplace root via `..`; a nested sibling has no other way to reach
 `plugins/pipeline-core`). Pick any convenient location, for example a sibling
 of the checkout itself, and record its path as `<local-marketplace-root>`.
 
+**Use a copy, not a symlink or junction.** This is load-bearing; see "Why a
+copy and not a link" below.
+
 Unix / macOS / Unix-WSL:
 
 ```text
 mkdir -p <local-marketplace-root>/.claude-plugin
 mkdir -p <local-marketplace-root>/plugins
-ln -s <absolute-checkout-root>/plugins/pipeline-core <local-marketplace-root>/plugins/pipeline-core
+cp -a <absolute-checkout-root>/plugins/pipeline-core <local-marketplace-root>/plugins/pipeline-core
 ```
 
 Native Windows (no elevation required):
@@ -109,21 +112,24 @@ Native Windows (no elevation required):
 ```text
 mkdir <local-marketplace-root>\.claude-plugin
 mkdir <local-marketplace-root>\plugins
-mklink /J <local-marketplace-root>\plugins\pipeline-core <absolute-checkout-root>\plugins\pipeline-core
+robocopy <absolute-checkout-root>\plugins\pipeline-core <local-marketplace-root>\plugins\pipeline-core /MIR
 ```
+
+`robocopy` exits with a status below 8 on success, which some shells report as
+a failure; treat only exit codes >= 8 as errors.
 
 Write `<local-marketplace-root>/.claude-plugin/marketplace.json`:
 
 ```json
 {
   "name": "agent-pipeline-local",
-  "description": "Local development marketplace root for agent-pipeline, symlinked to a checkout.",
+  "description": "Local development marketplace root for agent-pipeline, holding a copy of a checkout's plugin tree.",
   "owner": { "name": "agent-pipeline" },
   "plugins": [
     {
       "name": "pipeline-core",
       "source": "./plugins/pipeline-core",
-      "description": "Local-development candidate, symlinked/junctioned to a real checkout."
+      "description": "Local-development candidate, copied from a real checkout."
     }
   ]
 }
@@ -131,10 +137,59 @@ Write `<local-marketplace-root>/.claude-plugin/marketplace.json`:
 
 `claude plugin validate <local-marketplace-root>` should pass (this exact
 shape was confirmed by probe 2 in ADR-0052). Switching which checkout the
-local root serves is then a matter of repointing the symlink/junction to a
-different checkout's `plugins/pipeline-core` and restarting the session — the
-marketplace registration itself (`agent-pipeline-local`, pointed at
+local root serves means re-copying from that checkout's `plugins/pipeline-core`
+— the marketplace registration itself (`agent-pipeline-local`, pointed at
 `<local-marketplace-root>`) does not need to be removed and re-added.
+
+## Why a copy and not a link
+
+Both halves of this were measured on 2026-08-06, on a root whose
+`plugins/pipeline-core` was a symlink into the checkout.
+
+**A link silently disarms the guards.** Node resolves symlinks when it resolves
+a module, so `import.meta.url` is the real path while `process.argv[1]` stays
+the path the caller typed. Every `invokedDirectly` comparison went false, and
+each affected script exited 0 having done nothing. For a CLI that is merely
+broken; for a `PreToolUse` guard, **exit 0 is "allow"**. Six wired hooks —
+including `guard-lifecycle-ready.mjs`, the gate that admits writes at all — and
+the mandatory `pipeline-start-preflight.mjs` were dead in that layout, and the
+session that found it had been running unguarded from its first tool call.
+`guard-lifecycle-ready.mjs --runner bogus`, an input that must fail closed,
+returned 0 through the link and 2 through the real path.
+
+The entrypoint resolver was subsequently made symlink-proof
+(`lib/entrypoint.mjs`, gated by `entrypoint-reachability-tests`, which executes
+the wired hooks and the bootstrap chain through a real symlink). A copy is
+still the correct arrangement, because of the second half:
+
+**A link collapses the distinction GS-6 depends on.** `guard-gate-strength.mjs`
+refuses agent writes into the plugin root that is currently enforcing, and
+deliberately leaves a source checkout's own `plugins/pipeline-core/` writable —
+in development the enforcing copy is the installed one, and the repository copy
+is ordinary product source under Verify, Critic and the PO gate. When the
+installed copy *is* the checkout, those are the same files: GS-6 then refuses
+every agent edit under `plugins/pipeline-core/`, which is most of this
+repository's work. Keeping them physically distinct is what makes both
+properties true at once.
+
+## Refresh the local build after a change
+
+The copy does not follow the checkout. After changing plugin code:
+
+```text
+cp -a <absolute-checkout-root>/plugins/pipeline-core <local-marketplace-root>/plugins/
+claude plugin update pipeline-core@agent-pipeline-local --scope local
+```
+
+Then reload or restart per "The cachebuster mechanism" below. Guard *scripts*
+are re-read on every invocation, so a refreshed copy takes effect for them
+immediately; `hooks.json` is read once at session start, so a change to the
+wiring itself needs a new session.
+
+This refresh is deliberately an operator action taken outside an agent session:
+an agent session may not write into the plugin root that is enforcing its own
+guards, and `guard-lifecycle-ready.mjs` refuses cross-repository mutation
+(`GUARD-CROSS-REPO-MUTATION`) for the same reason.
 
 ## The cachebuster mechanism and version convention
 
@@ -157,12 +212,18 @@ the versioned cache directory above. They do **not** hold for a
 **directory-sourced** marketplace such as the local development root: after
 `/reload-plugins`, this session served the `conventional-commit` skill from
 `<local-marketplace-root>/plugins/pipeline-core/skills/conventional-commit`
-— i.e. live, straight through the symlink into the working tree — whereas at
-session start the same skill came from
+— i.e. live, straight out of the marketplace root — whereas at session start
+the same skill came from
 `~/.claude/plugins/cache/agent-pipeline-local/pipeline-core/0.5.1/skills/…`.
-A directory source therefore follows the checkout, and the cachebuster's role
-for it is to make the *registry* agree with the tree, not to freeze the code
-a session runs.
+A directory source therefore follows **the marketplace root**, and the
+cachebuster's role for it is to make the *registry* agree with that root, not
+to freeze the code a session runs.
+
+That measurement was taken while the root held a symlink into the checkout, so
+"follows the marketplace root" and "follows the checkout" were indistinguishable
+at the time. With the copy arrangement this document now prescribes they are
+not: the marketplace root follows the checkout only when you re-copy it, which
+is the point — see "Refresh the local build after a change" above.
 
 Two practical consequences: `/reload-plugins` is sufficient for a
 directory-sourced local build and **no session restart is required** (a restart
@@ -258,11 +319,11 @@ the single checkout it applies to, and it does not affect any other checkout
 on the host. A marketplace declaration, by contrast, lives at `--scope user`
 in `~/.claude/settings.json` and is host-wide: every repository on the host
 can see the marketplace, but only repositories with their own install and
-enablement actually load the plugin. The local marketplace root and the
-symlink/junction it contains are what let a single `agent-pipeline-local`
-registration serve any checkout on the host: switching which checkout is the
-development source means repointing that symlink/junction and restarting the
-session, not removing and re-adding the marketplace declaration.
+enablement actually load the plugin. The local marketplace root is what lets a
+single `agent-pipeline-local` registration serve any checkout on the host:
+switching which checkout is the development source means re-copying that
+checkout's `plugins/pipeline-core` into the root and restarting the session,
+not removing and re-adding the marketplace declaration.
 
 ## Exit / retire local test mode
 
