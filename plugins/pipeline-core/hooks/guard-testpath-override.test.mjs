@@ -28,10 +28,20 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  authorizeHumanGuardOverride,
+  planHumanGuardOverride,
+  prepareHumanGuardOverrideAuthorization,
+  recordHumanGuardDenial,
+} from "../lib/human-guard-override.mjs";
 
 const HOOKS = dirname(fileURLToPath(import.meta.url));
 const GUARD = join(HOOKS, "guard-testpath.mjs");
+const PLUGIN_ROOT = join(HOOKS, "..");
+const OVERRIDE_SCRIPT = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
 const PROTECTED = "harness/scripts/verify.mjs";
+/** Exactly the denial string guard-testpath builds from the fixture config: `<id>: <reason>`. */
+const TP3_DENIAL = "TP-3: the single verify-gate script";
 const roots = [];
 
 /** `mode: null` writes no pipeline.user.yaml at all -- the fail-closed default path. */
@@ -67,6 +77,39 @@ function ask(root, filePath) {
     env: { ...process.env, CLAUDE_PROJECT_DIR: root },
   });
   return { blocked: result.status !== 0, status: result.status, stderr: result.stderr ?? "" };
+}
+
+/**
+ * Arm a real one-time capability through the whole v2 chain, exactly as the human would:
+ * denial -> plan -> prepare-authorization -> authorize --activate.
+ *
+ * Driven through the library rather than the CLI so a failure names the step that broke.
+ * Every digest below is part of the binding, so anything the guard hashes differently --
+ * tool name, tool input, denial string, plugin identity -- yields a capability the guard
+ * will not accept, which is the property OT11 exercises.
+ */
+function arm(root, toolInput, denialReason, { toolName = "Edit" } = {}) {
+  const denials = [{ guard: "guard-testpath.mjs", reason: denialReason }];
+  const shared = { rootDir: root, pluginRoot: PLUGIN_ROOT, scriptPath: OVERRIDE_SCRIPT };
+  const recorded = recordHumanGuardDenial({ ...shared, toolName, toolInput, denials });
+  assert.equal(recorded.status, "planned", `denial not plannable: ${JSON.stringify(recorded)}`);
+  const { requestSha256 } = recorded;
+  const planned = planHumanGuardOverride({ ...shared, requestSha256 });
+  const reason = "briefed test-change task";
+  const prepared = prepareHumanGuardOverrideAuthorization({
+    ...shared, requestSha256, planSha256: planned.planSha256, reason,
+  });
+  const armed = authorizeHumanGuardOverride({
+    ...shared,
+    requestSha256,
+    planSha256: planned.planSha256,
+    selectionSha256: prepared.selectionSha256,
+    reason,
+    reasonSha256: prepared.reasonSha256,
+    activate: true,
+  });
+  assert.equal(armed.status, "armed");
+  return { planSha256: planned.planSha256, requestSha256 };
 }
 
 let passed = 0;
@@ -145,6 +188,89 @@ try {
     { encoding: "utf8" }).stdout);
     assert.match(source, /USER_SOURCE_PATH/u);
     assert.match(source, /gates\?\.push_approval/u);
+  });
+
+  // ---- F3: the allow path, which no test walked until now -------------------------
+
+  check("OT10 an armed capability admits exactly the edit it was bound to", () => {
+    const root = fixture({ mode: "chat" });
+    assert.equal(ask(root, PROTECTED).blocked, true, "precondition: refused while unarmed");
+    arm(root, { file_path: PROTECTED }, TP3_DENIAL);
+    const { blocked, status, stderr } = ask(root, PROTECTED);
+    assert.equal(blocked, false, `armed capability did not admit the edit (exit ${status}):\n${stderr}`);
+    assert.match(stderr, /\[pipeline-human-override\] guard-testpath TP-3/u);
+    assert.match(stderr, /capability consumed/u);
+  });
+
+  check("OT11 a capability bound to a different edit does not admit this one", () => {
+    // The binding is the whole point: arming for file A must not open file B. Both are
+    // TP-3 matches here, so only the tool-input digest separates them.
+    const root = fixture({ mode: "chat" });
+    arm(root, { file_path: PROTECTED }, TP3_DENIAL);
+    const other = "nested/harness/scripts/verify.mjs";
+    const { blocked, stderr } = ask(root, other);
+    assert.equal(blocked, true, "a capability bound elsewhere admitted this edit");
+    assert.match(stderr, /Rule ID: TP-3/u);
+    assert.doesNotMatch(stderr, /capability consumed/u);
+  });
+
+  check("OT12 the capability is single-use: the same edit is refused again", () => {
+    const root = fixture({ mode: "chat" });
+    arm(root, { file_path: PROTECTED }, TP3_DENIAL);
+    assert.equal(ask(root, PROTECTED).blocked, false, "precondition: first use is admitted");
+    const { blocked, stderr } = ask(root, PROTECTED);
+    assert.equal(blocked, true, "a consumed capability was accepted a second time");
+    assert.doesNotMatch(stderr, /capability consumed/u);
+  });
+
+  check("OT13 signature mode ignores an armed capability entirely", () => {
+    // The mode gate must sit in front of the capability, not beside it. Arming happens in
+    // a chat-mode fixture, then the setting is flipped to signature under the same store.
+    const root = fixture({ mode: "chat" });
+    arm(root, { file_path: PROTECTED }, TP3_DENIAL);
+    writeFileSync(join(root, "pipeline.user.yaml"),
+      'schema: "pipeline.user.v3"\ngates:\n  push_approval: "signature"\n');
+    const { blocked, stderr } = ask(root, PROTECTED);
+    assert.equal(blocked, true, "signature mode consumed a capability it must not consult");
+    assert.match(stderr, /no in-session override is admitted/u);
+    assert.doesNotMatch(stderr, /capability consumed/u);
+  });
+
+  check("OT14 a protected test path under plugins/pipeline-core gets no plain route", () => {
+    // Not a defect of this guard, but a coverage boundary worth pinning: eligibility treats
+    // every `plugins/pipeline-core/**` write as Pipeline-author repair, which needs an
+    // explicit source root and so never reaches "planned". In THIS repository that is four
+    // of the five TP entries -- TP-1, TP-2, TP-4, TP-5 -- leaving TP-3 the only one the
+    // override can serve. If eligibility ever changes, this check is where it surfaces.
+    const root = mkdtempSync(join(tmpdir(), "testpath-override-src-"));
+    roots.push(root);
+    mkdirSync(join(root, "project"), { recursive: true });
+    writeFileSync(join(root, "project", "guard-config.json"), JSON.stringify({
+      protectedTestPaths: [
+        { id: "TP-2", pattern: "plugins/pipeline-core/hooks/guard-testpath\\.test\\.mjs$", reason: "gates this very guard" },
+        { id: "TP-3", pattern: "harness/scripts/verify\\.mjs$", reason: "the single verify-gate script" },
+      ],
+    }));
+    writeFileSync(join(root, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "chat"\n');
+    spawnSync("git", ["init", "-q", root], { encoding: "utf8" });
+    spawnSync("git", ["-C", root, "config", "user.email", "fixture@example.invalid"]);
+    spawnSync("git", ["-C", root, "config", "user.name", "fixture"]);
+    spawnSync("git", ["-C", root, "add", "-A"]);
+    spawnSync("git", ["-C", root, "commit", "-qm", "fixture"]);
+
+    const source = ask(root, "plugins/pipeline-core/hooks/guard-testpath.test.mjs");
+    assert.equal(source.blocked, true);
+    assert.match(source.stderr, /Rule ID: TP-2/u);
+    assert.doesNotMatch(source.stderr, /--request-sha256\s+\S/u,
+      "a plain override route was offered for a Pipeline-source path");
+
+    // The differential half: the SAME fixture, same mode, same store -- only the path
+    // differs. Without this, "no route" could just as well mean "this fixture never
+    // produces one", and the check above would pass for the wrong reason.
+    const ordinary = ask(root, PROTECTED);
+    assert.equal(ordinary.blocked, true);
+    assert.match(ordinary.stderr, /--request-sha256\s+[a-f0-9]{64}\b/u,
+      "the fixture produces no route at all, so the assertion above proves nothing");
   });
 
   console.log(`\nguard-testpath-override: ${passed} passed, ${failed} failed`);
