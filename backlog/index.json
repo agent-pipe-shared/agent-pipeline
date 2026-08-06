@@ -3,21 +3,25 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "c312a267810b2c091028f7d8cdd68450fb1764b358aaa7a4587605d298c7b27e"
+    "transitionHead": "91dc1318343228088a843a0ea2e528ea14e65c7205a5dc4d5eb343f45b4b9ffa"
   },
   "counts": {
-    "open": 20,
+    "open": 21,
     "in_progress": 21,
-    "closed": 18
+    "closed": 19
   },
   "items": [
     {
       "id": "pipeline.adr-0051-follow-up-gaps-untracked",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-05",
-      "source": "T1 Critic review (Opus, functional-equivalent-read-only) of commits 7f5ac97/d622dc3/9429b94/b14391c, finding F5, Sprint Nova session 2026-08-04/05"
+      "source": "T1 Critic review (Opus, functional-equivalent-read-only) of commits 7f5ac97/d622dc3/9429b94/b14391c, finding F5, Sprint Nova session 2026-08-04/05",
+      "closedAt": "2026-08-06",
+      "closureRepository": "self",
+      "closureCommit": "bee2f41a3498a65412284f7786d406188288261b",
+      "closureEvidence": "backlog/evidence/2026-08-06-third-reconciliation-pass.md"
     },
     {
       "id": "pipeline.afk-assumption-mode",
@@ -216,6 +220,14 @@
       "source": "Public transfer completeness review of post-v0.3 Multi-CLI design and measurement work"
     },
     {
+      "id": "pipeline.native-windows-verify-red-suite-class",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "ADR-0051 Follow-up section names this as one of two gaps to track as a dated backlog item; created per backlog/items/2026-08-05-adr-0051-follow-up-gaps-untracked.md's proposal, executed 2026-08-06 night autonomous backlog reconciliation."
+    },
+    {
       "id": "pipeline.neutral-authority-tier-is-a-frozen-snapshot-the-compiler-never-updates",
       "status": "open",
       "type": "defect",
@@ -263,6 +275,14 @@
       "closureRepository": "self",
       "closureCommit": "c860e1dd5bb11f2f02c5d9ade2aeb84c1787107a",
       "closureEvidence": "backlog/evidence/2026-08-06-onboarding-runner-identity-reverification.md"
+    },
+    {
+      "id": "pipeline.onboarding-ready-path-unconditional-restart-barrier-read",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "ADR-0051 Follow-up section names this as one of two gaps to track as a dated backlog item; created per backlog/items/2026-08-05-adr-0051-follow-up-gaps-untracked.md's proposal, executed 2026-08-06 night autonomous backlog reconciliation."
     },
     {
       "id": "pipeline.pipeline-state-rebind-codex-default-runner",

@@ -3,10 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.adr-0051-follow-up-gaps-untracked
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-05
 source: "T1 Critic review (Opus, functional-equivalent-read-only) of commits 7f5ac97/d622dc3/9429b94/b14391c, finding F5, Sprint Nova session 2026-08-04/05"
-due: 2026-09-05
+closed_at: 2026-08-06
+closure_repository: self
+closure_commit: bee2f41a3498a65412284f7786d406188288261b
+closure_evidence: backlog/evidence/2026-08-06-third-reconciliation-pass.md
 ---
 
 # ADR-0051's own gap-tracking mechanism was never instantiated
@@ -56,7 +59,21 @@ and native-Windows Verify red suites).
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, delivered, closed.
+- **Rationale:** proposal steps 1-2 executed 2026-08-06 night: two dated,
+  owned, 30-day-expiry items created referencing this ADR by number —
+  `backlog/items/2026-08-07-onboarding-ready-path-unconditional-restart-barrier-read.md`
+  and
+  `backlog/items/2026-08-07-native-windows-verify-red-suite-class.md`.
+  Checked first whether [ADR-0057](../../docs/adr/0057-runner-platform-support-is-an-implementation-obligation.md)
+  (landed after this item was filed) already resolved either gap: read in
+  full, confirmed it addresses a different question (the definition of
+  ADR-0051's "support" clause) and restates the same "tracked, unchanged"
+  language for the Windows red-suite class without naming a concrete item
+  either — i.e. it does not close this loop, and the two new items are
+  still needed. Step 3 (the next triage sweep deciding
+  accepted/deferred/rejected for each) is for a future session, per this
+  item's own proposal — this item's job was only to create them.
+- **Assignment (if accepted):** the two new items are unassigned, awaiting
+  their own first triage.
+- **Date:** 2026-08-06

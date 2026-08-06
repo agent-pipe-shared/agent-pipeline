@@ -5,7 +5,7 @@
 
 | ID | Status | Type | Owner | Created | Tracking |
 | --- | --- | --- | --- | --- | --- |
-| pipeline.adr-0051-follow-up-gaps-untracked | open | defect | pipeline | 2026-08-05 | — |
+| pipeline.adr-0051-follow-up-gaps-untracked | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.afk-assumption-mode | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.backlog-delivery-status-reconciliation | in_progress | workflow-improvement | pipeline | 2026-07-25 | Nova A / issue #57 |
 | pipeline.canonical-worktree-lifecycle | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -29,11 +29,13 @@
 | pipeline.local-worker-supervisor-cli-suite-flakes-under-full-verify | open | defect | pipeline | 2026-08-06 | — |
 | pipeline.managed-onboarding-success-contract | open | workflow-improvement | pipeline | 2026-07-25 | — |
 | pipeline.multi-cli-efficiency-pilots | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
+| pipeline.native-windows-verify-red-suite-class | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.neutral-authority-tier-is-a-frozen-snapshot-the-compiler-never-updates | open | defect | pipeline | 2026-08-06 | — |
 | pipeline.no-gate-is-tested-end-to-end-for-satisfiability | open | workflow-improvement | pipeline | 2026-08-06 | — |
 | pipeline.nonblocking-interaction-continuity | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.observation-intake-document-governance | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.onboarding-lifecycle-plan-hardcodes-the-codex-runner | closed | defect | pipeline | 2026-08-06 | — |
+| pipeline.onboarding-ready-path-unconditional-restart-barrier-read | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.pipeline-state-rebind-codex-default-runner | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.po-gate-authority-path-canonicalization | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-authority-receipt-readback | open | defect | pipeline | 2026-07-25 | — |
@@ -67,6 +69,6 @@
 
 ## Counts
 
-- open: 20
+- open: 21
 - in_progress: 21
-- closed: 18
+- closed: 19
