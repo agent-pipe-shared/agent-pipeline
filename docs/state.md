@@ -252,6 +252,50 @@ disposition that introduced that commit
 (`specs/sprint-nova-epic/evidence/backlog/2026-07-24-unreachable-evidence-disposition.md`)
 replaced two unreachable commits with one that is itself unreachable here.
 
+### Self-weakening: the gate an agent could clear by itself
+
+The PO asked what stops an agent writing `gates.push_approval: "chat"` into
+`pipeline.user.yaml` and then pushing on its own authority. The answer was measured, not
+assumed, and it was: **nothing**. `guard-testpath`, `guard-devplan` and
+`guard-lifecycle-ready` each returned exit 0 for that Edit, and the file was in fact
+edited during the session that asked the question — the demonstration was performed and
+reverted, and `pipeline.user.yaml` reads `push_approval: "signature"` again. A prior
+Critic round had recorded this path as protected because `human-guard-override.mjs`
+lists it in a function named `protectedPath()`; that function only classifies what an
+override may touch and gates nothing. A plausible name was mistaken for a control.
+
+`guard-gate-strength.mjs` (commit 27fbb74) now refuses Edit/Write on the five files
+whose contents decide a gate's strength: `pipeline.user.yaml` (GS-1),
+`project/critical-human-proof.json` (GS-2), `project/pipeline.yaml` (GS-3),
+`project/guard-config.json` (GS-4), `.claude/pipeline.yaml` (GS-5). It has **no
+in-session override** by design — for "may I weaken my own gate", an override is the
+same hole with an extra step. The one escape is the PO editing the file outside an agent
+session. It is scoped to repositories carrying a pipeline marker, fails open on
+malformed input, and fails closed only on a listed path.
+
+Probing one level further found a strictly worse instance of the same hole (commit
+11c3342). The config decides a gate's strength; the **installed guard code** decides
+whether the config is read at all. `hooks.json` is loaded once at session start, so
+rewiring it only bites next session — but a guard *script* is re-read on every
+invocation, so `process.exit(0)` written into the installed `guard-push.mjs` disarms the
+push gate immediately, inside the same session. Measured: with a ready lifecycle, no
+guard in the family claimed that write. GS-6 now refuses any write inside the plugin
+root the guard is itself running from (and a declared `CLAUDE_PLUGIN_ROOT`, only when it
+really looks like this plugin, so an over-broad value cannot become a blanket refusal).
+A source checkout's own `plugins/pipeline-core/` stays writable: in development the
+enforcing copy is the installed one, and the repository copy is ordinary product source
+under Verify, Critic and the PO gate.
+
+Two honest limits. First, **this is deterministic prevention, not proof of intent** —
+it removes the easy path, and the remaining protection against a determined agent is
+that push itself requires a detached Ed25519 signature the agent has no key for.
+Second, **the wiring is not live in the session that wrote it**: `hooks.json` is read at
+session start, so GS-1..GS-6 take effect for the next session and for consumers only
+once the new candidate is installed. `guard-gate-strength.test.mjs` (12 checks) covers
+both halves the earlier round missed — that the guard refuses, and that it is wired —
+and is registered in the verify gate as `gate-strength-guard-tests`. Full Verify green,
+247/247, on 11c3342.
+
 ### Open — nothing here blocks 0.5.2, and each is named with its owner
 
 - **PO acceptance of four consumer-facing decisions**, none yet given: ADR-0052
