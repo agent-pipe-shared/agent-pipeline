@@ -76,12 +76,23 @@ const object = (value) => value !== null && typeof value === "object" && !Array.
 /**
  * The digest of a repository-relative artifact the approval bound.
  *
- * The path arrives inside the state record, so it is attacker-chosen input and is
- * treated as such: it must stay inside the project, must not be reached through a
- * symlink, and must be an ordinary file of bounded size. A path that leaves the
- * repository is refused rather than resolved — the same containment rule
- * `boundRepositoryArtifact` applies on the writing side, restated here because a
- * verifier that trusted the writer's containment would be trusting the record again.
+ * The path arrives inside the state record, so it is treated as untrusted input: it must
+ * be repository-relative, must land inside the project, and must be an ordinary file of
+ * bounded size. A path that leaves the repository is refused rather than resolved — the
+ * same containment rule `boundRepositoryArtifact` applies on the writing side, restated
+ * here because a verifier that trusted the writer's containment would be trusting the
+ * record again.
+ *
+ * Be exact about the symlink half, because the first version of this comment was not
+ * (T6 Critic, F5). Containment is LEXICAL — `resolve`/`relative`/`startsWith` — and only
+ * the FINAL component is `lstat`ed. A path whose intermediate directory is a symlink out
+ * of the repository therefore passes containment and is read through that symlink.
+ *
+ * That is left as-is rather than hardened, and the reason is worth stating so nobody
+ * "fixes" it into a false sense of strength later: both the path and its digest live
+ * inside the signed subject, so neither is choosable without the private key. Hardening
+ * here would defend against an attacker who, by construction, has already won. What was
+ * actually wrong was the comment claiming a protection the code does not implement.
  */
 function boundArtifactDigest(projectDir, relativePath) {
   if (typeof relativePath !== "string" || relativePath === "" || isAbsolute(relativePath)) return null;

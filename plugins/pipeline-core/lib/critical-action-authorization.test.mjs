@@ -283,6 +283,41 @@ try {
     assert.equal(call(root, { activeFeature: { id: "demo-feature" } }).code, "PUSH-PROOF-RECORD-INCOMPLETE");
   });
 
+  // PPA19 -- T6 Critic F4. `readCriticalHumanProofPolicy` admits `trustAnchor` on BOTH
+  // schema versions, but every fixture in every suite wrote `.v1`, so the `.v2` arm of that
+  // shape check had never executed anywhere. A project that uses an ADR-0055 waiver is
+  // necessarily on `.v2`, so this is the shape a proof-waiving project actually ships.
+  //
+  // Placed here rather than in the reader's own CHP suite deliberately: this exercises the
+  // branch end-to-end through the consumer that depends on it, and the reader's suite is
+  // TP-9 protected, so a lift would have been the only other route to the same coverage.
+  check("PPA19 a v2 policy carrying both a waiver and an anchor still authorizes", () => {
+    const key = keypair();
+    const { root, threatModel } = fixture({ anchor: { keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 } });
+    writeFileSync(join(root, "project", "critical-human-proof.json"), `${JSON.stringify({
+      schema: "pipeline.critical-human-proof-policy.v2",
+      requiredKinds: ["push", "deploy", "publication"],
+      waivedKinds: [{ kind: "deploy", reason: "operator decision recorded for this fixture" }],
+      trustAnchor: { keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 },
+    }, null, 2)}\n`);
+    const result = call(root, stateFor(approvalRecord({ key, threatModel })));
+    assert.equal(result.code, "PUSH-PROOF-VERIFIED");
+  });
+
+  // PPA20 -- the same v2 shape with a malformed anchor must still fail closed; an added
+  // optional key must not become a hole in the version that carries waivers.
+  check("PPA20 a v2 policy with a malformed anchor fails closed", () => {
+    const key = keypair();
+    const { root, threatModel } = fixture({ anchor: { keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 } });
+    writeFileSync(join(root, "project", "critical-human-proof.json"), `${JSON.stringify({
+      schema: "pipeline.critical-human-proof-policy.v2",
+      requiredKinds: ["push", "deploy", "publication"],
+      waivedKinds: [],
+      trustAnchor: { keyReference: "po-key-1", publicKeySha256: "nope" },
+    }, null, 2)}\n`);
+    assert.equal(call(root, stateFor(approvalRecord({ key, threatModel }))).code, "CRITICAL-PROOF-POLICY-TRUST-ANCHOR-INVALID");
+  });
+
   // ---- the release route ------------------------------------------------------------
   //
   // Same property, different signed subject. These exist because hardening only the push
