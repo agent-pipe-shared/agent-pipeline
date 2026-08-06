@@ -392,6 +392,7 @@ files are excepted only when their path is already declared here.
 | `governance/schemas/governance-event-receipt.schema.json` | create sanitized receipt schema | Exact append/readback evidence. |
 | `governance/schemas/governance-capture-policy.schema.json` | create materiality/privacy policy schema | Deterministic capture and redaction. |
 | `governance/events/registry.json` | create initial stream registry | Portable stream authority. |
+| `governance/events/capture-policy.json` | create the portable capture-policy instance for the policy schema and stream registry | Make the deny-by-default capture and redaction contract an auditable repository artifact rather than implicit behaviour. |
 | `plugins/pipeline-core/lib/governance-event.mjs` | create envelope/canonicalization/validation primitives | Shared safe event representation. |
 | `plugins/pipeline-core/lib/governance-event.test.mjs` | create canonicalization, schema, size, Unicode, unknown-field tests | Kernel correctness. |
 | `plugins/pipeline-core/lib/governance-event-store.mjs` | create physical stream writer/query/verify/recovery | Sole canonical storage service. |
@@ -416,6 +417,14 @@ files are excepted only when their path is already declared here.
 | `plugins/pipeline-core/hooks/guard-git.test.mjs` | add coordinator/target/privacy/replay cases | Backlog regression. |
 | `docs/human-governance-ledger.md` | create taxonomy, assurance, migration, operator guide | Human/auditor contract. |
 | `docs/adr/0048-human-governance-authority.md` | create authority decision | Prevent future authority collapse. |
+| `plugins/pipeline-core/lib/human-governance-decision.mjs` | create closed decision taxonomy and lifecycle-link validation | Keep authority decisions distinct, complete, and fail-closed before any ledger read/write. |
+| `plugins/pipeline-core/scripts/governance-authority.mjs` | create checkpoint-bound canonical authority readback and one-shot consumption CLI | Let existing synchronous guard/state consumers independently verify a ledger decision rather than trust mutable projection State. |
+| `plugins/pipeline-core/scripts/governance-authority.test.mjs` | cover canonical readback, scope/candidate drift, consumption, and consumption readback | Preserve direct-reader migration guarantees. |
+| `plugins/pipeline-core/lib/authority-revision-proof.mjs` | create the external public-key proof boundary for a continuity authority revision | Bind an authority transition to a verifiable human signature instead of a mutable local claim. |
+| `plugins/pipeline-core/lib/authority-revision-proof.test.mjs` | cover intent binding, trust-policy rejection, forged and replayed proofs | Prove the signature boundary is fail-closed. |
+| `plugins/pipeline-core/scripts/phoenix-authority-approval.mjs` | create the human-terminal prepare/approve/verify helper for a signed authority revision | Keep private keys and signing outside the repository and outside agent reach. |
+| `plugins/pipeline-core/scripts/phoenix-authority-revision.mjs` | create the proof-gated wrapper around the continuity authority revision writer | Admit the sanctioned writer only after an exact verified proof binding. |
+| `plugins/pipeline-core/hooks/guard-git-phoenix.test.mjs` | cover ledger-bound Git override authority, target-repository binding, and replay | Keep the override path provable against the ledger rather than against mutable state. |
 
 ### 7.5 Agent journal and lifecycle replay
 
@@ -437,6 +446,11 @@ files are excepted only when their path is already declared here.
 | `plugins/pipeline-core/skills/close-block/SKILL.md` | verify dispatch/exception/recovery records at close | Make audit omissions visible. |
 | `docs/agent-decision-journal.md` | create materiality/privacy/operator guide | Prevent hidden-reasoning scope creep. |
 | `docs/governance-replay.md` | create replay semantics and limitations | Non-authoritative view contract. |
+| `plugins/pipeline-core/lib/governance-replay-view.mjs` | create a validated, non-authoritative replay view model | Project canonical replay without turning a view into authority. |
+| `plugins/pipeline-core/lib/governance-replay-view-renderer.mjs` | create the deterministic accessible replay rendering boundary | Keep presentation separated from replay validation and authority. |
+| `plugins/pipeline-core/lib/governance-replay-view.test.mjs` | cover provenance, invalid-source, uncertainty, and privacy states | Prove the local replay view remains honest. |
+| `plugins/pipeline-core/scripts/governance-replay-viewer.mjs` | create explicit local replay-view build CLI | Provide a human-operable, offline read surface. |
+| `plugins/pipeline-core/scripts/governance-replay-viewer.test.mjs` | cover CLI output and source-invalid behavior | Preserve the operator boundary. |
 
 ### 7.6 Organization policy and audit bundle
 
@@ -508,6 +522,10 @@ files are excepted only when their path is already declared here.
 | `plugins/pipeline-core/scripts/governance-export.test.mjs` | create E2E policy/failure/readback tests | #32 acceptance. |
 | `docs/governance-event-export.md` | create mapping, retention, runbook, incident/recovery guide | #32 operator contract. |
 | `docs/adr/0051-governance-event-export.md` | create outbox/export decision | Durable rationale. |
+| `plugins/pipeline-core/lib/governance-export-delivery.mjs` | create destination delivery coordination and acknowledgement handling | Keep at-least-once transport distinct from canonical event authority. |
+| `plugins/pipeline-core/lib/governance-export-delivery.test.mjs` | cover acknowledgement, failure, retry, and independent destination behavior | Prove delivery receipts do not overclaim external retention or authority. |
+| `plugins/pipeline-core/lib/governance-export-outbox-store.mjs` | create durable machine-local outbox persistence | Isolate transport state from portable canonical records. |
+| `plugins/pipeline-core/lib/governance-export-outbox-store.test.mjs` | cover interruption, corruption, replay, and cursor persistence | Prove recovery remains explicit and non-authoritative. |
 
 ### 7.10 Phoenix package and integration documentation
 
@@ -525,8 +543,16 @@ files are excepted only when their path is already declared here.
 | `specs/sprint-phoenix-epic/result.md` | create append-only package results during implementation | Durable outcome. |
 | `specs/sprint-phoenix-epic/lifecycle.json` | create/update through #22 lifecycle writer | Canonical package state. |
 | `docs/phoenix-governance-threat-model.md` | create the integrated trust-boundary, abuse-case, privacy, and recovery threat model | Satisfy the maintained project threat-model obligation. |
+| `plugins/pipeline-core/scripts/phoenix-governance-threat-model.test.mjs` | cover the threat-model document's required trust boundaries, abuse cases, and recovery sections | Keep the threat-model obligation machine-checked instead of asserted. |
 | `docs/state.md` | update only at governed handover/close boundaries | Cross-session continuity. |
 | `CHANGELOG.md` | update only at an approved release boundary | Public release communication. |
+
+### 7.11 Governed external execution handoff
+
+| File | Change | Rationale |
+| --- | --- | --- |
+| `plugins/pipeline-core/lib/external-command-offer.mjs` | create typed, privacy-minimized records for Pipeline-known external command offers and readback | Make external handoffs visible without persisting arbitrary command content or granting authority. |
+| `plugins/pipeline-core/lib/external-command-offer.test.mjs` | cover authority-sensitive offers, command-content rejection, retry, and readback states | Preserve the external-execution safety boundary. |
 
 ## 8. Epic acceptance criteria
 
