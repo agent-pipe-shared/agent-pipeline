@@ -359,6 +359,14 @@ T3 Critic (`critic` agent, Opus, same T1 assurance), base `0f5eaa4` → candidat
   its own implementation contradicts. K7 is the same overselling shape that caused C1, in
   the same spot.
 
+**The T3 remediation itself was NOT independently reviewed.** PO decision, 2026-08-06:
+accepted without a fourth round, on the same reasoning as C5 — the block is at its end.
+Recorded plainly because the two rounds before it each found something in exactly this
+position, so this is an accepted risk, not a clean result. What partially offsets it: K1's
+fix is pinned by CHP24/CHP25 (the borrowed-blob case and its mirror, so it cannot pass by
+failing closed everywhere), and everything else in that remediation is comment and register
+wording rather than behaviour. What does not offset it: nobody but the author has read it.
+
 The T3 Critic's coverage boundary: it ran no suite, armed no capability and executed no
 write, so K1 rests on Git's documented rev-spec semantics plus four read-only probes rather
 than on a demonstrated bypass; it hash-verified but did **not read** the Spec or four of the
@@ -414,7 +422,9 @@ the TP-5 lift happened as recorded, since a lift leaves no artefact by design.
   evidence still binds to the tip, and **PG12c3** was added for the case that was missing
   entirely: the same fixture *without* the commit must BLOCK. TP-5 was restored immediately
   after, byte-identically. Suite 127/127.
-- **F7 — prepared as a complete file, one copy away.** GS-4 refuses
+- **F7 — CLOSED by the PO (`3be155f`, 2026-08-06).** Applied as staged; the config now
+  carries TP-1..TP-10 and the staged copy is gone. Kept below for the reasoning, which
+  still holds. GS-4 refuses
   `project/guard-config.json` to the agent deliberately and with no override, since that
   file decides which tests the agent may not touch; an agent that could edit it would be
   choosing its own restraints. So the full intended content is staged next to it as
