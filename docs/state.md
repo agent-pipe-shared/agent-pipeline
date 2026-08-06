@@ -304,10 +304,24 @@ FAIL**, five findings.
   block→allow→block. Two do. Corrected above.
 - **C4 (minor, FIXED in `c48c67f`)** — `guard-testpath.mjs`'s NOT-COVERED header still
   listed NotebookEdit as unmatched, contradicting its own MATCHING block and the wiring.
-- **C5 (major, DISCLOSED, PO's to close)** — every production diff in this range was
-  authored by the orchestrating session; no Goldfish dispatch record exists. Same standing
-  constraint as F8 and the blocks before it. The Critic notes it could find no §3.3
-  stage-0 fast path in `docs/operating-model.md` that would carve this out.
+- **C5 (major, ACCEPTED AND RECORDED — PO decision, 2026-08-06)** — every production diff
+  in this range was authored by the orchestrating session; no Goldfish dispatch record
+  exists. Same standing constraint as F8 and the blocks before it. The Critic could find no
+  §3.3 stage-0 fast path in `docs/operating-model.md` that would carve this out, so this is
+  a named exception, not a covered case. Second time this disposition has been taken (see
+  Attempt-3 F1, 2026-08-05); a third should not be routine.
+  **PO's stated rationale:** the block is at its end, and the episode reads as a useful
+  negative test of the Operating Model — the model held. That is supported by what actually
+  happened: three independent Critic rounds each found a blocker or major in the *previous
+  round's remediation*, and the two genuine runtime holes of this block (C1, K1) were both
+  caught by review rather than reaching a push. The role separation was absent and the
+  review layer compensated. Recorded as evidence for the review system, **not** as a
+  precedent that the implementor may be the reviewer's author.
+  **The cost, stated so the acceptance is not mistaken for a clean bill:** C1 and K1 share
+  one root cause — mechanism claims written into comments and this register without being
+  measured. `git rev-parse` twice would have prevented K1. Standing correction from here:
+  no "X cannot happen because Y" in code or register without a test or a measured probe
+  behind it; absent that, it is written as an open question.
 
 The T2 Critic's stated coverage boundary: it read ~200 of 1699 Spec lines and did **not**
 map this delta onto a numbered acceptance criterion; it read only `quality-gates.md` in
@@ -385,9 +399,12 @@ the TP-5 lift happened as recorded, since a lift leaves no artefact by design.
   What IS true: **0 session URLs, 0 provider co-author trailers, 64/64 carry the marker at
   least once**, and `git diff` against the pre-rewrite tip is empty — content byte-identical,
   messages only. The GIT-03 *substance* (no correlation data) is met; the duplication is a
-  GIT-01 parseability defect, not a privacy one, which is why it is not a blocker. **Open,
-  PO action:** one more `--msg-filter` pass to collapse consecutive duplicate markers before
-  these 42 commits are pushed. The 53 already-published commits are untouched.
+  GIT-01 parseability defect, not a privacy one, which is why it is not a blocker.
+  **CLOSED (2026-08-06):** the PO ran a third `--msg-filter` pass collapsing consecutive
+  duplicate markers. Verified across the whole unpushed range: every commit prints exactly
+  one `true` under `%(trailers:key=AI-Assisted)`, with 0 session URLs and 0 provider
+  co-author trailers. The 53 already-published commits are untouched and keep their
+  correlation data — that part is not recoverable.
 - **PG12c — CLOSED under an explicit PO lift of TP-5.** The C1 fix landed on a fixture that
   encoded the old contract: PG12c wrote `push_approval: chat` into `pipeline.user.yaml`
   **without committing it** and asserted the push was allowed, i.e. it asserted precisely
@@ -397,9 +414,21 @@ the TP-5 lift happened as recorded, since a lift leaves no artefact by design.
   evidence still binds to the tip, and **PG12c3** was added for the case that was missing
   entirely: the same fixture *without* the commit must BLOCK. TP-5 was restored immediately
   after, byte-identically. Suite 127/127.
-- **F7 above** — the only prior-round finding still open, and it is the PO's to close
-  because GS-4 refuses `project/guard-config.json` to the agent. Exact entries prepared
-  below.
+- **F7 — prepared as a complete file, one copy away.** GS-4 refuses
+  `project/guard-config.json` to the agent deliberately and with no override, since that
+  file decides which tests the agent may not touch; an agent that could edit it would be
+  choosing its own restraints. So the full intended content is staged next to it as
+  `project/guard-config.proposed.json` (not a gate-strength path, so writable), validated:
+  parses, and all ten patterns compile. The PO applies it with
+  `cp project/guard-config.proposed.json project/guard-config.json` and deletes the staged
+  copy. It adds **TP-6** guard-gate-strength, **TP-7** guard-testpath-override, **TP-8**
+  entrypoint, **TP-9** critical-human-proof-policy and **TP-10** notebook-write-coverage to
+  the existing TP-1..TP-5, which are carried over unchanged. TP-9 is the one the earlier
+  draft of this list missed: it gates how `gates.push_approval` resolves, i.e. the property
+  C1 and K1 were both about.
+  The honest limit, unchanged: TP binds agents, not the PO, and all five new paths sit under
+  `plugins/pipeline-core/**` or `lib/`, so per OT14 the override cannot serve them either —
+  a genuine future test change to any of them is a PO-cleared task.
 - **The guard-testpath override serves exactly one of this repository's five TP entries.**
   Found while closing F3, pinned as OT14. `human-guard-override` eligibility routes every
   `plugins/pipeline-core/**` write to Pipeline-author repair, which needs an explicitly
