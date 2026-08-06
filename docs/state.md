@@ -531,6 +531,25 @@ on source reading plus one read-only probe through `/proc/self/cwd`; Linux/WSL o
 numbered Spec acceptance criterion this range maps to, since the Spec never mentions
 `push_approval` or either ADR.
 
+### Final gate record for this block
+
+The durable entry N1 demanded and F3 found missing. Written after the run, naming the commit
+the run actually covers.
+
+- **Candidate: `7a7aa7c`, tree `62067164`.**
+- **Verify: exit 0, 250 registered suites, 250 terminal receipts, 0 failures**,
+  `binding: exact`, tree clean at start and finish.
+- **Security scan: exit 0, 0 findings**, same commit and tree, `symlinkPolicy: reject`,
+  `submodulePolicy: reject`.
+
+**The one commit that follows `7a7aa7c` is this register entry itself**, and it changes
+`docs/state.md` and nothing else. That is the honest resolution of a recursion that cannot be
+escaped: a run on commit X can never be recorded inside commit X, so either the record names
+a commit that is not the tip, or the tip carries no record. What is recorded here is which
+commit the numbers belong to, and what the commit after it does — verifiable by
+`git show --stat` on the tip. No claim is made that the gates ran on the tip; they ran on its
+parent, which carries every line of code and configuration in this block.
+
 ### Open
 
 - **GIT-03 violated on every commit this session — a REPEAT of an already-fixed defect.**
