@@ -178,6 +178,70 @@ try {
     assert.equal(insideLivePlugin(installed, [installed]), false, "the root itself is not a file in it");
   });
 
+  // ---- the shell lane -------------------------------------------------------------
+  // GS-1..GS-6 refuse an Edit or a Write. A shell command is neither, and this guard is
+  // wired into exactly one PreToolUse entry (GST07) whose matcher names only write tools.
+  // Measured 2026-08-06: `touch project/guard-config.json` was admitted with nothing
+  // claiming it, so the Edit refusal could be stepped around with `node -e`. Enforcement
+  // for the shell lives in guard-lifecycle-ready.mjs, which is already Bash-wired and
+  // already owns the read-only classifier; these checks assert it from the outside.
+  const LIFECYCLE_GUARD = join(HOOKS, "guard-lifecycle-ready.mjs");
+  function shell(root, command) {
+    const result = spawnSync(process.execPath, [LIFECYCLE_GUARD, "--runner", "claude"], {
+      input: JSON.stringify({ tool_name: "Bash", tool_input: { command }, cwd: root }),
+      encoding: "utf8",
+      cwd: root,
+      env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+    });
+    return { blocked: result.status !== 0, stderr: result.stderr ?? "" };
+  }
+
+  check("GST13 a shell command that writes a gate-strength file is refused", () => {
+    const root = governed();
+    const commands = [
+      "touch project/guard-config.json",
+      "cp /tmp/evil.yaml pipeline.user.yaml",
+      "mv /tmp/evil.yaml project/pipeline.yaml",
+      "git checkout -- project/guard-config.json",
+      // The token-blind case: the path sits inside a quoted script argument.
+      `node -e 'require("fs").writeFileSync("pipeline.user.yaml", "gates:\\n  push_approval: chat\\n")'`,
+    ];
+    for (const command of commands) {
+      const { blocked, stderr } = shell(root, command);
+      assert.equal(blocked, true, `admitted: ${command}`);
+      assert.match(stderr, /GUARD-GATE-STRENGTH-SHELL/u, `wrong refusal for: ${command}`);
+    }
+  });
+
+  check("GST14 reading a gate-strength file from the shell is never claimed by this rule", () => {
+    // A guard that stops `cat pipeline.user.yaml` would make the repository unworkable.
+    // Asserted as "not refused BY THIS RULE" rather than "admitted", because a governed
+    // fixture with no ready bootstrap has its own separate reasons to refuse.
+    const root = governed();
+    for (const command of [
+      "cat pipeline.user.yaml",
+      "sha256sum project/guard-config.json",
+      "git diff project/pipeline.yaml",
+      "rg push_approval pipeline.user.yaml",
+      "head -n 5 project/critical-human-proof.json",
+    ]) {
+      assert.doesNotMatch(shell(root, command).stderr, /GUARD-GATE-STRENGTH-SHELL/u,
+        `read-only command claimed by the gate-strength rule: ${command}`);
+    }
+  });
+
+  check("GST15 the shell refusal offers no in-session override either", () => {
+    const root = governed();
+    const { stderr } = shell(root, "touch pipeline.user.yaml");
+    assert.match(stderr, /outside an agent session/u);
+    assert.doesNotMatch(stderr, /PIPELINE_GUARD_OVERRIDE/u);
+  });
+
+  check("GST16 an unrelated command in the same repository is untouched", () => {
+    const root = governed();
+    assert.doesNotMatch(shell(root, "touch README.md").stderr, /GUARD-GATE-STRENGTH-SHELL/u);
+  });
+
   console.log(`\nguard-gate-strength: ${passed} passed, ${failed} failed`);
 } finally {
   for (const entry of roots) rmSync(entry, { recursive: true, force: true });

@@ -27,6 +27,7 @@ import {
 } from "../lib/codex-host-layout.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
+import { GATE_STRENGTH_PATHS } from "./guard-gate-strength.mjs";
 import {
   isBoundedReadOnlyPipeline,
   parseGuardCommand,
@@ -163,6 +164,57 @@ function crossRepositoryMutationBlocked() {
       + "Pipeline source, another repository, marketplace metadata, cachebuster updates, "
       + "and plugin installation require a separate session rooted at the exact target "
       + "plus their own explicit PO authorization.\n",
+  );
+}
+
+/**
+ * GS-1..GS-6 refuse an Edit or a Write. A shell command is neither.
+ *
+ * Measured 2026-08-06: `touch project/guard-config.json` was admitted with no guard
+ * claiming it. `guard-gate-strength` is wired into exactly one PreToolUse entry, matcher
+ * `Edit|Write|NotebookEdit`, so no Bash command can ever reach it -- and `node -e` is an
+ * ordinary simple command under the closed grammar. An agent that wanted
+ * `gates.push_approval: "chat"` therefore never needed the Edit tool at all, which is
+ * precisely the property GS-1 was introduced to remove.
+ *
+ * Same shape as GS-6 one level up: the config decides a gate's strength, the installed
+ * code decides whether the config is read -- and the shell decides everything, because it
+ * was never asked.
+ *
+ * SHAPE. Substring, not token, matching: the path that matters can sit INSIDE a quoted
+ * script argument (`node -e '...writeFileSync("pipeline.user.yaml", ...)'`), where token
+ * matching sees one opaque word. That deliberately over-refuses -- a `git commit -m`
+ * message merely naming one of these files is refused too. Over-refusal costs a `-F`
+ * flag; under-refusal costs the gate. Read-only diagnostics are exempt via the existing
+ * classifier, so `cat`, `rg`, `sha256sum` and `git diff` on these paths keep working.
+ */
+function gateStrengthShellRefusal(command, root) {
+  if (typeof command !== "string" || command === "") return null;
+  if (isReadOnlyDiagnosticCommand(command, root)) return null;
+  // Scoped to the five configuration paths (GS-1..GS-5) deliberately. The live plugin
+  // root (GS-6) is NOT a needle here: executing a plugin script by absolute path is the
+  // normal bootstrap and recovery shape, so matching the root would refuse
+  // `node <pluginRoot>/scripts/project-onboarding-v3.mjs inspect` -- the very command the
+  // gate tells the operator to run. Shell WRITES into the enforcing plugin root are
+  // already refused by GUARD-CROSS-REPO-MUTATION whenever the installed copy sits outside
+  // the project root, which is the arrangement docs/claude-local-plugin-development.md
+  // now prescribes; the residual case is recorded in docs/state.md rather than closed by
+  // a rule that would break bootstrap.
+  const needles = GATE_STRENGTH_PATHS.map((rule) => basename(rule.path));
+  const haystack = command.replace(/\\/gu, "/").toLowerCase();
+  const hit = needles.find((needle) => haystack.includes(needle.replace(/\\/gu, "/").toLowerCase()));
+  if (hit === undefined) return null;
+  return verdict(
+    2,
+    "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
+      + "GUARD-GATE-STRENGTH-SHELL: "
+      + `This command names ${hit}, a file whose contents decide how strong a gate is, `
+      + "and it is not a read-only diagnostic.\n"
+      + "An agent that can weaken the gate authorizing its own actions has no gate, and the "
+      + "Edit/Write refusal (GS-1..GS-6) is worth nothing if a shell command reaches the same "
+      + "file. There is deliberately no in-session override.\n"
+      + "Reading is unaffected: cat, rg, head, sha256sum and git diff/log/show on these paths "
+      + "are admitted. To change one, the PO edits it outside an agent session.\n",
   );
 }
 
@@ -840,6 +892,10 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
   if (!governed) return verdict(0);
   if (toolName === "Bash" && isHumanPoSigningCommand(input.tool_input.command, root)) {
     return externalPoSigningOnly();
+  }
+  if (toolName === "Bash") {
+    const gateStrength = gateStrengthShellRefusal(input.tool_input.command, root);
+    if (gateStrength !== null) return gateStrength;
   }
   if (WRITE_TOOLS.includes(toolName)) {
     const target = writeTargetPath(input.tool_input);
