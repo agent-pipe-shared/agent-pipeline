@@ -336,18 +336,59 @@ try {
     // a list of unsafe ones, so a source value added later fails closed by default. That is
     // precisely how the C1 fix opened this hole: it added `uncommitted` to a branch that
     // enumerated the unsafe cases.
+    // The first version of this loop overwrote the file WITHOUT committing, so
+    // readPushApprovalMode returned `uncommitted` before it ever parsed and all three
+    // iterations collapsed onto that one case -- `invalid` and `unreadable` were never
+    // reached. The T5 Critic found it (F1): narrowing the guard back to exclude `invalid`
+    // would have left the suite green. Each case now COMMITS its text, so the source really
+    // is the one the label names, and the source is asserted rather than assumed.
     const waiver = () => V2([{ kind: "push", reason: "policy-file waiver contradicting the source" }]);
-    for (const [label, text] of [
-      ["uncommitted", GATES("signature").replace('push: "blocking"', 'push:  "blocking"')],
+    for (const [source, text] of [
       ["invalid", 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "whatever"\n'],
       ["unreadable", ": : not yaml\n  - [\n"],
     ]) {
-      const base = userYaml(root(waiver()), GATES("signature"));
-      writeFileSync(join(base, "pipeline.user.yaml"), text);
+      const base = userYaml(root(waiver()), text);
+      assert.equal(readPushApprovalMode(base).source, source, `${source}: fixture reached a different source`);
       const result = criticalProofWaiverFor(base, "push");
-      assert.equal(result.waived, false, `${label}: a waiver was honoured`);
-      assert.equal(result.code, "CRITICAL-PROOF-MODE-CONFLICT", `${label}: wrong code`);
+      assert.equal(result.waived, false, `${source}: a waiver was honoured`);
+      assert.equal(result.code, "CRITICAL-PROOF-MODE-CONFLICT", `${source}: wrong code`);
     }
+    // `uncommitted` cannot be committed by construction, so it is built the other way.
+    const modified = userYaml(root(waiver()), GATES("signature"));
+    writeFileSync(join(modified, "pipeline.user.yaml"), GATES("signature").replace("gates:", "gates:\n"));
+    assert.equal(readPushApprovalMode(modified).source, "uncommitted");
+    assert.equal(criticalProofWaiverFor(modified, "push").code, "CRITICAL-PROOF-MODE-CONFLICT");
+  });
+
+  check("CHP30 deleting the source is not the same as never having one", () => {
+    // T5 Critic F2, the bypass. `default` is the only source that lets a policy waiver
+    // govern, and absence used to produce it before Git was consulted at all -- so `rm`
+    // reached what editing could not. Absence is now evidence like any other: if HEAD
+    // carries the file, its absence in the working tree is a modification.
+    const base = userYaml(
+      root(V2([{ kind: "push", reason: "policy-file waiver contradicting the source" }])),
+      GATES("signature"),
+    );
+    assert.equal(criticalProofWaiverFor(base, "push").code, "CRITICAL-PROOF-MODE-CONFLICT", "precondition");
+    rmSync(join(base, "pipeline.user.yaml"));
+    assert.deepEqual(readPushApprovalMode(base), { mode: "signature", source: "uncommitted" },
+      "a deleted file reported itself as a source with no opinion");
+    assert.equal(criticalProofWaiverFor(base, "push").waived, false,
+      "deleting the source stood the Ed25519 push proof down");
+  });
+
+  check("CHP31 a repository that never had the file still reads as default", () => {
+    // The other side of CHP30, so the fix cannot pass by calling every absence a
+    // modification: where Git has no blob either, the source genuinely has no opinion and an
+    // explicit policy waiver still governs.
+    const base = root(V2([{ kind: "push", reason: "the operator stood the proof down deliberately" }]));
+    spawnSync("git", ["init", "-q", base]);
+    spawnSync("git", ["-C", base, "config", "user.email", "fixture@example.invalid"]);
+    spawnSync("git", ["-C", base, "config", "user.name", "fixture"]);
+    spawnSync("git", ["-C", base, "add", "-A"]);
+    spawnSync("git", ["-C", base, "commit", "-qm", "fixture"]);
+    assert.deepEqual(readPushApprovalMode(base), { mode: "signature", source: "default" });
+    assert.equal(criticalProofWaiverFor(base, "push").waived, true);
   });
 
   check("CHP29 an absent key still lets an explicit policy waiver govern", () => {
