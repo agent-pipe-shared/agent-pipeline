@@ -604,7 +604,7 @@ function decisionPreview({ toolName, toolInput, paths, commandClass, denials }) 
   const effect = commandClass === "local-plugin-install"
     ? {
       repository: "does not change the bound repository working tree, index, refs, or configuration",
-      external: "adds exactly pipeline-core@agent-pipeline-local to the host Codex plugin registry from the bound local source",
+      external: "adds exactly pipeline-core@agent-pipeline-local to the host Codex plugin registry; only this checkout's manifest identity and plugin-source tree digest are attested, not the external agent-pipeline-local marketplace root the install actually resolves through",
       rollbackRecovery: "read back the native plugin registry; removal/restart remains a separately attended operator action",
       residualRisk: "the host-wide Codex plugin selection changes and existing sessions keep their already-loaded plugin until the attended refresh boundary",
     }
