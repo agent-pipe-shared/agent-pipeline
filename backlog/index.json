@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "a5d2406ada9e45b072b27479915991a85222d8f2817966cf0cc50eb3fda06f7a"
+    "transitionHead": "51570c44183e2ef6f83b8d4a96f3805908e75b9059f0db793fc2a7afd42a7811"
   },
   "counts": {
-    "open": 25,
+    "open": 26,
     "in_progress": 21,
     "closed": 11
   },
@@ -218,6 +218,14 @@
       "owner": "pipeline",
       "created": "2026-08-06",
       "source": "Sprint Nova session, 2026-08-06, ADR-0054 step 1 (routing hardcoded readers through resolveProjectAuthorityPaths). Comparing the two authority tiers before routing more readers to the resolver revealed that the tier the resolver PREFERS is the one nothing maintains."
+    },
+    {
+      "id": "pipeline.no-gate-is-tested-end-to-end-for-satisfiability",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-06",
+      "source": "PO question, 2026-08-06: why does an agent keep stopping and asking instead of working under the operating model. Investigating produced a structural answer rather than a behavioural one — four gate defects in a single session, none found by the suite."
     },
     {
       "id": "pipeline.nonblocking-interaction-continuity",
