@@ -734,25 +734,76 @@ asks for paths rather than commands, and its skip rules already tell the Critic 
 CI enforces. They simply had no reader at the moment of dispatch: `roles/critic.md` is read
 by the Critic, not by the Elephant dispatching it.
 
-**Open at this cut:**
+**Resolved after this cut:** the four suites were registered (`fd06ee6`); that registration
+run immediately failed `product-capability-inventory-tests` — six new surfaces (the guard,
+its hook matcher, the four verify phases) were undeclared, fixed in `90c64e7`. Both gates went
+live after the cachebuster bump/reinstall recorded below.
 
-- The four new suites (`commit-message-policy`, `dispatch-policy`, `guard-dispatch`, and the
-  `critical-action-authorization` suite from the earlier block) are **not registered in
-  `harness/scripts/verify.mjs`**. A test Verify does not know about protects nothing.
-  Needs a TP-3 lift.
-- Neither gate is live: the installed plugin is the older candidate. They enforce only after
-  a version bump and reinstall.
-- A Critic round on the full diff with a **template-conforming** dispatch — the point being
-  to see what an unsteered search surface finds, which the T6 round cannot answer.
-- The backlog item on ADR discipline (drafted, parked out of the candidate at the PO's
-  instruction so the reviewed tree stayed clean) still to be written, together with the
-  sanctioned route for `backlog/index.json` — it carries `generatedFrom` and a
-  `transitionHead` digest over `transitions.ndjson`, so it is generated and ledger-bound,
-  not hand-editable.
+### T7 Critic round on `3e03f7e^..90c64e7` — FAIL, and what the unsteered search surface found
 
-**Also open:** a second Critic round with a contract-conforming dispatch, to find out what
-an independent search surface sees. The TP-5 lift taken for these test edits must be
-restored before the candidate is offered.
+The round the T6 entry above asked for: a **template-conforming** dispatch (built from
+`templates/prompts/critic-review.md`, references only — 13 enumerated SHAs, spec/guardrail
+paths, calibration, ruleset SHA, evidence artifact path, no claims list, no hunt list, no
+rerun commands) against the full block, `754b32b..90c64e7` minus the already-reviewed T6
+range. **Verdict FAIL.** One blocker, three majors, two minors — a materially larger yield
+than T6's steered round, which is the point of running an unsteered one.
+
+| | Finding | Severity | Commit |
+|---|---|---|---|
+| F1 | `guard-dispatch`'s `NAMES_MODEL` refused a dispatch built from either canonical template — including the dispatch that found this | blocker | `29e39c6` |
+| F2 | no suite tested the real templates, only a hand-written stand-in shaped like what the check expected | major | `29e39c6` |
+| F3 | GIT-03 fell through to `inspected: false` (silent allow) on a `-F` message file outside the project root — an agent's own scratch directory | major | `a13c579` |
+| F4 | `chat` mode opened every branch except `main`; `attestedMainPublication` never consulted `criticalProofWaiverFor` | major | `771c841` |
+| F5 | this register claimed the four suites were unregistered after `fd06ee6`, two commits later in the same range, registered them | minor | this entry |
+| F6 | the `-F` containment check hardcoded `/` where its sibling module correctly used `node:path`'s `sep`, inert on Windows | minor | `a13c579` |
+
+**F1's reach.** Found by direct execution, not inspection: the Critic ran its own dispatch
+metadata block — `Criticality → model (MP-07): … higher-capability review model at max …` /
+`Requested route: claude-opus-5 at max effort.` — through `dispatchFindings` and got
+`DISPATCH-NO-MODEL`. The gate built two commits earlier to close a contamination incident
+would have refused the review that found its own bug. Fixed by keying `NAMES_MODEL` on a
+model-family token appearing anywhere in the text rather than adjacent to the word "model",
+and by adding an explicit `Requested route` field to `critic-review.md` so a compliant fill
+always carries a concrete identifier, not just a tier description.
+
+**Authorship (not fixed, disclosed).** The Critic flagged that all 13 commits in the reviewed
+block carry no `Dispatch: <TASK_ID> (goldfish)` trailer and no dispatch-record artifact
+exists for them — they were Elephant-authored directly in this session, the same lifecycle
+gap the 2026-07-23 close-ritual incident recorded above. Reported by the Critic as "not
+verifiable rather than proven" per its own evidence discipline; recorded here as an
+acknowledged fact, not a defended one. No retroactive fix is possible for commits already
+made; the corrective action is dispatching the *next* block of guardrail work to a fresh
+Goldfish context rather than repeating the pattern.
+
+**Adjacent gap found while fixing F4, not fixed (out of scope for this round).** The ordinary
+branch-route chat-mode lane (`guard-push.mjs` ~1607–1673) binds a `pushApproval.lastApproved`
+record to the push only by `forCommit` — it never checks `remote`/`destination` equality
+before accepting the record as authorization. The new F4 lane added to
+`attestedMainPublication` does not repeat this: it binds all three (`forCommit`, `remote`,
+`destination`), proven by `PG12c-main-mismatch`. So the same commit approved in `chat` mode
+for one branch could, in principle, authorize a push of that unchanged commit to a *different*
+non-`main` destination without a fresh approval. `main` cannot be reached this way (its own
+eager boundary binds destination independently); an ordinary branch can. Not a Critic finding,
+found incidentally while reading the code it shares a mechanism with — flagged rather than
+silently carried forward or silently fixed mid-remediation-round.
+
+**A self-inflicted incident during remediation, corrected rather than hidden.** The TP-5 lift
+command handed to the PO used hand-typed `sed` regex escaping and corrupted line 25 of both
+`guard-config.json` copies into invalid JSON (a stray embedded `"pattern_lifted":` fragment
+inside what should have been one string value). A second hand-typed fix attempt under-escaped
+the replacement and produced a lone backslash, also invalid JSON. The eventual fix used
+`String.fromCharCode(92)` + `JSON.stringify()` to construct the replacement programmatically
+— eliminating hand-counted backslashes entirely — plus a canary check against the untouched
+TP-4 entry and a `RegExp` match test against the intended targets, before writing. Both TP lift
+and TP restore for this round used the same node-script-with-verification pattern rather than
+another hand-typed `sed` line. The PO's own observation, mid-incident: a small script that
+takes a TP id, confirms it, and records the lift as documented human intent would have
+prevented this class of mistake outright — parked as a backlog candidate, not built tonight.
+
+**Evidence:** guard-dispatch 9/9 (was 7/7; GD8/GD9 added), dispatch-policy 12/12 (was 10/10;
+DP11/DP12 added), commit-message-policy 16/16 (CMP8 re-pointed from "uninspected" to
+"blocking finding"), guard-git 192/192 (was 191/191; GIT03-7 added), guard-push 146/146 (was
+144/144; PG12c-main/PG12c-main-mismatch added), guard-push-v2 9/9, pipeline-state 313/313.
 
 ### Open
 
