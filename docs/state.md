@@ -897,7 +897,9 @@ next-action, branch, and release statement below where they conflict.
 
 ## Operational head
 
-- Project calibration: [`.claude/pipeline.json`](../.claude/pipeline.json).
+- Project calibration: [`project/pipeline.json`](../project/pipeline.json) — the
+  resolved authority tier (ADR-0046/ADR-0054). `.claude/pipeline.json` is the
+  legacy compatibility copy and is no longer what the gates read.
 - Required gate: `node harness/scripts/verify.mjs`.
 - **0.4.4 managed-workspace hotfix:** Codex may create a writable fresh root
   containing host-owned, empty read-only `.git`/`.codex` controls (and
