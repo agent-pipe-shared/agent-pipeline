@@ -67,16 +67,19 @@ export function createGovernanceExportDeliverySession({ policy, profile } = {}) 
  * Re-admits a persisted session after a restart.
  *
  * A restart must not become a way to buy a fresh retry budget, so the recorded
- * attempt count and any outstanding wait survive verbatim. The one correction
- * made is a ceiling on the wait: a persisted next-attempt time further out than
+ * attempt count and any outstanding wait survive verbatim. Two corrections are
+ * made. A ceiling on the wait: a persisted next-attempt time further out than
  * one full backoff -- from clock skew or a tampered file -- would stall the
- * exporter indefinitely, which is a worse failure than retrying too early.
+ * exporter indefinitely, which is a worse failure than retrying too early. And
+ * the flush is cleared: it is a shutdown-drain concession to the process that
+ * asked for it, and carrying it across a restart would silently hand the new
+ * process a standing rate-limit waiver against the same destination.
  */
 export function restoreGovernanceExportDeliverySession(value, { policy, profile, nowEpochMs } = {}) {
   const active = validateGovernanceExportDeliveryPolicy(policy, { profile });
   if (!sessionShape(value) || value.profileId !== active.profileId || !bounded(nowEpochMs, 0, Number.MAX_SAFE_INTEGER)) fail("GEP-RESTORE");
   const ceiling = nowEpochMs + active.maxBackoffMs;
-  return freeze({ ...value, nextAttemptAtEpochMs: Math.min(value.nextAttemptAtEpochMs, ceiling) });
+  return freeze({ ...value, nextAttemptAtEpochMs: Math.min(value.nextAttemptAtEpochMs, ceiling), flushing: false });
 }
 
 /** Cancellation is terminal: a cancelled session never plans another delivery. */
@@ -121,7 +124,13 @@ export function planGovernanceExportDelivery({ session, outbox, policy, profile,
   if (session.cancelled) return plan("cancelled", session.cancelReason, { pending });
   if (session.attempt > active.maxAttempts) return plan("exhausted", "retry-budget", { pending, attempt: session.attempt });
   if (pending === 0) return plan("idle", "nothing-pending", { pending });
-  const waiting = !session.flushing && nowEpochMs < session.nextAttemptAtEpochMs;
+  // Flush waives the rate limit only. `nextAttemptAtEpochMs` carries both that
+  // and the post-failure backoff, so testing `flushing` against it alone let a
+  // shutdown drain straight through a backoff -- the one thing the flush
+  // contract says it must not do. `attempt > 1` is what distinguishes the two,
+  // and the plan below already reports them apart on exactly that test.
+  const backingOff = session.attempt > 1;
+  const waiting = (backingOff || !session.flushing) && nowEpochMs < session.nextAttemptAtEpochMs;
   if (waiting) return plan(session.attempt > 1 ? "backoff" : "rate-limited", session.attempt > 1 ? "retry-backoff" : "rate-limit", { pending, waitMs: session.nextAttemptAtEpochMs - nowEpochMs });
   return plan("deliver", session.flushing ? "flush" : "ready", {
     pending,
@@ -166,6 +175,13 @@ export function encodeGovernanceExportBatch({ mappings, policy, profile } = {}) 
     || mappings.some((mapping) => !object(mapping) || mapping.profileId !== active.profileId || mapping.payload === undefined)) fail("GEP-ENCODE");
   const raw = Buffer.from(mappings.map((mapping) => (typeof mapping.payload === "string" ? mapping.payload : `${JSON.stringify(mapping.payload)}\n`)).join(""), "utf8");
   const encoded = active.compression === "gzip" ? gzipSync(raw, { level: 9 }) : raw;
+  // The destination's byte bound applies to the batch, not only to the single
+  // events the mapper already checked: `maxBatchEvents` of individually legal
+  // payloads still add up. The bound is taken on what actually goes to the wire,
+  // so compression counts in the caller's favour. Failing here is correct --
+  // silently handing the destination a batch it declared it cannot accept would
+  // turn a policy bound into a runtime surprise.
+  if (encoded.byteLength > validateGovernanceExportAdapterProfile(profile).maxPayloadBytes) fail("GEP-ENCODE-PAYLOAD-LIMIT");
   // Base64 rather than a buffer: the record stays immutable and serializable,
   // and rawSha256 is taken before compression so a compressed batch and its
   // plain equivalent are provably the same events.

@@ -79,6 +79,21 @@ test("E-AC-16 applies compression only where the profile enables it, over the sa
   assert.throws(() => encodeGovernanceExportBatch({ mappings: [{ profileId: "other", payload: "x" }], policy: policy(), profile }), (error) => error.code === "GEP-ENCODE");
 });
 
+// The mapper bounds one event; nothing bounded their sum, so a batch of
+// individually legal payloads could exceed what the destination declared it
+// accepts. The bound belongs on what goes to the wire.
+test("E-AC-16 holds a batch inside the destination's declared payload bound", () => {
+  const tight = { ...profile, maxPayloadBytes: 512 };
+  const one = mapGovernanceExportProjection({ profile: tight, projection: policyProjection("a") });
+  assert.ok(one.payloadBytes < 512, "fixture must stay legal per event");
+  assert.ok(one.payloadBytes * 2 > 512, "fixture must exceed the bound in aggregate");
+  assert.equal(encodeGovernanceExportBatch({ mappings: [one], policy: policy(), profile: tight }).eventCount, 1);
+  const two = [one, mapGovernanceExportProjection({ profile: tight, projection: policyProjection("b") })];
+  assert.throws(() => encodeGovernanceExportBatch({ mappings: two, policy: policy(), profile: tight }), (error) => error.code === "GEP-ENCODE-PAYLOAD-LIMIT");
+  // Compression counts in the caller's favour: the bound is on the wire bytes.
+  assert.equal(encodeGovernanceExportBatch({ mappings: two, policy: policy({ compression: "gzip" }), profile: tight }).compression, "gzip");
+});
+
 test("E-AC-16 enforces the rate limit between successful deliveries", () => {
   const delivered = advanceGovernanceExportDeliverySession({ session: session(), policy: policy(), profile, disposition: "delivered", eventCount: 2, nowEpochMs: 1_000 });
   assert.equal(delivered.nextAttemptAtEpochMs, 1_100);
@@ -135,6 +150,15 @@ test("E-AC-16 lets flush drain a shutdown without waiving the retry budget or ca
   const flushed = planOf({ session: flushing, nowEpochMs: 1_010 });
   assert.equal(flushed.action, "deliver");
   assert.equal(flushed.reason, "flush");
+  // Flush waives the rate limit and nothing else. A shutdown is a reason to
+  // finish what is owed, not to hammer a destination that is already refusing
+  // traffic -- so an outstanding backoff still holds under flush.
+  const backingOff = advanceGovernanceExportDeliverySession({ session: session(), policy: policy(), profile, disposition: "retryable-failure", eventCount: 0, nowEpochMs: 1_000 });
+  const flushedBackoff = planOf({ session: flushGovernanceExportDeliverySession(backingOff), nowEpochMs: 1_010 });
+  assert.equal(flushedBackoff.action, "backoff");
+  assert.equal(flushedBackoff.reason, "retry-backoff");
+  // ...and it resumes on the backoff's own schedule, not immediately.
+  assert.equal(planOf({ session: flushGovernanceExportDeliverySession(backingOff), nowEpochMs: 1_050 }).action, "deliver");
   // Flush does not buy a retry budget it has already spent.
   let spent = flushGovernanceExportDeliverySession(session());
   for (let round = 0; round < 3; round += 1) spent = advanceGovernanceExportDeliverySession({ session: spent, policy: policy(), profile, disposition: "retryable-failure", eventCount: 0, nowEpochMs: 1_000 });
@@ -156,6 +180,13 @@ test("E-AC-16 resumes a restart with its retry budget and outstanding wait intac
   // A restart is not a way to buy a fresh budget.
   assert.equal(planOf({ session: resumed, nowEpochMs: 1_010 }).action, "backoff");
   assert.equal(planOf({ session: resumed, nowEpochMs: 1_050 }).action, "deliver");
+  // A flush is a concession to the process that asked for it. Carrying it over
+  // a restart would hand the new process a standing rate-limit waiver.
+  const flushedThenDelivered = advanceGovernanceExportDeliverySession({ session: flushGovernanceExportDeliverySession(session()), policy: policy(), profile, disposition: "delivered", eventCount: 1, nowEpochMs: 1_000 });
+  assert.equal(flushedThenDelivered.flushing, true);
+  const afterRestart = restoreGovernanceExportDeliverySession(JSON.parse(JSON.stringify(flushedThenDelivered)), { policy: policy(), profile, nowEpochMs: 1_010 });
+  assert.equal(afterRestart.flushing, false);
+  assert.equal(planOf({ session: afterRestart, nowEpochMs: 1_010 }).action, "rate-limited");
   // A wait beyond one full backoff -- clock skew or a tampered file -- is
   // capped rather than allowed to stall the exporter forever.
   const skewed = restoreGovernanceExportDeliverySession({ ...persisted, nextAttemptAtEpochMs: 9_000_000 }, { policy: policy(), profile, nowEpochMs: 1_000 });
