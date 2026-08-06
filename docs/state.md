@@ -103,10 +103,13 @@ Both scripts are deleted; the diff is the deliverable.
 
 - **Standing Nova exception (2026-08-06):** TP-1..TP-5 may be temporarily lifted for
   Nova work. Recorded here because it is a durable authorization, not chat context.
-- **The exception cannot be exercised by an agent, and that is a finding.**
-  `guard-testpath` has **no override mechanism at all**, by explicit design: not the v2
-  `human-guard-override` protocol (which covers only the Codex, lifecycle and
-  gate-strength guards) and not `guard-git`'s `PIPELINE_GUARD_OVERRIDE` env form. The
+- **The exception could not be exercised by an agent, and that was a finding — since
+  closed, see the Critic section below.** At the time of writing, `guard-testpath` had
+  **no override mechanism at all**, by explicit design: not the v2 `human-guard-override`
+  protocol and not `guard-git`'s `PIPELINE_GUARD_OVERRIDE` env form. (The claim in an
+  earlier draft that the v2 protocol "covers the Codex, lifecycle and gate-strength
+  guards" overstated its reach: before this block `consumeHumanGuardOverride` had exactly
+  one caller, `codex-pretool-guard.mjs`. The Critic caught that.) The
   documented escape — editing `project/guard-config.json` — is itself refused by GS-4.
   So the only route is the PO editing outside an agent session, and that is the protocol
   used here: the PO lifts TP-3/TP-4 in their own terminal, the agent makes the two edits,
@@ -146,8 +149,72 @@ the gate tells the operator to run. Proven against a real pre-fix artifact rathe
 assertion — the same input returns exit 0 from the installed copy and exit 2 from the
 checkout.
 
+### Gates and the independent Critic round
+
+Full Verify **exit 0, 250/250** on `511d7d7` / tree `ed467380`, candidate-bound, tree
+clean before and after; `security-scan` ran as step 250 and is `exit 0, findings 0` on the
+same commit. An earlier run on `5fa2548` was 248/249 with one real failure —
+`product-capability-inventory-tests`, because a hook's surfaceId embeds its matcher and
+the write matchers had gained `NotebookEdit`; fixed in `469233a`.
+
+T1 Critic (`critic` agent, Opus, assurance `functional-equivalent-read-only; OS isolation
+not asserted`), admission `packet-ready`, base `0c21c31` → candidate `511d7d7`. It stopped
+once at its tool budget mid-hunt and was resumed. **Verdict: FAIL**, eight findings.
+
+- **F1 (BLOCKER, FIXED in `3982210`)** — the new guard-testpath override was armable by
+  the agent it constrains. The Critic anchored it on the sanctioned-command allowlist,
+  which admits `authorize … --activate`. Verified here and **worse than reported**: that
+  allowlist governs only the non-ready lane, and a ready session is allowed an arbitrary
+  Bash command (`guard-lifecycle-ready.test.mjs:415` asserts exactly that), so the agent
+  never needed the allowlist at all and no change to it would have helped. Two files
+  apart, this repository held both "an in-session override for 'may I weaken my own gate'
+  is the same hole with an extra step" and an in-session override for exactly that.
+  **PO decision:** the override follows the ADR-0056 clearance mode. `signature` — this
+  repo's value and the fail-closed default for absent/unreadable/unrecognised — consults
+  no capability and offers no route; only an explicit `chat` admits it, labelled as
+  attribution rather than proof. The setting sits in `pipeline.user.yaml`, which GS-1
+  refuses through both lanes, so an agent cannot reach `chat` by writing it.
+- **F4 (major, FIXED in `ad602be`)** — `guard-lifecycle-ready` is wired on
+  `Bash|PowerShell` and named PowerShell in no decision, so every PowerShell call returned
+  `verdict(0)`. On Windows, `Set-Content project/guard-config.json` was exactly the bypass
+  `efe452c` claimed to close. Scoped fix: PowerShell reaches the gate-strength refusal and
+  nothing else, because every decision below parses a POSIX grammar and the recovery lanes
+  are Bash-only. The pre-existing bootstrap-admission asymmetry is **not** closed.
+- **F6 (minor, FIXED in `ad602be`)** — `writeTargetPath` ignored the tool name, so a
+  NotebookEdit payload carrying a stray `file_path` would have made all four guards judge
+  a path the call was not about to touch.
+- **F2 (major, FIXED here)** — this register and `project/resume-hint.json` still denied
+  what the candidate does. Corrected above; the resume hint is recaptured.
+- **F3 (major, PARTIALLY fixed)** — no test walked the new block→allow path. OT04 now
+  proves the route is really produced and OT02/OT03 pin the refusal in signature mode, but
+  **no test arms a capability and shows the guard allows exactly the bound edit, nor that
+  a capability bound to a different input is refused through this guard.** Recorded, not
+  claimed as covered.
+- **F5 (minor, NOT fixed)** — the shell lane matches a basename substring while the write
+  lane matches the exact repo-relative path. Consequence: on a legacy-tier project an
+  **Edit** to `.claude/guard-config.json` is not a gate-strength path at all, while the
+  shell lane refuses it by basename. Legacy-tier consumers only; this repo resolves the
+  neutral tier.
+- **F7 (minor, NOT fixed)** — the three new gating suites carry no TP entry, so the suite
+  pinning the override's fail-closed behaviour is itself agent-editable. Closing it means
+  editing `project/guard-config.json`, which GS-4 refuses to the agent; it is a PO action.
+- **F8 (major, DISCLOSED, not fixable)** — every production diff in this block was
+  authored by the orchestrating session; no Goldfish dispatch record exists. Same standing
+  session constraint as the two preceding blocks. The block began as incident response to
+  guards found disarmed at bootstrap, which is mitigation, not a carve-out.
+
+The Critic's stated coverage boundary, recorded so a next session does not assume more: it
+reproduced nothing and armed no capability; it read 814 of 1709 lines of the Spec and did
+**not** check this delta against a numbered acceptance criterion; it read only
+`quality-gates.md` of the five guardrail files; it diffed 5 of ~70 migrated scripts; and
+F4 rests on this repo's own contract rather than on observed PowerShell behaviour.
+
 ### Open
 
+- **F3, F5 and F7 above**, each named with its owner.
+- **The override is bound to the clearance MODE, not to a proof of its own.** In
+  `signature` mode the human still acts outside the session rather than signing a
+  testpath-kind proof. Adding that kind is schema work in `critical-human-proof-policy`.
 - **GS-6's Bash half remains serial, not redundant.** A shell write into the *installed
   plugin root* is caught by `GUARD-CROSS-REPO-MUTATION` alone, and only while the
   installed copy sits outside the project root — the arrangement now prescribed. While
