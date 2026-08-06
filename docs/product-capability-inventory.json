@@ -137,6 +137,12 @@
       "member": "guard-devplan"
     },
     {
+      "surfaceId": "guard:plugins/pipeline-core/hooks/guard-dispatch.mjs:guard-dispatch",
+      "kind": "guard",
+      "path": "plugins/pipeline-core/hooks/guard-dispatch.mjs",
+      "member": "guard-dispatch"
+    },
+    {
       "surfaceId": "guard:plugins/pipeline-core/hooks/guard-gate-strength.mjs:guard-gate-strength",
       "kind": "guard",
       "path": "plugins/pipeline-core/hooks/guard-gate-strength.mjs",
@@ -225,6 +231,12 @@
       "kind": "hook",
       "path": "plugins/pipeline-core/hooks/hooks.json",
       "member": "PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-testpath.mjs\""
+    },
+    {
+      "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Task|Agent:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch.mjs\"",
+      "kind": "hook",
+      "path": "plugins/pipeline-core/hooks/hooks.json",
+      "member": "PreToolUse:Task|Agent:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch.mjs\""
     },
     {
       "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:compact:node \"${CLAUDE_PLUGIN_ROOT}/hooks/post-compact-reground.mjs\"",
@@ -815,6 +827,12 @@
       "member": "codex-session-start-hint-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:commit-message-policy-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "commit-message-policy-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-host-adapter-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -929,6 +947,12 @@
       "member": "critic-packet-governance-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:critical-action-authorization-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "critical-action-authorization-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:critical-human-proof-policy-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -939,6 +963,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "delivery-course-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:dispatch-policy-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "dispatch-policy-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:doc-contract-check",
@@ -1047,6 +1077,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "guard-devplan-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-dispatch-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "guard-dispatch-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-git-tests",
@@ -2007,6 +2043,7 @@
       "surfaceIds": [
         "guard:plugins/pipeline-core/hooks/guard-apply-patch.mjs:guard-apply-patch",
         "guard:plugins/pipeline-core/hooks/guard-devplan.mjs:guard-devplan",
+        "guard:plugins/pipeline-core/hooks/guard-dispatch.mjs:guard-dispatch",
         "guard:plugins/pipeline-core/hooks/guard-gate-strength.mjs:guard-gate-strength",
         "guard:plugins/pipeline-core/hooks/guard-git.mjs:guard-git",
         "guard:plugins/pipeline-core/hooks/guard-push.mjs:guard-push",
@@ -2018,6 +2055,7 @@
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-gate-strength.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-testpath.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Task|Agent:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:compact:node \"${CLAUDE_PLUGIN_ROOT}/hooks/post-compact-reground.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/setup-check.mjs\"",
@@ -2051,6 +2089,7 @@
       "productionEvidence": [
         "plugins/pipeline-core/hooks/guard-apply-patch.mjs",
         "plugins/pipeline-core/hooks/guard-devplan.mjs",
+        "plugins/pipeline-core/hooks/guard-dispatch.mjs",
         "plugins/pipeline-core/hooks/guard-git.mjs",
         "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
         "plugins/pipeline-core/hooks/guard-push.mjs",
@@ -2058,6 +2097,7 @@
         "plugins/pipeline-core/hooks/hooks.json"
       ],
       "testEvidence": [
+        "plugins/pipeline-core/hooks/guard-dispatch.test.mjs",
         "plugins/pipeline-core/hooks/guard-git.test.mjs",
         "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
       ],
@@ -2185,6 +2225,7 @@
         "verify-phase:harness/scripts/verify.mjs:codex-sandbox-runtime-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-sandbox-select-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-session-start-hint-tests",
+        "verify-phase:harness/scripts/verify.mjs:commit-message-policy-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-host-adapter-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-result-bootstrap-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-result-case-migration-tests",
@@ -2204,8 +2245,10 @@
         "verify-phase:harness/scripts/verify.mjs:critic-fail-closed-check",
         "verify-phase:harness/scripts/verify.mjs:critic-fail-closed-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-packet-governance-tests",
+        "verify-phase:harness/scripts/verify.mjs:critical-action-authorization-tests",
         "verify-phase:harness/scripts/verify.mjs:critical-human-proof-policy-tests",
         "verify-phase:harness/scripts/verify.mjs:delivery-course-tests",
+        "verify-phase:harness/scripts/verify.mjs:dispatch-policy-tests",
         "verify-phase:harness/scripts/verify.mjs:doc-contract-check",
         "verify-phase:harness/scripts/verify.mjs:doc-contract-tests",
         "verify-phase:harness/scripts/verify.mjs:document-hooks-manifest-tests",
@@ -2224,6 +2267,7 @@
         "verify-phase:harness/scripts/verify.mjs:github-issue-operations-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-apply-patch-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-devplan-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-dispatch-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-git-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-lifecycle-ready-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-push-tests",
