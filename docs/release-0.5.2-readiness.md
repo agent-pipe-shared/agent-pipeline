@@ -202,6 +202,32 @@ evidence that the registered suites pass, not that the full corpus does.
 occurrence sits below the `DE-REFERENCE-BELOW` marker that declares those sections
 redundant and non-authoritative; the English above them is corrected.
 
+## Runner and platform scope, decided 2026-08-06
+
+ADR-0051 requires that every claimed runner/platform combination is either evidenced
+or recorded as a dated, PO-accepted gap. The PO's decision for 0.5.2: **everything
+ships except the hard evidence for Codex, macOS, Windows and Antigravity** — those
+are produced against the released artifact, with tracking issues created afterwards.
+
+That is the ADR's own second clause, not an exception to it. The record lives in
+[`docs/runner-platform-conformance.md`](runner-platform-conformance.md), which is the
+artifact ADR-0051's Follow-up asked for and never got — the reason those gaps went
+untracked is that no file was ever responsible for them.
+
+| Cell | 0.5.2 status |
+| --- | --- |
+| Claude × Unix/WSL | evidenced, pending the post-`RUNNER-THREAD-17` re-run |
+| Codex × Unix/WSL | accepted gap G1 |
+| macOS, both runners | accepted gap G2 |
+| Windows native, both runners | accepted gap G3 — known red suites, not merely absent evidence |
+| Antigravity | out of scope; landing it supersedes ADR-0051 |
+
+**One thing this changes about how the release reads:** 0.5.2 must not be described
+as "works on Codex and Claude across three platforms". Under the definition this
+repository itself adopted, it is evidenced for one runner on one platform, with three
+accepted gaps and a successor runner out of scope. The release notes should say that
+plainly.
+
 ## Explicitly deferred to 0.5.3, with reasons
 
 - **ADR-0054 steps 2–4** (`.arbitheon` tier, configurable directory name, writes
