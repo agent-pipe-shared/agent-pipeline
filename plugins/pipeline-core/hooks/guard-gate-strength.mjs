@@ -132,7 +132,7 @@ if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mj
   let filePath = "";
   try {
     const input = JSON.parse(readFileSync(0, "utf8"));
-    filePath = writeTargetPath(input?.tool_input);
+    filePath = writeTargetPath(input?.tool_input, String(input?.tool_name ?? ""));
   } catch {
     process.exit(0); // fail-open: malformed input is not this guard's business
   }

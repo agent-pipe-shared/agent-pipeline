@@ -21,12 +21,22 @@
  * see, not a blanket refusal of malformed input.
  */
 
-/** @param {unknown} toolInput the PreToolUse `tool_input` object */
-export function writeTargetPath(toolInput) {
+/**
+ * @param {unknown} toolInput the PreToolUse `tool_input` object
+ * @param {string} [toolName] the calling tool, when the caller knows it
+ *
+ * When `toolName` is given, the key that tool actually writes wins outright. Without it
+ * the order is a best guess. That distinction matters: a NotebookEdit payload carrying a
+ * stray `file_path` would otherwise make all four guards judge a path the call is not
+ * about to touch, which is a fail-open in the exact tool this module exists to cover.
+ */
+export function writeTargetPath(toolInput, toolName) {
   if (toolInput === null || typeof toolInput !== "object") return "";
-  for (const key of ["file_path", "notebook_path"]) {
+  const read = (key) => {
     const value = /** @type {Record<string, unknown>} */ (toolInput)[key];
-    if (typeof value === "string" && value !== "") return value;
-  }
-  return "";
+    return typeof value === "string" && value !== "" ? value : "";
+  };
+  if (toolName === "NotebookEdit") return read("notebook_path");
+  if (toolName === "Edit" || toolName === "Write") return read("file_path");
+  return read("file_path") || read("notebook_path");
 }

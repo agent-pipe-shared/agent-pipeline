@@ -65,6 +65,15 @@ try {
     assert.equal(writeTargetPath({ file_path: "a.mjs" }), "a.mjs");
     assert.equal(writeTargetPath({ notebook_path: "a.ipynb" }), "a.ipynb");
     assert.equal(writeTargetPath({ file_path: "a.mjs", notebook_path: "b.ipynb" }), "a.mjs");
+    // With the calling tool known, the key that tool actually writes wins outright. A
+    // NotebookEdit payload carrying a stray file_path would otherwise make all four
+    // guards judge a path the call is not about to touch -- a fail-open in the exact
+    // tool this module exists to cover.
+    assert.equal(writeTargetPath({ file_path: "a.mjs", notebook_path: "b.ipynb" }, "NotebookEdit"), "b.ipynb");
+    assert.equal(writeTargetPath({ file_path: "a.mjs", notebook_path: "b.ipynb" }, "Edit"), "a.mjs");
+    assert.equal(writeTargetPath({ file_path: "a.mjs", notebook_path: "b.ipynb" }, "Write"), "a.mjs");
+    assert.equal(writeTargetPath({ notebook_path: "b.ipynb" }, "Edit"), "");
+    assert.equal(writeTargetPath({ file_path: "a.mjs" }, "NotebookEdit"), "");
     // An empty or non-string file_path must not shadow a usable notebook_path.
     assert.equal(writeTargetPath({ file_path: "", notebook_path: "b.ipynb" }), "b.ipynb");
     assert.equal(writeTargetPath({ file_path: 7, notebook_path: "b.ipynb" }), "b.ipynb");

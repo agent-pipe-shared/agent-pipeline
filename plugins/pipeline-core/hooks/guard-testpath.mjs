@@ -115,7 +115,7 @@ let toolName = "";
 let toolInput = {};
 try {
   const input = JSON.parse(readFileSync(0, "utf8"));
-  filePath = writeTargetPath(input?.tool_input);
+  filePath = writeTargetPath(input?.tool_input, String(input?.tool_name ?? ""));
   toolName = String(input?.tool_name ?? "");
   toolInput = input?.tool_input ?? {};
 } catch {

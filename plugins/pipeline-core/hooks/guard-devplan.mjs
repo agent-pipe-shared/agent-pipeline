@@ -158,7 +158,7 @@ function normalize(p) {
 let filePath = "";
 try {
   const input = JSON.parse(readFileSync(0, "utf8"));
-  filePath = writeTargetPath(input?.tool_input);
+  filePath = writeTargetPath(input?.tool_input, String(input?.tool_name ?? ""));
 } catch {
   process.exit(0); // fail-open: guard is a safety net, not a prison
 }

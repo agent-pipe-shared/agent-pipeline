@@ -69,6 +69,9 @@ const VALID_RUNNERS = new Set(["claude", "codex"]);
 // -- allow -- without the session ever proving a ready bootstrap. Its target arrives as
 // `notebook_path`, not `file_path`; see lib/tool-write-target.mjs.
 const WRITE_TOOLS = ["Edit", "Write", "NotebookEdit"];
+// Both shells this hook is wired for. PowerShell was named in the matcher but in no
+// decision, which made the whole gate a no-op on the runner that uses it.
+const SHELL_TOOLS = ["Bash", "PowerShell"];
 const HOST_INIT_CROSS_VIEW_STATUSES = new Set([
   "repository-mount-read-only",
   "repository-control-path-invalid",
@@ -255,7 +258,7 @@ export function isProjectWritePath(filePath, root, dependencies = {}) {
 
 function isRestartResumeHintInputWrite(input, root) {
   if (!WRITE_TOOLS.includes(String(input?.tool_name ?? ""))) return false;
-  const filePath = writeTargetPath(input?.tool_input);
+  const filePath = writeTargetPath(input?.tool_input, String(input?.tool_name ?? ""));
   return filePath !== ""
     && resolve(root, filePath) === join(root, RESTART_RESUME_HINT_INPUT_PATH);
 }
@@ -865,9 +868,14 @@ export function isSanctionedLifecycleCommand(command, root, options = {}) {
 
 export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
   const toolName = String(input?.tool_name ?? "");
-  if (!["Bash", ...WRITE_TOOLS].includes(toolName)) return verdict(0);
+  // PowerShell is wired into the same PreToolUse matcher as Bash and was nevertheless
+  // absent from this list, so every PowerShell call returned verdict(0) -- allow -- for
+  // bootstrap admission, cross-repo mutation, the closed grammar and gate strength alike.
+  // On the native-Windows platform ADR-0051 makes a hard requirement, `Set-Content
+  // project/guard-config.json` was exactly the shell bypass efe452c set out to close.
+  if (![...SHELL_TOOLS, ...WRITE_TOOLS].includes(toolName)) return verdict(0);
   if (WRITE_TOOLS.includes(toolName)) {
-    const filePath = writeTargetPath(input?.tool_input);
+    const filePath = writeTargetPath(input?.tool_input, toolName);
     if (filePath.trim() === "" || filePath.includes("\0")) return blocked();
   } else {
     const command = input?.tool_input?.command;
@@ -893,12 +901,24 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
   if (toolName === "Bash" && isHumanPoSigningCommand(input.tool_input.command, root)) {
     return externalPoSigningOnly();
   }
-  if (toolName === "Bash") {
+  if (SHELL_TOOLS.includes(toolName)) {
     const gateStrength = gateStrengthShellRefusal(input.tool_input.command, root);
     if (gateStrength !== null) return gateStrength;
   }
+  // PowerShell reaches the gate-strength check above and nothing else, deliberately.
+  // Every decision below parses a POSIX command grammar; applying it to PowerShell would
+  // mis-read ordinary Windows syntax and refuse work rather than protect it, and the
+  // recovery lanes it gates are Bash-only, so a non-ready Windows operator would be left
+  // with no returned action. The bootstrap-admission asymmetry for PowerShell is
+  // pre-existing, is NOT closed here, and is recorded in docs/state.md.
+  //
+  // Consequence stated rather than hidden: `isReadOnlyDiagnosticCommand` is also a POSIX
+  // parser, so a PowerShell command naming one of the five paths is refused even when it
+  // only reads. That over-refuses on exactly five filenames and fails closed; a
+  // PowerShell-aware read-only classifier is the proper fix.
+  if (toolName === "PowerShell") return verdict(0);
   if (WRITE_TOOLS.includes(toolName)) {
-    const target = writeTargetPath(input.tool_input);
+    const target = writeTargetPath(input.tool_input, toolName);
     if (!isProjectWritePath(target, root, dependencies)) {
       return crossRepositoryMutationBlocked();
     }
