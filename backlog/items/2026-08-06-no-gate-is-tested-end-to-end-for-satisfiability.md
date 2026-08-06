@@ -70,3 +70,37 @@ red test, which is agent work, instead of an apparent decision point.
 - `backlog/items/2026-08-06-onboarding-lifecycle-plan-hardcodes-the-codex-runner.md`
 - `backlog/items/2026-08-06-release-preflight-has-a-builder-but-no-cli.md`
 - `docs/state.md`, the two 2026-08-06 blocks, for the full defect record.
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** accepted; a first instance of proposal step 1 already
+  exists. Stays open — the item's actual ask is the *systematic* version.
+- **Rationale (found 2026-08-06 night):**
+  `plugins/pipeline-core/hooks/lifecycle-gate-satisfiability.test.mjs` — its
+  own header states verbatim: *"That is the general lesson recorded in
+  `backlog/items/2026-08-06-no-gate-is-tested-end-to-end-for-satisfiability.md`,
+  and this suite is its first instance."* Commit `c92eaca` ("feat(guard):
+  make pipeline-start mandatory on Claude and the gate satisfiable") fixes
+  both a not-mandatory-on-Claude defect and a not-satisfiable defect in
+  `guard-lifecycle-ready.mjs`, and is registered in Verify
+  (`lifecycle-gate-satisfiability-tests`, `verify.mjs:264`). Proposal step 3
+  (consumer walk-through) also has a second, independent instance beyond
+  the one the item already names:
+  `guard-push.test.mjs`'s `PG12s1`/`PG12c`/`PGD23` and
+  `critical-action-authorization.test.mjs`'s `PPA1`/`DPA1` build a real
+  Ed25519 keypair, sign a real approval, and assert the push/deploy gate
+  **reaches ALLOW** — proving satisfiability, not just refusal.
+  **Still open, confirmed by direct check:** proposal step 2 (assert
+  remediation text is executable, as a *general* check) and the
+  generalization half of step 3 (every emitted action chain, not one or two
+  hand-picked ones) have no repository-wide framework — `grep -rl
+  "gate-walk"` across `plugins`/`harness`/`guardrails`/`backlog` matches
+  only this item itself. Step 4 (a QG rule for "test what the change
+  altered, not what it fixed") is not yet in `guardrails/quality-gates.md`;
+  QG-07 ("reproduce before you fix") is adjacent but does not cover this.
+  The item should be read as "generalize an already-proven pattern," not
+  "invent a new one."
+- **Assignment (if accepted):** step 1's first instance delivered by
+  `c92eaca`. Generalizing steps 1-3 across every configured gate/action
+  chain, and adding the step-4 QG rule, remains unassigned.
+- **Date:** 2026-08-06
