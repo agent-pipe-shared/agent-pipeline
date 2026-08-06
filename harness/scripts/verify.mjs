@@ -331,6 +331,8 @@ const TEST_SUITES = [
   { name: "pipeline-state-tests", file: join(scriptDir, "pipeline-state.test.mjs") },
   { name: "doc-contract-tests", file: join(scriptDir, "check-doc-contracts.test.mjs") },
   { name: "doc-contract-check", file: join(scriptDir, "check-doc-contracts.mjs") },
+  { name: "authority-tier-agreement-tests", file: join(scriptDir, "check-authority-tier-agreement.test.mjs") },
+  { name: "authority-tier-agreement-check", file: join(scriptDir, "check-authority-tier-agreement.mjs") },
   { name: "language-canon-tests", file: join(scriptDir, "check-language-canon.test.mjs") },
   { name: "language-canon-check", file: join(scriptDir, "check-language-canon.mjs") },
   { name: "license-contract-tests", file: join(scriptDir, "check-license-contract.test.mjs") },
