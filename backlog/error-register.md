@@ -18,6 +18,7 @@ The only allowed table form is:
 | Platform-specific filesystem and privilege assumptions can make a declared host surface unusable. | tooling | new |
 | Composed local read-only inspections can be misclassified as cross-root mutation. | tooling | recurring -> deferred: preserve fail-closed root enforcement and add closed command-shape coverage before changing the guard |
 | Mandatory design-close records can be blocked as implementation changes before the approval gate. | process | new |
+| A declared attended-human-override requirement can execute unenforced when the same sanctioned writer is invoked outside the intercepted tool surface. | safety | new |
 
 Use one concise, generic class per distinct root cause. Similar classes are
 merged; the board holds at most approximately 30 classes. `new` is allowed for
