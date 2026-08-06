@@ -209,6 +209,29 @@ try {
     assert.equal(second.planned.length, 0);
   });
 
+  check("RBL11 existing ledger bytes are never rewritten — the write is append-only", () => {
+    // Re-serialising the whole chain keeps every hash valid, which is exactly what
+    // makes rewriting history a quiet failure. It also invalidates content-bound
+    // external references into the file (this repository's .gitleaksignore
+    // false-positive fingerprints bind path:rule:line:column).
+    const { base } = fixture({
+      items: [ITEM("lambda", "in_progress"), ITEM("mu", "open")],
+      events: [{ id: "pipeline.lambda", from: null, to: "open", reference: "2026-07-01-lambda.md" }],
+    });
+    const ledger = join(base, "backlog", "transitions.ndjson");
+    const before = readFileSync(ledger, "utf8");
+    const result = applyBacklogReconciliation(base, { at: "2026-08-06" });
+    assert.equal(result.wrote, true);
+    const after = readFileSync(ledger, "utf8");
+    assert.equal(after.startsWith(before), true, "the prior ledger must survive verbatim as a prefix");
+    assert.equal(after.slice(0, before.length), before);
+    assert.equal(
+      after.trimEnd().split("\n").length,
+      before.trimEnd().split("\n").length + result.planned.length,
+      "exactly the planned events are appended, nothing else changes",
+    );
+  });
+
   check("RBL10 the transaction journal does not survive a successful apply", () => {
     const { base } = fixture({
       items: [ITEM("kappa", "open")],

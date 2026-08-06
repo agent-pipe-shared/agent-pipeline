@@ -213,8 +213,16 @@ export function applyBacklogReconciliation(root = DEFAULT_ROOT, options = {}) {
   const plan = planBacklogReconciliation(root, options);
   if (!plan.ok) return { ...plan, wrote: false };
   if (plan.planned.length === 0) return { ...plan, wrote: false };
+  // APPEND ONLY. Re-serialising the whole chain through canonicalJson would rewrite
+  // existing entries' BYTES (key order normalises), and an append-only hash-chained
+  // audit ledger must not have its history rewritten — the hashes would still verify,
+  // which is exactly what makes that failure mode quiet. It also invalidates every
+  // content-bound external reference into the file, e.g. the .gitleaksignore
+  // false-positive fingerprints, which bind path:rule:line:column.
+  const existing = existsSync(join(root, LEDGER_PATH)) ? readFileSync(join(root, LEDGER_PATH), "utf8") : "";
+  const appended = `${plan.planned.map((event) => canonicalJson(event)).join("\n")}\n`;
   const targets = [
-    { path: LEDGER_PATH, after: `${plan.events.map((event) => canonicalJson(event)).join("\n")}\n` },
+    { path: LEDGER_PATH, after: existing.trim() === "" ? appended : `${existing.replace(/\n*$/u, "\n")}${appended}` },
     { path: STATUS_PATH, after: plan.projection.statusText },
     { path: INDEX_PATH, after: plan.projection.indexText },
   ];
