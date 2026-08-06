@@ -5,7 +5,7 @@
 
 **Last updated:** 2026-08-06
 **Project status:** PAUSED — resumes with the rebase onto the 0.5.2 release
-**Current block:** Implementation against the approved §7 inventory. Phase `implementation`, lifecycle `implementing`, continuity revision `3`, authority PRD `303586c8…` + Spec `f7e32bb7…`. 18 of the 35 criterion gaps are closed; 2 are classified as needing implementation; 15 remain unclassified
+**Current block:** Implementation against the approved §7 inventory. Phase `implementation`, lifecycle `implementing`, continuity revision `3`, authority PRD `303586c8…` + Spec `f7e32bb7…`. 18 of the 35 criterion gaps are closed; 10 are classified as needing real implementation; 6 are classified as needing only a test against an existing mechanism; 1 remains unclassified (R-AC-10). All 35 are now read; none is left unread
 **Branch:** `sprint_phoenix`, based on public `origin/main`
 `9d1b3dc108eb77629ace5b82002120f5539abd8d`
 **Pipeline:** session runtime `0.5.2+claude.20260805231810.4221989`; the repo's own
@@ -13,10 +13,14 @@
 deliberately not the governing runtime
 **DoD:** 🟡 `EPIC-AC-05` is partially evaluable. 18 of the 35 gap criteria now
 carry named test evidence (12 tests against existing mechanisms, 6 genuine
-implementations). 2 more are classified as real feature gaps, 15 remain
-unclassified. Full Verify was green on `015a08c` (193/193, security `CLEAN`);
-six Critic findings have been fixed on top of it, so Verify is owed again on the
-new candidate before any publication attempt
+implementations). 10 are classified as real feature gaps (2 from the first
+pass — H-AC-08, X-AC-11 — plus 8 more from the 2026-08-06 classification pass:
+L-AC-07, P-AC-09, E-AC-10, E-AC-20, R-AC-02, R-AC-08, R-AC-11, R-AC-12). 6 more
+are classified as needing only a test against an already-present mechanism
+(K-AC-08, K-AC-10, L-AC-08, P-AC-08, E-AC-04, E-AC-09) — not yet closed. 1
+remains unclassified (R-AC-10). Full Verify was green on `015a08c` (193/193,
+security `CLEAN`); six Critic findings have been fixed on top of it, so Verify
+is owed again on the new candidate before any publication attempt
 
 ## Operational head
 
@@ -69,8 +73,67 @@ security evidence shape.
 
 Still open after the rebase: Critic findings F-8, F-9, F-10; the F-1
 regression test (belongs in `pipeline-state.test.mjs`, which TP-5
-protects with no in-session path); X-AC-11, H-AC-08; 15 unclassified
-criteria; issue reconciliation for eight `sprint:phoenix` issues.
+protects with no in-session path); 10 classified feature gaps (H-AC-08,
+X-AC-11, L-AC-07, P-AC-09, E-AC-10, E-AC-20, R-AC-02, R-AC-08, R-AC-11,
+R-AC-12); 6 classified test-only gaps (K-AC-08, K-AC-10, L-AC-08, P-AC-08,
+E-AC-04, E-AC-09); 1 unclassified criterion (R-AC-10); issue reconciliation
+for eight `sprint:phoenix` issues.
+
+### Classification pass 3, AFK session — 2026-08-06
+
+The Product Owner was away and asked, in one line, to implement everything
+still open in Phoenix, with instructions to make assumptions rather than wait.
+`docs/state.md` at session start recorded an explicit, dated PO pause —
+"resumes with the rebase onto the 0.5.2 release... not more feature work" —
+which directly conflicts with that ask. Overriding a recorded PO decision is
+not something an AFK instruction can authorize; it is exactly the class of
+decision this pipeline reserves for the PO. The conflict was surfaced back to
+the (AFK) user with four concrete options rather than silently picking one; the
+answer selected was the bounded middle path: no rebase, no new feature
+implementation, but safe, reversible, doc-only prep that does not depend on the
+0.5.2 version — concretely, finishing the criterion classification the
+2026-08-05/06 sessions had left at "15 remain unclassified."
+
+Bootstrap ran clean first: `pipeline-start` resolved `0.5.2+claude.20260806182135.8439afa`
+(the newest of eight locally cached plugin versions, none matching the
+`docs/state.md`-recorded `...20260805231810.4221989`), V4 onboarding `ready`
+with no diagnostics, observation governance `passed`, `CLAUDE_CODE_SUBAGENT_MODEL`
+unset. Verify evidence on disk is unchanged from the prior session: green on
+`7885206` (tree `c7a12ec8`); HEAD `40d18f1` is 3 docs-only commits ahead and
+was not re-verified, since nothing code-shaped changed in this session either.
+
+All 15 remaining unclassified gap criteria (K-AC-08, K-AC-10, L-AC-07, L-AC-08,
+P-AC-08, P-AC-09, E-AC-04, E-AC-09, E-AC-10, E-AC-20, R-AC-02, R-AC-08,
+R-AC-10, R-AC-11, R-AC-12) were read module by module — full detail and
+per-criterion evidence in `specs/sprint-phoenix-epic/evidence/acceptance-evidence-map-20260805.md`
+("Classification pass 3"). A subagent did the first read; three of its highest-
+leverage claims (the `GES-CHECKPOINT` fail path, the audit-bundle manifest
+schema, and the `external-command-offer.mjs` import list) were independently
+re-verified against the source directly before being written down. Result: 6
+more are test-only (K-AC-08, K-AC-10, L-AC-08, P-AC-08, E-AC-04, E-AC-09 — the
+mechanism already exists, only a test is missing); 8 more are genuine feature
+gaps (L-AC-07, P-AC-09, E-AC-10, E-AC-20, R-AC-02, R-AC-08, R-AC-11, R-AC-12);
+1 stays unclassified (R-AC-10 — a fail-closed-shaped code property with zero
+callers anywhere in the repo, so the system-level guarantee the criterion
+requires is not demonstrable either way without guessing). Combined with the
+earlier passes: of 35 originally-unbound criteria, all 35 are now read, 18 are
+closed, 10 are classified feature gaps, 6 are classified test-only gaps, 1
+stays honestly unclassified.
+
+**No code, test, or config file was written or edited.** No push, no rebase,
+no implementation. This entry and the evidence-map update get their own small
+`docs(phoenix)` commit, same as the three preceding session entries; the three
+machine/config state files (`.claude/pipeline.yaml`, `pipeline.user.yaml`,
+`project/pipeline-state.json`) stay dirty per the separate, narrower
+convention that covers only those three.
+
+**Next session.** The rebase-first decision from the prior pause is unchanged
+and still applies before more feature work. If/when the PO instead chooses to
+proceed on the current 0.4.6-era checkout without the rebase, the ordered
+work is: author the 6 pending tests against already-present mechanisms
+(cheapest, lowest-risk), then implement the 10 classified feature gaps, then
+resolve R-AC-10 by either wiring a real caller or reclassifying once one
+exists.
 
 ### Critic findings worked — 2026-08-06
 
