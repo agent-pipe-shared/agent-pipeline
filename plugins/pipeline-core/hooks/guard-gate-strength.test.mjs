@@ -242,6 +242,49 @@ try {
     assert.doesNotMatch(shell(root, "touch README.md").stderr, /GUARD-GATE-STRENGTH-SHELL/u);
   });
 
+  check("GST17 the two lanes cannot drift apart in coverage", () => {
+    // F5, as a standing check. The shell lane refuses on basename, the write lane on the
+    // exact repo-relative path, and those are deliberately different matching styles -- but
+    // a file one lane defends and the other does not is a hole, and that is exactly how
+    // `.claude/guard-config.json` came to be shell-refused while staying freely writable.
+    // Direction that matters: every basename the shell lane refuses must have at least one
+    // write-lane rule behind it.
+    const root = governed();
+    for (const name of new Set(GATE_STRENGTH_PATHS.map((rule) => rule.path.split("/").pop()))) {
+      const covering = GATE_STRENGTH_PATHS.filter((rule) => rule.path.endsWith(`/${name}`) || rule.path === name);
+      assert.ok(covering.length > 0, `shell lane refuses ${name} with no write-lane rule`);
+      assert.match(shell(root, `touch ${name}`).stderr, /GUARD-GATE-STRENGTH-SHELL/u,
+        `write lane defends ${name} but the shell lane admits it`);
+    }
+  });
+
+  check("GST18 both authority tiers of the guard config are defended", () => {
+    // Named rather than derived, so dropping either tier fails loudly instead of shrinking
+    // the loop above into agreement with itself.
+    const paths = GATE_STRENGTH_PATHS.map((rule) => rule.path);
+    assert.ok(paths.includes("project/guard-config.json"), "neutral-tier guard config is unprotected");
+    assert.ok(paths.includes(".claude/guard-config.json"), "legacy-tier guard config is unprotected");
+    assert.ok(paths.includes("project/pipeline.yaml"), "neutral-tier manifest is unprotected");
+    assert.ok(paths.includes(".claude/pipeline.yaml"), "legacy-tier manifest is unprotected");
+  });
+
+  check("GST19 a legacy-tier project's guard config is refused through the write lane", () => {
+    // The end-to-end shape of F5: a repository that never migrated, governed only by its
+    // legacy marker, editing the file that names every other guard's protected paths.
+    const root = mkdtempSync(join(tmpdir(), "gate-strength-legacy-"));
+    roots.push(root);
+    mkdirSync(join(root, ".claude"), { recursive: true });
+    writeFileSync(join(root, ".claude", "guard-config.json"), JSON.stringify({ protectedTestPaths: [] }));
+    const result = spawnSync(process.execPath, [GUARD], {
+      input: JSON.stringify({ tool_name: "Edit", tool_input: { file_path: ".claude/guard-config.json" }, cwd: root }),
+      encoding: "utf8",
+      cwd: root,
+      env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+    });
+    assert.notEqual(result.status, 0, "the legacy-tier guard config was writable");
+    assert.match(result.stderr ?? "", /Rule ID: GS-7/u);
+  });
+
   console.log(`\nguard-gate-strength: ${passed} passed, ${failed} failed`);
 } finally {
   for (const entry of roots) rmSync(entry, { recursive: true, force: true });

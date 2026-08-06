@@ -73,6 +73,17 @@ export const GATE_STRENGTH_PATHS = Object.freeze([
     path: ".claude/pipeline.yaml",
     reason: "the legacy-tier manifest carries gates.push.approval for projects that never migrated (ADR-0054).",
   }),
+  // GS-7 (not GS-6: that id is the live-plugin rule below and renumbering would break every
+  // reference to it). GS-3 got its legacy sibling as GS-5 but GS-4 never got one, so on a
+  // legacy-tier project an Edit to .claude/guard-config.json was not a gate-strength path at
+  // all -- while the shell lane, which matches on basename, refused the very same file. The
+  // write lane was the weaker of the two, which is the wrong way round. Found by the T1
+  // Critic on 511d7d7 (F5).
+  Object.freeze({
+    id: "GS-7",
+    path: ".claude/guard-config.json",
+    reason: "the legacy-tier guard config carries the same protected-path lists as GS-4 for projects that never migrated (ADR-0054).",
+  }),
 ]);
 
 export const LIVE_PLUGIN_RULE = Object.freeze({
@@ -154,7 +165,7 @@ if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mj
 
     // Only defend a repository the Pipeline actually governs; elsewhere these are
     // ordinary filenames.
-    const governed = ["pipeline.user.yaml", "project/pipeline.yaml", ".claude/pipeline.yaml", "project/guard-config.json"]
+    const governed = ["pipeline.user.yaml", "project/pipeline.yaml", ".claude/pipeline.yaml", "project/guard-config.json", ".claude/guard-config.json"]
       .some((marker) => existsSync(join(resolve(projectDir), marker)));
     if (!governed) process.exit(0);
   }
