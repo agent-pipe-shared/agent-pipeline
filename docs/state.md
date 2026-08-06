@@ -191,7 +191,9 @@ once at its tool budget mid-hunt and was resumed. **Verdict: FAIL**, eight findi
   prepare-authorization → authorize `--activate`) and then run the wired guard: the bound
   edit is admitted with the override marker on stderr, an edit bound elsewhere is refused,
   the capability is single-use, and `signature` mode ignores an armed capability outright.
-  Each walks block→allow→block rather than asserting a single state.
+  Two of the four reach an allow (OT10 block→allow, OT12 arm→allow→block); OT11 and OT13
+  arm and then assert a refusal, so they never cross into an allow. An earlier version of
+  this line said "each walks block→allow→block", which the T2 Critic corrected as C3.
 - **F5 (minor, FIXED in `d7b70d8`)** — the shell lane matches a basename substring while
   the write lane matches the exact repo-relative path. GS-3 got its legacy sibling as GS-5,
   but GS-4 never did, so on a legacy-tier project an **Edit** to `.claude/guard-config.json`
@@ -246,10 +248,83 @@ reproduced nothing and armed no capability; it read 814 of 1709 lines of the Spe
 `quality-gates.md` of the five guardrail files; it diffed 5 of ~70 migrated scripts; and
 F4 rests on this repo's own contract rather than on observed PowerShell behaviour.
 
+### The T2 Critic round on the remediation — and why the push did NOT happen
+
+The PO stopped the push chain on the correct ground: a Critic FAIL is an unmet gate, and
+the agreed order was to clear the findings first. That reversal is what produced everything
+below, so it is recorded as the decision it was.
+
+T2 Critic (`critic` agent, Opus, assurance `functional-equivalent-read-only; OS isolation
+not asserted`), admission `packet-ready`, base `511d7d7` → candidate `62de980`. **Verdict:
+FAIL**, five findings.
+
+- **C1 (BLOCKER, FIXED in `c48c67f`)** — the F1 remediation's own load-bearing claim was
+  false. The code comment asserted that GS-1 refuses `pipeline.user.yaml` "through both the
+  write lane and the shell lane", so an agent could not reach `chat` by writing it. The
+  shell lane matches the **literal filename in the command text**, so a name assembled at
+  runtime walks past it — and no better string matching closes that, because an interpreter
+  handed inline code, or a script written a moment earlier, is opaque to a guard that can
+  only read a command line. Worse than a writable config: the same single write both
+  admitted the in-session guard-testpath override AND, through `criticalProofWaiverFor`,
+  stood down the detached Ed25519 proof for `push`. The agent could clear its own push
+  gate — exactly the scenario `guard-gate-strength.mjs`'s header opens with. **Fix:** the
+  decision no longer rests on the working tree. `readPushApprovalMode` compares the file
+  against `HEAD` and treats any difference as unverified, returning the strongest mode. An
+  in-session write can now only *strengthen* this gate, whichever route wrote it.
+  **Residual, stated because overselling is how the false claim got written:** an agent
+  that writes *and commits* makes the two agree again. What it loses is invisibility — the
+  change becomes a diffable commit inside the candidate the push request binds to. This
+  lowers an unobservable flip to a recorded one; it does not make the file unreachable.
+  **Operator consequence:** setting `chat` now requires committing it.
+- **C2 (minor, FIXED in `d3cf7ed`)** — GST17 derived a basename from `GATE_STRENGTH_PATHS`
+  and then searched that same array for a covering rule, so it could not fail; deleting
+  GS-7 left it byte-identical in outcome. It was named for F5 and could not have caught F5.
+  It now spawns both lanes for every rule and asserts each refuses, naming the rule id.
+- **C3 (minor, FIXED here)** — this register said the four new override tests "each" walk
+  block→allow→block. Two do. Corrected above.
+- **C4 (minor, FIXED in `c48c67f`)** — `guard-testpath.mjs`'s NOT-COVERED header still
+  listed NotebookEdit as unmatched, contradicting its own MATCHING block and the wiring.
+- **C5 (major, DISCLOSED, PO's to close)** — every production diff in this range was
+  authored by the orchestrating session; no Goldfish dispatch record exists. Same standing
+  constraint as F8 and the blocks before it. The Critic notes it could find no §3.3
+  stage-0 fast path in `docs/operating-model.md` that would carve this out.
+
+The T2 Critic's stated coverage boundary: it read ~200 of 1699 Spec lines and did **not**
+map this delta onto a numbered acceptance criterion; it read only `quality-gates.md` in
+full; it read none of ADR-0014/0055/0056 themselves; it ran no test suite and armed no
+capability; and it did **not** chain C1 end to end into an actual write, establishing each
+link separately instead, because doing so would breach its read-only contract.
+
 ### Open
 
-- **F7 above** — the only Critic finding still open, and it is the PO's to close because
-  GS-4 refuses `project/guard-config.json` to the agent. Exact entries prepared below.
+- **GIT-03 violated on every commit this session — a REPEAT of an already-fixed defect.**
+  Raised by the PO, not by a gate. `guardrails/git.md` GIT-03 requires exactly
+  `AI-Assisted: true` and forbids "provider- or model-specific co-author trailers, session
+  URLs or IDs, account identifiers, or any other private correlation data" in commit
+  metadata. Every commit I authored carries both a `Co-Authored-By: Claude …` trailer and a
+  `Claude-Session: https://claude.ai/code/session_…` URL. This is the same finding the
+  register already records as fixed on 2026-08-05 (Attempt-3 F2, remediated by the PO with
+  `git filter-branch --msg-filter`); I reintroduced it, because the runner's own commit
+  convention says to add those trailers and this repository's guardrail overrides it.
+  Measured scope: **74** commits reachable from HEAD carry the session URL. **53 of them
+  are already published** on `upstream/feat/sprint-nova-codex-v046` at
+  `github.com/agent-pipe-shared/agent-pipeline`, a public repository — those are NOT
+  rewritable: GIT-04 bans rewriting shared history and the guard union denies the
+  force-push it would require. The correlation handle is public and stays public. The
+  remaining **21 are unpushed** and can still be cleaned by the same `filter-branch`
+  remedy, which is the PO's hand in their own terminal, not the agent's. Going forward this
+  session uses `AI-Assisted: true` and no session URL.
+- **Verify is RED on the current candidate**, one suite: `guard-push-tests`, case PG12c.
+  This is the C1 fix landing on a fixture that encoded the old contract — PG12c writes
+  `push_approval: chat` into `pipeline.user.yaml` **without committing it** and asserts the
+  push is allowed, which is now precisely the hole C1 closed. The fixture must commit the
+  file and re-read HEAD so its evidence still binds to the tip. The edit was attempted and
+  **refused by TP-5** (measured, not assumed), which is the guard working as designed: this
+  is a genuine test change and therefore its own briefed, human-cleared task. Needs a TP-5
+  lift or the PO's own edit; the exact patch is in the handover below.
+- **F7 above** — the only prior-round finding still open, and it is the PO's to close
+  because GS-4 refuses `project/guard-config.json` to the agent. Exact entries prepared
+  below.
 - **The guard-testpath override serves exactly one of this repository's five TP entries.**
   Found while closing F3, pinned as OT14. `human-guard-override` eligibility routes every
   `plugins/pipeline-core/**` write to Pipeline-author repair, which needs an explicitly
