@@ -85,6 +85,92 @@ proof path is exercised. Tracked in
   directory sources — `/reload-plugins` proved it), and the readiness doc's
   registration blocker closed.
 
+### Lifecycle deviation, disclosed (Critic F1)
+
+**This block was Elephant-authored throughout. No production diff in it came from a
+dispatched Goldfish session.** The T1 Critic raised this as F1 (major): 12 commits,
+34 files, +1558/−102, including a guardrail hook (`guard-push.mjs`), the verify gate
+(`verify.mjs`) and two new library modules — every one an explicit disqualifier in
+EL-01's stage-0 exception. The finding is accurate and is recorded here rather than
+argued with.
+
+The cause is a session-level constraint, not a judgement that dispatch was
+unnecessary: this runner session was started under an explicit instruction not to
+invoke subagents unless the operator asked for one. The operator asked for exactly one
+— the Critic review that produced this finding — and it was dispatched. Everything
+else was executed directly.
+
+Consequences, stated plainly: the three mechanisms this repository uses to make
+authorship checkable (commit trailers `Dispatch: <ID> (goldfish)`, `dispatch-record.json`
+artifacts, and the EL-21 ledger in this block) are absent for this range, and no
+retroactive record may be written for them — inventing provenance is what the previous
+block's F6 refused. The dispatch ledger for this block is therefore exactly one entry:
+
+| id | role | model / effort | outcome |
+| --- | --- | --- | --- |
+| CRITIC-NOVA-PM-01 | Critic (T1, GUARDRAIL) | Opus / max | FAIL, 4 findings (F1–F4) |
+
+The structural fix belongs to the operator, not to this block: either the constraint is
+lifted so ordinary work is dispatched again, or EL-01/EL-21 are amended to describe a
+sanctioned Elephant-direct lane with its own disclosure requirement. Until then, every
+such block must carry a disclosure like this one. Related open item:
+`backlog/items/2026-07-23-elephant-direct-implementation-under-afk-authorization.md`.
+
+### Critic round and remediation
+
+T1 Critic (Opus, effort max, `functional-equivalent-read-only; OS isolation not
+asserted`) on the fixed range `f1dd7cf..5d5ff93`. **Verdict FAIL**, four findings.
+F2, F3 and F4 are fixed; F1 is disclosed above.
+
+- **F1 (major, lifecycle)** — no dispatch provenance. Disclosed, not fixed; see above.
+- **F2 (major)** — the push gate was flipped to `required` while `CLAUDE.md`,
+  `guardrails/git.md` and ADR-0017 still asserted `standing-approved`, and ADR-0055
+  attributed the decision to ADR-0054, which records no such decision. All four
+  corrected: ADR-0017 is now marked superseded **for this repository only** (adopting
+  projects may still choose standing approval), and ADR-0055 names itself and the
+  register entry as the decision's record.
+- **F3 (major)** — the ADR-0055 waiver was wired for `push` only. The policy accepts a
+  `deploy` or `publication` waiver and reports it valid, but `approve-deploy` keyed its
+  flag set off `requiredKinds.has("deploy")` alone — and a waived kind deliberately
+  stays in that list — so it still demanded three proof paths that are never read, and
+  recorded an approval carrying no statement of what backed it. Both non-push call
+  sites now honour the waiver and label the record. Covered by CHP14/CHP15.
+- **F4 (minor)** — `verify.mjs`'s header let `resolveAuthorityArtifactPath` read as if
+  it signals a missing manifest. It never does, by design. The header now says so
+  explicitly and warns against trusting `.path`/`.exists` as the opt-out signal.
+
+The Critic also disclosed that the session scratchpad it was given was not fresh: it
+contained implementor commit drafts and two prior Critic dispatch directories. It read
+none of them and worked without writing. That is a harness isolation gap, not a
+briefing violation, and it is the second consecutive block in which the Critic's
+per-dispatch isolation was not actually provided.
+
+### Backlog ledger: closed
+
+`check-backlog-state.mjs` went from 39 findings to **0**. The cause was singular:
+backlog items were created and advanced by editing Markdown directly instead of through
+a ledger transition, so the files were the honest record and the ledger never heard
+about it. Neither existing tool could repair it — `migrate-backlog-state.mjs` is
+one-time and refuses once the ledger exists, and `applyBacklogTransition` refuses while
+the state is not ok, which it was not, precisely because of the drift. Deadlock.
+
+`plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs` breaks it: it records, in
+the ledger, the status each item file already asserts — 44 transitions across 38 items —
+and claims no implementation, review or closure of its own. A closure whose commit is
+unreachable or whose evidence file is missing blocks that item rather than being
+recorded. `check-backlog-state.mjs` is now a registered Verify step, so this cannot
+drift again unnoticed; the remedy when it goes red is one command.
+
+One latent finding surfaced and is NOT repaired:
+`backlog/items/2026-07-20-source-available-commercial-licensing.md` declares
+`closure_repository: "self"` with `closure_commit: 03de3d47…`, and that object does not
+exist in this repository (`git cat-file -t` fails). It was already `closed` in the
+ledger, so the reconciliation neither needed nor touched it, and the state checker does
+not verify reachability for already-recorded entries. The PO-approved repair
+disposition that introduced that commit
+(`specs/sprint-nova-epic/evidence/backlog/2026-07-24-unreachable-evidence-disposition.md`)
+replaced two unreachable commits with one that is itself unreachable here.
+
 ### Open
 
 - ADR-0054 steps 2–4 (third tier, configurable name, writes to the top tier,
