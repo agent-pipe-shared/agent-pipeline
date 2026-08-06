@@ -1,0 +1,8 @@
+{
+  "taskId": "RUNNER-THREAD-17",
+  "model": "sonnet",
+  "rulesetSha": "84502009cbb73bc3e1a36c7a981739ec2452e105",
+  "dispatcher": "goldfish",
+  "outcome": "reverted-then-completed-by-orchestrator",
+  "note": "Three resumed rounds left a partial change that broke 100 tests and never reached the CLI; reverted. The work was then completed directly, so commit c860e1d carries this task ID but is NOT goldfish-authored. Recorded so the trailer is not read as dispatch provenance it does not have."
+}

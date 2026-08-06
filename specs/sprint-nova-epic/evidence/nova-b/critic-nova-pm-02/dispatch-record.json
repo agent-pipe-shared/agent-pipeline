@@ -1,0 +1,8 @@
+{
+  "taskId": "CRITIC-NOVA-PM-02",
+  "model": "opus",
+  "rulesetSha": "9bfffa597a8027daeb33a8d576c7f068c8066bf5",
+  "dispatcher": "critic",
+  "outcome": "fail",
+  "note": "FAIL with one blocker (guard-push heredoc stripping shipped fail-open) and two major findings."
+}

@@ -21,9 +21,21 @@
  * candidate. It cannot manufacture a pass, it cannot upgrade a failure, and it holds
  * no opinion of its own. Running it on a red gate produces a refusal, not evidence.
  *
- * That distinction is the whole point. A tool that could write "passed" without a
- * passing source would reintroduce the self-attestation the closed loop was
- * (accidentally) preventing.
+ * WHAT THIS DOES NOT ACHIEVE — stated plainly because the first version of this
+ * header overclaimed it. The executor accepts gate evidence by EXACT key set
+ * (`schema`, `gate`, `candidate`, `status`, `exitCode` — see `requireSuccessfulGate`),
+ * and every one of those five is derivable by hand: the candidate from `git rev-parse`
+ * and the rest constant. The provenance this tool computes (`source.path`,
+ * `source.sha256`) is therefore printed but NOT persisted, because an artifact
+ * carrying it would be rejected.
+ *
+ * So the consumer cannot distinguish evidence derived here from evidence written by
+ * hand. This tool's refusal semantics bind only callers who choose to use it. That is
+ * a real residual, of the same class `guardrails/deploy.md` already records for
+ * agent-editable repository files: the load-bearing control is elsewhere, not in the
+ * artifact's shape. Closing it means teaching the executor to require provenance —
+ * a change to a security contract, tracked separately rather than smuggled into a
+ * release candidate.
  *
  * Usage:
  *   node publication-gate-evidence.mjs --gate <identity|verify|security> \

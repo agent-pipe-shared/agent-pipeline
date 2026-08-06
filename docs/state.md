@@ -116,6 +116,74 @@ sanctioned Elephant-direct lane with its own disclosure requirement. Until then,
 such block must carry a disclosure like this one. Related open item:
 `backlog/items/2026-07-23-elephant-direct-implementation-under-afk-authorization.md`.
 
+### Lifecycle deviation, second block (Critic CRITIC-NOVA-PM-02, F3)
+
+**The same disclosure applies to `5d5ff93..9bfffa5`, and was missing until the Critic
+said so.** The block above discloses the deviation for `f1dd7cf..5d5ff93` only; the
+register's own rule — "every such block must carry a disclosure like this one" — was
+therefore unsatisfied for the candidate under review. Recorded here rather than
+argued with.
+
+Of the 19 commits in that range, exactly one carries a dispatch trailer. The other 18
+include the guardrail hook `guard-push.mjs`, the verify gate, `pipeline-state.mjs`,
+and four new executable modules — every one a disqualifier for the stage-0 fast path.
+The cause is unchanged: a session-level constraint on invoking subagents, not a
+judgement that dispatch was unnecessary.
+
+**The one trailer is itself misleading, and the record now says so.** `c860e1d` carries
+`Dispatch: RUNNER-THREAD-17 (goldfish)`, but that dispatch was reverted after three
+resumed rounds left a partial change breaking 100 tests without reaching the CLI; the
+work was then completed directly. `runner-thread-17/dispatch-record.json` records
+`reverted-then-completed-by-orchestrator` so the trailer is not read as provenance it
+does not have.
+
+Both dispatch records were also untracked — `.gitignore`'s `evidence/` entry matches
+`specs/sprint-nova-epic/evidence/**`, while 52 sibling files there are tracked. They
+are now force-added, as their siblings were.
+
+| id | role | model / effort | outcome |
+| --- | --- | --- | --- |
+| RUNNER-THREAD-17 | Goldfish (deep) | sonnet / deep tier | reverted; completed by the orchestrator |
+| CRITIC-NOVA-PM-02 | Critic (T1, GUARDRAIL) | Opus / max | FAIL — 1 blocker, 2 major |
+
+### Second Critic round: a fail-open I shipped
+
+**F1, blocker.** The heredoc stripping added in `86b86cc` — my fix for the Phoenix
+friction finding — made the push gate **fail-open**. A real push placed after a
+heredoc terminator skipped every check: evidence freshness, approval binding, critical
+proof, publication authority. Two compounding defects: the opener was never removed
+and the scan restarted, so the same `<<TAG` was re-matched with its terminator gone
+and the remainder truncated; and removal glued text together without a separator, so a
+surviving push lost its word boundary.
+
+The commit message asserted the prior behaviour "was fail-closed, so never unsafe,
+only obstructive". The change inverted precisely that, on the gate the PO decision had
+just turned on, in a release candidate. Fixed in `d8c3775`, which states its safety
+properties and falls back to the *unstripped* command on bounded-scan exhaustion, so
+pathological input degrades to over-detection.
+
+**The tests could not see it.** PG-HD1/2 asserted allow; PG-HD3/4 asserted block for
+forms containing no heredoc. Not one placed a command *after* the terminator — the
+exact shape the change altered. PG-HD5..11 do, and five fail against the broken
+version. PG-HD10 passes either way, matching the finding that the quoted-tag form
+blocked only by accident.
+
+**F2, major.** `publication-gate-evidence.mjs`'s header claimed a closed loop the
+executor does not enforce. The executor accepts gate evidence by exact key set, all
+five fields hand-derivable, so the provenance the tool computes cannot be persisted
+and a consumer cannot tell derived evidence from hand-written. The header now states
+that residual instead of asserting the opposite.
+
+**Also disclosed by the Critic, third block running:** the scratchpad it was given was
+not fresh — implementor commit drafts, a session handover, ~20 verify logs and two
+prior Critic directories. It read none and worked in its own subdirectory. A harness
+gap, not a briefing defect, and now three-for-three.
+
+**Briefing violation, mine:** my mid-task message to the Critic enumerated three
+findings from its previous round. Earlier review verdicts are outside the closed
+admissible-input set. It did not change the analysis — the same findings are recorded
+in `docs/state.md` inside the candidate, which is admissible — but it was my error.
+
 ### Critic round and remediation
 
 T1 Critic (Opus, effort max, `functional-equivalent-read-only; OS isolation not
