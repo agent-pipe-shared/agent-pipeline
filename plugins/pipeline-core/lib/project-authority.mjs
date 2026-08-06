@@ -522,6 +522,57 @@ export function resolveProjectAuthorityPaths({ rootDir = process.cwd() } = {}) {
   };
 }
 
+/** The five authority artifacts, per tier.  Keys match `resolveProjectAuthorityPaths()`. */
+export const AUTHORITY_ARTIFACTS = Object.freeze({
+  manifest: Object.freeze({ neutral: NEUTRAL_MANIFEST, legacy: LEGACY_MANIFEST }),
+  state: Object.freeze({ neutral: NEUTRAL_STATE, legacy: LEGACY_STATE }),
+  calibration: Object.freeze({ neutral: NEUTRAL_CALIBRATION, legacy: LEGACY_CALIBRATION }),
+  guardConfig: Object.freeze({ neutral: NEUTRAL_GUARD_CONFIG, legacy: LEGACY_GUARD_CONFIG }),
+  guardAudit: Object.freeze({ neutral: NEUTRAL_GUARD_AUDIT, legacy: LEGACY_GUARD_AUDIT }),
+});
+
+/**
+ * Resolve ONE authority artifact for a plain reader (ADR-0054 step 1).
+ *
+ * `loadManifest()`, `pipeline-state.mjs`'s `statePath()` and `security-scan.mjs`
+ * each hand-rolled this same resolve-then-fall-back shape; this is that shape,
+ * once, so the remaining hardcoded readers can be routed without each inventing
+ * its own fallback.
+ *
+ * A reader must never become STRICTER by being routed.  An unresolvable or
+ * ambiguous authority therefore does not fail here: it falls back to the tier
+ * whose file actually exists, preferring legacy when neither does — byte-for-byte
+ * the behaviour of the hardcoded `.claude/` path it replaces, and the same rule
+ * `loadManifest()` already applies.  Callers that need to react to a broken
+ * authority read `authorityStatus`.
+ */
+export function resolveAuthorityArtifactPath(kind, { rootDir = process.cwd() } = {}) {
+  const artifact = AUTHORITY_ARTIFACTS[kind];
+  if (artifact === undefined) throw new TypeError(`unknown project-authority artifact: ${String(kind)}`);
+  const root = resolve(rootDir);
+  let authorityStatus = "invalid";
+  let source = null;
+  let relPath = null;
+  try {
+    const current = resolveProjectAuthorityPaths({ rootDir: root });
+    authorityStatus = current.status;
+    if (current.status === "ready") {
+      relPath = current[kind] ?? null;
+      source = relPath === null ? null : (current.source ?? null);
+    }
+  } catch {
+    // A malformed root is the hardcoded reader's own problem to report, exactly
+    // as it was before routing; it is not this resolver's to escalate.
+  }
+  if (relPath === null) {
+    const neutral = existsSync(join(root, artifact.neutral));
+    relPath = neutral ? artifact.neutral : artifact.legacy;
+    source = neutral ? "neutral" : "legacy";
+  }
+  const path = join(root, relPath);
+  return { kind, source, authorityStatus, relPath, path, exists: existsSync(path) };
+}
+
 /** Create an exact, write-free legacy-to-neutral migration plan. */
 export function planProjectAuthorityMigration({ rootDir = process.cwd(), provenance } = {}) {
   let root;

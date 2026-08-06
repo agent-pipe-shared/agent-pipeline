@@ -13,6 +13,7 @@ import {
   NEUTRAL_CALIBRATION, NEUTRAL_GUARD_AUDIT, NEUTRAL_GUARD_CONFIG, NEUTRAL_MANIFEST, NEUTRAL_STATE,
   inspectProjectAuthorityProvenance, planPendingProjectAuthorityRecovery, planProjectAuthorityMigration, readProjectAuthority,
   applyProjectAuthoritySessionCleanupRecovery, planProjectAuthoritySessionCleanupRecovery,
+  AUTHORITY_ARTIFACTS, resolveAuthorityArtifactPath,
 } from "./project-authority.mjs";
 import { cleanupSession, retireSessionDescriptor, startSessionDescriptor } from "./worktree-lifecycle.mjs";
 
@@ -376,6 +377,52 @@ try {
     assert.equal(applyProjectAuthorityMigration(plan, { rootDir: base, activate: true, interruptAfterRename: () => true }).status, "interrupted");
     const recovery = planPendingProjectAuthorityRecovery({ rootDir: base }); write(base, ".pipeline-project-authority-migration/journal.json", "{}\n");
     assert.equal(applyPendingProjectAuthorityRecovery(recovery, { rootDir: base, activate: true }).status, "rejected");
+  });
+  ok("artifact resolution follows a ready neutral authority for every kind", () => {
+    const base = root(); neutral(base, { schema: "pipeline.state.v0" });
+    for (const [kind, tiers] of Object.entries(AUTHORITY_ARTIFACTS)) {
+      const resolved = resolveAuthorityArtifactPath(kind, { rootDir: base });
+      assert.equal(resolved.authorityStatus, "ready", kind);
+      assert.equal(resolved.source, "neutral", kind);
+      assert.equal(resolved.relPath, tiers.neutral, kind);
+      assert.equal(resolved.path, join(base, tiers.neutral), kind);
+      assert.equal(resolved.exists, true, kind);
+    }
+  });
+  ok("artifact resolution follows a ready legacy authority for every kind", () => {
+    const base = root(); legacy(base);
+    for (const [kind, tiers] of Object.entries(AUTHORITY_ARTIFACTS)) {
+      const resolved = resolveAuthorityArtifactPath(kind, { rootDir: base });
+      assert.equal(resolved.authorityStatus, "ready", kind);
+      assert.equal(resolved.source, "legacy", kind);
+      assert.equal(resolved.relPath, tiers.legacy, kind);
+      assert.equal(resolved.exists, true, kind);
+    }
+  });
+  ok("a project with no authority keeps the legacy path a hardcoded reader used", () => {
+    const base = root();
+    const resolved = resolveAuthorityArtifactPath("manifest", { rootDir: base });
+    assert.equal(resolved.authorityStatus, "missing");
+    assert.equal(resolved.source, "legacy");
+    assert.equal(resolved.relPath, LEGACY_MANIFEST);
+    assert.equal(resolved.exists, false);
+  });
+  ok("an unresolvable authority still prefers the tier whose file exists", () => {
+    // Neutral manifest present, neutral State absent, legacy State present:
+    // the authority is `mixed`, so no reader may be made stricter by routing.
+    const base = root(); legacy(base);
+    write(base, NEUTRAL_MANIFEST, "schema: pipeline.manifest.v0\n");
+    assert.equal(readProjectAuthority({ rootDir: base }).status, "mixed");
+    const manifest = resolveAuthorityArtifactPath("manifest", { rootDir: base });
+    assert.equal(manifest.authorityStatus, "mixed");
+    assert.equal(manifest.relPath, NEUTRAL_MANIFEST);
+    assert.equal(manifest.exists, true);
+    const calibration = resolveAuthorityArtifactPath("calibration", { rootDir: base });
+    assert.equal(calibration.relPath, LEGACY_CALIBRATION);
+    assert.equal(calibration.exists, true);
+  });
+  ok("an unknown artifact kind is a caller error, not a silent legacy fallback", () => {
+    assert.throws(() => resolveAuthorityArtifactPath("settings", { rootDir: root() }), TypeError);
   });
   console.log(`project-authority: ${passed} passed, 0 failed`);
 } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
