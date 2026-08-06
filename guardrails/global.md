@@ -42,7 +42,7 @@ Rule IDs: `GL-xx`. Every rule = MUST / MUST NOT + Why + Verification.
   - **costly** (purchases, paid APIs or services beyond an agreed budget).
 - **MUST NOT** carry consent across contexts: an approval given in one session/task authorizes exactly that instance. A new session, a new task, or a changed scope re-requests consent.
 - **Why:** The PO is liable for every agent action; blanket or inherited approvals erode the human gate exactly where stakes are highest.
-- **Verification:** Human-gate step in the SDLC (`docs/operating-model.md` §3.2 step 9) and escalation ladder level 4 (§4.3); the completion report references the concrete approval (who/when/what). Autonomy levels are read from the committed project calibration (`.claude/pipeline.json`), never self-granted.
+- **Verification:** Human-gate step in the SDLC (`docs/operating-model.md` §3.2 step 9) and escalation ladder level 4 (§4.3); the completion report references the concrete approval (who/when/what). Autonomy levels are read from the committed project calibration at its resolved authority tier (`project/pipeline.json`, else `.claude/pipeline.json`), never self-granted.
 
 ## GL-05 — Judgment stays with the PO
 

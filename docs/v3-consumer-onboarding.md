@@ -250,7 +250,7 @@ repository.
 ## Neutral project authority migration
 
 Legacy project gates and lifecycle state may still live in
-`.claude/pipeline.yaml` and `.claude/pipeline-state.json`. Move that portable
+the manifest and lifecycle State at the legacy tier. Move that portable
 authority to the runner-neutral `project/` layer only through its separate,
 preview-first cutover:
 

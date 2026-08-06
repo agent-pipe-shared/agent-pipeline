@@ -31,7 +31,7 @@ Central, versioned Operating Model for agentic development across the PO's proje
 - **Guardrails:** [`guardrails/`](guardrails/) — provable prescriptive/prohibitive rules: `global.md`, `git.md`, `security.md`, `quality-gates.md`, `token-budget.md`.
 - **Templates/prompts:** [`templates/`](templates/) (+ `templates/prompts/`) — spec/ADR/roadmap/retro/CLAUDE.project templates, copy-paste-ready dispatch prompts.
 - **Plugin:** `plugins/pipeline-core/` — git-guard-union hook (+ test script), skills `pipeline-start`/`critic-review`/`close-block`/`conventional-commit`/`advisor-consult`, agents `goldfish-implementor`/`critic`/`plan-verifier`/`consult-advisor`; marketplace manifest in `.claude-plugin/` (`claude plugin validate` passes). End-to-end install verification on both machines: OPEN (Phase 4).
-- **Manifest (optional, additive):** `.claude/pipeline.yaml` — declarative phases/gates/security/model-routing/governance layer next to `.claude/pipeline.json` (zero field overlap); validator `harness/scripts/validate-manifest.mjs`; [ADR-0028](docs/adr/0028-manifest-approach.md).
+- **Manifest (optional, additive):** `pipeline.yaml` at the resolved authority tier — declarative phases/gates/security/model-routing/governance layer next to the calibration `pipeline.json` (zero field overlap; ADR-0046/ADR-0054); validator `harness/scripts/validate-manifest.mjs`; [ADR-0028](docs/adr/0028-manifest-approach.md).
 - **Governance layer:** [`governance/examples/`](governance/examples/README.md) — advisory guidelines vs. enforcing policies for a hosted project; [ADR-0030](docs/adr/0030-governance-layer.md).
 - **Improvement/feedback:** [`backlog/`](backlog/) — process in `backlog/README.md`.
 

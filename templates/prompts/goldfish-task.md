@@ -17,7 +17,7 @@ USAGE (Elephant)
    Never paste chat history, never paste your reasoning about alternatives.
 3. Dispatch as subagent (default: `goldfish-implementor`, effort `medium` per MP-27).
    Deviation from the role default REQUIRES the model justification in field 6.
-4. Writing tasks: worktree per project calibration (`.claude/pipeline.json`).
+4. Writing tasks: worktree per project calibration (`project/pipeline.json`, else `.claude/pipeline.json`).
 5. Light profile (stage-0 / bounded implementation ONLY): set field 6 `Profile: light` for a
    condensed 3-field report, reference-inlining, no baseline verify. Route mechanical work to
    `goldfish-mechanic`/`low` and bounded implementation to `goldfish-implementor`/`medium`. Use
@@ -41,7 +41,7 @@ report — never guess.
 First output line (compact bootstrap confirmation, verbatim canonical format,
 with the ruleset SHA from field 6):
 
-> Bootstrap check passed: ruleset {{RULESET_SHA}} loaded · Project {{PROJECT_NAME}} · Calibration {{CALIBRATION_FILE default: .claude/pipeline.json}} · State briefing {{TASK_ID}}/{{DATE}} · Role Goldfish
+> Bootstrap check passed: ruleset {{RULESET_SHA}} loaded · Project {{PROJECT_NAME}} · Calibration {{CALIBRATION_FILE default: the resolved calibration tier}} · State briefing {{TASK_ID}}/{{DATE}} · Role Goldfish
 
 If this briefing lacks the ruleset SHA, that is a briefing defect: stop and
 report back to the Elephant — do not research it yourself.

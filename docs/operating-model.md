@@ -203,8 +203,8 @@ guarded even when a model or prompt asks for them.
 ## 7. Project calibration and extensions
 
 The portable core is shared; each repository supplies a small committed
-calibration in `.claude/pipeline.json` and, where used, a declarative
-`.claude/pipeline.yaml`. The V3 source selects language, routing, profiles,
+calibration and, where used, a declarative manifest, both at the project's
+resolved authority tier (`project/*`, else the legacy `.claude/*`; ADR-0046/ADR-0054). The V3 source selects language, routing, profiles,
 duties and policy defaults. Use the templates rather than copying an existing
 repo's private details.
 

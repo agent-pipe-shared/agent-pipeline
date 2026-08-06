@@ -114,7 +114,7 @@ Invariant first: **A1–A5 (verify + evidence) are mandatory at every level — 
 
 ## 5. Project slots
 
-Slots come from the committed project calibration `.claude/pipeline.json` (field sketch: `docs/operating-model.md` §8). Never hardcode them — the pipeline runs on two machines with differing paths.
+Slots come from the committed project calibration at its resolved authority tier — `project/pipeline.json`, else `.claude/pipeline.json` (field sketch: `docs/operating-model.md` §8). Never hardcode them — the pipeline runs on two machines with differing paths.
 
 | Slot | Meaning | Calibration source |
 |---|---|---|

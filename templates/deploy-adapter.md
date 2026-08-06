@@ -2,7 +2,7 @@
 PROMPT/DOC TEMPLATE: deploy adapter reference form — Agent-Pipeline Release/Promotion
 phase (ADR-0033/0034). Language: English (agent-facing config reference).
 This is the FIELD REFERENCE for one adapter entry under a project manifest's
-`release.adapters.<name>` (`.claude/pipeline.yaml`, see `templates/pipeline.yaml.example`
+`release.adapters.<name>` (the project manifest, see `templates/pipeline.yaml.example`
 for the full commented shape in context). Copy the relevant example below when adding a
 new adapter; do not invent fields beyond this list.
 -->

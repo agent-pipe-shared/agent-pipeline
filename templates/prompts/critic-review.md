@@ -128,7 +128,7 @@ review, or issue a substantive pass/fail judgment.
 - Dispatch-record evidence (authorship evidence — the Critic can only verify
   diff authorship when dispatch records are in the evidence set):
   {{DISPATCH_LIST_PATH}}
-- Guardrails/constraints (the law): {{GUARDRAILS_PATHS e.g. "CLAUDE.md constraints block, .claude/pipeline.json, relevant policy file"}}
+- Guardrails/constraints (the law): {{GUARDRAILS_PATHS e.g. "CLAUDE.md constraints block, the project calibration, relevant policy file"}}
 - Evidence artifact(s) of the submission: {{EVIDENCE_PATHS e.g. "verify output log written by the script"}}
 - Claims/evidence record — a referenced, mechanical DoD result and command/exit
   code artifact only; the implementor's narrative rationale is NOT your input:

@@ -115,7 +115,7 @@ steps — a confirmation without performed checks is exactly the failure mode
    unreachable = **F3**. Goldfish/Critic: skip — the Elephant fixed the SHA at
    dispatch; use the SHA from your briefing.
 
-4. **Project calibration.** Check `.claude/pipeline.json` EXISTS, then read it:
+4. **Project calibration.** Check the calibration EXISTS at its resolved tier (`project/pipeline.json`, else `.claude/pipeline.json`), then read it:
    verify command(s), autonomy level, branch model, worktree rule, stakes,
    constraints. Check project denies where they actually live: committed
    `.claude/settings.json` / git-guard config (NOT in pipeline.json). Missing

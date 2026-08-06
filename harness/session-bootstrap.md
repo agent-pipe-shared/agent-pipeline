@@ -168,17 +168,17 @@ This step ends in a **third mandatory confirmation line** (printed directly unde
 
 ### Step 3 — Read the project calibration file (existence check first!)
 
-- **Requirement:** first check that the calibration file **exists** (working name, uniform: `.claude/pipeline.json`), then read it fully. Expected minimum required fields (field sketch → `docs/operating-model.md` §8): verify command(s), autonomy level, branch model, worktree rule, stakes rating, project constraints.
+- **Requirement:** first check that the calibration file **exists** at its resolved authority tier (`project/pipeline.json`, else the legacy `.claude/pipeline.json`), then read it fully. Expected minimum required fields (field sketch → `docs/operating-model.md` §8): verify command(s), autonomy level, branch model, worktree rule, stakes rating, project constraints.
 - **Requirement (denies):** project **denies** don't live in the calibration file, but in the committed `.claude/settings.json` resp. the git-guard config — this step checks the denies **there** (existence of the committed permission/guard entries).
 - **Why:** the central skills are parameterized and read this file — without it, rituals run with wrong defaults, in the worst case with the wrong project's guardrails.
 - **Verification:** file exists and contains the required fields; if missing or incomplete → case **F4**.
-- **Decided:** mechanism + field sketch → `docs/operating-model.md` §8; **schema format:** JSON (`.claude/pipeline.json`, shipped with the plugin).
+- **Decided:** mechanism + field sketch → `docs/operating-model.md` §8; **schema format:** JSON (`pipeline.json` at the resolved tier, shipped with the plugin).
 
 ### Step 4 — Read the handover/state file
 
 - **Requirement:** read the project's handover file in full (in the Pipeline repo: `docs/state.md`). It is the **sole authoritative state source**; memory is only a mirror.
 - **Why:** the hand-maintained triple baton has provably lied; the pipeline replaces it with one source — so every session must read exactly that one.
-- **Verification:** the last-update date is extractable (it goes into the confirmation line). **Drift threshold (default):** a warning applies if the project repo's last commit is NEWER than the handover state AND the delta since then contains at least one non-docs commit (pure docs deltas don't trigger a warning); a project can document a deviating threshold via a `$driftThreshold` comment field in `.claude/pipeline.json` (the default applies if the field is absent).
+- **Verification:** the last-update date is extractable (it goes into the confirmation line). **Drift threshold (default):** a warning applies if the project repo's last commit is NEWER than the handover state AND the delta since then contains at least one non-docs commit (pure docs deltas don't trigger a warning); a project can document a deviating threshold via a `$driftThreshold` comment field in the project calibration (the default applies if the field is absent).
 
 ### Step 5 — Project gates available?
 
@@ -394,9 +394,9 @@ The Elephant must additionally be able to speak to the session-lifecycle policy 
 
 - **PARTIALLY DONE:** the machine-readable source for the installed plugin SHA is verified on the main PC: `~/.claude/plugins/installed_plugins.json`, field `gitCommitSha` (details → Step 1). Naming the source in the `/pipeline-core:pipeline-start` skill has been backfilled. **Only the laptop cross-check remains OPEN** (two-machine validation, Sprint 1).
 - **DONE:** SessionStart hook wired up — `plugins/pipeline-core/hooks/staleness-check.mjs` (matcher `startup|resume|clear`, timeout 15s, fail-open, read-only) delegates to the channel-aware Pipeline-update helper and injects the bootstrap prompt plus visible `pipelineUpdateAvailability` channel/ref metadata alongside `repositoryFreshness=not-observed`; it never supplies repository write admission or performs an update.
-- **Decided:** mechanism and field sketch of the project calibration file are in `docs/operating-model.md` §8 (working name `.claude/pipeline.json`). **Schema format decided (shipped with the plugin):** JSON (`.claude/pipeline.json`); the `pipeline-start`/`close-block` skills read this format.
+- **Decided:** mechanism and field sketch of the project calibration file are in `docs/operating-model.md` §8. **Schema format decided (shipped with the plugin):** JSON (`pipeline.json` at the resolved authority tier — `project/`, else the legacy `.claude/`); the `pipeline-start`/`close-block` skills read this format.
 - **Decided:** handover file canonicalized (convention `docs/state.md`), relationship to HISTORY fixed — → `docs/operating-model.md` §6 + ADR-0012. **OPEN (Phase 4):** only the handover template + the final template name per project remain.
-- **DONE:** the handover drift-check threshold (Step 4) calibrated — default "HEAD newer than handover AND ≥1 non-docs commit in the delta," per-project override via `$driftThreshold` in `.claude/pipeline.json`.
+- **DONE:** the handover drift-check threshold (Step 4) calibrated — default "HEAD newer than handover AND ≥1 non-docs commit in the delta," per-project override via `$driftThreshold` in the project calibration.
 - **⚠ UNCERTAIN:** whether `autoUpdate` on the `extraKnownMarketplaces` entry has any effect outside managed settings — hence this protocol relies on explicit refreshes; re-evaluate the ritual in §5 if the docs situation changes.
 
 <!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
