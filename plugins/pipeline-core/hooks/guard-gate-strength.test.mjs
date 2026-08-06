@@ -242,19 +242,30 @@ try {
     assert.doesNotMatch(shell(root, "touch README.md").stderr, /GUARD-GATE-STRENGTH-SHELL/u);
   });
 
-  check("GST17 the two lanes cannot drift apart in coverage", () => {
-    // F5, as a standing check. The shell lane refuses on basename, the write lane on the
-    // exact repo-relative path, and those are deliberately different matching styles -- but
-    // a file one lane defends and the other does not is a hole, and that is exactly how
-    // `.claude/guard-config.json` came to be shell-refused while staying freely writable.
-    // Direction that matters: every basename the shell lane refuses must have at least one
-    // write-lane rule behind it.
+  check("GST17 every rule in the table is refused by both lanes", () => {
+    // An earlier version of this check asserted that each basename had "at least one
+    // covering rule" -- but the basename was derived from the same array it then searched,
+    // so the assertion could not fail. The T2 Critic caught it (C2); it is recorded here
+    // because a test that cannot fail is worse than no test, and this one carried a name
+    // suggesting it guarded F5.
+    //
+    // What is actually checked now: both lanes refuse every path in the table. That can
+    // fail -- if the shell lane stopped deriving its needles from GATE_STRENGTH_PATHS, or
+    // a rule were added whose exact path the write lane matches but whose spelling the
+    // shell lane misses, this goes red. It still cannot catch a tier that is in NEITHER
+    // lane, which is why GST18 names the tiers explicitly rather than deriving them.
     const root = governed();
-    for (const name of new Set(GATE_STRENGTH_PATHS.map((rule) => rule.path.split("/").pop()))) {
-      const covering = GATE_STRENGTH_PATHS.filter((rule) => rule.path.endsWith(`/${name}`) || rule.path === name);
-      assert.ok(covering.length > 0, `shell lane refuses ${name} with no write-lane rule`);
-      assert.match(shell(root, `touch ${name}`).stderr, /GUARD-GATE-STRENGTH-SHELL/u,
-        `write lane defends ${name} but the shell lane admits it`);
+    for (const rule of GATE_STRENGTH_PATHS) {
+      const write = spawnSync(process.execPath, [GUARD], {
+        input: JSON.stringify({ tool_name: "Edit", tool_input: { file_path: rule.path }, cwd: root }),
+        encoding: "utf8",
+        cwd: root,
+        env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+      });
+      assert.notEqual(write.status, 0, `write lane admits ${rule.path}`);
+      assert.match(write.stderr ?? "", new RegExp(`Rule ID: ${rule.id}\\b`, "u"));
+      assert.match(shell(root, `touch ${rule.path}`).stderr, /GUARD-GATE-STRENGTH-SHELL/u,
+        `shell lane admits ${rule.path}`);
     }
   });
 
