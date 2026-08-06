@@ -520,7 +520,35 @@ const PUSH_WAIVER = {
   // ADR-0056: the operator-facing control is gates.push_approval in the project's own
   // source of truth. `chat` stands the external signature down; the commit binding and
   // the labelled record stay exactly as strict.
-  const { dir, head } = freshRepo("required-chat-mode");
+  const { dir } = freshRepo("required-chat-mode");
+  // Committed, not merely written. Since the C1 fix a working-tree copy that differs from
+  // HEAD is untrusted and resolves to `signature`, so a written-only fixture would assert
+  // that an UNCOMMITTED chat setting authorizes a push -- precisely the hole C1 closed.
+  // HEAD is re-read afterwards so the evidence below still binds to the tip.
+  writeFileSync(join(dir, "pipeline.user.yaml"),
+    'schema: "pipeline.user.v3"\ngates:\n  claude_md_max_lines: 200\n  dev_plan: "blocking"\n  push: "blocking"\n  push_approval: "chat"\n  security: "blocking"\n');
+  gitAt(dir, "add", "pipeline.user.yaml");
+  gitAt(dir, "commit", "-q", "-m", "chat mode");
+  const head = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-06T06:00:00.000Z", forCommit: head,
+      remote: "origin", destination: "refs/heads/feature-test",
+      criticalProof: null,
+      criticalProofWaiver: { kind: "push", reason: "gates.push_approval: chat (pipeline.user.yaml)", mode: "chat", source: "pipeline.user.yaml" },
+    } },
+  });
+  check("PG12c allow a chat-mode push configured in pipeline.user.yaml", PUSH_CMD, dir, ALLOW);
+}
+{
+  // The T2 Critic's C1, at the gate that matters most. The shell lane refuses the literal
+  // filename but not a name assembled at runtime, so an in-session write to this file must
+  // be assumed reachable -- the fixture simply performs it. What must hold is that writing
+  // `chat` buys no push. Identical to PG12c in every respect except the missing commit.
+  const { dir, head } = freshRepo("required-chat-mode-uncommitted");
   writeManifest(dir, manifestPush({ approval: "required" }));
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
   writeFileSync(join(dir, "pipeline.user.yaml"),
@@ -534,7 +562,9 @@ const PUSH_WAIVER = {
       criticalProofWaiver: { kind: "push", reason: "gates.push_approval: chat (pipeline.user.yaml)", mode: "chat", source: "pipeline.user.yaml" },
     } },
   });
-  check("PG12c allow a chat-mode push configured in pipeline.user.yaml", PUSH_CMD, dir, ALLOW);
+  check("PG12c3 block a chat mode that exists only in the working tree", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["Push approval critical proof is not bound"],
+  });
 }
 {
   // The same source saying `signature` keeps the proof demanded — the setting is a
