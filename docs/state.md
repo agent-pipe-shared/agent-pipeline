@@ -609,8 +609,17 @@ instead, and that asymmetry is recorded rather than smoothed over.
   nothing behind it buys nothing.
 
 **Untouched, and verified so:** `PG03d`, `PG03e`, `PG26j` and `PG03a` all still hold — the
-executor keeps its exclusive claim on exact-candidate publication authority, and the
-anonymous-public delivery path refuses `main` independently at `guard-push.mjs:555`.
+executor keeps its exclusive claim on exact-candidate publication authority.
+
+**Correction (T6 Critic, F6).** An earlier version of this entry claimed the
+anonymous-public delivery path "refuses `main` independently at `guard-push.mjs:555`, a few
+hundred lines up". That was wrong twice over and is corrected rather than quietly edited:
+`:555` refuses a *calibration* naming `main` as its approved feature branch; the refusal of
+a pushed `main` comes from the destination comparison at `:551`. Both are inert unless
+`publicPushIdentity` calibration exists, and `checkAnonymousPublicPush` runs only after the
+manifest-absent early exit — so it is **not** a defence sitting above the boundary, and it
+does not exist at all in an uncalibrated repository. The claim overstated a second line of
+defence that was not there. `PG26j` still holds; what was wrong was the reasoning about why.
 
 **Not claimed:** the private key is what protects the action. Nothing here defends against
 an operator who signs the wrong thing, and none of it applies in `chat` mode or under an
@@ -622,9 +631,79 @@ would be better — recorded as ADR-0056 follow-up, not silently left.
 route is unavailable here until one is added — refused, never open. Adding it is an
 operator action outside an agent session, by design.
 
-**Pending:** a Critic round on this diff, requested by the PO, before the permission is
-used for the first time. The TP-5 lift taken for the test edits is still in place and must
-be restored.
+### T6 Critic round on `754b32b..1568fe3` — FAIL, and what it cost to find out
+
+**Verdict FAIL.** One major (raised to blocker on reproduction), two minor, three nits.
+Dispositions, all fixed in this block:
+
+| | Finding | Commit |
+|---|---|---|
+| F1 | anchor + state read from the pushed repository, not the governed session | `40d6a21` |
+| F2 | the attestation refusal echoed a credential-bearing remote into stderr | `08dcd67` |
+| F4 | the `trustAnchor`-on-`.v2` shape was executed by no suite anywhere | `d5564c9` |
+| F5 | `boundArtifactDigest` claimed more symlink protection than it implements | `d5564c9` |
+| F3 | the anchor availability break was documented only for the push route | docs |
+| F6 | this register cited the wrong line for the anonymous-public `main` rule | docs |
+
+**F1 was worse than reported, and the difference matters.** The Critic raised it as major
+and marked the reachability half *unverified*: it had declined to assemble a path at
+runtime to prove an agent can create a nested repository, on the grounds that doing so is
+the evasion this codebase documents. That was the right call and it left the severity
+understated. `PG12s13` and `PG12s14` settle it — both exited **0**, i.e. allowed. A nested
+repository carrying its own anchor authorized both a `main` push and a branch push. Blocker,
+and not specific to `main`: the ordinary branch route had the same hole, which the finding
+reached through `main` but never tested.
+
+Two further reads of the same file had the same defect and were fixed with it although
+neither was reported: `criticalProofWaiverFor` (a nested `.v2` waiver or committed
+`push_approval: chat` would have stood the gate down) and the deploy policy read (a nested
+repo could omit `deploy` from `requiredKinds`). Fixing only the reported instance would have
+left the next report's F1 already written.
+
+### The dispatch was contaminated, and the contract cannot detect that
+
+Raised by the PO, not by a gate. The Critic dispatch carried a "WHAT THE CHANGE CLAIMS"
+section listing five claims and an "ADVERSARIAL FOCUS" section listing eight hunt targets.
+`roles/critic.md:46` admits **references only** plus the task frame; `:103` defines the
+search surface the Critic derives *itself*. Both sections are outside that, and the focus
+list did not add to its search surface — it replaced it. The report is organised along my
+claim list, and **F1 was one of my eight bullets verbatim**. The finding is real and the
+fix stands, but as a coverage test this round proves only that a hole existed where I
+suspected one. It says nothing about the places I did not think of.
+
+The Critic recorded two dispatch defects itself (no ruleset SHA, no calibration file) and
+correctly refused to invent either. It recorded **no** contamination — `:47` names
+expectation-conclusion framing as contamination, and a list of claims to verify is that.
+Recorded as a second, smaller finding, about the Critic.
+
+### Why this keeps happening — measured, not diagnosed after the fact
+
+Every failure the PO caught this session was caught by a human reading, not by machinery:
+GIT-03 on 74 commits, the FAIL-verdict push preparation, QG-07, the contaminated dispatch,
+a backlog file written into a candidate under review. The measurement explains it:
+
+- **Seven hook matchers**, covering `Bash|PowerShell`, `Edit|Write|NotebookEdit`,
+  `startup|resume|clear` and `compact`. **No matcher on the Agent tool** — so the Critic
+  dispatch contract is structurally unenforceable; it can be kept or broken, never checked.
+- **`rg 'GIT-03|AI-Assisted'` across `harness/scripts`, `plugins/pipeline-core/hooks` and
+  `plugins/pipeline-core/scripts` returns nothing.** GIT-03 has no executable enforcement
+  at all. The 74 bad commits were not a gate failing; there is no gate.
+
+The Pipeline has two classes of rule and enforces one. The executable guards work — they
+blocked this session repeatedly (`GUARD-PARSE-UNSUPPORTED`, `GUARD-CROSS-REPO-MUTATION`,
+`GUARD-GATE-STRENGTH-SHELL`). The rules that get violated are the prose-only ones: GIT-03,
+the Critic dispatch contract, QG-07. Agent discipline is the only thing holding them, and
+it degrades over a long session — exactly when the stakes are highest.
+
+**Open, and being built in this block rather than filed:** a GIT-03 gate in the existing
+`Bash|PowerShell` matcher (refuse a `git commit` whose message carries a provider trailer or
+session URL, or lacks `AI-Assisted: true`), and a dispatch gate on the Agent tool (refuse a
+`pipeline-core:critic` dispatch carrying sections beyond the references-only set). The first
+would have blocked all 74 commits; the second would have blocked the briefing above.
+
+**Also open:** a second Critic round with a contract-conforming dispatch, to find out what
+an independent search surface sees. The TP-5 lift taken for these test edits must be
+restored before the candidate is offered.
 
 ### Open
 

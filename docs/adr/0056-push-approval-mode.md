@@ -176,6 +176,25 @@ it the route is simply unavailable (`PUSH-PROOF-TRUST-ANCHOR-MISSING`), never op
 the file is GS-2 protected, this is an operator action performed outside an agent session —
 by design.
 
+**The anchor is read from the governing session, not from the pushed repository.** Stated
+because the first implementation did the opposite and it was a blocker (T6 Critic, F1).
+The whole justification above is that the policy file is GS-2 protected — but GS-2 matches
+an exact repository-relative path against the *session* root, so `<root>/sub/project/…` is
+not a gate-strength path at all, and an agent able to create a nested repository could mint
+its own anchor and have the guard verify it. Measured, not theorised: the fixtures exited 0.
+This does not forbid a cross-repository push; it requires that one carry a signature under
+the **governing** project's key, over the target's candidate. The same rule applies to the
+proof waiver and to the deploy policy — otherwise the pushed repository would decide
+whether it needs a proof at all.
+
+**Availability consequence, and it lands on `deploy` first.** A project that lists `deploy`
+in `requiredKinds` without an ADR-0055 waiver will find **every** deploy-triggering push
+refused with `DEPLOY-PROOF-TRUST-ANCHOR-MISSING` until an operator commits the anchor. This
+is fail-closed, not a weakening, but it is an availability break that arrives at push time,
+and it is stated here because the anchor requirement was originally documented only for the
+push route (T6 Critic, F3). A project not ready to install an anchor should record the
+ADR-0055 waiver deliberately rather than discovering the gate at the worst moment.
+
 ## Consequences
 
 **Positive.** The operator sets this where they already set everything else, in one
