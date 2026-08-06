@@ -128,6 +128,34 @@ try {
     assert.equal(result.code, "CRITICAL-PROOF-POLICY-UNSAFE");
   });
 
+  check("CHP14 every action kind is waivable, not just push", () => {
+    // The schema is kind-generic by decision 1. A reviewer must be able to see that
+    // the two non-push kinds are actually reachable, because their CLI call sites
+    // key off requiredKinds and a waived kind deliberately stays in that list.
+    for (const kind of ["push", "deploy", "publication"]) {
+      const base = root(V2([{ kind, reason: `documented operator decision for ${kind}` }]));
+      const policy = readCriticalHumanProofPolicy(base);
+      assert.equal(policy.ok, true, kind);
+      assert.equal(policy.requiredKinds.has(kind), true, `${kind} must stay required`);
+      assert.equal(criticalProofWaiverFor(base, kind).waived, true, kind);
+      for (const other of ["push", "deploy", "publication"].filter((entry) => entry !== kind)) {
+        assert.equal(criticalProofWaiverFor(base, other).waived, false, `${kind} must not waive ${other}`);
+      }
+    }
+  });
+
+  check("CHP15 several kinds may be waived independently", () => {
+    const base = root(V2([
+      { kind: "deploy", reason: "documented operator decision for deploy" },
+      { kind: "publication", reason: "documented operator decision for publication" },
+    ]));
+    const policy = readCriticalHumanProofPolicy(base);
+    assert.equal(policy.ok, true, policy.code);
+    assert.equal(criticalProofWaiverFor(base, "deploy").waived, true);
+    assert.equal(criticalProofWaiverFor(base, "publication").waived, true);
+    assert.equal(criticalProofWaiverFor(base, "push").waived, false);
+  });
+
   check("CHP13 this repository ships the gate ON", () => {
     // The PO's standing decision: default on here, switchable off elsewhere.
     const repoRoot = new URL("../../..", import.meta.url).pathname;

@@ -2257,6 +2257,7 @@ function runPublicationCommand(sub, flags, deps) {
     let authority;
     let replay = false;
     let criticalProof = null;
+    let criticalProofWaiver = null;
     try {
       if (sub === "publication-prepare") {
         if (expected.value !== "absent" || input?.transactionId !== request.value.transactionId) throw new Error("prepare stale");
@@ -2315,6 +2316,7 @@ function runPublicationCommand(sub, flags, deps) {
             });
             if (!verified.ok) throw new Error(verified.code);
             criticalProof = verified.proof;
+            criticalProofWaiver = verified.waived ?? null;
           }
         }
         if (prior !== null) {
@@ -2374,16 +2376,20 @@ function runPublicationCommand(sub, flags, deps) {
     }
     let projection;
     try { projection = projectPublication(base, authority); } catch { console.error("Error: State publication projection invalid."); return 2; }
-    const proofProjection = criticalProof === null
+    // A waived publication is recorded as a waiver, never as an absent entry —
+    // otherwise durable publication authority carries no statement of what backed it
+    // (ADR-0055 decision 4).
+    const proofEntry = criticalProof ?? (criticalProofWaiver === null ? null : { waiver: criticalProofWaiver });
+    const proofProjection = proofEntry === null
       ? base.publicationCriticalProofs
-      : { ...(base.publicationCriticalProofs ?? {}), [request.value.transactionId]: criticalProof };
+      : { ...(base.publicationCriticalProofs ?? {}), [request.value.transactionId]: proofEntry };
     if (sameJson(base.publication, projection) && sameJson(base.publicationCriticalProofs, proofProjection)) {
       console.log(`${sub}: exact durable replay accepted; State projection already matches ${authority.record.publication.revision}.`);
       return 0;
     }
     const nextState = {
       ...base, schema: SCHEMA_ID, publication: projection,
-      ...(criticalProof === null ? {} : { publicationCriticalProofs: proofProjection }),
+      ...(proofEntry === null ? {} : { publicationCriticalProofs: proofProjection }),
       updatedAt: (deps.now ?? (() => new Date().toISOString()))(),
     };
     const written = atomicWriteContinuityState(dir, nextState, lock, deps);
@@ -5312,7 +5318,11 @@ export function run(argv = process.argv.slice(2), deps = {}) {
     case "approve-deploy": {
       const policy = criticalHumanProofPolicy(dir);
       if (!policy.ok) { console.error(`Error: approve-deploy refused (${policy.code}).`); return 2; }
-      const expectedFlags = new Set(policy.requiredKinds.has("deploy")
+      // ADR-0055: a waived kind STAYS in requiredKinds, so `has("deploy")` is not the
+      // question — "is the proof still demanded" is. Keying off requiredKinds alone
+      // would force the operator to pass three proof paths that are never read.
+      const deployProofDemanded = policy.requiredKinds.has("deploy") && !policy.waivers?.has("deploy");
+      const expectedFlags = new Set(deployProofDemanded
         ? ["env", "artifact", "by", "proof-request", "proof-authority", "proof"]
         : ["env", "artifact", "by"]);
       const parsed = parseExactFlags(rest, expectedFlags);
@@ -5331,6 +5341,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       }
       const approvedAt = now();
       let proof = null;
+      let waiver = null;
       if (policy.requiredKinds.has("deploy")) {
         const candidate = gitCandidate(dir);
         if (!candidate.ok) { console.error("Error: current candidate commit/tree could not be determined; deploy proof was not recorded."); return 2; }
@@ -5340,9 +5351,17 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         });
         if (!verified.ok) { console.error(`Error: approve-deploy refused (${verified.code}); external proof was not consumed.`); return 2; }
         proof = verified.proof;
+        waiver = verified.waived ?? null;
       }
       const priorApprovals = Array.isArray(base.deployApprovals) ? base.deployApprovals : [];
-      const entry = { forArtifact: artifact, forEnvironment: env, approvedBy: by, approvedAt, ...(proof === null ? {} : { criticalProof: proof }) };
+      // Labelled, exactly as the push record is: a consumed proof, or the waiver that
+      // stood it down. A waived approval must never be byte-identical to one recorded
+      // under a policy where the kind was never required (ADR-0055 decision 4).
+      const entry = {
+        forArtifact: artifact, forEnvironment: env, approvedBy: by, approvedAt,
+        ...(proof === null ? {} : { criticalProof: proof }),
+        ...(waiver === null ? {} : { criticalProofWaiver: waiver }),
+      };
       const next = {
         ...base,
         schema: SCHEMA_ID,
