@@ -224,6 +224,7 @@ import { existsSync, readFileSync, appendFileSync, realpathSync } from "node:fs"
 import { createHash } from "node:crypto";
 import { join, resolve } from "node:path";
 
+import { commitMessageFindings, markerPolicyMode } from "../lib/commit-message-policy.mjs";
 import { stripQuotedSegments, normalizeGlobalGitOptions } from "../lib/git-cmd.mjs";
 import {
   LEGACY_GUARD_AUDIT,
@@ -481,6 +482,7 @@ const configPath = join(projectDir, guardConfigRelPath);
 const warnings = [];
 /** @type {Array<{id: string, re: RegExp, why: string, origin: string}>} */
 const EXTRA_BLOCKERS = [];
+let projectConfig = null;
 let rawConfig = null;
 try {
   rawConfig = readFileSync(configPath, "utf8");
@@ -490,6 +492,7 @@ try {
 if (rawConfig !== null) {
   try {
     const cfg = JSON.parse(rawConfig);
+    projectConfig = cfg;
     const list = cfg?.extraDenyPatterns;
     if (list !== undefined && !Array.isArray(list)) {
       warnings.push('"extraDenyPatterns" is not an array -> ignored');
@@ -722,6 +725,46 @@ function allowWithOverride() {
 
 // All deny rules are always evaluated; consumption is decided on the FINAL verdict
 // (evaluation order and consumption semantics) — never exit on first match.
+// ---- GIT-03: correlation data must not enter commit metadata -------------------------
+//
+// Deliberately evaluated BEFORE the deny-rule union and deliberately NOT overridable. The
+// override mechanism exists for rules whose violation is recoverable; this one's is not.
+// A commit that reaches a public remote carrying a session URL cannot be un-published, and
+// this repository has the receipts: 53 of 74 such commits were already public and
+// unrewritable by the time a human noticed by reading them.
+//
+// The marker half (`AI-Assisted: true`) is config-gated and defaults to off -- see
+// ../lib/commit-message-policy.mjs for why the two halves are not the same kind of rule.
+{
+  const markerMode = markerPolicyMode(projectConfig);
+  const inspection = commitMessageFindings(cmd, {
+    readFile: (path) => {
+      // Message files are read from inside the project only. A `-F ../../elsewhere` is not
+      // followed: this check exists to read what is about to be committed here.
+      const absolute = resolve(projectDir, path);
+      if (!absolute.startsWith(`${resolve(projectDir)}/`) && absolute !== resolve(projectDir)) {
+        throw new Error("outside the project");
+      }
+      return readFileSync(absolute, "utf8");
+    },
+    requireMarker: markerMode !== "off",
+  });
+  const blocking = inspection.findings.filter((f) => f.code !== "GIT-03-MARKER-MISSING" || markerMode === "blocking");
+  const warningOnly = inspection.findings.filter((f) => f.code === "GIT-03-MARKER-MISSING" && markerMode === "warn");
+  if (blocking.length > 0) {
+    emit(2, [
+      `BLOCKED (git-guard GIT-03, plugin pipeline-core): this commit message carries ${blocking.map((f) => f.detail).join(" and ")}.`,
+      `Codes: ${blocking.map((f) => f.code).join(", ")}. Inspected: ${inspection.sources.join(", ")}.`,
+      "guardrails/git.md GIT-03: the anonymous `AI-Assisted: true` marker is the COMPLETE assistance signal.",
+      "Provider or model co-author trailers, session URLs or IDs, and account identifiers turn public history into a correlation index, and public history cannot be unpublished.",
+      "There is no override for this rule. Rewrite the message.",
+    ]);
+  }
+  if (warningOnly.length > 0) {
+    notices.push("[git-guard] WARN: commit message carries no `AI-Assisted: true` line (GIT-03; commitTrailerPolicy is \"warn\").");
+  }
+}
+
 const matched = [];
 for (const rule of UNION_BLOCKERS) if (rule.re.test(normalizedC)) matched.push(rule);
 for (const rule of RAW_BLOCKERS) if (rule.re.test(rawForQuoteRules)) matched.push(rule);

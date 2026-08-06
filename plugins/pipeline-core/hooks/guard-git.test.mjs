@@ -730,6 +730,44 @@ check(
   ALLOW,
 );
 
+// ---- GIT-03: correlation data in commit metadata (2026-08-06) ------------------------------------
+//
+// The rule is older than this suite and had no enforcement anywhere until now. What it
+// costs to leave unenforced is not hypothetical: 74 commits in one session carried a
+// provider co-author trailer and a session URL, and 53 were public before a human noticed.
+// GIT03-1 is that message.
+const GIT03_DIR = mkdtempSync(join(tmpdir(), "guard-test-git03-"));
+writeFileSync(join(GIT03_DIR, "dirty.txt"),
+  "feat(x): a thing\n\nAI-Assisted: true\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01Fx\n");
+writeFileSync(join(GIT03_DIR, "clean.txt"), "feat(x): a thing\n\nWhy it matters.\n\nAI-Assisted: true\n");
+
+check("GIT03-1 block  provider co-author and session URL via -F", "git commit -F dirty.txt", BLOCK, {
+  projectDir: GIT03_DIR,
+  stderrIncludes: ["GIT-03-PROVIDER-COAUTHOR", "GIT-03-SESSION-URL", "no override for this rule"],
+});
+check("GIT03-2 allow  a clean message via -F", "git commit -F clean.txt", ALLOW, { projectDir: GIT03_DIR });
+check("GIT03-3 block  an inline session trailer", 'git commit -m "fix: y" -m "Session-Id: 01Fx"', BLOCK, {
+  projectDir: GIT03_DIR,
+  stderrIncludes: ["GIT-03-CORRELATION-TRAILER"],
+});
+// A human co-author is legitimate; a rule that refused all co-authorship would be turned
+// off by the people it is meant to protect.
+check("GIT03-4 allow  a human co-author", 'git commit -m "feat: pair work" -m "Co-Authored-By: Jane Roe <jane@example.org>"', ALLOW, {
+  projectDir: GIT03_DIR,
+});
+// The correlation half is not overridable. The override mechanism exists for rules whose
+// violation is recoverable, and published history is not.
+check("GIT03-5 block  an armed override does not open the correlation rule",
+  'PIPELINE_GUARD_OVERRIDE=\'GIT-03|tok|because\' git commit -F dirty.txt', BLOCK, {
+    projectDir: GIT03_DIR,
+    stderrIncludes: ["GIT-03-PROVIDER-COAUTHOR"],
+  });
+// The marker half is a convention, so it stays off unless the project asks for it --
+// otherwise every ordinary commit in every consumer project would start failing.
+check("GIT03-6 allow  a missing marker is not enforced by default", 'git commit -m "chore: bump"', ALLOW, {
+  projectDir: GIT03_DIR,
+});
+
 // ---- Summary -------------------------------------------------------------------------------------
 for (const dir of [EMPTY_DIR, CFG_DIR, BROKEN_DIR, OV_DIR, OV_NOLEDGER_DIR, CFG_GITOPT_DIR]) {
   try {
