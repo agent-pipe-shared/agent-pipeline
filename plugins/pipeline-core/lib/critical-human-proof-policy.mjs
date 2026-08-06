@@ -16,10 +16,42 @@
  * stays in `requiredKinds`: the action remains gated, only the private-key proof is
  * no longer demanded.
  */
-import { lstatSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, lstatSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 
 import { CRITICAL_ACTION_KINDS } from "./critical-action-approval-request.mjs";
+import { PUSH_APPROVAL_MODES } from "./runner-profiles-v3.mjs";
+import { parseYaml } from "./yaml-lite.mjs";
+
+export const USER_SOURCE_PATH = "pipeline.user.yaml";
+export const DEFAULT_PUSH_APPROVAL_MODE = "signature";
+
+/**
+ * Read `gates.push_approval` from the project's own source of truth (ADR-0056).
+ *
+ * This is read directly rather than through a compiled projection because `gates` is
+ * not one of the V3 compiler's owned keys — the manifest's gate block is
+ * hand-maintained, so projecting a single setting would mean extending the frozen
+ * owned-keys contract for it. Absent file, absent key, or anything unparseable all
+ * mean the fail-closed default: a gate whose configuration cannot be read is at its
+ * strongest setting, never its weakest.
+ */
+export function readPushApprovalMode(dir) {
+  const path = join(resolve(dir), USER_SOURCE_PATH);
+  if (!existsSync(path)) return { mode: DEFAULT_PUSH_APPROVAL_MODE, source: "default" };
+  try {
+    const info = lstatSync(path);
+    if (!info.isFile() || info.isSymbolicLink()) return { mode: DEFAULT_PUSH_APPROVAL_MODE, source: "unsafe" };
+    const value = parseYaml(readFileSync(path, "utf8"));
+    const configured = value?.gates?.push_approval;
+    if (configured === undefined) return { mode: DEFAULT_PUSH_APPROVAL_MODE, source: "default" };
+    return PUSH_APPROVAL_MODES.includes(configured)
+      ? { mode: configured, source: USER_SOURCE_PATH }
+      : { mode: DEFAULT_PUSH_APPROVAL_MODE, source: "invalid" };
+  } catch {
+    return { mode: DEFAULT_PUSH_APPROVAL_MODE, source: "unreadable" };
+  }
+}
 
 export const CRITICAL_HUMAN_PROOF_POLICY_PATH = "project/critical-human-proof.json";
 export const CRITICAL_HUMAN_PROOF_POLICY_V1 = "pipeline.critical-human-proof-policy.v1";
@@ -98,6 +130,22 @@ export function criticalProofWaiverFor(dir, kind) {
   const policy = readCriticalHumanProofPolicy(dir);
   if (!policy.ok) return { waived: false, code: policy.code };
   const reason = policy.waivers.get(kind);
+  // For `push`, pipeline.user.yaml is the operator-facing control and wins (ADR-0056).
+  // The two must not disagree: a policy-file waiver alongside `signature` in the source
+  // is an ambiguous configuration, and an ambiguous gate configuration fails closed.
+  if (kind === "push") {
+    const configured = readPushApprovalMode(dir);
+    if (configured.mode === "chat") {
+      return {
+        waived: true,
+        code: null,
+        waiver: { kind, reason: reason ?? `gates.push_approval: chat (${configured.source})`, mode: "chat", source: configured.source },
+      };
+    }
+    if (reason !== undefined && configured.source === USER_SOURCE_PATH) {
+      return { waived: false, code: "CRITICAL-PROOF-MODE-CONFLICT" };
+    }
+  }
   return reason === undefined
     ? { waived: false, code: null }
     : { waived: true, code: null, waiver: { kind, reason } };

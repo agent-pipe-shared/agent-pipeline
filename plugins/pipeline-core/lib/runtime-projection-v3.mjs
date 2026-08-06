@@ -172,6 +172,13 @@ function v2CompatibilityIntent(intent) {
   // Repository export consent gates advisory dispatch only. It has no runtime
   // projection and must not leak into the closed V2 byte-rendering kernel.
   delete compatibilityIntent.advisor_export;
+  // `gates.push_approval` (ADR-0056) selects how a human clears the push gate. It is
+  // a V3-only setting read directly at gate time, has no V2 byte rendering, and would
+  // otherwise be rejected by V2's own closed gates key set.
+  if (compatibilityIntent.gates !== null && typeof compatibilityIntent.gates === "object") {
+    compatibilityIntent.gates = { ...compatibilityIntent.gates };
+    delete compatibilityIntent.gates.push_approval;
+  }
   return {
     ...compatibilityIntent,
     schema: "pipeline.user.v2",

@@ -2,7 +2,7 @@
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
-**Status:** superseded for this repository by the 2026-08-06 PO decision (see [ADR-0055](0055-critical-human-proof-waiver.md) and `docs/state.md`); originally accepted (2026-07-04, PO revision) · **Basis:** Register E15
+**Status:** superseded for this repository by the 2026-08-06 PO decision (see [ADR-0055](0055-critical-human-proof-waiver.md), [ADR-0056](0056-push-approval-mode.md) and `docs/state.md`); originally accepted (2026-07-04, PO revision) · **Basis:** Register E15
 
 > **Superseded 2026-08-06.** `project/pipeline.yaml` now declares
 > `gates.push.approval: required`. The standing approval this ADR records no longer

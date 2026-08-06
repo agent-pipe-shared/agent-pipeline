@@ -471,6 +471,47 @@ const PUSH_WAIVER = {
   });
 }
 {
+  // ADR-0056: the operator-facing control is gates.push_approval in the project's own
+  // source of truth. `chat` stands the external signature down; the commit binding and
+  // the labelled record stay exactly as strict.
+  const { dir, head } = freshRepo("required-chat-mode");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeFileSync(join(dir, "pipeline.user.yaml"),
+    'schema: "pipeline.user.v3"\ngates:\n  claude_md_max_lines: 200\n  dev_plan: "blocking"\n  push: "blocking"\n  push_approval: "chat"\n  security: "blocking"\n');
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-06T06:00:00.000Z", forCommit: head,
+      remote: "origin", destination: "refs/heads/feature-test",
+      criticalProof: null,
+      criticalProofWaiver: { kind: "push", reason: "gates.push_approval: chat (pipeline.user.yaml)", mode: "chat", source: "pipeline.user.yaml" },
+    } },
+  });
+  check("PG12c allow a chat-mode push configured in pipeline.user.yaml", PUSH_CMD, dir, ALLOW);
+}
+{
+  // The same source saying `signature` keeps the proof demanded — the setting is a
+  // real switch in both directions, not a one-way relaxation.
+  const { dir, head } = freshRepo("required-signature-mode");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeFileSync(join(dir, "pipeline.user.yaml"),
+    'schema: "pipeline.user.v3"\ngates:\n  claude_md_max_lines: 200\n  dev_plan: "blocking"\n  push: "blocking"\n  push_approval: "signature"\n  security: "blocking"\n');
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-06T06:00:00.000Z", forCommit: head,
+      remote: "origin", destination: "refs/heads/feature-test",
+      criticalProof: null,
+      criticalProofWaiver: { kind: "push", reason: "claimed while the source demands a signature", mode: "chat", source: "pipeline.user.yaml" },
+    } },
+  });
+  check("PG12c2 block a claimed chat waiver while the source demands a signature", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["Push approval critical proof is not bound"],
+  });
+}
+{
   // An unreadable policy answers "required", never "waived".
   const { dir, head } = freshRepo("required-broken-policy");
   writeManifest(dir, manifestPush({ approval: "required" }));

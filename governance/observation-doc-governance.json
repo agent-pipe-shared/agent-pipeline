@@ -193,6 +193,7 @@
           "docs/adr/0053-setup-generator-authority-resolved-targets.md",
           "docs/adr/0054-arbitheon-authority-directory-and-precedence-chain.md",
           "docs/adr/0055-critical-human-proof-waiver.md",
+          "docs/adr/0056-push-approval-mode.md",
           "docs/adr/README.md"
         ]
       },

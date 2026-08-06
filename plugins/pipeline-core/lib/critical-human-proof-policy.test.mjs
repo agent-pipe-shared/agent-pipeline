@@ -7,9 +7,17 @@ import { join } from "node:path";
 
 import {
   CRITICAL_HUMAN_PROOF_POLICY_PATH,
+  DEFAULT_PUSH_APPROVAL_MODE,
   criticalProofWaiverFor,
   readCriticalHumanProofPolicy,
+  readPushApprovalMode,
 } from "./critical-human-proof-policy.mjs";
+
+function userYaml(base, text) {
+  writeFileSync(join(base, "pipeline.user.yaml"), text);
+  return base;
+}
+const GATES = (mode) => `schema: "pipeline.user.v3"\ngates:\n  claude_md_max_lines: 200\n  dev_plan: "blocking"\n  push: "blocking"\n${mode === null ? "" : `  push_approval: "${mode}"\n`}  security: "blocking"\n`;
 
 const roots = [];
 function root(policy) {
@@ -154,6 +162,53 @@ try {
     assert.equal(criticalProofWaiverFor(base, "deploy").waived, true);
     assert.equal(criticalProofWaiverFor(base, "publication").waived, true);
     assert.equal(criticalProofWaiverFor(base, "push").waived, false);
+  });
+
+  check("CHP16 the push approval mode defaults to signature, the strongest setting", () => {
+    assert.equal(DEFAULT_PUSH_APPROVAL_MODE, "signature");
+    // No source file at all.
+    assert.deepEqual(readPushApprovalMode(root()), { mode: "signature", source: "default" });
+    // Source present, key absent — an older pipeline.user.yaml must keep working.
+    assert.deepEqual(readPushApprovalMode(userYaml(root(), GATES(null))), { mode: "signature", source: "default" });
+  });
+
+  check("CHP17 gates.push_approval chat stands the external signature down", () => {
+    const base = userYaml(root(V1()), GATES("chat"));
+    assert.equal(readPushApprovalMode(base).mode, "chat");
+    const result = criticalProofWaiverFor(base, "push");
+    assert.equal(result.waived, true);
+    assert.equal(result.waiver.mode, "chat");
+    assert.equal(result.waiver.source, "pipeline.user.yaml");
+    // Only push. deploy and publication keep their own policy-file control.
+    assert.equal(criticalProofWaiverFor(base, "deploy").waived, false);
+    assert.equal(criticalProofWaiverFor(base, "publication").waived, false);
+  });
+
+  check("CHP18 gates.push_approval signature keeps the proof demanded", () => {
+    const base = userYaml(root(V1()), GATES("signature"));
+    assert.deepEqual(criticalProofWaiverFor(base, "push"), { waived: false, code: null });
+  });
+
+  check("CHP19 an unreadable or invalid source falls back to signature, never to chat", () => {
+    for (const [text, source] of [
+      ["gates:\n  push_approval: \"whatever\"\n", "invalid"],
+      ["gates:\n  push_approval: true\n", "invalid"],
+      [": : not yaml\n  - [\n", "unreadable"],
+    ]) {
+      const observed = readPushApprovalMode(userYaml(root(), text));
+      assert.equal(observed.mode, "signature", `${source}: ${JSON.stringify(text)}`);
+      assert.equal(criticalProofWaiverFor(userYaml(root(V1()), text), "push").waived, false);
+    }
+  });
+
+  check("CHP20 a source saying signature and a policy file waiving push is refused, not guessed", () => {
+    const base = userYaml(
+      root(V2([{ kind: "push", reason: "policy-file waiver contradicting the source" }])),
+      GATES("signature"),
+    );
+    const result = criticalProofWaiverFor(base, "push");
+    assert.equal(result.waived, false);
+    assert.equal(result.code, "CRITICAL-PROOF-MODE-CONFLICT");
   });
 
   check("CHP13 this repository ships the gate ON", () => {

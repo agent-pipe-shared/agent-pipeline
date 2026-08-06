@@ -2,7 +2,7 @@
 
 > Agent-Pipeline · Sprint Nova · as of 2026-08-06
 
-**Status:** accepted · **Basis:** PO instruction, 2026-08-06 — *"was man auch
+**Status:** accepted; refined by [ADR-0056](0056-push-approval-mode.md), which moves the `push` control to `gates.push_approval` in `pipeline.user.yaml` and reframes it as a mode rather than a waiver · **Basis:** PO instruction, 2026-08-06 — *"was man auch
 konfigurieren können muss ist das human hard gate mit dem private key ausserhalb des
 repos. wir lassen es hier im default an aber das sollte man abschalten können wenn es
 einen nervt."*

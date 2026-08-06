@@ -41,6 +41,17 @@ const USER_SCHEMA = freeze(readJson(USER_SCHEMA_PATH));
 
 export const RUNNER_PROFILES_V3_REGISTRY_PATH = REGISTRY_PATH;
 export const PIPELINE_USER_V3_SCHEMA_PATH = USER_SCHEMA_PATH;
+/**
+ * How a human clears the push gate (ADR-0056).
+ *
+ * `signature` — a detached Ed25519 proof, private key outside the repository. The
+ *   agent can build the intent but cannot produce the proof. Fail-closed default.
+ * `chat` — the human clears it in-session by running the approval themselves. Still
+ *   bound to the exact candidate commit, so it never carries to the next one, but it
+ *   is an attribution record and NOT cryptographic proof; the recorded approval says
+ *   so on its face.
+ */
+export const PUSH_APPROVAL_MODES = Object.freeze(["signature", "chat"]);
 
 export function loadRunnerProfilesV3Registry(path = REGISTRY_PATH) {
   return clone(readJson(path));
@@ -113,7 +124,14 @@ function validateAdvisorContract(value, path, errors) {
   compareExact(value, expected, path, errors);
 }
 
-function validateClosedObject(value, path, required, errors, repair) {
+/**
+ * `required` is both the must-be-present set and, together with `optional`, the
+ * complete allowed set — the object stays closed either way. `optional` exists so a
+ * setting can be ADDED to the contract without invalidating every pipeline.user.yaml
+ * that predates it; an absent optional key means "take the documented default", never
+ * "unregistered property".
+ */
+function validateClosedObject(value, path, required, errors, repair, optional = []) {
   if (!isObject(value)) {
     add(errors, path, "type", `${path} must be an object`, repair);
     return false;
@@ -122,7 +140,9 @@ function validateClosedObject(value, path, required, errors, repair) {
     if (!Object.hasOwn(value, key)) add(errors, `${path}.${key}`, "required", "required property is missing", repair);
   }
   for (const key of Object.keys(value)) {
-    if (!required.includes(key)) add(errors, `${path}.${key}`, "additional_property", "property is not part of pipeline.user.v3", "remove the unregistered property");
+    if (!required.includes(key) && !optional.includes(key)) {
+      add(errors, `${path}.${key}`, "additional_property", "property is not part of pipeline.user.v3", "remove the unregistered property");
+    }
   }
   return true;
 }
@@ -214,8 +234,15 @@ function validateRoot(value, errors) {
     && (value.usage.common_projection !== "pipeline.runner-usage.v1" || value.usage.raw_persistence !== "none")) add(errors, "$.usage", "contract", "usage persistence contract is not registered", "restore the V3 usage contract");
   if (validateClosedObject(value.autonomy, "$.autonomy", ["push_policy", "branch_model", "wip_limit"], errors, "restore exactly the registered autonomy values")
     && (!["gated", "standing-approved"].includes(value.autonomy.push_policy) || !["feature-branch", "direct-main"].includes(value.autonomy.branch_model) || !Number.isInteger(value.autonomy.wip_limit) || value.autonomy.wip_limit < 1)) add(errors, "$.autonomy", "contract", "autonomy contract is invalid", "restore registered autonomy values");
-  if (validateClosedObject(value.gates, "$.gates", ["dev_plan", "push", "security", "claude_md_max_lines"], errors, "restore exactly the registered gate values")
+  if (validateClosedObject(value.gates, "$.gates", ["dev_plan", "push", "security", "claude_md_max_lines"], errors, "restore exactly the registered gate values", ["push_approval"])
     && (!["blocking", "warn", "off"].includes(value.gates.dev_plan) || !["blocking", "warn", "off"].includes(value.gates.push) || !["blocking", "warn", "off"].includes(value.gates.security) || !Number.isInteger(value.gates.claude_md_max_lines) || value.gates.claude_md_max_lines < 1)) add(errors, "$.gates", "contract", "gate contract is invalid", "restore registered gate values");
+  // How a human clears the push gate. Optional; absent means the fail-closed default
+  // `signature` (ADR-0056). `gates.push` decides WHETHER the gate blocks; this decides
+  // HOW a human clears it, and the two are deliberately separate settings.
+  if (isObject(value.gates) && Object.hasOwn(value.gates, "push_approval")
+    && !PUSH_APPROVAL_MODES.includes(value.gates.push_approval)) {
+    add(errors, "$.gates.push_approval", "contract", `push_approval must be one of ${PUSH_APPROVAL_MODES.join(", ")}`, "use signature for a detached external proof, or chat for an in-session human clearance");
+  }
   validateRoles(value, errors);
   validateSession(value, errors);
   compareExact(value.critic_export, FROZEN_REGISTRY.criticExportPolicy, "$.critic_export", errors, "export_policy");

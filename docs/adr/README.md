@@ -28,7 +28,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0014](0014-critic-contract.md) | Critic contract (E12, A10) | accepted | 2026-07-03 |
 | [0015](0015-self-application.md) | Self-application of the pipeline to the pipeline repo (E13) | accepted | 2026-07-03 |
 | [0016](0016-git-hosting-github.md) | Git hosting — staying with GitHub (E14) | accepted | 2026-07-06 |
-| [0017](0017-push-policy-standing-approval.md) | Push policy — standing approval for `main` push (E15) | superseded for this repo by the 2026-08-06 PO decision (see 0055) | 2026-07-06 |
+| [0017](0017-push-policy-standing-approval.md) | Push policy — standing approval for `main` push (E15) | superseded for this repo by the 2026-08-06 PO decision (see 0055/0056) | 2026-07-06 |
 | [0018](0018-retro-process-elephant-authored.md) | Retro-process revision — Elephant authors the close retro itself (E18) | accepted | 2026-07-06 |
 | [0019](0019-project-scoping-one-repo-one-elephant.md) | Project boundary — one repo, one Elephant at a time (E19) | accepted | 2026-07-06 |
 | [0020](0020-el01-enforcement-goldfish-duty.md) | EL-01 enforcement — implementation only as a briefed Goldfish dispatch (E20) | accepted | 2026-07-06 |
@@ -67,7 +67,8 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0052](0052-marketplace-identity-restoration-and-local-dev-separation.md) | Restore the published marketplace identity and give local development its own | accepted | 2026-08-06 |
 | [0053](0053-setup-generator-authority-resolved-targets.md) | `setup.mjs` writes to the resolved project-authority tier, not a hardcoded legacy path | accepted (generator fix), partially deferred (stale-mirror removal) | 2026-08-06 |
 | [0054](0054-arbitheon-authority-directory-and-precedence-chain.md) | `.arbitheon/` authority directory, three-tier precedence chain, configurable location | accepted (design + sequencing), implementation staged | 2026-08-06 |
-| [0055](0055-critical-human-proof-waiver.md) | The Ed25519 human hard gate gets a sanctioned off-switch | accepted | 2026-08-06 |
+| [0055](0055-critical-human-proof-waiver.md) | The Ed25519 human hard gate gets a sanctioned off-switch | accepted, refined by 0056 | 2026-08-06 |
+| [0056](0056-push-approval-mode.md) | The push gate stays; how a human clears it becomes a configured mode | accepted | 2026-08-06 |
 
 ### Resubmissions
 
@@ -85,6 +86,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0053](0053-setup-generator-authority-resolved-targets.md) | Repository-wide legacy-path migration (Full Verify plus roughly a dozen other files) must land before the deferred `.claude/pipeline.json`/`.claude/pipeline.yaml` stale-mirror removal can be completed |
 | [0054](0054-arbitheon-authority-directory-and-precedence-chain.md) | Steps 2–4 (third tier + configurable name, writes to the top tier, completeness-gated cleanup) each need their own dispatch; the lower tiers may not be deleted until the completeness check is green |
 | [0055](0055-critical-human-proof-waiver.md) | PRD approval (`approve-plan`) is still unattributed and not proof-bound — the remaining half of the 2026-08-05 backlog item |
+| [0056](0056-push-approval-mode.md) | `deploy` and `publication` have no source-of-truth mode; add one only if an operator asks |
 
 ### Conventions
 

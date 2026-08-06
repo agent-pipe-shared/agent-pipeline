@@ -337,7 +337,7 @@ import {
   criticalActionSubjectSha256,
   verifyCriticalActionApprovalRequest,
 } from "../lib/critical-action-approval-request.mjs";
-import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
+import { criticalProofWaiverFor, readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
 import {
   lifecycleDigest as closeCoordinatorDigest,
   readCloseCoordinator,
@@ -2593,11 +2593,14 @@ function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags,
   if (!policy.requiredKinds.has(kind)) {
     return required ? { ok: false, code: "CRITICAL-PROOF-POLICY-KIND-REQUIRED" } : { ok: true, proof: null };
   }
-  // An explicit, reasoned waiver stands the cryptographic proof down for this kind
-  // (ADR-0055). It is never inferred and never silent: the waiver travels back to the
-  // caller so the recorded approval says on its face that no proof backed it.
-  const waiver = policy.waivers?.get(kind);
-  if (waiver !== undefined) return { ok: true, proof: null, waived: { kind, reason: waiver } };
+  // The cryptographic proof may be stood down for this kind — by `gates.push_approval:
+  // chat` in pipeline.user.yaml for `push` (ADR-0056), or by an explicit reasoned
+  // waiver in the policy file for the other kinds (ADR-0055). Never inferred, never
+  // silent: it travels back to the caller so the recorded approval says on its face
+  // that no proof backed it.
+  const configured = criticalProofWaiverFor(dir, kind);
+  if (configured.code !== null && configured.code !== undefined) return { ok: false, code: configured.code };
+  if (configured.waived) return { ok: true, proof: null, waived: configured.waiver };
   const request = externalPublicJson(dir, flags["proof-request"]);
   const authority = externalPublicJson(dir, flags["proof-authority"]);
   const proof = externalPublicJson(dir, flags["proof"]);
@@ -5114,9 +5117,14 @@ export function run(argv = process.argv.slice(2), deps = {}) {
     case "approve-push": {
       const policy = criticalHumanProofPolicy(dir);
       if (!policy.ok) { console.error(`Error: approve-push refused (${policy.code}).`); return 2; }
-      // A waived push (ADR-0055) must not demand proof paths the operator deliberately
-      // stood down; every other binding stays exactly as strict as before.
-      const pushWaived = policy.waivers?.has("push") === true;
+      // A push cleared in chat mode (ADR-0056) must not demand proof paths the operator
+      // deliberately stood down; every other binding stays exactly as strict as before.
+      const pushMode = criticalProofWaiverFor(dir, "push");
+      if (pushMode.code !== null && pushMode.code !== undefined) {
+        console.error(`Error: approve-push refused (${pushMode.code}).`);
+        return 2;
+      }
+      const pushWaived = pushMode.waived === true;
       const expectedFlags = pushWaived
         ? new Set(["by", "remote", "destination"])
         : new Set(["by", "remote", "destination", "proof-request", "proof-authority", "proof"]);
@@ -5124,7 +5132,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       const by = parsed.value?.by;
       if (!parsed.ok || isBlank(by)) {
         console.error(pushWaived
-          ? 'Error: approve-push requires --by, --remote and --destination (project/critical-human-proof.json waives the push proof).'
+          ? 'Error: approve-push requires --by, --remote and --destination (gates.push_approval is "chat"; no external proof is demanded).'
           : 'Error: approve-push requires --by, --remote, --destination, --proof-request, --proof-authority and --proof.');
         return 2;
       }
