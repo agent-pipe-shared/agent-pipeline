@@ -151,6 +151,25 @@ silently follows new commits in the source checkout; (2) a new build
 propagates **only** when the version string changes. This is the entire
 purpose of the `+claude.<...>` build-metadata suffix.
 
+**Scope of the pinning claim (measured 2026-08-06, corrected here).** Both
+consequences hold for a **git-sourced** marketplace, which is materialized into
+the versioned cache directory above. They do **not** hold for a
+**directory-sourced** marketplace such as the local development root: after
+`/reload-plugins`, this session served the `conventional-commit` skill from
+`<local-marketplace-root>/plugins/pipeline-core/skills/conventional-commit`
+— i.e. live, straight through the symlink into the working tree — whereas at
+session start the same skill came from
+`~/.claude/plugins/cache/agent-pipeline-local/pipeline-core/0.5.1/skills/…`.
+A directory source therefore follows the checkout, and the cachebuster's role
+for it is to make the *registry* agree with the tree, not to freeze the code
+a session runs.
+
+Two practical consequences: `/reload-plugins` is sufficient for a
+directory-sourced local build and **no session restart is required** (a restart
+is still required for a git source, and the update command still says so); and
+a stale `.in_use` marker in an older cache directory does not mean that version
+is loaded — check the owning PID before believing it.
+
 Version convention adopted for this repository:
 `<semver>+claude.<YYYYMMDDHHMMSS>.<short-oid>`, e.g.
 `0.5.2+claude.20260805231810.4221989`. The `<short-oid>` is the 7-character

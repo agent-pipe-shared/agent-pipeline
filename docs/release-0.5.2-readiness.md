@@ -56,26 +56,36 @@ false single-caller claim still standing in `codex-pretool-guard.mjs`
 (finding N2); both are corrected, and both callers pass `--runner codex`,
 so the safety property held throughout even while the comment was wrong.
 
-## Not ready, with the blocker named precisely
+## The registration blocker: CLOSED 2026-08-06
 
-**The verify-gate registration gap.**
-`plugins/pipeline-core/scripts/pipeline-state-rebind-runner.test.mjs` is the
-sole proof for the rebind-runner threading landed in `7514fb9`, and it is
-not registered in `harness/scripts/verify.mjs`. The green "236/236" gate
-above therefore does not cover it — this is Critic finding F3 (major, not
-fixed), and the second round independently reconfirmed it as factually
-accurate. A dispatch attempted the registration during this session and was
-blocked by the `guard-testpath` hook, rule TP-3, whose refusal message
-names the only sanctioned route: "the PO edits `project/guard-config.json`
-(or the test file itself) directly, outside this session." This blocker is
-**structural and PO-only, not a matter of briefing quality** — it was
-proven by an actual blocked attempt, not assumed. The wider figure, also
-recorded in `docs/state.md`: 69 of 288 `*.test.mjs` files are unreferenced
-in `verify.mjs` with no aggregator importing them; eight of the relevant
-suites (including the rebind-runner one) were individually proven green
-standalone. This is **unregistered-but-green coverage loss**, not hidden
-breakage — but it does mean the Full Verify green above is evidence of
-236 registered suites passing, not of the full corpus passing.
+**The verify-gate registration gap is resolved.** The PO granted standing
+permission to lift TP-1..TP-5 task-scoped within the Nova session, which was
+the only thing the blocker below was ever waiting on.
+`plugins/pipeline-core/scripts/pipeline-state-rebind-runner.test.mjs` is now
+registered in `harness/scripts/verify.mjs`; TP-3 was lifted per task and
+restored byte-exactly each time (`project/guard-config.json` sha256
+`15a5f9feac3769746fe0b8b5bde38d4873c9650c53e7e859da92daf431384493`, unchanged).
+This closes the second Critic round's F3.
+
+Registering it immediately surfaced a follow-on rule that had been invisible: a
+suite registered in `verify.mjs` must also appear in
+`docs/product-capability-inventory.json` — as a surface record **and** in its
+group membership, both in the order that file expects — or the gate goes red.
+
+*Original blocker text, retained for the record:* the suite was the sole proof
+for the rebind-runner threading landed in `7514fb9` and was not registered, so
+the then-green "236/236" gate did not cover it (Critic finding F3, reconfirmed
+in round two). A dispatch attempted the registration and was blocked by
+`guard-testpath` rule TP-3, whose refusal message names the only sanctioned
+route: "the PO edits `project/guard-config.json` (or the test file itself)
+directly, outside this session."
+
+**Still open, and unchanged:** the wider figure recorded in `docs/state.md` —
+69 of 288 `*.test.mjs` files are unreferenced in `verify.mjs` with no
+aggregator importing them. Eight of the relevant suites were individually
+proven green standalone, so this remains **unregistered-but-green coverage
+loss**, not hidden breakage. A green Full Verify is evidence that the
+registered suites pass, not that the full corpus does.
 
 **Backlog ledger.** `check-backlog-state.mjs` exits 2 with 35 failures
 across two classes: roughly 27 items whose status does not match their
@@ -150,12 +160,9 @@ had PO acceptance yet.
 
 ## What the PO must do to release
 
-1. **Decide the verify-registration gap (F3).** Only the PO can lift TP-3
-   on `harness/scripts/verify.mjs` (edit `project/guard-config.json` or the
-   test file directly, outside this session) or explicitly accept the
-   unregistered-but-green risk as-is. Evidence that would close it: a green
-   Full Verify run with `pipeline-state-rebind-runner.test.mjs` present in
-   `verifyRun.registeredSuiteCount`.
+1. ~~**Decide the verify-registration gap (F3).**~~ **Done 2026-08-06** — the
+   PO granted the standing TP lift, the suite is registered, and Full Verify is
+   green with it counted. See the closed-blocker section above.
 2. **Accept or reject ADR-0052 and ADR-0053 as consumer-facing changes.**
    Only the PO can accept a published supply-chain identity change and a
    configuration-tier change for publication. Evidence: a recorded PO
