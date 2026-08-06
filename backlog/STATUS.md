@@ -44,7 +44,7 @@
 | pipeline.recovery-preview-ack-unstable-getter-poisons-replay-ledger | open | defect | pipeline | 2026-07-27 | — |
 | pipeline.recovery-preview-callback-attestation | in_progress | defect | pipeline | 2026-07-20 | — |
 | pipeline.regulated-document-hooks | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
-| pipeline.release-preflight-has-a-builder-but-no-cli | open | defect | pipeline | 2026-08-06 | — |
+| pipeline.release-preflight-has-a-builder-but-no-cli | in_progress | defect | pipeline | 2026-08-06 | — |
 | pipeline.runtime-projection-v2-eager-manifest-load | open | defect | pipeline | 2026-07-27 | — |
 | pipeline.security-scan-cross-branch-gitleaks-findings | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.sentinel-go-live-completion | closed | workflow-improvement | pipeline | 2026-07-20 | — |
@@ -65,6 +65,6 @@
 
 ## Counts
 
-- open: 26
-- in_progress: 20
+- open: 25
+- in_progress: 21
 - closed: 11

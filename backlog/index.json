@@ -3,11 +3,11 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e1721cea8d5cae5f8b8ecc596151826072e15dff4b755e0633c38853221d3d04"
+    "transitionHead": "a5d2406ada9e45b072b27479915991a85222d8f2817966cf0cc50eb3fda06f7a"
   },
   "counts": {
-    "open": 26,
-    "in_progress": 20,
+    "open": 25,
+    "in_progress": 21,
     "closed": 11
   },
   "items": [
@@ -349,7 +349,7 @@
     },
     {
       "id": "pipeline.release-preflight-has-a-builder-but-no-cli",
-      "status": "open",
+      "status": "in_progress",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-06",

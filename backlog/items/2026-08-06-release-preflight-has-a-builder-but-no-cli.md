@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.release-preflight-has-a-builder-but-no-cli
 type: defect
 owner: pipeline
-status: open
+status: in_progress
 created: 2026-08-06
 source: "sprint_phoenix handover finding 1, 2026-08-06. The gate-evidence half was closed by publication-gate-evidence.mjs; the release-preflight half was not, and is recorded separately so the remainder is not lost inside a partly-fixed finding."
 due: 2026-09-06
@@ -51,7 +51,27 @@ self-attestation problem that `publication-gate-evidence.mjs` was careful to avo
 The derivable parts should be derived, and the external ones must remain inputs the
 CLI refuses to invent.
 
-## Proposed fix
+## Resolved 2026-08-06
+
+`plugins/pipeline-core/scripts/release-preflight-cli.mjs` is the producer. It is a
+separate file rather than a CLI inside `release-preflight.mjs`, because that module is
+imported by the executor and should stay the pure builder+validator it already is.
+
+It derives everything observable — candidate and base, working-tree cleanliness, the
+five version surfaces, the durable documents and their digests — and refuses to invent
+the external parts. `consent.status` passes through verbatim; the tool never writes
+"approved" on the PO's behalf, and RPC02 asserts exactly that. A GG-03 binding is
+either supplied or recorded as not required, never as satisfied (RPC06).
+
+It cannot manufacture a ready verdict: `createReleasePreflight` derives status from its
+own reasons and this producer passes observations through unchanged. Run against this
+repository it reported `blocked` with `repository-not-clean` and
+`version-decision-mismatch` — the second independently reproducing the version-surface
+step recorded in `docs/release-0.5.2-readiness.md`.
+
+All five publication gates now have producers.
+
+## Original proposed fix
 
 1. A `release-preflight.mjs prepare` CLI that derives what it can from the repository
    (candidate, base, repository cleanliness, version surfaces, documentation and
