@@ -1650,9 +1650,16 @@ if (pushGate.approval === "standing-approved") {
       if (!attested.authorized) {
         failures.push(
           pushWaiver.code === null
-            ? `Push approval is not externally attested for this exact action (${attested.code}). `
-              + `Record one: node harness/scripts/pipeline-state.mjs approve-push --by <name> --remote ${pushBinding.remote} `
-              + `--destination ${pushBinding.destination} --proof-request <path> --proof-authority <path> --proof <path>.`
+            // Operand text is deliberately NOT interpolated here. `remote` is any positional
+          // the command supplied, so it can be a credential-bearing URL, and this message
+          // travels into the session transcript and from there into persisted artifacts
+          // (SEC-01). The file already redacts elsewhere for exactly this reason (PG17i);
+          // that fixture cannot reach this line, so PG12s15 covers it. The operator does
+          // not need the values echoed back -- they are in the command they just ran.
+          ? `Push approval is not externally attested for this exact action (${attested.code}). `
+              + "Record one for this commit, remote and destination ref: node harness/scripts/pipeline-state.mjs "
+              + "approve-push --by <name> --remote <remote> --destination <full-ref> "
+              + "--proof-request <path> --proof-authority <path> --proof <path>."
             : `Push approval critical proof is unavailable: project/critical-human-proof.json is ${pushWaiver.code}.`,
         );
       }

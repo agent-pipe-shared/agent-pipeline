@@ -886,6 +886,26 @@ function nestedAttestedRepo(prefix, { destination = "refs/heads/main", withManif
     });
 }
 {
+  // PG12s15 -- T6 Critic F2. The refusal below is the only new message in this hook that
+  // interpolates operand text, and `remote` is any positional, including a URL. PG17i
+  // proves the file's redaction convention but cannot cover this line: its fixture has no
+  // colon in the refspec, so it lands on the static publication-boundary message instead.
+  const { dir, head } = freshRepo("signature-remote-redaction");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-06T06:00:00.000Z", forCommit: head,
+      remote: "origin", destination: "refs/heads/feature-test",
+    } },
+  });
+  check("PG12s15 the attestation refusal never echoes a credential-bearing remote",
+    "git push https://t0ken@example.invalid/repo HEAD:refs/heads/feature-test", dir, BLOCK, {
+      stderrNotIncludes: ["t0ken"],
+    });
+}
+{
   // An unreadable policy answers "required", never "waived".
   const { dir, head } = freshRepo("required-broken-policy");
   writeManifest(dir, manifestPush({ approval: "required" }));
