@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "9051f97880f6ee93717311f45268c5b8736aa47ca51197e25643f508dca32059"
+    "transitionHead": "e1721cea8d5cae5f8b8ecc596151826072e15dff4b755e0633c38853221d3d04"
   },
   "counts": {
-    "open": 25,
+    "open": 26,
     "in_progress": 20,
     "closed": 11
   },
@@ -346,6 +346,14 @@
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.release-preflight-has-a-builder-but-no-cli",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-06",
+      "source": "sprint_phoenix handover finding 1, 2026-08-06. The gate-evidence half was closed by publication-gate-evidence.mjs; the release-preflight half was not, and is recorded separately so the remainder is not lost inside a partly-fixed finding."
     },
     {
       "id": "pipeline.runtime-projection-v2-eager-manifest-load",
