@@ -14,10 +14,14 @@ Two different controls sit on top of a push, and they were being conflated.
 **Control 1 — is there a human push gate at all?** `gates.push.approval` in the
 project manifest: `standing-approved` auto-passes, `required` demands a recorded,
 commit-bound approval. This was already configurable. As of 2026-08-06 this repository
-sets it to `required` by PO decision (see
-[ADR-0054](0054-arbitheon-authority-directory-and-precedence-chain.md) — the value had
-been decided on 2026-08-02 in commit `fb0e9ac` but written only to the tier the
-resolver does not serve, so it had never taken effect).
+sets it to `required` by PO decision, recorded in `docs/state.md`'s 2026-08-06
+afternoon block; this ADR and that register entry, not ADR-0054, are its record.
+[ADR-0054](0054-arbitheon-authority-directory-and-precedence-chain.md) supplies only
+the finding that made the decision necessary: the value had been decided on 2026-08-02
+in commit `fb0e9ac` but written only to the tier the resolver does not serve, so it had
+never taken effect. This decision supersedes
+[ADR-0017](0017-push-policy-standing-approval.md)'s standing approval for this
+repository; `CLAUDE.md` and `guardrails/git.md` are updated to match.
 
 **Control 2 — must that approval be backed by a detached Ed25519 proof?**
 `project/critical-human-proof.json` (`pipeline.critical-human-proof-policy.v1`) lists

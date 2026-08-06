@@ -2,7 +2,16 @@
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
-**Status:** accepted (2026-07-04, PO revision) · **Basis:** Register E15
+**Status:** superseded for this repository by the 2026-08-06 PO decision (see [ADR-0055](0055-critical-human-proof-waiver.md) and `docs/state.md`); originally accepted (2026-07-04, PO revision) · **Basis:** Register E15
+
+> **Superseded 2026-08-06.** `project/pipeline.yaml` now declares
+> `gates.push.approval: required`. The standing approval this ADR records no longer
+> describes this repository's enforced state: a push needs an approval bound to the
+> exact candidate commit and, by default, an Ed25519 human proof. The reasoning below
+> is retained as the record of why the standing approval existed and what it
+> deliberately did NOT cover; the destructive-form block and the deploy carve-out are
+> unaffected and still hold. Adopting projects may still choose standing approval —
+> this supersession is scoped to this repository.
 
 ## Context
 

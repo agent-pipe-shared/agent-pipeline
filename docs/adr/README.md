@@ -28,7 +28,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0014](0014-critic-contract.md) | Critic contract (E12, A10) | accepted | 2026-07-03 |
 | [0015](0015-self-application.md) | Self-application of the pipeline to the pipeline repo (E13) | accepted | 2026-07-03 |
 | [0016](0016-git-hosting-github.md) | Git hosting — staying with GitHub (E14) | accepted | 2026-07-06 |
-| [0017](0017-push-policy-standing-approval.md) | Push policy — standing approval for `main` push (E15) | accepted | 2026-07-06 |
+| [0017](0017-push-policy-standing-approval.md) | Push policy — standing approval for `main` push (E15) | superseded for this repo by the 2026-08-06 PO decision (see 0055) | 2026-07-06 |
 | [0018](0018-retro-process-elephant-authored.md) | Retro-process revision — Elephant authors the close retro itself (E18) | accepted | 2026-07-06 |
 | [0019](0019-project-scoping-one-repo-one-elephant.md) | Project boundary — one repo, one Elephant at a time (E19) | accepted | 2026-07-06 |
 | [0020](0020-el01-enforcement-goldfish-duty.md) | EL-01 enforcement — implementation only as a briefed Goldfish dispatch (E20) | accepted | 2026-07-06 |
