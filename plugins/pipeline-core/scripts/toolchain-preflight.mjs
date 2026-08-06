@@ -55,6 +55,7 @@
  *     no information about it at all) -- dropped from the report entirely
  *     rather than surfaced as a sixth "not-applicable" verdict.
  */
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -190,6 +191,24 @@ export function defaultGitProbe({ rootDir, tempDir, now = new Date(), platform =
   if (runProbeFn(observed.identity.realPath, ["diff", "--name-only", "HEAD", "HEAD", "--"], probeOptions).ok) capabilities.push("diff-paths");
   return { ok: true, status: "ready", handle: buildHandle("git", observed.identity, match?.[1] ?? null, capabilities, now.toISOString()) };
 }
+/**
+ * The exact candidate this probe observed. An identity attestation that does not say
+ * WHICH tree it probed cannot be consumed as gate evidence (ADR-0051 candidate
+ * binding); an unavailable or dirty repository yields null rather than a guess.
+ */
+function probedCandidate(rootDir) {
+  const git = (args) => {
+    const result = spawnSync("git", args, { cwd: rootDir, encoding: "utf8", shell: false, timeout: 5000 });
+    return result.status === 0 && !result.error ? String(result.stdout).trim() : null;
+  };
+  const commit = git(["rev-parse", "HEAD"]);
+  const tree = git(["rev-parse", "HEAD^{tree}"]);
+  const status = spawnSync("git", ["status", "--porcelain=v1"], { cwd: rootDir, encoding: "utf8", shell: false, timeout: 5000 });
+  if (!commit || !tree || !/^[0-9a-f]{40,64}$/u.test(commit) || !/^[0-9a-f]{40,64}$/u.test(tree)) return null;
+  if (status.status !== 0 || String(status.stdout).length !== 0) return null;
+  return { commit, tree };
+}
+
 function manifestDigest(rootDir) {
   const { path } = resolveAuthorityArtifactPath("manifest", { rootDir });
   if (!existsSync(path)) return null;
@@ -223,7 +242,7 @@ export function runToolchainPreflight({ rootDir, manifestResult = null, platform
   const handles = {};
   if (loaded.status === "invalid") {
     const overall = overallStatus(Object.values(baseResults), true, false);
-    return { schema: TOOLCHAIN_SCHEMA, ...overall, manifest: { status: "invalid", digest: manifestDigest(root) }, securityGate: "blocking", platform: selectedPlatform, results: FIXED_TOOLS.map((tool) => actionableResult(baseResults[tool], selectedPlatform)), preparedHandles: handles, exitCode: 2 };
+    return { schema: TOOLCHAIN_SCHEMA, ...overall, candidate: probedCandidate(root), manifest: { status: "invalid", digest: manifestDigest(root) }, securityGate: "blocking", platform: selectedPlatform, results: FIXED_TOOLS.map((tool) => actionableResult(baseResults[tool], selectedPlatform)), preparedHandles: handles, exitCode: 2 };
   }
   const now = deps.now ?? new Date();
   const nodeObserved = (deps.probeNodeFn ?? defaultNodeProbe)({ rootDir: root, tempDir, now });
@@ -252,6 +271,7 @@ export function runToolchainPreflight({ rootDir, manifestResult = null, platform
   const exitCode = overall.ok ? 0 : gateMode === "blocking" ? 2 : gateMode === "warn" ? 1 : 0;
   return {
     schema: TOOLCHAIN_SCHEMA, ...overall,
+    candidate: probedCandidate(root),
     manifest: { status: loaded.status, digest: manifestDigest(root) },
     securityGate: gateMode,
     platform: selectedPlatform,

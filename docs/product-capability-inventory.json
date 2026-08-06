@@ -1739,6 +1739,12 @@
       "member": "product-capability-inventory-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:publication-gate-evidence-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "publication-gate-evidence-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:publication-executor-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -2235,6 +2241,7 @@
         "verify-phase:harness/scripts/verify.mjs:provenance-local-builder-tests",
         "verify-phase:harness/scripts/verify.mjs:public-core-observation-tests",
         "verify-phase:harness/scripts/verify.mjs:publication-executor-tests",
+        "verify-phase:harness/scripts/verify.mjs:publication-gate-evidence-tests",
         "verify-phase:harness/scripts/verify.mjs:recovery-preview-attestation-tests",
         "verify-phase:harness/scripts/verify.mjs:release-version-plan-tests",
         "verify-phase:harness/scripts/verify.mjs:repository-freshness-tests",

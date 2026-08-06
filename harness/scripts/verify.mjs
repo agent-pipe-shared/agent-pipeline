@@ -326,6 +326,7 @@ const TEST_SUITES = [
   { name: "github-actions-permissions-tests", file: join(scriptDir, "check-github-actions-permissions.test.mjs") },
   { name: "github-actions-permissions-check", file: join(scriptDir, "check-github-actions-permissions.mjs") },
   { name: "publication-executor-tests", file: join(pluginScriptsDir, "publication-executor.test.mjs") },
+  { name: "publication-gate-evidence-tests", file: join(pluginScriptsDir, "publication-gate-evidence.test.mjs") },
   { name: "migrate-backlog-state-tests", file: join(pluginScriptsDir, "migrate-backlog-state.test.mjs") },
   { name: "spec-retention-tests", file: join(pluginScriptsDir, "check-spec-retention.test.mjs") },
   { name: "spec-retention-check", file: join(pluginScriptsDir, "check-spec-retention.mjs") },
