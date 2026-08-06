@@ -131,6 +131,122 @@ backlog-ledger failure count, and did not review `codex-pretool-guard.mjs`
 beyond the diff hunk or `session-cleanup.mjs`'s recovery/privatization
 paths.
 
+**Second T1 Critic round — remediation re-review.** Dispatched as the
+`critic` agent, model opus (`critic_high_risk` tier), assurance
+`functional-equivalent-read-only; OS isolation not asserted`. Scope was the
+remediation range `59e942c..aea5882` only, against the prior round's FAIL on
+`59e942c`. It was resumed once after stopping at its tool budget mid-hunt.
+It worked on a `git archive` extraction of the candidate in a fresh
+scratchpad subdirectory and invoked no mutating command against the
+checkout.
+
+**Verdict: the prior FAIL is discharged for F1, F2 and F4.** All three were
+confirmed closed against artifacts the Critic constructed itself.
+Specifically:
+
+- F1's test-blindness claim was independently reproduced: baseline 18/18
+  pass; with the real repository manifest renamed, the new test fails;
+  restored, 18/18 again; with a symlink injected into
+  `plugins/pipeline-core`, it fails again. The test reaches the real
+  repository artifacts rather than a fixture, and
+  `human-guard-override.test.mjs` is registered in
+  `harness/scripts/verify.mjs`, so a future regression does reach Full
+  Verify.
+- F1's symlink half was confirmed as correctly resolved by analysis rather
+  than code: four independent guards (`physicalRoot`, the source-directory
+  realness check, `isPipelineSourceRoot` requiring
+  `harness/scripts/verify.mjs`, and the Git-control-path topology checks)
+  each reject the external marketplace root, so no reachable
+  incompatibility existed and the strict symlink rejection was correctly
+  left in place.
+- F2 was confirmed across six fixtures: a manifest-less legacy consumer now
+  resolves `legacy` and writes the legacy tier with no `project/` directory
+  created; a genuinely pristine project resolves `neutral`. The ADR-0053
+  edit landed in Context as a dated remediation note with the Decision
+  section untouched, so record and code agree without the record having
+  been rewritten to match a bug.
+- The three "not fixed" dispositions (F3, F5, F6) were each confirmed
+  factually accurate.
+
+**Two new findings, both raised by the re-review:**
+
+- **N1 (major, FIXED in `c4d4034`):** the F1 fix restored liveness to the
+  local-plugin-install attestation without re-establishing what it binds.
+  The admitted command installs `pipeline-core@agent-pipeline-local`, which
+  since ADR-0052 is a separate marketplace root outside this checkout, while
+  the attestation hashes this checkout's manifest and plugin-source tree and
+  never observes the external root or where its symlink points. The
+  human-facing effect preview still asserted the install came "from the
+  bound local source". Before the F1 fix this path was fail-closed dead, so
+  the mismatch was unreachable; the fix made it live. Rated against QG-05
+  gate honesty and QG-06. **Disposition: fix the honesty, not the
+  binding.** `c4d4034` rewrote the preview to state exactly what is attested
+  (this checkout's manifest identity and plugin-source tree digest) and
+  what is not (the external marketplace root the install actually resolves
+  through). The capability was not disabled or weakened and the admitted
+  command literal was not changed. The residual binding gap is tracked as
+  `backlog/items/2026-08-06-local-plugin-install-attestation-does-not-bind-external-marketplace-root.md`
+  (owner PO, due 2026-09-06), because extending the attestation over an
+  external root is design work, not an overnight edit.
+- **N2 (minor, FIXED in `c4d4034`):** F4 had been closed in only one of the
+  two files carrying the same false claim. `codex-pretool-guard.mjs` still
+  asserted, under an "Authoritative, not inferred (ADR-0051)" label, that
+  `guard-lifecycle-ready.mjs` is registered as a Codex hook target and that
+  its own spawn is the only production caller. Both clauses were false — the
+  guard appears in no hook configuration of either runner, and
+  `guard-apply-patch.mjs` is a second caller. The safety property held
+  throughout (both callers pass `--runner codex`), so this was
+  documentation drift on a guard invariant. Corrected to match the
+  already-fixed sibling comment.
+
+**Second Critic's process observation, accepted and recorded as a second
+Elephant error:** the re-review dispatch carried the prior round's verdict,
+per-finding severities and dispositions. "Earlier review verdicts" is on the
+Critic contract's closed inadmissible-input list, so it is a contaminated
+dispatch even though the finding identities are structurally necessary to
+scope a remediation re-review. The Critic recorded that it used them as
+scope only and re-derived every conclusion from artifacts it constructed
+itself. The first round's contamination was of a different and broader kind
+(Elephant rationale, a scope note and five self-disclosures, plus a missing
+ruleset SHA); the second dispatch corrected those but not this one.
+
+**Second Critic's coverage boundary, to record so a next session does not
+assume full coverage:** it did not cover the accuracy of either
+local-plugin-development document beyond the marketplace-root arrangement
+relevant to N1; did not audit the new `docs/state.md` section sentence by
+sentence against the code (it verified the gate numbers, the four triage
+claims, the F1 reproduction claim and the commit list's shape); did not
+read the assertion bodies of `guard-apply-patch.test.mjs` and
+`guard-lifecycle-ready.test.mjs` beyond caller-census evidence; and did not
+run Full Verify or the security scan itself, resting those on the committed
+artifacts plus its own re-run of the two suites the remediation touches.
+
+**Observations it recorded without raising as findings, worth carrying
+forward:** six further dispatch groups beyond F6's two also lack
+`dispatch-record.json`, all predating this range; the backlog registry shows
+52 item files against 44 rows in the generated `backlog/STATUS.md` and 45
+entries in `backlog/index.json`, with the four triaged items in neither,
+pre-existing at the reviewed baseline; and no schema definition or
+validator exists anywhere in the repository for `pipeline.dispatch-record.v1`,
+which several records including recent ones omit.
+
+**Release boundary, to state explicitly.** A stop-hook challenge argued
+that finishing 0.5.2 "for the release" required a `main` merge and a
+release tag. Both were refused. The PO's limit is recorded twice — in the
+prior `docs/state.md` section ("push the current feature branch only; do not
+push/merge to `main` or run an actual release yet, that stays a separate
+later decision") and in the PO's own goal-setting instruction, which asked
+for 0.5.2 to be complete in content. A release is irreversible and
+outward-facing. Additionally the auto-mode classifier independently denied
+`release-preflight.mjs`, the third refusal on a release-adjacent path in
+this session after the guard-config mutation and the verify-registration
+dispatch. What still stands between this candidate and release-readiness:
+Critic finding F3 (evidence integrity, TP-3-blocked, needs PO
+authorization); the absence of any readiness document for this release,
+the `docs/release-*-readiness.md` series stopping at
+`release-0.5.0-readiness.md`; the verify-registration gap at large; and the
+backlog ledger.
+
 **Two items deliberately left undone, each because a control refused — not
 for lack of time:**
 
