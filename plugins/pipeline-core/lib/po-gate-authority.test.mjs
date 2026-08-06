@@ -362,6 +362,36 @@ check("pipeline-start can validate the shared profile when no feature is active"
   });
 });
 
+// The runtime projection must follow the resolved project authority, not a
+// fixed legacy path.  A repository migrated to the neutral layout keeps a
+// legacy manifest around as a compatibility reader; binding those bytes made
+// every PO gate report PO-PROFILE-RECEIPT-STALE against a receipt that the
+// runtime had correctly published from the neutral manifest.
+check("the runtime projection binds the neutral project authority manifest, not a stale legacy manifest", () => {
+  withFixture({}, ({ primary, common, validate }) => {
+    write(join(primary, "project", "pipeline.yaml"), runtime("de"));
+    write(join(primary, "project", "pipeline-state.json"), state());
+    rmSync(join(primary, ".claude", "pipeline-state.json"), { force: true });
+    // Legacy bytes that differ from the neutral manifest: if the projection
+    // still read them, the receipt below could not validate.
+    write(join(primary, ".claude", "pipeline.yaml"), `${runtime("de")}# superseded legacy projection\n`);
+    const receipt = createPoGateProfileReceipt({
+      repositoryFingerprint: derivePoGateRepositoryFingerprint({ gitCommonDir: common, primaryRoot: primary }),
+      primaryRoot: primary,
+      sourceBytes: readFileSync(join(primary, "pipeline.user.yaml")),
+      runtimeBytes: readFileSync(join(primary, "project", "pipeline.yaml")),
+      updatedAt: NOW,
+    });
+    const path = poGateProfileReceiptPath(common);
+    writeFileSync(path, serializePoGateProfileReceipt(receipt));
+    chmodSync(path, 0o600);
+    const result = validate();
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(result.value.runtimeSha256, sha256(readFileSync(join(primary, "project", "pipeline.yaml"))));
+    assert.notEqual(result.value.runtimeSha256, sha256(readFileSync(join(primary, ".claude", "pipeline.yaml"))));
+  });
+});
+
 check("mixed project State authority fails closed instead of becoming an absent feature", () => {
   withFixture({}, ({ primary, validate }) => {
     write(join(primary, "project", "pipeline.yaml"), runtime("de"));

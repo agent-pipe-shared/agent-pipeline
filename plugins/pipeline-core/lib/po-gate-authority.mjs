@@ -12,6 +12,7 @@ import { spawnSync } from "node:child_process";
 import {
   closeSync,
   constants,
+  existsSync,
   fstatSync,
   lstatSync,
   openSync,
@@ -32,7 +33,7 @@ import { TextDecoder } from "node:util";
 
 import { parseYaml } from "./yaml-lite.mjs";
 import { assessWindowsPrivatePath } from "./windows-private-state.mjs";
-import { readProjectAuthority } from "./project-authority.mjs";
+import { LEGACY_MANIFEST, NEUTRAL_MANIFEST, readProjectAuthority } from "./project-authority.mjs";
 
 export const PO_GATE_PROFILE_RECEIPT_SCHEMA = "pipeline.po-gate-profile-receipt.v1";
 export const PO_GATE_AUTHORITY_EVIDENCE_SCHEMA = "pipeline.po-gate-authority-evidence.v1";
@@ -399,7 +400,15 @@ function loadReceipt(gitCommonDir) {
 
 function readProjection(root) {
   const sourceBytes = readPhysicalFile(root, "pipeline.user.yaml");
-  const runtimeBytes = readPhysicalFile(root, ".claude/pipeline.yaml");
+  // The runtime projection is whichever manifest the project authority resolves
+  // to, not a fixed path.  Binding the legacy path on a repository that has
+  // migrated to the neutral layout would make the receipt describe a file that
+  // is no longer the authority -- it fails closed, but it fails on every gate.
+  const authority = readProjectAuthority({ rootDir: root });
+  const manifest = authority.status === "ready"
+    ? authority.manifest
+    : (existsSync(join(root, NEUTRAL_MANIFEST)) ? NEUTRAL_MANIFEST : LEGACY_MANIFEST);
+  const runtimeBytes = readPhysicalFile(root, manifest);
   return {
     sourceBytes,
     runtimeBytes,
