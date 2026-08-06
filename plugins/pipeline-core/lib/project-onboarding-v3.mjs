@@ -615,13 +615,17 @@ function isAdoptableUnmanagedRoot(entries, root, fs) {
   });
 }
 
-function freshIntent() {
+// The seeded default runner is the identity the onboarding actually ran under.
+// Seeding a literal here is how a Claude consumer used to end up with a Codex
+// project (ADR-0051/ADR-0057 R1); the literal survives only as the last-resort
+// fallback for a caller that genuinely has no observed identity.
+function freshIntent(runner = "codex") {
   const registry = loadRunnerProfilesV3Registry();
   return {
     schema: "pipeline.user.v3",
     language: { human_facing: "en", agent_facing: "en" },
     agent_runtime: "other",
-    runners: { enabled: ["claude", "codex"], default: "codex" },
+    runners: { enabled: ["claude", "codex"], default: runner },
     routing: { profiles: clone(registry.profiles), duties: clone(registry.duties) },
     usage: { common_projection: "pipeline.runner-usage.v1", raw_persistence: "none" },
     autonomy: { push_policy: "gated", branch_model: "feature-branch", wip_limit: 3 },
@@ -1283,6 +1287,21 @@ function commandAction(argv, mutation, requiresConfirmation, schema, statuses) {
   return { kind: "command", executable: "node", argv, mutation, requiresConfirmation, expected: { schema, statuses } };
 }
 
+/**
+ * Append the identity this observation ran under to a self-referencing
+ * onboarding-script argv, so executing the returned action verbatim can never
+ * silently substitute a different runner (ADR-0051, ADR-0057 R1). `--intent` is
+ * appended only when it differs from the "onboarding" default the receiving
+ * command would apply anyway; carrying the default forward changes nothing.
+ *
+ * A caller with no runner in scope must not call this — that is the stop
+ * condition, not a case to paper over with a literal.
+ */
+function lifecycleArgv(argv, runner, intent = "onboarding") {
+  if (typeof runner !== "string" || runner.length === 0) return argv;
+  return intent === "onboarding" ? [...argv, "--runner", runner] : [...argv, "--runner", runner, "--intent", intent];
+}
+
 function shellWord(value) {
   if (typeof value !== "string" || value.includes("\0")) {
     throw new TypeError("command arguments must be NUL-free strings");
@@ -1395,9 +1414,9 @@ function restartCopyCommands(executable, argv) {
   };
 }
 
-function continuityRepairPlanAction(root) {
+function continuityRepairPlanAction(root, runner, intent) {
   return commandAction(
-    [ONBOARDING_SCRIPT, "plan-repair", "--root", root],
+    lifecycleArgv([ONBOARDING_SCRIPT, "plan-repair", "--root", root], runner, intent),
     false,
     false,
     SCHEMA,
@@ -1639,7 +1658,7 @@ function readyLifecycleResult({ root, runner = "codex", intent, repository, runt
       runtime,
       continuity,
       appServer,
-      nextAction: continuityRepairPlanAction(root),
+      nextAction: continuityRepairPlanAction(root, runner, intent),
       diagnostics: [lifecycleDiagnostic(
         "$.continuity",
         "continuity_damaged",
@@ -2675,7 +2694,7 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
       intent,
       repository,
       runtime: emptyRuntime(),
-      nextAction: commandAction([ONBOARDING_SCRIPT, "plan", "--root", legacy.root], false, false, SCHEMA, ["portable-seed-required"]),
+      nextAction: commandAction(lifecycleArgv([ONBOARDING_SCRIPT, "plan", "--root", legacy.root], runner, intent), false, false, SCHEMA, ["portable-seed-required"]),
       diagnostics: [lifecycleDiagnostic("$.source", "portable_seed_missing", "no portable V3 source and calibration seed exists", "review the portable seed plan")],
     });
   }
@@ -2687,7 +2706,7 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
       intent,
       repository,
       runtime: emptyRuntime(),
-      nextAction: commandAction([ONBOARDING_SCRIPT, "plan", "--root", legacy.root], false, false, SCHEMA, ["adoption-required"]),
+      nextAction: commandAction(lifecycleArgv([ONBOARDING_SCRIPT, "plan", "--root", legacy.root], runner, intent), false, false, SCHEMA, ["adoption-required"]),
       diagnostics: [lifecycleDiagnostic("$.source", "adoption_required", "the local project has no Pipeline authority", "review the additive adoption plan")],
     });
   }
@@ -2819,7 +2838,7 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
             intent,
             repository,
             runtime,
-            nextAction: commandAction([ONBOARDING_SCRIPT, initialize ? "plan-runtime" : "plan-repair", "--root", legacy.root], false, false, SCHEMA, [initialize ? "runtime-initialization-required" : "projection-drift"]),
+            nextAction: commandAction(lifecycleArgv([ONBOARDING_SCRIPT, initialize ? "plan-runtime" : "plan-repair", "--root", legacy.root], runner, intent), false, false, SCHEMA, [initialize ? "runtime-initialization-required" : "projection-drift"]),
             diagnostics: [lifecycleDiagnostic("$.runtime", initialize ? "runtime_missing" : "projection_drift", initialize ? "required Codex runtime targets are absent" : "generated runtime bytes differ from the V3 projection", "review the lifecycle runtime plan")],
           });
         }
@@ -3002,7 +3021,7 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
                 readbackSha256: null,
               },
               nextAction: commandAction(
-                [ONBOARDING_SCRIPT, "plan-readback", "--root", legacy.root],
+                lifecycleArgv([ONBOARDING_SCRIPT, "plan-readback", "--root", legacy.root], runner, intent),
                 false,
                 false,
                 SCHEMA,
@@ -3059,7 +3078,7 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
               readbackSha256: null,
             },
             nextAction: commandAction(
-              [ONBOARDING_SCRIPT, "plan-readback", "--root", legacy.root],
+              lifecycleArgv([ONBOARDING_SCRIPT, "plan-readback", "--root", legacy.root], runner, intent),
               false,
               false,
               SCHEMA,
@@ -3103,13 +3122,13 @@ export function inspectProjectOnboardingV3({ rootDir = process.cwd(), deps: over
   return v4Inspection(rootDir, deps(overrides), intent, runner);
 }
 
-export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrides = {} } = {}) {
+export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrides = {}, runner } = {}) {
   const fs = deps(overrides); const inspected = legacyInspection(rootDir, fs);
   if (!["fresh", "fresh-host-managed", "existing-unmanaged"].includes(inspected.status)) return { schema: PLAN_SCHEMA, status: inspected.status, root: inspected.root, diagnostics: inspected.diagnostics, targets: [], requiresExplicitActivation: true };
   const hostManaged = inspected.status === "fresh-host-managed";
   const git = hostManaged ? { ok: true, version: null } : gitCapability(fs, inspected.root);
   if (!git.ok) return { schema: PLAN_SCHEMA, status: "unsupported", root: inspected.root, diagnostics: [diagnostic("$.git", "git_initial_branch_unsupported", git.reason, "install Git 2.28 or newer before activation")], targets: [], requiresExplicitActivation: true };
-  const intent = freshIntent(); const validation = validatePipelineUserV3(intent);
+  const intent = freshIntent(runner); const validation = validatePipelineUserV3(intent);
   if (!validation.ok) return { schema: PLAN_SCHEMA, status: "invalid-authority", root: inspected.root, diagnostics: validation.errors, targets: [], requiresExplicitActivation: true };
   const baselines = freshBaselines(intent, { hostManaged });
   const manifest = validateManifest(parseYaml(baselines[NEUTRAL_MANIFEST].bytes), { rootDir: inspected.root });
@@ -3496,13 +3515,13 @@ export function applyProjectRemoteAdoptionV4({ rootDir = process.cwd(), remote, 
   }
 }
 
-function planLifecycle(rootDir, fs, operation) {
-  const observed = v4Inspection(rootDir, fs);
+function planLifecycle(rootDir, fs, operation, intent = "onboarding", runner) {
+  const observed = v4Inspection(rootDir, fs, intent, runner);
   if (operation === "portable") {
     if (!["portable-seed-required", "adoption-required"].includes(observed.status)) return observed;
-    const plan = planProjectOnboardingV3({ rootDir, deps: fs });
+    const plan = planProjectOnboardingV3({ rootDir, deps: fs, runner: observed.runner });
     if (plan.status !== "ready") return observed;
-    return { ...observed, nextAction: commandAction([ONBOARDING_SCRIPT, "apply-portable-seed", "--root", plan.root, "--plan-sha256", lifecyclePlanDigest(plan), "--activate"], true, true, SCHEMA, ["runtime-initialization-required", "restart-required", "kickoff-required"]) };
+    return { ...observed, nextAction: commandAction(lifecycleArgv([ONBOARDING_SCRIPT, "apply-portable-seed", "--root", plan.root, "--plan-sha256", lifecyclePlanDigest(plan), "--activate"], observed.runner, intent), true, true, SCHEMA, ["runtime-initialization-required", "restart-required", "kickoff-required"]) };
   }
   if (operation === "repair" && observed.status === "continuity-damaged") {
     const plan = planOnboardingContinuityRepair({
@@ -3552,20 +3571,23 @@ function planLifecycle(rootDir, fs, operation) {
       : operation === "repair"
         ? "apply-repair"
         : "apply-readback";
-    return { ...observed, nextAction: commandAction([ONBOARDING_SCRIPT, applyCommand, "--root", plan.root, "--plan-sha256", lifecyclePlanDigest(plan), "--activate"], true, true, SCHEMA, statuses) };
+    return { ...observed, nextAction: commandAction(lifecycleArgv([ONBOARDING_SCRIPT, applyCommand, "--root", plan.root, "--plan-sha256", lifecyclePlanDigest(plan), "--activate"], observed.runner, intent), true, true, SCHEMA, statuses) };
   }
   return observed;
 }
 
-function applyLifecycle(rootDir, fs, operation, planSha256, activate) {
-  if (!activate || typeof planSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(planSha256)) return v4Inspection(rootDir, fs);
+function applyLifecycle(rootDir, fs, operation, planSha256, activate, intent = "onboarding", runner) {
+  if (!activate || typeof planSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(planSha256)) return v4Inspection(rootDir, fs, intent, runner);
   if (operation === "portable") {
-    const plan = planProjectOnboardingV3({ rootDir, deps: fs });
-    if (plan.status !== "ready" || lifecyclePlanDigest(plan) !== planSha256) return v4Inspection(rootDir, fs);
+    // The apply-side plan must be recomputed under the SAME identity the plan
+    // digest was produced with, or the digests never match and the apply is a
+    // silent no-op that loops the caller back to adoption-required.
+    const plan = planProjectOnboardingV3({ rootDir, deps: fs, runner: v4Inspection(rootDir, fs, intent, runner).runner });
+    if (plan.status !== "ready" || lifecyclePlanDigest(plan) !== planSha256) return v4Inspection(rootDir, fs, intent, runner);
     applyProjectOnboardingV3(plan, { rootDir, activate: true, deps: fs });
-    return v4Inspection(rootDir, fs);
+    return v4Inspection(rootDir, fs, intent, runner);
   }
-  const beforeApply = v4Inspection(rootDir, fs);
+  const beforeApply = v4Inspection(rootDir, fs, intent, runner);
   if (operation === "repair" && beforeApply.status === "continuity-damaged") {
     const plan = planOnboardingContinuityRepair({
       rootDir,
@@ -3582,9 +3604,9 @@ function applyLifecycle(rootDir, fs, operation, planSha256, activate) {
         deps: { spawn: fs.spawnSync },
       });
     } catch {
-      return v4Inspection(rootDir, fs);
+      return v4Inspection(rootDir, fs, intent, runner);
     }
-    return v4Inspection(rootDir, fs);
+    return v4Inspection(rootDir, fs, intent, runner);
   }
   const expectedBeforeApply = operation === "runtime"
     ? "runtime-initialization-required"
@@ -3601,7 +3623,7 @@ function applyLifecycle(rootDir, fs, operation, planSha256, activate) {
   }
   const plan = planRunnerProfileMigrationV3({ rootDir, deps: fs, initializeMissingRuntimeForSlimV3: operation === "runtime" });
   const expectedPlanStatus = operation === "readback" ? "noop" : "ready";
-  if (plan.status !== expectedPlanStatus || lifecyclePlanDigest(plan) !== planSha256) return v4Inspection(rootDir, fs);
+  if (plan.status !== expectedPlanStatus || lifecyclePlanDigest(plan) !== planSha256) return v4Inspection(rootDir, fs, intent, runner);
   const runtimeTargets = plan.targets.filter((target) => target.kind === "runtime" && target.path.startsWith(".codex/")).map((target) => ({
     path: target.path, beforeSha256: target.before.sha256, afterSha256: target.after.sha256,
   })).sort((left, right) => left.path.localeCompare(right.path));
@@ -3639,7 +3661,7 @@ function applyLifecycle(rootDir, fs, operation, planSha256, activate) {
       guidance: "repair private restart-state persistence before retrying",
     });
   }
-  if (operation === "readback") return v4Inspection(rootDir, fs);
+  if (operation === "readback") return v4Inspection(rootDir, fs, intent, runner);
   const applied = applyRunnerProfileMigrationV3(plan, { rootDir, activate: true, deps: fs });
   if (applied.status !== "applied" && persisted.written) {
     try {
@@ -3676,15 +3698,15 @@ function applyLifecycle(rootDir, fs, operation, planSha256, activate) {
       guidance: "repair the target transaction failure and retry from the observed barrier state",
     });
   }
-  return v4Inspection(rootDir, fs);
+  return v4Inspection(rootDir, fs, intent, runner);
 }
 
-export function planProjectOnboardingLifecycleV4({ rootDir = process.cwd(), deps: overrides = {}, operation = "portable" } = {}) {
-  return planLifecycle(rootDir, deps(overrides), operation);
+export function planProjectOnboardingLifecycleV4({ rootDir = process.cwd(), deps: overrides = {}, operation = "portable", intent = "onboarding", runner } = {}) {
+  return planLifecycle(rootDir, deps(overrides), operation, intent, runner);
 }
 
-export function applyProjectOnboardingLifecycleV4({ rootDir = process.cwd(), deps: overrides = {}, operation = "portable", planSha256, activate = false } = {}) {
-  return applyLifecycle(rootDir, deps(overrides), operation, planSha256, activate);
+export function applyProjectOnboardingLifecycleV4({ rootDir = process.cwd(), deps: overrides = {}, operation = "portable", planSha256, activate = false, intent = "onboarding", runner } = {}) {
+  return applyLifecycle(rootDir, deps(overrides), operation, planSha256, activate, intent, runner);
 }
 
 export function planProjectOnboardingKickoffV4({

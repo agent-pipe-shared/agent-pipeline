@@ -1793,7 +1793,7 @@ test("matrix source/runtime progress actions are exact, diagnostic-bound, and co
     assert.equal(portable.repository.status, "local-uninitialized");
     assertDiagnostic(portable, "portable_seed_missing");
     assertSingleLineAction(portable.nextAction, action(
-      [ONBOARDING_SCRIPT, "plan", "--root", empty],
+      [ONBOARDING_SCRIPT, "plan", "--root", empty, "--runner", "codex"],
       ["portable-seed-required"],
     ));
 
@@ -1805,7 +1805,7 @@ test("matrix source/runtime progress actions are exact, diagnostic-bound, and co
     assert.equal(adoption.repository.status, "local-valid-writable");
     assertDiagnostic(adoption, "adoption_required");
     assertSingleLineAction(adoption.nextAction, action(
-      [ONBOARDING_SCRIPT, "plan", "--root", existing],
+      [ONBOARDING_SCRIPT, "plan", "--root", existing, "--runner", "codex"],
       ["adoption-required"],
     ));
 
@@ -1830,7 +1830,7 @@ test("matrix source/runtime progress actions are exact, diagnostic-bound, and co
     assert.equal(missing.runtime.status, "missing");
     assertDiagnostic(missing, "runtime_missing");
     assertSingleLineAction(missing.nextAction, action(
-      [ONBOARDING_SCRIPT, "plan-runtime", "--root", runtime],
+      [ONBOARDING_SCRIPT, "plan-runtime", "--root", runtime, "--runner", "codex"],
       ["runtime-initialization-required"],
     ));
   } finally {
@@ -1859,7 +1859,7 @@ test("every lifecycle plan exposes the exact digest-bound apply status contract 
     });
     const portableDigest = portable.nextAction.argv[portable.nextAction.argv.indexOf("--plan-sha256") + 1];
     assert.match(assertSingleLineAction(portable.nextAction, applyAction(
-      [ONBOARDING_SCRIPT, "apply-portable-seed", "--root", portableRoot, "--plan-sha256", portableDigest, "--activate"],
+      [ONBOARDING_SCRIPT, "apply-portable-seed", "--root", portableRoot, "--plan-sha256", portableDigest, "--activate", "--runner", "codex"],
       ["runtime-initialization-required", "restart-required", "kickoff-required"],
     )), /'[^']*with spaces[^']*'/u);
 
@@ -1876,7 +1876,7 @@ test("every lifecycle plan exposes the exact digest-bound apply status contract 
     });
     const runtimeDigest = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
     assertSingleLineAction(runtime.nextAction, applyAction(
-      [ONBOARDING_SCRIPT, "initialize-runtime", "--root", runtimeRoot, "--plan-sha256", runtimeDigest, "--activate"],
+      [ONBOARDING_SCRIPT, "initialize-runtime", "--root", runtimeRoot, "--plan-sha256", runtimeDigest, "--activate", "--runner", "codex"],
       ["restart-required"],
     ));
     assert.equal(applyProjectOnboardingLifecycleV4({
@@ -1896,7 +1896,7 @@ test("every lifecycle plan exposes the exact digest-bound apply status contract 
     });
     const repairDigest = repair.nextAction.argv[repair.nextAction.argv.indexOf("--plan-sha256") + 1];
     assertSingleLineAction(repair.nextAction, applyAction(
-      [ONBOARDING_SCRIPT, "apply-repair", "--root", runtimeRoot, "--plan-sha256", repairDigest, "--activate"],
+      [ONBOARDING_SCRIPT, "apply-repair", "--root", runtimeRoot, "--plan-sha256", repairDigest, "--activate", "--runner", "codex"],
       ["restart-required", "kickoff-required", "ready"],
     ));
   } finally {
@@ -1919,7 +1919,7 @@ test("a projection-current upgraded repository must establish a barrier before n
     assert.equal(observed.status, "runtime-attestation-required");
     assert.equal(observed.runtime.status, "projection-current");
     assertDiagnostic(observed, "restart_required");
-    assert.deepEqual(observed.nextAction.argv, [ONBOARDING_SCRIPT, "plan-readback", "--root", path]);
+    assert.deepEqual(observed.nextAction.argv, [ONBOARDING_SCRIPT, "plan-readback", "--root", path, "--runner", "codex"]);
 
     const planned = planProjectOnboardingLifecycleV4({
       rootDir: path,
@@ -1935,6 +1935,8 @@ test("a projection-current upgraded repository must establish a barrier before n
       "--plan-sha256",
       digest,
       "--activate",
+      "--runner",
+      "codex",
     ]);
     const beforeRuntime = treeSnapshot(join(path, ".codex"));
     const applied = applyProjectOnboardingLifecycleV4({
@@ -1973,6 +1975,8 @@ test("a stale pending restart binding yields a replaceable readback plan", () =>
       "plan-readback",
       "--root",
       path,
+      "--runner",
+      "codex",
     ]);
 
     const planned = planProjectOnboardingLifecycleV4({
@@ -2249,7 +2253,7 @@ test("runtime plan preimage drift preserves external bytes and maps to exact pro
     assertSingleLineAction(mixed.nextAction, {
       kind: "command",
       executable: "node",
-      argv: [ONBOARDING_SCRIPT, "plan-repair", "--root", path],
+      argv: [ONBOARDING_SCRIPT, "plan-repair", "--root", path, "--runner", "codex"],
       mutation: false,
       requiresConfirmation: false,
       expected: {
@@ -2271,7 +2275,7 @@ test("runtime plan preimage drift preserves external bytes and maps to exact pro
     assertSingleLineAction(observed.nextAction, {
       kind: "command",
       executable: "node",
-      argv: [ONBOARDING_SCRIPT, "plan-repair", "--root", path],
+      argv: [ONBOARDING_SCRIPT, "plan-repair", "--root", path, "--runner", "codex"],
       mutation: false,
       requiresConfirmation: false,
       expected: {
@@ -2666,7 +2670,7 @@ test("current runtime exposes closed continuity outcomes while required App Serv
     const continuityAction = {
       kind: "command",
       executable: "node",
-      argv: [ONBOARDING_SCRIPT, "plan-repair", "--root", pristine],
+      argv: [ONBOARDING_SCRIPT, "plan-repair", "--root", pristine, "--runner", "codex"],
       mutation: false,
       requiresConfirmation: false,
       expected: {
@@ -2934,7 +2938,7 @@ test("a recognized read-only host control layout receives portable onboarding wi
     assertSingleLineAction(inspected.nextAction, {
       kind: "command",
       executable: "node",
-      argv: [ONBOARDING_SCRIPT, "plan", "--root", path],
+      argv: [ONBOARDING_SCRIPT, "plan", "--root", path, "--runner", "codex"],
       mutation: false,
       requiresConfirmation: false,
       expected: {
@@ -3539,7 +3543,7 @@ test("owned runtime drift and invalid V3 sources stay in closed lifecycle classi
     assertSingleLineAction(observedDrift.nextAction, {
       kind: "command",
       executable: "node",
-      argv: [ONBOARDING_SCRIPT, "plan-repair", "--root", drifted],
+      argv: [ONBOARDING_SCRIPT, "plan-repair", "--root", drifted, "--runner", "codex"],
       mutation: false,
       requiresConfirmation: false,
       expected: {

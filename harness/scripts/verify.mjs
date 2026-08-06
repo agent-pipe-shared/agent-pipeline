@@ -231,6 +231,9 @@ const TEST_SUITES = [
   { name: "codex-onboarding-app-server-tests", file: join(libDir, "codex-onboarding-app-server.test.mjs") },
   { name: "v3-bootstrap-authority-tests", file: join(pluginScriptsDir, "v3-bootstrap-authority.test.mjs") },
   { name: "project-onboarding-e2e-tests", file: join(pluginScriptsDir, "project-onboarding-e2e.test.mjs") },
+  // ADR-0051/ADR-0057 R1: walks the consumer chain executing each returned action
+  // verbatim, which is how the identity substitution was found in the first place.
+  { name: "onboarding-runner-identity-tests", file: join(pluginScriptsDir, "onboarding-runner-identity.test.mjs") },
   { name: "project-authority-tests", file: join(libDir, "project-authority.test.mjs") },
   { name: "project-authority-migration-cli-tests", file: join(pluginScriptsDir, "project-authority-migration.test.mjs") },
   { name: "feature-package-topology-tests", file: join(libDir, "feature-package-topology.test.mjs") },

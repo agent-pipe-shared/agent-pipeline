@@ -1757,6 +1757,12 @@
       "member": "project-authority-migration-cli-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:onboarding-runner-identity-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "onboarding-runner-identity-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:project-onboarding-e2e-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -2192,6 +2198,7 @@
         "verify-phase:harness/scripts/verify.mjs:nova-verify-resume-tests",
         "verify-phase:harness/scripts/verify.mjs:observation-governance-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-continuity-tests",
+        "verify-phase:harness/scripts/verify.mjs:onboarding-runner-identity-tests",
         "verify-phase:harness/scripts/verify.mjs:p3b-runner-conformance-tests",
         "verify-phase:harness/scripts/verify.mjs:parallel-dispatch-planner-tests",
         "verify-phase:harness/scripts/verify.mjs:phase26-invariants-check",
