@@ -696,6 +696,11 @@ function attestedMainPublication(binding) {
   }
   return authorizeRecordedPush({
     projectDir: binding.projectDir,
+    // The anchor comes from the GOVERNED session, never from the repository the command
+    // named. T6 Critic F1: `<root>/sub/project/critical-human-proof.json` is not a
+    // gate-strength path, so reading the anchor from the push target let an agent mint
+    // its own. PG12s13 exited 0 before this line existed.
+    anchorDir: fallbackProjectDir(),
     state,
     candidate: { commit, tree: tree.stdout.trim() },
     remote: binding.remote,
@@ -1118,7 +1123,11 @@ function checkDeployApprovals(required) {
   // different questions: a broken state file is a local accident and warns, while a policy
   // that cannot be read is a gate whose strength is unknown, and ADR-0055 already settles
   // that case as "required".
-  const policy = readCriticalHumanProofPolicy(projectDir);
+  // Read from the governed session root for the same reason the anchor is: a policy taken
+  // from the pushed repository lets that repository decide whether it needs a proof, and a
+  // nested one could simply omit `deploy` from requiredKinds. Not part of the T6 finding —
+  // found while fixing it, and fixed here rather than left as the next report's F1.
+  const policy = readCriticalHumanProofPolicy(fallbackProjectDir());
   if (!policy.ok) {
     return [`Deploy approval policy cannot be read (${policy.code}); a gate of unknown strength is treated as demanding proof.`];
   }
@@ -1147,6 +1156,7 @@ function checkDeployApprovals(required) {
       ? { authorized: false, code: "DEPLOY-PROOF-CANDIDATE-UNRESOLVED" }
       : authorizeRecordedDeploy({
         projectDir,
+        anchorDir: fallbackProjectDir(), // governed session root -- see attestedMainPublication
         state: parsed,
         candidate,
         artifact: req.bareArtifact,
@@ -1608,7 +1618,12 @@ if (pushGate.approval === "standing-approved") {
     // above must still be recorded and bound to THIS commit — but a waived project
     // does not additionally need the detached proof, and therefore does not need the
     // publication executor to carry the push. An unreadable policy answers "required".
-    const pushWaiver = criticalProofWaiverFor(projectDir, "push");
+    // Governed session root, not the pushed repository. The waiver decides whether the
+    // detached proof is demanded at all, so reading it from the target would let the target
+    // stand its own gate down -- a `.v2` push waiver or a committed `push_approval: chat` in
+    // a nested repository would do it. Same root cause as the anchor (T6 F1); the fix
+    // belongs in both places or in neither.
+    const pushWaiver = criticalProofWaiverFor(fallbackProjectDir(), "push");
     if (pushGate.approval === "required" && !pushWaiver.waived) {
       // ADR-0056 §6. This branch used to refuse EVERY agent-issued push and point at the
       // fixed publication executor. That was safe and unusable: publication is a release
@@ -1625,6 +1640,7 @@ if (pushGate.approval === "standing-approved") {
         ? { authorized: false, code: "PUSH-PROOF-CANDIDATE-UNRESOLVED" }
         : authorizeRecordedPush({
           projectDir,
+          anchorDir: fallbackProjectDir(), // governed session root -- see attestedMainPublication
           state,
           candidate: { commit: sourceCommit, tree: sourceTree },
           remote: pushBinding.remote,

@@ -98,9 +98,25 @@ function boundArtifactDigest(projectDir, relativePath) {
   }
 }
 
-/** The committed key identity, or a typed refusal. Shared by both routes. */
-function trustAnchorFor(projectDir, prefix) {
-  const policy = readCriticalHumanProofPolicy(projectDir);
+/**
+ * The committed key identity, or a typed refusal. Shared by both routes.
+ *
+ * `anchorDir` is the GOVERNED SESSION ROOT, and it is a separate parameter from the
+ * repository the action targets for a reason that cost a blocker to learn. The first
+ * version read the anchor from the target — `binding.projectDir`, i.e. whatever
+ * `git -C <path> push` named. But the entire justification for trusting the anchor is
+ * that `project/critical-human-proof.json` is gate-strength protected, and GS-2 matches an
+ * EXACT repository-relative path against the session root: `<root>/sub/project/…` is not a
+ * gate-strength path at all. An agent that creates a nested repository could therefore mint
+ * its own anchor, sign with its own key, and watch the guard verify it — measured, not
+ * theorised: PG12s13 and PG12s14 both exited 0 before this change.
+ *
+ * Anchoring to the session root does not forbid a cross-repository push. It requires that
+ * such a push carry a signature under the GOVERNING project's key, over the target's
+ * candidate — which is the property "the human cleared this" was always supposed to mean.
+ */
+function trustAnchorFor(anchorDir, prefix) {
+  const policy = readCriticalHumanProofPolicy(anchorDir);
   if (!policy.ok) return { ok: false, code: policy.code };
   return policy.trustAnchor === null
     ? { ok: false, code: `${prefix}-TRUST-ANCHOR-MISSING` }
@@ -194,17 +210,18 @@ const validNow = (now) => typeof now === "string" && Number.isFinite(Date.parse(
  * @returns {{authorized: true, code: "PUSH-PROOF-VERIFIED", keyReference: string}
  *          | {authorized: false, code: string}}
  */
-export function authorizeRecordedPush({ projectDir, state, candidate, remote, destination, now } = {}) {
+export function authorizeRecordedPush({ projectDir, anchorDir = projectDir, state, candidate, remote, destination, now } = {}) {
   const prefix = "PUSH-PROOF";
-  if (typeof projectDir !== "string" || !object(state) || !validCandidate(candidate)
+  if (typeof projectDir !== "string" || typeof anchorDir !== "string" || !object(state) || !validCandidate(candidate)
     || typeof remote !== "string" || remote === ""
     || typeof destination !== "string" || destination === "" || !validNow(now)) {
     return { authorized: false, code: `${prefix}-INPUT-INVALID` };
   }
 
   // The key identity is read first: every later check is meaningless without an anchor to
-  // verify against, and "no anchor" must never read as "no check needed".
-  const trust = trustAnchorFor(projectDir, prefix);
+  // verify against, and "no anchor" must never read as "no check needed". It comes from the
+  // governed session root, never from the pushed repository -- see `trustAnchorFor`.
+  const trust = trustAnchorFor(anchorDir, prefix);
   if (!trust.ok) return { authorized: false, code: trust.code };
 
   const approval = state?.pushApproval?.lastApproved;
@@ -265,15 +282,15 @@ export function authorizeRecordedPush({ projectDir, state, candidate, remote, de
  * @returns {{authorized: true, code: "DEPLOY-PROOF-VERIFIED", keyReference: string}
  *          | {authorized: false, code: string}}
  */
-export function authorizeRecordedDeploy({ projectDir, state, candidate, artifact, environment, now } = {}) {
+export function authorizeRecordedDeploy({ projectDir, anchorDir = projectDir, state, candidate, artifact, environment, now } = {}) {
   const prefix = "DEPLOY-PROOF";
-  if (typeof projectDir !== "string" || !object(state) || !validCandidate(candidate)
+  if (typeof projectDir !== "string" || typeof anchorDir !== "string" || !object(state) || !validCandidate(candidate)
     || typeof artifact !== "string" || artifact === ""
     || typeof environment !== "string" || environment === "" || !validNow(now)) {
     return { authorized: false, code: `${prefix}-INPUT-INVALID` };
   }
 
-  const trust = trustAnchorFor(projectDir, prefix);
+  const trust = trustAnchorFor(anchorDir, prefix);
   if (!trust.ok) return { authorized: false, code: trust.code };
 
   const approvals = Array.isArray(state?.deployApprovals) ? state.deployApprovals : [];

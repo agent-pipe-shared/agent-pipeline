@@ -782,6 +782,109 @@ function signedPushRepo(prefix, {
     stderrIncludes: ["PUSH-PROOF-NOT-CONSUMED"],
   });
 }
+// ---- PG12s13/s14 the anchor must belong to the GOVERNED session, not to the push target --
+//
+// T6 Critic, F1 (major). The attestation reads its trust anchor and its state from
+// `binding.projectDir` -- the repository the push COMMAND names. ADR-0056 §7 justifies
+// trusting that anchor because `project/critical-human-proof.json` is GS-2 protected, but
+// `gateStrengthRuleFor` matches an exact repository-relative path against the SESSION root
+// (guard-gate-strength.mjs), so `<root>/sub/project/critical-human-proof.json` is not a
+// gate-strength path at all. An agent that can create a nested repository can therefore
+// mint its own anchor, sign with its own key, and have the guard verify it happily.
+//
+// Before this diff the main boundary refused unconditionally, whatever repository the
+// command named; the exception is what made the anchor's provenance load-bearing.
+
+/**
+ * An outer repository that is the governed session root, and a nested one carrying a
+ * complete, internally valid attestation under a keypair the session never anchored.
+ */
+function nestedAttestedRepo(prefix, { destination = "refs/heads/main", withManifest = false } = {}) {
+  const { dir: outer } = freshRepo(prefix);
+  const inner = join(outer, "sub");
+  mkdirSync(inner, { recursive: true });
+  const git = (...args) => spawnSync("git", args, { cwd: inner, encoding: "utf8" });
+  git("init", "-q", "-b", "main");
+  git("config", "user.email", "goldfish@example.invalid");
+  git("config", "user.name", "Goldfish");
+  writeFileSync(join(inner, "README.md"), "nested\n");
+  git("add", "README.md");
+  git("commit", "-q", "-m", "init");
+  const head = git("rev-parse", "HEAD").stdout.trim();
+  const tree = git("rev-parse", `${head}^{tree}`).stdout.trim();
+
+  const key = pushKeypair();
+  const threatModelBody = "# nested threat model\n";
+  writeEvidence(inner, THREAT_MODEL_REL, threatModelBody);
+  const threatModel = { path: THREAT_MODEL_REL, sha256: createHash("sha256").update(threatModelBody).digest("hex") };
+  writeProofPolicy(inner, {
+    schema: "pipeline.critical-human-proof-policy.v1",
+    requiredKinds: ["push", "deploy", "publication"],
+    trustAnchor: { keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 },
+  });
+
+  const candidate = { commit: head, tree };
+  const action = {
+    kind: "push",
+    subjectSha256: criticalActionSubjectSha256({
+      kind: "push", candidate,
+      subject: { sourceCommit: head, remote: "origin", destination, threatModel },
+    }),
+    expiresAt: "2099-01-01T00:00:00.000Z",
+  };
+  const intent = createPoApprovalIntent({
+    kind: "critical-action", featureId: "fixture-feature", planSha256: SIGNED_PLAN_SHA, specSha256: SIGNED_SPEC_SHA,
+    candidate, policyRevision: "critical-human-proof-v1", subjectSha256: criticalActionSha256(action), decision: "approved",
+  });
+  const proof = {
+    schema: "pipeline.po-approval-proof.v1",
+    intentSha256: intent.sha256,
+    keyReference: "po-key-1",
+    publicKey: key.publicPem,
+    signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), key.privateKey).toString("base64"),
+  };
+  const proofSha256 = createHash("sha256").update(canonicalJson(proof)).digest("hex");
+  if (withManifest) {
+    writeManifest(inner, manifestPush({ approval: "required" }));
+    writeEvidence(inner, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  }
+  writeState(inner, {
+    schema: "pipeline.state.v0",
+    activeFeature: { id: "fixture-feature" },
+    planApproval: { poGateAuthority: { planSha256: SIGNED_PLAN_SHA, specSha256: SIGNED_SPEC_SHA } },
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-06T06:00:00.000Z", forCommit: head,
+      criticalProof: { proofSha256, intentSha256: intent.sha256, action, proof },
+      remote: "origin", destination, threatModel,
+    } },
+    criticalProofConsumption: [{ proofSha256, kind: "push", consumedAt: "2026-08-06T06:00:00.000Z" }],
+  });
+  return { outer, inner };
+}
+
+{
+  // PG12s13 -- the main boundary. The nested attestation is complete and verifies against
+  // the nested anchor; it must still buy nothing, because that anchor is not the governed
+  // project's. This is the invariant the exception must not have cost.
+  const { outer } = nestedAttestedRepo("nested-anchor-main");
+  check("PG12s13 block a main push attested only by an anchor inside the pushed repository",
+    "git -C sub push origin HEAD:refs/heads/main", outer, BLOCK, {
+      stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main"],
+      projectDir: outer,
+    });
+}
+{
+  // PG12s14 -- the same flaw on the ordinary branch route, which the T6 finding reached
+  // through main but which is not specific to it.
+  const { outer } = nestedAttestedRepo("nested-anchor-branch", {
+    destination: "refs/heads/feature-test", withManifest: true,
+  });
+  check("PG12s14 block a branch push attested only by an anchor inside the pushed repository",
+    "git -C sub push origin HEAD:refs/heads/feature-test", outer, BLOCK, {
+      stderrIncludes: ["PUSH-PROOF-TRUST-ANCHOR-MISSING"],
+      projectDir: outer,
+    });
+}
 {
   // An unreadable policy answers "required", never "waived".
   const { dir, head } = freshRepo("required-broken-policy");
