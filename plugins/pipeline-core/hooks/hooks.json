@@ -3,6 +3,17 @@
   "hooks": {
     "PreToolUse": [
       {
+        "$comment": "Dispatch preflight (2026-08-06). The FIRST matcher in this family that covers the subagent tool at all -- until now the role contracts in roles/ and templates/prompts/ were prose an Elephant could simply not open, and on 2026-08-06 one did not: a hand-written Critic briefing carried a claims list, a hunt list and a rerun-commands list, all three forbidden verbatim by critic-review.md. Both tool names are matched deliberately (`Task` in Claude Code, `Agent` elsewhere): a matcher naming the wrong tool is a SILENT no-op, the exact failure class this file already paid for with NotebookEdit. Structural check only -- it catches the accident, not a reworded steer; see hooks/guard-dispatch.mjs.",
+        "matcher": "Task|Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch.mjs\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
         "matcher": "Bash|PowerShell",
         "hooks": [
           {
