@@ -161,6 +161,19 @@ unreachable or whose evidence file is missing blocks that item rather than being
 recorded. `check-backlog-state.mjs` is now a registered Verify step, so this cannot
 drift again unnoticed; the remedy when it goes red is one command.
 
+**A defect in the reconciliation itself, caught by the security gate.** The first
+version wrote the whole chain back through `canonicalJson`, which normalises key order
+and therefore rewrote 38 pre-existing entries' *bytes* — 82 insertions / 38 deletions
+on an append-only, hash-chained ledger. Every hash still verified, which is exactly
+what makes rewriting history a quiet failure; `check-backlog-state.mjs` went green on
+a file whose history had been altered. What surfaced it was a *different* control:
+`.gitleaksignore` binds its false-positive fingerprints to `path:rule:line:column`, so
+shifting the columns of lines 42–43 un-allowlisted two known-benign sha256 values and
+turned the security scan red. Two controls disagreeing was the symptom. The write is
+now append-only — the prior file survives verbatim as a prefix — giving 44 insertions,
+0 deletions, with line 42 byte-identical to before. `RBL11` asserts the prefix property
+and the exact appended count.
+
 One latent finding surfaced and is NOT repaired:
 `backlog/items/2026-07-20-source-available-commercial-licensing.md` declares
 `closure_repository: "self"` with `closure_commit: 03de3d47…`, and that object does not
@@ -171,8 +184,22 @@ disposition that introduced that commit
 (`specs/sprint-nova-epic/evidence/backlog/2026-07-24-unreachable-evidence-disposition.md`)
 replaced two unreachable commits with one that is itself unreachable here.
 
-### Open
+### Open — nothing here blocks 0.5.2, and each is named with its owner
 
+- **PO acceptance of four consumer-facing decisions**, none yet given: ADR-0052
+  (published marketplace identity), ADR-0053 (which configuration tier `setup.mjs`
+  writes to), ADR-0054 (the push gate this candidate turns on for every project that
+  inherits this manifest), ADR-0055 (a new policy schema). ADR-0052's own follow-up
+  asked for a first confirmed `claude plugin install` against a separate local
+  marketplace root — that ran successfully on 2026-08-06 and the condition is met.
+- **PRD approval (`approve-plan`) is still unattributed and not proof-bound** — the
+  remaining half of the 2026-08-05 human-proof item. ADR-0055 closed the push half only
+  and says so.
+- **Roughly 32 normative documents still name `.claude/pipeline.json` as *the*
+  calibration path**, including `CLAUDE.md`, `roles/elephant.md`, `roles/goldfish.md`,
+  `guardrails/quality-gates.md` and `templates/prompts/critic-review.md`. ADR-0053
+  estimated "roughly fourteen"; the counted figure is more than double. Doc work, no
+  gate depends on it, and it is now a three-tier repoint rather than a two-tier one.
 - ADR-0054 steps 2–4 (third tier, configurable name, writes to the top tier,
   completeness-gated cleanup) are staged and not started. Step 1 is a clean
   boundary; nothing depends on step 2 landing.
