@@ -7,7 +7,9 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { readFileSync } from "node:fs";
 import { canonicalSha256, canonicalizeJson } from "./governance-event.mjs";
+import { createConsumedHumanRoleExceptionDecision, isHumanRoleExceptionDecision, validateHumanRoleExceptionDecision } from "./human-role-exception-decision.mjs";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
 import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
 import { HumanGovernanceLedgerError, appendConsumedHumanGovernanceDecision, appendHumanGovernanceDecision, createConsumedHumanGovernanceDecision, createExternalHumanGovernanceIntent, queryHumanGovernanceDecisions, resolveExternallyVerifiedHumanGovernanceAuthority, resolveHumanGovernanceAuthority, validateHumanGovernanceDecision, verifyExternalHumanGovernanceProof } from "./human-governance-ledger.mjs";
@@ -179,4 +181,122 @@ test("requires one event-specific link and outcome for every authority lifecycle
     assert.equal(validateHumanGovernanceDecision(decision({ decisionId: `${event}-1`, event, outcome, links })).event, event);
   }
   assert.throws(() => validateHumanGovernanceDecision(decision({ event: "requested", outcome: "granted", links: { requestDecisionId: null, consumesDecisionId: null, revokesDecisionId: null, expiresDecisionId: null, supersedesDecisionId: null, correctsDecisionId: null } })), (error) => error.code === "HGL-OUTCOME");
+});
+
+const exceptionLinks = { requestDecisionId: "request-1", consumesDecisionId: null, revokesDecisionId: null, expiresDecisionId: null, supersedesDecisionId: null, correctsDecisionId: null };
+function exception(overrides = {}) {
+  return {
+    schema: "pipeline.human-role-exception-decision.v1",
+    decisionId: "exception-1", event: "granted", outcome: "granted",
+    exceptionClass: "direct-elephant-implementation",
+    authorityClass: "product-owner", identityAssurance: "locally-attributed", timeAssurance: "locally-observed",
+    scope: { repositoryFingerprint: sha, candidate, packageId: "sprint-phoenix-epic", action: "ROLE.EXCEPTION", environment: "local", artifacts: [{ path: "specs/sprint-phoenix-epic/spec.md", sha256: sha }] },
+    constraints: [{ kind: "single-work-package", limit: null }, { kind: "max-commits", limit: 3 }],
+    followUpReview: { review: "critic-review", dueByEpochMs: 200, satisfiedByDecisionId: null },
+    reasonCode: "ROLE.EXCEPTION.GRANTED",
+    policyDigest: sha, ruleDigest: sha,
+    validity: { notBeforeEpochMs: 10, expiresAtEpochMs: 100, singleUse: true },
+    links: exceptionLinks,
+    ...overrides,
+  };
+}
+
+// H-AC-10: a bounded role exception records exact scope, reason, expiry,
+// constraints and a mandatory follow-up review, and cannot become a standing
+// implicit bypass. The class exists precisely so those last two are mandatory.
+test("H-AC-10 records scope, reason, expiry, constraints and a mandatory follow-up review", () => {
+  const granted = validateHumanRoleExceptionDecision(exception());
+  assert.equal(granted.scope.packageId, "sprint-phoenix-epic");
+  assert.equal(granted.scope.action, "ROLE.EXCEPTION");
+  assert.equal(granted.reasonCode, "ROLE.EXCEPTION.GRANTED");
+  assert.equal(granted.validity.expiresAtEpochMs, 100);
+  assert.deepEqual(granted.constraints.map((entry) => entry.kind), ["single-work-package", "max-commits"]);
+  assert.equal(granted.followUpReview.review, "critic-review");
+  assert.equal(granted.followUpReview.satisfiedByDecisionId, null);
+  assert.equal(Object.isFrozen(granted.constraints), true);
+  assert.equal(Object.isFrozen(granted.followUpReview), true);
+  // Each of the five is individually required, not merely present in the fixture.
+  for (const missing of ["scope", "reasonCode", "validity", "constraints", "followUpReview"]) {
+    const value = exception(); delete value[missing];
+    assert.throws(() => validateHumanRoleExceptionDecision(value), (error) => error instanceof HumanGovernanceLedgerError, missing);
+  }
+});
+
+test("H-AC-10 refuses an unconstrained, unreviewed or non-expiring exception", () => {
+  // No constraints at all is a bypass with extra steps.
+  assert.throws(() => validateHumanRoleExceptionDecision(exception({ constraints: [] })), (error) => error.code === "HRE-CONSTRAINTS");
+  assert.throws(() => validateHumanRoleExceptionDecision(exception({ constraints: [{ kind: "anything-goes", limit: null }] })), (error) => error.code === "HRE-CONSTRAINTS");
+  assert.throws(() => validateHumanRoleExceptionDecision(exception({ constraints: [{ kind: "max-commits", limit: null }] })), (error) => error.code === "HRE-CONSTRAINTS");
+  assert.throws(() => validateHumanRoleExceptionDecision(exception({ constraints: [{ kind: "no-remote-action", limit: 5 }] })), (error) => error.code === "HRE-CONSTRAINTS");
+  assert.throws(() => validateHumanRoleExceptionDecision(exception({ constraints: [{ kind: "max-commits", limit: 3 }, { kind: "max-commits", limit: 9 }] })), (error) => error.code === "HRE-CONSTRAINTS");
+  // The follow-up review is mandatory, comes from a closed set, and cannot be
+  // waived by naming something that is not a review.
+  assert.throws(() => validateHumanRoleExceptionDecision(exception({ followUpReview: { review: "waived", dueByEpochMs: 200, satisfiedByDecisionId: null } })), (error) => error.code === "HRE-FOLLOW-UP");
+  assert.throws(() => validateHumanRoleExceptionDecision(exception({ followUpReview: { review: "critic-review", dueByEpochMs: 200 } })), (error) => error.code === "HRE-FOLLOW-UP");
+  // A follow-up due before the exception expires could fall due while the
+  // exception is still being exercised.
+  assert.throws(() => validateHumanRoleExceptionDecision(exception({ followUpReview: { review: "critic-review", dueByEpochMs: 50, satisfiedByDecisionId: null } })), (error) => error.code === "HRE-FOLLOW-UP");
+  // No standing bypass: validity is mandatory and must actually be bounded.
+  assert.throws(() => validateHumanRoleExceptionDecision(exception({ validity: { notBeforeEpochMs: 10, expiresAtEpochMs: 10, singleUse: true } })), (error) => error.code === "HRE-VALIDITY");
+  assert.throws(() => validateHumanRoleExceptionDecision(exception({ validity: { notBeforeEpochMs: 10, expiresAtEpochMs: null, singleUse: true } })), (error) => error.code === "HRE-VALIDITY");
+  // The exception class itself is closed: "some other exception" is not recordable.
+  assert.throws(() => validateHumanRoleExceptionDecision(exception({ exceptionClass: "just-this-once" })), (error) => error.code === "HRE-SHAPE");
+});
+
+test("H-AC-10 admits no attribution, rationale or provider field, exactly like the plan class", () => {
+  for (const field of ["approvedBy", "actor", "personName", "rationale", "comment", "credential", "endpoint"]) {
+    assert.throws(() => validateHumanRoleExceptionDecision({ ...exception(), [field]: "person-fixture" }), (error) => error.code === "HRE-SHAPE", field);
+    assert.throws(() => validateHumanRoleExceptionDecision(exception({ scope: { ...exception().scope, [field]: "person-fixture" } })), (error) => error.code === "HRE-SCOPE", field);
+    assert.throws(() => validateHumanRoleExceptionDecision(exception({ constraints: [{ kind: "max-commits", limit: 3, [field]: "person-fixture" }] })), (error) => error.code === "HRE-CONSTRAINTS", field);
+    assert.throws(() => validateHumanRoleExceptionDecision(exception({ followUpReview: { review: "critic-review", dueByEpochMs: 200, satisfiedByDecisionId: null, [field]: "person-fixture" } })), (error) => error.code === "HRE-FOLLOW-UP", field);
+  }
+  assert.throws(() => validateHumanRoleExceptionDecision(exception({ reasonCode: "granted because it was late and we were in a hurry" })), (error) => error.code === "HRE-SHAPE");
+});
+
+test("H-AC-10 keeps the two decision classes apart in both directions", () => {
+  assert.equal(isHumanRoleExceptionDecision(exception()), true);
+  // A role exception cannot be validated as a plan decision, so it cannot be
+  // smuggled past the laxer contract by dropping its discriminator's meaning.
+  assert.throws(() => validateHumanGovernanceDecision(exception()), (error) => error.code === "HGL-SHAPE");
+  // And a plan decision does not accidentally satisfy the exception contract.
+  const planDecision = { decisionId: "decision-1", event: "granted", outcome: "granted", authorityClass: "product-owner", identityAssurance: "locally-attributed", timeAssurance: "locally-observed", scope: exception().scope, reasonCode: "SCOPE.ACCEPTED", policyDigest: sha, ruleDigest: sha, validity: { notBeforeEpochMs: 10, expiresAtEpochMs: 100, singleUse: true }, links: exceptionLinks };
+  assert.equal(isHumanRoleExceptionDecision(planDecision), false);
+  assert.throws(() => validateHumanRoleExceptionDecision(planDecision), (error) => error.code === "HRE-SHAPE");
+  assert.equal(validateHumanGovernanceDecision(planDecision).decisionId, "decision-1");
+});
+
+test("H-AC-10 resolves through the shared ledger and carries its bounds with the grant", () => {
+  const granted = resolveHumanGovernanceAuthority({ decisions: [exception()], decisionId: "exception-1", repositoryFingerprint: sha, candidate, nowEpochMs: 50 });
+  assert.equal(granted.status, "granted");
+  assert.equal(granted.exceptionClass, "direct-elephant-implementation");
+  assert.deepEqual(granted.constraints.map((entry) => entry.kind), ["single-work-package", "max-commits"]);
+  assert.equal(granted.followUpReview.review, "critic-review");
+  // Expiry is enforced by the same resolver that governs a plan decision.
+  assert.equal(resolveHumanGovernanceAuthority({ decisions: [exception()], decisionId: "exception-1", repositoryFingerprint: sha, candidate, nowEpochMs: 101 }).reason, "expired");
+  // A consumption disposition stays in the class and keeps the bounds visible.
+  const consumed = createConsumedHumanRoleExceptionDecision({ grant: exception(), decisionId: "exception-consumed-1", observedAtEpochMs: 50 });
+  assert.equal(consumed.schema, "pipeline.human-role-exception-decision.v1");
+  assert.equal(consumed.event, "consumed");
+  assert.equal(consumed.links.consumesDecisionId, "exception-1");
+  assert.deepEqual(consumed.constraints.map((entry) => entry.kind), ["single-work-package", "max-commits"]);
+  assert.equal(consumed.followUpReview.review, "critic-review");
+  assert.equal(resolveHumanGovernanceAuthority({ decisions: [exception(), consumed], decisionId: "exception-1", repositoryFingerprint: sha, candidate, nowEpochMs: 50 }).reason, "disposed");
+  // Mixed streams resolve without either class loosening the other.
+  const mixed = resolveHumanGovernanceAuthority({ decisions: [exception(), { decisionId: "decision-1", event: "granted", outcome: "granted", authorityClass: "product-owner", identityAssurance: "locally-attributed", timeAssurance: "locally-observed", scope: exception().scope, reasonCode: "SCOPE.ACCEPTED", policyDigest: sha, ruleDigest: sha, validity: { notBeforeEpochMs: 10, expiresAtEpochMs: 100, singleUse: true }, links: exceptionLinks }], decisionId: "decision-1", repositoryFingerprint: sha, candidate, nowEpochMs: 50 });
+  assert.equal(mixed.status, "granted");
+  assert.equal(Object.hasOwn(mixed, "constraints"), false);
+});
+
+test("H-AC-10 keeps the published schema and the validator in agreement", () => {
+  const schema = JSON.parse(readFileSync(new URL("../../../governance/schemas/human-role-exception-decision.schema.json", import.meta.url), "utf8"));
+  assert.equal(schema.additionalProperties, false);
+  assert.equal(schema.properties.schema.const, "pipeline.human-role-exception-decision.v1");
+  assert.deepEqual([...schema.required].sort(), Object.keys(exception()).sort());
+  for (const name of schema.required) assert.ok(Object.hasOwn(schema.properties, name), name);
+  assert.deepEqual([...schema.$defs.constraints.items.properties.kind.enum], ["max-artifacts", "max-commits", "no-guard-override", "no-remote-action", "no-schema-change", "no-authority-change", "single-work-package"]);
+  assert.deepEqual([...schema.$defs.followUpReview.properties.review.enum], ["critic-review", "security-review", "privacy-review", "product-owner-acceptance"]);
+  assert.equal(schema.$defs.constraints.minItems, 1);
+  assert.deepEqual([...schema.$defs.followUpReview.required].sort(), ["dueByEpochMs", "review", "satisfiedByDecisionId"]);
+  const envelope = JSON.parse(readFileSync(new URL("../../../governance/schemas/governance-event-envelope.schema.json", import.meta.url), "utf8"));
+  assert.ok(envelope.properties.payloadSchema.enum.includes("pipeline.human-role-exception-decision.v1"));
 });

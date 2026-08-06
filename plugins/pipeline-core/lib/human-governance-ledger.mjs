@@ -4,6 +4,7 @@ import { createHash, verify } from "node:crypto";
 import { canonicalSha256, validateGovernanceEventEnvelope } from "./governance-event.mjs";
 import { appendPortableGovernanceEvent, queryPortableGovernanceStream } from "./governance-event-store.mjs";
 import { HumanGovernanceLedgerError, createConsumedHumanGovernanceDecision, validateHumanGovernanceDecision } from "./human-governance-decision.mjs";
+import { HUMAN_ROLE_EXCEPTION_DECISION_SCHEMA, createConsumedHumanRoleExceptionDecision, isHumanRoleExceptionDecision, validateHumanRoleExceptionDecision } from "./human-role-exception-decision.mjs";
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const EXTERNAL_ID = /^[a-z][a-z0-9-]{0,63}$/u;
@@ -28,11 +29,25 @@ function validExternalIntent(intent) {
 function fail(code) { throw new HumanGovernanceLedgerError(code); }
 
 export { HumanGovernanceLedgerError, createConsumedHumanGovernanceDecision, validateHumanGovernanceDecision };
+export { HUMAN_ROLE_EXCEPTION_DECISION_SCHEMA, createConsumedHumanRoleExceptionDecision, isHumanRoleExceptionDecision, validateHumanRoleExceptionDecision };
+
+/**
+ * Validate one ledger entry as whatever class it declares itself to be.
+ *
+ * A role exception carries a `schema` discriminator; a plan-era decision does
+ * not. Dispatching on that keeps both classes in one stream without either
+ * validator having to loosen: an entry that claims to be a role exception is
+ * held to the role-exception contract, and cannot fall back to the laxer one by
+ * failing it.
+ */
+function validateLedgerDecision(value) {
+  return isHumanRoleExceptionDecision(value) ? validateHumanRoleExceptionDecision(value) : validateHumanGovernanceDecision(value);
+}
 
 /** Returns an immutable authority result; any ambiguity or stale binding fails closed. */
 export function resolveHumanGovernanceAuthority({ decisions, decisionId, repositoryFingerprint, candidate, nowEpochMs = Date.now() } = {}) {
   if (!Array.isArray(decisions) || !ID.test(decisionId) || !SHA256.test(repositoryFingerprint) || !exact(candidate, ["commit", "tree"]) || !OID.test(candidate.commit) || !OID.test(candidate.tree) || !Number.isSafeInteger(nowEpochMs)) fail("HGL-RESOLVE-REQUEST");
-  const valid = decisions.map(validateHumanGovernanceDecision);
+  const valid = decisions.map(validateLedgerDecision);
   const selected = valid.filter((entry) => entry.decisionId === decisionId);
   if (selected.length !== 1) return Object.freeze({ status: "unavailable", reason: "decision-not-unique" });
   const decision = selected[0];
@@ -41,7 +56,12 @@ export function resolveHumanGovernanceAuthority({ decisions, decisionId, reposit
   if (nowEpochMs < decision.validity.notBeforeEpochMs || nowEpochMs > decision.validity.expiresAtEpochMs) return Object.freeze({ status: "denied", reason: "expired" });
   const dispositions = valid.filter((entry) => Object.values(entry.links).includes(decisionId));
   if (dispositions.some((entry) => ["consumed", "revoked", "superseded", "corrected"].includes(entry.event))) return Object.freeze({ status: "denied", reason: "disposed" });
-  return Object.freeze({ status: "granted", decisionId, decisionDigest: canonicalSha256(decision), singleUse: decision.validity.singleUse, scope: decision.scope });
+  const granted = { status: "granted", decisionId, decisionDigest: canonicalSha256(decision), singleUse: decision.validity.singleUse, scope: decision.scope };
+  // A role exception's constraints and outstanding follow-up travel with the
+  // grant. A caller that can act on the exception can therefore also see what
+  // bounds it, instead of having to re-read the ledger to find out.
+  if (!isHumanRoleExceptionDecision(decision)) return Object.freeze(granted);
+  return Object.freeze({ ...granted, exceptionClass: decision.exceptionClass, constraints: decision.constraints, followUpReview: decision.followUpReview });
 }
 
 /**
@@ -103,7 +123,7 @@ export function verifyExternalHumanGovernanceProof({ intent, trustPolicy, proof 
 export function resolveExternallyVerifiedHumanGovernanceAuthority({ decisions, decisionId, repositoryFingerprint, candidate, nowEpochMs = Date.now(), plan, spec, trustPolicy, proof } = {}) {
   const local = resolveHumanGovernanceAuthority({ decisions, decisionId, repositoryFingerprint, candidate, nowEpochMs });
   if (local.status !== "granted") return local;
-  const selected = decisions.map(validateHumanGovernanceDecision).find((entry) => entry.decisionId === decisionId);
+  const selected = decisions.map(validateLedgerDecision).find((entry) => entry.decisionId === decisionId);
   try {
     const intent = createExternalHumanGovernanceIntent({ decision: selected, plan, spec });
     const verified = verifyExternalHumanGovernanceProof({ intent, trustPolicy, proof });
@@ -120,10 +140,19 @@ export function resolveExternallyAttestedHumanGovernanceAuthority(request) {
   return resolveExternallyVerifiedHumanGovernanceAuthority(request);
 }
 
-/** Append one already validated human decision through the canonical portable writer. */
+/**
+ * Append one already validated human decision through the canonical portable
+ * writer. Both decision classes share the human stream, and the envelope's
+ * declared payload schema must agree with the payload's own class -- an
+ * envelope cannot label a role exception as a plan decision to get it past the
+ * laxer validator.
+ */
 export async function appendHumanGovernanceDecision({ repositoryRoot, repositoryFingerprint, intent } = {}) {
-  if (!record(intent) || intent.origin !== "human" || intent.streamId !== "human" || intent.authorityClass !== "human-authority" || intent.payloadSchema !== "pipeline.human-governance-decision.v1") fail("HGL-APPEND-INTENT");
-  const decision = validateHumanGovernanceDecision(intent.payload);
+  const roleException = record(intent) && intent.payloadSchema === HUMAN_ROLE_EXCEPTION_DECISION_SCHEMA;
+  if (!record(intent) || intent.origin !== "human" || intent.streamId !== "human" || intent.authorityClass !== "human-authority"
+    || !(roleException || intent.payloadSchema === "pipeline.human-governance-decision.v1")
+    || isHumanRoleExceptionDecision(intent.payload) !== roleException) fail("HGL-APPEND-INTENT");
+  const decision = roleException ? validateHumanRoleExceptionDecision(intent.payload) : validateHumanGovernanceDecision(intent.payload);
   if (intent.repositoryFingerprint !== repositoryFingerprint || decision.scope.repositoryFingerprint !== repositoryFingerprint) fail("HGL-CROSS-REPOSITORY");
   return appendPortableGovernanceEvent({ repositoryRoot, repositoryFingerprint, intent });
 }
@@ -182,7 +211,7 @@ export async function appendConsumedHumanGovernanceDecision({ repositoryRoot, re
       if (!persisted || canonicalSha256(persisted) !== canonicalSha256(grantEvent)) fail("HGL-CONSUME-GRANT-STALE");
       const decisions = events
         .filter((event) => event.origin === "human" && event.streamId === "human")
-        .map((event) => validateHumanGovernanceDecision(event.payload));
+        .map((event) => validateLedgerDecision(event.payload));
       const authority = resolveHumanGovernanceAuthority({
         decisions,
         decisionId: grant.decisionId,
@@ -198,5 +227,5 @@ export async function appendConsumedHumanGovernanceDecision({ repositoryRoot, re
 /** Return only verified/prefix-valid canonical human decisions, never mutable projection state. */
 export async function queryHumanGovernanceDecisions({ repositoryRoot, repositoryFingerprint, checkpoint } = {}) {
   const result = await queryPortableGovernanceStream({ repositoryRoot, repositoryFingerprint, streamId: "human", checkpoint });
-  return Object.freeze({ ...result, decisions: Object.freeze(result.events.map((event) => validateHumanGovernanceDecision(event.payload))) });
+  return Object.freeze({ ...result, decisions: Object.freeze(result.events.map((event) => validateLedgerDecision(event.payload))) });
 }

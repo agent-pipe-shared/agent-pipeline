@@ -22,6 +22,7 @@ import {
 import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
 import { validateHumanGovernanceDecision } from "./human-governance-decision.mjs";
+import { isHumanRoleExceptionDecision, validateHumanRoleExceptionDecision } from "./human-role-exception-decision.mjs";
 import { validateLifecycleGovernanceEvent } from "./lifecycle-governance-events.mjs";
 import { validateAgentDecisionEvent } from "./agent-decision-journal.mjs";
 
@@ -295,7 +296,11 @@ function assertPortablePayload(event, policy) {
   const stream = policy.streams.find((entry) => entry?.origin === event.origin);
   if (!stream || stream.storageProfile !== "repository-public-safe" || stream.personalIdentifiability !== "prohibited" || stream.contextualIdentifiability !== "prohibited") fail("GES-CAPTURE-DENIED", "Capture policy denies this portable event.");
   if (event.origin === "human") {
-    const decision = validateHumanGovernanceDecision(event.payload);
+    // The envelope's declared payload schema selects the validator, so a role
+    // exception cannot be admitted through the plan-decision contract.
+    const roleException = event.payloadSchema === "pipeline.human-role-exception-decision.v1";
+    if (isHumanRoleExceptionDecision(event.payload) !== roleException) fail("GES-PAYLOAD-SCHEMA", "Human decision payload class does not match its declared envelope schema.");
+    const decision = roleException ? validateHumanRoleExceptionDecision(event.payload) : validateHumanGovernanceDecision(event.payload);
     if (decision.scope.repositoryFingerprint !== event.repositoryFingerprint || decision.scope.candidate.commit !== event.candidate.commit || decision.scope.candidate.tree !== event.candidate.tree || event.eventType !== `human.${decision.event}`) fail("GES-PAYLOAD-SCHEMA", "Human decision payload does not bind its envelope.");
     if (typeof event.policy.capturePolicyDigest !== "string" || event.policy.capturePolicyDigest !== canonicalSha256(policy)) fail("GES-CAPTURE-POLICY-BINDING", "Event does not bind the effective capture policy.");
     return;

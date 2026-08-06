@@ -40,6 +40,7 @@
     "payloadSchema": {
       "enum": [
         "pipeline.human-governance-decision.v1",
+        "pipeline.human-role-exception-decision.v1",
         "pipeline.agent-decision-event.v1",
         "pipeline.lifecycle-governance-event.v1"
       ]

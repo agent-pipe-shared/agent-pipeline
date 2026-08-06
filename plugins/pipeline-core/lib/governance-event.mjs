@@ -164,12 +164,14 @@ function validateEnvelopeShape(value, errors) {
   if (value.digestAlgorithm !== GOVERNANCE_EVENT_DIGEST_ALGORITHM) add(errors, "digest-algorithm");
   if (typeof value.eventId !== "string" || !ID.test(value.eventId)) add(errors, "event-id");
   if (typeof value.idempotencyKey !== "string" || !ID.test(value.idempotencyKey)) add(errors, "idempotency-key");
+  // The human stream carries two decision classes: the plan-era decision and
+  // the bounded role exception. Every other origin stays single-class.
   const payloadByOrigin = {
-    human: "pipeline.human-governance-decision.v1",
-    agent: "pipeline.agent-decision-event.v1",
-    lifecycle: "pipeline.lifecycle-governance-event.v1",
+    human: ["pipeline.human-governance-decision.v1", "pipeline.human-role-exception-decision.v1"],
+    agent: ["pipeline.agent-decision-event.v1"],
+    lifecycle: ["pipeline.lifecycle-governance-event.v1"],
   };
-  if (!Object.hasOwn(payloadByOrigin, value.origin) || value.payloadSchema !== payloadByOrigin[value.origin]) add(errors, "origin-payload-schema");
+  if (!Object.hasOwn(payloadByOrigin, value.origin) || !payloadByOrigin[value.origin].includes(value.payloadSchema)) add(errors, "origin-payload-schema");
   if ((value.origin === "human" && value.authorityClass !== "human-authority") || (value.origin !== "human" && value.authorityClass !== "non-authoritative")) add(errors, "origin-authority-class");
   if (typeof value.eventType !== "string" || !EVENT_TYPE.test(value.eventType)) add(errors, "event-type");
   if (![value.occurredAtEpochMs, value.observedAtEpochMs, value.sequence].every((number) => Number.isSafeInteger(number) && number >= 0)) add(errors, "integer-range");

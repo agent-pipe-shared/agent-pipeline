@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.dev/schemas/pipeline.human-role-exception-decision.v1.json",
+  "title": "Pipeline human role exception decision v1",
+  "description": "A bounded suspension of role separation. It is a separate class from a plan decision because it carries mandatory constraints and a mandatory follow-up review; making either optional would allow an exception that reads like an approval and carries none of what makes it accountable.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "decisionId", "event", "outcome", "exceptionClass", "authorityClass", "identityAssurance", "timeAssurance", "scope", "constraints", "followUpReview", "reasonCode", "policyDigest", "ruleDigest", "validity", "links"],
+  "properties": {
+    "schema": { "const": "pipeline.human-role-exception-decision.v1" },
+    "decisionId": { "$ref": "#/$defs/id" },
+    "event": { "enum": ["requested", "granted", "denied", "cancelled", "consumed", "revoked", "expired", "corrected", "superseded"] },
+    "outcome": { "enum": ["pending", "granted", "denied", "cancelled", "consumed", "revoked", "expired", "corrected", "superseded"] },
+    "exceptionClass": { "enum": ["direct-elephant-implementation", "self-review", "skipped-critic-review", "reduced-rigor", "role-substitution"] },
+    "authorityClass": { "enum": ["product-owner", "delegated-reviewer", "security-reviewer", "privacy-reviewer"] },
+    "identityAssurance": { "enum": ["locally-attributed", "externally-attested", "unknown"] },
+    "timeAssurance": { "enum": ["locally-observed", "externally-attested", "unknown"] },
+    "scope": { "$ref": "#/$defs/scope" },
+    "constraints": { "$ref": "#/$defs/constraints" },
+    "followUpReview": { "$ref": "#/$defs/followUpReview" },
+    "reasonCode": { "$ref": "#/$defs/code" },
+    "policyDigest": { "$ref": "#/$defs/sha256" },
+    "ruleDigest": { "$ref": "#/$defs/sha256" },
+    "validity": { "$ref": "#/$defs/validity" },
+    "links": { "$ref": "#/$defs/links" }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "nullableId": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9._:-]{0,127}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "oid": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+    "scope": {
+      "type": "object", "additionalProperties": false,
+      "required": ["repositoryFingerprint", "candidate", "packageId", "action", "environment", "artifacts"],
+      "properties": {
+        "repositoryFingerprint": { "$ref": "#/$defs/sha256" },
+        "candidate": { "type": "object", "additionalProperties": false, "required": ["commit", "tree"], "properties": { "commit": { "$ref": "#/$defs/oid" }, "tree": { "$ref": "#/$defs/oid" } } },
+        "packageId": { "$ref": "#/$defs/id" },
+        "action": { "$ref": "#/$defs/code" },
+        "environment": { "$ref": "#/$defs/id" },
+        "artifacts": { "type": "array", "minItems": 1, "maxItems": 128, "items": { "type": "object", "additionalProperties": false, "required": ["path", "sha256"], "properties": { "path": { "type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9][A-Za-z0-9._/-]{0,255}$" }, "sha256": { "$ref": "#/$defs/sha256" } } } }
+      }
+    },
+    "constraints": {
+      "description": "At least one bound, from a closed vocabulary. An exception with no constraints is a bypass with extra steps.",
+      "type": "array", "minItems": 1, "maxItems": 16,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["kind", "limit"],
+        "properties": {
+          "kind": { "enum": ["max-artifacts", "max-commits", "no-guard-override", "no-remote-action", "no-schema-change", "no-authority-change", "single-work-package"] },
+          "limit": { "type": ["integer", "null"], "minimum": 1, "maximum": 1024 }
+        }
+      }
+    },
+    "followUpReview": {
+      "description": "A commitment, never a status: it records the review that must still occur, and is satisfied only by a later decision that links to it.",
+      "type": "object", "additionalProperties": false,
+      "required": ["review", "dueByEpochMs", "satisfiedByDecisionId"],
+      "properties": {
+        "review": { "enum": ["critic-review", "security-review", "privacy-review", "product-owner-acceptance"] },
+        "dueByEpochMs": { "type": "integer", "minimum": 0 },
+        "satisfiedByDecisionId": { "$ref": "#/$defs/nullableId" }
+      }
+    },
+    "validity": {
+      "description": "An exception always expires. A standing implicit bypass is not representable.",
+      "type": "object", "additionalProperties": false,
+      "required": ["notBeforeEpochMs", "expiresAtEpochMs", "singleUse"],
+      "properties": { "notBeforeEpochMs": { "type": "integer", "minimum": 0 }, "expiresAtEpochMs": { "type": "integer", "minimum": 1 }, "singleUse": { "type": "boolean" } }
+    },
+    "links": {
+      "type": "object", "additionalProperties": false,
+      "required": ["requestDecisionId", "consumesDecisionId", "revokesDecisionId", "expiresDecisionId", "supersedesDecisionId", "correctsDecisionId"],
+      "properties": {
+        "requestDecisionId": { "$ref": "#/$defs/nullableId" },
+        "consumesDecisionId": { "$ref": "#/$defs/nullableId" },
+        "revokesDecisionId": { "$ref": "#/$defs/nullableId" },
+        "expiresDecisionId": { "$ref": "#/$defs/nullableId" },
+        "supersedesDecisionId": { "$ref": "#/$defs/nullableId" },
+        "correctsDecisionId": { "$ref": "#/$defs/nullableId" }
+      }
+    }
+  }
+}
