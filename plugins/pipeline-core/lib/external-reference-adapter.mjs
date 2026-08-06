@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Provider-neutral, preview-first controller for external references. */
+import { FEATURE_CLASSES, FEATURE_STATES } from "./feature-package-topology.mjs";
 import { canonicalSha256 } from "./governance-event.mjs";
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/u; const SHA = /^[a-f0-9]{64}$/u;
@@ -18,14 +19,49 @@ export function validateExternalAdapterCapabilities(capabilities) {
 function validateTarget(value, reference) { return exact(value, ["objectId", "revision", "state"]) && value.objectId === reference.objectId && ID.test(value.revision) && FRESHNESS.has(value.state); }
 function validateDesired(value) { return exact(value, ["requestId", "changes"]) && ID.test(value.requestId) && Array.isArray(value.changes) && value.changes.length > 0 && value.changes.length <= 32 && new Set(value.changes.map((change) => change.field)).size === value.changes.length && value.changes.every((change) => exact(change, ["field", "valueSha256", "ownership"]) && ID.test(change.field) && SHA.test(change.valueSha256) && OWNERSHIP.has(change.ownership)); }
 
+const IDENTITY_KEYS = ["schema", "featureId", "manifest", "manifestSha256", "lifecycleState", "candidate", "class", "path", "sha256", "authority", "mutability", "retention"];
+function identityRecord(value) {
+  return exact(value, IDENTITY_KEYS) && value.schema === "pipeline.artifact-identity.v1"
+    && typeof value.featureId === "string" && ID.test(value.featureId) && typeof value.manifest === "string" && SHA.test(value.manifestSha256)
+    && FEATURE_STATES.includes(value.lifecycleState) && FEATURE_CLASSES.includes(value.class)
+    && (value.candidate === null || (exact(value.candidate, ["commit", "tree"]) && typeof value.candidate.commit === "string" && typeof value.candidate.tree === "string"))
+    && typeof value.path === "string" && SHA.test(value.sha256) && typeof value.authority === "boolean"
+    && ["mutable", "append-only", "immutable"].includes(value.mutability) && ["active", "retain", "archive"].includes(value.retention);
+}
+
+/**
+ * Bind the referenced Pipeline artifact to its sole canonical identity and
+ * lifecycle through the feature-package topology (#22).
+ *
+ * The reference carries a path, and a path is a guess: it says nothing about
+ * which package owns the artifact, what lifecycle state it is in, or whether
+ * two packages claim it. Publishing on the strength of a path would export an
+ * identity the Pipeline never actually resolved, so anything short of exactly
+ * one validated binding is a rejection rather than a fallback.
+ */
+export async function bindCanonicalArtifactIdentity({ reference, resolveIdentity } = {}) {
+  const ref = validateExternalReference(reference);
+  if (typeof resolveIdentity !== "function") fail("ERA-IDENTITY-REQUEST");
+  const rejected = frozen({ schema: "pipeline.canonical-artifact-binding.v1", status: "rejected", reason: "canonical-identity", identity: null });
+  const resolved = await resolveIdentity(frozen({ path: ref.pipelineArtifact.path, sha256: ref.pipelineArtifact.sha256 }));
+  if (!exact(resolved, ["schema", "status", "identity", "findings"]) || resolved.schema !== "pipeline.canonical-artifact-identity.v1"
+    || resolved.status !== "resolved" || !identityRecord(resolved.identity)
+    || resolved.identity.path !== ref.pipelineArtifact.path || resolved.identity.sha256 !== ref.pipelineArtifact.sha256) return rejected;
+  return frozen({ schema: "pipeline.canonical-artifact-binding.v1", status: "bound", reason: null, identity: frozen({ ...resolved.identity, candidate: resolved.identity.candidate === null ? null : frozen({ ...resolved.identity.candidate }) }) });
+}
+
 /** Inspect and produce an exact, opaque write preview; provider data is never executed. */
-export async function planExternalReferenceWrite({ reference, capabilities, desired, inspect, preview } = {}) {
-  const ref = validateExternalReference(reference); const caps = validateExternalAdapterCapabilities(capabilities); if (!validateDesired(desired) || typeof inspect !== "function" || typeof preview !== "function") fail("ERA-REQUEST");
+export async function planExternalReferenceWrite({ reference, capabilities, desired, inspect, preview, resolveIdentity } = {}) {
+  const ref = validateExternalReference(reference); const caps = validateExternalAdapterCapabilities(capabilities); if (!validateDesired(desired) || typeof inspect !== "function" || typeof preview !== "function" || typeof resolveIdentity !== "function") fail("ERA-REQUEST");
   if (ref.adapterProfile !== caps.adapterProfile || ref.systemClass !== caps.systemClass || ref.mode !== "controlled-publication" || ref.authorityDirection !== "pipeline-to-external" || ref.ownership !== "pipeline-owned" || !["inspect", "preview", "apply", "readback"].every((operation) => caps.operations.includes(operation))) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "rejected", reason: "capability-or-policy", plan: null });
+  // X-AC-10: the canonical identity is resolved before any external contact, so
+  // an unresolvable or ambiguous artifact never reaches the provider at all.
+  const binding = await bindCanonicalArtifactIdentity({ reference: ref, resolveIdentity });
+  if (binding.status !== "bound") return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "rejected", reason: "canonical-identity", plan: null });
   const target = await inspect(frozen({ adapterProfile: ref.adapterProfile, objectId: ref.objectId })); if (!validateTarget(target, ref)) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "reconciliation-required", reason: "invalid-inspection", plan: null });
   if (target.revision !== ref.externalRevision || target.state !== "fresh" || desired.changes.some((change) => change.ownership !== "pipeline-owned")) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "conflict", reason: "revision-or-ownership", plan: null });
   const proposed = await preview(frozen({ objectId: ref.objectId, revision: target.revision, requestId: desired.requestId, changes: desired.changes.map((change) => frozen({ ...change })) })); if (!exact(proposed, ["previewDigest"]) || !SHA.test(proposed.previewDigest)) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "reconciliation-required", reason: "invalid-preview", plan: null });
-  const plan = frozen({ schema: "pipeline.external-reference-write-intent.v1", reference: ref, requestId: desired.requestId, expectedRevision: target.revision, changes: frozen(desired.changes.map((change) => frozen({ ...change }))), previewDigest: proposed.previewDigest });
+  const plan = frozen({ schema: "pipeline.external-reference-write-intent.v1", reference: ref, pipelineArtifactIdentity: binding.identity, requestId: desired.requestId, expectedRevision: target.revision, changes: frozen(desired.changes.map((change) => frozen({ ...change }))), previewDigest: proposed.previewDigest });
   return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "preview", reason: null, plan: frozen({ ...plan, planSha256: canonicalSha256(plan) }) });
 }
 
@@ -42,7 +78,7 @@ export async function reconcileExternalReference({ reference, capabilities, insp
 
 /** Apply one bound preview with idempotency and mandatory revision/readback comparison. */
 export async function applyExternalReferenceWrite({ plan, authorize, apply, readback } = {}) {
-  if (!exact(plan, ["schema", "reference", "requestId", "expectedRevision", "changes", "previewDigest", "planSha256"]) || plan.schema !== "pipeline.external-reference-write-intent.v1" || canonicalSha256({ schema: plan.schema, reference: plan.reference, requestId: plan.requestId, expectedRevision: plan.expectedRevision, changes: plan.changes, previewDigest: plan.previewDigest }) !== plan.planSha256 || typeof authorize !== "function" || typeof apply !== "function" || typeof readback !== "function") fail("ERA-APPLY-REQUEST");
+  if (!exact(plan, ["schema", "reference", "pipelineArtifactIdentity", "requestId", "expectedRevision", "changes", "previewDigest", "planSha256"]) || plan.schema !== "pipeline.external-reference-write-intent.v1" || !identityRecord(plan.pipelineArtifactIdentity) || canonicalSha256({ schema: plan.schema, reference: plan.reference, pipelineArtifactIdentity: plan.pipelineArtifactIdentity, requestId: plan.requestId, expectedRevision: plan.expectedRevision, changes: plan.changes, previewDigest: plan.previewDigest }) !== plan.planSha256 || typeof authorize !== "function" || typeof apply !== "function" || typeof readback !== "function") fail("ERA-APPLY-REQUEST");
   // Integration seam for Cyborg: `authorize` must eventually verify a signed
   // human-authority attestation bound to this exact requestId and planSha256.
   // Until then, this adapter treats it only as an injected policy decision and

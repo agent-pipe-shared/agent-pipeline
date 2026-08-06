@@ -6,6 +6,7 @@ import { isAbsolute, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseStrictJson } from "../lib/governance-event.mjs";
 import { planExternalReferenceWrite, reconcileExternalReference } from "../lib/external-reference-adapter.mjs";
+import { resolveCanonicalArtifactIdentity } from "../lib/feature-package-topology.mjs";
 
 function fail(code, message) { const error = new Error(message); error.code = code; throw error; }
 function safeRelative(root, value, code) { if (typeof value !== "string" || value.length === 0 || isAbsolute(value) || value.includes("\\\\")) fail(code, "A repository-relative path is required."); const target = resolve(root, value); const check = relative(root, target); if (check === "" || check === ".." || check.startsWith(`..${sep}`) || isAbsolute(check) || check.split(sep).some((part) => part === "." || part === "..")) fail(code, "The path escapes the repository."); return target; }
@@ -25,6 +26,9 @@ export async function main(argv = process.argv.slice(2), deps = {}) {
   const reference = await json(options.reference, read); const capabilities = await json(options.capabilities, read); const inspection = await json(options.inspection, read);
   if (options.command === "reconcile") return reconcileExternalReference({ reference, capabilities, inspect: inspectFrom(inspection) });
   const desired = await json(options.desired, read); const preview = await json(options.preview, read);
-  return planExternalReferenceWrite({ reference, capabilities, desired, inspect: inspectFrom(inspection), preview: async () => preview });
+  // The canonical identity is resolved against the checkout under --root through
+  // the feature-package topology, never inferred from the reference's own path.
+  const resolveIdentity = deps.resolveIdentity ?? (async ({ path }) => resolveCanonicalArtifactIdentity(options.root, path));
+  return planExternalReferenceWrite({ reference, capabilities, desired, inspect: inspectFrom(inspection), preview: async () => preview, resolveIdentity });
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) { try { process.stdout.write(`${JSON.stringify(await main())}\n`); } catch (error) { process.stderr.write(`${error.code ?? "ERC-FAILED"}: ${error.message}\n`); process.exitCode = 2; } }

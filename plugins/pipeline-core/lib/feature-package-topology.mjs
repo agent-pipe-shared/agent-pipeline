@@ -202,6 +202,57 @@ export function planFeaturePackageBootstrap(rootDir = process.cwd(), manifestPat
   };
 }
 
+/**
+ * Resolve one repository path to its sole canonical artifact identity.
+ *
+ * A path is not an identity: the same bytes can sit under a legacy directory,
+ * under two manifests, or under none, and only the package topology knows
+ * which of those is the artifact with a lifecycle.  Anything other than
+ * exactly one validated manifest binding is reported as such rather than being
+ * resolved by preferring a package -- an ambiguous identity is the case a path
+ * guess silently gets wrong.
+ */
+export function resolveCanonicalArtifactIdentity(rootDir = process.cwd(), artifactPath) {
+  const root = resolve(rootDir);
+  const unresolved = (status, findings = []) => ({ schema: "pipeline.canonical-artifact-identity.v1", status, identity: null, findings });
+  if (typeof artifactPath !== "string" || artifactPath === "" || !canonicalRelative(root, artifactPath)) return unresolved("invalid", ["FTP-IDENTITY: path is not canonical within the repository"]);
+  const matches = [];
+  const findings = [];
+  for (const manifest of inventoryFeaturePackages(root).packages) {
+    let value;
+    try { value = JSON.parse(readFileSync(join(root, manifest), "utf8")); }
+    catch { continue; }
+    for (const artifact of Array.isArray(value?.artifacts) ? value.artifacts : []) {
+      if (artifact?.path !== artifactPath) continue;
+      const checked = validateFeaturePackage(root, manifest);
+      if (!checked.ok) { findings.push(...checked.findings.map((finding) => `${manifest}: ${finding}`)); continue; }
+      matches.push({ manifest, value, artifact, receipt: checked.receipt });
+    }
+  }
+  if (matches.length > 1) return unresolved("ambiguous", matches.map((match) => `FTP-IDENTITY: ${match.manifest} also binds ${artifactPath}`));
+  if (matches.length === 0) return unresolved("unresolved", findings.length === 0 ? ["FTP-IDENTITY: no validated feature package binds this path"] : findings);
+  const [{ manifest, value, artifact, receipt }] = matches;
+  return {
+    schema: "pipeline.canonical-artifact-identity.v1",
+    status: "resolved",
+    identity: Object.freeze({
+      schema: "pipeline.artifact-identity.v1",
+      featureId: receipt.featureId,
+      manifest,
+      manifestSha256: receipt.manifestSha256,
+      lifecycleState: receipt.state,
+      candidate: value.candidate === null ? null : Object.freeze({ ...value.candidate }),
+      class: artifact.class,
+      path: artifact.path,
+      sha256: artifact.sha256,
+      authority: artifact.authority,
+      mutability: artifact.mutability,
+      retention: artifact.retention,
+    }),
+    findings: [],
+  };
+}
+
 export function validateFeatureTopology(rootDir = process.cwd()) {
   const root = resolve(rootDir); const inventory = inventoryFeaturePackages(root); const findings = [];
   const receipts = inventory.packages.map((manifest) => {
