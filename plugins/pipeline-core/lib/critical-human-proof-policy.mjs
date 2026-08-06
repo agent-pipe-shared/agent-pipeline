@@ -17,7 +17,7 @@
  * no longer demanded.
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, lstatSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { CRITICAL_ACTION_KINDS } from "./critical-action-approval-request.mjs";
@@ -76,7 +76,18 @@ function committedUnchanged(root, raw, spawn) {
     if (repoRoot === "") return false;
     // Ask for the blob at the path this file actually occupies, expressed from the top
     // level and with POSIX separators, which is the only form Git accepts in a rev spec.
-    const relPath = relative(repoRoot, join(resolve(root), USER_SOURCE_PATH));
+    //
+    // Both operands must live in the SAME namespace. `--show-toplevel` is physical: Git
+    // reaches it through `getcwd()`, so symlinks are already resolved. `resolve()` is purely
+    // lexical and resolves none. Relating them directly -- the first version of this line --
+    // makes `relative()` emit a `..` path for any root reached through a symlink, so a
+    // correctly committed file reads as uncommitted. The T4 Critic found it. The sibling
+    // modules had this right already: project-authority.mjs (`realRoot`) and
+    // guard-lifecycle-ready.mjs (`isProjectWritePath`) both realpath before comparing.
+    //
+    // Only the DIRECTORY is resolved. A symlinked `pipeline.user.yaml` must not be followed,
+    // and is not: readPushApprovalMode rejects it by `lstatSync` long before this runs.
+    const relPath = relative(repoRoot, join(realpathSync(resolve(root)), USER_SOURCE_PATH));
     if (relPath === "" || relPath.startsWith("..") || isAbsolute(relPath)) return false;
     const result = spawn("git", ["-C", root, "show", `HEAD:${relPath.split(sep).join("/")}`], {
       encoding: "buffer",
@@ -209,7 +220,18 @@ export function criticalProofWaiverFor(dir, kind) {
         waiver: { kind, reason: reason ?? `gates.push_approval: chat (${configured.source})`, mode: "chat", source: configured.source },
       };
     }
-    if (reason !== undefined && configured.source === USER_SOURCE_PATH) {
+    // Fail closed unless the source genuinely has NO opinion. `default` is the only such
+    // value -- no file at all, or a file without the key. Every other source (`unsafe`,
+    // `invalid`, `unreadable`, `uncommitted`) means "could not be established", which is
+    // the ambiguous configuration the paragraph above promises to refuse.
+    //
+    // This branch used to test `=== USER_SOURCE_PATH`, i.e. it enumerated the ONE source
+    // that triggers a conflict. Adding `uncommitted` for C1 therefore opened a hole nobody
+    // wrote on purpose: any state where the mode could not be read let a `.v2` push waiver
+    // through, and `pipeline-state.mjs approve-push` then stopped demanding the detached
+    // Ed25519 proof. Found by the T4 Critic. Enumerating the safe value instead of the
+    // unsafe ones is what makes a future source value fail closed by default.
+    if (reason !== undefined && configured.source !== "default") {
       return { waived: false, code: "CRITICAL-PROOF-MODE-CONFLICT" };
     }
   }
