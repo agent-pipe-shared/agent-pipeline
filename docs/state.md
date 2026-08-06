@@ -16,7 +16,152 @@ the supplied authoritative release identity; it is not a claimed release time.
 The historical candidate-qualification sections below are retained as
 session history and no longer describes the current publication disposition.
 
-## 2026-08-06 Nova (afternoon) — authority-tier drift found and closed, ADR-0054 step 1, ADR-0055 (current)
+## 2026-08-06 Nova II (evening) — the guards that were never running (current)
+
+Continues `feat/sprint-nova-codex-v046` from `0c21c31`. Scope limit unchanged:
+feature branch only, no `main` merge, no release. The session began as "check the
+new local candidate, then exercise the push" and the first bootstrap step failed.
+
+### The finding: a silent exit 0, which for a PreToolUse guard means ALLOW
+
+`pipeline-start-preflight.mjs` produced **no output and exit 0**. Cause: the local
+marketplace root registered that morning carries `plugins/pipeline-core` as a
+**symlink** into the checkout (the ADR-0052 separate-root arrangement). Node resolves
+symlinks when it resolves a module, so `import.meta.url` is the real path while
+`process.argv[1]` stays the symlinked one, and every `invokedDirectly` comparison went
+false. `main()` never ran.
+
+Measured, not inferred — `guard-lifecycle-ready.mjs --runner bogus`, an input that must
+fail closed:
+
+| invocation | exit | output |
+| --- | --- | --- |
+| through the symlinked marketplace root | **0** | none |
+| through the real checkout path | 2 | `GUARD-LIFECYCLE-NOT-READY` |
+
+Six wired hooks were dead in that layout — `guard-lifecycle-ready` (the PreToolUse write
+AND exec admission gate), `staleness-check`, `setup-check`, `codex-session-start-hint`,
+`post-compact-reground`, `stop-suggest` — plus the mandatory bootstrap preflight. **This
+session had been running unguarded from its first tool call.** Not affected:
+`guard-git`, `guard-push`, `guard-testpath`, `guard-devplan` (no entrypoint guard at all)
+and `guard-gate-strength` (uses `.endsWith()`, which happens to survive a symlink).
+
+**GS-6 collapsed in the same layout, in the opposite direction.** Its carve-out — "a
+source checkout's own `plugins/pipeline-core/` stays writable, because in development the
+enforcing copy is the installed one" — assumes the two are different files. Under the
+symlink they are the same files, so GS-6 refused every agent edit under
+`plugins/pipeline-core/`, which is most of this repository's work. Verified in-session:
+a `Write` probe into the plugin tree was refused with `Rule ID: GS-6`.
+
+### Landed
+
+- **Host (machine-local, PO-authorized):** the marketplace root's
+  `plugins/pipeline-core` is now a **copy**, not a symlink. Both properties returned
+  immediately — guard scripts are re-read per invocation — and `guard-lifecycle-ready`
+  began enforcing the closed shell grammar on this session's own commands within one
+  tool call.
+- `d5a5e07` — `lib/entrypoint.mjs`: one `isDirectInvocation()` comparing real paths,
+  never stricter than the checks it replaces. Adopted by the six hooks and the two
+  bootstrap-chain scripts. `lib/entrypoint.test.mjs`, 10 checks: EP07/EP08 execute the
+  wired guards and the bootstrap chain **through a real symlink**; EP09 fails if a wired
+  script reintroduces a fragile spelling.
+- `15a9b81` — `docs/claude-local-plugin-development.md` prescribed `ln -s`/`mklink /J`,
+  i.e. exactly the arrangement that disarmed the guards. Now `cp -a`/`robocopy`, with
+  both measured halves and a refresh loop for the operator's own terminal.
+- `dbebf8c` — the class was not eight files. **73 scripts across thirteen distinct
+  spellings.** Two were additionally broken on native Windows, which ADR-0051 makes a
+  hard requirement: ``import.meta.url === `file://${process.argv[1]}` `` and
+  `new URL(import.meta.url).pathname === process.argv[1]`. Three affected scripts are
+  gate-shaped, where a silent exit 0 reads as PASS: `critic-dispatch-preflight.mjs`,
+  `ai-assisted-hardening-gate.mjs`, `po-approval-gate.mjs`. Two files
+  (`codex-sandbox-preflight.mjs`, `private-overlay-activation.mjs`) were already correct
+  via `realpathSync` and were routed through the shared helper for uniformity only.
+- `6ee65b6` — **`NotebookEdit` was gated by nothing.** It appeared in no `hooks.json`
+  matcher, and `guard-lifecycle-ready` returns `verdict(0)` — allow — for any tool name
+  outside `["Bash","Edit","Write"]`. The gap had a second, independent half: all four
+  write guards read `tool_input.file_path`, while NotebookEdit names its target
+  `notebook_path`, so widening the matcher alone would have yielded an empty path and a
+  fail-open exit 0. Both closed via `lib/tool-write-target.mjs` (one reader, so the four
+  cannot drift) plus `WRITE_TOOLS` at all four decision points.
+  `hooks/notebook-write-coverage.test.mjs`, 8 checks; NB03 states the PO requirement
+  directly. No `.ipynb` exists here, so live exposure in this repo was zero — for a
+  consuming project with notebooks it was not.
+
+### Method note: the migration produced its own defect, and the validator caught it
+
+The 73-file sweep ran as a one-off script in git-ignored `evidence/`, matching an
+explicit closed set of spellings and **reporting every unclaimed residue** rather than
+rewriting whatever looked similar — which is how six further spellings were found after
+the first pass. The script then made a real error: it tested for the identifier
+`isDirectInvocation`, which its own replacement had just inserted, and therefore omitted
+the import in **all 73 files**. `node --check` cannot see this (a missing import is a
+runtime `ReferenceError`). A companion validator — syntax, specifier resolves on disk,
+no call without an import, no import orphaned — caught it before anything was committed.
+Both scripts are deleted; the diff is the deliverable.
+
+### PO decisions recorded this session
+
+- **Standing Nova exception (2026-08-06):** TP-1..TP-5 may be temporarily lifted for
+  Nova work. Recorded here because it is a durable authorization, not chat context.
+- **The exception cannot be exercised by an agent, and that is a finding.**
+  `guard-testpath` has **no override mechanism at all**, by explicit design: not the v2
+  `human-guard-override` protocol (which covers only the Codex, lifecycle and
+  gate-strength guards) and not `guard-git`'s `PIPELINE_GUARD_OVERRIDE` env form. The
+  documented escape — editing `project/guard-config.json` — is itself refused by GS-4.
+  So the only route is the PO editing outside an agent session, and that is the protocol
+  used here: the PO lifts TP-3/TP-4 in their own terminal, the agent makes the two edits,
+  and the PO restores the file from a backup taken beforehand. The digest that must hold
+  on both sides of that window is
+  `sha256 15a5f9feac3769746fe0b8b5bde38d4873c9650c53e7e859da92daf431384493`. An
+  authorization with no mechanism behind it is worth closing deliberately or documenting
+  as human-only; it should not stay an accident.
+
+### The bypass that made GS-1..GS-5 decorative, and its closure
+
+`guard-gate-strength` is wired into exactly one PreToolUse entry, matcher
+`Edit|Write|NotebookEdit` — asserted by its own GST07 — so **no Bash command can ever
+reach it.** Measured: `touch project/guard-config.json` was admitted with no guard
+claiming it. The closed grammar blocks `echo … >` redirection, but `node -e` is an
+ordinary simple command, so an agent wanting `gates.push_approval: "chat"` never needed
+the Edit tool at all. That is precisely the property GS-1 was introduced to remove, and
+the header of `guard-gate-strength.mjs` asserted the opposite.
+
+Same shape as GS-6 one level up: the config decides a gate's strength, the installed code
+decides whether the config is read — and the shell decides everything, because it was
+never asked.
+
+`efe452c` closes it in `guard-lifecycle-ready.mjs`, which is already Bash-wired and
+already owns the read-only classifier, importing `GATE_STRENGTH_PATHS` so there is still
+one definition of these paths. Substring rather than token matching, because the path can
+sit inside a quoted script argument where token matching sees one opaque word; this
+deliberately over-refuses (a `git commit -m` message naming one of these files is refused
+too — over-refusal costs a `-F` flag, under-refusal costs the gate). Read-only stays
+exempt via the existing classifier, so `cat`, `rg`, `sha256sum` and `git diff` on these
+paths keep working — GST14 asserts that, because a rule that stopped
+`cat pipeline.user.yaml` would make the repository unworkable.
+
+Scoped to the five configuration paths deliberately: matching the live plugin root would
+refuse `node <pluginRoot>/scripts/project-onboarding-v3.mjs inspect`, the very command
+the gate tells the operator to run. Proven against a real pre-fix artifact rather than by
+assertion — the same input returns exit 0 from the installed copy and exit 2 from the
+checkout.
+
+### Open
+
+- **GS-6's Bash half remains serial, not redundant.** A shell write into the *installed
+  plugin root* is caught by `GUARD-CROSS-REPO-MUTATION` alone, and only while the
+  installed copy sits outside the project root — the arrangement now prescribed. While
+  that guard was disarmed, `cp -a` into the enforcing plugin root succeeded, observed
+  directly this session. Deliberately not closed by extending the rule above, because
+  that would refuse the bootstrap command itself.
+- **The closed shell grammar has two false positives**, both hit repeatedly here: a `|`
+  inside a *quoted regex argument* is read as a pipeline operator (so
+  `rg -e 'a|b' path` is refused, while two `-e` flags pass), and a multi-line `git commit
+  -m` body is read as line continuation (worked around with `-F` on a git-ignored file).
+  Neither is a safety defect; both cost real friction and push authors toward workarounds.
+- Everything the sections below still list as open remains open.
+
+## 2026-08-06 Nova (afternoon) — authority-tier drift found and closed, ADR-0054 step 1, ADR-0055
 
 Continues the same branch `feat/sprint-nova-codex-v046`. Base for this block
 `f1dd7cf` (the remote tip). The PO's standing scope limit is unchanged: feature

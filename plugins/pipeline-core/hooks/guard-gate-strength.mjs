@@ -27,6 +27,16 @@
  * There is no in-session override, because an in-session override for "may I weaken my
  * own gate" is the same hole with an extra step.
  *
+ * SCOPE, and it is narrower than it looks. This hook is wired for write TOOLS only
+ * (`Edit|Write|NotebookEdit`, asserted by GST07), so it never sees a shell command.
+ * Measured 2026-08-06: `touch project/guard-config.json` was admitted with nothing
+ * claiming it, and `node -e` is an ordinary simple command under the closed grammar — so
+ * for a while the Edit refusal below could simply be stepped around. The shell lane is
+ * enforced by `guard-lifecycle-ready.mjs` (`GUARD-GATE-STRENGTH-SHELL`), which is already
+ * Bash-wired and already owns the read-only classifier, and which imports
+ * `GATE_STRENGTH_PATHS` from here so there is one definition of what these paths are.
+ * Neither half is sufficient alone; GST13..GST16 cover the shell one.
+ *
  * FAIL-OPEN on malformed input and on an unreadable repository, like its siblings: a
  * guard is a safety net, not a prison. It fails CLOSED only on the thing it exists for
  * — a write to a listed path.
