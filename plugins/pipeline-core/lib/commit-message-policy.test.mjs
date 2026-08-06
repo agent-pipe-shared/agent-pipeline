@@ -64,9 +64,16 @@ check("CMP7 an editor commit is reported as uninspected, never as clean", () => 
   assert.deepEqual(result.findings, []);
 });
 
-check("CMP8 an unreadable -F file is uninspected, not silently passed", () => {
+// CMP8 -- F3, 2026-08-06 Critic round. A `-F <path>` IS a named message source even when the
+// caller's readFile refuses it (out of bounds, gone, unreadable): an agent's scratch
+// directory is the ordinary place a commit message gets composed and usually sits outside the
+// project root the caller's readFile is scoped to. That must never collapse to the same
+// `inspected: false` as an editor commit (CMP7, which never named a source at all) -- "no
+// override for this rule" is not true if pointing `-F` at an unreadable path silently passes.
+check("CMP8 a -F file the caller refuses to read is a blocking finding, not a silent pass", () => {
   const result = run("git commit -F does-not-exist.txt");
-  assert.equal(result.inspected, false);
+  assert.equal(result.inspected, true);
+  assert.deepEqual(codes(result), ["GIT-03-UNREADABLE-MESSAGE-FILE"]);
 });
 
 // CMP9/CMP10 -- the marker half is config-gated, because switching it on unconditionally

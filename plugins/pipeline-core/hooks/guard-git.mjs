@@ -222,7 +222,7 @@
  */
 import { existsSync, readFileSync, appendFileSync, realpathSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { join, resolve } from "node:path";
+import { join, resolve, sep } from "node:path";
 
 import { commitMessageFindings, markerPolicyMode } from "../lib/commit-message-policy.mjs";
 import { stripQuotedSegments, normalizeGlobalGitOptions } from "../lib/git-cmd.mjs";
@@ -740,9 +740,13 @@ function allowWithOverride() {
   const inspection = commitMessageFindings(cmd, {
     readFile: (path) => {
       // Message files are read from inside the project only. A `-F ../../elsewhere` is not
-      // followed: this check exists to read what is about to be committed here.
+      // followed: this check exists to read what is about to be committed here. A refusal
+      // here is not a pass -- commitMessageFindings reports it as GIT-03-UNREADABLE-MESSAGE-FILE,
+      // a blocking finding, precisely because "outside the project" is where an agent's own
+      // scratch directory usually lives (2026-08-06 Critic round, F3).
+      const projectRoot = resolve(projectDir);
       const absolute = resolve(projectDir, path);
-      if (!absolute.startsWith(`${resolve(projectDir)}/`) && absolute !== resolve(projectDir)) {
+      if (!absolute.startsWith(`${projectRoot}${sep}`) && absolute !== projectRoot) {
         throw new Error("outside the project");
       }
       return readFileSync(absolute, "utf8");

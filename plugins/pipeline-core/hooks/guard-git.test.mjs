@@ -740,6 +740,11 @@ const GIT03_DIR = mkdtempSync(join(tmpdir(), "guard-test-git03-"));
 writeFileSync(join(GIT03_DIR, "dirty.txt"),
   "feat(x): a thing\n\nAI-Assisted: true\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01Fx\n");
 writeFileSync(join(GIT03_DIR, "clean.txt"), "feat(x): a thing\n\nWhy it matters.\n\nAI-Assisted: true\n");
+// GIT03_OUTSIDE_DIR is a sibling of the project root, the shape of an agent's own scratch
+// directory -- the ordinary place a commit message gets composed, and the exact path class
+// that made this rule's "no override" claim untrue before F3.
+const GIT03_OUTSIDE_DIR = mkdtempSync(join(tmpdir(), "guard-test-git03-outside-"));
+writeFileSync(join(GIT03_OUTSIDE_DIR, "clean.txt"), "feat(x): a thing\n\nWhy it matters.\n\nAI-Assisted: true\n");
 
 check("GIT03-1 block  provider co-author and session URL via -F", "git commit -F dirty.txt", BLOCK, {
   projectDir: GIT03_DIR,
@@ -767,6 +772,16 @@ check("GIT03-5 block  an armed override does not open the correlation rule",
 check("GIT03-6 allow  a missing marker is not enforced by default", 'git commit -m "chore: bump"', ALLOW, {
   projectDir: GIT03_DIR,
 });
+// GIT03-7 -- F3, 2026-08-06 Critic round. Before this fix, a -F path outside projectDir made
+// commitMessageFindings' readFile throw, the throw was swallowed, and the commit went
+// uninspected -- allowed, message content notwithstanding. The content here is clean on
+// purpose: the point is that an UNVERIFIABLE message must block on its own, not that this
+// particular file happens to carry a violation.
+check("GIT03-7 block  a -F file outside the project root, even with clean content",
+  `git commit -F ${join(GIT03_OUTSIDE_DIR, "clean.txt")}`, BLOCK, {
+    projectDir: GIT03_DIR,
+    stderrIncludes: ["GIT-03-UNREADABLE-MESSAGE-FILE", "no override for this rule"],
+  });
 
 // ---- Summary -------------------------------------------------------------------------------------
 for (const dir of [EMPTY_DIR, CFG_DIR, BROKEN_DIR, OV_DIR, OV_NOLEDGER_DIR, CFG_GITOPT_DIR]) {

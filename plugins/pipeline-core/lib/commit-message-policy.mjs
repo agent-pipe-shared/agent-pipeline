@@ -30,6 +30,14 @@
  * real `commit-msg` hook installed in the repository, which is a different mechanism with
  * its own install story. Anyone reading this should not mistake the check for total.
  *
+ * A `-F`/`--file` reference IS a message source even when its content cannot be read (out of
+ * bounds for the caller's `readFile`, gone, unreadable). That case must never collapse to the
+ * same `inspected: false` as "no -m/-F/heredoc at all" -- an agent's scratch directory is the
+ * ordinary place a commit message gets composed, is routinely outside the project root, and
+ * "no override for this rule" is not true if pointing `-F` there silently passes. It is
+ * therefore reported as its own blocking finding, `GIT-03-UNREADABLE-MESSAGE-FILE` (2026-08-06
+ * Critic round, F3): an unverifiable message fails closed rather than certifying itself clean.
+ *
  * OVERLAP, declared. `hooks/guard-push.mjs` carries an older, broader pattern set
  * (`TRAILER_DENY`, `PRIVATE_CORRELATION_IN_MESSAGE`) used to police the anonymous-public
  * delivery range. That set is deliberately more aggressive — it also refuses
@@ -138,6 +146,14 @@ export function commitMessageFindings(cmd, { readFile, requireMarker = false } =
 
   const parts = [];
   const sources = [];
+  const unreadable = [];
+  const readMessageFile = (path) => {
+    // A message file the agent wrote a moment ago is the ordinary route in this repository,
+    // so a check that ignored it would miss its own most likely violation. A path the caller
+    // refuses to read (out of bounds, gone, unreadable) is still a named message source --
+    // recorded as unreadable rather than dropped, so it becomes a finding, not a silent pass.
+    try { parts.push(readFile(path)); sources.push(path); } catch (error) { unreadable.push({ path, reason: error?.message ?? "unreadable" }); }
+  };
   for (let i = 0; i < tokens.length; i += 1) {
     const token = tokens[i];
     if (token === "-m" || token === "--message") {
@@ -148,33 +164,34 @@ export function commitMessageFindings(cmd, { readFile, requireMarker = false } =
       parts.push(token.slice(2)); sources.push("-m");
     } else if (token === "-F" || token === "--file") {
       const path = tokens[i + 1];
-      if (path !== undefined && path !== "-") {
-        // A message file the agent wrote a moment ago is the ordinary route in this
-        // repository, so a check that ignored it would miss its own most likely violation.
-        try { parts.push(readFile(path)); sources.push(path); } catch { /* unreadable -- see below */ }
-        i += 1;
-      }
+      if (path !== undefined && path !== "-") { readMessageFile(path); i += 1; }
     } else if (token.startsWith("--file=")) {
-      const path = token.slice("--file=".length);
-      try { parts.push(readFile(path)); sources.push(path); } catch { /* unreadable -- see below */ }
+      readMessageFile(token.slice("--file=".length));
     }
   }
   for (const body of heredocBodies(cmd)) { parts.push(body); sources.push("heredoc"); }
 
-  // No inspectable message: an editor commit, or a `-F` whose file could not be read. The
-  // caller must not treat this as clean — it is "not looked at", which is a different thing
-  // and is reported as such.
-  if (parts.length === 0) return { inspected: false, sources: [], findings: [] };
+  // No inspectable message and no named-but-unreadable source: an editor commit. The caller
+  // must not treat this as clean -- it is "not looked at", which is a different thing and is
+  // reported as such.
+  if (parts.length === 0 && unreadable.length === 0) return { inspected: false, sources: [], findings: [] };
 
   const message = parts.join("\n");
   const findings = CORRELATION_RULES
     .filter((rule) => rule.test.test(message))
     .map((rule) => ({ code: rule.code, detail: rule.detail }));
 
+  for (const { path, reason } of unreadable) {
+    findings.push({
+      code: "GIT-03-UNREADABLE-MESSAGE-FILE",
+      detail: `the message file "${path}" could not be verified (${reason}) — an unverifiable commit message is not certifiable clean`,
+    });
+  }
+
   if (requireMarker && !MARKER.test(message)) {
     findings.push({ code: "GIT-03-MARKER-MISSING", detail: "no `AI-Assisted: true` line" });
   }
-  return { inspected: true, sources, findings };
+  return { inspected: true, sources: [...sources, ...unreadable.map((entry) => entry.path)], findings };
 }
 
 export const COMMIT_MESSAGE_POLICY_MODES = Object.freeze(["off", "warn", "blocking"]);
