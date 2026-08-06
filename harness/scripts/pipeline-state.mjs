@@ -2538,19 +2538,20 @@ function poApprovalDecision(dir, manifest, deps) {
     && approval.schema === "pipeline.plan-approval.v2";
   const v3Approval = exactObjectKeys(approval, ["schema", "approvedBy", "approvedAt", "specBoundBy", "specBoundAt", "poGateAuthority", "humanDecision"])
     && approval.schema === "pipeline.plan-approval.v3";
-  // v4 replaces the specBound* pair with the submission digest that the approval
-  // discharges. Accepting it is strictly narrower than v2/v3: the approval must
-  // also bind the exact plan submission currently recorded, so an approval that
-  // survived a later resubmission can no longer authorize a manifest write.
-  const v4Approval = exactObjectKeys(approval, ["schema", "approvedBy", "approvedAt", "submissionSha256", "profileSha256", "poGateAuthority", "priorInvalidationSha256"])
-    && approval.schema === "pipeline.plan-approval.v4"
-    && SHA256_RE.test(approval.submissionSha256 ?? "")
-    && state.status === "ok"
-    && state.state.planSubmission !== undefined
-    && sha256CanonicalJson(state.state.planSubmission) === approval.submissionSha256;
+  // Only v2 and v3, the two schemas this branch actually implements.
+  //
+  // `pipeline.plan-approval.v4` exists upstream with a complete lifecycle --
+  // submission, invalidation, and an approval sealed against both -- but none of
+  // that has landed here yet. A local acceptance branch cannot be equivalent to
+  // it: it can check the fields it happens to know about and silently skip the
+  // profile agreement and the invalidation seal that make the upstream record
+  // current. Accepting v4 on those weaker terms would also disagree with this
+  // branch's own `guard-devplan`, which accepts v3 alone -- and when two readers
+  // of the same bytes disagree, the more permissive one decides. v4 arrives with
+  // its writer, its validator and its guard together, on the rebase, or not yet.
   if (state.status !== "ok" || state.state.planApproved !== true || state.state.activeFeature?.id === undefined
     || state.state.activeFeature.id !== manifest.feature.id || state.state.activeFeature.planPath !== authority?.planPath
-    || (!v2Approval && !v3Approval && !v4Approval)
+    || (!v2Approval && !v3Approval)
     || !exactObjectKeys(authority, ["schema", "humanFacing", "sourceSha256", "runtimeSha256", "receiptSha256", "repositoryFingerprint", "planPath", "planSha256", "specPath", "specSha256"])) return null;
   const observed = (deps.poGateAuthority ?? ((request) => validatePoGateAuthorityForRepository(request)))({ repoRoot: dir, expectedPlanSha256: authority.planSha256, expectedSpecSha256: authority.specSha256 });
   if (!observed?.ok || !samePhxJson(observed.value, authority)) return null;
