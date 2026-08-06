@@ -45,6 +45,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveAuthorityArtifactPath } from "../../plugins/pipeline-core/lib/project-authority.mjs";
 import { validateScopedVerifyRegistration } from "../../plugins/pipeline-core/lib/scoped-verify-registration.mjs";
 import { validateWindowsAssuranceVerifyRegistration } from "../../plugins/pipeline-core/lib/windows-assurance-verify-registration.mjs";
 import { createPublicVerifyRunEvidence } from "../../plugins/pipeline-core/lib/verify-resume.mjs";
@@ -386,9 +387,11 @@ const TEST_SUITES = [
   { name: "nova-verify-journal-tests", file: join(pluginScriptsDir, "verify-journal.test.mjs") },
 ];
 
-// Manifest-gated phase steps: see header — only projects with `.claude/pipeline.yaml`
-// get these two entries; everyone else keeps the suites-only step list.
-const manifestPath = join(repoRoot, ".claude", "pipeline.yaml");
+// Manifest-gated phase steps: see header — only projects that carry a manifest at
+// their resolved authority tier (ADR-0054: `project/pipeline.yaml` or the legacy
+// `.claude/pipeline.yaml`) get these two entries; everyone else keeps the
+// suites-only step list.
+const manifestPath = resolveAuthorityArtifactPath("manifest", { rootDir: repoRoot }).path;
 // Distinguish confirmed absence from unreadable presence. Confirmed ENOENT preserves the
 // suites-only evidence shape; any other read failure still runs validation and therefore
 // fails closed instead of being misclassified as opt-out. Security remains present-only.

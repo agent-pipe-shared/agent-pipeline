@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { parseYaml } from "../lib/yaml-lite.mjs";
+import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { validatePipelineUserV2 } from "../lib/runner-profiles-v2.mjs";
 import { planRuntimeProjectionV2, readRuntimeProjectionV2Baselines } from "../lib/runtime-projection-v2.mjs";
 import { validatePipelineUserV3 } from "../lib/runner-profiles-v3.mjs";
@@ -148,11 +149,14 @@ export function checkRepository(root = DEFAULT_ROOT) {
     const direct = validateDirectRouting(user.routing);
     if (!direct.ok) findings.push("pipeline.user.yaml direct routing invalid");
 
-    const manifestText = readFileSync(join(root, ".claude", "pipeline.yaml"), "utf8");
+    // v1 authoring: compare against the manifest at the resolved tier (ADR-0054),
+    // not a hardcoded legacy path that may be a stale mirror.
+    const resolved = resolveAuthorityArtifactPath("manifest", { rootDir: root });
+    const manifestText = readFileSync(resolved.path, "utf8");
     const manifest = parseYaml(manifestText);
-    if (direct.ok && !directManifestProjectionMatches(manifest.modelRouting, user.routing)) findings.push(".claude/pipeline.yaml Claude modelRouting drift");
-    if (direct.ok && !runnerRouteProjectionMatches(manifest.runnerRoutes, user.routing)) findings.push(".claude/pipeline.yaml runnerRoutes drift");
-    if (!hasCurrentProvenance(manifestText, "claude") || !hasCurrentProvenance(manifestText, "codex")) findings.push(".claude/pipeline.yaml routing provenance drift");
+    if (direct.ok && !directManifestProjectionMatches(manifest.modelRouting, user.routing)) findings.push(`${resolved.relPath} Claude modelRouting drift`);
+    if (direct.ok && !runnerRouteProjectionMatches(manifest.runnerRoutes, user.routing)) findings.push(`${resolved.relPath} runnerRoutes drift`);
+    if (!hasCurrentProvenance(manifestText, "claude") || !hasCurrentProvenance(manifestText, "codex")) findings.push(`${resolved.relPath} routing provenance drift`);
   }
 
   for (const [path, assignment] of Object.entries(projectAgentFrontmatter())) {

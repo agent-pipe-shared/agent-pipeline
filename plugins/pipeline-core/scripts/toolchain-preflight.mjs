@@ -61,6 +61,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadManifest } from "../lib/manifest.mjs";
+import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { probeGitleaks } from "./security-readiness/gitleaks-readiness.mjs";
 import { probeOsvScanner } from "./security-readiness/osv-scanner-readiness.mjs";
 import { probeSemgrep } from "./security-readiness/semgrep-readiness.mjs";
@@ -190,7 +191,7 @@ export function defaultGitProbe({ rootDir, tempDir, now = new Date(), platform =
   return { ok: true, status: "ready", handle: buildHandle("git", observed.identity, match?.[1] ?? null, capabilities, now.toISOString()) };
 }
 function manifestDigest(rootDir) {
-  const path = join(rootDir, ".claude", "pipeline.yaml");
+  const { path } = resolveAuthorityArtifactPath("manifest", { rootDir });
   if (!existsSync(path)) return null;
   try { return createHash("sha256").update(readFileSync(path)).digest("hex"); } catch { return null; }
 }

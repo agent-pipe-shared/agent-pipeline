@@ -19,6 +19,7 @@ import net from "node:net";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { parseYaml } from "../lib/yaml-lite.mjs";
+import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import {
   SessionPowerError,
   activateSessionPowerRecord,
@@ -66,7 +67,7 @@ function parseArgs(argv) {
 
 /** A closed projection reader: missing/unknown is disabled, never enabled. */
 export function projectedKeepAwake(rootDir) {
-  const path = join(rootDir, ".claude", "pipeline.yaml");
+  const { path } = resolveAuthorityArtifactPath("manifest", { rootDir });
   if (!existsSync(path)) return false;
   try {
     const manifest = parseYaml(readFileSync(path, "utf8"));

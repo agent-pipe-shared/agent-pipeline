@@ -12,6 +12,8 @@ import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { AUTHORITY_ARTIFACTS, resolveAuthorityArtifactPath } from "../../plugins/pipeline-core/lib/project-authority.mjs";
+
 import { checkObservationGovernance } from "./check-observation-governance.mjs";
 
 const decoder = new TextDecoder("utf-8", { fatal: true });
@@ -454,7 +456,8 @@ export function checkRepository(rootInput, options = {}) {
     }
   }
 
-  const calibrationPath = ".claude/pipeline.json";
+  // Whichever tier the project's authority actually resolves to (ADR-0054).
+  const calibrationPath = resolveAuthorityArtifactPath("calibration", { rootDir: root }).relPath;
   try {
     const raw = readRepoText(calibrationPath);
     const keyCount = [...raw.matchAll(/"handover"\s*:/g)].length;
@@ -489,7 +492,9 @@ export function checkRepository(rootInput, options = {}) {
   }
 
   const trackedStatefulDesignSurfaces = STATEFUL_DESIGN_SURFACES.filter((path) => trackedPaths.has(path));
-  const pipelineRepository = trackedPaths.has(".claude/pipeline.yaml");
+  // Tier-union, not resolver-routed: this asks "does this repository carry a
+  // pipeline manifest at all", so an artifact at ANY tier answers yes (ADR-0054).
+  const pipelineRepository = Object.values(AUTHORITY_ARTIFACTS.manifest).some((path) => trackedPaths.has(path));
   let statefulDesignContracts = "not-applicable";
   if (pipelineRepository) {
     statefulDesignContracts = "checked";

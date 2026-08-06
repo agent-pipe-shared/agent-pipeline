@@ -152,6 +152,7 @@ import {
   LEGACY_MANIFEST,
   NEUTRAL_CALIBRATION,
   NEUTRAL_MANIFEST,
+  resolveAuthorityArtifactPath,
   resolveProjectAuthorityPaths,
 } from "./plugins/pipeline-core/lib/project-authority.mjs";
 
@@ -574,7 +575,8 @@ export function validateAgentsAdapterMigrationAuthority({ runtimeManifestText, p
 export function migrateAgentsAdapter(rootDir = ROOT_DIR, deps = {}) {
   let runtimeManifestText;
   try {
-    runtimeManifestText = deps.runtimeManifestText ?? readFileSync(join(rootDir, ".claude", "pipeline.yaml"), "utf8");
+    runtimeManifestText = deps.runtimeManifestText
+      ?? readFileSync(resolveAuthorityArtifactPath("manifest", { rootDir }).path, "utf8");
   } catch {
     return { ok: false, status: "authority-failed", reason: "runtime-manifest-unreadable", writes: 0 };
   }
@@ -1537,7 +1539,7 @@ Legacy v0/v1/v2 sources are never compiled. Review and activate their one-way V3
     let runtimeYamlText;
     try {
       userYamlText = readFileSync(userYamlPath, "utf8");
-      runtimeYamlText = readFileSync(join(rootDir, ".claude", "pipeline.yaml"), "utf8");
+      runtimeYamlText = readFileSync(resolveAuthorityArtifactPath("manifest", { rootDir }).path, "utf8");
     } catch {
       console.error("setup.mjs: canonical primary PO-language source/runtime is unreadable; no receipt was written.");
       return 2;
