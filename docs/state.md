@@ -153,8 +153,13 @@ checkout.
 
 Full Verify **exit 0, 250/250** on `511d7d7` / tree `ed467380`, candidate-bound, tree
 clean before and after; `security-scan` ran as step 250 and is `exit 0, findings 0` on the
-same commit. Re-run after the F3/F5 remediation: **exit 0, 250/250** on `d7b70d8` / tree
-`e7a0b991`, likewise candidate-bound. An earlier run on `5fa2548` was 248/249 with one real failure —
+same commit. Re-run after the F3/F5 remediation: **exit 0, 250/250**, likewise
+candidate-bound. Final run of this block, after the C1/C2/C4 remediation, the PG12c fix and
+the GIT-03 history cleanup: **exit 0, 250/250, 0 failures** on `a3920f6` / tree `0654fc1`,
+`binding: exact`, tree clean at start and finish. Note that every SHA this block cites from
+before the cleanup is gone — the unpushed range was rewritten, so `511d7d7`, `d7b70d8`,
+`62de980` and their siblings no longer resolve; they are kept as written because they name
+what the Critic rounds actually reviewed. An earlier run on `5fa2548` was 248/249 with one real failure —
 `product-capability-inventory-tests`, because a hook's surfaceId embeds its matcher and
 the write matchers had gained `NotebookEdit`; fixed in `469233a`.
 
@@ -321,14 +326,24 @@ link separately instead, because doing so would breach its read-only contract.
   remaining **21 are unpushed** and can still be cleaned by the same `filter-branch`
   remedy, which is the PO's hand in their own terminal, not the agent's. Going forward this
   session uses `AI-Assisted: true` and no session URL.
-- **Verify is RED on the current candidate**, one suite: `guard-push-tests`, case PG12c.
-  This is the C1 fix landing on a fixture that encoded the old contract — PG12c writes
-  `push_approval: chat` into `pipeline.user.yaml` **without committing it** and asserts the
-  push is allowed, which is now precisely the hole C1 closed. The fixture must commit the
-  file and re-read HEAD so its evidence still binds to the tip. The edit was attempted and
-  **refused by TP-5** (measured, not assumed), which is the guard working as designed: this
-  is a genuine test change and therefore its own briefed, human-cleared task. Needs a TP-5
-  lift or the PO's own edit; the exact patch is in the handover below.
+  **Resolved (2026-08-06):** the PO ran the cleanup in two passes. The first pass removed
+  both forbidden trailers but left 21 commits with **no** `AI-Assisted:` marker at all —
+  `sed`'s `d` command starts the next cycle and discards the queued `$a` append, so on every
+  message that *ended* with the deleted line the marker was never added. Caught by counting
+  (64 commits, only 42 carrying the marker) rather than by a gate. A second pass appended
+  the marker only where absent. Final state on the unpushed range: **64/64 carry
+  `AI-Assisted: true`, 0 session URLs, 0 provider co-author trailers**, and
+  `git diff` against the pre-rewrite tip is empty — content byte-identical, messages only.
+  The 53 already-published commits are untouched and stay as they are.
+- **PG12c — CLOSED under an explicit PO lift of TP-5.** The C1 fix landed on a fixture that
+  encoded the old contract: PG12c wrote `push_approval: chat` into `pipeline.user.yaml`
+  **without committing it** and asserted the push was allowed, i.e. it asserted precisely
+  the hole C1 closed. The edit was attempted first and **refused by TP-5** (measured, not
+  assumed) — the guard working as designed, since a genuine test change is its own
+  human-cleared task. The PO lifted TP-5, the fixture now commits and re-reads HEAD so its
+  evidence still binds to the tip, and **PG12c3** was added for the case that was missing
+  entirely: the same fixture *without* the commit must BLOCK. TP-5 was restored immediately
+  after, byte-identically. Suite 127/127.
 - **F7 above** — the only prior-round finding still open, and it is the PO's to close
   because GS-4 refuses `project/guard-config.json` to the agent. Exact entries prepared
   below.
