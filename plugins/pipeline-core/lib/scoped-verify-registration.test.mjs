@@ -186,6 +186,10 @@ function scopedRegistrationFailureFixture() {
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "windows-assurance-verify-registration.mjs"), windowsRegistration);
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "verify-resume.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "verify-resume.mjs"));
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "windows-private-state.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "windows-private-state.mjs"));
+    // verify.mjs resolves the manifest tier through the authority resolver (ADR-0054);
+    // the fixture root must carry it and its one local dependency.
+    copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "project-authority.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "project-authority.mjs"));
+    copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "worktree-lifecycle.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "worktree-lifecycle.mjs"));
     mkdirSync(join(fixtureRoot, "plugins", "pipeline-core", "scripts"), { recursive: true });
     writeFileSync(
       join(fixtureRoot, "plugins", "pipeline-core", "scripts", "verify-journal.mjs"),

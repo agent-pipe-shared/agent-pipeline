@@ -14,15 +14,16 @@
  * registry, no expiry fields — those are backlog #2, CUT).
  *
  * Manifest-gated phase steps (AP1 W-WIRE): when the project opts into the manifest
- * layer (`.claude/pipeline.yaml` present), two extra steps run after the suites:
+ * layer (a manifest present at its resolved authority tier — ADR-0054:
+ * `project/pipeline.yaml`, else `.claude/pipeline.yaml`), two extra steps run after the suites:
  * validate-manifest (exit 2 on an invalid manifest, fail-closed once a manifest
  * EXISTS) and security-scan (adapter statuses PASS|FINDINGS|SKIPPED|ERROR; SKIPPED
  * never blocks, so machines without the scanner binaries stay green — QG-05 honesty
  * lives in the evidence artifact, not in a false red). No manifest -> step list stays
  * suites-only, so manifest-less projects keep the pre-AP1 verify shape (regression guard).
  *
- * Full chain note (QG-01/QG-02): this repo's calibration (`.claude/pipeline.json`,
- * field `verification: "docs+tests"`) has no separate format/lint/typecheck/build
+ * Full chain note (QG-01/QG-02): this repo's calibration (`project/pipeline.json` at
+ * the resolved tier, field `verification: "docs+tests"`) has no separate format/lint/typecheck/build
  * stage — the test suites plus the manifest-gated phase steps ARE the full chain
  * for a docs+guardrails repo. `steps[]` below therefore lists one entry per step run,
  * not the generic format/lint/typecheck/tests/build shape from the QG-03 sketch (gate
