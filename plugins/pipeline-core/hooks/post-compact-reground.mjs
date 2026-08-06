@@ -3,7 +3,8 @@
 /** Non-blocking SessionStart projection of validated compact continuity state. */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import {
   continuityDispatchAllowed,
   validateContinuityState,
@@ -215,4 +216,4 @@ export function run() {
   process.exit(0);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) run();
+if (isDirectInvocation(import.meta.url)) run();

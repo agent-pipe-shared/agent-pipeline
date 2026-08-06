@@ -9,6 +9,7 @@ import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { measureBootstrapPayload } from "../lib/bootstrap-payload-budget.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const SCHEMA = "pipeline.start-preflight.v1";
 const PLUGIN_ID = "pipeline-core@agent-pipeline";
@@ -263,5 +264,4 @@ export function main() {
   return pipelineStartPreflightExitCode(result);
 }
 
-const invokedDirectly = process.argv[1] && resolve(fileURLToPath(import.meta.url)) === resolve(process.argv[1]);
-if (invokedDirectly) process.exitCode = main();
+if (isDirectInvocation(import.meta.url)) process.exitCode = main();

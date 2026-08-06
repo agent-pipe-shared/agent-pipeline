@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 
-import { pathToFileURL } from "node:url";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import {
   applyProjectOnboardingManifestRepairV4,
   applyProjectOnboardingKickoffV4,
@@ -166,4 +166,4 @@ export function main(args = process.argv.slice(2), {
   if (output.schema === "pipeline.project-onboarding-remote-adoption-plan.v1") return output.status === "ready" || output.status === "activation-required" ? 0 : 1;
   return ["portable-seed-required", "runtime-initialization-required", "runtime-attestation-required", "restart-required", "kickoff-required", "host-repository-init-required", "ready", "migration-required", "adoption-required", "projection-drift"].includes(output.status) ? 0 : 1;
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) process.exit(main());
+if (isDirectInvocation(import.meta.url)) process.exit(main());

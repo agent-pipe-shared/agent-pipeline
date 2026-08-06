@@ -25,6 +25,7 @@ import {
   hasCodexExistingGitControlMount,
   readCodexHostRepositoryInitAdmission,
 } from "../lib/codex-host-layout.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import {
   isBoundedReadOnlyPipeline,
   parseGuardCommand,
@@ -969,6 +970,4 @@ export function main(rawInput = undefined, dependencies = {}) {
   return result.exitCode;
 }
 
-const invokedDirectly = process.argv[1]
-  && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
-if (invokedDirectly) process.exitCode = main();
+if (isDirectInvocation(import.meta.url)) process.exitCode = main();

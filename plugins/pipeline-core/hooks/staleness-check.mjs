@@ -11,7 +11,8 @@
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const PLUGIN_ID = "pipeline-core@agent-pipeline";
 export const BOOTSTRAP_LINE = "Agent-Pipeline: run /pipeline-core:pipeline-start before any work";
@@ -203,6 +204,6 @@ export async function run(deps = {}) {
   return { exitCode: 0, decision };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectInvocation(import.meta.url)) {
   await run();
 }

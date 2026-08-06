@@ -4,7 +4,8 @@
 /** Surface a concise, non-mutating Agent-Pipeline entry hint in every Codex session. */
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const GOVERNANCE_MARKERS = [
   ".agent-pipeline/core.lock.json",
@@ -69,5 +70,4 @@ export function main({ projectDir, exists } = {}) {
   })}\n`);
 }
 
-const invokedDirectly = process.argv[1] && resolve(fileURLToPath(import.meta.url)) === resolve(process.argv[1]);
-if (invokedDirectly) main();
+if (isDirectInvocation(import.meta.url)) main();

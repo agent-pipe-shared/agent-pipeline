@@ -225,8 +225,8 @@ import {
   resolve,
   sep,
 } from "node:path";
-import { pathToFileURL } from "node:url";
 
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { loadManifestSafe, activePhases, gateConfig } from "../lib/manifest.mjs";
 import {
   LEGACY_STATE,
@@ -1013,6 +1013,6 @@ export function run() {
 
 // Only auto-run when executed directly (`node stop-suggest.mjs`), never on import (the test
 // file imports the functions above without triggering the real CLI/exit).
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectInvocation(import.meta.url)) {
   run();
 }
