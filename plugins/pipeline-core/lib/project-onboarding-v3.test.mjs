@@ -3201,6 +3201,8 @@ test("an invalid generated manifest is never accepted as a current fresh authori
       "plan-manifest-repair",
       "--root",
       path,
+          "--runner",
+      "codex",
     ]);
     const disposition = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
     assert.equal(disposition.status, "unrepairable");
@@ -3507,6 +3509,8 @@ test("source recovery planner distinguishes invalid authority and unsupported ru
       "plan-source-recovery",
       "--root",
       invalid,
+          "--runner",
+      "codex",
     ]);
     const invalidPlan = planProjectOnboardingSourceRecoveryV4({ rootDir: invalid, deps: fakeDeps });
     assert.equal(invalidPlan.status, "unrepairable");

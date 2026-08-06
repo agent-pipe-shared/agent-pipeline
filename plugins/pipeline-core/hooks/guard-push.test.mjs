@@ -403,6 +403,18 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
     `git commit -F - <<'EOF'\nm\nEOF\n${real}`, dir, BLOCK);
   check("PG-HD11 block a push that itself carries an unterminated heredoc",
     `${real} <<EOF\nnote\n`, dir, BLOCK);
+  // A `<<` that is NOT a redirection. An earlier version stripped to end-of-string
+  // whenever no terminator was found, so an arithmetic left shift deleted every
+  // following command from the detection region and the gate went open. The header
+  // named the whitespace-prefix rule as the mitigation; a spaced shift has exactly
+  // that shape. Every PG-HD case above uses a well-formed heredoc and none could see
+  // it.
+  check("PG-HD12 block a push after an arithmetic left shift",
+    `echo $(( 1 << shift ))\n${real}`, dir, BLOCK);
+  check("PG-HD13 block a push after a shift in an assignment",
+    `x=$(( 8 << bits ))\n${real}`, dir, BLOCK);
+  check("PG-HD14 block a push after a shift inside a command substitution",
+    `v=$(echo $(( 2 << n )))\n${real}`, dir, BLOCK);
 }
 
 // ---- PG12 required + fresh approval without a critical proof -> block ------------------

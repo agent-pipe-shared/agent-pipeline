@@ -2010,6 +2010,11 @@ function sourceRecoveryResult({
 export function planProjectOnboardingSourceRecoveryV4({
   rootDir = process.cwd(),
   deps: overrides = {},
+  // Echoed, never inferred (ADR-0051/ADR-0057 R1): a recovery result that does not
+  // say which runner observed it cannot be consumed as identity-bound evidence, and
+  // its own emitted actions would silently fall back to the literal default.
+  runner = null,
+  intent = null,
 } = {}) {
   const fs = deps(overrides);
   let root;
@@ -2184,6 +2189,11 @@ function currentRuntimeBaselines(root, intent, fs) {
 export function planProjectOnboardingManifestRepairV4({
   rootDir = process.cwd(),
   deps: overrides = {},
+  // Echoed, never inferred (ADR-0051/ADR-0057 R1). Named sessionIntent because this
+  // function already binds `intent` to the PARSED pipeline.user.yaml; the two are
+  // different concepts and must not share a name.
+  runner = null,
+  sessionIntent = null,
 } = {}) {
   const fs = deps(overrides);
   let root;
@@ -2746,7 +2756,7 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
           intent,
           repository,
           runtime: emptyRuntime(),
-          nextAction: commandAction([ONBOARDING_SCRIPT, "plan-source-recovery", "--root", legacy.root], false, false, SOURCE_RECOVERY_SCHEMA, ["recoverable", "unrepairable"]),
+          nextAction: commandAction(lifecycleArgv([ONBOARDING_SCRIPT, "plan-source-recovery", "--root", legacy.root], runner, intent), false, false, SOURCE_RECOVERY_SCHEMA, ["recoverable", "unrepairable"]),
           diagnostics: [lifecycleDiagnostic("$.source", "source_invalid", "pipeline.user.yaml is not a valid V3 source", "review the closed source recovery disposition")],
         });
       }
@@ -2775,7 +2785,7 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
         const manifest = loadManifest(legacy.root);
         if (manifest.status !== "ok") {
           return lifecycleResult({ status: "partial", root: legacy.root, runner, intent, repository, runtime: emptyRuntime(),
-            nextAction: commandAction([ONBOARDING_SCRIPT, "plan-manifest-repair", "--root", legacy.root], false, false, MANIFEST_REPAIR_PLAN_SCHEMA, ["ready", "unrepairable"]),
+            nextAction: commandAction(lifecycleArgv([ONBOARDING_SCRIPT, "plan-manifest-repair", "--root", legacy.root], runner, intent), false, false, MANIFEST_REPAIR_PLAN_SCHEMA, ["ready", "unrepairable"]),
             diagnostics: [lifecycleDiagnostic("$.manifest", "manifest_invalid", "the generated pipeline manifest is absent or invalid", "review the digest-bound manifest-only repair plan")] });
         }
         // Codex reserves this directory inside its sandbox. The installed
@@ -2855,7 +2865,7 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
       intent,
       repository,
       runtime: emptyRuntime(),
-      nextAction: reparable ? commandAction([ONBOARDING_SCRIPT, "plan-partial-authority", "--root", legacy.root], false, false, PARTIAL_AUTHORITY_PLAN_SCHEMA, ["selection-required", "ready"]) : null,
+      nextAction: reparable ? commandAction(lifecycleArgv([ONBOARDING_SCRIPT, "plan-partial-authority", "--root", legacy.root], runner, intent), false, false, PARTIAL_AUTHORITY_PLAN_SCHEMA, ["selection-required", "ready"]) : null,
       diagnostics: [lifecycleDiagnostic("$.authority", "partial_authority", "the project has an incomplete Pipeline authority", reparable ? "run the typed partial-authority planner and bind an explicit PO selection" : "inspect the existing source and generated targets")],
     });
   }
@@ -3113,7 +3123,7 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
     intent,
     repository,
     runtime: emptyRuntime(),
-    nextAction: reparable ? commandAction([ONBOARDING_SCRIPT, "plan-partial-authority", "--root", legacy.root], false, false, PARTIAL_AUTHORITY_PLAN_SCHEMA, ["selection-required", "ready"]) : null,
+    nextAction: reparable ? commandAction(lifecycleArgv([ONBOARDING_SCRIPT, "plan-partial-authority", "--root", legacy.root], runner, intent), false, false, PARTIAL_AUTHORITY_PLAN_SCHEMA, ["selection-required", "ready"]) : null,
     diagnostics: [lifecycleDiagnostic("$.authority", "partial_authority", "the Pipeline authority is incomplete", reparable ? "run the typed partial-authority planner and bind an explicit PO selection" : "inspect the source and generated targets")],
   });
 }
@@ -3544,7 +3554,7 @@ function planLifecycle(rootDir, fs, operation, intent = "onboarding", runner) {
     return {
       ...observed,
       nextAction: commandAction(
-        [ONBOARDING_SCRIPT, "apply-repair", "--root", plan.root, "--plan-sha256", plan.planSha256, "--activate"],
+        lifecycleArgv([ONBOARDING_SCRIPT, "apply-repair", "--root", plan.root, "--plan-sha256", plan.planSha256, "--activate"], observed.runner, intent),
         true,
         true,
         SCHEMA,

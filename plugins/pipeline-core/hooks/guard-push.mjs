@@ -219,8 +219,12 @@ const normalized = normalizeGlobalGitOptions(stripped.toLowerCase());
  *  - the scan continues past the removal instead of restarting, so it terminates;
  *  - a newline REPLACES every removed region, so `…<<EOF…EOF\ngit push` cannot be
  *    glued into `…git push` without a word boundary and slip past `\bgit\s+push\b`;
- *  - an opener must be preceded by whitespace or start-of-string, so a `<<` that is
- *    not a redirection cannot be used to swallow a real command;
+ *  - stripping happens ONLY for an opener whose terminator line actually exists. A
+ *    `<<` with no terminator is NOT treated as a heredoc and nothing is removed, so a
+ *    non-redirection `<<` -- an arithmetic left shift such as `$(( 1 << shift ))` --
+ *    cannot swallow the rest of the command. An earlier version claimed the
+ *    whitespace-prefix rule prevented this; it does not, because a spaced arithmetic
+ *    shift has exactly that shape, and that version shipped fail-OPEN for it;
  *  - the loop is bounded, and on exhaustion the ORIGINAL string is used, so a
  *    pathological input degrades to over-detection (fail-closed), never under.
  */
@@ -241,9 +245,11 @@ const commandRegion = (() => {
     const terminator = new RegExp(`\\n[ \\t]*${match[3]}[ \\t]*(?=\\n|$)`, "u");
     const rest = text.slice(bodyStart);
     const found = rest.match(terminator);
-    // No terminator: the heredoc consumes the remainder, which is therefore all data.
-    const removeTo = found === null ? text.length : bodyStart + found.index + found[0].length;
-    text = `${text.slice(0, openerStart)}\n${text.slice(removeTo)}`;
+    // No terminator line: this is not a here-document. Treating it as one would let
+    // any `<<` delete the remainder of the command -- the arithmetic-shift fail-open.
+    // Strip nothing and detect against the whole command instead.
+    if (found === null) return normalized;
+    text = `${text.slice(0, openerStart)}\n${text.slice(bodyStart + found.index + found[0].length)}`;
   }
   // Bounded-scan exhaustion: fall back to the unstripped command. Over-detection is
   // the safe direction; this is the branch that must never silently open the gate.
