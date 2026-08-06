@@ -122,7 +122,7 @@ Stop and report (do not keep iterating) when ANY of these occurs:
 
 - Ruleset SHA/version (always, from the Elephant's bootstrap): `{{RULESET_SHA}}`
   — echo it in your confirmation line.
-- Model/effort for this run: {{MODEL_EFFORT default: "the implement-tier model / medium"}}.
+- Model/effort for this run: {{MODEL_EFFORT — the CONCRETE model identifier resolved from the role default, not the tier name, e.g. "claude-sonnet-5 / medium"; default: implement-tier model / medium}}.
 - Model justification (ONLY if deviating from the Goldfish default, MP-05):
   {{MODEL_JUSTIFICATION e.g. ">15 files across two subsystems → the design-tier model per MP-05 criterion 1" or "n/a — role default"}}
 - Worktree: {{WORKTREE e.g. "yes — per calibration `worktree: on-write`" or "no — read-only task"}}

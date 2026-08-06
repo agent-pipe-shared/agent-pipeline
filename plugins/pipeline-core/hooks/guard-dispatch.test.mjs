@@ -6,11 +6,32 @@
  * The unit-level rules live in ../lib/dispatch-policy.test.mjs. These cases prove the hook
  * around them: that it reads the real tool-input shape, that it blocks rather than warns,
  * and that it fails open on everything it cannot parse.
+ *
+ * GD8/GD9 read the real shipped templates rather than a hand-written stand-in, for the same
+ * reason as dispatch-policy.test.mjs DP11/DP12: a hand-written fixture is what let the F1
+ * adjacency bug ship green while every real template-built dispatch was refused.
  */
+import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const GUARD = fileURLToPath(new URL("./guard-dispatch.mjs", import.meta.url));
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+
+function filledTemplateBody(relativePath) {
+  const raw = readFileSync(join(repoRoot, relativePath), "utf8");
+  const marker = "COPY EVERYTHING BELOW THIS LINE\n-->";
+  const markerIndex = raw.indexOf(marker);
+  assert.ok(markerIndex >= 0, `${relativePath}: copy marker not found -- template shape changed`);
+  let body = raw.slice(markerIndex + marker.length);
+  body = body.replace(/\{\{MODEL_ID\}\}/g, "claude-opus-5");
+  body = body.replace(/\{\{EFFORT\}\}/g, "max");
+  body = body.replace(/\{\{MODEL_EFFORT[^{}]*\}\}/g, "claude-sonnet-5 / medium");
+  body = body.replace(/\{\{[^{}]*\}\}/g, "FILLED");
+  return body;
+}
 
 let pass = 0;
 const failures = [];
@@ -72,6 +93,17 @@ check("GD5 allow  an unrelated subagent type", {
 // hook must never become a work stoppage.
 check("GD6 allow  a payload with no tool_input", { tool_name: "Task" }, ALLOW);
 check("GD7 allow  a dispatch with no subagent type", { tool_input: { prompt: "anything" } }, ALLOW);
+
+// GD8/GD9 -- the real templates, filled, must be dispatchable at the hook boundary too.
+check("GD8 the real critic-review.md template, filled, is dispatchable", {
+  tool_name: "Task",
+  tool_input: { subagent_type: "pipeline-core:critic", prompt: filledTemplateBody("templates/prompts/critic-review.md") },
+}, ALLOW);
+
+check("GD9 the real goldfish-task.md template, filled, is dispatchable", {
+  tool_name: "Task",
+  tool_input: { subagent_type: "pipeline-core:goldfish-implementor", prompt: filledTemplateBody("templates/prompts/goldfish-task.md") },
+}, ALLOW);
 
 console.log(`\n${pass}/${pass + failures.length} cases passed.`);
 if (failures.length > 0) {

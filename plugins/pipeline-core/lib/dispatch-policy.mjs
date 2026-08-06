@@ -76,12 +76,17 @@ const GOLDFISH_FIELDS = Object.freeze([
 /**
  * Every dispatch names its model explicitly; silent inheritance is the MP-05 failure.
  *
- * Keyed on an actual model token rather than on `model:` punctuation. The first version
- * required a colon and would have reported the 2026-08-06 briefing as naming no model,
- * which it did — `DISPATCH METADATA: model claude-opus-5, effort high`. A gate that cries
- * wolf on a compliant field is worse than none: it trains the dispatcher to ignore it.
+ * Keyed on an actual model-family token appearing anywhere in the text, not on it sitting
+ * immediately after the word "model". A second version required that adjacency and refused
+ * every dispatch built from either canonical template: `critic-review.md`'s field reads
+ * "Criticality → model (MP-07): guardrail diff → higher-capability review model at max ..."
+ * and `goldfish-task.md`'s reads "Model/effort for this run: {{MODEL_EFFORT}}" — in both, the
+ * real token sits sentences away from the label, never glued to it. A Critic dispatch built
+ * from the template this way was itself refused by this rule (F1, 2026-08-06 Critic round on
+ * the block that introduced it). A gate that cries wolf on a compliant field is worse than
+ * none: it trains the dispatcher to ignore it.
  */
-const NAMES_MODEL = /\bmodel\b\s*[:=]?\s*["']?(?:claude|gpt|o[0-9]|gemini|sonnet|opus|haiku|fable|codex)[-a-z0-9.[\]]*/i;
+const NAMES_MODEL = /\b(?:claude|gpt|o[0-9]|gemini|sonnet|opus|haiku|fable|codex)[-a-z0-9.[\]]*/i;
 const NAMES_RULESET = /\bruleset[- ]?sha\s*[:=]\s*\S/i;
 
 /**

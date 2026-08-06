@@ -5,10 +5,38 @@
  * DP1 is the actual 2026-08-06 briefing, shortened but with its real section headings. If
  * this check would not have refused that dispatch it is decoration, so that case comes
  * first and everything else is secondary.
+ *
+ * DP11/DP12 read the actual shipped templates rather than a hand-written stand-in. The
+ * hand-written CLEAN_CRITIC/CLEAN_GOLDFISH fixtures above were what let a real adjacency bug
+ * (F1, 2026-08-06 Critic round) ship green: they wrote `Model: claude-opus-5` in a shape
+ * neither template uses, so a synthetic prompt passed while every real template-built
+ * dispatch was refused. These two read `templates/prompts/` from disk, so a future edit to
+ * either template's field wording is exactly what this suite exercises.
  */
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { dispatchFindings } from "./dispatch-policy.mjs";
+
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+
+/** The dispatchable body of a prompt template: everything below its copy marker, with
+ * placeholders filled the way a real Elephant fill would -- a concrete model identifier for
+ * the two model fields, a neutral stand-in for everything else. */
+function filledTemplateBody(relativePath) {
+  const raw = readFileSync(join(repoRoot, relativePath), "utf8");
+  const marker = "COPY EVERYTHING BELOW THIS LINE\n-->";
+  const markerIndex = raw.indexOf(marker);
+  assert.ok(markerIndex >= 0, `${relativePath}: copy marker not found -- template shape changed`);
+  let body = raw.slice(markerIndex + marker.length);
+  body = body.replace(/\{\{MODEL_ID\}\}/g, "claude-opus-5");
+  body = body.replace(/\{\{EFFORT\}\}/g, "max");
+  body = body.replace(/\{\{MODEL_EFFORT[^{}]*\}\}/g, "claude-sonnet-5 / medium");
+  body = body.replace(/\{\{[^{}]*\}\}/g, "FILLED");
+  return body;
+}
 
 let checks = 0;
 const check = (label, fn) => { fn(); checks += 1; process.stdout.write(`ok ${label}\n`); };
@@ -122,6 +150,20 @@ check("DP9 an unrelated subagent type is untouched", () => {
 check("DP10 a reworded steer passes -- the check is structural, not semantic", () => {
   const prompt = `${CLEAN_CRITIC}\n\nWhile reading, the boundary between repositories may repay a careful look.`;
   assert.deepEqual(codes(dispatchFindings({ subagentType: "pipeline-core:critic", prompt })), []);
+});
+
+// DP11 -- the real critic-review.md template, filled the way an Elephant fills it, must pass.
+check("DP11 the real critic-review.md template, filled, passes", () => {
+  const prompt = filledTemplateBody("templates/prompts/critic-review.md");
+  const result = dispatchFindings({ subagentType: "pipeline-core:critic", prompt });
+  assert.deepEqual(codes(result), []);
+});
+
+// DP12 -- the real goldfish-task.md template, filled, must pass.
+check("DP12 the real goldfish-task.md template, filled, passes", () => {
+  const prompt = filledTemplateBody("templates/prompts/goldfish-task.md");
+  const result = dispatchFindings({ subagentType: "pipeline-core:goldfish-implementor", prompt });
+  assert.deepEqual(codes(result), []);
 });
 
 process.stdout.write(`\n${checks}/${checks} dispatch policy checks passed\n`);
