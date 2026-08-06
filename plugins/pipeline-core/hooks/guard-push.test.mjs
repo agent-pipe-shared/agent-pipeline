@@ -371,21 +371,38 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   });
 }
 
-// ---- PG-HD heredoc/message bodies are DATA, not push commands -------------------------
-// A commit whose message mentions the phrase used to be classified as a push and then
-// rejected as an ambiguous shell bundle -- fail-closed, so never unsafe, but it made
-// working ON the push gate impossible. Detection now reads the command region only.
+// ---- PG-HD heredoc bodies are DATA; a command AFTER one is still a command ----------
+// A first version of this stripping shipped FAIL-OPEN: the opener was never removed so
+// the scan re-matched it, the terminator was gone the second time, and the whole
+// remainder was truncated -- a real push after a heredoc passed the gate entirely.
+// PG-HD1/2 (allow) alone could not see that. The BLOCK cases below are the ones that
+// matter: every one places a real push AFTER the heredoc.
 {
   const { dir, head } = freshRepo("heredoc-body");
   writeManifest(dir, manifestPush({ approval: "required" }));
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
-  check("PG-HD1 allow a commit whose heredoc body mentions git push",
-    "git commit -q -F - <<EOF\nfix: note that a raw git push cannot consume it\nEOF", dir, ALLOW);
-  check("PG-HD2 allow a commit whose quoted message mentions git push",
-    'git commit -m "docs: explain why git push is refused"', dir, ALLOW);
-  // The forms the whole-string test carries must keep blocking.
+  const push = ["git", "push"].join(" ");
+  const real = `${push} origin main`;
+  check("PG-HD1 allow a commit whose heredoc body mentions the phrase",
+    `git commit -q -F - <<EOF\nfix: a raw ${push} cannot consume it\nEOF`, dir, ALLOW);
+  check("PG-HD2 allow a commit whose quoted message mentions the phrase",
+    `git commit -m "docs: explain why ${push} is refused"`, dir, ALLOW);
   check("PG-HD3 block a --git-dir override push", "git --git-dir=/tmp/x push origin main", dir, BLOCK);
   check("PG-HD4 block an env-prefixed push", "FOO=bar git push origin main", dir, BLOCK);
+  check("PG-HD5 block a real push AFTER a heredoc terminator",
+    `git commit -q -F - <<EOF\nmsg\nEOF\n${real}`, dir, BLOCK);
+  check("PG-HD6 block a real push chained after a heredoc",
+    `git commit -q -F - <<EOF\nmsg\nEOF\n && ${real}`, dir, BLOCK);
+  check("PG-HD7 block a real push after a tab-indented <<- heredoc",
+    `git commit -F - <<-EOF\n\tmsg\n\tEOF\n${real}`, dir, BLOCK);
+  check("PG-HD8 block a real push after two heredocs",
+    `cat <<A\nx\nA\ncat <<B\ny\nB\n${real}`, dir, BLOCK);
+  check("PG-HD9 block a real push separated from the terminator by a blank line",
+    `git commit -F - <<EOF\nm\nEOF\n\n${real}`, dir, BLOCK);
+  check("PG-HD10 block a real push after a quoted-tag heredoc",
+    `git commit -F - <<'EOF'\nm\nEOF\n${real}`, dir, BLOCK);
+  check("PG-HD11 block a push that itself carries an unterminated heredoc",
+    `${real} <<EOF\nnote\n`, dir, BLOCK);
 }
 
 // ---- PG12 required + fresh approval without a critical proof -> block ------------------

@@ -211,25 +211,43 @@ const stripped = stripQuotedSegments(cmd);
 const normalized = normalizeGlobalGitOptions(stripped.toLowerCase());
 /**
  * Everything a here-document feeds to a command is DATA, not command text, but it
- * still arrives inside the raw command string and survives quote-stripping. Remove
- * each heredoc body (`<<TAG`, `<<-TAG`, `<<'TAG'`, `<<"TAG"`) up to its terminator so
- * push detection reads the command, not its payload.
+ * arrives inside the raw command string and survives quote-stripping. Remove each
+ * heredoc body so push detection reads the command, not its payload.
+ *
+ * SAFETY PROPERTIES, each of which a previous version got wrong and shipped fail-OPEN:
+ *  - the opener token itself is removed, so the same `<<TAG` can never be re-matched;
+ *  - the scan continues past the removal instead of restarting, so it terminates;
+ *  - a newline REPLACES every removed region, so `…<<EOF…EOF\ngit push` cannot be
+ *    glued into `…git push` without a word boundary and slip past `\bgit\s+push\b`;
+ *  - an opener must be preceded by whitespace or start-of-string, so a `<<` that is
+ *    not a redirection cannot be used to swallow a real command;
+ *  - the loop is bounded, and on exhaustion the ORIGINAL string is used, so a
+ *    pathological input degrades to over-detection (fail-closed), never under.
  */
 const commandRegion = (() => {
+  const opener = /(^|\s)<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\2/u;
   let text = normalized;
-  const opener = /<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/g;
-  let match;
-  while ((match = opener.exec(text)) !== null) {
-    const tag = match[2];
-    const bodyStart = text.indexOf("\n", match.index);
-    if (bodyStart === -1) { text = text.slice(0, match.index); break; }
-    const terminator = new RegExp(`\\n[ \\t]*${tag}[ \\t]*(?:\\n|$)`, "u");
+  for (let pass = 0; pass < 64; pass += 1) {
+    const match = opener.exec(text);
+    if (match === null) return text;
+    const openerStart = match.index + match[1].length;
+    const afterOpener = match.index + match[0].length;
+    const bodyStart = text.indexOf("\n", afterOpener);
+    if (bodyStart === -1) {
+      // An opener with no body: drop the opener token only.
+      text = `${text.slice(0, openerStart)}\n${text.slice(afterOpener)}`;
+      continue;
+    }
+    const terminator = new RegExp(`\\n[ \\t]*${match[3]}[ \\t]*(?=\\n|$)`, "u");
     const rest = text.slice(bodyStart);
-    const end = rest.search(terminator);
-    text = end === -1 ? text.slice(0, bodyStart) : text.slice(0, bodyStart) + rest.slice(end + rest.match(terminator)[0].length);
-    opener.lastIndex = 0;
+    const found = rest.match(terminator);
+    // No terminator: the heredoc consumes the remainder, which is therefore all data.
+    const removeTo = found === null ? text.length : bodyStart + found.index + found[0].length;
+    text = `${text.slice(0, openerStart)}\n${text.slice(removeTo)}`;
   }
-  return text;
+  // Bounded-scan exhaustion: fall back to the unstripped command. Over-detection is
+  // the safe direction; this is the branch that must never silently open the gate.
+  return normalized;
 })();
 const rawDetectionTokens = tokenizeArgv(cmd);
 // Skip a leading `NAME=value` run and an optional `env`, so `FOO=bar git push` and
