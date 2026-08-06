@@ -32,6 +32,7 @@
 | pipeline.neutral-authority-tier-is-a-frozen-snapshot-the-compiler-never-updates | open | defect | pipeline | 2026-08-06 | — |
 | pipeline.nonblocking-interaction-continuity | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.observation-intake-document-governance | closed | workflow-improvement | pipeline | 2026-07-20 | — |
+| pipeline.onboarding-lifecycle-plan-hardcodes-the-codex-runner | open | defect | pipeline | 2026-08-06 | — |
 | pipeline.pipeline-state-rebind-codex-default-runner | open | defect | pipeline | 2026-08-05 | — |
 | pipeline.po-gate-authority-path-canonicalization | open | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-authority-receipt-readback | open | defect | pipeline | 2026-07-25 | — |
@@ -63,6 +64,6 @@
 
 ## Counts
 
-- open: 24
+- open: 25
 - in_progress: 20
 - closed: 11

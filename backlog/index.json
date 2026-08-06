@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "159eb068c85d06efe2f964cd9c63d35b4535ea70bd5635234f2c753a2685c485"
+    "transitionHead": "9051f97880f6ee93717311f45268c5b8736aa47ca51197e25643f508dca32059"
   },
   "counts": {
-    "open": 24,
+    "open": 25,
     "in_progress": 20,
     "closed": 11
   },
@@ -239,6 +239,14 @@
       "closureRepository": "self",
       "closureCommit": "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb",
       "closureEvidence": "backlog/evidence/2026-07-24-completed-companion-deliveries.md"
+    },
+    {
+      "id": "pipeline.onboarding-lifecycle-plan-hardcodes-the-codex-runner",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-06",
+      "source": "Smoke test of the 0.5.2 release candidate in an empty directory, 2026-08-06: a fresh consumer following the tool's OWN printed next actions ends up with a Codex-configured project inside a Claude bootstrap."
     },
     {
       "id": "pipeline.pipeline-state-rebind-codex-default-runner",

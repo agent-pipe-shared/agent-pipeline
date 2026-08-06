@@ -55,6 +55,86 @@ suite must also appear in `docs/product-capability-inventory.json`.
 confirmed `claude plugin install` against a separate local marketplace root. That
 ran successfully on 2026-08-06.
 
+## The smoke test ran, and it found a blocker
+
+A fresh session installed the candidate into an empty directory and followed only
+the tool's own printed next actions. Every step returned exit 0 and well-formed
+JSON; the guard hook passed; no crash, no stack trace. And the result is wrong.
+
+**A Claude consumer following the tool's own instructions is silently routed onto
+the Codex rail.** `inspect --runner claude --intent bootstrap` correctly reports
+`runner: "claude"`, but the `nextAction` it prints drops `--runner` and `--intent`,
+and the `plan` subcommand accepts `--runner claude` and then discards it:
+
+```
+plan --root <dir>                                     → runner: codex | intent: onboarding
+plan --root <dir> --runner claude --intent bootstrap  → runner: codex | intent: onboarding
+```
+
+`CLAUDECODE=1` was set in both. The chain then writes `pipeline.user.yaml` with
+`runners.default: "codex"` and ends at `runtime_missing: "required Codex runtime
+targets are absent"` — inside what is nominally a Claude bootstrap.
+
+Root cause is a parsed-then-discarded option plus a literal default:
+`planProjectOnboardingLifecycleV4` takes no `runner` at all, and
+`v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex")` supplies one.
+
+**Assessment: this blocks the release.** It is the exact failure mode ADR-0051
+exists to prevent, on the primary consumer onboarding path, in the release whose
+stated purpose is that the hardened Codex work also runs cleanly on Claude. It is
+the same class as the F-A finding fixed earlier this sprint — that fix corrected
+the ready gate and never reached this path.
+
+**Not fixed in this candidate, deliberately.** There are 24 `v4Inspection` call
+sites and most do not thread identity; correcting it is a real change to runner
+threading through the whole V4 lifecycle, not a release-commit edit. Doing that
+un-reviewed immediately before the gate — in a block the Critic has already
+flagged as having no dispatch provenance — would be the worst possible moment.
+Tracked as
+`backlog/items/2026-08-06-onboarding-lifecycle-plan-hardcodes-the-codex-runner.md`
+with a four-part proposed fix.
+
+Two secondary observations from the same run, neither a defect: the CLI is still
+named `project-onboarding-v3.mjs` while its schema is `pipeline.project-onboarding.v4`;
+and `requiresConfirmation: true` is advisory JSON metadata only — the script
+mutates immediately when invoked directly, so the confirmation gate must be
+enforced by whatever orchestrates the calls.
+
+## Required release-time step, proven by direct invocation
+
+**Both plugin manifests must read exactly `0.5.2` before a tag.** The release
+version plan checks five surfaces — `VERSION`, and each runner's plugin manifest
+twice (as manifest and as resolved marketplace entry) — and compares each against
+the target version with a strict `!==`. The local-development cachebuster suffix
+makes two of them mismatch. Run against the candidate's own bytes:
+
+```
+deriveVersionSurfaceConsistency({...}, "0.5.2")
+  → refused: RVP-VERSION — private codexPlugin does not equal targetVersion
+```
+
+Current surfaces:
+
+| Surface | Value |
+| --- | --- |
+| `VERSION` | `0.5.2` ✓ |
+| `.claude-plugin/plugin.json` | `0.5.2+claude.20260806101646.967bd09` ✗ |
+| `.codex-plugin/plugin.json` | `0.5.2+codex.20260803204000` ✗ |
+
+This is not a defect: the `+build` suffix is what makes `claude plugin update`
+pick up a new local build at all, so it must stay while the candidate is being
+tested. It does mean the released artifact is a *different build string* from the
+one smoke-tested, and that stripping both suffixes is a mandatory, separate step
+between accepting this candidate and tagging it — followed by a re-run of Verify
+and Security on the stripped commit, because that commit is then the real
+release candidate.
+
+Note also that the Codex manifest's build metadata is from 2026-08-03 and has not
+tracked this sprint's content. That is harmless for the version check above (it
+gets stripped either way) but means no Codex-side local install has been
+refreshed against this candidate. **The smoke test below covers the Claude runner
+only.** A dual-runner release claim would need the Codex side exercised too.
+
 ## What the PO must decide
 
 **1. Accept or reject six consumer-facing decisions.** None has PO acceptance yet.
