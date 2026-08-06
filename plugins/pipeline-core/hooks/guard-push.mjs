@@ -125,6 +125,7 @@ import { isAbsolute, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { loadManifest, gateConfig, loadDeployPolicy } from "../lib/manifest.mjs";
+import { criticalProofWaiverFor } from "../lib/critical-human-proof-policy.mjs";
 import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv, refMatchesPattern } from "../lib/git-cmd.mjs";
 import {
   LEGACY_CALIBRATION,
@@ -1436,13 +1437,30 @@ if (pushGate.approval === "standing-approved") {
         )}, expected pushed source commit=${JSON.stringify(sourceCommit)}. Record: node harness/scripts/pipeline-state.mjs approve-push --by <name>.`,
       );
     }
-    if (pushGate.approval === "required") {
+    // ADR-0055: the project may stand the private-key proof down for `push` with an
+    // explicit, reasoned waiver. The human gate itself still applies — the approval
+    // above must still be recorded and bound to THIS commit — but a waived project
+    // does not additionally need the detached proof, and therefore does not need the
+    // publication executor to carry the push. An unreadable policy answers "required".
+    const pushWaiver = criticalProofWaiverFor(projectDir, "push");
+    if (pushGate.approval === "required" && !pushWaiver.waived) {
       const action = approval?.criticalProof?.action;
       if (action?.kind === "push" && approval.remote === pushBinding.remote && approval.destination === pushBinding.destination) {
         failures.push("Raw git push cannot consume a critical proof; use the fixed publication executor for the externally attested action.");
       } else {
-        failures.push("Push approval critical proof is not bound to this remote and destination ref.");
+        failures.push(
+          pushWaiver.code === null
+            ? "Push approval critical proof is not bound to this remote and destination ref."
+            : `Push approval critical proof is unavailable: project/critical-human-proof.json is ${pushWaiver.code}.`,
+        );
       }
+    } else if (pushGate.approval === "required" && approval?.criticalProofWaiver?.kind !== "push") {
+      // Waived by policy, but the recorded approval does not say so: it was recorded
+      // under a different policy than the one in force now. Re-approve deliberately.
+      failures.push(
+        "Push approval predates the current critical-proof waiver; re-record it with " +
+        "node harness/scripts/pipeline-state.mjs approve-push so the record states what backed it.",
+      );
     }
   }
 }

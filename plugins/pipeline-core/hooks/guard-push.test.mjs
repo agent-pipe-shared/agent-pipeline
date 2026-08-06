@@ -385,6 +385,112 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   });
 }
 
+// ---- PG12w ADR-0055: an explicit, reasoned waiver stands the PROOF down --------------
+// The human gate itself is untouched: the approval must still be recorded and bound to
+// this exact commit. Only the detached private-key proof is no longer demanded, and the
+// recorded approval has to say so on its face.
+function writeProofPolicy(dir, policy) {
+  mkdirSync(join(dir, "project"), { recursive: true });
+  writeFileSync(join(dir, "project", "critical-human-proof.json"), `${JSON.stringify(policy, null, 2)}\n`);
+}
+const PUSH_WAIVER = {
+  schema: "pipeline.critical-human-proof-policy.v2",
+  requiredKinds: ["push", "deploy", "publication"],
+  waivedKinds: [{ kind: "push", reason: "operator decision recorded for this fixture" }],
+};
+{
+  const { dir, head } = freshRepo("required-waived");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeProofPolicy(dir, PUSH_WAIVER);
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-06T06:00:00.000Z", forCommit: head,
+      remote: "origin", destination: "refs/heads/feature-test",
+      criticalProof: null,
+      criticalProofWaiver: { kind: "push", reason: "operator decision recorded for this fixture" },
+    } },
+  });
+  check("PG12w allow required approval when the proof is explicitly waived", PUSH_CMD, dir, ALLOW);
+}
+{
+  // A waiver does NOT relax the approval binding itself.
+  const { dir, head } = freshRepo("required-waived-stale");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeProofPolicy(dir, PUSH_WAIVER);
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-06T06:00:00.000Z",
+      forCommit: "0000000000000000000000000000000000000000",
+      remote: "origin", destination: "refs/heads/feature-test",
+      criticalProof: null,
+      criticalProofWaiver: { kind: "push", reason: "operator decision recorded for this fixture" },
+    } },
+  });
+  check("PG12w2 block a waived push whose approval is bound to another commit", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["Push approval missing or stale"],
+  });
+}
+{
+  // An approval recorded before the waiver existed must be re-recorded, so the state
+  // never silently claims proof-backed authority it does not have.
+  const { dir, head } = freshRepo("required-waived-unlabelled");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeProofPolicy(dir, PUSH_WAIVER);
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-06T06:00:00.000Z", forCommit: head,
+      remote: "origin", destination: "refs/heads/feature-test",
+    } },
+  });
+  check("PG12w3 block a waived push whose recorded approval does not name the waiver", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["Push approval predates the current critical-proof waiver"],
+  });
+}
+{
+  // The waiver must be written down. A missing policy file is not a waiver.
+  const { dir, head } = freshRepo("required-no-policy");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-06T06:00:00.000Z", forCommit: head,
+      remote: "origin", destination: "refs/heads/feature-test",
+      criticalProof: null,
+      criticalProofWaiver: { kind: "push", reason: "claimed without a policy backing it" },
+    } },
+  });
+  check("PG12w4 block a claimed waiver that no policy file backs", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["Push approval critical proof is not bound"],
+  });
+}
+{
+  // An unreadable policy answers "required", never "waived".
+  const { dir, head } = freshRepo("required-broken-policy");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  mkdirSync(join(dir, "project"), { recursive: true });
+  writeFileSync(join(dir, "project", "critical-human-proof.json"), "{ not json\n");
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-06T06:00:00.000Z", forCommit: head,
+      remote: "origin", destination: "refs/heads/feature-test",
+      criticalProof: null,
+      criticalProofWaiver: { kind: "push", reason: "claimed against an unreadable policy" },
+    } },
+  });
+  check("PG12w5 block when the proof policy cannot be read", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["CRITICAL-PROOF-POLICY-UNREADABLE"],
+  });
+}
+
 // ---- PG12b raw push cannot consume a shaped critical proof ------------------------------
 {
   const { dir, head } = freshRepo("required-critical-proof");

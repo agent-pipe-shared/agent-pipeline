@@ -337,6 +337,7 @@ import {
   criticalActionSubjectSha256,
   verifyCriticalActionApprovalRequest,
 } from "../lib/critical-action-approval-request.mjs";
+import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
 import {
   lifecycleDigest as closeCoordinatorDigest,
   readCloseCoordinator,
@@ -346,7 +347,6 @@ export const SCHEMA_ID = "pipeline.state.v0";
 export const CONTINUITY_LOCK_SCHEMA_ID = "pipeline.continuity-lock.v0";
 export const CONTINUITY_LOCK_STALE_MS = 30_000;
 const CONTINUITY_REQUEST_MAX_BYTES = 32_768;
-const CRITICAL_HUMAN_PROOF_POLICY_PATH = "project/critical-human-proof.json";
 const PUSH_THREAT_MODEL_PATH = "specs/sprint-nova-epic/implementation/critical-action-authorization-threat-model.md";
 const EXTERNAL_PUBLIC_ARTIFACT_MAX_BYTES = 1_048_576;
 const CONTINUITY_RESULT_MAX_BYTES = 1_048_576;
@@ -2548,25 +2548,8 @@ function defaultGitCandidate(dir) {
   return { ok: true, commit: commit.commit, tree: tree.stdout.trim() };
 }
 
-function criticalHumanProofPolicy(dir) {
-  const path = resolve(dir, CRITICAL_HUMAN_PROOF_POLICY_PATH);
-  try {
-    const stat = lstatSync(path);
-    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 32_768) return { ok: false, code: "CRITICAL-PROOF-POLICY-UNSAFE" };
-    const value = JSON.parse(readFileSync(path, "utf8"));
-    if (!exactObjectKeys(value, ["schema", "requiredKinds"])
-      || value.schema !== "pipeline.critical-human-proof-policy.v1"
-      || !Array.isArray(value.requiredKinds)
-      || value.requiredKinds.length === 0
-      || new Set(value.requiredKinds).size !== value.requiredKinds.length
-      || value.requiredKinds.some((kind) => !CRITICAL_ACTION_KINDS.includes(kind))) {
-      return { ok: false, code: "CRITICAL-PROOF-POLICY-INVALID" };
-    }
-    return { ok: true, requiredKinds: new Set(value.requiredKinds) };
-  } catch (error) {
-    return error?.code === "ENOENT" ? { ok: true, requiredKinds: new Set() } : { ok: false, code: "CRITICAL-PROOF-POLICY-UNREADABLE" };
-  }
-}
+/** ADR-0055: one shared implementation, so the push guard reads the same policy. */
+const criticalHumanProofPolicy = (dir) => readCriticalHumanProofPolicy(dir);
 
 function boundRepositoryArtifact(dir, relativePath) {
   const root = realpathSync(resolve(dir));
@@ -2604,6 +2587,11 @@ function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags,
   if (!policy.requiredKinds.has(kind)) {
     return required ? { ok: false, code: "CRITICAL-PROOF-POLICY-KIND-REQUIRED" } : { ok: true, proof: null };
   }
+  // An explicit, reasoned waiver stands the cryptographic proof down for this kind
+  // (ADR-0055). It is never inferred and never silent: the waiver travels back to the
+  // caller so the recorded approval says on its face that no proof backed it.
+  const waiver = policy.waivers?.get(kind);
+  if (waiver !== undefined) return { ok: true, proof: null, waived: { kind, reason: waiver } };
   const request = externalPublicJson(dir, flags["proof-request"]);
   const authority = externalPublicJson(dir, flags["proof-authority"]);
   const proof = externalPublicJson(dir, flags["proof"]);
@@ -5120,11 +5108,18 @@ export function run(argv = process.argv.slice(2), deps = {}) {
     case "approve-push": {
       const policy = criticalHumanProofPolicy(dir);
       if (!policy.ok) { console.error(`Error: approve-push refused (${policy.code}).`); return 2; }
-      const expectedFlags = new Set(["by", "remote", "destination", "proof-request", "proof-authority", "proof"]);
+      // A waived push (ADR-0055) must not demand proof paths the operator deliberately
+      // stood down; every other binding stays exactly as strict as before.
+      const pushWaived = policy.waivers?.has("push") === true;
+      const expectedFlags = pushWaived
+        ? new Set(["by", "remote", "destination"])
+        : new Set(["by", "remote", "destination", "proof-request", "proof-authority", "proof"]);
       const parsed = parseExactFlags(rest, expectedFlags);
       const by = parsed.value?.by;
       if (!parsed.ok || isBlank(by)) {
-        console.error('Error: approve-push requires --by, --remote, --destination, --proof-request, --proof-authority and --proof.');
+        console.error(pushWaived
+          ? 'Error: approve-push requires --by, --remote and --destination (project/critical-human-proof.json waives the push proof).'
+          : 'Error: approve-push requires --by, --remote, --destination, --proof-request, --proof-authority and --proof.');
         return 2;
       }
       const head = gitHead(dir);
@@ -5161,15 +5156,21 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         return 2;
       }
       const consumed = Array.isArray(priorConsumption) ? priorConsumption : [];
-      if (consumed.some((entry) => entry.proofSha256 === verified.proof.proofSha256)) {
+      if (verified.proof !== null && consumed.some((entry) => entry.proofSha256 === verified.proof.proofSha256)) {
         console.error("Error: approve-push refused (CRITICAL-PROOF-REPLAY); external proof was already consumed.");
         return 2;
       }
+      // The record states on its face what backed it: a consumed proof, or the waiver
+      // and its reason. There is no third, unlabelled state.
+      const approvalRecord = { approvedBy: by, approvedAt, forCommit: head.commit, criticalProof: verified.proof, remote, destination, threatModel: threatModelBinding };
+      if (verified.waived !== undefined) approvalRecord.criticalProofWaiver = verified.waived;
       const next = {
         ...base,
         schema: SCHEMA_ID,
-        pushApproval: { lastApproved: { approvedBy: by, approvedAt, forCommit: head.commit, criticalProof: verified.proof, remote, destination, threatModel: threatModelBinding } },
-        criticalProofConsumption: [...consumed, { proofSha256: verified.proof.proofSha256, kind: "push", consumedAt: approvedAt }],
+        pushApproval: { lastApproved: approvalRecord },
+        criticalProofConsumption: verified.proof === null
+          ? consumed
+          : [...consumed, { proofSha256: verified.proof.proofSha256, kind: "push", consumedAt: approvedAt }],
         updatedAt: approvedAt,
       };
       if (!stateWriteSucceeded(writeState(dir, next, base))) {

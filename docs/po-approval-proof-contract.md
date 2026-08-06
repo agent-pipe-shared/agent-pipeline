@@ -89,11 +89,30 @@ current plan/Spec hashes, action kind, exact action-subject digest and expiry.
 For `push`, the writer-owned subject also binds the selected remote, full
 destination ref and the byte digest of
 `specs/sprint-nova-epic/implementation/critical-action-authorization-threat-model.md`.
-Push proof is
-non-optional: removing `push` from project policy rejects the writer action
-rather than restoring an attribution-only approval. The State writer verifies
-those public bindings before creating durable external-effect authority; proof
-use across kinds, candidates or subjects is rejected.
+Push proof cannot be dropped by *deletion*: removing `push` from project policy
+rejects the writer action rather than restoring an attribution-only approval. The
+State writer verifies those public bindings before creating durable external-effect
+authority; proof use across kinds, candidates or subjects is rejected.
+
+Since [ADR-0055](adr/0055-critical-human-proof-waiver.md) there is exactly one
+legitimate way to stand the proof down, and it is not deletion. Policy schema
+`pipeline.critical-human-proof-policy.v2` accepts `waivedKinds`, where each entry
+names its kind and carries a reason:
+
+```json
+{
+  "schema": "pipeline.critical-human-proof-policy.v2",
+  "requiredKinds": ["push", "deploy", "publication"],
+  "waivedKinds": [{ "kind": "push", "reason": "<why, in the operator's words>" }]
+}
+```
+
+A waived kind stays in `requiredKinds` — the action is still gated, only the
+detached proof is no longer demanded, and the recorded approval carries
+`criticalProofWaiver` so it never claims authority a proof did not give it. A
+waiver is never inferred: no policy file, an unreadable policy, and a kind merely
+absent from `requiredKinds` all mean "still required". This repository ships no
+waiver, and a test enforces that.
 
 Remote provisional receipts are intentionally not this contract. They are
 short-lived, one-time acknowledgements for local continuation only and never

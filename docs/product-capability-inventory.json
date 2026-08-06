@@ -1049,6 +1049,12 @@
       "member": "feature-package-topology-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:critical-human-proof-policy-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "critical-human-proof-policy-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:critic-bare-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -2108,6 +2114,7 @@
         "verify-phase:harness/scripts/verify.mjs:critic-fail-closed-check",
         "verify-phase:harness/scripts/verify.mjs:critic-fail-closed-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-packet-governance-tests",
+        "verify-phase:harness/scripts/verify.mjs:critical-human-proof-policy-tests",
         "verify-phase:harness/scripts/verify.mjs:delivery-course-tests",
         "verify-phase:harness/scripts/verify.mjs:doc-contract-check",
         "verify-phase:harness/scripts/verify.mjs:doc-contract-tests",
