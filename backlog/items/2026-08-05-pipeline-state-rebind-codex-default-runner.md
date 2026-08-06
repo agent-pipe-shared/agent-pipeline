@@ -3,10 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.pipeline-state-rebind-codex-default-runner
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-05
 source: "Read-only skills audit, Sprint Nova session 2026-08-05 (finding 1 of 6); re-raised as T1 Critic finding F-B (major) against candidate 8d9b3df for lacking a dated tracking artifact"
-due: 2026-09-05
+closed_at: 2026-08-06
+closure_repository: self
+closure_commit: 7514fb95f23d6b30bd42bbed2435f2dc4d76ca61
+closure_evidence: backlog/evidence/2026-08-06-second-reconciliation-pass.md
 ---
 
 # `po-authority-rebind-apply` force-rolls-back a Claude session on a false App-Server failure

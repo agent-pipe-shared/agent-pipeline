@@ -3,10 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.ready-gate-env-var-runner-authority
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-05
 source: "T1 Critic review of candidate 8d9b3df, finding F-A (major), Sprint Nova session 2026-08-05"
-due: 2026-08-12
+closed_at: 2026-08-06
+closure_repository: self
+closure_commit: f5e41744edfcc0f8cb76e36036cde90fa989582f
+closure_evidence: backlog/evidence/2026-08-06-second-reconciliation-pass.md
 ---
 
 # `requireProjectOnboardingReady` makes an unauthenticated environment variable the runner authority for four mutating admission entrypoints

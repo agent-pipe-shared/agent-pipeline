@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "38dee5301a500ae597fe0ba164068a476c95a38dadd03d7caa13db7cd79d6db1"
+    "transitionHead": "09c307766779a8fdcca707c5d8d07c4eedd982ea7b5454337c585acb4d333d59"
   },
   "counts": {
-    "open": 26,
+    "open": 22,
     "in_progress": 21,
-    "closed": 12
+    "closed": 16
   },
   "items": [
     {
@@ -262,19 +262,27 @@
     },
     {
       "id": "pipeline.pipeline-state-rebind-codex-default-runner",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-05",
-      "source": "Read-only skills audit, Sprint Nova session 2026-08-05 (finding 1 of 6); re-raised as T1 Critic finding F-B (major) against candidate 8d9b3df for lacking a dated tracking artifact"
+      "source": "Read-only skills audit, Sprint Nova session 2026-08-05 (finding 1 of 6); re-raised as T1 Critic finding F-B (major) against candidate 8d9b3df for lacking a dated tracking artifact",
+      "closedAt": "2026-08-06",
+      "closureRepository": "self",
+      "closureCommit": "7514fb95f23d6b30bd42bbed2435f2dc4d76ca61",
+      "closureEvidence": "backlog/evidence/2026-08-06-second-reconciliation-pass.md"
     },
     {
       "id": "pipeline.po-gate-authority-path-canonicalization",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-07-25",
-      "source": "Self-observation during Sprint Cyborg CYB-0 follow-up (approve-plan dispatch), 2026-07-24/25; direct reproduction via `node -e` against `resolvePoGateRepositoryTopology`."
+      "source": "Self-observation during Sprint Cyborg CYB-0 follow-up (approve-plan dispatch), 2026-07-24/25; direct reproduction via `node -e` against `resolvePoGateRepositoryTopology`.",
+      "closedAt": "2026-08-06",
+      "closureRepository": "self",
+      "closureCommit": "3652d92ac02757d5bf0fde1e816e4f70710a0a1b",
+      "closureEvidence": "backlog/evidence/2026-08-06-second-reconciliation-pass.md"
     },
     {
       "id": "pipeline.po-gate-authority-receipt-readback",
@@ -328,11 +336,15 @@
     },
     {
       "id": "pipeline.ready-gate-env-var-runner-authority",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-05",
-      "source": "T1 Critic review of candidate 8d9b3df, finding F-A (major), Sprint Nova session 2026-08-05"
+      "source": "T1 Critic review of candidate 8d9b3df, finding F-A (major), Sprint Nova session 2026-08-05",
+      "closedAt": "2026-08-06",
+      "closureRepository": "self",
+      "closureCommit": "f5e41744edfcc0f8cb76e36036cde90fa989582f",
+      "closureEvidence": "backlog/evidence/2026-08-06-second-reconciliation-pass.md"
     },
     {
       "id": "pipeline.recovery-preview-ack-unstable-getter-poisons-replay-ledger",
@@ -418,11 +430,15 @@
     },
     {
       "id": "pipeline.setup-mjs-marketplace-name-collision-defeats-local-dev-installs",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-05",
-      "source": "Live reproduction on this machine, Sprint Nova session 2026-08-05 (two separate clobbers of the local marketplace registration, both traced to setup.mjs's compileSettingsJson() output)"
+      "source": "Live reproduction on this machine, Sprint Nova session 2026-08-05 (two separate clobbers of the local marketplace registration, both traced to setup.mjs's compileSettingsJson() output)",
+      "closedAt": "2026-08-06",
+      "closureRepository": "self",
+      "closureCommit": "d3db4a07dee565c1eeee2eb1e1e77ffcd2ca4e0a",
+      "closureEvidence": "backlog/evidence/2026-08-06-second-reconciliation-pass.md"
     },
     {
       "id": "pipeline.source-available-commercial-licensing",

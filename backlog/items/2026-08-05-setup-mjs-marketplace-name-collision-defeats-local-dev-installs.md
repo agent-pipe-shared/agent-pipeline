@@ -3,10 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.setup-mjs-marketplace-name-collision-defeats-local-dev-installs
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-05
 source: "Live reproduction on this machine, Sprint Nova session 2026-08-05 (two separate clobbers of the local marketplace registration, both traced to setup.mjs's compileSettingsJson() output)"
-due: 2026-09-05
+closed_at: 2026-08-06
+closure_repository: self
+closure_commit: d3db4a07dee565c1eeee2eb1e1e77ffcd2ca4e0a
+closure_evidence: backlog/evidence/2026-08-06-second-reconciliation-pass.md
 ---
 
 # `setup.mjs` systematically re-creates a marketplace name collision that defeats every local development install

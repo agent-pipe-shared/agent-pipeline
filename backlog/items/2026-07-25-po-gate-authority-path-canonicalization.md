@@ -3,9 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.po-gate-authority-path-canonicalization
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-07-25
 source: "Self-observation during Sprint Cyborg CYB-0 follow-up (approve-plan dispatch), 2026-07-24/25; direct reproduction via `node -e` against `resolvePoGateRepositoryTopology`."
+closed_at: 2026-08-06
+closure_repository: self
+closure_commit: 3652d92ac02757d5bf0fde1e816e4f70710a0a1b
+closure_evidence: backlog/evidence/2026-08-06-second-reconciliation-pass.md
 ---
 
 # pipeline.po-gate-authority-path-canonicalization
@@ -59,3 +63,19 @@ before the strict `!==` check. Add a Windows fixture that starts from a
 deliberately mis-cased cwd and asserts the topology still resolves. No fix
 applied yet — this item records the defect for the Windows/sandbox-assurance
 slice; scope and sequencing decision is in `docs/state.md`.
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** accepted, delivered, closed.
+- **Rationale:** fixed by `3652d92` ("fix(pipeline-core): correct
+  native-Windows path-case mismatch in resolvePoGateRepositoryTopology"),
+  2026-07-25 — the day after this item was filed, but never linked back.
+  `po-gate-authority.mjs:336-351` now re-derives both sides through
+  `realpathSync.native` immediately before the equality check, matching this
+  item's Proposal exactly, including the deliberately-mis-cased-cwd fixture
+  it asked for. Independently re-verified 2026-08-06:
+  `node --test plugins/pipeline-core/lib/po-gate-authority.test.mjs` → 36/36
+  pass. Full evidence: `backlog/evidence/2026-08-06-second-reconciliation-pass.md`.
+- **Assignment (if accepted):** delivered, `3652d92`, Sprint Nova session,
+  2026-07-25.
+- **Date:** 2026-08-06
