@@ -1,0 +1,8 @@
+{
+  "schema": "pipeline.dispatch-record.v1",
+  "taskId": "READINESS-052-14",
+  "model": "sonnet",
+  "rulesetSha": "2914a55713d714d95323231edaddccec5e1d6c2e5a4fbfaaaaa9d913a5fb1efc",
+  "dispatcher": "elephant",
+  "outcome": "success"
+}
