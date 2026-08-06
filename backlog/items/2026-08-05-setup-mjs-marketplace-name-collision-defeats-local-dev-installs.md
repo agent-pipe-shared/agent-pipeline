@@ -21,13 +21,20 @@ comment calls this "part of the staleness contract". The same builder's
 fresh-project branch (`setup.mjs:842-847`) additionally writes
 `enabledPlugins: { "pipeline-core@agent-pipeline": true }`.
 
-The repository-root `.claude-plugin/marketplace.json` has `"name":
-"agent-pipeline-local"`. A Claude Code marketplace registers under the
-`name` field of its source's manifest, NOT under the key used to declare it.
-Therefore the declaration above resolves and registers itself as
+At the time this defect was found, the repository-root
+`.claude-plugin/marketplace.json` self-named `"agent-pipeline-local"` (a
+`60df4e5` metadata-refresh regression). A Claude Code marketplace registers
+under the `name` field of its source's manifest, NOT under the key used to
+declare it. The declaration above therefore resolved and registered itself as
 `agent-pipeline-local`, silently overwriting any existing registration of
 that name — including a correct user-scope `directory` registration pointing
 at a local development checkout.
+
+**Resolved 2026-08-06.** Commit `d3db4a0` (ADR-0052) restored the manifest's
+original `"agent-pipeline"` name and introduced a separate
+local-development marketplace-root mechanism (symlink on Unix/macOS/WSL,
+directory junction on native Windows) so the published and local identities
+coexist without a name collision. See Triage below.
 
 - **Consequence A:** `enabledPlugins: { "pipeline-core@agent-pipeline": true
   }` can never resolve, because no marketplace named `agent-pipeline` can
@@ -94,7 +101,17 @@ Owner: PO. Due: 2026-09-05.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted, and resolved — Option 1 (rename the published
+  manifest) was chosen over Option 2 (suppress the `setup.mjs` write).
+- **Rationale:** ADR-0052 restored `.claude-plugin/marketplace.json`'s
+  `"name"` field to `"agent-pipeline"`, which is the identity `setup.mjs`'s
+  `compileSettingsJson()` already declared unconditionally, so `setup.mjs`
+  needed no code change — the manifest was the sole defect. A separate
+  local-development marketplace root (symlink/junction) keeps a distinct
+  local identity available without reintroducing the name collision.
+- **Assignment (if accepted):** Delivered by commit `d3db4a0`, Sprint Nova
+  session, 2026-08-06. No further assignment; the live host registration was
+  independently verified to still work after the rename (marketplace list,
+  plugin list, and preflight all unchanged; the rename only takes effect on
+  an explicit marketplace refresh).
+- **Date:** 2026-08-06

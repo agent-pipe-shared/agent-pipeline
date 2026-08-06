@@ -104,7 +104,16 @@ result requires its own T1 Critic round.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted, and delivered per the Critic's stated shortest
+  correct fix.
+- **Rationale:** Commit `a2089cd` removed `process.env.CLAUDECODE` as the
+  runner authority inside the shared `requireProjectOnboardingReady` gate,
+  closing the tautological self-confirming runner check this item describes.
+  Commit `f5e4174` fixed a regression that surfaced from that removal: two
+  ready-gate callers had not been migrated to pass an explicit runner and
+  would otherwise have broken. Together the two commits move runner identity
+  resolution to the four callers' own boundaries, matching ADR-0051's
+  Decision text quoted in the Proposal above.
+- **Assignment (if accepted):** Delivered by commits `a2089cd` and `f5e4174`,
+  Sprint Nova session, 2026-08-06.
+- **Date:** 2026-08-06

@@ -66,9 +66,10 @@ because they share a cause and a fix session:
   `"Agent Pipeline source: local-development · registered local Codex
   marketplace"` unconditionally in every local-dev bootstrap. The only
   marketplace file in the repo is `.claude-plugin/marketplace.json`
-  (`agent-pipeline-local`, self-described "for Claude Code"); there is no
-  separate Codex marketplace file, so a Claude Code session prints a factually
-  wrong claim.
+  (at the time of this finding self-described `"agent-pipeline-local"`, "for
+  Claude Code"; since renamed to `"agent-pipeline"` by ADR-0052/`d3db4a0`, see
+  the sibling backlog item); there is no separate Codex marketplace file, so a
+  Claude Code session printed a factually wrong claim.
 - `plugins/pipeline-core/skills/pipeline-start/SKILL.md:72-75` — instructs
   treating `executionBoundary: "host-authorized-wsl"` with Codex-sandbox
   vocabulary ("never first retry it in the Codex workspace sandbox"), while
@@ -92,7 +93,18 @@ because they share a cause and a fix session:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted; the code half is delivered.
+- **Rationale:** Commit `7514fb9` adds an explicit `--runner claude|codex` to
+  `po-authority-rebind-apply`, resolved at the CLI boundary from `CLAUDECODE`
+  when absent, threaded into all three `inspectV4` intents; a Claude-runner
+  rebind now reaches `ready` without an App-Server daemon, matching Proposal
+  steps 1-2. The same commit also rewords `pipeline-start/SKILL.md`'s
+  local-marketplace line to be runner-neutral and scopes the sandbox-boundary
+  MUST's Codex-specific clause explicitly to Codex, addressing Proposal step
+  3. `po-authority-decision-apply`, which shares the same apply helper, is
+  deliberately left byte-for-byte unaffected (no runner passed, same internal
+  `"codex"` default as before) since it was out of this fix's scope.
+- **Assignment (if accepted):** Delivered by commit `7514fb9`, dispatch
+  `REBIND-RUNNER-04` (goldfish), Sprint Nova session, 2026-08-06. No further
+  assignment needed for the code half.
+- **Date:** 2026-08-06

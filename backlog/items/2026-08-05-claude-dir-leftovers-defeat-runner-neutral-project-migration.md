@@ -145,7 +145,24 @@ angle rather than the migration-completeness angle).
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Partially addressed; the item stays open. **Option 1
+  (retire the legacy `.claude/*` tier) is now proven impossible as written**
+  and is withdrawn from the Proposal's option set. Only Option 2 (generated
+  projection plus a fail-closed drift check) remains viable.
+- **Rationale:** ADR-0053's investigation, done while implementing
+  `AUTHORITY-GEN-07` (commit `32cfc85`), established that roughly a dozen
+  executable files — including `harness/scripts/verify.mjs` — genuinely
+  read the legacy `.claude/` tier directly, not merely the ~14 normative
+  documents this item already lists. Retiring that tier via
+  `planProjectAuthorityMigration` would therefore break live gate execution,
+  not just stale documentation. `setup.mjs` was changed in `32cfc85` to
+  derive its compiled write targets from `resolveProjectAuthorityPaths()`
+  instead of hardcoded `.claude/` paths, which addresses the generator half
+  of this item's own guidance ("the fix belongs in the generator, never in a
+  hand edit of the generated file") but does not retire the legacy tier
+  itself, nor does it add the fail-closed drift check Option 2 requires, nor
+  repoint the 14 normative documents.
+- **Assignment (if accepted):** Not assigned this session. Remaining work —
+  the fail-closed drift check and the documentation repointing — is carried
+  forward per `docs/state.md`'s 2026-08-06 section.
+- **Date:** 2026-08-06
