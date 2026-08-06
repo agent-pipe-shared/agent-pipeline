@@ -550,6 +550,82 @@ commit the numbers belong to, and what the commit after it does — verifiable b
 `git show --stat` on the tip. No claim is made that the gates ran on the tip; they ran on its
 parent, which carries every line of code and configuration in this block.
 
+### ADR-0056 §7 — `signature` made usable, and the release route hardened with it
+
+Block opened 2026-08-06 on the PO's requirement: "every session must be able to push, on
+every branch and on `main`, when the human clears it — by signature or by chat, depending
+on the config." Mid-block the PO added the scope that turned out to matter most: "the
+hardening has to exist on the other release path too, not only on the push path."
+
+**What was measured before anything was changed** (three findings, none assumed):
+
+1. `signature` mode refused **every** agent-issued push. Not a bug — the branch pointed at
+   the fixed publication executor, a release path a feature branch has no business
+   entering. The strong mode meant "no session can ever push".
+2. `main` hangs on a **separate, earlier** boundary (`guard-push.mjs`, before the manifest
+   is read). The push-approval branch never saw it. This was found by the red test run,
+   not by reading — `PG12s2` failed with a message from a rule I had not accounted for.
+3. `checkDeployApprovals` matched an approval on `forArtifact`/`forEnvironment`/`!usedAt`
+   and **never read `criticalProof` at all**. On the release path a recorded approval was
+   not merely believed — its proof was not looked at. That gap predates this block.
+
+**The decision, and why it is not the obvious one.** The cheap way to grant the PO's ask
+is to believe `pushApproval.lastApproved`: it already names commit, remote and destination.
+That was rejected. `project/pipeline-state.json` is a mutable working-tree file —
+guard-lifecycle-ready refuses an agent's Edit and Write to it, but a guard is not a
+signature, and a permission resting on that record would have demoted `signature` to `chat`
+with nobody changing a setting. That is precisely the self-weakening class T2–T5 spent this
+sprint closing in `critical-human-proof-policy.mjs`, and repeating it one module over would
+have been the same mistake with a new file name.
+
+So the guard **verifies**: it rebuilds the signed subject from what it can observe about the
+push actually happening (candidate commit, candidate tree, remote, destination ref, current
+bytes of the bound threat model), rebuilds the intent around it, and checks the Ed25519
+signature against a `trustAnchor` committed in `project/critical-human-proof.json` — a file
+that is GS-2 protected, so the agent reaches it through neither the write lane nor the
+shell lane.
+
+**Commits:** `3e03f7e` (the verification module, unwired and therefore behaviour-neutral),
+`a179897` (both guard routes wired, plus the State writers persisting the proof object).
+
+**Evidence:** guard-push 141/141 (12 new signature cases, 2 new release cases),
+guard-push-v2 9/9, pipeline-state 313/313, critical-action-authorization 29/29. The 12
+signature cases were run **red against the unchanged hook first** (QG-07); the deploy half
+was written implementation-first, so its tests were confirmed red under a mutation probe
+instead, and that asymmetry is recorded rather than smoothed over.
+
+**Deliberate narrowings and tightenings, listed because each changes something:**
+
+- The `main` boundary stays **eager**. It fires before the manifest is read, so deferring
+  it would hand every ungoverned checkout a free push to `main`.
+- Its exception is narrower than the rule: only the explicit `…:refs/heads/main` form.
+  `git push origin main` stays refused — an attestation names a ref.
+- A `deploy` approval is now bound to the commit it was approved for. It previously
+  survived arbitrary later commits.
+- An approval recorded before this block carries a digest but no proof object and cannot
+  authorize a raw push. It must be re-recorded.
+- `PG12b` no longer pins "a raw push can never consume a critical proof" — that is the rule
+  being reversed. It pins the half that had to survive: a proof-*shaped* record with
+  nothing behind it buys nothing.
+
+**Untouched, and verified so:** `PG03d`, `PG03e`, `PG26j` and `PG03a` all still hold — the
+executor keeps its exclusive claim on exact-candidate publication authority, and the
+anonymous-public delivery path refuses `main` independently at `guard-push.mjs:555`.
+
+**Not claimed:** the private key is what protects the action. Nothing here defends against
+an operator who signs the wrong thing, and none of it applies in `chat` mode or under an
+ADR-0055 waiver. `publication` was **not** brought onto this shape; it keeps its own
+external-verification route through the fixed executor. Two shapes now exist where one
+would be better — recorded as ADR-0056 follow-up, not silently left.
+
+**Open for the operator:** this repository has no `trustAnchor` committed yet, so the new
+route is unavailable here until one is added — refused, never open. Adding it is an
+operator action outside an agent session, by design.
+
+**Pending:** a Critic round on this diff, requested by the PO, before the permission is
+used for the first time. The TP-5 lift taken for the test edits is still in place and must
+be restored.
+
 ### Open
 
 - **GIT-03 violated on every commit this session — a REPEAT of an already-fixed defect.**

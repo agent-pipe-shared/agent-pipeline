@@ -77,6 +77,14 @@ ergonomics, and it is written into the record rather than glossed. Anyone readin
 `mode: "chat"` in the state should read it as "a human said yes here", not as "a human
 was proven present".
 
+Be precise about what it still buys, because "weaker" is not "absent" (PO, 2026-08-06):
+even in `chat` the clearance must **exist** — the agent cannot simply proceed without one,
+and the record is still commit-bound, attributed and self-declaring. What `chat` no longer
+resists is *intent*. It protects against forgetting the gate, working out of order, or
+pushing a stale candidate; it does not protect against an agent that deliberately records
+a clearance the human never gave. That is a violation, not a bypass, and it is the risk
+the soft configuration knowingly accepts.
+
 ### 5. For `push`, the source wins; a contradiction fails closed
 
 `pipeline.user.yaml` is the operator-facing control for `push`. A policy-file waiver
@@ -96,6 +104,77 @@ compiler's owned keys — the manifest's gate block is hand-maintained — so pr
 this one setting would mean extending the frozen owned-keys contract for it, and would
 then need ADR-0054's tier-agreement treatment as well. Direct read, one source, no
 second copy to drift.
+
+### 7. `signature` becomes usable: an attested action is allowed, on both routes
+
+Added 2026-08-06, on the PO's requirement that "every session must be able to push, on
+every branch and on `main`, when the human clears it — by signature or by chat,
+depending on the config."
+
+The mode as originally shipped could not do that. `signature` reached a branch in
+`guard-push.mjs` that refused **every** agent-issued push and pointed at the fixed
+publication executor, which is a release path an ordinary feature branch has no business
+entering. `main` was refused even earlier, by a separate boundary that fires before the
+manifest is read at all. So the strong mode did not mean "a session can push what the
+human signed"; it meant "no session can ever push", and the only way to work was to pick
+the weaker mode.
+
+Both routes now admit exactly one thing. **Not a record — a verified signature.**
+
+`guard-push` rebuilds, from what it can observe about the push actually taking place, the
+subject digest the key holder signed: the candidate commit, the candidate tree, the
+remote, the destination ref, and the **current bytes** of the bound threat model. It
+rebuilds the approval intent around that action — which draws in the plan/spec authority
+— and checks the detached Ed25519 signature against a `trustAnchor` committed in
+`project/critical-human-proof.json`. Redirect the remote, retarget the ref, push a
+different tree, let the proof expire, or edit the threat model after approval, and the
+signature stops matching.
+
+**Why a committed anchor and not the state record.** `pushApproval.lastApproved` already
+names the commit, the remote and the destination, so believing it looks sufficient. It is
+not: `project/pipeline-state.json` is a mutable working-tree file. `guard-lifecycle-ready`
+refuses an agent's Edit and Write to it, but a guard is not a signature — and a permission
+built on that record would have turned `signature` into `chat` with nobody changing a
+setting, which is the exact self-weakening this sprint's T2–T5 Critic rounds were spent
+closing one module over. The anchor lives in the policy file because that file is
+gate-strength protected (GS-2), so the agent can reach it through neither the write lane
+nor the shell lane. It is public data — a key reference and a public key's digest — so
+committing it costs nothing.
+
+**`main` is not special-cased, and its boundary is not moved.** The destination ref is
+part of what is signed, so `main` needs no separate permission. The boundary stays eager,
+because it applies to a repository with no manifest and no push gate at all; deferring it
+to the gate section would hand every ungoverned checkout a free push to `main`. Its
+exception is deliberately *narrower* than the rule it excepts: only the explicit
+`…:refs/heads/main` form is admitted. `git push origin main`, whose destination comes from
+remote configuration rather than the command, stays refused — an attestation names a ref,
+and a command that does not name one cannot be matched against it without guessing. The
+publication executor keeps its exclusive claim on exact-candidate publication authority,
+and the anonymous-public delivery path refuses `main` independently.
+
+**The release route is in scope, not a sequel.** `checkDeployApprovals` matched a recorded
+approval on `forArtifact`/`forEnvironment`/`!usedAt` and never read `criticalProof` at all.
+Where a project demands a proof for `deploy`, the strongest thing that path could say
+about an approval was that somebody had written one down. The same rebuild-and-verify now
+applies over that route's own signed subject. An unreadable policy fails closed there,
+unlike the state file beside it: a broken state file is a local accident and warns, a
+policy whose strength cannot be read is a gate of unknown strength.
+
+**What this does not claim.** The private key is what protects the action. Nothing here
+defends against an operator who signs the wrong thing, and none of it applies in `chat`
+mode or under an ADR-0055 waiver, where a recorded approval is an attribution and decision
+4 above stands unchanged.
+
+**Two tightenings, and one workflow change.** A `deploy` approval is now bound to the
+commit it was approved for; it previously survived arbitrary later commits. And an approval
+recorded before this decision carries a digest but no proof object, so it cannot authorize
+a raw push — it must be re-recorded.
+
+**What a project must do to use it.** Add `trustAnchor: {keyReference, publicKeySha256}`
+to `project/critical-human-proof.json`, matching the external `trust-policy.json`. Without
+it the route is simply unavailable (`PUSH-PROOF-TRUST-ANCHOR-MISSING`), never open. Because
+the file is GS-2 protected, this is an operator action performed outside an agent session —
+by design.
 
 ## Consequences
 
@@ -128,3 +207,13 @@ this sprint has already paid for twice.
   for one, the shape is already proven here.
 - The `chat` mode makes a session-level attestation plausible (a signed session
   transcript reference, say). Not built, not needed for the ask.
+- **Open, from the T5 Critic (F4).** Decision 5 describes the conflict rule as "a
+  policy-file waiver alongside an explicit `signature` in the source". The implementation
+  is deliberately wider: it refuses whenever the mode could not be *established* — every
+  source except `default` — because enumerating the one safe value is what makes a future
+  source value fail closed instead of open. The prose and the code therefore disagree in
+  the safe direction, and the prose is the one that should move.
+- `publication` keeps its own external-verification route through the fixed executor and
+  was not brought onto decision 7's rebuild-and-verify. It is not weaker for it — the
+  executor verifies externally at consumption — but the two now differ in shape, and one
+  shape would be better than two.
