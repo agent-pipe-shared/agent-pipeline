@@ -132,11 +132,18 @@ and the danger of an unscoped "lift everything" default.
   ONE PO signature. Real but non-default precondition (requires a signed
   request that bypassed `prepare()`'s own clamp). Correction round 2 needed,
   scoped to this one finding, before Critic sign-off.
-- **Not yet done:** correction round 2 (Finding 1) + a further delta re-Critic;
-  F4/F5 application (patch scripts prepared for the PO to run outside a
-  guarded session — see `scratch/gmw-patch-check/patch-*.mjs` in this
-  checkout, syntax-validated but not committed, since `scratch/` is
-  scratch) + a sealed real `verify.mjs` run; the bootstrap SessionStart
+- **F4/F5 closed, 2026-08-07:** the PO applied the prepared patch scripts
+  outside this guarded session (`scratch/gmw-patch-check/patch-*.mjs`),
+  landing on the worktree as commit `c9a8cbd`. Found and fixed one further
+  gap along the way: registering the new suite in `verify.mjs` created a
+  discovered `verify-phase` surface the checked-in
+  `docs/product-capability-inventory.json` did not yet declare, failing
+  `check-product-capability-inventory.test.mjs` (HAW-A02) — not a
+  TP-protected file, so the Elephant fixed it directly. Full Verify run:
+  **255/255, exit 0**, sealed at
+  `specs/sprint-nova-epic/evidence/nova-gmw/verify-c9a8cbd.json` (commit `d28d4d7`).
+- **Not yet done:** correction round 3 (Finding 1 only) + a further delta
+  re-Critic scoped to it; the bootstrap SessionStart
   warning (design already written, appended to the same design-note commit
   `4398dde`); end-to-end testing with a real PO-signed proof (needs the
   PO's own external signing device/key — cannot happen inside any agent
