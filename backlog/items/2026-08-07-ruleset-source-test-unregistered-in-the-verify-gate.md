@@ -68,6 +68,56 @@ match misses would show as a false positive, and a suite deliberately excluded
 without being a defect. The three subsystem clusters above were spot-checked and
 are genuinely absent; the total of 108 is an upper bound until each is classified.
 
+### Classified 2026-08-08 — the figure was 109, and the caveat above was wrong in direction
+
+A dispatch enumerated the set properly (parsing the registration arrays rather than
+matching basenames), classified every file, and ran each one. Report:
+`specs/sprint-phoenix-epic/evidence/unregistered-suite-classification.md`.
+
+- **109 unregistered, not 108.** The extra file is
+  `harness/scripts/security-readiness/security-readiness.test.mjs`, hidden from the
+  Elephant's count by a basename collision with the *registered*
+  `plugins/pipeline-core/lib/security-readiness.test.mjs`.
+- **The "upper bound" caveat was wrong in direction.** It assumed some of the set
+  would turn out to be fixtures or helpers and the true number would be lower. It is
+  **zero**: every one of the 109 is a real, self-checking, runnable suite.
+- **102 green, 7 red, 0 timeouts.** Red share 6.4 %, far below the one-third
+  threshold that would have made this a PO decision rather than a batching exercise.
+  Total runtime for the green set: **16.8 seconds.**
+
+**A correction to the classification criterion, made by the dispatch and worth
+keeping.** A first pass using "imports `node:test`" put 46 files in the
+not-really-a-suite bucket — including `ruleset-source.test.mjs`, which *this item*
+calls a real suite. Inspection found a second suite style in this repository:
+hand-rolled self-checking scripts (`function check(name, fn) { … }`, throw on
+failure, non-zero exit). The criterion was restated behaviourally — self-checking
+and `node`-runnable — and applied uniformly. Anyone measuring test coverage in this
+repository by framework import will undercount by roughly 40 %.
+
+**Two findings inside the red set that need an owner rather than a registration
+line:**
+
+1. **Three of the seven fail with `SyntaxError: … does not provide an export named
+   …`** — they are written against a module surface that does not exist in this
+   tree. Registering them would turn the gate red on arrival; they are stale, not
+   broken.
+2. **`windows-assurance-verify-registration.test.mjs` is unregistered *and* red**,
+   failing exactly one check: `WAVR19 Verify fails before ordinary suites with a
+   named Windows-assurance registration step`. A suite that pins a property of the
+   verify entry point is itself outside the gate and currently failing.
+
+**Recommendation, now that it rests on data:** register the 102 green suites in
+batches — the runtime cost is negligible and each batch can be reverted alone — and
+file the 7 red ones for triage. Do **not** bundle this with
+`backlog/items/2026-08-08-first-verify-run-is-red-with-four-failures.md`: that item
+is about what the gate says now, this one about what should be in it, and answering
+them together invites registering suites to dilute a red.
+
+**Not observed, and checked for:** no suite in the set mutated a tracked file. One
+mid-run appearance of a staged `harness/scripts/verify.mjs` was traced to a parallel
+dispatch's commit, not to a suite. The set was re-enumerated at the final HEAD and is
+byte-identical to the set that was run.
+
 ## Why this one matters beyond the general rule
 
 `normalizeRulesetSource` from that module decides one of the two disjuncts of
