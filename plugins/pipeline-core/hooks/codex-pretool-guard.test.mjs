@@ -178,9 +178,9 @@ check("attended Human override admits only the exact next tool call and is then 
   git("config", "user.name", "Fixture");
   git("config", "user.email", "fixture@example.invalid");
   writeFileSync(join(root, "README.md"), "fixture\n");
-  git("add", "README.md");
+  writeFileSync(join(root, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "chat"\n');
+  git("add", "README.md", "pipeline.user.yaml");
   git("commit", "-q", "-m", "fixture");
-  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
   const input = { tool_name: "Write", tool_input: { file_path: "notes.md", content: "attended\n" } };
   const first = decision(run(input, root));
   assert.equal(first.permissionDecision, "deny");
@@ -225,7 +225,7 @@ check("Pipeline Author Repair selects one exact source root and consumes one pat
   git("config", "user.name", "Fixture");
   git("config", "user.email", "fixture@example.invalid");
   writeFileSync(join(root, "README.md"), "fixture\n");
-  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  writeFileSync(join(root, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "chat"\n');
   const sourceRoot = join(root, "plugins", "pipeline-core");
   mkdirSync(join(sourceRoot, ".codex-plugin"), { recursive: true });
   mkdirSync(join(sourceRoot, "lib"), { recursive: true });
