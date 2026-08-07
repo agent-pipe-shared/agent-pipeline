@@ -362,8 +362,47 @@ design; that class of gap gets its own separate, narrower fix (worktree
 recognition in `GUARD-CROSS-REPO-MUTATION`, tracked as follow-up in the ADR,
 not yet designed in detail). Explicit PO requirement folded into Decision 4:
 every denial in the family must report its own mode-appropriate next-step
-command, never a bare refusal. **Not yet dispatched** — queued behind GMW's
-Critic verdict, deliberately not run in parallel with it (task #11).
+command, never a bare refusal.
+
+**Dispatch status (2026-08-07, this session):** two goldfish-deep dispatches
+against this ADR, both `plugins/pipeline-core:goldfish-deep` / `xhigh`.
+
+- `NOVA-HGOSIG-1` (first pass): added `authorizeHumanGuardOverrideBySignature()`
+  to `lib/human-guard-override.mjs` (Decision 1) plus a defense-in-depth
+  mode-refusal inside the existing `authorizeHumanGuardOverride()`. Left
+  **uncommitted** in the working tree when it stopped (its own final message
+  read as a mid-task checkpoint, not a completion report — treated
+  accordingly, not taken at face value). Independently verified by the
+  Elephant, not from the agent's self-report: `git status` showed exactly
+  `lib/human-guard-override.mjs` + `lib/human-guard-override.test.mjs`
+  modified; `node --test plugins/pipeline-core/lib/human-guard-override.test.mjs`
+  → 18/18 pass against that diff. Missing at this point: any test for the new
+  signature function itself, the `authorize-by-signature` CLI subcommand
+  (Decision 1's own doc comment already names it), and Decision 3/4 in the
+  calling guards — `guard-testpath.mjs` was confirmed still unmodified
+  (still gates on `overrideAdmitted = approvalMode === "chat"` before
+  attempting consumption, the exact pattern Decision 3 replaces).
+- `NOVA-HGOSIG-2` (continuation, dispatched immediately after, same
+  ruleset SHA `7138c1ea2ff339433d8cf3bb39a868918da4609e`): closes the gaps
+  above — signature-path tests (valid proof, invalid proof, unsupported
+  `global-plugin-install` class, missing trust anchor, replay), the
+  `authorize-by-signature` CLI subcommand, `guard-testpath.mjs`'s Decision 3
+  rewrite (always-attempt-consume-first, mode-appropriate denial guidance),
+  a judgment call on whether `codex-pretool-guard.mjs` (already
+  Decision-3-shaped, unclear on Decision 4) needs a text change, and the full
+  project Verify. **Running in the background; not yet returned as of this
+  note.**
+
+**Mandatory next steps once NOVA-HGOSIG-2 returns** (unchanged from the
+standing rule established for NOVA-HGOSIG-1, still in force): independent
+Elephant diff review — read the actual diff, do not take the dispatched
+Goldfish's self-report alone — then a mandatory T1 Critic round on the full
+ADR-0059 implementation (self-application rule for guardrail-tier checkpoint
+deliverables, required BEFORE any PO gate). Only after a Critic PASS does
+[`2026-08-07-gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions.md`](../backlog/items/2026-08-07-gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions.md)
+(backlog item #4, the reason ADR-0059 was pulled forward in the first place)
+get dispatched — it needs a working `signature`-mode HGO path to route
+through, which does not exist until this lands.
 
 ## 2026-08-07 Nova VII — first Nova A completion wave: 6 issues evidenced
 
