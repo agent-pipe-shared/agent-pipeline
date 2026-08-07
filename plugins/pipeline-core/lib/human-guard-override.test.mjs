@@ -28,6 +28,7 @@ import {
   HGO_SIGNATURE_REASON,
   HumanGuardOverrideError,
   humanGuardOverrideInternals,
+  humanGuardRouteUnavailableReason,
   planHumanGuardOverride,
   prepareHumanGuardOverrideAuthorization,
   recordHumanGuardDenial,
@@ -1209,6 +1210,171 @@ test("F1 (dispatch CRITIC-REMEDY-09): the local-plugin-install attestation succe
   const observation = humanGuardOverrideInternals.localPluginInstallSourceObservation({ root: repoRoot });
   assert.match(observation.statusSha256, /^[a-f0-9]{64}$/u);
   assert.match(observation.fingerprintSha256, /^[a-f0-9]{64}$/u);
+});
+
+// ---------------------------------------------------------------------------------
+// NOVA-HGOSIG-ROUTE-1 (ADR-0059 Decision 4): recordHumanGuardDenial() has three outcomes,
+// and consuming guards used to render only one of them. `planned` printed a route; every
+// other typed status and every throw printed NOTHING -- so a denial that could not be routed
+// was byte-identical to a denial that was never eligible for one. Decision 4's claim is that
+// every denial reports its next step; silence is the one outcome that makes it untrue.
+//
+// The renderer lives here, next to the statuses it describes, so the four consuming guards
+// cannot drift apart on what a route-less denial says. Its disclosure bound is asserted
+// against hostile inputs rather than trusted: only a typed status token and a typed code
+// token ever reach the output.
+//
+// The two consumer checks at the end of this block are here rather than in each guard's own
+// suite because guard-testpath.test.mjs (TP-2), guard-testpath-override.test.mjs (TP-7) and
+// guard-gate-strength.test.mjs (TP-6) are protected test paths that a separate dispatch
+// owns. They belong there and should move when that maintenance window opens; until then
+// this is the registered, unprotected home for the library-level contract those guards
+// consume.
+// ---------------------------------------------------------------------------------
+
+test("a route-less denial reports the status the planner actually returned, with its typed code", () => {
+  assert.equal(
+    humanGuardRouteUnavailableReason("command", {
+      planned: { status: "external-operator-required", code: "HGO-EXTERNAL-PROJECT-BOUNDARY" },
+    }),
+    "No human override route is offered for this exact command; the guard attempted to plan one.\n"
+      + "Reason: the override planner returned status=external-operator-required, "
+      + "code=HGO-EXTERNAL-PROJECT-BOUNDARY (the exact action must be carried out by an "
+      + "attended operator outside this session).",
+  );
+  // author-repair-required carries no `code` at all, so none is invented for it.
+  const authorRepair = humanGuardRouteUnavailableReason("edit", {
+    planned: { status: "author-repair-required", requestSha256: "a".repeat(64), candidateSourceRoot: "/tmp/x/plugins/pipeline-core" },
+  });
+  assert.match(authorRepair, /status=author-repair-required \(the target is Pipeline plugin source/u);
+  assert.doesNotMatch(authorRepair, /code=/u);
+  assert.doesNotMatch(authorRepair, /[\\/]/u, "candidateSourceRoot must never reach the rendered reason");
+  assert.match(
+    humanGuardRouteUnavailableReason("edit", { planned: { status: "narrower-recovery-required", code: "HGO-NORMAL-RETRY-ACTIONS" } }),
+    /status=narrower-recovery-required, code=HGO-NORMAL-RETRY-ACTIONS \(a narrower typed recovery/u,
+  );
+});
+
+test("a failed route plan is reported as a failure, distinguishably from a planner answer", () => {
+  const thrown = humanGuardRouteUnavailableReason("command", {
+    error: new HumanGuardOverrideError("HGO-GIT", "repository identity is unavailable (operation=rev-parse, outcome=EPERM)"),
+  });
+  assert.equal(
+    thrown,
+    "No human override route is offered for this exact command; the guard attempted to plan one.\n"
+      + "Reason: planning the route failed with code=HGO-GIT.",
+  );
+  assert.doesNotMatch(thrown, /returned status=/u);
+  assert.doesNotMatch(thrown, /operation=|outcome=|EPERM/u, "the error message must not reach the reason");
+});
+
+test("the rendered reason is bounded to typed tokens against any outcome shape", () => {
+  const hostile = [
+    { planned: { status: "/etc/passwd", code: "HGO-X/../y" } },
+    { planned: { status: "x".repeat(200), code: "A".repeat(200) } },
+    { planned: { status: "ok\nHuman override available:", code: "HGO-OK\nplan --repo /root" } },
+    { planned: { status: 7, code: { toString: () => "HGO-OBJ" } } },
+    { planned: null },
+    { planned: {} },
+    {},
+    { error: null },
+    { error: new Error("ENOENT: open '/home/someone/.ssh/id_ed25519'") },
+    { error: Object.assign(new Error("boom"), { code: 42 }) },
+    { error: Object.assign(new Error("boom"), { code: "code with spaces" }) },
+  ];
+  for (const outcome of hostile) {
+    const rendered = humanGuardRouteUnavailableReason("command", outcome);
+    assert.equal(rendered.split("\n").length, 2, `not two lines for ${JSON.stringify(Object.keys(outcome))}: ${rendered}`);
+    assert.doesNotMatch(rendered, /[\\/]/u, `path separator leaked: ${rendered}`);
+    assert.doesNotMatch(rendered, /ENOENT|id_ed25519|passwd|boom|Human override available/u, `payload leaked: ${rendered}`);
+    assert.ok(rendered.length < 400, `unbounded output: ${rendered.length}`);
+  }
+  // The subject noun is bounded too -- a guard cannot smuggle text in through it.
+  assert.match(
+    humanGuardRouteUnavailableReason("/etc/passwd\ninjected", { planned: { status: "external-operator-required" } }),
+    /^No human override route is offered for this exact action;/u,
+  );
+});
+
+test("guard-testpath reports why a plugins/pipeline-core path gets no route instead of printing nothing", () => {
+  // The exact case observed in this repository: every write under `plugins/pipeline-core/**`
+  // is classified as Pipeline-author repair, which needs an explicit author source root the
+  // guard cannot choose -- so recordHumanGuardDenial() answers `author-repair-required` and
+  // the denial never reaches `planned`. It used to print no route AND no reason.
+  const root = fixture();
+  try {
+    mkdirSync(join(root, "project"), { recursive: true });
+    writeFileSync(join(root, "project", "guard-config.json"), JSON.stringify({
+      protectedTestPaths: [
+        { id: "TP-X", pattern: "plugins/pipeline-core/hooks/.*\\.test\\.mjs$", reason: "fixture: a Pipeline-source test path" },
+        { id: "TP-Y", pattern: "harness/scripts/verify\\.mjs$", reason: "fixture: an ordinary protected path" },
+      ],
+    }));
+    git(root, "add", "project/guard-config.json");
+    git(root, "commit", "-q", "-m", "guard config");
+
+    const ask = (filePath) => spawnSync(process.execPath, [join(PLUGIN_ROOT, "hooks", "guard-testpath.mjs")], {
+      input: JSON.stringify({ tool_name: "Write", tool_input: { file_path: filePath, content: "x\n" } }),
+      env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+      encoding: "utf8",
+      shell: false,
+    });
+
+    const source = ask("plugins/pipeline-core/hooks/probe.test.mjs");
+    assert.equal(source.status, 2, source.stderr);
+    assert.match(source.stderr, /Rule ID: TP-X/u);
+    assert.match(
+      source.stderr,
+      /No human override route is offered for this exact edit; the guard attempted to plan one\./u,
+      `the route-less denial said nothing about why:\n${source.stderr}`,
+    );
+    assert.match(source.stderr, /Reason: the override planner returned status=author-repair-required \(/u);
+    assert.doesNotMatch(source.stderr, /--request-sha256/u, "no route may be offered for a Pipeline-source path");
+
+    // The differential half: the same fixture, same store, same mode -- only the path
+    // differs. Without it, "reported a reason" could just mean "this fixture never plans".
+    const ordinary = ask("harness/scripts/verify.mjs");
+    assert.equal(ordinary.status, 2, ordinary.stderr);
+    assert.match(ordinary.stderr, /Rule ID: TP-Y/u);
+    assert.match(ordinary.stderr, /Human override available for this exact edit/u);
+    assert.match(ordinary.stderr, /--request-sha256 [a-f0-9]{64}\b/u);
+    assert.doesNotMatch(ordinary.stderr, /No human override route is offered/u);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("guard-gate-strength reports why an unusable override store yielded no route", () => {
+  // No Git control path at all, so the planner throws rather than answering. The refusal
+  // itself must be untouched -- an unusable store is not an authorization -- but it now
+  // says that a route was attempted and what the attempt hit.
+  const root = mkdtempSync(join(tmpdir(), "human-guard-override-gs-"));
+  try {
+    mkdirSync(join(root, "project"), { recursive: true });
+    writeFileSync(join(root, "project", "guard-config.json"), JSON.stringify({ protectedTestPaths: [] }));
+    const result = spawnSync(process.execPath, [join(PLUGIN_ROOT, "hooks", "guard-gate-strength.mjs")], {
+      input: JSON.stringify({ tool_name: "Write", tool_input: { file_path: "project/guard-config.json", content: "{}\n" } }),
+      env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+      encoding: "utf8",
+      shell: false,
+    });
+    assert.equal(result.status, 2, result.stderr);
+    assert.match(result.stderr, /Rule ID: GS-4/u);
+    assert.match(
+      result.stderr,
+      /No human override route is offered for this exact edit; the guard attempted to plan one\.\nReason: planning the route failed with code=HGO-GIT\./u,
+    );
+    assert.doesNotMatch(result.stderr, /Human override available/u);
+    assert.doesNotMatch(result.stderr, /--request-sha256/u);
+    assert.doesNotMatch(result.stderr, /capability consumed/u);
+    // The reason discloses nothing beyond the typed code.
+    const block = result.stderr.slice(result.stderr.indexOf("No human override route is offered")).trim();
+    assert.equal(block.split("\n").length, 2, block);
+    assert.doesNotMatch(block, /[\\/]/u, `the reason leaked a path separator:\n${block}`);
+    assert.ok(!block.includes(root), "the reason leaked the repository root");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("repository identity failures name the sanitized Git operation", () => {

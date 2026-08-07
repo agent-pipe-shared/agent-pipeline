@@ -105,6 +105,7 @@ import { readPushApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import { windowCoversRule } from "../lib/guard-maintenance-window.mjs";
 import {
   consumeHumanGuardOverride,
+  humanGuardRouteUnavailableReason,
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
 import {
@@ -267,6 +268,14 @@ if (matched) {
   // the refusal still stands, it just carries no copyable next step. Attempted unconditionally
   // now (Decision 3) -- both `chat` and `signature` mode have a real, working next step
   // (Decision 4), so there is no mode left to withhold it from.
+  //
+  // "No copyable next step" is not the same as saying nothing, and this guard used to
+  // conflate them. The case that made it visible is this repository's own: a TP-7 write to
+  // a `plugins/pipeline-core/**` path is classified as Pipeline-author repair, which needs
+  // an explicit author source root and therefore never reaches `planned` -- so the refusal
+  // printed no route AND no hint that one had been attempted, exactly like a rule that has
+  // no override at all. Both no-route outcomes now render a bounded typed reason instead
+  // (humanGuardRouteUnavailableReason(); see its header for the disclosure bound).
   let overrideGuidance = "";
   if (consumed.status === "absent" || consumed.status === "replan") {
     try {
@@ -295,8 +304,12 @@ if (matched) {
           `${process.execPath} ${JSON.stringify(script)} plan --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256}`,
           continuation,
         ].join("\n");
+      } else {
+        overrideGuidance = ["", humanGuardRouteUnavailableReason("edit", { planned })].join("\n");
       }
-    } catch { /* no route offered; the refusal below is unchanged */ }
+    } catch (error) {
+      overrideGuidance = ["", humanGuardRouteUnavailableReason("edit", { error })].join("\n");
+    }
   }
 
   emit(2, [

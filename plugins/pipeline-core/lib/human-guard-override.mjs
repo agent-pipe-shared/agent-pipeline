@@ -1180,6 +1180,82 @@ function validatedRequest(paths, requestSha256) {
   return request;
 }
 
+// ---------------------------------------------------------------------------------
+// ADR-0059 Decision 4: every denial reports its next step. recordHumanGuardDenial() below
+// has THREE outcomes, not one -- it returns `planned` (there is a next step to print), it
+// returns one of the other typed statuses (the route machinery worked and answered "not
+// this way"), or it throws (the route machinery could not answer at all). Consuming guards
+// rendered only the first and swallowed the other two, so a denial that could not be
+// routed printed exactly like a denial that was never eligible for one: silence, the one
+// outcome Decision 4 does not admit. Observed twice in the field -- a grammar denial
+// against a path outside the repository root, and a TP-7 denial against a
+// `plugins/pipeline-core/**` path (every write there is author repair and needs an explicit
+// author source root, so it never reaches `planned`).
+//
+// This renders the line a guard prints INSTEAD of a route. The defect being closed is the
+// swallowed reason, not the missing route, so this deliberately offers no command: it says
+// that a route was attempted, and what the attempt observed.
+//
+// What it can disclose is bounded by construction rather than by care. Only two tokens ever
+// reach the output, each rendered only if it matches a typed-token shape and is short --
+// so no `/`, `\`, `:`, whitespace or newline can pass -- plus a fixed clause selected by
+// the observed status. No error message, no stack, no digest, no path. `candidateSourceRoot`
+// (the one field of a non-planned outcome carrying an absolute host path) is never read.
+// ---------------------------------------------------------------------------------
+const ROUTE_STATUS_TOKEN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/u;
+const ROUTE_CODE_TOKEN = /^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*$/u;
+const ROUTE_SUBJECT_TOKEN = /^[a-z]+(?: [a-z]+)*$/u;
+const ROUTE_TOKEN_MAX_LENGTH = 64;
+const ROUTE_UNTYPED_CODE = "HGO-UNTYPED";
+const ROUTE_UNTYPED_STATUS = "unrecognized";
+
+/**
+ * Why THIS status carries no route. Keyed on the value actually observed; a status with no
+ * entry here is still reported, just without a clause -- the guard never invents one.
+ */
+const ROUTE_STATUS_EXPLANATION = Object.freeze({
+  "author-repair-required":
+    "the target is Pipeline plugin source, so an override is author repair and needs an "
+    + "explicit author source root, which a guard cannot select on the human's behalf",
+  "narrower-recovery-required":
+    "a narrower typed recovery is required instead of a general override",
+  "external-operator-required":
+    "the exact action must be carried out by an attended operator outside this session",
+});
+
+function routeToken(value, pattern, fallback) {
+  return typeof value === "string"
+    && value.length > 0
+    && value.length <= ROUTE_TOKEN_MAX_LENGTH
+    && pattern.test(value)
+    ? value
+    : fallback;
+}
+
+/**
+ * @param {string} subject short noun the denying guard uses for the refused thing ("command", "edit").
+ * @param {{planned?: object}|{error?: unknown}} outcome exactly what route planning produced.
+ * @returns {string} two lines: that no route is offered, and the typed reason why.
+ */
+export function humanGuardRouteUnavailableReason(subject, outcome = {}) {
+  const noun = routeToken(subject, ROUTE_SUBJECT_TOKEN, "action");
+  const headline = `No human override route is offered for this exact ${noun}; the guard attempted to plan one.`;
+  if (object(outcome) && Object.hasOwn(outcome, "error")) {
+    const code = routeToken(outcome.error?.code, ROUTE_CODE_TOKEN, ROUTE_UNTYPED_CODE);
+    return `${headline}\nReason: planning the route failed with code=${code}.`;
+  }
+  const planned = object(outcome) && object(outcome.planned) ? outcome.planned : {};
+  const status = routeToken(planned.status, ROUTE_STATUS_TOKEN, ROUTE_UNTYPED_STATUS);
+  const code = Object.hasOwn(planned, "code")
+    ? routeToken(planned.code, ROUTE_CODE_TOKEN, ROUTE_UNTYPED_CODE)
+    : null;
+  const explanation = ROUTE_STATUS_EXPLANATION[status] ?? null;
+  return `${headline}\nReason: the override planner returned status=${status}`
+    + (code === null ? "" : `, code=${code}`)
+    + (explanation === null ? "" : ` (${explanation})`)
+    + ".";
+}
+
 export function recordHumanGuardDenial({
   rootDir,
   pluginRoot,

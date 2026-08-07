@@ -64,6 +64,7 @@ import { isNeverLiftableKernelPath, windowCoversRule } from "../lib/guard-mainte
 import { readPushApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import {
   consumeHumanGuardOverride,
+  humanGuardRouteUnavailableReason,
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
 
@@ -271,8 +272,15 @@ if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mj
             `${process.execPath} ${JSON.stringify(script)} plan --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256}`,
             continuation,
           ].join("\n");
+        } else {
+          // ADR-0059 Decision 4: a denial with no route says so, with a bounded typed
+          // reason, rather than looking identical to a rule that has no override at all
+          // (which for this guard is a real, adjacent case -- GS-6, one branch below).
+          overrideGuidance = ["", humanGuardRouteUnavailableReason("edit", { planned })].join("\n");
         }
-      } catch { /* no route offered; the refusal below is unchanged */ }
+      } catch (error) {
+        overrideGuidance = ["", humanGuardRouteUnavailableReason("edit", { error })].join("\n");
+      }
     }
   }
 

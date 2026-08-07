@@ -29,6 +29,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { readPushApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import {
   consumeHumanGuardOverride,
+  humanGuardRouteUnavailableReason,
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
@@ -165,10 +166,16 @@ function blocked(code = "GUARD-LIFECYCLE-NOT-READY", lifecycleStatus = null, ret
  * (harmless: it only ever succeeds against a genuinely armed, matching one, regardless
  * of mode); when nothing is consumed, attempt to record the denial and offer the
  * mode-appropriate next step (Decision 4). Offering the route is a convenience, never a
- * gate: an unusable store leaves the plain refusal exactly as it was -- same pattern as
+ * gate: an unusable store leaves the refusal itself standing unchanged -- same pattern as
  * guard-testpath.mjs's `overrideGuidance` block, adapted to this file's own message
  * shape. GUARD-CROSS-REPO-MUTATION and GUARD-LIFECYCLE-NOT-READY never call this
  * (ADR-0059 Decision 5; out of scope for this dispatch).
+ *
+ * What it does NOT leave unchanged any more is the silence. Both no-route outcomes --
+ * planning threw, and planning returned a status other than `planned` -- print a bounded
+ * typed reason via humanGuardRouteUnavailableReason(), because Decision 4's claim is that
+ * every denial reports its next step, and "no next step, and no word about why" is the one
+ * outcome that makes it untrue.
  *
  * The exact denial reason text is `${code}: ${GRAMMAR_DENIAL_GUIDANCE[code]}` -- the
  * SAME string blocked() itself prints for that code -- because the HGO request/capability
@@ -223,8 +230,16 @@ function grammarOverrideRoute(code, root, toolName, toolInput, dependencies = {}
           continuation,
           "",
         ].join("\n");
+      } else {
+        // ADR-0059 Decision 4: a denial that could not be routed must SAY so. Silence here
+        // made this path indistinguishable from a denial that was never eligible for a
+        // route at all -- see humanGuardRouteUnavailableReason()'s own header for what may
+        // and may not appear in the rendered reason.
+        overrideGuidance = ["", humanGuardRouteUnavailableReason("command", { planned }), ""].join("\n");
       }
-    } catch { /* no route offered; the plain grammar refusal stands unchanged */ }
+    } catch (error) {
+      overrideGuidance = ["", humanGuardRouteUnavailableReason("command", { error }), ""].join("\n");
+    }
   }
   return { admitted: null, overrideGuidance };
 }

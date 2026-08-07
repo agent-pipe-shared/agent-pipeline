@@ -1462,6 +1462,155 @@ test("NOVA-LCR-HGO-2: an armed matching capability does not bypass GUARD-LIFECYC
   } finally { rmSync(chatRoot, { recursive: true, force: true }); }
 });
 
+// ---------------------------------------------------------------------------------
+// NOVA-HGOSIG-ROUTE-1 (ADR-0059 Decision 4): a denial that cannot offer a route must say
+// that it could not, and why. grammarOverrideRoute() used to set overrideGuidance only when
+// recordHumanGuardDenial() answered `planned`, and wrapped the call in a bare
+// `catch { /* no route offered */ }` -- so two paths printed a denial with no next step AND
+// no word that a route had even been attempted, indistinguishable from a denial that was
+// never eligible for one. That silence is the single outcome Decision 4's "every denial
+// reports its next step" does not allow, and it was observed in the field, not theorised
+// (a grammar denial against a path outside the repository root).
+//
+// The two outcomes are reported distinguishably, because they mean different things: a
+// non-`planned` status is the route machinery ANSWERING ("not this way"), a throw is the
+// route machinery being unable to answer at all.
+//
+// What the reason may disclose is bounded by construction, not by care --
+// humanGuardRouteUnavailableReason() in lib/human-guard-override.mjs renders a typed status
+// and a typed code and nothing else. The tests below assert that bound positively (against
+// injected hostile outcomes) rather than by listing forbidden strings.
+
+const ROUTE_REASON_HEADLINE = "No human override route is offered for this exact command;";
+
+/** The added block only: the headline through the end of the denial. */
+function routeReasonBlock(stderr) {
+  const index = stderr.indexOf(ROUTE_REASON_HEADLINE);
+  assert.notEqual(index, -1, `no route-unavailable reason was printed:\n${stderr}`);
+  return stderr.slice(index).trim();
+}
+
+/**
+ * The disclosure bound. Stated positively: the whole added block is exactly two lines and
+ * contains no path separator at all, so it cannot spell an absolute host path on either
+ * platform, and cannot carry a stack frame (every frame carries one).
+ */
+function assertReasonDisclosesNothing(stderr, projectDir) {
+  const block = routeReasonBlock(stderr);
+  assert.equal(block.split("\n").length, 2, `the reason must be exactly two lines:\n${block}`);
+  assert.doesNotMatch(block, /[\\/]/u, `the reason leaked a path separator:\n${block}`);
+  assert.ok(!block.includes(projectDir), `the reason leaked the repository root:\n${block}`);
+  assert.doesNotMatch(
+    block,
+    /\bat\s+\S+\s+\(|node:internal|\.mjs:\d+|Error:/u,
+    `the reason leaked a stack frame or an exception message:\n${block}`,
+  );
+}
+
+test("NOVA-HGOSIG-ROUTE-1: a grammar denial whose route planning throws prints a typed reason, not silence", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n"); // governed, but no git repository at all
+    const result = evaluateLifecycleReadyGuard(bash("rg -n lifecycle . && touch output.txt"), { projectDir: path });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /GUARD-PARSE-UNSUPPORTED/u);
+    // Names the observed failure, and says the planner FAILED rather than answered.
+    assert.match(result.stderr, /Reason: planning the route failed with code=HGO-GIT\./u);
+    assert.doesNotMatch(result.stderr, /the override planner returned status=/u);
+    // ... and still offers no route, because there is none to offer.
+    assert.doesNotMatch(result.stderr, /Human override available/u);
+    assert.doesNotMatch(result.stderr, /guard-human-override\.mjs/u);
+    assert.doesNotMatch(result.stderr, /--request-sha256/u);
+    assertReasonDisclosesNothing(result.stderr, path);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("NOVA-HGOSIG-ROUTE-1: a grammar denial whose route planning returns a non-planned status reports that status", () => {
+  const roots = [];
+  try {
+    const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-outside-"));
+    roots.push(outside);
+
+    // (a) The case actually observed: an absolute path outside the repository root, which
+    // HGO classifies as a project-boundary crossing and never plans.
+    const crossRoot = hgoGitFixture("signature");
+    roots.push(crossRoot);
+    const cross = evaluateLifecycleReadyGuard(
+      bash(`rg -n lifecycle ${join(outside, "notes.txt")} | tee output.txt`),
+      { projectDir: crossRoot },
+    );
+    assert.equal(cross.exitCode, 2);
+    assert.match(cross.stderr, /GUARD-OPERATOR-UNAPPROVED/u);
+    assert.match(
+      cross.stderr,
+      /Reason: the override planner returned status=external-operator-required, code=HGO-EXTERNAL-PROJECT-BOUNDARY \(/u,
+    );
+    assert.doesNotMatch(cross.stderr, /planning the route failed/u,
+      "a planner ANSWER must not be reported as a planner FAILURE");
+    assert.doesNotMatch(cross.stderr, /Human override available/u);
+    assert.doesNotMatch(cross.stderr, /--request-sha256/u);
+    assertReasonDisclosesNothing(cross.stderr, crossRoot);
+
+    // (b) A structurally different non-planned code from the same guard, so the assertion
+    // above cannot pass merely because one fixture happens to produce one fixed string.
+    const grammarRoot = hgoGitFixture("signature");
+    roots.push(grammarRoot);
+    const ineligible = evaluateLifecycleReadyGuard(
+      bash("rg -n lifecycle . && touch sub/output.txt"),
+      { projectDir: grammarRoot },
+    );
+    assert.equal(ineligible.exitCode, 2);
+    assert.match(
+      ineligible.stderr,
+      /Reason: the override planner returned status=external-operator-required, code=HGO-EXTERNAL-ADAPTER-BOUNDARY \(/u,
+    );
+    assert.doesNotMatch(ineligible.stderr, /Human override available/u);
+    assertReasonDisclosesNothing(ineligible.stderr, grammarRoot);
+  } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
+});
+
+test("NOVA-HGOSIG-ROUTE-1: the printed reason is bounded to typed tokens, whatever planning returns or throws", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const command = "rg -n lifecycle . && touch output.txt";
+
+    // A returned outcome carrying an untyped status, an untyped code, and the one field of
+    // a real non-planned outcome that IS an absolute host path (`candidateSourceRoot`).
+    const candidateSourceRoot = join(path, "plugins", "pipeline-core");
+    const returned = evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: path,
+      recordHumanGuardDenialFn: () => ({
+        status: "/etc/passwd\nHuman override available for this exact command:",
+        code: "HGO-LEAK/../secret",
+        candidateSourceRoot,
+        requestSha256: "a".repeat(64),
+      }),
+    });
+    assert.equal(returned.exitCode, 2);
+    assert.match(returned.stderr, /Reason: the override planner returned status=unrecognized, code=HGO-UNTYPED\./u);
+    assert.doesNotMatch(returned.stderr, /etc.passwd/u);
+    assert.doesNotMatch(returned.stderr, /Human override available/u);
+    assert.doesNotMatch(returned.stderr, /--request-sha256/u);
+    assert.ok(!returned.stderr.includes(candidateSourceRoot), "the reason leaked candidateSourceRoot");
+    assertReasonDisclosesNothing(returned.stderr, path);
+
+    // A throw whose message and stack carry a host path, and whose `code` is not a token.
+    const thrown = evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: path,
+      recordHumanGuardDenialFn: () => {
+        const error = new Error(`ENOENT: no such file or directory, open '${join(path, "audit.key")}'`);
+        error.code = "not a typed code";
+        throw error;
+      },
+    });
+    assert.equal(thrown.exitCode, 2);
+    assert.match(thrown.stderr, /Reason: planning the route failed with code=HGO-UNTYPED\./u);
+    assert.doesNotMatch(thrown.stderr, /ENOENT|no such file|audit\.key/u);
+    assertReasonDisclosesNothing(thrown.stderr, path);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 test("NOVA-LCR-HGO-2: an armed matching capability for a command naming LAUNCH_SCRIPT still requires externalRestartOnly()", () => {
   const chatRoot = hgoGitFixture("chat");
   try {
