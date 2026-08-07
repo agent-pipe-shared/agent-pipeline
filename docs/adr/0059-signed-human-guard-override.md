@@ -85,6 +85,29 @@ additionally refuses outright when the resolved mode is `signature` — a
 second, defense-in-depth check, not reliance on the calling guard alone to
 keep it out of reach.
 
+**Standing principle, stated explicitly so it stops needing to be
+rediscovered per guard (PO, chat, 2026-08-07 — restated after this exact
+question came up again for GS-7):** *"alle Sachen die den Agenten blockieren
+müssen mit human Signatur oder chat je nach config Liftbar sein... wenn ein
+User bewusst von der sicheren Signaturmethode auf Chat umstellt, dann ist
+das völlig okay, dass dann auch der Lift per Chat funktioniert... der
+signature Mode, der Default ist, schützt das ja ausreichend, so dass der
+human intent gewahrt [ist]. Wenn dann der human das bewusst umschaltet auf
+Chat, ist es völlig okay — kein Grund, hier alles so permanent schwierig zu
+machen."* Every guard this repository ever adds that blocks an agent action
+gets the SAME lift shape Decision 3 establishes — signature always,
+chat whenever the human has genuinely, committedly configured it — with
+**no file- or guard-specific exception that makes chat mode inadmissible
+somewhere it is otherwise configured on.** `signature` being the safe
+default is what makes this safe; a real, deliberate, recorded switch to
+`chat` (ADR-0056 Decision 4) is the human's own governance choice, not a
+hole for the Pipeline to keep fencing off. A narrower restriction is
+admissible only where a *concrete, demonstrated* attack path requires it
+(none has been found for any guard in this family as of this ADR) — never
+as a default precaution "to be safe." If a PO wants chat mode unavailable
+entirely, the existing configuration surface already does that: they
+simply do not set `gates.push_approval: chat`.
+
 ### 4. Every denial reports the next step, not just a refusal
 
 Explicit PO requirement mid-design (chat, 2026-08-07): *"es muss nur
