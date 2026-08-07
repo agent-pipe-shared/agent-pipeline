@@ -573,8 +573,54 @@ Two parallel, non-overlapping dispatches launched: `NOVA-HGOSIG-4`
 existing entries left untouched per this repo's own precedent. Independently
 re-verified: `node harness/scripts/security-scan.mjs` → `gitleaks: OK (0
 findings)`, `Verdict: CLEAN`, exit 0. This suite is now genuinely clean.
-`NOVA-HGOSIG-4` (the `guard-testpath-override.test.mjs` wording fix) still
-running as of this note.
+
+**`NOVA-HGOSIG-4` stopped, blocked — a genuine, informative finding, not a
+failure.** It could not edit `guard-testpath-override.test.mjs`: that exact
+file is itself `TP-7`-protected in this repository's real
+`project/guard-config.json`, and — correctly, per its own briefing — the
+dispatch refused to bypass the block. It fully designed and verified all 5
+replacement texts against live guard output before stopping; nothing was
+written. Root cause distinct from a Goldfish error: whoever added `TP-7`
+(this session's own NOVA-HGOSIG-3 work, most likely, indirectly) never
+arranged a lift route for the very next dispatch that would need to touch
+it. Queued for resolution alongside the GS-7 work below (same signed-HGO
+machinery once it exists more broadly), or a direct PO edit outside a
+session in the meantime.
+
+**GS-7 finding (PO report, chat, 2026-08-07): "gs 7 muss auch liftbar sein
+das blockiert eine andere Session."** Investigated immediately given a live
+session was blocked. Confirmed: `guard-gate-strength.mjs` (enforcing
+GS-1/GS-2/GS-3/GS-4/GS-5/GS-7 — six exact files that decide a gate's own
+strength) has had **zero lift mechanism of any kind** for these six paths —
+not GMW, not the new signed HGO path, nothing — by ORIGINAL DESIGN, per its
+own header comment: *"There is no in-session override, because an
+in-session override for 'may I weaken my own gate' is the same hole with an
+extra step."* This directly contradicted ADR-0059 Decision 5's own text,
+which claimed these paths already had a working HGO route — **corrected in
+the ADR itself, commit `30ee837`** (the false claim, why it was false, and
+the follow-up decision actually taken).
+
+**Immediate workaround given to the PO:** edit the blocking file directly,
+outside any agent session — the guard's own documented escape hatch,
+available right now with no code change.
+
+**Follow-up dispatched: `NOVA-HGOSIG-GS7-1`** (goldfish-deep,
+ruleset `30ee83781114901dd8a09a110735969cc77b53ed`) — a SIGNED-ONLY lift for
+GS-1..GS-5/GS-7 (GS-6 untouched, keeps its own GMW mechanism). The load-
+bearing safety property, stated explicitly in the briefing as the one thing
+that must never bend: `authorizeHumanGuardOverride()` (the chat-mode path)
+must refuse to arm a capability for any of these six exact paths
+**unconditionally** — regardless of the configured `gates.push_approval`
+mode, not merely "refused unless chat mode" like every other HGO consumer —
+because these are the files that decide what "chat mode" even means, so
+admitting a chat-armed capability here would be circular by construction.
+Only `authorizeHumanGuardOverrideBySignature()` may ever arm one for these
+paths. **This change modifies the single most security-critical guard in
+the repository and explicitly needs its own dedicated, extra-careful
+independent Critic pass before anyone relies on it** — flagged as a
+mandatory next step in the dispatch briefing itself, not to be folded
+silently into the general ADR-0059 Critic round as "just another fix."
+Running as of this note.
 
 **Mandatory next steps (restated, unchanged):** once full Verify confirms
 exit 0, dispatch the mandatory T1 Critic round on the complete ADR-0059
