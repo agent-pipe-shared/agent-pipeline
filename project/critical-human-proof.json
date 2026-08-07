@@ -4,5 +4,9 @@
     "push",
     "deploy",
     "publication"
-  ]
+  ],
+  "trustAnchor": {
+    "keyReference": "local-po-key",
+    "publicKeySha256": "f28988b21c670c4b958a534e82fef485195ab1abc74df1a41772c9b58c73db14"
+  }
 }
