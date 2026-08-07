@@ -265,6 +265,40 @@ the gate prints `(operating-model §7)` into its operator-visible fix string.
 Note (c) is a one-line change but sits in a `harness/scripts/` file, so it
 follows the ordinary briefed-task path rather than an in-session edit.
 
+**R3 (`84876f1`) Critic round 1/4: FAIL — 1 major, 3 minor.** Report at
+`specs/sprint-phoenix-epic/evidence/phx-r3-rescope-critic-review-84876f1.md`.
+This was the last design package that had never been reviewed; it now has been.
+
+**F1 (major) is a genuine catch and it indicts the method, not just the
+instance.** `templates/prompts/critic-review.md:15` carries a `§4.2` that resolves
+in no candidate document — not the operating model, not `review-protocol.md`, not
+`model-policy.md`. The inventory misses it, and §II.4's row for that exact line
+affirmatively states it carries no operating-model citation. The cause is the
+document's own attribution rule ("nearest preceding document reference **on its
+line**"): on that line the nearest preceding reference is the rule id `MP-07`, so
+the token falls out of the scan. **A measurement that reports a defect class is
+itself subject to that class.** The rework is therefore briefed to re-check the
+whole C1–C9 set for `§` tokens preceded by a rule id rather than a document name,
+not just to patch line 15.
+
+F2 corrects two wrong `file:line` coordinates and forces §II.8's "every
+`file:line` was confirmed by reading the file" claim to become true of what was
+actually done. F3 corrects 31-anchors-for-20-headings to 31-for-29 (the
+conclusion it supports survives; the number does not). F4 makes the "68" subset's
+stated definition match its number.
+
+**Round 1 rework dispatched (`PHX-R3-REWORK-1`).** Explicitly briefed to re-derive
+each finding from source before applying it, and to report rather than apply
+anything that does not reproduce.
+
+**What the review did NOT shake, and this matters for how much of R3 is load
+bearing:** the re-derived structure of `docs/operating-model.md`, the separation
+of the two defect kinds, the anchor-drift refutation that withdrew the first
+revision's justification, and the boundary framing all survived independent
+re-derivation — in several places token-for-token. The Critic re-derived 13
+separate measurement sets itself and listed by name which ones it did *not*
+re-derive. The FAIL is a precision failure on a document whose substance held.
+
 **PO lifted the merge hold (APS, 2026-08-07):** *"du kannst jetzt von origin main
 den rebase machen bei gelegenheit - ist aber nicht dringend und es wird noch einen
 0.5.4 irgendwann mal geben."* `origin/main` has moved `6e2c9b2` → `2740041` and
