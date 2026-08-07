@@ -1,5 +1,13 @@
 # Onboarding and recovery (lazy)
 
+Preflight status `plugin-refresh-required` is advisory-only: no recovery
+action is required. `nextAction` is `{kind: "advisory", ...}` (nothing to
+execute); bootstrap continues normally through Step 0-4, and the advisory
+(a pending plugin refresh) is noted in the printed confirmation line rather
+than withholding it. This covers both the pre-existing loaded/installed
+version-mismatch case and the origin/content self-application attestation
+(design: bootstrap-origin-allowlist-and-codex-wsl-freshness.md §A.5).
+
 For inherited handoff run `codex-project-runtime-readback-host.mjs --root
 "$PWD"`; accept only `pipeline.codex-project-runtime-readback-status.v1`,
 status `produced`, then re-inspect V4 from the beginning. Never print tickets,
