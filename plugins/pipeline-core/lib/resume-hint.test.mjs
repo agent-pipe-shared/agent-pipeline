@@ -57,6 +57,13 @@ export const FORBIDDEN = [
   "Use Ab9Qx2Lm8Vw4Ze7Rt1Yu?",
   "password: hunter2",
   "secret: correcthorsebattery",
+  // A short, all-alphabetic value sitting beside its own label is still a leak.
+  "password: swordfish",
+  "secret: pineapple",
+  "api key: abcdefghi",
+  "token: alphabeta",
+  "credential: seashell",
+  "passphrase: bluewhale",
 ];
 
 /** Ordinary distilled prose. Each entry contains a character the old filter banned outright. */
@@ -77,6 +84,12 @@ export const ADMITTED = [
   "the phases are analysis | design | build",
   "escape a backslash \\ or a caret ^ in the pattern",
   "Ask whether the API key handling belongs in phase 2",
+  // A credential label opening a sentence: the clause keeps talking, so it is prose, not a value.
+  "credentials: the rotation story moves to phase 3",
+  "api key: handling belongs in the identity slice",
+  "token: the bucket sizing question is still open",
+  "password: the reset flow is out of scope for now",
+  "passphrase: agree the wording with the security reviewer",
 ];
 
 test("rejects every dangerous shape, in the intent and in a list field alike", () => {

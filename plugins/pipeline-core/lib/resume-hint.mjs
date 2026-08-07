@@ -23,7 +23,9 @@ const CONTEXT_KEYS = ["intent", "scope", "constraints", "questions"];
 const SHELL_TOOLS = "node|npx|npm|pnpm|yarn|bun|deno|git|gh|glab|codex|claude|bash|sh|zsh|pwsh|powershell|python3?|pip3?|ruby|perl|curl|wget|ssh|scp|rsync|docker|kubectl|cargo|sudo|chmod|chown|rm|mv|cp|cat|ls|export|eval|source|awk|sed|grep|rg|openssl|gpg|aws|gcloud|az|pipeline-state";
 const COMMAND_ARGUMENT = String.raw`-{1,2}[A-Za-z][A-Za-z0-9-]*|[A-Za-z0-9._~-]*\/[A-Za-z0-9._~-]+|[A-Za-z0-9._-]+\.(?:mjs|cjs|js|ts|json|ya?ml|toml|sh|ps1|py|rb|pem|key|env|log|txt|md)\b`;
 const SECRET_LABEL = String.raw`api[-_ ]?keys?|access[-_ ]?keys?|secrets?|tokens?|credentials?|passwords?|passphrases?|private[-_ ]?keys?|client[-_ ]?secrets?|authorization`;
-const SECRET_ASSIGNMENT = new RegExp(String.raw`\b(?:${SECRET_LABEL})\b\s*[:=]{1,2}\s*["'\x60]?([^\s"'\x60]+)`, "gi");
+const SECRET_ASSIGNMENT = new RegExp(String.raw`\b(?:${SECRET_LABEL})\b\s*([:=]{1,2})\s*(["'\x60]?)([^\s"'\x60]+)`, "gi");
+const CLAUSE_END = /[,;.!?|)\]}]/;
+const VALUE_ALPHABET = /[A-Za-z]\d|\d[A-Za-z]|[a-z][A-Z]/;
 const FORBIDDEN_SHAPES = [
   /```|~~~/,                                                                                        // fenced code block
   /^\s*(?:user|assistant|system|human|developer|tool)\s*:/i,                                        // transcript role marker opening the text
@@ -68,10 +70,19 @@ function opaqueToken(value) {
     return /^[A-Z0-9]{16,}$/.test(compact) || (hasLower && hasUpper && hasDigit) || (compact.length >= 24 && (hasDigit || /[_=-]/.test(compact)));
   });
 }
-/** A credential word next to a value is the leak; the bare word is ordinary design vocabulary. */
+/**
+ * A credential word next to a value is the leak; the bare word is ordinary design vocabulary.
+ * The discriminator is the FORM of what follows the label, never the size of it: a value stands
+ * alone as the whole clause, is quoted, is `=`-assigned, or is written in an alphabet no English
+ * word uses (letters mixed with digits, or an inner capital). Prose keeps talking — it carries
+ * further words in the same clause — and a length floor cannot tell "swordfish" from "quarterly".
+ */
 function secretAssignment(value) {
-  for (const [, candidate] of value.matchAll(SECRET_ASSIGNMENT)) {
-    if (candidate.length >= 10 || (candidate.length >= 4 && /\d/.test(candidate))) return true;
+  for (const match of value.matchAll(SECRET_ASSIGNMENT)) {
+    const [assignment, operator, quote, candidate] = match;
+    if (operator.includes("=") || quote !== "" || VALUE_ALPHABET.test(candidate)) return true;
+    const rest = value.slice(match.index + assignment.length).split(CLAUSE_END, 1)[0];
+    if (!/[A-Za-z0-9]/.test(rest)) return true;
   }
   return false;
 }
