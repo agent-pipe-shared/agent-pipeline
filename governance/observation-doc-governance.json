@@ -111,6 +111,7 @@
           "docs/critic-isolation-threat-model.md",
           "docs/github-actions-token-permissions.md",
           "docs/gitlab-ci-pilot-threat-model.md",
+          "docs/guard-maintenance-window-threat-model.md",
           "docs/human-guard-override-threat-model.md",
           "docs/local-supervisor-state-threat-model.md",
           "docs/marketplace-supply-chain-threat-model.md",
@@ -197,6 +198,7 @@
           "docs/adr/0055-critical-human-proof-waiver.md",
           "docs/adr/0056-push-approval-mode.md",
           "docs/adr/0057-runner-platform-support-is-an-implementation-obligation.md",
+          "docs/adr/0058-guard-maintenance-window.md",
           "docs/adr/README.md"
         ]
       },
