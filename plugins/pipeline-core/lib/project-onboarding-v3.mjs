@@ -679,29 +679,53 @@ const KICKOFF_PROFILES = Object.freeze(["epic", "feature", "mini"]);
 // `pipeline.user.yaml` said `dev_plan: blocking`. The chapter below is what
 // makes a new project state which gates are actually live.
 //
-// `dev-plan` is seeded in `warn`, NOT in `blocking`, and that is a deliberate
-// bounded choice: a blocking dev-plan gate has no satisfying path in a fresh
-// project today, because `approve-plan` is unreachable for a feature created
-// through the sanctioned kickoff promotion (promotion requires
-// planPath === specPath while the PO plan gate requires planPath to name a
-// prd_*.md -- backlog/items/2026-08-07-a-promoted-feature-can-never-pass-the-plan-gate.md).
-// A gate that blocks with no path through it is worse than a gate that is off;
-// `warn` makes the gate live and visible without creating an unpassable block.
-// `push` and `security` are deliberately NOT seeded here: their satisfying path
-// in a brand-new project was not established, and seeding an unsatisfiable gate
-// is exactly what this chapter must not do.
-const DEV_PLAN_WARN_GATE = "gates:\n  dev-plan:\n    mode: warn\n    type: human\n";
-// Per PO profile. All three resolve to the same live chapter today -- the
+// `dev-plan` is seeded in `blocking`, and that is what makes a new project ASK
+// its human before implementation starts: guard-devplan.mjs exits 1 (a report
+// the tool call survives) in `warn` and 2 (a refusal) in `blocking`, so a `warn`
+// seed cannot keep implementation from beginning -- the reported defect was
+// exactly that a fresh project wrote its first implementation file without the
+// PO ever being asked
+// (backlog/items/2026-08-07-a-promoted-feature-can-never-pass-the-plan-gate.md).
+//
+// `blocking` is only defensible because the satisfying path was MEASURED end to
+// end in a real temporary root before this seed was changed, not read off the
+// code: onboarding -> runtime -> kickoff -> kickoff promotion -> `submit-plan
+// --by <name> --profile <epic|feature|mini>` (exit 0) -> `approve-plan --by
+// <name>` (exit 0) -> `set-phase --phase implementation` (exit 0), after which
+// the same non-exempt implementation write the gate refused is admitted (guard
+// exit 0). The path was measured for all three PO profiles AND for a project
+// that never promotes a design package (the kickoff seed is itself valid PRD
+// authority), so no reachable fresh-project shape is left standing in front of
+// a gate it cannot pass. The two conditions the path does depend on are already
+// satisfied by the seeded artifacts: the active PRD declares the repository PO
+// language once (`<!-- po-language: en -->`) and binds the neighbouring spec.md
+// digest once (`<!-- technical-spec-sha256: ... -->`), which is what the kickoff
+// seed writes and what a hand-authored replacement PRD must preserve.
+//
+// `push` and `security` are still deliberately NOT seeded here: their satisfying
+// path in a brand-new project was not established, and seeding an unsatisfiable
+// gate is exactly what this chapter must not do.
+const DEV_PLAN_BLOCKING_GATE = "gates:\n"
+  // The refusal itself reports the lifecycle state but not the whole command
+  // sequence out of it, so the enforcing artifact carries it.
+  + "  # Human plan approval. Implementation writes are REFUSED until the PO has\n"
+  + "  # approved this feature's plan and the phase has been switched:\n"
+  + "  #   pipeline-state submit-plan --by <name> --profile <epic|feature|mini>\n"
+  + "  #   pipeline-state approve-plan --by <name>\n"
+  + "  #   pipeline-state set-phase --phase implementation\n"
+  + "  dev-plan:\n    mode: blocking\n    type: human\n";
+// Per PO profile. All three resolve to the same live chapter -- the
 // differentiation surface exists (the profile is a real input on the
-// partial-authority path), but only one gate currently has a demonstrable
-// satisfying path, and it is the same one for epic, feature and mini.
+// partial-authority path), and the satisfying path above was measured
+// separately for epic, feature and mini with the same outcome, so there is no
+// measured reason to give them different modes.
 const FRESH_GATE_CHAPTERS = Object.freeze({
-  epic: DEV_PLAN_WARN_GATE,
-  feature: DEV_PLAN_WARN_GATE,
-  mini: DEV_PLAN_WARN_GATE,
+  epic: DEV_PLAN_BLOCKING_GATE,
+  feature: DEV_PLAN_BLOCKING_GATE,
+  mini: DEV_PLAN_BLOCKING_GATE,
 });
 export function freshGateChapter(profile = null) {
-  return KICKOFF_PROFILES.includes(profile) ? FRESH_GATE_CHAPTERS[profile] : DEV_PLAN_WARN_GATE;
+  return KICKOFF_PROFILES.includes(profile) ? FRESH_GATE_CHAPTERS[profile] : DEV_PLAN_BLOCKING_GATE;
 }
 // Greenfield onboarding has no profile yet: the kickoff collects the goal, and
 // the profile is only bound later, at kickoff promotion. The profile-neutral

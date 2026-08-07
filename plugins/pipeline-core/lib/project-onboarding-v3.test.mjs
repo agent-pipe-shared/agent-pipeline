@@ -2663,6 +2663,88 @@ test("a real fresh local kickoff is immediately a valid canonical PO authority",
   } finally { dispose(path); }
 });
 
+// The gate the fresh seed switches on has to be PASSABLE, and that is
+// established by driving the whole path rather than by reading it. Both halves
+// are the contract: a promoted `feature` whose plan nobody approved is REFUSED
+// an implementation write (exit 2 -- exit 1 would let the write proceed, which
+// is the reported defect: implementation beginning without the human ever being
+// asked), and the exact same write is admitted once the plan is approved and
+// the phase switched. A blocking gate with no path through it would be worse
+// than the `warn` seed it replaces, so neither half may be dropped.
+test("the seeded dev-plan gate refuses implementation before approval and admits it after", () => {
+  const path = root();
+  try {
+    hostGit(path, ["init", "--initial-branch=main"]);
+    const localDeps = { ...fakeDeps, initializePoGateProfileReceipt: initializeActualPoGateProfileReceipt };
+    const barrier = initializeRestartRequiredRoot(path, localDeps);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path, "Ship one gated feature", localDeps);
+
+    // A realistic design package: the PRD declares the repository PO language
+    // once and binds the neighbouring spec.md digest once -- the two markers the
+    // PO gate requires, and exactly what the kickoff seed itself writes.
+    mkdirSync(join(path, "specs", "gated"), { recursive: true });
+    const prdPath = "specs/gated/prd_gated.md";
+    const specPath = "specs/gated/spec.md";
+    const designInputPath = "specs/gated/design-input.md";
+    writeFileSync(join(path, specPath), "# Gated technical specification\n");
+    const specSha256 = sha256(readFileSync(join(path, specPath)));
+    writeFileSync(join(path, prdPath), [
+      "<!-- po-language: en -->",
+      `<!-- technical-spec-sha256: ${specSha256} -->`,
+      "",
+      "# Gated product requirements",
+      "",
+    ].join("\n"));
+    writeFileSync(join(path, designInputPath), "# Gated design input\n");
+    const promotion = {
+      rootDir: path, profile: "feature", featureId: "gated-work", planPath: prdPath,
+      prdPath, specPath, designInputPath, deps: localDeps,
+    };
+    const planned = planProjectOnboardingKickoffPromotionV4(promotion);
+    const promoted = applyProjectOnboardingKickoffPromotionV4({ ...promotion, planSha256: planned.planSha256, activate: true });
+    assert.equal(promoted.status, "ready");
+    assert.equal(validatePoGateAuthorityForRepository({ repoRoot: path }).ok, true);
+
+    const attemptWrite = (target) => spawnSync(
+      process.execPath,
+      [fileURLToPath(new URL("../hooks/guard-devplan.mjs", import.meta.url))],
+      {
+        cwd: path,
+        encoding: "utf8",
+        input: JSON.stringify({ tool_name: "Write", tool_input: { file_path: target } }),
+        env: { ...process.env, CLAUDE_PROJECT_DIR: path },
+      },
+    );
+    const refused = attemptWrite("src/index.html");
+    assert.equal(refused.status, 2, `an unapproved plan must refuse implementation: ${refused.stderr}`);
+    assert.match(String(refused.stderr), /lifecycle is "draft"/u);
+    // The design package itself stays writable while the gate is closed --
+    // refusing the plan the human is meant to review would be the same trap.
+    assert.equal(attemptWrite(prdPath).status, 0, "the plan under review must stay writable");
+
+    const state = (argv) => {
+      const stderr = [];
+      const code = pipelineStateRun(argv, {
+        dir: path,
+        now: () => "2026-08-01T12:00:00.000Z",
+        writeError: (value) => stderr.push(String(value)),
+      });
+      return { code, stderr: stderr.join("") };
+    };
+    const submitted = state(["submit-plan", "--by", "po", "--profile", "feature"]);
+    assert.equal(submitted.code, 0, submitted.stderr);
+    assert.equal(attemptWrite("src/index.html").status, 2, "a submitted but unapproved plan still refuses implementation");
+    const approved = state(["approve-plan", "--by", "po"]);
+    assert.equal(approved.code, 0, approved.stderr);
+    const phased = state(["set-phase", "--phase", "implementation"]);
+    assert.equal(phased.code, 0, phased.stderr);
+
+    const admitted = attemptWrite("src/index.html");
+    assert.equal(admitted.status, 0, `the approved plan must admit the same write: ${admitted.stderr}`);
+  } finally { dispose(path); }
+});
+
 // A runner without a native runtime readback is onboarded exactly as ADR-0057
 // decision 2a describes: portable seed, runtime targets, no barrier, and the
 // lifecycle standing at `kickoff-required`. This is the state from which the
@@ -4447,19 +4529,28 @@ test("a freshly seeded project is honest about its authority tier, its verify co
     // for the profile-neutral greenfield seed and for each of the three PO
     // profiles the kickoff flow collects.
     const seeded = parseYaml(readFileSync(join(path, "project", "pipeline.yaml"), "utf8"));
-    assert.deepEqual(seeded.gates, { "dev-plan": { mode: "warn", type: "human" } });
+    assert.deepEqual(seeded.gates, { "dev-plan": { mode: "blocking", type: "human" } });
     for (const profile of ["epic", "feature", "mini"]) {
       const gate = gateConfig(parseYaml(freshManifestBytes(profile)), "dev-plan");
       assert.notEqual(gate, null, `${profile} seeds a dev-plan gate`);
-      assert.notEqual(gate.mode, "off", `${profile} seeds a LIVE dev-plan gate`);
+      assert.equal(gate.mode, "blocking", `${profile} seeds an ENFORCING dev-plan gate`);
       assert.equal(gate.type, "human");
     }
+    // The enforcing artifact names the command sequence out of its own refusal,
+    // because the refusal reports the lifecycle state but not the whole path.
+    const chapter = freshManifestBytes("feature");
+    for (const command of ["submit-plan", "approve-plan", "set-phase --phase implementation"]) {
+      assert.equal(chapter.includes(command), true, `the seeded gate names ${command}`);
+    }
 
-    // (e) guard-devplan.mjs no longer exits 0 by default: with the seeded gate
-    // chapter and an active feature whose design was never approved, a write to
-    // a non-exempt implementation path is reported (exit 1, `warn`) instead of
-    // being silently allowed. `blocking` is deliberately NOT seeded -- see the
-    // gate chapter comment in project-onboarding-v3.mjs.
+    // (e) guard-devplan.mjs no longer exits 0 by default, and no longer merely
+    // reports: with the seeded gate chapter and an active feature whose design
+    // was never approved, a write to a non-exempt implementation path is
+    // REFUSED (exit 2, `blocking`). Exit 1 would leave the write to proceed,
+    // which is the reported defect -- implementation beginning without the
+    // human ever being asked. The satisfying path for this gate is measured
+    // end to end by the dedicated test above; see the gate chapter comment in
+    // project-onboarding-v3.mjs.
     writeFileSync(join(path, "project", "pipeline-state.json"), `${JSON.stringify({ activeFeature: { id: "F-001", planPath: "docs/plan.md" } }, null, 2)}\n`);
     const guard = spawnSync(process.execPath, [fileURLToPath(new URL("../hooks/guard-devplan.mjs", import.meta.url))], {
       cwd: path,
@@ -4467,7 +4558,7 @@ test("a freshly seeded project is honest about its authority tier, its verify co
       input: JSON.stringify({ tool_name: "Write", tool_input: { file_path: "src/index.js" } }),
       env: { ...process.env, CLAUDE_PROJECT_DIR: path },
     });
-    assert.equal(guard.status, 1, `the seeded dev-plan gate must be live, not inert: ${guard.stderr}`);
+    assert.equal(guard.status, 2, `the seeded dev-plan gate must refuse, not merely report: ${guard.stderr}`);
     assert.match(String(guard.stderr), /guard-devplan/);
   } finally { dispose(path); dispose(legacyPath); }
 });
