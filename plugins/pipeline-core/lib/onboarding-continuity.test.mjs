@@ -14,6 +14,15 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+
+import {
+  createPoGateProfileReceipt,
+  derivePoGateRepositoryFingerprint,
+  poGateProfileReceiptPath,
+  serializePoGateProfileReceipt,
+  validatePoGateAuthority,
+} from "./po-gate-authority.mjs";
 
 import {
   KICKOFF_FAULT_STAGES,
@@ -102,6 +111,10 @@ function targetBytes(root, plan) {
 
 function expectKickoffError(code, fn) {
   assert.throws(fn, (error) => error?.code === code);
+}
+
+function digest(value) {
+  return createHash("sha256").update(value).digest("hex");
 }
 
 check("pristine requires all three continuity sources to be absent", () => {
@@ -810,8 +823,16 @@ function promotionSeed(name, { privatized = false } = {}) {
   }
   const directory = join(root, "specs", "promoted");
   mkdirSync(directory, { recursive: true });
-  writeFileSync(join(directory, "prd.md"), `# ${name} PRD\n`);
-  writeFileSync(join(directory, "spec.md"), `# ${name} specification\n`);
+  const specBytes = `# ${name} specification\n`;
+  writeFileSync(join(directory, "spec.md"), specBytes);
+  // The promoted PRD is the approval subject, so it carries the PO-gate
+  // markers: the human-facing language and the digest of the Spec beside it.
+  writeFileSync(join(directory, "prd_promoted.md"), [
+    "<!-- po-language: en -->",
+    `<!-- technical-spec-sha256: ${digest(specBytes)} -->`,
+    `# ${name} PRD`,
+    "",
+  ].join("\n"));
   writeFileSync(join(directory, "design-input.md"), `# ${name} design input\n`);
   return {
     root,
@@ -821,8 +842,8 @@ function promotionSeed(name, { privatized = false } = {}) {
       rootDir: root,
       profile: "feature",
       featureId: `feature-${name}`,
-      planPath: "specs/promoted/spec.md",
-      prdPath: "specs/promoted/prd.md",
+      planPath: "specs/promoted/prd_promoted.md",
+      prdPath: "specs/promoted/prd_promoted.md",
       specPath: "specs/promoted/spec.md",
       designInputPath: "specs/promoted/design-input.md",
     },
@@ -875,7 +896,7 @@ check("promotion requires bound design evidence and rejects post-promotion evide
   writeFileSync(kickoffDesignInput, "# provisional evidence\n");
   assert.throws(() => planOnboardingKickoffPromotion({
     ...seed.request,
-    planPath: seed.kickoff.targets.spec.path,
+    planPath: seed.kickoff.targets.prd.path,
     prdPath: seed.kickoff.targets.prd.path,
     specPath: seed.kickoff.targets.spec.path,
     designInputPath: `${dirname(seed.kickoff.targets.spec.path)}/design-input.md`,
@@ -1104,5 +1125,153 @@ for (const [name, mutate] of [
     });
   });
 }
+
+function promotionHistoryPath(root) {
+  return join(root, ".git", "agent-pipeline", "onboarding", "continuity-history.json");
+}
+
+function promote(seed) {
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  return plan;
+}
+
+function promotedArtifact(seed, name) {
+  return join(seed.root, "specs", "promoted", name);
+}
+
+check("promotion binds the PRD as the approval subject and presents the Spec beside it", () => {
+  const seed = promotionSeed("prd-is-the-plan");
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  assert.equal(plan.feature.planPath, "specs/promoted/prd_promoted.md");
+  assert.equal(plan.authority.prd.path, plan.feature.planPath);
+  assert.equal(plan.authority.spec.path, "specs/promoted/spec.md");
+  assert.notEqual(plan.authority.prd.path, plan.authority.spec.path);
+  applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  const state = JSON.parse(readFileSync(seed.statePath, "utf8"));
+  assert.equal(state.activeFeature.planPath, "specs/promoted/prd_promoted.md");
+  assert.deepEqual(state.continuity.authority.prd, plan.authority.prd);
+  assert.deepEqual(state.continuity.authority.spec, plan.authority.spec);
+  assert.equal(state.planApproved, false);
+});
+
+check("the recorded promotion transaction names the PRD and the Spec with both digests", () => {
+  const seed = promotionSeed("both-digests");
+  const plan = promote(seed);
+  const entry = JSON.parse(readFileSync(promotionHistoryPath(seed.root), "utf8")).transactions[1];
+  assert.equal(entry.planPath, "specs/promoted/prd_promoted.md");
+  assert.equal(entry.specPath, "specs/promoted/spec.md");
+  assert.equal(entry.prdSha256, digest(readFileSync(promotedArtifact(seed, "prd_promoted.md"))));
+  assert.equal(entry.specSha256, digest(readFileSync(promotedArtifact(seed, "spec.md"))));
+  assert.equal(entry.prdSha256, plan.authority.prd.sha256);
+  assert.equal(entry.specSha256, plan.authority.spec.sha256);
+  assert.notEqual(entry.prdSha256, entry.specSha256);
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
+});
+
+check("editing the promoted PRD invalidates the mutual digest binding", () => {
+  const seed = promotionSeed("prd-drift");
+  promote(seed);
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
+  const path = promotedArtifact(seed, "prd_promoted.md");
+  writeFileSync(path, `${readFileSync(path, "utf8")}\nEdited after promotion.\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "unavailable");
+});
+
+check("editing the promoted Spec invalidates the mutual digest binding", () => {
+  const seed = promotionSeed("spec-drift");
+  promote(seed);
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
+  const path = promotedArtifact(seed, "spec.md");
+  writeFileSync(path, `${readFileSync(path, "utf8")}\nEdited after promotion.\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "unavailable");
+});
+
+check("promotion refuses a plan that is the Spec, a plan that is not a prd_*.md, and a noncanonical Spec", () => {
+  const seed = promotionSeed("plan-subject");
+  expectKickoffError("KICKOFF-PROMOTION-PLAN-IS-SPEC", () => planOnboardingKickoffPromotion({
+    ...seed.request, planPath: seed.request.specPath,
+  }));
+  writeFileSync(promotedArtifact(seed, "plan.md"), "# not the PRD\n");
+  expectKickoffError("KICKOFF-PROMOTION-PLAN-NOT-PRD", () => planOnboardingKickoffPromotion({
+    ...seed.request, planPath: "specs/promoted/plan.md",
+  }));
+  writeFileSync(promotedArtifact(seed, "prd.md"), "# misnamed PRD\n");
+  expectKickoffError("KICKOFF-PROMOTION-PLAN-NOT-PRD", () => planOnboardingKickoffPromotion({
+    ...seed.request, planPath: "specs/promoted/prd.md", prdPath: "specs/promoted/prd.md",
+  }));
+  writeFileSync(promotedArtifact(seed, "technical.md"), "# misnamed Spec\n");
+  expectKickoffError("KICKOFF-PROMOTION-SPEC-NOT-CANONICAL", () => planOnboardingKickoffPromotion({
+    ...seed.request, specPath: "specs/promoted/technical.md",
+  }));
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
+});
+
+function publishPoGateProfile(root) {
+  const gitCommonDir = join(root, ".git");
+  writeFileSync(join(root, "pipeline.user.yaml"),
+    "schema: pipeline.user.v1\nlanguage:\n  human_facing: en\n  agent_facing: en\n");
+  writeFileSync(join(root, ".claude", "pipeline.yaml"),
+    "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\n");
+  const receipt = createPoGateProfileReceipt({
+    repositoryFingerprint: derivePoGateRepositoryFingerprint({ gitCommonDir, primaryRoot: root }),
+    primaryRoot: root,
+    sourceBytes: readFileSync(join(root, "pipeline.user.yaml")),
+    runtimeBytes: readFileSync(join(root, ".claude", "pipeline.yaml")),
+    updatedAt: "2026-08-08T00:00:00.000Z",
+  });
+  const path = poGateProfileReceiptPath(gitCommonDir);
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, serializePoGateProfileReceipt(receipt));
+  chmodSync(path, 0o600);
+  return {
+    repoRoot: root,
+    gitCommonDir,
+    primaryRoot: root,
+    registeredWorktreeRoots: [root],
+  };
+}
+
+check("a promoted feature satisfies the PO plan gate and its evidence names PRD and Spec alike", () => {
+  const seed = promotionSeed("po-gate");
+  const plan = promote(seed);
+  const topology = publishPoGateProfile(seed.root);
+  const authority = validatePoGateAuthority({
+    ...topology,
+    expectedPlanSha256: plan.authority.prd.sha256,
+    expectedSpecSha256: plan.authority.spec.sha256,
+  });
+  assert.equal(authority.ok, true, JSON.stringify(authority));
+  assert.equal(authority.code, "PO-GATE-AUTHORITY-VALID");
+  assert.equal(authority.value.planPath, plan.authority.prd.path);
+  assert.equal(authority.value.planSha256, plan.authority.prd.sha256);
+  assert.equal(authority.value.specPath, plan.authority.spec.path);
+  assert.equal(authority.value.specSha256, plan.authority.spec.sha256);
+});
+
+check("a legacy promotion whose planPath is the Spec stays readable and is refused a new promotion", () => {
+  const seed = promotionSeed("legacy-plan-is-spec");
+  promote(seed);
+  const historyPath = promotionHistoryPath(seed.root);
+  const history = JSON.parse(readFileSync(historyPath, "utf8"));
+  const state = JSON.parse(readFileSync(seed.statePath, "utf8"));
+  state.activeFeature.planPath = seed.request.specPath;
+  writeFileSync(seed.statePath, `${JSON.stringify(state, null, 2)}\n`);
+  history.transactions[1].planPath = seed.request.specPath;
+  delete history.transactions[1].specPath;
+  history.transactions[1].afterStateSha256 = digest(readFileSync(seed.statePath));
+  writeFileSync(historyPath, `${JSON.stringify(history, null, 2)}\n`, { mode: 0o600 });
+  // Tolerated read-only: an honest older record stays readable, and no reader
+  // crashes on it.  It simply cannot pass the PO plan gate, which is the state
+  // it was already in, and a rebind is the way out.
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
+  const topology = publishPoGateProfile(seed.root);
+  const authority = validatePoGateAuthority(topology);
+  assert.equal(authority.ok, false);
+  assert.equal(authority.code, "PO-GATE-ACTIVE-FEATURE-INVALID");
+  expectKickoffError("KICKOFF-PROMOTION-PLAN-IS-SPEC", () => planOnboardingKickoffPromotion({
+    ...seed.request, planPath: seed.request.specPath,
+  }));
+});
 
 console.log(`${passed} onboarding continuity/kickoff checks passed.`);

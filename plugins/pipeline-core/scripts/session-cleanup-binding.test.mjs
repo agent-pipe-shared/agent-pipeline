@@ -136,12 +136,12 @@ function legacyPromotionCleanupMismatch(name) {
   writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
   const authorityDir = join(root, "specs", "rune");
   mkdirSync(authorityDir, { recursive: true });
-  writeFileSync(join(authorityDir, "prd.md"), "# Rune PRD\n");
+  writeFileSync(join(authorityDir, "prd_rune.md"), "# Rune PRD\n");
   writeFileSync(join(authorityDir, "spec.md"), "# Rune spec\n");
   writeFileSync(join(authorityDir, "design-input.md"), "# Rune design input\n");
   const promotion = planOnboardingKickoffPromotion({
     rootDir: root, profile: "feature", featureId: "rune-game",
-    planPath: "specs/rune/spec.md", prdPath: "specs/rune/prd.md", specPath: "specs/rune/spec.md",
+    planPath: "specs/rune/prd_rune.md", prdPath: "specs/rune/prd_rune.md", specPath: "specs/rune/spec.md",
     designInputPath: "specs/rune/design-input.md",
   });
   applyOnboardingKickoffPromotion({ plan: promotion, expectedPlanSha256: promotion.planSha256, activate: true });

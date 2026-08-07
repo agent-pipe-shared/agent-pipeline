@@ -126,6 +126,14 @@ const PROMOTION_TARGET_KEYS = {
 };
 const PROMOTION_PROFILES = new Set(["epic", "feature", "mini"]);
 const SAFE_FEATURE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+// The approval subject is the PRD.  `activeFeature.planPath` is what the PO
+// plan gate reads, and that gate accepts exactly one shape: a `prd_*.md` whose
+// neighbouring `spec.md` it binds by digest.  Promotion therefore enforces the
+// same two basenames, so a wrong document is refused where the operator can
+// still act on it instead of two steps later at an unreachable gate.
+const PROMOTION_PRD_BASENAME = /^prd_[^/\\]+\.md$/u;
+const PROMOTION_SPEC_BASENAME = "spec.md";
+const PROMOTION_DESIGN_INPUT_BASENAME = "design-input.md";
 
 function authorityPaths(root) {
   const authority = resolveProjectAuthorityPaths({ rootDir: root });
@@ -380,16 +388,22 @@ function validateHistory(value) {
   const promotionEvidenceEntryKeys = new Set([
     ...promotionEntryKeys, "designInputPath", "designInputSha256",
   ]);
+  // `specPath` is the second half of the PRD/Spec pair.  It is optional on the
+  // record so promotions written before the pair existed stay readable; new
+  // promotions always carry it (validatePromotionPlan requires it).
+  const promotionEntryKeySets = [promotionEntryKeys, promotionEvidenceEntryKeys]
+    .flatMap((base) => [base, new Set([...base, "specPath"])])
+    .flatMap((base) => [base, new Set([...base, "cleanupBinding"])]);
+  const safePath = (value) => {
+    try { safeRelativePath(value, "promotion authority"); return true; } catch { return false; }
+  };
   const validKickoff = (entry) => exactKeys(entry, kickoffEntryKeys)
     && entry.kind === "kickoff"
     && [
       "transactionSha256", "goalSha256", "calibrationSha256", "stateSha256",
       "handoverSha256", "prdSha256", "specSha256",
     ].every((key) => SHA256_RE.test(entry[key]));
-  const validPromotion = (entry, previous) => (exactKeys(entry, promotionEntryKeys)
-      || exactKeys(entry, new Set([...promotionEntryKeys, "cleanupBinding"]))
-      || exactKeys(entry, promotionEvidenceEntryKeys)
-      || exactKeys(entry, new Set([...promotionEvidenceEntryKeys, "cleanupBinding"])))
+  const validPromotion = (entry, previous) => promotionEntryKeySets.some((keys) => exactKeys(entry, keys))
     && entry.kind === "kickoff-promotion"
     && SHA256_RE.test(entry.transactionSha256)
     && entry.previousTransactionSha256 === previous?.transactionSha256
@@ -399,6 +413,8 @@ function validateHistory(value) {
     && typeof entry.planPath === "string"
     && ["prdSha256", "specSha256", "beforeStateSha256", "afterStateSha256"]
       .every((key) => SHA256_RE.test(entry[key]))
+    && (entry.specPath === undefined || (typeof entry.specPath === "string"
+      && entry.specPath !== entry.planPath && safePath(entry.planPath) && safePath(entry.specPath)))
     && (entry.designInputPath === undefined || (typeof entry.designInputPath === "string"
       && SHA256_RE.test(entry.designInputSha256)
       && (() => { try { safeRelativePath(entry.designInputPath, "promotion design input"); return true; } catch { return false; } })()))
@@ -508,10 +524,27 @@ function observeDetailed({
       history = parseJsonObject(historyObservation, "private continuity history");
       validateHistory(history);
       for (const entry of history.transactions.slice(1)) {
-        if (entry.designInputPath === undefined) continue;
-        const evidence = observeOptionalProjectFile(root, entry.designInputPath, "promotion design input");
-        if (evidence.status !== "present" || evidence.sha256 !== entry.designInputSha256) {
-          fail("KICKOFF-PROMOTION-EVIDENCE-DRIFT", "promotion design input does not match its bound evidence");
+        if (entry.designInputPath !== undefined) {
+          const evidence = observeOptionalProjectFile(root, entry.designInputPath, "promotion design input");
+          if (evidence.status !== "present" || evidence.sha256 !== entry.designInputSha256) {
+            fail("KICKOFF-PROMOTION-EVIDENCE-DRIFT", "promotion design input does not match its bound evidence");
+          }
+        }
+        // A promoted feature carries the PRD as its plan and the Spec beside
+        // it, and the transaction names both digests.  The two are therefore
+        // mutually bound: editing either document breaks the recorded pair,
+        // exactly as editing the bound design input does.  Promotions written
+        // before the pair existed carry no `specPath`; that older record is
+        // read-only history and is left exactly as it was written.
+        if (entry.specPath === undefined) continue;
+        for (const [path, expected, label] of [
+          [entry.planPath, entry.prdSha256, "promotion PRD"],
+          [entry.specPath, entry.specSha256, "promotion specification"],
+        ]) {
+          const bound = observeOptionalProjectFile(root, path, label);
+          if (bound.status !== "present" || bound.sha256 !== expected) {
+            fail("KICKOFF-PROMOTION-AUTHORITY-DRIFT", `${label} does not match its mutual digest binding`);
+          }
         }
       }
     }
@@ -3397,9 +3430,21 @@ function promotionInput({ profile, featureId, planPath, prdPath, specPath, desig
   for (const [value, label] of [[planPath, "plan"], [prdPath, "PRD"], [specPath, "specification"], [designInputPath, "design input"]]) {
     safeRelativePath(value, `promotion ${label}`);
   }
-  if (planPath !== specPath || new Set([prdPath, specPath, designInputPath]).size !== 3
+  // The Spec is presented beside the PRD and digest-bound to it, but it is
+  // never the approval subject; equating the two is the inverted invariant and
+  // keeps its own reason so the refusal stays legible.
+  if (planPath === specPath) {
+    fail("KICKOFF-PROMOTION-PLAN-IS-SPEC", "promotion plan is the specification, but the approval subject is the PRD");
+  }
+  if (planPath !== prdPath || !PROMOTION_PRD_BASENAME.test(basename(prdPath))) {
+    fail("KICKOFF-PROMOTION-PLAN-NOT-PRD", "promotion plan must be exactly the promoted prd_*.md");
+  }
+  if (basename(specPath) !== PROMOTION_SPEC_BASENAME) {
+    fail("KICKOFF-PROMOTION-SPEC-NOT-CANONICAL", "promotion specification must be the neighbouring spec.md");
+  }
+  if (new Set([prdPath, specPath, designInputPath]).size !== 3
     || dirname(prdPath) !== dirname(specPath) || dirname(designInputPath) !== dirname(specPath)
-    || basename(designInputPath) !== "design-input.md") {
+    || basename(designInputPath) !== PROMOTION_DESIGN_INPUT_BASENAME) {
     fail("KICKOFF-PROMOTION-INPUT", "promotion plan and authority paths are inconsistent");
   }
   return { profile, featureId, planPath, prdPath, specPath, designInputPath };
@@ -3511,6 +3556,7 @@ function validatePromotionPlan(plan) {
     || history[1].transactionSha256 !== plan.transactionSha256
     || history[1].featureId !== input.featureId
     || history[1].planPath !== input.planPath
+    || history[1].specPath !== input.specPath
     || history[1].prdSha256 !== plan.authority.prd.sha256
     || history[1].specSha256 !== plan.authority.spec.sha256
     || history[1].designInputPath !== input.designInputPath
@@ -3564,7 +3610,8 @@ function buildKickoffPromotionPlan({
     const authority = promotionArtifacts(observed.root, input);
     if (entries?.length !== 2 || entry?.kind !== "kickoff-promotion"
       || entry.profile !== input.profile || entry.featureId !== input.featureId
-      || entry.planPath !== input.planPath || entry.prdSha256 !== authority.prd.sha256
+      || entry.planPath !== input.planPath || entry.specPath !== input.specPath
+      || entry.prdSha256 !== authority.prd.sha256
       || entry.specSha256 !== authority.spec.sha256 || entry.designInputPath !== input.designInputPath
       || entry.designInputSha256 !== authority.designInput.sha256 || entry.afterStateSha256 !== observed.stateObservation.sha256
       || observed.state?.activeFeature?.id !== input.featureId || observed.state?.activeFeature?.planPath !== input.planPath
@@ -3645,7 +3692,7 @@ function buildKickoffPromotionPlan({
     schema: "pipeline.codex-onboarding-kickoff-promotion-transaction.v1",
     root: observed.root, repositoryCapability, profile: input.profile, feature: { id: input.featureId, planPath: input.planPath },
     kickoffTransactionSha256: kickoff.transactionSha256, beforeStateSha256, afterStateSha256,
-    prdSha256: authority.prd.sha256, specSha256: authority.spec.sha256,
+    prdSha256: authority.prd.sha256, specPath: authority.spec.path, specSha256: authority.spec.sha256,
     designInputPath: authority.designInput.path, designInputSha256: authority.designInput.sha256,
   };
   const transactionSha256 = canonicalSha256(transaction);
@@ -3654,6 +3701,7 @@ function buildKickoffPromotionPlan({
     transactions: [...kickoff.history.transactions, {
       kind: "kickoff-promotion", transactionSha256, previousTransactionSha256: kickoff.transactionSha256, kickoffFeatureId: kickoff.state.activeFeature.id,
       profile: input.profile, featureId: input.featureId, planPath: input.planPath,
+      specPath: input.specPath,
       prdSha256: authority.prd.sha256, specSha256: authority.spec.sha256,
       designInputPath: authority.designInput.path, designInputSha256: authority.designInput.sha256,
       beforeStateSha256, afterStateSha256,
