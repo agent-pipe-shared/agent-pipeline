@@ -5,7 +5,7 @@
 
 **Last updated:** 2026-08-07
 **Project status:** ACTIVE
-**Current block:** 0.5.2 released, backlog triaged; Nova A completion paused on genuine ADR-gated/evidence-gated blockers; human-authorization unification is now the priority thread — GMW (ADR-0058) implemented (4 commits, Verify 254/254), Critic review dispatched; HGO signed-admission extension (ADR-0059) designed, queued behind the Critic verdict
+**Current block:** 0.5.2 released, backlog triaged; Nova A completion paused on genuine ADR-gated/evidence-gated blockers; human-authorization unification is now the priority thread — GMW (ADR-0058) correction round 1 landed (F1-F3 fixed, independently re-verified; F4-F5 environmentally blocked pending PO action or branch merge, see Nova GMW section), delta Critic re-review next; HGO signed-admission extension (ADR-0059) designed, queued behind the Critic verdict
 **Repair baseline:** `5d2b83dcc765d50801f4491e1bd9bed32090112b`
 **Release version:** `0.5.2` released
 **Release state:** version `0.5.2` · tag `v0.5.2` · commit `6e2c9b2868d164ff3b631ab068fa5df20939e07d` · tree `23171c38a317d8cdf50baa013f54f5447e17f754` · status `published`
@@ -95,8 +95,38 @@ and the danger of an unscoped "lift everything" default.
   254/254 evidence never actually ran it (F5). Correction round dispatched
   next, referencing F1-F6 only (neutral findings registry, no
   paraphrase/justification per the rework-dispatch input contract).
-- **Not yet done:** the correction round + re-Critic; the bootstrap SessionStart warning
-  (design already written, appended to the same design-note commit
+- **Correction round 1 landed, 2026-08-07: F1/F2/F3 fixed, F4/F5
+  environmentally blocked.** Final candidate `2bc1fc8` (adds a 5th commit
+  to the same branch). F1/F2 fix: `expiresAtMs` moved inside the Ed25519-
+  signed subject, computed once (absolute, clamped) in `prepare`, written
+  through verbatim by `install` (never recomputed), refuses outright if
+  already passed — closes both the tamper hole and the unlimited-renewal
+  hole structurally, together. F3 fix: `isLiftableRuleId`/`validScope`
+  now re-checked at `install()` and inside `currentGuardMaintenanceWindow()`/
+  `windowCoversRule()`, not just `prepare()`. Elephant independently
+  re-verified all three directly (full diff read + fresh re-run of all
+  three test suites: `guard-maintenance-window` 13/13, `guard-gate-strength`
+  19/19, `guard-testpath` 8/8 — not taken from the dispatched agent's
+  self-report alone). F4/F5 remain genuinely open, and not by scope
+  avoidance: the two required test additions target
+  `guard-gate-strength.test.mjs`, `guard-testpath.test.mjs`, and
+  `harness/scripts/verify.mjs`, which this repository's own already-live
+  TP-2/TP-3/TP-6 rules refuse to Edit/Write in `gates.push_approval:
+  "signature"` mode (no in-session override), and GMW itself is not yet
+  merged into the live-enforcing checkout to lift them — confirmed by two
+  independent attempts. The false test-header coverage claim (part of F4)
+  IS fixed; the missing coverage itself is not. Exact content for both
+  gaps held at
+  `specs/sprint-nova-epic/evidence/nova-gmw/blocked-test-additions-2bc1fc8.md`
+  for the PO to apply directly outside a guarded session (or after the
+  branch is merged and a real window can cover TP-*). Full disposition:
+  `specs/sprint-nova-epic/evidence/nova-gmw/correction-1-2bc1fc8.md`
+  (commit `6859869`, worktree branch).
+- **Not yet done:** F4/F5 application + a sealed real `verify.mjs` run
+  (blocked as above — needs PO action outside this session, or the branch
+  merge); a delta Critic re-review of `2bc1fc8` (scoped to F1-F3, since
+  F4/F5 cannot close inside this session); the bootstrap SessionStart
+  warning (design already written, appended to the same design-note commit
   `4398dde`); end-to-end testing with a real PO-signed proof (needs the
   PO's own external signing device/key — cannot happen inside any agent
   session by construction); the deliberate, human-attended merge of the
