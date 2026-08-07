@@ -59,9 +59,13 @@ Each item's `Triage` block records a binding 2026-08-07 PO decision. Taken as gi
   candidate directions 1 and 2 is explicitly *not* pre-decided and is done in §I.2.4.
 - **R3:** implement; proposal items 1+2 are mechanical, item 3 is design work — done in §II.2.
   *(Corrected 2026-08-07: the "mechanical" half of that framing does not survive the re-derivation.
-  **What** to change is mechanical; **which files** to change is a scope decision the PO still owes,
-  because the defect is 345 citations over 57 files rather than the nine in the two templates —
-  §II.1.3, §II.6. Count corrected from 344/eight by the R3 rework, review finding F1.)*
+  **What** to change is mechanical; **which files** to change was a second scope decision, because
+  the defect is 345 citations over 57 files rather than the nine in the two templates — §II.1.3,
+  §II.6. Count corrected from 344/eight by the R3 rework, review finding F1.)* That second decision
+  has since been taken and binds this document exactly like the three above it: **APS, 2026-08-07 —
+  scope option B3, sweep all 39 live agent-facing artifacts (≈233 citations)**, recorded in the same
+  `Triage` block. §II.6 records the option set it was chosen from and what stays excluded under it;
+  §II.5 is the inventory written for it.
 
 ### 0.3 Relationship to the Part-A design document, and what this supersedes
 
@@ -1071,7 +1075,7 @@ tracked file (§II.8). The first revision's two substantive findings (the "light
 #### II.1.1 The measured structure of `docs/operating-model.md`
 
 Read directly, English part only (`:1-322`; the German reference-translation marker is at `:323`,
-the file is 671 lines and everything below the marker is the German reader copy):
+the file is 670 lines and everything below the marker is the German reader copy):
 
 - **10 `##` sections, all numbered 1–10:** §1 `:16` *What the model protects* · §2 `:38` *Roles and
   boundaries* · §3 `:57` *V3 routing: profiles, duties and phases* · §4 `:87` *The lifecycle* ·
@@ -1262,11 +1266,14 @@ the template, because the operating model's §4 step 5 also says "prohibitions".
 `roles/goldfish.md` — the file this decision promotes to canonical carrier — **carries six dead
 operating-model citations of its own** (`:7` §2.3, `:103` §3.3, `:126` §2.3/§3.2/§4.1/§4.3;
 §II.1.3). Promoting it while leaving those in place makes the newly-declared source of truth a
-carrier of the exact defect R3 exists to remove, and the §II.5 inventory's "at most one sentence" in
-that file does not cover them. The decision itself is unaffected — `roles/` is still the right home
-and GF-01 is still the complete, normative list — but **the scope options in §II.6 that exclude
-`roles/goldfish.md` are inconsistent with this decision**, and that is one of the two facts the
-boundary call has to weigh.
+carrier of the exact defect R3 exists to remove, and an "at most one sentence" edit to that file does
+not cover them. The decision itself is unaffected — `roles/` is still the right home and GF-01 is
+still the complete, normative list — but **the scope options in §II.6 that exclude
+`roles/goldfish.md` would have been inconsistent with this decision**, and that was one of the two
+facts the boundary call had to weigh. *(The call has since been made: the PO chose **B3** (§II.6),
+which admits `roles/goldfish.md` as part of class C3, so the inconsistency does not arise — the file
+this decision promotes to canonical carrier has its own six citations repaired in the same package,
+and §II.5's inventory says so.)*
 
 ### II.3 Decision — should section numbers be cited at all
 
@@ -1290,11 +1297,14 @@ The extractor is line-based with no HTML-comment handling, so links inside the t
 `<!-- ... -->` header blocks are validated exactly like body links.
 
 **At the R3 re-scope the gate reported `490 Markdown file(s), 776 link(s), 13 anchor check(s)` and
-exited 0; re-run on the R3 rework's final state it reports `500 Markdown file(s), 776 link(s), 13
-anchor check(s)`, still 0.** The file count moves with every backlog item added; the two figures
-this argument rests on did not move at all. Thirteen. The anchor check is not a broad safety net; it is whatever fragments happen to
-have been written as links, and today that is 13 out of 776 links and 0 out of 345 section
-citations.
+exited 0; re-run on the round-1 rework's final state it reported `500 Markdown file(s), 776 link(s),
+13 anchor check(s)`, still 0; re-run again on the round-2 rework's final state, 2026-08-08, it
+reports `535 Markdown file(s), 826 link(s), 13 anchor check(s)`, still 0.** Files and links both move
+with everything this branch adds — 490 → 500 → 535 files, 776 → 826 links across the three dated
+runs. **The one figure the argument rests on has not moved through any of them: thirteen.** The
+anchor check is not a broad safety net; it is whatever fragments happen to have been written as
+links, and at the latest of those runs that is 13 out of 826 links and 0 out of the 345 section
+citations of §II.1.3.
 
 #### II.3.2 The measured refutation: the anchor form has already drifted, green
 
@@ -1368,9 +1378,10 @@ Three further measured properties of the anchor namespace, all from `collectAnch
 Revised 2026-08-07: citations are given as **file + stable heading title**, per §II.3.3; where an
 anchor slug is named it is the optional link half, and the implementation must confirm it against
 `collectAnchors` (`check-doc-contracts.mjs:160-188`) by running the gate, never by assuming
-GitHub's convention. This table covers scope option **B1** only; options B2/B3 (§II.6) add the
-corresponding tables for the further files, which this document does not pre-write because the
-boundary is undecided.
+GitHub's convention. This table covers **class C1** — the two dispatch templates, the first of the
+eight classes the chosen scope B3 admits (§II.6). Per-line replacement tables for B3's other 37
+files are deliberately **not** pre-written here; §II.5 records what stands in their place and what
+the implementation still has to derive for itself.
 
 | Location | Replace with |
 | --- | --- |
@@ -1389,24 +1400,60 @@ they are not to be touched.
 
 ### II.5 Inventory, tests, acceptance criteria (R3)
 
-The inventory below is written for scope option **B1** (§II.6), because that is the option the
-backlog item's literal wording names. **It is not a green light: §II.6 is an open PO decision, and
-B2/B3 extend this table file by file from §II.1.3.** The acceptance criteria are written so that
-they hold under whichever option is chosen.
+The inventory below is written for the **chosen** scope option, **B3** — all 39 live agent-facing
+artifacts, ≈233 citations, classes C1–C8 of §II.1.3, both language halves (§II.6; PO decision APS
+2026-08-07, recorded in the backlog item's `Triage`). It is deliberately **not** a per-line
+replacement table for all 39 files, and says so in its own last row: this document measured the
+defect at class granularity and wrote out replacement *text* for class C1 only (§II.4). Each tier
+below states exactly what has been derived; the third states what the implementation has to derive
+before it edits anything.
 
-| File | Change |
-| --- | --- |
-| `templates/prompts/critic-review.md` | **five** citation lines per §II.4 (`:5`, `:6`, `:15`, `:142`, `:215`) — the first revision said four — carrying **five** dead operating-model citations plus one incomplete path, both of the latter on `:15` (R3 rework, finding F1; before it, `:15` was listed as a line to edit but its `§4.2` was not counted as a citation) |
-| `templates/prompts/goldfish-task.md` | four citation lines per §II.4 (`:5`, `:7`, `:15`, `:129`); reconcile "Forbidden"/"Prohibitions" per §II.2 |
-| `roles/goldfish.md` | **at most one sentence** in §2 marking GF-01's list as the canonical carrier the templates cite. No renumbering, no restructuring. **Under B1 this file keeps its own six dead citations** (§II.2 consequence 2) — a disclosed inconsistency of B1, not an oversight. |
+**Tier 1 — the five files this document enumerates line by line** (37 of the 233 citations):
+
+| File | Citations | Change |
+| --- | --- | --- |
+| `templates/prompts/critic-review.md` | **5** on 5 lines (`:5`, `:6`, `:15`, `:142`, `:215`) | replacement text written out in §II.4 — the first revision said four lines — carrying **five** dead operating-model citations plus one incomplete path, both of the latter on `:15` (R3 rework, finding F1; before it, `:15` was listed as a line to edit but its `§4.2` was not counted as a citation) |
+| `templates/prompts/goldfish-task.md` | **4** on 4 lines (`:5`, `:7`, `:15`, `:129`) | replacement text written out in §II.4; additionally reconcile "Forbidden"/"Prohibitions" per §II.2 |
+| `roles/goldfish.md` | **6** (`:7`, `:103`, `:126` ×4) | repair all six per §II.3.3 item 1, **plus at most one sentence** in §2 marking GF-01's list as the canonical carrier the templates cite. No renumbering, no restructuring, no rule-id change. B3 is what removes the inconsistency B1 would have carried here (§II.2 consequence 2): the newly-declared source of truth stops carrying the defect in the same package that points at it |
+| `roles/critic.md` | **10** (`:10` ×2, `:72` ×2, `:138`, `:190`, `:211` ×4) | all kind A per §II.1.3; repair per §II.3.3 item 1. `:190`'s other `§3` token is a self-reference to that file's own §3 and is **not** in scope — it is the one verified false positive the scan dropped by hand |
+| `harness/review-protocol.md` | **12** across 10 lines (§II.7, complete list) | eleven kind A; `:5`'s `§4` is kind B (§4 is *The lifecycle*, the topic is *Evidence, review and recovery*). `:140` carries one **inside a heading**, so repairing it changes that heading's slug — nothing may pin the current slug, and §II.4 already cites the heading by title for exactly this reason (§II.3.2 item 3) |
+
+**Tier 2 — the rest of B3, counted but not enumerated** (34 files, 196 citations; the two tiers
+reconcile: 37 + 196 = 233 over 5 + 34 = 39 files). Every row is the corresponding §II.1.3 row minus
+whatever tier 1 already took out of it:
+
+| Class | Files | Citations | Notes (from §II.1.3) |
+| --- | --- | --- | --- |
+| **C2 other prompt templates** | 3 | 9 | `elephant-kickoff.md`, `kickoff-new-project.md`, `session-bootstrap-check.md`. `elephant-kickoff.md:114` carries the same dead trigger-matrix `§4.2` as C1's `:6`/`:15` and was **uncounted** by the scan (§II.8) — the first thing the sweep will find here is that this class's 9 is a floor |
+| **C3 remainder — `roles/elephant.md`** | 1 | 32 | 23 kind A + 9 kind B, incl. `:273`'s six-way topic shift and `:247` (§II.1.3) |
+| **C4 root canon** | 2 | 13 | `CLAUDE.md` 11 (3 kind A at `:20`/`:22`/`:44`; 8 kind B, six of them on `:27`) and `README.md` 1+1 de — bilingual, so AC-R3-6 binds |
+| **C5 remainder** | 7 | 53 | incl. `harness/session-bootstrap.md` 20 (bilingual) and `definition-of-done.md` 12 |
+| **C6 guardrails + policies** | 5 | 31 | `global.md` 7, `model-policy.md` 14; bilingual halves present |
+| **C7 project-facing templates** | 9 | 34 | `spec.md` 8, `CLAUDE.project.md` 9, `pipeline.json.example` 5 — this is the class that changes what every new project inherits |
+| **C8 shipped plugin artifacts** | 7 | 24 | `close-block/SKILL.md` 11, `critic-review/SKILL.md` 4, 4 agent files, `guard-git.mjs` 5. A distribution change; it is the reason the sequencing constraint in §II.6 existed, and that constraint is now released |
+
+**Tier 3 — what the implementation still has to derive, stated rather than implied.** For tier 2 this
+document has *counts*, not *coordinates*: the per-line list exists only in the machine scan behind
+§II.1.3, and the replacement text — which heading title each citation becomes, and, for every kind-B
+citation, which section now carries the topic the citing sentence states — is written nowhere. That
+is a reading judgement per citation, not a substitution, and §II.1.2 is explicit that kind B "only
+by reading the citing sentence against the heading" can be detected at all. So the sweep opens by
+re-deriving tier 2's coordinates and drafting their replacements, with the method AC-R3-1 fixes:
+search for the section sign, never for the string `operating-model`. This document does not pre-write
+those 196 replacements, and an implementer must not read tier 2's counts as a completed inventory.
 
 Verification is the existing gate: `node harness/scripts/check-doc-contracts.mjs` exits 0, plus the
 deliberate-break falsification of §II.3.3 item 4. There is no unit test for prose citations and this
 design does not invent one — which is precisely why §II.3.3 item 3 records the lint as a follow-up
 rather than pretending the gate covers this.
 
-- **AC-R3-1** No `§N`/`§N.M` reference to `docs/operating-model.md` remains in any file the chosen
-  scope admits. **The check must search for the section sign, not for the string `operating-model`:**
+The acceptance criteria were written to hold under whichever option was chosen; with B3 taken they
+are stated against B3, and no criterion is relaxed by that — B3 is the widest of the three, so every
+one of them binds over more files than before, not fewer.
+
+- **AC-R3-1** No `§N`/`§N.M` reference to `docs/operating-model.md` remains in any of the 39 files
+  B3 admits (classes C1–C8 of §II.1.3). **The check must search for the section sign, not for the
+  string `operating-model`:**
   `rg -n "§" <scope paths>` and `rg -n "OM §" <scope paths>`. Searching for `operating-model` is what
   made both the backlog item and the first revision of this section miss
   `templates/prompts/critic-review.md:215`, and it is not an acceptable verification of this AC.
@@ -1418,38 +1465,67 @@ rather than pretending the gate covers this.
   what that proves and what it does not (§II.3.3 item 4).
 - **AC-R3-4** Both templates still contain all six field names and the "never freehand" contract
   intact — this is a citation repair, not a rewrite of dispatch semantics.
-- **AC-R3-5** The `roles/goldfish.md` edit is one sentence and changes no rule id (B1); under B2/B3
-  the six citations of `:7`/`:103`/`:126` are additionally repaired, still with no rule-id change.
-- **AC-R3-6** For every file the chosen scope admits that carries a German reference half
-  (`README.md`, `harness/session-bootstrap.md`, `policies/model-policy.md`, `docs/adr/*`), the German
-  mirror of each corrected citation is corrected in the same commit, or the file is explicitly
-  excluded. A half-corrected bilingual file is a new defect, not a partial fix.
-- **AC-R3-7** No file outside the chosen scope is touched, and the implementation report enumerates
-  the citations it deliberately left in place with their counts, so the residual stays measurable.
+- **AC-R3-5** The `roles/goldfish.md` change is the six citations of `:7`/`:103`/`:126` repaired plus
+  at most one added sentence in §2, and it changes no rule id. (Under B1 this AC would have been the
+  sentence alone; B3 is the option that also repairs the six.)
+- **AC-R3-6** For every one of B3's 39 files that carries a German reference half (`README.md`,
+  `harness/session-bootstrap.md`, `policies/model-policy.md`), the German mirror of each corrected
+  citation is corrected in the same commit, or the file is explicitly excluded. A half-corrected
+  bilingual file is a new defect, not a partial fix. (`docs/adr/*` carries German halves too but is
+  class C9, excluded from B3 by §II.6 — the criterion does not reach it.)
+- **AC-R3-7** No file outside B3 is touched — in particular nothing in C9 (`docs/**`, including
+  `docs/state.md`), nothing in C10 (`specs/**`, `backlog/**`) and not `docs/operating-model.md`
+  itself (§II.6) — and the implementation report enumerates the citations it deliberately left in
+  place with their counts, so the residual stays measurable.
 
-### II.6 The implementation boundary — an open PO decision
+### II.6 The implementation boundary — the PO's scope decision, and what it excludes
 
 The first revision drew no boundary: it fixed two templates and disclosed "four" further citations
 in `harness/review-protocol.md` as an open scope call. The measurement changes both halves of that.
 The `harness/review-protocol.md` figure is **twelve, not four** (`:5` ×2, `:22`, `:35`, `:53` ×2,
 `:58`, `:140`, `:161`, `:188`, `:206`, `:213`), and the same defect class runs through 57 files.
-**This design does not choose the boundary.** The choice is the PO's, for the reason the backlog
-item already records: `templates/prompts/*.md` and `roles/*.md` are normative dispatch artifacts
-under CLAUDE.md's "Dispatch from the template, never freehand" rule, and the volume decides whether
-R3 stays a mechanical task or becomes a package. The three defensible options, with what each buys
-and costs:
+**This design does not choose the boundary — it sized the options and the PO chose.** The choice was
+the PO's for the reason the backlog item already records: `templates/prompts/*.md` and `roles/*.md`
+are normative dispatch artifacts under CLAUDE.md's "Dispatch from the template, never freehand" rule,
+and the volume decides whether R3 stays a mechanical task or becomes a package.
+
+**Decision (APS, 2026-08-07, recorded in the backlog item's `Triage`): option B3** — sweep all 39
+live agent-facing artifacts. B1 and B2 were presented with their sizes and not taken. The option
+table is kept as it was presented, because a decision that hides what it was chosen from cannot be
+audited; the chosen row is marked, and nothing below re-opens it (§0.2). The three options, with
+what each buys and costs:
 
 | Option | Scope | Size | What it buys | What it leaves |
 | --- | --- | --- | --- | --- |
 | **B1 literal** | the two dispatch templates (+ the one sentence in `roles/goldfish.md`) | 3 files, **9 dead citations on 9 lines** (`critic-review.md` 5 on 5, `goldfish-task.md` 4 on 4) | exactly what the backlog item asks for; smallest review surface; matches the Triage's "mechanical" framing | the templates then cite `roles/goldfish.md` (6 dead) and `harness/review-protocol.md` (12 dead) — **it repairs the first hop of a chain whose next two hops are broken**, and leaves `CLAUDE.md` (3 dead + 6 wrong-topic), the highest-traffic carrier in the repo, untouched |
 | **B2 citation-chain closure** | B1 + `roles/goldfish.md` (all 6) + `roles/critic.md` (10) + `harness/review-protocol.md` (12) + `CLAUDE.md` (11) | 6 files, ~48 citations | closes every hop an agent traverses when it follows a dispatch template, and makes §II.2's decision coherent (the canonical carrier stops carrying the defect) | everything else: `roles/elephant.md` (32), `harness/session-bootstrap.md` (20), `templates/**`, the shipped plugin. Still a real reduction, still a stated residual |
-| **B3 all live agent-facing artifacts** | classes C1–C8 of §II.1.3, both language halves | 39 files, ~233 citations | removes the class from every artifact an agent or a new project actually reads | touches the **shipped plugin** (`plugins/pipeline-core/**`, 7 files — a distribution change with plugin-refresh implications), one `.mjs` (`harness/scripts/check-claude-md-lines.mjs`, incl. an operator-visible fix string), and all nine project-facing templates, which changes what every new project inherits. This is a package with its own Critic pass, not a task |
+| **B3 all live agent-facing artifacts — CHOSEN** | classes C1–C8 of §II.1.3, both language halves | 39 files, ~233 citations | removes the class from every artifact an agent or a new project actually reads | touches the **shipped plugin** (`plugins/pipeline-core/**`, 7 files — a distribution change with plugin-refresh implications), one `.mjs` (`harness/scripts/check-claude-md-lines.mjs`, incl. an operator-visible fix string), and all nine project-facing templates, which changes what every new project inherits. This is a package with its own Critic pass, not a task |
 
 *(Sizes re-derived by the R3 rework, review finding F1, and stated so they can be re-added: B1 = C1
 = 9; B2 = 9 + 6 + 10 + 12 + 11 = 48; B3 = the C1–C8 rows of §II.1.3 summed with their `de` columns =
 8 + 9 + 48 + 13 + 65 + 31 + 34 + 24, with C1 now 9 rather than 8 = **233** over the same 39 files.
 B1's earlier "9 citations" was a count of citation **lines** while the class table counted 8
 citations; after F1 both readings are 9, and the row now says which one it means.)*
+
+**Which sizes the decision was taken against.** The scope decision was recorded against the figures
+as they then stood — B1 9, B2 ~47, B3 ~232. The R3 rework's finding F1 added one citation
+(`templates/prompts/critic-review.md:15`), moving them to 9 / 48 / 233; the sizes in the table above
+are the corrected ones. **The decision is not re-opened by that, and this document does not re-open
+it:** the growth is a single citation in a single file, it lands inside all three options, and the
+backlog item carries the reconciliation itself — the decision line with its original figures, plus a
+2026-08-08 amendment that records the corrected sizes and states explicitly that the decision stands
+as recorded. Written down here because a design that quotes a decision's sizes should say which
+vintage it is quoting.
+
+**Sequencing was constrained, and the constraint has since been released.** The same record
+constrains the *order*, not only the scope: B3 touches `plugins/pipeline-core/**`, the tree the then
+pending 0.5.3 merge reconciles, so the merge lands first and the sweep second
+(`specs/sprint-phoenix-epic/design/plugin-0.5.3-merge-plan.md` §3/§4 — a manual union over a
+sixteen-file conflict set, with one proven case where taking a file wholesale deletes a protection
+and no test goes red). **Satisfied 2026-08-08: the merge landed as `35d9e11`**, and the backlog item
+records the release. The constraint is recorded rather than deleted, because it did apply: a sweep
+run before that merge would have been reconciled against a tree that was about to be rewritten, and
+the plugin half of B3 would have had to be redone.
 
 **Excluded under every option, with reasons — this part is not a decision, it is a boundary:**
 
@@ -1506,8 +1582,10 @@ Three things follow that the first revision could not see:
    `harness/review-protocol.md` (12) and `roles/goldfish.md` (6, §II.2 consequence 2) →
    `docs/operating-model.md`. B1 repairs hop one only.
 3. The scope call is therefore not a small addendum to R3 but part of the boundary decision itself,
-   and it has moved into §II.6 where it belongs. This section no longer makes a recommendation of
-   its own; §II.6 option B2 is where these twelve lines are decided.
+   and it moved into §II.6 where it belongs. This section makes no recommendation of its own; §II.6
+   is where these twelve lines were decided, and the chosen option **B3** admits
+   `harness/review-protocol.md` as part of class C5 — so all twelve are in scope, and §II.5 tier 1
+   carries them.
 
 Two further adjacent observations, recorded and deliberately not acted on:
 
@@ -1598,25 +1676,42 @@ review's authority. All measurements are pinned to `84876f1` — the reviewed tr
   C1–C9 have a rule id as their nearest preceding reference, and only one of them is an
   operating-model citation:** `critic-review.md:15` `§4.2` ← `MP-07` (F1 itself);
   `harness/session-bootstrap.md:91` and `:487` `§6.5` ← `MP-28`, both self-references to that file's
-  own `### 6.5 Speed bootstrap` (`:361`, German `:741`); and `docs/state.md:1801` `§7` ← `AC-07`,
-  which reads "`PX0-AC-02` through `PX0-AC-07` describe the very §7 path that is currently blocked"
-  — a reference into the acceptance-criteria document those ids belong to, not into
-  `docs/operating-model.md`.
+  own `### 6.5 Speed bootstrap` (`:361`, German `:741`); and the `§7` at `docs/state.md:1801` ←
+  `AC-07`, in a sentence that spans `docs/state.md:1800-1801` and reads "…and `PX0-AC-02` ⏎ through
+  `PX0-AC-07` describe the very §7 path that is currently blocked." — a reference into the
+  acceptance-criteria document those ids belong to, not into `docs/operating-model.md`.
+  *(Attribution corrected by the round-2 rework, review finding F-D: the earlier form attributed the
+  whole quoted sentence to `:1801` alone. Line `:1801` reads only `through PX0-AC-07 describe the
+  very §7 path that is currently blocked.`; the `` `PX0-AC-02` `` that opens the clause is the last
+  thing on `:1800`. The token and its nearest preceding rule id are both on `:1801`, so the audit
+  row's own coordinate was right and the conclusion is untouched — what was wrong was quoting two
+  lines as one. The `⏎` marks the line break, the convention the round's own coordinate checker
+  prints.)*
   **So the mandated re-check turns up no further instance beyond F1**, and no count moves because of
   it.
 - **A second, adjacent miss mechanism — measured, scale reported, deliberately not folded in.** The
-  same run counted the tokens the scan drops for the *other* reason: **146** tokens in C1–C9 have no
-  document reference on their line at all and were not rescued by the sticky carry-over. Most are
-  self-references (`roles/critic.md:103`/`:113` → its own `### 5.2`/`### 5.3`; `roles/elephant.md:99`
+  same run counted the tokens the scan drops for the *other* reason: **147** tokens in C1–C9 have no
+  document reference on their line at all and were not rescued by the sticky carry-over *(figure
+  corrected by the round-2 rework, review finding F-C: the run reports 147, not the 146 first
+  published. Re-derived from the run's own output rather than from the review — 275 unattributed
+  tokens in all, of which 127 are C10 and 1 is `OTHER`, both outside the live classes; 275 − 128 =
+  147, and the per-class tally sums to the same — C1..C9 = 2 + 14 + 5 + 8 + 61 + 0 + 12 + 4 + 41,
+  C6 contributing nothing)*. Most are
+  self-references (`roles/critic.md:103`/`:113` → its own `### 5.3`/`### 5.2` respectively —
+  *pairing corrected by the round-2 rework: the two were listed in the reverse order, and `:103` is
+  the one that cites §5.3*; `roles/elephant.md:99`
   and `:250` → its own `## 1`; the `kickoff-new-project.md` `§0`/`§1`/`§6.1` family; `setup.mjs` →
   a PRD), but not all: `templates/prompts/elephant-kickoff.md:114` ("flags on level-0 tasks trigger
   the Critic per the §4.2 matrix") is the same dead trigger-matrix citation as `:6` and `:15`, in a
   live C2 artifact, uncounted. **C1 is clean** — its two unattributed tokens are
   `critic-review.md:9` (`Rensin §5`) and `goldfish-task.md:37` (`bootstrap §6.2`), neither an
-  operating-model citation — so **B1's size is not affected**. Adjudicating all 146 would move
+  operating-model citation — so **B1's size is not affected**. Adjudicating all 147 would move
   several class subtotals and is a re-derivation of the inventory, not a fix to it; it is therefore
-  reported here as a measured **lower bound on the undercount** and left to the PO with §II.6, not
-  applied.
+  reported here as a measured **lower bound on the undercount** and left to the sweep, not applied.
+  *(Round-2 note: the scope decision this was reported into has since been taken — B3, §II.6 — and
+  B3 admits `templates/prompts/elephant-kickoff.md` as class C2, so the one named uncounted instance
+  is inside the chosen scope. §II.5 tier 2 therefore records C2's 9 as a floor, not a total, and
+  tier 3 puts the re-derivation of the per-line coordinates ahead of any editing.)*
 - **The whole class table was re-derived, not spot-checked.** The re-implementation was diffed file
   by file against the predecessor scan's own machine output (`.git/phx-r3-inventory.json`, totals
   `citingFiles: 57`, `sectionTokens: 345`, `A: 230`, `B?: 115` — the published 344/230/114 is that
@@ -1636,12 +1731,21 @@ review's authority. All measurements are pinned to `84876f1` — the reviewed tr
   `docs/state.md:700` is `**Two adjacent defects found and deliberately NOT fixed**, both correctly
   out` and the quoted note is at `:727`; `templates/CLAUDE.project.md:4` is
   `Source of truth: docs/operating-model.md §5/§6/§7/§8, ADR-0011 (language).`, four bare numbers
-  with no topic label, and the labelled instances are `:21`, `:60`, `:70`, `:98`. **New coverage
-  statement, true of what was actually done:** every fully qualified `` `path:line` `` coordinate in
-  Part II — **40 unique, 47 occurrences** — was resolved against the pinned tree by a checker that
-  prints the real line text for each (`.git/phx-r3-rework-1-coords.mjs`, output
-  `.git/phx-r3-rework-1-coords-84876f1.json`), and each was read against the claim it carries. Two
-  were wrong; both are corrected above; **no third was found.** Two entries in that output are
+  with no topic label, and the labelled instances are `:21`, `:60`, `:70`, `:98`. **Coverage statement
+  of this run, narrowed to the set it actually checked** *(narrowed by the round-2 rework, review
+  finding F-B; as published it read "every fully qualified `path:line` coordinate in Part II", which
+  the section outgrew in the same commit series that made the claim — see below)*: the **40 unique,
+  47 occurrences** in Part II **as it stood before this rework's edits, over document lines
+  1059–1517** were resolved against the pinned tree by a checker that prints the real line text for
+  each (`.git/phx-r3-rework-1-coords.mjs`, output `.git/phx-r3-rework-1-coords-84876f1.json`), and
+  each was read against the claim it carries. Two were wrong; both are corrected above; **no third
+  was found in that set.** What that set does **not** contain, established from the artifact rather
+  than asserted: its `docRange` is `[1059, 1517]`, which stops inside §II.7 and never reaches §II.8,
+  and it still resolves the withdrawn `docs/state.md:700` at document line 1124 while containing no
+  entry for the replacement `docs/state.md:727` or for `templates/CLAUDE.project.md:21` — i.e. it
+  scanned the pre-rework text, so every coordinate this rework added, several of them inside this
+  block, lies outside it. The round-2 block below re-runs the resolution over the whole of Part II on
+  the final state and states the current figures. Two entries in that output are
   flagged `line-out-of-range` and are artifacts of the checker, not of this document: §II.4's rows
   name `critic-review.md:142`/`:215` by basename, which the checker resolves against
   `harness/checklists/critic-review.md`; the intended `templates/prompts/critic-review.md:142`
@@ -1658,7 +1762,7 @@ review's authority. All measurements are pinned to `84876f1` — the reviewed tr
 - **F3 — confirmed, applied.** `collectAnchors` was imported from the checker itself and run over
   `git show 84876f1:docs/operating-model.md` (`.git/phx-r3-rework-1-anchors.mjs`, output
   `.git/phx-r3-rework-1-anchors-84876f1.json`): **31 anchors, 29 slug-generating headings** (29 ATX,
-  0 setext), 20 of which are `##`, plus the 2 `<a id>` values; 671 lines. The ratio is 31:29. The
+  0 setext), 20 of which are `##`, plus the 2 `<a id>` values; 670 lines. The ratio is 31:29. The
   measurement is corrected in place rather than dropped, and the conclusion it was offered for — one
   flat EN/DE slug namespace — is independently true and unchanged.
 - **F4 — confirmed, applied.** `outside specs/`/`backlog/` alone is C1–C9 = 114 − 36 = 78; the
@@ -1676,6 +1780,125 @@ review's authority. All measurements are pinned to `84876f1` — the reviewed tr
 - **Not run:** `node harness/scripts/verify.mjs` is unreachable in this checkout. It was not run,
   nothing was run in its place, and no substitute is claimed for it — the two checks above are not
   the project's verify gate, and AC-R3-3 remains written against the gate.
+
+**Added by the 2026-08-08 R3 rework** (`Dispatch: PHX-R3-REWORK-2 (goldfish)`, design tier per the
+standing rule at the head of this document), which resolved Critic round 2's five findings on Part
+II. Every finding was re-derived from source before it was applied, and every correction was then
+re-checked against source as a claim in its own right — three of the five findings were corrections
+that had introduced a *new* inaccuracy, so a fix that is only plausible is the failure mode this
+block is written against. Citation **targets** stay pinned to `84876f1`; measurements **of this
+document** are taken on the state this rework leaves behind and say so where it matters.
+
+- **F-A — confirmed, applied. The document is reconciled to the decision record; the decision itself
+  is taken as given (§0.2) and is nowhere re-derived, re-argued or re-opened.** The record is the
+  backlog item's `Triage`: scope option **B3** (39 live agent-facing artifacts), APS 2026-08-07, with
+  B1 and B2 presented and not taken, plus a merge-before-sweep sequencing constraint. Part II
+  contradicted it in **five** places — the four the review names (§0.2 "a scope decision the PO still
+  owes"; §II.5 "not a green light: §II.6 is an open PO decision"; §II.6's heading; §II.6's "This
+  design does not choose the boundary") and one it does not, §II.4's "because the boundary is
+  undecided", which carries the same claim and would have survived the four. All five now state the
+  decision as taken. Two further sentences were reconciled for the same reason and are named here
+  rather than left to be found: §II.2's consequence 2, which said the options excluding
+  `roles/goldfish.md` "are inconsistent with this decision" and now records that the call went to B3,
+  which admits the file; and §II.7's item 3, which said §II.6 "is where these twelve lines are
+  decided" and now records that B3 admits `harness/review-protocol.md` with class C5.
+- **F-A, the figures half.** The decision was recorded against B1 9 / B2 ~47 / B3 ~232; the round-1
+  rework's F1 moved them to 9 / 48 / 233. The backlog item was amended 2026-08-08 with exactly those
+  corrected sizes and an explicit "the decision stands as recorded and is **not** reopened", so the
+  document's figures and the record's now agree and no discrepancy is carried. §II.6 states which
+  vintage it quotes rather than silently publishing the newer one. **Nothing in the record was
+  edited by this rework** — the backlog item is input here, not output.
+- **F-A, the sequencing half.** The constraint was real and is not deleted: B3 touches
+  `plugins/pipeline-core/**`, which the pending 0.5.3 merge reconciles. It has since been satisfied —
+  the merge landed as `35d9e11`, confirmed an ancestor of this branch's head with
+  `git merge-base --is-ancestor` (exit 0), and the backlog item records the release on 2026-08-08.
+  §II.6 records constraint and release together, so a reader can still see why the order mattered.
+- **What §II.5 now does *not* contain, disclosed rather than implied.** B3 is 39 files. This document
+  wrote replacement *text* for two of them (§II.4) and enumerates line coordinates for five (37 of
+  the 233 citations). The other 34 files — 196 citations — are counted, not enumerated, and §II.5
+  tier 3 says so in those words. Writing that table is a design pass of its own, because every kind-B
+  citation in it is a reading judgement rather than a substitution (§II.1.2), and this rework
+  deliberately did not guess at it: a re-labelled inventory that pretends to per-line coverage it
+  does not have would be the same defect class as the coverage claim F-B corrects.
+- **F-B — confirmed, applied, and the run put in the right order.** The round-1 claim was false at
+  the head that carried it: its checker had been pointed at document lines 1059–1517 of the
+  *pre-rework* text, which stops inside §II.7 and never reaches §II.8, so the coordinates the rework
+  itself added were outside the set it claimed to cover. Both halves are established from that run's
+  own artifact and are recorded in the round-1 block above, which is narrowed there to the set it
+  really checked rather than deleted. The replacement measurement is a re-run
+  (`.git/phx-r3-rework-2-coords.mjs`, output `.git/phx-r3-rework-2-coords-84876f1.json`) with two
+  changes: the document range is derived from the document's own `## Part II` / `## Part III`
+  headings instead of being hand-typed, so it cannot stop short of a section; and it was executed
+  **after** the edits rather than before them, then re-executed once the figures below had been
+  written into this block, and once more after the last edit of the session — three runs, identical
+  result each time, the last one being the recorded artifact. The ordering is the fix: a coverage
+  figure measured before the edits it describes is worthless.
+  **Result on the final state, over the whole of Part II — the range being derived from the `## Part
+  II` and `## Part III` headings rather than typed: 69 occurrences, 52 unique coordinates; 66
+  occurrences resolve, 3 are flagged `line-out-of-range`.** Each was resolved against `84876f1` by a
+  checker that prints the resolved line text, and the output was read entry by entry against the
+  claim the coordinate carries here. **Residue, stated rather than implied, and larger than round 1
+  reported it:** seven of the 52 are written by basename as `critic-review.md` plus a line number,
+  and the tree holds two files with that basename, so the checker's suffix match sends all seven to
+  `harness/checklists/critic-review.md` — two loudly, as the out-of-range flags round 1 disclosed,
+  and **five silently**, returning unrelated text from the wrong file under an `ok` status. The
+  intended file is the dispatch template in `templates/prompts/`, and all seven were resolved there
+  directly at the pin by a second script (`.git/phx-r3-rework-2-tailset.mjs`, output
+  `.git/phx-r3-rework-2-tailset-84876f1.json`), which prints the full line rather than the coordinate
+  checker's 240-character head; the same script covers the five Part II coordinates whose cited
+  content sits past that cut, so no entry in this set rests on a truncated head. Unchanged from round
+  1 and repeated because it is the boundary of the claim: bare `` `:N` `` coordinates that inherit
+  their file from the surrounding sentence are **not** in this set and were not re-read one by one.
+  Reading the output this way turned up one further misattribution of F-D's class, corrected above:
+  the two `roles/critic.md` self-references were paired with their sections in the wrong order.
+- **F-C — confirmed, applied.** The published **146** does not reproduce; the run reports **147**.
+  Re-derived from the run's own output rather than from the review, by a script that reads the
+  artifact and tallies the `unattributed` array by class
+  (`.git/phx-r3-rework-2-unattributed.mjs`, output `.git/phx-r3-rework-2-unattributed.json`): 275
+  entries in total, 127 of them C10 and 1 `OTHER`, leaving **147** in the live classes C1–C9, which
+  is also what the per-class tally sums to. Cross-check in the same script: the `audit` array is
+  C1–C9-only as claimed (154 entries, no C10 or `OTHER` row), so the two halves of that run are
+  consistent. The figure is corrected in place in the bullet that carries it and in the sentence
+  below it that repeats it; nothing else in Part II depends on it, which was re-checked by searching
+  the section for the old value.
+- **F-D — confirmed, applied.** The quotation attributed to `docs/state.md:1801` is stitched across
+  two lines: at the pin `:1800` ends `…and PX0-AC-02` and `:1801` reads `through PX0-AC-07 describe
+  the very §7 path that is currently blocked.` The attribution is corrected rather than the
+  quotation dropped — the coordinate now names the range and the quotation shows the break — and the
+  audit row's own coordinate (`:1801`, where both the `§7` token and its nearest preceding rule id
+  sit) was right all along, so the conclusion it supports does not move.
+- **F-E — confirmed, applied, and the second instance found and corrected too.** `wc -l` and
+  `rg -c ''` both report **670** lines for `docs/operating-model.md`; the 671 comes from
+  `split("\n").length` counting the empty element after the trailing newline, which is what
+  `.git/phx-r3-rework-1-anchors-84876f1.json` records as `fileLines`. The review names the instance
+  in §II.8's F3 bullet; the same off-by-one also sits in §II.1.1's structure paragraph, published
+  before the rework and therefore outside the review object. Both are corrected, because leaving one
+  standing next to the other would make the document disagree with itself about a number it states
+  twice. No figure depends on either; the marker line stays `:323` and the 1–322 English range is
+  unaffected.
+- **Not changed, and why:** no citing artifact was touched — not the templates, not `roles/`, not
+  `CLAUDE.md`, not `docs/operating-model.md` — and the backlog item was not touched either: its
+  decision record is this rework's input, not its output. Part I and Part III are untouched, which
+  leaves one known residual disclosed rather than fixed: §III.1's bullet on the twelve
+  `harness/review-protocol.md` citations still says the scope call is "deliberately left to the PO".
+  It is inside Part III, which this rework may not edit, and it is now stale in exactly the way F-A
+  describes.
+- **One further figure the tree had outgrown, found by this rework's own gate run and corrected:**
+  §II.3.1 stated "today that is 13 out of 776 links". The gate now reports 826 links (and 535
+  Markdown files); only the anchor-check count, the figure the argument actually rests on, is
+  unchanged at thirteen. The paragraph now carries three dated runs instead of two and says which
+  number is load-bearing. Not one of the five findings — it is the same class as F-B, a claim whose
+  basis moved after it was written, so it is corrected here rather than left for a third round.
+- `node harness/scripts/check-doc-contracts.mjs` and `node --test harness/scripts/check-doc-contracts.test.mjs`
+  → both exit 0 on this rework's final state, run through a wrapper that recorded each command and
+  its exit code itself (`.git/phx-r3-rework-2-checks.json`). The limit stated in the round-1 block is
+  unchanged and is repeated because it still applies: that gate validates Markdown links and anchors,
+  so a green run is evidence about links and **never** evidence that the citation inventory above is
+  correct or complete.
+- **Not run:** `node harness/scripts/verify.mjs`. A separate dispatch was repairing a duplicate suite
+  registration in that file while this rework ran; it was therefore excluded by the briefing, was not
+  run, nothing was run in its place, and no substitute is claimed for it. AC-R3-3 remains written
+  against the gate, not against these two checks.
 
 ---
 
