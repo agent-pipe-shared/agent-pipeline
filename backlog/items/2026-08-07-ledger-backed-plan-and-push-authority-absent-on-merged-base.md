@@ -186,6 +186,27 @@ delta Critic re-review (base `099a31b`, head `6f191ee`, prior finding IDs
 1-4) is dispatched next — **Critic round 4 of 4, the last one allowed under
 this package's cap.**
 
+**Delta re-review 3 / round 4 (2026-08-07): FAIL — round cap reached, PO
+decision needed.** Full findings:
+`specs/sprint-phoenix-epic/evidence/wp5-phx2-design-critic-delta-review-3-6f191ee.md`.
+Finding 1 (the MAJOR ordering fix) is genuinely and correctly resolved —
+independently re-derived from `pipeline-state.mjs` source, not from the
+document's claim. Findings 2 and 4 are cleanly resolved. What fails the
+package: 2 new MINOR documentation-self-consistency defects, confined to
+§4's prose, with **no design, control-flow, or security consequence** — (A)
+a recovery-paragraph appositive says "the two" write-side failure points
+share a property that all three actually share, and a stale scoping phrase
+elsewhere wasn't updated to match a related rewrite; (B) the timeout
+paragraph's "guard-push.mjs's own two existing git spawns" underclaims —
+the real count is 20, all uniformly `5000`ms, so the paragraph's
+recommendation is if anything better-supported than stated, just misquoted.
+
+Per `critic-review.md`'s Phase-2.6 cap (initial + 3 deltas = 4 rounds max),
+this now requires a **PO course gate**, not a further autonomous rework. The
+Critic's own input to that gate: exact remaining fix is two sentence-level
+corrections at 4 specific line ranges, nothing else implicated — offered as
+input, not as a decision it's authorized to make. **Decision pending.**
+
 **Delta re-review 1 (2026-08-07): FAIL.** Full findings:
 `specs/sprint-phoenix-epic/evidence/wp5-phx2-design-critic-delta-review-1-8a54751.md`.
 F1–F5 are all genuinely resolved, but the F1 fix itself introduces a new

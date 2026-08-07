@@ -215,6 +215,21 @@ freehand). Status:
    re-review (base `099a31b`, head `6f191ee`) is dispatched next — **Critic
    round 4 of 4, the last one allowed for this package.**
 
+   **Round 4: FAIL — round cap reached, PO decision needed.** The MAJOR
+   ordering fix (Finding 1) is genuinely and correctly resolved, independently
+   re-derived from `pipeline-state.mjs` source. Findings 2/4 cleanly resolved.
+   What fails the package: 2 new MINOR documentation-self-consistency defects
+   confined to §4's prose (a "the two" vs. "the three" write-side-cases
+   miscount plus a stale cross-reference; a timeout paragraph that undercounts
+   `guard-push.mjs`'s spawn sites as 2 instead of 20) — **no design,
+   control-flow, or security consequence**. Full findings:
+   `specs/sprint-phoenix-epic/evidence/wp5-phx2-design-critic-delta-review-3-6f191ee.md`.
+   Per the 4-round cap, this now needs a **PO course gate** — presented to the
+   PO as: accept the design with these 2 trivial prose fixes applied via a
+   bounded editorial-only correction (not counted as a fifth Critic round,
+   since it doesn't revisit substance), or take another path. **Decision
+   pending as of this entry.**
+
 **Infra finding, 2026-08-07:** the `isolation: "worktree"` dispatch option
 pinned two of three agents' worktrees to `6e2c9b2` (origin/main's pre-merge
 tip) instead of `sprint_phoenix`'s actual HEAD — one agent (WP2+WP3)
