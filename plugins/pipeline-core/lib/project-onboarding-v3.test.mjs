@@ -27,6 +27,7 @@ import {
   planProjectOnboardingManifestRepairV4,
   planProjectOnboardingSourceRecoveryV4,
   planProjectOnboardingV3,
+  freshManifestBytes,
   planProjectPartialAuthorityAdoption,
   applyProjectPartialAuthorityAdoption,
   applyProjectOnboardingReinstall,
@@ -54,7 +55,9 @@ import { cleanupSession, retireSessionDescriptor, startSessionDescriptor } from 
 import {
   applyProjectAuthoritySessionCleanupRecovery,
   planProjectAuthoritySessionCleanupRecovery,
+  readProjectAuthority,
 } from "./project-authority.mjs";
+import { gateConfig } from "./manifest.mjs";
 import { captureResumeHint, discardResumeHint, inspectResumeHint } from "./resume-hint.mjs";
 import { inspectObservationGovernanceBootstrap } from "./observation-governance-bootstrap.mjs";
 import { validatePoGateAuthorityForRepository } from "./po-gate-authority.mjs";
@@ -3205,7 +3208,11 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
     assert.equal(source.autonomy.branch_model, "feature-branch");
     assert.equal(source.gates.security, "warn");
     const calibration = JSON.parse(readFileSync(join(path, "project/pipeline.json"), "utf8"));
-    assert.equal(calibration.verify, "git diff --check");
+    // Contract correction: this pin used to assert the always-green placeholder
+    // `git diff --check`. That value made a brand-new project report a satisfied
+    // verification contract while owning no tests, so the pin encoded the defect
+    // it was meant to guard. The contract is now "fails until configured".
+    assert.match(calibration.verify, /not configured/);
     assert.equal(calibration.repositoryMode, "local-only");
     assert.equal(existsSync(join(path, "docs/state.md")), false, "handover stays a project decision; normal bootstrap deliberately remains F4 until it exists");
     const barrier = readRestartBarrier({ rootDir: path, spawn: fakeGit });
@@ -4396,6 +4403,73 @@ test("observation governance applies only to the Pipeline source checkout, never
     assert.equal(invoked.status, 0, invoked.stderr);
     assert.equal(JSON.parse(invoked.stdout).status, "not-applicable");
   } finally { dispose(consumer); }
+});
+
+test("a freshly seeded project is honest about its authority tier, its verify contract and its gates", () => {
+  const path = root();
+  const legacyPath = root();
+  try {
+    const seed = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    assert.equal(applyProjectOnboardingV3(seed, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+
+    // (a) The seed lands in the neutral authority tier and NOT in the legacy
+    // compatibility tier a brand-new repository has no history to migrate from.
+    assert.equal(existsSync(join(path, "project", "pipeline.json")), true, "the seed writes the neutral calibration");
+    assert.equal(existsSync(join(path, ".claude", "pipeline.json")), false, "the seed never writes calibration into the legacy compatibility tier");
+    const authority = readProjectAuthority({ rootDir: path });
+    assert.equal(authority.status, "ready");
+    assert.equal(authority.source, "neutral");
+    assert.equal(authority.calibration, "project/pipeline.json");
+    assert.equal(authority.manifest, "project/pipeline.yaml");
+
+    // (b) A project that already carries the legacy tier keeps resolving
+    // exactly as before: this is a change to what is newly written, never a
+    // migration of what exists.
+    mkdirSync(join(legacyPath, ".claude"));
+    writeFileSync(join(legacyPath, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+    writeFileSync(join(legacyPath, ".claude", "pipeline.json"), `${JSON.stringify({ project: "legacy", verify: "npm test" }, null, 2)}\n`);
+    const legacyAuthority = readProjectAuthority({ rootDir: legacyPath });
+    assert.equal(legacyAuthority.status, "ready");
+    assert.equal(legacyAuthority.source, "legacy");
+    assert.equal(legacyAuthority.calibration, ".claude/pipeline.json");
+    assert.equal(JSON.parse(readFileSync(join(legacyPath, ".claude", "pipeline.json"), "utf8")).verify, "npm test");
+
+    // (c) The seeded verify contract FAILS until a human configures it, and its
+    // own output names what to replace and where. An unconfigured project is
+    // distinguishable from a satisfied one by running verify.
+    const calibration = JSON.parse(readFileSync(join(path, "project", "pipeline.json"), "utf8"));
+    const verify = spawnSync(calibration.verify, { cwd: path, shell: true, encoding: "utf8" });
+    assert.notEqual(verify.status, 0, "an unconfigured verify contract must not report success");
+    assert.match(String(verify.stderr), /not configured/);
+    assert.match(String(verify.stderr), /Replace the verify command in project\/pipeline\.json/);
+
+    // (d) The seeded manifest carries a gate chapter, and it is a LIVE gate --
+    // for the profile-neutral greenfield seed and for each of the three PO
+    // profiles the kickoff flow collects.
+    const seeded = parseYaml(readFileSync(join(path, "project", "pipeline.yaml"), "utf8"));
+    assert.deepEqual(seeded.gates, { "dev-plan": { mode: "warn", type: "human" } });
+    for (const profile of ["epic", "feature", "mini"]) {
+      const gate = gateConfig(parseYaml(freshManifestBytes(profile)), "dev-plan");
+      assert.notEqual(gate, null, `${profile} seeds a dev-plan gate`);
+      assert.notEqual(gate.mode, "off", `${profile} seeds a LIVE dev-plan gate`);
+      assert.equal(gate.type, "human");
+    }
+
+    // (e) guard-devplan.mjs no longer exits 0 by default: with the seeded gate
+    // chapter and an active feature whose design was never approved, a write to
+    // a non-exempt implementation path is reported (exit 1, `warn`) instead of
+    // being silently allowed. `blocking` is deliberately NOT seeded -- see the
+    // gate chapter comment in project-onboarding-v3.mjs.
+    writeFileSync(join(path, "project", "pipeline-state.json"), `${JSON.stringify({ activeFeature: { id: "F-001", planPath: "docs/plan.md" } }, null, 2)}\n`);
+    const guard = spawnSync(process.execPath, [fileURLToPath(new URL("../hooks/guard-devplan.mjs", import.meta.url))], {
+      cwd: path,
+      encoding: "utf8",
+      input: JSON.stringify({ tool_name: "Write", tool_input: { file_path: "src/index.js" } }),
+      env: { ...process.env, CLAUDE_PROJECT_DIR: path },
+    });
+    assert.equal(guard.status, 1, `the seeded dev-plan gate must be live, not inert: ${guard.stderr}`);
+    assert.match(String(guard.stderr), /guard-devplan/);
+  } finally { dispose(path); dispose(legacyPath); }
 });
 
 console.log(`\nproject-onboarding-v3: ${passed} passed, ${failures.length} failed`);

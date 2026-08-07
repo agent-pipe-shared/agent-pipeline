@@ -243,7 +243,9 @@ export function planProjectPartialAuthorityAdoption({ rootDir = process.cwd(), p
     const artifacts = paths.map((relative) => ({ path: relative, snapshot: physicalTreeSnapshot(safePath(root, relative, fs), fs) }));
     const intent = freshIntent();
     if (!validatePipelineUserV3(intent).ok) throw new Error("canonical V3 source is invalid");
-    const baselines = freshBaselines(intent);
+    // This path holds an explicit PO profile selection, so the seeded gate
+    // chapter is the one that profile asks for.
+    const baselines = freshBaselines(intent, { profile });
     const targets = [
       { path: SOURCE, bytes: renderYaml(intent) },
       { path: ".claude/pipeline.yaml", bytes: baselines[".claude/pipeline.yaml"].bytes },
@@ -655,14 +657,69 @@ function freshIntent(runner = "codex") {
     advisor_export: { consent: "approved" },
   };
 }
-function freshBaselines(intent, { hostManaged = false } = {}) {
+// A seeded verify command that FAILS until a human replaces it, and says what
+// to replace and where. See the comment on the calibration baseline below.
+const UNCONFIGURED_VERIFY = "node -e \"console.error('pipeline: the verify contract of this project is not configured. Replace the verify command in project/pipeline.json with the real verification command for this project (for example its test suite), then run verify again.'); process.exit(1)\"";
+
+// The three PO gate profiles the kickoff flow collects, verbatim and complete.
+const KICKOFF_PROFILES = Object.freeze(["epic", "feature", "mini"]);
+
+// The seeded gate chapter. A manifest WITHOUT a `gates` section leaves every
+// gate reading it inert: `gateConfig()` returns null for an absent section
+// (lib/manifest.mjs), and guard-devplan.mjs exits 0 on a falsy gate -- so a
+// freshly onboarded project used to run with no plan gate at all while its
+// `pipeline.user.yaml` said `dev_plan: blocking`. The chapter below is what
+// makes a new project state which gates are actually live.
+//
+// `dev-plan` is seeded in `warn`, NOT in `blocking`, and that is a deliberate
+// bounded choice: a blocking dev-plan gate has no satisfying path in a fresh
+// project today, because `approve-plan` is unreachable for a feature created
+// through the sanctioned kickoff promotion (promotion requires
+// planPath === specPath while the PO plan gate requires planPath to name a
+// prd_*.md -- backlog/items/2026-08-07-a-promoted-feature-can-never-pass-the-plan-gate.md).
+// A gate that blocks with no path through it is worse than a gate that is off;
+// `warn` makes the gate live and visible without creating an unpassable block.
+// `push` and `security` are deliberately NOT seeded here: their satisfying path
+// in a brand-new project was not established, and seeding an unsatisfiable gate
+// is exactly what this chapter must not do.
+const DEV_PLAN_WARN_GATE = "gates:\n  dev-plan:\n    mode: warn\n    type: human\n";
+// Per PO profile. All three resolve to the same live chapter today -- the
+// differentiation surface exists (the profile is a real input on the
+// partial-authority path), but only one gate currently has a demonstrable
+// satisfying path, and it is the same one for epic, feature and mini.
+const FRESH_GATE_CHAPTERS = Object.freeze({
+  epic: DEV_PLAN_WARN_GATE,
+  feature: DEV_PLAN_WARN_GATE,
+  mini: DEV_PLAN_WARN_GATE,
+});
+export function freshGateChapter(profile = null) {
+  return KICKOFF_PROFILES.includes(profile) ? FRESH_GATE_CHAPTERS[profile] : DEV_PLAN_WARN_GATE;
+}
+// Greenfield onboarding has no profile yet: the kickoff collects the goal, and
+// the profile is only bound later, at kickoff promotion. The profile-neutral
+// chapter is therefore the seeded default, and a caller that DOES hold an
+// explicit PO profile (the partial-authority reconstruction) passes it.
+export function freshManifestBytes(profile = null) {
+  return "schema: pipeline.manifest.v0\n"
+    + "language:\n  human_facing: en\n"
+    + freshGateChapter(profile)
+    + "modelRouting:\n  legacy:\n    model: legacy\n    effort: low\n";
+}
+function freshBaselines(intent, { hostManaged = false, profile = null } = {}) {
   const baselines = {
     ".claude/settings.json": { status: "present", bytes: "{}\n" },
-    // `git diff --check` is deliberately HEAD-independent: onboarding creates
-    // no commit, so `git diff --check HEAD` would make the one verify command
-    // fail before the user's initial commit exists.
-    ".claude/pipeline.json": { status: "present", bytes: `${JSON.stringify({ project: "new-project", verify: "git diff --check", handover: "docs/state.md", autonomy: "gated", branchModel: "feature-branch", repositoryMode: hostManaged ? "host-managed" : "local-only", worktree: "optional", stakes: "standard", constraints: [hostManaged ? "Codex owns .git and .codex; configure project verification before delivery." : "Configure project-specific policy before delivery."] }, null, 2)}\n` },
-    ".claude/pipeline.yaml": { status: "present", bytes: "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\nmodelRouting:\n  legacy:\n    model: legacy\n    effort: low\n" },
+    // The seeded verify command FAILS until a human configures it. The previous
+    // seed (`git diff --check`) was chosen to be HEAD-independent so it could
+    // never fail before the user's first commit -- which made a brand-new
+    // project report a green verification contract while owning no tests at
+    // all, indistinguishable from a satisfied one everywhere downstream (stop
+    // hook, Goldfish submission, candidate binding). An unconfigured contract
+    // must be visibly unconfigured, so the placeholder exits non-zero and names
+    // exactly what to replace and where. `node` is used rather than a shell
+    // builtin because the runtime executing this command is guaranteed present
+    // on every host the Pipeline runs on, on Windows as well.
+    ".claude/pipeline.json": { status: "present", bytes: `${JSON.stringify({ project: "new-project", verify: UNCONFIGURED_VERIFY, handover: "docs/state.md", autonomy: "gated", branchModel: "feature-branch", repositoryMode: hostManaged ? "host-managed" : "local-only", worktree: "optional", stakes: "standard", constraints: [hostManaged ? "Codex owns .git and .codex; configure project verification before delivery." : "Configure project-specific policy before delivery."] }, null, 2)}\n` },
+    ".claude/pipeline.yaml": { status: "present", bytes: freshManifestBytes(profile) },
     ".codex/config.toml": { status: "present", bytes: "" },
     ".codex/agents/implementor.toml": { status: "present", bytes: codexCustomAgentSeed("implementor") },
     ".codex/agents/critic.toml": { status: "present", bytes: codexCustomAgentSeed("critic") },
