@@ -60,9 +60,40 @@ const claudeKnownMarketplaces = (
   },
 });
 
+// Deterministic, hermetic default for the new origin/content attestation
+// dependency (design: bootstrap-origin-allowlist-and-codex-wsl-freshness.md
+// §A.2/§A.3) -- mirrors `readyObservation`/`baseDependencies` in
+// private-overlay-activation.test.mjs, this file's own sibling that already
+// injects the same `observePublicCoreIdentity`/`observeCodexPublicCoreIdentity`
+// shape rather than letting a test hit the real filesystem/Git. Every
+// pre-existing test below is about the version/installed-identity logic, not
+// about this new attestation, so it is defaulted to "ready" and only
+// overridden by the tests that specifically exercise the new attestation.
+function readyObservation() {
+  return {
+    schema: "pipeline.public-core-observation.v1",
+    status: "ready",
+    candidate: {
+      repository: "https://github.com/agent-pipe-shared/agent-pipeline.git",
+      branch: "main",
+      commit: "a".repeat(40),
+      tree: "b".repeat(40),
+    },
+    plugin: {
+      name: "pipeline-core",
+      version: "0.4.5+test",
+      manifestSha256: "c".repeat(64),
+      contentSha256: "d".repeat(64),
+    },
+  };
+}
+function preflight(options) {
+  return observePipelineStartPreflight({ observe: readyObservation, ...options });
+}
+
 test("preflight reports exact identity and no-handoff without secret fields", () => {
   const cwd = "/projects/current";
-  const result = observePipelineStartPreflight({
+  const result = preflight({
     env: {},
     pluginList: pluginList(),
     read: () => manifest,
@@ -110,7 +141,7 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
 
 test("preflight declares the Claude runner when CLAUDECODE marks the session", () => {
   const cwd = "/projects/current";
-  const result = observePipelineStartPreflight({
+  const result = preflight({
     env: { CLAUDECODE: "1" },
     pluginList: pluginList(),
     read: () => manifest,
@@ -121,7 +152,7 @@ test("preflight declares the Claude runner when CLAUDECODE marks the session", (
 
 test("preflight keeps the Codex runner default for any non-Claude-Code session", () => {
   for (const env of [{}, { CLAUDECODE: "0" }, { CLAUDECODE: "true" }]) {
-    const result = observePipelineStartPreflight({
+    const result = preflight({
       env,
       pluginList: pluginList(),
       read: () => manifest,
@@ -143,7 +174,7 @@ test("preflight selects one host-authorized capability boundary for WSL", () => 
     { WSL_DISTRO_NAME: "Ubuntu" },
     { WSL_INTEROP: "/run/WSL/1_interop" },
   ]) {
-    const result = observePipelineStartPreflight({
+    const result = preflight({
       env,
       pluginList: pluginList(),
       read: () => manifest,
@@ -156,7 +187,7 @@ test("preflight selects one host-authorized capability boundary for WSL", () => 
 });
 
 test("preflight distinguishes complete and malformed handoff by presence only", () => {
-  const ready = observePipelineStartPreflight({
+  const ready = preflight({
     env: {
       PIPELINE_CODEX_ONBOARDING_TICKET_ID: "private-ticket",
       PIPELINE_CODEX_ONBOARDING_TOKEN: "private-token",
@@ -173,7 +204,7 @@ test("preflight distinguishes complete and malformed handoff by presence only", 
     { PIPELINE_CODEX_ONBOARDING_TOKEN: "private-token" },
     { PIPELINE_CODEX_ONBOARDING_TICKET_ID: "", PIPELINE_CODEX_ONBOARDING_TOKEN: "private-token" },
   ]) {
-    assert.equal(observePipelineStartPreflight({
+    assert.equal(preflight({
       env,
       pluginList: pluginList(),
       read: () => manifest,
@@ -182,7 +213,7 @@ test("preflight distinguishes complete and malformed handoff by presence only", 
 });
 
 test("preflight turns a loaded/installed mismatch into a typed refresh handoff", () => {
-  const result = observePipelineStartPreflight({
+  const result = preflight({
     env: {},
     pluginList: pluginList("0.4.5+new"),
     read: () => manifest,
@@ -194,7 +225,7 @@ test("preflight turns a loaded/installed mismatch into a typed refresh handoff",
 });
 
 test("an exact registered local marketplace is a visible development source", () => {
-  const result = observePipelineStartPreflight({
+  const result = preflight({
     env: {},
     pluginList: pluginList("0.4.5+test", "local"),
     read: () => manifest,
@@ -216,7 +247,7 @@ test("simultaneous local-development and official installations fail closed", ()
     "agent-pipeline-local",
   )()).installed[0];
   const both = () => JSON.stringify({ installed: [official, local], available: [] });
-  const result = observePipelineStartPreflight({
+  const result = preflight({
     env: {},
     pluginList: both,
     read: () => manifest,
@@ -249,7 +280,7 @@ test("unavailable registry remains non-blocking when the loaded identity is cohe
     () => "{",
     () => JSON.stringify({ installed: [] }),
   ]) {
-    const result = observePipelineStartPreflight({
+    const result = preflight({
       env: {},
       pluginList: unavailable,
       read: () => manifest,
@@ -288,7 +319,7 @@ test("missing or malformed manifest fails identity closed", () => {
     () => "{}",
     () => "{",
   ]) {
-    const result = observePipelineStartPreflight({
+    const result = preflight({
       env: {},
       pluginList: pluginList(),
       read,
@@ -300,7 +331,7 @@ test("missing or malformed manifest fails identity closed", () => {
 });
 
 test("a Claude session reads the Claude source manifest, never the Codex one", () => {
-  const result = observePipelineStartPreflight({
+  const result = preflight({
     env: { CLAUDECODE: "1" },
     pluginList: () => JSON.stringify([]),
     read: (path) => {
@@ -313,7 +344,7 @@ test("a Claude session reads the Claude source manifest, never the Codex one", (
 });
 
 test("a non-Claude-Code session still reads the Codex source manifest, never the Claude one", () => {
-  const result = observePipelineStartPreflight({
+  const result = preflight({
     env: {},
     pluginList: pluginList(),
     read: (path) => {
@@ -326,7 +357,7 @@ test("a non-Claude-Code session still reads the Codex source manifest, never the
 });
 
 test("a Claude bare-array registry resolves an attested local-development installation", () => {
-  const result = observePipelineStartPreflight({
+  const result = preflight({
     env: { CLAUDECODE: "1" },
     pluginList: claudePluginList(),
     knownMarketplaces: claudeKnownMarketplaces(),
@@ -351,7 +382,7 @@ test("a Claude registry with two eligible entries fails closed as ambiguous", ()
     installedPipelineIdentity(both, "claude", claudeKnownMarketplaces()),
     { version: null, source: "unknown", ambiguous: true },
   );
-  const result = observePipelineStartPreflight({
+  const result = preflight({
     env: { CLAUDECODE: "1" },
     pluginList: both,
     knownMarketplaces: claudeKnownMarketplaces(),
@@ -370,7 +401,7 @@ test("a malformed, non-array, or empty Claude registry yields no identity withou
     () => JSON.stringify([]),
   ]) {
     assert.equal(installedPipelineIdentity(invalid, "claude", claudeKnownMarketplaces()), null);
-    const result = observePipelineStartPreflight({
+    const result = preflight({
       env: { CLAUDECODE: "1" },
       pluginList: invalid,
       knownMarketplaces: claudeKnownMarketplaces(),
@@ -383,7 +414,7 @@ test("a malformed, non-array, or empty Claude registry yields no identity withou
 });
 
 test("a Claude version mismatch between loaded and installed identity requires refresh", () => {
-  const result = observePipelineStartPreflight({
+  const result = preflight({
     env: { CLAUDECODE: "1" },
     pluginList: claudePluginList("0.5.2+claude.other"),
     knownMarketplaces: claudeKnownMarketplaces(),
@@ -419,4 +450,92 @@ test("a non-local Claude installation id reports unknown source without touching
     }),
     { version: "0.5.2+claude.test", source: "unknown" },
   );
+});
+
+// ---- origin/content attestation (design: bootstrap-origin-allowlist-and-codex-wsl-freshness.md §A) ----
+
+test("preflight calls observe self-referentially with the loaded plugin root on both sides", () => {
+  const calls = [];
+  const result = preflight({
+    env: {},
+    pluginList: pluginList(),
+    read: () => manifest,
+    observe(input) { calls.push(input); return readyObservation(); },
+  });
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0], { sourcePluginRoot: result.pluginRoot, installedPluginRoot: result.pluginRoot });
+  assert.equal(result.status, "ready");
+});
+
+test("an unattested origin folds into the soft plugin-refresh-required advisory, never a new hard status", () => {
+  const result = preflight({
+    env: {},
+    pluginList: pluginList(),
+    read: () => manifest,
+    observe: () => ({
+      ...readyObservation(),
+      candidate: { ...readyObservation().candidate, repository: "https://example.invalid/fork.git" },
+    }),
+  });
+  assert.equal(result.status, "plugin-refresh-required");
+  assert.equal(pipelineStartPreflightExitCode(result), 0);
+  assert.deepEqual(result.nextAction, {
+    kind: "advisory",
+    executable: null,
+    argv: [],
+    mutation: false,
+    requiresConfirmation: false,
+    executionBoundary: "default",
+    expected: { schema: "pipeline.plugin-refresh-advisory.v1" },
+  });
+});
+
+test("the second reviewed origin (SSH form) also attests as ready", () => {
+  const result = preflight({
+    env: {},
+    pluginList: pluginList(),
+    read: () => manifest,
+    observe: () => ({
+      ...readyObservation(),
+      candidate: { ...readyObservation().candidate, repository: "git@github-public:agent-pipe-shared/agent-pipeline.git" },
+    }),
+  });
+  assert.equal(result.status, "ready");
+});
+
+test("a rejected observation (dirty tree, missing git, any SNT-A2-* code) folds into the same soft advisory", () => {
+  const result = preflight({
+    env: {},
+    pluginList: pluginList(),
+    read: () => manifest,
+    observe: () => ({ schema: "pipeline.public-core-observation.v1", status: "rejected", reasonCodes: ["SNT-A2-SOURCE-DIRTY"] }),
+  });
+  assert.equal(result.status, "plugin-refresh-required");
+  assert.equal(pipelineStartPreflightExitCode(result), 0);
+  assert.equal(result.nextAction.kind, "advisory");
+});
+
+test("a missing manifest still hard-fails to plugin-identity-unavailable without invoking the attestation", () => {
+  let called = false;
+  const result = preflight({
+    env: {},
+    pluginList: pluginList(),
+    read: () => { throw new Error("missing"); },
+    observe: () => { called = true; return readyObservation(); },
+  });
+  assert.equal(result.status, "plugin-identity-unavailable");
+  assert.equal(result.nextAction, null);
+  assert.equal(called, false);
+  assert.equal(pipelineStartPreflightExitCode(result), 2);
+});
+
+test("plugin-identity-unavailable keeps nextAction null even under a failing attestation", () => {
+  const result = preflight({
+    env: {},
+    pluginList: pluginList(),
+    read: () => { throw new Error("missing"); },
+    observe: () => ({ schema: "pipeline.public-core-observation.v1", status: "rejected", reasonCodes: ["SNT-A2-GIT-UNAVAILABLE"] }),
+  });
+  assert.equal(result.status, "plugin-identity-unavailable");
+  assert.equal(result.nextAction, null);
 });

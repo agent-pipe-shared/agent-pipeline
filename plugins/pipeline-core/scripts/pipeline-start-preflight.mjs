@@ -10,6 +10,9 @@ import { fileURLToPath } from "node:url";
 
 import { measureBootstrapPayload } from "../lib/bootstrap-payload-budget.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { observeCodexPublicCoreIdentity, observePublicCoreIdentity } from "../lib/public-core-observation.mjs";
+import { PUBLIC_SELF_APPLICATION_ORIGINS } from "../lib/public-core-origin-allowlist.mjs";
+import { normalizeRulesetSource, RULESET_SOURCE_SCHEMA } from "../lib/ruleset-source.mjs";
 
 export const SCHEMA = "pipeline.start-preflight.v1";
 const PLUGIN_ID = "pipeline-core@agent-pipeline";
@@ -176,6 +179,7 @@ export function observePipelineStartPreflight({
   scriptUrl = import.meta.url,
   cwd = process.cwd(),
   knownMarketplaces = readClaudeKnownMarketplaces,
+  observe,
 } = {}) {
   const pluginRoot = resolve(dirname(fileURLToPath(scriptUrl)), "..");
   // CLAUDECODE is set by every Claude Code session (main and subagent); its
@@ -208,9 +212,41 @@ export function observePipelineStartPreflight({
   const wsl = [env.WSL_DISTRO_NAME, env.WSL_INTEROP]
     .some((value) => typeof value === "string" && value.trim() !== "");
   const executionBoundary = wsl ? "host-authorized-wsl" : "default";
+  // Origin/content attestation of the loaded plugin itself (design:
+  // bootstrap-origin-allowlist-and-codex-wsl-freshness.md §A.2-§A.5). Mirrors
+  // the calling pattern already established in private-overlay-activation.mjs:
+  // `observe` defaults per-runner, self-referentially, to the same reused
+  // Public-Core observers already proven safe on the private-overlay path.
+  // Skipped when the manifest itself is unreadable -- `status` below already
+  // hard-fails to "plugin-identity-unavailable" in that case regardless of
+  // this result. A negative result never invents a new hard-fail status; it
+  // only widens the existing "plugin-refresh-required" branch.
+  const resolvedObserve = observe
+    ?? (runner === "codex" ? observeCodexPublicCoreIdentity : observePublicCoreIdentity);
+  let attestationFailed = false;
+  if (version) {
+    const observation = resolvedObserve({ sourcePluginRoot: pluginRoot, installedPluginRoot: pluginRoot }, {});
+    const originAllowlisted = observation?.status === "ready"
+      && PUBLIC_SELF_APPLICATION_ORIGINS.has(observation.candidate?.repository);
+    // sourcePluginRoot === installedPluginRoot by construction here, so
+    // loadedIdentity/installedIdentity are necessarily equal -- normalizeRulesetSource
+    // is exercised for its schema-closure value and as a genuine production
+    // caller, not as an independent content-hash match (design §A.4, PO-resolved).
+    const normalized = observation?.status === "ready"
+      ? normalizeRulesetSource({
+          schema: RULESET_SOURCE_SCHEMA,
+          runner,
+          selectedPlugin: { id: observation.plugin.name, version: observation.plugin.version },
+          source: { class: "self-application" },
+          loadedIdentity: { status: "available", algorithm: "content-sha256", value: observation.plugin.contentSha256 },
+          installedIdentity: { status: "available", algorithm: "content-sha256", value: observation.plugin.contentSha256 },
+        })
+      : null;
+    attestationFailed = !originAllowlisted || normalized?.status !== "ready";
+  }
   const status = !version
     ? "plugin-identity-unavailable"
-    : installedIdentity?.ambiguous === true || installedVersion !== null && installedVersion !== version
+    : installedIdentity?.ambiguous === true || installedVersion !== null && installedVersion !== version || attestationFailed
       ? "plugin-refresh-required"
       : "ready";
   const result = {
@@ -243,7 +279,23 @@ export function observePipelineStartPreflight({
             schema: "pipeline.project-onboarding.v4",
           },
         }
-      : null,
+      // "plugin-refresh-required" is a soft/advisory status, not a hard block
+      // (design §A.5, correcting the prior nextAction: null defect -- that left
+      // this branch with nothing to execute and no printable confirmation).
+      // Nothing executes; the advisory is carried forward through bootstrap.
+      : status === "plugin-refresh-required"
+        ? {
+            kind: "advisory",
+            executable: null,
+            argv: [],
+            mutation: false,
+            requiresConfirmation: false,
+            executionBoundary,
+            expected: {
+              schema: "pipeline.plugin-refresh-advisory.v1",
+            },
+          }
+        : null,
   };
   return {
     ...result,
