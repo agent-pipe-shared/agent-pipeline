@@ -932,6 +932,85 @@ directory in `a00cbae`, together with records for the two dispatches whose
 reports never wrote one. Each record states both what the dispatch claimed
 and what reviewing its diff found afterwards.
 
+### Critic round 1 — FAIL on governance, not on the guard logic
+
+Recorded here rather than in the feature's evidence directory on purpose: a
+second round on the mandated tier is running against the same enumerated SHAs
+as this is written, and a prior verdict is forbidden material inside its input
+boundary. `docs/state.md` is the one file the Critic contract categorically
+excludes, and round 1 demonstrably respected that exclusion ("State n/a
+(Critic sees no history)"). Move this into
+`specs/sprint-nova-epic/evidence/nova-hgosig/critic-round-1/` once round 2 has
+reported.
+
+Reviewed SHAs: `2365a8c, e4772d0, 06971d7, f650164, 5be2273, 4d19def, 5efb0f1,
+584a598, bae3c1a, a52ff69, 503fe0d, 058190f, 2c280ed, f667dec, b0dcd4e`.
+Lane: `functional-equivalent-read-only; OS isolation not asserted`. Verdict:
+**FAIL**.
+
+- **F1, major — orchestrator self-implementation on a guardrail file
+  (`503fe0d`).** MP-22 bans it unconditionally; `guard-gate-strength.mjs`
+  decides gate strength, and this commit carries a `Dispatch:` trailer while
+  its own record says the dispatch never reported and the Elephant finished it
+  — shipped with no machine-executed test evidence at commit time. The Critic
+  independently confirmed the mitigation rather than accepting it: `f667dec`,
+  in the same batch, adds a 29/29 adversarial suite that genuinely covers this
+  code (GST27 arms a real, valid capability and proves GS-6 still does not
+  lift; GST28 pins the source shape). The delivered logic is verified; the
+  commit that introduced it was not.
+- **F2, major — a second self-authorship instance, and this one with no
+  `Dispatch:` trailer at all (`584a598`).** Direct edits to
+  `threat-model-approval-request.test.mjs` and 37 new lines in
+  `docs/po-human-approval.md`. Mechanical, immediately machine-verified
+  (36/36), but a repeat of F1 with zero provenance.
+- **F3, minor — the shared-checkout collision (`5efb0f1`)**, already known and
+  already a backlog item. GIT-02/GIT-03, GF-05.
+- **F4, minor — two disclosed gaps carry no owner or expiry** (QG-06):
+  `claims-evidence.json` `knownGapsDisclosed[0]`/`[1]`. Directly fixable; held
+  until round 2 has finished reading that file.
+
+What the FAIL is *not*: the Critic cleared ADR-0059's five Decisions and the
+standing principle as covered by both code and tests, confirmed the GS-6
+kernel exclusion holds under adversarial test, confirmed
+`GUARD-CROSS-REPO-MUTATION` is untouched upstream at
+`guard-lifecycle-ready.mjs:1102/1112`, found no new external dependency in any
+of the 15 commits, and verified the evidence binding `916805f` is
+documentation-only and therefore a faithful proxy for the batch tip. It named
+`bae3c1a`'s control-flow bug being fixed by a *fresh dispatch* (`a52ff69`)
+rather than self-patched as the correct process, in explicit contrast to F1
+and F2. Its trajectory verdict on the evidence axis: consistent — every
+self-disclosed deviation was independently reproducible from the raw diffs,
+"the self-reporting throughout this batch is honest, not spin". Inconsistent
+only on the authorship axis, which is F1–F3.
+
+### The round's own route violation, and where it came from
+
+The Critic opened its report with its effective identity `claude-sonnet-5`,
+quoted from its own runtime system prompt as direct same-dispatch evidence,
+against a requested route of `claude-opus-5 at max` — MP-07's *mandatory*
+escalation for a guardrail diff. It named this a dispatch-compliance defect
+reducing confidence in its own completeness, and asked for a re-run before the
+review is relied on as a gate. That is the report-header requirement doing
+exactly the job it exists for.
+
+The cause was found afterwards, and it is not a one-off slip:
+`plugins/pipeline-core/agents/critic.md` frontmatter pins `model: sonnet`. A
+per-dispatch override wins over it, so the pin is a sane default for an
+ordinary class-mittel first pass — but it means the dispatch text naming
+`claude-opus-5 at max` has no effect on which model runs. It only gives the
+Critic something to compare against. Every T1 A/G/S round silently lands on
+the review tier unless the orchestrator separately remembers the tool-layer
+override. This is CLAUDE.md's "Model discipline" failure mode — silent
+inheritance — reappearing one layer below where that rule reaches, and it
+fails in the direction of less scrutiny while producing a fluent, well-formed
+report that is not marked as degraded in any way.
+
+Round 2 was dispatched immediately with the explicit override, same enumerated
+SHAs, `full` mode, no prior findings passed. One residual honesty note carried
+into that dispatch as a bare fact: the dispatch layer could set the model
+identifier but had no channel to set the effort level, which therefore
+inherits the dispatching session's rather than being pinned at `max`.
+
 ## 2026-08-07 Nova VII — first Nova A completion wave: 6 issues evidenced
 
 Continues from Nova VI. PO instruction: "leg mal los und fange an — du
