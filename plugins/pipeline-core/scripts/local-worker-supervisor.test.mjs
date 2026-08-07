@@ -294,8 +294,13 @@ async function waitForRecord(context, predicate, timeoutMs = 10_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (existsSync(recordPath)) {
-      const record = JSON.parse(readFileSync(recordPath, "utf8"));
-      if (predicate(record)) return record;
+      let record;
+      try {
+        record = JSON.parse(readFileSync(recordPath, "utf8"));
+      } catch {
+        record = null;
+      }
+      if (record !== null && predicate(record)) return record;
     }
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 25));
   }
