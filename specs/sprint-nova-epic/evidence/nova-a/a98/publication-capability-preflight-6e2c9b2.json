@@ -1,0 +1,43 @@
+{
+  "schema": "pipeline.publication-capability-preflight.v1",
+  "preflightId": "nova-a98-retro-0.5.2-2026-08-07",
+  "candidate": {
+    "commit": "6e2c9b2868d164ff3b631ab068fa5df20939e07d",
+    "tree": "23171c38a317d8cdf50baa013f54f5447e17f754"
+  },
+  "remote": {
+    "name": "origin",
+    "fingerprint": "6d701b432e5583af95ddcfc3363500a9f53dddd0b2c199834f0b0cd8b8e5904c",
+    "status": "available",
+    "evidenceSha256": "42defdbc6382b4c1cfe2de92002fed58567198a87d67d84025679eadde55d324"
+  },
+  "destinationRef": "refs/heads/main",
+  "remotePreimage": "6e2c9b2868d164ff3b631ab068fa5df20939e07d",
+  "credential": { "status": "available", "evidenceSha256": "22d05524185c4ee912054188831279d860f9256bcfbbb150bb6c1803d835c613" },
+  "permissions": { "status": "available", "evidenceSha256": "230d89cdccd57b98f8c17fa6c5e14d98c654dbff373c521c1fcb02b52cc16e16" },
+  "workflowUpdate": { "status": "not-required", "evidenceSha256": "f5215114bc8c72a1337456823d21b41c455574e32b3f65e9d1029f2f34d7b678" },
+  "policy": { "status": "available", "evidenceSha256": "b6e1dd90e938517bacbc6e4a9263eda79e9aa30c735421461e1d9e017bfba6bf" },
+  "executor": { "status": "available", "evidenceSha256": "8f05553f4bb774aaa1a2d1df2663b04151d92cc1acecaec454a5557e3ef5978b" },
+  "status": "ready",
+  "reasons": [],
+  "recordSha256": "fcf91caec925808ddb6be86e5b8d62f28cb451df78ba1db94d7598c45e0c5e55",
+  "producedBy": {
+    "command": "node plugins/pipeline-core/scripts/publication-executor.mjs preflight --root . --preflight-id nova-a98-retro-0.5.2-2026-08-07 --candidate 6e2c9b2868d164ff3b631ab068fa5df20939e07d --remote-name origin --destination-ref refs/heads/main",
+    "exitCode": 0,
+    "real": true,
+    "note": "remotePreimage equals candidate.commit, independently confirming the R2 execute step's push would be a provable no-op for this already-published candidate."
+  },
+  "chainStatus": {
+    "next": "prepare",
+    "blockedBy": [
+      {
+        "reason": "critic-gate-zero-findings-unmet",
+        "detail": "preparePublicationTransaction's requireSuccessfulGate demands, for the critic gate specifically, a native critic-evidence record with review.verdict === 'pass' AND review.findings.length === 0. The only real candidate-bound Critic review available (specs/sprint-nova-epic/evidence/nova-a/a5/critic-convergence-report-d5be0e6.json) has 2 findings. The generic pipeline.nova-a-gate-observation.v1 wrapper schema would structurally satisfy the check regardless of finding count, but using it here would mean self-attesting a 'passed' critic gate for a review that did not actually clear cleanly -- exactly the fabrication publication-gate-evidence.mjs's own docstring says this mechanism must never allow. Not used."
+      },
+      {
+        "reason": "release-preflight-consent-not-approved",
+        "detail": "specs/sprint-nova-epic/evidence/nova-a/a6/release-preflight-record-57ee7e9.json (real, from the NOVA-A56-EVIDENCE-1 dispatch) reports status: blocked, reasons: [repository-not-clean, consent-not-approved] for a synthetic declined consent input. No real PO consent artifact exists for this candidate. preparePublicationTransaction requires releasePreflight.record.status === 'ready'. This is a genuine external precondition, not derivable from any artifact already in the repository."
+      }
+    ]
+  }
+}
