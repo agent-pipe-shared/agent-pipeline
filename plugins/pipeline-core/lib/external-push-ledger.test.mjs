@@ -227,6 +227,46 @@ check("EPL19 externalPushLedgerGate rejects a non-string, non-object argument", 
   assert.throws(() => externalPushLedgerGate(""), TypeError);
 });
 
+// ---- WP5-phx2-rework-1 F4 fix coverage (DoD field 3 cases (a)-(d)) -----------------------
+// (d) is already EPL16/EPL17 above, confirmed unchanged and still passing.
+
+/** A real git repo with at least one commit, whose `pipeline.user.yaml` is written but never
+ * `git add`ed/committed -- genuinely untracked, no HEAD blob for it at all. */
+function repoWithUntrackedUserYaml(prefix, gatesYaml) {
+  const dir = freshRoot(prefix);
+  git(dir, ["init", "-q", "-b", "main"]);
+  git(dir, ["config", "user.email", "fixture@example.invalid"]);
+  git(dir, ["config", "user.name", "Fixture"]);
+  writeFileSync(join(dir, "README.md"), "fixture\n");
+  git(dir, ["add", "README.md"]);
+  git(dir, ["commit", "-q", "-m", "init"]);
+  writeFileSync(join(dir, "pipeline.user.yaml"), `schema: "pipeline.user.v1"\n${gatesYaml}`); // never staged/committed
+  return dir;
+}
+
+check("EPL20 dir form (DoD a): untracked pipeline.user.yaml, no committed version at all -> off, regardless of what the untracked copy says", () => {
+  const dir = repoWithUntrackedUserYaml("untracked-no-commit", "gates:\n  push_external_ledger: \"required\"\n");
+  assert.equal(externalPushLedgerGate(dir), "off");
+});
+
+check("EPL21 dir form (DoD b): committed key absent, working tree dirty for an UNRELATED reason -> still off", () => {
+  const dir = userYamlRepo("committed-absent-unrelated-dirty", "gates:\n  push_approval: \"signature\"\n");
+  writeFileSync(join(dir, "pipeline.user.yaml"), "schema: \"pipeline.user.v1\"\ngates:\n  push_approval: \"chat\"\n"); // dirty; push_external_ledger stays absent both sides
+  assert.equal(externalPushLedgerGate(dir), "off");
+});
+
+check("EPL22 dir form (DoD c): committed required, working tree dirty for an UNRELATED reason -> still required", () => {
+  const dir = userYamlRepo("committed-required-unrelated-dirty", "gates:\n  push_external_ledger: \"required\"\n");
+  writeFileSync(join(dir, "pipeline.user.yaml"), "schema: \"pipeline.user.v1\"\ngates:\n  push_external_ledger: \"required\"\n  push_approval: \"chat\"\n"); // dirty, unrelated addition
+  assert.equal(externalPushLedgerGate(dir), "required");
+});
+
+check("EPL23 dir form: NOT a git repository at all, but a working-tree pipeline.user.yaml file exists -> required (distrust, not day-one 'off' -- mirrors pipeline-state-external-push-ledger.test.mjs's PSXL05 fixture)", () => {
+  const dir = freshRoot("no-repo-file-present");
+  writeFileSync(join(dir, "pipeline.user.yaml"), "schema: \"pipeline.user.v1\"\ngates:\n  push_external_ledger: \"required\"\n");
+  assert.equal(externalPushLedgerGate(dir), "required");
+});
+
 for (const root of fixtureRoots) rmSync(root, { recursive: true, force: true });
 console.log(`\n${passed}/${passed + failed} checks passed.`);
 process.exit(failed === 0 ? 0 : 1);

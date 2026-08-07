@@ -49,39 +49,80 @@
  *
  * `externalPushLedgerGate(manifestOrDir)` (design §3/§5): reads `gates.push_external_ledger`
  * out of `pipeline.user.yaml`, modeled on `readPushApprovalMode`'s committed-content-verified
- * shape (`plugins/pipeline-core/lib/critical-human-proof-policy.mjs`) -- a working-tree copy
- * that differs from the blob committed at HEAD is never trusted, so an in-session edit can only
- * ever strengthen this gate, never weaken it (same asymmetry, same rationale as that module's
- * own header comment). Reimplemented locally rather than imported: `critical-human-proof-
- * policy.mjs`'s `committedBytes` helper is not exported and that file is out of scope for this
- * change (WP5-phx2-implementation field 4).
+ * TRUST BOUNDARY (`plugins/pipeline-core/lib/critical-human-proof-policy.mjs`): only content
+ * that Git has actually committed at HEAD is ever treated as configuration; nothing read from
+ * the mutable working tree is. Reimplemented locally rather than imported: `critical-human-
+ * proof-policy.mjs`'s `committedBytes` helper is not exported and that file is out of scope for
+ * this change (WP5-phx2-implementation field 4).
  *
- * ONE deliberate divergence from `readPushApprovalMode`'s own direction (design §5, day-one
- * safety): absent file or absent key resolves to `"off"` (not consulted at all), the OPPOSITE
- * direction from ADR-0056's "absent resolves to strongest" -- because on day one of shipping
- * this design, zero repositories have ever populated the write side, so a fail-closed default
- * would break every push in every project the moment this code ships, with no operator action
- * having caused it. Once a value is genuinely configured (or the source cannot be trusted --
- * unreadable, unsafe path shape, or an uncommitted working-tree divergence from HEAD), the
- * fail-closed direction re-applies exactly as ADR-0056's does: anything other than the exact
- * string `"off"` resolves to `"required"`.
+ * WHY THIS IS NOT A BYTE-FOR-BYTE PORT OF `readPushApprovalMode` (WP5-phx2-rework-1, F4). That
+ * reader's own "any working-tree divergence from HEAD -> fail closed" rule is safe there for a
+ * reason that does not carry over: `readPushApprovalMode`'s absent-default and its fail-closed
+ * default are the SAME value (`"signature"`), so collapsing every kind of divergence into one
+ * bucket never changes the outcome. This module's absent-default (`"off"`, day-one safety, see
+ * below) and its fail-closed default (`"required"`) are DIFFERENT values by design -- so the
+ * same collapse is not merely conservative here, it is wrong: it would fail closed to
+ * `"required"` for a working tree that is merely dirty for a reason that has nothing to do with
+ * this key, even when HEAD's own committed content has no opinion at all or already says
+ * `"off"`. The generalization that DOES carry over is the underlying trust boundary itself,
+ * applied directly rather than through a byte-for-byte working-tree/HEAD comparison: resolve
+ * the value from the committed blob's OWN content when Git has one at all (whatever it says --
+ * `"off"`, `"required"`, absent-key, or malformed -- an uncommitted working-tree edit can
+ * neither weaken NOR fabricate that answer, since it is never consulted for parsing), and only
+ * when Git has no committed blob for this path at all does the day-one "off" default apply.
+ * `git show HEAD:<path>` reads the OBJECT DATABASE, not the working-tree file, so this needs no
+ * working-tree lstat/symlink check of its own for the "a committed blob exists" case: whatever
+ * is currently on disk at `pipeline.user.yaml` (present, absent, a symlink, mid-edit) cannot
+ * influence what HEAD's own blob says.
  *
- * `manifestOrDir` accepts a directory (string) -- read `pipeline.user.yaml` from underneath it,
- * committed-content-verified -- or an already-parsed, caller-trusted `pipeline.user.yaml`-
- * shaped document (object) -- read `.gates.push_external_ledger` directly off it, no
- * re-verification. Both of this module's actual call sites (`guard-push.mjs`'s read side,
- * `pipeline-state.mjs`'s `approve-push` write side) pass the directory form: `guard-push.mjs`'s
- * already-loaded `manifest` variable is `project/pipeline.yaml`'s (or `.claude/pipeline.yaml`'s)
- * parsed content, a DIFFERENT file with a different, nested `gates.push.approval` shape than
+ * `committedUserYamlBytes` therefore returns a THREE-WAY result, not a two-way one, and
+ * `externalPushLedgerGate` branches on all three (this is the completed F4 fix, WP5-phx2-
+ * rework-1 -- an earlier draft during the same fix collapsed the first two into one and broke
+ * `harness/scripts/pipeline-state-external-push-ledger.test.mjs`'s PSXL05 case, which
+ * deliberately runs `pipeline-state.mjs approve-push` against a directory that is not a git
+ * repository at all to exercise `discoverRepository`'s own throw path):
+ *   1. NO REPOSITORY could even be found at this path (`{ repoFound: false }`) -- Git itself
+ *      could not be consulted, so nothing here is verifiable one way or the other. This is a
+ *      genuine, key-presence-UNRELATED reason to distrust the source (the third bucket of the
+ *      three-way distinction) -- but only when there is something to distrust: a working-tree
+ *      file present here is an unverifiable CLAIM and fails closed to `"required"`; the
+ *      complete absence of both a repository and a file is genuinely nothing to have an opinion
+ *      about, `"off"`. An ordinary day-one project that has not opted in always HAS a real
+ *      repository (this branch is not that case; see bucket 2).
+ *   2. A repository exists, but HEAD has no blob at this path at all (`{ repoFound: true, bytes:
+ *      null }`) -- never committed, including an untracked working-tree-only copy -- genuinely
+ *      no committed opinion -> `"off"` (day-one safety, design §5, DoD case (a)), the OPPOSITE
+ *      direction from ADR-0056's "absent resolves to strongest" -- because on day one of
+ *      shipping this design, zero repositories have ever populated the write side, so a
+ *      fail-closed default would break every push in every project the moment this code ships,
+ *      with no operator action having caused it.
+ *   3. A committed blob exists (`{ repoFound: true, bytes: Buffer }`) -- the fail-closed
+ *      direction applies to its OWN content exactly as ADR-0056's does: anything other than the
+ *      exact committed string `"off"` (an explicit `"required"`, an unrecognised value, or a
+ *      blob that fails to parse as YAML at all) resolves to `"required"`, and an uncommitted
+ *      working-tree edit can neither weaken NOR fabricate that answer, since it is never
+ *      consulted for parsing (DoD cases (b)/(c)/(d)).
+ *
+ * `manifestOrDir` accepts a directory (string) -- read `pipeline.user.yaml`'s HEAD-committed
+ * blob from underneath it -- or an already-parsed, caller-trusted `pipeline.user.yaml`-shaped
+ * document (object) -- read `.gates.push_external_ledger` directly off it, no re-verification.
+ * Both of this module's actual call sites (`guard-push.mjs`'s read side, `pipeline-state.mjs`'s
+ * `approve-push` write side) pass the directory form: `guard-push.mjs`'s already-loaded
+ * `manifest` variable is `project/pipeline.yaml`'s (or `.claude/pipeline.yaml`'s) parsed
+ * content, a DIFFERENT file with a different, nested `gates.push.approval` shape than
  * `pipeline.user.yaml`'s flat `gates.push_external_ledger` -- passing it here would silently
- * never find the key. `guard-push.mjs` calls this with its own `projectDir` (already in scope,
- * same string form `pipeline-state.mjs`'s `approve-push` uses for its `dir`) instead. The object
- * form is kept, disclosed and tested, purely so the exported `manifestOrDir` signature is not a
- * silent lie about what it accepts.
+ * never find the key. `guard-push.mjs` calls this with the governed SESSION ROOT
+ * (`fallbackProjectDir()`, not the pushed repository's own `projectDir` -- WP5-phx2-rework-1,
+ * F5: reading it from the pushed repository would let a pushed repository's own committed
+ * `gates.push_external_ledger: "off"` stand this gate down for a session whose own root has it
+ * required, exactly the flaw the ADR-0056 waiver check one function above already avoids and
+ * documents its own reason for avoiding), same string form `pipeline-state.mjs`'s `approve-push`
+ * uses for its `dir`. The object form is kept, disclosed and tested, purely so the exported
+ * `manifestOrDir` signature is not a silent lie about what it accepts.
  *
  * VERIFY: node plugins/pipeline-core/lib/external-push-ledger.test.mjs
  */
-import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -171,30 +212,42 @@ export function checkExternalPushLedgerConsumption({
 }
 
 /**
- * The bytes Git has for `pipeline.user.yaml` at HEAD, or `null` when it has none. Mirrors
- * `critical-human-proof-policy.mjs`'s `committedBytes` (not exported there, and that file is
- * out of scope here -- see header). Kept in step with that precedent's own hard-won fixes: the
- * rev-spec path resolves against the repository TOP LEVEL, not `-C`, and only the directory
- * component is realpath-resolved (a symlinked `pipeline.user.yaml` itself must not be followed).
+ * The bytes Git has for `pipeline.user.yaml` at HEAD, discriminated from WHY there might be
+ * none: `{ repoFound: false }` when no repository could be found at `dir` at all (Git itself
+ * could not be consulted, so nothing here is verifiable one way or the other); otherwise
+ * `{ repoFound: true, bytes: Buffer|null }`, `bytes` being `null` when the repository exists
+ * but HEAD simply has no blob at this path (never committed, or committed and later removed).
+ * Mirrors `critical-human-proof-policy.mjs`'s `committedBytes` (not exported there, and that
+ * file is out of scope here -- see header) for the underlying git plumbing, but returns the
+ * repo-found/no-blob split that one collapses, because -- unlike that sibling's push_approval,
+ * whose absent-default and fail-closed default are the SAME value -- this module's two
+ * defaults differ (see the header's "WHY THIS IS NOT A BYTE-FOR-BYTE PORT" paragraph), so which
+ * of the two null-causing situations happened is externally observable behavior here, not an
+ * internal detail. Kept in step with that precedent's own hard-won fixes: the rev-spec path
+ * resolves against the repository TOP LEVEL, not `-C`, and only the directory component is
+ * realpath-resolved (a symlinked `pipeline.user.yaml` itself must not be followed).
  */
 function committedUserYamlBytes(dir) {
   try {
     const top = spawnSync("git", ["-C", dir, "rev-parse", "--show-toplevel"], { encoding: "utf8" });
-    if (top.error || top.status !== 0 || typeof top.stdout !== "string") return null;
+    if (top.error || top.status !== 0 || typeof top.stdout !== "string") return { repoFound: false };
     const repoRoot = top.stdout.trim();
-    if (repoRoot === "") return null;
-    // Only the DIRECTORY is realpath-resolved -- a symlinked pipeline.user.yaml itself must
-    // not be followed (readPushApprovalMode rejects that shape before this ever runs).
+    if (repoRoot === "") return { repoFound: false };
+    // Only the DIRECTORY is realpath-resolved -- the `pipeline.user.yaml` path component is a
+    // purely lexical join, never touched on disk here. `git show HEAD:<path>` reads the object
+    // database by that path string; it does not traverse or dereference whatever currently sits
+    // at that path in the working tree (present, absent, or a symlink), so a symlinked working-
+    // tree copy cannot influence what this function returns either way.
     const relPath = relative(repoRoot, join(realpathSync(resolve(dir)), USER_SOURCE_PATH));
-    if (relPath === "" || relPath.startsWith("..") || isAbsolute(relPath)) return null;
+    if (relPath === "" || relPath.startsWith("..") || isAbsolute(relPath)) return { repoFound: false };
     const result = spawnSync("git", ["-C", dir, "show", `HEAD:${relPath.split(sep).join("/")}`], {
       encoding: "buffer",
       maxBuffer: 1024 * 1024,
     });
-    if (result.error || result.status !== 0 || !result.stdout) return null;
-    return Buffer.from(result.stdout);
+    if (result.error || result.status !== 0 || !result.stdout) return { repoFound: true, bytes: null };
+    return { repoFound: true, bytes: Buffer.from(result.stdout) };
   } catch {
-    return null;
+    return { repoFound: false };
   }
 }
 
@@ -214,25 +267,34 @@ export function externalPushLedgerGate(manifestOrDir) {
     throw new TypeError("externalPushLedgerGate requires a directory string or a parsed document object");
   }
   const dir = resolve(manifestOrDir);
-  const path = join(dir, USER_SOURCE_PATH);
   const committed = committedUserYamlBytes(dir);
-  if (!existsSync(path)) {
-    // Nothing anywhere -> genuinely no opinion -> "off" (day-one safety, design §5). A
-    // committed blob that the working tree deleted is an uncommitted divergence, not "no
-    // opinion" -- fails closed instead of silently reading as "off".
-    return committed === null ? "off" : "required";
+  if (!committed.repoFound) {
+    // No repository could even be found at this path -- Git could not be consulted at all, so
+    // nothing here is verifiable one way or the other. That is a genuine, key-presence-
+    // UNRELATED reason to distrust the source (the third bucket of the F4 fix's three-way
+    // distinction), distinct from an ordinary day-one project that simply has not opted in yet
+    // (which always has a real repository, see the `repoFound` branch below). A working-tree
+    // file making an unverifiable claim here fails closed; the complete absence of both a
+    // repository AND a file is genuinely nothing to have an opinion about at all.
+    return existsSync(join(dir, USER_SOURCE_PATH)) ? "required" : "off";
   }
+  if (committed.bytes === null) {
+    // A real repository exists, but HEAD has no blob for pipeline.user.yaml at this path at
+    // all (never committed, including an untracked working-tree-only copy) -- genuinely no
+    // committed opinion -> "off" (day-one safety, design §5), regardless of what an untracked
+    // working-tree copy happens to say (WP5-phx2-rework-1 F4, DoD case (a)).
+    return "off";
+  }
+  // A committed blob exists -- resolve strictly from ITS content, never the working tree's.
+  // This is the actual F4 fix: the previous version returned a hardcoded "required" the moment
+  // the working tree merely differed from this blob for ANY reason, without ever parsing what
+  // the blob itself says (DoD cases (b)/(c)). Reading straight from the committed blob makes an
+  // uncommitted working-tree edit powerless either way: it can neither weaken an already
+  // "required" committed gate (EPL16/EPL17/PGXL06, unchanged -- DoD case (d)) nor fabricate a
+  // "required" out of a committed "off" or a committed absence (the bug F4 reported).
   try {
-    const stat = lstatSync(path);
-    if (!stat.isFile() || stat.isSymbolicLink()) return "required";
-    const raw = readFileSync(path, "utf8");
-    if (committed === null || Buffer.compare(committed, Buffer.from(raw, "utf8")) !== 0) {
-      // Working tree disagrees with (or cannot be confirmed against) HEAD -> the same
-      // "uncommitted" disposition readPushApprovalMode uses, fails closed here too.
-      return "required";
-    }
-    return resolveGateValue(parseYaml(raw)?.gates?.push_external_ledger);
+    return resolveGateValue(parseYaml(committed.bytes.toString("utf8"))?.gates?.push_external_ledger);
   } catch {
-    return "required";
+    return "required"; // committed blob does not even parse as this module's YAML subset
   }
 }
