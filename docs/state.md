@@ -82,7 +82,16 @@ post-merge redesign packages have landed code this session:
   HEAD^` + a pathspec-scoped recommit, nothing lost — both sessions
   independently verified the recovery. **Next:** a bounded delta Critic
   re-review (base `f16b8f2`, head `f01f111`, prior finding IDs F1/F4/F5) —
-  dispatched. **Not the implementation's own
+  **PASS, no findings.** F1/F4/F5 all independently re-derived and confirmed
+  resolved from source; no regression against any pre-existing test or
+  invariant. Full report:
+  `specs/sprint-phoenix-epic/evidence/wp5-phx2-rework-1-delta-critic-review-f01f111.md`.
+  **WP5/PHX-2 is now Critic-clean end to end (design + implementation) —
+  ready for the PO's self-application gate.** One item still genuinely
+  blocked, unchanged from before: `verify.mjs`'s suite registration for the
+  ledger test files (TP-3 guard-protected, needs the audited override or a
+  direct PO edit outside any agent session).
+  **Not the implementation's own
   fault, an Elephant/dispatch-construction lesson for next time:** the
   evidence-gathering approach this session invented (run selected suites,
   hand-write a summary JSON) does not satisfy QG-03; the correct approach is
