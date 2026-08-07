@@ -5,6 +5,40 @@
 
 **Last updated:** 2026-08-07
 
+**Design phase, open packages (2026-08-07 evening).** Two design documents were
+authored this session and both are in the Critic cycle:
+- **PHX-LEDGER-INTAKE** (`f68a17d`, GMW/HGO evidence into the human decision
+  ledger). Critic round 1/4: **FAIL**, 4 major + 3 minor, report at
+  `specs/sprint-phoenix-epic/evidence/phx-ledger-intake-design-critic-review-f68a17d.md`
+  (`bbebe18`). The two findings that make the contract unimplementable as
+  written: **F1**, the intersection rule never states which candidate it passes
+  to `resolveHumanGovernanceAuthority`, and both available readings fail — the
+  current candidate makes every moved-HEAD window look like a false
+  ledger/window disagreement (and a reconcile keyed on that can append a
+  permanently irreversible `revoked`), while the grant's own candidate makes the
+  check vacuous; **F3**, the HGO half names `scope.artifacts` as "plan + spec of
+  the override", which HGO does not carry at all. **F2** would write a stable
+  pseudonym into an append-only record *through* the design's own privacy test,
+  because `policyDigest`'s preimage is left open and its natural resolution is a
+  digest over the trust anchor the design explicitly excluded one section
+  earlier. **F4** anchors the hook-path residual to H-AC-12's migration clause
+  while H-AC-02 states the same requirement unconditionally and is cited
+  nowhere. Rework dispatched (`PHX-LEDGER-INTAKE-rework-1`, Design-tier).
+  Trajectory verdict was `consistent` and the Critic re-verified ~40 of the
+  document's citations itself — this is a fail on a strong document, and the
+  Critic said so.
+- **PHX-R2-THREATMODEL-rework** (`ad5d185`): Critic round 1 dispatched, report
+  outstanding.
+  Both Critics returned a truncated single-sentence fragment on their first
+  completion and had to be asked for the mandated report — the third and fourth
+  occurrence of that pattern this session. It is a dispatch-harness behaviour,
+  not a review defect: the resumed agent had done the work.
+  **Evidence-transcription rule established (`bbebe18`):** a Critic report is
+  persisted by the Elephant (the Critic is read-only and writes nothing), and
+  machine-specific absolute paths in it are transcribed repo-relative, because
+  CLAUDE.md forbids those in committed artifacts. The change is disclosed in the
+  evidence file's own header rather than made silently.
+
 **HOLD — plugin snapshot sync deferred by PO instruction (2026-08-07 evening).**
 A newer local plugin candidate is installed and reloaded:
 `0.5.3+claude.20260807181921.f667dec` at
