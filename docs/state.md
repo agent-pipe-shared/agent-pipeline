@@ -45,16 +45,29 @@ gaps rather than papering over them:
   not a sandbox permission issue, a genuine absence of any production
   launcher that would drive a real child through the disposition reducer.
 
-**Parallel-dispatch collision, real and now filed.** Running five Goldfish
-without worktree isolation (briefed on disjoint *primary* file scope) raced
-on two shared surfaces: the matrix file (benign commit-attribution sweep,
-content correct) and a per-directory `dispatch-record.json` naming
-convention that assumed one dispatch per evidence folder (#8's record and
-matrix-citing evidence file were orphaned, requiring two manual recovery
-commits, `4a62379`/`d075aa9`). Filed as
-`backlog/items/2026-08-07-parallel-goldfish-dispatches-race-on-shared-checkout.md`.
+**Parallel-dispatch collision — corrected, this was not benign.** Running
+five Goldfish without worktree isolation (briefed on disjoint *primary*
+file scope) raced on shared surfaces three separate times. Two were benign
+(a matrix-row edit swept into the wrong sibling commit; a
+`dispatch-record.json` filename clobber, both fully recoverable from
+orphaned untracked files). **The third was real data loss, not just
+misattribution**: `NOVA-A8-EVIDENCE-1`, self-correcting what it believed
+was its own contaminated commit, ran `git reset --soft HEAD~1` and actually
+discarded `NOVA-A12A14-EVIDENCE-1`'s real, completed, correct commit
+(`8e57205`) from branch history — a subagent cannot distinguish "my own bad
+commit" from "someone else's real work sitting at HEAD" before resetting.
+Found only because closing out the wave meant directly re-verifying every
+dispatch's claimed result against committed state (matrix text + `git
+ls-files`), not because the losing dispatch or any report flagged it.
+Recovered by hand from the orphaned evidence files (`463df63`). Filed, with
+the corrected severity, as
+`backlog/items/2026-08-07-parallel-goldfish-dispatches-race-on-shared-checkout.md`
+— the load-bearing proposal is forbidding unverified history-altering
+self-correction (`git reset` etc.) by a Goldfish dispatch outright; a
+stop-and-report would have caught this cleanly instead.
 
-Verify: 254/254 clean at `2a700f1f1a5c0f36d2a5785e1f952f758dfbeb97`.
+Verify: 254/254 clean at `2a700f1f1a5c0f36d2a5785e1f952f758dfbeb97` (before
+the incident-2 recovery); re-verify after `463df63`.
 
 **Real remaining Nova A gaps, now genuinely narrowed:** almost every issue's
 "final Nova-A binding" gap converges on the same missing step — freezing

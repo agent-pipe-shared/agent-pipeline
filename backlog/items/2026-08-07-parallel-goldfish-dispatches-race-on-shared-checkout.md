@@ -20,39 +20,60 @@ dispatch touches — even when each dispatch's *primary* scope is disjoint,
 because the goldfish-task template's own commit discipline
 (`git add -- <exact paths>` then `git commit -- <same paths>`) re-adds
 whatever the *working tree* currently holds for those paths, not a snapshot
-taken at dispatch start. Two concrete failure modes were observed in the
-same wave:
+taken at dispatch start. **Corrected 2026-08-07, same day:** this item
+originally described the observed effects as "benign" / "no data lost."
+That was wrong for one of the three actual incidents in the same wave —
+corrected below after directly re-verifying committed state against every
+dispatch's own final report, rather than trusting the reports alone.
 
-1. **Silent commit sweep.** Two dispatches (`NOVA-A12A14-EVIDENCE-1` and a
-   sibling) both touched `issue-acceptance-matrix.md` (different rows).
-   Whichever committed second implicitly picked up the first dispatch's
-   already-staged row edit too, because both edits lived in the same
-   working-tree file at commit time. Benign here (content was correct,
-   just misattributed to the wrong commit's diff/`Dispatch:` trailer), but
-   it means per-dispatch evidence/authorship attribution (the trailer's
-   whole purpose per the template) is not reliable under parallel dispatch.
-2. **Shared-filename clobber.** Two dispatches (`NOVA-A8-EVIDENCE-1` and
-   `NOVA-A56-EVIDENCE-1`) were separately briefed to write
-   `dispatch-record.json` into the same evidence subdirectory
-   (`specs/sprint-nova-epic/evidence/nova-a/a6/`), each mirroring an
-   established naming pattern that assumed one dispatch per slice-folder.
-   The second write clobbered the first. The losing dispatch additionally
-   attempted a `git commit -- <paths>` that picked up the *other* dispatch's
-   already-staged files (mode 1 above), detected it via `git show --stat`,
-   and self-corrected with a local `git reset --soft HEAD~1`. It then
-   reported honestly that nothing landed — but its own evidence file and
-   matrix-row edit remained correct on disk, just orphaned (the file was
-   gitignored and untracked, and the matrix edit had, unknown to it,
-   already been swept into a third dispatch's commit by mode 1). The
-   Elephant had to reconcile this by hand after the fact (two recovery
-   commits, `4a62379`/`d075aa9`).
+Three concrete incidents, same wave, in probable causal order:
 
-Neither incident lost data or corrupted committed content — both were
-caught and reconciled — but both were luck-adjacent: mode 1 could just as
-easily have dropped a real edit if the two writes had raced differently
-(e.g. simultaneous `git commit` rather than sequential), and mode 2 required
-the losing dispatch to notice the collision itself and self-correct rather
-than blindly committing over the other's work.
+1. **Benign commit sweep (no loss).** `NOVA-A29-EVIDENCE-1`'s matrix-row
+   edit landed inside `NOVA-A56-EVIDENCE-1`'s commit (`196b32c`) instead of
+   its own commit (`805797a`), because both edits lived in the same
+   working-tree file at commit time. Content correct, just misattributed to
+   the wrong commit's diff/`Dispatch:` trailer — per-dispatch authorship
+   evidence (the trailer's whole purpose) is not reliable under parallel
+   dispatch, but nothing was lost.
+2. **A real commit destroyed by another dispatch's self-correction
+   (actual data loss, recovered by hand).** `NOVA-A12A14-EVIDENCE-1`
+   completed and made a real standalone commit (`8e57205`, its own
+   matrix-row edit + two evidence files). `NOVA-A8-EVIDENCE-1`, running
+   concurrently, later ran its own `git commit -- <its own paths>`, found
+   unexpected content in the result (evidently including `#12`/`#14`
+   material still present in the shared working tree/index), concluded
+   *its own* commit was contaminated, and ran `git reset --soft HEAD~1` to
+   undo what it believed was its own mistake. **This actually discarded
+   `8e57205` — a different dispatch's real, completed, correct commit —
+   from branch history**, not just its own erroneous one; the subagent had
+   no way to distinguish "my commit picked up someone else's staged
+   content" from "someone else's real commit is sitting at HEAD" before
+   resetting. The content survived only as orphaned, gitignored, untracked
+   files on disk (`git ls-files` for the target directory returned empty;
+   the matrix still carried the pre-dispatch text). Found and recovered by
+   the Elephant only because closing out the wave included directly
+   re-verifying every dispatch's claimed result against committed state,
+   not because any dispatch flagged it (`463df63`).
+3. **Shared-filename clobber, evidence recoverable (no loss, but required
+   manual reconciliation).** `NOVA-A8-EVIDENCE-1` and `NOVA-A56-EVIDENCE-1`
+   were separately briefed to write `dispatch-record.json` into the same
+   evidence subdirectory (`specs/sprint-nova-epic/evidence/nova-a/a6/`),
+   each mirroring an established naming pattern that assumed one dispatch
+   per slice-folder. `#56`'s write landed; `#8`'s own evidence file and
+   matrix-row edit were left uncommitted after incident 2's revert cascade
+   and were never committed by any dispatch. Recovered by hand
+   (`4a62379`/`d075aa9`).
+
+**The load-bearing finding is incident 2, not incidents 1/3:** a subagent
+performed a history-altering operation (`git reset --soft`) on a shared
+branch based only on its own local, incomplete view of concurrent state,
+with no way to tell "this is my own bad commit" from "this is someone
+else's real, finished work sitting at HEAD right now." That is a
+structural gap in the dispatch discipline, not a one-off mistake by that
+specific run — any future parallel-dispatch wave where one subagent
+self-corrects via reset is exposed to the same risk, and unlike incidents
+1/3 (recoverable orphaned files), a hard `git reset --hard` or a push in
+between would have made this unrecoverable.
 
 ## Triggering situation
 
@@ -91,6 +112,14 @@ Not designed here. Candidates for a future session:
    the dispatches' *primary* files overlap" but "does *any* file either
    dispatch will `git add`/write to overlap, including shared tracking
    documents and shared-directory conventions."
+4. **Forbid unverified `git reset`/history-altering self-correction by a
+   Goldfish dispatch outright** — the template's stop-condition discipline
+   already says "more than 2 failed attempts... report the failure state";
+   a subagent that suspects its own commit is contaminated should stop and
+   report the exact commit SHA and diff it's unsure about, never
+   unilaterally reset HEAD on a branch it does not exclusively own. This
+   would have converted incident 2 into a clean stop-and-report instead of
+   silent history loss.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
