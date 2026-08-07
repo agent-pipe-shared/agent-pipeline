@@ -125,6 +125,7 @@ mapping above.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
+- **Design (2026-08-07):** `specs/sprint-phoenix-epic/design/gmw-hgo-evidence-intake-into-the-human-ledger.md`
 - **Decision:**
 - **Rationale:**
 - **Assignment (if accepted):**
