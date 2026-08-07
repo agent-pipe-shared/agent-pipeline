@@ -60,6 +60,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0046](0046-project-authority-layering.md) | Project authority layering | accepted | 2026-07-24 |
 | [0047](0047-model-free-advisor-preflight-v2.md) | Model-free Advisor preflight and on-demand consultation v2 | accepted | 2026-07-29 |
 | [0047-N](0047-local-supervisor-state-authority.md) | Local supervisor state authority (repository-local numbering collision retained) | accepted | 2026-07-26 |
+| [0047-N2](0047-governance-event-kernel.md) | Governance event kernel uses separate immutable stream records (Phoenix PHX-1; repository-local numbering collision retained) | accepted | 2026-08-02 |
 | [0048](0048-local-goldfish-supervisor.md) | Local Goldfish supervisor | accepted | 2026-07-26 |
 | [0049](0049-gitlab-ci-constrained-remote-executor-pilot.md) | GitLab CI constrained remote-executor pilot | accepted | 2026-07-27 |
 | [0050](0050-candidate-bound-verify-run-journal.md) | Candidate-bound private Verify run journal | accepted | 2026-08-01 |
