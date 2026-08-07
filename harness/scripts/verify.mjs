@@ -51,6 +51,12 @@ import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  NOVA_APPROVAL_PENDING_BINDING,
+  NOVA_APPROVAL_PENDING_STATUS,
+  NOVA_APPROVAL_STATE_PATH,
+  classifyNovaCandidateWorktree,
+} from "../../plugins/pipeline-core/lib/nova-candidate-freeze.mjs";
 import { resolveAuthorityArtifactPath } from "../../plugins/pipeline-core/lib/project-authority.mjs";
 import { validateScopedVerifyRegistration } from "../../plugins/pipeline-core/lib/scoped-verify-registration.mjs";
 import { validateWindowsAssuranceVerifyRegistration } from "../../plugins/pipeline-core/lib/windows-assurance-verify-registration.mjs";
@@ -66,16 +72,31 @@ const hooksDir = join(repoRoot, "plugins", "pipeline-core", "hooks");
 const libDir = join(repoRoot, "plugins", "pipeline-core", "lib");
 const pluginScriptsDir = join(repoRoot, "plugins", "pipeline-core", "scripts");
 
-/** Capture one exact clean Git candidate; an unavailable Git fixture stays explicit. */
+/**
+ * Capture one exact clean Git candidate; an unavailable Git fixture stays explicit.
+ * The single non-clean status that is not `dirty` is `approval-pending` (ADR-0061 Change 3):
+ * a tree whose only modification is the push approval `approve-push` just recorded FOR THIS
+ * commit. The freeze library owns that judgment -- see nova-candidate-freeze.mjs -- and every
+ * tree it cannot fully read stays `dirty`, so this reader is never the place that widens it.
+ */
 function candidateIdentity() {
   try {
     const commit = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8", cwd: repoRoot });
     const tree = spawnSync("git", ["rev-parse", "HEAD^{tree}"], { encoding: "utf8", cwd: repoRoot });
     const worktree = spawnSync("git", ["status", "--porcelain=v1"], { encoding: "utf8", cwd: repoRoot });
     if (commit.status !== 0 || tree.status !== 0 || worktree.status !== 0) return { status: "unavailable", commit: null, tree: null };
+    const commitId = commit.stdout.trim();
     return {
-      status: worktree.stdout === "" ? "clean" : "dirty",
-      commit: commit.stdout.trim(),
+      status: classifyNovaCandidateWorktree({
+        porcelain: worktree.stdout,
+        headCommit: commitId,
+        readHeadState: () => {
+          const blob = spawnSync("git", ["show", `${commitId}:${NOVA_APPROVAL_STATE_PATH}`], { encoding: "utf8", cwd: repoRoot });
+          return blob.status === 0 ? blob.stdout : null;
+        },
+        readWorktreeState: () => readFileSync(join(repoRoot, NOVA_APPROVAL_STATE_PATH), "utf8"),
+      }),
+      commit: commitId,
       tree: tree.stdout.trim(),
     };
   } catch { return { status: "unavailable", commit: null, tree: null }; }
@@ -513,8 +534,11 @@ if (startedCandidate.status === "dirty") {
 }
 
 const finishedCandidate = candidateIdentity();
-if (startedCandidate.status === "clean") {
-  const stable = finishedCandidate.status === "clean"
+// An `approval-pending` candidate earns the same stability obligation as a clean one: the
+// tolerated dirt is a fixed, already-classified record, so any further movement while the
+// suites ran is drift exactly as it would be on a pristine tree.
+if (startedCandidate.status === "clean" || startedCandidate.status === NOVA_APPROVAL_PENDING_STATUS) {
+  const stable = finishedCandidate.status === startedCandidate.status
     && startedCandidate.commit === finishedCandidate.commit
     && startedCandidate.tree === finishedCandidate.tree;
   if (!stable) {
@@ -534,7 +558,9 @@ const evidence = {
   candidate: {
     start: startedCandidate,
     finish: finishedCandidate,
-    binding: startedCandidate.status === "unavailable" ? "unavailable" : startedCandidate.status === "dirty" ? "preflight-rejected" : steps.some((step) => step.name === "candidate-binding") ? "drift" : "exact",
+    // `approval-pending` is deliberately NOT `exact`: a run under an armed push approval must
+    // never be readable as a run on a pristine tree (ADR-0061 Change 3).
+    binding: startedCandidate.status === "unavailable" ? "unavailable" : startedCandidate.status === "dirty" ? "preflight-rejected" : steps.some((step) => step.name === "candidate-binding") ? "drift" : startedCandidate.status === NOVA_APPROVAL_PENDING_STATUS ? NOVA_APPROVAL_PENDING_BINDING : "exact",
   },
   startedAt: verifyStartedAt,
   finishedAt: new Date().toISOString(),
