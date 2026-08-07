@@ -638,11 +638,18 @@ the template, because the operating model's §4 step 5 also says "prohibitions".
 `harness/scripts/check-doc-contracts.mjs` validates Markdown links and their fragments: it collects
 heading anchors (`:163-187`), resolves every relative link target (`:414-438`), and reports "anchor
 not found" when a fragment does not resolve (`:451-454`). It does **not** validate prose `§N.M`
-references — nothing does. So a citation written as `[§ The lifecycle](../../docs/operating-model.md#4-the-lifecycle)`
-is checked by the existing verify gate on every run, while `§4.2` is checked by nobody. The
-extractor is line-based and contains no HTML-comment handling, so links inside the templates'
-`<!-- ... -->` header blocks are validated exactly like body links — which is precisely where the
-stale citations sit.
+references — nothing does. So a citation written as a Markdown link with the destination
+`docs/operating-model.md#4-the-lifecycle` (spelled relative to the citing file — from
+`templates/prompts/` that is two levels up) is checked by the existing verify gate on every run,
+while `§4.2` is checked by nobody. The extractor is line-based and contains no HTML-comment
+handling, so links inside the templates' `<!-- ... -->` header blocks are validated exactly like
+body links — which is precisely where the stale citations sit.
+
+Two properties of the checker the implementation must respect, both measured in this session rather
+than assumed (§III.4): the extractor does **not** exempt inline-code spans, so even an *example*
+link written inside backticks is resolved and must be correct; and destinations are resolved
+relative to the citing file, so the same citation needs a different `../` depth in
+`templates/prompts/` than in `roles/`.
 
 The residual is honest and small: an anchor slug contains the section number
 (`#4-the-lifecycle`), so a renumbering still breaks the link — but it breaks it **red**, in the
@@ -797,4 +804,14 @@ not this document's.
 - `rg -n "anchor|slug|\]\(|LINK|headings" harness/scripts/check-doc-contracts.mjs` → the link/anchor
   validation of §II.3 (`:163-187`, `:288-302`, `:414-454`); no HTML-comment handling exists.
 - `node harness/scripts/check-doc-contracts.mjs` → green before this document was written
-  ("480 Markdown file(s), 776 link(s), 13 anchor check(s)"), and again after.
+  ("480 Markdown file(s), 776 link(s), 13 anchor check(s)"), and green again on the final state
+  ("481 Markdown file(s), 776 link(s), 13 anchor check(s)").
+- One red→green cycle in between, on this document itself, and it is the evidence behind §II.3
+  rather than an anecdote: an *example* citation written inside backticks was still resolved as a
+  real link and failed with `DOC-CONTRACT … -> ../../docs/operating-model.md#4-the-lifecycle: target
+  is not tracked`, because the destination's `../` depth was written for a file in
+  `templates/prompts/` while the citing file lives three levels deep under `specs/`. Two facts
+  measured, not assumed: the checker does not exempt inline-code spans, and it resolves
+  destinations relative to the citing file. It also only checks links from *tracked* files, so the
+  finding appeared on the commit, not on the first run against the untracked draft — an
+  implementation dispatch that runs the gate only before committing will not see this class.
