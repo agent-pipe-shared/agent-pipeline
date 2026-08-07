@@ -1684,19 +1684,25 @@ if (pushGate.approval === "standing-approved") {
               + "--proof-request <path> --proof-authority <path> --proof <path>."
             : `Push approval critical proof is unavailable: project/critical-human-proof.json is ${pushWaiver.code}.`,
         );
-      } else if (externalPushLedgerGate(projectDir) !== "off") {
+      } else if (externalPushLedgerGate(fallbackProjectDir()) !== "off") {
         // PHX-2 additive external ledger (opt-in, see design doc §2/§5). AND-ed onto the
         // base signature attestation above -- evaluated only once `attested.authorized` is
         // already true, since there is nothing to consume-check if the base proof did not
-        // verify. `projectDir` (not `manifest`) is passed deliberately: `manifest` here is
-        // project/pipeline.yaml's already-loaded content (nested `gates.push.approval`
-        // shape), a different file from `pipeline.user.yaml`'s flat `gates.push_external_
-        // ledger` this gate actually lives in -- passing `manifest` would silently never
-        // find the key. `projectDir` is the same worktree-local root form `externalPushLedgerGate`
-        // also accepts from `pipeline-state.mjs`'s `dir`.
+        // verify. `fallbackProjectDir()` (not `manifest`, and NOT `projectDir` -- WP5-phx2-
+        // rework-1, F5) is passed deliberately: `manifest` here is project/pipeline.yaml's
+        // already-loaded content (nested `gates.push.approval` shape), a different file from
+        // `pipeline.user.yaml`'s flat `gates.push_external_ledger` this gate actually lives
+        // in -- passing `manifest` would silently never find the key. `projectDir` is the
+        // PUSHED repository, not the governed session root -- exactly the same distinction
+        // the ADR-0056 waiver check above (`pushWaiver`) already reads from
+        // `fallbackProjectDir()`, not `projectDir`, for: reading it from the pushed
+        // repository would let a pushed repository's own committed
+        // `gates.push_external_ledger: "off"` stand this gate down for a session whose own
+        // root has it required. Same root cause as the anchor (T6 F1) and the waiver above;
+        // the fix belongs in both places or in neither.
         let repository = null;
         try {
-          repository = discoverRepository(projectDir, { timeout: 5000 });
+          repository = discoverRepository(fallbackProjectDir(), { timeout: 5000 });
         } catch {
           // discoverRepository throws on >=7 paths (missing/symlinked start path, git spawn
           // failure/non-zero exit incl. WT-GIT-SPAWN, submodule/`--separate-git-dir` common-dir

@@ -271,6 +271,106 @@ const ALLOW = 0, BLOCK = 2;
   });
 }
 
+/**
+ * WP5-phx2-rework-1 F5: an outer repository that is the governed session root, carrying its
+ * own committed `pipeline.user.yaml` (what `fallbackProjectDir()` reads), and a nested inner
+ * repository -- the repository the push command actually names via `-C sub` -- carrying a
+ * DIFFERENT committed `pipeline.user.yaml` plus the full attested-push apparatus. The trust
+ * anchor (`project/critical-human-proof.json`) is written into the OUTER repository, matching
+ * `authorizeRecordedPush`'s own `anchorDir: fallbackProjectDir()` contract, so the base
+ * ADR-0056 attestation genuinely succeeds and this fixture exercises the external-ledger gate
+ * specifically -- unlike guard-push.test.mjs's `nestedAttestedRepo` (T6 F1), which puts the
+ * anchor in the WRONG place (inner) on purpose to prove that fails.
+ */
+function nestedSignedPushRepo(prefix, { outerGates, innerGates, destination = "refs/heads/feature-test" } = {}) {
+  const { dir: outer } = freshRepo(prefix);
+  if (outerGates) writeUserYamlCommitted(outer, outerGates);
+
+  const inner = join(outer, "sub");
+  mkdirSync(inner, { recursive: true });
+  const git = (...args) => spawnSync("git", args, { cwd: inner, encoding: "utf8" });
+  git("init", "-q", "-b", "main");
+  git("config", "user.email", "goldfish@example.invalid");
+  git("config", "user.name", "Goldfish");
+  writeFileSync(join(inner, "README.md"), "nested\n");
+  git("add", "README.md");
+  git("commit", "-q", "-m", "init");
+  if (innerGates) writeUserYamlCommitted(inner, innerGates);
+
+  const key = pushKeypair();
+  const head = gitAt(inner, "rev-parse", "HEAD").stdout.trim();
+  writeManifest(inner, manifestPush({ approval: "required" }));
+  writeEvidence(inner, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  const tree = gitAt(inner, "rev-parse", `${head}^{tree}`).stdout.trim();
+
+  const threatModelBody = "# nested xledger threat model\n";
+  writeEvidence(inner, THREAT_MODEL_REL, threatModelBody);
+  const threatModel = { path: THREAT_MODEL_REL, sha256: createHash("sha256").update(threatModelBody).digest("hex") };
+
+  // Trust anchor lives in OUTER -- the governed session root `authorizeRecordedPush` actually
+  // reads it from (`anchorDir: fallbackProjectDir()`), not the pushed target repository.
+  writeProofPolicy(outer, {
+    schema: "pipeline.critical-human-proof-policy.v1",
+    requiredKinds: ["push", "deploy", "publication"],
+    trustAnchor: { keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 },
+  });
+
+  const remote = "origin";
+  const candidate = { commit: head, tree };
+  const action = {
+    kind: "push",
+    subjectSha256: criticalActionSubjectSha256({ kind: "push", candidate, subject: { sourceCommit: candidate.commit, remote, destination, threatModel } }),
+    expiresAt: "2099-01-01T00:00:00.000Z",
+  };
+  const intent = createPoApprovalIntent({
+    kind: "critical-action", featureId: "fixture-feature", planSha256: "c".repeat(64), specSha256: "d".repeat(64),
+    candidate, policyRevision: "critical-human-proof-v1", subjectSha256: criticalActionSha256(action), decision: "approved",
+  });
+  const proof = {
+    schema: "pipeline.po-approval-proof.v1",
+    intentSha256: intent.sha256,
+    keyReference: "po-key-1",
+    publicKey: key.publicPem,
+    signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), key.privateKey).toString("base64"),
+  };
+  const proofSha256 = createHash("sha256").update(canonicalJson(proof)).digest("hex");
+
+  // `state` lives in INNER -- the pushed target repository `projectDir` resolves to.
+  writeState(inner, {
+    schema: "pipeline.state.v0",
+    activeFeature: { id: "fixture-feature" },
+    planApproval: { poGateAuthority: { planSha256: "c".repeat(64), specSha256: "d".repeat(64) } },
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-06T06:00:00.000Z", forCommit: head,
+      criticalProof: { proofSha256, intentSha256: intent.sha256, action, proof },
+      remote, destination, threatModel,
+    } },
+    criticalProofConsumption: [{ proofSha256, kind: "push", consumedAt: "2026-08-06T06:00:00.000Z" }],
+  });
+  return { outer, inner, head, proofSha256 };
+}
+
+// ---- PGXL07: WP5-phx2-rework-1 F5 -- the gate config and ledger fingerprint must be read
+// from the governed session root (fallbackProjectDir()), never from the pushed target
+// repository -- mirrors how guard-push.test.mjs's PG12s13/PG12s14 (T6 F1) test the same
+// session-root-vs-target-repo distinction for the base ADR-0056 trust anchor.
+{
+  const { outer } = nestedSignedPushRepo("session-root-vs-target", {
+    outerGates: "gates:\n  push_external_ledger: \"required\"\n",
+    innerGates: "gates:\n  push_external_ledger: \"off\"\n",
+  });
+  const home = mkdtempSync(join(tmpdir(), "guard-push-xledger-home-"));
+  ALL_DIRS.push(home);
+  // No ledger record is seeded for either fingerprint -- the point of this case is that the
+  // session root's "required" must still be CONSULTED at all, not silently bypassed by the
+  // pushed target's own committed "off". Before the F5 fix, this pushed clean (exit 0): the
+  // gate read the pushed target's "off" and never reached the ledger check.
+  check("PGXL07 block  a pushed target's own committed gate:off cannot stand down the session root's required gate",
+    "git -C sub push origin HEAD:refs/heads/feature-test", outer, home, BLOCK, {
+      stderrIncludes: ["External push ledger consumption is PUSH-EXTERNAL-LEDGER-MISSING"],
+    });
+}
+
 for (const dir of ALL_DIRS) {
   try { rmSync(dir, { recursive: true, force: true }); } catch { /* best effort */ }
 }
