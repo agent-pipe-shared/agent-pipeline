@@ -146,7 +146,7 @@ export function buildReleasePreflight({ rootDir = process.cwd(), preflightId, ba
 
   const input = {
     preflightId,
-    base: { commit: git(root, ["rev-parse", baseCommit]), tree: baseTree },
+    base: { commit: git(root, ["rev-parse", `${baseCommit}^{commit}`]), tree: baseTree },
     candidate,
     repository,
     version: { candidateVersion: version.candidateVersion, targetVersion: version.targetVersion, decisionId: version.decisionId, decisionSha256: version.decisionSha256 },
