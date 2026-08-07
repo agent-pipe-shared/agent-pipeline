@@ -478,7 +478,111 @@ post-merge redesign packages have landed code this session:
   whose whole purpose is lifting guard refusals. The 14-test core suite carries
   the real load. Pre-existing (it arrived that way in the marketplace snapshot),
   not a regression, and not a blocker — recorded as its own backlog item rather
-  than left as an observation in a handover paragraph.
+  than left as an observation in a handover paragraph. **Withdrawn on PO
+  instruction (APS, 2026-08-07)** — "das backlog item zum GMW brauchst du nicht
+  das habe ich an die andere session gegeben": the session owning the GMW
+  module took it over. Item deleted in `c3d6ea5`; the observation is kept here
+  so it is not lost with the file.
+
+  **PO requirement (APS, 2026-08-07) — GMW/HGO evidence must reach Phoenix's
+  audit ledger.** "der finale GMW und HGO … in der nächsten Version ihre
+  Evidenzen sauber in den Audit-Ledger schreiben, den Phoenix dann liefert …
+  was wurde wann warum von wem freigegeben". Recorded as
+  `backlog/items/2026-08-07-gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger.md`
+  with the field mapping onto the already-bound acceptance criteria (H-AC-11
+  covers all four questions, H-AC-04 the binding dimensions) plus three gaps
+  found on verification rather than assumed: (1) **H-AC-12's enumeration of
+  authority-granting paths predates GMW and does not name it** — HGO is covered
+  as "Git-guard override consumption", GMW is absent, so a conformance run
+  would pass while GMW sits entirely outside the ledger; (2) **GMW retains no
+  history at all today** — `install` overwrites via `writeAtomic` and
+  `closeGuardMaintenanceWindow` does `unlinkSync`, so after the normal end
+  state (a closed window) no evidence remains that it existed, the exact
+  opposite of H-AC-06's append-only requirement; (3) **"by whom" cannot be
+  satisfied by logging a name** — H-AC-05/H-AC-13 keep natural-person
+  attribution, joinable pseudonyms and free-form rationale out of the portable
+  record entirely, so it needs two records in different trust zones with no
+  join handle (H-AC-11); the same split applies to "why" (stable reason code
+  portable, GMW's current free-text `subject.reason` not). Design dispatched
+  (`PHX-LEDGER-INTAKE-design`, Design-tier), briefed to design the *receiving
+  contract* and to label every assumption about the unfinished GMW's final
+  shape as unverified.
+
+  **`PHX-RESIDUALS-design` landed** (Design-tier `claude-opus-5`/xhigh),
+  commits `64be53f`/`53b3194`/`fa3a538`, design at
+  `specs/sprint-phoenix-epic/design/part-a-residuals-and-dispatch-template-drift.md`.
+  All three PO-accepted residuals designed into implementable scope.
+  **R1:** extract the full gate evaluation into a dedicated module, then GS-9
+  on it; four alternatives rejected with tradeoffs; refresh timing
+  independently re-verified against `hooks.json:39` rather than restated on
+  trust; **an irreducible remainder of unprotected wiring is disclosed**, not
+  papered over. **R2: direction 1 (offline signed release attestation)
+  recommended, not left open**, and staged — the only one of the two satisfying
+  Part A's no-network-in-bootstrap constraint, reusing three existing primitive
+  families. Direction 2 rejected: it puts a network read in a path that must
+  work offline, is known-broken in the exact Codex+WSL sandbox its sibling
+  Part B exists for (so any network condition switches the gate off —
+  fail-open), and does not even escape the anchor problem, since a non-git copy
+  has no local origin to read and would need a pin *plus* the network
+  dependency; its one genuine advantage (closing Part A's limitation 2) is
+  recorded. **R3:** the six-field briefing list gets `roles/goldfish.md` GF-01
+  as its canonical carrier (option c, no new file), and citations become anchor
+  links instead of drift-prone section numbers, closing the defect class
+  structurally; the citation inventory found **8** stale references, 4 more
+  than the backlog item had recorded.
+  **Highest-risk assumption, flagged by the dispatch as most likely to break
+  its own recommendation: U4** — `stableFile` rejects `nlink !== 1n`, so a
+  hardlinking installer would make every installed-copy attestation fail
+  closed. Must be measured on a real install before R2 stage 2 starts.
+  **Two adjacent defects found and deliberately NOT fixed**, both correctly out
+  of scope and recorded rather than silently passed: a stale comment at
+  `guard-lifecycle-ready.mjs:197` claiming the shell needles are "scoped to
+  GS-1..GS-5" when the table has carried GS-7/GS-8 for a while and `:206`
+  derives needles from the whole array; and four more stale `OM §…` citations
+  inside `harness/review-protocol.md`, the same defect class as R3 but outside
+  its stated scope — enumerated with a recommendation, left as a PO/Elephant
+  scope call.
+  **Honest caveat the dispatch volunteered:** its document contains no Markdown
+  links at all (repo-wide link count unchanged at 776), so the green
+  doc-contract result satisfies "links and anchors resolve" trivially, not
+  richly — the citations are backtick code spans, which that checker does not
+  validate. The same limitation was already recorded for the Part A package.
+  **Next:** this design needs its own independent Critic review before any
+  implementation dispatch (CLAUDE.md self-application), and the PO still owns
+  five named decisions — chiefly (a) release signing as a *process* commitment
+  (a second held key, signing each release) before R2 stage 2 starts.
+
+  **PO decision on open question (a): REJECTED, with a threat-model correction
+  that binds the whole package (APS, 2026-08-07).** "PO schlüssel?! ne jetzt
+  übertreiben wir hier wieder! wir sichern den agenten ab und nicht den human.
+  Das signieren ausserhalb ist schon heftig genug." A second PO-held key and a
+  per-release signing ceremony are **not** to be introduced. The binding
+  constraint the PO states, which is broader than question (a) and should be
+  read as a standing scope rule for this repository's guard work:
+  **the adversary these mechanisms defend against is the AGENT, not a human
+  attacker.** The existing detached-signature burden (ADR-0056 `signature`
+  mode) is already at the acceptable ceiling; no new human ceremony may be
+  added on top of it.
+  **Consequence, stated plainly rather than softened:** R2's recommended
+  direction 1 (offline signed release attestation) is built on exactly the
+  process commitment just refused, so **the R2 recommendation does not
+  survive this decision** — stage 2 as designed is dead, and stages 1/3 need
+  re-derivation against the corrected threat model. Direction 2 was already
+  rejected on technical grounds that still stand.
+  **The corrected threat model also puts R2's premise itself in question, and
+  that must be re-examined rather than assumed:** GS-6 already refuses agent
+  writes into the live plugin root, so an *agent* cannot alter the installed
+  copy in the first place. The residual R2 was created to close ("a forked or
+  locally altered marketplace copy passes readiness undetected") is therefore
+  largely a *human*-adversary scenario — the class the PO has just placed out
+  of scope — with an accidental-drift/misconfiguration remainder that is a
+  correctness concern, not a security one, and that needs no signature to
+  detect. Whether anything of R2 remains worth building, and in what form, is
+  the question the rework must answer honestly, including the answer "less
+  than we thought". Note this may partially reinstate what candidate direction
+  3 proposed, which an earlier PO decision overrode — that earlier override was
+  taken before the threat model was stated, and the rework must reconcile the
+  two rather than silently preferring one.
 - **GMW (Guard Maintenance Window, ADR-0058) merged in from the local-development
   marketplace snapshot** (commit `cca5ad8`): the PO pointed at
   `/home/skar667/agent-pipeline-local-marketplace` as the currently-wired snapshot
