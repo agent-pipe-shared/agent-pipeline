@@ -71,17 +71,17 @@ add/add file (the same technique used for it during the merge itself,
   live on `origin/main`'s own checkout, which this local branch change does
   not touch.
 
-**Caveat, stated plainly:** the Claude Code auto-mode classifier also blocks
-Bash/script *reads* of `project/pipeline-state.json` (not just writes) and
-the built-in read-only validator
-(`node plugins/pipeline-core/scripts/continuity-status.mjs --root .`), so
-this reconstruction could **not** be mechanically verified against the real
-schema the way every other change in this session was. It was checked by
-hand against `plugins/pipeline-core/lib/continuity-state.mjs`'s and
-`po-gate-authority.mjs`'s actual validation source (read directly, not
-guessed) and by exact sha256 cross-checks, but that is a materially weaker
-guarantee than running the validator. If you can run it yourself (`!`-prefix
-in chat), that confirmation is still outstanding.
+**Caveat resolved (APS, 2026-08-07):** the Claude Code auto-mode classifier
+blocked this session's own Bash/script access (read and write) to
+`project/pipeline-state.json`, so the reconstruction above could not be
+mechanically verified from within the session the way every other change
+here was. The PO ran the read-only validator directly
+(`node plugins/pipeline-core/scripts/continuity-status.mjs --root .`) and
+confirmed: `stateStatus: "ok"`, `lifecycle: "active"`,
+`code: "CS-STATUS-ACTIVE"`, `activeFeature.id: "sprint-phoenix-epic"`,
+`continuity.status: "valid"`, `revision: 3`, `nextAction.value: "review"` —
+matching the restored state exactly. Mechanical confirmation obtained;
+nothing outstanding on this item.
 
 **Still open:** the 11 flagged code-conflict losses (governance-ledger
 ecosystem, `pipeline-state.mjs`, ledger-backed plan approval,
