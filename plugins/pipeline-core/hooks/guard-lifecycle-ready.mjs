@@ -578,7 +578,7 @@ export function isForbiddenCrossRepositoryMutation(command, root, dependencies =
 }
 
 /**
- * Strip an optional trailing `--runner <claude|codex>` before the shape checks.
+ * Strip an optional `--runner <claude|codex>` pair before the shape checks.
  *
  * ADR-0051 requires the invoking runner to be threaded explicitly, and the onboarding
  * CLI now honours it — but this allowlist predated that and accepted only the
@@ -587,12 +587,19 @@ export function isForbiddenCrossRepositoryMutation(command, root, dependencies =
  * runner, i.e. it pushed every caller onto the exact path ADR-0051 exists to prevent,
  * and the refusal it printed named a command it would itself deny.
  *
- * Narrow by construction: only the two registered runner values, only as the final
- * pair, and the remaining shape is still matched exactly as before.
+ * `lifecycleArgv(argv, runner, intent)` always appends `--runner <runner>` first and,
+ * whenever `intent !== "onboarding"`, `--intent <intent>` afterward — so `--runner` is
+ * not always the trailing pair; it can also sit second-to-last, with `--intent`
+ * trailing. Scan the array for the first `--runner <claude|codex>` pair found
+ * anywhere and remove it, so both shapes normalize correctly before the shape
+ * checks run. Narrow by construction: only the two registered runner values,
+ * only an exact `--runner <value>` pair, first match only.
  */
 function withoutRunnerFlag(args) {
-  if (args.length >= 2 && args[args.length - 2] === "--runner" && ["claude", "codex"].includes(args[args.length - 1])) {
-    return args.slice(0, -2);
+  for (let i = 0; i < args.length - 1; i += 1) {
+    if (args[i] === "--runner" && ["claude", "codex"].includes(args[i + 1])) {
+      return [...args.slice(0, i), ...args.slice(i + 2)];
+    }
   }
   return args;
 }
@@ -607,7 +614,10 @@ function sanctionedOnboardingArgs(rawArgs, root) {
   if (args[0] === "continuity" && args[1] === "inspect"
     && exactRoot(args, root, 2) && args.length === 4) return true;
   if (["plan", "plan-runtime", "plan-reinstall", "plan-repair", "plan-readback", "plan-source-recovery", "plan-manifest-repair"].includes(args[0])
-    && exactRoot(args, root, 1) && args.length === 3) return true;
+    && exactRoot(args, root, 1)
+    && (args.length === 3
+      || (args.length === 5 && args[3] === "--intent"
+        && ["onboarding", "bootstrap", "session", "dispatch"].includes(args[4])))) return true;
   if (["plan-source-recovery", "plan-manifest-repair"].includes(args[0])
     && exactRoot(args, root, 1) && args.length === 3) return true;
   if (args[0] === "apply-manifest-repair"

@@ -742,6 +742,45 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+test("plan-runtime family accepts the runner-plus-intent argv lifecycleArgv actually emits for non-default intents", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const command of [
+      "plan", "plan-runtime", "plan-reinstall", "plan-repair", "plan-readback",
+      "plan-source-recovery", "plan-manifest-repair",
+    ]) {
+      // Regression pin: this is the exact 7-token argv shape lifecycleArgv(argv, runner, intent)
+      // emits at project-onboarding-v3.mjs:1300-1303 whenever intent !== "onboarding" — --runner
+      // is appended first, --intent afterward, so --runner sits second-to-last, not trailing.
+      for (const intent of ["onboarding", "bootstrap", "session", "dispatch"]) {
+        for (const runner of ["claude", "codex"]) {
+          const withIntent = `node '${ONBOARDING_SCRIPT}' ${command} --root '${path}' --runner ${runner} --intent ${intent}`;
+          assert.equal(isSanctionedLifecycleCommand(withIntent, path), true, withIntent);
+        }
+      }
+      // No-regression pin: the pre-existing default-intent shape (trailing --runner, no
+      // --intent) must keep working exactly as before the generalization.
+      assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' ${command} --root '${path}' --runner claude`, path), true);
+      assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' ${command} --root '${path}' --runner codex`, path), true);
+      assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' ${command} --root '${path}'`, path), true);
+    }
+    for (const command of [
+      // invalid intent value
+      `node '${ONBOARDING_SCRIPT}' plan-runtime --root '${path}' --runner claude --intent unknown`,
+      // invalid runner value
+      `node '${ONBOARDING_SCRIPT}' plan-runtime --root '${path}' --runner windows --intent session`,
+      // malformed / wrong-length argv
+      `node '${ONBOARDING_SCRIPT}' plan-runtime --root '${path}' --intent session --extra flag`,
+      `node '${ONBOARDING_SCRIPT}' plan-runtime --root '${path}' --runner claude --intent session --extra flag`,
+      `node '${ONBOARDING_SCRIPT}' plan-runtime --root '${path}' --runner claude --intent`,
+      `node '${ONBOARDING_SCRIPT}' plan-runtime --root '${path}' --runner claude --goal session`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 test("partial PO authority rebind admits only the exact read-only planner", () => {
   const path = root();
   try {
