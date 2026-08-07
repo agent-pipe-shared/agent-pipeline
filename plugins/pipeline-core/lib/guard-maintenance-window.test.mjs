@@ -9,20 +9,17 @@
  * LIBRARY level: scope rejection (including F3 defense in depth at install/read time,
  * not just prepare), fail-closed expiry parsing over the signed `expiresAtMs` (F1/F2
  * fix: an absolute, signed bound rather than a relative ttlSeconds reinterpreted
- * later), non-renewability of a repeated install, TTL clamp beyond a signed claim,
- * physical-repository binding, and tamper detection.
+ * later), non-renewability of a repeated install, an install-time bound rejecting any
+ * signed expiresAtMs more than one MAX_WINDOW_TTL_MS beyond the actual install time
+ * (Critic delta review 2 Finding 1, closing the "walk the read-time ceiling forward
+ * from one signature" gap left by the first fix), physical-repository binding, and
+ * tamper detection.
  *
  * Guard-integration end-to-end coverage (a REAL armed window installed, then a
  * covered path allowed and a NEVER_LIFTABLE_KERNEL_PATHS path still refused, through
- * the actual guard-gate-strength.mjs/guard-testpath.mjs binaries) is NOT in this
- * file, and is NOT yet in guard-gate-strength.test.mjs/guard-testpath.test.mjs
- * either (Critic finding F4, dispatch NOVA-GMW-1): both files are protected by this
- * repository's own live guard-testpath.mjs rules (TP-2, TP-6) with
- * gates.push_approval: "signature", which admits no in-session override -- every
- * Edit attempt into either file is refused before any bytes change, confirmed twice
- * across two dispatch turns. See the dispatch report's Open Items for the exact
- * refusal text and the intended test content, held for the PO/Elephant to apply
- * outside a guarded session.
+ * the actual guard-gate-strength.mjs/guard-testpath.mjs binaries) lives in
+ * guard-gate-strength.test.mjs (GST20) and guard-testpath.test.mjs (TP09), applied by
+ * the PO outside this dispatch's guarded session (Critic findings F4/F5, closed).
  *
  * Run: node plugins/pipeline-core/lib/guard-maintenance-window.test.mjs
  */
@@ -272,21 +269,52 @@ try {
     assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent");
   });
 
-  // ---- TTL clamp: a signed claim beyond MAX_WINDOW_TTL_MS is honored only up to the clamp
-  check("GMW05 a signed expiresAtMs beyond MAX_WINDOW_TTL_MS is clamped, not honored in full", () => {
+  // ---- TTL clamp / Finding 1 (delta Critic review 2, bounded to 2bc1fc8) -------------
+  // Pre-fix, an oversized signed expiresAtMs installed successfully and was merely
+  // read-time-clamped -- which a repeated install() (re-anchoring installedAtMs to a
+  // later "now" each time) could walk forward indefinitely from one PO signature
+  // (Finding 1). Post-fix, install() itself refuses any request whose signed
+  // expiresAtMs exceeds one MAX_WINDOW_TTL_MS beyond the ACTUAL install time -- the
+  // exploit never gets a first foothold. This check reproduces Finding 1's exact
+  // scenario (~100x MAX_WINDOW_TTL_MS, hand-built, bypassing prepare()'s own clamp)
+  // and asserts the FIRST installGuardMaintenanceWindow call itself throws.
+  check("GMW05 a signed expiresAtMs far beyond nowMs + MAX_WINDOW_TTL_MS is refused at the FIRST install, never silently honored (Finding 1)", () => {
     const root = repoFixture("gmw-ttl-");
     const plugin = pluginRootFixture();
     const before = Date.now();
-    // Far beyond the 4h ceiling, bypassing prepare()'s own clamp entirely.
+    // Far beyond the 4h ceiling, bypassing prepare()'s own clamp entirely -- exactly
+    // Finding 1's precondition.
     const { request, intent } = handBuiltRequest({
       root, plugin, scopeRuleIds: ["GS-6"], expiresAtMs: before + MAX_WINDOW_TTL_MS * 100, reason: "excessive claim",
     });
-    const installed = installGuardMaintenanceWindow({
-      rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin,
+    assert.throws(
+      () => installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin }),
+      GuardMaintenanceWindowError,
+      "the first install attempt of a grossly oversized signed expiresAtMs must itself refuse, not silently clamp",
+    );
+    assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent", "a refused install must leave no window record behind");
+  });
+
+  check("GMW13 the exploit does not get a foothold: re-attempting install() of the same oversized request never succeeds, even much later", () => {
+    // Finding 1's actual attack shape was REPEATED install() calls walking the
+    // read-time ceiling forward. Confirms the fix holds not just on the first
+    // attempt but on every subsequent one -- there is no "wait a bit, try again"
+    // route around the new install-time bound for this same oversized request.
+    const root = repoFixture("gmw-ttl-repeat-");
+    const plugin = pluginRootFixture();
+    const before = Date.now();
+    const { request, intent } = handBuiltRequest({
+      root, plugin, scopeRuleIds: ["GS-6"], expiresAtMs: before + MAX_WINDOW_TTL_MS * 100, reason: "excessive claim, repeated",
     });
-    assert.equal(installed.status, "active");
-    assert.ok(installed.remainingMs <= MAX_WINDOW_TTL_MS, `remainingMs=${installed.remainingMs} exceeds the clamp`);
-    assert.ok(installed.expiresAtMs <= before + MAX_WINDOW_TTL_MS + 5_000, "effective expiry exceeds installedAt + MAX_WINDOW_TTL_MS");
+    const proof = proofFor(intent);
+    for (const nowMs of [before, before + 60_000, before + 2 * 60 * 60 * 1000]) {
+      assert.throws(
+        () => installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy, proof, livePluginRoot: plugin, nowMs }),
+        GuardMaintenanceWindowError,
+        `install must still refuse at nowMs=${nowMs}`,
+      );
+    }
+    assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent");
   });
 
   // ---- physical-repository binding --------------------------------------------------

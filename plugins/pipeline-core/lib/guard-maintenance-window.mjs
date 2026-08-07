@@ -421,6 +421,28 @@ export function installGuardMaintenanceWindow({ rootDir, request, trustPolicy, p
   // The signed `expiresAtMs` is written through VERBATIM -- install() never recomputes
   // or extends it (F1/F2 fix). If it has already passed, there is nothing left to arm.
   if (request.subject.expiresAtMs <= nowMs) fail("GMW-EXPIRED", "the signed window has already expired; nothing left to arm");
+  // Critic delta review 2 (Finding 1, bounded to 2bc1fc8): `validSubject` places no
+  // upper bound on a hand-built (non-prepare()) subject.expiresAtMs beyond
+  // finiteness/positivity -- only prepare()'s OWN clamp bounded it, and a hand-built
+  // request bypasses prepare() entirely. Without this check, ONE PO signature over a
+  // grossly oversized expiresAtMs (e.g. ~100x MAX_WINDOW_TTL_MS) could be
+  // re-submitted to install() every <4h, each call re-anchoring the read-time ceiling
+  // (`installedAtMs + MAX_WINDOW_TTL_MS`) forward from a LATER "now" -- walking the
+  // effective expiry forward indefinitely (bounded only by the huge signed value)
+  // from that single signature, contradicting INV-2 and ADR-0058 point 4's
+  // `min(signedExpiresAt, openedAt + MAX_TTL)` formula, where "openedAt" implies a
+  // stable, one-time anchor. Rejecting here, at the FIRST install attempt, denies the
+  // exploit a foothold: a request only ever installs when its signed expiry is
+  // already within one MAX_WINDOW_TTL_MS of the ACTUAL install time, so no later
+  // re-install can ever walk the ceiling past what was already true at first install.
+  // A normal prepare()-built request always satisfies this (prepare clamps to
+  // nowMs_prepare + min(ttl, MAX_TTL), and install happens at or after prepare, so
+  // nowMs_install + MAX_TTL >= nowMs_prepare + MAX_TTL >= expiresAtMs); a legitimate
+  // repeated install of an already-small-TTL window (GMW09) stays far below this
+  // bound on every call.
+  if (request.subject.expiresAtMs > nowMs + MAX_WINDOW_TTL_MS) {
+    fail("GMW-EXPIRY-TOO-FAR", "the signed expiresAtMs is more than one MAX_WINDOW_TTL_MS beyond the actual install time");
+  }
   // `installedAtMs` is informational only (audit: when this record was actually placed)
   // -- it is NOT part of the signed subject and carries no security weight of its own.
   // A defensive read-time ceiling (currentGuardMaintenanceWindow) uses it only to
@@ -429,7 +451,8 @@ export function installGuardMaintenanceWindow({ rootDir, request, trustPolicy, p
   // PO actually signed. Re-running install() with the identical {request, proof} is
   // therefore safe: it just reinstalls the same signed, already-bounded window rather
   // than resetting a fresh expiry from a later "now" (closes F2's "unlimited renewable"
-  // failure mode).
+  // failure mode), and the check above now guarantees this holds even for a hand-built
+  // subject that skipped prepare()'s own clamp.
   const installedAtMs = nowMs;
   const record = {
     schema: GMW_WINDOW_SCHEMA,
