@@ -268,8 +268,19 @@ The cost, stated because it is easy to walk into: once a cachebuster-free
 version is installed, **you cannot push a corrected build of that same version
 locally.** The registry sees an unchanged version string and does not
 re-materialize. If a fix is needed after cutting, either re-add a cachebuster
-for the test round or move to the next patch number. Practical consequence:
-install a released version locally AFTER its review has cleared, not before.
+for the test round or move to the next patch number.
+
+The practice that follows, adopted 2026-08-07: **carry the cachebuster while a
+version is under review, and strip it when the release tag is cut.** A
+candidate that cannot be replaced is the wrong shape for something a reviewer
+may still send back; a released artifact that is not reproducible from its own
+commit is the wrong shape for something people install. The two constraints do
+not conflict, they just apply at different moments.
+
+Only the Claude manifest carries build metadata. Codex's stays at the bare
+semver, and `codex-pretool-guard.test.mjs` compares BASE versions — it splits
+at `+` before comparing — so the two manifests agree while only one is
+cachebusted.
 
 The Claude manifest is not the only one carrying the number. Codex has its own
 `plugins/pipeline-core/.codex-plugin/plugin.json`, and

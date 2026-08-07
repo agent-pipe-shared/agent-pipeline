@@ -7,12 +7,19 @@ the candidate is ready and on what evidence. Everything here is read from
 `docs/state.md`'s 2026-08-07 sections, ADR-0056/0058/0059, the gate evidence
 files, and direct invocation — nothing is asserted from memory.
 
-`VERSION` reads `0.5.3`, and both plugin manifests — Claude's
-`.claude-plugin/plugin.json` and Codex's `.codex-plugin/plugin.json` — read
-`0.5.3` with no build cachebuster, matching how 0.5.2 was cut for release.
-`codex-pretool-guard.test.mjs` enforces that the Codex manifest and `VERSION`
-agree, which is what caught the Codex manifest being left behind on a first
-attempt.
+`VERSION` reads `0.5.3`. Codex's `.codex-plugin/plugin.json` reads `0.5.3`;
+Claude's `.claude-plugin/plugin.json` reads
+`0.5.3+claude.20260807181921.f667dec`. `codex-pretool-guard.test.mjs` compares
+BASE versions, splitting at `+`, so the two agree — and that check is what
+caught the Codex manifest being left behind on a first bump attempt.
+
+**The cachebuster is deliberately retained on this candidate**, against the
+usual release practice of stripping it, because of a cost that only bites
+after the fact: a cachebuster-free version cannot be re-materialized locally
+under the same number, so a fix found in review would force `0.5.4` rather
+than a corrected `0.5.3`. Keeping it preserves the ability to replace this
+exact build while it is still under review. Strip it when cutting the actual
+release tag, not before.
 
 **Why 0.5.3 and not 0.6.0, although this candidate adds a capability.** In this
 repository the minor position tracks sprints, not feature counts: a `0.X` bump
@@ -137,7 +144,7 @@ scripts (re-read per invocation); a change to `hooks.json` wiring needs a new
 session. This candidate does not change `hooks.json`.
 
 **Readback before trusting it:** `claude plugin list --json` shows
-`0.5.3` at `scope: "user"`, and
+`0.5.3+claude.20260807181921.f667dec` at `scope: "user"`, and
 `pipeline-start-preflight.mjs` returns `status: "ready"` with
 `installedSource: "local-development"`. A `plugin-refresh-required` there means
 manifest and registry disagree.
