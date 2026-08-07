@@ -265,6 +265,92 @@ the gate prints `(operating-model §7)` into its operator-visible fix string.
 Note (c) is a one-line change but sits in a `harness/scripts/` file, so it
 follows the ordinary briefed-task path rather than an in-session edit.
 
+**THE VERIFY GATE RAN END TO END FOR THE FIRST TIME IN THIS SESSION — AND IT IS
+RED (2026-08-08).** This is the session's most consequential result, and it is a
+result, not a failure.
+
+| | |
+| --- | --- |
+| Command | `node harness/scripts/verify.mjs` |
+| Where | detached worktree at `b3901b1`, clean tree, `candidate.binding: "exact"` |
+| Exit code | **1** |
+| Registered steps | **260** |
+| Terminal receipts | **260** — every registered step produced one; no step was skipped |
+| **Passed / failed** | **256 / 4** |
+| Duration | 3 m 02 s |
+| Run id | `verify-1786142281528-629c486b0b030457` |
+
+**Before the repair the number was zero.** The 0.5.3 merge auto-merged
+`harness/scripts/verify.mjs` without conflict and left
+`guard-maintenance-window-tests` registered **twice**;
+`plugins/pipeline-core/lib/verify-resume.mjs:114` throws
+`Verify suite registration is invalid` on the first repeated id, before planning
+anything. The gate was not slow or flaky — it started no suite at all, and said so
+in five words. Repaired in `b3901b1` under the human-signed maintenance window; the
+two duplicate lines were proven byte-identical by SHA-256 over the raw line bytes
+before either was removed, and history decided which one went (the merge-introduced
+copy, restoring the pre-merge array order).
+
+**THE FOUR FAILURES. All pre-existing, none caused by this session's commits, and
+all four were invisible for as long as the gate could not start.**
+
+1. **`product-capability-inventory-tests`** — `HAW-A02 accepts an attested receipt
+   and an honest inventory-phase pending gate`:
+   `assert.equal(validated(inventory()).ok, true)` got `false`
+   (`harness/scripts/check-product-capability-inventory.test.mjs:124`). `HAW-A00`
+   and `HAW-A01` pass.
+2. **`authority-tier-agreement-check`** — `TIER-DRIFT protectedTestPaths: tiers
+   disagree`. The `project/` tier carries **TP-1…TP-11**; the `.claude/` tier
+   carries only **TP-1…TP-10**. **TP-11 — the rule protecting the origin-allowlist
+   test — exists in one authority tier and not the other.** Worth reading twice: a
+   protected-test-path rule whose coverage depends on which tier a project resolves
+   to is a guard that is present or absent by accident of layout.
+3. **`security-scan-tests`** — `gitleaks ignore: Nova A1 no longer carries
+   commit-bound legacy fingerprints`: 13 fingerprints still pinned at commit
+   `9dd9c5b1`, across `backlog/transitions.ndjson`, three `backlog/receipts/*.json`
+   and several `specs/sprint-nova-epic/evidence/backlog/*` files. Every other
+   security-scan assertion passes.
+4. **`backlog-state-check`** — `ledger event N: evidence.commit is not a reachable
+   local Git commit`, for events **14 through 38**.
+
+None was repaired, skipped or weakened: the dispatch was forbidden to, and a red
+gate is the information. **They now need owners.** Failure 2 is the one this feature
+should care about directly — it touches the same protected-test-path machinery R1
+depends on.
+
+**A process risk this session created and should not repeat.** Four dispatches ran
+concurrently in **one** checkout. `8839b71` landed 11 seconds after `b3901b1`, and
+an unrelated backlog file appeared *staged* in the index between one dispatch's two
+commits. Nothing leaked — every commit was pathspec-scoped and each contains exactly
+one file, verified with `git log --stat` — but that was discipline and timing, not
+isolation. A single pathspec-less `git commit` would have swept up another
+dispatch's staged work. Parallel dispatches need either worktree isolation or a
+serialized commit lane; running them in a shared checkout is a bet that every
+briefing remembers to scope its pathspec.
+
+**Also landed under the window:**
+- **`57065c3`** — R1 review finding F1 fixed, and fixed better than briefed: rather
+  than substituting the correct line number, the citations now name the construct
+  (`the caller's sole `const status =` ternary in `observePipelineStartPreflight``)
+  and carry no line number at all. The reasoning is recorded in the comment itself —
+  a number is exactly what rotted, and the construct name is unique and searchable.
+  Landed **before** the plugin refresh, so it cost two tokens instead of a human
+  action.
+- **`aed8807`** — `guard-gate-strength-origin-attestation.test.mjs`, 7 cases
+  (GST31–GST37), the first behavioural coverage GS-8 and GS-9 have ever had.
+  Non-vacuity was **proven, not assumed**: five mutants, each red, each with its
+  observed failure recorded. The case worth naming is **GST35**, which pins that the
+  rules are not *inert* — that every table entry names a file that exists and that
+  the guard's own resolver maps that real file back to that rule. A typo in a rule's
+  path would have been green under every pre-existing test and would have protected
+  nothing.
+  That dispatch also **corrected a premise of its own briefing** rather than
+  accepting it: GS-8/GS-9 were not entirely uncovered — GST01/GST17 iterate the
+  table — but that coverage is table-derived, which is precisely the blind spot
+  GST35 closes. It also declined to assert kernel-list membership, because that is
+  the open P5 decision and pinning today's answer would make strengthening the guard
+  a red suite.
+
 **THE 0.5.3 MERGE IS DONE (`35d9e11`), plus the ledger reconciliation (`6a5331d`).**
 `origin/main` `2740041`, tag `v0.5.3`, merged into `sprint_phoenix`. The plan
 written before any file was touched predicted the outcome exactly: seven
