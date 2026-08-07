@@ -160,13 +160,28 @@ and the danger of an unscoped "lift everything" default.
   guardrail-tier review chain for NOVA-GMW-1** (three correction rounds:
   F1-F3, F4-F5, Finding 1 -- each independently Elephant- and
   Critic-verified, never taken on the dispatched agent's self-report alone).
+- **Merged, 2026-08-07:** the PO merged `worktree-agent-ab84ec0efe49bd94a`
+  into `feat/sprint-nova-codex-v046` (merge commit `8bc5ceb`, conflict-free --
+  the two branches never touched an overlapping file since their common
+  ancestor, confirmed before merging). Full Verify re-run by the Elephant
+  post-merge: **255/255, exit 0** on `82d2d648`, sealed at
+  `specs/sprint-nova-epic/evidence/nova-gmw/verify-82d2d64-merged-main.json`
+  (commit `343b10d`). Two unrelated real findings surfaced and were handled
+  along the way: a backlog-ledger drift from an earlier same-day item
+  (mechanically reconciled); and a genuinely new structural gap --
+  `codex-critic-isolation.test.mjs` requires this repository's own live HEAD
+  to be a single-parent commit, which the merge commit itself briefly
+  violated (self-resolved once HEAD advanced past it via ordinary commits;
+  filed as `backlog/items/2026-08-07-codex-critic-isolation-fixture-rejects-merge-commit-head.md`
+  since a Verify run pinned exactly to a merge commit would hit it again).
+  Also filed this session: `backlog/items/2026-08-07-onboarding-restart-flow-is-codex-only-not-runner-aware.md`
+  (PO-reported defect from a separate session, detailed root cause, not
+  fixed here -- guardrail/core-logic scope).
 - **Not yet done:** the PO's own end-to-end signing test with a real trust
-  anchor; the deliberate, human-attended merge of the worktree branch
-  (`worktree-agent-ab84ec0efe49bd94a`, final commit `22767f5`) into this
-  checkout's own live-enforcing branch, followed by refreshing the local
-  marketplace candidate (`/home/skar667/agent-pipeline-local-marketplace`)
-  and a session restart -- both explicitly out of scope for any dispatched
-  agent, next up with the PO; the bootstrap SessionStart
+  anchor; refreshing the local marketplace candidate
+  (`/home/skar667/agent-pipeline-local-marketplace`, per
+  `docs/claude-local-plugin-development.md`) and a session restart -- next up
+  with the PO; the bootstrap SessionStart
   warning (design already written, appended to the same design-note commit
   `4398dde`); end-to-end testing with a real PO-signed proof (needs the
   PO's own external signing device/key — cannot happen inside any agent
