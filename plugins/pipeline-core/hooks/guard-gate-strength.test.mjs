@@ -598,6 +598,38 @@ try {
     assert.doesNotMatch(lifted.stderr, /no in-session override/u);
   });
 
+  check("GST30 an unusable override store still says a route was attempted, and what the attempt hit", () => {
+    // Moved here from lib/human-guard-override.test.mjs, which hosted it only because this
+    // suite is TP-6 protected and no maintenance window was open when NOVA-HGOSIG-ROUTE-1
+    // landed it. It spawns this guard end to end, so it belongs beside the guard it
+    // describes; the library suite keeps the renderer's own direct unit cases.
+    //
+    // GST24 above pins the half that must NOT change -- an unusable store is not an
+    // authorization, so the refusal stands, no route is printed and nothing is consumed;
+    // those assertions are not repeated here. This is the other half (ADR-0059 Decision 4):
+    // the denial now says a route was ATTEMPTED and names the typed code the attempt hit,
+    // instead of being byte-identical to a rule that has no override at all -- which for
+    // this guard is a real, adjacent case (GS-6, pinned by GST29). `governed()` has no Git
+    // control path, so the planner throws rather than answering a typed status, exercising
+    // humanGuardRouteUnavailableReason()'s `error` branch.
+    const rule = GATE_STRENGTH_PATHS.find((entry) => entry.id === "GS-4");
+    const root = governed();
+    const { blocked, stderr } = ask(root, rule.path);
+    assert.equal(blocked, true, "a broken override store must not become an authorization");
+    assert.match(stderr, /Rule ID: GS-4\b/u);
+    assert.match(
+      stderr,
+      /No human override route is offered for this exact edit; the guard attempted to plan one\.\nReason: planning the route failed with code=HGO-GIT\./u,
+      `the route-less denial said nothing about why:\n${stderr}`,
+    );
+    // The reason discloses nothing beyond the typed code: exactly two lines, no path
+    // separator, and never the repository root.
+    const block = stderr.slice(stderr.indexOf("No human override route is offered")).trim();
+    assert.equal(block.split("\n").length, 2, block);
+    assert.doesNotMatch(block, /[\\/]/u, `the reason leaked a path separator:\n${block}`);
+    assert.ok(!block.includes(root), "the reason leaked the repository root");
+  });
+
   console.log(`\nguard-gate-strength: ${passed} passed, ${failed} failed`);
 } finally {
   for (const entry of roots) rmSync(entry, { recursive: true, force: true });

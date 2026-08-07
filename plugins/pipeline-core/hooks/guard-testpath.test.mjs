@@ -50,7 +50,11 @@ const EMPTY_DIR = mkdtempSync(join(tmpdir(), "guard-testpath-empty-"));
 
 let pass = 0;
 const failures = [];
-function check(id, toolName, filePath, expectExit, { projectDir = EMPTY_DIR, stderrIncludes, stderrExcludes, stderrEmpty, extraInput } = {}) {
+// `stderrMatches` (regex list) is additive alongside the substring channels: some
+// properties are shapes rather than literals -- "a real 64-hex request digest was offered"
+// is not the same claim as "the string --request-sha256 appears somewhere". Existing cases
+// pass none and are unaffected.
+function check(id, toolName, filePath, expectExit, { projectDir = EMPTY_DIR, stderrIncludes, stderrExcludes, stderrMatches, stderrEmpty, extraInput } = {}) {
   const { code, stderr } = runGuard(toolName, filePath, projectDir, extraInput);
   const problems = [];
   if (code !== expectExit) problems.push(`exit ${code} (expected ${expectExit})`);
@@ -59,6 +63,9 @@ function check(id, toolName, filePath, expectExit, { projectDir = EMPTY_DIR, std
   }
   for (const needle of [].concat(stderrExcludes ?? [])) {
     if (stderr.includes(needle)) problems.push(`stderr unexpectedly contains "${needle}"`);
+  }
+  for (const pattern of [].concat(stderrMatches ?? [])) {
+    if (!pattern.test(stderr)) problems.push(`stderr does not match ${String(pattern)}`);
   }
   if (stderrEmpty && stderr.trim() !== "") problems.push(`stderr not empty: ${stderr.trim().slice(0, 120)}`);
   if (problems.length === 0) {
@@ -291,8 +298,71 @@ check(
   },
 );
 
+// ---- ADR-0059 Decision 4: a denial with NO route says why, instead of printing nothing --
+// Moved here from lib/human-guard-override.test.mjs, which hosted it only because this suite
+// is TP-2 protected and no maintenance window was open when NOVA-HGOSIG-ROUTE-1 landed it.
+// It spawns this guard end to end, so it belongs beside the guard it describes; the library
+// suite keeps the renderer's own direct unit cases.
+//
+// The exact case observed in this repository: every write under `plugins/pipeline-core/**` is
+// classified as Pipeline-author repair, which needs an explicit author source root the guard
+// cannot choose on the human's behalf -- so recordHumanGuardDenial() answers
+// `author-repair-required`, the denial never reaches `planned`, and the refusal used to print
+// no route AND no hint that one had been attempted, byte-identical to a rule with no override
+// at all. TP12 pins the reason; TP13 is its differential half -- same fixture, same store,
+// same committed mode, only the path differs -- because without it "reported a reason" could
+// equally mean "this fixture never plans anything", and TP12 would pass for the wrong reason.
+const ROUTE_DIR = mkdtempSync(join(tmpdir(), "guard-testpath-route-"));
+mkdirSync(join(ROUTE_DIR, ".claude"), { recursive: true });
+writeFileSync(
+  join(ROUTE_DIR, ".claude", "guard-config.json"),
+  JSON.stringify({
+    protectedTestPaths: [
+      { id: "TP-X", pattern: "plugins/pipeline-core/hooks/.*\\.test\\.mjs$", reason: "fixture: a Pipeline-source test path" },
+      { id: "TP-Y", pattern: "harness/scripts/verify\\.mjs$", reason: "fixture: an ordinary protected path" },
+    ],
+  }),
+);
+// Committed, and with a real HEAD: the override's repository observation degrades to "no
+// route offered" without one, which would make TP13 vacuous and TP12 meaningless.
+writeFileSync(join(ROUTE_DIR, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "chat"\n');
+gitCommitAll(ROUTE_DIR);
+
+check(
+  "TP12 block  a route-less denial (Pipeline source) names the planner status it actually got",
+  "Write",
+  "plugins/pipeline-core/hooks/probe.test.mjs",
+  BLOCK,
+  {
+    projectDir: ROUTE_DIR,
+    stderrIncludes: [
+      "Rule ID: TP-X",
+      "No human override route is offered for this exact edit; the guard attempted to plan one.",
+      "Reason: the override planner returned status=author-repair-required (",
+    ],
+    // A route for a Pipeline-source path would mean the guard picked an author source root
+    // itself; the reason is offered INSTEAD of a route, never alongside one.
+    stderrExcludes: ["--request-sha256"],
+    extraInput: { content: "x\n" },
+  },
+);
+
+check(
+  "TP13 block  the same fixture still offers a real route for an ordinary protected path",
+  "Write",
+  "harness/scripts/verify.mjs",
+  BLOCK,
+  {
+    projectDir: ROUTE_DIR,
+    stderrIncludes: ["Rule ID: TP-Y", "Human override available for this exact edit"],
+    stderrExcludes: ["No human override route is offered"],
+    stderrMatches: [/--request-sha256 [a-f0-9]{64}\b/u],
+    extraInput: { content: "x\n" },
+  },
+);
+
 // ---- Summary -----------------------------------------------------------------------------
-for (const dir of [EMPTY_DIR, CFG_DIR, BROKEN_DIR, CFG_ID_DIR, GMW_DIR, MODE_CHAT_DIR]) {
+for (const dir of [EMPTY_DIR, CFG_DIR, BROKEN_DIR, CFG_ID_DIR, GMW_DIR, MODE_CHAT_DIR, ROUTE_DIR]) {
   try {
     rmSync(dir, { recursive: true, force: true });
   } catch {
