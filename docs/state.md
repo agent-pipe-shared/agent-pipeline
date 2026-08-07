@@ -27,8 +27,50 @@ authored this session and both are in the Critic cycle:
   Trajectory verdict was `consistent` and the Critic re-verified ~40 of the
   document's citations itself — this is a fail on a strong document, and the
   Critic said so.
-- **PHX-R2-THREATMODEL-rework** (`ad5d185`): Critic round 1 dispatched, report
-  outstanding.
+- **PHX-R2-THREATMODEL-rework** (`ad5d185`): Critic round 1 **PASS**, 1 major +
+  1 minor, report at
+  `specs/sprint-phoenix-epic/evidence/phx-r2-threatmodel-rework-critic-review-ad5d185.md`
+  (`62f9f97`). The Critic independently re-derived SL-1 from source and confirms
+  it; ~30 of the document's citations were re-verified without a substantive
+  miss. **Both findings dispositioned by the Elephant, not deferred:**
+  - **F2 (minor) — closed.** Part A's disclosed limitation 2 (an allowlisted
+    origin at an arbitrary *committed* history) lost its only proposed successor
+    when the threat-model correction withdrew the signed-release pin, leaving it
+    disclosed in two designs and tracked nowhere. Now held by
+    `backlog/items/2026-08-07-part-a-limitation-2-orphaned-by-the-r2-rework.md`,
+    kept deliberately separate from limitation 1 and from SL-1 — three different
+    subjects that would each look answered if merged.
+  - **F1 (major) — confirmed, and the root cause is now known rather than
+    folklore.** The Critic is right that one of ~250 steps is not the verify
+    gate. Attempting the real gate produced a better answer than a disposition
+    would have: `node harness/scripts/verify.mjs` in the primary checkout stops
+    at `VERIFY-CANDIDATE-PREFLIGHT` because `.claude/settings.json` is
+    permanently dirty; in a detached worktree at the exact candidate it stops at
+    the *first* step, `verify-journal`, with
+    `VERIFY-CLEANUP-REGISTRATION-REQUIRED` — **zero suites run**. The cause is
+    `plugins/pipeline-core/scripts/verify-journal.mjs:163-169`:
+    `registerBoundVerifyRun` demands an onboarding session-cleanup binding and
+    throws unless `binding.status === "bound"` with a non-null `sessionCleanup`.
+    **This session's own continuity projection reports `"sessionCleanup": null`**
+    — so the gate is unreachable for this session in either checkout, and no
+    dispatch could have satisfied it. The dispatch's fault is therefore narrower
+    than the finding states: not that it skipped the gate, but that it presented
+    a single hand-picked step as its verification instead of disclosing that the
+    gate was unreachable and why. The evidence artifact contract itself is
+    sound — the aborted run still emitted a correct
+    `pipeline.verify-evidence.v0` with `commit`, `tree` and
+    `candidate.binding: "exact"`. Recorded here rather than fixed: repairing the
+    session-cleanup binding is guard/lifecycle work needing its own dispatch,
+    and doing it inside a review disposition is exactly the shortcut this
+    process exists to prevent.
+  - **Elephant briefing error, recorded because it recurs otherwise.** The
+    Critic dispatch named the prior round's review file as "the neutral findings
+    registry". The fail-closed boundary lists a prior verdict as forbidden input
+    "even when disguised in a filename", and the filename was
+    `…-critic-review-…`. The Critic did not open it, completed the review on its
+    own construction, and stated the consequence honestly. The distinction to
+    hold: that reference is *correct* in a Goldfish rework briefing (the
+    implementor needs the findings) and *forbidden* in a Critic dispatch.
   Both Critics returned a truncated single-sentence fragment on their first
   completion and had to be asked for the mandated report — the third and fourth
   occurrence of that pattern this session. It is a dispatch-harness behaviour,
