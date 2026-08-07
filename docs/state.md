@@ -265,6 +265,34 @@ the gate prints `(operating-model §7)` into its operator-visible fix string.
 Note (c) is a one-line change but sits in a `harness/scripts/` file, so it
 follows the ordinary briefed-task path rather than an in-session edit.
 
+**PO decision, reaffirmed after measurement: the 0.5.3 merge waits for `main`
+(APS, 2026-08-07).** The Elephant put the choice again *because the stated
+reason for waiting had gone away*, and the PO kept the instruction anyway. That
+is the decision; it is not an oversight and should not be re-raised without new
+information.
+What was measured and presented before the decision: the 0.5.3 work has real git
+history on `origin/feat/sprint-nova-codex-v046` (head `378cb64`, carrying exactly
+the installed `0.5.3+claude.20260807221336.14e7b97`, build commit `14e7b97` in
+its own history), sharing merge base `6e2c9b2` with this branch — so a real
+three-way merge is computable and the flat-copy provenance objection no longer
+applies. `git merge-tree --write-tree` reports **7 conflicting files, exactly one
+of them plugin code**: `plugins/pipeline-core/hooks/guard-gate-strength.mjs`, the
+GS-8 file the merge plan predicted. `guard-testpath.mjs` and
+`harness/scripts/verify.mjs` auto-merge cleanly; the other six conflicts are
+append-only bookkeeping (`backlog/STATUS.md`, `backlog/index.json`,
+`backlog/transitions.ndjson`, `docs/state.md`,
+`governance/observation-doc-governance.json`, `project/pipeline-state.json`).
+The trade the PO weighed and declined: a feature branch that has not landed on
+`main` may still change before it does.
+**Consequences that follow and are now blocked, not forgotten:** the merge
+itself; R3's B3 sweep, which by the recorded sequencing must come *after* the
+merge because it touches the same plugin tree; and the arrival of ADR-0058,
+ADR-0059 and the GMW threat model, which this checkout still lacks. **The design
+phase is otherwise closed except for R1's last review round** — nothing else is
+waiting on an agent.
+Measurement recorded in `specs/sprint-phoenix-epic/design/plugin-0.5.3-merge-plan.md`
+§8a (`a1053d2`), which supersedes that plan's §4/§5 estimate.
+
 **HOLD — plugin snapshot sync deferred by PO instruction (2026-08-07 evening).**
 A newer local plugin candidate is installed and reloaded:
 `0.5.3+claude.20260807181921.f667dec` at
