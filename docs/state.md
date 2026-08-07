@@ -701,6 +701,29 @@ documented convention and prepare a fresh local marketplace refresh —
 explicitly a LOCAL candidate, not a push/publication event. Not actioned
 yet; queued behind the in-flight dispatches and their Critic rounds.
 
+The concrete procedure, resolved read-only from that document so the step
+itself is mechanical when the wave lands. The current manifest version is
+`0.5.2` with the cachebuster deliberately stripped (`d2bc254`); this wave
+adds a new capability (ADR-0059's signed HGO admission path), so the
+candidate is a MINOR bump, `0.6.0`, carrying the repository's convention
+`<semver>+claude.<YYYYMMDDHHMMSS>.<short-oid>` — where `<short-oid>` is the
+7-character OID of the last FUNCTIONAL commit of the wave, never of the
+metadata commit that writes the string (it cannot know its own OID). The
+agent-executable part is exactly one edit to
+`plugins/pipeline-core/.claude-plugin/plugin.json`. The two remaining steps
+are operator actions taken OUTSIDE a session by construction — an agent
+session may not write into the plugin root enforcing its own guards, and
+`guard-lifecycle-ready.mjs` refuses `GUARD-CROSS-REPO-MUTATION` for that
+reason: `cp -a <checkout-root>/plugins/pipeline-core <local-marketplace-root>/plugins/`
+then `claude plugin update pipeline-core@agent-pipeline-local --scope user`.
+For a directory-sourced local marketplace `/reload-plugins` suffices for
+guard scripts (re-read per invocation); a change to `hooks.json` wiring
+still needs a new session. Readback contract before trusting the candidate:
+`claude plugin list --json` shows the expected `version` at `scope: "user"`,
+and `pipeline-start-preflight.mjs` returns `status: "ready"` with
+`installedSource: "local-development"` — a `plugin-refresh-required` there
+means manifest and registry disagree.
+
 **Mandatory next steps (restated, unchanged):** once full Verify confirms
 exit 0, dispatch the mandatory T1 Critic round on the complete ADR-0059
 implementation (commits `e4772d0`, `06971d7`, `f650164`, `5be2273`, plus the
