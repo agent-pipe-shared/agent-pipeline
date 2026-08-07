@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e52140ff6ddc5c7081a51912fb171b99d4f2321bc45c81af3c6ecf8f97f9ea64"
+    "transitionHead": "8217e13325ceabf0737909e0668a8391913b882017551110bcbd8b1dad166378"
   },
   "counts": {
-    "open": 31,
+    "open": 32,
     "in_progress": 21,
     "closed": 19
   },
@@ -226,6 +226,14 @@
       "owner": "pipeline",
       "created": "2026-07-29",
       "source": "Sprint Cyborg epic, self-application finding #2 (Elephant self-observation while implementing CYB-2E; PO decision Option B recorded in docs/state.md, session 2026-07-29)"
+    },
+    {
+      "id": "pipeline.guard-lifecycle-ready-rejects-plan-runtime-intent-argv",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "Live onboarding test (rune_test1_claude line of work) hitting a self-inflicted guard rejection at the plan-runtime step, 2026-08-07 (Nova GMW session); root cause independently re-verified by reading the cited source directly, not taken from the report alone."
     },
     {
       "id": "pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root",

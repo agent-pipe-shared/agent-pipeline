@@ -30,6 +30,7 @@
 | pipeline.execution-model-switchback | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.guard-lifecycle-ready-blocks-claude-memory-writes | open | defect | pipeline | 2026-07-29 | — |
+| pipeline.guard-lifecycle-ready-rejects-plan-runtime-intent-argv | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root | open | defect | pipeline | 2026-08-06 | — |
 | pipeline.local-worker-supervisor-cli-suite-flakes-under-full-verify | open | defect | pipeline | 2026-08-06 | — |
 | pipeline.managed-onboarding-success-contract | open | workflow-improvement | pipeline | 2026-07-25 | — |
@@ -79,6 +80,6 @@
 
 ## Counts
 
-- open: 31
+- open: 32
 - in_progress: 21
 - closed: 19
