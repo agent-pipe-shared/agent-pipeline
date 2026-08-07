@@ -5,7 +5,7 @@
 
 **Last updated:** 2026-08-07
 **Project status:** ACTIVE
-**Current block:** 0.5.2 released, backlog triaged; Nova A completion paused on genuine ADR-gated/evidence-gated blockers; human-authorization unification is now the priority thread — GMW (ADR-0058) correction round 1 landed (F1-F3 fixed, independently re-verified; F4-F5 environmentally blocked pending PO action or branch merge, see Nova GMW section), delta Critic re-review next; HGO signed-admission extension (ADR-0059) designed, queued behind the Critic verdict
+**Current block:** 0.5.2 released, backlog triaged; Nova A completion paused on genuine ADR-gated/evidence-gated blockers; human-authorization unification is now the priority thread — GMW (ADR-0058) fully landed and merged into `feat/sprint-nova-codex-v046` (three correction rounds, Critic PASS, 255/255 post-merge Verify), then verified genuinely live after a local-marketplace refresh + restart (Nova GWM section); HGO signed-admission extension (ADR-0059) designed, queued behind the Critic verdict
 **Repair baseline:** `5d2b83dcc765d50801f4491e1bd9bed32090112b`
 **Release version:** `0.5.2` released
 **Release state:** version `0.5.2` · tag `v0.5.2` · commit `6e2c9b2868d164ff3b631ab068fa5df20939e07d` · tree `23171c38a317d8cdf50baa013f54f5447e17f754` · status `published`
@@ -178,10 +178,7 @@ and the danger of an unscoped "lift everything" default.
   (PO-reported defect from a separate session, detailed root cause, not
   fixed here -- guardrail/core-logic scope).
 - **Not yet done:** the PO's own end-to-end signing test with a real trust
-  anchor; refreshing the local marketplace candidate
-  (`/home/skar667/agent-pipeline-local-marketplace`, per
-  `docs/claude-local-plugin-development.md`) and a session restart -- next up
-  with the PO; the bootstrap SessionStart
+  anchor; the bootstrap SessionStart
   warning (design already written, appended to the same design-note commit
   `4398dde`); end-to-end testing with a real PO-signed proof (needs the
   PO's own external signing device/key — cannot happen inside any agent
@@ -189,6 +186,85 @@ and the danger of an unscoped "lift everything" default.
   worktree branch into this checkout's own live-enforcing branch (per the
   Delivery-path note above — not something this session performs
   unilaterally).
+
+### 2026-08-07 Nova GWM — local marketplace refresh verified live; PO recalibrates commit/gate autonomy
+
+Session renamed "Nova GWM" by the PO (same topic as Nova GMW above, the
+transposed spelling is the PO's own). The PO refreshed the local marketplace
+outside the session (`cp -a plugins/pipeline-core` into
+`~/agent-pipeline-local-marketplace/plugins/`, `claude plugin marketplace
+update agent-pipeline-local`, `claude plugin update pipeline-core@agent-pipeline-local
+--scope user` — the last step reported "already at latest version" since the
+manifest version string was not bumped) and restarted the session, then asked
+for verification that GMW is genuinely active.
+
+**Verified active**, with one real false alarm along the way: the installed
+cache (`~/.claude/plugins/cache/agent-pipeline-local/pipeline-core/0.5.2`,
+`installed_plugins.json`'s `lastUpdated: 2026-08-07T05:49:15.239Z`) does NOT
+contain `lib/guard-maintenance-window.mjs` — the version-string-gated
+`plugin update` genuinely never refreshed it. This does not matter for a
+**directory-sourced** local marketplace, though: `docs/claude-local-plugin-development.md`
+(§"Scope of the pinning claim") already documents, from an earlier
+measurement, that such a marketplace is served live from its root after
+restart/`/reload-plugins`, not from the version-pinned cache. Confirmed
+in-session: the `pipeline-start` skill's own reported base directory was
+`~/agent-pipeline-local-marketplace/plugins/pipeline-core/skills/pipeline-start`
+(the fresh root, not the stale cache); `diff -rq` between the checkout and
+the marketplace root showed zero differences; and a live-fire read-only test,
+`node scripts/guard-maintenance-window.mjs status --repo-root <this repo>`,
+executed the full CLI → `lib/guard-maintenance-window.mjs` code path and
+returned `{"status": "absent"}` (no window installed, as expected).
+
+**Separate, real defect found and locally mitigated:** this repo's own
+committed `.claude/settings.json` (written by `setup.mjs`'s
+`compileSettingsJson()`, intentional per ADR-0001 D1 for normal consumer
+projects — ordinary self-describing project-scope plugin pinning, not a bug)
+declares `enabledPlugins["pipeline-core@agent-pipeline"]: true` plus the
+published GitHub marketplace, which Claude Code re-syncs at every session
+start in this checkout regardless of what is deleted from global state —
+exactly the "installs itself again" symptom the PO hit repeatedly. Not one of
+the `GATE_STRENGTH_PATHS` (GS-1..5/7), so agent-writable; the committed file
+was deliberately left untouched (reopening ADR-0001 for every consumer is a
+bigger call than this session's scope). Mitigated instead with a personal,
+git-ignored override: `.claude/settings.local.json` ->
+`{"enabledPlugins": {"pipeline-core@agent-pipeline": false}}`. **Not yet
+confirmed to survive an actual session restart** — settings load only at
+session start, so this could not be proven from inside the session that
+wrote it.
+
+Used the fresh GMW-unblocked state to correct two existing backlog items with
+live second-repro evidence (`onboarding-restart-flow-is-codex-only-not-runner-aware`,
+`restart-launch-is-codex-only-for-every-runner`) and file a new one,
+`guard-lifecycle-ready-rejects-plan-runtime-intent-argv` — the `c860e1d`
+runner-identity fix added an `--intent` flag to `plan-runtime`/`plan-repair`
+`nextAction`s that `guard-lifecycle-ready.mjs`'s own sanctioned-command
+allowlist never learned to accept, so the pipeline's own suggested command
+self-rejects whenever `intent !== "onboarding"` (the ordinary case for a
+mid-session lifecycle re-check, not an edge case). Independently re-verified
+against `lifecycleArgv`/`sanctionedOnboardingArgs` source, not taken from the
+report alone. Landed as `a121ec5` (item files) + `49899e7` (ledger
+transition + regenerated `STATUS.md`/`index.json`, since the transition
+schema requires `evidence.commit` to name an already-existing commit —
+confirmed by reading the schema's own validation error rather than guessing);
+`check-backlog-state.mjs` reports clean.
+
+**PO decision, verbatim intent:** committing, Verify, and backlog maintenance
+are ordinary autonomous Elephant work under this repo's own operating
+model — not a human gate — and the session had been over-asking before every
+one. Corrected mid-session: commits for exactly this class of work (docs/
+backlog, no guardrail/canon code, no push) now proceed without asking first.
+The push gate (signature-mode PO approval, ADR-0056) is unaffected and stays
+exactly as strict as before; this only lowers friction on the local,
+reversible, pre-push side. Recorded here since the session's own generic
+cross-session memory system is guard-blocked in this governed session by
+design (`GUARD-CROSS-REPO-MUTATION`, same limitation already recorded in the
+Nova IV section below) — this file is the sanctioned fallback.
+
+**Not yet done:** the PO restarting a session to confirm the
+`.claude/settings.local.json` override actually stops the published
+marketplace from re-registering; deciding whether the cachebuster version
+string should be bumped as a matter of hygiene on every local refresh even
+though it did not matter for this particular directory-sourced marketplace.
 
 ## 2026-08-07 Nova HGO-Sig — signed admission path for Human Guard Override, everything GMW doesn't cover (current)
 
