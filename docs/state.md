@@ -83,13 +83,39 @@ confirmed: `stateStatus: "ok"`, `lifecycle: "active"`,
 matching the restored state exactly. Mechanical confirmation obtained;
 nothing outstanding on this item.
 
-**Still open:** the 11 flagged code-conflict losses (governance-ledger
-ecosystem, `pipeline-state.mjs`, ledger-backed plan approval,
-`project-authority.mjs` dual-state repair) — decide what, if anything, gets
-redesigned. Filed as 5 grouped `defect` backlog items
-(`backlog/items/2026-08-07-*`, status `open`, Triage section empty) so the
-candidates are tracked instead of living only in the gitignored evidence
-report; no accept/defer/reject decision has been made on any of them.
+**PO direction (APS, 2026-08-07):** work through the 5 redesign backlog
+items per PO recommendation-triage (item 1 implement now, items 2+3
+investigate first, item 4 link to 2+3's outcome not a blanket restore, item
+5 implement the already-decided PHX-2 direction). Dispatched to Goldfish-deep
+per CLAUDE.md's guardrail/authority-class-work rule (template-based, never
+freehand). Status:
+
+1. **`project-authority-dual-state-repair-and-failclosed-gate` — CLOSED**
+   (commit `1f070c9`). Fail-closed restored; Phoenix's dual-state repair tool
+   confirmed not needed (main already has an equivalent). See
+   `backlog/evidence/2026-08-07-project-authority-failclosed-closure.md`.
+2. **`self-application-integrity-check-absent`** and
+3. **`ruleset-freshness-wsl-subsystem-absent`** — investigation in progress.
+   Already found, independent of the dispatched agent: `ruleset-freshness-host.mjs`
+   (Phoenix-only, merged in cleanly) has a **currently broken import** —
+   verified directly (`node -e "import(...)"` throws) — depending on 9 named
+   exports across `ruleset-freshness.mjs`/`codex-host-plugin-list.mjs` that
+   don't exist in main's versions of those files.
+4. **`governance-product-verify-suites-deregistered`** — blocked on 1–3's
+   outcome, not started.
+5. **`ledger-backed-plan-and-push-authority-absent-on-merged-base`** — design
+   phase (not implementation) dispatched: a spec addendum for the additive
+   ledger layer on top of ADR-0056, explicitly NOT reviving Phoenix's full
+   pre-merge `pipeline-state.mjs`/`plan-spec-state-v2.mjs` subsystems.
+
+**Infra finding, 2026-08-07:** the `isolation: "worktree"` dispatch option
+pinned two of three agents' worktrees to `6e2c9b2` (origin/main's pre-merge
+tip) instead of `sprint_phoenix`'s actual HEAD — one agent (WP2+WP3)
+self-detected this and stopped cleanly rather than guessing; the other (WP1)
+verified its touched files were byte-identical between the stale base and
+`sprint_phoenix` before proceeding, so its result was still valid and was
+cherry-picked across. Avoid `isolation: "worktree"` for further redispatches
+in this session until the root cause is understood.
 
 **Resolved during this session's post-merge follow-up (2026-08-07):**
 - ADR-0047 numbering collision (`0047-governance-event-kernel.md`) indexed in
