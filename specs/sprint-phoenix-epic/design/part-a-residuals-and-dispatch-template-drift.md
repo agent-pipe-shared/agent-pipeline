@@ -81,8 +81,11 @@ design editing the sibling design before its own Critic pass.
 
 ### 0.4 Verification posture
 
-Every `file:line` and every `§N` in this document was checked by reading the target in this
-session; the commands are listed in §III.4. Claims that could **not** be verified here are marked
+Every `file:line` and every `§N` in this document was checked by reading the target, and every
+session that wrote or reworked a section logs its own reads and commands in its own dated block of
+§III.4 — so a reader can tell a logged citation from an unlogged one rather than taking the claim on
+trust: a citation is backed when the §III.4 block of the session that added it, or a later
+re-verification block, lists the read behind it. Claims that could **not** be verified are marked
 `ASSUMPTION Un` inline and collected in §III.3. This posture is not decoration: the Part-A document
 was Critic-failed twice for inherited assumptions — once for an overclaimed guarantee ("byte-identical
 to a clean checkout"), once for a topology assumption refuted by a single command.
@@ -219,7 +222,7 @@ gate sits behind GS-9; what remains outside is only the wiring" — was false. T
 modules the extracted gate imports are unprotected, and an edit in one of them is a strictly smaller
 lever than the wiring residual this section did disclose.)*
 
-**What GS-9 does not close, stated plainly.** Three residuals, not one. QG-05 is the rule being
+**What GS-9 does not close, stated plainly.** Four residuals, not one. QG-05 is the rule being
 served: a gate states its blind spots next to the gate, and this block is that statement for GS-9.
 
 **Residual 1 — the wiring.** The import line, the call site and the `|| attestationFailed` disjunct
@@ -267,13 +270,40 @@ enforcing copy, while the source-checkout copy stays refused because GS-9 is not
 is likewise not in the kernel list. Whether the kernel list should grow is one ADR-0058 decision
 about both modules at once, not an R1 change (P5 below).
 
+**Residual 4 — a path-table rule fires only in a repository the guard recognises as governed.**
+Matching `GATE_STRENGTH_PATHS` is necessary but not sufficient. After `gateStrengthRuleFor()`
+returns a rule, `guard-gate-strength.mjs:179-188` runs a second test before refusing anything: an
+`existsSync` over five governance markers — `pipeline.user.yaml`, `project/pipeline.yaml`,
+`.claude/pipeline.yaml`, `project/guard-config.json`, `.claude/guard-config.json` (`:185-186`) —
+resolved against `CLAUDE_PROJECT_DIR || process.cwd()` (`:163`), with `process.exit(0)` when none of
+them is present (`:187`). The shell lane carries the identical precondition, same marker list, and
+stands down even earlier (`guard-lifecycle-ready.mjs:893-900`). GS-9 therefore protects the module
+**in a governed checkout**, not in every checkout of this source — and GS-6 is the one rule in the
+family that carries no such precondition, because it is decided at `:168-177`, *before* the
+`if (matched === null)` block that holds the marker test. Wherever this document contrasts GS-9's
+path matching with GS-6's live-root matching, that is the dimension on which GS-6 is the
+unconditional one.
+
+Mitigating facts, stated rather than hidden. All five markers are ordinary **tracked** files in this
+repository (`git ls-files` over `pipeline.user.yaml`, `project/` and `.claude/`, §III.4), so every
+clone of it is governed and GS-9 would fire here. The path table also cannot reach outside the
+project root at all — `gateStrengthRuleFor()` returns `null` for a `..`-relative path (`:148`) — so
+this is a scope statement, not a cross-repository hole. And R1 inherits the precondition rather than
+creating it: it is the guard family's deliberate "only defend a repository the Pipeline actually
+governs" (`:183-184`), identical for GS-1..GS-5, GS-7 and GS-8 today. What it costs is a claim, not a
+mechanism: a copy of this source tree in a repository carrying none of the five markers — a vendored
+copy, or a checkout with those tracked files removed — is agent-writable at that path, and no GS rule
+says otherwise. No follow-up is proposed for this residual: narrowing the stand-down would change
+every path rule in the family at once, which is a guard-family decision like P5, not an R1 change.
+
 **The corrected guarantee.** GS-9 makes the gate's composition unwritable by an agent session; it
 does not make the gate's verdict trustworthy against an agent that can edit
 `public-core-observation.mjs`. The bar it raises is real but bounded: from "silently widen the gate's
 semantics inside the evaluation" to "delete a visible call site in a reviewed file (residual 1), or
 edit a visibly unrelated observer module (residual 2), or work inside a human-signed GS-6 window
-(residual 3)". That is still the protection level the originating Critic review judged sufficient
-when it kept this finding minor — every one of these files stays under the ordinary Verify/Critic/PO
+(residual 3), or work from a checkout the guard does not recognise as governed (residual 4)". That
+is still the protection level the originating Critic review judged sufficient when it kept this
+finding minor — every one of these files stays under the ordinary Verify/Critic/PO
 gate — but it has to be claimed at that level and not above it.
 
 **Proposed follow-up for residuals 2 and 3 — specified, deliberately not applied.** None of this is
@@ -327,7 +357,7 @@ change (§0 header).
 | --- | --- |
 | `plugins/pipeline-core/lib/self-application-attestation-gate.mjs` | **new.** SPDX header, doc comment stating the GS-9 protection and why the module exists; the two exports of §I.1.3; imports `observeCodexPublicCoreIdentity`/`observePublicCoreIdentity` from `./public-core-observation.mjs`, `PUBLIC_SELF_APPLICATION_ORIGINS` from `./public-core-origin-allowlist.mjs`, `normalizeRulesetSource`/`RULESET_SOURCE_SCHEMA` from `./ruleset-source.mjs`, `existsSync` from `node:fs`, `resolve` from `node:path`. |
 | `plugins/pipeline-core/lib/self-application-attestation-gate.test.mjs` | **new.** Unit coverage for the moved logic (§I.1.6). |
-| `plugins/pipeline-core/scripts/pipeline-start-preflight.mjs` | delete `:175-206` (doc comment + predicate) and **`:248-293`** — the whole attestation block *including* its explanatory comment, which the new module carries instead; replace with one import and the one-line call of §I.1.3. Drop the now-unused imports: `existsSync` from `node:fs` (`:6`; its only use in this file is `:205`), `observeCodexPublicCoreIdentity`/`observePublicCoreIdentity` (`:13`), `PUBLIC_SELF_APPLICATION_ORIGINS` (`:14`), `normalizeRulesetSource`/`RULESET_SOURCE_SCHEMA` (`:15`). `readFileSync` stays (used at `:60`, `:211`). `:174` and `:207` are both blank lines and become adjacent once `:175-206` is gone — leave exactly one. |
+| `plugins/pipeline-core/scripts/pipeline-start-preflight.mjs` | delete `:175-206` (doc comment + predicate) and **`:248-293`** — the whole attestation block *including* its explanatory comment (`:248-270`), which the new module carries in **adapted** form, not verbatim: the comment twice points forward at code that does *not* move — "`status` below already hard-fails to `plugin-identity-unavailable`" (`:253-254`) and "`status` below falls through to exactly the version/installedIdentity/installedVersion decision" (`:264-266`) — and that `status` is the ternary at `:294-298`, outside the deletion range and staying in this file. In the new module both references must name their target instead of pointing at it (e.g. "the caller's `status` ternary in `pipeline-start-preflight.mjs`, `:294-298` at the time of writing"); carried over unchanged they refer to nothing. Nothing else in that comment changes target. Replace the deleted lines with one import and the one-line call of §I.1.3. Drop the now-unused imports: `existsSync` from `node:fs` (`:6`; its only use in this file is `:205`), `observeCodexPublicCoreIdentity`/`observePublicCoreIdentity` (`:13`), `PUBLIC_SELF_APPLICATION_ORIGINS` (`:14`), `normalizeRulesetSource`/`RULESET_SOURCE_SCHEMA` (`:15`). `readFileSync` stays (used at `:60`, `:211`). `:174` and `:207` are both blank lines and become adjacent once `:175-206` is gone — leave exactly one. |
 | `plugins/pipeline-core/hooks/guard-gate-strength.mjs` | append the GS-9 entry of §I.1.3 to `GATE_STRENGTH_PATHS` after `:97`. Nothing else; GS-6/GS-8 and the GMW block (`:196-209`) are untouched. |
 | `plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs` | no assertion changes. Additions only, if the implementor wants the wiring test of §I.1.6. |
 | `harness/scripts/verify.mjs` | **register the new suite**, otherwise nothing pins the GS-9-protected module inside the gate. Exact line, appended to `TEST_SUITES` immediately after the GS-8 analogue at `:330`: `  { name: "self-application-attestation-gate-tests", file: join(libDir, "self-application-attestation-gate.test.mjs") },`. Registration is hand-maintained — `TEST_SUITES` (`:164`) is a static array with no globbing, and the file says so at `:314-316` ("An unregistered suite is not a test Verify forgot to run — it is a test that protects nothing"). **This file is TP-3-protected** (`project/guard-config.json:13-17`), so the edit is not available to an ordinary implementation dispatch: it is a separate, briefed test-change task under QG-04, planned here rather than discovered as a blocked write mid-dispatch (§I.3 item 3). Without it AC-R1-5 is satisfied vacuously — the gate goes green having never run the new suite. |
@@ -383,17 +413,24 @@ command is the statusline script). An edit landing GS-9 in the source checkout t
 nothing the currently-enforcing guard reads; the rule first binds after the plugin refresh that
 installs it. From that point on `gateStrengthRuleFor()` matches by repo-relative path — unlike
 GS-6's live-root-only `insideLivePlugin()` — so the new module's *source-tree* copy is refused to
-agent sessions too, with the PO-hand-edit escape hatch (`guard-gate-strength.mjs:211-223`) as the
-only remaining route. One session may land the module and the rule together, in either order. For
-the *enforcing* copy the matched rule is GS-6 rather than GS-9, with the window-lift consequence
-that follows from it — residual 3 of §I.1.3.
+agent sessions too, **in a checkout the guard recognises as governed**: the path-table branch refuses
+only after the five-marker `existsSync` test at `:179-188` passes and stands down silently otherwise
+(residual 4 of §I.1.3). That condition holds in this repository, whose markers are tracked files, so
+here the PO-hand-edit escape hatch (`guard-gate-strength.mjs:211-223`) is indeed the only remaining
+route; in a marker-less copy of the same source there is nothing to escape from. On this dimension
+the comparison runs the other way: GS-6 is decided at `:168-177`, before the branch carrying the
+marker test, so it is GS-9 that is conditional and GS-6 that is not. One session may land the module
+and the rule together, in either order. For the *enforcing* copy the matched rule is GS-6 rather
+than GS-9, with the window-lift consequence that follows from it — residual 3 of §I.1.3.
 
 **Disclosed consequence 2 — the module's basename becomes a shell needle.** The shell lane derives
 its needles from `basename(rule.path)` (`guard-lifecycle-ready.mjs:206`) and matches them as
 substrings of any non-read-only command (`:207-209`), deliberately over-refusing (`:188-192`):
 after the refresh, any write-classified shell command whose text contains
 `self-application-attestation-gate.mjs` — including a `git commit -m` message that merely names the
-file — is refused with `GUARD-GATE-STRENGTH-SHELL`. Read-only diagnostics stay exempt (`:196`).
+file — is refused with `GUARD-GATE-STRENGTH-SHELL`. Read-only diagnostics stay exempt (`:196`), and
+so is every command in an ungoverned checkout: this lane runs the same five-marker test before it
+reaches the needles and returns `verdict(0)` when none is present (`:893-900`; residual 4 of §I.1.3).
 This is why the module name must be long and distinctive rather than generic: a name like
 `preflight-gate.mjs` would be a plausible substring of unrelated commands.
 
@@ -465,8 +502,10 @@ today under GS-8.
   complete until it and AC-R1-7 have landed, and a report claiming R1 done without them must say so
   explicitly.
 - **AC-R1-9** The residual block of §I.1.3 is reproduced or cited in the implementation's report,
-  including that GS-9 does not protect `public-core-observation.mjs` or `ruleset-source.mjs`. No
-  report or comment may restate the withdrawn claim that every semantic lever sits behind GS-9.
+  including that GS-9 does not protect `public-core-observation.mjs` or `ruleset-source.mjs`, and
+  including that the refusal fires only in a checkout carrying one of the five governance markers
+  (residual 4). No report or comment may restate the withdrawn claim that every semantic lever sits
+  behind GS-9, and none may state the source-tree refusal unconditionally.
 
 ### I.2 R2 — no integrity check runs for the marketplace-install topology
 
@@ -1554,3 +1593,78 @@ re-derived §0.5 and §I.2.3–§I.2.10. Every `file:line` in those sections was
 - **Not run, deliberately:** no attempt was made to write into the live plugin root through either
   lane. §I.2.3(a)–(c) is a static read of the two guards; confirming (c) empirically would mean
   attempting to disarm the enforcing guard code, which is outside a design pass's business.
+
+**Added by the 2026-08-07 §I.1 reworks** (`Dispatch: PHX-R1-REWORK-1`, commit `94ec7d8` — the
+dependency table, the residual list, the corrected inventory rows and the shell-needle mitigation —
+completed by `Dispatch: PHX-R1-REWORK-2`, which added residual 4 and this block). PHX-R1-REWORK-1
+landed its citations without a block of its own; that gap is what this block closes. **Every read
+below was performed in the PHX-R1-REWORK-2 session**, against the `sprint_phoenix` working tree on
+2026-08-07; the commits that landed in the checkout meanwhile touched only `docs/state.md` and an
+unrelated design document (`git diff --name-only`), so no cited file moved under these reads. This
+is a re-verification of §I.1's citations, not a transcript of the earlier session:
+
+- Read `plugins/pipeline-core/hooks/guard-gate-strength.mjs` in full → the WHY line `:15`;
+  `GATE_STRENGTH_PATHS` `:51-98` with GS-4 `:67-71`, the renumbering note `:77-79` and GS-8 `:88-97`;
+  `LIVE_PLUGIN_RULE` `:100-103`; the "leaves a source checkout writable" note `:113-116`;
+  `livePluginRoots`/`insideLivePlugin` `:118-140`; `gateStrengthRuleFor` `:143-151` including the
+  `..`-relative `null` at `:148`; the GS-6-first evaluation `:168-177`; the path-table branch with
+  its five-marker `governed` test and `process.exit(0)` `:179-188`; the GMW block `:196-209`; the
+  refusal and escape-hatch message `:211-223`.
+- Read `plugins/pipeline-core/scripts/pipeline-start-preflight.mjs` `:1-20`, `:55-169`, `:170-215`,
+  `:222-310` and `:300-367` → the imports `:6`/`:13-15`; `readFileSync` at `:60` and `:211`; both
+  installed-identity parsers `:63-169`; the predicate `:204-206` with its doc comment `:175-203`;
+  the blank lines `:174`/`:207`; the manifest read `:229-237`; `executionBoundary` `:245-247`; the
+  attestation block `:248-293`, its explanatory comment `:248-270` and that comment's two forward
+  references to `status` at `:253-254` and `:264-266`; the `status` ternary `:294-298` (outside the
+  deletion range — the basis for the adaptation note in §I.1.5); `nextAction` `:308-345`; the
+  exit-code mapping `:356-358`.
+- `rg -n "existsSync" plugins/pipeline-core/scripts/pipeline-start-preflight.mjs` → the import `:6`,
+  one prose mention `:202`, exactly one real use `:205`; and a repo-wide `rg` over `*.mjs` for
+  `pluginRootHasSelfApplicationGit` → definition `:204` and one call site `:274`, both in that file.
+  Together these back §I.1.5's "drop the now-unused imports" line and its no-external-importer claim.
+- Read `plugins/pipeline-core/lib/public-core-origin-allowlist.mjs` in full → the two origins
+  `:16-21`; read `public-core-origin-allowlist.test.mjs:15-28` → the export-set assertion `:20-24`.
+- Read `plugins/pipeline-core/lib/guard-maintenance-window.mjs:98-132` → `LIFTABLE_RULE_IDS` `:104`,
+  `NEVER_LIFTABLE_KERNEL_PATHS` `:120-128`.
+- Read `plugins/pipeline-core/lib/public-core-observation.mjs:145-184` and `:325-349` → `observeGit`
+  `:152-179` with `remote get-url origin` at `:157`, the `resolveSourceLayout`/`observeGit` call
+  sites `:330`/`:332`, `status: "ready"` at `:345`. `wc -l` → 377 lines; an importer search over
+  `plugins/` and `harness/` → three production importers (`pipeline-start-preflight.mjs:13`,
+  `private-overlay-activation.mjs:30`, `private-overlay-bootstrap-status.mjs:9`) plus its own test —
+  the numbers P1 rests on.
+- `wc -l plugins/pipeline-core/lib/ruleset-source.mjs` → 153 lines; `rg -n "^import|node:"` on it →
+  no match at all, i.e. no filesystem or subprocess dependency; the same importer search → exactly
+  one production importer (`pipeline-start-preflight.mjs:15`) and `ruleset-source.test.mjs`. These
+  are P2's three claims.
+- Read `harness/scripts/verify.mjs:160-184` and `:310-337` → `TEST_SUITES` `:164`,
+  `ruleset-freshness-tests` `:178`, the registration note `:314-316`, `public-core-observation-tests`
+  `:329`, `public-core-origin-allowlist-tests` `:330` (the anchor §I.1.5 appends after).
+  `rg -n "ruleset" harness/scripts/verify.mjs` → one hit, `:178`, so `ruleset-source.test.mjs` is
+  still unregistered.
+- Read `project/guard-config.json` in full → TP-3 `:13-17`, TP-11 `:53-57`, and TP-11 as the last
+  row, which is why TP-12 is the next free id.
+- Read `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs:26-33`, `:185-219`, `:300-367` and
+  `:880-924` → the `GATE_STRENGTH_PATHS` import `:30`; the over-refusal rationale `:188-192`;
+  `gateStrengthShellRefusal` `:194-214` with the read-only exemption `:196` and the
+  `basename(rule.path)` needles `:206-209`; the `node --check` shape `:307-312`; `sha256sum`
+  `:313-322`; the read-only tool list `:337`; the read-only `git` subcommands `:346-366`; and the
+  lane's own five-marker stand-down `:893-900`, which returns `verdict(0)` before any needle is
+  compared — residual 4's second code reference.
+- Read `plugins/pipeline-core/hooks/hooks.json:32-45` → the `${CLAUDE_PLUGIN_ROOT}` wiring `:39`;
+  read `.claude/settings.json` in full → a statusline command and no hook wiring, as §I.1.6 claims.
+- Read `plugins/pipeline-core/hooks/guard-gate-strength.test.mjs:240-291` → GST17 `:245-278`,
+  GST18 `:280-288`; `rg -n "function governed" -A 12` on the same file → the fixture at `:28-38`,
+  which writes four of the five governance markers, so the suite's roots are governed by
+  construction and GST17 does not exercise the ungoverned path at all.
+- Read `plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:88-97`, `:470-546` and
+  `:560-634` → the `observe` seam `:96`, the injection points `:480`/`:503`/`:516`/`:529`/`:542`,
+  the `.git`-presence section header `:548`, the fixture builder `:571-591`, and the three cases at
+  `:603`, `:607`/`:619` and `:625`.
+- `git ls-files` over `project`, `.claude` and `pipeline.user.yaml` → all five governance markers are
+  tracked files in this repository; `ls` over the three manifest-tier markers → present in the
+  working tree. This is the mitigating fact stated in residual 4.
+- `node harness/scripts/check-doc-contracts.mjs` → exit 0 on this document's final state. Stated
+  with its limit: that gate validates Markdown links and anchors, so a green run is evidence about
+  links, never about whether the `file:line` citations above are correct.
+- **Not run:** `node harness/scripts/verify.mjs` is unreachable in this checkout. No substitute was
+  run in its place, and no claim is made about the project verify gate for this document's state.
