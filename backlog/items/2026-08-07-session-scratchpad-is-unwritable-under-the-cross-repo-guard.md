@@ -89,12 +89,50 @@ passing. Candidates for a deliberate decision, explicitly not a commitment:
    supplies that path and whether an agent can influence it — if it can, the
    exception is the hole, since a writable path the agent names is exactly what
    the guard exists to refuse.
-2. **Keep the guard and fix the contract instead.** Move Critic scratch space
-   inside the project root under a gitignored, per-dispatch directory. Cheapest
-   and needs no guard change, but it puts uncommitted fixtures from a
-   contractually isolated reviewer inside the tree under review, which is the
-   contamination the isolation clause exists to prevent. Would need the
-   isolation clause rewritten to say so, not silently reinterpreted.
+2. **Keep the guard and put the scratch space inside the repository instead —
+   created at setup, briefed to agents, outside git, with cleanup rules.**
+   Proposed by the PO on 2026-08-07. This is the strongest candidate on
+   inspection, because most of it already half-exists and was never wired up:
+
+   - `scratch/` is **already** in `.gitignore` (alongside `evidence/`), so the
+     "outside git" half is done.
+   - `templates/pipeline.yaml.example:58` already carries `scratch/` as a
+     commented-out example entry in a cleanup allowlist — the intended shape
+     was sketched and never activated.
+   - The cleanup machinery the PO's proposal needs is **built and in use**:
+     `plugins/pipeline-core/lib/session-cleanup-recovery.mjs` implements
+     session-scoped descriptors, per-session cleanup manifests, allowlisted
+     descriptor-bound deletion, orphan retirement with a write-ahead journal
+     and lock, and PO-confirmed rebinding. It was written for worktrees; a
+     scratch directory is the same lifecycle problem with a simpler target.
+
+   What is genuinely missing is small by comparison: nothing *creates* the
+   directory during setup/onboarding, nothing *briefs* it as the working
+   location (the agent-facing text still points at the host temp path), and no
+   cleanup descriptor binds it.
+
+   Two questions a design has to answer rather than assume:
+
+   - **Per-dispatch subdirectories.** `roles/critic.md:53` requires per-dispatch
+     isolation, not merely a writable directory. `scratch/<dispatch-id>/` gives
+     that, but the naming has to be collision-free across parallel dispatches
+     sharing one checkout — the same failure that produced the shared-index
+     collision recorded in
+     `2026-08-07-push-release-flow-unusable-for-third-party-adopters.md`.
+   - **Contamination, honestly.** This puts a contractually isolated reviewer's
+     uncommitted fixtures inside the tree it is reviewing. Gitignored is not the
+     same as invisible: the Critic reads the working tree. The isolation clause
+     would need rewriting to say what is actually true, not silently
+     reinterpreted — and `git status` cleanliness checks, Verify's candidate
+     binding, and the security scan all need to agree that `scratch/` is
+     out of scope, or the scratch directory starts breaking gates.
+
+   Cleanup rules the PO named as a requirement, and the shape they most likely
+   take given the existing machinery: bind a scratch descriptor at session
+   start, delete only descriptor-bound allowlisted paths at close, retire
+   orphans from crashed sessions on a later bootstrap rather than broadly
+   clearing the directory, and never delete anything a descriptor does not
+   claim.
 3. **Accept the restriction and make it honest.** Change `roles/critic.md` and
    the template from "create a fresh subdirectory" to a stated capability
    limit, and require every report to disclose that no reproduction was possible.
