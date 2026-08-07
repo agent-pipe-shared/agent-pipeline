@@ -102,6 +102,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readPushApprovalMode } from "../lib/critical-human-proof-policy.mjs";
+import { windowCoversRule } from "../lib/guard-maintenance-window.mjs";
 import {
   consumeHumanGuardOverride,
   recordHumanGuardDenial,
@@ -205,6 +206,21 @@ function emit(code, lines) {
 const matched = PROTECTED_PATHS.find((rule) => rule.re.test(normalizedPath));
 if (matched) {
   const denials = [{ guard: "guard-testpath.mjs", reason: `${matched.id}: ${matched.reason}` }];
+
+  // GMW (ADR-0058): a valid, unexpired, correctly-scoped window is a real proof
+  // regardless of push-approval mode -- unlike the chat-mode HGO branch below, this
+  // check does not depend on `gates.push_approval`. It is a pure addition alongside
+  // the existing overrideAdmitted/HGO logic, checked first and falling through
+  // unchanged when the rule is not covered.
+  try {
+    const { covered, window } = windowCoversRule({ rootDir: projectDir, ruleId: matched.id });
+    if (covered) {
+      process.stderr.write(
+        `[pipeline-guard-maintenance-window] ${matched.id} lifted: expires ${new Date(window.expiresAtMs).toISOString()}, reason: ${window.reason}\n`,
+      );
+      process.exit(0);
+    }
+  } catch { /* an unusable window is not a lift; the refusal below still stands */ }
 
   // Which clearances count is one setting, and it is not this guard's to decide
   // (ADR-0056). `signature` -- the value here and the fail-closed default for anything
