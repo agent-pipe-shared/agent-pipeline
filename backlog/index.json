@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "2d3f2c613ccf023a671452cec1a358f110e39f291c3282cb5fb55d99ddcc8eb4"
+    "transitionHead": "ab2594131b20b555ab8170cfd0e04bfc331fcd25920573a297343cfdf7de1fca"
   },
   "counts": {
-    "open": 22,
+    "open": 26,
     "in_progress": 21,
     "closed": 19
   },
@@ -31,6 +31,14 @@
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.authority-signing-terminal-contract",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-06",
+      "source": "Phoenix §7 authority revision; approve step failed twice inside an agent session"
     },
     {
       "id": "pipeline.backlog-delivery-status-reconciliation",
@@ -194,6 +202,14 @@
       "owner": "pipeline",
       "created": "2026-07-29",
       "source": "Sprint Cyborg epic, self-application finding #2 (Elephant self-observation while implementing CYB-2E; PO decision Option B recorded in docs/state.md, session 2026-07-29)"
+    },
+    {
+      "id": "pipeline.human-legible-approval-record",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-06",
+      "source": "Product Owner requirement raised at the Phoenix plan-approval gate"
     },
     {
       "id": "pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root",
@@ -367,6 +383,14 @@
       "closureEvidence": "backlog/evidence/2026-07-24-po-sentinel-closure-disposition.md"
     },
     {
+      "id": "pipeline.readonly-command-guard-classification",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-07-26",
+      "source": "Phoenix close self-retro; specs/sprint-phoenix-epic/RECOVERY.md R-02"
+    },
+    {
       "id": "pipeline.ready-gate-env-var-runner-authority",
       "status": "closed",
       "type": "defect",
@@ -471,6 +495,14 @@
       "closureRepository": "self",
       "closureCommit": "d3db4a07dee565c1eeee2eb1e1e77ffcd2ca4e0a",
       "closureEvidence": "backlog/evidence/2026-08-06-second-reconciliation-pass.md"
+    },
+    {
+      "id": "pipeline.signed-authority-binding-durability",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-06",
+      "source": "Phoenix §7 authority revision; observed directly during the revision sequence"
     },
     {
       "id": "pipeline.source-available-commercial-licensing",
