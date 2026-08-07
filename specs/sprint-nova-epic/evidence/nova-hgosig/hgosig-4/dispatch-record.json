@@ -1,0 +1,19 @@
+{
+  "schema": "pipeline.dispatch-record.v1",
+  "taskId": "NOVA-HGOSIG-4",
+  "model": "claude-opus-5",
+  "rulesetSha": "2914a55713d714d95323231edaddccec5e1d6c2e5a4fbfaaaaa9d913a5fb1efc",
+  "dispatcher": "goldfish-deep",
+  "outcome": "done-verified. Fixed the five stale pre-Decision-3 assertions in plugins/pipeline-core/hooks/guard-testpath-override.test.mjs (OT02, OT03, OT13, OT15, OT17), each of which asserted the guard's stderr matched /no in-session override is admitted/u -- text the guard no longer emits since ADR-0059 Decision 3/4 changed signature mode from a hard wall into a mode-appropriate offer. Read the guard's live stderr output first (ran the failing suite, captured the exact text) before writing replacements. Each replaced case now pins: (1) which mode was resolved (`gates.push_approval is \"signature\"`), (2) that the in-session activate continuation is refused (`in-session activation step is refused`, and absence of `--activate`), and (3) that the signed route IS offered instead (`--request-sha256 <64-hex>` present, `authorize-by-signature` present) -- so no case was weakened into asserting merely 'something was blocked'. OT03 additionally asserts the offered route (not just that mode falls back to signature) per the DoD. OT13/OT15/OT17 keep their original substantive assertions (capability ignored / uncommitted write buys nothing / committed-then-modified drops to strongest mode) and only replace the stale wording. Traced the exact resolution logic in lib/critical-human-proof-policy.mjs (readPushApprovalMode: any absent/unreadable/unrecognised/uncommitted source resolves to mode=signature, source != 'chat') to confirm each fixture path actually resolves to signature before asserting it. Evidence log below.",
+  "evidenceLog": [
+    "1. Baseline: `node --test plugins/pipeline-core/hooks/guard-testpath-override.test.mjs` before any edit -- 13 passed, 5 failed (OT02, OT03, OT13, OT15, OT17), exit 1. Captured exact guard stderr text for signature-mode denials from this run.",
+    "2. Read docs/adr/0059-signed-human-guard-override.md (Decision 3, Decision 4, standing principle) and docs/adr/0056-push-approval-mode.md (mode semantics, fail-closed-to-signature resolution).",
+    "3. Read plugins/pipeline-core/hooks/guard-testpath.mjs in full -- the Clearance: line and overrideGuidance block are the source of truth for what to assert.",
+    "4. Read plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs NOVA-LCR-HGO-1 cases as the worked example of asserting mode-appropriate-route contract.",
+    "5. Read plugins/pipeline-core/lib/critical-human-proof-policy.mjs readPushApprovalMode() to confirm every OT02/OT03/OT13/OT15/OT17 fixture path resolves to mode=signature (not just 'not chat').",
+    "6. Edited OT02, OT03, OT13, OT15, OT17 in guard-testpath-override.test.mjs only.",
+    "7. Post-edit: `node --test plugins/pipeline-core/hooks/guard-testpath-override.test.mjs` -- 18 passed, 0 failed, exit 0.",
+    "8. `node --test plugins/pipeline-core/hooks/guard-testpath.test.mjs` -- 9/9 cases passed, exit 0 (guard itself untouched, confirmed by `git status --porcelain` showing only the test file modified).",
+    "9. `git diff -- plugins/pipeline-core/hooks/guard-testpath-override.test.mjs` reviewed in full: only the five named checks changed; the other thirteen are byte-identical."
+  ]
+}

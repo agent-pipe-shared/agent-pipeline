@@ -137,21 +137,31 @@ try {
     assert.match(stderr, /Rule ID: TP-3/u);
   });
 
-  check("OT02 signature mode admits no in-session override and offers no route", () => {
-    // The blocker, stated as a test. In signature mode the capability is never consulted.
+  check("OT02 signature mode refuses in-session activation and offers the signed route (ADR-0059 Decision 3/4)", () => {
+    // Since ADR-0059 Decision 3, signature mode is no longer a hard wall: the guard always
+    // attempts to consume first (harmless here -- nothing is armed), then offers the
+    // mode-appropriate next step. What signature mode still refuses is the in-session
+    // `activate` continuation; what it now offers instead is the signed route.
     const { blocked, stderr } = ask(fixture({ mode: "signature" }), PROTECTED);
     assert.equal(blocked, true);
-    assert.match(stderr, /no in-session override is admitted/u);
-    assert.doesNotMatch(stderr, /--request-sha256/u, "a route must not be offered in signature mode");
+    assert.match(stderr, /gates\.push_approval is "signature"/u);
+    assert.match(stderr, /in-session activation step is refused/u);
+    assert.match(stderr, /A signed override is admitted instead/u);
+    assert.match(stderr, /--request-sha256\s+[a-f0-9]{64}\b/u, "signature mode must offer the signed route");
+    assert.match(stderr, /authorize-by-signature\b/u);
+    assert.doesNotMatch(stderr, /--activate\b/u, "signature mode must not offer the in-session activate step");
     assert.match(stderr, /outside\s+this session/u);
   });
 
-  check("OT03 an absent, unreadable or unrecognised setting falls back to signature", () => {
+  check("OT03 an absent, unreadable or unrecognised setting falls back to signature and offers the signed route", () => {
     for (const mode of [null, "whatever", ""]) {
       const { blocked, stderr } = ask(fixture({ mode }), PROTECTED);
       assert.equal(blocked, true, `mode=${String(mode)}`);
-      assert.match(stderr, /no in-session override is admitted/u, `mode=${String(mode)}`);
-      assert.doesNotMatch(stderr, /--request-sha256/u, `mode=${String(mode)} offered a route`);
+      assert.match(stderr, /gates\.push_approval is "signature"/u, `mode=${String(mode)}`);
+      assert.match(stderr, /in-session activation step is refused/u, `mode=${String(mode)}`);
+      assert.match(stderr, /--request-sha256\s+[a-f0-9]{64}\b/u, `mode=${String(mode)} offered no route`);
+      assert.match(stderr, /authorize-by-signature\b/u, `mode=${String(mode)}`);
+      assert.doesNotMatch(stderr, /--activate\b/u, `mode=${String(mode)} must not offer the in-session activate step`);
     }
   });
 
@@ -243,7 +253,9 @@ try {
       'schema: "pipeline.user.v3"\ngates:\n  push_approval: "signature"\n');
     const { blocked, stderr } = ask(root, PROTECTED);
     assert.equal(blocked, true, "signature mode consumed a capability it must not consult");
-    assert.match(stderr, /no in-session override is admitted/u);
+    assert.match(stderr, /gates\.push_approval is "signature"/u);
+    assert.match(stderr, /in-session activation step is refused/u);
+    assert.match(stderr, /authorize-by-signature\b/u);
     assert.doesNotMatch(stderr, /capability consumed/u);
   });
 
@@ -286,17 +298,22 @@ try {
 
   // ---- C1: an in-session write to the setting must not weaken this gate ------------
 
-  check("OT15 an uncommitted chat setting does not admit the override", () => {
+  check("OT15 an uncommitted chat setting does not admit the chat-mode continuation", () => {
     // The T2 Critic's blocker, as a test. The shell lane refuses the literal filename but
     // not a name assembled at runtime, so the write itself is assumed to succeed -- the
-    // fixture simply performs it. What must hold is that the write buys nothing.
+    // fixture simply performs it. What must hold is that the write buys nothing: the
+    // resolved mode stays signature, so the route offered (if any) is the signed one, not
+    // the chat-mode activate continuation the uncommitted write asked for.
     const root = fixture({ mode: "signature" });
     writeFileSync(join(root, "pipeline.user.yaml"),
       'schema: "pipeline.user.v3"\ngates:\n  push_approval: "chat"\n');
     const { blocked, stderr } = ask(root, PROTECTED);
     assert.equal(blocked, true, "an uncommitted flip to chat opened the gate");
-    assert.match(stderr, /no in-session override is admitted/u);
-    assert.doesNotMatch(stderr, /--request-sha256/u, "an uncommitted flip offered a route");
+    assert.match(stderr, /gates\.push_approval is "signature"/u, "an uncommitted flip to chat must not change the resolved mode");
+    assert.match(stderr, /in-session activation step is refused/u);
+    assert.match(stderr, /--request-sha256\s+[a-f0-9]{64}\b/u, "the committed (signature) mode still offers its own route");
+    assert.match(stderr, /authorize-by-signature\b/u);
+    assert.doesNotMatch(stderr, /--activate\b/u, "an uncommitted flip to chat must not offer the in-session activate step");
   });
 
   check("OT16 the same setting, committed, is honoured", () => {
@@ -311,7 +328,9 @@ try {
     // The asymmetry, from the only starting point where it can be observed: HEAD says
     // chat, so the gate is open, and ANY in-session modification closes it again. Writing
     // the identical bytes back is deliberately not included -- that is not a modification,
-    // and asserting it would pin the wrong property.
+    // and asserting it would pin the wrong property. The resolved mode still falls back to
+    // signature, which (since ADR-0059 Decision 3/4) offers its own signed route rather than
+    // no route at all -- what must not survive the modification is the chat continuation.
     for (const written of ["signature", "nonsense", ""]) {
       const root = fixture({ mode: "chat" });
       assert.match(ask(root, PROTECTED).stderr, /--request-sha256/u, "precondition: open");
@@ -319,7 +338,10 @@ try {
         `schema: "pipeline.user.v3"\ngates:\n  push_approval: "${written}"\n`);
       const { blocked, stderr } = ask(root, PROTECTED);
       assert.equal(blocked, true, `written=${written}`);
-      assert.match(stderr, /no in-session override is admitted/u, `written=${written}`);
+      assert.match(stderr, /gates\.push_approval is "signature"/u, `written=${written}`);
+      assert.match(stderr, /in-session activation step is refused/u, `written=${written}`);
+      assert.match(stderr, /--request-sha256\s+[a-f0-9]{64}\b/u, `written=${written} must still offer the signed route`);
+      assert.doesNotMatch(stderr, /--activate\b/u, `written=${written} must not offer the in-session activate step`);
     }
   });
 
