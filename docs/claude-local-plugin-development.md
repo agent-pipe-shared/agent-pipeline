@@ -241,6 +241,24 @@ the metadata commit that writes the string, which cannot know its own OID.
 The registry separately records the actual installed commit in its
 `gitCommitSha` field, so both are traceable.
 
+**What the `<semver>` part means here, which is not what Semver means.** The
+minor position tracks SPRINTS, not features: a `0.X` bump is reserved for the
+completion of a whole sprint. Increments within a running sprint land in the
+patch position no matter what they contain, so a patch bump in this repository
+may well carry a new capability — 0.5.3 shipped ADR-0059's signed
+human-guard-override admission path, which 0.5.2 did not have. Do not infer
+"bug fixes only" from a patch number here, and do not reach for a minor bump
+just because something new landed; that decision belongs to the sprint
+boundary. A released version carries no `+claude.<...>` build metadata at all
+— the cachebuster exists for local development builds, and is stripped when a
+version is cut for release (`d2bc254` did this for 0.5.2).
+
+The Claude manifest is not the only one carrying the number. Codex has its own
+`plugins/pipeline-core/.codex-plugin/plugin.json`, and
+`codex-pretool-guard.test.mjs` asserts that its base version equals the
+repository `VERSION`. A bump that touches only the Claude manifest fails
+Verify, which is exactly what that check is for.
+
 ## Enter local test mode
 
 ```text

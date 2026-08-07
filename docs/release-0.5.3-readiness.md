@@ -1,4 +1,4 @@
-# Release 0.6.0 readiness — local repair candidate
+# Release 0.5.3 readiness
 
 > Agent-Pipeline · Sprint Nova · as of 2026-08-07
 
@@ -7,16 +7,20 @@ the candidate is ready and on what evidence. Everything here is read from
 `docs/state.md`'s 2026-08-07 sections, ADR-0056/0058/0059, the gate evidence
 files, and direct invocation — nothing is asserted from memory.
 
-`VERSION` reads `0.6.0`; the plugin manifest reads
-`0.6.0+claude.20260807172706.a52ff69`, where the OID is the last functional
-commit of the wave, per the convention in
-[`claude-local-plugin-development.md`](claude-local-plugin-development.md).
-Branch `feat/sprint-nova-codex-v046`. Not on `main`; no tag exists; nothing is
-pushed.
+`VERSION` reads `0.5.3`, and both plugin manifests — Claude's
+`.claude-plugin/plugin.json` and Codex's `.codex-plugin/plugin.json` — read
+`0.5.3` with no build cachebuster, matching how 0.5.2 was cut for release.
+`codex-pretool-guard.test.mjs` enforces that the Codex manifest and `VERSION`
+agree, which is what caught the Codex manifest being left behind on a first
+attempt.
 
-**This is a MINOR bump, not a patch.** 0.5.2 → 0.6.0 because the candidate adds
-a capability rather than only repairing one: a signed admission path for the
-Human Guard Override (ADR-0059 Decision 1) that did not exist before.
+**Why 0.5.3 and not 0.6.0, although this candidate adds a capability.** In this
+repository the minor position tracks sprints, not feature counts: a `0.X` bump
+is reserved for the completion of a whole sprint. Sprint Nova is not finished,
+so its increments land in the patch position regardless of what they contain —
+and this one does contain something new, ADR-0059 Decision 1's signed admission
+path for the Human Guard Override, which did not exist in 0.5.2. Read the patch
+number here as "third increment within Nova", not as "nothing new shipped".
 
 ## Scope: what this candidate repairs
 
@@ -133,7 +137,7 @@ scripts (re-read per invocation); a change to `hooks.json` wiring needs a new
 session. This candidate does not change `hooks.json`.
 
 **Readback before trusting it:** `claude plugin list --json` shows
-`0.6.0+claude.20260807172706.a52ff69` at `scope: "user"`, and
+`0.5.3` at `scope: "user"`, and
 `pipeline-start-preflight.mjs` returns `status: "ready"` with
 `installedSource: "local-development"`. A `plugin-refresh-required` there means
 manifest and registry disagree.
