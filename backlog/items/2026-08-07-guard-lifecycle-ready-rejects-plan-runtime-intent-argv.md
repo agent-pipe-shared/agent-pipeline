@@ -87,16 +87,51 @@ returned `nextAction`, not by following it.
 
 ## Proposal
 
-Not implemented, for triage only. Likely shape: extend the `plan*` branch in
-`sanctionedOnboardingArgs` with the same optional `--intent
-<onboarding|bootstrap|session|dispatch>` support the `inspect` branch already
-has (after the existing `withoutRunnerFlag` strip), mirroring that branch's
-pattern rather than inventing a new one. Add a guard-side regression test
-that constructs the exact `nextAction.argv` `lifecycleArgv` would emit for
-each non-default intent and asserts the guard accepts it — closing the gap
-the existing regression suite apparently missed. Small, bounded, hook-tier
-change (guard/canon code per this repo's own dispatch tiering) — needs a
-Goldfish-deep + Critic round, not a same-session hotfix, consistent with the
-sibling restart-runner items.
+**Corrected 2026-08-07** (a first dispatch, NOVA-LCR-INTENT-1, correctly
+stopped rather than implement this section's original text verbatim — see
+below): the original proposal below assumed `withoutRunnerFlag`'s existing
+trailing-pair-only strip already normalizes a `--runner`-then-`--intent`
+argv down to `[cmd, "--root", root, "--intent", intent]` before the `plan*`
+shape check runs. It does not. `lifecycleArgv(argv, runner, intent)` always
+appends `--runner <runner>` first, then `--intent <intent>` afterward
+whenever `intent !== "onboarding"` — so `--intent` is the trailing pair, not
+`--runner`, and `withoutRunnerFlag`'s trailing-only check does nothing for
+this shape. The array `sanctionedOnboardingArgs` actually receives for e.g.
+`plan-runtime --root <root> --runner claude --intent session` is the full
+7-token `[cmd, "--root", root, "--runner", "claude", "--intent", "session"]`,
+never the 5-token form this section originally described.
+
+Corrected fix shape: generalize `withoutRunnerFlag` from a trailing-pair-only
+strip to a scan-and-remove of the first `--runner <claude|codex>` pair
+found anywhere in the array (not only at the end), before any shape check
+runs. `lifecycleArgv`'s own construction is deterministic — `--runner` is
+always either the trailing pair (default intent) or the second-to-last pair
+(non-default intent, with `--intent` trailing) — so a scan-and-remove
+strip correctly normalizes both cases to a clean `[cmd, "--root", root]` or
+`[cmd, "--root", root, "--intent", intent]` shape, and the `plan*` branch
+can then mirror the `inspect` branch's existing optional-`--intent` pattern
+literally, exactly as this section originally intended. This is the more
+robust fix (closes the actual fragility class future flag additions would
+otherwise re-trigger) rather than a shape-specific patch for this one
+argv ordering. Verify no regression across every other branch that calls
+`withoutRunnerFlag` (`inspect`, `continuity inspect`, `apply-manifest-repair`,
+`apply-*`, `kickoff plan`/`apply`) via the full existing
+`guard-lifecycle-ready.test.mjs` suite, since the strip is now less
+positionally strict than before.
+
+Add a guard-side regression test that constructs the exact `nextAction.argv`
+`lifecycleArgv` would emit for each non-default intent (the real 7-token
+shape, not the originally-assumed 5-token one) and asserts the guard accepts
+it — closing the gap the existing regression suite apparently missed. Small,
+bounded, hook-tier change (guard/canon code per this repo's own dispatch
+tiering) — needs a Goldfish-deep + Critic round, not a same-session hotfix,
+consistent with the sibling restart-runner items.
+
+**Separately noted, out of this item's scope:** NOVA-LCR-INTENT-1 also found
+`sanctionedOnboardingArgs` lines 611-612 (`["plan-source-recovery",
+"plan-manifest-repair"]` with an identical `args.length === 3` check) are
+fully subsumed by line 609's broader list check and are dead code —
+pre-existing, harmless, not part of this defect; left untouched, flagged here
+for a future cleanup pass.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)

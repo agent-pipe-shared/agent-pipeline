@@ -435,6 +435,19 @@ exact argv shape `lifecycleArgv()` emits. PO instruction motivating this
 (chat, 2026-08-07): "nicht anhalten! setze goals und ziehe durch" — running
 in the background alongside NOVA-HGOSIG-3; not yet returned as of this note.
 
+**Queued PO instruction (chat, 2026-08-07):** "und wenn wir mal später einen
+runden Stand haben gerne mal einen branch Push machen" — once this thread of
+work reaches a settled/rounded state (all in-flight/queued dispatches landed,
+independently reviewed, and the mandatory T1 Critic round on ADR-0059 has a
+PASS verdict), prepare and run a branch push. This repo's configured
+`gates.push_approval` is `signature` (`pipeline.user.yaml:34`, this repo's
+actual value, not `chat`) — per
+[`docs/push-release-flow.md`](../docs/push-release-flow.md) the push gate
+needs an approval recorded against the exact candidate commit via a detached
+Ed25519 proof with the private key outside the repository; a real PO-external
+step, not something an agent session completes alone. Not actioned yet —
+explicitly queued for "later, once rounded", not now.
+
 ## 2026-08-07 Nova VII — first Nova A completion wave: 6 issues evidenced
 
 Continues from Nova VI. PO instruction: "leg mal los und fange an — du
