@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e5454bb3316008887ad1dd8aa90686f5621e693b75b46f5b267382a9c68ed51b"
+    "transitionHead": "03f5760c2f8d770f78638c59ef9a4a398af6c7a27d09acc3d5fcceca8d8dae1c"
   },
   "counts": {
-    "open": 46,
+    "open": 47,
     "in_progress": 21,
     "closed": 22
   },
@@ -338,6 +338,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "Observation from a parallel Phoenix session on the marketplace snapshot that each guard hook carries only one maintenance-window test, sharpened and empirically checked against the live TP-2/TP-6/TP-7 window during the 2026-08-07 Nova session."
+    },
+    {
+      "id": "pipeline.maintenance-window-signature-voided-by-unrelated-write",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Observed live while opening a Guard Maintenance Window for an AFK hardening session, 2026-08-08. The PO had already signed; the install failed."
     },
     {
       "id": "pipeline.managed-onboarding-success-contract",
