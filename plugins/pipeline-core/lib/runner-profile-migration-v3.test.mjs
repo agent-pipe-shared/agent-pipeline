@@ -6,6 +6,13 @@ import { existsSync, linkSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, 
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
+import { gateConfig } from "./manifest.mjs";
+import {
+  applyProjectOnboardingLifecycleV4,
+  applyProjectOnboardingV3,
+  planProjectOnboardingLifecycleV4,
+  planProjectOnboardingV3,
+} from "./project-onboarding-v3.mjs";
 import {
   applyPendingTransactionRecoveryV3,
   applyRunnerProfileMigrationV3,
@@ -1278,6 +1285,85 @@ record("the shipped v1 seed converts directly to V3 without a persistent V2 inte
     const intent = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
     assert.equal(intent.schema, "pipeline.user.v3");
     assert.equal(validatePipelineUserV3(intent).ok, true);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// A freshly onboarded project seeds its neutral-tier manifest from
+// freshManifestBytes() and its legacy compatibility tier through the slim V3
+// runtime initialization in this module. While both were written from separate
+// literals, adding the gate chapter to the neutral seed alone silently split
+// the two tiers: a reader resolving the legacy tier saw no gates at all.
+function freshlyOnboardedRoot() {
+  const root = mkdtempSync(join(tmpdir(), "runner-profile-v3-fresh-"));
+  try {
+    const portable = planProjectOnboardingV3({ rootDir: root });
+    assert.equal(portable.status, "ready", "fresh onboarding must plan");
+    assert.equal(applyProjectOnboardingV3(portable, { rootDir: root, activate: true }).status, "applied");
+    const runtime = planProjectOnboardingLifecycleV4({ rootDir: root, operation: "runtime", runner: "claude" });
+    assert.equal(runtime.status, "runtime-initialization-required");
+    const argv = runtime.nextAction?.argv ?? [];
+    const initialized = applyProjectOnboardingLifecycleV4({
+      rootDir: root,
+      operation: "runtime",
+      runner: "claude",
+      planSha256: argv[argv.indexOf("--plan-sha256") + 1],
+      activate: true,
+    });
+    assert.equal(initialized.status, "kickoff-required", "runtime initialization must seed the compatibility tier");
+    return root;
+  } catch (error) { rmSync(root, { recursive: true, force: true }); throw error; }
+}
+function manifestTiers(root) {
+  return {
+    neutral: readFileSync(join(root, "project/pipeline.yaml"), "utf8"),
+    legacy: readFileSync(join(root, ".claude/pipeline.yaml"), "utf8"),
+  };
+}
+
+record("a freshly onboarded project seeds both manifest tiers byte-identically", () => {
+  const root = freshlyOnboardedRoot();
+  try {
+    const tiers = manifestTiers(root);
+    assert.equal(
+      tiers.legacy,
+      tiers.neutral,
+      "the legacy compatibility tier must not be written from a second seed",
+    );
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+record("both freshly seeded manifest tiers resolve the same gate chapter", () => {
+  const root = freshlyOnboardedRoot();
+  try {
+    const tiers = manifestTiers(root);
+    const neutralGate = gateConfig(parseYaml(tiers.neutral), "dev-plan");
+    const legacyGate = gateConfig(parseYaml(tiers.legacy), "dev-plan");
+    assert.notEqual(neutralGate, null, "the neutral tier must seed a live dev-plan gate");
+    assert.deepEqual(legacyGate, neutralGate, "a reader resolving either tier must see the same gate");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+record("a customised existing manifest is never replaced by the fresh seed", () => {
+  const root = fixture(yaml(v3Intent()));
+  try {
+    const manifestPath = join(root, ".claude/pipeline.yaml");
+    const customised = readFileSync(manifestPath, "utf8");
+    const plan = planRunnerProfileMigrationV3({ rootDir: root, initializeMissingRuntimeForSlimV3: true });
+    assert.equal(plan.status, "ready");
+    const target = plan.targets.find((entry) => entry.path === ".claude/pipeline.yaml");
+    assert.equal(target.before.status, "present", "a present target keeps its own preimage, never a seed");
+    assert.equal(target.before.byteLength, Buffer.byteLength(customised, "utf8"));
+    assert.equal(target.preWrite.ownerMode, "owned-keys-preserve-unowned");
+    assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
+    const written = readFileSync(manifestPath, "utf8");
+    for (const sentinel of ["# pipeline-prefix-sentinel", "unownedBefore: exact", "unownedAfter: exact"]) {
+      assert.equal(written.includes(sentinel), true, `user-owned content survives: ${sentinel}`);
+    }
+    assert.equal(
+      gateConfig(parseYaml(written), "dev-plan"),
+      null,
+      "the fresh gate chapter must not be injected into an existing project's manifest",
+    );
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

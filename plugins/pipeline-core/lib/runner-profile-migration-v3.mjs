@@ -36,6 +36,9 @@ import {
   hasCodexRuntimeControlMount,
   readCodexHostRepositoryInitAdmission,
 } from "./codex-host-layout.mjs";
+// One seed for both manifest tiers.  This is an intentional import cycle
+// (project-onboarding-v3.mjs imports this module); every use is lazy.
+import { freshManifestBytes } from "./project-onboarding-v3.mjs";
 import { applyRunnerProfileMigrationV2, planRunnerProfileMigrationV2 } from "./runner-profile-migration-v2.mjs";
 import { validatePipelineUserV2 } from "./runner-profiles-v2.mjs";
 import { loadRunnerProfilesV3Registry, validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
@@ -119,12 +122,32 @@ const SLIM_V3_RUNTIME_SEEDS = Object.freeze({
     stakes: "private-overlay",
     constraints: ["Public Core owns the runtime projection; private overlay policy may add constraints."],
   }, null, 2)}\n`,
-  ".claude/pipeline.yaml": "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\nmodelRouting:\n  legacy:\n    model: legacy\n    effort: low\n",
+  // The runtime manifest seed is deliberately ABSENT here: it is not this
+  // module's to restate.  A freshly onboarded project seeds its neutral-tier
+  // `project/pipeline.yaml` from freshManifestBytes(), and a second literal
+  // here made the legacy compatibility tier disagree with it the moment the
+  // gate chapter was added to the neutral seed alone -- which is how a kickoff
+  // receipt came to bind a manifest without a `gates` chapter while the
+  // validator read one with it.  slimRuntimeSeed() resolves it from that one
+  // owner instead.
   ".codex/config.toml": "",
   ".codex/agents/implementor.toml": codexCustomAgentSeed("implementor"),
   ".codex/agents/critic.toml": codexCustomAgentSeed("critic"),
   ".codex/agents/consult-advisor.toml": "",
 });
+// Resolved per use, never at module evaluation: project-onboarding-v3.mjs
+// imports this module, so the import cycle leaves its module-level bindings
+// uninitialized while this module's body runs.  By the time a slim V3
+// initialization needs a baseline, both modules are fully evaluated.
+//
+// Fresh runtime initialization holds no PO profile -- the migration API takes
+// none, and the kickoff binds the profile only at promotion, after this call
+// site -- so the profile-neutral default is the correct seed here.
+function slimRuntimeSeed(relative) {
+  return relative === ".claude/pipeline.yaml"
+    ? freshManifestBytes()
+    : SLIM_V3_RUNTIME_SEEDS[relative];
+}
 
 class IntentionalMigrationInterruption extends Error {
   constructor(target) { super(`intentional interruption after ${target}`); this.name = "IntentionalMigrationInterruption"; }
@@ -260,7 +283,7 @@ function runtimeBaselines(root, deps, sourceKind, { initializeMissingRuntimeForS
     if (!deps.existsSync(target)) {
       const seed = legacy
         ? LEGACY_V3_RUNTIME_SEEDS[relative]
-        : initializeSlimV3 ? SLIM_V3_RUNTIME_SEEDS[relative]
+        : initializeSlimV3 ? slimRuntimeSeed(relative)
           // A reserved Codex mount supplies `.codex` at runtime.  Missing
           // Claude compatibility projections are renderer baselines only in
           // this mode; they must not make a freshly project-seeded root
