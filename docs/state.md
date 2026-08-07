@@ -351,6 +351,52 @@ post-merge redesign packages have landed code this session:
   not a fifth autonomous iteration.** Base computed correctly this time as
   `<first-enumerated-SHA>^` = `2e48cbd^` = `5c12a8d`, closing the
   base-computation defect both preceding Critic reviews flagged.
+  **Round 4/4: PASS.** All four findings independently re-derived from source
+  and confirmed resolved — including F1's central claim, which the Critic
+  re-derived by hand after confirming that `check-doc-contracts.mjs` parses
+  only inline links and reference definitions, so for these backtick-form
+  citations it verifies neither content nor existence (the evidence artifact's
+  own disclosure slightly *understated* the gap but overclaimed no coverage).
+  Base bounding explicitly confirmed correct this round. Full report:
+  `specs/sprint-phoenix-epic/evidence/wp2wp3-parta-rework-3-delta-critic-review-138e2e3.md`.
+  **One new MINOR finding:** §A.3's rescoping parenthetical mis-described the
+  §A.5 passage it cited — it claimed §A.5's F1 correction still framed Part A's
+  arrival as "on the next plugin refresh" (post-rescoping it quotes that phrase
+  only as superseded) and attributed the reach phrase "every session, every
+  project" to both cited passages, when §A.5's carried "every session, on the
+  next plugin refresh" and never "every project". The same defect class as F1/F2
+  recurring at the anchor the F2 fix itself edited. No technical conclusion
+  falsified — §A.3's timing claim is independently anchored to `hooks.json:39`
+  and `guard-gate-strength.mjs`.
+  **Elephant disposition: fixed directly as a bounded editorial fix** (commit
+  below), after independently verifying the Critic's claim by extracting the
+  pre-diff document at `5c12a8d` and confirming via `rg` that "every session,
+  every project" appeared only at the opening summary (line 51), never at §A.5's
+  F1 correction (line 337). This does not revisit substance (a two-sentence
+  cross-reference correction), so per this repo's own precedent for the identical
+  situation at the round cap (WP5/PHX-2 design round 4: "PO decision: bounded
+  editorial fix (chosen). Applied directly by the Elephant, commit `4e4cf35`")
+  it is **not** counted as a fifth Critic round. `check-doc-contracts.mjs` green
+  after the fix (478 files/776 links/13 anchors). The PO may of course overrule
+  this disposition at the gate.
+  **Elephant follow-up, not a package defect:** the Critic flagged that the
+  Critic-dispatch template's guardrail reference `docs/operating-model.md §2.4,
+  §4.2` does not resolve — that file has no such subsections (the Critic
+  contract lives at `:25-26, 45, 233-236`, rigor/review material at `:157,
+  :180`). Non-contaminating (the Critic located the substance itself) but should
+  be corrected in `templates/prompts/critic-review.md` before the next dispatch.
+  **WP2-WP3 Part A is now Critic-clean end to end (design + implementation) —
+  ready for the PO's self-application gate.** Full round history: implementation
+  review 1 (FAIL, 2 blockers + 2 major + 2 minor) → rework-1 → delta 1 (PASS, 4
+  non-blocking) → rework-2 → delta 2 (FAIL, 3 major + 1 minor) → rework-3
+  (Design-tier) → delta 3/round 4 (PASS, 1 minor, Elephant editorial fix).
+  **Two Elephant dispatch-construction lessons recorded for the next package:**
+  (1) compute a Critic dispatch's base as `<first-enumerated-SHA>^`, never carry
+  over the prior candidate — flagged in two consecutive rounds before it was
+  fixed; (2) a dispatch that authors or reworks a design document is a
+  design-phase step and must be routed on the Design-tier model — briefing
+  rework-2 on `claude-sonnet-5` produced Critic finding F3, and its two
+  companion majors were both defects in the text that below-tier dispatch wrote.
 - **GMW (Guard Maintenance Window, ADR-0058) merged in from the local-development
   marketplace snapshot** (commit `cca5ad8`): the PO pointed at
   `/home/skar667/agent-pipeline-local-marketplace` as the currently-wired snapshot

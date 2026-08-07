@@ -299,11 +299,19 @@ a negative result widen the existing `status` ternary (see §A.5) rather than re
    `plugins/pipeline-core/hooks/guard-gate-strength.mjs` therefore changes nothing the
    currently-enforcing guard reads; the new rule first takes effect on the **next plugin refresh**,
    exactly like every other change to this plugin's code and exactly as this document already
-   frames Part A's arrival elsewhere — "on the next plugin refresh" in the opening Part-A
-   summary and again in §A.5's F1 correction. (Those two passages also stated a *reach*, "every
-   session, every project"; that part is rescoped per Critic finding F2, delta re-review
-   `412d33d`, because the attestation reaches self-application/dev checkouts only. The refresh
-   *timing* quoted here is unaffected by that rescoping.)
+   frames Part A's arrival in the opening Part-A summary — "on the next plugin refresh".
+   (**Corrected per Critic finding 1, MINOR, round-4 delta re-review `138e2e3`, as a bounded
+   editorial fix:** this parenthetical previously also cited §A.5's F1 correction as carrying
+   that same framing and attributed the reach phrase "every session, every project" to both
+   passages. Neither held: §A.5's F1 correction carried "every session, on the next plugin
+   refresh" — never "every project" — and after the F2 rescoping it no longer frames Part A's
+   arrival at all, quoting the timing phrase only as superseded. Only the opening Part-A
+   summary carried both the reach and the timing. The reach half is rescoped per Critic
+   finding F2, delta re-review `412d33d`, because the attestation reaches
+   self-application/dev checkouts only. The refresh *timing* asserted here is unaffected by
+   either rescoping and does not rest on those cross-references: it is anchored directly in
+   `plugins/pipeline-core/hooks/hooks.json:39` and `guard-gate-strength.mjs`'s
+   `livePluginRoots()`/`insideLivePlugin()`.)
 
    So the real consequence is a **window, not a same-session lockout**: between the commit that
    lands the rule and the plugin refresh that installs it, the new allowlist module stays freely
