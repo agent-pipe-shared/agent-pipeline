@@ -154,4 +154,17 @@ in-session edit.
   is constrained, not free:** B3 touches `plugins/pipeline-core/**`, the tree the
   pending 0.5.3 merge reconciles, so the merge lands first and the sweep second
   (`specs/sprint-phoenix-epic/design/plugin-0.5.3-merge-plan.md` §3/§4).
-- **Date:** 2026-08-07
+- **Figures updated 2026-08-08, decision unchanged.** A Critic round found a
+  citation the inventory had missed (`templates/prompts/critic-review.md:15`
+  carries a `§4.2` that resolves in no document; the attribution rule dropped it
+  because the nearest preceding reference on that line is a rule id). The
+  corrected sizes are **B1 = 9 dead citations on 9 lines**, **B2 ≈ 48**,
+  **B3 ≈ 233**, against repository totals of 345 citations across 57 files
+  (231 kind A, 114 kind B). The decision above was taken against the superseded
+  figures ~232 / ~47 / 9; each option grew by at most one citation, so the
+  decision stands as recorded and is **not** reopened. Recorded here rather than
+  silently corrected, because a decision should say what it was actually taken
+  against.
+- **Sequencing satisfied 2026-08-08:** the 0.5.3 merge landed (`35d9e11`). The
+  sweep is no longer blocked.
+- **Date:** 2026-08-07 (figures amended 2026-08-08)
