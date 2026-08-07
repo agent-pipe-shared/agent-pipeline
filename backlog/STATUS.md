@@ -46,7 +46,7 @@
 | pipeline.po-gate-authority-receipt-readback | open | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-worktree-authority | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.private-overlay-activation-bridge | closed | workflow-improvement | pipeline | 2026-07-20 | — |
-| pipeline.project-authority-dual-state-repair-and-failclosed-gate | open | defect | pipeline | 2026-08-07 | — |
+| pipeline.project-authority-dual-state-repair-and-failclosed-gate | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.project-scoped-github-issue-operations | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.push-guard-worktree-target | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.readonly-command-guard-classification | open | workflow-improvement | pipeline | 2026-07-26 | — |
@@ -79,6 +79,6 @@
 
 ## Counts
 
-- open: 31
+- open: 30
 - in_progress: 21
-- closed: 19
+- closed: 20

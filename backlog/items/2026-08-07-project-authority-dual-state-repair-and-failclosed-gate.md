@@ -3,9 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.project-authority-dual-state-repair-and-failclosed-gate
 type: defect
 owner: pipeline
-status: open
+status: closed
 source: merge report section 4 finding 8 and the two narrowed findings on po-gate-authority.mjs (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361
 created: 2026-08-07
+closed_at: 2026-08-07
+closure_repository: self
+closure_commit: 1f070c91743b7340c59ea5836286cd632bb0eba8
+closure_evidence: backlog/evidence/2026-08-07-project-authority-failclosed-closure.md
 ---
 
 # Project-authority dual-state repair is gone; the paired gate now fails open on ambiguity
@@ -42,16 +46,38 @@ verbatim per PO's same-function policy).
 
 ## Proposal
 
-No proposal yet. Two independent questions for the redesign round: (1)
-whether main's `resolveProjectAuthorityPaths` needs a fail-closed mode
-restored for the ambiguous/mixed case, and (2) whether Phoenix's dual-state
-repair tool is still needed given main's simpler project-authority layout
-(ADR-0046), or whether that layout structurally avoids the ambiguity Phoenix
-had to repair.
+**Implemented (2026-08-07).** Question (1) — fail-closed restored:
+`po-gate-authority.mjs`'s `activeFeatureState` now returns a dedicated
+`"unavailable"` status for any non-`"ready"` `resolveProjectAuthorityPaths`
+result (mixed, missing, unsafe, migration-required), mapped to
+`PO-GATE-STATE-AUTHORITY-UNAVAILABLE` in `validatePoGateAuthority`. The
+`"ready"` path is byte-for-byte unchanged. Regression coverage added
+permanently in `po-gate-authority.test.mjs` (mixed + missing, via both
+`validatePoGateAuthority` and `validatePoGateAuthorityForRepository`).
+Commit `1f070c9` on `sprint_phoenix` (cherry-picked from a Goldfish-deep
+dispatch's worktree commit `f8121a5`, verified byte-identical target files
+before the pick). Verify: `node plugins/pipeline-core/lib/po-gate-authority.test.mjs`
+→ 39/39 passed, exit 0; `node plugins/pipeline-core/lib/project-authority.test.mjs`
+→ 25/25 passed, exit 0.
+
+Question (2) — dual-state repair tool: **not needed.** Main's
+`project-authority.mjs` already has its own equivalent repair/migration
+mechanism for both ambiguity classes: `planProjectAuthorityMigration`/
+`applyProjectAuthorityMigration`, covering `"migration-required"`
+(`PA-LEGACY-STATE-RETIREMENT-REQUIRED`, a `retire-legacy-state` operation)
+and `"mixed"` (an `adopt-existing-neutral` provenance-gated plan/apply flow),
+with the same durable-journal/transaction-recovery discipline Phoenix's tool
+had. Phoenix's separate subsystem is functionally superseded, not genuinely
+absent — confirmed by reading the current code, not assumed. No repair tool
+was built; none is needed.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, implemented
+- **Rationale:** fail-closed on ambiguous project authority is a core safety
+  property this session already relied on elsewhere (continuity-authority
+  work); low-risk, well-scoped, no dependency on the larger redesign items.
+  The paired "is a repair tool still needed" question resolved to "no" on
+  investigation — main's project-authority.mjs already covers it.
+- **Assignment (if accepted):** done, 2026-08-07.
+- **Date:** 2026-08-07
