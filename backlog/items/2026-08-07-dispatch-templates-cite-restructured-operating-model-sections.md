@@ -129,4 +129,29 @@ in-session edit.
   `specs/sprint-phoenix-epic/design/part-a-residuals-and-dispatch-template-drift.md` Part II
   (proposal item 3 decided there; the citation inventory found four stale references beyond
   the four recorded here).
+- **Re-scoped (2026-08-07):** this item's inventory is superseded. It recorded
+  8 stale references across the two dispatch templates; measured against
+  `docs/operating-model.md`'s actual structure (ten numbered `##` sections,
+  three `###` children, **none numbered**), the real figure is **344 citations
+  across 57 files**, `CLAUDE.md` itself carrying 11. Two defect kinds now
+  separated because they need different fixes: 230 citations to subsections that
+  do not exist, and 51 confirmed citations to a section that exists but is
+  described wrongly. Re-derivation in
+  `specs/sprint-phoenix-epic/design/part-a-residuals-and-dispatch-template-drift.md`
+  Part II (`84876f1`).
+- **Remedy revised, not confirmed (2026-08-07):** "cite stable headings, not
+  section numbers" stands, but proposal item 2's assumption — that anchor links
+  are machine-checked and therefore cannot drift again — is **refuted by
+  measurement**. `backlog/README.md` already uses that form and 4 of its 5 links
+  name headings that no longer exist, yet stay green: `docs/operating-model.md`
+  carries planted alias anchors at `:563` and `:583` sitting above **German**
+  headings, and `collectAnchors` returns 31 anchors for 20 headings with English
+  and German slugs in one namespace. So the checker can pass on wrong-language
+  content — tracked separately as the anchor-hygiene follow-up.
+- **PO decision on scope (APS, 2026-08-07): B3 — sweep all 39 live agent-facing
+  artifacts (~232 citations).** B1 (this item's original 2 files / 9 citations)
+  and B2 (6 files / ~47) were presented with sizes and not taken. **Sequencing
+  is constrained, not free:** B3 touches `plugins/pipeline-core/**`, the tree the
+  pending 0.5.3 merge reconciles, so the merge lands first and the sweep second
+  (`specs/sprint-phoenix-epic/design/plugin-0.5.3-merge-plan.md` §3/§4).
 - **Date:** 2026-08-07

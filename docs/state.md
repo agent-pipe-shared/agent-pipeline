@@ -136,6 +136,29 @@ the only instance that reaches an operator through tool output; and the German
 half carries a `### H5 Close-Koordinator` heading (`:649`) with no English
 counterpart, an EN/DE structural divergence outside R3.
 
+**PO decision on R3's implementation boundary: B3 — sweep everything (APS,
+2026-08-07).** All 39 live agent-facing artifacts, ~232 citations, including the
+shipped plugin tree and one `.mjs`. The two narrower options (B1 = 2 files / 9
+citations, the literal backlog scope; B2 = 6 files / ~47, closing the citation
+chain) were presented with their sizes and were not taken. **Consequence the PO
+accepted when choosing it, recorded so it is not rediscovered as a surprise:**
+B3 touches `plugins/pipeline-core/**`, which is exactly the tree the pending
+0.5.3 merge reconciles — see the sixteen-file conflict set in
+`specs/sprint-phoenix-epic/design/plugin-0.5.3-merge-plan.md` §4. **Sequencing
+follows from that and is not a free choice: the 0.5.3 merge lands first, R3's
+sweep second.** Doing it the other way means re-resolving every swept citation
+inside the merge's manual union, on files where a wrong union silently drops a
+guard rule (§3 of that plan).
+**PO decision on the three follow-ups: all three accepted (APS, 2026-08-07).**
+(a) anchor hygiene in `check-doc-contracts.mjs` — a fragment link can be green
+while pointing at wrong-language content; (b) a citation lint for prose `§N` /
+`§N.M` references, which is what makes the defect class non-recurring rather
+than once-cleaned; (c) `harness/scripts/check-claude-md-lines.mjs:59` to be
+taken along immediately — it is the only instance that reaches a human, because
+the gate prints `(operating-model §7)` into its operator-visible fix string.
+Note (c) is a one-line change but sits in a `harness/scripts/` file, so it
+follows the ordinary briefed-task path rather than an in-session edit.
+
 **HOLD — plugin snapshot sync deferred by PO instruction (2026-08-07 evening).**
 A newer local plugin candidate is installed and reloaded:
 `0.5.3+claude.20260807181921.f667dec` at
