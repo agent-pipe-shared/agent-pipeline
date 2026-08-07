@@ -33,10 +33,12 @@ import {
   selectPrimaryWorktree,
   serializePoGateProfileReceipt,
   validatePoGateAuthority,
+  validatePoGateAuthorityForRepository,
   validatePoGateLanguageProjection,
   validatePoGateProfileReceipt,
   validatePoGateProfileForRepository,
 } from "./po-gate-authority.mjs";
+import { main as poGateProfileRepair } from "../scripts/po-gate-profile-repair.mjs";
 import { hardenWindowsPrivateDirectory } from "./windows-private-state.mjs";
 import { resolveTrustedSystemExecutable } from "./trusted-tool-resolution.mjs";
 
@@ -894,6 +896,194 @@ check("literal linked detached worktree uses the primary receipt without reconci
   } finally {
     rmSync(base, { recursive: true, force: true });
   }
+});
+
+// --- Operator-facing language is the PO's own setting (ADR-0011) -------------
+//
+// A consumer project is its own Git repository: it has the plugin but no
+// setup.mjs, and its primary checkout is its own, not the Pipeline's. These
+// checks exercise the correction route exactly as such a PO reaches it.
+
+/** The realistic source form: the generated pipeline.user.yaml quotes and comments this scalar. */
+function quotedSource(language) {
+  return `schema: pipeline.user.v1\nlanguage:\n  human_facing: "${language}"  # operator-facing surface\n  agent_facing: "en"\n`;
+}
+
+function consumerProject(language) {
+  const base = realpathSync(mkdtempSync(join(tmpdir(), "po-gate-consumer-")));
+  const root = join(base, "consumer-project");
+  mkdirSync(root, { recursive: true });
+  git(root, "init", "-b", "main");
+  git(root, "config", "user.name", "PO Gate Test");
+  git(root, "config", "user.email", "po-gate@example.invalid");
+  populateRoot(root, language);
+  write(join(root, "pipeline.user.yaml"), quotedSource(language));
+  git(root, "add", ".");
+  git(root, "commit", "-m", "fixture");
+  return { base, root };
+}
+
+function withConsumerProject(language, fn) {
+  const project = consumerProject(language);
+  try {
+    return fn(project);
+  } finally {
+    rmSync(project.base, { recursive: true, force: true });
+  }
+}
+
+function repair(argv) {
+  let stdout = "";
+  const status = poGateProfileRepair(argv, (chunk) => { stdout += chunk; });
+  return { status, stdout };
+}
+
+function repairJson(argv) {
+  const result = repair(argv);
+  return { ...result, value: JSON.parse(result.stdout) };
+}
+
+function userYaml(root) {
+  return readFileSync(join(root, "pipeline.user.yaml"), "utf8");
+}
+
+function runtimeYaml(root) {
+  return readFileSync(join(root, ".claude", "pipeline.yaml"), "utf8");
+}
+
+check("the operator-facing language is correctable from a consumer project's own primary checkout", () => {
+  withConsumerProject("en", ({ root }) => {
+    assert.notEqual(root, REPO_ROOT);
+    assert.equal(validatePoGateProfileForRepository({ repoRoot: root }).ok, false);
+
+    const plan = repairJson(["plan", "--root", root, "--human-facing", "de"]);
+    assert.equal(plan.status, 0, plan.stdout);
+    assert.deepEqual(
+      { from: plan.value.languageChange.from, to: plan.value.languageChange.to },
+      { from: "en", to: "de" },
+    );
+    assert.equal(plan.value.profile.humanFacing, "en");
+    assert.equal(userYaml(root), quotedSource("en"));
+
+    const applied = repairJson([
+      "apply", "--root", root, "--human-facing", "de", "--plan-sha256", plan.value.planSha256, "--activate",
+    ]);
+    assert.equal(applied.status, 0, applied.stdout);
+    assert.equal(applied.value.code, "PO-PROFILE-REPAIR-APPLIED");
+    assert.equal(applied.value.humanFacing, "de");
+
+    // Only the one scalar moves: quoting, the trailing comment and agent_facing survive.
+    assert.equal(userYaml(root), quotedSource("de"));
+    assert.equal(runtimeYaml(root), runtime("de"));
+    const profile = validatePoGateProfileForRepository({ repoRoot: root });
+    assert.equal(profile.ok, true, JSON.stringify(profile));
+    assert.equal(profile.value.humanFacing, "de");
+  });
+});
+
+check("a corrected consumer project accepts an honestly marked PRD and refuses a wrongly marked one", () => {
+  withConsumerProject("en", ({ root }) => {
+    const plan = repairJson(["plan", "--root", root, "--human-facing", "de"]);
+    assert.equal(repair([
+      "apply", "--root", root, "--human-facing", "de", "--plan-sha256", plan.value.planSha256, "--activate",
+    ]).status, 0);
+
+    write(join(root, "specs", "feature", "prd_feature.md"), prd("de"));
+    const honest = validatePoGateAuthorityForRepository({ repoRoot: root });
+    assert.equal(honest.ok, true, JSON.stringify(honest));
+    assert.equal(honest.value.humanFacing, "de");
+
+    write(join(root, "specs", "feature", "prd_feature.md"), prd("en"));
+    const contradicting = validatePoGateAuthorityForRepository({ repoRoot: root });
+    assert.equal(contradicting.ok, false);
+    assert.equal(contradicting.code, "PO-GATE-PRD-LANGUAGE-MISMATCH");
+  });
+});
+
+check("the marker grammar stays closed and single-line after the language is corrected", () => {
+  withConsumerProject("en", ({ root }) => {
+    const plan = repairJson(["plan", "--root", root, "--human-facing", "de"]);
+    assert.equal(repair([
+      "apply", "--root", root, "--human-facing", "de", "--plan-sha256", plan.value.planSha256, "--activate",
+    ]).status, 0);
+    const specBytes = spec();
+    const marker = PO_GATE_PRD_LANGUAGE_MARKER("de");
+    for (const content of [
+      // missing, duplicated, wrong-language, prefixed, uppercased, split over two lines
+      `${TECHNICAL_SPEC_MARKER(sha256(specBytes))}\n# PRD\n`,
+      `${prd("de")}${marker}\n`,
+      prd("en"),
+      `prefix ${marker}\n${TECHNICAL_SPEC_MARKER(sha256(specBytes))}\n# PRD\n`,
+      `<!-- po-language: DE -->\n${TECHNICAL_SPEC_MARKER(sha256(specBytes))}\n# PRD\n`,
+      `<!-- po-language:\nde -->\n${TECHNICAL_SPEC_MARKER(sha256(specBytes))}\n# PRD\n`,
+    ]) {
+      write(join(root, "specs", "feature", "prd_feature.md"), content);
+      const result = validatePoGateAuthorityForRepository({ repoRoot: root });
+      assert.equal(result.ok, false, JSON.stringify(result));
+      assert.equal(result.code, "PO-GATE-PRD-LANGUAGE-MISMATCH", JSON.stringify(result));
+    }
+  });
+});
+
+check("republication without --human-facing keeps the English-configured project exactly as it is today", () => {
+  withConsumerProject("en", ({ root }) => {
+    const before = { source: userYaml(root), runtime: runtimeYaml(root) };
+    const plan = repairJson(["plan", "--root", root]);
+    assert.equal(plan.status, 0, plan.stdout);
+    assert.equal(Object.prototype.hasOwnProperty.call(plan.value, "languageChange"), false);
+    assert.equal(plan.value.profile.humanFacing, "en");
+    assert.equal(plan.value.applyAction.argv.includes("--human-facing"), false);
+
+    const applied = repairJson(["apply", "--root", root, "--plan-sha256", plan.value.planSha256, "--activate"]);
+    assert.equal(applied.status, 0, applied.stdout);
+    assert.equal(applied.value.code, "PO-PROFILE-REPAIR-APPLIED");
+    assert.equal(Object.prototype.hasOwnProperty.call(applied.value, "humanFacing"), false);
+    assert.deepEqual({ source: userYaml(root), runtime: runtimeYaml(root) }, before);
+    assert.equal(validatePoGateProfileForRepository({ repoRoot: root }).value.humanFacing, "en");
+  });
+});
+
+check("the language route refuses unsupported values and every ambiguous language scalar", () => {
+  withConsumerProject("en", ({ root }) => {
+    const unsupported = repair(["plan", "--root", root, "--human-facing", "fr"]);
+    assert.equal(unsupported.status, 64);
+    assert.match(unsupported.stdout, /usage:/u);
+    for (const [sourceBytes, code] of [
+      [`schema: pipeline.user.v1\nlanguage:\n  human_facing: en\n  human_facing: de\n  agent_facing: en\n`, "PO-PROFILE-LANGUAGE-SCALAR-AMBIGUOUS"],
+      [`schema: pipeline.user.v1\nagent:\n  human_facing: en\n`, "PO-PROFILE-LANGUAGE-BLOCK-MISSING"],
+      [`schema: pipeline.user.v1\nlanguage:\n  human_facing: en\nother: 1\nlanguage:\n  human_facing: en\n`, "PO-PROFILE-LANGUAGE-BLOCK-AMBIGUOUS"],
+      [`schema: pipeline.user.v1\nlanguage:\n  human_facing: "en\n  agent_facing: en\n`, "PO-PROFILE-LANGUAGE-SCALAR-AMBIGUOUS"],
+    ]) {
+      write(join(root, "pipeline.user.yaml"), sourceBytes);
+      const result = repairJson(["plan", "--root", root, "--human-facing", "de"]);
+      assert.equal(result.status, 2, result.stdout);
+      assert.equal(result.value.status, "unavailable");
+      assert.equal(result.value.code, code, result.stdout);
+    }
+  });
+});
+
+check("a stale plan digest is rejected before any language byte is written", () => {
+  withConsumerProject("en", ({ root }) => {
+    const before = { source: userYaml(root), runtime: runtimeYaml(root) };
+    const stale = repairJson([
+      "apply", "--root", root, "--human-facing", "de", "--plan-sha256", "c".repeat(64), "--activate",
+    ]);
+    assert.equal(stale.status, 2);
+    assert.equal(stale.value.code, "PO-PROFILE-REPAIR-PLAN-STALE");
+    assert.deepEqual({ source: userYaml(root), runtime: runtimeYaml(root) }, before);
+    assert.equal(validatePoGateProfileForRepository({ repoRoot: root }).ok, false);
+  });
+});
+
+check("profile repair guidance names a route a consumer project can actually run", () => {
+  withFixture({}, ({ receiptPath, validate }) => {
+    unlinkSync(receiptPath);
+    const { repair: guidance } = validate();
+    assert.match(guidance, /setup\.mjs --publish-po-profile/u);
+    assert.match(guidance, /po-gate-profile-repair\.mjs/u);
+    assert.match(guidance, /--human-facing <de\|en>/u);
+  });
 });
 
 process.stdout.write(`po-gate-authority: ${passed} checks passed\n`);

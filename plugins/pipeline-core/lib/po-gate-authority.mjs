@@ -65,7 +65,16 @@ const RECEIPT_KEYS = [
   "humanFacing",
   "updatedAt",
 ];
-const PROFILE_REPAIR = "Run node setup.mjs --publish-po-profile from the canonical primary checkout, then retry.";
+// The first route exists only inside the Pipeline's own repository. A consumer
+// project has the plugin but no setup.mjs, so naming only that route hands the
+// PO guidance they cannot execute; the second sentence names the route they can
+// run against their own project, including the operator-facing language ADR-0011
+// leaves to them. Both act on the project's own primary checkout -- the receipt
+// is shared through the Git common directory and is validated against the
+// primary's bytes, so a linked worktree must not be able to publish it.
+const PROFILE_REPAIR = "Run node setup.mjs --publish-po-profile from the canonical primary checkout, then retry."
+  + " In a consumer project, run the pipeline-core script po-gate-profile-repair.mjs (plan, then apply --activate)"
+  + " against that project's own primary checkout; add --human-facing <de|en> to set or correct the operator-facing language.";
 const PRD_REPAIR = "Repair activeFeature.planPath and the active feature directory; do not create child PRDs.";
 const UTF8 = new TextDecoder("utf-8", { fatal: true });
 
