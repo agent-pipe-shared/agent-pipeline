@@ -99,11 +99,13 @@ export function pluginRootHasSelfApplicationGit(pluginRoot) {
  * `observe` defaults per-runner, self-referentially, to the same reused
  * Public-Core observers already proven safe on the private-overlay path.
  * Skipped when the manifest itself is unreadable (`version` falsy) -- the
- * caller's `status` ternary in `pipeline-start-preflight.mjs` (`:294-298` at
- * the time of writing) already hard-fails to "plugin-identity-unavailable" in
- * that case regardless of this result. A negative result never invents a new
- * hard-fail status; it only widens that ternary's existing
- * "plugin-refresh-required" branch.
+ * caller's sole `const status =` ternary, in `observePipelineStartPreflight`
+ * (`../scripts/pipeline-start-preflight.mjs`), already hard-fails to
+ * "plugin-identity-unavailable" in that case regardless of this result. A
+ * negative result never invents a new hard-fail status; it only widens that
+ * ternary's existing "plugin-refresh-required" branch. (Cited by construct,
+ * not by line: the line range this comment originally carried was already
+ * stale by the commit that extracted this module.)
  *
  * Gated on `.git` presence at the self-application layout's repository root
  * (Critic finding F2, WP2-WP3-partA-rework-1, PO-confirmed fix direction):
@@ -112,8 +114,8 @@ export function pluginRootHasSelfApplicationGit(pluginRoot) {
  * installed plugin copy has no `.git` at all, so calling the observer there
  * made `attestationFailed` permanently true for every real install. When no
  * `.git` is present the attestation is skipped entirely -- not attempted,
- * not failed -- and the caller's `status` ternary
- * (`pipeline-start-preflight.mjs:294-298` at the time of writing) falls
+ * not failed -- and that same `const status =` ternary in
+ * `observePipelineStartPreflight` falls
  * through to exactly the version/installedIdentity/installedVersion decision
  * that predates this feature. A real integrity check for the installed
  * non-git case is explicitly out of scope; see the design doc's Part A §A.7
