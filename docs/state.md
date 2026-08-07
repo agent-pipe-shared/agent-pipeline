@@ -95,14 +95,23 @@ freehand). Status:
    confirmed not needed (main already has an equivalent). See
    `backlog/evidence/2026-08-07-project-authority-failclosed-closure.md`.
 2. **`self-application-integrity-check-absent`** and
-3. **`ruleset-freshness-wsl-subsystem-absent`** — the first dispatch hit the
-   worktree-staleness bug (below) and self-detected/stopped cleanly without
-   guessing; being redispatched without `isolation: "worktree"`. Already
-   found, independent of the dispatched agent: `ruleset-freshness-host.mjs`
-   (Phoenix-only, merged in cleanly) has a **currently broken import** —
-   verified directly (`node -e "import(...)"` throws) — depending on 9 named
-   exports across `ruleset-freshness.mjs`/`codex-host-plugin-list.mjs` that
-   don't exist in main's versions of those files.
+3. **`ruleset-freshness-wsl-subsystem-absent`** — **investigated, PO decision
+   needed, no code changed.** Confirmed: `ruleset-freshness-host.mjs`
+   (Phoenix-only, merged in cleanly) has a currently broken import chain
+   across `ruleset-freshness.mjs`/`codex-host-plugin-list.mjs`/
+   `pipeline-start-preflight.mjs`. The redispatched agent correctly stopped
+   rather than force a fix: pre-merge, the self-application origin-allowlist
+   check was folded into the bootstrap **readiness gate's `status` decision**
+   itself in `pipeline-start-preflight.mjs` — not an additive field, core
+   gate semantics. A correct fix therefore needs a PO decision on whether
+   that check becomes part of ordinary bootstrap readiness again (reusing
+   `public-core-observation.mjs`/`ruleset-source.mjs`, already proven safe on
+   the private-overlay path) before any implementation, plus a decision on
+   whether the WSL host-authorized network-boundary concept is still wanted
+   given main's simpler direct-read replacement. Full detail, including a
+   name-collision risk (`inspectRulesetFreshness`) and a stale sentence found
+   in `harness/session-bootstrap.md:159`, in both backlog items' Proposal
+   sections.
 4. **`governance-product-verify-suites-deregistered`** — blocked on 1–3's
    outcome, not started.
 5. **`ledger-backed-plan-and-push-authority-absent-on-merged-base`** — design
