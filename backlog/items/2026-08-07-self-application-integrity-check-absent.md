@@ -151,3 +151,22 @@ consequence (can't create the module in the same session the rule lands,
 since the guard has no in-session override) and the maintenance consequence
 (later edits need a PO hand-edit). A bounded delta re-review is dispatched
 next — round 3 of 4 (initial + delta 1 + this delta 2).
+
+**Delta re-review 2 (2026-08-07): FAIL — 3 new MINOR.** Full findings:
+`specs/sprint-phoenix-epic/evidence/wp2wp3-design-critic-delta-review-2-d99e59f.md`.
+(1) the Finding-C disclosure's sequencing claim is wrong the other way: it
+says the new entry blocks the allowlist module's creation *in the same
+session*, but the document's own adjacent claims (GS-6 exempts the
+source-tree checkout, matching only the installed/enforcing root) mean the
+protection only engages on the next plugin refresh — the module stays
+agent-writable in the source tree until then, and that correct consequence
+is unstated; (2) §A.6's now-correct 5-file figure contradicts §A.5, which
+still says "four files," double-counting `SKILL.md` across two bullets —
+Finding B's exact defect recurring at the sibling anchor; (3) the Finding-A
+disclosure names the original dispatch and rework 1 but omits that
+`WP2-WP3-design-rework-2` — the dispatch that wrote the disclosure itself —
+also ran below-Design-tier, Finding A's shape recurring one level down.
+Finding D (§B.8 open item) fully resolved. All three narrow/textual, no new
+blocker/major. A scoped rework 3 is dispatched next, this time on the
+Design-tier model per MP-22/23 to close Finding-3's recurrence structurally
+— round 4 of 4, the last delta re-review allowed before a PO course gate.

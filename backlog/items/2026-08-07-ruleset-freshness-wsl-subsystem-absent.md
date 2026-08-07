@@ -147,3 +147,13 @@ actual open-item bullet (not just a §B.6 pointer to nothing) with owner
 shape is finalized," covering both §B.6 threat-model doc-update entries. A
 bounded delta re-review is dispatched next — round 3 of 4 (initial + delta 1
 + this delta 2).
+
+**Delta re-review 2 (2026-08-07): FAIL — Part-A-only, Part B unaffected.**
+Full findings:
+`specs/sprint-phoenix-epic/evidence/wp2wp3-design-critic-delta-review-2-d99e59f.md`.
+Finding D (this item's §B.8 fix) verified fully resolved — real owner +
+trigger, both threat-model pointers resolve cleanly, citations verbatim. The
+3 new MINOR findings (1-3) are all Part-A scoped (see companion item
+`2026-08-07-self-application-integrity-check-absent.md` for detail). A
+scoped rework 3 is dispatched next — round 4 of 4, the last delta re-review
+allowed before a PO course gate.

@@ -168,6 +168,28 @@ freehand). Status:
    its sequencing/maintenance consequences (Finding C); replaces §B.8's
    dangling pointer with a real owned, triggered open-item bullet (Finding
    D). A bounded delta re-review is dispatched next — round 3 of 4.
+
+   **Delta re-review 2 (round 3/4): FAIL — 3 new MINOR, Finding D fully
+   resolved.** Full findings:
+   `specs/sprint-phoenix-epic/evidence/wp2wp3-design-critic-delta-review-2-d99e59f.md`.
+   (1) the Finding-C disclosure asserts the new `GATE_STRENGTH_PATHS` entry
+   blocks the allowlist module's creation *in the same session* — false; GS-6
+   exempts the source-tree checkout by the document's own adjacent claims, so
+   the protection only engages on the next plugin refresh, leaving the module
+   agent-writable in the source tree until then; (2) the corrected §A.6
+   figure (5 files) now contradicts §A.5's uncorrected count (still "four
+   files," double-counting `SKILL.md` across two bullets) — the exact defect
+   Finding B was raised about, recurring at the sibling anchor; (3) the
+   Finding-A disclosure names the original dispatch and the first rework but
+   omits that `WP2-WP3-design-rework-2` (the dispatch that wrote the
+   disclosure itself) also ran below-Design-tier — Finding A's shape
+   recurring one level down. All three are narrow/textual; no new
+   blocker/major. A scoped rework is dispatched next, this time on the
+   Design-tier model per MP-22/23 (design-phase document authorship) to
+   close Finding-3's recurrence structurally rather than by adding another
+   disclosure — **round 4 of 4, the last delta re-review allowed for this
+   package; a further FAIL needs a PO course gate, not a fifth autonomous
+   iteration** (mirrors WP5/PHX-2's round 4 outcome).
 4. **`governance-product-verify-suites-deregistered`** — blocked on 1–3's
    outcome, not started.
 5. **`ledger-backed-plan-and-push-authority-absent-on-merged-base`** —
