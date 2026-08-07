@@ -108,6 +108,34 @@ authored this session and both are in the Critic cycle:
   CLAUDE.md forbids those in committed artifacts. The change is disclosed in the
   evidence file's own header rather than made silently.
 
+**R3 re-scoped (`84876f1`, +393/−91) — the measurement changed the answer, not
+just the number.** The design claimed 8 stale citations in two dispatch
+templates. Measured against the operating model's real structure (10 numbered
+`##` sections, 3 `###` children, **none numbered**): **344 citations across 57
+files**, `CLAUDE.md` itself carrying 11. Two defect kinds now separated because
+they need different fixes — 230 citations to subsections that do not exist, and
+51 confirmed citations to a section that exists but is described wrongly.
+**The chosen remedy was revised, not confirmed.** "No section numbers" stands;
+the justification that anchor links are machine-checked and therefore
+non-recurring is **refuted by measurement**: `backlog/README.md` already uses
+that form, and 4 of its 5 links name headings that no longer exist yet stay
+green — because `docs/operating-model.md:563` and `:583` carry planted
+`<a id="7-feedback-loop">` / `<a id="8-projekt-kalibrierungsschicht">` anchors
+sitting above **German** headings (the German half starts at `:340`; verified
+independently by the Elephant). `collectAnchors` returns 31 anchors for 20
+headings with English and German slugs in one namespace. So a fragment link can
+be green while pointing at wrong-language content — a gate-honesty defect in the
+checker, proposed as a follow-up item and not filed.
+**Open PO decision — the implementation boundary (§II.6), stated with sizes and
+deliberately not chosen:** B1 = 2 files / 9 citations (the literal backlog
+scope); B2 = 6 files / ~47 (closes the citation chain); B3 = 39 files / ~232
+(all live agent-facing artifacts, touches the shipped plugin and one `.mjs`).
+Two adjacent findings for the same decision: `harness/scripts/check-claude-md-lines.mjs:59`
+puts `(operating-model §7)` into the fix string the gate **prints to a human** —
+the only instance that reaches an operator through tool output; and the German
+half carries a `### H5 Close-Koordinator` heading (`:649`) with no English
+counterpart, an EN/DE structural divergence outside R3.
+
 **HOLD — plugin snapshot sync deferred by PO instruction (2026-08-07 evening).**
 A newer local plugin candidate is installed and reloaded:
 `0.5.3+claude.20260807181921.f667dec` at
