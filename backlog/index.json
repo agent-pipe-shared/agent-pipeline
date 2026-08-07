@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "a964716251b1b2f24f4c4f633f0d23db0ac9c119251cb0ff42b2439bc77e84c6"
+    "transitionHead": "e737cd988fc1225705bdd4a355dc6b6f5222e9dd6193851faad6ff261ab6b340"
   },
   "counts": {
-    "open": 33,
+    "open": 35,
     "in_progress": 21,
     "closed": 22
   },
@@ -246,6 +246,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "Live onboarding test (rune_test1_claude line of work) hitting a self-inflicted guard rejection at the plan-runtime step, 2026-08-07 (Nova GMW session); root cause independently re-verified by reading the cited source directly, not taken from the report alone."
+    },
+    {
+      "id": "pipeline.handover-file-has-no-rotation-obligation",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "PO, 2026-08-07: 'state wird aber auch hoffentlich nicht unendlich lang sondern irgendwann wieder leer :) wenn etwas dauerhaft als regel geschrieben wird, dann muss es in adrs'."
     },
     {
       "id": "pipeline.human-approval-ux-directory-clarity-and-single-command",
@@ -575,6 +583,14 @@
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.session-scratchpad-is-unwritable-under-the-cross-repo-guard",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "PO, 2026-08-07, on watching the guard refuse a scratchpad write: 'eigentlich solltest du auf tmp zugriff haben'. The Critic-contract half of the finding was observed independently the same day."
     },
     {
       "id": "pipeline.setup-mjs-marketplace-name-collision-defeats-local-dev-installs",

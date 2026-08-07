@@ -32,6 +32,7 @@
 | pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.guard-lifecycle-ready-blocks-claude-memory-writes | open | defect | pipeline | 2026-07-29 | — |
 | pipeline.guard-lifecycle-ready-rejects-plan-runtime-intent-argv | open | defect | pipeline | 2026-08-07 | — |
+| pipeline.handover-file-has-no-rotation-obligation | open | workflow-improvement | pipeline | 2026-08-07 | — |
 | pipeline.human-approval-ux-directory-clarity-and-single-command | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.human-authorization-prompts-ignore-the-configured-language-profile | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root | open | defect | pipeline | 2026-08-06 | — |
@@ -67,6 +68,7 @@
 | pipeline.security-scan-cross-branch-gitleaks-findings | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.sentinel-go-live-completion | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.session-keep-awake | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
+| pipeline.session-scratchpad-is-unwritable-under-the-cross-repo-guard | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.setup-mjs-marketplace-name-collision-defeats-local-dev-installs | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.source-available-commercial-licensing | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.spec-retention-on-close | open | defect | pipeline | 2026-07-20 | — |
@@ -84,6 +86,6 @@
 
 ## Counts
 
-- open: 33
+- open: 35
 - in_progress: 21
 - closed: 22
