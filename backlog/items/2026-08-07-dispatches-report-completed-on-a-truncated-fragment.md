@@ -23,6 +23,14 @@ result. Observed six times in one session:
 | Critic | "Now let me verify the design's source claims against the actual modules." | unknown at time of writing |
 | Goldfish | "Now the HGO half of the receiving contract (F3):" | **work in progress, uncommitted** |
 | Goldfish | "Now §II.5 (inventory/ACs) and §II.6 (the boundary decision)." | **work in progress, uncommitted** |
+| Critic | "I need to check one line-number claim about `docs/state.md`. I will read a bounded 4-line window only (disclosed in my report), not the narrative." | review in progress, report never emitted |
+
+The last row is the most informative sample so far, and it was recorded after the
+first six: the fragment is not a closing remark at all, it is an *announcement of
+the next tool call*. The agent stated its intent, and the run ended there with
+`status: completed`. That is evidence for the output-truncation reading in
+proposal 3 rather than for a genuine early stop — the agent had no reason to stop
+at that point and every intention of continuing.
 
 Two distinct sub-cases, and they need different recoveries:
 
@@ -50,8 +58,25 @@ worse, gets recorded as a PASS that no reviewer issued.
 ## Triggering situation
 
 An Elephant session running several Goldfish and Critic dispatches in parallel
-on 2026-08-07. All six were recovered without data loss, but each cost a
-detection step and a re-dispatch round trip.
+on 2026-08-07. All were recovered without data loss, but each cost a detection
+step and a re-dispatch round trip.
+
+**A second defect surfaced during the seventh recovery, and it is the
+Elephant's, not the harness's.** A Critic reads the live working tree. While that
+review was running, the dispatching session committed twice to `docs/state.md` —
+so the file the Critic was about to consult for a line-number claim no longer
+matched the reviewed commit. Here it was harmless: `docs/state.md` is forbidden
+input for a Critic anyway, and the resume message could redirect the check to
+`git show 84876f1:docs/state.md`. The same edit against `CLAUDE.md` or a guardrail
+file — both of which a Critic reads as law — would have silently invalidated
+citations in a verdict, with nothing to notice it.
+
+The rule that follows is narrow and cheap: **while a Critic dispatch is open, the
+dispatching session does not modify any file in that dispatch's reference set.**
+It belongs next to the acceptance check in proposal 1. A related but distinct
+item on parallel dispatches racing on a shared checkout exists on `main` and
+arrives with the 0.5.3 merge; this one is about the *orchestrator* writing under
+a reviewer, not two workers colliding.
 
 ## Affected artifact
 
