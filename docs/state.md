@@ -81,9 +81,21 @@ and the danger of an unscoped "lift everything" default.
   (GS-6 wiring), `db88788` (TP-* wiring), `0b83a2e` (lib tests). Verify run
   by the Elephant directly against that worktree HEAD: 254/254, exit 0,
   sealed at `specs/sprint-nova-epic/evidence/nova-gmw/verify-0b83a2e.json`
-  (commit `12ed391`). A Critic review (guardrail-tier, `claude-opus-5` per
-  MP-07) is dispatched against the four enumerated commits.
-- **Not yet done:** the Critic verdict; the bootstrap SessionStart warning
+  (commit `12ed391`).
+- **Critic review 1: FAIL** (guardrail-tier, `claude-opus-5` per MP-07),
+  sealed at `specs/sprint-nova-epic/evidence/nova-gmw/critic-review-1-0b83a2e.md`
+  (commit `bb673a9`). Two blockers: window `expiresAt` is unsigned and
+  directly editable (F1); the arming nonce is never consumed, so one
+  genuine PO signature renews a window indefinitely (F2) — both defeat the
+  mechanism's core auto-expiry claim. Three major: the closed liftable
+  scope is enforced only at `prepare`, not at the verification boundary
+  (F3); the mandatory real-armed-window kernel-refusal integration test
+  does not exist, and the shipped test file falsely claims it does (F4);
+  the new test suite is not registered in `verify.mjs`, so the sealed
+  254/254 evidence never actually ran it (F5). Correction round dispatched
+  next, referencing F1-F6 only (neutral findings registry, no
+  paraphrase/justification per the rework-dispatch input contract).
+- **Not yet done:** the correction round + re-Critic; the bootstrap SessionStart warning
   (design already written, appended to the same design-note commit
   `4398dde`); end-to-end testing with a real PO-signed proof (needs the
   PO's own external signing device/key — cannot happen inside any agent
