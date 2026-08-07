@@ -447,6 +447,38 @@ post-merge redesign packages have landed code this session:
     for this specific pair; the GMW route's advantage is auditability and that
     the agent applies the change with full context. Both routes are legitimate;
     the PO chooses.
+
+  **RESOLVED — both guard-blocked items applied by the PO (APS, 2026-08-07),
+  commit `550b21f`.** The PO chose the direct-edit route (GMW deferred to a
+  later plugin version). The Elephant prepared a validated patch
+  (`git apply --check` clean on both files) at
+  `specs/sprint-phoenix-epic/evidence/pending-guard-blocked-registrations.patch`
+  (gitignored); the PO applied it, ran all six suites, and committed with an
+  explicit pathspec so the permanently-dirty `.claude/settings.json` stayed out.
+  **Scope was larger than the item as previously recorded, and this is the
+  substantive finding:** while assembling the patch the Elephant checked what is
+  *actually* unregistered rather than transcribing the one known line —
+  **six** suites existed on this branch and ran in no Verify gate at all, not
+  one. They had accumulated across three work packages, each independently
+  stalled at the same TP-3 refusal: WP5/PHX-2's `external-push-ledger.test.mjs`
+  and `guard-push-external-ledger.test.mjs`; GMW's
+  `guard-maintenance-window.test.mjs`, `guard-gate-strength-gmw.test.mjs` and
+  `guard-testpath-gmw.test.mjs` (i.e. the freshly-merged Guard Maintenance
+  Window shipped with zero gate coverage); and WP2-WP3 Part A's
+  `public-core-origin-allowlist.test.mjs`. All six now registered next to their
+  nearest sibling `public-core-observation-tests`, and all six green on the
+  PO's own run: 3 + 24 + 14 + 7 + 1 + 1 = **50 checks, 0 failures**. TP-11 is
+  live, so `public-core-origin-allowlist.test.mjs` is now guard-protected —
+  a future genuine change to it needs its own briefed test-change task.
+  This closes the `verify.mjs`-registration item that had been open since the
+  WP5/PHX-2 implementation block and the F6 finding from the WP2-WP3 Part A
+  implementation review.
+  **Disclosed, not silently dropped:** the two GMW hook suites carry exactly
+  one test each (`GST20`, `TP09`) — happy-path end-to-end only, for a feature
+  whose whole purpose is lifting guard refusals. The 14-test core suite carries
+  the real load. Pre-existing (it arrived that way in the marketplace snapshot),
+  not a regression, and not a blocker — recorded as its own backlog item rather
+  than left as an observation in a handover paragraph.
 - **GMW (Guard Maintenance Window, ADR-0058) merged in from the local-development
   marketplace snapshot** (commit `cca5ad8`): the PO pointed at
   `/home/skar667/agent-pipeline-local-marketplace` as the currently-wired snapshot
