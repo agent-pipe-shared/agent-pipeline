@@ -92,3 +92,18 @@ its own rollback protocol for exactly this file).
 - **Assignment (if accepted):** design phase, next dispatch (combined with
   the companion item — one investigation, one design).
 - **Date:** 2026-08-07
+
+**Design phase (2026-08-07):** produced — commit `a75a45d`,
+`specs/sprint-phoenix-epic/design/bootstrap-origin-allowlist-and-codex-wsl-freshness.md`
+Part B. Fixes a scoping bug (`executionBoundary` was WSL-presence-only,
+present pre-merge too — not a merge regression) to
+`runner === "codex" && wsl`; repairs the freshness read via
+`inspectPipelineUpdateAvailability`'s existing `options.spawn` seam rather
+than reviving the retired single-fixed-action host model, which is confirmed
+technically insufficient for main's richer channel/tag-based reads. Confirms
+the scoping condition for every other runner/host combination (Claude Code on
+any host; Codex on non-WSL) stays unchanged. Flags the new closed
+host-action-family's exact schema (§B.3/§B.8) as real remaining design
+surface for a fast-follow sub-design, not resolved here given its security
+sensitivity. A first (not delta) Critic review is dispatched next, before
+implementation.

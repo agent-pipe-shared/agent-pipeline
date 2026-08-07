@@ -95,21 +95,26 @@ freehand). Status:
    confirmed not needed (main already has an equivalent). See
    `backlog/evidence/2026-08-07-project-authority-failclosed-closure.md`.
 2. **`self-application-integrity-check-absent`** and
-3. **`ruleset-freshness-wsl-subsystem-absent`** — **investigated, PO decided,
-   design dispatched.** `ruleset-freshness-host.mjs` (Phoenix-only, merged in
-   cleanly) has a currently broken import chain across
-   `ruleset-freshness.mjs`/`codex-host-plugin-list.mjs`/
-   `pipeline-start-preflight.mjs`; the pre-merge origin-allowlist check was
-   folded into the bootstrap **readiness gate's `status` decision** itself,
-   not an additive field. **PO decisions (APS, 2026-08-07):** (a) restore the
-   origin-allowlist check into ordinary bootstrap readiness, reusing the
-   existing `public-core-observation.mjs`/`ruleset-source.mjs` primitives
-   (already proven safe on the private-overlay path), not Phoenix's old
-   separate API surface; (b) repair the WSL host-authorized network-boundary
-   mechanism, but **scoped specifically to Codex running under WSL** — not a
-   universal requirement for every runner/host. A combined design (not
-   implementation) covering both is dispatched, following WP5's now-proven
-   design-first → Critic-review → implement sequence.
+3. **`ruleset-freshness-wsl-subsystem-absent`** — **design done** (commit
+   `a75a45d`,
+   `specs/sprint-phoenix-epic/design/bootstrap-origin-allowlist-and-codex-wsl-freshness.md`).
+   Part A: reinstates origin/content attestation into
+   `observePipelineStartPreflight` by calling
+   `observeCodexPublicCoreIdentity`/`observePublicCoreIdentity`
+   self-referentially against a fresh 2-URL allowlist constant, shaped through
+   `normalizeRulesetSource`, folding a negative result into the existing soft
+   `"plugin-refresh-required"` branch (no new hard status on day one). Part B:
+   fixes a pre-existing (pre-merge too) scoping bug where `executionBoundary`
+   was WSL-presence-only instead of `runner === "codex" && wsl`, and repairs
+   the freshness read via `inspectPipelineUpdateAvailability`'s existing
+   `options.spawn` seam rather than reviving the old single-fixed-action host
+   model (confirmed technically insufficient for main's richer channel/tag
+   reads). Two open questions flagged for the PO in the doc itself (§A.4:
+   `normalizeRulesetSource`'s loaded-vs-installed pairing is tautological in
+   this self-referential calling pattern; §A.6: soft-advisory vs. hard-block
+   day-one failure mode) plus one deferred sub-design (§B.8: the new
+   closed host-action family's exact schema). Next: a first (not delta)
+   Critic review, mirroring WP5's sequence, before implementation.
 4. **`governance-product-verify-suites-deregistered`** — blocked on 1–3's
    outcome, not started.
 5. **`ledger-backed-plan-and-push-authority-absent-on-merged-base`** —

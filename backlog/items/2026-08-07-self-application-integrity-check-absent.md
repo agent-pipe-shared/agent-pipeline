@@ -88,3 +88,15 @@ related freshness half of the same investigation):
   same session.
 - **Assignment (if accepted):** design phase, next dispatch.
 - **Date:** 2026-08-07
+
+**Design phase (2026-08-07):** produced — commit `a75a45d`,
+`specs/sprint-phoenix-epic/design/bootstrap-origin-allowlist-and-codex-wsl-freshness.md`
+Part A. Reuses `observeCodexPublicCoreIdentity`/`observePublicCoreIdentity` +
+`normalizeRulesetSource` self-referentially against a fresh 2-URL allowlist
+constant; folds a negative result into the existing soft
+`"plugin-refresh-required"` branch. Flags one open question for the PO (§A.4:
+`normalizeRulesetSource`'s comparison is tautological when both sides are the
+same self-referential observation — is that acceptable, or is a genuinely
+independent second identity source wanted?) and one rollout question (§A.6:
+soft-advisory vs. hard-block on day one). A first (not delta) Critic review is
+dispatched next, before implementation.
