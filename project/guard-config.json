@@ -49,6 +49,11 @@
       "id": "TP-10",
       "pattern": "plugins/pipeline-core/hooks/notebook-write-coverage\\.test\\.mjs$",
       "reason": "notebook-write suite pins that every write matcher covers NotebookEdit and that its notebook_path target is read (E5/QG-04) — no ad-hoc edits outside a briefed test-change task."
+    },
+    {
+      "id": "TP-11",
+      "pattern": "plugins/pipeline-core/lib/public-core-origin-allowlist\\.test\\.mjs$",
+      "reason": "this suite pins the two-URL self-application origin allowlist's own exact assertions (exact-2, exact-URLs); GS-8 protects the constant module but not the test that pins it (Critic finding F6, WP2-WP3 Part A implementation review, E5/QG-04) — no ad-hoc edits outside a briefed test-change task."
     }
   ]
 }
