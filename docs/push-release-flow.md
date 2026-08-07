@@ -7,6 +7,14 @@
 > `backlog/items/2026-08-07-push-release-flow-unusable-for-third-party-adopters.md`
 > for the finding this document is the first remediation step for.
 
+> **Changed on 2026-08-07, after the 0.5.3 release, under
+> [ADR-0061](adr/0061-uniform-human-approval-ceremony.md).** The human's part is
+> now **one command, the word `approve`, and the passphrase** — layers 2 and 3
+> collapsed into `authorize-critical`, and layer 5's `OVERRIDE GG-03` ritual is
+> gone for a signed push. The sections below describe both the new shape and what
+> it replaced, because a repository running an older plugin build still walks the
+> old one. The version that ships this is `0.5.4`.
+
 This repo's own `pipeline.user.yaml` sets `gates.push_approval: signature`
 ([ADR-0056](adr/0056-push-approval-mode.md)) — the strictest of the two
 supported modes. Everything below describes that mode. A repo configured for
@@ -26,7 +34,39 @@ the agent is cryptographically incapable of producing this proof by design
 (`docs/adr/0055-critical-human-proof-waiver.md`,
 `docs/adr/0056-push-approval-mode.md`).
 
-### Layer 2 — prepare the request (agent-eligible by design, guard-blocked in practice)
+### Layers 2 + 3 — the human's one command (current shape)
+
+```
+node plugins/pipeline-core/scripts/po-human-approval.mjs authorize-critical \
+  --repo-root <repo> --directory <external-po-dir> \
+  --feature-id <featureId> \
+  --plan <repo-relative-PRD-path> --spec <repo-relative-spec-path> \
+  --kind push --subject-sha256 <hash> --expires-at <ISO-8601>
+```
+
+Prepares the candidate-bound request and signs **that** request in one
+invocation. Immediately before the passphrase prompt it states the action kind,
+the candidate commit and tree, the subject binding, the expiry, the intent
+digest, and what the approval does **not** cover. The human types `approve`,
+then the passphrase. That is the whole human ceremony.
+
+The agent still constructs the command — in particular `--subject-sha256`, whose
+computation is described under the old layer 2 below and has not changed. The
+agent cannot run it: signing needs the private key, and `po-approval-gate.mjs`
+(the agent-facing half) deliberately cannot reach `authorize-critical` at all,
+which is pinned by a test.
+
+Why one command rather than two: a failed `prepare-critical` followed by a
+successful `approve-critical` signed the **stale** request still on disk, with a
+confirmation that looked entirely normal — measured in the 0.5.2 session, cost a
+wasted signature. One invocation removes that failure mode by construction
+rather than by ordering. `--expires-at` must be an exact `toISOString()` round
+trip (milliseconds included); the validation error now names the offending flag
+and hands back the accepted spelling.
+
+The two-command flow below still exists for programmatic use and is unchanged.
+
+### Layer 2 (superseded as a human step) — prepare the request
 
 ```
 node plugins/pipeline-core/scripts/po-approval-gate.mjs prepare-critical \
@@ -61,7 +101,7 @@ binding. Compute it by **importing the real function** in a throwaway script
 (`scratch/`, gitignored) — never hand-roll the hash. A wrong hash fails
 closed at verification, it does not silently accept.
 
-### Layer 3 — sign it (human-only, by design — no override exists or should exist)
+### Layer 3 (superseded as a separate step) — sign it (human-only, by design — no override exists or should exist)
 
 ```
 node plugins/pipeline-core/scripts/po-human-approval.mjs approve-critical \
@@ -101,17 +141,26 @@ work — no human action needed here beyond having already produced the proof.
 
 ### Layer 5 — execute the push (dual-gated: Pipeline + Claude Code harness)
 
-Once `approve-push` succeeds, the actual `git push` still passes through
-`guard-git.mjs`'s `GG-03` (refuses any direct write to `main`/protected
-branches without the documented double-confirmation override —
-`guardrails/git.md` §"Double-confirmation override procedure": the agent
-explains the command/reason/risk, the PO replies the literal `OVERRIDE
-GG-03`, the agent arms `PIPELINE_GUARD_OVERRIDE="GG-03|<token>|<reason>" git
-push ...` with a one-time `YYYYMMDD-<n>` token, logged to
-`project/guard-override.log.jsonl`). A push to a **non-`main`** branch with a
-valid `approve-push` record does not need this — GG-03 is specifically the
-`main`/protected-branch line of defense, a second, independent check beyond
-the signature already verified in Layer 3-4.
+Once `approve-push` succeeds, the actual `git push` passes through
+`guard-git.mjs`'s `GG-03`. **Since 0.5.4 this needs no second human act:** when
+`GG-03` is the only matching rule and `authorizeRecordedPush` verifies the
+recorded approval for this exact candidate, remote and destination ref, the
+guard admits the push with no arming, no token and no typed phrase, and writes
+an audit entry naming the authorization it relied on. A denial names the
+returned `PUSH-PROOF-*` code. The push must write out its destination ref
+(`HEAD:refs/heads/<branch>` or `<sha>:refs/heads/<branch>`); a `--force` or
+`+refspec` push also matches `GG-01`/`GG-02` and still blocks, approval or not.
+
+The old route — the agent explains the command/reason/risk, the PO replies the
+literal `OVERRIDE GG-03`, the agent arms
+`PIPELINE_GUARD_OVERRIDE="GG-03|<token>|<reason>" git push ...` — remains for
+every rule that has no signature route, and for a `GG-03` push with no approval.
+Its token is no longer burned by an attempt that never ran: an arming is bound
+to the exact command, the observed candidate and a lifetime, and a byte-identical
+re-presentation at the same `HEAD` inside that lifetime is admitted as a retry.
+That matters because the harness classifier and the remote both refuse *after*
+the guard has already consumed the token — which cost two armings in the 0.5.3
+release.
 
 **Separately, and invisibly to the Pipeline**, Claude Code's own harness-level
 "auto mode classifier" may refuse the actual `git push`/`git restore`
@@ -175,13 +224,16 @@ because it structurally isn't one.
 | Layer | Step | Runs as |
 |---|---|---|
 | 1 | Policy already set in `pipeline.user.yaml` | n/a (config, not a per-push action) |
-| 2 | `prepare-critical` | Agent-eligible by design; **PO in practice** (guard-blocked) |
-| 3 | `approve-critical` | **PO only** (private key, by design) |
+| 2+3 | `authorize-critical` (prepare + sign, one invocation) | **PO only** — one command, `approve`, passphrase. The agent constructs the command and computes `--subject-sha256`. |
 | 4 | `pipeline-state.mjs approve-push` | Agent |
 | 5a | `git push` (non-main, proof valid) | Agent, subject to the harness classifier |
-| 5b | `git push` to `main`/protected (GG-03) | Agent, after PO's literal `OVERRIDE GG-03`, subject to the harness classifier |
+| 5b | `git push` to `main`/protected (GG-03) | Agent — the verified approval *is* the confirmation; no `OVERRIDE GG-03`. Still subject to the harness classifier. |
 | 6 | GitHub repository ruleset on the target ref | Repo admin (PO); agent can read it, not change it without an explicit decision |
 | 7 | `gh release create` (tag + release) | Agent |
+
+The old rows 2 and 3 (`prepare-critical`, then `approve-critical`) and the old
+row 5b (`OVERRIDE GG-03` plus an armed token) are retained above as the
+superseded shape: still supported, no longer the human's path.
 
 Layers 3 and the harness classifier's block are the two points in this flow
 that are not resolvable by the agent under any configuration — everything
