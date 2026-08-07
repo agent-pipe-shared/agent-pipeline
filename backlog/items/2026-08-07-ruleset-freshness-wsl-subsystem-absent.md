@@ -124,3 +124,19 @@ already recorded this exact defect, which a narrower-than-claimed grep
 threat-model doc-update row; a mis-cited `session-bootstrap.md` line). A
 rework dispatch addressing these plus the companion item's Part-A findings is
 next, then a bounded re-review before implementation.
+
+**Rework (2026-08-07): landed, commit `8c526dd`.** F2 accounts for all 8 git
+invocations behind the seam (2 network-delegated typed shapes, 6
+local-passthrough that never leaves the local machine); F3 corrects the
+false "inert"/"zero behavioral change" claims, citing the already-closed
+prior-art backlog item and re-running the grep genuinely repo-wide; F6/F8
+(minor) fix the missed threat-model doc-update entry and the mis-cited
+line. A bounded delta Critic re-review is dispatched next.
+
+**Delta re-review 1 (2026-08-07): FAIL — 4 new MINOR, 1 Part-B-relevant.**
+Full findings:
+`specs/sprint-phoenix-epic/evidence/wp2wp3-design-critic-delta-review-1-8c526dd.md`.
+(D) F6's threat-model fix defers replacement wording to a "§B.8 open item"
+that doesn't exist in the document — the exact "documented risk, no owner"
+shape F6 originally flagged, recurring one level down. F2/F3/F6/F8 remain
+genuinely resolved otherwise. A scoped rework is dispatched next.

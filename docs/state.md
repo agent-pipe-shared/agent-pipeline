@@ -143,6 +143,22 @@ freehand). Status:
    bounded delta Critic re-review (base `a75a45d`, head `8c526dd`, prior
    finding IDs F1-F8) is dispatched next, before implementation — same
    sequence as WP5.
+
+   **Delta re-review 1 (round 2/4): FAIL — 4 new MINOR, F1(blocker)/F2-F5
+   (major) all genuinely resolved.** Independently re-verified line by
+   line, including a full re-run of the design's own repo-wide grep (exact
+   match). Findings: (A) F7's below-tier-authorship disclosure doesn't cover
+   the rework dispatch itself, which also ran below-tier; (B) §A.6's
+   PO-facing scope figure ("four files instead of one") is wrong — the real
+   count is 5, spread across 2 separate additions; (C) F5's new
+   `GATE_STRENGTH_PATHS` entry would be the first one in the repo protecting
+   product source rather than config, reversing GS-6's own documented
+   choice, and blocks in-session creation/maintenance of the module it
+   protects — undisclosed; (D) F6's threat-model fix defers to a "§B.8 open
+   item" that doesn't exist. Full findings:
+   `specs/sprint-phoenix-epic/evidence/wp2wp3-design-critic-delta-review-1-8c526dd.md`.
+   A scoped rework (Finding A-D) is dispatched next — round 3 of 4, within
+   cap.
 4. **`governance-product-verify-suites-deregistered`** — blocked on 1–3's
    outcome, not started.
 5. **`ledger-backed-plan-and-push-authority-absent-on-merged-base`** —
@@ -227,8 +243,13 @@ freehand). Status:
    Per the 4-round cap, this now needs a **PO course gate** — presented to the
    PO as: accept the design with these 2 trivial prose fixes applied via a
    bounded editorial-only correction (not counted as a fifth Critic round,
-   since it doesn't revisit substance), or take another path. **Decision
-   pending as of this entry.**
+   since it doesn't revisit substance), or take another path.
+
+   **PO decision: bounded editorial fix (chosen).** Applied directly by the
+   Elephant, commit `4e4cf35`. **Design phase DONE — ready for implementation
+   dispatch.** Full round history: initial (FAIL 3M+2m) → rework 1 → delta 1
+   (FAIL 1 new major + 3 minor) → rework 2 → delta 2 (FAIL 1 new major + 3
+   minor) → rework 3 → delta 3/round 4 (FAIL 2 trivial minor, PO-resolved).
 
 **Infra finding, 2026-08-07:** the `isolation: "worktree"` dispatch option
 pinned two of three agents' worktrees to `6e2c9b2` (origin/main's pre-merge

@@ -205,7 +205,27 @@ Per `critic-review.md`'s Phase-2.6 cap (initial + 3 deltas = 4 rounds max),
 this now requires a **PO course gate**, not a further autonomous rework. The
 Critic's own input to that gate: exact remaining fix is two sentence-level
 corrections at 4 specific line ranges, nothing else implicated — offered as
-input, not as a decision it's authorized to make. **Decision pending.**
+input, not as a decision it's authorized to make.
+
+**PO decision (2026-08-07): bounded editorial fix.** Applied directly by the
+Elephant (commit `4e4cf35`) — an editorial-only correction on a design-phase
+artifact under `specs/`, not a goldfish dispatch and not a fifth Critic
+round. Both remaining findings fixed exactly as the Critic specified: the
+recovery-paragraph appositive now correctly names all three write-side
+failure points sharing the "occurs after local write succeeded" property
+while distinguishing which two get the signing-ceremony recovery (vs.
+`EEXIST`'s separate investigative recovery); the stale cross-reference quote
+repaired; the timeout paragraph's `guard-push.mjs` spawn count corrected to
+its real value (20, not 2) and the `pipeline-state.mjs` conditional-timeout
+claim corrected (only one of two sites is conditional).
+
+**Design phase: DONE. Ready for implementation dispatch.** Full round
+history: initial review (FAIL, 3 major + 2 minor) → rework 1 → delta 1
+(FAIL, 1 new major + 3 minor) → rework 2 → delta 2 (FAIL, 1 new major + 3
+minor) → rework 3 → delta 3/round 4 (FAIL, 2 new trivial minor, PO-resolved
+via editorial fix). Next: implementation dispatch against the now-stable
+design, then Verify + a fresh Critic review of the implementation diff
+(architecture/security class, mandatory per CLAUDE.md).
 
 **Delta re-review 1 (2026-08-07): FAIL.** Full findings:
 `specs/sprint-phoenix-epic/evidence/wp5-phx2-design-critic-delta-review-1-8a54751.md`.

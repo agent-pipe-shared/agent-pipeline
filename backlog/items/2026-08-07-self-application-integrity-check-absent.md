@@ -117,3 +117,23 @@ unprotected gate-strength surface — `guard-gate-strength.mjs`'s
 fix that would. A rework dispatch addressing these plus the companion
 item's Part-B findings is next, then a bounded re-review before
 implementation.
+
+**Rework (2026-08-07): landed, commit `8c526dd`.** F1 corrects the false
+"soft/advisory" claim and widens Part A's scope to a companion
+`nextAction`/`SKILL.md`/`onboarding-recovery.md` fix (named, not
+implemented) so the branch genuinely has something safe to do; F4 rewrites
+Part A's guarantee to what a local-only check can actually prove
+(allowlisted origin + no uncommitted drift, not byte-identity); F5 adds
+`GATE_STRENGTH_PATHS` protection for the new allowlist constant, in Part
+A's own scope. A bounded delta Critic re-review is dispatched next.
+
+**Delta re-review 1 (2026-08-07): FAIL — 4 new MINOR, Part-A-relevant.**
+Full findings:
+`specs/sprint-phoenix-epic/evidence/wp2wp3-design-critic-delta-review-1-8c526dd.md`.
+(B) §A.6's PO-facing scope figure ("four files instead of one") is wrong —
+the real count is 5, across 2 separate scope additions; (C) F5's new
+`GATE_STRENGTH_PATHS` entry would be the first in the repo protecting
+product source rather than config, reversing GS-6's own documented choice,
+and blocks in-session creation/maintenance of the module it protects,
+undisclosed. F1/F4/F5 remain genuinely resolved. A scoped rework is
+dispatched next.
