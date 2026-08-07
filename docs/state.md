@@ -508,6 +508,48 @@ Working tree at this point: only `NOVA-PO-SIGN-HELPER-1`'s in-progress files
 remain uncommitted; everything else from this session's four dispatch waves
 is now committed.
 
+**`NOVA-PO-SIGN-HELPER-1` landed (2026-08-07):** commit `2365a8c` — a generic
+`sign-intent` subcommand in `po-human-approval.mjs`, request-shape-agnostic
+(takes a raw `--intent-sha256` instead of reading a kind-specific request
+file), reusing the exact existing OpenSSL/proof-construction logic. First
+test file for this script (3 cases, real OpenSSL round trip against a
+throwaway unencrypted test key, `verifyPoApprovalProof` confirms the output
+validates). Independently re-verified: 3/3 pass, working tree fully clean —
+**every uncommitted artifact from this session's four dispatch waves is now
+committed.** Closes the ADR-0058 Follow-up "ergonomics helper" gap
+generically, not just for the one TP-2 case that motivated it.
+
+**PO's exact next command, once ready** (from the dispatch's own report,
+using the already-prepared GMW TP-2 request from earlier this session,
+`intentSha256 edc610d4f81b150a314952ffe824d876faf9ecd8a78dbbdea3b9e407775398ce`):
+`setup` first if no external PO directory exists yet, then
+`node plugins/pipeline-core/scripts/po-human-approval.mjs sign-intent --repo-root <repo> --directory <external-dir> --intent-sha256 edc610d4f81b150a314952ffe824d876faf9ecd8a78dbbdea3b9e407775398ce`
+— output lands at `<external-dir>/proof-manual.json`, which then feeds
+`guard-maintenance-window.mjs install --proof <that-path>` to actually lift
+TP-2 for the still-open Decision 4 test-coverage gap in
+`guard-testpath.test.mjs`. Not yet run as of this note — the PO's own
+external step.
+
+**Full project Verify running (2026-08-07):** with the tree now fully clean
+and committed, `node harness/scripts/verify.mjs` launched in the background
+against commit `5ab8ce0` (before the sign-intent doc-commit lands) /
+`2365a8c` (the actual candidate) — result pending as of this note. This is
+the first full Verify run this session against the complete, fully-committed
+ADR-0059 + guard-lifecycle-ready diff.
+
+**Mandatory next steps (restated, unchanged):** once full Verify confirms
+exit 0, dispatch the mandatory T1 Critic round on the complete ADR-0059
+implementation (commits `e4772d0`, `06971d7`, `f650164`, `5be2273`, plus the
+still-open Decision 4 test-coverage gap in `guard-testpath.test.mjs`,
+honestly disclosed to the Critic as a known, TP-2-signature-blocked gap
+rather than hidden). Separately, `4d19def` (the `guard-lifecycle-ready.mjs`
+`--intent` fix) is functionally complete and independently verified
+(30/30) — decide whether it needs its own dedicated Critic pass or can ride
+along with the ADR-0059 round, given both are hook/guard-tier canon changes
+from the same session. Only after a Critic PASS on ADR-0059 does backlog
+item #4 (`gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions`) get
+dispatched.
+
 ## 2026-08-07 Nova VII — first Nova A completion wave: 6 issues evidenced
 
 Continues from Nova VI. PO instruction: "leg mal los und fange an — du
