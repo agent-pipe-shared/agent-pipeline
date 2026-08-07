@@ -1289,8 +1289,10 @@ file, so the same citation needs a different `../` depth in `templates/prompts/`
 The extractor is line-based with no HTML-comment handling, so links inside the templates'
 `<!-- ... -->` header blocks are validated exactly like body links.
 
-**On the current tree the gate reports `490 Markdown file(s), 776 link(s), 13 anchor check(s)` and
-exits 0.** Thirteen. The anchor check is not a broad safety net; it is whatever fragments happen to
+**At the R3 re-scope the gate reported `490 Markdown file(s), 776 link(s), 13 anchor check(s)` and
+exited 0; re-run on the R3 rework's final state it reports `500 Markdown file(s), 776 link(s), 13
+anchor check(s)`, still 0.** The file count moves with every backlog item added; the two figures
+this argument rests on did not move at all. Thirteen. The anchor check is not a broad safety net; it is whatever fragments happen to
 have been written as links, and today that is 13 out of 776 links and 0 out of 345 section
 citations.
 
