@@ -13,7 +13,7 @@
  */
 import { createHash, createPublicKey } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 
 import { approvalRequestFromExternalJson, observeCleanCandidate, run as runApprovalRequest } from "./po-approval-request.mjs";
@@ -96,6 +96,45 @@ function command(executable, args, dependencies) {
   if (result?.status !== 0) fail(`${executable} failed; the human terminal must complete the local prompt`);
 }
 
+const CONFIRMATION_TOKEN = "approve";
+
+/**
+ * Reads one line of plain-text confirmation from the real controlling
+ * terminal. Synchronous by design: this file already blocks on `spawnSync`
+ * for the OpenSSL passphrase prompt, and a human confirmation gate that must
+ * complete before that prompt has to block the same way, not hand control to
+ * an async callback the rest of this CLI does not have.
+ */
+function defaultReadConfirmation(prompt) {
+  process.stdout.write(prompt);
+  const buffer = Buffer.alloc(1); const bytes = [];
+  for (;;) {
+    let read;
+    try { read = readSync(0, buffer, 0, 1, null); }
+    catch (error) { if (error?.code === "EAGAIN") continue; if (error?.code === "EOF") break; throw error; }
+    if (read === 0 || buffer[0] === 10) break;
+    bytes.push(buffer[0]);
+  }
+  return Buffer.from(bytes).toString("utf8").replace(/\r$/u, "").trim();
+}
+
+/**
+ * The deliberate, plain-language gate the PO requires before any passphrase
+ * prompt: a human must read what is being authorized and its consequence,
+ * then type the exact confirmation token. Anything else cancels, and the
+ * caller must never reach the OpenSSL sign step or write any artifact.
+ */
+function requireExplicitConfirmation(summaryLines, dependencies) {
+  const prompt = [
+    "PO APPROVAL CONFIRMATION -- read before you enter your passphrase:",
+    ...summaryLines.map((line) => `  ${line}`),
+    "This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.",
+    `Type exactly "${CONFIRMATION_TOKEN}" to continue; anything else cancels: `,
+  ].join("\n");
+  const read = dependencies.readConfirmation ?? defaultReadConfirmation;
+  if (read(prompt) !== CONFIRMATION_TOKEN) fail("approval cancelled: explicit confirmation was not given");
+}
+
 export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}) {
   const args = parseHumanArgs(argv); if (args.error) fail(args.error);
   if (args.command.endsWith("-all")) {
@@ -175,6 +214,10 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
   if (args.command === "sign-intent") {
     if (!exists(paths.privateKey) || !exists(paths.publicKey) || !exists(paths.authority)) fail("run setup before sign-intent");
     const intentSha256 = args.intentSha256;
+    requireExplicitConfirmation([
+      `intent sha256: ${intentSha256}`,
+      "this arms a one-time, audited guard-lift/guard-override authorization (HGO/GMW) for whatever action was already recorded against this exact digest; this command has no more specific description of that action available to it.",
+    ], dependencies);
     const manual = {
       intent: artifactPath(directory, "intent-manual.txt"),
       signature: artifactPath(directory, "signature-manual.bin"),
@@ -197,6 +240,13 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
   if (!SHA.test(intentSha256 ?? "")) fail("request has no valid approval intent");
   if (args.command === "approve" || args.command === "approve-critical") {
     if (!exists(paths.privateKey)) fail("private key is unavailable");
+    const kind = critical ? request?.action?.kind : request?.approvalIntent?.value?.kind;
+    const summary = [`kind: ${kind}`, `candidate commit: ${request?.candidate?.commit}`];
+    if (critical) {
+      summary.push(`action subject sha256: ${request?.action?.subjectSha256}`);
+      summary.push(`action expires at: ${request?.action?.expiresAt}`);
+    }
+    requireExplicitConfirmation(summary, dependencies);
     write(paths.intent, intentSha256, { mode: 0o600 });
     try { command("openssl", ["pkeyutl", "-sign", "-rawin", "-inkey", paths.privateKey, "-in", paths.intent, "-out", paths.signature], dependencies); }
     finally { rmSync(paths.intent, { force: true }); }

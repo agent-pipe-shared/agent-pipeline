@@ -1599,6 +1599,42 @@ test("omitting --runner keeps the historical Codex App-Server requirement", () =
   } finally { dispose(path); }
 });
 
+test("restart action for a non-codex runner is a manual external-operator action, never the Codex launcher", () => {
+  const path = root();
+  try {
+    initializeRestartRequiredRoot(path);
+    const observed = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, runner: "claude" });
+    assert.equal(observed.status, "restart-required");
+    assert.equal(observed.runner, "claude");
+    assert.equal(observed.nextAction.kind, "external-operator");
+    assert.equal(observed.nextAction.requiresCurrentProcessExit, false);
+    assert.equal(observed.nextAction.mutation, false);
+    assert.equal(observed.nextAction.requiresConfirmation, true);
+    assert.equal(typeof observed.nextAction.guidance, "string");
+    assert.ok(observed.nextAction.guidance.length > 0);
+    assert.deepEqual(Object.keys(observed.nextAction.expected).sort(), ["schema", "statuses"]);
+    assert.equal(observed.nextAction.expected.schema, "pipeline.project-onboarding.v4");
+    assert.ok(observed.nextAction.expected.statuses.includes("ready"));
+    assert.equal(Object.prototype.hasOwnProperty.call(observed.nextAction, "launch"), false);
+    assert.equal(JSON.stringify(observed.nextAction).includes("codex-onboarding-launch"), false);
+  } finally { dispose(path); }
+});
+
+test("restart action for the codex runner is unchanged: still the Codex launcher (regression pin)", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    const observed = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, runner: "codex" });
+    assert.equal(observed.status, "restart-required");
+    assert.equal(observed.nextAction.kind, "restart-process");
+    assert.equal(observed.nextAction.requiresCurrentProcessExit, true);
+    assert.equal(observed.nextAction.launch.executable, "node");
+    assert.equal(observed.nextAction.launch.argv[0], ONBOARDING_LAUNCH_SCRIPT);
+    assert.ok(observed.nextAction.launch.argv.includes(barrier.rawSha256));
+    assert.equal(observed.nextAction.launch.codexToolCallPermitted, false);
+  } finally { dispose(path); }
+});
+
 test("a V3 source enabling only Claude admits a Claude Code session instead of hard-failing as Codex-disabled", () => {
   const path = root();
   try {

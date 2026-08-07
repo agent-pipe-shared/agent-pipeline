@@ -619,6 +619,21 @@ function isAdoptableUnmanagedRoot(entries, root, fs) {
 // Seeding a literal here is how a Claude consumer used to end up with a Codex
 // project (ADR-0051/ADR-0057 R1); the literal survives only as the last-resort
 // fallback for a caller that genuinely has no observed identity.
+//
+// NOTE (NOVA-RESTART-RUNNER-1): this and the other hardcoded `runner =
+// "codex"` defaults below were investigated for correction to
+// `env.CLAUDECODE === "1" ? "claude" : "codex"` per this task's briefed root
+// cause #2. That change was reverted: it directly cascades into breaking the
+// existing, deliberately named regression test "omitting --runner keeps the
+// historical Codex App-Server requirement"
+// (project-onboarding-v3.test.mjs) and dozens of others whenever the
+// process itself runs under Claude Code (CLAUDECODE=1) -- which is every
+// session that could run this task or its own test suite. The prior CLOSED
+// backlog item (onboarding-lifecycle-plan-hardcodes-the-codex-runner)
+// explicitly declined this exact change for the same reason, calling it
+// "its own reviewed change" outside that item's bounded fix. Left as a stop
+// condition for a follow-up task scoped to decide and re-pin the intended
+// default behavior; see this task's final report.
 function freshIntent(runner = "codex") {
   const registry = loadRunnerProfilesV3Registry();
   return {
@@ -1452,7 +1467,20 @@ const RESTART_EXPECTED_STATUSES = [
   "worktree-capability-unavailable", "runtime-target-read-only", "runtime-readback-unavailable", "projection-drift", "continuity-damaged",
   "continuity-observation-unavailable", "app-server-execution-denied", "app-server-not-running", "app-server-unavailable",
 ];
-function restartAction(_root, barrierSha256) {
+// Reached whenever onboarding observes a restart-required runtime state,
+// regardless of which runner is driving the session -- `runner` MUST be
+// threaded from the caller's own already-known identity (never redetected
+// here), so this stays consistent with the rest of the lifecycle result it
+// is embedded in. There is today no Claude-native counterpart to
+// `codex-onboarding-launch.mjs`/`codex-onboarding-runtime.mjs` (dead-end
+// checked: `native-plugin-readback.mjs` is an install/update readback
+// verifier, not a restart launcher); a `runner` other than `"codex"` gets a
+// typed external-operator action instead of the Codex launcher, mirroring
+// `externalRestartOnly()`'s "show the user, never a tool call" pattern in
+// `guard-lifecycle-ready.mjs` (backlog:
+// onboarding-restart-flow-is-codex-only-not-runner-aware).
+function restartAction(_root, barrierSha256, runner) {
+  if (runner !== "codex") return externalOperatorRestartAction(runner);
   const executable = "node";
   // Restart commands intentionally use the caller's current physical root.
   // The launcher rejects a mismatched --root before issuing a ticket, so this
@@ -1470,6 +1498,21 @@ function restartAction(_root, barrierSha256) {
       copyCommand: restartCopyCommands(executable, argv),
     },
     mutation: true, requiresConfirmation: true, expectedStatuses: RESTART_EXPECTED_STATUSES,
+  };
+}
+
+// Minimal, non-Codex restart action (field 1's Scope note, option b): a
+// genuine Claude-native restart/resume launcher still needs to be built from
+// scratch (no reusable starting point exists today) and is out of this
+// defect's bounded scope. This never spawns a subprocess and is never a
+// sanctioned tool-call target; it only carries guidance for the human/agent
+// to resume or continue the session manually.
+function externalOperatorRestartAction(runner) {
+  return {
+    kind: "external-operator",
+    requiresCurrentProcessExit: false,
+    guidance: `a restart is required, but the automated restart launcher exists only for the Codex runner today; ${typeof runner === "string" && runner.length > 0 ? `the "${runner}" runner has` : "this runner has"} no native launcher yet -- do not run any command for this step through a tool call; end this session and resume or start a fresh session at the same project root instead`,
+    mutation: false, requiresConfirmation: true, expected: { schema: SCHEMA, statuses: RESTART_EXPECTED_STATUSES },
   };
 }
 
@@ -3052,7 +3095,7 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
             intent,
             repository,
             runtime: { status: "restart-required", sourceSha256: barrier.barrier.sourceSha256, targetsSha256: barrier.barrier.runtimeTargetsSha256, barrierSha256: barrier.rawSha256, readbackSha256: null },
-            nextAction: restartAction(legacy.root, barrier.rawSha256),
+            nextAction: restartAction(legacy.root, barrier.rawSha256, runner),
             diagnostics: [lifecycleDiagnostic("$.runtime", "restart_required", "Codex runtime targets changed and require a fresh effective-runtime readback", "confirm the one-use restart action")],
           });
         }
