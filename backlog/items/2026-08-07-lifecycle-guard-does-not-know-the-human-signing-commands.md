@@ -1,0 +1,74 @@
+---
+schema: pipeline.backlog-item.v1
+id: pipeline.lifecycle-guard-does-not-know-the-human-signing-commands
+type: defect
+owner: pipeline
+status: open
+created: 2026-08-07
+due: 2026-08-21
+source: "Reported by the ONECMD-1 dispatch (2026-08-07) as an adjacent finding it deliberately left alone rather than fixing outside its briefed scope."
+---
+
+# `guard-lifecycle-ready`'s human-signing list names only three of six commands
+
+## Description
+
+`plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs` carries an
+`isHumanPoSigningCommand` list used to recognise invocations that belong to the
+human's terminal rather than to an in-session agent. It names `setup`,
+`approve` and `approve-all`. It does not name `approve-critical`, `sign-intent`,
+or the new `authorize-critical` — the three commands that actually reach the
+signer today.
+
+The list predates all three. `approve-critical` and `sign-intent` were added
+later, and `authorize-critical` landed on 2026-08-07 with the one-command
+ceremony (ADR-0061, `decbc61`). Nothing updated the list with them, and nothing
+would have noticed: no check ties the guard's list to the CLI's actual
+subcommand set, so the two drift silently and have.
+
+## What this does and does not mean
+
+State it precisely, because it is easy to overstate. This is **not** a hole
+through which an agent obtains a signature: signing needs the encrypted private
+key and its passphrase from a controlling terminal, which an in-session agent
+does not have, and `po-approval-gate.mjs` — the agent-facing half — cannot reach
+`authorize-critical` at all (pinned by a test in `po-human-approval.test.mjs`).
+The trust boundary holds independently of this list.
+
+What it means is that the lifecycle guard's classification of these commands is
+wrong, so whatever it does with that classification — refuse, route, annotate —
+does not happen for the three commands where it matters most. A guard whose
+recognition list is stale is making a decision on an incorrect premise, and the
+next change to what that classification controls will inherit the error.
+
+## Triggering situation
+
+Found by the ONECMD-1 Goldfish while adding `authorize-critical`, reading the
+lifecycle guard to check whether the new subcommand needed registering there. It
+reported the gap rather than fixing it, correctly: the fix is a guard change
+outside its briefed file scope.
+
+## Affected artifact
+
+`plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs` (`isHumanPoSigningCommand`),
+against `plugins/pipeline-core/scripts/po-human-approval.mjs`'s actual command set.
+
+## Proposal
+
+Not designed here. Two candidates, and the second is the one that matters:
+
+1. Add the three missing names. Trivially correct, and it fixes today's instance.
+2. **Derive the list from the CLI rather than restating it**, or add a check
+   that fails when the guard's list and the CLI's parsed command set disagree.
+   Restating a list in a second file is what produced this; fixing only the
+   contents leaves the mechanism that caused it in place, and the same drift
+   will recur with the next subcommand. This is the same shape as
+   `2026-08-07-unregistered-suite-is-red-and-invisible-to-verify.md` — a
+   registration that nothing forces to stay complete.
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:**
+- **Rationale:**
+- **Assignment (if accepted):**
+- **Date:**

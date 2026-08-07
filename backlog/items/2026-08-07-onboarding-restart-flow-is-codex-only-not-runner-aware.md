@@ -140,6 +140,57 @@ made harder than it should be), a session still lands on
 gap, not only a static-reading concern -- confirmed twice now, from two
 independent onboarding-test sessions.
 
+## Third repro, 2026-08-07 evening — and it is worse than "surprising routing"
+
+PO, live, setting up a genuinely empty new project (`rune_test1_claude_052_28`)
+with the Claude runner against the local `0.5.3+claude.20260807221336.14e7b97`
+build. Verbatim: *"es gibt immer noch keinen sauberen aufsetzpfad für ein leeres
+frisches repo/ordner mit claude! es hängt immer noch und läuft nicht sauber
+wegen codex"*. The session's own diagnosis, which this item now adopts because
+it is more precise than everything above it:
+
+1. **A Claude session cannot clear the restart barrier at all.**
+   `initialize-runtime` publishes `.git/agent-pipeline/onboarding/restart-barrier.json`
+   with `restart-required`. The only thing that clears it is
+   `completeRuntimeReadback`, which demands an **authenticated launch ticket**
+   issued by `scripts/codex-onboarding-launch.mjs`. The guard refuses every
+   tool-call to that launcher by design (`externalRestartOnly`) — it is for an
+   external terminal only. So a Claude Code restart, which is exactly what the
+   `nextAction` instructs the human to perform, **provably cannot** clear it.
+   The PO restarted, and nothing changed, because nothing could.
+2. **The barrier's own runtime targets are exclusively `.codex/*`** —
+   `config.toml` plus three agent definitions. For a Claude session the barrier
+   is guarding the re-read of files that session does not use.
+3. **Until the lifecycle is `ready`, the guard refuses every project write.** So
+   the failure is not cosmetic: a fresh Claude-only repository is inert. No spec,
+   no code, no kickoff. The setup path does not merely route oddly; it terminates.
+4. **The escape requires a second runner's binary on the machine.** The workaround
+   that worked was the human running, in an external WSL terminal,
+   `node .../codex-onboarding-launch.mjs --root . --barrier-sha256 <hash> --activate`,
+   which returned `{"status":"launched"}`, cleared the barrier, and let the
+   lifecycle proceed to `kickoff-required` and then `ready`. It works — and it
+   means the documented Claude onboarding path has a hard dependency on Codex
+   being installed, pinned, and launchable. That is not a runner-neutral product.
+5. **Two bootstrap steps cannot run in their own prescribed order.**
+   `observation-governance-bootstrap.mjs` and `resume-hint.mjs inspect` are both
+   refused while the lifecycle is not `ready`, but the bootstrap protocol places
+   them before the confirmation line. The session read the resume-hint file
+   directly instead and said so rather than claiming the typed readback had run —
+   correct behaviour, and evidence that the step ordering is itself wrong.
+
+**What this changes for triage.** The suggested fix direction above (thread
+`runner`, branch `restartAction`) is necessary but no longer sufficient. Even a
+perfectly runner-aware `restartAction` has nothing to route a Claude session
+*to*: the barrier-clearing mechanism is ticket-bound to the Codex launcher.
+Either a Claude-native readback path has to exist, or a Claude session must not
+publish a restart barrier whose targets are all `.codex/*` in the first place.
+The second is smaller and probably correct: a barrier exists to force a re-read,
+and there is nothing for a Claude session to re-read there.
+
+Priority is no longer "not urgent enough to interrupt" — the PO has now hit this
+on three separate occasions, and it is the first thing any new adopter on the
+Claude runner will meet.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 Not yet triaged -- the PO submitted this as a detailed, reproducible defect
