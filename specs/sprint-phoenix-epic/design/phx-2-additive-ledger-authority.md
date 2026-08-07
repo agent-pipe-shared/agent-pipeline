@@ -138,36 +138,76 @@ check inside it — never runs at all for a `chat`-mode-approved push:
 if (!attested.authorized) {
   failures.push(/* existing message, unchanged */);
 } else if (externalPushLedgerGate(manifest) !== "off") {   // new: opt-in, see §5
-  const repository = discoverRepository(projectDir);  // worktree-invariant roots, see below
-  const ledgerCheck = checkExternalPushLedgerConsumption({
-    repositoryFingerprint: derivePoGateRepositoryFingerprint({
-      gitCommonDir: repository.commonDir,
-      primaryRoot: repository.primaryRoot,
-    }),
-    proofSha256: state.pushApproval.lastApproved.criticalProof.proofSha256,
-    candidate: { commit: sourceCommit, tree: sourceTree },
-  });
-  if (!ledgerCheck.ok) {
+  let repository = null;
+  try {
+    repository = discoverRepository(projectDir);  // worktree-invariant roots, see below
+  } catch {
+    // discoverRepository throws on >=7 paths (missing/symlinked start path, git spawn
+    // failure/non-zero exit incl. WT-GIT-SPAWN, submodule/`--separate-git-dir` common-dir
+    // shape, missing primary root -- worktree-lifecycle.mjs:163-169,231-249). This file has
+    // no ambient try/catch around this integration point, and per hooks.json's own exit-code
+    // contract (0 allow, 2 block, 1 allow+warn), an UNCAUGHT throw here exits the process at
+    // 1 -- which this hook's own harness treats as ALLOW, silently discarding every other
+    // already-accumulated failure in `failures`. This catch is the fail-closed disposition
+    // that replaces that uncaught-throw path; see §4's new read-side entry.
     failures.push(
-      `External push ledger consumption is ${ledgerCheck.code}. Record it with: `
-      + "node harness/scripts/pipeline-state.mjs approve-push ... "
-      + "(the same command that already records pushApproval now also writes this).",
+      "External push ledger repository topology could not be resolved "
+      + "(PUSH-EXTERNAL-LEDGER-TOPOLOGY-UNRESOLVED). Push refused -- this is a fail-closed "
+      + "disposition, never a silent pass-through and never an uncaught throw.",
     );
+  }
+  if (repository !== null) {
+    const ledgerCheck = checkExternalPushLedgerConsumption({
+      repositoryFingerprint: derivePoGateRepositoryFingerprint({
+        gitCommonDir: repository.commonDir,
+        primaryRoot: repository.primaryRoot,
+      }),
+      proofSha256: state.pushApproval.lastApproved.criticalProof.proofSha256,
+      candidate: { commit: sourceCommit, tree: sourceTree },
+    });
+    if (!ledgerCheck.ok) {
+      failures.push(
+        `External push ledger consumption is ${ledgerCheck.code}. Record it with: `
+        + "node harness/scripts/pipeline-state.mjs approve-push ... "
+        + "(the same command that already records pushApproval now also writes this).",
+      );
+    }
   }
 }
 ```
 
 `discoverRepository` (`plugins/pipeline-core/lib/worktree-lifecycle.mjs:231`) is imported, not
-newly written — a net-new import for `guard-push.mjs` (which does not currently import it),
-already available in `pipeline-state.mjs` alongside its existing `inspectSessionClosure`
-import from the same module. Its `primaryRoot`/`commonDir` pair is the physical primary
-checkout, resolved the same way regardless of which worktree the guard happens to be running
-from. This is not a stylistic choice: it is the same pair every real call site of
-`derivePoGateRepositoryFingerprint` in this codebase sources its fingerprint from —
-`document-adapter.mjs:99`, `document-binding.mjs:120`, `governance-event-store.mjs:87`,
-`document-identifiers.mjs:106`, `session-power.mjs:312`, `po-gate-profile-publisher.mjs:197`
-and `po-gate-authority.mjs:484` all derive it from a `discoverRepository()` result's
-`.commonDir`/`.primaryRoot`, never from a worktree-local toplevel. Using `projectDir`
+newly written — but it is a **net-new import at both integration points**, not an existing one
+reused from elsewhere: `guard-push.mjs` does not currently import it (confirmed: no reference
+to `worktree-lifecycle.mjs` anywhere in that file today), and neither does `pipeline-state.mjs`
+— that file's only import from `worktree-lifecycle.mjs` today is `inspectSessionClosure`
+(`pipeline-state.mjs:321`), not `discoverRepository`. Both files need a new import line added.
+
+Its `primaryRoot`/`commonDir` pair is the physical primary checkout, resolved the same way
+regardless of which worktree the guard happens to be running from. This is not a stylistic
+choice, but it also does not mean `discoverRepository()` is "the one universal primitive" every
+fingerprint call site in this codebase already funnels through — it is one of **two related,
+independently implemented primitives**. Five real call sites genuinely do feed
+`derivePoGateRepositoryFingerprint` directly from a `discoverRepository()` result's
+`.commonDir`/`.primaryRoot` — `document-adapter.mjs:99`, `document-binding.mjs:120`,
+`governance-event-store.mjs:87` (via a fail-closed wrapper), `document-identifiers.mjs:106`,
+`session-power.mjs:312`. A second, distinct primitive, `resolvePoGateRepositoryTopology()`
+(`po-gate-authority.mjs:336-377`), independently re-derives a similar worktree-invariant
+topology via its own git spawns — it is not built on top of `discoverRepository()` and does not
+call it. At least four real call sites feed `derivePoGateRepositoryFingerprint` from *that*
+primitive's `gitCommonDir`/`primaryRoot` output instead: `po-gate-profile-publisher.mjs:197-200`
+(via `resolveTopology`, defaulting to `resolvePoGateRepositoryTopology`, `po-gate-profile-
+publisher.mjs:81,181`), `po-gate-authority.mjs:484` (nested inside `validatePoGateProfileSnapshot`,
+itself fed `resolvePoGateRepositoryTopology`'s output at its call site, `po-gate-authority.mjs:387,
+408`), and two call sites an earlier draft of this paragraph omitted entirely —
+`setup.mjs:1226,1238-1241` and `codex-advisory-bootstrap.mjs:93-94`. Both primitives are
+worktree-invariant in the same way (neither uses a worktree-local toplevel), so the direction of
+this design's F1 fix is unaffected either way — but this design deliberately uses
+`discoverRepository()` specifically, for a self-contained fingerprint-input calculation at a
+read/write pair that does not need `resolvePoGateRepositoryTopology()`'s broader topology object
+(registered worktree roots, worktree list) — not because it is the only primitive that exists,
+and not because either `guard-push.mjs` or `pipeline-state.mjs` already imports it.
+Using `projectDir`
 (`fallbackProjectDir()`'s `git rev-parse --show-toplevel` from whichever worktree the push
 runs in — `plugins/pipeline-core/hooks/guard-push.mjs:748-754`) or the CLI's own working
 directory (`dir` in `pipeline-state.mjs`) instead would make the fingerprint itself vary
@@ -193,7 +233,21 @@ local write succeeded, add one call:
 
 ```js
 if (verified.proof !== null && externalPushLedgerGate(dir) !== "off") {
-  const repository = discoverRepository(dir);  // same worktree-invariant roots as the read side
+  let repository;
+  try {
+    repository = discoverRepository(dir);  // same worktree-invariant roots as the read side
+  } catch {
+    // Same >=7-path throw surface as the read side (worktree-lifecycle.mjs:163-169,231-249),
+    // caught before the external-ledger write is even attempted -- and, notably, BEFORE the
+    // local `writeState(dir, next, base)` write below, so local state is untouched by this
+    // specific failure. An uncaught throw here would not be silently treated as allow the way
+    // the read-side hook's exit code is (Node's default uncaught-exception handling exits the
+    // CLI process non-zero on its own), but it would still be an unstructured crash instead of
+    // the explicit, named `approve-push refused (<CODE>)` disposition every other failure in
+    // this command produces. Give it the same name and shape as the read side:
+    console.error("Error: approve-push refused (PUSH-EXTERNAL-LEDGER-TOPOLOGY-UNRESOLVED).");
+    return 2;
+  }
   const appended = appendExternalPushLedgerConsumption({
     repositoryFingerprint: derivePoGateRepositoryFingerprint({
       gitCommonDir: repository.commonDir,
@@ -205,6 +259,20 @@ if (verified.proof !== null && externalPushLedgerGate(dir) !== "off") {
   if (!appended.ok) { console.error(`Error: approve-push refused (${appended.code}).`); return 2; }
 }
 ```
+
+The two `discoverRepository(...)` calls above should also carry an explicit `timeout`, matching
+the convention this file's two existing git spawns already use (`guard-push.mjs:427-430` and
+`guard-push.mjs:750-753`, both `5000`ms). As of the current `worktree-lifecycle.mjs`, though,
+this is not simply a matter of passing `{ timeout: 5000 }`: `runGit`'s `options` parameter
+forwards only `cwd`, `env`, `encoding`, `maxBuffer` and `shell` to the underlying `spawnSync`
+call (`worktree-lifecycle.mjs:110-125`) -- no existing caller of `discoverRepository` anywhere
+in this codebase passes a `timeout`, and none would be honored today even if one did. Meeting
+this file's own timeout convention therefore needs a small, disclosed extension to
+`worktree-lifecycle.mjs`'s shared `runGit`/`gitText` helpers (forwarding an `options.timeout`
+through to `spawnSync`) as part of implementing this design, not merely invoking a capability
+that already exists. The numeric value should match this file's own established `5000`ms
+unless the implementation dispatch finds a reason to diverge; the exact wiring is left to that
+dispatch.
 
 `gitCommonDir`/`primaryRoot: dir` (the CLI's raw working directory) are replaced with the same
 `discoverRepository(dir)` call the read side now uses, for the identical reason: `dir` is
@@ -234,8 +302,11 @@ this is a disclosed scope limit, not an oversight).
   §2).
 - `discoverRepository` (`plugins/pipeline-core/lib/worktree-lifecycle.mjs:231`) — the existing
   worktree-invariant repository-discovery primitive, reused to compute the fingerprint's inputs
-  at both call sites (§2); a net-new import in `guard-push.mjs`, already imported (for
-  `inspectSessionClosure`) in `pipeline-state.mjs`.
+  at both call sites (§2); a net-new import at **both** — `guard-push.mjs` imports nothing from
+  `worktree-lifecycle.mjs` today, and `pipeline-state.mjs` imports only `inspectSessionClosure`
+  from that module today (`pipeline-state.mjs:321`), not `discoverRepository`. See §2's
+  correction of this point for the related, distinct `resolvePoGateRepositoryTopology()`
+  primitive some other fingerprint call sites use instead.
 - The `pipeline-state.mjs approve-push` CLI subcommand as the **sole** write path — no new
   CLI, no new subcommand. One more atomic file write is added to the existing command.
 - The GS-1 gate-strength protection already covering the whole `pipeline.user.yaml` file
@@ -345,34 +416,99 @@ failure mode that follows it (`appendExternalPushLedgerConsumption`, consulted b
   strings `"required"` or `"off"`) → resolves to `"required"` (fails closed), mirroring
   ADR-0056 decision 2's "unrecognised resolves to `signature`" precedent exactly. Only a
   clean, exact `"off"` disables the check.
+- **`discoverRepository(projectDir)` throws before the ledger check can even run** — missing or
+  symlinked start path, a git spawn that fails to start or exits non-zero (including the
+  `WT-GIT-SPAWN` case this repo's own `CLAUDE.md` documents can occur when `git` is
+  unexpectedly absent from `PATH`), a submodule/`--separate-git-dir` common-dir shape, or a
+  missing primary root — the full throw surface is `worktree-lifecycle.mjs:163-169,231-249`.
+  → `{ ok: false, code: "PUSH-EXTERNAL-LEDGER-TOPOLOGY-UNRESOLVED" }` → push refused. This is a
+  different failure class from every other read-side case above (it is about the repository
+  topology needed to even compute the ledger marker's path, not about the marker file itself),
+  but the disposition is the same for the same reason: `guard-push.mjs` has no ambient
+  try/catch around this integration point, and per `hooks.json`'s own exit-code contract (0
+  allow, 2 block, 1 allow+warn), an *uncaught* throw here would exit the process at 1 — which
+  this hook's own harness treats as ALLOW, silently discarding every other already-accumulated
+  push-gate failure. §2's read-side snippet therefore wraps the `discoverRepository(...)` call
+  in its own `try`/`catch`; the `catch` is this bullet's disposition — an explicit, named,
+  fail-closed push refusal, never a fall-through to "check not applicable" and never an
+  uncaught throw.
 
-**Write side (`appendExternalPushLedgerConsumption`, inside `approve-push`):** the
-`mkdirSync`+`writeFileSync` pair (§3) can still fail for a reason other than "directory
-missing" — permission denied on `.pipeline/push-ledger/` (or an ancestor), a read-only or full
-filesystem, or (per the local-filesystem caveat in §3) a lock-manager error on a non-local
-mount. This failure is structurally different from every read-side case above: by the time it
-can happen, the local write (`writeState(dir, next, base)`, line 5213) has **already
-succeeded**, so `pushApproval.lastApproved` and `criticalProofConsumption` for this
-`proofSha256` are already persisted. A naive retry of `approve-push` with the same `--proof`
-artifact therefore hits the pre-existing `CRITICAL-PROOF-REPLAY` guard (line 5196-5199) and is
-refused — recovery is not "just run the command again."
+**Write side (`appendExternalPushLedgerConsumption`, inside `approve-push`):** two structurally
+distinct failure points, in the order they can occur:
 
-The fail-safe answer this design commits to: **the write-side failure is fatal to the whole
-`approve-push` command** — `console.error` + `return 2`, exactly as §2's write-side snippet
-already shows, and the existing `console.log("Push approved by ...")` success line must not be
-reached. Treating it as a non-fatal warning would let `approve-push` report success while a
-`gates.push_external_ledger: required` project's next push is, correctly, still refused by the
-read side for `PUSH-EXTERNAL-LEDGER-MISSING` — a confusing, misleading "succeeded, but didn't"
-outcome this design avoids by failing loudly at the point of the actual failure instead. The
-accepted operational cost of that choice: because the local write cannot be un-done from inside
-`approve-push` itself, recovering from this specific failure needs one of (a) an operator
-manually removing the just-added `criticalProofConsumption` entry for that `proofSha256` from
-local state (an explicit, auditable manual edit, not a silent one) before retrying
-`approve-push` with the same proof, once the underlying filesystem condition is fixed, or (b)
-a fresh human-signed proof for a new signing ceremony. This is a genuine, disclosed rough edge
-of the local write and the external-ledger write not being one atomic transaction; per (a) in
-§3, the one concretely identified cause (`ENOENT` on first use in a repository) is eliminated
-by the `mkdirSync` step, so in practice this recovery path is expected to be rare, not routine.
+1. **`discoverRepository(dir)` itself throws** (§2) — the same `>=7`-path throw surface as the
+   read-side bullet above. This happens *before* `appendExternalPushLedgerConsumption` is even
+   called, and — unlike both write-side cases below — *before* the local
+   `writeState(dir, next, base)` write (line 5213) as well, so local state is untouched by this
+   specific failure. Unlike the read-side hook, an uncaught throw here would not be silently
+   treated as allow (a crashed CLI process exits non-zero on its own, via Node's default
+   uncaught-exception handling), but it would still be an unstructured crash instead of the
+   explicit, named `approve-push refused (<CODE>)` disposition every other failure in this
+   command produces. §2's write-side snippet wraps this call in `try`/`catch` too, with the
+   same `PUSH-EXTERNAL-LEDGER-TOPOLOGY-UNRESOLVED` disposition as the read side:
+   `console.error` + `return 2`, before either write is attempted.
+2. **The `mkdirSync`+`writeFileSync` pair (§3) fails once both writes are reachable.** Two
+   sub-cases, and they must not share a disposition or a recovery story:
+   - **A filesystem condition** — permission denied on `.pipeline/push-ledger/` (or an
+     ancestor), a read-only or full filesystem, or (per the local-filesystem caveat in §3) a
+     lock-manager error on a non-local mount. This is structurally different from every
+     read-side case above: by the time it can happen, the local write
+     (`writeState(dir, next, base)`, line 5213) has **already succeeded**, so
+     `pushApproval.lastApproved` and `criticalProofConsumption` for this `proofSha256` are
+     already persisted. A naive retry of `approve-push` with the same `--proof` artifact
+     therefore hits the pre-existing `CRITICAL-PROOF-REPLAY` guard (line 5196-5199) and is
+     refused — recovery is not "just run the command again"; see the recovery paragraph below.
+   - **`EEXIST` on the `writeFileSync(path, json, { flag: "wx", ... })` call itself** →
+     `PUSH-EXTERNAL-LEDGER-ALREADY-CONSUMED`. This is not a filesystem condition to fix — it is
+     the single-use mechanism's own success case working exactly as designed, surfaced at a
+     moment the write side must treat as a hard stop, not a retry. By construction, the local
+     write immediately above always runs only *after* the pre-existing `CRITICAL-PROOF-REPLAY`
+     guard (`pipeline-state.mjs:5196-5199`) has already refused any `proofSha256` present in
+     local `criticalProofConsumption`. So an `EEXIST` here can only mean the external ledger
+     already has a consumption record for this exact `proofSha256` that local state does *not*
+     have — otherwise the replay guard upstream would have refused the command before this
+     write was even attempted. That is exactly the Git-level-replay scenario §1 point 1 exists
+     to defend against: a reset, forged, or stale local state file, or a fresh worktree/clone,
+     presenting a `proofSha256` as locally unconsumed when the external ledger already knows
+     otherwise. Disposition: `approve-push` refuses (`console.error` + `return 2`), identically
+     fatal to every other write-side case, but with a **different recovery framing**: there is
+     no filesystem condition to fix here, and retrying does nothing but reproduce the same
+     `EEXIST` — the "once the underlying filesystem condition is fixed" language in the
+     recovery paragraph below applies only to the filesystem-condition sub-case immediately
+     above, never to `EEXIST`. Recovery from `EEXIST` is investigative, not mechanical: an
+     operator needs to establish why a proof recorded as unconsumed locally is already consumed
+     externally (the exact scenario §1 point 1 names) before any push proceeds.
+
+The fail-safe answer this design commits to for both `2.` sub-cases above: **the write-side
+failure is fatal to the whole `approve-push` command** — `console.error` + `return 2`, exactly
+as §2's write-side snippet already shows, and the existing `console.log("Push approved by
+...")` success line must not be reached. Treating it as a non-fatal warning would let
+`approve-push` report success while a `gates.push_external_ledger: required` project's next
+push is, correctly, still refused by the read side for `PUSH-EXTERNAL-LEDGER-MISSING` — a
+confusing, misleading "succeeded, but didn't" outcome this design avoids by failing loudly at
+the point of the actual failure instead. The accepted operational cost of the
+filesystem-condition sub-case specifically: because the local write cannot be un-done from
+inside `approve-push` itself, and because `.claude/pipeline-state.json` is written EXCLUSIVELY
+through the CLI, never hand-edited, with no carve-out for this or any other case (ADR-0029
+decision 1, `docs/adr/0029-file-handoffs-status.md:11`), recovering from a filesystem-condition
+write failure has exactly one path: a fresh human-signed proof for a new signing ceremony,
+followed by a fresh `approve-push` call, once the underlying filesystem condition is fixed. An
+earlier draft of this section additionally proposed an operator manually removing the
+just-added `criticalProofConsumption` entry from local state as a second recovery option — that
+option is withdrawn here: it is a hand-edit of a CLI-exclusive file, which ADR-0029 decision 1
+forbids outright, with no carve-out for "explicit and auditable." This design also does not
+propose a new CLI subcommand to programmatically undo that one local write instead: §6 already
+states that this design builds no revocation flow for the external ledger entry and goes no
+further than the *existing* local `criticalProofConsumption` mechanism already goes (which also
+has no revocation flow today); a dedicated "undo this one local write" subcommand would be new,
+security-sensitive surface built solely for a narrow, expected-to-be-rare edge case, which is
+disproportionate and inconsistent with that already-stated scope discipline. A fresh signing
+ceremony is accepted as the operational cost instead. This is a genuine, disclosed rough edge of
+the local write and the external-ledger write not being one atomic transaction; per §3, the one
+concretely identified cause (`ENOENT` on first use in a repository) is eliminated by the
+`mkdirSync` step, so in practice the filesystem-condition sub-case is expected to be rare, not
+routine. `EEXIST` (above) has no comparable "fixed by mkdirSync" mitigation and is not expected
+to be rare in the same sense — it is a signal, not an accident.
 
 ## 5. Migration/rollout note
 
