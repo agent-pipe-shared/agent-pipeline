@@ -5,7 +5,7 @@
 
 **Last updated:** 2026-08-07
 **Project status:** ACTIVE
-**Current block:** 0.5.2 released, backlog triaged; Nova A closeout decision pending PO, Nova B blocked on it
+**Current block:** 0.5.2 released, backlog triaged; PO chose to complete Nova A's missing work before closeout — entry gate confirmed clear, per-issue status reconciled, real implementation work starts next
 **Repair baseline:** `5d2b83dcc765d50801f4491e1bd9bed32090112b`
 **Release version:** `0.5.2` released
 **Release state:** version `0.5.2` · tag `v0.5.2` · commit `6e2c9b2868d164ff3b631ab068fa5df20939e07d` · tree `23171c38a317d8cdf50baa013f54f5447e17f754` · status `published`
@@ -16,7 +16,69 @@ the supplied authoritative release identity; it is not a claimed release time.
 The historical candidate-qualification sections below are retained as
 session history and no longer describes the current publication disposition.
 
-## 2026-08-07 Nova V — backlog triage for 2026-08-05 through 2026-08-07 (current)
+## 2026-08-07 Nova VI — Nova A entry gate cleared, 10-issue status reconciled (current)
+
+Continues from Nova V. The PO chose, of three offered options, to complete
+Nova A's missing per-issue evidence/closure work before formal close (not
+accept-as-is, not mark revoked). Before touching any implementation, found and
+fixed a real defect: `nova-a.md`'s entry gate still said the PRD/Spec approval
+was revoked and blocked implementation from resuming — stale. Verified
+directly against `project/pipeline-state.json`: the plan was resubmitted and
+approved 2026-08-02 (`06a2cf9`/`afa8cee`), `planApproval.approvedAt` and
+`poGateAuthority.planSha256`/`specSha256` match the current
+`prd_sprint-nova-epic.md`/`spec.md` bytes exactly (independently re-hashed,
+not just read from the record), and the R0 rebase-adoption record is
+complete. Corrected in `fd7c2d2`. Implementation may resume.
+
+Given that finding, did not trust `issue-acceptance-matrix.md`'s 2026-08-01/02
+snapshot either and ran six parallel investigations (one per Nova A slice) to
+establish current truth for all 10 issues before dispatching anything. Result,
+committed in `9aea436`:
+
+- **#57 (A1):** closer to done than recorded — the matrix's own "remaining
+  gap" (checker-green, events-39/40 amendment readback) was separately closed
+  by 2026-08-06 ledger-reconciliation work and never reconciled back. Real
+  remaining work narrows to candidate-freeze + fresh Critic + PO gate.
+- **#7, #29, #38 (A2/A5), #12, #14 (A4), #8 (A6):** matrix confirmed accurate
+  — zero implementation movement since the snapshot date; the stated gaps are
+  real, unstarted work (fresh candidate-bound integration/execution evidence).
+- **#54 (A5 Critic convergence):** matrix accurate; acceptance.md gained a
+  12th criterion (NVA-A54-12, 2026-08-02) never reflected. Confirmed today's
+  own 0.5.2 Critic dispatch does **not** count as evidence for this issue —
+  wrong diff, not candidate-bound, no correction/delta path exercised.
+- **#56 (A7 release preflight):** new tooling landed 2026-08-06
+  (`release-preflight-cli.mjs`, 9/9 tests) but has never been run against a
+  real candidate with real consent/GG-03 binding; today's actual release
+  didn't use it either.
+- **#98 (A6R+A6S, the P0 blocker):** A6S's six steps are functionally
+  complete since 2026-08-02, never reflected. R0/R1 done (pre-existing), R5
+  (release-state projection) newly closed today. **R2's own DoD — "no raw
+  push or improvised library invocation is needed as the normal path" — is
+  directly contradicted by how this session's own 0.5.2 release actually
+  shipped**: three separate ad-hoc mechanisms (attested main-push, GG-03
+  override, raw `gh release create`) instead of the one designed
+  `publication-executor.mjs` CLI sequence, which exists but went unexercised.
+  R3 not freshly evidenced, R4 (Critic delta lineage) likely needs building,
+  R6 (integrated fixtures) missing. Smallest next step identified: re-run
+  today's transaction retroactively through
+  `publication-executor.mjs`'s full `preflight → prepare → authorize-plan →
+  authorize-apply → execute → readback` sequence.
+
+Also fixed a lifecycle-manifest digest drift caught by Verify
+(`artifact-topology-check`/`threat-model-tests`) after the `nova-a.md` edit —
+`specs/sprint-nova-epic/lifecycle.json`'s bound sha256 for that file is
+`mutability: mutable`/`authority: false`, a plain reseal, not an
+approval-gated change (`e2716bc`). Verify: 254/254 clean at
+`e2716bcd1a9cd3fd1b684709d3a2f3702bdf5832`.
+
+**Next:** per `issue-acceptance-matrix.md`'s own recommended order, start
+real implementation/evidence work with #57 (closest to done), then
+#7/#29/#38, then #12/#14/#8/#54/#56, then #98 — each dispatched to a fresh
+Goldfish per `nova-a.md`'s own rule that the Elephant does not implement
+production code. This is realistically a multi-session program, not a
+single-turn close.
+
+## 2026-08-07 Nova V — backlog triage for 2026-08-05 through 2026-08-07
 
 Continues from Nova IV. Filled in the Triage section for the 9 items from
 the last two days that still had it blank (4 investigated fresh against
