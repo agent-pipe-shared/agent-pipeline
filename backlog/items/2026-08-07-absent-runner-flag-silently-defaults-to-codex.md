@@ -47,8 +47,9 @@ item is only the remaining defaults question.
 - `plugins/pipeline-core/lib/project-onboarding-v3.test.mjs` — the regression
   test "omitting `--runner` keeps the historical Codex App-Server requirement",
   which currently pins the behaviour under discussion.
-- [ADR-0051](../../docs/adr/0051-runner-identity.md) / ADR-0057 R1 — the
-  runner-identity contract this default sits under.
+- [ADR-0051](../../docs/adr/0051-dual-runner-tri-platform-development-contract.md)
+  and [ADR-0057](../../docs/adr/0057-runner-platform-support-is-an-implementation-obligation.md)
+  R1 — the runner-identity contract this default sits under.
 
 ## Proposal
 
