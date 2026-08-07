@@ -56,10 +56,10 @@
 | pipeline.regulated-document-hooks | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.release-preflight-has-a-builder-but-no-cli | in_progress | defect | pipeline | 2026-08-06 | — |
 | pipeline.restart-launch-is-codex-only-for-every-runner | open | defect | pipeline | 2026-08-06 | — |
-| pipeline.ruleset-freshness-wsl-subsystem-absent | open | defect | pipeline | 2026-08-07 | — |
+| pipeline.ruleset-freshness-wsl-subsystem-absent | in_progress | defect | pipeline | 2026-08-07 | — |
 | pipeline.runtime-projection-v2-eager-manifest-load | open | defect | pipeline | 2026-07-27 | — |
 | pipeline.security-scan-cross-branch-gitleaks-findings | closed | defect | pipeline | 2026-07-25 | — |
-| pipeline.self-application-integrity-check-absent | open | defect | pipeline | 2026-08-07 | — |
+| pipeline.self-application-integrity-check-absent | in_progress | defect | pipeline | 2026-08-07 | — |
 | pipeline.sentinel-go-live-completion | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.session-keep-awake | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.setup-mjs-marketplace-name-collision-defeats-local-dev-installs | closed | defect | pipeline | 2026-08-05 | — |
@@ -79,6 +79,6 @@
 
 ## Counts
 
-- open: 30
-- in_progress: 21
+- open: 28
+- in_progress: 23
 - closed: 20

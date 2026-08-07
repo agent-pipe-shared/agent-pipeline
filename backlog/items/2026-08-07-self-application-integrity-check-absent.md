@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.self-application-integrity-check-absent
 type: defect
 owner: pipeline
-status: open
+status: in_progress
 source: merge report section 4 findings 7 and 9 (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361
 created: 2026-08-07
 ---
@@ -75,12 +75,16 @@ related freshness half of the same investigation):
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** deferred — needs PO input on the two open questions above
-  before scope can be fixed and a redesign/implementation dispatch built.
-- **Rationale:** the investigation this item asked for surfaced a materially
-  larger design question (bootstrap-readiness-gate semantics) than the
-  original "narrow integrity check" framing assumed; forcing a decision
-  without PO input here would be exactly the kind of "invented PO approval"
-  this pipeline's own rules prohibit for gate-affecting changes.
-- **Assignment (if accepted):** not yet assigned.
+- **Decision:** accepted (APS, 2026-08-07) — resume the self-application
+  origin-allowlist check as part of ordinary bootstrap readiness, via the
+  existing `public-core-observation.mjs`/`ruleset-source.mjs` primitives
+  (not a revival of Phoenix's separate pre-merge API surface). Given WP5's
+  Critic review just caught 3 MAJOR defects in a gate-adjacent design before
+  implementation, this change (which touches the bootstrap readiness gate's
+  `status` semantics) gets the same design-first → Critic-review →
+  implement sequence before any code is written.
+- **Rationale:** PO decision. Design-first is not optional overhead here —
+  it just proved its worth on a closely related security-gate change in the
+  same session.
+- **Assignment (if accepted):** design phase, next dispatch.
 - **Date:** 2026-08-07

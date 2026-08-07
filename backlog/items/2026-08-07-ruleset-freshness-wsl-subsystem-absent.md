@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.ruleset-freshness-wsl-subsystem-absent
 type: defect
 owner: pipeline
-status: open
+status: in_progress
 source: merge report section 4 finding 10 (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361
 created: 2026-08-07
 ---
@@ -77,9 +77,18 @@ its own rollback protocol for exactly this file).
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** deferred — needs PO input (see companion item's Triage for
-  the shared underlying question).
-- **Rationale:** same as the companion item — this grew into a bootstrap-
-  readiness-gate design question, not a contained repair.
-- **Assignment (if accepted):** not yet assigned.
+- **Decision:** accepted (APS, 2026-08-07) — repair the WSL host-authorized
+  boundary mechanism, but **scoped specifically to Codex running under
+  WSL** (the concrete problem this boundary exists for: a broken/DNS-limited
+  Codex sandbox on WSL). It is explicitly NOT a universal requirement for
+  every runner/host combination — other runners/environments don't have
+  this sandbox problem and must not be forced through the host-boundary
+  path. Design-first → Critic review → implement, same sequence as the
+  companion item (WP5's Critic review just demonstrated why, on a related
+  gate-adjacent design, in this same session).
+- **Rationale:** PO decision. The scoping constraint (Codex+WSL only, not
+  universal) is load-bearing — a design that makes this boundary mandatory
+  for every runner would be over-scoped relative to the actual problem.
+- **Assignment (if accepted):** design phase, next dispatch (combined with
+  the companion item — one investigation, one design).
 - **Date:** 2026-08-07

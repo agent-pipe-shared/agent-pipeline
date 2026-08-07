@@ -3,11 +3,11 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "1822ce904563f641b1554c1b01a296e268d1727b59d3f3606c1ff5179aa68c18"
+    "transitionHead": "7636ea87561403fddde0fdbec4075fcca9c4cf93f408d33f8f1e05be10146c7f"
   },
   "counts": {
-    "open": 30,
-    "in_progress": 21,
+    "open": 28,
+    "in_progress": 23,
     "closed": 20
   },
   "items": [
@@ -473,7 +473,7 @@
     },
     {
       "id": "pipeline.ruleset-freshness-wsl-subsystem-absent",
-      "status": "open",
+      "status": "in_progress",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
@@ -501,7 +501,7 @@
     },
     {
       "id": "pipeline.self-application-integrity-check-absent",
-      "status": "open",
+      "status": "in_progress",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
