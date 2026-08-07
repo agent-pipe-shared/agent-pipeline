@@ -72,6 +72,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0057](0057-runner-platform-support-is-an-implementation-obligation.md) | Runner/platform support is an implementation obligation, not a per-cell evidence duty | accepted | 2026-08-06 |
 | [0058](0058-guard-maintenance-window.md) | Signed, time-boxed maintenance window lets the PO lift GS-6/TP-* with no in-session activation step | accepted | 2026-08-07 |
 | [0059](0059-signed-human-guard-override.md) | Human Guard Override gains a signed admission path, usable in `signature` mode for everything else it already classifies | accepted | 2026-08-07 |
+| [0060](0060-handover-placement-and-rotation.md) | Mid-task findings go into the handover because a fresh context is a Goldfish; durable rules go into ADRs; the handover gains a retention obligation whose mechanism is still open | accepted (placement) / open (rotation) | 2026-08-07 |
 
 ### Resubmissions
 
