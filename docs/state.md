@@ -265,6 +265,56 @@ the gate prints `(operating-model §7)` into its operator-visible fix string.
 Note (c) is a one-line change but sits in a `harness/scripts/` file, so it
 follows the ordinary briefed-task path rather than an in-session edit.
 
+**R1 IMPLEMENTATION LANDED (`986b540`, `b0ca256`) — the first Phoenix code of this
+session.** Elephant-verified independently of the report: both commits carry
+`Dispatch: PHX-R1-IMPL (goldfish)`, three files, +158/−83, working tree clean apart
+from the permanently-dirty settings file, the GS-9 entry present at
+`guard-gate-strength.mjs:98-102` with the design's literal `id`/`path`/`reason`
+and appended after GS-8 without renumbering, and the new module exporting exactly
+the two specified symbols.
+
+- `plugins/pipeline-core/lib/self-application-attestation-gate.mjs` (new) — the
+  whole attestation evaluation, moved out of the unprotected preflight.
+- `plugins/pipeline-core/scripts/pipeline-start-preflight.mjs` — reduced to one
+  import and one call; exactly four now-unused imports dropped.
+- `plugins/pipeline-core/hooks/guard-gate-strength.mjs` — the GS-9 entry.
+
+The dispatch built a **differential equivalence proof** rather than asserting
+behaviour was preserved: it reconstructed a reference implementation
+mechanically from the pre-change revision and compared five scenarios, including
+observer call count and arguments — all identical. The existing preflight suite
+passes 32/32 unedited, which is the check that matters: an extraction that needed
+its test changed would not have been an extraction.
+
+**What did NOT land, and it is not an oversight.** AC-R1-5, AC-R1-7 and AC-R1-8
+are open: the new module's test suite, its registration in
+`harness/scripts/verify.mjs` (TP-3) and the protected-test-path row (GS-4). Those
+are the two acts blocked on human authorization — the Nova session's topic. The
+dispatch was explicitly forbidden to route around them, and it did not.
+**Stated plainly rather than buried: the module is guard-protected while no suite
+pins it.** That is the weaker half of R1, it is the half that needs the
+authorization, and it should not be read as done.
+
+**An operational consequence the next session will hit, recorded so it is not
+rediscovered as a bug.** From the next plugin refresh onward, GS-9's `path`
+basename becomes a **shell needle** for the shell lane, which substring-matches it
+against any non-read-only command. From then on, in any checkout the shell lane
+recognises as governed — this one does — these are refused with
+`GUARD-GATE-STRENGTH-SHELL`: `git add` or `git commit --` naming that file, `git
+mv`/`git restore`/`git checkout --`/`git stash push` on it, and `node <path>`
+(only `node --check` is exempt). No file-scoped stage or commit of that path
+remains available to an agent session. The sanctioned follow-through, already used
+by this dispatch: directory-scoped `git add plugins/pipeline-core/lib` and
+`git commit -F <message file>` whose text does not name the module. This is the
+same friction `guard-config.json` already imposes; it is the cost of the
+protection, not a defect.
+
+**R1's implementation still needs its own independent Critic review** — the design
+review does not cover the diff. Deliberately not dispatched yet: the R3 rework is
+currently editing the same design document the review would read, and this session
+just recorded the rule that an orchestrator does not write under an open reviewer.
+It runs once R3's rework lands.
+
 **R3 (`84876f1`) Critic round 1/4: FAIL — 1 major, 3 minor.** Report at
 `specs/sprint-phoenix-epic/evidence/phx-r3-rescope-critic-review-84876f1.md`.
 This was the last design package that had never been reviewed; it now has been.
