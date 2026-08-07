@@ -13,6 +13,7 @@ import {
   consumeHumanGuardOverride,
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
+import { readPushApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import { loadRuntimeProjectionV3OwnedKeys } from "../lib/runtime-projection-v3.mjs";
 import {
   nativeHookSessionId,
@@ -430,10 +431,31 @@ if (denials.length > 0) {
       });
       if (planned.status === "planned") {
         const script = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+        // ADR-0059 Decision 4: name the exact next command for the CURRENTLY CONFIGURED
+        // mode, not just the mode-common `plan` step -- otherwise the agent has a
+        // digest but no route to actually clear the gate, and (in `signature` mode
+        // especially) no signal that a human, not the agent, must act next. Fails
+        // closed to `signature`'s continuation on any read error, exactly like
+        // guard-testpath.mjs's own `readPushApprovalMode` usage.
+        let approvalMode = "signature";
+        try { approvalMode = readPushApprovalMode(projectRoot, { spawn: overrideSpawn })?.mode ?? "signature"; }
+        catch { approvalMode = "signature"; }
+        const continuation = approvalMode === "chat"
+          ? [
+            `Then (the human confirms in-session; this is attribution, not proof -- gates.push_approval is "chat"):`,
+            `${process.execPath} ${JSON.stringify(script)} prepare-authorization --repo ${JSON.stringify(projectRoot)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256-from-plan> --reason "<human-reason>"`,
+            `${process.execPath} ${JSON.stringify(script)} authorize --repo ${JSON.stringify(projectRoot)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256> --selection-sha256 <selection-sha256> --reason "<human-reason>" --reason-sha256 <reason-sha256> --activate`,
+          ].join("\n")
+          : [
+            `Then, outside this session (gates.push_approval is "${approvalMode}"; presence of a valid, correctly-bound Ed25519 signature IS the authorization -- there is no in-session activate step for this mode):`,
+            `${process.execPath} ${JSON.stringify(script)} prepare-authorization --repo ${JSON.stringify(projectRoot)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256-from-plan> --reason "<fixed HGO_SIGNATURE_REASON text>"`,
+            `${process.execPath} ${JSON.stringify(script)} authorize-by-signature --repo ${JSON.stringify(projectRoot)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256> --proof <external-proof.json>`,
+          ].join("\n");
         overrideGuidance = [
           "",
           "Human override available for this exact action (one use; audited; explicit confirmation required):",
           `${process.execPath} ${JSON.stringify(script)} plan --repo ${JSON.stringify(projectRoot)} --request-sha256 ${planned.requestSha256}`,
+          continuation,
         ].join("\n");
       } else if (planned.status === "author-repair-required") {
         const script = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
