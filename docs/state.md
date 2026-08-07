@@ -87,7 +87,12 @@ post-merge redesign packages have landed code this session:
   invariant. Full report:
   `specs/sprint-phoenix-epic/evidence/wp5-phx2-rework-1-delta-critic-review-f01f111.md`.
   **WP5/PHX-2 is now Critic-clean end to end (design + implementation) —
-  ready for the PO's self-application gate.** One item still genuinely
+  ready for the PO's self-application gate.**
+
+  **PO gate: accepted (APS, 2026-08-07).** Explicit go-ahead given after the
+  Critic-clean summary was presented ("klar was auch immer das heißt! auf
+  geht's"). No further Critic/rework cycle needed for WP5/PHX-2. One item
+  still genuinely
   blocked, unchanged from before: `verify.mjs`'s suite registration for the
   ledger test files (TP-3 guard-protected, needs the audited override or a
   direct PO edit outside any agent session).
