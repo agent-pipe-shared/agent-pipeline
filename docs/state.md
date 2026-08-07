@@ -423,6 +423,18 @@ deliverables, required BEFORE any PO gate). Only after a Critic PASS does
 get dispatched — it needs a working `signature`-mode HGO path to route
 through, which does not exist until this lands.
 
+**Parallel dispatch while NOVA-HGOSIG-3 was in flight:** `NOVA-LCR-INTENT-1`
+(same `goldfish-deep`/`xhigh` tier, ruleset SHA
+`06971d73b0c220b4038f18401d55feb301f8f5d1`) — a fully independent, already-
+fully-triaged, non-overlapping-file defect fix for
+[`2026-08-07-guard-lifecycle-ready-rejects-plan-runtime-intent-argv.md`](../backlog/items/2026-08-07-guard-lifecycle-ready-rejects-plan-runtime-intent-argv.md):
+`guard-lifecycle-ready.mjs`'s `sanctionedOnboardingArgs()` `plan*` branch
+gets the same optional trailing `--intent <onboarding|bootstrap|session|dispatch>`
+support the `inspect` branch already has, plus a regression test against the
+exact argv shape `lifecycleArgv()` emits. PO instruction motivating this
+(chat, 2026-08-07): "nicht anhalten! setze goals und ziehe durch" — running
+in the background alongside NOVA-HGOSIG-3; not yet returned as of this note.
+
 ## 2026-08-07 Nova VII — first Nova A completion wave: 6 issues evidenced
 
 Continues from Nova VI. PO instruction: "leg mal los und fange an — du
