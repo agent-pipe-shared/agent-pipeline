@@ -178,12 +178,28 @@ export function installedPipelineVersion(pluginList = () => readInstalledPluginL
  * bootstrap-origin-allowlist-and-codex-wsl-freshness.md §A -- PO-confirmed F2
  * fix direction, 2026-08-07): a `.git` entry at the repository root two
  * directories above `pluginRoot` (`<clone>/plugins/pipeline-core` ->
- * `<clone>`), the exact layout `resolveSourceLayout()` in
- * `public-core-observation.mjs` requires. A real marketplace-installed plugin
- * copy (e.g. `~/.claude/plugins/cache/<marketplace>/pipeline-core/<version>`)
- * has no `.git` at all, at this path or any other -- this is a cheap,
- * read-only filesystem check, never a `git` subprocess, and never throws for
- * a missing/unreadable path (`existsSync` fails closed to `false`).
+ * `<clone>`).
+ *
+ * **Corrected per Critic finding F-D (MINOR, delta re-review `7aa84f0`):**
+ * this is a cheap presence check, not a re-implementation of the layout
+ * `resolveSourceLayout()` in `public-core-observation.mjs` requires --
+ * the two do not verify the same thing. `resolveSourceLayout()` checks three
+ * different, unrelated conditions and never inspects `.git` at all: that
+ * `pluginRoot`'s basename is exactly `"pipeline-core"`, its parent's basename
+ * is exactly `"plugins"`, and each of `pluginRoot`/its parent/its
+ * grandparent is a real, canonical (`realpathSync`-stable), non-symlink
+ * directory. A missing repository at that layout only surfaces later,
+ * indirectly, when `observeGit()`'s `git` subprocess calls against that
+ * directory fail (`SNT-A2-GIT-UNAVAILABLE`) -- `resolveSourceLayout()` itself
+ * has no dedicated `.git`-presence check for this function to mirror. This
+ * function, conversely, never checks the `pipeline-core`/`plugins` basename
+ * naming `resolveSourceLayout()` requires; it only tests for a `.git` entry
+ * two directories up from whatever path it is given. A real
+ * marketplace-installed plugin copy (e.g.
+ * `~/.claude/plugins/cache/<marketplace>/pipeline-core/<version>`) has no
+ * `.git` at all, at this path or any other -- this is a cheap, read-only
+ * filesystem check, never a `git` subprocess, and never throws for a
+ * missing/unreadable path (`existsSync` fails closed to `false`).
  */
 export function pluginRootHasSelfApplicationGit(pluginRoot) {
   return existsSync(resolve(pluginRoot, "..", "..", ".git"));
