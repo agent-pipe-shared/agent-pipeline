@@ -237,10 +237,15 @@ if (verified.proof !== null && externalPushLedgerGate(dir) !== "off") {
   try {
     repository = discoverRepository(dir);  // same worktree-invariant roots as the read side
   } catch {
-    // Same >=7-path throw surface as the read side (worktree-lifecycle.mjs:163-169,231-249),
-    // caught before the external-ledger write is even attempted -- and, notably, BEFORE the
-    // local `writeState(dir, next, base)` write below, so local state is untouched by this
-    // specific failure. An uncaught throw here would not be silently treated as allow the way
+    // Same >=7-path throw surface as the read side (worktree-lifecycle.mjs:163-169,231-249).
+    // Per this block's own placement above ("immediately after the existing local write ... and
+    // only if that local write succeeded"), this catch can only fire AFTER
+    // `writeState(dir, next, base)` (line 5213) has already succeeded -- so
+    // `pushApproval.lastApproved` and `criticalProofConsumption` for this `proofSha256` are
+    // already persisted by the time this specific catch fires. That gives this sub-case the same
+    // state consequence as the write-side sub-cases below (§4): a naive retry with the same
+    // proof hits the pre-existing `CRITICAL-PROOF-REPLAY` guard (line 5196-5199), so recovery is
+    // not "just retry." An uncaught throw here would not be silently treated as allow the way
     // the read-side hook's exit code is (Node's default uncaught-exception handling exits the
     // CLI process non-zero on its own), but it would still be an unstructured crash instead of
     // the explicit, named `approve-push refused (<CODE>)` disposition every other failure in
@@ -261,18 +266,25 @@ if (verified.proof !== null && externalPushLedgerGate(dir) !== "off") {
 ```
 
 The two `discoverRepository(...)` calls above should also carry an explicit `timeout`, matching
-the convention this file's two existing git spawns already use (`guard-push.mjs:427-430` and
-`guard-push.mjs:750-753`, both `5000`ms). As of the current `worktree-lifecycle.mjs`, though,
-this is not simply a matter of passing `{ timeout: 5000 }`: `runGit`'s `options` parameter
-forwards only `cwd`, `env`, `encoding`, `maxBuffer` and `shell` to the underlying `spawnSync`
-call (`worktree-lifecycle.mjs:110-125`) -- no existing caller of `discoverRepository` anywhere
-in this codebase passes a `timeout`, and none would be honored today even if one did. Meeting
-this file's own timeout convention therefore needs a small, disclosed extension to
-`worktree-lifecycle.mjs`'s shared `runGit`/`gitText` helpers (forwarding an `options.timeout`
-through to `spawnSync`) as part of implementing this design, not merely invoking a capability
-that already exists. The numeric value should match this file's own established `5000`ms
-unless the implementation dispatch finds a reason to diverge; the exact wiring is left to that
-dispatch.
+the `5000`ms convention `guard-push.mjs`'s own two existing git spawns already use
+(`guard-push.mjs:427-430` and `guard-push.mjs:750-753`, both `5000`ms). `pipeline-state.mjs` has
+no equivalent uniform convention to match instead: it has seven `spawnSync` git calls today
+(lines 1592, 1593, 2096, 2540, 2551, 2675, 2685), five of which pass no `timeout` at all, and the
+two that do (`2675`, `2685`) use `5_000`ms or `30_000`ms *conditionally*
+(`args[0] === "ls-remote" ? 30_000 : 5_000`), not a single uniform value -- so "this file's own
+established `5000`ms" is accurate only for `guard-push.mjs`, not for `pipeline-state.mjs`. As of
+the current `worktree-lifecycle.mjs`, though, this is not simply a matter of passing
+`{ timeout: 5000 }`: `runGit`'s `options` parameter forwards only `cwd`, `env`, `encoding`,
+`maxBuffer` and `shell` to the underlying `spawnSync` call (`worktree-lifecycle.mjs:110-125`) --
+no existing caller of `discoverRepository` anywhere in this codebase passes a `timeout`, and none
+would be honored today even if one did. Meeting a timeout convention therefore needs a small,
+disclosed extension to `worktree-lifecycle.mjs`'s shared `runGit`/`gitText` helpers (forwarding
+an `options.timeout` through to `spawnSync`) as part of implementing this design, not merely
+invoking a capability that already exists. The recommended numeric value for both new call sites
+is `5000`ms, matching `guard-push.mjs`'s established convention for consistency across the two
+integration points -- not because `pipeline-state.mjs` already has such a convention (it does
+not), but so both files converge on the one convention that does exist in this codebase -- unless
+the implementation dispatch finds a reason to diverge; the exact wiring is left to that dispatch.
 
 `gitCommonDir`/`primaryRoot: dir` (the CLI's raw working directory) are replaced with the same
 `discoverRepository(dir)` call the read side now uses, for the identical reason: `dir` is
@@ -421,8 +433,14 @@ failure mode that follows it (`appendExternalPushLedgerConsumption`, consulted b
   `WT-GIT-SPAWN` case this repo's own `CLAUDE.md` documents can occur when `git` is
   unexpectedly absent from `PATH`), a submodule/`--separate-git-dir` common-dir shape, or a
   missing primary root — the full throw surface is `worktree-lifecycle.mjs:163-169,231-249`.
-  → `{ ok: false, code: "PUSH-EXTERNAL-LEDGER-TOPOLOGY-UNRESOLVED" }` → push refused. This is a
-  different failure class from every other read-side case above (it is about the repository
+  → `failures.push(...)` with the exact message "External push ledger repository topology could
+  not be resolved (PUSH-EXTERNAL-LEDGER-TOPOLOGY-UNRESOLVED). Push refused -- this is a
+  fail-closed disposition, never a silent pass-through and never an uncaught throw." (§2's
+  read-side snippet) → push refused. This is a plain free-text failure message, not a
+  `{ ok: false, code }` return value: `checkExternalPushLedgerConsumption` is never called on
+  this path (§2's `if (repository !== null)` guard skips it once `discoverRepository` has
+  thrown). This is a different failure class from every other read-side case above (it is about
+  the repository
   topology needed to even compute the ledger marker's path, not about the marker file itself),
   but the disposition is the same for the same reason: `guard-push.mjs` has no ambient
   try/catch around this integration point, and per `hooks.json`'s own exit-code contract (0
@@ -438,15 +456,21 @@ distinct failure points, in the order they can occur:
 
 1. **`discoverRepository(dir)` itself throws** (§2) — the same `>=7`-path throw surface as the
    read-side bullet above. This happens *before* `appendExternalPushLedgerConsumption` is even
-   called, and — unlike both write-side cases below — *before* the local
-   `writeState(dir, next, base)` write (line 5213) as well, so local state is untouched by this
-   specific failure. Unlike the read-side hook, an uncaught throw here would not be silently
-   treated as allow (a crashed CLI process exits non-zero on its own, via Node's default
-   uncaught-exception handling), but it would still be an unstructured crash instead of the
-   explicit, named `approve-push refused (<CODE>)` disposition every other failure in this
-   command produces. §2's write-side snippet wraps this call in `try`/`catch` too, with the
-   same `PUSH-EXTERNAL-LEDGER-TOPOLOGY-UNRESOLVED` disposition as the read side:
-   `console.error` + `return 2`, before either write is attempted.
+   called -- but per §2's own placement instruction ("immediately after the existing local write
+   ... and only if that local write succeeded"), it happens *after* the local
+   `writeState(dir, next, base)` write (line 5213) has already succeeded. So this sub-case has
+   the SAME state consequence as sub-case `2.`'s filesystem-condition case below:
+   `pushApproval.lastApproved` and `criticalProofConsumption` for this `proofSha256` are already
+   persisted by the time this catch can fire, and a naive retry with the same proof hits the
+   pre-existing `CRITICAL-PROOF-REPLAY` guard (line 5196-5199) -- recovery is not "just retry";
+   see the recovery paragraph below, which now covers this sub-case too. Unlike the read-side
+   hook, an uncaught throw here would not be silently treated as allow (a crashed CLI process
+   exits non-zero on its own, via Node's default uncaught-exception handling), but it would still
+   be an unstructured crash instead of the explicit, named `approve-push refused (<CODE>)`
+   disposition every other failure in this command produces. §2's write-side snippet wraps this
+   call in `try`/`catch` too, with the same `PUSH-EXTERNAL-LEDGER-TOPOLOGY-UNRESOLVED`
+   disposition as the read side: `console.error` + `return 2`, before the external-ledger write
+   is attempted (the local write has already happened by this point).
 2. **The `mkdirSync`+`writeFileSync` pair (§3) fails once both writes are reachable.** Two
    sub-cases, and they must not share a disposition or a recovery story:
    - **A filesystem condition** — permission denied on `.pipeline/push-ledger/` (or an
@@ -479,20 +503,23 @@ distinct failure points, in the order they can occur:
      operator needs to establish why a proof recorded as unconsumed locally is already consumed
      externally (the exact scenario §1 point 1 names) before any push proceeds.
 
-The fail-safe answer this design commits to for both `2.` sub-cases above: **the write-side
-failure is fatal to the whole `approve-push` command** — `console.error` + `return 2`, exactly
-as §2's write-side snippet already shows, and the existing `console.log("Push approved by
-...")` success line must not be reached. Treating it as a non-fatal warning would let
-`approve-push` report success while a `gates.push_external_ledger: required` project's next
-push is, correctly, still refused by the read side for `PUSH-EXTERNAL-LEDGER-MISSING` — a
-confusing, misleading "succeeded, but didn't" outcome this design avoids by failing loudly at
-the point of the actual failure instead. The accepted operational cost of the
-filesystem-condition sub-case specifically: because the local write cannot be un-done from
+The fail-safe answer this design commits to for sub-case `1.` and both `2.` sub-cases above:
+**the write-side failure is fatal to the whole `approve-push` command** — `console.error` +
+`return 2`, exactly as §2's write-side snippet already shows, and the existing
+`console.log("Push approved by ...")` success line must not be reached. Treating it as a
+non-fatal warning would let `approve-push` report success while a `gates.push_external_ledger:
+required` project's next push is, correctly, still refused by the read side for
+`PUSH-EXTERNAL-LEDGER-MISSING` — a confusing, misleading "succeeded, but didn't" outcome this
+design avoids by failing loudly at the point of the actual failure instead. The accepted
+operational cost of sub-case `1.` (the `discoverRepository(dir)` throw) and the
+filesystem-condition sub-case under `2.` — the two write-side failure points that occur only
+after the local write has already succeeded: because the local write cannot be un-done from
 inside `approve-push` itself, and because `.claude/pipeline-state.json` is written EXCLUSIVELY
 through the CLI, never hand-edited, with no carve-out for this or any other case (ADR-0029
-decision 1, `docs/adr/0029-file-handoffs-status.md:11`), recovering from a filesystem-condition
-write failure has exactly one path: a fresh human-signed proof for a new signing ceremony,
-followed by a fresh `approve-push` call, once the underlying filesystem condition is fixed. An
+decision 1, `docs/adr/0029-file-handoffs-status.md:11`), recovering from either has exactly one
+path: a fresh human-signed proof for a new signing ceremony, followed by a fresh `approve-push`
+call, once the underlying condition (the repository-topology resolution failure, or the
+filesystem condition) is fixed. An
 earlier draft of this section additionally proposed an operator manually removing the
 just-added `criticalProofConsumption` entry from local state as a second recovery option — that
 option is withdrawn here: it is a hand-edit of a CLI-exclusive file, which ADR-0029 decision 1
