@@ -64,6 +64,14 @@ export const FORBIDDEN = [
   "token: alphabeta",
   "credential: seashell",
   "passphrase: bluewhale",
+  // A credential value followed by further words in the same clause is still a credential:
+  // trailing prose is not evidence of prose. Regression cover for the case the clause-end
+  // branch alone could not see.
+  "password: correcthorsebatterystaple for the staging box",
+  "password: correcthorsebattery and it works",
+  "token: abcdefghijklmnopqrst in staging",
+  "password: 12345678 for prod",
+  "credential: 1234 for the demo tenant",
 ];
 
 /** Ordinary distilled prose. Each entry contains a character the old filter banned outright. */
@@ -90,6 +98,13 @@ export const ADMITTED = [
   "token: the bucket sizing question is still open",
   "password: the reset flow is out of scope for now",
   "passphrase: agree the wording with the security reviewer",
+  // Prose a PO actually writes, opening on a credential label. The word after the label is an
+  // ordinary short one; "ownership" holds the boundary at nine characters, one below the floor.
+  "token: refresh cadence is the open question for review",
+  "credentials: ownership moves to the platform team",
+  "password: reset links expire after a day",
+  "api key: scoping is still an open question",
+  "secrets: rotation is owned by the platform team",
 ];
 
 test("rejects every dangerous shape, in the intent and in a list field alike", () => {

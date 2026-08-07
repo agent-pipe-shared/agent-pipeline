@@ -26,6 +26,8 @@ const SECRET_LABEL = String.raw`api[-_ ]?keys?|access[-_ ]?keys?|secrets?|tokens
 const SECRET_ASSIGNMENT = new RegExp(String.raw`\b(?:${SECRET_LABEL})\b\s*([:=]{1,2})\s*(["'\x60]?)([^\s"'\x60]+)`, "gi");
 const CLAUSE_END = /[,;.!?|)\]}]/;
 const VALUE_ALPHABET = /[A-Za-z]\d|\d[A-Za-z]|[a-z][A-Z]/;
+const VALUE_MIN_LENGTH = 10;       // no clause of distilled prose opens on a word this long after a credential label
+const VALUE_MIN_DIGIT_LENGTH = 4;  // with a digit inside it, four characters are already enough to be a value
 const FORBIDDEN_SHAPES = [
   /```|~~~/,                                                                                        // fenced code block
   /^\s*(?:user|assistant|system|human|developer|tool)\s*:/i,                                        // transcript role marker opening the text
@@ -72,15 +74,25 @@ function opaqueToken(value) {
 }
 /**
  * A credential word next to a value is the leak; the bare word is ordinary design vocabulary.
- * The discriminator is the FORM of what follows the label, never the size of it: a value stands
- * alone as the whole clause, is quoted, is `=`-assigned, or is written in an alphabet no English
- * word uses (letters mixed with digits, or an inner capital). Prose keeps talking — it carries
- * further words in the same clause — and a length floor cannot tell "swordfish" from "quarterly".
+ * The discriminator is the candidate itself, never what follows it: a value is `=`-assigned, is
+ * quoted, is written in an alphabet no English word uses (letters mixed with digits, or an inner
+ * capital), is longer than a word prose would open a clause with, or is short but digit-bearing.
+ * Trailing words prove nothing — a label, a value and then "for the staging box" is still a leaked
+ * value — so the clause-end test below only ADDS the bare "label: value" form; it can never rescue
+ * a candidate the alphabet and size tests already condemned. A length floor alone cannot tell
+ * "swordfish" from "quarterly", which is why it is one union term here and not the whole rule.
+ * Ties resolve toward rejection: this card is advisory, discardable and fails open, so the price
+ * of over-rejection is one refused sentence, and the price of under-rejection is a credential
+ * written into a git-trackable file.
  */
+function secretValue(candidate) {
+  return VALUE_ALPHABET.test(candidate) || candidate.length >= VALUE_MIN_LENGTH
+    || (candidate.length >= VALUE_MIN_DIGIT_LENGTH && /\d/.test(candidate));
+}
 function secretAssignment(value) {
   for (const match of value.matchAll(SECRET_ASSIGNMENT)) {
     const [assignment, operator, quote, candidate] = match;
-    if (operator.includes("=") || quote !== "" || VALUE_ALPHABET.test(candidate)) return true;
+    if (operator.includes("=") || quote !== "" || secretValue(candidate)) return true;
     const rest = value.slice(match.index + assignment.length).split(CLAUSE_END, 1)[0];
     if (!/[A-Za-z0-9]/.test(rest)) return true;
   }
