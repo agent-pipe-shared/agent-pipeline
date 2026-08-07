@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "2d3f2c613ccf023a671452cec1a358f110e39f291c3282cb5fb55d99ddcc8eb4"
+    "transitionHead": "9556190a5eaf77663b765cdbd65fcbfb08c70c07acc4cb0a6ae047e2ebe9ec21"
   },
   "counts": {
-    "open": 22,
+    "open": 23,
     "in_progress": 21,
     "closed": 19
   },
@@ -365,6 +365,14 @@
       "closureRepository": "self",
       "closureCommit": "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb",
       "closureEvidence": "backlog/evidence/2026-07-24-po-sentinel-closure-disposition.md"
+    },
+    {
+      "id": "pipeline.push-release-flow-unusable-for-third-party-adopters",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "PO, live during the 0.5.2 main-release session, 2026-08-07 — verbatim: 'Eine Entwickler Agent-Pipeline die nicht pushen und releasen kann ist unbrauchbar, außerdem viel zu unhandlich mit so vielen Freigaben.'"
     },
     {
       "id": "pipeline.ready-gate-env-var-runner-authority",

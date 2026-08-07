@@ -44,6 +44,7 @@
 | pipeline.private-overlay-activation-bridge | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.project-scoped-github-issue-operations | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.push-guard-worktree-target | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
+| pipeline.push-release-flow-unusable-for-third-party-adopters | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.ready-gate-env-var-runner-authority | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.recovery-preview-ack-unstable-getter-poisons-replay-ledger | open | defect | pipeline | 2026-07-27 | — |
 | pipeline.recovery-preview-callback-attestation | in_progress | defect | pipeline | 2026-07-20 | — |
@@ -70,6 +71,6 @@
 
 ## Counts
 
-- open: 22
+- open: 23
 - in_progress: 21
 - closed: 19
