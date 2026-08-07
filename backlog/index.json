@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "962c6dbf947081d41e988093198ed4344d4bd362c810523969ce3a6e18cfcf47"
+    "transitionHead": "65f148b375c0070ef1ac5acdeca649df75089278788cbb7006a384f49987ec22"
   },
   "counts": {
-    "open": 26,
+    "open": 27,
     "in_progress": 21,
     "closed": 19
   },
@@ -434,6 +434,14 @@
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.release-preflight-cli-base-commit-not-peeled",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "NVA-A54 Critic review, 2026-08-07 (finding 2), reviewing commits 6e2c9b2..d5be0e6."
     },
     {
       "id": "pipeline.release-preflight-has-a-builder-but-no-cli",

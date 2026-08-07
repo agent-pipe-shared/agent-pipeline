@@ -67,7 +67,49 @@ self-correction (`git reset` etc.) by a Goldfish dispatch outright; a
 stop-and-report would have caught this cleanly instead.
 
 Verify: 254/254 clean at `2a700f1f1a5c0f36d2a5785e1f952f758dfbeb97` (before
-the incident-2 recovery); re-verify after `463df63`.
+the incident-2 recovery); re-verified clean after `463df63` and again after
+the severity-correction commit `d5be0e6`.
+
+**#54's first real candidate-bound Critic execution.** Dispatched a genuine
+Critic review through `critic-dispatch-preflight.mjs`'s admission machinery
+(it correctly refused twice — `CDP-EVIDENCE-REQUIRED`, then
+`CDP-EVIDENCE-BINDING` — until fresh Verify/Security evidence existed for
+the exact candidate) covering this whole wave (21 commits, base `6e2c9b2`
+through candidate `d5be0e69`). **Verdict: PASS**, two minor findings:
+
+1. Commit `7140776` (from the earlier 0.5.2-cleanup block, not this wave)
+   is missing the mandatory `AI-Assisted: true` trailer. Accepted as a
+   permanent, unfixable gap — no history rewrite. Recorded here since it
+   cannot be filed as a normal backlog item with a real remediation.
+2. `release-preflight-cli.mjs:149` seals a git tag's own OID as `base.commit`
+   instead of peeling to the commit it points to (missing a `^{commit}`
+   peel that the adjacent `base.tree` field already has). Real, minor,
+   non-blocking — filed as
+   `backlog/items/2026-08-07-release-preflight-cli-base-commit-not-peeled.md`.
+
+Sealed as NVA-A54 evidence at
+`specs/sprint-nova-epic/evidence/nova-a/a5/critic-convergence-report-d5be0e6.json`.
+NVA-A54-1/3/9/12
+demonstrated; NVA-A54-4/5/6/11 (a real correction/delta round) still need a
+dispatch where the Critic actually finds something requiring fix-and-re-review
+— this pass's findings were accepted/filed rather than corrected.
+
+**#98's R2 exercise: scoped, not yet run.** Read `publication-executor.mjs`
+in enough depth to know precisely what R2's retroactive exercise needs: a
+real (network-touching) capability preflight, gate-evidence wrapper
+artifacts in a strict schema (`requireSuccessfulGate` demands
+`pipeline.publication-gate-evidence.v1`/`pipeline.nova-a-gate-observation.v1`,
+or Critic evidence with `review.verdict === "pass"` **and**
+`findings.length === 0`), then `prepare` → `authorize-plan` (read-only,
+just computes a plan digest) → `authorize-apply --activate` (the real
+state-mutating step, self-described `requiresConfirmation: true`) →
+`execute` (provably a no-op push here, since the remote already matches
+the already-published candidate) → `readback`. The just-produced #54
+Critic evidence does NOT qualify as R2's Critic-evidence input — its
+findings count is 2, not the required 0. This needs its own properly
+scoped dispatch (construct the wrapper artifacts, run through
+`authorize-plan` only, stop before `--activate` pending a real
+confirmation) — not attempted this wave.
 
 **Real remaining Nova A gaps, now genuinely narrowed:** almost every issue's
 "final Nova-A binding" gap converges on the same missing step — freezing
