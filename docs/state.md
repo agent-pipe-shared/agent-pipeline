@@ -207,6 +207,20 @@ freehand). Status:
    confined to §A.3's disclosure block, the GS-6 exception paragraph, and
    §A.5/§A.6). A bounded delta re-review is dispatched next — **round 4 of
    4, the last one allowed before a PO course gate.**
+
+   **Round 4/4: PASS.** All three findings independently re-derived and
+   confirmed resolved from source (`hooks.json:39`, `guard-gate-strength.mjs`'s
+   `insideLivePlugin()`/`gateStrengthRuleFor()`, this repo's own
+   `.claude/settings.json`, all 4 dispatch records cross-checked against
+   commit trailers). No new blocker/major/minor. Part B/§B.8/F1-F8/A-D
+   material byte-identical (md5-verified) except the two sentences each
+   round-3 finding required. Full findings:
+   `specs/sprint-phoenix-epic/evidence/wp2wp3-design-critic-delta-review-3-0d8ed74.md`.
+   **Design phase DONE for the combined WP2+WP3 package (Part A + Part B)
+   — ready for implementation dispatch.** Full round history: initial (FAIL
+   1 blocker + 4 major + 3 minor) → rework → delta 1 (FAIL 4 minor) →
+   rework 2 → delta 2 (FAIL 3 minor) → rework 3 (Design-tier) → delta 3/
+   round 4 (PASS).
 4. **`governance-product-verify-suites-deregistered`** — blocked on 1–3's
    outcome, not started.
 5. **`ledger-backed-plan-and-push-authority-absent-on-merged-base`** —

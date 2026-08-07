@@ -161,3 +161,10 @@ allowed before a PO course gate.
 **Rework 3 (2026-08-07): landed, commit `0d8ed74`, Part-A-only — Part B
 untouched.** Findings 1-3 were all Part-A scoped; see the companion item for
 detail. A bounded delta re-review is dispatched next — round 4 of 4.
+
+**Delta re-review 3 (2026-08-07): PASS — round 4 of 4.** Part B confirmed
+byte-identical (md5-verified) across the whole rework/re-review sequence —
+zero regression. Full findings:
+`specs/sprint-phoenix-epic/evidence/wp2wp3-design-critic-delta-review-3-0d8ed74.md`.
+**Design phase DONE for the combined package — ready for implementation
+dispatch.**
