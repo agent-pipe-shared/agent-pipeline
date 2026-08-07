@@ -314,6 +314,43 @@ post-merge redesign packages have landed code this session:
   anchors, and re-frame the still-open PO question on the true post-F2 blast
   radius), F3 (add the disclosure paragraph for this dispatch and for
   rework-2), F4 (correct the two design-only status claims).
+  **`WP2-WP3-partA-rework-3` landed** (Design-tier `claude-opus-5`/xhigh, per
+  the document's own rule and F3), 4 commits `2e48cbd`/`ca2d66a`/`7583893`/
+  `138e2e3`, all Elephant-reviewed diff-by-diff before the next Critic round.
+  **F1 (`ca2d66a`):** new backlog item
+  `backlog/items/2026-08-07-marketplace-install-topology-unattested.md` that
+  genuinely tracks the residual (named `**Owner: PO.**`, concrete next step,
+  three disclosed candidate directions — non-git content attestation against a
+  trusted expected value, a remote-read check, or accepting the boundary
+  permanently — none pre-selected), explicitly distinguished from the
+  wrongly-cited `self-application-integrity-check-absent.md` which is left
+  untouched; all three citation sites repointed (verified via `rg`: lines 147,
+  449, 565 now cite the new item, each with an explicit note on why the old
+  target was wrong). Line references in the new item spot-checked by the
+  Elephant against source (`pipeline-start-preflight.mjs:204`/`:274`/`:288` —
+  all exact). **F2 (`2e48cbd`):** §A.6 plus the four stale anchors rescoped onto
+  the true post-F2 reach; the still-open PO question re-framed on the correct
+  (much narrower, developer-facing) blast radius while explicitly staying open
+  and undecided, with §A.6's existing recommendation unchanged. **F3
+  (`7583893`):** the breach recorded in the document's own running disclosure
+  convention, naming it plainly as a dispatch-construction error by the
+  Elephant rather than a Goldfish fault (the briefing specified the model), and
+  recording this dispatch's on-tier route; the `:45-48` commitment left
+  standing and unweakened. **F4 (`138e2e3`):** both design-only status claims
+  reworded to be true of the revisions that carry them, keeping the status line
+  a reader needs while naming the one bounded comment-text-only exception.
+  Both verify commands re-run by the Elephant directly against final HEAD
+  `138e2e3`: `check-doc-contracts.mjs` clean (478 files/776 links/13 anchors),
+  `pipeline-start-preflight.test.mjs` 32/32 (regression guard — this dispatch
+  touched no code). Evidence:
+  `specs/sprint-phoenix-epic/evidence/wp2wp3-parta-rework-3-verify-138e2e3.json`,
+  which also discloses that F1's central claim is NOT mechanically verifiable
+  (`check-doc-contracts.mjs` is a link-existence check only) and was
+  spot-verified by reading instead. **Next:** Critic round 4 — **the last
+  round allowed for this package; a further FAIL requires a PO course gate,
+  not a fifth autonomous iteration.** Base computed correctly this time as
+  `<first-enumerated-SHA>^` = `2e48cbd^` = `5c12a8d`, closing the
+  base-computation defect both preceding Critic reviews flagged.
 - **GMW (Guard Maintenance Window, ADR-0058) merged in from the local-development
   marketplace snapshot** (commit `cca5ad8`): the PO pointed at
   `/home/skar667/agent-pipeline-local-marketplace` as the currently-wired snapshot
