@@ -25,14 +25,35 @@ report). Full detail, resolution policy per file, and the priority-ordered
 open-items list (gitignored `evidence/` work artifact, not a tracked
 doc-contract target): `specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md`
 
-**Open items awaiting a PO decision (see the report's §11 for full detail):**
+**Standing attribution:** the PO's name for every `--by <name>` / attribution
+field in this repository's tooling is **APS** (PO decision, 2026-08-07).
+
+**Decided (APS, 2026-08-07):** Push Policy — adopt main's `signature`/`chat`
+`gates.push_approval` model (ADR-0056) as the governing baseline (already
+implemented, already what the merged tree runs); PHX-2 is not retired, it
+becomes follow-on work that extends/optimizes this baseline rather than
+replacing it. Detail and rationale recorded in
+`backlog/items/2026-08-07-ledger-backed-plan-and-push-authority-absent-on-merged-base.md`.
+
+**Still open — blocked on a fact only the PO can supply, not just a
+preference:**
 1. `project/pipeline-state.json` reconciliation — Phoenix's plan-approval/
    continuity authority is not currently live (main's `sprint-nova-epic`
-   state is); needs an explicit fresh approval cycle, not a silent overwrite.
-2. Push Policy: adopt main's `signature`/`chat` `gates.push_approval` model
-   (ADR-0056) as-is, or carry the PHX-2 Human Governance Decision Ledger
-   design forward as new work against the merged base.
-3. The 11 flagged code-conflict losses (governance-ledger ecosystem,
+   state is). Investigated the mechanism: `pipeline-state.mjs set-feature`
+   refuses outright while `continuity` is active ("close it through the
+   revision/evidence-bound close gate first"), and `close-feature` on an
+   active continuity requires `--continuity-close-request` bound to a real
+   Result document and close evidence. Nova's continuity is still
+   `implementation` phase with an undispatched `queueHead`
+   (`nova-b0`/`runner-native-continuation`, `nextAction: "dispatch"`) — there
+   is no genuine completion evidence for it to close honestly, and
+   fabricating a Result to force the close would misrepresent work that was
+   never actually finished. **Needs the PO to say whether Nova's `nova-b0`
+   continuation is actually done** (then a real Result can be written and
+   `close-feature` run honestly) **or whether Phoenix's authority should be
+   re-established some other way** that doesn't require closing Nova's
+   still-open epic. Not executed either way.
+2. The 11 flagged code-conflict losses (governance-ledger ecosystem,
    `pipeline-state.mjs`, ledger-backed plan approval, `project-authority.mjs`
    dual-state repair) — decide what, if anything, gets redesigned. Now filed
    as 5 grouped `defect` backlog items (`backlog/items/2026-08-07-*`, status
@@ -46,8 +67,10 @@ doc-contract target): `specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-
   its own internal collision — no file rename needed.
 - Backlog ledger drift (4 of Phoenix's own 2026-08-06 items) reconciled via
   `reconcile-backlog-ledger.mjs --activate`; `RBL01` now passes.
-- The 11 flagged code-conflict losses filed as 5 backlog items (see item 3
+- The 11 flagged code-conflict losses filed as 5 backlog items (see item 2
   above) — filing only, no redesign decision made.
+- Push Policy direction decided (APS): main's model is the baseline, PHX-2
+  extends it (see "Decided" above).
 - `docs/state.md` itself — this editorial pass. Both full pre-merge histories
   are retained verbatim below as dated historical record; this section is now
   the single current-state source, resolving the two disagreeing "Project

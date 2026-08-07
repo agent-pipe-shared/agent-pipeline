@@ -65,18 +65,28 @@ Policy paragraph (already repointed to ADR-0056 in the merge).
 
 ## Proposal
 
-No proposal yet — this is the core finding for the redesign round the PO's
-own merge procedure explicitly deferred to a later step. Needs an explicit
-PO decision first: adopt main's signature/chat model as final (retire PHX-2
-as a concept, scrub remaining references), or carry the PHX-2 ledger design
-forward as new work designed against the merged base rather than resurrected
-wholesale. Either way, whichever line is chosen should be the only one left
-described in the repository's docs — the current post-merge state has two
-named mechanisms, only one of which is implemented.
+**PO decision (APS, 2026-08-07):** adopt main's `signature`/`chat`
+`gates.push_approval` model (ADR-0056) as the governing baseline — it is
+already implemented and already what the merged tree runs. PHX-2 is not
+retired as a concept; it becomes follow-on work that extends and optimizes
+this baseline rather than replacing it. Concretely this means: design PHX-2's
+ledger-backed plan/push authority as an additive layer on top of main's
+`gates.push_approval` mechanism (e.g. an extra ledger-backed proof consumed
+alongside the signature/chat gate, not a competing enforcement path), not as
+a from-scratch resurrection of the pre-merge Phoenix implementation against
+the old base. Scope, sequencing, and which of the six affected files get
+touched first are still open — this decision fixes the *direction*, not the
+implementation plan.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted (direction only — main's model is the baseline;
+  PHX-2 extends it)
+- **Rationale:** PO decision, 2026-08-07 (APS): main's signature/chat model
+  is already implemented and already governs the merged tree; nothing
+  regresses by keeping it. PHX-2 was never built on either side, so building
+  it as an addition rather than a replacement avoids re-litigating a working
+  mechanism.
+- **Assignment (if accepted):** redesign round, not yet scheduled to a
+  phase/release.
+- **Date:** 2026-08-07
