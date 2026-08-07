@@ -265,6 +265,43 @@ the gate prints `(operating-model §7)` into its operator-visible fix string.
 Note (c) is a one-line change but sits in a `harness/scripts/` file, so it
 follows the ordinary briefed-task path rather than an in-session edit.
 
+**STANDING RULE — one human approval clears the whole chain (APS, 2026-08-07).
+Highest-precedence process rule; applies to every human approval, without
+exception.** Verbatim: *"oberste regel ab jetzt, wenn der human etwas freigeben
+muss egal was, dann tut der das nur einmal mit einem befehl und dann wird die
+ganze kette dafür durchgezogen."* When something needs human release, the human
+issues **one** command, once — and everything that follows from that release is
+then carried through without returning for further approvals. The sibling
+session is adapting the mechanism now.
+
+**What this forbids, stated concretely because the abstract version is easy to
+nod at and then violate:** splitting one authorization into a sequence of human
+touches; asking again for a step that the first approval already implies;
+designing a package whose landing requires the human to act two or three
+separate times.
+
+**Consequences for open Phoenix items, all of which currently violate it:**
+- **R1 is designed to land in three acts** — the implementation dispatch, a
+  briefed test-change task for the `harness/scripts/verify.mjs` registration
+  (TP-3), and a PO hand-edit for the protected-test-path row (GS-4). AC-R1-8
+  makes R1 incomplete until the last two land. Under this rule that is one
+  approval, not three, and the design needs reworking to say so.
+- **The unregistered-suite defect class** recorded today
+  (`backlog/items/2026-08-07-ruleset-source-test-unregistered-in-the-verify-gate.md`)
+  has exactly this cause: the registration file is protected, so every author
+  must hand the edit off, and hand-offs get dropped — three occurrences. This
+  rule is the structural fix for it, not just a convenience.
+- **The signed-override route (ADR-0059)** is the natural carrier: one signed
+  authorization covering the whole chain rather than one per protected path.
+  Whether it can express a multi-path chain today is unverified and must be
+  established before any package relies on it.
+- **O-4 and the ledger PO gate** should be presented as single decisions with
+  their downstream consequences already resolved, not as a first question whose
+  answer generates a second.
+
+Nothing already approved is reopened by this rule; it governs how approvals are
+requested from here on.
+
 **PO decision, reaffirmed after measurement: the 0.5.3 merge waits for `main`
 (APS, 2026-08-07).** The Elephant put the choice again *because the stated
 reason for waiting had gone away*, and the PO kept the instruction anyway. That
