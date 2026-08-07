@@ -209,7 +209,41 @@ post-merge redesign packages have landed code this session:
   `.claude/settings.json` was ever dirty alongside it). **Next:** a bounded
   delta Critic re-review scoped to F1/F2/F4/F5 (the four in-session-fixable
   findings; F3/F6 named as structurally blocked in the neutral finding
-  registry, not re-litigated) — not yet dispatched.
+  registry, not re-litigated) — dispatched and landed: PASS, no blocker.
+  Full report:
+  `specs/sprint-phoenix-epic/evidence/wp2wp3-parta-rework-1-delta-critic-review-7aa84f0.md`.
+  F1/F2/F4/F5 all independently re-derived and confirmed resolved (F1: 14,782
+  bytes measured directly; F2: attestation no longer permanently fails,
+  verified against this machine's real installed plugin layout; F4: the 3 new
+  cases genuinely reach the real per-runner default-observer line unstubbed;
+  F5: hermetic again). The F3/F6 "structurally blocked" claim was
+  independently re-verified against the guard sources (not taken on faith)
+  and holds, with one correction to the dispatch record: F6's exact TP-11
+  entry needs to go into `project/guard-config.json` (GS-4), not
+  `.claude/guard-config.json` (GS-7) as the dispatch record says — both files
+  exist in this repo and it is the `project/` tier that actually carries the
+  live `protectedTestPaths` list. 4 non-blocking findings surfaced, most
+  significant F-A (major, PO-visibility item): the design contract
+  (`bootstrap-origin-allowlist-and-codex-wsl-freshness.md` §A.5/§A.7/§A.1)
+  still says a non-git flat-copy install should fold into
+  `plugin-refresh-required`; after the F2 fix that exact case now falls
+  through to `ready` with attestation never attempted, verified empirically
+  against this machine's real installed plugin cache (no `.git` two levels
+  above `pluginRoot` in either installed copy). The design doc was not
+  amended to match, and the new code comment cites a §A.7 exclusion that does
+  not exist there. Critic's own framing: the fix direction itself is a
+  defensible narrowing versus the pre-fix permanently-broken state (not a
+  regression), but the written contract now describes the opposite of what
+  ships. F-B (minor): the new gate-deciding line in
+  `pipeline-start-preflight.mjs:257` is not GS-8-class protected — the exact
+  hole GS-8 was added to close is reopened one level up. F-C (minor): the new
+  unstubbed test fixture assumes `os.tmpdir()` is already its own realpath,
+  a portability risk on macOS/Windows tmp layouts, not a present red (32/32
+  green on this Linux host). F-D (minor): a JSDoc comment overstates
+  layout-equivalence to `resolveSourceLayout()`, currently latent.
+  **WP2-WP3 Part A is now Critic-clean (PASS, no blocker) — technically ready
+  for the PO's self-application gate, but F-A is a live open question about
+  what the design contract should actually say, not yet decided or fixed.**
 - **GMW (Guard Maintenance Window, ADR-0058) merged in from the local-development
   marketplace snapshot** (commit `cca5ad8`): the PO pointed at
   `/home/skar667/agent-pipeline-local-marketplace` as the currently-wired snapshot
