@@ -202,6 +202,7 @@
           "docs/adr/0058-guard-maintenance-window.md",
           "docs/adr/0059-signed-human-guard-override.md",
           "docs/adr/0060-handover-placement-and-rotation.md",
+          "docs/adr/0061-uniform-human-approval-ceremony.md",
           "docs/adr/README.md"
         ]
       },
