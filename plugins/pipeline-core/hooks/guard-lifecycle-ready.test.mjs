@@ -863,6 +863,163 @@ test("plan-runtime family accepts the runner-plus-intent argv lifecycleArgv actu
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+/**
+ * GUARDFIX-1 (A). The apply half of the same defect the test above closed for the plan half.
+ *
+ * `plan-runtime --intent session` returns, verbatim, the argv built at
+ * lib/project-onboarding-v3.mjs:3608-3627 through `lifecycleArgv(argv, runner, intent)`
+ * (:1315-1318): `initialize-runtime --root <root> --plan-sha256 <hex> --activate --runner
+ * <runner> --intent <intent>` -- `--runner` appended first, `--intent` afterward and only
+ * when it differs from the "onboarding" default. The allowlist required `args.length === 6`
+ * after the runner strip, so the planner emitted a command its own guard refused and the
+ * printed recovery instruction pointed the operator back at the refusal.
+ *
+ * The accepted `--intent` values are written out here on purpose rather than imported or
+ * paraphrased: they are the CLI's own closed set (scripts/project-onboarding-v3.mjs:62), and
+ * a test that derived them from the guard could not fail when the guard drifts from the CLI.
+ *
+ * Positive and negative shapes in ONE test deliberately: the mutations alone pass against
+ * the unfixed code, which refuses everything, so only the admission proves the branch
+ * exists, and only the mutations prove it did not arrive as a blanket allowance.
+ */
+test("GUARDFIX-1: the apply family admits exactly the runner-plus-intent argv the planner returns and no wider shape", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const sha = "a".repeat(64);
+    const applyFamily = [
+      "apply-portable-seed", "apply-reinstall", "initialize-runtime", "apply-repair", "apply-readback",
+    ];
+    for (const command of applyFamily) {
+      for (const intent of ["onboarding", "bootstrap", "session", "dispatch"]) {
+        for (const runner of ["claude", "codex"]) {
+          const returned = `node '${ONBOARDING_SCRIPT}' ${command} --root '${path}' --plan-sha256 ${sha} --activate --runner ${runner} --intent ${intent}`;
+          assert.equal(isSanctionedLifecycleCommand(returned, path), true, returned);
+          assert.deepEqual(evaluateLifecycleReadyGuard(bash(returned), {
+            projectDir: path,
+            requireProjectOnboardingReadyFn() { deny("runtime-initialization-required"); },
+          }), { exitCode: 0, stderr: "" }, returned);
+        }
+      }
+      // No-regression pins: every shape admitted before this fix stays admitted.
+      for (const unchanged of [
+        `node '${ONBOARDING_SCRIPT}' ${command} --root '${path}' --plan-sha256 ${sha} --activate`,
+        `node '${ONBOARDING_SCRIPT}' ${command} --root '${path}' --plan-sha256 ${sha} --activate --runner claude`,
+        `node '${ONBOARDING_SCRIPT}' ${command} --root '${path}' --plan-sha256 ${sha} --activate --runner codex`,
+      ]) {
+        assert.equal(isSanctionedLifecycleCommand(unchanged, path), true, unchanged);
+      }
+    }
+    const base = `node '${ONBOARDING_SCRIPT}' initialize-runtime --root '${path}' --plan-sha256 ${sha} --activate`;
+    for (const command of [
+      // an --intent value outside the CLI's closed set
+      `${base} --runner claude --intent onboarding-v2`,
+      `${base} --runner claude --intent implementation`,
+      `${base} --runner claude --intent ''`,
+      `${base} --intent session --runner windows`,
+      // a flag added to the returned argv
+      `${base} --runner claude --intent session --extra flag`,
+      `${base} --runner claude --intent session --activate`,
+      `${base} --runner claude --intent`,
+      // the positionally checked flags reordered (the guard compares a fixed sequence and
+      // must keep doing so; --runner/--intent pair order is normalized by the pre-existing
+      // withoutRunnerFlag scan and is deliberately not asserted here)
+      `node '${ONBOARDING_SCRIPT}' initialize-runtime --root '${path}' --plan-sha256 ${sha} --intent session --activate --runner claude`,
+      `node '${ONBOARDING_SCRIPT}' initialize-runtime --root '${path}' --activate --plan-sha256 ${sha} --runner claude --intent session`,
+      `node '${ONBOARDING_SCRIPT}' initialize-runtime --plan-sha256 ${sha} --root '${path}' --activate --runner claude --intent session`,
+      // the digest and the root stay checked under the new length
+      `node '${ONBOARDING_SCRIPT}' initialize-runtime --root '${path}' --plan-sha256 ${"a".repeat(63)} --activate --runner claude --intent session`,
+      `node '${ONBOARDING_SCRIPT}' initialize-runtime --root /tmp/other --plan-sha256 ${sha} --activate --runner claude --intent session`,
+      // the intent pair does not smuggle in a neighbouring subcommand's shape
+      `node '${ONBOARDING_SCRIPT}' apply-manifest-repair --root '${path}' --plan-sha256 ${sha} --activate --runner claude --intent session`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("runtime-initialization-required"); },
+      }).exitCode, 2, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * GUARDFIX-1 (B). A denial code has to name what actually happened.
+ *
+ * `hasExternalOutputRedirect()` -- the fallback the cross-repository classifier uses for
+ * commands the closed grammar cannot parse -- read every `>` as an output redirect and
+ * refused the command as GUARD-CROSS-REPO-MUTATION whenever the target sat outside the
+ * project root. `/dev/null` sits outside every project root, so a composed read-only lookup
+ * carrying nothing but a stderr suppressor was reported as a mutation of another repository.
+ * The accepted-parse branch of the same function had exempted `2>/dev/null` since 2b56304;
+ * the two had simply drifted, and both now share isNullDeviceStderrRedirect().
+ *
+ * What this fix does NOT do is admit anything: every command below is still refused with
+ * exit code 2. Only the code changes, from a false one to the one the guard's own grammar
+ * rules already assign.
+ */
+test("GUARDFIX-1: a null-device stderr suppressor is never itself a cross-repository mutation while every real redirect keeps its own code", () => {
+  const path = root();
+  const deps = {
+    projectDir: path,
+    requireProjectOnboardingReadyFn() { deny("continuity-damaged"); },
+  };
+  const code = (command) => {
+    const result = evaluateLifecycleReadyGuard(bash(command), deps);
+    assert.equal(result.exitCode, 2, command);
+    return (result.stderr.match(/GUARD-[A-Z-]+/u) ?? ["<none>"])[0];
+  };
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    // The reported command. Already truthfully typed before this fix (its grammar parses,
+    // so it reached the accepted-parse branch that already exempted `2>/dev/null`); pinned
+    // so it cannot regress into the mutation code from either direction.
+    assert.equal(isForbiddenCrossRepositoryMutation("which a b c 2>/dev/null", path), false);
+    assert.equal(code("which a b c 2>/dev/null"), "GUARD-REDIRECT-UNAPPROVED");
+    // Changed by this fix: the parse-denied siblings, whose real fault is composition.
+    for (const command of [
+      "which a b c 2>/dev/null; which d",
+      "which a b c 2>/dev/null && which d",
+      "which a b c 2>NUL; which d",
+    ]) {
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
+      assert.equal(code(command), "GUARD-PARSE-UNSUPPORTED", command);
+    }
+    // A genuine cross-repository write is still refused as exactly that, parsed or not, and
+    // a suppressor standing next to one does not launder it: each redirect is judged alone.
+    for (const command of [
+      "cp /etc/hosts /tmp/elsewhere/hosts",
+      "printf implementation 2>/etc/passwd",
+      "printf implementation > /tmp/elsewhere/out.txt; printf done",
+      "printf implementation 2>/dev/null > /tmp/elsewhere/out.txt; printf done",
+      "printf implementation 2>/dev/null > /tmp/elsewhere/out.txt",
+    ]) {
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), true, command);
+      assert.equal(code(command), "GUARD-CROSS-REPO-MUTATION", command);
+    }
+    // Narrowness of the exemption, pinned: descriptor 2 only, null device only. `&>` and a
+    // bare `>` to the null device are NOT stderr suppression and keep their prior code.
+    for (const command of [
+      "which a b c &>/dev/null",
+      "which a b c >/dev/null 2>&1",
+    ]) {
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), true, command);
+      assert.equal(code(command), "GUARD-CROSS-REPO-MUTATION", command);
+    }
+    // A redirect that writes a file is still refused, under whichever code the grammar
+    // rules already give it -- "suppress stderr" did not become "redirects are fine".
+    assert.equal(code("printf implementation > out.txt"), "GUARD-REDIRECT-UNAPPROVED");
+    assert.equal(code("printf implementation >> out.txt"), "GUARD-PARSE-UNSUPPORTED");
+    assert.equal(code("printf implementation 2> out.txt"), "GUARD-REDIRECT-UNAPPROVED");
+    for (const command of [
+      "printf implementation > out.txt",
+      "printf implementation >> out.txt",
+      "printf implementation 2> out.txt",
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 test("partial PO authority rebind admits only the exact read-only planner", () => {
   const path = root();
   try {

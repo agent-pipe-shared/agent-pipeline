@@ -543,6 +543,31 @@ function commandPath(value, root) {
   return resolve(root, value);
 }
 
+/**
+ * The one redirect shape that writes nothing anywhere: stderr sent to the platform null
+ * device. Shared by BOTH redirect classifiers -- the accepted-parse branch of
+ * isForbiddenCrossRepositoryMutation() and the unparsed-command fallback
+ * hasExternalOutputRedirect() -- so the two cannot drift apart again.
+ *
+ * They had drifted. The accepted-parse branch already exempted `2>/dev/null`; the fallback
+ * did not, so any command the closed grammar could not parse -- `cmd 2>/dev/null; cmd2`,
+ * `cmd 2>/dev/null && cmd2` -- was refused as GUARD-CROSS-REPO-MUTATION on the strength of
+ * its stderr suppressor. Suppressing stderr mutates nothing, least of all another
+ * repository, and what was actually wrong with those commands (composition) has its own
+ * truthful code. A guard that misnames what it caught teaches operators to distrust the
+ * codes it gets right. Measured 2026-08-08.
+ *
+ * This exempts a REASON, never a command: such commands are still refused, by the closed
+ * grammar (GUARD-PARSE-UNSUPPORTED / GUARD-REDIRECT-UNAPPROVED) one screen below. Narrow by
+ * construction -- file descriptor 2 only, the null device only, per redirect. `2>audit.log`,
+ * `>/dev/null`, `&>/dev/null` and every stdout redirect stay outside it, and a second
+ * redirect in the same command is judged on its own (`cmd 2>/dev/null > /etc/passwd` stays a
+ * cross-repository mutation).
+ */
+function isNullDeviceStderrRedirect(fd, target) {
+  return fd === 2 && (target === "/dev/null" || target.toLowerCase() === "nul");
+}
+
 function hasExternalOutputRedirect(command, root) {
   let quote = null;
   for (let index = 0; index < command.length; index += 1) {
@@ -558,6 +583,10 @@ function hasExternalOutputRedirect(command, root) {
     }
     if (char !== ">") continue;
     if (command[index + 1] === ">" || command[index + 1] === "&") continue;
+    // Same descriptor rule the tokenizer uses (hooks/guard-command-grammar.mjs, the
+    // `char === "2" && command[index + 1] === ">"` branch): a `2` immediately before the
+    // `>` names file descriptor 2. `&>` and a bare `>` are deliberately not descriptor 2.
+    const fd = command[index - 1] === "2" ? 2 : null;
     let cursor = index + 1;
     while (cursor < command.length && /\s/u.test(command[cursor])) cursor += 1;
     let target = "";
@@ -566,6 +595,7 @@ function hasExternalOutputRedirect(command, root) {
       target += command[cursor];
       cursor += 1;
     }
+    if (isNullDeviceStderrRedirect(fd, target)) continue;
     const resolved = commandPath(target, root);
     if (resolved !== null && !pathInside(root, resolved)) return true;
   }
@@ -624,8 +654,7 @@ export function isForbiddenCrossRepositoryMutation(command, root, dependencies =
   if (parsed.parseStatus !== "accepted" && hasExternalOutputRedirect(command, root)) return true;
   if (parsed.parseStatus === "accepted" && parsed.redirects.length > 0) {
     return parsed.redirects.some((redirect) => {
-      if (redirect.fd === 2
-        && (redirect.target === "/dev/null" || redirect.target.toLowerCase() === "nul")) return false;
+      if (isNullDeviceStderrRedirect(redirect.fd, redirect.target)) return false;
       const target = commandPath(redirect.target, root);
       return target !== null && !pathInside(root, target);
     });
@@ -729,10 +758,23 @@ function sanctionedOnboardingArgs(rawArgs, root) {
     && exactRoot(args, root, 1)
     && args[3] === "--plan-sha256" && HEX.test(args[4] ?? "")
     && args[5] === "--activate" && args.length === 6) return true;
+  // The apply half of the same defect the plan* branch above already closed. `plan-runtime
+  // --intent session` returns `initialize-runtime --root <root> --plan-sha256 <hex>
+  // --activate --runner <runner> --intent session` (lib/project-onboarding-v3.mjs:3608-3627
+  // building it through lifecycleArgv at :1315-1318), so the planner emitted a command this
+  // very allowlist refused, and the printed recovery instruction -- run the returned
+  // nextAction verbatim -- pointed straight back at the refusal. Measured 2026-08-08.
+  // The trailing `--intent <value>` pair is optional and positional exactly as in the two
+  // branches above; the closed value set is the CLI's own
+  // (scripts/project-onboarding-v3.mjs:62). Nothing else moves: no new subcommand, no
+  // reordering tolerance, both digest and `--activate` still checked by position.
   if (["apply-portable-seed", "apply-reinstall", "initialize-runtime", "apply-repair", "apply-readback"].includes(args[0])
     && exactRoot(args, root, 1)
     && args[3] === "--plan-sha256" && HEX.test(args[4] ?? "")
-    && args[5] === "--activate" && args.length === 6) return true;
+    && args[5] === "--activate"
+    && (args.length === 6
+      || (args.length === 8 && args[6] === "--intent"
+        && ["onboarding", "bootstrap", "session", "dispatch"].includes(args[7])))) return true;
   if (args[0] === "kickoff" && args[1] === "plan"
     && exactRoot(args, root, 2) && args[4] === "--goal"
     && typeof args[5] === "string" && args[5].trim() !== "" && args.length === 6) return true;
