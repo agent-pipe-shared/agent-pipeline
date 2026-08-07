@@ -178,6 +178,22 @@ const cases = [
     const value = clone(registry); value.duties.advisory.codex.runner = "claude";
     const checked = validateRunnerProfilesV3Registry(value); assert.equal(checked.ok, false); assert.ok(has(checked, "$.duties.advisory.codex.runner", "frozen_mapping"));
   }],
+  // WP5-phx2-rework-1 F1: the closed-`gates`-object optional-key list must actually admit
+  // `gates.push_external_ledger`, or the opt-in key the PHX-2 design's whole rollout mechanism
+  // depends on (§5) makes every pipeline.user.yaml that sets it invalid.
+  ["gates.push_external_ledger accepts required/off, absence stays valid, other values are rejected", () => {
+    assert.equal(validatePipelineUserV3(completeIntent()).ok, true); // absent -> still valid
+    for (const valid of ["required", "off"]) {
+      const value = completeIntent(); value.gates.push_external_ledger = valid;
+      const checked = validatePipelineUserV3(value);
+      assert.equal(checked.ok, true, `push_external_ledger: ${valid} unexpectedly rejected`);
+      assert.ok(!has(checked, "$.gates.push_external_ledger", "additional_property"));
+    }
+    const value = completeIntent(); value.gates.push_external_ledger = "sometimes";
+    const checked = validatePipelineUserV3(value);
+    assert.equal(checked.ok, false);
+    assert.ok(has(checked, "$.gates.push_external_ledger", "contract"));
+  }],
 ];
 
 let passed = 0;

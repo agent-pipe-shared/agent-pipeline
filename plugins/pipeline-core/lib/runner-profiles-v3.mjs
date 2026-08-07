@@ -234,7 +234,7 @@ function validateRoot(value, errors) {
     && (value.usage.common_projection !== "pipeline.runner-usage.v1" || value.usage.raw_persistence !== "none")) add(errors, "$.usage", "contract", "usage persistence contract is not registered", "restore the V3 usage contract");
   if (validateClosedObject(value.autonomy, "$.autonomy", ["push_policy", "branch_model", "wip_limit"], errors, "restore exactly the registered autonomy values")
     && (!["gated", "standing-approved"].includes(value.autonomy.push_policy) || !["feature-branch", "direct-main"].includes(value.autonomy.branch_model) || !Number.isInteger(value.autonomy.wip_limit) || value.autonomy.wip_limit < 1)) add(errors, "$.autonomy", "contract", "autonomy contract is invalid", "restore registered autonomy values");
-  if (validateClosedObject(value.gates, "$.gates", ["dev_plan", "push", "security", "claude_md_max_lines"], errors, "restore exactly the registered gate values", ["push_approval"])
+  if (validateClosedObject(value.gates, "$.gates", ["dev_plan", "push", "security", "claude_md_max_lines"], errors, "restore exactly the registered gate values", ["push_approval", "push_external_ledger"])
     && (!["blocking", "warn", "off"].includes(value.gates.dev_plan) || !["blocking", "warn", "off"].includes(value.gates.push) || !["blocking", "warn", "off"].includes(value.gates.security) || !Number.isInteger(value.gates.claude_md_max_lines) || value.gates.claude_md_max_lines < 1)) add(errors, "$.gates", "contract", "gate contract is invalid", "restore registered gate values");
   // How a human clears the push gate. Optional; absent means the fail-closed default
   // `signature` (ADR-0056). `gates.push` decides WHETHER the gate blocks; this decides
@@ -242,6 +242,18 @@ function validateRoot(value, errors) {
   if (isObject(value.gates) && Object.hasOwn(value.gates, "push_approval")
     && !PUSH_APPROVAL_MODES.includes(value.gates.push_approval)) {
     add(errors, "$.gates.push_approval", "contract", `push_approval must be one of ${PUSH_APPROVAL_MODES.join(", ")}`, "use signature for a detached external proof, or chat for an in-session human clearance");
+  }
+  // PHX-2 additive external push-ledger opt-in (design doc
+  // specs/sprint-phoenix-epic/design/phx-2-additive-ledger-authority.md §5). Optional; unlike
+  // `push_approval` above, an ABSENT key means the fail-OPEN default "off" (day-one safety --
+  // see external-push-ledger.mjs's header), not the fail-closed default -- so absence is not
+  // validated here at all, only an explicitly present value is constrained. This is a
+  // hand-inlined literal enum (not imported from external-push-ledger.mjs) to avoid a real
+  // import cycle: that module already imports critical-human-proof-policy.mjs, which imports
+  // PUSH_APPROVAL_MODES from this file.
+  if (isObject(value.gates) && Object.hasOwn(value.gates, "push_external_ledger")
+    && !["required", "off"].includes(value.gates.push_external_ledger)) {
+    add(errors, "$.gates.push_external_ledger", "contract", "push_external_ledger must be one of required, off", "use required to enable the additive external push-ledger consumption check, or off to leave it disabled");
   }
   validateRoles(value, errors);
   validateSession(value, errors);
