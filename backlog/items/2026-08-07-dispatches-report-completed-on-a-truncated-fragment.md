@@ -71,12 +71,23 @@ input for a Critic anyway, and the resume message could redirect the check to
 file — both of which a Critic reads as law — would have silently invalidated
 citations in a verdict, with nothing to notice it.
 
-The rule that follows is narrow and cheap: **while a Critic dispatch is open, the
+The rule that follows is narrow and cheap: **while a dispatch is open, the
 dispatching session does not modify any file in that dispatch's reference set.**
 It belongs next to the acceptance check in proposal 1. A related but distinct
 item on parallel dispatches racing on a shared checkout exists on `main` and
 arrives with the 0.5.3 merge; this one is about the *orchestrator* writing under
-a reviewer, not two workers colliding.
+its own worker, not two workers colliding.
+
+**It happened a second time, an hour later, and the rule as first written would
+not have caught it.** The eighth fragment came from a *Goldfish*, not a Critic,
+and the same session had again committed to `docs/state.md` mid-run — this time
+while that Goldfish was building a check over coordinates in exactly that file.
+Two corrections follow from the repeat: the rule is not Critic-specific (hence the
+wording above), and knowing the rule is demonstrably not enough to follow it. The
+durable fix is mechanical — a dispatch declares its reference set, and the
+orchestrator's writes are checked against open dispatches — not another line of
+prose telling an Elephant to remember. Recorded as the second data point rather
+than as a resolution.
 
 ## Affected artifact
 
