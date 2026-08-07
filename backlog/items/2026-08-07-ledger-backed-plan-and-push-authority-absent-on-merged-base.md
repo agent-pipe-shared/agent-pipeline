@@ -258,3 +258,66 @@ for this package.
 - **Assignment (if accepted):** redesign round, not yet scheduled to a
   phase/release.
 - **Date:** 2026-08-07
+
+**Implementation (2026-08-07): landed, commits `8b34e1f`/`6bdaeb0`/`f16b8f2`.**
+Dispatched as `WP5-phx2-implementation` (goldfish-deep) against the
+finalized, PO-approved, Critic-clean design (`4e4cf35`). Ran across two
+truncated rounds (turn/token limits mid-task, no work lost — each resume
+picked up from the prior round's persisted checkpoint) before completing.
+New module `plugins/pipeline-core/lib/external-push-ledger.mjs` (both
+exports, exact schema/path/`wx`-mkdir per §3/§4); read-side integration in
+`guard-push.mjs` and write-side in `pipeline-state.mjs`'s `approve-push`,
+both exactly per §2 (placement, exact fail-closed message strings, the
+`console.log` success line unreachable on any new failure path — verified
+directly in the diff, not assumed); `worktree-lifecycle.mjs`'s `runGit`
+extended to forward `options.timeout` (no-op for existing callers);
+`pipeline-user-v3.schema.json` updated (confirmed via
+`check-routing-projections.mjs` that it validates the same live
+`pipeline.user.yaml`, so the new key needed registering there too — a
+finding the design doc itself didn't anticipate). Paired test file
+`external-push-ledger.test.mjs` (20/20). Two new *sibling* test files
+(`guard-push-external-ledger.test.mjs`,
+`harness/scripts/pipeline-state-external-push-ledger.test.mjs`) instead of
+editing `guard-push.test.mjs`/`harness/scripts/pipeline-state.test.mjs`
+directly — both are `guard-testpath.mjs` TP-5-protected in this repo's live
+config (`.claude/guard-config.json`), no in-session override available
+(`signature` mode); same precedent as the existing `guard-push-v2.test.mjs`
+(CYB-2F). All of the following independently re-run and confirmed green by
+the Elephant (not just goldfish-reported): `external-push-ledger.test.mjs`,
+`guard-push.test.mjs` (original, unmodified), `guard-push-external-ledger.test.mjs`,
+`harness/scripts/pipeline-state.test.mjs` (original, unmodified),
+`pipeline-state-external-push-ledger.test.mjs`, `worktree-lifecycle.test.mjs`,
+`check-doc-contracts.mjs`, `check-observation-governance.mjs`,
+`security-scan.mjs` (CLEAN).
+
+**One open item, genuinely blocked (not the goldfish's or the Elephant's to
+resolve):** `harness/scripts/verify.mjs`'s suite registration for the three
+new test files is **not applied**. `verify.mjs` is `guard-testpath.mjs`
+TP-3-protected (`harness/scripts/verify\.mjs$`) with no sibling-file
+workaround possible — it's the one file holding the suite list — and no
+in-session override exists in `signature` mode. This binds any agent
+session, Elephant included, not only Goldfish (guard-testpath.mjs's own
+header: "the guard binds agents, not humans"). The exact, disclosed 3-line
+diff (add one `SCOPED_VERIFY_SUITES`-style entry each for
+`external-push-ledger-tests`, `guard-push-external-ledger-tests`,
+`pipeline-state-external-push-ledger-tests`, matching the file's existing
+per-suite entry style) is recorded in the implementation dispatch's full
+report; applying it needs either the audited `guard-human-override.mjs`
+two-step protocol (`prepare-authorization` then `authorize --activate`,
+attended, SHA256-bound) or a direct PO edit outside any agent session. Left
+open for the PO/next session rather than rushed through either path during
+this wrap-up. Overlaps but is not identical to WP4
+(`governance-product-verify-suites-deregistered`) — that item is about
+suites orphaned BY the merge; this is a suite never registered in the first
+place because the registering file itself is guarded. Worth resolving
+together when WP4 is picked up.
+
+**Next (not yet dispatched, deferred to the next session):** per CLAUDE.md's
+self-application rule, this implementation diff (architecture/security
+class — the push-authority enforcement path) needs an independent, fresh-
+context Critic review before being treated as ready for the PO's self-
+application gate — the same bar the design doc itself was held to across 4
+rounds. Not dispatched this session per the PO's explicit wrap-up-before-
+restart instruction; the fixed candidate is commit `f16b8f2` (or later, if
+the `verify.mjs` diff lands first — re-state the exact base commit at
+dispatch time).

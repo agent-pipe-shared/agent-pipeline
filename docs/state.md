@@ -5,6 +5,34 @@
 
 **Last updated:** 2026-08-07
 
+**Next-session pointer (restart handover, 2026-08-07 evening):** both
+post-merge redesign packages have landed code this session:
+- **WP5/PHX-2** (external push-authority ledger): design Critic-clean
+  (`4e4cf35`), implementation landed (`8b34e1f`/`6bdaeb0`/`f16b8f2`), all
+  tests independently re-verified green, security-scan CLEAN. **Next:**
+  dispatch a fresh, independent Critic review of the implementation diff
+  (architecture/security class, CLAUDE.md self-application rule) before
+  the PO gate — not yet dispatched. One small blocked item first: apply the
+  3-line `harness/scripts/verify.mjs` suite-registration diff (TP-3
+  guard-protected, needs the audited override or a direct PO edit outside
+  any agent session — exact diff in
+  `backlog/items/2026-08-07-ledger-backed-plan-and-push-authority-absent-on-merged-base.md`).
+- **WP2+WP3** (bootstrap origin-allowlist + Codex/WSL freshness): design
+  Critic-clean (`0d8ed74`, round 4/4 PASS). **Next:** dispatch
+  implementation, same design-first→Critic→implement sequence WP5 just
+  finished.
+- Full round-by-round history for both is below (search `WP5`/`ledger-backed-
+  plan-and-push-authority` and `WP2+WP3`/`self-application-integrity-check`).
+  `check-doc-contracts.mjs`/`check-observation-governance.mjs`/
+  `security-scan.mjs` all pass as of this update.
+- Session-local plugin-scope fix (not code, not committed): this repo's
+  `.claude/settings.local.json` had accidentally acquired a `local`-scope
+  plugin installation/registration for `pipeline-core@agent-pipeline-local`
+  (diverging from every sibling repo, which runs the plugin purely at `user`
+  scope). Removed via `claude plugin uninstall pipeline-core@agent-pipeline-local -s local -y`;
+  `claude plugin list` now shows exactly one `user`-scope entry, matching
+  the sibling-repo pattern. Purely local/gitignored state, nothing to redo.
+
 ## Current status
 
 **Project status:** MERGE LANDED (local only) — origin/main 0.5.2 is integrated
@@ -312,6 +340,46 @@ freehand). Status:
    dispatch.** Full round history: initial (FAIL 3M+2m) → rework 1 → delta 1
    (FAIL 1 new major + 3 minor) → rework 2 → delta 2 (FAIL 1 new major + 3
    minor) → rework 3 → delta 3/round 4 (FAIL 2 trivial minor, PO-resolved).
+
+   **Implementation (2026-08-07): landed, commits `8b34e1f`/`6bdaeb0`/`f16b8f2`.**
+   Dispatched `WP5-phx2-implementation` (goldfish-deep) against the finalized
+   design (`4e4cf35`); ran across two truncated rounds (turn/token limits,
+   resumed via `SendMessage` with full context each time, no work lost — each
+   resume picked up from a persisted scratchpad checkpoint). New module
+   `plugins/pipeline-core/lib/external-push-ledger.mjs` (both exports, exact
+   schema/path/`wx`-mkdir per §3/§4); read-side integration in `guard-push.mjs`
+   and write-side in `pipeline-state.mjs`'s `approve-push`, both exactly per §2
+   (placement, exact fail-closed messages, `console.log` success line
+   unreachable on any new failure path — independently confirmed in the diff
+   by the Elephant, not just goldfish-reported); `worktree-lifecycle.mjs`'s
+   `runGit` extended to forward `options.timeout` (no-op for existing
+   callers); `pipeline-user-v3.schema.json` updated (confirmed via
+   `check-routing-projections.mjs` that it validates the same live
+   `pipeline.user.yaml` — a finding the design doc itself didn't anticipate).
+   Paired test `external-push-ledger.test.mjs` (20/20) plus two new *sibling*
+   test files (`guard-push-external-ledger.test.mjs`,
+   `harness/scripts/pipeline-state-external-push-ledger.test.mjs`) rather than
+   editing the originals directly — both are `guard-testpath.mjs` TP-5-protected
+   in this repo's live `.claude/guard-config.json`, no in-session override in
+   `signature` mode; same precedent as `guard-push-v2.test.mjs` (CYB-2F). All
+   test files plus `check-doc-contracts.mjs`/`check-observation-governance.mjs`/
+   `security-scan.mjs` independently re-run and confirmed green by the
+   Elephant. **One item genuinely blocked, not rushed through:**
+   `harness/scripts/verify.mjs`'s suite registration for the three new test
+   files is not applied — `verify.mjs` is itself TP-3-protected (binds any
+   agent session, Elephant included; the guard's own header: "binds agents,
+   not humans"), no sibling-file workaround exists since it's the one file
+   holding the suite list. Exact 3-line diff recorded in the backlog item;
+   applying it needs the audited `guard-human-override.mjs` two-step protocol
+   or a direct PO edit outside any agent session — left open rather than
+   rushed through either path during this session's wrap-up. Full detail:
+   `backlog/items/2026-08-07-ledger-backed-plan-and-push-authority-absent-on-merged-base.md`.
+   **Next (not yet dispatched):** per CLAUDE.md's self-application rule, this
+   architecture/security-class diff needs an independent, fresh-context Critic
+   review before the PO's self-application gate — the same bar the design was
+   held to. Deferred to the next session per the PO's explicit
+   wrap-up-before-restart instruction; fixed candidate `f16b8f2` (re-state if
+   the `verify.mjs` diff lands first).
 
 **Infra finding, 2026-08-07:** the `isolation: "worktree"` dispatch option
 pinned two of three agents' worktrees to `6e2c9b2` (origin/main's pre-merge
