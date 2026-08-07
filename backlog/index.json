@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "dd2dc6b4ab0406c2ed5312c581ebc01d0962e25a012e7e6ac261d46db19d5e06"
+    "transitionHead": "dd5fc3b19b5226fba60f1579d9a5c17e6b010f6f60b4d5cf040205b64c84d436"
   },
   "counts": {
-    "open": 48,
+    "open": 49,
     "in_progress": 21,
     "closed": 22
   },
@@ -278,6 +278,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "Live onboarding test (rune_test1_claude line of work) hitting a self-inflicted guard rejection at the plan-runtime step, 2026-08-07 (Nova GMW session); root cause independently re-verified by reading the cited source directly, not taken from the report alone."
+    },
+    {
+      "id": "pipeline.guard-reclassification-changed-what-a-signature-can-lift",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Critic round on the 2026-08-08 greenfield hardening block, finding F3, severity minor. Independently corroborated from the reviewing agent's own denial trajectory."
     },
     {
       "id": "pipeline.handover-file-has-no-rotation-obligation",
