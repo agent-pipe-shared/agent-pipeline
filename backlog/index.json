@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "eb45943cd910c90bd3fd340d8a9adc2f34115ee5de96d935f1b1e95b0d3425e9"
+    "transitionHead": "a964716251b1b2f24f4c4f633f0d23db0ac9c119251cb0ff42b2439bc77e84c6"
   },
   "counts": {
-    "open": 32,
+    "open": 33,
     "in_progress": 21,
     "closed": 22
   },
@@ -282,6 +282,14 @@
       "closureRepository": "self",
       "closureCommit": "577c515404e2bd4c94f890c9cd7009ac93b66d1d",
       "closureEvidence": "backlog/evidence/2026-08-07-nova-gwm-backlog-fixes.md"
+    },
+    {
+      "id": "pipeline.maintenance-window-selectivity-is-untested-at-both-levels",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "Observation from a parallel Phoenix session on the marketplace snapshot that each guard hook carries only one maintenance-window test, sharpened and empirically checked against the live TP-2/TP-6/TP-7 window during the 2026-08-07 Nova session."
     },
     {
       "id": "pipeline.managed-onboarding-success-contract",
