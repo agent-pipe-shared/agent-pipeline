@@ -12,13 +12,16 @@
  * — which classifies what an override may touch and gates nothing.
  */
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { GATE_STRENGTH_PATHS, gateStrengthRuleFor, insideLivePlugin } from "./guard-gate-strength.mjs";
+import { GATE_STRENGTH_PATHS, gateStrengthRuleFor, insideLivePlugin, livePluginRoots } from "./guard-gate-strength.mjs";
+import { installGuardMaintenanceWindow, prepareGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
+import { PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
 
 const HOOKS = dirname(fileURLToPath(import.meta.url));
 const GUARD = join(HOOKS, "guard-gate-strength.mjs");
@@ -302,6 +305,47 @@ try {
     });
     assert.notEqual(result.status, 0, "the legacy-tier guard config was writable");
     assert.match(result.stderr ?? "", /Rule ID: GS-7/u);
+  });
+
+  check("GST20 a real armed GS-6 window lifts an ordinary plugin file but a kernel path stays refused", () => {
+    const root = mkdtempSync(join(tmpdir(), "gate-strength-gmw-"));
+    roots.push(root);
+    execFileSync("git", ["init", "-q"], { cwd: root });
+    execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: root });
+    execFileSync("git", ["config", "user.name", "Test"], { cwd: root });
+    mkdirSync(join(root, "project"), { recursive: true });
+    writeFileSync(join(root, "plan.md"), "plan\n");
+    writeFileSync(join(root, "spec.md"), "spec\n");
+    const pair = generateKeyPairSync("ed25519");
+    const publicKey = pair.publicKey.export({ type: "spki", format: "pem" });
+    const publicKeySha256 = createHash("sha256").update(publicKey).digest("hex");
+    writeFileSync(join(root, "project", "critical-human-proof.json"), JSON.stringify({
+      schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push"],
+      trustAnchor: { keyReference: "gst-e2e", publicKeySha256 },
+    }));
+    execFileSync("git", ["add", "-A"], { cwd: root });
+    execFileSync("git", ["commit", "-q", "-m", "gmw-fixture"], { cwd: root });
+    const livePluginRoot = livePluginRoots()[0];
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "GST20",
+      featureId: "gst20", planSha256: createHash("sha256").update("plan\n").digest("hex"),
+      specSha256: createHash("sha256").update("spec\n").digest("hex"), policyRevision: "gst20-v1", livePluginRoot,
+    });
+    const proof = {
+      schema: PO_APPROVAL_PROOF_SCHEMA, intentSha256: intent.sha256, keyReference: "gst-e2e", publicKey,
+      signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), pair.privateKey).toString("base64"),
+    };
+    installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy: { keyReference: "gst-e2e", publicKeySha256 }, proof, livePluginRoot });
+
+    const ordinary = ask(root, join(PLUGIN_ROOT, "hooks", "guard-git.mjs"));
+    assert.equal(ordinary.blocked, false, "ordinary plugin file should be lifted under the active window");
+    assert.match(ordinary.stderr, /guard-maintenance-window.*GS-6 lifted/u);
+
+    const kernel = ask(root, join(PLUGIN_ROOT, "hooks", "guard-gate-strength.mjs"));
+    assert.equal(kernel.blocked, true, "kernel path must stay refused under the SAME active window");
+    assert.doesNotMatch(kernel.stderr, /lifted/u);
+    const kernel2 = ask(root, join(PLUGIN_ROOT, "hooks", "hooks.json"));
+    assert.equal(kernel2.blocked, true);
   });
 
   console.log(`\nguard-gate-strength: ${passed} passed, ${failed} failed`);
