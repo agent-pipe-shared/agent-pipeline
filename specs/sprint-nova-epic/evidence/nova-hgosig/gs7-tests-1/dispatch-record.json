@@ -1,0 +1,34 @@
+{
+  "schema": "pipeline.dispatch-record.v1",
+  "taskId": "NOVA-GS7-TESTS-1",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "2914a55713d714d95323231edaddccec5e1d6c2e5a4fbfaaaaa9d913a5fb1efc",
+  "dispatcher": "goldfish-elephant",
+  "outcome": "completed",
+  "evidenceLog": [
+    {
+      "step": "read-context",
+      "note": "Read ADR-0059, ADR-0056, ADR-0058, guard-gate-strength.mjs, guard-gate-strength.test.mjs, guard-testpath-override.test.mjs (pattern only), human-guard-override.mjs (full), po-approval-proof.mjs, critical-human-proof-policy.mjs, tool-write-target.mjs."
+    },
+    {
+      "step": "finding",
+      "note": "guard-gate-strength.mjs's CLI always attempts consumeHumanGuardOverride() first for GS-1..GS-5/GS-7 regardless of the committed push_approval mode (approvalMode is read only to select the offered next-step text). consumeHumanGuardOverride() itself never inspects push_approval mode, so a signature-armed capability is consumed identically under a chat- or signature-committed repository. GS-6 (matched === LIVE_PLUGIN_RULE) skips this whole block unconditionally."
+    },
+    {
+      "step": "test-authorship",
+      "note": "Added GST21..GST29 to plugins/pipeline-core/hooks/guard-gate-strength.test.mjs: chat-armed admission, signature-armed admission under both committed modes, mode-appropriate next-step text with nothing armed, unusable-store degrade, mismatched-binding refusal, single-use consumption, GS-6 never-lifted regression (built via a fixture-local declared plugin root so a real, exactly-matching, validly armed capability exists and is still refused), a static source-shape pin for the GS-6 exclusion, and the differential refusal-text pin (GS-6 keeps 'no in-session override', lifted rules do not)."
+    },
+    {
+      "step": "verify",
+      "note": "node --test plugins/pipeline-core/hooks/guard-gate-strength.test.mjs -> 29/29 PASS, exit 0. Evidence: specs/sprint-nova-epic/evidence/nova-hgosig/gs7-tests-1/verify-guard-gate-strength.log"
+    },
+    {
+      "step": "verify-sibling",
+      "note": "node --test plugins/pipeline-core/lib/human-guard-override.test.mjs -> 23/23 PASS, exit 0, proving that file untouched. Evidence: specs/sprint-nova-epic/evidence/nova-hgosig/gs7-tests-1/verify-human-guard-override.log"
+    },
+    {
+      "step": "scope-check",
+      "note": "git status --porcelain at completion shows two unrelated modified files (docs/po-human-approval.md, docs/release-0.6.0-readiness.md) from concurrent dispatches in the shared checkout; left untouched and excluded from this commit by pathspec."
+    }
+  ]
+}
