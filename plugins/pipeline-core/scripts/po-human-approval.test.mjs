@@ -13,17 +13,27 @@
  * confirmation. `approve`/`approve-critical` share the exact same
  * `requireExplicitConfirmation` gate exercised below; their own request-fixture setup
  * is covered elsewhere (plugins/pipeline-core/lib/threat-model-approval-request.test.mjs).
+ *
+ * ONECMD-1 widened this suite to the critical-action path: the single-invocation
+ * `authorize-critical` command (prepare + sign in one transaction, so no request
+ * left on disk by an earlier preparation can be the thing that gets signed), the
+ * disclosure it prints before the passphrase prompt, and the field-naming
+ * validation errors the two-step `prepare-critical` now returns. The two-step flow
+ * is characterised here too, because both halves were refactored onto the shared
+ * request-construction and signing helpers the new command uses.
  */
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import test from "node:test";
 
 import { runHumanApproval } from "./po-human-approval.mjs";
+import { run as runApprovalGate } from "./po-approval-gate.mjs";
 import { PO_APPROVAL_PROOF_SCHEMA, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
+import { createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
 
 function openssl(args) {
   const result = spawnSync("openssl", args, { stdio: "pipe" });
@@ -172,6 +182,368 @@ test("sign-intent cancels on an empty confirmation answer the same way as a mism
       /approval cancelled: explicit confirmation was not given/,
     );
     assert.equal(spawnCalled, false);
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+/* ------------------------------------------------------------------ *
+ * ONECMD-1: the single-invocation critical-action ceremony.
+ * ------------------------------------------------------------------ */
+
+const CANDIDATE = Object.freeze({ commit: "a".repeat(40), tree: "b".repeat(40) });
+const STALE_CANDIDATE = Object.freeze({ commit: "c".repeat(40), tree: "d".repeat(40) });
+const FEATURE_ID = "nova-onecmd";
+const PLAN = "plan.md";
+const SPEC = "spec.md";
+
+/** A fixture repository (plan/spec only; the candidate is injected, never observed via git). */
+function criticalDirs() {
+  const dirs = {
+    repoRoot: mkdtempSync(join(tmpdir(), "po-authorize-critical-repo-")),
+    directory: mkdtempSync(join(tmpdir(), "po-authorize-critical-external-")),
+  };
+  writeFileSync(join(dirs.repoRoot, PLAN), "# plan fixture\n");
+  writeFileSync(join(dirs.repoRoot, SPEC), "# spec fixture\n");
+  return dirs;
+}
+
+const futureExpiry = () => new Date(Date.now() + 3_600_000).toISOString();
+const subjectDigest = (label) => createHash("sha256").update(label).digest("hex");
+
+function criticalArgv(command, dirs, { kind = "push", subjectSha256, expiresAt, plan = PLAN, spec = SPEC, featureId = FEATURE_ID } = {}) {
+  return [
+    command, "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+    "--feature-id", featureId, "--plan", plan, "--spec", spec,
+    "--kind", kind, "--subject-sha256", subjectSha256, "--expires-at", expiresAt,
+  ];
+}
+
+function criticalArtifacts(dirs, kind = "push") {
+  return {
+    request: join(dirs.directory, `request-critical-${kind}.json`),
+    proof: join(dirs.directory, `proof-critical-${kind}.json`),
+    intent: join(dirs.directory, `intent-critical-${kind}.txt`),
+    signature: join(dirs.directory, `signature-critical-${kind}.bin`),
+  };
+}
+
+test("authorize-critical prepares and signs in ONE invocation, and the proof is bound to the request built in that same invocation", () => {
+  const dirs = criticalDirs();
+  try {
+    const { authority } = keyFixture(dirs.directory);
+    const expiresAt = futureExpiry();
+    const subjectSha256 = subjectDigest("nova-onecmd-subject");
+    const action = { kind: "push", subjectSha256, expiresAt };
+    const writes = []; const prompts = [];
+    const dependencies = {
+      observeCandidate: () => ({ ...CANDIDATE }),
+      readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; },
+      writeFile: (path, data, options) => { writes.push({ path, data }); return writeFileSync(path, data, options); },
+    };
+
+    const result = runHumanApproval(criticalArgv("authorize-critical", dirs, { subjectSha256, expiresAt }), dependencies);
+    assert.equal(result.ok, true);
+    assert.equal(result.code, "PO-HUMAN-CRITICAL-AUTHORIZATION-READY");
+    assert.deepEqual(result.candidate, { ...CANDIDATE });
+    assert.deepEqual(result.action, action);
+
+    // Binding by construction: the three writes of this invocation, in order, are the
+    // request, the exact digest bytes handed to OpenSSL, and the proof. The digest that
+    // was signed is read from the request THIS invocation wrote -- no second file, no
+    // second digest computation, no window between the two steps.
+    assert.deepEqual(writes.map((entry) => basename(entry.path)), [
+      "request-critical-push.json", "intent-critical-push.txt", "proof-critical-push.json",
+    ]);
+    const request = JSON.parse(writes[0].data);
+    assert.equal(writes[1].data, request.approvalIntent.sha256, "the bytes signed by OpenSSL must be this invocation's own intent digest");
+    assert.equal(JSON.parse(writes[2].data).intentSha256, request.approvalIntent.sha256);
+    assert.equal(result.intentSha256, request.approvalIntent.sha256);
+
+    // The request is the library's construction of the declared inputs, not a re-derivation.
+    const rebuilt = createCriticalActionApprovalRequest({
+      candidate: { ...CANDIDATE },
+      featureId: FEATURE_ID,
+      planBytes: readFileSync(join(dirs.repoRoot, PLAN)),
+      specBytes: readFileSync(join(dirs.repoRoot, SPEC)),
+      action,
+    });
+    assert.equal(request.approvalIntent.sha256, rebuilt.approvalIntent.sha256);
+
+    const paths = criticalArtifacts(dirs);
+    assert.deepEqual(JSON.parse(readFileSync(paths.request, "utf8")), request, "the durable request must be the signed one");
+    const proof = JSON.parse(readFileSync(paths.proof, "utf8"));
+    assert.equal(proof.schema, PO_APPROVAL_PROOF_SCHEMA);
+    assert.equal(proof.keyReference, authority.keyReference);
+    const verified = verifyCriticalActionApprovalRequest({ request, trustPolicy: authority, proof, expectedCandidate: { ...CANDIDATE }, expectedAction: action });
+    assert.equal(verified.verified, true);
+    assert.equal(verified.code, "CRITICAL-ACTION-PROOF-VERIFIED");
+
+    // Temporary signing material is gone; only request + proof remain.
+    assert.equal(existsSync(paths.intent), false);
+    assert.equal(existsSync(paths.signature), false);
+
+    // The artifacts are interchangeable with the two-invocation flow's: verify-critical reads them unchanged.
+    const readback = runHumanApproval(["verify-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--kind", "push"], { observeCandidate: () => ({ ...CANDIDATE }) });
+    assert.equal(readback.value.verified, true);
+    assert.equal(readback.value.code, "CRITICAL-ACTION-PROOF-VERIFIED");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("authorize-critical states what it is about to authorize -- and what it does not cover -- before the passphrase prompt", () => {
+  const dirs = criticalDirs();
+  try {
+    keyFixture(dirs.directory);
+    const expiresAt = futureExpiry();
+    const subjectSha256 = subjectDigest("nova-onecmd-disclosure");
+    const prompts = [];
+    runHumanApproval(criticalArgv("authorize-critical", dirs, { subjectSha256, expiresAt }), {
+      observeCandidate: () => ({ ...CANDIDATE }),
+      readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; },
+    });
+    assert.equal(prompts.length, 1, "exactly one human confirmation, per ADR-0061 Decision 1");
+    const [prompt] = prompts;
+    const facts = {
+      "action kind": "action kind: push",
+      "candidate commit": CANDIDATE.commit,
+      "candidate tree": CANDIDATE.tree,
+      "subject binding": subjectSha256,
+      "expiry": expiresAt,
+    };
+    for (const [label, fact] of Object.entries(facts)) {
+      assert.ok(prompt.includes(fact), `the disclosure must state the ${label}`);
+    }
+    assert.match(prompt, /does not cover/iu, "the disclosure must state what the approval does NOT cover");
+    assert.match(prompt, /type exactly "approve"/iu, "the existing typed-token gate must still be the last thing asked");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("authorize-critical aborts on an input failure before the prompt and before any signing, writing neither artifact", () => {
+  const cases = [
+    { label: "--expires-at that is not an exact toISOString() round trip", overrides: { expiresAt: "2026-08-07T12:00:00Z" }, message: /--expires-at/u },
+    { label: "--expires-at that is not a timestamp at all", overrides: { expiresAt: "next tuesday" }, message: /--expires-at/u },
+    { label: "unreadable --plan", overrides: { plan: "missing-plan.md" }, message: /ENOENT/u },
+    { label: "unreadable --spec", overrides: { spec: "missing-spec.md" }, message: /ENOENT/u },
+    { label: "malformed --subject-sha256", overrides: { subjectSha256: "not-a-sha256" }, message: /--subject-sha256/u },
+  ];
+  for (const scenario of cases) {
+    const dirs = criticalDirs();
+    try {
+      keyFixture(dirs.directory);
+      let spawnCalled = false; let confirmationAsked = false;
+      const dependencies = {
+        observeCandidate: () => ({ ...CANDIDATE }),
+        readConfirmation: () => { confirmationAsked = true; return "approve"; },
+        spawn: () => { spawnCalled = true; return { status: 0 }; },
+      };
+      const argv = criticalArgv("authorize-critical", dirs, { subjectSha256: subjectDigest("nova-onecmd-abort"), expiresAt: futureExpiry(), ...scenario.overrides });
+      assert.throws(() => runHumanApproval(argv, dependencies), scenario.message, scenario.label);
+      assert.equal(confirmationAsked, false, `${scenario.label}: the human must never be prompted for an invalid request`);
+      assert.equal(spawnCalled, false, `${scenario.label}: OpenSSL must never be reached`);
+      const paths = criticalArtifacts(dirs);
+      assert.equal(existsSync(paths.request), false, `${scenario.label}: no request artifact`);
+      assert.equal(existsSync(paths.proof), false, `${scenario.label}: no proof artifact`);
+    } finally {
+      cleanup(dirs);
+    }
+  }
+});
+
+test("authorize-critical never signs a stale request left in the external directory: it prepares its own and binds to that one", () => {
+  const dirs = criticalDirs();
+  try {
+    const { authority } = keyFixture(dirs.directory);
+    const paths = criticalArtifacts(dirs);
+    const staleAction = { kind: "push", subjectSha256: subjectDigest("stale-subject"), expiresAt: futureExpiry() };
+    const stale = createCriticalActionApprovalRequest({
+      candidate: { ...STALE_CANDIDATE },
+      featureId: "stale-feature",
+      planBytes: Buffer.from("# stale plan\n"),
+      specBytes: Buffer.from("# stale spec\n"),
+      action: staleAction,
+    });
+    writeFileSync(paths.request, `${JSON.stringify(stale, null, 2)}\n`);
+
+    const expiresAt = futureExpiry();
+    const subjectSha256 = subjectDigest("nova-onecmd-fresh-subject");
+    const action = { kind: "push", subjectSha256, expiresAt };
+    const result = runHumanApproval(criticalArgv("authorize-critical", dirs, { subjectSha256, expiresAt }), {
+      observeCandidate: () => ({ ...CANDIDATE }),
+      readConfirmation: () => "approve",
+    });
+
+    const request = JSON.parse(readFileSync(paths.request, "utf8"));
+    assert.deepEqual(request.candidate, { ...CANDIDATE }, "the stale request must have been replaced, not signed");
+    assert.deepEqual(request.action, action);
+    assert.equal(result.intentSha256, request.approvalIntent.sha256);
+    assert.notEqual(result.intentSha256, stale.approvalIntent.sha256);
+
+    const proof = JSON.parse(readFileSync(paths.proof, "utf8"));
+    assert.equal(proof.intentSha256, request.approvalIntent.sha256);
+    assert.equal(verifyCriticalActionApprovalRequest({ request, trustPolicy: authority, proof, expectedCandidate: { ...CANDIDATE }, expectedAction: action }).verified, true);
+    // The decisive assertion: the produced proof authorizes nothing about the stale request.
+    const staleVerified = verifyCriticalActionApprovalRequest({ request: stale, trustPolicy: authority, proof, expectedCandidate: { ...STALE_CANDIDATE }, expectedAction: staleAction });
+    assert.equal(staleVerified.verified, false);
+    assert.equal(staleVerified.code, "CRITICAL-ACTION-EXTERNAL-AUTHORITY-REQUIRED");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("authorize-critical still requires the literal word approve: anything else cancels before OpenSSL and writes no proof", () => {
+  for (const answer of ["nope", "", "APPROVE", "yes", "approve "]) {
+    const dirs = criticalDirs();
+    try {
+      keyFixture(dirs.directory);
+      let spawnCalled = false;
+      const argv = criticalArgv("authorize-critical", dirs, { subjectSha256: subjectDigest("nova-onecmd-cancel"), expiresAt: futureExpiry() });
+      assert.throws(
+        () => runHumanApproval(argv, { observeCandidate: () => ({ ...CANDIDATE }), readConfirmation: () => answer, spawn: () => { spawnCalled = true; return { status: 0 }; } }),
+        /approval cancelled: explicit confirmation was not given/u,
+        `answer ${JSON.stringify(answer)} must cancel`,
+      );
+      assert.equal(spawnCalled, false);
+      const paths = criticalArtifacts(dirs);
+      assert.equal(existsSync(paths.proof), false, "a cancelled ceremony must leave no proof");
+      assert.equal(existsSync(paths.signature), false);
+      assert.equal(existsSync(paths.intent), false);
+      // The request of THIS invocation stays on disk; it is this command's own, never a
+      // signature, and the next authorize-critical overwrites it before reading anything.
+      assert.deepEqual(JSON.parse(readFileSync(paths.request, "utf8")).candidate, { ...CANDIDATE });
+    } finally {
+      cleanup(dirs);
+    }
+  }
+});
+
+test("authorize-critical fails closed before setup and prepares nothing when key material is absent", () => {
+  const dirs = criticalDirs();
+  try {
+    const argv = criticalArgv("authorize-critical", dirs, { subjectSha256: subjectDigest("nova-onecmd-nokey"), expiresAt: futureExpiry() });
+    assert.throws(
+      () => runHumanApproval(argv, { observeCandidate: () => ({ ...CANDIDATE }), readConfirmation: () => "approve" }),
+      /run setup before authorize-critical/u,
+    );
+    const paths = criticalArtifacts(dirs);
+    assert.equal(existsSync(paths.request), false);
+    assert.equal(existsSync(paths.proof), false);
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("authorize-critical requires a feature id, exactly as prepare-critical does", () => {
+  const dirs = criticalDirs();
+  try {
+    keyFixture(dirs.directory);
+    assert.throws(
+      () => runHumanApproval([
+        "authorize-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+        "--plan", PLAN, "--spec", SPEC, "--kind", "push",
+        "--subject-sha256", subjectDigest("nova-onecmd-nofeature"), "--expires-at", futureExpiry(),
+      ], { observeCandidate: () => ({ ...CANDIDATE }), readConfirmation: () => "approve" }),
+      /critical approval requires a feature id/u,
+    );
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("the agent-facing approval gate cannot invoke authorize-critical: signing stays on the human terminal", () => {
+  const dirs = criticalDirs();
+  try {
+    keyFixture(dirs.directory);
+    assert.throws(
+      () => runApprovalGate(criticalArgv("authorize-critical", dirs, { subjectSha256: subjectDigest("nova-onecmd-gate"), expiresAt: futureExpiry() }), {}),
+      /Usage: po-approval-gate\.mjs/u,
+    );
+    assert.equal(existsSync(criticalArtifacts(dirs).proof), false);
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("prepare-critical names the offending field instead of only saying the request is invalid", () => {
+  const dirs = criticalDirs();
+  try {
+    const base = { subjectSha256: subjectDigest("nova-onecmd-fieldnames"), expiresAt: futureExpiry() };
+    const dependencies = { observeCandidate: () => ({ ...CANDIDATE }) };
+
+    // The exact input that silently failed in a real session: parsable ISO-8601, but not
+    // the `toISOString()` round trip the digest binds. The message must name the field and
+    // hand back the accepted spelling.
+    assert.throws(
+      () => runApprovalGate(criticalArgv("prepare-critical", dirs, { ...base, expiresAt: "2026-08-07T12:00:00Z" }), dependencies),
+      (error) => {
+        assert.match(error.message, /^critical approval request is invalid: --expires-at/u);
+        assert.match(error.message, /toISOString/u);
+        assert.ok(error.message.includes("2026-08-07T12:00:00.000Z"), "the message must show the accepted spelling of the value supplied");
+        return true;
+      },
+    );
+    assert.equal(existsSync(criticalArtifacts(dirs).request), false, "a rejected request must not be written");
+
+    assert.throws(
+      () => runApprovalGate(criticalArgv("prepare-critical", dirs, { ...base, subjectSha256: "0xdeadbeef" }), dependencies),
+      /critical approval request is invalid: --subject-sha256/u,
+    );
+    assert.throws(
+      () => runApprovalGate([
+        "prepare-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+        "--feature-id", FEATURE_ID, "--spec", SPEC, "--kind", "push",
+        "--subject-sha256", base.subjectSha256, "--expires-at", base.expiresAt,
+      ], dependencies),
+      /critical approval request is invalid: --plan/u,
+    );
+    assert.throws(
+      () => runApprovalGate([
+        "prepare-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+        "--feature-id", FEATURE_ID, "--plan", PLAN, "--kind", "push",
+        "--subject-sha256", base.subjectSha256, "--expires-at", base.expiresAt,
+      ], dependencies),
+      /critical approval request is invalid: --spec/u,
+    );
+    assert.throws(
+      () => runApprovalGate([
+        "prepare-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+        "--feature-id", FEATURE_ID, "--plan", PLAN, "--spec", SPEC, "--kind", "push",
+        "--subject-sha256", base.subjectSha256,
+      ], dependencies),
+      /critical approval request is invalid: --expires-at is required/u,
+    );
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("the two-invocation prepare-critical + approve-critical flow is unchanged and still yields a verifiable proof", () => {
+  const dirs = criticalDirs();
+  try {
+    const { authority } = keyFixture(dirs.directory);
+    const expiresAt = futureExpiry();
+    const subjectSha256 = subjectDigest("nova-onecmd-two-step");
+    const action = { kind: "push", subjectSha256, expiresAt };
+    const dependencies = { observeCandidate: () => ({ ...CANDIDATE }), readConfirmation: () => "approve" };
+
+    const prepared = runApprovalGate(criticalArgv("prepare-critical", dirs, { subjectSha256, expiresAt }), dependencies);
+    assert.equal(prepared.code, "PO-HUMAN-CRITICAL-REQUEST-READY");
+    assert.deepEqual(prepared.candidate, { ...CANDIDATE });
+    assert.deepEqual(prepared.action, action);
+
+    const approved = runHumanApproval(["approve-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--kind", "push"], dependencies);
+    assert.equal(approved.code, "PO-HUMAN-PROOF-READY");
+    assert.equal(approved.intentSha256, prepared.intentSha256);
+
+    const paths = criticalArtifacts(dirs);
+    const request = JSON.parse(readFileSync(paths.request, "utf8"));
+    const proof = JSON.parse(readFileSync(paths.proof, "utf8"));
+    assert.equal(verifyCriticalActionApprovalRequest({ request, trustPolicy: authority, proof, expectedCandidate: { ...CANDIDATE }, expectedAction: action }).verified, true);
+    assert.equal(existsSync(paths.intent), false);
+    assert.equal(existsSync(paths.signature), false);
   } finally {
     cleanup(dirs);
   }
