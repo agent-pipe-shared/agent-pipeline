@@ -56,10 +56,8 @@ safe recovery. Never treat this consent as approval for unrelated adoption,
 remote operations, deployment, publication, destructive work, or a scope
 change.
 
-1. **Step 0 / V4 onboarding:** when preflight's `nextAction` is
-   `{kind: "advisory", ...}` (status `plugin-refresh-required`), there is
-   nothing to execute -- proceed to Step 2 and surface the advisory alongside
-   the rest of bootstrap. Otherwise execute the exact read-only
+1. **Step 0 / V4 onboarding:** `nextAction.kind: "advisory"` runs nothing --
+   go to Step 2, surfaced. Otherwise execute the exact read-only
    `project-onboarding-v3.mjs inspect --root "$PWD" --intent bootstrap` action
    returned by preflight. Accept only `pipeline.project-onboarding.v4` ready
    native local or receipt-bound plugin-managed forms, including CAS-READY
@@ -82,11 +80,9 @@ change.
    not a visually wrapped long command.
 4. **Confirmation:** after all checks, print the auditable confirmation line
    with version, root, V3/runtime, profile, model/effort, role, calibration,
-   handover and Verify evidence. "Non-ready" means a preflight status that is
-   neither `ready` nor `plugin-refresh-required` (the latter is the advisory
-   soft-refresh state; carry its advisory forward in the printed confirmation
-   rather than withholding it). No confirmation is printed on that non-ready
-   state, nor on unavailable, stale, malformed or drifted state elsewhere.
+   handover and Verify evidence. "Non-ready" excludes `plugin-refresh-required`
+   (soft-refresh; carried forward, not withheld). No confirmation on
+   non-ready, unavailable, stale, malformed or drifted state.
    The four required confirmation facts are: `runtime.status`, `profile/model`
    and `role`, `calibration/handover`, and `Verify availability`; each is
    digest-bound to the machine readback and printed before continuation.
