@@ -147,6 +147,34 @@ function canonicalRoot(rootDir, fs = NATIVE_FS) {
   return fs.realpathSync(requested);
 }
 function targetPaths() { return loadRuntimeProjectionV3OwnedKeys().targets.filter((target) => target.path.startsWith(".codex/")).map((target) => target.path).sort(); }
+/**
+ * Runners whose effective runtime this barrier cannot speak about.
+ *
+ * The restart barrier is a Codex artifact by construction, not by convention:
+ * `targetPaths()` above freezes its declared target set to `.codex/*`, so
+ * `validateRuntimeTargets` structurally rejects any other target set, and
+ * `validateRestartBarrier` binds a `codexExecutableSha256` whose only clearing
+ * route is a ticket proving a fresh *Codex* process re-read those bytes. A
+ * runner that reads none of the declared targets therefore has nothing to
+ * re-read: publishing a barrier for it produces a gate it can never clear
+ * rather than evidence, which is exactly the inert-repository defect recorded
+ * in `backlog/items/2026-08-07-onboarding-restart-flow-is-codex-only-not-runner-aware.md`
+ * and forbidden by ADR-0057 decision 2a (no runner may require another
+ * runner's artifact).
+ *
+ * Peer of `RUNNERS_WITHOUT_NATIVE_READBACK` in
+ * `scripts/v3-bootstrap-authority.mjs`, which already answers
+ * `runtimeReadback: "not-applicable"` for the same runners and states that no
+ * barrier has to exist on disk and none is fabricated. Keep the two sets equal.
+ *
+ * This is a membership test on an identity the caller already threaded, never
+ * an environment sniff and never a fallback (ADR-0057 decision 2): an unknown
+ * runner keeps the Codex-strength barrier rather than losing it silently.
+ */
+const RUNNERS_WITHOUT_NATIVE_RUNTIME_READBACK = new Set(["claude"]);
+export function requiresNativeRuntimeReadback(runner) {
+  return !RUNNERS_WITHOUT_NATIVE_RUNTIME_READBACK.has(runner);
+}
 function fsyncDirectory(path, fs = NATIVE_FS) {
   let fd;
   try { fd = fs.openSync(path, "r"); fs.fsyncSync(fd); }

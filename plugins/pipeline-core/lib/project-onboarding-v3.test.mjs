@@ -44,8 +44,9 @@ import { main as onboardingCli } from "../scripts/project-onboarding-v3.mjs";
 import { main as sessionCleanupCli } from "../scripts/session-cleanup.mjs";
 import { run as pipelineStateRun } from "../scripts/pipeline-state.mjs";
 import {
-  canonicalJson, CodexOnboardingRuntimeError, consumeRuntimeReadback, issueLaunchTicket, readCurrentRuntimeReadback, readRestartBarrier,
-  removeRestartBarrierCas, sha256,
+  canonicalJson, CodexOnboardingRuntimeError, consumeRuntimeReadback, issueLaunchTicket, persistRestartBarrier,
+  prepareRuntimeRestartBinding, readCurrentRuntimeReadback, readRestartBarrier,
+  removeRestartBarrierCas, requiresNativeRuntimeReadback, sha256,
 } from "./codex-onboarding-runtime.mjs";
 import { observeOnboardingAppServer } from "./codex-onboarding-app-server.mjs";
 import { readOnboardingSessionCleanupBinding } from "./onboarding-continuity.mjs";
@@ -1599,13 +1600,160 @@ test("omitting --runner keeps the historical Codex App-Server requirement", () =
   } finally { dispose(path); }
 });
 
-test("restart action for a non-codex runner is a manual external-operator action, never the Codex launcher", () => {
+// CONTRACT CORRECTION, not a loosened pin. The predecessor of this test
+// asserted that a `claude` session still reached `restart-required` behind a
+// published barrier, only with the restart rendered as manual guidance. That
+// premise is the defect: the barrier's declared targets are frozen to
+// `.codex/*` and it clears only through a Codex launch ticket, so the
+// rendering was truthful about the launcher and untruthful about the outcome.
+// The launcher-versus-manual-rendering concern it protected survives below in
+// the unknown-runner case, which still receives the barrier and the manual
+// action. What is asserted here now is the positive new contract.
+test("a runner without a native runtime readback publishes no barrier and proceeds to the next real step", () => {
   const path = root();
   try {
-    initializeRestartRequiredRoot(path);
+    const bindings = [];
+    const publications = [];
+    const observingDeps = {
+      ...fakeDeps,
+      codexExecutable: join(path, "no-codex-executable-exists-here"),
+      prepareRuntimeRestartBinding(options) { bindings.push(options); throw new Error("no Codex executable may be bound for this runner"); },
+      persistRestartBarrier(options) { publications.push(options); throw new Error("no barrier may be published for this runner"); },
+    };
+    const portable = planProjectOnboardingV3({ rootDir: path, deps: observingDeps, runner: "claude" });
+    assert.equal(applyProjectOnboardingV3(portable, { rootDir: path, activate: true, deps: observingDeps }).status, "applied");
+    const plan = planProjectOnboardingLifecycleV4({ rootDir: path, deps: observingDeps, operation: "runtime", runner: "claude" });
+    assert.equal(plan.status, "runtime-initialization-required");
+    // The plan must not promise a state its own apply can never reach.
+    assert.deepEqual(plan.nextAction.expected.statuses, ["kickoff-required", "ready"]);
+    const digest = plan.nextAction.argv[plan.nextAction.argv.indexOf("--plan-sha256") + 1];
+    const initialized = applyProjectOnboardingLifecycleV4({
+      rootDir: path, deps: observingDeps, operation: "runtime", planSha256: digest, activate: true, runner: "claude",
+    });
+    assert.equal(initialized.runner, "claude");
+    assert.equal(initialized.status, "kickoff-required");
+    // Structural, not textual: nothing was bound and nothing was published, so
+    // there is no artifact a launch ticket could ever be required to clear.
+    assert.deepEqual(bindings, []);
+    assert.deepEqual(publications, []);
+    const barrier = readRestartBarrier({ rootDir: path, spawn: fakeGit });
+    assert.equal(barrier.status, "absent");
+    assert.equal(existsSync(barrier.paths.barrier), false);
+    assert.equal(existsSync(barrier.paths.tickets), false);
+    assert.equal(existsSync(barrier.paths.currentReadback), false);
+    assert.deepEqual(initialized.runtime, {
+      status: "readback-not-applicable",
+      sourceSha256: initialized.runtime.sourceSha256,
+      targetsSha256: initialized.runtime.targetsSha256,
+      barrierSha256: null,
+      readbackSha256: null,
+    });
+    // The instruction the session receives is the one that actually advances
+    // it -- never a restart it cannot make good on.
+    assert.equal(initialized.nextAction.kind, "collect-input");
+    assert.equal(initialized.nextAction.requiresCurrentProcessExit, undefined);
+    assert.equal(Object.prototype.hasOwnProperty.call(initialized.nextAction, "launch"), false);
+    const serialized = JSON.stringify(initialized);
+    assert.equal(serialized.includes("codex-onboarding-launch"), false);
+    assert.equal(serialized.includes("restart"), false);
+    assert.equal(serialized.includes("ticket"), false);
+    // ADR-0057 decision 2a's own test: the runtime targets really were written,
+    // with no Codex executable resolvable anywhere on this machine.
+    assert.equal(existsSync(join(path, ".claude", "settings.json")), true);
+    assert.equal(existsSync(join(path, ".codex", "config.toml")), true);
+    assert.equal(existsSync(observingDeps.codexExecutable), false);
+  } finally { dispose(path); }
+});
+
+test("a pending Codex restart barrier never gates a Claude session, and that session leaves it untouched", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    assert.equal(barrier.status, "present");
     const observed = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, runner: "claude" });
-    assert.equal(observed.status, "restart-required");
     assert.equal(observed.runner, "claude");
+    assert.equal(observed.status, "kickoff-required");
+    assert.equal(observed.runtime.status, "readback-not-applicable");
+    assert.equal(observed.runtime.barrierSha256, null);
+    assert.equal(observed.nextAction.kind, "collect-input");
+    assert.equal(JSON.stringify(observed).includes("codex-onboarding-launch"), false);
+    // The Codex artifact is not consumed, cleared or removed by the peer
+    // runner: a Codex session in the same project still owes its readback.
+    const after = readRestartBarrier({ rootDir: path, spawn: fakeGit });
+    assert.equal(after.status, "present");
+    assert.equal(after.rawSha256, barrier.rawSha256);
+    assert.equal(inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, runner: "codex" }).status, "restart-required");
+  } finally { dispose(path); }
+});
+
+test("the codex runtime apply is unchanged: bound executable, frozen .codex digests, barrier durable before mutation", () => {
+  const path = root();
+  try {
+    const bindings = [];
+    const publications = [];
+    const observingDeps = {
+      ...fakeDeps,
+      prepareRuntimeRestartBinding(options) {
+        bindings.push({
+          runtimeTargets: options.runtimeTargets,
+          codexExecutable: options.codexExecutable,
+          sourceSha256: options.sourceSha256,
+        });
+        return prepareRuntimeRestartBinding(options);
+      },
+      persistRestartBarrier(options) {
+        // Durable BEFORE the target transaction: at publication time not one
+        // runtime target byte may exist yet.
+        publications.push({
+          codexTargetWritten: existsSync(join(path, ".codex", "config.toml")),
+          claudeTargetWritten: existsSync(join(path, ".claude", "settings.json")),
+          runtimeTargetsSha256: options.binding.runtimeTargetsSha256,
+        });
+        return persistRestartBarrier(options);
+      },
+    };
+    const seed = planProjectOnboardingV3({ rootDir: path, deps: observingDeps, runner: "codex" });
+    assert.equal(applyProjectOnboardingV3(seed, { rootDir: path, activate: true, deps: observingDeps }).status, "applied");
+    const plan = planProjectOnboardingLifecycleV4({ rootDir: path, deps: observingDeps, operation: "runtime", runner: "codex" });
+    assert.deepEqual(plan.nextAction.expected.statuses, ["restart-required"]);
+    const digest = plan.nextAction.argv[plan.nextAction.argv.indexOf("--plan-sha256") + 1];
+    const initialized = applyProjectOnboardingLifecycleV4({
+      rootDir: path, deps: observingDeps, operation: "runtime", planSha256: digest, activate: true, runner: "codex",
+    });
+    assert.equal(initialized.status, "restart-required");
+    assert.equal(bindings.length, 1);
+    assert.equal(publications.length, 1);
+    assert.equal(bindings[0].codexExecutable, process.execPath);
+    assert.deepEqual(bindings[0].runtimeTargets.map((target) => target.path), [
+      ".codex/agents/consult-advisor.toml", ".codex/agents/critic.toml", ".codex/agents/implementor.toml", ".codex/config.toml",
+    ]);
+    assert.equal(publications[0].codexTargetWritten, false);
+    assert.equal(publications[0].claudeTargetWritten, false);
+    const stored = readRestartBarrier({ rootDir: path, spawn: fakeGit });
+    assert.equal(stored.status, "present");
+    assert.equal(stored.barrier.state, "restart-required");
+    assert.equal(stored.barrier.runtimeTargetsSha256, publications[0].runtimeTargetsSha256);
+    assert.equal(stored.barrier.codexExecutablePath, process.execPath);
+    assert.equal(stored.rawSha256, initialized.runtime.barrierSha256);
+    assert.equal(initialized.nextAction.kind, "restart-process");
+    assert.equal(initialized.nextAction.launch.argv[0], ONBOARDING_LAUNCH_SCRIPT);
+    // Still ticket-bound: the barrier clears only through the launch ticket.
+    clearRuntimeBarrier(path, stored);
+    assert.equal(inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, runner: "codex" }).runtime.status, "readback-current");
+  } finally { dispose(path); }
+});
+
+test("an unknown runner keeps the Codex-strength barrier and a manual action, never the Codex launcher", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    assert.equal(barrier.status, "present");
+    assert.equal(requiresNativeRuntimeReadback("some-future-runner"), true);
+    // Fail-closed by construction: an unnamed runner does not silently lose the
+    // barrier, it only loses the Codex-specific launcher rendering.
+    const observed = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, runner: "some-future-runner" });
+    assert.equal(observed.status, "restart-required");
+    assert.equal(observed.runtime.barrierSha256, barrier.rawSha256);
     assert.equal(observed.nextAction.kind, "external-operator");
     assert.equal(observed.nextAction.requiresCurrentProcessExit, false);
     assert.equal(observed.nextAction.mutation, false);
@@ -1617,6 +1765,24 @@ test("restart action for a non-codex runner is a manual external-operator action
     assert.ok(observed.nextAction.expected.statuses.includes("ready"));
     assert.equal(Object.prototype.hasOwnProperty.call(observed.nextAction, "launch"), false);
     assert.equal(JSON.stringify(observed.nextAction).includes("codex-onboarding-launch"), false);
+  } finally { dispose(path); }
+});
+
+test("the barrier's runner exemption is the same set the V3 bootstrap authority already exempts", () => {
+  const path = root();
+  try {
+    initializeRestartRequiredRoot(path);
+    // Asserted behaviourally, not by reading a private constant: the two sets
+    // are equal iff every runner that skips the barrier is exactly the runner
+    // the authority reports `runtimeReadback: "not-applicable"` for.
+    for (const runner of ["claude", "codex", "some-future-runner", "", null, undefined]) {
+      const authority = validateV3BootstrapAuthority({ rootDir: path, deps: fakeDeps, runner });
+      assert.equal(
+        requiresNativeRuntimeReadback(runner),
+        authority.runtimeReadback !== "not-applicable",
+        `runner ${JSON.stringify(runner)} disagrees between the barrier exemption and the bootstrap authority`,
+      );
+    }
   } finally { dispose(path); }
 });
 
@@ -2494,6 +2660,154 @@ test("a real fresh local kickoff is immediately a valid canonical PO authority",
   } finally { dispose(path); }
 });
 
+// A runner without a native runtime readback is onboarded exactly as ADR-0057
+// decision 2a describes: portable seed, runtime targets, no barrier, and the
+// lifecycle standing at `kickoff-required`. This is the state from which the
+// kickoff entry points below are exercised.
+function initializeClaudeOnboardedRoot(path, deps = fakeDeps) {
+  const portable = planProjectOnboardingV3({ rootDir: path, deps, runner: "claude" });
+  assert.equal(applyProjectOnboardingV3(portable, { rootDir: path, activate: true, deps }).status, "applied");
+  const runtime = planProjectOnboardingLifecycleV4({ rootDir: path, deps, operation: "runtime", runner: "claude" });
+  const digest = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
+  const initialized = applyProjectOnboardingLifecycleV4({
+    rootDir: path, deps, operation: "runtime", planSha256: digest, activate: true, runner: "claude",
+  });
+  assert.equal(initialized.runner, "claude");
+  assert.equal(initialized.status, "kickoff-required");
+  return initialized;
+}
+
+test("a claude-onboarded root reaches a real kickoff plan instead of runtime-attestation-required", () => {
+  const path = root();
+  try {
+    initializeClaudeOnboardedRoot(path);
+    const goal = "Ship the Claude-onboarded project";
+    const planned = planProjectOnboardingKickoffV4({ rootDir: path, goal, runner: "claude", deps: fakeDeps });
+    assert.equal(planned.schema, "pipeline.codex-onboarding-kickoff-plan.v1");
+    assert.notEqual(planned.status, "runtime-attestation-required");
+    assert.match(planned.planSha256, /^[a-f0-9]{64}$/u);
+    // The other half of the same contract: omission is never promoted to this
+    // runner. Without the identity the entry point still inspects as Codex,
+    // which on this root is the historical Codex-only dead end.
+    const substituted = planProjectOnboardingKickoffV4({ rootDir: path, goal, deps: fakeDeps });
+    assert.equal(substituted.schema, "pipeline.project-onboarding.v4");
+    assert.equal(substituted.runner, "codex");
+    assert.equal(substituted.status, "runtime-attestation-required");
+  } finally { dispose(path); }
+});
+
+test("a claude-onboarded root completes kickoff apply and becomes a ready lifecycle", () => {
+  const path = root();
+  try {
+    initializeClaudeOnboardedRoot(path);
+    const goal = "Ship the Claude-onboarded project";
+    const planned = planProjectOnboardingKickoffV4({ rootDir: path, goal, runner: "claude", deps: fakeDeps });
+    const applied = applyProjectOnboardingKickoffV4({
+      rootDir: path, goal, runner: "claude", planSha256: planned.planSha256, activate: true, deps: fakeDeps,
+    });
+    assert.equal(applied.schema, "pipeline.project-onboarding.v4");
+    assert.equal(applied.runner, "claude");
+    assert.equal(applied.status, "ready");
+    assert.equal(applied.continuity.status, "valid");
+    assert.equal(applied.runtime.status, "readback-not-applicable");
+    assert.equal(applied.runtime.barrierSha256, null);
+    assert.equal(existsSync(join(path, "project", "pipeline-state.json")), true);
+  } finally { dispose(path); }
+});
+
+test("codex kickoff plan and apply are unchanged whether the runner is omitted or explicit", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path); clearRuntimeBarrier(path, barrier);
+    const goal = "Codex kickoff regression pin";
+    const omitted = planProjectOnboardingKickoffV4({ rootDir: path, goal, deps: fakeDeps });
+    const explicit = planProjectOnboardingKickoffV4({ rootDir: path, goal, runner: "codex", deps: fakeDeps });
+    assert.equal(omitted.schema, "pipeline.codex-onboarding-kickoff-plan.v1");
+    assert.deepEqual(explicit, omitted);
+    const applied = applyProjectOnboardingKickoffV4({
+      rootDir: path, goal, runner: "codex", planSha256: omitted.planSha256, activate: true, deps: fakeDeps,
+    });
+    assert.equal(applied.status, "ready");
+    assert.equal(applied.runner, "codex");
+    assert.equal(applied.continuity.status, "valid");
+  } finally { dispose(path); }
+});
+
+test("omitting --runner on the kickoff CLI keeps the exact historical Codex behaviour", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path); clearRuntimeBarrier(path, barrier);
+    const goal = "Codex kickoff CLI regression pin";
+    const invoke = (args) => {
+      let stdout = ""; let stderr = "";
+      const code = onboardingCli(args, {
+        deps: fakeDeps,
+        write: (chunk) => { stdout += chunk; },
+        writeError: (chunk) => { stderr += chunk; },
+      });
+      return { code, stderr, result: stdout ? JSON.parse(stdout) : null };
+    };
+    const omitted = invoke(["kickoff", "plan", "--root", path, "--goal", goal]);
+    const explicit = invoke(["kickoff", "plan", "--root", path, "--goal", goal, "--runner", "codex"]);
+    assert.equal(omitted.code, 0, omitted.stderr);
+    assert.equal(omitted.result.schema, "pipeline.codex-onboarding-kickoff-plan.v1");
+    assert.deepEqual(explicit.result, omitted.result);
+    const applied = invoke(omitted.result.applyAction.argv.slice(1));
+    assert.equal(applied.code, 0, applied.stderr);
+    assert.equal(applied.result.status, "ready");
+    assert.equal(applied.result.runner, "codex");
+  } finally { dispose(path); }
+});
+
+test("the kickoff CLI applies its closed runner value set: claude is honoured, unknown fails closed", () => {
+  const path = root();
+  try {
+    initializeClaudeOnboardedRoot(path);
+    const goal = "Closed runner value set";
+    const invoke = (args, overrides = {}) => {
+      let stdout = ""; let stderr = "";
+      const code = onboardingCli(args, {
+        deps: fakeDeps,
+        write: (chunk) => { stdout += chunk; },
+        writeError: (chunk) => { stderr += chunk; },
+        ...overrides,
+      });
+      return { code, stdout, stderr, result: stdout.startsWith("{") ? JSON.parse(stdout) : null };
+    };
+    const planned = invoke(["kickoff", "plan", "--root", path, "--goal", goal, "--runner", "claude"]);
+    assert.equal(planned.code, 0, planned.stderr);
+    assert.equal(planned.result.schema, "pipeline.codex-onboarding-kickoff-plan.v1");
+    const applied = invoke([
+      "kickoff", "apply", "--root", path, "--goal", goal,
+      "--runner", "claude", "--plan-sha256", planned.result.planSha256, "--activate",
+    ]);
+    assert.equal(applied.code, 0, applied.stderr);
+    assert.equal(applied.result.status, "ready");
+    assert.equal(applied.result.runner, "claude");
+
+    // An unknown runner is refused by the same closed value set the other
+    // subcommands use, and refused before anything is observed: every dependency
+    // this deps object exposes throws the moment it is merged.
+    const refusing = {
+      get spawnSync() { throw new Error("no inspection may happen for an unknown runner"); },
+      get observeCodexOnboardingCapabilities() { throw new Error("no inspection may happen for an unknown runner"); },
+      get observeOnboardingAppServer() { throw new Error("no inspection may happen for an unknown runner"); },
+    };
+    const before = names(path);
+    for (const command of ["plan", "apply"]) {
+      const refused = invoke(
+        ["kickoff", command, "--root", path, "--goal", goal, "--runner", "gemini"],
+        { deps: refusing },
+      );
+      assert.equal(refused.code, 2);
+      assert.match(refused.stdout, /--runner must be claude or codex/u);
+      assert.equal(refused.stderr, "");
+      assert.equal(refused.result, null);
+    }
+    assert.deepEqual(names(path), before);
+  } finally { dispose(path); }
+});
+
 test("kickoff promotion replaces only the exact unapproved seed and is replay-safe across profiles", () => {
   for (const profile of ["epic", "feature", "mini"]) {
     const path = root();
@@ -2501,14 +2815,14 @@ test("kickoff promotion replaces only the exact unapproved seed and is replay-sa
       const barrier = initializeRestartRequiredRoot(path); clearRuntimeBarrier(path, barrier);
       completeKickoff(path, `Promotion ${profile}`);
       mkdirSync(join(path, "specs", profile), { recursive: true });
-      const prdPath = `specs/${profile}/prd-${profile}.md`;
+      const prdPath = `specs/${profile}/prd_${profile}.md`;
       const specPath = `specs/${profile}/spec.md`;
       const designInputPath = `specs/${profile}/design-input.md`;
       writeFileSync(join(path, prdPath), `# ${profile} PRD\n`);
       writeFileSync(join(path, specPath), `# ${profile} Spec\n`);
       writeFileSync(join(path, designInputPath), `# ${profile} design input\n`);
       const args = {
-        rootDir: path, profile, featureId: `${profile}-work`, planPath: specPath,
+        rootDir: path, profile, featureId: `${profile}-work`, planPath: prdPath,
         prdPath, specPath, designInputPath, deps: fakeDeps,
       };
       const plan = planProjectOnboardingKickoffPromotionV4(args);
@@ -2519,7 +2833,7 @@ test("kickoff promotion replaces only the exact unapproved seed and is replay-sa
       assert.equal(applied.status, "ready");
       const state = JSON.parse(readFileSync(join(path, "project", "pipeline-state.json"), "utf8"));
       assert.equal(state.activeFeature.id, `${profile}-work`);
-      assert.equal(state.activeFeature.planPath, specPath);
+      assert.equal(state.activeFeature.planPath, prdPath);
       assert.equal(state.planApproved, false);
       assert.equal(state.planSubmission, undefined);
       assert.equal(state.planApproval, undefined);
@@ -2598,7 +2912,7 @@ test("public cleanup privatization preserves the historical kickoff seed for CLI
     const seedSha256 = sha256(readFileSync(statePath));
 
     mkdirSync(join(path, "specs", "post-private"), { recursive: true });
-    const prdPath = "specs/post-private/prd.md";
+    const prdPath = "specs/post-private/prd_post_private.md";
     const specPath = "specs/post-private/spec.md";
     const designInputPath = "specs/post-private/design-input.md";
     writeFileSync(join(path, prdPath), "# Post-private PRD\n");
@@ -2607,7 +2921,7 @@ test("public cleanup privatization preserves the historical kickoff seed for CLI
     const promoteArgs = [
       "kickoff", "promote", "plan", "--root", path,
       "--profile", "feature", "--id", "post-private-work",
-      "--plan-path", specPath, "--prd-path", prdPath, "--spec-path", specPath,
+      "--plan-path", prdPath, "--prd-path", prdPath, "--spec-path", specPath,
       "--design-input-path", designInputPath,
     ];
     const planned = invokeOnboarding(promoteArgs);
@@ -2646,14 +2960,14 @@ test("kickoff promotion fails closed for authority drift, a real active feature,
     const barrier = initializeRestartRequiredRoot(path); clearRuntimeBarrier(path, barrier);
     completeKickoff(path, "Promotion failures");
     mkdirSync(join(path, "specs"), { recursive: true });
-    writeFileSync(join(path, "specs", "real-prd.md"), "# PRD\n");
-    writeFileSync(join(path, "specs", "real-spec.md"), "# Spec\n");
+    writeFileSync(join(path, "specs", "prd_real.md"), "# PRD\n");
+    writeFileSync(join(path, "specs", "spec.md"), "# Spec\n");
     writeFileSync(join(path, "specs", "design-input.md"), "# Design input\n");
-    const args = { rootDir: path, profile: "feature", featureId: "real-work", planPath: "specs/real-spec.md", prdPath: "specs/real-prd.md", specPath: "specs/real-spec.md", designInputPath: "specs/design-input.md", deps: fakeDeps };
+    const args = { rootDir: path, profile: "feature", featureId: "real-work", planPath: "specs/prd_real.md", prdPath: "specs/prd_real.md", specPath: "specs/spec.md", designInputPath: "specs/design-input.md", deps: fakeDeps };
     const plan = planProjectOnboardingKickoffPromotionV4(args);
-    writeFileSync(join(path, "specs", "real-spec.md"), "# changed\n");
+    writeFileSync(join(path, "specs", "spec.md"), "# changed\n");
     assert.throws(() => applyProjectOnboardingKickoffPromotionV4({ ...args, planSha256: plan.planSha256, activate: true }), /promotion plan digest/u);
-    writeFileSync(join(path, "specs", "real-spec.md"), "# Spec\n");
+    writeFileSync(join(path, "specs", "spec.md"), "# Spec\n");
     const applied = applyProjectOnboardingKickoffPromotionV4({ ...args, planSha256: plan.planSha256, activate: true });
     assert.equal(applied.status, "ready");
     assert.throws(() => planProjectOnboardingKickoffPromotionV4({ ...args, featureId: "other-work" }), /exact unapproved kickoff seed/u);

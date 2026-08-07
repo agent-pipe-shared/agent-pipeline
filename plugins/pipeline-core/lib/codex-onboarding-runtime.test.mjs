@@ -14,7 +14,7 @@ import { PassThrough, Writable } from "node:stream";
 import {
   HELPER_PATH, authenticateLaunchTicket, canonicalJson, canonicalSha256, consumeRuntimeReadback, issueLaunchTicket,
   persistRestartBarrier, prepareRuntimeRestartBinding, readCurrentRuntimeReadback, readRestartBarrier,
-  resolveRuntimeExecutable, sha256,
+  requiresNativeRuntimeReadback, resolveRuntimeExecutable, sha256, validateRuntimeTargets,
 } from "./codex-onboarding-runtime.mjs";
 import {
   main as runtimeReadbackMain,
@@ -1125,6 +1125,20 @@ test("wrong identity, origin, same-generation, timeout, oversize, and absent tra
       rootDir: path, ticketId: issued.ticketId, token: issued.token, now: 30_002, spawn: host,
     }).ticket.value.state, "issued", "typed readback failures must not consume the one-use ticket");
   } finally { dispose(path); }
+});
+
+test("the barrier exemption is a closed membership test that fails closed for every unnamed runner", () => {
+  // The barrier's declared target set is frozen to `.codex/*`, so only a runner
+  // that reads none of it may skip it. Everything else -- including an unknown,
+  // empty or absent runner id -- keeps the full Codex-strength barrier.
+  assert.equal(requiresNativeRuntimeReadback("claude"), false);
+  assert.equal(requiresNativeRuntimeReadback("codex"), true);
+  for (const runner of ["some-future-runner", "Claude", " claude", "", null, undefined, 0, {}]) {
+    assert.equal(requiresNativeRuntimeReadback(runner), true, `unnamed runner ${JSON.stringify(runner)} must keep the barrier`);
+  }
+  // The exemption may never widen the barrier's own target universe: a target
+  // set naming a `.claude/*` path stays structurally unrepresentable.
+  assert.throws(() => validateRuntimeTargets([{ path: ".claude/settings.json", beforeSha256: null, afterSha256: "0".repeat(64) }]));
 });
 
 let passed = 0; const failures = [];

@@ -55,7 +55,8 @@ import { codexCustomAgentSeed, loadRuntimeProjectionV3OwnedKeys, planRuntimeProj
 import {
   CodexOnboardingRuntimeError,
   prepareRuntimeRestartBinding, persistRestartBarrier, readCurrentRuntimeReadback,
-  readRestartBarrier, removeRestartBarrierCas, runtimeRestartBindingCurrent,
+  readRestartBarrier, removeRestartBarrierCas, requiresNativeRuntimeReadback,
+  runtimeRestartBindingCurrent,
 } from "./codex-onboarding-runtime.mjs";
 import { validateV3BootstrapAuthority } from "../scripts/v3-bootstrap-authority.mjs";
 import { planSessionCleanupRecovery } from "./session-cleanup-recovery.mjs";
@@ -3056,6 +3057,27 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
     }
     if (["projection-current", "restart-required", "ready"].includes(authority.status)
       || authority.runtimeProjection === "noop") {
+      // A runner without a native runtime readback never reads the barrier's
+      // declared targets (they are frozen to `.codex/*`), so the private Codex
+      // restart authority is not consulted for it at all -- not even when a
+      // Codex session left a pending barrier behind in a dual-runner project.
+      // Gating this session on that artifact would make one runner a
+      // precondition for another (ADR-0057 decision 2a). This mirrors
+      // `projectionCurrent`'s own branch in `scripts/v3-bootstrap-authority.mjs`,
+      // which is why `authority.status` is already `"ready"` here.
+      if (!requiresNativeRuntimeReadback(runner)) {
+        return afterRuntimeLifecycleResult({
+          root: legacy.root,
+          runner,
+          intent,
+          repository,
+          runtime: {
+            ...emptyRuntime("readback-not-applicable"),
+            sourceSha256: authority.sourceSha256 ?? null,
+            targetsSha256: sha256(JSON.stringify(runtimePaths())),
+          },
+        }, fs);
+      }
       try {
         const barrier = readRestartBarrier({ rootDir: legacy.root, repositoryCapability: repository.mode, deps: fs });
         if (barrier.status === "present" && barrier.barrier.state === "restart-required") {
@@ -3614,8 +3636,15 @@ function planLifecycle(rootDir, fs, operation, intent = "onboarding", runner) {
     if (observed.status !== expected) return observed;
     const plan = planRunnerProfileMigrationV3({ rootDir, deps: fs, initializeMissingRuntimeForSlimV3: operation === "runtime" });
     if (operation === "readback" ? plan.status !== "noop" : plan.status !== "ready") return observed;
-    const statuses = operation === "runtime"
+    // A runner without a native runtime readback publishes no barrier, so its
+    // initialization lands on the next real step instead of `restart-required`.
+    // Promising `restart-required` there would hand the caller an expectation
+    // the apply can never satisfy.
+    const runtimeStatuses = requiresNativeRuntimeReadback(observed.runner)
       ? ["restart-required"]
+      : ["kickoff-required", "ready"];
+    const statuses = operation === "runtime"
+      ? runtimeStatuses
       : operation === "repair"
         ? ["restart-required", "kickoff-required", "ready"]
         : ["restart-required"];
@@ -3680,43 +3709,54 @@ function applyLifecycle(rootDir, fs, operation, planSha256, activate, intent = "
   const runtimeTargets = plan.targets.filter((target) => target.kind === "runtime" && target.path.startsWith(".codex/")).map((target) => ({
     path: target.path, beforeSha256: target.before.sha256, afterSha256: target.after.sha256,
   })).sort((left, right) => left.path.localeCompare(right.path));
-  let binding;
-  try {
-    binding = (fs.prepareRuntimeRestartBinding ?? prepareRuntimeRestartBinding)({
-      rootDir: plan.root,
-      sourceSha256: plan.sourceSha256,
-      runtimeTargets,
-      codexExecutable: fs.codexExecutable,
-    });
-  } catch (error) {
-    return runtimeFailureResult(beforeApply, error, {
-      phase: "runtime-executable-binding",
-      code: "runtime_executable_binding_failed",
-      message: "the trusted Codex runtime executable could not be bound",
-      guidance: "repair executable discovery and retry the unchanged digest-bound plan",
-    });
-  }
-  let persisted;
-  try {
-    // The barrier is durable before the target transaction begins. A crash in
-    // either direction therefore blocks rather than claiming a loaded runtime.
-    persisted = (fs.persistRestartBarrier ?? persistRestartBarrier)({
-      rootDir: plan.root,
-      repositoryCapability: beforeApply.repository.mode,
-      binding,
-      deps: fs,
-    });
-  } catch (error) {
-    return runtimeFailureResult(beforeApply, error, {
-      phase: "restart-barrier-persist",
-      code: "restart_barrier_publication_failed",
-      message: "the restart barrier could not be published before runtime mutation",
-      guidance: "repair private restart-state persistence before retrying",
-    });
+  // The barrier declares `.codex/*` targets only and is cleared only by a
+  // ticket proving a fresh Codex process re-read them. For a runner without a
+  // native runtime readback neither half is reachable, so publishing one would
+  // strand the project behind an unclearable gate -- and binding it would even
+  // make a Codex executable a hard precondition for that runner's onboarding
+  // (ADR-0057 decision 2a). Nothing here is skipped for the Codex path: its
+  // binding, its digests and its durable-before-mutation ordering are
+  // untouched below.
+  const barrierRequired = requiresNativeRuntimeReadback(beforeApply.runner);
+  let persisted = null;
+  if (barrierRequired) {
+    let binding;
+    try {
+      binding = (fs.prepareRuntimeRestartBinding ?? prepareRuntimeRestartBinding)({
+        rootDir: plan.root,
+        sourceSha256: plan.sourceSha256,
+        runtimeTargets,
+        codexExecutable: fs.codexExecutable,
+      });
+    } catch (error) {
+      return runtimeFailureResult(beforeApply, error, {
+        phase: "runtime-executable-binding",
+        code: "runtime_executable_binding_failed",
+        message: "the trusted Codex runtime executable could not be bound",
+        guidance: "repair executable discovery and retry the unchanged digest-bound plan",
+      });
+    }
+    try {
+      // The barrier is durable before the target transaction begins. A crash in
+      // either direction therefore blocks rather than claiming a loaded runtime.
+      persisted = (fs.persistRestartBarrier ?? persistRestartBarrier)({
+        rootDir: plan.root,
+        repositoryCapability: beforeApply.repository.mode,
+        binding,
+        deps: fs,
+      });
+    } catch (error) {
+      return runtimeFailureResult(beforeApply, error, {
+        phase: "restart-barrier-persist",
+        code: "restart_barrier_publication_failed",
+        message: "the restart barrier could not be published before runtime mutation",
+        guidance: "repair private restart-state persistence before retrying",
+      });
+    }
   }
   if (operation === "readback") return v4Inspection(rootDir, fs, intent, runner);
   const applied = applyRunnerProfileMigrationV3(plan, { rootDir, activate: true, deps: fs });
-  if (applied.status !== "applied" && persisted.written) {
+  if (applied.status !== "applied" && persisted?.written) {
     try {
       (fs.removeRestartBarrierCas ?? removeRestartBarrierCas)({
         rootDir: plan.root,
@@ -3762,13 +3802,20 @@ export function applyProjectOnboardingLifecycleV4({ rootDir = process.cwd(), dep
   return applyLifecycle(rootDir, deps(overrides), operation, planSha256, activate, intent, runner);
 }
 
+// The kickoff entry points inspect on the caller's behalf, so they must inspect
+// as the caller's runner. Substituting one here is the same identity loss the
+// consumer chain guards against (ADR-0051, ADR-0057 R1): a runner without a
+// native runtime readback would be told it owes a Codex attestation and could
+// never reach a kickoff at all. The default stays `"codex"`, so an omitted
+// runner keeps its exact historical behaviour and is never promoted silently.
 export function planProjectOnboardingKickoffV4({
   rootDir = process.cwd(),
   goal,
+  runner = "codex",
   deps: overrides = {},
 } = {}) {
   const fs = deps(overrides);
-  const observed = v4Inspection(rootDir, fs, "onboarding");
+  const observed = v4Inspection(rootDir, fs, "onboarding", runner);
   if (observed.status !== "kickoff-required") return observed;
   return planOnboardingKickoff({
     rootDir: observed.root,
@@ -3782,12 +3829,13 @@ export function planProjectOnboardingKickoffV4({
 export function applyProjectOnboardingKickoffV4({
   rootDir = process.cwd(),
   goal,
+  runner = "codex",
   planSha256,
   activate = false,
   deps: overrides = {},
 } = {}) {
   const fs = deps(overrides);
-  const observed = v4Inspection(rootDir, fs, "onboarding");
+  const observed = v4Inspection(rootDir, fs, "onboarding", runner);
   if (!["kickoff-required", "ready"].includes(observed.status)
     || !["absent-pristine", "valid"].includes(observed.continuity.status)) {
     return observed;
@@ -3806,7 +3854,7 @@ export function applyProjectOnboardingKickoffV4({
     deps: { ...overrides, spawn: fs.spawnSync },
   });
   if (observed.repository.mode === "local") initializeKickoffPoProfile(observed.root, fs);
-  return v4Inspection(rootDir, fs, "onboarding");
+  return v4Inspection(rootDir, fs, "onboarding", runner);
 }
 
 export function planProjectOnboardingKickoffPromotionV4({

@@ -26,7 +26,7 @@ function usage() {
     "Usage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> [--profile <epic|feature|mini> --source <selection>]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--plan-sha256 <sha256>] [--activate]",
-    "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> [--plan-sha256 <sha256>] [--activate]",
+    "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> --design-input-path <path> [--plan-sha256 <sha256>] [--activate]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>",
   ].join("\n");
@@ -119,11 +119,13 @@ export function main(args = process.argv.slice(2), {
     else if (options.command === "kickoff-plan") output = planProjectOnboardingKickoffV4({
       rootDir: options.root,
       goal: options.goal,
+      runner: options.runner,
       deps,
     });
     else if (options.command === "kickoff-apply") output = applyProjectOnboardingKickoffV4({
       rootDir: options.root,
       goal: options.goal,
+      runner: options.runner,
       planSha256: options.planSha256,
       activate: options.activate,
       deps,
