@@ -120,12 +120,20 @@ freehand). Status:
    an integration point structurally unreachable in `chat` mode,
    contradicting the design's own framing). Full findings:
    `specs/sprint-phoenix-epic/evidence/wp5-phx2-design-critic-review-ad49c48.md`
-   (gitignored). None of the findings require abandoning the approach — a
-   rework dispatch addressing all 5 is running, to be followed by a bounded
-   delta Critic re-review before any implementation. This is exactly the
-   outcome CLAUDE.md's self-application rule (Critic review before the PO's
-   gate) exists to catch, on the first design produced under it this
-   session.
+   (gitignored). **Rework landed** (commit `8a54751`, doc-only, +172/−37):
+   F1 now sources `repositoryFingerprint` from `discoverRepository(...)`
+   (worktree-invariant, matching all 7 real call sites) instead of
+   worktree-local `projectDir`/`dir`; F2 adds the missing `mkdirSync`
+   before the `wx` write plus a new write-side failure-mode entry (fatal
+   to `approve-push`, disclosed recovery cost); F3 resolved via scope
+   narrowing — the design now states plainly it engages only for
+   `signature`-mode-configured projects, `chat` mode gets zero benefit
+   until a follow-up design (extending coverage would need a `chat`-mode
+   consumption key and single-use semantics that don't exist even locally
+   today); F4/F5 reframed the security-property and filesystem-atomicity
+   claims accurately. A bounded delta Critic re-review (base `ad49c48`,
+   head `8a54751`, prior finding IDs F1–F5) is dispatched, per
+   `critic-review.md`'s Phase-2.6 mechanism — not implementation yet.
 
 **Infra finding, 2026-08-07:** the `isolation: "worktree"` dispatch option
 pinned two of three agents' worktrees to `6e2c9b2` (origin/main's pre-merge

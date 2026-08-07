@@ -89,8 +89,28 @@ write mechanism omits directory creation, guaranteeing `ENOENT` on first use
 everywhere, with recovery blocked behind an unrelated existing guard; (3) the
 integration point is structurally unreachable in `chat` mode, contradicting
 the design's own "alongside the signature/chat gate" framing. Plus two MINOR
-findings. Next step: a rework dispatch addressing all five findings, then a
-bounded delta Critic re-review — not implementation yet.
+findings.
+
+**Rework (2026-08-07):** commit `8a54751` (doc-only, +172/−37 lines) fixes all
+five findings: F1 now derives `repositoryFingerprint` from
+`discoverRepository(...).primaryRoot`/`.commonDir`, matching every real call
+site of `derivePoGateRepositoryFingerprint` in the codebase, and removes the
+false "existing git-common-dir resolution" comment; F2 adds the missing
+`mkdirSync(dirname(path), { recursive: true, mode: 0o700 })` before the `wx`
+write plus a new §4 write-side failure-mode entry (write failure is fatal to
+`approve-push`, with the disclosed manual-recovery cost); F3 is resolved by
+narrowing scope rather than extending coverage — §1 now states prominently
+that this design engages only for `signature`-mode-configured projects, and
+that `chat`-mode projects get zero benefit until a follow-up design (extending
+coverage would require inventing a `chat`-mode consumption key and single-use
+semantics that don't exist even locally today, which is materially more than
+"smallest additive mechanism" calls for); F4 reframes the "no encryption"
+justification around tamper-resistance rather than secrecy; F5 adds a
+non-local-filesystem (NFS) caveat to the atomicity claim. Diff snapshot:
+`specs/sprint-phoenix-epic/evidence/wp5-phx2-design-rework-diff-ad49c48-8a54751.txt`
+(gitignored). A bounded delta Critic re-review (base `ad49c48`, head
+`8a54751`, prior finding IDs F1–F5, per `critic-review.md`'s Phase-2.6
+mechanism) is dispatched — not implementation yet.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
