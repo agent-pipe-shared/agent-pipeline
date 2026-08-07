@@ -1,0 +1,25 @@
+{
+  "schema": "pipeline.nova-gmw-verify-evidence.v1",
+  "candidate": {
+    "commit": "0b83a2e019e8a30e25a7fa2fa319a04faa7945f1",
+    "tree": "f0d2a519edb610a94b0ec529b14a191a1f1ccbe1",
+    "branch": "worktree-agent-ab84ec0efe49bd94a",
+    "worktreePath": "/home/skar667/src/agent-pipeline-share_nova/.claude/worktrees/agent-ab84ec0efe49bd94a"
+  },
+  "commitRange": [
+    "a58e8365722f549f27d00ece5c876b341c0b70e1",
+    "b974dda",
+    "db88788",
+    "0b83a2e019e8a30e25a7fa2fa319a04faa7945f1"
+  ],
+  "producedBy": {
+    "command": "node harness/scripts/verify.mjs",
+    "runFrom": "the worktree at agent-ab84ec0efe49bd94a, HEAD = candidate.commit",
+    "exitCode": 0,
+    "real": true,
+    "note": "Run by the Elephant directly against the dispatched Goldfish's worktree HEAD, after confirming the worktree was clean (git status --porcelain empty) and the commit history matched the design note's expected commit sequence."
+  },
+  "runId": "verify-1786101450014-d1ff0ba87867422b",
+  "suiteCount": 254,
+  "status": "passed"
+}
