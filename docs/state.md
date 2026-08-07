@@ -122,10 +122,21 @@ and the danger of an unscoped "lift everything" default.
   branch is merged and a real window can cover TP-*). Full disposition:
   `specs/sprint-nova-epic/evidence/nova-gmw/correction-1-2bc1fc8.md`
   (commit `6859869`, worktree branch).
-- **Not yet done:** F4/F5 application + a sealed real `verify.mjs` run
-  (blocked as above — needs PO action outside this session, or the branch
-  merge); a delta Critic re-review of `2bc1fc8` (scoped to F1-F3, since
-  F4/F5 cannot close inside this session); the bootstrap SessionStart
+- **Delta Critic review 2: FAIL** (bounded to INV-1/INV-2/INV-3 per Phase-2.6),
+  sealed at `specs/sprint-nova-epic/evidence/nova-gmw/critic-review-2-delta-2bc1fc8.md`
+  (commit `3b2d0b0`, worktree). INV-1 and INV-3 genuinely closed. **Finding 1
+  (major):** `installedAtMs` resets to `nowMs` on every `installGuardMaintenanceWindow`
+  call with no upper bound on a hand-built (non-`prepare()`) `subject.expiresAtMs`
+  — repeatedly re-installing an unchanged `{request, proof}` walks the read-time
+  ceiling forward indefinitely (bounded only by the signed value itself) from
+  ONE PO signature. Real but non-default precondition (requires a signed
+  request that bypassed `prepare()`'s own clamp). Correction round 2 needed,
+  scoped to this one finding, before Critic sign-off.
+- **Not yet done:** correction round 2 (Finding 1) + a further delta re-Critic;
+  F4/F5 application (patch scripts prepared for the PO to run outside a
+  guarded session — see `scratch/gmw-patch-check/patch-*.mjs` in this
+  checkout, syntax-validated but not committed, since `scratch/` is
+  scratch) + a sealed real `verify.mjs` run; the bootstrap SessionStart
   warning (design already written, appended to the same design-note commit
   `4398dde`); end-to-end testing with a real PO-signed proof (needs the
   PO's own external signing device/key — cannot happen inside any agent
