@@ -16,11 +16,16 @@
  * Hermetics: every spawn sets CLAUDE_PROJECT_DIR to a temp dir so a real project
  * guard-config on the machine can never leak into these cases.
  */
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
+
+import { closeGuardMaintenanceWindow, installGuardMaintenanceWindow, prepareGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
+import { livePluginRoots } from "./guard-gate-strength.mjs";
+import { PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
 
 const GUARD = fileURLToPath(new URL("./guard-testpath.mjs", import.meta.url));
 
@@ -148,8 +153,52 @@ check(
   { projectDir: CFG_ID_DIR, stderrIncludes: ["CUSTOM-01"], extraInput: { old_string: "a", new_string: "b" } },
 );
 
+// ---- F4 (ADR-0058): a real armed GMW window lifts a matching TP-* rule -----------------
+const GMW_DIR = mkdtempSync(join(tmpdir(), "guard-testpath-gmw-"));
+mkdirSync(join(GMW_DIR, ".claude"), { recursive: true });
+mkdirSync(join(GMW_DIR, "project"), { recursive: true });
+writeFileSync(join(GMW_DIR, ".claude", "guard-config.json"), JSON.stringify({
+  protectedTestPaths: [{
+    pattern: "plugins/pipeline-core/hooks/guard-git\\.test\\.mjs$",
+    reason: "The git-guard union test suite is the implementation contract for guard-git.mjs.",
+  }],
+}));
+writeFileSync(join(GMW_DIR, "plan.md"), "plan\n");
+writeFileSync(join(GMW_DIR, "spec.md"), "spec\n");
+const gmwPair = generateKeyPairSync("ed25519");
+const gmwPublicKey = gmwPair.publicKey.export({ type: "spki", format: "pem" });
+const gmwPublicKeySha256 = createHash("sha256").update(gmwPublicKey).digest("hex");
+writeFileSync(join(GMW_DIR, "project", "critical-human-proof.json"), JSON.stringify({
+  schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push"],
+  trustAnchor: { keyReference: "tp-e2e", publicKeySha256: gmwPublicKeySha256 },
+}));
+execFileSync("git", ["init", "-q"], { cwd: GMW_DIR });
+execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: GMW_DIR });
+execFileSync("git", ["config", "user.name", "Test"], { cwd: GMW_DIR });
+execFileSync("git", ["add", "-A"], { cwd: GMW_DIR });
+execFileSync("git", ["commit", "-q", "-m", "gmw-fixture"], { cwd: GMW_DIR });
+
+check("TP09 real armed GMW window scoped to TP-1 lifts the matching Edit", "Edit",
+  "D:/repo/plugins/pipeline-core/hooks/guard-git.test.mjs", ALLOW, (() => {
+    const livePluginRoot = livePluginRoots()[0];
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+      rootDir: GMW_DIR, scopeRuleIds: ["TP-1"], ttlSeconds: 300, reason: "TP09",
+      featureId: "tp-gmw-e2e", planSha256: createHash("sha256").update("plan\n").digest("hex"),
+      specSha256: createHash("sha256").update("spec\n").digest("hex"), policyRevision: "tp-gmw-e2e-v1", livePluginRoot,
+    });
+    const proof = {
+      schema: PO_APPROVAL_PROOF_SCHEMA, intentSha256: intent.sha256, keyReference: "tp-e2e", publicKey: gmwPublicKey,
+      signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), gmwPair.privateKey).toString("base64"),
+    };
+    installGuardMaintenanceWindow({
+      rootDir: GMW_DIR, request, trustPolicy: { keyReference: "tp-e2e", publicKeySha256: gmwPublicKeySha256 }, proof, livePluginRoot,
+    });
+    return { projectDir: GMW_DIR, stderrIncludes: ["pipeline-guard-maintenance-window", "TP-1 lifted"] };
+  })());
+closeGuardMaintenanceWindow({ rootDir: GMW_DIR });
+
 // ---- Summary -----------------------------------------------------------------------------
-for (const dir of [EMPTY_DIR, CFG_DIR, BROKEN_DIR, CFG_ID_DIR]) {
+for (const dir of [EMPTY_DIR, CFG_DIR, BROKEN_DIR, CFG_ID_DIR, GMW_DIR]) {
   try {
     rmSync(dir, { recursive: true, force: true });
   } catch {
