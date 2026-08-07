@@ -3,12 +3,12 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-06
+**Last updated:** 2026-08-07
 **Project status:** ACTIVE
-**Current block:** 0.5.2 patch-candidate recovery on the released `v0.5.1` baseline
+**Current block:** 0.5.2 released; Nova A closeout and Nova B disposition next
 **Repair baseline:** `5d2b83dcc765d50801f4491e1bd9bed32090112b`
-**Release version:** `0.5.1` released; `0.5.2` is the next local candidate
-**Release state:** version `0.5.1` · tag `v0.5.1` · commit `5d2b83dcc765d50801f4491e1bd9bed32090112b` · tree `86357b12e9366d65b20d682b4079e656a60e1415` · status `published`
+**Release version:** `0.5.2` released
+**Release state:** version `0.5.2` · tag `v0.5.2` · commit `6e2c9b2868d164ff3b631ab068fa5df20939e07d` · tree `23171c38a317d8cdf50baa013f54f5447e17f754` · status `published`
 
 The machine-readable public projection is [`release-state.json`](release-state.json).
 Its `observedAt` is the UTC time when this public projection was produced from
