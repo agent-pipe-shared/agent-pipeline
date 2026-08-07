@@ -136,6 +136,39 @@ the only instance that reaches an operator through tool output; and the German
 half carries a `### H5 Close-Koordinator` heading (`:649`) with no English
 counterpart, an EN/DE structural divergence outside R3.
 
+**Ledger rework 2 landed (`55d04d8`, +414/−137); Critic round 3/4 dispatched.
+The blocker could not be resolved as designed, and that is the result.** F-A
+asked for a portable identifier scheme that does not reproduce a value existing
+byte-identically in the machine-local record. The rework proved no such scheme
+exists: `scope.candidate` is the signed intent candidate, `scope.artifacts[].sha256`
+are the signed plan/spec digests, `validity.expiresAtEpochMs` is the signed
+expiry, `ruleDigest` recomputes from `subject.scopeRuleIds` + `openingTreeSha256`
+— every one byte-identical or recomputable by whoever holds that record. Dropping
+the request correlator would breach H-AC-11's own "expose request" clause while
+leaving an exact per-decision fingerprint intact. **Plainly: no identifier scheme
+satisfies both clauses of H-AC-11 at once.** §5.2 now states three rules
+separately — R-1 (portable content, holds), R-2 (portable ↔ governance store,
+holds in increment 2), R-3 (**does not hold**, disclosed per producer). For HGO
+the join reaches only digests; for **GMW** it reaches `subject.reason` in clear
+text and `proof.publicKey`/`keyReference`. So **increment 1 does not satisfy
+H-AC-11's no-join-handle clause for GMW**, §5.4's contrary designation is
+withdrawn, and the criterion-level amendment is specified in §9 rather than
+applied. Carried as **O-4** with owner and both exits, deliberately without a
+date. **This is a PO decision, not an Elephant one:** amend the criterion for
+GMW, or change GMW's machine-local record so nothing attributing remains there —
+the first edits a bound acceptance artifact, the second a module another session
+owns. Also new: **O-5**, `window.json` is a `writeAtomic` singleton while the
+ledger can hold two live grants, so two *distinct* concurrent requests diverge —
+disclosed, not designed around, because that would have been an unrequested
+design change.
+**Negative result worth keeping: plugin 0.5.3 does not fix the verify gate.**
+Re-tested against `55d04d8` in a detached worktree after the newer candidate was
+installed and reloaded — identical abort at `VERIFY-CLEANUP-REGISTRATION-REQUIRED`,
+first step, zero suites. This rules out the most plausible hypothesis and
+confirms the cause is the session's missing cleanup binding, not the plugin
+version. See
+`backlog/items/2026-08-07-verify-gate-unreachable-without-a-session-cleanup-binding.md`.
+
 **PO decision on R3's implementation boundary: B3 — sweep everything (APS,
 2026-08-07).** All 39 live agent-facing artifacts, ~232 citations, including the
 shipped plugin tree and one `.mjs`. The two narrower options (B1 = 2 files / 9
