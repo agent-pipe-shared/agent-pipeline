@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "2e07c84e97257ac1a114f5de9ae7c797a30c0ab8a27ca68b82c5461263137459"
+    "transitionHead": "716912c4a7f46b25167cc81b58b5d5069636711eed6158ab18b86270bcb1c09e"
   },
   "counts": {
-    "open": 37,
+    "open": 38,
     "in_progress": 21,
     "closed": 22
   },
@@ -187,6 +187,14 @@
       "owner": "pipeline",
       "created": "2026-07-20",
       "source": "Public V3 Foundation stabilization close authorship check: delivered Goldfish work packages lacked required public Dispatch trailers"
+    },
+    {
+      "id": "pipeline.dispatched-agents-return-truncated-mid-step",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "PO, 2026-08-07: 'die goldfische generell und criticer liefern seit einiger zeit immer abgeschnittenes das könnte an der WSL umgebung liegen'. Four instances measured in one session the same day."
     },
     {
       "id": "pipeline.documentation-information-architecture",
