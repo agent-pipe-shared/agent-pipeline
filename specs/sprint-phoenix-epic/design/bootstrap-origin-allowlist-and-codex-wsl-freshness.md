@@ -9,6 +9,14 @@ Companion backlog items:
 binding 2026-08-07 PO decisions that this design does not re-litigate; see each item's
 Triage section for the exact wording.
 
+**Model-policy disclosure (added per Critic finding F7 against commit `a75a45d`):** the
+design-phase dispatch that originally produced this document ran on `claude-sonnet-5` (per
+its scratchpad `dispatch-record.json`), below the Design-tier model `policies/model-policy.md`
+MP-23 mandates for design-phase/design-latitude work ("When in doubt whether a design-phase
+step ... needs the Design-tier model, it does"), with no rationale recorded at the time. This
+cannot be corrected retroactively for the artifact already produced; it is disclosed here,
+flagged by the Critic review, for the PO's awareness.
+
 This design covers two related, independently shippable repairs. Part A changes the
 bootstrap readiness gate's `status` semantics (blast radius: every session, every project,
 on the next plugin refresh). Part B repairs a Codex+WSL-only advisory freshness path (blast
@@ -38,17 +46,38 @@ rather than silently smoothed over — see §1.3.
 
 ### A.1 What guarantee is being restored
 
-Concretely: **the plugin code a session is about to trust at bootstrap is byte-identical to
-a clean checkout of one of the two reviewed Public-Core origins** —
-`https://github.com/agent-pipe-shared/agent-pipeline.git` or
-`git@github-public:agent-pipe-shared/agent-pipeline.git` — or, for local development, to the
-verified self-application layout. Without this check, `observePipelineStartPreflight`
-currently only compares version *strings* (`version` read from the loaded manifest vs.
-`installedVersion` read from the host's plugin list, `pipeline-start-preflight.mjs:211-215`)
-— it has no opinion on where those bytes actually came from, whether the working tree is
-dirty, or whether the manifest was hand-edited without touching the version string. A forked
-or locally altered marketplace clone with a matching version string currently passes
-readiness undetected.
+**Corrected per Critic finding F4 (MAJOR, commit `a75a45d`'s review):** the original text of
+this section claimed the check proves plugin code is "byte-identical to a clean checkout" of
+an allowlisted origin. Checked directly against Part A's actual mechanism
+(`observeGit`/`observeCodexPublicCoreIdentity`/`observePublicCoreIdentity` in
+`public-core-observation.mjs`): it performs **no remote read at all** — only local
+`rev-parse`/`remote get-url origin`/`status --porcelain`. It cannot prove byte-identity to any
+canonical remote copy; the "clean checkout" framing overclaimed what a purely local check can
+deliver.
+
+Concretely, the guarantee Part A actually restores is narrower: **the origin URL is one of
+the two reviewed Public-Core origins** — `https://github.com/agent-pipe-shared/agent-pipeline.git`
+or `git@github-public:agent-pipe-shared/agent-pipeline.git` — or, for local development, the
+verified self-application layout — **AND the plugin subtree carries no *uncommitted* local
+modification** (`git status --porcelain` clean). Without this check,
+`observePipelineStartPreflight` currently only compares version *strings* (`version` read
+from the loaded manifest vs. `installedVersion` read from the host's plugin list,
+`pipeline-start-preflight.mjs:211-215`) — it has no opinion on where those bytes actually
+came from, whether the working tree is dirty, or whether the manifest was hand-edited without
+touching the version string. A forked or locally altered marketplace clone with a matching
+version string currently passes readiness undetected; Part A closes exactly that gap, no
+more.
+
+**Disclosed limitation, not closed by this design (stated plainly, matching this document's
+own diligence standard elsewhere):** a clone whose remote origin is genuinely one of the two
+allowlisted URLs, but which is checked out at an arbitrary *committed* local commit/history
+(e.g. a locally amended, rebased, or cherry-picked history, or a detached-HEAD checkout of an
+arbitrary committed tree, on a clone that still reports one of the two allowlisted origin
+URLs), would still pass both checks — the origin-URL comparison only inspects the configured
+remote string, and `status --porcelain` only detects *uncommitted* drift, not which commit is
+checked out or whether that commit's history matches the real, reviewed origin's history.
+This is a real, disclosed limitation this design does not close, not a guarantee it
+provides.
 
 Verified byte-identical constant for the allowlist (pre-merge
 `plugins/pipeline-core/lib/codex-host-plugin-list.mjs:21-24` at commit `998a609`):
@@ -107,9 +136,15 @@ a negative result widen the existing `status` ternary (see §A.5) rather than re
    Public-Core URLs anywhere — `public-core-observation.mjs`'s `validRepository()` (lines
    132-150) accepts *any* syntactically well-formed credential-free `https`/`git@` origin,
    not just the two reviewed ones. The literal 2-entry allowlist Set and the ~5-line
-   comparison of `observation.candidate.repository` against it must be declared fresh (in
-   `pipeline-start-preflight.mjs`, or a small new shared constant module) using the same two
-   literal values verified in §A.1 — reusing the *values*, not the retired *module*.
+   comparison of `observation.candidate.repository` against it must be declared fresh using
+   the same two literal values verified in §A.1 — reusing the *values*, not the retired
+   *module*. **Resolved per Critic finding F5 (MAJOR, commit `a75a45d`'s review), see also
+   §A.7:** this constant is declared in its own small, new, dedicated module (e.g.
+   `plugins/pipeline-core/lib/public-core-origin-allowlist.mjs`, containing only the
+   allowlist Set and nothing else) rather than inline inside `pipeline-start-preflight.mjs` —
+   deliberately, so the gate-strength protection added in item 3 below can cover exactly this
+   gate-deciding constant without blocking ordinary, unrelated maintenance of the rest of
+   `pipeline-start-preflight.mjs`.
 2. **The shaping code that builds a `pipeline.ruleset-source.v1` object and calls
    `normalizeRulesetSource` on it.** No existing helper does this today; pre-merge, this
    shaping lived entirely inside the now-retired `observeCodexRulesetSource`
@@ -117,6 +152,19 @@ a negative result widen the existing `status` ternary (see §A.5) rather than re
    installedPluginRoot` by construction in this self-referential call, `loadedIdentity` and
    `installedIdentity` fed into `normalizeRulesetSource` are necessarily equal — see the
    open question in §A.4.
+3. **A `GATE_STRENGTH_PATHS` entry protecting the new allowlist module.** Added per Critic
+   finding F5: `guard-gate-strength.mjs`'s `GATE_STRENGTH_PATHS` (GS-1..GS-5, GS-7) does not
+   cover `pipeline-start-preflight.mjs` or any new constant module today, and GS-6 covers only
+   the *installed* live plugin root, not the source tree — so, before this design's fix, an
+   agent in a self-application session could weaken the new bootstrap gate by editing its own
+   two-URL allowlist with no PreToolUse refusal, and §A.5's failure-mode taxonomy had no
+   "allowlist constant was edited" case (a QG-06 gap: a known risk with no owner or
+   next-step). Direction chosen: **(a)**, not (b) — this is a small, disclosed, in-scope
+   addition, not an accepted-risk writeup: `guard-gate-strength.mjs` gains one new rule (next
+   free id after GS-7) whose `path` is the new module from item 1 above, refusing any
+   agent-session `Edit`/`Write` to it the same way GS-1..GS-7 already refuse writes to the
+   other gate-deciding files, with the same PO-edits-it-directly escape hatch. See §A.7 for
+   how this narrows, rather than voids, that section's scope exclusion.
 
 **Explicitly not revived:** the ~270-line plugin-list-parsing/`sourceClass`-computation
 machinery from pre-merge `codex-host-plugin-list.mjs` (`selectedPluginRecord`,
@@ -140,9 +188,12 @@ independently sourced ones. `normalizeRulesetSource` therefore functions here as
 schema-closure/validation pass, not a second independent identity source.
 
 **Question for the PO:** is that acceptable (the real guarantee comes entirely from
-`observeCodexPublicCoreIdentity`'s host-path attestation + clean-git-state + content-hash
-match, and `normalizeRulesetSource` is exercised only for its schema closure and to
-establish it as a genuine production caller — see the verification note up front), or does
+`observeCodexPublicCoreIdentity`'s host-path attestation + allowlisted origin URL +
+clean-git-state — **not** an independent content-hash match: per the paragraph above, that
+comparison is tautological in this exact self-referential calling pattern, so it is corrected
+here, per Critic finding F4, to remove that overclaim — and `normalizeRulesetSource` is
+exercised only for its schema closure and to establish it as a genuine production caller —
+see the verification note up front), or does
 the PO want a *second*, independently sourced installed-identity observation (e.g. calling
 `observeSelectedCodexPipelinePlugin` directly for its own path/version, independent of what
 `observeCodexPublicCoreIdentity` re-derives internally) so `normalizeRulesetSource`'s
@@ -160,7 +211,53 @@ make silently.
    exactly matches pre-merge precedent: `!sourceVersionBound` folded into the identical
    branch at pre-merge `pipeline-start-preflight.mjs:154` (`998a609`).
    `pipelineStartPreflightExitCode` (current main, lines 257-259) already treats
-   `"plugin-refresh-required"` as exit `0` — this failure class is soft/advisory on day one.
+   `"plugin-refresh-required"` as exit `0`.
+
+   **Corrected per Critic finding F1 (BLOCKER, commit `a75a45d`'s review):** "exit `0`" is not
+   the same as "soft/advisory," and the original text of this section wrongly conflated them.
+   Checked directly: this branch sets `nextAction: null`
+   (`pipeline-start-preflight.mjs:225`); the mandatory bootstrap skill
+   (`plugins/pipeline-core/skills/pipeline-start/SKILL.md:22-24` accepts this status but
+   requires `nextAction` "when ready"; `SKILL.md:59-61` requires executing the returned
+   `nextAction`; `SKILL.md:80-83` forbids printing the mandatory confirmation line on
+   non-ready state) — and `references/onboarding-recovery.md` has no documented recovery
+   entry for `"plugin-refresh-required"` (grep: no match). A session that trips this branch
+   today, pre-Part-A, already has nothing to execute and no printable confirmation; Part A
+   does not create this defect, but it multiplies its population from "version-mismatch
+   sessions only" to "every session, on the next plugin refresh" (this document's own stated
+   blast radius). That is not soft/advisory in any operationally meaningful sense as things
+   stand.
+
+   **Resolution chosen — direction (a): a distinct, minimal advisory `nextAction`, not a
+   softened claim.** Part A's implementation scope is widened (disclosed here, not silently
+   built in) to include a small change to `observePipelineStartPreflight`'s `nextAction`
+   computation, plus three companion files, so the branch this design widens actually has
+   something safe to do:
+   - `pipeline-start-preflight.mjs`: when `status === "plugin-refresh-required"`, return a
+     new, non-mutating, non-executing `nextAction` shape (e.g. `{kind: "advisory", executable:
+     null, argv: [], mutation: false, requiresConfirmation: false, executionBoundary,
+     expected: {schema: "pipeline.plugin-refresh-advisory.v1"}}`) instead of `null`.
+     `"ready"` keeps its existing onboarding action unchanged; `"plugin-identity-unavailable"`
+     keeps `nextAction: null` unchanged — that status stays the genuine hard block (exit `2`
+     per `pipelineStartPreflightExitCode`), untouched by this resolution.
+   - `SKILL.md` Step 1 (lines 59-61): recognize the `"advisory"` `nextAction` kind as "nothing
+     to execute, proceed to Step 2, surface the advisory" rather than an onboarding action to
+     run.
+   - `SKILL.md` Step 4 (lines 80-83): clarify the "non-ready" language that forbids the
+     confirmation line to mean "not `ready` and not `plugin-refresh-required`" — matching the
+     status list Step 0/`SKILL.md:22-24` already (inconsistently, today) accepts — so a
+     session that only trips an advisory refresh notice can still complete bootstrap and print
+     its confirmation, carrying the advisory forward, instead of being silently stuck with no
+     action and no confirmation.
+   - `references/onboarding-recovery.md`: add the missing documented entry for
+     `"plugin-refresh-required"` — advisory-only, no recovery action required, bootstrap
+     continues normally with the advisory noted in the confirmation line.
+
+   None of these four files is touched by this design-document revision itself (this document
+   stays design-only, per the header); they are the disclosed follow-on implementation surface
+   Part A's implementation dispatch must carry in addition to the origin/content attestation
+   itself — see §A.6 for the rollout framing and the PO's actual choice, including the
+   alternative (day-one hard block) this design does not recommend but discloses.
 2. **The check cannot run at all** (missing `git` binary, non-git flat-copy install, an
    unhandled exception inside the observer): both `observeCodexPublicCoreIdentity` and
    `observePublicCoreIdentity` already fail closed *internally* — every code path returns
@@ -188,23 +285,42 @@ install (not just local-development) preserves a `.git` directory at exactly
 running in the private-overlay path in production, not because this design re-verified it
 against a real marketplace install topology.
 
-Given that unverified assumption and §A.5's choice (fold into the existing, already-soft
-`"plugin-refresh-required"` branch rather than a new hard status), the worst realistic
-day-one outcome is a previously-silent "please refresh your plugin" advisory newly appearing
-on some sessions — never a new bootstrap failure, and never a new exit-code-2 case. This
-mirrors the *shape* of WP5's rollout choice (`specs/sprint-phoenix-epic/design/phx-2-additive-ledger-authority.md`
-§5: soft-launch before hard enforcement) even though the mechanism differs — WP5 used an
-opt-in `pipeline.user.yaml` key because its blast radius was zero-populated-ledgers-on-day-one;
-Part A instead reuses an already-existing soft status branch, because DoD constrains this
-design to reused primitives and minimal new surface, and because every session everywhere
-hits this path immediately (a config-gated rollout would need its own new config key, which
-this design deliberately avoids adding).
+**Corrected per Critic finding F1 (BLOCKER):** the original text below this point asserted a
+worst-case outcome that was not actually true of the mechanism as originally specified (see
+§A.5's correction). The framing here is now conditioned explicitly on whether §A.5's
+companion `nextAction`/`SKILL.md`/`onboarding-recovery.md` fix ships together with the
+origin/content attestation, because that fix is what makes the soft outcome real rather than
+asserted.
 
-**Flagged for the PO (secondary to §A.4):** is "soft/advisory on day one, hard block only as
-a later follow-up once observed clean across real installs" an acceptable reading of "fail
-closed, consistent with established convention" for this specific gate — or does the PO want
-day-one hard enforcement, accepting the regression risk against the untested assumption
-above?
+**If the §A.5 companion fix ships together with Part A's attestation** (this design's
+recommendation): given the unverified layout assumption above, the worst realistic day-one
+outcome is a previously-silent "please refresh your plugin" advisory newly appearing on some
+sessions, with a working `nextAction` and a printable confirmation line — never a new
+bootstrap failure, and never a new exit-code-2 case. This mirrors the *shape* of WP5's
+rollout choice (`specs/sprint-phoenix-epic/design/phx-2-additive-ledger-authority.md` §5:
+soft-launch before hard enforcement) even though the mechanism differs — WP5 used an opt-in
+`pipeline.user.yaml` key because its blast radius was zero-populated-ledgers-on-day-one; Part
+A instead reuses an already-existing status branch (now repaired to actually be soft, not
+merely labelled so), because DoD constrains this design to reused primitives and minimal new
+surface, and because every session everywhere hits this path immediately (a config-gated
+rollout would need its own new config key, which this design deliberately avoids adding).
+
+**If Part A's origin/content attestation ships WITHOUT the §A.5 companion fix:** the outcome
+is not the soft one described above — it reproduces the F1 defect at the new, wider scale
+this design's own attestation creates (`nextAction: null`, no printable confirmation, no
+documented recovery path, for every session the new attestation newly routes into
+`"plugin-refresh-required"`). This design does not recommend shipping Part A's attestation on
+its own for that reason.
+
+**Flagged for the PO (secondary to §A.4, corrected scope):** is treating the §A.5 companion
+fix as a hard prerequisite of Part A's ship (not a follow-up) — i.e., accepting the small,
+disclosed widening of Part A's own implementation surface to four files instead of one, so
+that "soft/advisory" is actually true — an acceptable reading of "fail closed, consistent
+with established convention" for this specific gate? Or does the PO instead want Part A's
+origin/content attestation to ship alone, accepting that its day-one failure mode is a
+genuine, undocumented, every-session-eligible bootstrap block (not the soft outcome originally
+promised) until a later follow-up repairs it — the honest "day-one hard block on a currently
+broad blast radius" alternative this correction discloses rather than glosses over?
 
 ### A.7 Explicitly out of scope (Part A)
 
@@ -221,7 +337,13 @@ above?
 - Promoting the failure mode from soft (`"plugin-refresh-required"`) to a new hard status —
   left as an explicit, PO-gated follow-up per §A.6.
 - Any change to `.claude/settings.json`, `.codex-plugin/plugin.json`, or any other
-  guardrail/config surface.
+  guardrail/config surface — **narrowed per Critic finding F5 (MAJOR, commit `a75a45d`'s
+  review):** this exclusion no longer covers the one `guard-gate-strength.mjs`
+  `GATE_STRENGTH_PATHS` addition specified in §A.3 item 3, which protects the new
+  origin-allowlist module itself. That one guardrail-surface change is now explicitly *in*
+  Part A's scope, disclosed here rather than left unprotected behind this blanket exclusion —
+  it does not reopen the exclusion for anything else (settings.json, plugin manifests, hook
+  wiring, or any other guardrail/config surface stay out of scope, unchanged).
 
 ---
 
@@ -307,17 +429,66 @@ revival of the old single-action model cannot express this — it would, at best
 an approximation of the alpha-channel `HEAD` read (and `HEAD` is not guaranteed identical to
 `refs/heads/main`) and leave stable/beta channel reads unrepaired.
 
-**New, and flagged as real remaining design surface (not a trivial rewire):** a small
-**closed family** of typed, individually schema/hash-validated host actions, generalizing
-`createFreshnessHostAction`'s existing one-action pattern to cover the operations
-`inspectPipelineUpdateAvailability` actually performs: `ls-remote-refs-heads-main`,
-`ls-remote-refs-tags`, `init-bare`, `fetch-commit(sha)` (with `sha` validated against
-`^[0-9a-f]{40}$` before it can enter an argv), `show-marketplace-manifest`. Each action must
-still reject any deviation from its own exact expected shape before a process is spawned —
-preserving the "boundary ID + request hash, no argv drift" property the threat model's asset
-table already requires (`docs/phoenix-governance-threat-model.md`, "Host network capability"
-row). This is genuinely new design work, not present in either pre-merge or main today; see
-§B.5 for the alternative this design rejects and why.
+**Corrected per Critic finding F2 (MAJOR, commit `a75a45d`'s review):** the original text of
+this paragraph listed exactly 5 members and claimed the family covers "the operations
+`inspectPipelineUpdateAvailability` actually performs" — that overclaimed. Checked directly,
+line by line, against every `run()`/`git()` call site in `ruleset-freshness.mjs`: the function
+makes **8** distinct git invocations in total, and only **2** of them touch the network at
+all — `ls-remote` (`:185`, resolving the channel target) and `fetch` (`:333`, pulling the
+selected commit into the disposable bare repo). The other **6** are local-disk-only and touch
+no network whatsoever:
+
+- `:84` `rev-parse --verify HEAD` — reads the LOADED plugin's own `.git` at `pluginRoot`
+  (`loadedIdentity()`). Purely local.
+- `:236` `rev-parse --git-path objects` — also reads the LOADED plugin's own `.git` at
+  `pluginRoot` (`pluginObjectPath()`), to locate the local objects directory used as a fetch
+  alternate. Purely local.
+- `:244` `--git-dir <temporary> show refs/pipeline/marketplace:<path>` — reads from the
+  **disposable LOCAL bare repo** (`temporary`, created at `:315` and fetched into at `:333`),
+  not the remote; by the time this runs, the manifest content already exists locally in
+  `temporary`'s object store.
+- `:255` `--git-dir <temporary> update-ref refs/pipeline/loaded <sha>` — writes a ref inside
+  the same disposable LOCAL bare repo, pointing it at the already-known loaded commit. No
+  network.
+- `:263` `--git-dir <temporary> rev-list --left-right --count ...` — a local ref-graph
+  comparison entirely inside the same disposable LOCAL bare repo. No network.
+- `:315` `init --bare --quiet <temporary>` — creates the disposable LOCAL bare repo itself, in
+  the OS tmpdir. No network.
+
+**Resolution — both (a) and (b), reconciled, not a choice between them:** all 8 invocations
+get a typed, individually validated shape in the closed family — preserving the "boundary ID
++ request hash, no argv drift" property the threat model's asset table requires
+(`docs/phoenix-governance-threat-model.md`, "Host network capability" row) for every command
+that can pass through the injected `options.spawn`, not only the network-touching ones — but
+the family is now explicitly **two classes**, not one flat list of 5:
+
+1. **Network-delegated class (2 members): `ls-remote-refs-heads-main`/`ls-remote-refs-tags`,
+   `fetch-commit(sha)`** (`sha` validated against `^[0-9a-f]{40}$` before it can enter an
+   argv). These are the only two shapes actually routed through the WSL-host-attested
+   App-Server channel (§B.1/§B.2(b)) — the genuine reason this design exists, since these are
+   the only two calls a Codex+WSL sandbox cannot complete directly.
+2. **Local-passthrough class (6 members): `rev-parse-verify-head`, `rev-parse-git-path-objects`,
+   `show-marketplace-manifest`, `update-ref-loaded`, `rev-list-left-right-count`,
+   `init-bare`.** Each is still matched against its own exact expected shape before it runs
+   (same argv-drift discipline as the network class), but on a match the substitute `spawn`
+   implementation executes it via the **ordinary, unrestricted local `spawnSync`** directly —
+   never through the App-Server host-attestation channel — because none of these six ever
+   leaves the local machine; the Codex+WSL sandbox DNS restriction this design exists to work
+   around does not apply to them at all, with or without this design.
+
+**The fork this finding identifies is resolved explicitly:** a command matching one of these
+8 typed shapes is executed (via the network-attested channel or local passthrough, per its
+class); a command matching **none** of the 8 shapes is **rejected** — the substitute `spawn`
+never falls through to plain, unvalidated `spawnSync` execution for anything outside this
+closed set. This is what keeps the threat model's "No direct fallback after restricted
+preflight" mitigation (`docs/phoenix-governance-threat-model.md:31`) intact: an unrecognized
+command never reaches a process at all, network-touching or not; only the recognized
+local-only shapes are consciously, deliberately excused from the host-attestation detour, not
+silently smuggled through it. This also corrects this paragraph's own opening framing: the
+family now genuinely covers every operation `inspectPipelineUpdateAvailability` performs (all
+8, not 5), and this document's claim to that effect is accurate rather than aspirational. This
+is genuinely new design work, not present in either pre-merge or main today; see §B.5 for the
+alternative this design rejects and why.
 
 ### B.4 Runner/host scoping condition
 
@@ -336,9 +507,17 @@ neither invented for this design:
 - **`wsl`:** `[env.WSL_DISTRO_NAME, env.WSL_INTEROP].some((v) => typeof v === "string" &&
   v.trim() !== "")` — verified present, byte-identical, in both pre-merge
   (`998a609:plugins/pipeline-core/scripts/pipeline-start-preflight.mjs:149-150`) and current
-  main (`pipeline-start-preflight.mjs:208-209`). Confirmed by repo-wide grep to be the
-  **sole** WSL-detection mechanism anywhere in the tree — no other file references either
-  env var.
+  main (`pipeline-start-preflight.mjs:208-209`). **Corrected per Critic finding F3 (MAJOR,
+  commit `a75a45d`'s review):** the original text here claimed a "repo-wide grep" confirmed
+  this the sole mechanism, but the Verification log at the end of this document records that
+  grep as scoped to `plugins/` only. Re-run genuinely repo-wide for this correction
+  (`grep -rln 'WSL_DISTRO_NAME\|WSL_INTEROP' --include='*.mjs' --include='*.md'
+  --include='*.json' .`, excluding `node_modules`): the only matches outside prose
+  documentation (this design document itself and the backlog item it cites, both of which
+  quote the mechanism rather than implement it) are
+  `plugins/pipeline-core/scripts/pipeline-start-preflight.mjs` and its own test file,
+  `pipeline-start-preflight.test.mjs`. Confirmed the **sole** WSL-detection mechanism in code
+  across the whole tree, now checked at the scope the claim actually asserts.
 
 **Confirmation for every other combination** (required by DoD item 4): Claude Code on any
 host (`runner === "claude"`, `wsl` true or false) → `executionBoundary` stays `"default"`.
@@ -351,11 +530,29 @@ boundary. This directly closes the concrete bug found in §B.2(a): today, a Clau
 session running inside a WSL shell (a real, unremarkable setup — Claude Code is an ordinary
 CLI, nothing stops it running under WSL) already computes `executionBoundary:
 "host-authorized-wsl"` even though Claude Code has no App-Server-attested control-channel
-mechanism at all (`hostControlBinding`/`observeCodexAppServer` are Codex-specific). That
-value is currently inert (nothing consumes it), so it causes no live incident today — but it
-is exactly the kind of latent scoping error this backlog item's investigation was launched
-to find, and it must be corrected as part of restoring `executionBoundary` to a load-bearing
-value in Part B.
+mechanism at all (`hostControlBinding`/`observeCodexAppServer` are Codex-specific).
+
+**Corrected per Critic finding F3 (MAJOR, commit `a75a45d`'s review):** the original text here
+claimed that value "is currently inert (nothing consumes it)." That is false, checked
+directly: `executionBoundary: "host-authorized-wsl"` is consumed today, live, as a mandatory
+host execution profile by
+`plugins/pipeline-core/skills/pipeline-start/SKILL.md:71-76` ("Treat
+`executionBoundary: "host-authorized-wsl"` as a mandatory host execution profile: submit the
+exact returned action directly at that boundary..."). A prior, already-closed backlog item —
+`backlog/items/2026-08-05-pipeline-state-rebind-codex-default-runner.md` (status `closed`,
+`closed_at: 2026-08-06`) — already recorded this exact defect as one of two cosmetic siblings
+of its primary finding: "a Claude Code session under WSL therefore receives Codex-specific
+instructions with no documented Claude-side equivalent." That prior item's own fix (commit
+`7514fb9`) reworded the adjacent Codex-sandbox-specific sentence in `SKILL.md:75-76` to be
+explicitly scoped to Codex ("For Codex, never first retry it..."), but left the first
+sentence — the one that treats `executionBoundary: "host-authorized-wsl"` itself as
+unconditionally mandatory, regardless of runner — untouched, because fixing the *source* of
+the mis-scoped value (this exact `pipeline-start-preflight.mjs:210` computation) was out of
+that fix's scope. So today, before Part B ships, a Claude-Code-under-WSL session is actively,
+incorrectly instructed to route through a host-attestation boundary it has no mechanism for.
+This is a real, live latent defect this backlog item's investigation was launched to find —
+not a dormant one — and Part B's §B.2(a) fix genuinely corrects it, which is a point in this
+design's favor, not the "nothing to see here, purely inert" framing the original text used.
 
 ### B.5 Failure mode
 
@@ -375,12 +572,17 @@ value in Part B.
   this design); `wsl` defaults to `false`/`"default"` boundary when neither WSL variable is a
   non-empty string. No new ambiguous state is introduced.
 - **This never becomes a hard bootstrap failure.** Per the repo's established convention
-  (`harness/session-bootstrap.md:154,162,167`; threat-model asset table row "Public ruleset
-  freshness"), an unavailable/ambiguous freshness read is advisory metadata only — it never
-  blocks bootstrap or write authority by itself (only the separate `repositoryFreshness`
-  mechanism gates writes). Part B's repair only *widens* when a genuine successful read can
-  occur; it never introduces a new way for freshness to fail *harder* than `unknown` already
-  does today.
+  (**corrected per Critic finding F8 (MINOR, commit `a75a45d`'s review)** —
+  `harness/session-bootstrap.md:159,162`, not `:154,162,167`: line `154` sits inside an
+  unrelated private-overlay bullet and does not support this claim; verified directly that
+  `:159` ("Ordinary marketplace drift is advisory metadata and never repository write
+  authority") and `:162` ("Offline/unavailable output is `unknown`, fail-open, and never a
+  freshness claim") are the two lines that actually state it; threat-model asset table row
+  "Public ruleset freshness"), an unavailable/ambiguous freshness read is advisory metadata
+  only — it never blocks bootstrap or write authority by itself (only the separate
+  `repositoryFreshness` mechanism gates writes). Part B's repair only *widens* when a genuine
+  successful read can occur; it never introduces a new way for freshness to fail *harder*
+  than `unknown` already does today.
 
 ### B.6 Doc updates required
 
@@ -414,6 +616,21 @@ Not flagging this now would repeat the exact kind of doc/code drift this session
 investigation already found once (`harness/session-bootstrap.md:159` itself was one such
 drift) — see the open item this leaves for the PO/Critic in §B.8.
 
+**`docs/phoenix-governance-threat-model.md:15` (the "Host network capability" asset-table row)
+— go. Added per Critic finding F6 (MINOR, commit `a75a45d`'s review):** §B.3 justifies the
+widening from one fixed host action to a family by citing exactly this row's "Required
+control" text — "WSL/restricted preflight binds one network-open, read-only host action by
+boundary ID and request hash" — but the original doc-update list here did not flag that this
+row is precisely what the widening falsifies. §B.3's corrected resolution (per F2) makes the
+row's accurate replacement text concrete: **two** network-open, read-only host actions
+(`ls-remote-refs-heads-main`/`ls-remote-refs-tags`, `fetch-commit`), each still bound by
+boundary ID and request hash — not one, and not the full 8-member closed family, since the
+other 6 members are the local-passthrough class that never crosses the host-network boundary
+this row describes at all. Like the sibling entry above, this design does not propose exact
+replacement wording beyond that substance, for the same reason (§B.3's action-family naming
+isn't finalized here) — flagged for the same follow-up edit at implementation time, tracked
+alongside it in §B.8's open item.
+
 ### B.7 Migration/rollout note
 
 Lower risk than Part A, and no opt-in flag is proposed. Today, **every** Codex+WSL session
@@ -424,10 +641,24 @@ if it succeeds, the session sees a genuine freshness comparison where it previou
 saw `unknown` — a strict improvement, nothing existing is removed. If any part of the
 attestation fails, the code path degrades to the **exact same** `unknown`/fail-open output
 sessions already receive today. There is therefore no plausible path from "working" to
-"broken" for Codex+WSL sessions, and **zero** behavioral change for every other runner/host
-combination (§B.4). No `pipeline.user.yaml` gate key is needed for Part B, unlike Part A —
-the failure mode is symmetric with the pre-repair baseline, which is exactly the condition
-under which WP5's own design (§5 there) treats an opt-in flag as unnecessary.
+"broken" for Codex+WSL sessions.
+
+**Corrected per Critic finding F3 (MAJOR, commit `a75a45d`'s review):** the original text here
+also claimed "**zero** behavioral change for every other runner/host combination." That is
+false, falsified by this design's own §B.2(a) fix and §B.4's confirmation section: a
+Claude-Code-under-WSL session sees exactly one behavior change — it stops being incorrectly
+instructed (via `SKILL.md:71-76`, per §B.4's correction above) to route through a
+host-attestation boundary it has no mechanism for, because `executionBoundary` correctly
+computes `"default"` for it after this fix instead of the wrong `"host-authorized-wsl"`. The
+accurate claim is narrower: **the one behavior change for a non-Codex/non-WSL-Codex
+combination is this exact bug fix, and it is strictly a fix, never a regression** — Claude
+Code under WSL had no way to satisfy the mandatory boundary instruction it was incorrectly
+given (no App-Server-attested control channel exists for it), so the prior state was a latent
+defect, not a working behavior this design changes for the worse. Every runner/host
+combination other than Codex+WSL and Claude-under-WSL is genuinely unaffected. No
+`pipeline.user.yaml` gate key is needed for Part B, unlike Part A — the failure mode is
+symmetric with the pre-repair baseline, which is exactly the condition under which WP5's own
+design (§5 there) treats an opt-in flag as unnecessary.
 
 ### B.8 Explicitly out of scope (Part B)
 
