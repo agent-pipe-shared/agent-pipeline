@@ -95,6 +95,11 @@ export const GATE_STRENGTH_PATHS = Object.freeze([
     path: "plugins/pipeline-core/lib/public-core-origin-allowlist.mjs",
     reason: "public-core-origin-allowlist.mjs is the two reviewed Public-Core origins the bootstrap self-application check compares its own origin against -- widening it widens what the readiness gate accepts as attested.",
   }),
+  Object.freeze({
+    id: "GS-9",
+    path: "plugins/pipeline-core/lib/self-application-attestation-gate.mjs",
+    reason: "self-application-attestation-gate.mjs decides whether the bootstrap origin/content attestation runs at all and whether its result fails -- disabling it disables the GS-8 allowlist comparison with it.",
+  }),
 ]);
 
 export const LIVE_PLUGIN_RULE = Object.freeze({
