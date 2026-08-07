@@ -114,6 +114,43 @@ mechanism) is dispatched — not implementation yet.
 
 **Delta re-review 1 (2026-08-07): FAIL.** Full findings:
 `specs/sprint-phoenix-epic/evidence/wp5-phx2-design-critic-delta-review-1-8a54751.md`.
+F1–F5 all genuinely resolved; the F1 fix itself introduced a new MAJOR
+(unguarded `discoverRepository(...)` call with no try/catch in
+`guard-push.mjs` — an uncaught throw exits the hook at code 1, which the
+hook's exit-code contract treats as ALLOW, discarding every other
+accumulated push-gate failure) plus 3 MINOR. A narrowly-scoped second rework
+(F-A/F-B/F-C/F-D only) was dispatched.
+
+**Second rework (2026-08-07): landed, commit `099a31b`.** Wraps both
+`discoverRepository(...)` calls in try/catch with an explicit fail-closed
+`PUSH-EXTERNAL-LEDGER-TOPOLOGY-UNRESOLVED` disposition (F-A); withdraws the
+ADR-0029-forbidden manual-hand-edit recovery option, leaving a fresh signing
+ceremony as the sole recovery path (F-B); adds a distinct `EEXIST` →
+`PUSH-EXTERNAL-LEDGER-ALREADY-CONSUMED` taxonomy entry, the mechanism's own
+replay signal rather than a retryable condition (F-C); corrects the
+"one universal primitive, already imported" overclaim — two related
+worktree-invariant primitives exist, and `discoverRepository` is a net-new
+import at both integration points (F-D). F1–F5's prior resolutions are
+unchanged.
+
+**Process note:** this rework's content was produced by dispatch
+`WP5-phx2-design-rework-2`, but its own commit attempt was absorbed by a
+concurrent, unrelated Elephant-session commit via a shared-index race
+(staging + committing were not atomic across the two sessions on the same
+live checkout). The dispatch's own scratchpad `dispatch-record.json`
+correctly self-diagnosed the collision and verified its content
+byte-for-byte against its intended diff rather than silently reporting
+success. The Elephant split the colliding commit locally (`git reset --soft`,
+unpushed, nothing lost) into `099a31b` (the design-file change, carrying the
+proper `Dispatch: WP5-phx2-design-rework-2 (goldfish)` trailer) and a
+separate docs-only commit — restoring correct authorship attribution before
+the next Critic pass, since the Critic contract's authorship check (EL-01/
+EL-16) depends on it. A second bounded delta Critic re-review (base `8a54751`,
+head `099a31b`, prior finding IDs F-A/F-B/F-C/F-D) is dispatched next —
+Critic round 3 of the 4 allowed for this package (initial + delta 1 + delta 2).
+
+**Delta re-review 1 (2026-08-07): FAIL.** Full findings:
+`specs/sprint-phoenix-epic/evidence/wp5-phx2-design-critic-delta-review-1-8a54751.md`.
 F1–F5 are all genuinely resolved, but the F1 fix itself introduces a new
 MAJOR defect (F-A): both integration points now call `discoverRepository(...)`
 unguarded, and `guard-push.mjs` has no try/catch around either call site —

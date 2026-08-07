@@ -161,9 +161,23 @@ freehand). Status:
    `EEXIST` taxonomy entry; an overclaimed "every call site" justification).
    Full findings:
    `specs/sprint-phoenix-epic/evidence/wp5-phx2-design-critic-delta-review-1-8a54751.md`.
-   A second, narrowly-scoped rework (F-A/F-B/F-C/F-D only) is dispatched next,
-   then a second delta re-review — Critic round 3 of the 4 allowed for this
-   package.
+   **Second rework: landed, commit `099a31b`.** Wraps both
+   `discoverRepository(...)` calls in try/catch with an explicit fail-closed
+   disposition (F-A); withdraws the ADR-0029-forbidden hand-edit recovery
+   option (F-B); adds a distinct `EEXIST` replay-signal taxonomy entry (F-C);
+   corrects the "one universal primitive" overclaim (F-D). **Process note:**
+   this commit's content was produced by dispatch `WP5-phx2-design-rework-2`,
+   but a concurrent Elephant-session commit absorbed its staged edits via a
+   shared-index race before the dispatch could commit them itself (both
+   sessions were writing to the same live checkout). The dispatch's own
+   `dispatch-record.json` self-diagnosed the collision and verified its
+   content byte-for-byte rather than silently reporting success; the
+   Elephant then split the colliding commit locally (`git reset --soft`,
+   unpushed, nothing lost) to restore the correct `Dispatch: ... (goldfish)`
+   trailer before the next Critic pass, since the Critic's authorship check
+   (EL-01/EL-16) depends on it. A second bounded delta Critic re-review
+   (base `8a54751`, head `099a31b`) is dispatched next — Critic round 3 of
+   the 4 allowed for this package.
 
 **Infra finding, 2026-08-07:** the `isolation: "worktree"` dispatch option
 pinned two of three agents' worktrees to `6e2c9b2` (origin/main's pre-merge
