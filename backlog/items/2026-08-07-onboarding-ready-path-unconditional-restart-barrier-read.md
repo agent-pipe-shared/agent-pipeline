@@ -57,7 +57,20 @@ before proposing a fix — the two may share a root cause or a fix.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accept-open.
+- **Rationale:** re-verified 2026-08-07:
+  `project-onboarding-v3.mjs:3014-3017` still calls
+  `readRestartBarrier({ rootDir: legacy.root, repositoryCapability:
+  repository.mode, deps: fs })` unconditionally inside the ready-path branch,
+  with no runner check. The 2026-08-06 runner-identity-threading fix
+  (`c860e1d`) reworked `plan*`/`apply*` call sites and `lifecycleArgv` but did
+  not touch this call site — confirmed via `git log -G"readRestartBarrier\(\{
+  rootDir"` showing only one prior commit (`a8bd954`, predating this item).
+- **Assignment (if accepted):** as the item's own Proposal already states,
+  pair with `backlog/items/2026-08-06-restart-launch-is-codex-only-for-every-runner.md`
+  — both are open, both sit in runner-neutrality gaps adjacent to the same
+  `restart-required`/ready-path machinery, and may share a root cause or a
+  fix. First step for whoever picks this up: determine whether
+  `readRestartBarrier` is meaningfully Codex-specific or only its naming is.
+  No PO scope call needed to start that investigation.
+- **Date:** 2026-08-07

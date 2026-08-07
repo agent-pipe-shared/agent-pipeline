@@ -76,6 +76,16 @@ directly outside a session should apply the split and re-run
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-Not yet triaged. Filed at the PO's explicit request to work through the
-Critic's 0.5.2 findings; fix drafted above but blocked from application
-in-session, consistent with GS-6's designed behavior.
+- **Decision:** accept-open.
+- **Rationale:** correctness gap in an audit-trail's human-readable field,
+  real but low-severity (the machine-checkable `evidence.commit` binding is
+  unaffected, per the item's own Description) and low-risk to fix (a
+  two-line conditional, already drafted and reviewed in this item). No
+  design latitude remains — the fix is fully specified.
+- **Assignment (if accepted):** `goldfish-mechanic` (mechanical, uniform,
+  fully-specified — no in-task design decisions) once dispatched from a
+  session or PO edit not bound by this checkout's GS-6 restriction on
+  `plugins/pipeline-core/**`, applying the drafted `CLOSED_REASON` split to
+  `reconcile-backlog-ledger.mjs`, then re-running
+  `reconcile-backlog-ledger-tests` and `backlog-state-check`.
+- **Date:** 2026-08-07

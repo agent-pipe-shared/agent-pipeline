@@ -47,7 +47,15 @@ Owner: PO. Due: 2026-09-05.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accept-deferred.
+- **Rationale:** re-verified 2026-08-07: `plugins/pipeline-core/hooks/` has a
+  Codex-only session-start hint (`codex-session-start-hint.mjs`) with no
+  Claude equivalent; no commit since filing adds a bare-repo, pre-plugin-
+  install adoption hint for Claude sessions. The gap is real and, as the
+  item's own Description states, is feature work needing its own PRD/Spec —
+  not something to scope by inference here.
+- **Assignment (if accepted):** needs a PO scope decision first (is this
+  in-repo hint-only, or a fuller onboarding flow matching Codex's V4
+  onboarding?), then a normal kickoff/PRD/Spec cycle. Not blocking 0.5.2 or
+  Nova B.
+- **Date:** 2026-08-07

@@ -96,7 +96,20 @@ Owner: PO. Due: 2026-09-06.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accept-deferred.
+- **Rationale:** re-verified 2026-08-07:
+  `localPluginInstallSourceObservation` (now at `human-guard-override.mjs:197-240`)
+  still only hashes this checkout's own `marketplace.json`, `plugin.json`,
+  and source tree; it never resolves or hashes the external
+  `agent-pipeline-local` marketplace root. Only `c4d4034` (2026-08-06,
+  "state the local-plugin-install attestation's true scope") has landed
+  since filing, and it only fixed the human-facing preview text — exactly
+  the narrow GATE-HONESTY-11 scope this item's own "Triggering situation"
+  already names as *not* the fix. The underlying attestation gap is
+  unpatched and, per the item's own reachability note, now live (no longer
+  fail-closed dead).
+- **Assignment (if accepted):** as the item's Proposal already states,
+  `goldfish-deep` with a T1 Critic round on the result — this is
+  design/attestation work on a security-relevant install path, not a
+  same-session mechanical fix.
+- **Date:** 2026-08-07

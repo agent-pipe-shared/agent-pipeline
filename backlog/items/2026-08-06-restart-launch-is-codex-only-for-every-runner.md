@@ -68,7 +68,17 @@ confirming the actual runtime behavior, not just the naming.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accept-open.
+- **Rationale:** the item's own two open questions (is
+  `codex-onboarding-launch.mjs` actually runner-generic in effect, and does
+  a live Claude session ever reach this `nextAction`) are unanswered and
+  should be answered before any fix is designed — this is exactly the class
+  of issue the item's own "Attempt 1" caution warns against fixing on
+  naming alone. Not investigated further this session; no new evidence
+  changes the item's own assessment.
+- **Assignment (if accepted):** pair with
+  `backlog/items/2026-08-07-onboarding-ready-path-unconditional-restart-barrier-read.md`
+  (filed the same sprint, adjacent runner-neutrality gap in the same
+  ready/restart machinery) — investigate both together, they may share a
+  root cause or a fix.
+- **Date:** 2026-08-07

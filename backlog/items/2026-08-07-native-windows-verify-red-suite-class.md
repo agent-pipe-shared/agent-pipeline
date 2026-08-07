@@ -61,7 +61,22 @@ here rather than as isolated one-off items.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accept-deferred.
+- **Rationale:** re-verified 2026-08-07: the item's own Description already
+  correctly lists the individually-filed Windows defects it knows of as
+  closed (`po-gate-authority-path-canonicalization`,
+  `windows-verify-brittle-test-hygiene`); the same is true of the other
+  Windows-named items filed this sprint (`windows-private-state-assurance`,
+  `windows-trusted-tool-resolution`, `windows-verify-reproducibility`,
+  `windows-runtime-baseline-containment`, `windows-directory-durability`),
+  all `status: closed`. Nothing has re-measured the class-level 11/25 count
+  since the original measurement — this session runs on Linux/WSL and cannot
+  execute that measurement itself, so the class-level disposition is
+  unchanged from filing.
+- **Assignment (if accepted):** PO, next time native Windows access (Git-Bash
+  and PowerShell) is available — run Verify on both shells against current
+  HEAD, diff the red-suite count against the original 11/25 baseline, and
+  either continue closing individual fixed suites as already happens, or, if
+  a remainder is large enough to warrant it, record it as one dated
+  inventory here rather than as isolated one-off items.
+- **Date:** 2026-08-07

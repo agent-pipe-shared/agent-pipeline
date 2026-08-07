@@ -107,6 +107,27 @@ commitment to any of them:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-Not yet triaged. Filed same-session as the finding, at the PO's explicit
-request to record it immediately rather than let it live only in chat
-history (operating-model §5.1, P2).
+- **Decision:** accept-open, partially addressed.
+- **Rationale:** candidate #1 of this item's own Proposal — "one
+  authoritative, current document" naming every layer, agent-executable vs.
+  PO-only, exact commands — is now written:
+  [`docs/push-release-flow.md`](../../docs/push-release-flow.md), pointed to
+  from CLAUDE.md's bootstrap-read "Push policy" bullet and "Where things
+  live" section so it is read once per session rather than rediscovered
+  live, as this item's own text asked for. This closes the *documentation*
+  half of the finding, not the underlying composition: candidates #2
+  (whether the harness classifier can be pre-cleared at the settings level),
+  #3 (whether `prepare-critical`'s cross-repo refusal can be narrowed), and
+  #4 (a deliberate PO cost/benefit review of whether five stacked layers is
+  the intended posture) are all still open and are explicitly PO-territory
+  calls per the item's own Proposal — none should be picked unilaterally by
+  an agent. The PO's underlying verdict ("unusable for third parties as
+  shipped") stands until at least one of #2-#4 is actually decided and
+  acted on, not just documented.
+- **Assignment (if accepted):** #2 and #3 are candidates for a future
+  Goldfish/design dispatch once the PO makes the call in #4; #3 overlaps
+  `backlog/items/2026-08-07-gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions.md`'s
+  narrower scope and should be designed together with it rather than
+  separately, since both are instances of "guard drawn at a whole-directory
+  boundary rather than at what actually needs protecting."
+- **Date:** 2026-08-07
