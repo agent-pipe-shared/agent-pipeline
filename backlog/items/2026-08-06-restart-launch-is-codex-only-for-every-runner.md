@@ -82,3 +82,19 @@ confirming the actual runtime behavior, not just the naming.
   ready/restart machinery) — investigate both together, they may share a
   root cause or a fix.
 - **Date:** 2026-08-07
+
+## Update, 2026-08-07 (second live session)
+
+A second onboarding test (`rune_test1_claude` line of work, same day) reached
+this same territory in a genuinely live session using `--runner claude`
+throughout, and the returned restart `nextAction` still named
+`codex-onboarding-launch.mjs` — partial evidence toward this item's own open
+question "does a live Claude Code session ever actually reach this
+`nextAction` in practice?" (above). This is still a static reading of the
+returned JSON, not an executed restart (the process-exiting launch itself was
+not run, same caution as the original finding) — the other open question,
+whether `codex-onboarding-launch.mjs` is actually runner-generic in effect,
+remains unanswered. Full detail, including the precise unrelated guard-grammar
+trap hit on the way there, is in the sibling item
+`backlog/items/2026-08-07-onboarding-restart-flow-is-codex-only-not-runner-aware.md`
+("Additional evidence, 2026-08-07" section).

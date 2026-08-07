@@ -98,6 +98,48 @@ following the auto-launch action when it appears.
    `onboarding-recovery.md` to include `--runner {{RUNNER}}` explicitly, so a
    copy-reconstruction can't silently drop it.
 
+## Additional evidence, 2026-08-07 (second independent repro)
+
+A second live onboarding test in the same `rune_test1_claude` line of work
+reproduced the same shape from a different angle and surfaced two more
+findings, independently re-verified against current HEAD in the Nova GMW
+session (`plugins/pipeline-core/lib/project-onboarding-v3.mjs:1455-1474`
+re-read directly, unchanged since this item was filed):
+
+1. **`restartAction(_root, barrierSha256)` re-confirmed unchanged.** `_root` is
+   still unused (underscore-prefixed) and there is still no `runner`
+   parameter anywhere in the function signature or its call site
+   (`lib/project-onboarding-v3.mjs:3055`) -- the analysis above still holds
+   verbatim against current HEAD, not just the commit this item was
+   originally filed against.
+2. **`scripts/native-plugin-readback.mjs` is not a usable starting point for
+   the fix.** It looked, from its filename alone, like it might be an
+   existing Claude-native counterpart to `codex-onboarding-launch.mjs`.
+   Independently checked: `grep -rl "native-plugin-readback"
+   plugins/pipeline-core --include=*.mjs` returns only its own test file --
+   it is reachable from nowhere in the onboarding/restart lifecycle. Reading
+   its own schema (`pipeline.btm-d2-native-readback.v1`) and phase names
+   (`prepared`, `update-observed`, `reload-observed`, `trust-observed`,
+   `fresh-session-observed`, `verified`, `blocked`) shows it is actually a
+   **native plugin install/update readback verifier** -- checking that a
+   `claude plugin update` + reload/restart actually took effect -- not a
+   restart *launcher* at all. It is dead code today (unwired, tested only in
+   isolation) and not directly reusable for this item's fix; a genuine
+   Claude-native restart path still needs to be built from scratch.
+3. **A separate, upstream guard-grammar defect was hit and worked around
+   while reaching this point**, now filed separately:
+   [`2026-08-07-guard-lifecycle-ready-rejects-plan-runtime-intent-argv.md`](2026-08-07-guard-lifecycle-ready-rejects-plan-runtime-intent-argv.md).
+   It does not change this item's root cause, but explains why a session
+   following the tool's own suggested command literally can dead-end one
+   step earlier than the restart action itself.
+
+Conclusion unchanged from root cause #1: even with `--runner claude` threaded
+correctly from the very first command (which the guard-grammar defect above
+made harder than it should be), a session still lands on
+`codex-onboarding-launch.mjs` at the restart step. This is a real, live-path
+gap, not only a static-reading concern -- confirmed twice now, from two
+independent onboarding-test sessions.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 Not yet triaged -- the PO submitted this as a detailed, reproducible defect
@@ -105,4 +147,6 @@ report (not urgent enough to interrupt in-progress GMW work) with a known
 manual workaround. Left `status: open`, untriaged, for a session with
 capacity to thread `runner` through the onboarding module properly (guardrail/
 core-logic change -- belongs in a full Goldfish-deep + Critic dispatch, not a
-same-session hotfix).
+same-session hotfix). The second repro above (2026-08-07) does not change
+this assessment; it strengthens the evidence without closing the sizing
+question.
