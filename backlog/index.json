@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "716912c4a7f46b25167cc81b58b5d5069636711eed6158ab18b86270bcb1c09e"
+    "transitionHead": "42a2048d24634ed73198024e1a4bcd9fce454014d47d2f758007dc06e76e32fa"
   },
   "counts": {
-    "open": 38,
-    "in_progress": 21,
-    "closed": 22
+    "open": 56,
+    "in_progress": 26,
+    "closed": 23
   },
   "items": [
     {
@@ -63,6 +63,35 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "NOVA-GMW-1 first dispatch attempt, 2026-08-07 -- Agent tool isolation:worktree."
+    },
+    {
+      "id": "pipeline.anchor-check-passes-on-wrong-language-content",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07"
+    },
+    {
+      "id": "pipeline.approval-mechanisms-require-out-of-session-po-acts",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07"
+    },
+    {
+      "id": "pipeline.attestation-git-presence-gate-not-gs8-protected",
+      "status": "in_progress",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07"
+    },
+    {
+      "id": "pipeline.authority-signing-terminal-contract",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-06",
+      "source": "Phoenix §7 authority revision; approve step failed twice inside an agent session"
     },
     {
       "id": "pipeline.backlog-delivery-status-reconciliation",
@@ -189,12 +218,26 @@
       "source": "Public V3 Foundation stabilization close authorship check: delivered Goldfish work packages lacked required public Dispatch trailers"
     },
     {
+      "id": "pipeline.dispatch-templates-cite-restructured-operating-model-sections",
+      "status": "in_progress",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07"
+    },
+    {
       "id": "pipeline.dispatched-agents-return-truncated-mid-step",
       "status": "open",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "PO, 2026-08-07: 'die goldfische generell und criticer liefern seit einiger zeit immer abgeschnittenes das könnte an der WSL umgebung liegen'. Four instances measured in one session the same day."
+    },
+    {
+      "id": "pipeline.dispatches-report-completed-on-a-truncated-fragment",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07"
     },
     {
       "id": "pipeline.documentation-information-architecture",
@@ -238,6 +281,28 @@
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.gate-strength-shell-comment-understates-its-own-scope",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07"
+    },
+    {
+      "id": "pipeline.gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-08-07"
+    },
+    {
+      "id": "pipeline.governance-product-verify-suites-deregistered",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "merge report section 4 finding 3 and section 7.3 (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361"
     },
     {
       "id": "pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions",
@@ -288,6 +353,29 @@
       "source": "PO request in the 2026-08-07 Nova session for a deliberate confirmation before PIN entry, explicitly qualified as language-profile dependent; partially delivered by NOVA-PO-CONFIRM-1 in commits 5efb0f1 and 584a598."
     },
     {
+      "id": "pipeline.human-legible-approval-record",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-06",
+      "source": "Product Owner requirement raised at the Phoenix plan-approval gate"
+    },
+    {
+      "id": "pipeline.ledger-backed-plan-and-push-authority-absent-on-merged-base",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "merge report section 4 findings 1/2/4/5/6/11 (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361"
+    },
+    {
+      "id": "pipeline.live-plugin-root-undefended-in-the-shell-lane",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07"
+    },
+    {
       "id": "pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root",
       "status": "open",
       "type": "defect",
@@ -324,6 +412,20 @@
       "source": "close-block self-retro, 0.4.4 managed-workspace onboarding hotfix"
     },
     {
+      "id": "pipeline.marketplace-install-topology-unattested",
+      "status": "in_progress",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07"
+    },
+    {
+      "id": "pipeline.module-scope-manifest-read-rearms-the-disarm-by-config-fault",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07"
+    },
+    {
       "id": "pipeline.mp22-orchestrator-self-implementation-has-no-enforcement",
       "status": "open",
       "type": "defect",
@@ -356,12 +458,26 @@
       "source": "Sprint Nova session, 2026-08-06, ADR-0054 step 1 (routing hardcoded readers through resolveProjectAuthorityPaths). Comparing the two authority tiers before routing more readers to the resolver revealed that the tier the resolver PREFERS is the one nothing maintains."
     },
     {
+      "id": "pipeline.no-check-validates-prose-section-citations",
+      "status": "open",
+      "type": "improvement",
+      "owner": "pipeline",
+      "created": "2026-08-07"
+    },
+    {
       "id": "pipeline.no-gate-is-tested-end-to-end-for-satisfiability",
       "status": "open",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-06",
       "source": "PO question, 2026-08-06: why does an agent keep stopping and asking instead of working under the operating model. Investigating produced a structural answer rather than a behavioural one — four gate defects in a single session, none found by the suite."
+    },
+    {
+      "id": "pipeline.no-test-pins-the-ungoverned-path-rule-stand-down",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07"
     },
     {
       "id": "pipeline.nonblocking-interaction-continuity",
@@ -421,6 +537,14 @@
       "source": "Observed live during a 2026-08-07 wave of five parallel Nova A evidence-sealing Goldfish dispatches, each briefed 'Worktree: no' on the reasoning that their file scopes were disjoint."
     },
     {
+      "id": "pipeline.part-a-limitation-2-orphaned-by-the-r2-rework",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "Critic finding F2 on PHX-R2-THREATMODEL-rework (specs/sprint-phoenix-epic/evidence/phx-r2-threatmodel-rework-critic-review-ad5d185.md). Recorded by the Elephant as the disposition of that finding — the item the finding says was missing."
+    },
+    {
       "id": "pipeline.pipeline-state-rebind-codex-default-runner",
       "status": "closed",
       "type": "defect",
@@ -474,6 +598,18 @@
       "closureEvidence": "backlog/evidence/2026-07-24-completed-companion-deliveries.md"
     },
     {
+      "id": "pipeline.project-authority-dual-state-repair-and-failclosed-gate",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "merge report section 4 finding 8 and the two narrowed findings on po-gate-authority.mjs (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361",
+      "closedAt": "2026-08-07",
+      "closureRepository": "self",
+      "closureCommit": "1f070c91743b7340c59ea5836286cd632bb0eba8",
+      "closureEvidence": "backlog/evidence/2026-08-07-project-authority-failclosed-closure.md"
+    },
+    {
       "id": "pipeline.project-scoped-github-issue-operations",
       "status": "in_progress",
       "type": "workflow-improvement",
@@ -501,6 +637,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "PO, live during the 0.5.2 main-release session, 2026-08-07 — verbatim: 'Eine Entwickler Agent-Pipeline die nicht pushen und releasen kann ist unbrauchbar, außerdem viel zu unhandlich mit so vielen Freigaben.'"
+    },
+    {
+      "id": "pipeline.readonly-command-guard-classification",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-07-26",
+      "source": "Phoenix close self-retro; specs/sprint-phoenix-epic/RECOVERY.md R-02"
     },
     {
       "id": "pipeline.ready-gate-env-var-runner-authority",
@@ -568,6 +712,21 @@
       "source": "Manual re-run of the empty-directory onboarding smoke test in scratch/onboarding-smoke-test while re-verifying backlog/items/2026-08-06-onboarding-lifecycle-plan-hardcodes-the-codex-runner.md (see backlog/evidence/2026-08-06-onboarding-runner-identity-reverification.md), 2026-08-06."
     },
     {
+      "id": "pipeline.ruleset-freshness-wsl-subsystem-absent",
+      "status": "in_progress",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "merge report section 4 finding 10 (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361"
+    },
+    {
+      "id": "pipeline.ruleset-source-test-unregistered-in-the-verify-gate",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07"
+    },
+    {
       "id": "pipeline.runtime-projection-v2-eager-manifest-load",
       "status": "open",
       "type": "defect",
@@ -586,6 +745,14 @@
       "closureRepository": "self",
       "closureCommit": "83111227cb59eff7d186c49aadc6963f78232b77",
       "closureEvidence": "backlog/items/2026-07-25-security-scan-cross-branch-gitleaks-findings.md"
+    },
+    {
+      "id": "pipeline.self-application-integrity-check-absent",
+      "status": "in_progress",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "merge report section 4 findings 7 and 9 (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361"
     },
     {
       "id": "pipeline.sentinel-go-live-completion",
@@ -627,6 +794,14 @@
       "closureRepository": "self",
       "closureCommit": "d3db4a07dee565c1eeee2eb1e1e77ffcd2ca4e0a",
       "closureEvidence": "backlog/evidence/2026-08-06-second-reconciliation-pass.md"
+    },
+    {
+      "id": "pipeline.signed-authority-binding-durability",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-06",
+      "source": "Phoenix §7 authority revision; observed directly during the revision sequence"
     },
     {
       "id": "pipeline.source-available-commercial-licensing",
@@ -691,6 +866,14 @@
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.verify-gate-unreachable-without-a-session-cleanup-binding",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "Elephant diagnosis while dispositioning Critic finding F1 on PHX-R2-THREATMODEL-rework (2026-08-07). The symptom was already recorded in docs/state.md as an unexplained infra gap; this item records the measured cause."
     },
     {
       "id": "pipeline.windows-directory-durability",
