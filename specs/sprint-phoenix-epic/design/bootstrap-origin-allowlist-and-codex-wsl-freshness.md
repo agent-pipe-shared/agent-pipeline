@@ -17,6 +17,15 @@ step ... needs the Design-tier model, it does"), with no rationale recorded at t
 cannot be corrected retroactively for the artifact already produced; it is disclosed here,
 flagged by the Critic review, for the PO's awareness.
 
+**Extended per Critic finding A (MINOR, second Critic pass against commit `8c526dd`):** the
+same disclosure duty applies to the dispatch that produced the corrections above, not only to
+the original dispatch. That rework (commit trailer `Dispatch: WP2-WP3-design-rework
+(goldfish)`) also ran on `claude-sonnet-5`, the same below-Design-tier model, with no
+rationale recorded at the time — the identical pattern, not a one-off confined to the
+document's first draft. This too cannot be corrected retroactively; it is disclosed here
+plainly, rather than leaving only the earlier dispatch named and the more recent one's
+identical gap unstated.
+
 This design covers two related, independently shippable repairs. Part A changes the
 bootstrap readiness gate's `status` semantics (blast radius: every session, every project,
 on the next plugin refresh). Part B repairs a Codex+WSL-only advisory freshness path (blast
@@ -166,6 +175,39 @@ a negative result widen the existing `status` ternary (see §A.5) rather than re
    other gate-deciding files, with the same PO-edits-it-directly escape hatch. See §A.7 for
    how this narrows, rather than voids, that section's scope exclusion.
 
+   **Disclosed exception to GS-6's own stated policy, and its operational consequence (added
+   per Critic finding C, second Critic pass):** verified directly against
+   `guard-gate-strength.mjs`'s current `GATE_STRENGTH_PATHS` array — all six existing entries
+   (GS-1, GS-2, GS-3, GS-4, GS-5, GS-7) protect configuration files (`pipeline.user.yaml`,
+   `project/critical-human-proof.json`, `project/pipeline.yaml`, `project/guard-config.json`,
+   `.claude/pipeline.yaml`, `.claude/guard-config.json`); none protects product *source*. The
+   new entry this item adds is therefore the **first** `GATE_STRENGTH_PATHS` entry in this
+   repo to protect a product-source file rather than a config file, and it does so inside
+   `plugins/pipeline-core/` — the exact directory GS-6's own file-header rationale states is
+   *deliberately* left writable in a source checkout, "because in a development session the
+   enforcing copy is the installed one and the repository copy is ordinary product source
+   under Verify, Critic and the PO gate." Unlike GS-6 (which only ever matches the currently
+   *enforcing* live plugin root via `insideLivePlugin()`, exempting the source-tree copy by
+   design), a plain `GATE_STRENGTH_PATHS` entry matches by repo-relative path
+   (`gateStrengthRuleFor()`), so it protects the new module's *source-tree* copy too, not only
+   an installed one. This is a deliberate, disclosed, narrow exception to GS-6's stated policy,
+   not an oversight: it is warranted here because the new allowlist module is not ordinary
+   product source under active development — it is a fixed, review-gated 2-URL allowlist that
+   should not change casually, so trading away its in-session editability is the correct
+   default, unlike the rest of `pipeline-start-preflight.mjs` and its siblings. The operational
+   consequence, stated plainly because the guard has no in-session override (verified directly
+   against the file's own header comment: "There is no in-session override, because an
+   in-session override for 'may I weaken my own gate' is the same hole with an extra step," and
+   no override mechanism is defined anywhere in the file) and because a guard *script* is
+   re-read fresh on every invocation, not cached at session start (GS-6's own doc-comment): an
+   agent session that lands this new `GATE_STRENGTH_PATHS` entry cannot also create the new
+   allowlist module it protects in that same session — the very next write attempt is already
+   refused by the freshly-edited guard (a sequencing note for the implementation dispatch: land
+   the module's content before, or in a session distinct from, the rule that protects it) — and
+   no later agent session can maintain the module either (e.g. adding a third reviewed origin)
+   without a PO hand-edit made directly, outside an agent session, exactly like the escape
+   hatch every other `GATE_STRENGTH_PATHS` entry already relies on.
+
 **Explicitly not revived:** the ~270-line plugin-list-parsing/`sourceClass`-computation
 machinery from pre-merge `codex-host-plugin-list.mjs` (`selectedPluginRecord`,
 `observedPluginRecord`, `classifyGitMarketplaceSource`, `safeMarketplaceSource`,
@@ -314,8 +356,13 @@ its own for that reason.
 
 **Flagged for the PO (secondary to §A.4, corrected scope):** is treating the §A.5 companion
 fix as a hard prerequisite of Part A's ship (not a follow-up) — i.e., accepting the small,
-disclosed widening of Part A's own implementation surface to four files instead of one, so
-that "soft/advisory" is actually true — an acceptable reading of "fail closed, consistent
+disclosed widening of Part A's own implementation surface — one new `nextAction` shape in the
+core script (`pipeline-start-preflight.mjs`, already Part A's own integration point per §A.2),
+two companion doc files (`SKILL.md`, `references/onboarding-recovery.md`), one new constant
+module, and one new guardrail-protection entry (the latter two per §A.3 items 1 and 3) — five
+files touched in total, **corrected here (Critic finding B, second Critic pass) from this
+section's earlier, now-inaccurate "four files instead of one" framing** — so that
+"soft/advisory" is actually true — an acceptable reading of "fail closed, consistent
 with established convention" for this specific gate? Or does the PO instead want Part A's
 origin/content attestation to ship alone, accepting that its day-one failure mode is a
 genuine, undocumented, every-session-eligible bootstrap block (not the soft outcome originally
@@ -680,6 +727,19 @@ design (§5 there) treats an opt-in flag as unnecessary.
   implementation, not folded into this document's scope.
 - Any change to `.claude/settings.json`, `.codex-plugin/plugin.json`, or any other
   guardrail/config surface.
+
+**Open item (not an out-of-scope exclusion — carried forward from §B.6; added per Critic
+finding D, second Critic pass), owner: implementation dispatch, trigger: once §B.3's
+action-family shape is finalized.** §B.6's two threat-model doc-update entries
+(`docs/phoenix-governance-threat-model.md:61-70`'s host receipt package rollback section, and
+`docs/phoenix-governance-threat-model.md:15`'s "Host network capability" asset-table row) both
+need exact replacement wording once the new action-family's final export names/shapes are
+fixed. This document deliberately does not propose that wording now, for the same reason the
+bullet above leaves the action-family schema/names themselves unresolved: the wording depends
+on names this design does not fix. The implementation dispatch that resolves §B.3's
+action-family shape must carry both threat-model wording updates as part of its own scope —
+not leave them to a silent, undocumented follow-up — this bullet is the tracking entry §B.6
+points to.
 
 ---
 
