@@ -833,6 +833,51 @@ nothing stale was left behind. It must be re-prepared once the wave stops
 moving, because the request binds the candidate commit and opening tree.
 This supersedes the earlier TP-2-only request — do not sign that one.
 
+**The leak fix landed, and the readiness gate is genuinely restored.**
+`a52ff69` extracts the `LAUNCH_SCRIPT`/readiness tail into
+`evaluateAfterGrammarAdmission()` and always evaluates it; a grammar lift is
+captured rather than returned, and honoured only if that tail also admits.
+38/38, with the three new cases asserting exactly the three behaviours
+(admitted-when-ready, refused-when-not-ready, still-`externalRestartOnly()`
+for the launcher). The design-latitude question was answered rather than
+left implicit: a consumed capability stays **spent** even when refused
+downstream, because `consumeHumanGuardOverride()` marks it on disk before
+the caller sees the result and there is no un-consume primitive; the
+consumption is surfaced by prepending its audit line to the denial instead
+of vanishing. Two of the five `bae3c1a` HGO tests needed a fixture
+adjustment — their bare-git fixture never had to pass real onboarding
+readiness before, because the pre-fix code returned before readiness was
+consulted; only the post-arm admission call in each got an injected ready
+receipt, every assertion byte-identical.
+
+**Verify on `a52ff69`: 255/255 receipts, three suites failing, and one of
+them was mine.** `doc-contract-tests`/`doc-contract-check` failed on a link
+I invented from memory in a backlog item (`0051-runner-identity.md`; the
+real files are `0051-dual-runner-tri-platform-development-contract.md` and
+`0057-runner-platform-support-is-an-implementation-obligation.md`). Fixed
+in `0431a56`; the gate caught it, which is what it is for. `security-scan`
+is exit 0 — the gitleaks fingerprint work from earlier still holds across
+the new ledger entries.
+
+**The one remaining Verify failure is the TP-7 blocker, and all five of its
+cases share one cause.** `guard-testpath-override.test.mjs` pins the
+pre-Decision-3 assertion `no in-session override is admitted`, which
+Decision 3 deliberately replaced; the guard is behaving correctly and the
+test is stale. OT03 additionally asserts that an absent/unreadable/
+unrecognised mode offers no route at all, which Decision 4 also changed —
+so that one is a semantic update, not a string swap. Nothing here can be
+fixed without a window: the file is TP-7.
+
+**Pending PO action — one signature, three unblocked test files.** A 3h
+window over `TP-2,TP-6,TP-7` is prepared and persisted at
+`evidence/gmw-request.json`. It binds a candidate commit and opening tree,
+so it is invalidated by any further commit and must be the last thing
+prepared before handing over. Once installed, the queued work is:
+`NOVA-HGOSIG-4`'s five replacement texts (TP-7), the GS-1..5/7 lift
+coverage that `503fe0d` shipped without (TP-6), and the Decision 4
+denial-guidance case (TP-2). Only after that can Verify reach exit 0, and
+only then does the Critic round have a green candidate to review.
+
 **Also cleaned up:** `NOVA-LCR-HGO-1` wrote its dispatch record to
 `plugins/pipeline-core/dispatch-record.json`, inside the tree copied into
 every consumer's plugin install. Relocated to the feature's evidence
