@@ -1023,6 +1023,108 @@ into that dispatch as a bare fact: the dispatch layer could set the model
 identifier but had no channel to set the effort level, which therefore
 inherits the dispatching session's rather than being pinned at `max`.
 
+### Critic round 2 on the mandated tier — FAIL with real defects, and the fix wave that followed
+
+Round 2 was a different review. It declined to claim its own effective model
+identity (`unknown` — no direct evidence in the dispatch, so no assertion), and
+it caught a defect in my dispatch: the diff range I offered, `2365a8c^..b0dcd4e`,
+spans 36 commits, 21 of them not enumerated. It reviewed per-SHA instead, as the
+template's conditional instructs.
+
+Four majors, of which three were new and technical rather than procedural. I
+verified the top three in the source myself before accepting them:
+
+- **F1** — `externalJson()` enforced only "not inside the repository", so
+  `--authority` let the caller supply the trust anchor. ADR-0059 Decision 1
+  claims the CLI "cannot succeed without a genuine signature it is structurally
+  incapable of producing"; generating a keypair is not something a caller is
+  incapable of. The red run settled it: the pre-fix path armed a real capability
+  (`{"status":"armed","mutated":true}`) from a self-signed proof plus a
+  self-written anchor naming its own key.
+- **F2** — `sanctionedHumanOverrideArgs()` matched `authorize` by strict
+  equality, which `authorize-by-signature` does not satisfy. Every guard printed
+  it as the decisive final step for `signature` mode — this repository's
+  committed mode — and the same guard then refused it. The offered route
+  dead-ended at its last step, in precisely the non-ready state where an
+  override matters.
+- **F8** — the same function's separator was hard-coded POSIX and therefore
+  inert on win32, where `resolve()` returns backslashes and only exact equality
+  with the root was ever caught. Composed with F1: an in-repo, agent-writable
+  JSON file as the trust anchor.
+- **F4** — `codex-pretool-guard.mjs` prints the new continuation once; its test
+  file contained zero occurrences. The commit's "21/21 verified" was numerically
+  true and evidentially empty.
+
+Fixed in `c167d43` (F1/F2/F8) and `ca3a37b` (F7 + F4 + F5). Two decisions inside
+those worth keeping:
+
+`--authority` was **removed**, not constrained to match the committed anchor. A
+flag whose only admissible value is the default carries no capability while
+keeping a caller-supplied-anchor code path alive, and it would have forced the
+hook to admit a second arbitrary path word in a not-ready session. And because
+`--proof` is a path rather than a digest, `HEX` cannot bound it — the admission
+branch bounds it structurally instead: absolute, `.json`, no traversal segment,
+length-capped, no control characters, and outside the repository, so the gate
+never admits a command the CLI itself would refuse.
+
+F7's fix reframed the defect. `recordHumanGuardDenial` has three outcomes, not
+one: it plans a route, it answers "not this way" with a typed status, or it
+throws. Three guards rendered only the first and swallowed the rest behind a
+bare `catch` whose comment declared the silence intentional — so a denial that
+*could not* be routed printed identically to one that was never eligible.
+Silence is the single outcome Decision 4 does not admit. The fix says a route
+was attempted and what the attempt observed, and deliberately offers no command,
+because the swallowed reason was the defect. It says "is offered" rather than
+"is available": for `author-repair-required` a route genuinely exists through the
+CLI, and the guard simply cannot choose the source root on the human's behalf.
+Disclosure is bounded structurally — two typed tokens, length-capped so no
+separator, colon, whitespace or newline can pass; `error.message`, `error.stack`
+and `candidateSourceRoot` are never read. Proven adversarially against a status
+made of a file path plus a newline.
+
+Verify: exit 0, binding `exact`, 255/255 on `7c530aa`.
+
+### What is still open, and why
+
+**Two tests sit in the wrong file.** `ROUTE-1` needed cases in TP-2 and TP-6
+protected suites; registering a new suite needs `verify.mjs`, itself TP-3. It put
+them in the library suite instead, where they spawn the real guard binaries — the
+right assertions from the wrong place — and flagged the move. Together with the
+`OT13` correction (TP-7) this is what the maintenance window is for: scope TP-2,
+TP-6, TP-7.
+
+**`OT13` is still mis-named and still green**, which is the failure mode itself.
+`OT13-1` stopped cleanly on the TP-7 denial and delivered the better design in
+the process: the case cannot pin "signature mode ignores an armed capability" as
+a *consumption* property, because any mode flip also drifts the capability and
+the two causes are inseparable in a fixture. The invariant survives one step
+earlier as `HGO-SIGNATURE-MODE-REQUIRED`, and is pinned nowhere today. Shape:
+rename OT13 honestly as a drift test with a twin fixture writing byte-identical
+content (no drift → capability consumed) to prove it tracks drift rather than
+never admitting anything, plus a new OT19 for the real invariant.
+
+**Incidental, pre-existing, invisible to the gate:**
+`plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs`
+fails on a stale digest pin for `harness/review-protocol.md`, and that suite is
+not registered in `verify.mjs`. A pin nothing checks is not a pin.
+
+### Dispatch truncation, measured
+
+Four dispatches this session returned their last in-progress sentence instead of
+a report, always immediately after announcing the next step and before executing
+it. Critic and Goldfish alike, two models, two effort tiers. Recorded as
+`backlog/items/2026-08-07-dispatched-agents-return-truncated-mid-step.md` with
+the PO's WSL hypothesis kept as a hypothesis — the correlation with tool-use
+count (21 on the clean run, 57–68 on the truncated ones) fits a duration or
+output-size limit equally well.
+
+The cost is not the re-prompt. `TRUST-1` stopped mid-way through a briefed
+revert-observe-restore cycle and left the tree half-rolled-back with the whole
+fix living only in a stash. It was recovered; it was one unlucky command from not
+being. The briefing was the hazard and it was mine. Both later dispatches forbid
+tree reverts and take red evidence from a reconstructed copy — the one mitigation
+that holds regardless of what the cause turns out to be.
+
 ## 2026-08-07 Nova VII — first Nova A completion wave: 6 issues evidenced
 
 Continues from Nova VI. PO instruction: "leg mal los und fange an — du
