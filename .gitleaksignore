@@ -50,6 +50,8 @@ content-v1:72c063a1d9676feca7ddf6bf5c48a646e66174d67a4612284fb87f03fe1a9b38:spec
 content-v1:7c7f3f45a621ecc89e1c4581c59bb16cccf89e125de3e86516b64820161cebe4:backlog/receipts/d311a66737ff088e2ae324df5f3525b08cefd4c9f58787d09870d3bd26961363.json:generic-api-key:1:177
 content-v1:ed750ca435e7cf7cd41c16fd429bb3b3049395623fdd241737c90bc95063429a:backlog/transitions.ndjson:sentry-access-token:42:540
 content-v1:8c19215eefae95d28bc3840ead52d2cdb3d979e54179d9ca36d7f5b1add7b80c:backlog/transitions.ndjson:sentry-access-token:43:501
+content-v1:7b24a69170d7eff1bc8f18f1f7f63bb3ac7450c59aedfd0c66a7571465383ddb:backlog/transitions.ndjson:sentry-access-token:42:482
+content-v1:a6109f1726ddf194fbbafcd6c989aaa73406c6c8ad1d6cd22d5568ffc3732d8a:backlog/transitions.ndjson:sentry-access-token:43:456
 content-v1:b7bb6dad6c1bd87273732947cca62e8429d9f4c80557f0dcebd8bc95cfea6a75:specs/sprint-nova-epic/evidence/backlog/issue-57-assign-intent.json:generic-api-key:1:87
 content-v1:bd4ad36f1f59efa3913913b0bbdc133a7993d9b325ae56a672cc94688f157e7e:harness/scripts/pipeline-state.test.mjs:generic-api-key:2204:477
 content-v1:c7fd9a9af55669aa1d94ad41d161c31c30981ca5db7671bc114a1534e44501d4:specs/2026-07-24-sprint-cyborg-epic/briefing-gitleaks-in-tree-fixture-fp-fix.md:generic-api-key:59:13
