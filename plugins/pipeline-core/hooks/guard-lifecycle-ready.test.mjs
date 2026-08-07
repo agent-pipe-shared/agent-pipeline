@@ -757,6 +757,73 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+/**
+ * ADR-0059 Decision 4, `signature` mode's decisive final step (NOVA-HGOSIG-TRUST-1 D1).
+ *
+ * The guard prints `authorize-by-signature ...` as the next command whenever
+ * gates.push_approval is `signature` (this repository's committed value) -- see the
+ * continuation assertion at "signature mode offers authorize-by-signature" further down --
+ * and `sanctionedHumanOverrideArgs()` then had to admit it. It did not: its base check
+ * matched `args[0] === "authorize"` by strict equality, so the offered route dead-ended at
+ * its last step. Positive and negative shapes are asserted in ONE test on purpose: the
+ * mutations alone pass against the unfixed code (which refuses everything), so only the
+ * admission assertion proves the branch exists, and only the mutations prove it did not
+ * arrive as a blanket allowance.
+ */
+test("signature mode's authorize-by-signature is admitted in exactly its printed shape and refused when mutated", () => {
+  const path = root();
+  const external = mkdtempSync(join(tmpdir(), "guard-lifecycle-ready-proof-"));
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const request = "f".repeat(64);
+    const plan = "a".repeat(64);
+    const proof = join(external, "proof.json");
+    const authorRoot = join(path, "plugins", "pipeline-core");
+    const signature = `node '${HUMAN_OVERRIDE_SCRIPT}' authorize-by-signature --repo '${path}' --request-sha256 ${request} --plan-sha256 ${plan} --proof '${proof}'`;
+    const signatureAuthor = `${signature} --author-source-root '${authorRoot}'`;
+    for (const command of [signature, signatureAuthor]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+      assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
+      }), { exitCode: 0, stderr: "" }, command);
+    }
+    for (const command of [
+      // wrong flag order
+      `node '${HUMAN_OVERRIDE_SCRIPT}' authorize-by-signature --repo '${path}' --plan-sha256 ${plan} --request-sha256 ${request} --proof '${proof}'`,
+      // non-hex and short digests
+      `node '${HUMAN_OVERRIDE_SCRIPT}' authorize-by-signature --repo '${path}' --request-sha256 ${"g".repeat(64)} --plan-sha256 ${plan} --proof '${proof}'`,
+      `node '${HUMAN_OVERRIDE_SCRIPT}' authorize-by-signature --repo '${path}' --request-sha256 ${request} --plan-sha256 ${"a".repeat(63)} --proof '${proof}'`,
+      // extra trailing word
+      `${signature} --bypass`,
+      `${signature} --activate`,
+      `${signatureAuthor} --activate`,
+      // wrong --repo
+      `node '${HUMAN_OVERRIDE_SCRIPT}' authorize-by-signature --repo /tmp/other --request-sha256 ${request} --plan-sha256 ${plan} --proof '${proof}'`,
+      // wrong --author-source-root
+      `${signature} --author-source-root /tmp/other`,
+      // the trust anchor is not caller-supplied: --authority is no shape at all
+      `${signature} --authority '${join(external, "authority.json")}'`,
+      // --proof is bounded structurally: in-repository, relative, traversing,
+      // non-JSON and empty paths are all refused
+      `node '${HUMAN_OVERRIDE_SCRIPT}' authorize-by-signature --repo '${path}' --request-sha256 ${request} --plan-sha256 ${plan} --proof '${join(path, "proof.json")}'`,
+      `node '${HUMAN_OVERRIDE_SCRIPT}' authorize-by-signature --repo '${path}' --request-sha256 ${request} --plan-sha256 ${plan} --proof proof.json`,
+      `node '${HUMAN_OVERRIDE_SCRIPT}' authorize-by-signature --repo '${path}' --request-sha256 ${request} --plan-sha256 ${plan} --proof '${external}/../proof.json'`,
+      `node '${HUMAN_OVERRIDE_SCRIPT}' authorize-by-signature --repo '${path}' --request-sha256 ${request} --plan-sha256 ${plan} --proof '${join(external, "proof.txt")}'`,
+      `node '${HUMAN_OVERRIDE_SCRIPT}' authorize-by-signature --repo '${path}' --request-sha256 ${request} --plan-sha256 ${plan} --proof ''`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
+      }).exitCode, 2, command);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(external, { recursive: true, force: true });
+  }
+});
+
 test("plan-runtime family accepts the runner-plus-intent argv lifecycleArgv actually emits for non-default intents", () => {
   const path = root();
   try {

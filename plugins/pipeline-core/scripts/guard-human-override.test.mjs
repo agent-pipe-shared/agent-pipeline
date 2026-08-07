@@ -12,7 +12,13 @@
  * `authorizeHumanGuardOverrideBySignature()` and returns its JSON result on stdout,
  * exactly like the existing subcommands already do (`main()`'s own `write(...)` call),
  * plus the CLI-only concerns: flag parsing and the external-proof-file discipline
- * `--proof`/`--authority` share with guard-maintenance-window.mjs's own `--proof`.
+ * `--proof` shares with guard-maintenance-window.mjs's own `--proof`.
+ *
+ * NOVA-HGOSIG-TRUST-1: the trust anchor is NOT part of that flag surface. ADR-0059
+ * Decision 1 fixes it at the committed `project/critical-human-proof.json`, so the
+ * `--authority` flag this suite used to assert acceptance of is gone, and the two tests
+ * below pin the property that assertion contradicted -- a trust policy the project never
+ * committed cannot arm a capability, whether it arrives on the command line or not.
  */
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
@@ -40,6 +46,13 @@ const pair = generateKeyPairSync("ed25519");
 const publicKey = pair.publicKey.export({ type: "spki", format: "pem" });
 const publicKeySha256 = createHash("sha256").update(publicKey).digest("hex");
 const KEY_REFERENCE = "hgo-cli-test-key";
+// A second, genuine Ed25519 keypair that the fixture repository never commits an anchor
+// for -- i.e. exactly what a caller able to run `generateKeyPairSync` can produce for
+// itself. Every signature it makes is cryptographically valid and must still be worthless
+// here, because the anchor decides whose signatures count.
+const foreignPair = generateKeyPairSync("ed25519");
+const foreignPublicKey = foreignPair.publicKey.export({ type: "spki", format: "pem" });
+const foreignPublicKeySha256 = createHash("sha256").update(foreignPublicKey).digest("hex");
 const HGO_SIGNATURE_INTENT_PLAN_SHA256 = createHash("sha256").update("pipeline.human-guard-override-signature-plan.v1").digest("hex");
 const HGO_SIGNATURE_INTENT_SPEC_SHA256 = createHash("sha256").update("pipeline.human-guard-override-signature-spec.v1").digest("hex");
 
@@ -84,7 +97,11 @@ function io() {
   };
 }
 
-function armRequest(root, toolInput) {
+const COMMITTED_SIGNER = { privateKey: pair.privateKey, publicKey, keyReference: KEY_REFERENCE };
+/** The forger: a real key of its own, reusing the committed anchor's key REFERENCE so only the public-key digest can tell the two apart. */
+const FOREIGN_SIGNER = { privateKey: foreignPair.privateKey, publicKey: foreignPublicKey, keyReference: KEY_REFERENCE };
+
+function armRequest(root, toolInput, signer = COMMITTED_SIGNER) {
   // Real, current timestamps throughout (never a fixed nowMs): main() below calls
   // authorizeHumanGuardOverrideBySignature() with the CLI's own real Date.now(), which
   // must land inside the request's TTL window for these fixtures to reach the CLI at
@@ -110,9 +127,9 @@ function armRequest(root, toolInput) {
   const proof = {
     schema: PO_APPROVAL_PROOF_SCHEMA,
     intentSha256: intent.sha256,
-    keyReference: KEY_REFERENCE,
-    publicKey,
-    signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), pair.privateKey).toString("base64"),
+    keyReference: signer.keyReference,
+    publicKey: signer.publicKey,
+    signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), signer.privateKey).toString("base64"),
   };
   return { requestSha256: recorded.requestSha256, planSha256: plan.planSha256, proof };
 }
@@ -145,30 +162,102 @@ test("authorize-by-signature reaches authorizeHumanGuardOverrideBySignature() an
   }
 });
 
-test("authorize-by-signature accepts an --authority override, mirroring the committed trust anchor path", () => {
+/**
+ * NOVA-HGOSIG-TRUST-1 D2. This test REPLACES one that asserted the opposite ("accepts an
+ * --authority override, mirroring the committed trust anchor path"). That assertion
+ * encoded the defect: `--authority` was validated only as "a JSON file outside the
+ * repository", which any caller can write, so the flag let the caller supply the trust
+ * anchor its own proof would then be checked against. ADR-0059 Decision 1 fixes the anchor
+ * at the committed `project/critical-human-proof.json` and calls the subcommand agent-safe
+ * because it "cannot succeed without a genuine signature it is structurally incapable of
+ * producing" -- a claim the flag falsified, since generating a keypair is not something a
+ * caller is incapable of.
+ *
+ * Both directions are asserted here, because only the pair is meaningful: the flag is gone
+ * (a usage error, not a trust source), AND the forged proof it would have carried is
+ * refused on its merits once the committed anchor is the only thing consulted.
+ */
+test("authorize-by-signature refuses a caller-supplied trust anchor; the committed anchor is the only trust source", () => {
   const root = fixture();
   const proofRoot = externalDir();
   try {
-    const { requestSha256, planSha256, proof } = armRequest(root, { file_path: "notes.md", content: "cli signed authority\n" });
+    const { requestSha256, planSha256, proof } = armRequest(
+      root,
+      { file_path: "notes.md", content: "cli forged authority\n" },
+      FOREIGN_SIGNER,
+    );
     const proofPath = join(proofRoot, "proof.json");
     const authorityPath = join(proofRoot, "authority.json");
     writeFileSync(proofPath, JSON.stringify(proof));
-    writeFileSync(authorityPath, JSON.stringify({ keyReference: KEY_REFERENCE, publicKeySha256 }));
-    const captured = io();
-    const status = main([
+    // A syntactically perfect trust policy naming the forger's own public key.
+    writeFileSync(authorityPath, JSON.stringify({ keyReference: KEY_REFERENCE, publicKeySha256: foreignPublicKeySha256 }));
+
+    const supplied = io();
+    assert.equal(main([
       "authorize-by-signature",
       "--repo", root,
       "--request-sha256", requestSha256,
       "--plan-sha256", planSha256,
       "--proof", proofPath,
       "--authority", authorityPath,
-    ], captured);
-    assert.equal(status, 0, captured.stderr);
-    assert.equal(JSON.parse(captured.stdout).status, "armed");
+    ], supplied), 2);
+    assert.match(supplied.stderr, /HGO-USAGE/u);
+    assert.doesNotMatch(supplied.stderr, /HGO-PROOF-INVALID/u); // refused before any verification
+    assert.equal(supplied.stdout, "");
+
+    // Same genuinely-signed proof, no flag to hide behind: the committed anchor decides.
+    const committed = io();
+    assert.equal(main([
+      "authorize-by-signature",
+      "--repo", root,
+      "--request-sha256", requestSha256,
+      "--plan-sha256", planSha256,
+      "--proof", proofPath,
+    ], committed), 2);
+    assert.match(committed.stderr, /HGO-PROOF-INVALID: PO-APPROVAL-TRUST-MISMATCH/u);
+    assert.equal(committed.stdout, "");
   } finally {
     rmSync(root, { recursive: true, force: true });
     rmSync(proofRoot, { recursive: true, force: true });
   }
+});
+
+/**
+ * NOVA-HGOSIG-TRUST-1 D3. `externalJson()` compared with a hard-coded POSIX separator
+ * (`source.startsWith(`${root}/`)`), which `resolve()` never produces on win32 -- so only
+ * exact equality with the root was caught and an in-repository, agent-writable file passed
+ * as "external". ADR-0051/ADR-0057 make native Windows an implementation obligation, so
+ * this is a defect on a supported platform, not a hypothetical.
+ *
+ * The platform is injected through `main()`'s options exactly as the sibling guard suites
+ * drive `{ platform: "win32" }`, so the win32 answer is provable from either host. The
+ * negative half matters as much as the positive one: a fix that simply refused everything
+ * would pass the first assertion and fail the second.
+ */
+test("the external-path check uses the platform's own separator, so an in-repository win32 path is refused", () => {
+  const digest = "a".repeat(64);
+  const argv = (proofPath) => [
+    "authorize-by-signature",
+    "--repo", "C:\\repo",
+    "--request-sha256", digest,
+    "--plan-sha256", digest,
+    "--proof", proofPath,
+  ];
+
+  const inside = io();
+  assert.equal(main(argv("C:\\repo\\project\\proof.json"), inside, { platform: "win32" }), 2);
+  assert.match(inside.stderr, /outside the repository/u);
+
+  // Case-folded drive letter: the same directory by any Windows filesystem's reckoning.
+  const insideOtherCase = io();
+  assert.equal(main(argv("c:\\Repo\\proof.json"), insideOtherCase, { platform: "win32" }), 2);
+  assert.match(insideOtherCase.stderr, /outside the repository/u);
+
+  // A genuinely external win32 path clears the check (and then fails for the ordinary
+  // reason that this host has no such file, which is not what is under test).
+  const outside = io();
+  assert.equal(main(argv("D:\\po\\proof.json"), outside, { platform: "win32" }), 2);
+  assert.doesNotMatch(outside.stderr, /outside the repository/u);
 });
 
 test("authorize-by-signature refuses an invalid proof with HGO-PROOF-INVALID on stderr and exit 2", () => {

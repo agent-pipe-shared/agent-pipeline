@@ -888,6 +888,29 @@ function sanctionedProjectAuthorityMigrationArgs(args, root) {
     && args[5] === "--activate" && args.length === 6;
 }
 
+/**
+ * `--proof` carries a filesystem path, not a digest, so HEX cannot bound it -- and an
+ * unbounded word is exactly what the rest of this function refuses to admit. The bound
+ * is therefore structural, and deliberately narrower than "any string": an absolute
+ * `.json` path, no control characters, no `.`/`..` segment, a bounded byte length, and
+ * -- mirroring the CLI's own `externalJson()` discipline (ADR-0059 Decision 1) -- a
+ * location OUTSIDE the repository root, so this gate never admits a command the CLI
+ * would refuse anyway. Host `isAbsolute`/`resolve`/`pathInside` are used deliberately:
+ * a Windows path is absolute on the Windows host and is not a path at all on POSIX,
+ * which is the correct answer on each.
+ *
+ * The residual is a single external path word, and it stays a data argument: the closed
+ * shell grammar has already tokenized it, so it can never re-enter the shell, and the
+ * only thing the CLI does with it is JSON.parse a file whose contents must still carry a
+ * valid signature under the project's committed trust anchor.
+ */
+function externalProofPathArgument(value, root) {
+  if (typeof value !== "string" || value === "" || Buffer.byteLength(value, "utf8") > 500) return false;
+  if (/[\u0000-\u001f\u007f]/u.test(value) || !/\.json$/iu.test(value)) return false;
+  if (value.split(/[\\/]/u).some((segment) => segment === "." || segment === "..")) return false;
+  return isAbsolute(value) && !pathInside(root, resolve(value));
+}
+
 function sanctionedHumanOverrideArgs(args, root) {
   const exactAuthorRoot = (index) => args[index] === "--author-source-root"
     && args[index + 1] === join(root, "plugins", "pipeline-core");
@@ -906,6 +929,27 @@ function sanctionedHumanOverrideArgs(args, root) {
   }
   if (args[0] === "verify-audit") {
     return args[1] === "--repo" && args[2] === root && args.length === 3;
+  }
+  // ADR-0059 Decision 4: `signature` mode's own decisive final step -- and, until this
+  // branch existed, the one command in the family that every guard PRINTED as the next
+  // step while the base check below refused it, because `args[0] === "authorize"` is a
+  // strict equality that `authorize-by-signature` does not satisfy. `signature` is this
+  // repository's committed mode, so the offered route dead-ended at its last step in
+  // exactly the session state (GUARD-LIFECYCLE-NOT-READY) where an override matters.
+  //
+  // Same exactness discipline as its siblings: pinned flag order, pinned `--repo`, HEX on
+  // every digest, an exact total `args.length`, and the optional `--author-source-root`
+  // tail handled identically. The shape is derived from the CLI's own argument parsing
+  // (scripts/guard-human-override.mjs's `authorize-by-signature` branch), not from the
+  // guidance strings: there is no `--activate` here (a verified signature IS the
+  // authorization) and no `--authority` at all (the committed trust anchor is the only
+  // trust source, ADR-0059 Decision 1).
+  if (args[0] === "authorize-by-signature") {
+    const base = args[1] === "--repo" && args[2] === root
+      && args[3] === "--request-sha256" && HEX.test(args[4] ?? "")
+      && args[5] === "--plan-sha256" && HEX.test(args[6] ?? "")
+      && args[7] === "--proof" && externalProofPathArgument(args[8], root);
+    return base && (args.length === 9 || (exactAuthorRoot(9) && args.length === 11));
   }
   const base = args[0] === "authorize"
     && args[1] === "--repo" && args[2] === root
