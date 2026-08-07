@@ -134,6 +134,10 @@ const SAFE_FEATURE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const PROMOTION_PRD_BASENAME = /^prd_[^/\\]+\.md$/u;
 const PROMOTION_SPEC_BASENAME = "spec.md";
 const PROMOTION_DESIGN_INPUT_BASENAME = "design-input.md";
+// The provisional kickoff PRD and Spec are not removed at promotion: they are
+// named superseded.  See publishKickoffSupersession for why annotation is the
+// only retirement this transaction can offer without weakening it.
+const KICKOFF_SUPERSESSION_BASENAME = "SUPERSEDED.md";
 
 function authorityPaths(root) {
   const authority = resolveProjectAuthorityPaths({ rootDir: root });
@@ -4162,6 +4166,79 @@ export function applyOnboardingKickoff({
   }
 }
 
+function kickoffSupersessionBytes(plan) {
+  return Buffer.from(`${[
+    "<!-- pipeline.kickoff-supersession.v1 -->",
+    "# Superseded: nothing in this directory is authoritative",
+    "",
+    "The PRD and the specification here were the provisional bootstrap anchors",
+    `of kickoff \`${plan.kickoff.featureId}\`. That kickoff was promoted, and the`,
+    "package below replaced them as the digest-bound authority. These files are",
+    "stale copies: do not read, cite, or edit them as if they still governed.",
+    "",
+    `- Feature: \`${plan.feature.id}\``,
+    `- Profile: \`${plan.profile}\``,
+    `- PRD (the approval subject): \`${plan.authority.prd.path}\``,
+    `- Specification: \`${plan.authority.spec.path}\``,
+    `- Design input: \`${plan.authority.designInput.path}\``,
+    `- Promotion transaction: \`${plan.transactionSha256}\``,
+    "",
+    "This marker is an advisory annotation written by the promotion transaction",
+    "after it commits. No gate reads it, and no record binds it; deleting it",
+    "only stops this directory from naming what replaced it.",
+    "",
+  ].join("\n")}`, "utf8");
+}
+
+/**
+ * Retire the provisional kickoff anchors by naming their successor.
+ *
+ * Removal was the other route and this transaction cannot offer it honestly.
+ * It has no rollback: publication is roll-forward from a recoverable prefix,
+ * and the only rollback in this module belongs to the kickoff apply. A removal
+ * placed before the commit point would therefore destroy the very seed a
+ * failed promotion is recovered from — `recognisedKickoff` requires both files
+ * present — and a removal placed after it is an unrecoverable delete of a
+ * directory whose full contents the transaction never knew. Annotation is the
+ * retirement that stays inside what the transaction can guarantee.
+ *
+ * Consequently this runs last, after the State publication and after every
+ * fault point: any failure leaves the provisional location byte for byte as it
+ * was. It also cannot fail the committed transaction — a marker that could
+ * turn a durable promotion into a reported failure would be exactly the trade
+ * this route exists to avoid — and it never overwrites: an absent directory
+ * (already cleaned) and an existing marker (already retired) are both left
+ * alone. The price is bounded and stated: a crash between the State
+ * publication and this write is replayed as a completed promotion, and replay
+ * is zero-write, so that one promotion stays unmarked.
+ */
+function publishKickoffSupersession(plan, suffix) {
+  if (!/^kickoff-[a-f0-9]{16}$/u.test(plan.kickoff?.featureId ?? "")) return;
+  let marker;
+  try {
+    const provisional = initialAuthorityPaths(plan.kickoff.featureId);
+    marker = absoluteProjectPath(plan.root,
+      `${dirname(provisional.prd)}/${KICKOFF_SUPERSESSION_BASENAME}`,
+      "kickoff supersession marker");
+    assertPhysicalChain(plan.root, marker);
+  } catch {
+    return;
+  }
+  const directory = dirname(marker);
+  if (!existsSync(directory) || existsSync(marker)) return;
+  const temporary = join(directory, `.${KICKOFF_SUPERSESSION_BASENAME}.promotion-${suffix}.tmp`);
+  try {
+    writeExclusiveSynced(temporary, kickoffSupersessionBytes(plan), 0o644);
+    if (existsSync(marker)) throw new Error("supersession marker appeared before publication");
+    renameSync(temporary, marker);
+    fsyncDirectory(directory);
+  } catch {
+    try {
+      if (existsSync(temporary)) unlinkSync(temporary);
+    } catch { /* The transaction is committed; the annotation is not worth a throw. */ }
+  }
+}
+
 /**
  * Apply the public/private promotion under the same continuity locks as
  * kickoff. Publication order is history, private cleanup binding, then State:
@@ -4265,7 +4342,11 @@ export function applyOnboardingKickoffPromotion({
       simulatedCrash = true;
       throw new SimulatedKickoffCrash("promotion-state-published");
     }
-    return promotionResult(plan, "applied", true, deps.spawn ?? defaultGitSpawn);
+    // The readback stays the last gate on the commit: the provisional anchors
+    // are only named superseded once this promotion has validated itself.
+    const result = promotionResult(plan, "applied", true, deps.spawn ?? defaultGitSpawn);
+    publishKickoffSupersession(plan, suffix);
+    return result;
   } finally {
     if (!simulatedCrash && privateLock) releaseLock(privateLock);
     if (!simulatedCrash) releaseLock(stateLock);

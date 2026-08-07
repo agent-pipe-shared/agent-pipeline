@@ -8,6 +8,7 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  rmSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -970,6 +971,155 @@ for (const stage of [
     assert.equal(readOnboardingSessionCleanupBinding({ rootDir: seed.root }).status, "bound");
   });
 }
+
+// The provisional `specs/kickoff-*` PRD and Spec survive promotion as stale
+// copies of the two documents the whole gate chain is digest-bound to.  The
+// promotion transaction is the only place that knows both locations, so it is
+// where the provisional one is retired: by a marker naming the successor
+// package, published after the commit point, never by a removal this
+// transaction has no rollback to undo.  These checks pin both halves of that
+// decision -- the marker exists after a success, and no failure point can
+// leave a byte of it behind.
+const SUPERSEDED_BASENAME = "SUPERSEDED.md";
+
+function provisionalDirectory(seed) {
+  return join(seed.root, dirname(seed.kickoff.targets.prd.path));
+}
+
+function directoryBytes(directory) {
+  if (!existsSync(directory)) return null;
+  return Object.fromEntries(readdirSync(directory).sort().map((name) => [
+    name,
+    readFileSync(join(directory, name)).toString("base64"),
+  ]));
+}
+
+// Content *and* mtime of everything a promotion may write, so "zero-write" is
+// a claim about the filesystem rather than about identical bytes.
+function promotionWriteSurface(seed) {
+  const surface = {};
+  const visit = (directory, prefix) => {
+    if (!existsSync(directory)) return;
+    for (const name of readdirSync(directory).sort()) {
+      const child = join(directory, name);
+      const rel = `${prefix}/${name}`;
+      if (lstatSync(child).isDirectory()) {
+        visit(child, rel);
+        continue;
+      }
+      surface[rel] = `${readFileSync(child).toString("base64")}@${lstatSync(child).mtimeMs}`;
+    }
+  };
+  visit(join(seed.root, "specs"), "specs");
+  visit(join(seed.root, ".git", "agent-pipeline"), "private");
+  visit(dirname(seed.statePath), "state");
+  return surface;
+}
+
+check("promotion retires the provisional kickoff anchors with a marker naming its successor", () => {
+  const seed = promotionSeed("supersession");
+  const provisional = provisionalDirectory(seed);
+  const marker = join(provisional, SUPERSEDED_BASENAME);
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  assert.equal(existsSync(marker), false);
+  assert.equal(applyOnboardingKickoffPromotion({
+    plan, expectedPlanSha256: plan.planSha256, activate: true,
+  }).status, "applied");
+  assert.equal(existsSync(marker), true);
+  const text = readFileSync(marker, "utf8");
+  for (const named of [
+    plan.kickoff.featureId, seed.request.featureId, seed.request.profile,
+    seed.request.prdPath, seed.request.specPath, seed.request.designInputPath,
+    plan.transactionSha256,
+  ]) {
+    assert.ok(text.includes(named), `supersession marker must name ${named}`);
+  }
+  assert.deepEqual(readdirSync(provisional).sort(), [
+    SUPERSEDED_BASENAME, basename(seed.kickoff.targets.prd.path), "spec.md",
+  ].sort());
+  // The marker is an annotation, never an authority record: the promotion
+  // history entry still records exactly what it recorded before, `specPath`
+  // included, and gains nothing.
+  const entry = JSON.parse(readFileSync(join(seed.root, ".git", "agent-pipeline",
+    "onboarding", "continuity-history.json"), "utf8")).transactions[1];
+  assert.deepEqual(entry, plan.targets.history.value.transactions[1]);
+  assert.deepEqual(Object.keys(entry).sort(), [
+    "afterStateSha256", "beforeStateSha256", "designInputPath", "designInputSha256",
+    "featureId", "kickoffFeatureId", "kind", "planPath", "prdSha256",
+    "previousTransactionSha256", "profile", "specPath", "specSha256", "transactionSha256",
+  ]);
+  assert.equal(entry.specPath, seed.request.specPath);
+  assert.equal(entry.planPath, seed.request.planPath);
+});
+
+for (const stage of [
+  "promotion-history-published",
+  "promotion-cleanup-binding-published",
+  "promotion-state-published",
+]) {
+  check(`promotion crash at ${stage} leaves the provisional kickoff anchors byte for byte`, () => {
+    const seed = promotionSeed(`supersession-crash-${stage}`, { privatized: true });
+    const provisional = provisionalDirectory(seed);
+    const before = directoryBytes(provisional);
+    const plan = planOnboardingKickoffPromotion(seed.request);
+    assert.throws(() => applyOnboardingKickoffPromotion({
+      plan,
+      expectedPlanSha256: plan.planSha256,
+      activate: true,
+      deps: { crashAt: stage },
+    }), (error) => error?.message === stage);
+    assert.deepEqual(directoryBytes(provisional), before);
+    assert.equal(existsSync(join(provisional, SUPERSEDED_BASENAME)), false);
+  });
+}
+
+check("promotion replay after supersession stays zero-write and canonically identical", () => {
+  const seed = promotionSeed("supersession-replay");
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  const applied = applyOnboardingKickoffPromotion({
+    plan, expectedPlanSha256: plan.planSha256, activate: true,
+  });
+  const surface = promotionWriteSurface(seed);
+  const replay = applyOnboardingKickoffPromotion({
+    plan, expectedPlanSha256: plan.planSha256, activate: true,
+  });
+  assert.equal(replay.status, "replayed");
+  assert.equal(replay.mutated, false);
+  assert.deepEqual(promotionWriteSurface(seed), surface);
+  assert.deepEqual({ ...replay, status: applied.status, mutated: applied.mutated }, applied);
+  assert.deepEqual(reconstructOnboardingKickoffPromotionPlan(seed.request), plan);
+});
+
+check("an already-cleaned provisional location survives inspection and replay", () => {
+  const seed = promotionSeed("supersession-cleaned");
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  rmSync(provisionalDirectory(seed), { recursive: true, force: true });
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
+  assert.equal(applyOnboardingKickoffPromotion({
+    plan, expectedPlanSha256: plan.planSha256, activate: true,
+  }).status, "replayed");
+  assert.deepEqual(reconstructOnboardingKickoffPromotionPlan(seed.request), plan);
+  assert.equal(existsSync(provisionalDirectory(seed)), false);
+});
+
+check("an already-marked provisional location is never overwritten by the promotion", () => {
+  const seed = promotionSeed("supersession-marked");
+  const provisional = provisionalDirectory(seed);
+  const marker = join(provisional, SUPERSEDED_BASENAME);
+  const original = "# retired by hand, before the promotion ran\n";
+  writeFileSync(marker, original);
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  assert.equal(applyOnboardingKickoffPromotion({
+    plan, expectedPlanSha256: plan.planSha256, activate: true,
+  }).status, "applied");
+  assert.equal(readFileSync(marker, "utf8"), original);
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
+  assert.equal(applyOnboardingKickoffPromotion({
+    plan, expectedPlanSha256: plan.planSha256, activate: true,
+  }).status, "replayed");
+  assert.deepEqual(readdirSync(provisional).filter((name) => name.startsWith(".")), []);
+});
 
 function legacyPromotionCleanupMismatch(name) {
   const seed = promotionSeed(`legacy-${name}`, { privatized: true });
