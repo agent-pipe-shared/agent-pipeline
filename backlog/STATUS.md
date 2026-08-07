@@ -16,6 +16,7 @@
 | pipeline.claude-has-no-start-time-opt-in-adoption-path | open | idea | pipeline | 2026-08-05 | — |
 | pipeline.close-spec-retention-and-consent | closed | workflow-improvement | pipeline | 2026-07-21 | — |
 | pipeline.closed-input-channel-review-economics | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
+| pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.codex-plugin-validator-host-parity | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.codex-sandbox-critic-longterm | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.critic-context-isolation | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
@@ -78,6 +79,6 @@
 
 ## Counts
 
-- open: 30
+- open: 31
 - in_progress: 21
 - closed: 19
