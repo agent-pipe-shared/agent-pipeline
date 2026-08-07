@@ -12,7 +12,39 @@ const SHA256 = /^[a-f0-9]{64}$/;
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const MAX_FIELD_BYTES = 480;
 const CONTEXT_KEYS = ["intent", "scope", "constraints", "questions"];
-const SENSITIVE_OR_CONTROLLED_TEXT = /(?:```|\b(?:user|assistant|system)\s*:|https?:\/\/|\b(?:bearer|api[-_ ]?key|secret|password|credential|token|private key|approval|approved|authori[sz]ed)\b|\b(?:node|git|codex|npm|pnpm|yarn|bash|sh|python|curl)\b\s|[\\/|><$`@:]|\b(?:close[- ]?block|close[- ]?feature|pipeline[- ]?state)\b|\b(?:\d{1,3}\.){3}\d{1,3}\b|\b(?:ghp_|glpat_|sk-)|(?:AKIA|ASIA)[A-Z0-9]{16}|\b[0-9a-f]{16,}\b|\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b)/i;
+/**
+ * Forbidden SHAPES, never the characters those shapes happen to contain. A colon,
+ * slash, at-sign, dollar, pipe, backslash or angle bracket inside ordinary prose
+ * carries no information; a scheme-qualified URL, an absolute path, a command
+ * line, a credential-shaped token, a host address or a transcript marker does.
+ * Each entry below is one such form, and every relaxation against the character
+ * class this replaced is covered by an admission case in resume-hint.test.mjs.
+ */
+const SHELL_TOOLS = "node|npx|npm|pnpm|yarn|bun|deno|git|gh|glab|codex|claude|bash|sh|zsh|pwsh|powershell|python3?|pip3?|ruby|perl|curl|wget|ssh|scp|rsync|docker|kubectl|cargo|sudo|chmod|chown|rm|mv|cp|cat|ls|export|eval|source|awk|sed|grep|rg|openssl|gpg|aws|gcloud|az|pipeline-state";
+const COMMAND_ARGUMENT = String.raw`-{1,2}[A-Za-z][A-Za-z0-9-]*|[A-Za-z0-9._~-]*\/[A-Za-z0-9._~-]+|[A-Za-z0-9._-]+\.(?:mjs|cjs|js|ts|json|ya?ml|toml|sh|ps1|py|rb|pem|key|env|log|txt|md)\b`;
+const SECRET_LABEL = String.raw`api[-_ ]?keys?|access[-_ ]?keys?|secrets?|tokens?|credentials?|passwords?|passphrases?|private[-_ ]?keys?|client[-_ ]?secrets?|authorization`;
+const SECRET_ASSIGNMENT = new RegExp(String.raw`\b(?:${SECRET_LABEL})\b\s*[:=]{1,2}\s*["'\x60]?([^\s"'\x60]+)`, "gi");
+const FORBIDDEN_SHAPES = [
+  /```|~~~/,                                                                                        // fenced code block
+  /^\s*(?:user|assistant|system|human|developer|tool)\s*:/i,                                        // transcript role marker opening the text
+  /\b(?:user|assistant|system)\s*:.*\b(?:user|assistant|system)\s*:/i,                              // several transcript turns inlined
+  /<\s*\/?\s*(?:system|assistant|user|human|instructions?|prompt|script|tool_use|tool_result)\b/i,   // instruction or markup tag
+  /\b[a-z][a-z0-9+.-]*:\/\//i,                                                                      // scheme-qualified URL
+  /\b(?:javascript|vbscript):|\bdata:[a-z]+\/[a-z0-9.+-]+/i,                                        // executable or inline-payload scheme
+  /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/,                                          // mailbox or ssh target
+  /(?:^|[\s"'`(\[{<,;=|:])(?:~|\.{1,2})?\/[A-Za-z0-9._~-]/,                                         // POSIX absolute, home or relative path
+  /\b[A-Za-z]:[\\/]|\\\\[A-Za-z0-9._-]+\\|%[A-Za-z_][A-Za-z0-9_]{2,}%/,                             // Windows drive path, UNC share or environment expansion
+  /&&|\|\||\$\(|\$\{|\$[A-Z_]{2,}\b|>>|<<|\d?>&\d/,                                                 // shell operator, redirect or expansion
+  new RegExp(`(?:^|[\\s"'\\x60(;|&])(?:${SHELL_TOOLS})\\s+(?:${COMMAND_ARGUMENT})`, "i"),           // command line carrying a flag or path argument
+  /\bgit\s+(?:add|clone|commit|push|pull|fetch|checkout|switch|restore|branch|merge|rebase|reset|revert|stash|status|log|diff|show|init|config|remote|tag|worktree|cherry-pick|apply)\b/i, // git invocation
+  /\b(?:npm|pnpm|yarn|npx|bun|deno|pip3?|cargo|docker|kubectl|brew|apt(?:-get)?)\s+(?:install|uninstall|add|remove|run|exec|ci|test|build|start|publish|login|pull|push|apply)\b/i,        // package or container invocation
+  /\b(?:\d{1,3}\.){3}\d{1,3}\b/,                                                                    // IPv4 address
+  /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/,                                 // JWT
+  /\b(?:ghp_|gho_|ghu_|ghs_|github_pat_|glpat[-_]|sk-|xox[baprs]-|AIza)/,                           // vendor credential prefix
+  /(?:AKIA|ASIA)[A-Z0-9]{16}/i,                                                                     // AWS key id, deliberately not word-bounded
+  /\b[0-9a-f]{16,}\b/i,                                                                             // long hex digest
+  new RegExp(String.raw`\bbearer\s+[A-Za-z0-9._~+\/-]{8,}`, "i"),                                   // bearer credential
+];
 
 function object(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
 function exact(value, keys) { return object(value) && Object.keys(value).length === keys.length && Object.keys(value).every((key) => keys.includes(key)); }
@@ -36,10 +68,17 @@ function opaqueToken(value) {
     return /^[A-Z0-9]{16,}$/.test(compact) || (hasLower && hasUpper && hasDigit) || (compact.length >= 24 && (hasDigit || /[_=-]/.test(compact)));
   });
 }
+/** A credential word next to a value is the leak; the bare word is ordinary design vocabulary. */
+function secretAssignment(value) {
+  for (const [, candidate] of value.matchAll(SECRET_ASSIGNMENT)) {
+    if (candidate.length >= 10 || (candidate.length >= 4 && /\d/.test(candidate))) return true;
+  }
+  return false;
+}
 function validText(value) {
   return typeof value === "string" && value === value.trim() && value.length > 0
     && !/[\r\n\0]/.test(value) && Buffer.byteLength(value, "utf8") <= MAX_FIELD_BYTES
-    && !SENSITIVE_OR_CONTROLLED_TEXT.test(value) && !opaqueToken(value);
+    && !FORBIDDEN_SHAPES.some((shape) => shape.test(value)) && !secretAssignment(value) && !opaqueToken(value);
 }
 function validTextList(value, maximum) { return Array.isArray(value) && value.length <= maximum && value.every(validText); }
 function validContext(value) {
