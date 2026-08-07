@@ -48,6 +48,7 @@
 | pipeline.multi-cli-efficiency-pilots | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.native-windows-verify-red-suite-class | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.neutral-authority-tier-is-a-frozen-snapshot-the-compiler-never-updates | open | defect | pipeline | 2026-08-06 | — |
+| pipeline.no-design-to-implementation-handover-exists | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.no-gate-is-tested-end-to-end-for-satisfiability | open | workflow-improvement | pipeline | 2026-08-06 | — |
 | pipeline.nonblocking-interaction-continuity | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.observation-intake-document-governance | closed | workflow-improvement | pipeline | 2026-07-20 | — |
@@ -59,6 +60,7 @@
 | pipeline.po-gate-authority-path-canonicalization | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-authority-receipt-readback | open | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-worktree-authority | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
+| pipeline.po-language-is-set-without-asking-and-cannot-be-changed | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.private-overlay-activation-bridge | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.project-scoped-github-issue-operations | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.push-guard-worktree-target | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -72,6 +74,7 @@
 | pipeline.restart-launch-is-codex-only-for-every-runner | open | defect | pipeline | 2026-08-06 | — |
 | pipeline.runtime-projection-v2-eager-manifest-load | open | defect | pipeline | 2026-07-27 | — |
 | pipeline.security-scan-cross-branch-gitleaks-findings | closed | defect | pipeline | 2026-07-25 | — |
+| pipeline.seeded-verify-contract-is-always-green | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.sentinel-go-live-completion | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.session-keep-awake | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.session-scratchpad-is-unwritable-under-the-cross-repo-guard | open | defect | pipeline | 2026-08-07 | — |
@@ -81,6 +84,7 @@
 | pipeline.stateful-design-contract-template | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.t1-governance-path-preflight | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.technical-lock-for-pipeline-consent-before-onboarding-complete | open | workflow-improvement | pipeline | 2026-08-07 | — |
+| pipeline.three-smaller-greenfield-defects | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.unified-human-authorization-ux | open | workflow-improvement | pipeline | 2026-08-02 | Current CYB-4 helper is a compatible first adapter only; no programme-wide migration or closure is claimed. |
 | pipeline.unregistered-suite-is-red-and-invisible-to-verify | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.verify-gate-scoped-registration | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -93,6 +97,6 @@
 
 ## Counts
 
-- open: 42
+- open: 46
 - in_progress: 21
 - closed: 22

@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "5cf13df6f559d61f7bfc4e1758580457360940e621c9bceb82674a0654eb37ff"
+    "transitionHead": "e5454bb3316008887ad1dd8aa90686f5621e693b75b46f5b267382a9c68ed51b"
   },
   "counts": {
-    "open": 42,
+    "open": 46,
     "in_progress": 21,
     "closed": 22
   },
@@ -380,6 +380,14 @@
       "source": "Sprint Nova session, 2026-08-06, ADR-0054 step 1 (routing hardcoded readers through resolveProjectAuthorityPaths). Comparing the two authority tiers before routing more readers to the resolver revealed that the tier the resolver PREFERS is the one nothing maintains."
     },
     {
+      "id": "pipeline.no-design-to-implementation-handover-exists",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Greenfield onboarding handover from a parallel Claude session, 2026-08-08, finding 6 of 12. Located in code by that session."
+    },
+    {
       "id": "pipeline.no-gate-is-tested-end-to-end-for-satisfiability",
       "status": "open",
       "type": "workflow-improvement",
@@ -484,6 +492,14 @@
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.po-language-is-set-without-asking-and-cannot-be-changed",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Greenfield onboarding handover from a parallel Claude session, 2026-08-08, finding 8 of 12."
     },
     {
       "id": "pipeline.private-overlay-activation-bridge",
@@ -612,6 +628,14 @@
       "closureEvidence": "backlog/items/2026-07-25-security-scan-cross-branch-gitleaks-findings.md"
     },
     {
+      "id": "pipeline.seeded-verify-contract-is-always-green",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Greenfield onboarding handover from a parallel Claude session, 2026-08-08, finding 7 of 12."
+    },
+    {
       "id": "pipeline.sentinel-go-live-completion",
       "status": "closed",
       "type": "workflow-improvement",
@@ -697,6 +721,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "PO handover from a separate session (agent-pipeline-share_phoenix), submitted through the PO's own channel, 2026-08-07."
+    },
+    {
+      "id": "pipeline.three-smaller-greenfield-defects",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Greenfield onboarding handover from a parallel Claude session, 2026-08-08, findings 9, 11 and 12 of 12. Grouped because each is small and self-contained; none needs a design round of its own."
     },
     {
       "id": "pipeline.unified-human-authorization-ux",
