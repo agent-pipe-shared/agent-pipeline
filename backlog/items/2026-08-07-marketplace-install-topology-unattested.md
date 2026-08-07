@@ -137,4 +137,15 @@ design-first treatment (MP-22/23) when accepting the companion item
   `specs/sprint-phoenix-epic/design/part-a-residuals-and-dispatch-template-drift.md` §I.2
   (candidate direction 1 recommended, direction 2 rejected with tradeoffs; open PO
   questions in §I.2.10).
+- **Threat model (2026-08-07):** PO decision — the adversary these guard mechanisms defend against
+  is the **agent**; a human attacker with local write access is out of scope; and the existing
+  detached-signature burden (ADR-0056 `signature` mode) is the accepted ceiling, so no new human
+  key, ceremony or per-release signing step may be introduced. Re-derived against that model, the
+  recommendation is revised: the signed release attestation is withdrawn (it buys nothing while its
+  pin ships inside the artifact, and its signing step is the refused commitment); what remains is at
+  most an unsigned drift check for accidental drift, plus a provenance-label check if assumption U3
+  holds; and candidate direction 3 is **partially reinstated** as the correct answer for the
+  human-adversary and channel-compromise classes — which the PO must confirm. See
+  `specs/sprint-phoenix-epic/design/part-a-residuals-and-dispatch-template-drift.md` §0.5, §I.2.3,
+  §I.2.4 and §I.2.10 item 1.
 - **Date:** 2026-08-07
