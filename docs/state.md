@@ -60,7 +60,13 @@ post-merge redesign packages have landed code this session:
   exactly this reason. Full report:
   `specs/sprint-phoenix-epic/evidence/wp5-phx2-implementation-critic-review-1-f16b8f2.md`.
   **Next:** a scoped rework dispatch addressing F1-F5, then a bounded delta
-  Critic re-review — not yet dispatched. **Not the implementation's own
+  Critic re-review. **Dispatched:** `WP5-phx2-rework-1` (goldfish-deep,
+  background, not yet landed) — fixes F1/F4/F5 (F2/F3 are the evidence
+  methodology fix below, not a Goldfish task). Scoped to
+  `external-push-ledger.mjs`(+test), `guard-push.mjs`,
+  `guard-push-external-ledger.test.mjs`, `runner-profiles-v3.mjs`(+test) —
+  deliberately excludes every file `WP2-WP3-partA-implementation` (below) is
+  concurrently touching, no overlap. **Not the implementation's own
   fault, an Elephant/dispatch-construction lesson for next time:** the
   evidence-gathering approach this session invented (run selected suites,
   hand-write a summary JSON) does not satisfy QG-03; the correct approach is
