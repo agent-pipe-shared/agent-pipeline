@@ -651,6 +651,56 @@ again). The in-flight `NOVA-HGOSIG-GS7-1` dispatch was redirected via
 status`/`git log` immediately before redirecting) — running with the
 corrected design as of this note.
 
+**Broader guard audit (PO request, chat, 2026-08-07): "gibt es noch
+Schutzmechanismen die wir vergessen haben zu verdrahten?"** Checked every
+guard hook in `plugins/pipeline-core/hooks/*.mjs` for HGO/GMW wiring.
+Confirmed clean/not-applicable: `guard-git.mjs` (push gate already has its
+own signature/chat mechanism per ADR-0056), `guard-devplan.mjs` and
+`guard-dispatch.mjs` (process-compliance checks with their own natural
+resolution path — "write the plan"/"use the template" — not authorization
+gates), `guard-apply-patch.mjs` (delegates to `guard-testpath.mjs`, already
+covered). Confirmed a real, second gap: `guard-lifecycle-ready.mjs`'s
+`GUARD-PARSE-UNSUPPORTED`/`GUARD-OPERATOR-UNAPPROVED`/`GUARD-REDIRECT-UNAPPROVED`
+shell-grammar denials (hit repeatedly by this very session) have zero HGO
+wiring. `GUARD-CROSS-REPO-MUTATION`, in the same file, is DELIBERATELY
+excluded (ADR-0059 Decision 5 — HGO's audit model is scoped to one
+repository, cannot safely attest across a boundary; the correct fix there
+is the already-tracked, separate "worktree recognition" follow-up, not HGO
+wiring). Also confirmed a genuine UX/safety gap: `po-human-approval.mjs`'s
+`approve`/`approve-critical`/`sign-intent` go straight to the OpenSSL
+passphrase prompt with no prior plain-language "what are you about to
+authorize" confirmation.
+
+**PO decision: do all three now** — declined the option to sequence or
+defer. PO's own preferred shape for the shell-grammar fix, stated
+explicitly to avoid per-denial-type special-casing: bind the HGO request to
+the EXACT verbatim command text and let the human review/clear that,
+reusing the generic Bash-command classification `human-guard-override.mjs`'s
+`eligibility()` already has (`closed-shell-exact`) rather than inventing
+new classification.
+
+Three more dispatches launched in parallel, none overlapping in file scope:
+`NOVA-PO-CONFIRM-1` (goldfish-deep) — the pre-sign confirmation prompt;
+`NOVA-LCR-HGO-1` (goldfish-deep) — the shell-grammar HGO wiring, explicitly
+scoped away from `GUARD-CROSS-REPO-MUTATION`/`GUARD-LIFECYCLE-NOT-READY`;
+`NOVA-RESTART-RUNNER-1` (goldfish-deep) — the onboarding restart-launches-
+Codex-regardless-of-runner defect (the third open thread from earlier this
+session), scoped to at minimum stop offering the Codex launcher to a
+non-Codex session, with a full native Claude launcher as PO's/next
+session's call if the dispatch judges it out of reach this round. All
+running as of this note, alongside `NOVA-HGOSIG-GS7-1` (corrected design)
+and the still-blocked `NOVA-HGOSIG-4` (TP-7).
+
+**Goal set (PO, chat, 2026-08-07): "Reparatur-Kandidat für GMW/HGO-Modul &
+Onboarding als lokalen Kandidaten release-bereit zur Verfügung stellen
+(inkl. lokaler neuer Versionsnummer etc.)."** Once the current wave lands,
+passes its Verify/Critic gates, and the working tree is clean: bump the
+local cachebuster/version per
+[`docs/claude-local-plugin-development.md`](claude-local-plugin-development.md)'s
+documented convention and prepare a fresh local marketplace refresh —
+explicitly a LOCAL candidate, not a push/publication event. Not actioned
+yet; queued behind the in-flight dispatches and their Critic rounds.
+
 **Mandatory next steps (restated, unchanged):** once full Verify confirms
 exit 0, dispatch the mandatory T1 Critic round on the complete ADR-0059
 implementation (commits `e4772d0`, `06971d7`, `f650164`, `5be2273`, plus the
