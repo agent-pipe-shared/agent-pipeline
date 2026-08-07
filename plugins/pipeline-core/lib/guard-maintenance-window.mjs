@@ -293,11 +293,20 @@ function validSubject(value) {
   return object(value)
     && Array.isArray(value.scopeRuleIds) && value.scopeRuleIds.length > 0
     && value.scopeRuleIds.every((id) => typeof id === "string")
-    && Number.isFinite(value.ttlSeconds) && value.ttlSeconds > 0
+    // `expiresAtMs` is the SIGNED, absolute bound (F1/F2 fix): prepare() computes and
+    // clamps it once, install() writes it through verbatim, and currentGuardMaintenanceWindow()
+    // derives validity purely from this signed value. It is never recomputed from a
+    // relative ttlSeconds interpreted against a later, attacker-influenceable "now".
+    && Number.isFinite(value.expiresAtMs) && value.expiresAtMs > 0
     && typeof value.reason === "string" && value.reason.trim() !== ""
     && SHA256.test(value.repoFingerprintSha256 ?? "")
     && SHA256.test(value.openingTreeSha256 ?? "")
     && typeof value.nonce === "string" && value.nonce.length > 0;
+}
+
+/** F3 defense in depth: never trust a stored/rebuilt subject's scope claim without re-checking the closed set. */
+function validScope(scopeRuleIds) {
+  return Array.isArray(scopeRuleIds) && scopeRuleIds.length > 0 && scopeRuleIds.every(isLiftableRuleId);
 }
 
 function validIntentEnvelope(value) {
@@ -339,10 +348,13 @@ export function prepareGuardMaintenanceWindowRequest({
   const openingTreeSha256 = pluginTreeSha256(livePluginRoot);
   const repoFingerprintSha256 = repoFingerprint(repo);
   const nonce = randomBytes(16).toString("hex");
-  const clampedTtlSeconds = Math.floor(Math.min(ttlSeconds * 1000, MAX_WINDOW_TTL_MS) / 1000);
+  // The ABSOLUTE bound is chosen and clamped ONCE, here, and becomes part of the
+  // signed subject (F1/F2 fix) -- never a relative ttlSeconds that a later step
+  // reinterprets against its own "now".
+  const expiresAtMs = Math.min(nowMs + ttlSeconds * 1000, nowMs + MAX_WINDOW_TTL_MS);
   const subject = {
     scopeRuleIds: [...new Set(scopeRuleIds)].sort(),
-    ttlSeconds: clampedTtlSeconds,
+    expiresAtMs,
     reason: reason.trim(),
     repoFingerprintSha256,
     openingTreeSha256,
@@ -370,6 +382,9 @@ export function prepareGuardMaintenanceWindowRequest({
 /** Agent-safe: verify-and-place only. Cannot succeed without a genuine proof. */
 export function installGuardMaintenanceWindow({ rootDir, request, trustPolicy, proof, livePluginRoot, nowMs = Date.now(), spawn = spawnSync } = {}) {
   if (!validRequest(request)) fail("GMW-REQUEST-INVALID", "window request is malformed");
+  // F3 defense in depth: install() re-validates the closed scope set independently of
+  // prepare() -- a hand-built request naming a non-liftable id must never install.
+  if (!validScope(request.subject.scopeRuleIds)) fail("GMW-SCOPE-INVALID", "scope must name only GS-6 or a TP-* rule id");
   if (typeof livePluginRoot !== "string" || livePluginRoot === "") {
     fail("GMW-PLUGIN-SOURCE", "no currently-enforcing live plugin root was supplied (see guard-gate-strength.mjs's livePluginRoots())");
   }
@@ -403,9 +418,19 @@ export function installGuardMaintenanceWindow({ rootDir, request, trustPolicy, p
   const verified = verifyPoApprovalProof({ intent: rebuiltIntent, trustPolicy, proof });
   if (!verified.verified) fail("GMW-PROOF-INVALID", verified.code ?? "PO-APPROVAL-PROOF-INVALID");
 
-  const openedAtMs = nowMs;
-  const ttlMs = Math.min(request.subject.ttlSeconds * 1000, MAX_WINDOW_TTL_MS);
-  const expiresAt = new Date(openedAtMs + ttlMs).toISOString();
+  // The signed `expiresAtMs` is written through VERBATIM -- install() never recomputes
+  // or extends it (F1/F2 fix). If it has already passed, there is nothing left to arm.
+  if (request.subject.expiresAtMs <= nowMs) fail("GMW-EXPIRED", "the signed window has already expired; nothing left to arm");
+  // `installedAtMs` is informational only (audit: when this record was actually placed)
+  // -- it is NOT part of the signed subject and carries no security weight of its own.
+  // A defensive read-time ceiling (currentGuardMaintenanceWindow) uses it only to
+  // NARROW the effective expiry, never to extend it past the signed bound -- tampering
+  // with it post-install can only make the window smaller, never larger than what the
+  // PO actually signed. Re-running install() with the identical {request, proof} is
+  // therefore safe: it just reinstalls the same signed, already-bounded window rather
+  // than resetting a fresh expiry from a later "now" (closes F2's "unlimited renewable"
+  // failure mode).
+  const installedAtMs = nowMs;
   const record = {
     schema: GMW_WINDOW_SCHEMA,
     root: repo.root,
@@ -413,8 +438,7 @@ export function installGuardMaintenanceWindow({ rootDir, request, trustPolicy, p
     subject: request.subject,
     intent: rebuiltIntent,
     proof,
-    openedAtMs,
-    expiresAt,
+    installedAtMs,
   };
   const paths = storagePaths(repo.common);
   writeAtomic(paths.window, Buffer.from(`${JSON.stringify(record)}\n`, "utf8"));
@@ -425,7 +449,7 @@ function validWindowRecord(value) {
   return object(value) && value.schema === GMW_WINDOW_SCHEMA && typeof value.root === "string"
     && SHA256.test(value.repoFingerprintSha256 ?? "") && validSubject(value.subject)
     && object(value.intent) && object(value.intent.value) && SHA256.test(value.intent.sha256 ?? "")
-    && object(value.proof) && Number.isFinite(value.openedAtMs) && typeof value.expiresAt === "string";
+    && object(value.proof) && Number.isFinite(value.installedAtMs);
 }
 
 /**
@@ -447,6 +471,10 @@ export function currentGuardMaintenanceWindow({ rootDir, nowMs = Date.now(), spa
     record = JSON.parse(readFileSync(paths.window, "utf8"));
   } catch { return { status: "absent" }; }
   if (!validWindowRecord(record)) return { status: "absent" };
+  // F3 defense in depth: never trust a stored record's scope claim, even if every
+  // other check below would otherwise pass -- a record naming a non-liftable id is
+  // treated as wholly invalid, not partially honored.
+  if (!validScope(record.subject.scopeRuleIds)) return { status: "absent" };
 
   const repoFingerprintSha256 = repoFingerprint(repo);
   if (record.repoFingerprintSha256 !== repoFingerprintSha256 || record.root !== repo.root) return { status: "absent" };
@@ -478,9 +506,19 @@ export function currentGuardMaintenanceWindow({ rootDir, nowMs = Date.now(), spa
   const verified = verifyPoApprovalProof({ intent: rebuiltIntent, trustPolicy: trustAnchor, proof: record.proof });
   if (!verified.verified) return { status: "absent" }; // tamper / revoked anchor
 
-  const signedExpiresMs = Date.parse(record.expiresAt);
-  const ceilingMs = record.openedAtMs + MAX_WINDOW_TTL_MS;
-  const effectiveExpiresAtMs = Number.isFinite(signedExpiresMs) ? Math.min(signedExpiresMs, ceilingMs) : NaN;
+  // Validity is derived PURELY from the signed, digest-verified `expiresAtMs` above
+  // (F1/F2 fix) -- fail-closed: `Number.isFinite(...) && nowMs < ...`, never the
+  // inverted `expired = ... <= nowMs` shape that produced a known bug elsewhere in
+  // this codebase (human-guard-override.mjs). `installedAtMs` (plaintext, unsigned,
+  // server-observed at actual install time) adds a purely NARROWING defensive
+  // ceiling: `min(signed, installedAtMs + MAX_WINDOW_TTL_MS)` can only ever reduce
+  // the effective expiry toward the signed bound, never extend it past what the PO
+  // actually signed -- tampering with `installedAtMs` upward cannot exceed
+  // `record.subject.expiresAtMs`, and tampering with `expiresAtMs` itself (inside
+  // `record.subject`) already fails the subject/intent digest check above.
+  const signedExpiresAtMs = record.subject.expiresAtMs;
+  const ceilingMs = record.installedAtMs + MAX_WINDOW_TTL_MS;
+  const effectiveExpiresAtMs = Number.isFinite(signedExpiresAtMs) ? Math.min(signedExpiresAtMs, ceilingMs) : NaN;
   const active = Number.isFinite(effectiveExpiresAtMs) && nowMs < effectiveExpiresAtMs;
 
   const shared = {
@@ -497,7 +535,10 @@ export function currentGuardMaintenanceWindow({ rootDir, nowMs = Date.now(), spa
 /** Convenience wrapper. Callers refusing a `NEVER_LIFTABLE_KERNEL_PATHS` path never call this at all. */
 export function windowCoversRule({ rootDir, ruleId, nowMs = Date.now(), spawn = spawnSync } = {}) {
   const window = currentGuardMaintenanceWindow({ rootDir, nowMs, spawn });
-  const covered = window.status === "active" && typeof ruleId === "string" && window.scopeRuleIds.includes(ruleId);
+  // F3 defense in depth: `isLiftableRuleId` is re-checked here too, even though
+  // currentGuardMaintenanceWindow already refuses a record naming a non-liftable id --
+  // never report `covered: true` for GS-1..GS-5/GS-7 or an unknown id through this path.
+  const covered = window.status === "active" && isLiftableRuleId(ruleId) && window.scopeRuleIds.includes(ruleId);
   return { covered, window };
 }
 
