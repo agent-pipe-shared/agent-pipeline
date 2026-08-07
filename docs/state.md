@@ -25,6 +25,37 @@ post-merge redesign packages have landed code this session:
   plan-and-push-authority` and `WP2+WP3`/`self-application-integrity-check`).
   `check-doc-contracts.mjs`/`check-observation-governance.mjs`/
   `security-scan.mjs` all pass as of this update.
+- **GMW (Guard Maintenance Window, ADR-0058) merged in from the local-development
+  marketplace snapshot** (commit `cca5ad8`): the PO pointed at
+  `/home/skar667/agent-pipeline-local-marketplace` as the currently-wired snapshot
+  of a sibling `sprint-nova-epic` feature not yet on `origin/main`, and asked for
+  it to be brought in now because it will need to connect to the WP5/PHX-2 push
+  ledger. Diffed the marketplace's `plugins/pipeline-core` tree file-by-file
+  against this branch first: `guard-push.mjs`/`worktree-lifecycle.mjs`/
+  `pipeline-state.mjs`/`pipeline-user-v3.schema.json` differed only by this
+  branch's own WP5 additions (snapshot predates them, nothing to take);
+  `po-gate-authority.mjs`/`public-core-observation.mjs`/
+  `feature-package-topology.mjs`/critic-review `SKILL.md` are this branch's own
+  newer versions (left untouched, not reverted). The genuine new content was GMW
+  itself: new `lib/guard-maintenance-window.mjs` (+test) and its `scripts/` CLI,
+  plus wiring into `guard-gate-strength.mjs`/`guard-testpath.mjs` (a signed,
+  time-boxed record lets GS-6/TP-* honor one additional narrow "allow", with a
+  hardcoded kernel-path list that stays refused even under an active window).
+  End-to-end GS-6/TP-* coverage landed in new sibling test files rather than
+  edits to the existing protected suites (TP-6/TP-2 refuse in-session edits in
+  this repo's `signature` mode) — same precedent as WP5's own sibling test
+  files. All 14 lib + 19 + 1 + 8 + 1 hook-suite checks pass, plus
+  `check-doc-contracts.mjs`/`check-observation-governance.mjs`. **Not done**,
+  named rather than silently skipped: GMW awareness is not yet wired into the
+  WP5/PHX-2 external-push-ledger path itself (the PO named this as later,
+  separate follow-up work); `verify.mjs` suite registration for the new test
+  files hits the same TP-3 guard-protection gap already open for WP5's own new
+  tests. The design/threat-model docs GMW's own header references
+  (`docs/adr/0058-guard-maintenance-window.md`,
+  `docs/guard-maintenance-window-threat-model.md`,
+  `specs/sprint-nova-epic/design/2026-08-07-guard-maintenance-window-design.md`)
+  were not part of the marketplace snapshot (only `plugins/pipeline-core` is) and
+  do not exist on this branch yet — a real gap, not fabricated here.
 - Session-local plugin-scope fix (not code, not committed): this repo's
   `.claude/settings.local.json` had accidentally acquired a `local`-scope
   plugin installation/registration for `pipeline-core@agent-pipeline-local`
