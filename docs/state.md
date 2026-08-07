@@ -943,6 +943,18 @@ excludes, and round 1 demonstrably respected that exclusion ("State n/a
 `specs/sprint-nova-epic/evidence/nova-hgosig/critic-round-1/` once round 2 has
 reported.
 
+**The general rule this is an instance of, PO, 2026-08-07 (verbatim):** "state
+ist ja auch dafür gedacht. weil eine neue session immer dumm ist und deine
+zwischendokumente nicht finden würde. eins der agentischen
+entwicklungsprobleme: auch ein Elephant ist am Anfang ein Goldfisch." Held
+findings, intermediate decisions and anything written mid-task belong in
+`docs/state.md`, not in a scratch file or a side document. `state.md` is the
+one artifact the bootstrap mandates reading first; everything else depends on a
+future session independently deciding to look, which is precisely the
+capability a fresh context does not have. The question to ask is never "where
+does this belong topically" but "what will a context with no memory actually
+open". Move it to its topical home afterwards, as a follow-up, never instead.
+
 Reviewed SHAs: `2365a8c, e4772d0, 06971d7, f650164, 5be2273, 4d19def, 5efb0f1,
 584a598, bae3c1a, a52ff69, 503fe0d, 058190f, 2c280ed, f667dec, b0dcd4e`.
 Lane: `functional-equivalent-read-only; OS isolation not asserted`. Verdict:
