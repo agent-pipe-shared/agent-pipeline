@@ -115,6 +115,10 @@ export function runGit(cwd, args, options = {}) {
     encoding: options.encoding ?? "utf8",
     maxBuffer: options.maxBuffer ?? 16 * 1024 * 1024,
     shell: false,
+    // Forwarded so `discoverRepository(...)` callers (PHX-2, external-push-ledger.mjs's two
+    // integration points) can bound their git spawns -- undefined/absent stays a no-op, so no
+    // existing caller that never passed a timeout changes behavior (spawnSync's own default).
+    ...(options.timeout !== undefined ? { timeout: options.timeout } : {}),
   });
   if (result.error) fail("WT-GIT-SPAWN", `git could not start: ${result.error.message}`);
   if (result.status !== 0 && !options.allowNonzero) {

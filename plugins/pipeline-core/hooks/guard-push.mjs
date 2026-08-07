@@ -127,6 +127,9 @@ import { spawnSync } from "node:child_process";
 import { loadManifest, gateConfig, loadDeployPolicy } from "../lib/manifest.mjs";
 import { authorizeRecordedDeploy, authorizeRecordedPush } from "../lib/critical-action-authorization.mjs";
 import { criticalProofWaiverFor, readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
+import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
+import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
+import { checkExternalPushLedgerConsumption, externalPushLedgerGate } from "../lib/external-push-ledger.mjs";
 import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv, refMatchesPattern } from "../lib/git-cmd.mjs";
 import {
   LEGACY_CALIBRATION,
@@ -1681,6 +1684,51 @@ if (pushGate.approval === "standing-approved") {
               + "--proof-request <path> --proof-authority <path> --proof <path>."
             : `Push approval critical proof is unavailable: project/critical-human-proof.json is ${pushWaiver.code}.`,
         );
+      } else if (externalPushLedgerGate(projectDir) !== "off") {
+        // PHX-2 additive external ledger (opt-in, see design doc §2/§5). AND-ed onto the
+        // base signature attestation above -- evaluated only once `attested.authorized` is
+        // already true, since there is nothing to consume-check if the base proof did not
+        // verify. `projectDir` (not `manifest`) is passed deliberately: `manifest` here is
+        // project/pipeline.yaml's already-loaded content (nested `gates.push.approval`
+        // shape), a different file from `pipeline.user.yaml`'s flat `gates.push_external_
+        // ledger` this gate actually lives in -- passing `manifest` would silently never
+        // find the key. `projectDir` is the same worktree-local root form `externalPushLedgerGate`
+        // also accepts from `pipeline-state.mjs`'s `dir`.
+        let repository = null;
+        try {
+          repository = discoverRepository(projectDir, { timeout: 5000 });
+        } catch {
+          // discoverRepository throws on >=7 paths (missing/symlinked start path, git spawn
+          // failure/non-zero exit incl. WT-GIT-SPAWN, submodule/`--separate-git-dir` common-dir
+          // shape, missing primary root -- worktree-lifecycle.mjs). This file has no ambient
+          // try/catch around this integration point, and per hooks.json's own exit-code
+          // contract (0 allow, 2 block, 1 allow+warn), an UNCAUGHT throw here exits the
+          // process at 1 -- which this hook's own harness treats as ALLOW, silently
+          // discarding every other already-accumulated failure in `failures`. This catch is
+          // the fail-closed disposition that replaces that uncaught-throw path.
+          failures.push(
+            "External push ledger repository topology could not be resolved "
+            + "(PUSH-EXTERNAL-LEDGER-TOPOLOGY-UNRESOLVED). Push refused -- this is a fail-closed "
+            + "disposition, never a silent pass-through and never an uncaught throw.",
+          );
+        }
+        if (repository !== null) {
+          const ledgerCheck = checkExternalPushLedgerConsumption({
+            repositoryFingerprint: derivePoGateRepositoryFingerprint({
+              gitCommonDir: repository.commonDir,
+              primaryRoot: repository.primaryRoot,
+            }),
+            proofSha256: state.pushApproval.lastApproved.criticalProof.proofSha256,
+            candidate: { commit: sourceCommit, tree: sourceTree },
+          });
+          if (!ledgerCheck.ok) {
+            failures.push(
+              `External push ledger consumption is ${ledgerCheck.code}. Record it with: `
+              + "node harness/scripts/pipeline-state.mjs approve-push ... "
+              + "(the same command that already records pushApproval now also writes this).",
+            );
+          }
+        }
       }
     } else if (pushGate.approval === "required" && approval?.criticalProofWaiver?.kind !== "push") {
       // Waived by policy, but the recorded approval does not say so: it was recorded

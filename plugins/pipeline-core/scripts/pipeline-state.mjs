@@ -285,9 +285,14 @@ import {
   validateCourseDecisionReceipt,
 } from "../lib/review-economy.mjs";
 import {
+  derivePoGateRepositoryFingerprint,
   validatePoGateAuthorityForRepository,
   validatePoGateProfileForRepository,
 } from "../lib/po-gate-authority.mjs";
+import {
+  appendExternalPushLedgerConsumption,
+  externalPushLedgerGate,
+} from "../lib/external-push-ledger.mjs";
 import { inspectProjectOnboardingV3 } from "../lib/project-onboarding-v3.mjs";
 import {
   applyLegacyV2RevocationRecovery,
@@ -318,7 +323,7 @@ import {
   validatePortablePipelineState,
 } from "../lib/project-authority.mjs";
 import { observeGitSource } from "../lib/source-observation.mjs";
-import { inspectSessionClosure } from "../lib/worktree-lifecycle.mjs";
+import { discoverRepository, inspectSessionClosure } from "../lib/worktree-lifecycle.mjs";
 import {
   PUBLICATION_AUTHORITY_REFERENCE_SCHEMA,
   approvePublicationAuthority,
@@ -5212,6 +5217,38 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       };
       if (!stateWriteSucceeded(writeState(dir, next, base))) {
         return 2;
+      }
+      // PHX-2 additive external ledger (opt-in, see design doc §2/§5). Placed immediately
+      // after the local write succeeds, and only when there is a real proof to bind (a
+      // `chat`-mode waiver has no `criticalProof`, so `verified.proof` is null and there is
+      // nothing to externally consume -- see the design's coverage-boundary note). `dir` is
+      // passed to `externalPushLedgerGate`/`discoverRepository` for the same reason as the
+      // read side: worktree-invariant roots, not the CLI's worktree-local cwd.
+      if (verified.proof !== null && externalPushLedgerGate(dir) !== "off") {
+        let repository;
+        try {
+          repository = discoverRepository(dir, { timeout: 5000 });
+        } catch {
+          // Same >=7-path throw surface as the read side. This can only fire AFTER the local
+          // write above has already succeeded, so `pushApproval.lastApproved` and
+          // `criticalProofConsumption` for this `proofSha256` are already persisted -- a naive
+          // retry with the same proof hits the pre-existing CRITICAL-PROOF-REPLAY guard above.
+          // Recovery is a fresh signing ceremony, not a retry (design §4).
+          console.error("Error: approve-push refused (PUSH-EXTERNAL-LEDGER-TOPOLOGY-UNRESOLVED).");
+          return 2;
+        }
+        const appended = appendExternalPushLedgerConsumption({
+          repositoryFingerprint: derivePoGateRepositoryFingerprint({
+            gitCommonDir: repository.commonDir,
+            primaryRoot: repository.primaryRoot,
+          }),
+          proofSha256: verified.proof.proofSha256,
+          consumedAt: approvedAt,
+        });
+        if (!appended.ok) {
+          console.error(`Error: approve-push refused (${appended.code}).`);
+          return 2;
+        }
       }
       console.log(`Push approved by "${by}" for commit ${head.commit} (${approvedAt}).`);
       return 0;
