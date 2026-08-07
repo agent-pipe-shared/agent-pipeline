@@ -66,7 +66,23 @@ post-merge redesign packages have landed code this session:
   `external-push-ledger.mjs`(+test), `guard-push.mjs`,
   `guard-push-external-ledger.test.mjs`, `runner-profiles-v3.mjs`(+test) —
   deliberately excludes every file `WP2-WP3-partA-implementation` (below) is
-  concurrently touching, no overlap. **Not the implementation's own
+  concurrently touching, no overlap. **Landed:** commits `db271b5` (F1:
+  `push_external_ledger` added to `validatePipelineUserV3`'s optional-key
+  list + enum check), `befadd2` (F4: `externalPushLedgerGate` resolves
+  strictly from HEAD's committed blob, never the working tree — a genuine
+  three-way split no-repo/repo-no-blob/repo-with-blob was needed, not the
+  simpler two-way collapse first tried, to keep an out-of-scope fixture
+  `PSXL05` passing alongside the in-scope cases), `f01f111` (F5:
+  `guard-push.mjs` reads from `fallbackProjectDir()` not `projectDir`). All 7
+  verify commands green (24/24, 7/7, 5/5, 146/146, 313/313, 20/20,
+  doc-contracts) — including both TP-5-protected canonical suites, run-only,
+  unmodified. **Mid-dispatch incident, resolved:** a concurrent `git commit`
+  in this session (docs-only, missing its own pathspec) briefly absorbed this
+  dispatch's staged F5 files; caught immediately, fixed via `git reset --soft
+  HEAD^` + a pathspec-scoped recommit, nothing lost — both sessions
+  independently verified the recovery. **Next:** a bounded delta Critic
+  re-review (base `f16b8f2`, head `f01f111`, prior finding IDs F1/F4/F5) —
+  dispatched. **Not the implementation's own
   fault, an Elephant/dispatch-construction lesson for next time:** the
   evidence-gathering approach this session invented (run selected suites,
   hand-write a summary JSON) does not satisfy QG-03; the correct approach is
