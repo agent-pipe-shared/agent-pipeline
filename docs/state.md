@@ -136,6 +136,28 @@ the only instance that reaches an operator through tool output; and the German
 half carries a `### H5 Close-Koordinator` heading (`:649`) with no English
 counterpart, an EN/DE structural divergence outside R3.
 
+**Ledger rework 3 landed (`9ba73ba`, +123/−29); Critic round 4/4 dispatched —
+the last autonomous round.** F-1 was resolved by **narrowing** the adoption
+precondition, not relaxing it, which is the direction the briefing required.
+`validity.expiresAtEpochMs` and `validity.singleUse` join
+`scope`/`ruleDigest`/`policyDigest` in an explicit byte-identity set; only
+`validity.notBeforeEpochMs` leaves it, because it is the per-process clock read
+(`guard-maintenance-window.mjs:456`, unsigned per `:446-447`). The replacement
+bindings are named rather than assumed: the enforcement formula `:542-545`
+re-evaluated on the committed pair, plus in-force resolution at the adopter's
+own clock, which `resolveHumanGovernanceAuthority` already performs
+(`human-governance-ledger.mjs:56`). Keeping `validity` whole was rejected **in
+writing**, with the reason stated: adoption would then be decidable only by
+millisecond coincidence and unreachable otherwise — the same defect class round 2
+removed.
+**The dispatch flagged its own weakest inference for the reviewer**, which is the
+behaviour this process is meant to produce: the resolution rests on
+`GMW-EXPIRY-TOO-FAR` (`:443-445`) making `validity.expiresAtEpochMs` equal the
+signed `subject.expiresAtMs` for every request that installs. If that is wrong,
+the byte-identity set is weaker than the document claims. **Known gap left
+open:** §14's correction log now lags one round behind the document, because §14
+substance was out of scope; it needs a follow-up entry.
+
 **R1 Critic round 2/4: FAIL — one major, two minor; rework 2 dispatched
 (`PHX-R1-REWORK-2`).** The F1 correction itself held up: the Critic re-derived
 the `:157` lever, the GS-6-before-path-table evaluation order and the complete
