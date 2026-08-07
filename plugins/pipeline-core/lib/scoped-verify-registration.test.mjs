@@ -186,6 +186,12 @@ function scopedRegistrationFailureFixture() {
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "windows-assurance-verify-registration.mjs"), windowsRegistration);
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "verify-resume.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "verify-resume.mjs"));
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "windows-private-state.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "windows-private-state.mjs"));
+    // verify.mjs delegates its candidate classification to the freeze library (ADR-0061
+    // Change 3), which in turn needs review-economy's canonical hashing. Both must exist in
+    // the fixture root or verify.mjs fails to LOAD -- which looks like this case failing for
+    // its own reason instead of for a missing dependency.
+    copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "nova-candidate-freeze.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "nova-candidate-freeze.mjs"));
+    copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "review-economy.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "review-economy.mjs"));
     // verify.mjs resolves the manifest tier through the authority resolver (ADR-0054);
     // the fixture root must carry it and its one local dependency.
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "project-authority.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "project-authority.mjs"));

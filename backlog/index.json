@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "716912c4a7f46b25167cc81b58b5d5069636711eed6158ab18b86270bcb1c09e"
+    "transitionHead": "642a87da1526fc857a64a33b3cf726ce8c88eed2334b2934fae7f189ceade48a"
   },
   "counts": {
-    "open": 38,
+    "open": 40,
     "in_progress": 21,
     "closed": 22
   },
@@ -286,6 +286,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "PO request in the 2026-08-07 Nova session for a deliberate confirmation before PIN entry, explicitly qualified as language-profile dependent; partially delivered by NOVA-PO-CONFIRM-1 in commits 5efb0f1 and 584a598."
+    },
+    {
+      "id": "pipeline.lifecycle-guard-does-not-know-the-human-signing-commands",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "Reported by the ONECMD-1 dispatch (2026-08-07) as an adjacent finding it deliberately left alone rather than fixing outside its briefed scope."
     },
     {
       "id": "pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root",
@@ -682,6 +690,14 @@
       "created": "2026-08-02",
       "source": "PO product-direction decision during Sprint Cyborg CYB-4 PO-proof UX review, 2026-08-02",
       "tracking": "Current CYB-4 helper is a compatible first adapter only; no programme-wide migration or closure is claimed."
+    },
+    {
+      "id": "pipeline.unregistered-suite-is-red-and-invisible-to-verify",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "Found incidentally during the 0.5.3 candidate work, 2026-08-07, while looking for something else. Re-confirmed by running the suite directly on candidate d4887b7."
     },
     {
       "id": "pipeline.verify-gate-scoped-registration",
