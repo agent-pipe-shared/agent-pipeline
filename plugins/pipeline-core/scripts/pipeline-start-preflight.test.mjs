@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -559,9 +559,17 @@ function fixtureScriptUrl(pluginRoot) {
  * require for a genuine "ready" attestation. Built with real `git` calls
  * (mkdtempSync fixture, not further stubbing) so the real default-selection
  * line in `observePipelineStartPreflight` actually executes end to end.
+ *
+ * Corrected per Critic finding F-C (MINOR, delta re-review `7aa84f0`): the
+ * `mkdtempSync` root is canonicalized via `realpathSync` immediately, before
+ * any git/fixture operation uses it, so `physicalDirectory()`'s
+ * `realpathSync(path) !== path` check (`public-core-observation.mjs`) does
+ * not fail closed on hosts where `os.tmpdir()` resolves through a symlink
+ * (e.g. macOS `/var/folders`, some Windows TEMP setups) -- not a present red
+ * on this host, where `os.tmpdir()` already is its own realpath.
  */
 function buildSelfApplicationGitFixture() {
-  const gitRoot = mkdtempSync(join(tmpdir(), "pipeline-start-preflight-git-fixture-"));
+  const gitRoot = realpathSync(mkdtempSync(join(tmpdir(), "pipeline-start-preflight-git-fixture-")));
   const pluginRoot = join(gitRoot, "plugins", "pipeline-core");
   mkdirSync(join(pluginRoot, ".codex-plugin"), { recursive: true });
   writeFileSync(join(pluginRoot, ".codex-plugin", "plugin.json"), JSON.stringify({
