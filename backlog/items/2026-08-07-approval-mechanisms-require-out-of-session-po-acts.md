@@ -106,13 +106,27 @@ a design.
    route exists.** Removing the sentence before the mechanism lands would leave an
    agent staring at a refusal with no route at all, which is worse than a route
    the rule dislikes.
-4. **One interpretation needs the PO's confirmation, because a whole mode hangs
-   on it.** Taken literally the rule abolishes `signature` mode, since a detached
-   proof is by construction produced outside the session. The reading applied by
-   the Phoenix session is that the *configured release act itself* is the
-   boundary, and what is forbidden is anything additional beyond it — a second
-   signing act per path, a per-release ceremony, or a hand-edit. Confirm or
-   correct before building.
+4. **The acceptance criterion is UX, not formal correctness — PO clarification,
+   2026-08-07.** `signature` mode stands and its one external signing call is
+   expected. What must stop is the pipeline *repeatedly* sending the human out to
+   run commands; a rare unavoidable exception is fine, the permanent state is not.
+   So the test to build against is **how many commands a human must run, and how
+   often, to get ordinary work done** — not whether one approval formally
+   suffices. The PO's stated reason is adoption, in those words: nobody will use a
+   pipeline this complicated.
+
+   Measure it against what ships today. `guard-gate-strength.mjs`'s `signature`
+   guidance emits a three-command sequence — `plan`, `prepare-authorization`,
+   `authorize-by-signature` — with four digests (`request-sha256`, `plan-sha256`,
+   `selection-sha256`, `reason-sha256`) to be carried between them by hand, plus
+   an external signing step, **for one protected edit**. Multiply by the number of
+   protected acts in an ordinary package and the number is the answer.
+
+   Two shapes worth weighing before choosing one: collapse the ceremony into a
+   single command that emits one artifact to sign and consumes the signed one
+   (the digest chaining is machine work and should not be the human's), and let
+   one release cover a declared scope so the count does not scale with the number
+   of protected paths in a package.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 

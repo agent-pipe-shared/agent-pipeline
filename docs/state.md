@@ -289,16 +289,30 @@ Three things follow, and they are requirements, not preferences:
    of scope"). The rule extends that settled model from the guards to the approval
    mechanism itself, which is consistent rather than a new concession.
 
-**The reading this session applied, stated explicitly so it can be corrected in
-one sentence if wrong.** Taken literally, "no PO activity outside the session"
-would abolish `signature` mode, since a detached Ed25519 proof is by construction
-produced outside the session with a key held outside the repository. But the same
-sentence names signature as an acceptable release ("per signatur oder chat je nach
-config"). The coherent reading is therefore: **the configured release act — one
-signature, or one chat approval — is itself the boundary. What is forbidden is
-anything *additional* beyond it:** a second signing act per protected path, a
-per-release ceremony, or a hand-edit the agent cannot perform. If that reading is
-wrong, it is wrong in one direction only and one sentence fixes it.
+**The reading, corrected by the PO immediately after the first version of this
+entry stated it too absolutely (APS, 2026-08-07):** *"natürlich gilt die signature
+weiter auch wenn sie der eine externe Aufruf ist. ich meine dass einen die
+pipeline nicht andauernd auffordern darf lauter Befehle extern zu machen. Klar
+wenn es gar nicht anders geht okay aber das darf nicht hier der Dauerzustand
+sein! das ist miese UX niemand wird diese pipeline nutzen wenn es so kompliziert
+ist."*
+
+So the rule is **not** zero external acts. `signature` mode stands, and the one
+external signing call is expected and fine. What is forbidden is the pipeline
+*repeatedly* sending the human out to run commands. A rare, genuinely unavoidable
+exception is acceptable; it must not be the normal operating state.
+
+**This changes the acceptance criterion, and that is the part worth keeping.** The
+test is not the formal one — "does one approval technically suffice" — but the
+adoption one: **how many commands must a human run, and how often, to get ordinary
+work done.** A mechanism that satisfies one-approval on paper while making the
+human paste six commands out of a denial message has failed. The reason given is
+explicit and it is not governance: nobody will use a pipeline this complicated.
+
+The current denial texts fail that test plainly. `guard-gate-strength.mjs`'s
+`signature`-mode guidance hands the agent a three-command sequence
+(`plan`, `prepare-authorization`, `authorize-by-signature`) with four digests to
+carry between them by hand — for **one** protected edit.
 
 **What this reclassifies, immediately.** This session measured from source that
 HGO binds one authorization to one byte-exact tool input, and that GMW's window
