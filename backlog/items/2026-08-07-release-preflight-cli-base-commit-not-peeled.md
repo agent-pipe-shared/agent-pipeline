@@ -57,6 +57,25 @@ unaffected and no false-ready claim results — but worth fixing since
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-Not yet triaged. Filed at Critic-review time; not fixed in-session since
-`release-preflight-cli.mjs` sits under GS-6 (no in-session edit path) and
-severity is minor/non-blocking.
+- **Decision:** accept-open.
+- **Rationale:** confirmed twice now, not assumed — a `NOVA-A54-BUGFIX-1`
+  Goldfish dispatch was sent to fix this directly and hit `guard-gate-strength.mjs`
+  Rule GS-6 on both target files (`release-preflight-cli.mjs` and its test),
+  refused outright with no partial write. The dispatch briefing wrongly
+  claimed GS-6 only protects `hooks/**`/`guard*` files; in this self-hosted
+  session GS-6 protects the entire live plugin root
+  (`plugins/pipeline-core/**`), exactly the same wall this session already
+  hit repeatedly and separately filed
+  (`backlog/items/2026-08-07-gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions.md`).
+  The fix itself is fully specified (see Proposal above) — only the
+  in-session apply path is blocked, same class of gap as
+  `backlog/items/2026-08-06-local-worker-supervisor-cli-suite-flakes-under-full-verify.md`'s
+  drafted-but-unapplied fix.
+- **Assignment (if accepted):** the PO applies the two-line fix directly
+  outside an agent session (GS-6's own documented escape hatch), or a
+  future session dispatches it from a genuinely separate installed plugin
+  copy (`CLAUDE_PLUGIN_ROOT` pointing elsewhere), per the failed dispatch's
+  own recommendation. Once applied, this also unblocks a real correction/
+  delta Critic round for NVA-A54-4/5/6/11 (Nova A #54), which was the
+  original reason this fix was attempted in-session.
+- **Date:** 2026-08-07
