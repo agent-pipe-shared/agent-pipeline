@@ -58,3 +58,4 @@ content-v1:c7fd9a9af55669aa1d94ad41d161c31c30981ca5db7671bc114a1534e44501d4:spec
 content-v1:c876696e50e6161b403250790f19ea0d07c957fb279e721589725cf1cd6db309:backlog/transitions.ndjson:generic-api-key:73:870
 content-v1:c8ebaf6daf4957777ff3388a98d41b3564b9822b1dd2a622ef975ac5f6bb96a7:backlog/transitions.ndjson:generic-api-key:73:869
 content-v1:d70126230e844c446f92529399917fca3550484aeb0911d3cc1c6a14d9d0d59c:specs/sprint-nova-epic/evidence/backlog/event-40-delivery-intent.json:generic-api-key:1:86
+content-v1:7fb7576eab2931c14762838065727eff8b0acbebeeec72ecd1965a656571c173:plugins/pipeline-core/hooks/guard-git.test.mjs:generic-api-key:1219:6
