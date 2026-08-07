@@ -142,8 +142,18 @@ and the danger of an unscoped "lift everything" default.
   TP-protected file, so the Elephant fixed it directly. Full Verify run:
   **255/255, exit 0**, sealed at
   `specs/sprint-nova-epic/evidence/nova-gmw/verify-c9a8cbd.json` (commit `d28d4d7`).
-- **Not yet done:** correction round 3 (Finding 1 only) + a further delta
-  re-Critic scoped to it; the bootstrap SessionStart
+- **Correction round 3 landed, 2026-08-07: Finding 1 fixed.** `installGuardMaintenanceWindow`
+  now refuses any signed `expiresAtMs` more than one `MAX_WINDOW_TTL_MS` beyond
+  the ACTUAL install time, closing the ceiling-walk exploit at the first
+  install attempt (the exploit request never gets a foothold, so no later
+  re-install can extend it). Elephant independently re-verified the diff and
+  re-ran all three affected suites (14/14, 20/20, 9/9). Full sealed Verify:
+  **255/255, exit 0** on candidate `8d2cc59`, at
+  `specs/sprint-nova-epic/evidence/nova-gmw/verify-8d2cc59.json` (commit `b846727`).
+  A third delta Critic re-review, bounded to this one commit and the INV-2
+  invariant only, is dispatched and pending.
+- **Not yet done:** the pending delta Critic verdict on Finding 1's fix (if
+  PASS, this closes the correction-round chain for NOVA-GMW-1 entirely); the bootstrap SessionStart
   warning (design already written, appended to the same design-note commit
   `4398dde`); end-to-end testing with a real PO-signed proof (needs the
   PO's own external signing device/key — cannot happen inside any agent
