@@ -127,6 +127,7 @@ mapping above.
 
 - **Design (2026-08-07):** `specs/sprint-phoenix-epic/design/gmw-hgo-evidence-intake-into-the-human-ledger.md`
 - **Review (2026-08-07):** Critic verdict `fail` on the first revision; findings F1..F7 in `specs/sprint-phoenix-epic/evidence/phx-ledger-intake-design-critic-review-f68a17d.md`, each resolved or explicitly bounded in the design (rework `PHX-LEDGER-INTAKE-rework-1`).
+- **Review round 2 (2026-08-07):** five further findings resolved in rework `PHX-LEDGER-INTAKE-rework-2`; the material outcome for the PO is that proposal point 3's "no join handle" is **not attainable** for the GMW half — H-AC-11's first clause requires the portable record to carry the values that constitute the join — so the design now discloses the residual and asks for a decision (design §5.2 R-3, O-4).
 - **Decision:**
 - **Rationale:**
 - **Assignment (if accepted):**

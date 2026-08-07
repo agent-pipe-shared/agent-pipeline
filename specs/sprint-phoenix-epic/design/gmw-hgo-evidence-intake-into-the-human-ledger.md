@@ -3,8 +3,9 @@
 > Design only. Nothing in this document has been implemented. It specifies a
 > **receiving contract**: what the PHX-2 Human Governance Decision Ledger requires
 > from the two human-authority mechanisms in this plugin (GMW, HGO) so that a
-> reviewer can reconstruct *what was approved, when, why, and by whom* — without
-> violating the privacy split the bound acceptance criteria already mandate.
+> reviewer can reconstruct *what was approved, when, why, and by whom* under the
+> privacy split the bound acceptance criteria mandate — including the one clause of
+> that split this design cannot satisfy and therefore discloses (§5.2 R-3, O-4).
 > The finalized GMW is being produced in a separate session and was not available
 > when this was written; every assumption about its final shape is listed and
 > labelled in §10.
@@ -216,10 +217,23 @@ document asserted an HGO field set instead of verifying it, and named a
   **`specSha256` does not occur anywhere in the module**, and `planSha256`
   (`:1295-1313`) is the digest of an in-memory plan payload object, not of a
   repository file. There is no plan/spec artifact pair to copy.
-- The capability *does* carry a candidate: `repository` is `repositoryObservation`
-  (`:424-434`) = `{fingerprintSha256, head, tree, statusSha256, state}`, so
-  `scope.candidate = {commit: repository.head, tree: repository.tree}` is
-  derivable and exact.
+- The capability carries a candidate **in two of its three modes, not in all
+  three.** `repository` is whatever the denial, plan and consume paths observed,
+  and each of them branches on the mode. For `standard` and `pipeline-author-repair`
+  it is `repositoryObservation` (`:424-434`) =
+  `{fingerprintSha256, head, tree, statusSha256, state}`, so
+  `scope.candidate = {commit: repository.head, tree: repository.tree}` is derivable
+  and exact. For `mode: "global-plugin-install"` all three paths substitute
+  `localPluginInstallSourceObservation` (`:1164`, `:1276`, `:1586`), whose `head`
+  and `tree` are **`null`** (`:231-232`) — deliberately, because that observation
+  attests the plugin *source tree* (`marketplaceSha256`, `manifestSha256`,
+  `pluginTreeSha256`, `:233-238`) and never runs `rev-parse` at all. The capability
+  copies the observation verbatim (`repository: planned.repository`, `:1470`), and
+  `scope.candidate` requires two `OID` values (`human-governance-decision.mjs:29`),
+  so that mode has **no candidate source**. §7.5 makes this the first
+  representability layer and §8.1 states the consequence. An earlier revision of
+  this document asserted the candidate as unconditional and pinned it as verified in
+  H-2; that was true of `repositoryObservation` and of two modes, not of the field.
 - `eligiblePaths` holds **repo-relative** strings (`safePath` `:436-455`, pushed as
   `path.relative` at `:798`/`:815`/`:851`). It is **empty** for the
   `closed-shell-exact` (`:838-844`) and `global-plugin-install` (`:785-792`)
@@ -268,7 +282,7 @@ All field names are from the validated payload (§3.1) unless prefixed `envelope
 | **what** was approved | `scope.action` | `GUARD.MAINTENANCE.LIFT` | `GUARD.OVERRIDE.CONSUME.SIGNATURE` or `GUARD.OVERRIDE.CONSUME.CHAT` | H-AC-11 "exact scope", H-AC-04 "action" | deterministic, derived from the mechanism, not from operator input |
 | | `scope.packageId` | `guard-maintenance-window` | `human-guard-override` | H-AC-04 "package" | deterministic |
 | | `ruleDigest` | `canonicalSha256({scopeRuleIds, openingTreeSha256})` | `canonicalSha256({eligiblePaths, commandClass})` | H-AC-04 "rule", H-AC-11 "rule digests" | re-derivable against the closed public catalogue (`LIFTABLE_RULE_IDS` + `TP-` prefix, `:104-110`) |
-| | `scope.candidate` | intent `candidate{commit,tree}` verbatim (`guard-maintenance-window.mjs:364-371`) | `{commit: repository.head, tree: repository.tree}` from the capability's `repositoryObservation` (`human-guard-override.mjs:424-434`) | H-AC-04 "candidate" | signed for GMW; locally observed for HGO |
+| | `scope.candidate` | intent `candidate{commit,tree}` verbatim (`guard-maintenance-window.mjs:364-371`) | `{commit: repository.head, tree: repository.tree}` from the capability's `repositoryObservation` (`human-guard-override.mjs:424-434`) — **except `mode: "global-plugin-install"`, whose observation carries `head: null`/`tree: null` and has no candidate at all** (§3.3, §7.5 layer 0) | H-AC-04 "candidate" | signed for GMW; locally observed for HGO; absent for one HGO mode |
 | | `scope.artifacts` | plan + spec `{path, sha256}`, digests re-checked against the signed intent | the layered, source-established set of §7.5 — representable `eligiblePaths`, else the present `policy.project` entries; **never** a plan/spec pair, which HGO does not have | H-AC-04 "artifact" | digest-verified at intake |
 | | `scope.environment` | `local-checkout` | `local-checkout` | H-AC-04 "environment" | deterministic |
 | | `validity.singleUse` | `false` (a window is time-boxed, not single-use) | `true` | H-AC-04 "single-use" | structural |
@@ -279,7 +293,7 @@ All field names are from the validated payload (§3.1) unless prefixed `envelope
 | | *(the operator's free-form reason)* | **not portable, ever** — stays machine-local (§5) | already digest-only (`reasonSha256`) and machine-local | H-AC-13 | — |
 | **by whom** | `authorityClass` | `product-owner` | `product-owner` (or the configured reviewer class) | H-AC-11 "actor/authority class" | class only — **no name, no key digest, no pseudonym** (H-AC-05) |
 | | `identityAssurance` | **`locally-attributed`** — see below | `locally-attributed` | H-AC-05 | — |
-| | `envelope.correlation.requestId` | the approval intent digest `intent.sha256` | request digest | H-AC-11 "request" | per-decision unique, non-identifying |
+| | `envelope.correlation.requestId` | the approval intent digest `intent.sha256` | request digest | H-AC-11 "request" | per-decision unique; carries no person-identifying value, and is byte-identical to the producers' machine-local request key — see §5.2, R-3 |
 | | `policyDigest` | the closed preimage of §5.5 — signed `policyRevision` + `kind`, the public liftable-rule catalogue and TTL ceiling. **The trust anchor is not an input, at any depth** | `canonicalSha256(capability.policy)`, i.e. the guard/policy identity HGO already computes and MACs (`human-governance-decision.mjs` untouched; source `human-guard-override.mjs:369-396`) | H-AC-11 "policy digest" | re-derivable from public inputs alone |
 
 **Why `identityAssurance` is `locally-attributed` even for a cryptographically
@@ -299,9 +313,11 @@ agent is cryptographically incapable of producing it, and that fact is what
 **What a reviewer therefore gets, plainly stated:** *what*, *when* and *why* are
 fully answered from the portable record alone. *By whom* is answered **at class
 level only** — `product-owner`, `locally-attributed` — and, by the deliberate
-design of H-AC-11, the natural person behind it is not recoverable from the
-repository, nor joinable to it from the machine-local zone. §5 designs that split
-rather than assuming it.
+design of H-AC-11, the natural person behind it is not recoverable **from the
+repository record**. Whether that record is *joinable* to a machine-local one that
+does name a person is a second, separate question, and the honest answer is
+producer-dependent: no for HGO, yes for GMW while its window/request record still
+exists. §5.2 establishes that instead of assuming the split holds.
 
 ## 5. The privacy split, designed
 
@@ -341,29 +357,100 @@ Note `proofSha256` is deliberately **not** persisted portably either: a reviewer
 cannot verify a signature digest without the key, and per-decision uniqueness is
 already carried by `correlation.requestId = intent.sha256`.
 
-### 5.2 What stays restricted, and how the two records relate
+### 5.2 What stays restricted, and the join that actually exists
 
-They relate **only by construction, never by a handle.** H-AC-11 requires that the
-restricted record "SHALL have no portable counterpart or join handle and SHALL NOT
-be persisted in, bundled from, or inferred by a repository record". This design
-therefore forbids, as a testable rule:
+H-AC-11's second clause requires that the restricted record "SHALL have no
+portable counterpart or join handle and SHALL NOT be persisted in, bundled from,
+or inferred by a repository record". An earlier revision of this section asserted,
+as a testable rule, that no intent digest, candidate, artifact digest or timestamp
+may appear in both zones — while §4 and §7.3 placed exactly those values in the
+portable record. **That rule is not implementable together with H-AC-11's first
+clause, and this section no longer asserts it.** The reason is structural, and it
+has to be stated before the corrected rules, because this is the one place where
+two bound criteria pull against each other.
 
-- no `decisionId`, `eventId`, `idempotencyKey`, intent digest, subject digest,
-  nonce, candidate commit/tree, artifact digest or exact timestamp from a portable
-  record may appear in a restricted record, and vice versa;
-- a restricted envelope sets `candidate`, `artifacts` and every `correlation` key
-  to the typed state `{state:"omitted-by-policy"}` (permitted by
-  `governance-event.mjs:118-128,130-149`), leaving only the repository
-  fingerprint, which is zone-scoped and identical for every record in the
-  repository and therefore not a record-level join handle;
-- the erasure test in §12 asserts that erasing the restricted record leaves no
-  dangling reference anywhere in the portable stream.
+**Why no identifier scheme can satisfy it.** H-AC-11's first clause requires the
+portable record to expose "request … exact scope … policy and rule digests,
+evidence". Every one of those values is, by construction, a function of the same
+producer facts the machine-local record holds:
 
-**The honest consequence, stated plainly:** after erasure — or even before it — no
-mechanical join can attribute a specific lift to a specific person. That is not a
-gap in this design; it is what the bound criteria decided, and it is what makes
-the machine-local record genuinely erasable while the portable record is
-append-only forever (H-AC-06). It is carried to the PO as open question O-1 (§14)
+| Portable value | Machine-local counterpart | Relation |
+| --- | --- | --- |
+| `envelope.correlation.requestId` | GMW `record.intent.sha256` (`guard-maintenance-window.mjs:462`); HGO `capability.requestSha256`, which is also the **filename** of the machine-local request (`human-guard-override.mjs:1223`) and is carried in every audit entry (`:1226-1235`, `:1511-1520`, `:1623-1631`) | byte-identical |
+| `decisionId` = `gmw-request-<i32>` (§7.3) | the same intent digest | 32-hex prefix of it |
+| `scope.candidate` | GMW signed `intent.value.candidate` (`:366-375`, stored at `:462`); HGO `capability.repository.head/.tree` | byte-identical |
+| `scope.artifacts[].sha256` | GMW signed `planSha256`/`specSha256`; HGO `policyIdentity`'s file digests (`human-guard-override.mjs:380-394`) | byte-identical |
+| `validity.expiresAtEpochMs` | GMW signed `subject.expiresAtMs`, narrowed by `installedAtMs` (`:542-545`) | equal by formula |
+| `ruleDigest` | recomputable from `subject.scopeRuleIds` + `openingTreeSha256` (`:355-362`) | recomputable |
+
+Renaming or salting the identifiers removes none of this: any deterministic
+derivation is recomputable by whoever holds the machine-local record (§5.1 makes
+the same argument one hash deeper for key digests), and dropping
+`correlation.requestId` altogether would violate H-AC-11's own "expose request"
+requirement while leaving `scope.candidate` + `validity` + `ruleDigest` as an
+exact per-decision fingerprint. **Stated plainly: no identifier scheme available to
+this design satisfies both clauses of H-AC-11 at once.** What follows is therefore
+split into what holds and what does not.
+
+**R-1 — the portable-content rule (holds; tested).** No portable record produced by
+this path contains a natural-person identifier, a pseudonym, a key digest or any
+value derived from the trust anchor at any depth, free-form text, a digest of
+free-form text, an absolute path, or the subject nonce. That is §5.1's exclusion
+list, enforced constructively for `policyDigest` (§5.5, U-7) and by enumeration
+elsewhere (I-10, AC-2).
+
+**R-2 — the zone rule between the portable stream and the restricted governance
+store (holds; increment 2).** When the attribution payload of D-1 enters the
+restricted store (§3.4), no record-level correlator crosses in either direction:
+no `decisionId`, `eventId`, `idempotencyKey`, intent digest, subject digest,
+nonce, candidate, artifact digest or exact timestamp. The restricted envelope sets
+`candidate`, `artifacts` and every `correlation` key to the typed state
+`{state:"omitted-by-policy"}` (permitted by `governance-event.mjs:118-128`,
+`:130-149`), leaving only the repository fingerprint — zone-scoped, identical for
+every record in the repository, and therefore not a record-level handle. §12's
+erasure test asserts exactly this pair of properties and nothing wider.
+
+**R-3 — the disclosure (does not hold; recorded, not softened).** The producers'
+**pre-existing** machine-local stores are joinable to the portable record per
+decision, by every row of the table above. Increment 1 therefore does **not**
+designate them as H-AC-11's restricted record (§5.4 withdraws the earlier claim
+that it did) and does not claim H-AC-11's second clause satisfied. The consequence
+differs materially per producer:
+
+- **HGO — the join reaches no attribution.** Its machine-local zone holds digests
+  only: `reasonSha256` over the operator's text and never the text itself
+  (`human-guard-override.mjs:1370`, re-checked at `:1430`; no path writes the
+  plaintext to disk), no key material, and no natural-person identifier anywhere in
+  `audit.jsonl`, the request files or the capabilities. A join tells its holder
+  *which* machine-local request produced a lift, not *who* authorized it. H-AC-11's
+  "natural-person attribution or free-form rationale" has no exposure point on the
+  HGO side today, so its second clause has no referent there.
+- **GMW — the join reaches attribution and rationale, and that is a
+  non-conformance.** The window and request records hold `subject.reason` as free
+  text (`guard-maintenance-window.mjs:342`, `:358`, `:461`) and `proof`, whose shape
+  is `{schema, intentSha256, keyReference, publicKey, signatureBase64}`
+  (`po-approval-proof.mjs:34`) — the approver's public key and its reference — and
+  `currentGuardMaintenanceWindow` already returns the reason to a local query
+  (`:549`). That record *is* an attribution-and-rationale record in H-AC-11's sense,
+  and after this design the repository permanently holds a per-decision pointer into
+  it. **Increment 1 does not satisfy H-AC-11's no-join-handle clause for the GMW
+  half.** Carried as O-4 (§14) with an owner and the two available exits, not as a
+  resolved item.
+
+**Two bounds on the GMW residual, so it is neither overstated nor understated.**
+The machine-local side is transient by construction: `request.json` is a single
+fixed path that the next `prepare` overwrites (`:377-378`, `storagePaths`
+`:258-261`) and `window.json` is unlinked at close (`:574`), so the join target for
+an earlier decision is normally already gone, while the portable record is
+permanent. And whoever holds the machine-local record holds the attribution
+already, ledger or no ledger; what the ledger adds is a durable repository-side
+pointer to a record that may no longer exist. Neither bound makes the clause
+satisfied, and neither is offered as one.
+
+**The honest consequence for a reviewer, unchanged:** no *portable* record
+attributes a lift to a person, and once the machine-local record is gone no
+mechanical attribution is possible at all. That accountability ceiling is what the
+bound criteria decided, and it is carried to the PO as open question O-1 (§14)
 rather than quietly softened.
 
 ### 5.3 What happens to GMW's free-text `subject.reason`
@@ -373,9 +460,10 @@ rather than quietly softened.
   which already returns it (`:549`). Nothing about GMW's own storage of it changes.
 - It is **never copied portably**, and — importantly — **no digest of it is
   copied portably either**. A digest of a short, low-entropy operator sentence is
-  both dictionary-attackable and a perfect join handle to the machine-local
-  record; it would defeat §5.2 while looking prudent. (HGO's `reasonSha256` is
-  fine precisely because it never leaves the machine-local zone.)
+  both dictionary-attackable and — unlike a scope digest — a direct route back to
+  the *content* of the operator's sentence; it would breach §5.2's R-1 while
+  looking prudent. (HGO's `reasonSha256` is fine precisely because it never leaves
+  the machine-local zone.)
 - The portable `reasonCode` is a **separate, stable code**, not a transformation
   of the free text. Preferred source: a new `reasonCode` field inside GMW's signed
   subject, so the code is covered by the *existing* signature — one more field in
@@ -391,9 +479,12 @@ rather than quietly softened.
 - **Increment 1 (this design, no kernel change).** Portable events only.
   Attribution and rationale stay in the producers' existing machine-local, owner-
   private stores — HGO's MAC-chained `audit.jsonl` (§3.3) and GMW's window/request
-  files (§3.2). Both are outside the worktree, `0600`, and already satisfy
-  "separately protected machine-local record readable by an authorized local
-  query" for H-AC-11 purposes.
+  files (§3.2). Both are outside the worktree and owner-private. What increment 1
+  does **not** do is designate them as the "separately protected machine-local
+  decision record" of H-AC-11: they are joinable to the portable record per
+  decision, and only the GMW pair exposes attribution or rationale at all (§5.2,
+  R-3, and O-4). The record H-AC-11 describes is created by increment 2, in the
+  restricted store, under R-2.
 - **Increment 2 (D-1, bundled with the rebind of §9).** Move attribution into the
   restricted governance store (§3.4) to gain encryption at rest, expiry, erase
   receipts and key destruction — i.e. the machinery H-AC-06's restricted branch
@@ -452,12 +543,24 @@ the copy still agrees with GMW's behaviour through the exported `isLiftableRuleI
 
 **HGO.** `policyDigest = canonicalSha256(capability.policy)`, i.e. the exact
 `policyIdentity` object HGO already computes, MACs into the capability, and
-re-checks at consume time (`human-guard-override.mjs:369-396`, `:1593`). Its
-inputs are shipped guard code digests and repository-relative policy files with
-byte digests — public repository material, no key material. This is not a new
-construction: HGO's own denial audit entry already carries `policySha256:
-sha(policy)` over that same object (`:1233`), so the portable field reuses a
-digest the mechanism had already decided was safe to record.
+re-checks at consume time (`human-guard-override.mjs:369-396`, `:1593`).
+
+The argument for portability rests on the preimage alone, and is complete without
+any reference to what HGO records locally: every input is a digest of *content* —
+shipped guard implementation files under the plugin's `hooks/` (`:371-379`) and
+repository-relative policy files (`:380-394`) — so the value is reproducible by
+anyone holding those same bytes; it contains no key material, no free text and no
+path outside the repository; and it is not person-bound, since two different
+approvers acting on the same policy state produce the same digest. Those are the
+same three properties the GMW preimage is checked against below.
+
+Deliberately **not** part of that argument: the fact that HGO's own denial audit
+entry already carries `policySha256` over the same object (`:1233`). Machine-local
+recording is not evidence of portable safety — §5.3 rejects precisely that
+inference two sections earlier, where `reasonSha256` is acceptable *because* it
+never leaves the machine-local zone. A rule that only binds in the direction that
+is inconvenient is not a rule, so the local precedent is recorded here as a
+non-argument rather than quietly reused.
 
 **Four properties, stated so they can be tested rather than believed:**
 
@@ -614,36 +717,69 @@ wrong under concurrency: two racing installs read different clocks, so they woul
 have produced two *different* grant ids for one request and left two live grants
 that the boundary check of §8.5 could not disambiguate.
 
-**The skip and the generation are re-asserted under the store's own lock.** The
-store wraps scan-plus-append in `withExclusiveStreamLock` and exposes
-`assertAppend` for exactly this purpose — "a caller may bind a domain-specific
-append precondition to this same stream lock … a separately queried grant must not
-be consumed twice in a race" (`governance-event-store.mjs:638`, `:645-651`). The
-intake therefore:
+**One behaviour for the identical-request race, and where the race is actually
+decided.** The store resolves the idempotency key *before* it calls `assertAppend`:
+under the stream lock it scans, looks for a committed event with the same
+`idempotencyKey`, fails `GES-IDEMPOTENCY-CONFLICT` on a differing intent digest or
+returns an `idempotent-replay` receipt on a byte-identical one, and only if no such
+event exists does `assertAppend` run at all
+(`governance-event-store.mjs:638-651`). Because every identifier above is derived
+from the request digest **and from the stream state itself**, an `assertAppend`
+precondition cannot fire for this identifier scheme: the intake's `g` is the number
+of grants it observed, so any concurrent append that would invalidate the
+precondition also increments that number, and the id the intake then computes
+collides with the committed one. Two concurrent installs of the same signed request
+are the plainest case — both read an empty stream, both compute `g = 0`, both build
+the same `decisionId` and the same `idempotencyKey`, and the second one under the
+lock is decided by the idempotency branch. An earlier revision specified a
+`GAL-GRANT-RACE` precondition on `assertAppend` for exactly this race, with a losing
+racer that "fails closed and retryable"; that precondition was unreachable and
+§12's I-12 asserted a behaviour the store cannot produce. Both are corrected here.
 
-1. reads the stream unlocked, computes `g`, and skips entirely if a live,
-   non-disposed grant for `requestDecisionId` already exists (the common,
-   supported re-install case, GMW `:451-455`);
-2. passes an `assertAppend` that re-checks both facts **inside** the lock — still
-   no live grant, and the generation is still `g` — and throws
-   `GAL-GRANT-RACE` otherwise.
+The single specified behaviour:
 
-A losing racer therefore fails **closed** and retryable: no window arms, and the
-operator re-runs the identical `{request, proof}` — no re-signing, no new ceremony
-(§1). On the retry the live grant is visible and nothing is appended.
+1. The intake reads the stream unlocked, computes `g`, and **skips** the append
+   entirely if a live, non-disposed grant for `requestDecisionId` already exists —
+   the common, supported re-install case (GMW `:451-455`).
+2. Otherwise it appends. If the store returns `idempotent-replay` or fails
+   `GES-IDEMPOTENCY-CONFLICT`, the intake re-reads the committed event under that
+   key and **adopts** it — continuing to §7.4's step (d) — if and only if all of:
+   the committed payload validates as the same decision class with the same
+   `decisionId`; its `scope`, `ruleDigest`, `policyDigest` and `validity` are
+   byte-identical to what the intake was about to append; and, for a `granted`
+   append, that grant resolves as live and non-disposed in the same read (a
+   `requested` record has nothing to dispose). Adoption is what makes the race
+   benign: both racers end up bound to one and the same ledger decision, which is
+   exactly the state a sequential identical re-install produces, and the window each
+   of them arms is the same signed window with the same signed bound.
+3. In every other case — a different decision committed under the intake's key, or
+   a committed decision that is already revoked or expired — the intake **fails
+   closed with the retryable code `GAL-GRANT-RACE` and no window is armed.** The
+   operator re-runs the identical `{request, proof}`: no re-signing, no new ceremony
+   (§1). Case 3 is not decorative; it is the interleaving in which a racer would
+   otherwise arm a window against an already-disposed grant, which §8.5 would then
+   deny anyway — arming it would be capability the ledger does not back.
 
-**Idempotency conflicts are handled, not assumed away.** The store compares
-idempotency keys *before* `assertAppend` runs and fails a same-key/different-intent
-replay with `GES-IDEMPOTENCY-CONFLICT` (`:640-644`); a byte-identical intent
-returns `idempotent-replay` instead (`:643`). Because `occurredAtEpochMs` comes
-from the local clock, two appends of the same decision are never byte-identical,
-so the conflict path is the one that fires. The intake treats it as a **signal,
-not an error**, and only after verification: it re-reads the committed event under
-that key and continues only if the event's payload validates as the same decision
-class with the same `decisionId` and a byte-identical `scope`, `ruleDigest`,
-`policyDigest` and `validity`. Anything else fails closed. This is strictly
-stronger than the previous unlocked check-then-append, which §12's concurrency
-test now pins.
+The byte-identical branch is the rare one, not the rule: `occurredAtEpochMs` comes
+from the local clock, so two appends of the same decision are normally not
+byte-identical and the conflict path is what fires. Treating that conflict as a
+signal rather than an error is safe **only** because of the verification in (2); an
+unverified "a conflict means someone else already wrote my record" is precisely the
+assumption this section refuses to make.
+
+`assertAppend` is not unused by this design — it is load-bearing where it is
+reachable. The kernel's own consumption helper binds the live-grant check to the
+same stream lock (`human-governance-ledger.mjs:209-223`, `HGL-CONSUME-NOT-LIVE`),
+and §7.5's HGO consumption goes through that helper rather than re-implementing it.
+If a later revision ever moves these identifiers off the stream state — a clock or
+nonce suffix would do it — the precondition becomes reachable again and must be
+reinstated together with a test that can fail without it.
+
+The race specified here is **per request**. Two *different* signed requests
+installed concurrently produce two independent request/grant chains, while GMW's
+`writeAtomic` keeps `window.json` a singleton (`:467`), so the ledger can hold two
+live grants behind one machine-local window. That interleaving is outside this
+section and is recorded as O-5 (§14) rather than designed around silently.
 
 `requested` is appended once and skipped on every later install of the same
 request. It is required, not optional: a `granted` decision without a non-null
@@ -692,11 +828,28 @@ PO signed over would defeat the digest check it is supposed to pass.
 `validity.notBeforeEpochMs` / `expiresAtEpochMs` from `capability.authorizedAt` /
 `capability.expiresAt`; `correlation.requestId` from `capability.requestSha256`.
 
-**`scope.artifacts`, and the case where it cannot be built.** The payload requires
-at least one `{path, sha256}` entry whose path matches an artifact pattern that
-begins `[A-Za-z0-9]` (`human-governance-decision.mjs:30-31`; the envelope repeats
-it at `governance-event.mjs:23`). HGO's own data satisfies that only sometimes, so
-the intake uses a layered, deterministic source and states the residue:
+**Representability, in the order the payload actually constrains it.** Two payload
+requirements can independently make an HGO decision unrepresentable. The candidate
+is checked **first**, because no artifact source can repair a missing one — and
+because checking it second is what let an earlier revision classify a candidate-less
+capability as representable.
+
+**Layer 0 — the candidate.** `scope.candidate` requires two `OID` values and admits
+no typed state (`human-governance-decision.mjs:29`), unlike the envelope, which does
+(`governance-event.mjs:138-145`). A capability whose `repository.head`/`.tree` are
+`null` — i.e. every `mode: "global-plugin-install"` capability (§3.3) — **cannot be
+represented**, and the intake appends nothing for it. The intake **SHALL NOT**
+substitute the observation's `statusSha256`, its `fingerprintSha256` or the plugin
+tree digest for a commit or a tree: all three are 64-hex and would pass the `OID`
+pattern, and writing one would place a value into `scope.candidate` that is not the
+thing the field denotes — permanently, in an append-only record. That is the
+prohibition AC-12 already states for artifacts; AC-13 states it for the candidate.
+
+**Layers 1-3 — the artifacts.** The payload requires at least one `{path, sha256}`
+entry whose path matches an artifact pattern that begins `[A-Za-z0-9]`
+(`human-governance-decision.mjs:30-31`; the envelope repeats it at
+`governance-event.mjs:23`). HGO's own data satisfies that only sometimes, so the
+intake uses a layered, deterministic source and states the residue:
 
 1. every `capability.eligiblePaths` entry that matches the artifact path pattern
    **and** resolves to a regular file inside the worktree, paired with the sha256
@@ -711,12 +864,18 @@ the intake uses a layered, deterministic source and states the residue:
 3. otherwise **the decision is not representable in the portable payload at all**,
    and increment 1 appends nothing for it. See finding F-3 (§14) and §8.1.
 
-Case 3 is not hypothetical: `eligiblePaths` is empty for the `closed-shell-exact`
-and `global-plugin-install` classes, and the dominant
-`writer-owned-project-policy-emergency` class targets dot-prefixed paths such as
-the `.claude/` configuration files (`:457-478`), which the leading-`[A-Za-z0-9]`
-rule rejects. This is a limitation of the payload contract, not of HGO, and the
-amendment that removes it is specified in §9 and left to the rebind.
+**Neither residue is hypothetical, and they are not the same set.** `eligiblePaths`
+is empty for the `closed-shell-exact` (`:838-844`) and `global-plugin-install`
+(`:785-792`) classes, and the dominant `writer-owned-project-policy-emergency` class
+targets dot-prefixed paths such as the `.claude/` configuration files (`:457-478`),
+which the leading-`[A-Za-z0-9]` rule rejects. Layer 2 rescues part of that, because
+two of `policyIdentity`'s five `project` entries are `project/`-prefixed and do
+begin alphanumerically (`:380-394`) — which is exactly why layer 0 has to come
+first: a `global-plugin-install` capability in a checkout carrying those files would
+otherwise pass layer 2 and be classified representable while its candidate is still
+`null`, and the fail-closed rule of §8.1 would then fire on a decision that was
+never expressible. These are limitations of the payload contract, not of HGO; the
+amendments that remove them are specified in §9 and left to the rebind.
 
 | HGO transition | Portable event | Reason code | Link |
 | --- | --- | --- | --- |
@@ -759,17 +918,33 @@ Grounds:
   is explicitly supported by GMW (`:451-455`); the operator retries the same
   command with the same signature. No re-signing, no new ceremony (§1).
 
-**One bounded exception, named rather than hidden: the HGO decisions that the
-payload cannot represent at all (§7.5 case 3).** "Fail closed" there would not
-mean "record it and proceed", it would mean *disabling HGO's dominant emergency
-lane* for as long as the artifact contract stays as it is. The field constraint of
-§1 reads as a ceiling on additions, and it retires nothing that already exists;
-turning off a working human lane to satisfy a bookkeeping rule would retire
-something. Increment 1 therefore leaves those consumptions exactly as they are
-today — machine-local audit chain only, no portable event, no new capability, no
-change to HGO's behaviour — and the gap is carried as finding F-3 with its
-amendment in §9, not silently absorbed. Every HGO decision that *is* representable
-fails closed as stated above. This exception is scoped to representability alone: a
+**One bounded exception, named rather than hidden: the HGO decisions the payload
+cannot represent at all (§7.5, layers 0 and 3).** "Fail closed" there would not mean
+"record it and proceed", it would mean *disabling a working human lane* for as long
+as the payload contract stays as it is. The field constraint of §1 reads as a
+ceiling on additions and retires nothing that already exists; turning off a lane to
+satisfy a bookkeeping rule would retire something.
+
+The exception covers two disjoint sets, and the second matters more than the first:
+
+- the decisions whose **artifact** set cannot be built (§7.5 layer 3) — the
+  dot-prefixed and path-less classes;
+- **every `global-plugin-install` decision, whose candidate does not exist** (§7.5
+  layer 0). That set is the local plugin-install override lane, and it exists only
+  in a Pipeline source checkout: `isPipelineSourceRoot` requires both
+  `plugins/pipeline-core/.codex-plugin/plugin.json` and `harness/scripts/verify.mjs`
+  (`human-guard-override.mjs:242-245`), which is to say, in the repository where the
+  Pipeline itself is developed — including this one. An unconditional fail-closed
+  rule would therefore have switched off, in exactly that repository, the one lane
+  whose purpose is installing the plugin under test.
+
+Increment 1 leaves both sets exactly as they are today — machine-local audit chain
+only, no portable event, no refusal, no new capability, no change to HGO's behaviour
+— and the gap is carried as finding F-3 with its amendments in §9, not silently
+absorbed. Representability is decided **before** any append is attempted, so the two
+cases can never be conflated at run time: a decision that cannot be represented is
+not an append that failed. Every HGO decision that *is* representable fails closed
+as stated above, and this exception is scoped to representability alone: a
 representable decision whose append merely *fails* still blocks the consumption.
 
 **Narrowing SHALL fail open.** `close` deletes the window record first and appends
@@ -912,8 +1087,12 @@ only *deny* itself the lift), and no human step is added. The remaining real cos
 is per-call read I/O over the human stream, which is why this is scheduled as
 increment 2 alongside D-1 rather than asserted as free, and why the hooks that
 call `windowCoversRule` appear in §9's amendment rather than in §11's increment-1
-inventory. Until it lands, O-2 (§14) carries a **known non-conformance with an
-owner and a date**, not an interpretation to ratify.
+inventory. Until it lands, O-2 (§14) carries a **known non-conformance with an owner
+and a named closure path**, not an interpretation to ratify. It carries **no date**:
+scheduling increment 2 is part of the decision O-2 asks the PO for, and this
+document does not assert a date it has no standing to set. The only date in §9 is
+H-AC-12's migration expiry, which bounds that clause alone and, as §9 says
+explicitly, discharges nothing of H-AC-02.
 
 The migration compatibility owner and expiry that H-AC-12's own sentence requires
 are recorded in the amendment of §9; they bound the H-AC-12 clause, and they do
@@ -991,6 +1170,31 @@ derived row-by-row from §11 rather than summarized:
   payload as the envelope already does (`governance-event.mjs:130-136`). The
   first is narrower and is the recommendation; both touch a shipped validator and
   its published schema, so both belong to the reviewed rebind.
+- **For the candidate-less HGO decisions (increment 2, finding F-3's second
+  half).** `scope.candidate` requires two `OID` values and admits no typed state
+  (`human-governance-decision.mjs:29`), while a `global-plugin-install` capability
+  observes a plugin source tree and carries `head: null`/`tree: null`
+  (`human-guard-override.mjs:231-232`). The only honest amendment is to let
+  `scope.candidate` carry a typed state as the envelope already does
+  (`governance-event.mjs:138-145`), which K-AC-09 already requires consumers to
+  preserve exactly. The alternative — borrowing the observation's 64-hex
+  `statusSha256`, which would pass the `OID` pattern — is rejected: it would record a
+  value that is not a commit as a commit, permanently. Until the amendment lands the
+  local plugin-install lane stays outside the portable ledger and unchanged (§8.1).
+- **For H-AC-11's join clause (F-A, O-4).** No intake design can satisfy H-AC-11's
+  "no portable counterpart or join handle" while its first clause requires the
+  portable record to expose request, exact scope and the rule/policy digests: §5.2's
+  table shows the two records are joinable through `scope.candidate`, `validity`,
+  `ruleDigest` and the artifact digests even with every identifier removed. The
+  amendment that would make the criterion satisfiable scopes the clause to the record
+  it actually describes — the restricted machine-local profile of §3.4, whose
+  envelope can omit every correlator by typed state — and states separately what is
+  required of a producer's own enforcement material, which is not a ledger record
+  and is not created by this path. This is an acceptance-criterion change and is
+  **not** applied here; O-4 carries the PO decision. The alternative exit is a change
+  to GMW's machine-local storage so that the rationale and the proof no longer sit in
+  a record keyed by the intent digest; that touches a module another session owns, it
+  is not proposed here, and it would still not remove the structural join.
 - Only if increment 2 (D-1) is accepted: `spec.md` §6.1's closed schema family
   gains the restricted attribution schema.
 
@@ -1032,7 +1236,7 @@ test, rather than breaking the intake silently.
 | # | Pinned dependency (**verified**, `human-guard-override.mjs`) | If it changes | Detection |
 | --- | --- | --- | --- |
 | H-1 | `CAPABILITY_KEYS` keeps `repository`, `eligiblePaths`, `policy`, `commandClass`, `requestSha256`, `authorizedAt`, `expiresAt` (`:1066-1089`) | the HGO builders lose their field sources and fail closed | shape assertion in the unit tests; `exactKeys` at `:1100` already fails a drifted capability |
-| H-2 | `repository` stays `repositoryObservation` with `head`/`tree` (`:424-434`) | `scope.candidate` has no source; no HGO event can be built | unit test pins the mapping; `HGL-SCOPE` at validation |
+| H-2 | `repository` stays `repositoryObservation` with `head`/`tree` for `standard`/`pipeline-author-repair` (`:424-434`), **and stays `localPluginInstallSourceObservation` with `head: null`/`tree: null` for `global-plugin-install`** (`:231-232`, substituted at `:1164`, `:1276`, `:1586`) | if the mode split moves, either `scope.candidate` loses a source it had, or a mode that has none is treated as if it had one | U-10 pins the mapping **per mode** including the layer-0 not-representable outcome; `HGL-SCOPE` at validation |
 | H-3 | `eligiblePaths` stays repo-relative (`:436-455`, `:815`) | an absolute path could reach a portable field | privacy test 16 and the artifact path pattern both reject it |
 | H-4 | `policy` stays `policyIdentity`'s `{guards, project}` shape with no key material (`:369-396`) | `policyDigest`'s HGO preimage stops being closed or stops being safe | §12's constructive `policyDigest` test |
 | H-5 | consume keeps refusing on repository/policy/plugin drift (`:1588-1611`) | §8.5.1's HGO half becomes vacuous too, and the current-candidate choice loses its justification | integration test on drift-rejection ordering |
@@ -1083,11 +1287,15 @@ test, rather than breaking the intake silently.
   the H-AC-15 correction dimension unaddressed.
 - **U-9** The HGO denial builder produces `requested` + `denied` with
   `GUARD.OVERRIDE.DENIED` and `links.requestDecisionId`.
-- **U-10** HGO artifact layering (§7.5): a capability with representable
-  `eligiblePaths` uses them; one without falls back to the present
-  `policy.project` entries; one with neither yields the explicit
-  *not-representable* outcome and **no decision object** — never a fabricated path
-  and never an empty `artifacts` array.
+- **U-10** HGO representability, in §7.5's order. Layer 0: a
+  `global-plugin-install` capability (`repository.head === null`) yields the explicit
+  *not-representable* outcome and **no decision object**, even when its
+  `policy.project` entries would satisfy layer 2; and no builder ever writes
+  `statusSha256`, `fingerprintSha256` or a plugin tree digest into `scope.candidate`.
+  Layers 1-3: a capability with representable `eligiblePaths` uses them; one without
+  falls back to the present `policy.project` entries; one with neither yields the
+  same *not-representable* outcome — never a fabricated path, never a fabricated
+  candidate, never an empty `artifacts` array.
 
 **Integration** (temporary repository, real store, both CLIs):
 
@@ -1114,16 +1322,28 @@ test, rather than breaking the intake silently.
   still resolves as a live grant at the arming boundary and in `status`; reconcile
   appends **no** disposition from a candidate difference; and the HGO half denies
   when the observed candidate differs from the capability's.
-- **I-12** Concurrency: two concurrent installs of the same signed request leave
-  exactly one `requested` and one `granted` in the stream; the losing racer arms
-  no window and fails with a retryable code; its retry then appends nothing.
+- **I-12** Concurrency, asserting §7.3's one specified behaviour and no other. (a)
+  Two concurrent installs of the same signed request leave exactly one `requested`
+  and one `granted` in the stream; **both** racers adopt that one grant, both arm the
+  window (the second arming is the supported identical re-install, GMW `:451-455`),
+  and neither errors; a subsequent install then appends nothing. (b) The fail-closed
+  half: a racer that finds, under its own idempotency key, a committed decision that
+  is already revoked arms **no** window and fails with `GAL-GRANT-RACE`. (c) A
+  regression assertion that the intake never relies on an `assertAppend` precondition
+  for (a) — the same-key branch is what decides it
+  (`governance-event-store.mjs:640-644`).
 - **I-13** Expiry: a window that expires unused gets exactly one `expired`
   disposition from reconcile, and a second reconcile appends nothing.
 - **I-14** Reconstruction (AC-8): a fixture-based test renders one window's full
   history from the portable stream alone and answers *what / when / why / by-whom-
   as-class*.
-- **Increment 2 only** — erasing the restricted record leaves no dangling
-  reference, and no portable field appears in the restricted record.
+- **Increment 2 only** — R-2 of §5.2, and deliberately nothing wider: no
+  `decisionId`, `eventId`, `idempotencyKey`, intent digest, candidate, artifact
+  digest or exact timestamp appears in the restricted record; its envelope carries
+  the typed `omitted-by-policy` states; and erasing it leaves no dangling reference
+  in the portable stream. The test does **not** assert that the portable record is
+  unjoinable to the producers' own machine-local stores — it is joinable, and §5.2's
+  R-3 says so rather than letting a green test imply otherwise.
 
 **H-AC-15 coverage map** (`acceptance.md:206-209`), so the claim and the tests can
 be compared directly instead of taken on trust:
@@ -1167,7 +1387,7 @@ Gate: `node harness/scripts/check-doc-contracts.mjs` for this document;
 - **AC-6** Re-installing an identical signed request neither errors nor appends.
 - **AC-7** HGO consumption fails closed when the `consumed` event cannot be
   appended — for every decision the payload can represent. For the decisions it
-  cannot (§7.5 case 3, §8.1), increment 1 changes HGO's behaviour in no way at
+  cannot (§7.5 layers 0 and 3, §8.1), increment 1 changes HGO's behaviour in no way at
   all, and a test asserts exactly that: no portable event, no refusal, no new
   capability.
 - **AC-8** A reviewer can answer *what/when/why* and *by-whom-as-class* for any
@@ -1186,15 +1406,22 @@ Gate: `node harness/scripts/check-doc-contracts.mjs` for this document;
 - **AC-12** No HGO decision is ever recorded with a fabricated or substituted
   artifact: the artifact set comes from §7.5's layers or the decision is not
   recorded at all (U-10).
+- **AC-13** No HGO decision is ever recorded with a fabricated or substituted
+  **candidate**: a capability whose observation carries no `head`/`tree` produces no
+  portable record at all, no digest of any kind is written into `scope.candidate` in
+  its place, and the local plugin-install lane behaves exactly as it does today —
+  no portable event, no refusal, no new capability (§7.5 layer 0, §8.1, U-10).
 
 ## 14. Open items and findings for the PO
 
-- **O-1 (decision to confirm).** The privacy split means natural-person
-  attribution is, by construction, **not joinable** to any specific lift (§5.2).
-  A reviewer gets `product-owner / locally-attributed` and nothing more. This
+- **O-1 (decision to confirm).** From the repository alone, natural-person
+  attribution is **not recoverable** for any lift: a reviewer gets
+  `product-owner / locally-attributed` and nothing more, forever (§5.2, R-1). This
   follows from H-AC-11 as written; confirm that this accountability ceiling is
   intended before implementation, because it cannot be softened later without
-  reopening H-AC-11.
+  reopening H-AC-11. Read together with O-4, which is the opposite-direction
+  finding: the ceiling holds for the repository record, and *not* for a holder of
+  GMW's machine-local record, who can still join the two.
 - **O-2 (known non-conformance, not an interpretation).** The dual evaluation runs
   at the arming/consumption boundaries, in `status` and in reconcile, not inside
   the synchronous guard hook (§8.5.2, D-2). Against H-AC-12's migration clause
@@ -1206,7 +1433,33 @@ Gate: `node harness/scripts/check-doc-contracts.mjs` for this document;
   of §8.5.2 — not as a question about how to read a criterion. The PO decision
   actually needed is whether increment 1 may ship with that gap open, given that
   the gap is identical to today's behaviour and that closing it costs per-call
-  read I/O in the guard path.
+  read I/O in the guard path. **No date is asserted for the closure**, here or in
+  §8.5.2: scheduling increment 2 is part of this decision, not something this
+  document can announce. §9's only date is H-AC-12's migration expiry, which bounds
+  that clause and discharges nothing of H-AC-02.
+- **O-4 (known non-conformance, PO decision needed).** H-AC-11's second clause — a
+  restricted record with "no portable counterpart or join handle" — is **not
+  satisfied for the GMW half** of increment 1, and §5.2 shows it cannot be satisfied
+  by any identifier scheme while the first clause requires the portable record to
+  expose request, exact scope and the rule/policy digests: the two records stay
+  joinable through `scope.candidate`, `validity`, `ruleDigest` and the artifact
+  digests even with every identifier stripped out. On the HGO side the same join
+  reaches a zone that holds no attribution and no plaintext rationale at all
+  (`human-guard-override.mjs:1370`, `:1430`), so nothing is exposed there. Owner
+  `pipeline` (PHX-2). No date is asserted: the two exits are an
+  acceptance-criterion amendment (§9) or a change to GMW's own machine-local
+  storage, and choosing between them is the PO's call, not this document's. What is
+  needed is which exit to take — and, until one is taken, whether increment 1 may
+  ship with the residual disclosed as R-3 states it.
+- **O-5 (open, narrow).** Two *different* signed requests installed concurrently
+  each produce their own `requested`/`granted` chain, while GMW keeps `window.json`
+  a singleton (`writeAtomic`, `guard-maintenance-window.mjs:467`). The ledger can
+  therefore hold two live grants behind one machine-local window, and a later
+  repair `revoked` (§8.2 row 5) would have to dispose both. §7.3 specifies the
+  identical-request race only; this one is disclosed rather than designed around,
+  because closing it means deciding whether a second live grant should be refused
+  at intake or recorded and reconciled — a design call the PO's sequencing should
+  make together with increment 2.
 - **O-3 (no ceremony added).** Nothing here adds a human step. The one producer-
   side ask is a `reasonCode` field inside GMW's *existing* signed subject
   (§5.3) — same signature, one more field. If that is not wanted, the fallback is
@@ -1224,18 +1477,28 @@ Gate: `node harness/scripts/check-doc-contracts.mjs` for this document;
   absent from `spec.md` §6.1's "closed" v1 schema family (`:278-301`). Not caused
   by this work; relevant because increment 2 would touch the same list, and the
   rebind is the moment to reconcile it.
-- **Finding F-3 (contract limitation, verified).** The portable payload cannot
-  represent an HGO override whose bound paths are all dot-prefixed or absent:
-  `scope.artifacts` requires at least one entry and every entry's path must start
-  `[A-Za-z0-9]` (`human-governance-decision.mjs:30-31`, mirrored at
-  `governance-event.mjs:23`). HGO's dominant class targets exactly the
-  dot-prefixed configuration paths of `protectedPath`
-  (`human-guard-override.mjs:457-478`), and two other classes carry no path at all
-  (`:785-792`, `:838-844`). Increment 1 therefore records the representable subset
-  and leaves the rest exactly as it is today (§7.5 case 3, §8.1); the kernel
-  amendment that removes the limitation is specified in §9 and applied by the
-  rebind. This is a limitation of the payload contract, not of HGO, and it was
-  found by verifying HGO's field inventory rather than assuming it.
+- **Finding F-3 (contract limitation, verified, two halves).** The portable payload
+  cannot represent two disjoint classes of HGO override.
+  **(a) No artifact.** `scope.artifacts` requires at least one entry and every
+  entry's path must start `[A-Za-z0-9]` (`human-governance-decision.mjs:30-31`,
+  mirrored at `governance-event.mjs:23`), while HGO's dominant class targets exactly
+  the dot-prefixed configuration paths of `protectedPath`
+  (`human-guard-override.mjs:457-478`) and two other classes carry no path at all
+  (`:785-792`, `:838-844`).
+  **(b) No candidate.** `scope.candidate` requires two `OID` values and admits no
+  typed state (`human-governance-decision.mjs:29`), while a
+  `mode: "global-plugin-install"` capability observes
+  `localPluginInstallSourceObservation`, whose `head`/`tree` are `null`
+  (`human-guard-override.mjs:231-232`, substituted at `:1164`, `:1276`, `:1586`).
+  Half (b) is the more consequential one: it is the local plugin-install lane, it
+  exists only in a Pipeline source checkout (`:242-245`) — including this one — and
+  an unconditional fail-closed rule would have disabled it there. Increment 1 records
+  the representable subset and leaves both classes exactly as they are today (§7.5
+  layers 0 and 3, §8.1); the two kernel amendments are specified in §9 and applied by
+  the rebind. Both are limitations of the payload contract, not of HGO, and both were
+  found by verifying HGO's field inventory rather than assuming it — (b) only after
+  an earlier revision of this document had asserted the candidate as unconditionally
+  present and pinned that assertion as "verified".
 - **Finding F-4 (inventory correction, verified).** `docs/human-governance-ledger.md`
   **does not exist in this checkout** — untracked and absent from disk, while
   `spec.md:418` still carries it as a create. The earlier inventory row described
@@ -1244,11 +1507,24 @@ Gate: `node harness/scripts/check-doc-contracts.mjs` for this document;
   create.
 - **Backlog claims:** all six checked claims survived verification (§3.2 table);
   none had to be designed around.
-- **Corrections carried into this revision.** Seven review findings were resolved
-  against source: the boundary check's candidate argument (§8.5.1), `policyDigest`'s
-  closed preimage (§5.5), HGO's real artifact sources (§3.3, §7.5), the H-AC-02
-  anchoring of the hook residual (§8.5.2, O-2), the H-AC-15 coverage claim versus
-  the actual tests (§12), the §9 amendment versus the §11 inventory, and F-4 above.
-  Two of them changed the design rather than only its wording: identifiers are now
-  generation-suffixed and re-asserted under the store's lock (§7.3), and the HGO
-  half is explicitly scoped to the decisions the payload can represent (§8.1).
+- **Corrections carried into this revision (review round 2).** Five findings were
+  resolved against source. §5.2 asserted a two-zone separation that the payload's own
+  required fields make unattainable; it is replaced by three rules — what holds, what
+  holds in increment 2, and a disclosed residual — plus O-4. §3.3 pinned HGO's
+  candidate as unconditional; it is mode-dependent and absent for
+  `global-plugin-install`, which is now §7.5's layer 0, an explicit §8.1 exception,
+  and AC-13. §7.3's `GAL-GRANT-RACE` precondition could not fire for the race it
+  named, because the store resolves the idempotency key first; the race now has one
+  specified behaviour (verified adoption, or fail closed) and I-12 asserts that one.
+  §8.5.2 claimed O-2 carried a date it does not have; the claim is withdrawn rather
+  than a date invented. §5.5's HGO justification rested on the machine-local-recording
+  inference §5.3 rejects; the independent argument is now the only one, with the
+  precedent explicitly marked as a non-argument. Two of the five changed the design
+  rather than its wording: representability is decided at the candidate before the
+  artifacts, and the race resolves by verified adoption instead of a retryable loser.
+- **Round 1's corrections remain in force**: the boundary check's candidate argument
+  (§8.5.1), `policyDigest`'s closed preimage (§5.5), HGO's real artifact sources
+  (§3.3, §7.5), the H-AC-02 anchoring of the hook residual (§8.5.2, O-2), the
+  H-AC-15 coverage claim versus the actual tests (§12), the §9 amendment versus the
+  §11 inventory, and F-4 above — with the generation-suffixed identifiers of §7.3
+  kept and their concurrency story corrected as described above.
