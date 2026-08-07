@@ -448,6 +448,38 @@ Ed25519 proof with the private key outside the repository; a real PO-external
 step, not something an agent session completes alone. Not actioned yet —
 explicitly queued for "later, once rounded", not now.
 
+**NOVA-HGOSIG-3 returned (2026-08-07):** a genuine clean stop-and-report this
+time, not another silent truncation. Real progress, independently verified:
+commit `06971d7` fixed the two regressed `codex-pretool-guard.test.mjs`
+fixtures (19/19 restored); commit `f650164` implemented Decision 3 in
+`guard-testpath.mjs` (unconditional consume-attempt, mode-appropriate
+`Clearance:` guidance), 9/9 pre-existing `guard-testpath.test.mjs` cases
+still pass. Genuinely blocked on the Decision 4 test coverage for
+`guard-testpath.mjs` itself: that test file is protected by its own guard
+(`TP-2`), `gates.push_approval` is `signature`, and no PO signature was
+available in-session — correctly stopped rather than bypass. The PO offered
+to sign now; a GMW request was prepared for TP-2 (agent-safe, `intentSha256
+edc610d4f81b150a314952ffe824d876faf9ecd8a78dbbdea3b9e407775398ce`), but no
+generic signing tool for GMW's `guard-lift` kind exists yet
+(`po-human-approval.mjs` only signs `push`/`deploy`/`publication` +
+PRD/Spec kinds) — exactly the ADR-0058 Follow-up gap. PO chose to build the
+missing helper rather than defer.
+
+**Third parallel wave dispatched (2026-08-07):** `NOVA-PO-SIGN-HELPER-1`
+(goldfish-deep/xhigh) adds a generic `sign-intent` subcommand to
+`po-human-approval.mjs`, reusing the existing `approve` OpenSSL-signing
+logic parameterized on a directly-supplied intent digest instead of a
+kind-specific request file — closes the ADR-0058 gap for good, not just for
+this one TP-2 case. `NOVA-LCR-INTENT-2` (goldfish-deep/xhigh) is the
+corrected redispatch of the `guard-lifecycle-ready.mjs` `--intent` fix (see
+the corrected backlog item, commit `091882f`): generalize
+`withoutRunnerFlag` to a scan-and-remove instead of trailing-only, since
+NOVA-LCR-INTENT-1 found the original proposal's premise wrong.
+`NOVA-HGOSIG-COMMIT-1` (goldfish-mechanic/low) is a pure staging+commit task
+for the still-uncommitted, already-tested Decision 1/CLI diff left behind by
+NOVA-HGOSIG-1/2. All three running in the background as of this note, none
+overlapping in file scope.
+
 ## 2026-08-07 Nova VII — first Nova A completion wave: 6 issues evidenced
 
 Continues from Nova VI. PO instruction: "leg mal los und fange an — du
