@@ -1,13 +1,17 @@
 ---
-schema: pipeline.backlog-item.v1
-id: pipeline.backlog-ledger-closure-reason-misleading
-type: defect
-owner: pipeline
-status: open
-created: 2026-08-07
+schema: "pipeline.backlog-item.v1"
+id: "pipeline.backlog-ledger-closure-reason-misleading"
+type: "defect"
+owner: "pipeline"
+status: "closed"
+created: "2026-08-07"
 source: "0.5.2 release Critic round, 2026-08-07, finding F3."
-due: 2026-09-06
-expires: 2026-09-06
+due: "2026-09-06"
+expires: "2026-09-06"
+closed_at: "2026-08-07"
+closure_repository: "self"
+closure_commit: "19c5bf0f2e2eb0835c1980edaacdae26316934f0"
+closure_evidence: "backlog/evidence/2026-08-07-nova-gwm-backlog-fixes.md"
 ---
 
 # `reconcile-backlog-ledger.mjs` records a "no closure claimed" reason on real closures

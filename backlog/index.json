@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "8217e13325ceabf0737909e0668a8391913b882017551110bcbd8b1dad166378"
+    "transitionHead": "852019717532328ca41077e49ddf26ce69f51c0115d1c145a9fb72fbd6df74c1"
   },
   "counts": {
-    "open": 32,
+    "open": 29,
     "in_progress": 21,
-    "closed": 19
+    "closed": 22
   },
   "items": [
     {
@@ -59,11 +59,15 @@
     },
     {
       "id": "pipeline.backlog-ledger-closure-reason-misleading",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "0.5.2 release Critic round, 2026-08-07, finding F3."
+      "source": "0.5.2 release Critic round, 2026-08-07, finding F3.",
+      "closedAt": "2026-08-07",
+      "closureRepository": "self",
+      "closureCommit": "19c5bf0f2e2eb0835c1980edaacdae26316934f0",
+      "closureEvidence": "backlog/evidence/2026-08-07-nova-gwm-backlog-fixes.md"
     },
     {
       "id": "pipeline.canonical-worktree-lifecycle",
@@ -245,11 +249,15 @@
     },
     {
       "id": "pipeline.local-worker-supervisor-cli-suite-flakes-under-full-verify",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-06",
-      "source": "Sprint Nova session, 2026-08-06: Full Verify on candidate 9f5bfc9 failed with local-worker-supervisor-cli-tests=1, the same suite passed 9/9 standalone immediately afterwards, and an unchanged re-run of Full Verify on the same candidate and clean tree went green."
+      "source": "Sprint Nova session, 2026-08-06: Full Verify on candidate 9f5bfc9 failed with local-worker-supervisor-cli-tests=1, the same suite passed 9/9 standalone immediately afterwards, and an unchanged re-run of Full Verify on the same candidate and clean tree went green.",
+      "closedAt": "2026-08-07",
+      "closureRepository": "self",
+      "closureCommit": "577c515404e2bd4c94f890c9cd7009ac93b66d1d",
+      "closureEvidence": "backlog/evidence/2026-08-07-nova-gwm-backlog-fixes.md"
     },
     {
       "id": "pipeline.managed-onboarding-success-contract",
@@ -469,11 +477,15 @@
     },
     {
       "id": "pipeline.release-preflight-cli-base-commit-not-peeled",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "NVA-A54 Critic review, 2026-08-07 (finding 2), reviewing commits 6e2c9b2..d5be0e6."
+      "source": "NVA-A54 Critic review, 2026-08-07 (finding 2), reviewing commits 6e2c9b2..d5be0e6.",
+      "closedAt": "2026-08-07",
+      "closureRepository": "self",
+      "closureCommit": "5e20b854afc1f499d1376c43558565389e375c59",
+      "closureEvidence": "backlog/evidence/2026-08-07-nova-gwm-backlog-fixes.md"
     },
     {
       "id": "pipeline.release-preflight-has-a-builder-but-no-cli",

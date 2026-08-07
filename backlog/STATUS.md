@@ -10,7 +10,7 @@
 | pipeline.afk-assumption-mode | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.agent-tool-isolation-worktree-snapshots-stale-upstream-ref | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.backlog-delivery-status-reconciliation | in_progress | workflow-improvement | pipeline | 2026-07-25 | Nova A / issue #57 |
-| pipeline.backlog-ledger-closure-reason-misleading | open | defect | pipeline | 2026-08-07 | — |
+| pipeline.backlog-ledger-closure-reason-misleading | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.canonical-worktree-lifecycle | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.claude-dir-leftovers-defeat-runner-neutral-project-migration | open | defect | pipeline | 2026-08-05 | — |
 | pipeline.claude-has-no-start-time-opt-in-adoption-path | open | idea | pipeline | 2026-08-05 | — |
@@ -32,7 +32,7 @@
 | pipeline.guard-lifecycle-ready-blocks-claude-memory-writes | open | defect | pipeline | 2026-07-29 | — |
 | pipeline.guard-lifecycle-ready-rejects-plan-runtime-intent-argv | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root | open | defect | pipeline | 2026-08-06 | — |
-| pipeline.local-worker-supervisor-cli-suite-flakes-under-full-verify | open | defect | pipeline | 2026-08-06 | — |
+| pipeline.local-worker-supervisor-cli-suite-flakes-under-full-verify | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.managed-onboarding-success-contract | open | workflow-improvement | pipeline | 2026-07-25 | — |
 | pipeline.multi-cli-efficiency-pilots | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.native-windows-verify-red-suite-class | open | defect | pipeline | 2026-08-07 | — |
@@ -56,7 +56,7 @@
 | pipeline.recovery-preview-ack-unstable-getter-poisons-replay-ledger | open | defect | pipeline | 2026-07-27 | — |
 | pipeline.recovery-preview-callback-attestation | in_progress | defect | pipeline | 2026-07-20 | — |
 | pipeline.regulated-document-hooks | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
-| pipeline.release-preflight-cli-base-commit-not-peeled | open | defect | pipeline | 2026-08-07 | — |
+| pipeline.release-preflight-cli-base-commit-not-peeled | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.release-preflight-has-a-builder-but-no-cli | in_progress | defect | pipeline | 2026-08-06 | — |
 | pipeline.restart-launch-is-codex-only-for-every-runner | open | defect | pipeline | 2026-08-06 | — |
 | pipeline.runtime-projection-v2-eager-manifest-load | open | defect | pipeline | 2026-07-27 | — |
@@ -80,6 +80,6 @@
 
 ## Counts
 
-- open: 32
+- open: 29
 - in_progress: 21
-- closed: 19
+- closed: 22

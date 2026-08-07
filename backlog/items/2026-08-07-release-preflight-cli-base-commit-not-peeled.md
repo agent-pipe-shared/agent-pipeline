@@ -1,13 +1,17 @@
 ---
-schema: pipeline.backlog-item.v1
-id: pipeline.release-preflight-cli-base-commit-not-peeled
-type: defect
-owner: pipeline
-status: open
-created: 2026-08-07
+schema: "pipeline.backlog-item.v1"
+id: "pipeline.release-preflight-cli-base-commit-not-peeled"
+type: "defect"
+owner: "pipeline"
+status: "closed"
+created: "2026-08-07"
 source: "NVA-A54 Critic review, 2026-08-07 (finding 2), reviewing commits 6e2c9b2..d5be0e6."
-due: 2026-09-06
-expires: 2026-09-06
+due: "2026-09-06"
+expires: "2026-09-06"
+closed_at: "2026-08-07"
+closure_repository: "self"
+closure_commit: "5e20b854afc1f499d1376c43558565389e375c59"
+closure_evidence: "backlog/evidence/2026-08-07-nova-gwm-backlog-fixes.md"
 ---
 
 # `release-preflight-cli.mjs` records a tag OID as `base.commit` without peeling to the commit
