@@ -59,10 +59,43 @@
  *   Value = exactly 3 segments split on the first two "|" (reason may itself contain
  *   "|"); token is a fresh one-time value, reason is mandatory and non-empty.
  *
- *   One-time semantics: a consumption ledger `.claude/guard-override.log.jsonl` bound to
- *   the physical command target records one JSON line per successful override
- *   `{ts, rule, token, reason, command, targetSha256}`. A `rule|token` pair
- *   already in the ledger is consumed forever — re-presenting it blocks.
+ *   One-time semantics, BOUND rather than counted: a consumption ledger
+ *   `.claude/guard-override.log.jsonl` bound to the physical command target records one
+ *   JSON line per successful override `{ts, rule, token, reason, command, commandSha256,
+ *   candidateCommit, status, expiresAt, targetSha256}`. A `rule|token` pair already in the
+ *   ledger is consumed — re-presenting it blocks — with exactly one exception: the SAME
+ *   arming, for the byte-identical command, at the same `candidateCommit`, in the same
+ *   physical target, before `expiresAt`, is admitted again and appended as `status:"retry"`.
+ *   Rationale (design R2): the token used to be spent by the MATCH, before anything
+ *   downstream had decided whether the command would run, so a harness refusal or a remote's
+ *   own ruleset burned an authorization the human had already given. Re-running the
+ *   identical command against the identical candidate is the same authorized act; what the
+ *   unbound counter actually prevented was reuse for a DIFFERENT act, and the binding
+ *   prevents that far more precisely. A different command, a moved HEAD, an expired arming,
+ *   another target, and every entry written before this change (no `commandSha256`) all stay
+ *   consumed forever. Lifetime: `overrideArmingTtlSeconds` from the loaded guard-config,
+ *   else 3600s from the first admission — an arming that outlives the session that
+ *   requested it is not a retry window.
+ *
+ * SIGNED-PUSH ADMISSION (GG-03 only) — ADR-0061 Decision 0, design R1
+ *   When GG-03 is the ONLY matching rule, no `PIPELINE_GUARD_OVERRIDE` is in play, and the
+ *   command is one plain `git [-C <same root>] push <remote> <source>:<destination>`, the
+ *   guard verifies the project's recorded push approval (lib/critical-action-authorization
+ *   .mjs `authorizeRecordedPush`) against the OBSERVED candidate, the parsed remote and the
+ *   parsed destination ref. `authorized: true` allows the push (exit 0) and appends an audit
+ *   entry naming the authorization relied on (`keyReference`, `forCommit`, `destination`);
+ *   no token, no typed phrase, no second human act. The Decision-0 test is what removed the
+ *   phrase: the signature is per-commit, per-destination, unforgeable by the agent and
+ *   verified against a gate-strength committed anchor, so `OVERRIDE GG-03` on top of it
+ *   prevents no agent behaviour — it only asks the human to decide twice.
+ *   What stays: GG-03 blocks exactly as before whenever no verified approval exists for
+ *   THIS commit and THIS destination (the unattended-agent case it was built for); a
+ *   `--force`/`+refspec`/`--no-verify` push carrying a valid approval still blocks on ITS
+ *   rule, because the admission requires GG-03 to be the single match; a deletion or an
+ *   implicit destination is never matched against an attestation, and the denial now says
+ *   so. Every failure mode — unparseable command, unconfirmed physical target, unreadable
+ *   candidate/State, absent anchor, unwritable ledger, a throw — leaves the refusal exactly
+ *   as it was.
  *
  *   Evaluation order: ALL deny rules are always evaluated; consumption is decided on
  *   the FINAL verdict. Only when every matching rule equals the single armed rule id
@@ -222,15 +255,18 @@
  */
 import { existsSync, readFileSync, appendFileSync, realpathSync } from "node:fs";
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { join, resolve, sep } from "node:path";
 
 import { commitMessageFindings, markerPolicyMode } from "../lib/commit-message-policy.mjs";
-import { stripQuotedSegments, normalizeGlobalGitOptions } from "../lib/git-cmd.mjs";
+import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv } from "../lib/git-cmd.mjs";
 import {
   LEGACY_GUARD_AUDIT,
   LEGACY_GUARD_CONFIG,
+  LEGACY_STATE,
   NEUTRAL_GUARD_AUDIT,
   NEUTRAL_GUARD_CONFIG,
+  NEUTRAL_STATE,
   resolveProjectAuthorityPaths,
 } from "../lib/project-authority.mjs";
 
@@ -478,6 +514,12 @@ const guardConfigRelPath = authority.status === "ready"
 const guardAuditRelPath = authority.status === "ready"
   ? authority.guardAudit
   : (existsSync(join(projectDir, NEUTRAL_GUARD_AUDIT)) ? NEUTRAL_GUARD_AUDIT : LEGACY_GUARD_AUDIT);
+// Same resolve-then-fall-back shape the two paths above use. Read ONLY by the GG-03
+// signed-push admission below; an unreadable/absent State is simply "no approval", never
+// an allow.
+const guardStateRelPath = authority.status === "ready"
+  ? (authority.state ?? NEUTRAL_STATE)
+  : (existsSync(join(projectDir, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE);
 const configPath = join(projectDir, guardConfigRelPath);
 const warnings = [];
 /** @type {Array<{id: string, re: RegExp, why: string, origin: string}>} */
@@ -654,6 +696,200 @@ function appendLedger(entry, target) {
   }
 }
 
+// ---- override mechanism: what an arming is bound to, and how long it lives -------------
+// R2 of specs/sprint-nova-epic/implementation/one-approval-all-layers-design.md. The token
+// used to be spent by the MATCH — before anything downstream had decided whether the
+// command would run at all — so a harness refusal or a remote's own ruleset burned an
+// authorization the human had already given (measured twice in the v0.5.3 release). The
+// ledger entry now records WHAT was authorized (`commandSha256`, `candidateCommit`) and how
+// long the arming lives (`expiresAt`); a re-presentation that reproduces all of it exactly
+// is admitted again and appended as a `retry`, so the audit trail gains detail rather than
+// losing it. Everything that differs — a different command, a moved HEAD, an expired
+// arming, another physical target — needs a fresh token exactly as before, and so does
+// every entry written before this change (they carry no `commandSha256`, so they can never
+// satisfy the retry test: a pre-existing ledger does not become re-usable).
+const OVERRIDE_ARMING_TTL_DEFAULT_SECONDS = 3600;
+function overrideArmingTtlSeconds() {
+  const configured = projectConfig?.overrideArmingTtlSeconds;
+  return typeof configured === "number" && Number.isFinite(configured) && configured > 0
+    ? configured
+    : OVERRIDE_ARMING_TTL_DEFAULT_SECONDS;
+}
+/** One git object id read out of the confirmed physical target, or null. Never throws. */
+function gitObjectId(root, args) {
+  try {
+    const result = spawnSync("git", ["-C", root, ...args], { encoding: "utf8", shell: false, timeout: 5000 });
+    if (result.error || result.status !== 0) return null;
+    const value = String(result.stdout ?? "").trim();
+    return /^[0-9a-f]{40,64}$/.test(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+function observedCandidateCommit(target) {
+  return gitObjectId(target.root, ["rev-parse", "--verify", "--end-of-options", "HEAD"]);
+}
+/**
+ * May an arming that is already in the ledger be presented again?
+ *
+ * Stricter than the design's letter in exactly one place, stated so nobody reads it as an
+ * oversight: an UNOBSERVABLE candidate (no repository, no git, an unreadable HEAD → `null`)
+ * never admits a retry, although two nulls are trivially "identical". "The same authorized
+ * act" is an argument ABOUT a candidate; where there is none to compare, the one-time rule
+ * stands unchanged.
+ */
+function admitsRetry(prior, { commandSha256, candidateCommit, target, nowMs }) {
+  if (!prior || typeof prior.commandSha256 !== "string" || prior.commandSha256 !== commandSha256) return false;
+  if (typeof candidateCommit !== "string" || prior.candidateCommit !== candidateCommit) return false;
+  if (prior.targetSha256 !== target.sha256) return false;
+  const expiresAtMs = Date.parse(prior.expiresAt ?? "");
+  return Number.isFinite(expiresAtMs) && nowMs < expiresAtMs;
+}
+
+// ---- GG-03: a verified push signature IS the confirmation ------------------------------
+// R1 of the same design, under ADR-0061 Decision 0. `OVERRIDE GG-03` after a verified,
+// per-commit, per-destination Ed25519 approval for `kind: push` prevents no agent behaviour
+// the signature does not already prevent: the signature names the commit AND the
+// destination ref, cannot be produced by the agent, and is verified against an anchor
+// committed at gate strength. The typed phrase only asks the human to decide again.
+//
+// Scope, deliberately narrow:
+//   - GG-03 must be the ONLY matching rule. A `--force`/`+refspec`/`--no-verify` push
+//     carrying a perfectly valid approval still blocks on ITS rule — the "every matching
+//     rule must be the single admitted rule" invariant is untouched.
+//   - No arming may be present. An armed (or malformed) `PIPELINE_GUARD_OVERRIDE` keeps
+//     today's token route exactly as it is; the two mechanisms never interleave.
+//   - The command must be one plain `git [-C <same root>] push <remote> <src>:<dst>`. A
+//     deletion (`--delete main`, `:main`) or an implicit destination cannot be matched
+//     against an attestation, because an approval names a ref and guessing one is how a
+//     verifier turns into a rubber stamp. The denial now says so instead of leaving the
+//     operator to infer it.
+// Failure of ANY kind — unparseable command, unconfirmed target, unreadable candidate,
+// unreadable State, absent anchor, unwritable ledger, a throw — leaves the refusal exactly
+// as it was. There is no path here that converts an error into an allow.
+const PUSH_SAFE_FLAGS = new Set([
+  "--dry-run", "--porcelain", "--verbose", "-v", "--quiet", "-q", "--atomic", "--no-atomic",
+  "--set-upstream", "-u",
+]);
+const SIGNED_ROUTE_HINT =
+  "A push approval that verifies for THIS commit, THIS remote and THIS destination ref lifts GG-03 with no token and no " +
+  "typed phrase (record one: node harness/scripts/pipeline-state.mjs approve-push --by <name> --remote <remote> " +
+  "--destination <full-ref> --proof-request <path> --proof-authority <path> --proof <path>). The push must write its " +
+  "destination out (`HEAD:refs/heads/<branch>`): an approval names a ref, and a command that names none cannot be matched against it.";
+function parseAttestablePush(rawCmd) {
+  let single = false;
+  let double = false;
+  let escaped = false;
+  for (const ch of rawCmd) {
+    if (escaped) { escaped = false; continue; }
+    if (ch === "\\" && !single) { escaped = true; continue; }
+    if (!single && (ch === "$" || ch === "`" || "*?[]{}~".includes(ch))) {
+      return { ok: false, reason: "the command contains shell expansion or glob syntax" };
+    }
+    if (ch === "'" && !double) single = !single;
+    else if (ch === '"' && !single) double = !double;
+  }
+  if (single || double || escaped) return { ok: false, reason: "the command's quoting is incomplete or ambiguous" };
+  if (/&&|\|\||[;|\n\r`<>]|\$\(/.test(stripQuotedSegments(rawCmd))) {
+    return { ok: false, reason: "the push must be a standalone command (no shell bundle, pipe, redirection or substitution)" };
+  }
+  const tokens = tokenizeArgv(rawCmd);
+  if (tokens[0]?.toLowerCase() !== "git") return { ok: false, reason: "the command is not a bare `git` invocation" };
+  let i = 1;
+  // A `-C <path>` is tolerated here ONLY because overrideTarget() proves separately that
+  // every git invocation in the command names the one coordinator root; any other global
+  // repository override is refused below with the rest of the option surface.
+  if (tokens[i] === "-C") i += 2;
+  if (tokens[i]?.toLowerCase() !== "push") {
+    return { ok: false, reason: "only `git [-C <path>] push` can be matched against an approval" };
+  }
+  i += 1;
+  const positionals = [];
+  for (; i < tokens.length; i += 1) {
+    const token = tokens[i];
+    if (PUSH_SAFE_FLAGS.has(token)) continue;
+    if (token.startsWith("-")) return { ok: false, reason: "the push carries an option that cannot be bound to one source commit" };
+    positionals.push(token);
+  }
+  if (positionals.length !== 2) {
+    return { ok: false, reason: "the push must name exactly one remote and exactly one explicit `<source>:<destination>` refspec" };
+  }
+  const [remote, refspec] = positionals;
+  const colon = refspec.indexOf(":");
+  if (colon === -1) return { ok: false, reason: "the push does not write out its destination ref" };
+  const source = refspec.slice(0, colon);
+  const destination = refspec.slice(colon + 1);
+  if (!remote || !source || !destination || source.startsWith("+")) {
+    return { ok: false, reason: "the refspec is deleting, forced, or source-ambiguous" };
+  }
+  return { ok: true, remote, source, destination };
+}
+async function admitSignedPush() {
+  const binding = parseAttestablePush(cmd);
+  if (!binding.ok) {
+    return { admitted: false, note: `Signed-approval route: not applicable — ${binding.reason}. ${SIGNED_ROUTE_HINT}` };
+  }
+  const target = overrideTarget();
+  if (!target.ok) {
+    return {
+      admitted: false,
+      note: `Signed-approval route: not applicable — command target and audit target are not one confirmed physical project. ${SIGNED_ROUTE_HINT}`,
+    };
+  }
+  const commit = gitObjectId(target.root, ["rev-parse", "--verify", "--end-of-options", `${binding.source}^{commit}`]);
+  const tree = commit === null ? null : gitObjectId(target.root, ["rev-parse", "--verify", "--end-of-options", `${commit}^{tree}`]);
+  if (commit === null || tree === null) {
+    return { admitted: false, note: `Signed-approval route: refused (PUSH-PROOF-CANDIDATE-UNRESOLVED). ${SIGNED_ROUTE_HINT}` };
+  }
+  let state;
+  try {
+    state = JSON.parse(readFileSync(join(projectDir, guardStateRelPath), "utf8"));
+  } catch {
+    return { admitted: false, note: `Signed-approval route: refused (PUSH-PROOF-STATE-UNREADABLE). ${SIGNED_ROUTE_HINT}` };
+  }
+  // Loaded lazily: this module chain (policy reader, request digests, Ed25519 verifier) is
+  // needed by roughly no Bash call at all, and this hook runs on every one of them.
+  const { authorizeRecordedPush } = await import("../lib/critical-action-authorization.mjs");
+  const verdict = authorizeRecordedPush({
+    projectDir,
+    anchorDir: projectDir, // the governed session root IS the confirmed target here
+    state,
+    candidate: { commit, tree },
+    remote: binding.remote,
+    destination: binding.destination,
+    now: new Date().toISOString(),
+  });
+  if (verdict.authorized !== true) {
+    return { admitted: false, note: `Signed-approval route: refused (${verdict.code}). ${SIGNED_ROUTE_HINT}` };
+  }
+  // The authorization this admission relied on, in the same ledger as every override — with
+  // the raw command deliberately reduced to its digest. `remote` is any positional the
+  // command supplied and can be a credential-bearing URL (SEC-01, and the reason guard-push
+  // refuses to echo it either); the audit question here is "which approval did I believe",
+  // which the fields below answer without transporting the operand.
+  const appended = appendLedger({
+    ts: new Date().toISOString(),
+    rule: "GG-03",
+    route: "signed-push-approval",
+    reason: "a verified human push approval for this candidate, remote and destination ref",
+    commandSha256: sha256(cmd),
+    candidateCommit: commit,
+    status: "authorized",
+    keyReference: verdict.keyReference,
+    forCommit: commit,
+    destination: binding.destination,
+    targetSha256: target.sha256,
+  }, target);
+  if (!appended) {
+    return {
+      admitted: false,
+      note: `Signed-approval route: NOT applied — the audit ledger (${guardAuditRelPath}) could not be written, so the ` +
+        "verified approval is not acted on (fail-closed, exactly like an override without an audit record).",
+    };
+  }
+  return { admitted: true, keyReference: verdict.keyReference, forCommit: commit, destination: binding.destination };
+}
+
 // ---- verdict -------------------------------------------------------------------------
 function formatBlockHeader(rule) {
   return (
@@ -690,6 +926,8 @@ function blockOverrideConsumed(rule, priorEntry) {
     formatBlockHeader(rule),
     `Override rejected: the token "${arming.token}" for rule ${arming.rule} was already consumed ` +
       `(one-time use${priorEntry?.ts ? `, at ${priorEntry.ts}` : ""}) — arm a fresh token.`,
+    "An arming is re-presentable only for the byte-identical command, against the same candidate commit, in the same " +
+      "physical project, and before it expires; anything else is a second authorized act and needs a second authorization.",
     overrideProcedureText(rule),
     ...notices,
   ];
@@ -713,9 +951,11 @@ function blockTargetBindingFailure(rule) {
     ...notices,
   ]);
 }
-function allowWithOverride() {
+function allowWithOverride(status, expiresAt) {
   const lines = [
-    `[git-guard] OVERRIDE APPLIED (one-time): rule ${arming.rule}, token ${arming.token}.`,
+    status === "retry"
+      ? `[git-guard] OVERRIDE APPLIED (retry of the same arming — identical command, same candidate, valid until ${expiresAt}): rule ${arming.rule}, token ${arming.token}.`
+      : `[git-guard] OVERRIDE APPLIED (one-time, this arming is valid until ${expiresAt} for this exact command and candidate): rule ${arming.rule}, token ${arming.token}.`,
     `Reason: ${arming.reason}`,
     `Ledger: ${guardAuditRelPath} (appended).`,
     ...notices,
@@ -777,22 +1017,54 @@ for (const rule of EXTRA_BLOCKERS) if (rule.re.test(normalizedStripped)) matched
 
 if (matched.length > 0) {
   const overrideCoversAll = arming && !arming.malformed && matched.every((r) => r.id === arming.rule);
+  // The signed-push route runs only where the token ritual is the ONLY thing standing
+  // between a verified human approval and the push it names: GG-03 alone, no arming of any
+  // kind in play. Anything else falls through to the mechanism below, unchanged.
+  let signed = null;
+  if (armingRaw === null && matched.every((r) => r.id === "GG-03")) {
+    try {
+      signed = await admitSignedPush();
+    } catch {
+      signed = { admitted: false, note: "Signed-approval route: refused (PUSH-PROOF-ROUTE-ERROR) — the admission path threw, so the rule stands." };
+    }
+  }
+  if (signed?.admitted) {
+    emit(0, [
+      `[git-guard] GG-03 lifted by a verified push approval (key ${signed.keyReference}) for candidate ${signed.forCommit} -> ${signed.destination}.`,
+      `Audit: ${guardAuditRelPath} (appended). No override token was armed or consumed.`,
+      ...notices,
+    ]);
+  }
+  if (signed) notices.push(signed.note);
   if (overrideCoversAll) {
     const target = overrideTarget();
     if (!target.ok) blockTargetBindingFailure(matched[0]);
     const prior = findConsumption(arming.rule, arming.token, target);
-    if (prior) {
+    const armedAt = new Date();
+    const commandSha256 = sha256(cmd);
+    const candidateCommit = observedCandidateCommit(target);
+    const retry = prior !== null
+      && admitsRetry(prior, { commandSha256, candidateCommit, target, nowMs: armedAt.getTime() });
+    if (prior && !retry) {
       blockOverrideConsumed(matched[0], prior);
     } else {
+      // A retry never extends the window: the lifetime belongs to the FIRST admission.
+      const expiresAt = retry
+        ? prior.expiresAt
+        : new Date(armedAt.getTime() + overrideArmingTtlSeconds() * 1000).toISOString();
       const appended = appendLedger({
-        ts: new Date().toISOString(),
+        ts: armedAt.toISOString(),
         rule: arming.rule,
         token: arming.token,
         reason: arming.reason,
         command: cmd,
+        commandSha256,
+        candidateCommit,
+        status: retry ? "retry" : "armed",
+        expiresAt,
         targetSha256: target.sha256,
       }, target);
-      if (appended) allowWithOverride();
+      if (appended) allowWithOverride(retry ? "retry" : "armed", expiresAt);
       else blockLedgerFailure(matched[0]);
     }
   } else {

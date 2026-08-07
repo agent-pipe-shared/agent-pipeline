@@ -32,11 +32,14 @@
  * guard-config on the machine can never leak into union expectations.
  */
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
-import { createHash } from "node:crypto";
+import { appendFileSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, writeFileSync, rmSync } from "node:fs";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { criticalActionSha256, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
+import { createPoApprovalIntent } from "../lib/po-approval-proof.mjs";
 
 const GUARD = fileURLToPath(new URL("./guard-git.mjs", import.meta.url));
 
@@ -783,8 +786,451 @@ check("GIT03-7 block  a -F file outside the project root, even with clean conten
     stderrIncludes: ["GIT-03-UNREADABLE-MESSAGE-FILE", "no override for this rule"],
   });
 
+// ---- Change 1 (design R1, ADR-0061 Decision 0): a verified push signature IS the GG-03
+// confirmation --------------------------------------------------------------------------
+//
+// Every fixture below builds a REAL Ed25519 keypair, a REAL detached signature and a REAL
+// git repository. The property under test is that the guard VERIFIES a recorded approval
+// rather than believing it, and a stubbed signature or a faked candidate would prove
+// nothing about that (same reason lib/critical-action-authorization.test.mjs states).
+const SIGNED_ROOTS = [];
+const THREAT_MODEL_REL_PATH = "specs/demo/threat-model.md";
+const SIGNED_PLAN_SHA = "c".repeat(64);
+const SIGNED_SPEC_SHA = "d".repeat(64);
+const SIGNED_EXPIRES = "2099-01-01T00:00:00.000Z"; // the guard checks expiry against the real clock
+const SIGNED_REMOTE = "origin";
+const SIGNED_DESTINATION = "refs/heads/main";
+const SIGNED_KEY_REFERENCE = "po-key-1";
+
+/** Generic pass/fail recorder for the facts below that are not a guard invocation. */
+function checkThat(id, predicate) {
+  let problem = null;
+  try {
+    if (!predicate()) problem = "the asserted fact did not hold";
+  } catch (error) {
+    problem = `the assertion threw (${error.message})`;
+  }
+  if (problem === null) {
+    pass++;
+    console.log(`PASS  ${id}`);
+  } else {
+    failures.push(`${id}: ${problem}`);
+    console.log(`FAIL  ${id} — ${problem}`);
+  }
+}
+function ledgerEntries(projectDir) {
+  try {
+    return readFileSync(join(projectDir, ".claude", "guard-override.log.jsonl"), "utf8")
+      .split("\n")
+      .filter((line) => line.trim() !== "")
+      .map((line) => JSON.parse(line));
+  } catch {
+    return [];
+  }
+}
+function gitIn(root) {
+  return (...args) => spawnSync(
+    "git",
+    ["-C", root, "-c", "user.email=guard-test@example.invalid", "-c", "user.name=Guard Test", "-c", "commit.gpgsign=false", ...args],
+    { encoding: "utf8" },
+  );
+}
+function gitRepoFixture(prefix) {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), prefix)));
+  SIGNED_ROOTS.push(root);
+  gitIn(root)("init", "--quiet");
+  return root;
+}
+function commitFile(root, name, body) {
+  writeFileSync(join(root, name), body);
+  gitIn(root)("add", "--", name);
+  gitIn(root)("commit", "--quiet", "-m", `seed ${name}`);
+}
+function candidateOf(root) {
+  const git = gitIn(root);
+  return {
+    commit: String(git("rev-parse", "HEAD").stdout ?? "").trim(),
+    tree: String(git("rev-parse", "HEAD^{tree}").stdout ?? "").trim(),
+  };
+}
+function keypair() {
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  const publicPem = publicKey.export({ type: "spki", format: "pem" }).toString();
+  return { publicPem, privateKey, publicKeySha256: createHash("sha256").update(publicPem).digest("hex") };
+}
+const canonicalJson = (value) => Array.isArray(value)
+  ? `[${value.map(canonicalJson).join(",")}]`
+  : value !== null && typeof value === "object"
+    ? `{${Object.keys(value).sort().map((k) => `${JSON.stringify(k)}:${canonicalJson(value[k])}`).join(",")}}`
+    : JSON.stringify(value);
+
+/** The exact chain approve-push writes: subject -> action -> intent -> detached proof. */
+function pushApprovalRecord({ key, threatModel, candidate, remote = SIGNED_REMOTE, destination = SIGNED_DESTINATION }) {
+  const action = {
+    kind: "push",
+    subjectSha256: criticalActionSubjectSha256({
+      kind: "push",
+      candidate,
+      subject: { sourceCommit: candidate.commit, remote, destination, threatModel },
+    }),
+    expiresAt: SIGNED_EXPIRES,
+  };
+  const intent = createPoApprovalIntent({
+    kind: "critical-action",
+    featureId: "demo-feature",
+    planSha256: SIGNED_PLAN_SHA,
+    specSha256: SIGNED_SPEC_SHA,
+    candidate,
+    policyRevision: "critical-human-proof-v1",
+    subjectSha256: criticalActionSha256(action),
+    decision: "approved",
+  });
+  const proof = {
+    schema: "pipeline.po-approval-proof.v1",
+    intentSha256: intent.sha256,
+    keyReference: SIGNED_KEY_REFERENCE,
+    publicKey: key.publicPem,
+    signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), key.privateKey).toString("base64"),
+  };
+  return {
+    approvedBy: "Human",
+    approvedAt: "2026-08-07T00:00:00.000Z",
+    forCommit: candidate.commit,
+    criticalProof: {
+      proofSha256: createHash("sha256").update(canonicalJson(proof)).digest("hex"),
+      intentSha256: intent.sha256,
+      action,
+      proof,
+    },
+    remote,
+    destination,
+    threatModel,
+  };
+}
+
+/**
+ * A governed project whose committed policy carries the trust anchor, whose neutral State
+ * carries one verifying push approval for the repository's actual HEAD, and whose threat
+ * model exists with the bytes the subject digest binds.
+ */
+function signedPushFixture({
+  foreignSigner = false, ledgerDir = true, anchor = true, destination = SIGNED_DESTINATION,
+  remote = SIGNED_REMOTE, tamper = null,
+} = {}) {
+  const root = gitRepoFixture("guard-test-signed-push-");
+  mkdirSync(join(root, "project"), { recursive: true });
+  mkdirSync(join(root, "specs", "demo"), { recursive: true });
+  if (ledgerDir) mkdirSync(join(root, ".claude"), { recursive: true });
+  const threatBody = "# threat model\n";
+  writeFileSync(join(root, THREAT_MODEL_REL_PATH), threatBody);
+  const threatModel = { path: THREAT_MODEL_REL_PATH, sha256: createHash("sha256").update(threatBody).digest("hex") };
+  commitFile(root, "seed.txt", "seed\n");
+  const candidate = candidateOf(root);
+  const operator = keypair();
+  const policy = {
+    schema: "pipeline.critical-human-proof-policy.v1",
+    requiredKinds: ["push", "deploy", "publication"],
+    trustAnchor: { keyReference: SIGNED_KEY_REFERENCE, publicKeySha256: operator.publicKeySha256 },
+  };
+  if (!anchor) delete policy.trustAnchor;
+  writeFileSync(join(root, "project", "critical-human-proof.json"), `${JSON.stringify(policy, null, 2)}\n`);
+  const record = pushApprovalRecord({ key: foreignSigner ? keypair() : operator, threatModel, candidate, remote, destination });
+  if (tamper) tamper(record);
+  writeFileSync(
+    join(root, "project", "pipeline-state.json"),
+    `${JSON.stringify({
+      activeFeature: { id: "demo-feature" },
+      planApproval: { poGateAuthority: { planSha256: SIGNED_PLAN_SHA, specSha256: SIGNED_SPEC_SHA } },
+      pushApproval: { lastApproved: record },
+      criticalProofConsumption: [{ proofSha256: record.criticalProof.proofSha256, kind: "push", consumedAt: "2026-08-07T00:00:00.000Z" }],
+    }, null, 2)}\n`,
+  );
+  return { root, candidate };
+}
+
+// SIG-1: the whole point. A push whose only matching rule is GG-03, no arming anywhere, and
+// a recorded approval that VERIFIES for this candidate, remote and destination ref: allowed,
+// with an audit entry naming the authorization the guard relied on. No token, no phrase.
+const SIG_OK = signedPushFixture();
+check(
+  "SIG-1 allow   GG-03 push with a verifying push approval and no arming at all",
+  "git push origin HEAD:refs/heads/main",
+  ALLOW,
+  { projectDir: SIG_OK.root },
+);
+checkLedger(
+  "SIG-1 ledger  the admission records the authorization it relied on (key, forCommit, destination) and no token",
+  SIG_OK.root,
+  (entry) => entry.route === "signed-push-approval"
+    && entry.rule === "GG-03"
+    && entry.status === "authorized"
+    && entry.keyReference === SIGNED_KEY_REFERENCE
+    && entry.forCommit === SIG_OK.candidate.commit
+    && entry.destination === SIGNED_DESTINATION
+    && entry.candidateCommit === SIG_OK.candidate.commit
+    && entry.token === undefined
+    && entry.command === undefined // the remote operand can be a credential-bearing URL (SEC-01)
+    && entry.commandSha256 === createHash("sha256").update("git push origin HEAD:refs/heads/main").digest("hex"),
+);
+
+// SIG-2: the attack the committed anchor exists for. The signature is perfectly valid, it is
+// simply not the operator's key — so the record is a claim, not a proof.
+check(
+  "SIG-2 block   a valid signature from a key the committed anchor does not name",
+  "git push origin HEAD:refs/heads/main",
+  BLOCK,
+  { projectDir: signedPushFixture({ foreignSigner: true }).root, stderrIncludes: ["GG-03", "PUSH-PROOF-TRUST-MISMATCH"] },
+);
+
+// SIG-3: an approval names a ref. Redirecting the same approval at a different destination
+// is a different act.
+check(
+  "SIG-3 block   a push whose destination differs from the approved one",
+  "git push origin HEAD:refs/heads/master",
+  BLOCK,
+  { projectDir: signedPushFixture().root, stderrIncludes: ["GG-03", "PUSH-PROOF-BINDING-MISMATCH"] },
+);
+
+// SIG-4: an approval names a commit. One commit later it is an approval for something else.
+const SIG_MOVED = signedPushFixture();
+commitFile(SIG_MOVED.root, "later.txt", "moved on\n");
+check(
+  "SIG-4 block   a push at a commit that is not the approval's forCommit",
+  "git push origin HEAD:refs/heads/main",
+  BLOCK,
+  { projectDir: SIG_MOVED.root, stderrIncludes: ["GG-03", "PUSH-PROOF-COMMIT-MISMATCH"] },
+);
+
+// SIG-5: THE case. A valid approval covers the push it names; it does not widen to the OTHER
+// rule the command trips. The "every matching rule must be the single admitted rule"
+// invariant is what stands between "the human approved a push to main" and "the human
+// approved rewriting main's history" — and the admission must record nothing either.
+const SIG_FORCE = signedPushFixture();
+check(
+  "SIG-5 block   --force carrying a VALID approval still blocks on GG-01 (single-match invariant)",
+  "git push --force origin HEAD:refs/heads/main",
+  BLOCK,
+  { projectDir: SIG_FORCE.root, stderrIncludes: ["GG-01"] },
+);
+checkThat(
+  "SIG-5 ledger  the refused force-push wrote no authorization record",
+  () => ledgerEntries(SIG_FORCE.root).every((entry) => entry?.route !== "signed-push-approval"),
+);
+
+// SIG-6: with no approval and no arming, GG-03 is exactly the rule it always was — the
+// unattended-agent case it was built for, with today's block message intact.
+check(
+  "SIG-6 block   a GG-03 push with no approval and no arming blocks with today's message",
+  "git push origin HEAD:refs/heads/main",
+  BLOCK,
+  {
+    projectDir: EMPTY_DIR,
+    stderrIncludes: [
+      "BLOCKED (git-guard, plugin pipeline-core)",
+      "Rule ID: GG-03",
+      "Rule origin:",
+      "Override: if this is genuinely intended",
+      'PIPELINE_GUARD_OVERRIDE="GG-03|<token>|<reason>"',
+    ],
+  },
+);
+
+// SIG-7: a DELETION carrying a valid push approval. An approval names a ref to write; a
+// command that names none cannot be matched against one, and guessing is how a verifier
+// becomes a rubber stamp. The denial now says so instead of leaving it to be inferred.
+const SIG_DELETE = signedPushFixture();
+check(
+  "SIG-7 block   `push origin --delete main` under a valid approval is never attested",
+  "git push origin --delete main",
+  BLOCK,
+  { projectDir: SIG_DELETE.root, stderrIncludes: ["GG-03", "Signed-approval route: not applicable", "HEAD:refs/heads/<branch>"] },
+);
+checkThat(
+  "SIG-7 ledger  the refused deletion wrote no authorization record",
+  () => ledgerEntries(SIG_DELETE.root).every((entry) => entry?.route !== "signed-push-approval"),
+);
+
+// SIG-8: fail-closed, identical to the override mechanism's own rule — an authorization the
+// guard cannot write an audit record for is not acted on.
+check(
+  "SIG-8 block   a verified approval is NOT applied when the audit ledger cannot be written",
+  "git push origin HEAD:refs/heads/main",
+  BLOCK,
+  {
+    projectDir: signedPushFixture({ ledgerDir: false }).root,
+    stderrIncludes: ["GG-03", "audit ledger", "fail-closed"],
+  },
+);
+
+// SIG-9: the candidate is observed in ONE physical project. A `-C` pointing elsewhere is not
+// that project, so there is nothing to observe and nothing to attest.
+check(
+  "SIG-9 block   a cross-target -C push under a valid approval is refused before any attestation",
+  `git -C ${OV_ABSOLUTE_TARGET} push origin HEAD:refs/heads/main`,
+  BLOCK,
+  { projectDir: signedPushFixture().root, stderrIncludes: ["GG-03", "not one confirmed physical project"] },
+);
+
+// SIG-10: the two mechanisms never interleave. With an arming present the token route runs
+// exactly as it did before this change, signature or no signature.
+check(
+  "SIG-10 warn   an armed GG-03 override still takes the unchanged token route",
+  "PIPELINE_GUARD_OVERRIDE='GG-03|nova-sig-10|the PO armed this deliberately' git push origin HEAD:refs/heads/main",
+  WARN,
+  { projectDir: signedPushFixture().root, stderrIncludes: ["GG-03", "nova-sig-10", "OVERRIDE APPLIED"] },
+);
+
+// SIG-11: "no anchor" must never read as "no check needed". Without a committed key
+// identity there is nothing to verify against, and an unverifiable proof is not a proof.
+check(
+  "SIG-11 block  a project with no committed trust anchor cannot attest anything",
+  "git push origin HEAD:refs/heads/main",
+  BLOCK,
+  { projectDir: signedPushFixture({ anchor: false }).root, stderrIncludes: ["GG-03", "PUSH-PROOF-TRUST-ANCHOR-MISSING"] },
+);
+
+// SIG-12: the threat model is inside the signed subject, so editing it after the approval
+// revokes the authorization — the human signed a decision about THOSE bytes.
+const SIG_THREAT = signedPushFixture();
+writeFileSync(join(SIG_THREAT.root, THREAT_MODEL_REL_PATH), "# threat model, edited after the approval\n");
+check(
+  "SIG-12 block  a threat model edited after the approval revokes it",
+  "git push origin HEAD:refs/heads/main",
+  BLOCK,
+  { projectDir: SIG_THREAT.root, stderrIncludes: ["GG-03", "PUSH-PROOF-THREAT-MODEL"] },
+);
+
+// SIG-13: the record is a mutable working-tree file, so the guard-visible fields agreeing
+// proves nothing. Here they were rewritten to agree while the SIGNED subject says the
+// approval was for another ref — the exact edit a helpful agent would make.
+check(
+  "SIG-13 block  a record whose stated binding contradicts the signed subject",
+  "git push origin HEAD:refs/heads/main",
+  BLOCK,
+  {
+    projectDir: signedPushFixture({
+      destination: "refs/heads/other",
+      tamper: (record) => { record.destination = SIGNED_DESTINATION; },
+    }).root,
+    stderrIncludes: ["GG-03", "PUSH-PROOF-SUBJECT-MISMATCH"],
+  },
+);
+
+// ---- Change 2 (design R2): an armed token survives an attempt that never ran -------------
+//
+// The v0.5.3 release burned two tokens on commands that never executed: one refused by the
+// harness classifier AFTER the guard had consumed it, one rejected by the remote's ruleset.
+// The arming is now bound to the command and the candidate, and lives for a bounded time.
+const RTY_DIR = gitRepoFixture("guard-test-retry-");
+mkdirSync(join(RTY_DIR, ".claude"), { recursive: true });
+commitFile(RTY_DIR, "seed.txt", "seed\n");
+const RTY_COMMAND = "PIPELINE_GUARD_OVERRIDE='GG-07|nova-r2-1|the PO approved this exact reset' git reset --hard HEAD~1";
+check(
+  "RTY-1 warn    first admission of an armed token allows and ledgers it",
+  RTY_COMMAND,
+  WARN,
+  { projectDir: RTY_DIR, stderrIncludes: ["GG-07", "nova-r2-1", "OVERRIDE APPLIED"] },
+);
+checkLedger(
+  "RTY-1 ledger  the entry binds command + candidate and carries a 3600s default lifetime",
+  RTY_DIR,
+  (entry) => entry.status === "armed"
+    && entry.rule === "GG-07"
+    && entry.token === "nova-r2-1"
+    && entry.command === RTY_COMMAND
+    && entry.commandSha256 === createHash("sha256").update(RTY_COMMAND).digest("hex")
+    && entry.candidateCommit === candidateOf(RTY_DIR).commit
+    && entry.targetSha256 === createHash("sha256").update(RTY_DIR).digest("hex")
+    && Date.parse(entry.expiresAt) - Date.parse(entry.ts) === 3600 * 1000,
+);
+const RTY_ARMED_EXPIRES_AT = ledgerEntries(RTY_DIR).at(-1)?.expiresAt;
+check(
+  "RTY-2 warn    the SAME token, byte-identical command, same HEAD, inside the TTL is admitted again",
+  RTY_COMMAND,
+  WARN,
+  { projectDir: RTY_DIR, stderrIncludes: ["GG-07", "nova-r2-1", "OVERRIDE APPLIED", "retry of the same arming"] },
+);
+checkLedger(
+  "RTY-2 ledger  the re-presentation is appended as a retry and does NOT extend the lifetime",
+  RTY_DIR,
+  (entry) => entry.status === "retry"
+    && entry.token === "nova-r2-1"
+    && entry.commandSha256 === createHash("sha256").update(RTY_COMMAND).digest("hex")
+    && entry.candidateCommit === candidateOf(RTY_DIR).commit
+    && entry.targetSha256 === createHash("sha256").update(RTY_DIR).digest("hex")
+    && entry.expiresAt === RTY_ARMED_EXPIRES_AT,
+);
+check(
+  "RTY-3 block   the same token against a DIFFERENT command is consumed exactly as before",
+  "PIPELINE_GUARD_OVERRIDE='GG-07|nova-r2-1|a different reason is a different command' git reset --hard HEAD~1",
+  BLOCK,
+  { projectDir: RTY_DIR, stderrIncludes: ["GG-07", "already consumed"] },
+);
+check(
+  "RTY-4 block   a cross-target -C re-presentation of an admitted arming is refused (target binding)",
+  `PIPELINE_GUARD_OVERRIDE='GG-07|nova-r2-1|the PO approved this exact reset' git -C ${OV_ABSOLUTE_TARGET} reset --hard HEAD~1`,
+  BLOCK,
+  { projectDir: RTY_DIR, stderrIncludes: ["GG-07", "command target and ledger target"] },
+);
+commitFile(RTY_DIR, "later.txt", "HEAD moves on\n");
+check(
+  "RTY-5 block   the identical command after HEAD moved is a different act and stays consumed",
+  RTY_COMMAND,
+  BLOCK,
+  { projectDir: RTY_DIR, stderrIncludes: ["GG-07", "already consumed"] },
+);
+
+// RTY-6/7: the lifetime is real and configurable. `overrideArmingTtlSeconds` is read from
+// the loaded guard-config; an arming that has outlived it is not a retry window.
+const TTL_DIR = gitRepoFixture("guard-test-retry-ttl-");
+mkdirSync(join(TTL_DIR, ".claude"), { recursive: true });
+writeFileSync(join(TTL_DIR, ".claude", "guard-config.json"), JSON.stringify({ overrideArmingTtlSeconds: 0.001 }));
+commitFile(TTL_DIR, "seed.txt", "seed\n");
+const TTL_COMMAND = "PIPELINE_GUARD_OVERRIDE='GG-07|nova-r2-ttl|the PO approved this exact reset' git reset --hard HEAD~1";
+check(
+  "RTY-6 warn    first admission under a configured lifetime allows",
+  TTL_COMMAND,
+  WARN,
+  { projectDir: TTL_DIR, stderrIncludes: ["GG-07", "nova-r2-ttl", "OVERRIDE APPLIED"] },
+);
+checkLedger(
+  "RTY-6 ledger  overrideArmingTtlSeconds from the guard-config is what bounds the arming",
+  TTL_DIR,
+  (entry) => entry.status === "armed" && Date.parse(entry.expiresAt) - Date.parse(entry.ts) === 1,
+);
+check(
+  "RTY-7 block   the identical command after the arming expired stays consumed",
+  TTL_COMMAND,
+  BLOCK,
+  { projectDir: TTL_DIR, stderrIncludes: ["GG-07", "already consumed"] },
+);
+
+// RTY-8: a ledger written before this change carries no `commandSha256`, so it can never
+// satisfy the retry test. A pre-existing ledger does not become re-usable.
+const OLD_DIR = gitRepoFixture("guard-test-retry-oldshape-");
+mkdirSync(join(OLD_DIR, ".claude"), { recursive: true });
+commitFile(OLD_DIR, "seed.txt", "seed\n");
+const OLD_COMMAND = "PIPELINE_GUARD_OVERRIDE='GG-07|nova-r2-legacy|armed before this change' git reset --hard HEAD~1";
+appendFileSync(
+  join(OLD_DIR, ".claude", "guard-override.log.jsonl"),
+  `${JSON.stringify({
+    ts: new Date().toISOString(),
+    rule: "GG-07",
+    token: "nova-r2-legacy",
+    reason: "armed before this change",
+    command: OLD_COMMAND,
+    targetSha256: createHash("sha256").update(OLD_DIR).digest("hex"),
+  })}\n`,
+);
+check(
+  "RTY-8 block   an OLD-shape ledger entry (no commandSha256) stays fully consumed",
+  OLD_COMMAND,
+  BLOCK,
+  { projectDir: OLD_DIR, stderrIncludes: ["GG-07", "already consumed"] },
+);
+
 // ---- Summary -------------------------------------------------------------------------------------
-for (const dir of [EMPTY_DIR, CFG_DIR, BROKEN_DIR, OV_DIR, OV_NOLEDGER_DIR, CFG_GITOPT_DIR]) {
+for (const dir of [EMPTY_DIR, CFG_DIR, BROKEN_DIR, OV_DIR, OV_NOLEDGER_DIR, CFG_GITOPT_DIR, ...SIGNED_ROOTS]) {
   try {
     rmSync(dir, { recursive: true, force: true });
   } catch {
