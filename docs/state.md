@@ -265,6 +265,69 @@ the gate prints `(operating-model §7)` into its operator-visible fix string.
 Note (c) is a one-line change but sits in a `harness/scripts/` file, so it
 follows the ordinary briefed-task path rather than an in-session edit.
 
+**PO lifted the merge hold (APS, 2026-08-07):** *"du kannst jetzt von origin main
+den rebase machen bei gelegenheit - ist aber nicht dringend und es wird noch einen
+0.5.4 irgendwann mal geben."* `origin/main` has moved `6e2c9b2` → `2740041` and
+carries tag `v0.5.3`.
+
+**One correction to the instruction's wording, because it changes what gets
+executed.** `sprint_phoenix` is already pushed, so a *rebase* onto `main` would
+rewrite published history and require a force-push — both are absolute
+prohibitions in the guard union, not preferences. The operation will therefore be
+a **merge**, which reaches the same state without rewriting anything. Recorded
+here rather than silently substituted.
+
+**Measured against the real `origin/main`, and it matches the §8a prediction
+exactly: 7 conflicts, exactly one in the plugin tree** — the GS-8 file
+`plugins/pipeline-core/hooks/guard-gate-strength.mjs`. The other six are
+append-only bookkeeping (`backlog/STATUS.md`, `backlog/index.json`,
+`backlog/transitions.ndjson`, `docs/state.md`,
+`governance/observation-doc-governance.json`, `project/pipeline-state.json`).
+`harness/scripts/verify.mjs` and `guard-testpath.mjs` auto-merge clean. The plugin
+delta on `main` is 29 files, +4434/−176. **ADR-0058, ADR-0059 and the GMW threat
+model are all present on `main`** — §7's open items 2 and 3 are resolved by the
+merge rather than inherited as gaps. Item 1 (GS-8 has no test on either side)
+stands and is the merge's key carry-forward. Full measurement in
+`specs/sprint-phoenix-epic/design/plugin-0.5.3-merge-plan.md` §8b.
+
+**The merge is deliberately not executed yet:** it rewrites `docs/state.md` and
+touches the guardrails and operating-model tree, and a Critic dispatch is
+currently reading those files. Running it now would drift the review's own source
+reads out from under it. It runs after that review returns.
+
+**THE ONE-APPROVAL QUESTION IS ANSWERED — from source on `origin/main`, not from
+expectation.** This was recorded as unverified and blocking: can one signed
+authorization carry a whole chain? It is two mechanisms with different shapes, and
+the answer is partly no.
+
+- **HGO (ADR-0059) cannot carry a chain at all.**
+  `consumeHumanGuardOverride()` admits only a capability whose `toolName` **and**
+  byte-exact `toolInputSha256` match the call being made, with identical denial
+  digests, and then rewrites it to `status: "consumed"`. The guard's own denial
+  text says it plainly: "one exact, audited edit". One signature = one tool call,
+  once.
+- **GMW (ADR-0058) can — over a narrow, closed surface.**
+  `prepare --scope <comma-separated rule ids> --ttl-seconds <n>` is signed once,
+  installed once, and then stands open over a **set** of rules for a time box.
+  That is precisely the shape the standing rule asks for. But its admissible scope
+  is `GS-6` plus any `TP-*` rule and nothing else, enforced at build, install and
+  read; `NEVER_LIFTABLE_KERNEL_PATHS` is refused first and unconditionally even
+  under a window that claims to cover it.
+
+**Consequence for R1, which is the package the rule was aimed at:** the
+implementation and the TP-3 `verify.mjs` registration **can** land under one GMW
+window. The GS-4 row in `project/guard-config.json` **cannot** join it — GS-4 is
+outside GMW's scope set, and its HGO route is one exact edit. **R1 therefore goes
+from three human touches to two, not to one, with what exists today.**
+
+That is not a reason to weaken anything. It is the concrete input the mechanism
+work needs: reaching one release means either the GS-4 row is not required in the
+same release, or a carrier is needed that does not exist yet. Stated as a
+measurement so the sibling session building the mechanism does not have to
+rediscover it — and so nobody is tempted to close the gap by widening GMW's scope
+set, which would put the gate-strength files under a time-boxed lift and defeat
+what GS-1..GS-7 exist for.
+
 **Residual R1: Critic round 4/4 — PASS, no findings. R1 is Critic-clean
 (`21b24c4`).** Report at
 `specs/sprint-phoenix-epic/evidence/phx-r1-rework-3-critic-review-21b24c4.md`.
