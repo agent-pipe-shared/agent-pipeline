@@ -25,6 +25,27 @@ post-merge redesign packages have landed code this session:
   plan-and-push-authority` and `WP2+WP3`/`self-application-integrity-check`).
   `check-doc-contracts.mjs`/`check-observation-governance.mjs`/
   `security-scan.mjs` all pass as of this update.
+- **Two dispatches in flight (2026-08-07 evening, background, not yet landed):**
+  (1) fresh independent Critic review of the WP5/PHX-2 implementation diff
+  (fixed candidates `8b34e1f`/`6bdaeb0`/`f16b8f2`, base `7e8983f`) — T1
+  architecture/security class, functional-equivalent-read-only lane, requested
+  route claude-opus-5 at max, evidence
+  `specs/sprint-phoenix-epic/evidence/wp5-phx2-implementation-verify-f16b8f2.json`
+  (candidate-bound, gathered via a detached worktree at the exact candidate:
+  all 7 checks green — the 4 new/extended test files, doc-contracts,
+  observation-governance, security-scan). (2) `WP2-WP3-partA-implementation`
+  (goldfish-deep), against the finalized design (`0d8ed74`), **Part A only**
+  — the bootstrap self-application origin/content allowlist. Part B
+  (Codex-under-WSL freshness) is deliberately NOT dispatched yet: the design
+  document's own §B.8 flags its action-family shape as unfinished design
+  surface, recommending "a fast-follow granular sub-design with its own
+  Critic pass before implementation" rather than direct implementation — that
+  sub-design is the next actual step for Part B, not a plain implementation
+  dispatch. Two PO decisions from AskUserQuestion are binding on the Part A
+  dispatch: §A.4 option (a) (attestation from `observeCodexPublicCoreIdentity`
+  alone, no second independent observation) and §A.6 bundle (the companion
+  `nextAction`/`SKILL.md`/`onboarding-recovery.md` fix ships together as a
+  hard prerequisite, not a follow-up).
 - **GMW (Guard Maintenance Window, ADR-0058) merged in from the local-development
   marketplace snapshot** (commit `cca5ad8`): the PO pointed at
   `/home/skar667/agent-pipeline-local-marketplace` as the currently-wired snapshot
