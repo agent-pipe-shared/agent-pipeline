@@ -84,6 +84,41 @@ explicitly not a commitment:
    detection happens *after* the commit is in history, where the only remedy is
    disclosure — history rewriting being correctly forbidden.
 
+## Third instance, and the first one outside this repository (2026-08-07 evening)
+
+PO, watching a greenfield `feature`-profile project onboarded with the Claude
+runner: *"und er implementiert auch nicht mit goldfischen sondern selber. Also da
+klappt einiges nicht!"*
+
+The session wrote `index.html`, `styles.css`, `game.js`, two test suites and a
+README itself, in one continuous run, and dispatched nothing. That is a `feature`
+profile — not a `mini`, not a stage-0 fast path — and it included **test
+authorship**, which EL-01's only exception excludes by its own terms.
+
+Three things make this instance worth recording separately from the two above:
+
+1. **It is not this repository's self-application quirk.** The first two
+   violations happened in the Pipeline repo, where one could argue the
+   orchestrator is unusually close to the work. This one happened in an ordinary
+   consumer project, which is the case the rule exists for.
+2. **Nothing objected, at any point.** No guard, no gate, no bootstrap check, no
+   report. The session did not decide to skip dispatch after weighing MP-22; the
+   question never came up, which is exactly what "no enforcement" means in
+   practice.
+3. **It compounds with the missing plan gate.** In the same run the human was
+   never asked to approve PRD/Spec
+   (`2026-08-07-a-promoted-feature-can-never-pass-the-plan-gate.md`). So a
+   feature went from kickoff to finished implementation with neither a human
+   acceptance point nor an independent implementor. Either alone is a gap; both
+   together mean the profile's entire control structure was inert while
+   reporting itself as ready.
+
+The strongest candidate in this item's own Proposal — a mechanical check that a
+work-package commit carries a grounded `Dispatch:` trailer — would not have
+caught this one, because there was no dispatch to be missing from. What would
+catch it is a check on the *other* side: a `feature`-profile phase that reaches
+implementation with zero dispatch records is a finding.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:**
