@@ -26,12 +26,25 @@ import {
   readCodexHostRepositoryInitAdmission,
 } from "../lib/codex-host-layout.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { readPushApprovalMode } from "../lib/critical-human-proof-policy.mjs";
+import {
+  consumeHumanGuardOverride,
+  recordHumanGuardDenial,
+} from "../lib/human-guard-override.mjs";
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
 import { GATE_STRENGTH_PATHS } from "./guard-gate-strength.mjs";
 import {
   isBoundedReadOnlyPipeline,
   parseGuardCommand,
 } from "./guard-command-grammar.mjs";
+
+// ADR-0059 Decision 3/4: the same generic, exact-command-bound Human-Guard-Override
+// (HGO) route the other guards in this family already use for their own denials
+// (guard-testpath.mjs, codex-pretool-guard.mjs). Reused here unmodified -- only the
+// three closed-shell-grammar denial codes below are wired to it; GUARD-CROSS-REPO-MUTATION
+// and GUARD-LIFECYCLE-NOT-READY stay outside HGO's authority (ADR-0059 Decision 5,
+// this file's own header comments on crossRepositoryMutationBlocked()).
+const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 const GOVERNANCE_MARKERS = [
   ".agent-pipeline/core.lock.json",
@@ -94,17 +107,21 @@ function exactReadyReceipt(value) {
     && value.intent === "session";
 }
 
-function blocked(code = "GUARD-LIFECYCLE-NOT-READY", lifecycleStatus = null, retryActions = []) {
-  const grammarGuidance = {
-    "GUARD-PARSE-UNSUPPORTED": "The command is outside the closed Pipeline shell grammar.",
-    "GUARD-OPERATOR-UNAPPROVED": "The command contains an unapproved shell operator.",
-    "GUARD-REDIRECT-UNAPPROVED": "The command contains an unapproved shell redirection.",
-  };
+// Hoisted to module scope so grammarOverrideRoute() can build the identical, exact
+// denial reason text blocked() itself prints -- the two must never drift apart, since
+// the HGO request/capability is bound to this exact reason string.
+const GRAMMAR_DENIAL_GUIDANCE = {
+  "GUARD-PARSE-UNSUPPORTED": "The command is outside the closed Pipeline shell grammar.",
+  "GUARD-OPERATOR-UNAPPROVED": "The command contains an unapproved shell operator.",
+  "GUARD-REDIRECT-UNAPPROVED": "The command contains an unapproved shell redirection.",
+};
+
+function blocked(code = "GUARD-LIFECYCLE-NOT-READY", lifecycleStatus = null, retryActions = [], overrideGuidance = "") {
   const typedLifecycleStatus = code === "GUARD-LIFECYCLE-NOT-READY"
     && CONTROLLING_NON_READY_STATUSES.has(lifecycleStatus)
     ? lifecycleStatus
     : null;
-  const grammarReason = grammarGuidance[code];
+  const grammarReason = GRAMMAR_DENIAL_GUIDANCE[code];
   if (grammarReason) {
     const retryEnvelope = {
       schema: "pipeline.guard-retry-actions.v1",
@@ -118,7 +135,8 @@ function blocked(code = "GUARD-LIFECYCLE-NOT-READY", lifecycleStatus = null, ret
         + "Do not construct a new composed command with &&, ;, pipelines, redirects, or line continuation.\n"
         + "If typed retryActions are present, run only those exact read-only actions as separate tool calls.\n"
         + "Only bounded rg-to-rg and rg-to-head diagnostic pipelines are admitted as exceptions.\n"
-        + `${JSON.stringify(retryEnvelope)}\n`,
+        + `${JSON.stringify(retryEnvelope)}\n`
+        + overrideGuidance,
     );
   }
   const guidance = typedLifecycleStatus === null
@@ -137,6 +155,78 @@ function blocked(code = "GUARD-LIFECYCLE-NOT-READY", lifecycleStatus = null, ret
       + `${guidance[0]}\n`
       + `${guidance[1]}\n`,
   );
+}
+
+/**
+ * ADR-0059 Decision 3: wire the three closed-shell-grammar denial codes into the
+ * EXISTING, already-working generic HGO Bash class (`eligibility()`'s
+ * `commandClass: "closed-shell-exact"`) -- no new classification logic, this file is a
+ * CONSUMER of that machinery. Always attempt to consume a matching capability first
+ * (harmless: it only ever succeeds against a genuinely armed, matching one, regardless
+ * of mode); when nothing is consumed, attempt to record the denial and offer the
+ * mode-appropriate next step (Decision 4). Offering the route is a convenience, never a
+ * gate: an unusable store leaves the plain refusal exactly as it was -- same pattern as
+ * guard-testpath.mjs's `overrideGuidance` block, adapted to this file's own message
+ * shape. GUARD-CROSS-REPO-MUTATION and GUARD-LIFECYCLE-NOT-READY never call this
+ * (ADR-0059 Decision 5; out of scope for this dispatch).
+ *
+ * The exact denial reason text is `${code}: ${GRAMMAR_DENIAL_GUIDANCE[code]}` -- the
+ * SAME string blocked() itself prints for that code -- because the HGO request/capability
+ * is bound to this exact reason string; a request planned for one code's reason will not
+ * match a differently-worded denial for the same command.
+ */
+function grammarOverrideRoute(code, root, toolName, toolInput, dependencies = {}) {
+  const denials = [{ guard: "guard-lifecycle-ready.mjs", reason: `${code}: ${GRAMMAR_DENIAL_GUIDANCE[code]}` }];
+  const consumeFn = dependencies.consumeHumanGuardOverrideFn ?? consumeHumanGuardOverride;
+  let consumed = { status: "absent" };
+  try {
+    consumed = consumeFn({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName, toolInput, denials });
+  } catch {
+    consumed = { status: "absent" }; // an unusable capability is not an authorization
+  }
+  if (consumed.status === "consumed") {
+    return {
+      admitted: verdict(
+        0,
+        `[pipeline-human-override] guard-lifecycle-ready ${code}: exact one-time capability consumed; plan=${consumed.planSha256}.\n`,
+      ),
+    };
+  }
+  let overrideGuidance = "";
+  if (consumed.status === "absent" || consumed.status === "replan") {
+    let approvalMode = "signature";
+    const readModeFn = dependencies.readPushApprovalModeFn ?? readPushApprovalMode;
+    try { approvalMode = readModeFn(root)?.mode ?? "signature"; } catch { approvalMode = "signature"; }
+    try {
+      const recordFn = dependencies.recordHumanGuardDenialFn ?? recordHumanGuardDenial;
+      const planned = recordFn({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName, toolInput, denials });
+      if (planned.status === "planned") {
+        const script = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+        // ADR-0059 Decision 4: name the exact next command for the CURRENTLY CONFIGURED
+        // mode -- mirrors guard-testpath.mjs's own continuation exactly in shape.
+        const continuation = approvalMode === "chat"
+          ? [
+            `Then (the human confirms in-session; this is attribution, not proof):`,
+            `${process.execPath} ${JSON.stringify(script)} prepare-authorization --repo ${JSON.stringify(root)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256-from-plan> --reason "<human-reason>"`,
+            `${process.execPath} ${JSON.stringify(script)} authorize --repo ${JSON.stringify(root)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256> --selection-sha256 <selection-sha256> --reason "<human-reason>" --reason-sha256 <reason-sha256> --activate`,
+          ].join("\n")
+          : [
+            `Then, outside this session (presence of a valid, correctly-bound Ed25519 ` +
+              `signature IS the authorization -- there is no in-session activate step for this mode):`,
+            `${process.execPath} ${JSON.stringify(script)} prepare-authorization --repo ${JSON.stringify(root)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256-from-plan> --reason "<fixed HGO_SIGNATURE_REASON text>"`,
+            `${process.execPath} ${JSON.stringify(script)} authorize-by-signature --repo ${JSON.stringify(root)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256> --proof <external-proof.json>`,
+          ].join("\n");
+        overrideGuidance = [
+          "",
+          "Human override available for this exact command (one use; audited; the human confirms):",
+          `${process.execPath} ${JSON.stringify(script)} plan --repo ${JSON.stringify(root)} --request-sha256 ${planned.requestSha256}`,
+          continuation,
+          "",
+        ].join("\n");
+      }
+    } catch { /* no route offered; the plain grammar refusal stands unchanged */ }
+  }
+  return { admitted: null, overrideGuidance };
 }
 
 function externalRestartOnly() {
@@ -951,16 +1041,20 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
   if (toolName === "Bash") {
     const parsed = parseGuardCommand(input.tool_input.command, root);
     if (parsed.parseStatus !== "accepted") {
+      const route = grammarOverrideRoute("GUARD-PARSE-UNSUPPORTED", root, toolName, input.tool_input, dependencies);
+      if (route.admitted) return route.admitted;
       return blocked(
         "GUARD-PARSE-UNSUPPORTED",
         null,
         retryActionsForDeniedCommand(input.tool_input.command, root),
+        route.overrideGuidance,
       );
     }
     if (parsed.operators.length > 0 || parsed.redirects.length > 0) {
-      return blocked(parsed.redirects.length > 0
-        ? "GUARD-REDIRECT-UNAPPROVED"
-        : "GUARD-OPERATOR-UNAPPROVED", null, []);
+      const code = parsed.redirects.length > 0 ? "GUARD-REDIRECT-UNAPPROVED" : "GUARD-OPERATOR-UNAPPROVED";
+      const route = grammarOverrideRoute(code, root, toolName, input.tool_input, dependencies);
+      if (route.admitted) return route.admitted;
+      return blocked(code, null, [], route.overrideGuidance);
     }
   }
   if (toolName === "Bash" && input.tool_input.command.includes(LAUNCH_SCRIPT)) {
