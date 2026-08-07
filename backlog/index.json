@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e54e5713398bbaf843e5fd770a0bc8c18713e8604c3def8001ba6d60eeb4d371"
+    "transitionHead": "eb45943cd910c90bd3fd340d8a9adc2f34115ee5de96d935f1b1e95b0d3425e9"
   },
   "counts": {
-    "open": 31,
+    "open": 32,
     "in_progress": 21,
     "closed": 22
   },
@@ -246,6 +246,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "Live onboarding test (rune_test1_claude line of work) hitting a self-inflicted guard rejection at the plan-runtime step, 2026-08-07 (Nova GMW session); root cause independently re-verified by reading the cited source directly, not taken from the report alone."
+    },
+    {
+      "id": "pipeline.human-approval-ux-directory-clarity-and-single-command",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "PO decision and observation during the first live guard-maintenance-window signing on 2026-08-07: the wrong key directory was used twice before the trust mismatch surfaced, and the PO was handed two commands where only the first is theirs."
     },
     {
       "id": "pipeline.human-authorization-prompts-ignore-the-configured-language-profile",
