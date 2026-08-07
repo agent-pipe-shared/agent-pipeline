@@ -85,24 +85,35 @@ Items 1 and 2 are unblocked by one PO signature; item 3 follows them.
 
 ## What the PO must do, in order
 
-**Step 1 — sign the maintenance window.** Digest, scope `TP-2,TP-6,TP-7`, 3h:
+**Step 1 — sign the maintenance window. This is the only command that is
+yours.** `--repo-root` must be ABSOLUTE (`po-human-approval.mjs:87` requires
+it and the usage string does not say so), and `--directory` must be the
+external directory holding the key this repository actually pins — compare
+`trust-policy.json`'s `publicKeySha256` against `trustAnchor.publicKeySha256`
+in `project/critical-human-proof.json` if more than one directory exists,
+because a `keyReference` of `local-po-key` does not discriminate between them.
 
 ```sh
 node plugins/pipeline-core/scripts/po-human-approval.mjs sign-intent \
-  --repo-root . --directory "$PO_DIR" --intent-sha256 "$INTENT_SHA256"
+  --repo-root /absolute/path/to/checkout --directory "$PO_DIR" \
+  --intent-sha256 "$INTENT_SHA256"
 ```
 
 The digest is in `evidence/gmw-request.json` under `intent.sha256`; the
-confirmation prompt will name it back to you before the passphrase — compare
-the two. Then:
+confirmation prompt names it back to you before the passphrase — compare the
+two, and cancel if they differ.
 
-```sh
-node plugins/pipeline-core/scripts/guard-maintenance-window.mjs install \
-  --repo-root . --request evidence/gmw-request.json --proof "$PO_DIR/proof-manual.json"
-```
+**Step 2 is NOT yours.** `guard-maintenance-window.mjs install` reads no
+private key; it verifies a signature and places a file, and its own source
+documents it as `Agent-safe: verify-and-place only`
+(`lib/guard-maintenance-window.mjs:382`). Tell the agent you have signed and
+it runs the install. An earlier version of this document asked the PO to run
+it, which was an orchestration error on the agent's part, not a requirement.
 
 The request binds a candidate commit and opening tree, so it is invalidated by
 any further commit; it is re-prepared as the last act before each handover.
+The installed window, by contrast, is not tree-bound at use time — ordinary
+commits during the window do not close it.
 
 **Step 2 — the three test files get written, Verify re-runs, the Critic round
 runs.** Agent work, no further human step.

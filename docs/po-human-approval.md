@@ -53,6 +53,27 @@ question "should this be authorized, with this consequence?" is answered while
 you can still read the terms, rather than being implied by having typed a
 passphrase. `setup` creates key material and signs nothing, so it does not ask.
 
+## Which commands are yours
+
+Every command in this document that reads the private key is yours and only
+yours: `setup`, `approve`, `approve-all`, `approve-critical`, `sign-intent`.
+Everything else — `prepare*`, `verify*`, and the guard-side consumers such as
+`guard-maintenance-window.mjs install` and `guard-human-override.mjs` — reads
+only public artifacts and is executed by the agent. If an agent asks you to run
+one of those, it is doing extra work on your behalf that it should have done
+itself.
+
+`--repo-root` must be an ABSOLUTE path for `po-human-approval.mjs`; the usage
+string does not currently say so and a relative path is rejected with the bare
+usage text.
+
+If more than one external directory exists on the machine, confirm you are
+using the one whose key this repository pins: `trust-policy.json`'s
+`publicKeySha256` must equal `trustAnchor.publicKeySha256` in
+`project/critical-human-proof.json`. The `keyReference` field does not
+discriminate — separate keys may both be called `local-po-key`, and signing
+with the wrong one fails only afterwards, with `PO-APPROVAL-TRUST-MISMATCH`.
+
 ## Signing a bare intent digest
 
 Guard lifts (`guard-lift`, `guard-override` — the Guard Maintenance Window and
