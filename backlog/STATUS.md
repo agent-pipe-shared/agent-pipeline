@@ -39,6 +39,7 @@
 | pipeline.observation-intake-document-governance | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.onboarding-lifecycle-plan-hardcodes-the-codex-runner | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.onboarding-ready-path-unconditional-restart-barrier-read | open | defect | pipeline | 2026-08-07 | — |
+| pipeline.parallel-goldfish-dispatches-race-on-shared-checkout | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.pipeline-state-rebind-codex-default-runner | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.po-gate-authority-path-canonicalization | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-authority-receipt-readback | open | defect | pipeline | 2026-07-25 | — |
@@ -73,6 +74,6 @@
 
 ## Counts
 
-- open: 25
+- open: 26
 - in_progress: 21
 - closed: 19

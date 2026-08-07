@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "52fcbb8b705c57a86345e6ad4d2fee4bb7228bb87e36fb471f829f6d818bf49a"
+    "transitionHead": "962c6dbf947081d41e988093198ed4344d4bd362c810523969ce3a6e18cfcf47"
   },
   "counts": {
-    "open": 25,
+    "open": 26,
     "in_progress": 21,
     "closed": 19
   },
@@ -307,6 +307,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "ADR-0051 Follow-up section names this as one of two gaps to track as a dated backlog item; created per backlog/items/2026-08-05-adr-0051-follow-up-gaps-untracked.md's proposal, executed 2026-08-06 night autonomous backlog reconciliation."
+    },
+    {
+      "id": "pipeline.parallel-goldfish-dispatches-race-on-shared-checkout",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "Observed live during a 2026-08-07 wave of five parallel Nova A evidence-sealing Goldfish dispatches, each briefed 'Worktree: no' on the reasoning that their file scopes were disjoint."
     },
     {
       "id": "pipeline.pipeline-state-rebind-codex-default-runner",
