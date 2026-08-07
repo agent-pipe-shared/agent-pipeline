@@ -5,7 +5,7 @@
 
 **Last updated:** 2026-08-07
 **Project status:** ACTIVE
-**Current block:** 0.5.2 released, backlog triaged; PO chose to complete Nova A's missing work before closeout — entry gate confirmed clear, per-issue status reconciled, real implementation work starts next
+**Current block:** 0.5.2 released, backlog triaged; Nova A completion in progress — 6 issues freshly evidenced (#38,#8,#12,#14,#56,#29), #54 and #98 next, #12/#14/#29's remaining gaps are ADR-gated production work, not agent-unilateral
 **Repair baseline:** `5d2b83dcc765d50801f4491e1bd9bed32090112b`
 **Release version:** `0.5.2` released
 **Release state:** version `0.5.2` · tag `v0.5.2` · commit `6e2c9b2868d164ff3b631ab068fa5df20939e07d` · tree `23171c38a317d8cdf50baa013f54f5447e17f754` · status `published`
@@ -16,7 +16,60 @@ the supplied authoritative release identity; it is not a claimed release time.
 The historical candidate-qualification sections below are retained as
 session history and no longer describes the current publication disposition.
 
-## 2026-08-07 Nova VI — Nova A entry gate cleared, 10-issue status reconciled (current)
+## 2026-08-07 Nova VII — first Nova A completion wave: 6 issues evidenced (current)
+
+Continues from Nova VI. PO instruction: "leg mal los und fange an — du
+kannst es sinnvoll slicen und Nova step by step fertig bauen." Dispatched
+five Goldfish in parallel (single-task, template-built briefings per
+`templates/prompts/goldfish-task.md`), each sealing fresh candidate-bound
+evidence for one Nova A slice against current HEAD, honestly reporting
+gaps rather than papering over them:
+
+- **#38 (A3):** NVA-A38-1..6 evidenced; no tracked systemic-repair instance
+  found for -6, reported as such. Commit `57ee7e9`.
+- **#8 (A6 benchmark):** NVA-A8-1..3 evidenced; NVA-A8-4's empirical half
+  (real serial-vs-native task benefit) and NVA-A8-5 (PO-gated pilot)
+  honestly left open — not demonstrable from the synthetic fixture suite.
+- **#12/#14 (A4):** contract-level suites re-confirmed (9/9, 10/10, 10/10);
+  candidate-bound integration with real authoritative write paths and a
+  production executor remains open BY DESIGN — nova-a.md's own text
+  forbids a production executor "without ADR approval," so this is not
+  something to build unilaterally.
+- **#56 (A7 preflight):** the 2026-08-06 CLI was actually run against real
+  HEAD for the first time — honestly returned `blocked`
+  (repository-not-clean, consent-not-approved, no real PO consent artifact
+  exists for this candidate). NVA-A56-7/8 turned out not to be implemented
+  by the files in scope at all (they live in `publication-executor.mjs`).
+- **#29 (A2 selected sandbox):** NVA-A29-1..5,7 evidenced; NVA-A29-6's
+  positive leg (a real selected-child execution) confirmed UNREACHABLE —
+  not a sandbox permission issue, a genuine absence of any production
+  launcher that would drive a real child through the disposition reducer.
+
+**Parallel-dispatch collision, real and now filed.** Running five Goldfish
+without worktree isolation (briefed on disjoint *primary* file scope) raced
+on two shared surfaces: the matrix file (benign commit-attribution sweep,
+content correct) and a per-directory `dispatch-record.json` naming
+convention that assumed one dispatch per evidence folder (#8's record and
+matrix-citing evidence file were orphaned, requiring two manual recovery
+commits, `4a62379`/`d075aa9`). Filed as
+`backlog/items/2026-08-07-parallel-goldfish-dispatches-race-on-shared-checkout.md`.
+
+Verify: 254/254 clean at `2a700f1f1a5c0f36d2a5785e1f952f758dfbeb97`.
+
+**Real remaining Nova A gaps, now genuinely narrowed:** almost every issue's
+"final Nova-A binding" gap converges on the same missing step — freezing
+one Nova A candidate and running Slice A7's single Full Verify/Security/
+fresh-Critic/PO-gate. That freeze is not yet warranted: #12/#14 (executor),
+#29 (launcher) are ADR-gated new production work, not paperwork; #54
+(Critic convergence) has not yet had a real candidate-bound Critic dispatch
+through its own admission machinery; #98's R2/R3/R4/R6 remain open. Next:
+#54, then #98's R2 (a carefully-scoped retroactive `publication-executor.mjs`
+exercise against the already-published 0.5.2 candidate — its push step is a
+provable no-op since the remote already matches, but `authorize-apply`
+still writes real state into the production publication-authority store, so
+this needs a deliberately-chosen transaction ID, not a rushed briefing).
+
+## 2026-08-07 Nova VI — Nova A entry gate cleared, 10-issue status reconciled
 
 Continues from Nova V. The PO chose, of three offered options, to complete
 Nova A's missing per-issue evidence/closure work before formal close (not
