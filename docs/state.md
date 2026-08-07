@@ -25,15 +25,51 @@ post-merge redesign packages have landed code this session:
   plan-and-push-authority` and `WP2+WP3`/`self-application-integrity-check`).
   `check-doc-contracts.mjs`/`check-observation-governance.mjs`/
   `security-scan.mjs` all pass as of this update.
-- **Two dispatches in flight (2026-08-07 evening, background, not yet landed):**
-  (1) fresh independent Critic review of the WP5/PHX-2 implementation diff
-  (fixed candidates `8b34e1f`/`6bdaeb0`/`f16b8f2`, base `7e8983f`) — T1
-  architecture/security class, functional-equivalent-read-only lane, requested
-  route claude-opus-5 at max, evidence
-  `specs/sprint-phoenix-epic/evidence/wp5-phx2-implementation-verify-f16b8f2.json`
-  (candidate-bound, gathered via a detached worktree at the exact candidate:
-  all 7 checks green — the 4 new/extended test files, doc-contracts,
-  observation-governance, security-scan). (2) `WP2-WP3-partA-implementation`
+- **WP5/PHX-2 implementation Critic review 1: FAIL.** Independent Critic review
+  of the implementation diff (candidates `8b34e1f`/`6bdaeb0`/`f16b8f2`, base
+  `7e8983f`) — T1 architecture/security class, functional-equivalent-read-only
+  lane, requested route claude-opus-5 at max. **F1 (blocker): the design's
+  entire opt-in rollout mechanism is unreachable** — `f16b8f2` registered
+  `gates.push_external_ledger` in `pipeline-user-v3.schema.json`, but that
+  file is never consulted for validation; the live validator
+  (`validatePipelineUserV3` in `runner-profiles-v3.mjs`) still has a closed
+  `gates` object listing only `push_approval` as optional, so setting the new
+  key makes `pipeline.user.yaml` fail V3 validation and breaks `verify.mjs`'s
+  own `routing-projection-check` step — reproduced directly, not inferred.
+  **F2/F3 (major): evidence integrity.** The candidate-bound evidence this
+  session gathered via a detached-worktree subagent
+  (`specs/sprint-phoenix-epic/evidence/wp5-phx2-implementation-verify-f16b8f2.json`)
+  ran 4 targeted test files + doc-contracts + observation-governance +
+  security-scan, but never the repo's one calibrated verify command
+  (`node harness/scripts/verify.mjs`) — and the repo's own real,
+  script-written record for this exact candidate commit/tree
+  (`evidence/verify-latest.json`, gitignored, pre-existing) shows
+  `exitCode: 1`, `verifyRun: null` (likely the already-known
+  verify-journal/session-cleanup-binding infra gap this session's earlier
+  merge-report already named, but the submitted evidence never surfaced or
+  reconciled this — a self-authored JSON with a custom schema stood in for a
+  script-written one, QG-03 violation). **F4 (major):**
+  `externalPushLedgerGate` fails closed (resolves to `"required"`) for any
+  project whose `pipeline.user.yaml` is merely untracked/locally modified,
+  not only for a project that actually configured the key — contradicting the
+  design's own stated day-one safety guarantee (absent → `"off"`).
+  **F5 (minor):** the read side sources the new gate from the pushed
+  repository (`projectDir`) rather than the governed session root
+  (`fallbackProjectDir()`), unlike the ADR-0056 waiver check one line above it
+  in the same file, which deliberately reads from the session root for
+  exactly this reason. Full report:
+  `specs/sprint-phoenix-epic/evidence/wp5-phx2-implementation-critic-review-1-f16b8f2.md`.
+  **Next:** a scoped rework dispatch addressing F1-F5, then a bounded delta
+  Critic re-review — not yet dispatched. **Not the implementation's own
+  fault, an Elephant/dispatch-construction lesson for next time:** the
+  evidence-gathering approach this session invented (run selected suites,
+  hand-write a summary JSON) does not satisfy QG-03; the correct approach is
+  either a real `verify.mjs` run against the candidate (in a detached
+  worktree, accepting the known session-cleanup-binding gap as a disclosed
+  limitation) or, if that genuinely cannot complete, an honest report of that
+  fact as the evidence — never a substitute self-authored artifact standing
+  in for the real one.
+- `WP2-WP3-partA-implementation`
   (goldfish-deep), against the finalized design (`0d8ed74`), **Part A only**
   — the bootstrap self-application origin/content allowlist. Part B
   (Codex-under-WSL freshness) is deliberately NOT dispatched yet: the design
