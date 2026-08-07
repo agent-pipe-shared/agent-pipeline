@@ -3,14 +3,22 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "9556190a5eaf77663b765cdbd65fcbfb08c70c07acc4cb0a6ae047e2ebe9ec21"
+    "transitionHead": "52fcbb8b705c57a86345e6ad4d2fee4bb7228bb87e36fb471f829f6d818bf49a"
   },
   "counts": {
-    "open": 23,
+    "open": 25,
     "in_progress": 21,
     "closed": 19
   },
   "items": [
+    {
+      "id": "pipeline.adr-0047-numbering-collision",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "specs/sprint-nova-epic/plans/nova-b-readiness-2026-08-06.md (lines 55-69), promoted from a plan-only note to a backlog item per the 0.5.2 Critic round's F2 finding, 2026-08-07."
+    },
     {
       "id": "pipeline.adr-0051-follow-up-gaps-untracked",
       "status": "closed",
@@ -40,6 +48,14 @@
       "created": "2026-07-25",
       "source": "Approved Nova A1 issue #57 bootstrap authority and reviewed canonical backlog intake.",
       "tracking": "Nova A / issue #57"
+    },
+    {
+      "id": "pipeline.backlog-ledger-closure-reason-misleading",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "0.5.2 release Critic round, 2026-08-07, finding F3."
     },
     {
       "id": "pipeline.canonical-worktree-lifecycle",

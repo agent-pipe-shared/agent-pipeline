@@ -6,6 +6,8 @@ owner: pipeline
 status: open
 created: 2026-08-07
 source: "0.5.2 release session, 2026-08-07: PO asked why a release cannot run end-to-end through the Pipeline with only the final signature as the human step, for the version-surface strip specifically."
+due: 2026-09-06
+expires: 2026-09-06
 ---
 
 # GS-6 blocks the version field in `plugin.json` exactly as hard as it blocks guard code

@@ -6,6 +6,8 @@ owner: pipeline
 status: open
 created: 2026-08-06
 source: "Manual re-run of the empty-directory onboarding smoke test in scratch/onboarding-smoke-test while re-verifying backlog/items/2026-08-06-onboarding-lifecycle-plan-hardcodes-the-codex-runner.md (see backlog/evidence/2026-08-06-onboarding-runner-identity-reverification.md), 2026-08-06."
+due: 2026-09-05
+expires: 2026-09-05
 ---
 
 # The `restart-required` step names Codex regardless of the active runner
