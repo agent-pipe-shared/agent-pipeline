@@ -266,13 +266,13 @@ if (verified.proof !== null && externalPushLedgerGate(dir) !== "off") {
 ```
 
 The two `discoverRepository(...)` calls above should also carry an explicit `timeout`, matching
-the `5000`ms convention `guard-push.mjs`'s own two existing git spawns already use
-(`guard-push.mjs:427-430` and `guard-push.mjs:750-753`, both `5000`ms). `pipeline-state.mjs` has
+the `5000`ms convention `guard-push.mjs` uses uniformly across all 20 of its existing git spawns
+(e.g. `guard-push.mjs:427-430` and `guard-push.mjs:750-753`, both `5000`ms). `pipeline-state.mjs` has
 no equivalent uniform convention to match instead: it has seven `spawnSync` git calls today
-(lines 1592, 1593, 2096, 2540, 2551, 2675, 2685), five of which pass no `timeout` at all, and the
-two that do (`2675`, `2685`) use `5_000`ms or `30_000`ms *conditionally*
-(`args[0] === "ls-remote" ? 30_000 : 5_000`), not a single uniform value -- so "this file's own
-established `5000`ms" is accurate only for `guard-push.mjs`, not for `pipeline-state.mjs`. As of
+(lines 1592, 1593, 2096, 2540, 2551, 2675, 2685), five of which pass no `timeout` at all; of the
+two that do, only `2675` is conditional (`args[0] === "ls-remote" ? 30_000 : 5_000`) and `2685`
+is unconditionally `5_000`ms -- so "this file's own established `5000`ms" is accurate only for
+`guard-push.mjs`, not for `pipeline-state.mjs`. As of
 the current `worktree-lifecycle.mjs`, though, this is not simply a matter of passing
 `{ timeout: 5000 }`: `runGit`'s `options` parameter forwards only `cwd`, `env`, `encoding`,
 `maxBuffer` and `shell` to the underlying `spawnSync` call (`worktree-lifecycle.mjs:110-125`) --
@@ -497,9 +497,9 @@ distinct failure points, in the order they can occur:
      otherwise. Disposition: `approve-push` refuses (`console.error` + `return 2`), identically
      fatal to every other write-side case, but with a **different recovery framing**: there is
      no filesystem condition to fix here, and retrying does nothing but reproduce the same
-     `EEXIST` — the "once the underlying filesystem condition is fixed" language in the
-     recovery paragraph below applies only to the filesystem-condition sub-case immediately
-     above, never to `EEXIST`. Recovery from `EEXIST` is investigative, not mechanical: an
+     `EEXIST` — the "once the underlying condition ... is fixed" language in the
+     recovery paragraph below applies to sub-case `1.` and the filesystem-condition sub-case
+     immediately above, never to `EEXIST`. Recovery from `EEXIST` is investigative, not mechanical: an
      operator needs to establish why a proof recorded as unconsumed locally is already consumed
      externally (the exact scenario §1 point 1 names) before any push proceeds.
 
@@ -512,8 +512,10 @@ required` project's next push is, correctly, still refused by the read side for
 `PUSH-EXTERNAL-LEDGER-MISSING` — a confusing, misleading "succeeded, but didn't" outcome this
 design avoids by failing loudly at the point of the actual failure instead. The accepted
 operational cost of sub-case `1.` (the `discoverRepository(dir)` throw) and the
-filesystem-condition sub-case under `2.` — the two write-side failure points that occur only
-after the local write has already succeeded: because the local write cannot be un-done from
+filesystem-condition sub-case under `2.` — the two write-side failure points whose recovery is
+a fresh signing ceremony (all three write-side failure points, including `EEXIST` above, occur
+only after the local write has already succeeded; `EEXIST` alone gets the different,
+investigative recovery described above, not this one): because the local write cannot be un-done from
 inside `approve-push` itself, and because `.claude/pipeline-state.json` is written EXCLUSIVELY
 through the CLI, never hand-edited, with no carve-out for this or any other case (ADR-0029
 decision 1, `docs/adr/0029-file-handoffs-status.md:11`), recovering from either has exactly one
