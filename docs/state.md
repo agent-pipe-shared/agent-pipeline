@@ -152,8 +152,21 @@ and the danger of an unscoped "lift everything" default.
   `specs/sprint-nova-epic/evidence/nova-gmw/verify-8d2cc59.json` (commit `b846727`).
   A third delta Critic re-review, bounded to this one commit and the INV-2
   invariant only, is dispatched and pending.
-- **Not yet done:** the pending delta Critic verdict on Finding 1's fix (if
-  PASS, this closes the correction-round chain for NOVA-GMW-1 entirely); the bootstrap SessionStart
+- **Delta Critic review 3: PASS, 2026-08-07.** Bounded to Finding 1/INV-2,
+  sealed at `specs/sprint-nova-epic/evidence/nova-gmw/critic-review-3-delta-8d2cc59.md`
+  (commit `22767f5`, worktree). No blocker/major finding survives; the
+  Critic built and ran an independent boundary repro corroborating the fix
+  at its mathematically tightest points. **This closes the GMW
+  guardrail-tier review chain for NOVA-GMW-1** (three correction rounds:
+  F1-F3, F4-F5, Finding 1 -- each independently Elephant- and
+  Critic-verified, never taken on the dispatched agent's self-report alone).
+- **Not yet done:** the PO's own end-to-end signing test with a real trust
+  anchor; the deliberate, human-attended merge of the worktree branch
+  (`worktree-agent-ab84ec0efe49bd94a`, final commit `22767f5`) into this
+  checkout's own live-enforcing branch, followed by refreshing the local
+  marketplace candidate (`/home/skar667/agent-pipeline-local-marketplace`)
+  and a session restart -- both explicitly out of scope for any dispatched
+  agent, next up with the PO; the bootstrap SessionStart
   warning (design already written, appended to the same design-note commit
   `4398dde`); end-to-end testing with a real PO-signed proof (needs the
   PO's own external signing device/key — cannot happen inside any agent
