@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-07
+due: 2026-09-06
 source: "PO request in the 2026-08-07 Nova session for a deliberate confirmation before PIN entry, explicitly qualified as language-profile dependent; partially delivered by NOVA-PO-CONFIRM-1 in commits 5efb0f1 and 584a598."
 ---
 

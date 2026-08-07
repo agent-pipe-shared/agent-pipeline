@@ -56,7 +56,7 @@
     "Commit 5efb0f1's Dispatch trailer names one dispatch while its diff carries production changes from two, caused by a shared-checkout index race.",
     "Maintenance-window scope selectivity is not asserted by any test at either library or hook level, though it was verified empirically against a live window.",
     "GUARD-CROSS-REPO-MUTATION blocks writes to the session's harness-assigned scratchpad directory and has no lift by design.",
-    "One grammar denial against a path outside the repository root was observed without the new override-route block; not yet diagnosed."
+    "One grammar denial against a path outside the repository root was observed without the new override-route block. DIAGNOSED 2026-08-07: grammarOverrideRoute() only sets overrideGuidance when recordHumanGuardDenial returns status 'planned', and wraps that call in a bare catch whose comment reads 'no route offered; the plain grammar refusal stands unchanged'. Either a throw or any non-'planned' status therefore prints a denial with no next step and no statement that a route was attempted -- silently making ADR-0059 Decision 4 untrue for that path. The swallowed reason is the defect, not the missing route. Owner: pipeline. Expiry: 2026-08-21. Tracked for fix in the same wave as the round-2 findings."
   ],
   "excludedFromReview": "Documentation-only, backlog and evidence-relocation commits in the same range are not part of the enumerated review object."
 }

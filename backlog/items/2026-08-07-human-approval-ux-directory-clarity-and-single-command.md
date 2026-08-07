@@ -5,6 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-07
+due: 2026-09-06
 source: "PO decision and observation during the first live guard-maintenance-window signing on 2026-08-07: the wrong key directory was used twice before the trust mismatch surfaced, and the PO was handed two commands where only the first is theirs."
 ---
 
