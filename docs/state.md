@@ -172,6 +172,44 @@ post-merge redesign packages have landed code this session:
   alone, no second independent observation) and §A.6 bundle (the companion
   `nextAction`/`SKILL.md`/`onboarding-recovery.md` fix ships together as a
   hard prerequisite, not a follow-up).
+  **`WP2-WP3-partA-rework-1` (goldfish-deep) dispatched and landed**, 3 commits
+  `d63b858`/`e5db7df`/`7aa84f0` (base `77a7d79`). **F1 (fixed, `d63b858`):**
+  `SKILL.md` trimmed 15,094 to 14,782 bytes, back under
+  `BOOTSTRAP_PAYLOAD_MAX_BYTES`. **F2 (fixed, `e5db7df`, PO-confirmed
+  direction):** attestation now gated on `pluginRootHasSelfApplicationGit`
+  (a real `.git` two directories above `pluginRoot`); absent means skipped
+  entirely (not attempted, not failed), `status` falls through to the
+  pre-existing version-only decision — resolves F2's structural gap for the
+  real marketplace-installed (non-git) layout without inventing an
+  alternative attestation mechanism. **F4 (fixed, same commit):** 3 new
+  `pipeline-start-preflight.test.mjs` cases exercise the real per-runner
+  default-observer path with no `observe` stub (claude reaches real
+  `observePublicCoreIdentity`, codex reaches real
+  `observeCodexPublicCoreIdentity`, plus the F2 no-`.git` skip), against real
+  `mkdtempSync` git fixtures — the exact line F2's real-world failure lived
+  in, previously covered by zero of 27 tests. **F5 (fixed, `7aa84f0`):**
+  `bootstrap-payload-measure.test.mjs` now injects the same deterministic
+  `observe` DI override, hermetic again (no more real subprocess/full-tree
+  hash on every Verify run). **F3 and F6: genuinely blocked, not fixed,
+  matches the dispatch's own anticipation.** `harness/scripts/verify.mjs`
+  (TP-3) and `.claude/guard-config.json` (GS-7) both refuse the Edit tool
+  outright with no in-session override in this repo's `signature`
+  push-approval mode — confirmed by reading `guard-gate-strength.mjs`
+  directly: only GS-6 (the live-plugin rule) has a maintenance-window escape,
+  GS-1 through GS-5/GS-7/GS-8 have none at all by design ("there is
+  deliberately no in-session override"). Exact content for the PO to apply
+  directly, outside any agent session, is recorded in
+  `.git/dispatch-record-WP2-WP3-partA-rework-1.json` (F3: one `verify.mjs`
+  suite-registration line for `public-core-origin-allowlist.test.mjs`,
+  alongside WP5's already-open same-shaped item; F6: one new `TP-11` entry
+  protecting that same test file's own pinning assertions, a compounding fix
+  for F3). All verify commands green (32/32, silent/exit-0, 3/3, 19/19,
+  doc-contracts); no shared-checkout incident this time (confirmed via the
+  dispatch's own concurrency note — only the pre-existing
+  `.claude/settings.json` was ever dirty alongside it). **Next:** a bounded
+  delta Critic re-review scoped to F1/F2/F4/F5 (the four in-session-fixable
+  findings; F3/F6 named as structurally blocked in the neutral finding
+  registry, not re-litigated) — not yet dispatched.
 - **GMW (Guard Maintenance Window, ADR-0058) merged in from the local-development
   marketplace snapshot** (commit `cca5ad8`): the PO pointed at
   `/home/skar667/agent-pipeline-local-marketplace` as the currently-wired snapshot
