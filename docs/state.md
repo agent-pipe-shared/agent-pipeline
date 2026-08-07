@@ -5,7 +5,7 @@
 
 **Last updated:** 2026-08-07
 **Project status:** ACTIVE
-**Current block:** 0.5.2 released, backlog triaged; Nova A completion in progress — 6 issues freshly evidenced (#38,#8,#12,#14,#56,#29), #54 and #98 next, #12/#14/#29's remaining gaps are ADR-gated production work, not agent-unilateral
+**Current block:** 0.5.2 released, backlog triaged; Nova A completion in progress (paused on genuine ADR-gated/evidence-gated blockers); new parallel thread — Guard Maintenance Window (ADR-0058) in build, dispatched NOVA-GMW-1 to an isolated worktree
 **Repair baseline:** `5d2b83dcc765d50801f4491e1bd9bed32090112b`
 **Release version:** `0.5.2` released
 **Release state:** version `0.5.2` · tag `v0.5.2` · commit `6e2c9b2868d164ff3b631ab068fa5df20939e07d` · tree `23171c38a317d8cdf50baa013f54f5447e17f754` · status `published`
@@ -16,7 +16,60 @@ the supplied authoritative release identity; it is not a claimed release time.
 The historical candidate-qualification sections below are retained as
 session history and no longer describes the current publication disposition.
 
-## 2026-08-07 Nova VII — first Nova A completion wave: 6 issues evidenced (current)
+## 2026-08-07 Nova GMW — Guard Maintenance Window: signed, time-boxed PO lift for GS-6/TP-* (current)
+
+All session, GS-6 has refused every Edit/Write into `plugins/pipeline-core/**`
+inside this self-hosted session, unconditionally, by design — including
+small, fully-specified bugfixes (the `release-preflight-cli.mjs` tag-peel
+fix from Nova VII/the T7 Critic round). PO instruction (chat, verbatim):
+"bitte baue einen fix der dafür sorgt, dass generell dieser Blocker durch
+mich liftbar ist... ein Mechanismus den du nicht selber auslösen kannst
+aber der es mir ermöglicht auch für einen Zeitraum solche guards alle zu
+liften... eine Prüfung und Warnung [beim bootstrap] wenn etwas nicht
+wieder aktiviert wurde (kein fail! aber Warnung)".
+
+Before building, consulted an independent advisor (fresh-context, model
+Fable, read-only) on the design. It confirmed a signed, time-boxed window
+reusing the existing detached-Ed25519 PO-approval-proof primitive
+(ADR-0056) is sound, and flagged concrete failure modes now written into
+both the ADR and the threat model: a recursive-verifier hole (a window
+must never cover its own verifying code), effects outliving the window
+(argues for a narrow liftable scope — GS-6/TP-* only, never the GS-1..5/7
+gate-strength-deciding files), a known fail-open expiry-parsing bug
+pattern already present once in this codebase (`human-guard-override.mjs`),
+and the danger of an unscoped "lift everything" default.
+
+- **Decision recorded:** [ADR-0058](adr/0058-guard-maintenance-window.md),
+  commit `586f59e`.
+- **Threat model:** `docs/guard-maintenance-window-threat-model.md`, its own
+  document (structurally different mechanism from the existing single-
+  tool-call HGO override, not a section grafted onto it), same commit.
+- **Implementation design:** `specs/sprint-nova-epic/design/2026-08-07-guard-maintenance-window-design.md`,
+  commit `c457a10` — the concrete API/schema/file-list companion, written
+  as the Goldfish dispatch's spec.
+- **Dispatched:** `NOVA-GMW-1` to `pipeline-core:goldfish-deep`,
+  `isolation: worktree` (mandatory — GS-6 blocks the parent checkout
+  entirely; the worktree copy is not the live-enforcing plugin root, so
+  GS-6 does not apply to it). Scope: new lib module + CLI +
+  `guard-gate-strength.mjs` GS-6 branch + `guard-testpath.mjs` TP-* branch,
+  each with tests. Explicitly NOT in scope: the shell lane (no existing
+  GS-6/TP-* shell enforcement to extend — accepted, documented gap), the
+  bootstrap SessionStart warning (separate follow-up dispatch once this
+  one's `status` output is Critic-reviewed), and `lib/po-approval-proof.mjs`/
+  `lib/human-guard-override.mjs` themselves (read-only references).
+- **Delivery path, stated up front:** the worktree's `plugins/pipeline-core/**`
+  is a separate physical copy; merging it back into this checkout's own
+  live-enforcing copy is a deliberate, separate, human-attended step — not
+  something this session performs unilaterally via an ordinary git command,
+  precisely because that would be the exact same-session bypass the
+  threat model records as an open residual risk (ADR-0058 Follow-up).
+- **Not yet done:** end-to-end testing with a real PO-signed proof (needs
+  the PO's own external signing device/key — cannot happen inside any
+  agent session by construction); the bootstrap warning; the merge/install
+  step; a Critic review of the whole feature before it's considered done
+  (self-application rule, CLAUDE.md).
+
+## 2026-08-07 Nova VII — first Nova A completion wave: 6 issues evidenced
 
 Continues from Nova VI. PO instruction: "leg mal los und fange an — du
 kannst es sinnvoll slicen und Nova step by step fertig bauen." Dispatched
