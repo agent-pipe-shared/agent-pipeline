@@ -26,6 +26,27 @@ document's first draft. This too cannot be corrected retroactively; it is disclo
 plainly, rather than leaving only the earlier dispatch named and the more recent one's
 identical gap unstated.
 
+**Extended a second time per Critic finding 3 (MINOR, third Critic pass against commit
+`d99e59f`):** the same gap recurred one level down, in the dispatch that wrote the paragraph
+above. `WP2-WP3-design-rework-2` (commit trailer `Dispatch: WP2-WP3-design-rework-2
+(goldfish)`, commit `d99e59f`; its scratchpad `dispatch-record.json` records `"model":
+"claude-sonnet-5"` and carries no rationale field) also ran below the Design tier, with no
+rationale recorded. Naming the two earlier dispatches while the dispatch that authored the
+disclosure itself carried the identical gap would have reproduced exactly the pattern the
+disclosure exists to expose, so it is named here too — three dispatches, one recurring
+pattern, none of them correctable retroactively.
+
+**Pattern closed structurally from this revision onward:** the dispatch that produced *this*
+correction (`WP2-WP3-design-rework-3`) was routed on the Design-tier model (`claude-opus-5`,
+effort `xhigh`, per its dispatch metadata), explicitly citing MP-22/MP-23 ("When in doubt
+whether a design-phase step ... needs the Design-tier model, it does") as its stated model
+justification rather than leaving the tier choice implicit. It is the first dispatch touching
+this document to run on the Design tier. The three below-tier dispatches disclosed above stay
+uncorrectable for the artifacts they already produced, but the pattern ends here for
+design-phase authorship of this document going forward: any further dispatch that authors or
+reworks this design is a design-phase step and is dispatched on the Design-tier model, with
+its model recorded in the dispatch metadata either way.
+
 This design covers two related, independently shippable repairs. Part A changes the
 bootstrap readiness gate's `status` semantics (blast radius: every session, every project,
 on the next plugin refresh). Part B repairs a Codex+WSL-only advisory freshness path (blast
@@ -198,15 +219,48 @@ a negative result widen the existing `status` ternary (see §A.5) rather than re
    consequence, stated plainly because the guard has no in-session override (verified directly
    against the file's own header comment: "There is no in-session override, because an
    in-session override for 'may I weaken my own gate' is the same hole with an extra step," and
-   no override mechanism is defined anywhere in the file) and because a guard *script* is
-   re-read fresh on every invocation, not cached at session start (GS-6's own doc-comment): an
-   agent session that lands this new `GATE_STRENGTH_PATHS` entry cannot also create the new
-   allowlist module it protects in that same session — the very next write attempt is already
-   refused by the freshly-edited guard (a sequencing note for the implementation dispatch: land
-   the module's content before, or in a session distinct from, the rule that protects it) — and
-   no later agent session can maintain the module either (e.g. adding a third reviewed origin)
-   without a PO hand-edit made directly, outside an agent session, exactly like the escape
-   hatch every other `GATE_STRENGTH_PATHS` entry already relies on.
+   no override mechanism is defined anywhere in the file): once this new rule is *enforcing*, no
+   agent session can create or maintain the module at all (e.g. adding a third reviewed origin) —
+   only a PO hand-edit made directly, outside an agent session, can, exactly like the escape hatch
+   every other `GATE_STRENGTH_PATHS` entry already relies on.
+
+   **Corrected per Critic finding 1 (MINOR, third Critic pass against commit `d99e59f`):** *when*
+   "enforcing" begins is what the original text of this paragraph got wrong. It concluded that an
+   agent session landing this new `GATE_STRENGTH_PATHS` entry could not also create the allowlist
+   module in that same session, "because the very next write attempt is already refused by the
+   freshly-edited guard" — carrying the (correct) re-read-on-every-invocation property one step too
+   far, and contradicting this same section's adjacent, correct statement that the guard binds the
+   *installed* copy. The cited doc-comment says so itself
+   (`guard-gate-strength.mjs:98-100`): the immediate-disarm case it describes is "writing
+   `process.exit(0)` into the **installed** `guard-push.mjs`," not into a source checkout's copy.
+   Re-verified directly for this correction, against the wiring rather than
+   against the prior text: the PreToolUse hook runs `node
+   "${CLAUDE_PLUGIN_ROOT}/hooks/guard-gate-strength.mjs"`
+   (`plugins/pipeline-core/hooks/hooks.json:39`), so the script re-read on every invocation is the
+   *installed* copy under the host's plugin cache
+   (`~/.claude/plugins/cache/<marketplace>/pipeline-core/<version>`), a different directory from
+   this source checkout — and this repository's own `.claude/settings.json` wires no source-tree
+   hooks at all. An edit that lands the new entry in the source checkout's
+   `plugins/pipeline-core/hooks/guard-gate-strength.mjs` therefore changes nothing the
+   currently-enforcing guard reads; the new rule first takes effect on the **next plugin refresh**,
+   exactly like every other change to this plugin's code and exactly as this document already
+   frames Part A's blast radius elsewhere — "every session, every project, on the next plugin
+   refresh" in the opening Part-A summary, and the same phrase again in §A.5's F1 correction.
+
+   So the real consequence is a **window, not a same-session lockout**: between the commit that
+   lands the rule and the plugin refresh that installs it, the new allowlist module stays freely
+   agent-writable in the source tree, because the protection this item adds is not yet enforcing
+   for anyone. Sequencing note for the implementation dispatch, corrected accordingly: **the
+   same-session ordering constraint does not apply** — one session may land the allowlist module
+   and the `GATE_STRENGTH_PATHS` entry that protects it together, in either order; the earlier
+   advice to land the module's content first, or in a session distinct from the rule, rested on
+   the false premise above and is withdrawn. The constraint that does apply is at plugin-refresh
+   granularity: once the refresh makes the new rule enforcing, `gateStrengthRuleFor()` matches by
+   repo-relative path (unlike GS-6's live-root-only `insideLivePlugin()`), so from that point on
+   the module's *source-tree* copy is refused to agent sessions too, and the PO-hand-edit escape
+   hatch above is the only remaining route. The implementation dispatch should therefore treat the
+   module's content as settled before that refresh rather than plan a follow-up agent session to
+   touch it up afterwards.
 
 **Explicitly not revived:** the ~270-line plugin-list-parsing/`sourceClass`-computation
 machinery from pre-merge `codex-host-plugin-list.mjs` (`selectedPluginRecord`,
@@ -273,8 +327,10 @@ make silently.
    **Resolution chosen — direction (a): a distinct, minimal advisory `nextAction`, not a
    softened claim.** Part A's implementation scope is widened (disclosed here, not silently
    built in) to include a small change to `observePipelineStartPreflight`'s `nextAction`
-   computation, plus three companion files, so the branch this design widens actually has
-   something safe to do:
+   computation, plus two companion doc files (`SKILL.md`, edited in two separate places below,
+   and `references/onboarding-recovery.md`) — three distinct files at this anchor, which are
+   part of, not the whole of, the five-file total §A.6 states and owns as the single source of
+   that figure. So the branch this design widens actually has something safe to do:
    - `pipeline-start-preflight.mjs`: when `status === "plugin-refresh-required"`, return a
      new, non-mutating, non-executing `nextAction` shape (e.g. `{kind: "advisory", executable:
      null, argv: [], mutation: false, requiresConfirmation: false, executionBoundary,
@@ -295,8 +351,16 @@ make silently.
      `"plugin-refresh-required"` — advisory-only, no recovery action required, bootstrap
      continues normally with the advisory noted in the confirmation line.
 
-   None of these four files is touched by this design-document revision itself (this document
-   stays design-only, per the header); they are the disclosed follow-on implementation surface
+   None of these three files is touched by this design-document revision itself (this document
+   stays design-only, per the header) — and neither are the two further files §A.3 items 1 and 3
+   touch (the new constant module, and `guard-gate-strength.mjs`, which gains the one
+   `GATE_STRENGTH_PATHS` entry protecting that module), which together with these three make up
+   the **five files touched in total** §A.6 states, **corrected here
+   per Critic finding 2 (MINOR, third Critic pass) from this section's earlier "three companion
+   files"/"these four files" framing**, which double-counted `SKILL.md` across its own two
+   bullets and therefore diverged from §A.6's category breakdown. §A.6 is the single source of
+   this count; this section enumerates only its own local surface and defers the total there.
+   These files are the disclosed follow-on implementation surface
    Part A's implementation dispatch must carry in addition to the origin/content attestation
    itself — see §A.6 for the rollout framing and the PO's actual choice, including the
    alternative (day-one hard block) this design does not recommend but discloses.
@@ -361,7 +425,9 @@ core script (`pipeline-start-preflight.mjs`, already Part A's own integration po
 two companion doc files (`SKILL.md`, `references/onboarding-recovery.md`), one new constant
 module, and one new guardrail-protection entry (the latter two per §A.3 items 1 and 3) — five
 files touched in total, **corrected here (Critic finding B, second Critic pass) from this
-section's earlier, now-inaccurate "four files instead of one" framing** — so that
+section's earlier, now-inaccurate "four files instead of one" framing**, and this category
+breakdown is the single source of that count, which §A.5 now defers to rather than restating
+(Critic finding 2, third Critic pass) — so that
 "soft/advisory" is actually true — an acceptable reading of "fail closed, consistent
 with established convention" for this specific gate? Or does the PO instead want Part A's
 origin/content attestation to ship alone, accepting that its day-one failure mode is a
