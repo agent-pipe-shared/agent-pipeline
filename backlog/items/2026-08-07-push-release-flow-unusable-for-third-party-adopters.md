@@ -149,6 +149,18 @@ commitment to any of them:
    confidently signed wrong thing. Merging them is not only ergonomics — it
    removes that failure mode by construction.
 
+   **7c. The loop is structural, not just a scheduling accident.**
+   `approve-push` writes its approval and proof-consumption record into
+   `project/pipeline-state.json`, which is **tracked**. So every approved push
+   leaves the working tree dirty; Verify's `candidate-preflight` then refuses
+   the candidate until that record is committed; and committing it moves `HEAD`
+   past the very `forCommit` the approval names. Measured directly in this
+   session: Verify went red on exactly one of 255 suites for this reason alone.
+   The sequence approve → verify → push cannot be walked without either
+   skipping Verify or invalidating the approval. Any fix for 7a has to answer
+   this, because it is the same loop closing through the state file rather than
+   through ordinary work commits.
+
    Two smaller findings from the same walkthrough, worth fixing whatever
    shape 7a/7b take:
 

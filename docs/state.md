@@ -1125,6 +1125,53 @@ being. The briefing was the hazard and it was mine. Both later dispatches forbid
 tree reverts and take red evidence from a reconstructed copy — the one mitigation
 that holds regardless of what the cause turns out to be.
 
+### Branch pushed, release prepared to the gate
+
+`origin/feat/sprint-nova-codex-v046` stands at `378cb64`, read back with
+`ls-remote` rather than inferred from the push output. The candidate has since
+moved on with release preparation.
+
+The push itself needed three corrections worth keeping, because each was
+discovered by being refused rather than by reading anything:
+
+- **The first signature was wasted, and it was my error.** `prepare-critical`
+  rejected an `--expires-at` without milliseconds — `iso()` demands an exact
+  `toISOString()` round-trip — and reported only `critical approval request is
+  invalid`, naming no field. `approve-critical` then signed the **stale**
+  request still on disk without noticing prepare had failed. The confirmation
+  text looked entirely normal; only the commit hash inside it revealed the
+  wrong subject. Two commands with no coupling turn a failed first step into a
+  confidently signed wrong thing.
+- **`git push origin <branch>` is refused.** The guard requires the written-out
+  destination ref, and its reasoning is right: an attestation names a ref, and
+  a command that does not name one cannot be matched against it without
+  guessing. Nothing says so in advance and the denial does not either.
+  `git push origin HEAD:refs/heads/<branch>` is the admitted form.
+- **The harness classifier refused the fully authorized push** after the
+  Pipeline's own gate had passed — a second measured instance of the layer this
+  repository cannot fix from the inside.
+
+**Release preparation, done.** Cachebuster stripped; `VERSION` and both plugin
+manifests read a bare `0.5.3`. `docs/release-0.5.3-readiness.md` rewritten to
+the truth: its three blockers are closed, and closing them is what surfaced the
+second Critic round's four majors, so the document now says that in the order
+it happened. Verify exit 0, binding `exact`, 255/255; `security-scan` exit 0.
+
+**One finding from the release run itself, now candidate 7c on the push/release
+item.** Verify went red on exactly one of 255 suites — `candidate-preflight` —
+because `approve-push` writes its approval and consumption record into the
+**tracked** `project/pipeline-state.json`. So every approved push dirties the
+tree, Verify then refuses the candidate until that record is committed, and the
+commit moves `HEAD` past the `forCommit` the approval names. approve → verify →
+push cannot be walked without either skipping Verify or invalidating the
+approval. This is the sign/invalidate loop the PO asked to have fixed, closing
+through the state file rather than through ordinary work commits.
+
+**Not started, and deliberately:** the `main` push and `gh release create`.
+Both need a fresh `push`-kind signature bound to the `main` destination plus the
+GG-03 override, and branch and `main` proofs cannot be prepared in parallel
+because both land on `proof-critical-push.json`.
+
 ## 2026-08-07 Nova VII — first Nova A completion wave: 6 issues evidenced
 
 Continues from Nova VI. PO instruction: "leg mal los und fange an — du
