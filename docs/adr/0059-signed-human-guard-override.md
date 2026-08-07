@@ -130,21 +130,40 @@ mechanism, signed or otherwise, until the follow-up below.
 
 **Follow-up decision (2026-08-07, PO instruction — a live session was
 blocked on GS-7 with no route at all):** extend `guard-gate-strength.mjs`
-with a SIGNED-ONLY lift for GS-1..GS-5/GS-7 (never GS-6, which keeps its own
-GMW mechanism unchanged), mirroring Decision 3's always-attempt-consume
-pattern — but with an additional, absolute constraint the other guards do
-not need: `authorizeHumanGuardOverride()` (the chat-mode path) must refuse
-to arm a capability for any of these six exact paths UNCONDITIONALLY,
-regardless of the configured `gates.push_approval` mode — not merely
-"refused unless chat mode" like every other HGO consumer. Only
-`authorizeHumanGuardOverrideBySignature()` may ever arm one. This is
-stricter than Decision 2's "consuming side doesn't care how a capability was
-armed" for the ordinary guard family: for gate-strength paths specifically,
-an in-session chat-mode capability must never be *creatable* in the first
-place, not merely inadmissible at consume time — because these are the
-files that decide what "chat mode" even means, so any acceptance of a
-chat-armed capability here is circular by construction. Tracked and
-implemented as a direct follow-up dispatch on this same ADR, not a new one.
+with the SAME always-attempt-consume-first lift GS-1..GS-5/GS-7's sibling
+guards already have (Decision 3), with **no special-casing at all** — never
+GS-6, which keeps its own separate GMW mechanism unchanged.
+
+A first version of this follow-up (superseded within the hour, before
+anything was committed) proposed an ADDITIONAL, absolute constraint beyond
+Decision 3's own pattern: forbidding `authorizeHumanGuardOverride()` (the
+chat-mode path) from ever arming a capability for these six paths, no matter
+the configured mode. **The PO rejected this explicitly and it is not part of
+the design.** The standing principle, already stated in
+[ADR-0056](0056-push-approval-mode.md) Decision 4 ("a real and deliberate
+weakening, chosen for ergonomics... `mode: chat` ... should [be] read as 'a
+human said yes here'"), is: `signature` is the safe default, and once a
+human has genuinely, deliberately committed `gates.push_approval: chat`,
+that is an accepted, recorded downgrade the Pipeline must honour uniformly —
+not something to fence off file-by-file. Everything that blocks the agent
+must be liftable by signature or by chat, matching whatever is actually
+configured, with no per-file exception.
+
+The self-service-escalation concern that motivated the rejected version (an
+agent using a chat-armed capability to write `gates.push_approval: chat`
+into `pipeline.user.yaml` itself, bootstrapping its own weaker mode) turns
+out not to be reachable, and needs no carve-out to close: Decision 1's
+`HGO-SIGNATURE-MODE-REQUIRED` check in `authorizeHumanGuardOverride()` is
+already unconditional and already path-independent — it refuses to arm ANY
+chat-mode capability, for ANY file, gate-strength or not, unless the
+repository's own COMMITTED mode is already `chat`. Obtaining a chat-armed
+capability at all therefore already presupposes a human has genuinely put
+the repository into chat mode beforehand (a real commit, a real human act);
+the loop cannot bootstrap itself starting from `signature`. `GATE_STRENGTH_PATHS`
+needs no representation in `human-guard-override.mjs` at all — `guard-gate-strength.mjs`
+is the only file this follow-up touches, mirroring `guard-testpath.mjs`
+exactly, chat continuation and signature continuation both offered per the
+committed mode, same as every other HGO consumer.
 
 ## Consequences
 
