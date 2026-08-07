@@ -48,8 +48,14 @@ reworks this design is a design-phase step and is dispatched on the Design-tier 
 its model recorded in the dispatch metadata either way.
 
 This design covers two related, independently shippable repairs. Part A changes the
-bootstrap readiness gate's `status` semantics (blast radius: every session, every project,
-on the next plugin refresh). Part B repairs a Codex+WSL-only advisory freshness path (blast
+bootstrap readiness gate's `status` semantics (blast radius, **rescoped per Critic finding F2,
+MAJOR, delta re-review `412d33d`**: the changed code path is reached by every session and every
+project on the next plugin refresh, but the new origin/content attestation can only change a
+session's `status` where a real `.git` sits two directories above `pluginRoot` — the
+self-application/dev-checkout topology. A marketplace-installed copy skips the attestation
+entirely and keeps today's version-only outcome (§A.5 case 2). The "every session, every
+project" framing of the *effect* predates the F2 gate and is refuted by it). Part B repairs a
+Codex+WSL-only advisory freshness path (blast
 radius: Codex-under-WSL sessions only, and only in the direction "was `unknown`, may now
 resolve"). They share one document because they were investigated together and because
 Part B's pre-merge implementation imported from Part A's pre-merge implementation, but they
@@ -258,8 +264,11 @@ a negative result widen the existing `status` ternary (see §A.5) rather than re
    `plugins/pipeline-core/hooks/guard-gate-strength.mjs` therefore changes nothing the
    currently-enforcing guard reads; the new rule first takes effect on the **next plugin refresh**,
    exactly like every other change to this plugin's code and exactly as this document already
-   frames Part A's blast radius elsewhere — "every session, every project, on the next plugin
-   refresh" in the opening Part-A summary, and the same phrase again in §A.5's F1 correction.
+   frames Part A's arrival elsewhere — "on the next plugin refresh" in the opening Part-A
+   summary and again in §A.5's F1 correction. (Those two passages also stated a *reach*, "every
+   session, every project"; that part is rescoped per Critic finding F2, delta re-review
+   `412d33d`, because the attestation reaches self-application/dev checkouts only. The refresh
+   *timing* quoted here is unaffected by that rescoping.)
 
    So the real consequence is a **window, not a same-session lockout**: between the commit that
    lands the rule and the plugin refresh that installs it, the new allowlist module stays freely
@@ -333,10 +342,15 @@ make silently.
    non-ready state) — and `references/onboarding-recovery.md` has no documented recovery
    entry for `"plugin-refresh-required"` (grep: no match). A session that trips this branch
    today, pre-Part-A, already has nothing to execute and no printable confirmation; Part A
-   does not create this defect, but it multiplies its population from "version-mismatch
-   sessions only" to "every session, on the next plugin refresh" (this document's own stated
-   blast radius). That is not soft/advisory in any operationally meaningful sense as things
-   stand.
+   does not create this defect, but it multiplies its population — **rescoped per Critic
+   finding F2 (MAJOR, delta re-review `412d33d`), which refuted the "every session, on the next
+   plugin refresh" figure this sentence carried before** — from "version-mismatch sessions
+   only" to "version-mismatch sessions, plus every session running the plugin out of a real git
+   checkout at the self-application layout whose origin/content attestation comes back
+   negative" (§A.5 case 2: a marketplace-installed session never reaches the attestation at
+   all). That population is far narrower than this document originally stated, and it is not
+   empty; for a session that does trip the branch nothing about the outcome improves, so this
+   is still not soft/advisory in any operationally meaningful sense as things stand.
 
    **Resolution chosen — direction (a): a distinct, minimal advisory `nextAction`, not a
    softened claim.** Part A's implementation scope is widened (disclosed here, not silently
@@ -412,13 +426,22 @@ ordinary bootstrap path at all. Every session that currently reports `"ready"` c
 
 **The first session that bootstraps after this ships:** the origin/content attestation runs
 in production, ordinary-bootstrap context, for the first time (previously it only ran on the
-private-overlay path, which is opt-in and much less traveled). The specific unverified
-assumption this design inherits, not independently re-checks: that a real marketplace-git
-install (not just local-development) preserves a `.git` directory at exactly
-`<clone>/plugins/pipeline-core` with the expected layout — this is *assumed* to hold because
-`observePublicCoreIdentity`/`observeCodexPublicCoreIdentity` are the same primitives already
-running in the private-overlay path in production, not because this design re-verified it
-against a real marketplace install topology.
+private-overlay path, which is opt-in and much less traveled) — but only in sessions whose
+plugin copy sits in the self-application/dev-checkout topology.
+
+**Rescoped per Critic finding F2 (MAJOR, delta re-review `412d33d`):** this paragraph
+previously rested on an assumption this design inherited rather than re-checked — that a real
+marketplace-git install (not just local development) preserves a `.git` directory at exactly
+`<clone>/plugins/pipeline-core`. That assumption is refuted, and its refutation is what the
+earlier Critic finding F2 (`WP2-WP3-partA-rework-1`) responded to: a marketplace-installed
+plugin copy (e.g. `~/.claude/plugins/cache/<marketplace>/pipeline-core/<version>`) has no
+`.git` at all. The shipped attestation is therefore gated on a real `.git` two directories
+above `pluginRoot` (`pluginRootHasSelfApplicationGit()`, `pipeline-start-preflight.mjs`) and is
+skipped entirely — not attempted, not failed — for the installed topology (§A.5 case 2). The
+rollout reach this whole section reasons about is consequently the self-application/dev-checkout
+population only, never "every session everywhere"; the residual for the installed topology is
+disclosed in §A.1 (limitation 1) and scoped out in §A.7, both of which carry the citation of
+the backlog item that tracks it.
 
 **Corrected per Critic finding F1 (BLOCKER):** the original text below this point asserted a
 worst-case outcome that was not actually true of the mechanism as originally specified (see
@@ -428,24 +451,34 @@ origin/content attestation, because that fix is what makes the soft outcome real
 asserted.
 
 **If the §A.5 companion fix ships together with Part A's attestation** (this design's
-recommendation): given the unverified layout assumption above, the worst realistic day-one
-outcome is a previously-silent "please refresh your plugin" advisory newly appearing on some
-sessions, with a working `nextAction` and a printable confirmation line — never a new
+recommendation): given the `.git` gating above, the worst realistic day-one outcome is a
+previously-silent "please refresh your plugin" advisory newly appearing on some
+self-application/dev-checkout sessions, with a working `nextAction` and a printable
+confirmation line — never a new
 bootstrap failure, and never a new exit-code-2 case. This mirrors the *shape* of WP5's
 rollout choice (`specs/sprint-phoenix-epic/design/phx-2-additive-ledger-authority.md` §5:
 soft-launch before hard enforcement) even though the mechanism differs — WP5 used an opt-in
 `pipeline.user.yaml` key because its blast radius was zero-populated-ledgers-on-day-one; Part
 A instead reuses an already-existing status branch (now repaired to actually be soft, not
 merely labelled so), because DoD constrains this design to reused primitives and minimal new
-surface, and because every session everywhere hits this path immediately (a config-gated
-rollout would need its own new config key, which this design deliberately avoids adding).
+surface. **Rescoped per Critic finding F2 (MAJOR, delta re-review `412d33d`):** the second
+justification this sentence used to carry — "every session everywhere hits this path
+immediately", so a config-gated rollout would be overkill — is refuted by the F2 gate; after
+it, the attestation reaches self-application/dev checkouts only, and blast radius no longer
+argues for or against a config-gated rollout. What still stands on its own is the narrower
+reason: a config-gated rollout would need its own new `pipeline.user.yaml` key, i.e. new
+surface the DoD constrains, which this design deliberately avoids adding.
 
 **If Part A's origin/content attestation ships WITHOUT the §A.5 companion fix:** the outcome
-is not the soft one described above — it reproduces the F1 defect at the new, wider scale
-this design's own attestation creates (`nextAction: null`, no printable confirmation, no
-documented recovery path, for every session the new attestation newly routes into
-`"plugin-refresh-required"`). This design does not recommend shipping Part A's attestation on
-its own for that reason.
+is not the soft one described above — it reproduces the F1 defect for every session the new
+attestation newly routes into `"plugin-refresh-required"` (`nextAction: null`, no printable
+confirmation, no documented recovery path). **Rescoped per Critic finding F2 (MAJOR, delta
+re-review `412d33d`):** that population is not the "new, wider scale" this paragraph asserted
+before — the F2 gate confines it to sessions running the plugin out of a real git checkout at
+the self-application layout (local development and self-application checkouts); a
+marketplace-installed session never reaches the attestation at all (§A.5 case 2). Narrower than
+stated, not zero, and undiminished in severity for a session that does hit it. This design does
+not recommend shipping Part A's attestation on its own for that reason.
 
 **Flagged for the PO (secondary to §A.4, corrected scope):** is treating the §A.5 companion
 fix as a hard prerequisite of Part A's ship (not a follow-up) — i.e., accepting the small,
@@ -460,9 +493,22 @@ breakdown is the single source of that count, which §A.5 now defers to rather t
 "soft/advisory" is actually true — an acceptable reading of "fail closed, consistent
 with established convention" for this specific gate? Or does the PO instead want Part A's
 origin/content attestation to ship alone, accepting that its day-one failure mode is a
-genuine, undocumented, every-session-eligible bootstrap block (not the soft outcome originally
-promised) until a later follow-up repairs it — the honest "day-one hard block on a currently
-broad blast radius" alternative this correction discloses rather than glosses over?
+genuine, undocumented bootstrap block (not the soft outcome originally promised) until a later
+follow-up repairs it — the honest "day-one hard block" alternative this correction discloses
+rather than glosses over?
+
+**Both alternatives above are re-framed on the true post-F2 blast radius per Critic finding F2
+(MAJOR, delta re-review `412d33d`); the question itself stays open and is not decided here.**
+The second alternative was previously weighed as an "every-session-eligible bootstrap block on
+a currently broad blast radius". That premise is refuted: after the F2 gate a hard block can
+only reach sessions running the plugin out of a real git checkout at the self-application
+layout — local development and self-application sessions — and never a marketplace-installed
+one (§A.5 case 2). What the PO is therefore weighing is a bounded, disclosed five-file widening
+of Part A's implementation surface against an undocumented hard-block failure mode on a narrow
+but developer-facing population — not on the broad population this section asserted before. The
+recommendation §A.6 already records (ship the companion fix together with the attestation) is
+unchanged by this re-framing and remains a recommendation, not a decision; what changed is the
+cost of the alternative, so that the decision is taken on true rather than refuted facts.
 
 ### A.7 Explicitly out of scope (Part A)
 
