@@ -41,16 +41,46 @@ reproduced in the merge's full 341-file direct sweep.
 
 ## Proposal
 
-No proposal yet. Needs a decision on whether main's self-application model
-already covers this integrity concern by other means (main's file went in
-its own direction rather than simply deleting the functionality — worth
-checking what it does instead before assuming a straight gap) or whether
-Phoenix's allowlist check needs to be redesigned against main's current
-bootstrap-preflight shape.
+**Investigated (2026-08-07), not resolved — grew bigger than the original
+framing.** A Goldfish-deep dispatch found that `pipeline-start-preflight.mjs`
+is not a peripheral wiring point but part of the same broken chain: its
+pre-merge `observePipelineStartPreflight` took `observeRulesetSource`
+(`= observeCodexRulesetSource`) as a parameter and folded the self-application
+origin-allowlist check directly into the bootstrap **readiness gate's
+`status` decision** — not an additive field, a change to the core "is this
+session ready to proceed" logic. That means a correct restoration is a
+non-additive change to the bootstrap readiness gate itself, not a contained
+fix to `codex-host-plugin-list.mjs`/`ruleset-freshness.mjs` alone — a design
+decision needing PO sign-off before any code is written, given the blast
+radius (every session's bootstrap).
+
+Main's tree only **partially** covers the concern: `public-core-observation.mjs`
+(`observeCodexPublicCoreIdentity`, `observePublicCoreIdentity`) and
+`ruleset-source.mjs` (`normalizeRulesetSource`) still exist, unchanged and
+still exercised — but only by the private-overlay activation path
+(`private-overlay-activation.mjs:230,573`, `private-overlay-bootstrap-status.mjs:49`),
+never by ordinary bootstrap. The `PUBLIC_SELF_APPLICATION_ORIGINS` allowlist
+gate itself has no equivalent anywhere on main.
+
+Open questions for the PO (see companion item
+`2026-08-07-ruleset-freshness-wsl-subsystem-absent.md` for the closely
+related freshness half of the same investigation):
+1. Should the self-application origin-allowlist become part of ordinary
+   bootstrap readiness again, reusing the existing (already-proven-safe)
+   `public-core-observation.mjs`/`ruleset-source.mjs` primitives rather than
+   reviving Phoenix's separate pre-merge API surface?
+2. If yes, is changing the bootstrap readiness gate's `status` semantics
+   (not just adding a field) an acceptable scope for this fix, or does it
+   need its own dedicated design pass (mirroring how WP5/PHX-2 got one)?
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** deferred — needs PO input on the two open questions above
+  before scope can be fixed and a redesign/implementation dispatch built.
+- **Rationale:** the investigation this item asked for surfaced a materially
+  larger design question (bootstrap-readiness-gate semantics) than the
+  original "narrow integrity check" framing assumed; forcing a decision
+  without PO input here would be exactly the kind of "invented PO approval"
+  this pipeline's own rules prohibit for gate-affecting changes.
+- **Assignment (if accepted):** not yet assigned.
+- **Date:** 2026-08-07
