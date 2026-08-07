@@ -85,6 +85,16 @@ export const GATE_STRENGTH_PATHS = Object.freeze([
     path: ".claude/guard-config.json",
     reason: "the legacy-tier guard config carries the same protected-path lists as GS-4 for projects that never migrated (ADR-0054).",
   }),
+  // GS-8: the first entry in this table protecting product source rather than
+  // project configuration -- deliberately, because this is a fixed,
+  // review-gated 2-URL allowlist the bootstrap readiness gate trusts, not
+  // ordinary product source under active development. See design
+  // bootstrap-origin-allowlist-and-codex-wsl-freshness.md §A.3 item 3.
+  Object.freeze({
+    id: "GS-8",
+    path: "plugins/pipeline-core/lib/public-core-origin-allowlist.mjs",
+    reason: "public-core-origin-allowlist.mjs is the two reviewed Public-Core origins the bootstrap self-application check compares its own origin against -- widening it widens what the readiness gate accepts as attested.",
+  }),
 ]);
 
 export const LIVE_PLUGIN_RULE = Object.freeze({
