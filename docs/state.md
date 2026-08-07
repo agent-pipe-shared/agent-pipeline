@@ -878,6 +878,53 @@ coverage that `503fe0d` shipped without (TP-6), and the Decision 4
 denial-guidance case (TP-2). Only after that can Verify reach exit 0, and
 only then does the Critic round have a green candidate to review.
 
+**0.5.3 is cut, installed, and verified end to end against the enforcing
+build.** Verify exits 0 on `916805f` — 255 registered suites, 255 terminal
+receipts, clean at start and finish, binding `exact`; security-scan 0. The PO
+set the version at `0.5.3` rather than `0.6.0`: in this repository the minor
+position tracks SPRINTS, so a `0.X` bump is reserved for a sprint closing and
+increments inside a running sprint land in the patch position regardless of
+what they carry. That convention was nowhere written down and is now recorded
+next to the version convention itself, because reading "patch" as "bug fixes
+only" would be wrong here — 0.5.3 ships ADR-0059's signed admission path,
+which 0.5.2 did not have.
+
+The cachebuster is retained on this candidate, against the usual practice of
+stripping it for a release, for a reason worth keeping: a cachebuster-free
+version cannot be re-materialized locally under the same number, so a finding
+in review would force `0.5.4` instead of a corrected `0.5.3`. Carry it under
+review, strip it at the tag. Only the Claude manifest carries it; Codex stays
+at the bare semver, which `codex-pretool-guard.test.mjs` accepts because it
+compares base versions. That same check caught the Codex manifest being left
+behind on the first bump attempt — a second manifest that had simply been
+overlooked.
+
+The local install is done and its readback contract holds: `status: "ready"`,
+`version` equal to `installedVersion` at
+`0.5.3+claude.20260807181921.f667dec`, `installedSource: "local-development"`.
+More importantly, the ENFORCING copy was probed rather than assumed: a GS-7
+denial from the installed build now refuses fail-closed AND names the override
+route with a real request digest, offering the signature route as the
+committed mode requires, with commands pointing at the marketplace path rather
+than this checkout. The blocker that stranded another session is therefore
+resolved in a build that is actually running, not only in source.
+
+**Release deferred by PO decision, branch push only.** The PO declined to run
+the release path this session and restated the underlying defect more sharply
+than before: an agent pipeline that cannot release *after the human has
+approved* is not worth having, and the fix should be ADR-0059's own admission
+shape — signature always, chat where genuinely committed — rather than a
+separate human-only ceremony for this one path. Recorded as candidate 5 in
+`push-release-flow-unusable-for-third-party-adopters`, deliberately not
+improvised mid-release. Two structural facts about that path, established by
+reading it rather than attempting it: `prepare-critical` writes into the
+external key directory and is therefore refused by `GUARD-CROSS-REPO-MUTATION`,
+which ADR-0059 Decision 5 keeps unliftable, so the human runs two commands per
+push and not one; and because the subject digest binds `destination` while
+`approve-critical` always writes the same `proof-critical-push.json`, branch
+and `main` must be done sequentially — a second request would overwrite the
+first.
+
 **Also cleaned up:** `NOVA-LCR-HGO-1` wrote its dispatch record to
 `plugins/pipeline-core/dispatch-record.json`, inside the tree copied into
 every consumer's plugin install. Relocated to the feature's evidence
