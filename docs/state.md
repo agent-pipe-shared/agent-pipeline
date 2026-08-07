@@ -480,6 +480,34 @@ for the still-uncommitted, already-tested Decision 1/CLI diff left behind by
 NOVA-HGOSIG-1/2. All three running in the background as of this note, none
 overlapping in file scope.
 
+**Wave 3 results, independently verified (2026-08-07):**
+
+- `NOVA-HGOSIG-COMMIT-1` → commit `e4772d0` (Decision 1 lib function + CLI
+  subcommand, 4 files). Re-run: 23/23 lib tests, 5/5 CLI tests.
+- A leftover the Elephant missed on the first pass: `codex-pretool-guard.mjs`'s
+  Decision 4 diff (from NOVA-HGOSIG-2) was still uncommitted after
+  `NOVA-HGOSIG-COMMIT-1` — caught via `git status`, fixed with a follow-up
+  `NOVA-HGOSIG-COMMIT-2` (goldfish-mechanic) → commit `5be2273`. Re-run:
+  21/21.
+- `NOVA-LCR-INTENT-2` → commit `4d19def`: generalized `withoutRunnerFlag` to
+  a scan-and-remove, extended the `plan*` branch with the same optional
+  `--intent` support `inspect` already has. Re-run independently: 30/30
+  `guard-lifecycle-ready.test.mjs` cases, including the new
+  "plan-runtime family accepts the runner-plus-intent argv lifecycleArgv
+  actually emits for non-default intents" regression case. **This item's
+  fix is done and verified — pending its own DoD-mandated full-project
+  Verify confirmation and, per this repo's self-application rule, a T1
+  Critic round before it can be considered fully closed**, but the
+  production defect itself is fixed.
+- `NOVA-PO-SIGN-HELPER-1` (the generic `sign-intent` CLI subcommand) —
+  still running as of this note; `po-human-approval.mjs` +
+  `po-human-approval.test.mjs` (new) present, uncommitted, as expected for
+  an in-flight dispatch.
+
+Working tree at this point: only `NOVA-PO-SIGN-HELPER-1`'s in-progress files
+remain uncommitted; everything else from this session's four dispatch waves
+is now committed.
+
 ## 2026-08-07 Nova VII — first Nova A completion wave: 6 issues evidenced
 
 Continues from Nova VI. PO instruction: "leg mal los und fange an — du
