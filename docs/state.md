@@ -94,7 +94,37 @@ post-merge redesign packages have landed code this session:
   needs its own independent Critic review (T1, architecture/guardrail class —
   touches `guard-gate-strength.mjs` and the bootstrap readiness gate) before
   any PO gate, per the design's own "two separate implementation dispatches
-  and two separate Critic reviews" — not yet dispatched. **Open item, not a
+  and two separate Critic reviews". **Dispatched and landed: FAIL, 2
+  blockers.** Full report:
+  `specs/sprint-phoenix-epic/evidence/wp2wp3-parta-implementation-critic-review-1-77a7d79.md`.
+  F1 (blocker): the `SKILL.md` edit pushes the mandatory bootstrap payload to
+  15,094 bytes, over its own declared 15,000-byte budget — breaks the
+  registered `bootstrap-payload-measure-cli-tests` Verify suite, reproduced
+  directly. F2 (blocker, the significant one): the new attestation calls the
+  observer against `pluginRoot`, which for a REAL installed plugin is
+  `~/.claude/plugins/cache/<marketplace>/pipeline-core/<version>` — no `.git`
+  directory there at all. `resolveSourceLayout`/`observeGit` require one, so
+  `attestationFailed` is permanently true for every real installed copy, the
+  bootstrap status is permanently `plugin-refresh-required`, and per this
+  diff's own advisory-`nextAction` framing that means the mandatory V4
+  onboarding action silently never runs — in every session, forever, not "on
+  some sessions" as the design's rollout note (§A.6) described. Reproduced
+  directly against this session's own real installed root (confirmed no
+  `.git`). This is the design document's own flagged "unverified assumption"
+  (§A.6: "that a real marketplace-git install… preserves a `.git` directory…
+  is *assumed*, not independently re-checked") turning out FALSE, not a
+  Goldfish coding mistake — the self-referential git-based attestation
+  mechanism, as specified, structurally cannot work for a marketplace-
+  installed (non-git) plugin copy. F3/F4 (major): the new test suite isn't
+  registered in `verify.mjs`, and the per-runner observer-selection default
+  path (exactly where F2 lives) has zero test coverage — every one of 27
+  tests injects a stub. F5/F6 (minor): a sibling suite became non-hermetic; a
+  gate-protected constant's own pinning test is unprotected.
+  **Not auto-dispatching a rework this time** — F2 needs a real design
+  decision (how should self-application attestation behave for a
+  non-git, marketplace-installed layout — the case this repo's OWN session
+  is actually running under right now), not a mechanical fix; surfaced to the
+  PO instead of another autonomous cycle. **Open item, not a
   defect:** the dispatch flagged `runner-profiles-v3.mjs`/`.test.mjs` as
   concurrently modified by "something else" on the shared checkout — this is
   the sibling `WP5-phx2-rework-1` dispatch (still in flight at the time),
