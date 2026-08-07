@@ -541,7 +541,36 @@ post-merge redesign packages have landed code this session:
   derives needles from the whole array; and four more stale `OM §…` citations
   inside `harness/review-protocol.md`, the same defect class as R3 but outside
   its stated scope — enumerated with a recommendation, left as a PO/Elephant
-  scope call.
+  scope call. The first of these is now tracked in
+  `backlog/items/2026-08-07-gate-strength-shell-comment-understates-its-own-scope.md`
+  (2026-08-07, commit `a47a09b`) — verified, no behavior change proposed, not
+  fixable in-session because the file is a never-liftable kernel path.
+  **R3's scope measurement is an order of magnitude too small, measured by the
+  Elephant on 2026-08-07 (commit pending) rather than assumed.** The design
+  states an 8-line inventory across `templates/prompts/*.md` plus 4 more in
+  `harness/review-protocol.md`. The actual structure of
+  `docs/operating-model.md` is that **no numbered subsection exists anywhere**:
+  `rg -n "^#{2,3} "` returns ten `##` sections (§1..§10) and exactly three
+  `###` children, all of them *titled* ("Profiles", "Duties", "Gate discipline
+  and autonomous happy path") and none numbered. Therefore **every `§N.M`
+  citation in the repository is stale**, not only those in the two dispatch
+  templates — and several bare `§N` citations point at the wrong section too
+  (`harness/review-protocol.md:5` calls §4 "review system"; §4 is "The
+  lifecycle". `templates/prompts/elephant-kickoff.md:4` calls §3 "SDLC"; §3 is
+  "V3 routing"). A repo-wide count over 48 files puts the largest carriers at
+  `roles/elephant.md` 18, `harness/session-bootstrap.md` 12,
+  `policies/model-policy.md` 10, `harness/definition-of-done.md` 10,
+  `harness/review-protocol.md` 9 — and **`CLAUDE.md` itself carries 3**
+  (`:22` "operating-model §5.1", `:44` "§5.2/P5"; §5 has no numbered children).
+  Consequence for the package: R3's chosen fix — anchor links instead of
+  section numbers — is the *right* remedy and is reinforced by this, but its
+  stated blast radius is wrong, and a Critic reading `operating-model.md`
+  independently will find that. The inventory must be re-scoped before the R3
+  implementation dispatch, and the PO owns whether R3 fixes only the two
+  dispatch templates (its current scope, defensible: they are the artifacts
+  CLAUDE.md's "dispatch from the template, never freehand" rule makes normative
+  for every future dispatch) or sweeps the normative core as well. This is a
+  scope call, not a defect of the design's reasoning.
   **Honest caveat the dispatch volunteered:** its document contains no Markdown
   links at all (repo-wide link count unchanged at 776), so the green
   doc-contract result satisfies "links and anchors resolve" trivially, not
