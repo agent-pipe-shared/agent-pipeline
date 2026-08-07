@@ -34,7 +34,11 @@ doc-contract target): `specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-
    design forward as new work against the merged base.
 3. The 11 flagged code-conflict losses (governance-ledger ecosystem,
    `pipeline-state.mjs`, ledger-backed plan approval, `project-authority.mjs`
-   dual-state repair) — decide what, if anything, gets redesigned.
+   dual-state repair) — decide what, if anything, gets redesigned. Now filed
+   as 5 grouped `defect` backlog items (`backlog/items/2026-08-07-*`, status
+   `open`, Triage section empty) so the candidates are tracked instead of
+   living only in the gitignored evidence report; no accept/defer/reject
+   decision has been made on any of them.
 
 **Resolved during this session's post-merge follow-up (2026-08-07):**
 - ADR-0047 numbering collision (`0047-governance-event-kernel.md`) indexed in
@@ -42,6 +46,8 @@ doc-contract target): `specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-
   its own internal collision — no file rename needed.
 - Backlog ledger drift (4 of Phoenix's own 2026-08-06 items) reconciled via
   `reconcile-backlog-ledger.mjs --activate`; `RBL01` now passes.
+- The 11 flagged code-conflict losses filed as 5 backlog items (see item 3
+  above) — filing only, no redesign decision made.
 - `docs/state.md` itself — this editorial pass. Both full pre-merge histories
   are retained verbatim below as dated historical record; this section is now
   the single current-state source, resolving the two disagreeing "Project
@@ -51,6 +57,12 @@ doc-contract target): `specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-
   `PIPELINE_SESSION_OWNER_NONCE` to bind — establishing one artificially
   would fabricate evidence rather than supply it. Left as a genuine
   infrastructure gap for whoever stands up the runner-side binding.
+- New, independent finding: `check-backlog-state.mjs` fails with 38
+  `evidence.commit is not a reachable local Git commit` errors — confirmed
+  present identically on a clean `origin/main`-only worktree, so this is
+  main's own pre-existing issue, not caused by the merge or by anything
+  filed here. Not this session's problem to fix; noted for whoever next
+  touches backlog-ledger tooling.
 
 **Still open, not urgent:** `.gitleaksignore` legacy-format entries are inert
 under main's new adapter (0 live findings today; matters only if one of the
