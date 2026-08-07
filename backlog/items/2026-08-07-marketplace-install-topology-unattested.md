@@ -107,9 +107,30 @@ decision, which is the exact change class the PO already ruled needs the
 design-first treatment (MP-22/23) when accepting the companion item
 `backlog/items/2026-08-07-self-application-integrity-check-absent.md`.
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** ACCEPTED for implementation. PO decision (APS, 2026-08-07):
+  implement, and carry into the Phoenix design so it lands in the
+  implementation phase as planned scope. This answers decision (a) in the
+  Proposal above — the marketplace-install topology **is** to get an integrity
+  check; Part A's guarantee is NOT deliberately scoped to
+  self-application/dev checkouts for good, so candidate direction 3 ("accept
+  the residual as an explicit, permanent scope boundary") is overridden.
+- **Rationale:** the PO's stated position on the open residuals from the
+  WP2-WP3 Part A review was "warum nicht umsetzen bzw. ins design bitte
+  aufnehmen von phoenix für implementierungsphase". The gap this item records
+  is the one Part A was originally created to close, left open only for the
+  topology that every ordinary end-user install actually ships to — leaving it
+  permanently open would hollow out Part A's purpose.
+- **Assignment (if accepted):** decision (b) in the Proposal is answered YES:
+  its own design pass first, per the same design-first → Critic-review →
+  implement sequence Part A received, because any answer changes the bootstrap
+  readiness gate again. Choosing between candidate directions 1 (non-git
+  content attestation against a trusted expected value — note this implies a
+  distribution-side change, a published/signed release manifest) and 2 (a
+  remote-read check at bootstrap — note this introduces a network dependency
+  Part A deliberately has none of) is itself part of that design work, not
+  pre-decided here. To be folded into the Phoenix design for the
+  implementation phase together with the two sibling items recorded the same
+  day.
+- **Date:** 2026-08-07

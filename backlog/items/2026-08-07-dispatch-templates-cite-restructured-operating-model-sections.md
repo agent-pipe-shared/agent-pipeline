@@ -101,9 +101,28 @@ to them affects every future Goldfish and Critic dispatch, so the PO may want
 this to run as its own briefed task with a Critic pass rather than as an
 in-session edit.
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** ACCEPTED for implementation. PO decision (APS, 2026-08-07):
+  implement, and carry into the Phoenix design so it lands in the
+  implementation phase as planned scope.
+- **Rationale:** the PO's stated position on the open residuals from the
+  WP2-WP3 Part A review was "warum nicht umsetzen bzw. ins design bitte
+  aufnehmen von phoenix für implementierungsphase". This one compounds with
+  every future dispatch: the Elephant copies the stale reference list out of
+  the template into each Goldfish/Critic briefing, which is exactly how it
+  surfaced.
+- **Assignment (if accepted):** proposal items 1 and 2 (repoint the Critic
+  contract reference to §2 + §6 and the rigor/gate reference to §5; decide
+  whether to cite stable heading titles instead of drift-prone numbers) are
+  mechanical and can go into an ordinary briefed task. Proposal item 3 (where
+  the six-field briefing list canonically lives — restore it to
+  `operating-model.md`, declare the template its carrier, or move it to a
+  dedicated normative file) remains a real decision and is design work. Per
+  this item's own closing note, `templates/prompts/*.md` are normative
+  dispatch artifacts under CLAUDE.md's "Dispatch from the template, never
+  freehand" rule, so the change runs as its own briefed task with a Critic
+  pass, not as an in-session edit. To be folded into the Phoenix design for
+  the implementation phase together with the two sibling items recorded the
+  same day.
+- **Date:** 2026-08-07

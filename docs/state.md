@@ -397,6 +397,56 @@ post-merge redesign packages have landed code this session:
   design-phase step and must be routed on the Design-tier model — briefing
   rework-2 on `claude-sonnet-5` produced Critic finding F3, and its two
   companion majors were both defects in the text that below-tier dispatch wrote.
+
+  **PO gate: accepted (APS, 2026-08-07)** — "1. freigabe". WP2-WP3 Part A is
+  released; no further Critic/rework cycle. The Elephant's bounded-editorial-fix
+  disposition for the round-4 minor finding stands (not overruled).
+
+  **PO direction on the open backlog residuals (APS, 2026-08-07)** — "warum
+  nicht umsetzen bzw. ins design bitte aufnehmen von phoenix für
+  implementierungsphase": the three items below are NOT to sit in backlog
+  triage awaiting a later scoping decision. The PO decision is to **implement
+  them**, and to take them into the Phoenix design so they are carried into the
+  implementation phase as planned scope rather than as residuals. This closes
+  the "Owner: PO, needs a scoping decision first" gate each item recorded:
+  - `2026-08-07-attestation-git-presence-gate-not-gs8-protected.md` (F-B: the
+    `.git`-presence gate is not GS-8-class protected; candidate direction 1, a
+    narrow GS-9 via constant extraction, is the implementable one — direction 2
+    was "accept the residual", which this decision overrides).
+  - `2026-08-07-marketplace-install-topology-unattested.md` (F1: no origin or
+    content check runs in the topology every end-user install ships to; three
+    candidate directions were disclosed, and choosing among them is itself
+    design work now in scope).
+  - `2026-08-07-dispatch-templates-cite-restructured-operating-model-sections.md`
+    (both dispatch templates cite sections that no longer exist; the six-field
+    briefing list has no canonical home).
+  Each item's Triage block records this decision; the design work to fold them
+  into the Phoenix implementation scope is the next dispatch.
+
+  **PO direction on the two guard-blocked items (APS, 2026-08-07)** — "machen
+  wir gleich wenn der lift off auch für TP11 geht". **Elephant's verified
+  answer: the GMW lift works for one of the two, not both.**
+  - `harness/scripts/verify.mjs` suite registration is blocked by **TP-3**. TP-*
+    ids are liftable by GMW (`isLiftableRuleId`, `guard-maintenance-window.mjs:104-110`)
+    and `harness/scripts/verify.mjs` is **not** in `NEVER_LIFTABLE_KERNEL_PATHS`
+    (`:120-128`), so a correctly-scoped, PO-signed window DOES lift it. The
+    guard-testpath GMW branch (`guard-testpath.mjs:215-223`) fires regardless of
+    `gates.push_approval`, unlike the HGO branch below it.
+  - The new **TP-11** entry must be written into `project/guard-config.json`
+    (confirmed: that tier carries the live TP-1..TP-10 list, not the `.claude/`
+    one), which is **GS-4** — and GS-4 is **not** liftable. GMW's GS-side lift
+    fires only for `LIVE_PLUGIN_RULE`/GS-6 (`guard-gate-strength.mjs:196`);
+    GS-1..GS-5/GS-7/GS-8 have no override in any approval mode by design. So
+    **the TP-11 entry cannot be delivered by a maintenance window** — it needs
+    the PO to edit that one file directly, outside an agent session.
+  - Practical consequence: a GMW ceremony for TP-3 costs the PO a detached
+    Ed25519 signature over a digest-bound request (`prepare` → PO signs →
+    `install`, ≤4h window). Since the PO must in any case edit
+    `project/guard-config.json` by hand for TP-11, editing
+    `harness/scripts/verify.mjs` by hand at the same time is the cheaper route
+    for this specific pair; the GMW route's advantage is auditability and that
+    the agent applies the change with full context. Both routes are legitimate;
+    the PO chooses.
 - **GMW (Guard Maintenance Window, ADR-0058) merged in from the local-development
   marketplace snapshot** (commit `cca5ad8`): the PO pointed at
   `/home/skar667/agent-pipeline-local-marketplace` as the currently-wired snapshot

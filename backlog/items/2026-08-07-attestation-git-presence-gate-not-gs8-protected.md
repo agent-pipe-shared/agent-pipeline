@@ -81,9 +81,22 @@ already gating live bootstrap readiness) and deserves the same
 design-first-if-in-doubt treatment (MP-22/23) this design document's Part A
 already received for its own gate-strength question (§A.3 item 3).
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** ACCEPTED for implementation. PO decision (APS, 2026-08-07):
+  implement, and carry into the Phoenix design so it lands in the
+  implementation phase as planned scope rather than remaining a residual.
+  Candidate direction **1** (a narrow GS-9 entry, which requires the
+  constant-extraction refactor first) is the direction taken; direction 2
+  ("accept the residual as-is") is explicitly overridden by this decision.
+- **Rationale:** the PO's stated position on the open residuals from the
+  WP2-WP3 Part A review was "warum nicht umsetzen bzw. ins design bitte
+  aufnehmen von phoenix für implementierungsphase" — these are to be built,
+  not parked. The gate this item recorded ("no guard change until the PO has
+  made this scoping decision") is hereby satisfied.
+- **Assignment (if accepted):** design work first, per this item's own note
+  that the constant extraction is a non-trivial behavior-preserving refactor
+  of a script gating live bootstrap readiness (MP-22/23 design-first). To be
+  folded into the Phoenix design for the implementation phase together with
+  the two sibling items recorded the same day.
+- **Date:** 2026-08-07
