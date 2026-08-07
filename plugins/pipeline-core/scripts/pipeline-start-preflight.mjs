@@ -12,6 +12,15 @@ import { measureBootstrapPayload } from "../lib/bootstrap-payload-budget.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const SCHEMA = "pipeline.start-preflight.v1";
+/**
+ * What `status` ranges over -- declared, not implied (SETUPSTATUS-1). This preflight resolves
+ * the loaded plugin distribution's identity and nothing else: it never reads
+ * `pipeline.user.yaml`, so `ready` is never a statement that project setup is complete. A
+ * greenfield session read it as one, next to the SessionStart setup-check reporting the file
+ * missing, and had no basis to choose. Naming the scope makes the two statements reconcilable
+ * by construction; `setup-check.mjs`'s `reconcileSetupObservation` refuses an undeclared one.
+ */
+export const STATUS_SCOPE = "plugin-distribution-identity";
 const PLUGIN_ID = "pipeline-core@agent-pipeline";
 const LOCAL_PLUGIN_ID = "pipeline-core@agent-pipeline-local";
 const NORMAL_BOOTSTRAP_CHECKS = Object.freeze([
@@ -216,6 +225,7 @@ export function observePipelineStartPreflight({
   const result = {
     schema: SCHEMA,
     status,
+    statusScope: STATUS_SCOPE,
     version,
     installedVersion,
     installedSource: installedIdentity?.source ?? "unknown",

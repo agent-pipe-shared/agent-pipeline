@@ -6,7 +6,7 @@ import test from "node:test";
 
 import {
   installedPipelineIdentity, installedPipelineVersion, observePipelineStartPreflight,
-  normalBootstrapPayloadReceipt, pipelineStartPreflightExitCode, SCHEMA,
+  normalBootstrapPayloadReceipt, pipelineStartPreflightExitCode, SCHEMA, STATUS_SCOPE,
 } from "./pipeline-start-preflight.mjs";
 
 const manifest = JSON.stringify({ version: "0.4.5+test" });
@@ -60,6 +60,32 @@ const claudeKnownMarketplaces = (
   },
 });
 
+// SETUPSTATUS-1: `status` says "ready" about ONE question. Leaving that question implicit
+// is half of the reported contradiction -- a human read `ready` as "setup is complete"
+// while the SessionStart setup-check reported pipeline.user.yaml missing, both correct.
+// The scope declaration is what makes the two statements reconcilable by construction
+// (setup-check.mjs's `reconcileSetupObservation` refuses an undeclared scope outright).
+test("preflight declares what its status ranges over, in every status", () => {
+  const cwd = "/projects/current";
+  const ready = observePipelineStartPreflight({ env: {}, pluginList: pluginList(), read: () => manifest, cwd });
+  const refresh = observePipelineStartPreflight({
+    env: {}, pluginList: pluginList("0.4.4+test"), read: () => manifest, cwd,
+  });
+  const unavailable = observePipelineStartPreflight({
+    env: {}, pluginList: pluginList(), read: () => { throw new Error("manifest unreadable"); }, cwd,
+  });
+  assert.equal(ready.status, "ready");
+  assert.equal(refresh.status, "plugin-refresh-required");
+  assert.equal(unavailable.status, "plugin-identity-unavailable");
+  for (const result of [ready, refresh, unavailable]) {
+    assert.equal(result.statusScope, STATUS_SCOPE);
+    assert.equal(result.statusScope, "plugin-distribution-identity");
+  }
+  // Structural proof that the two readiness sources are disjoint: the preflight never
+  // observes project personalization, so its `ready` can never be an answer about it.
+  assert.ok(!JSON.stringify(ready).includes("pipeline.user.yaml"));
+});
+
 test("preflight reports exact identity and no-handoff without secret fields", () => {
   const cwd = "/projects/current";
   const result = observePipelineStartPreflight({
@@ -70,9 +96,10 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
   });
   assert.deepEqual(Object.keys(result).sort(), [
     "bootstrapPayload", "executionBoundary", "handoff", "installedSource", "installedVersion",
-    "nextAction", "pluginRoot", "schema", "status", "version",
+    "nextAction", "pluginRoot", "schema", "status", "statusScope", "version",
   ]);
   assert.equal(result.schema, SCHEMA);
+  assert.equal(result.statusScope, STATUS_SCOPE);
   assert.equal(result.status, "ready");
   assert.equal(result.version, "0.4.5+test");
   assert.equal(result.installedVersion, "0.4.5+test");

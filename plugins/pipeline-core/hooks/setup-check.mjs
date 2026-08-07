@@ -40,6 +40,19 @@
  * hookSpecificOutput: { hookEventName: "SessionStart", additionalContext } }` JSON on
  * stdout (message duplicated in both fields), exit code 0.
  *
+ * SCOPE DECLARATION (SETUPSTATUS-1). A greenfield session read this hook's "setup not
+ * complete" alongside `pipeline-start-preflight`'s `ready` in the same moment and had no
+ * basis to choose between them. The two never measured the same thing: this hook reads
+ * `pipeline.user.yaml` (project personalization), the preflight resolves the loaded plugin
+ * distribution's identity, and neither is derived from the other. Adopting the preflight's
+ * projection here (route A) was rejected -- it costs a `claude|codex plugin list --json`
+ * subprocess with a 5 s timeout plus a home-directory registry read on EVERY SessionStart,
+ * and it would answer a question that is not the one this hook exists to answer. Instead
+ * this hook states what it is: a point-in-time observation of one file, non-authoritative,
+ * naming the step expected to change it (`resolvingSteps`). It remains purely informational
+ * -- it never gates, never changes exit status, and onboarding never depends on it.
+ * `reconcileSetupObservation` is the checkable contract between the two statements.
+ *
  * MECHANICS: no stdin contract needed (SessionStart hooks receive session/env info this
  * hook does not gate on -- same as staleness-check.mjs). Reads `pipeline.user.yaml` from
  * `CLAUDE_PROJECT_DIR` (falls back to `process.cwd()`). Wired into
@@ -76,6 +89,53 @@ export function isStillDefault(parsed) {
   return setup.intent === DEFAULT_SETUP_INTENT;
 }
 
+// ---- declared scope of this observation (SETUPSTATUS-1) -------------------------------------
+/**
+ * What this hook is able to observe -- deliberately narrow: one file, at one moment.
+ * `pipeline-start-preflight` declares its own, DIFFERENT scope in its `statusScope` field
+ * (`plugin-distribution-identity`); the two readiness sources are disjoint and neither is
+ * derived from the other. `reconcileSetupObservation` below turns that from a matter of
+ * wording into something a test can check.
+ */
+export const OBSERVATION_SCHEMA = "pipeline.setup-check-observation.v1";
+export const OBSERVATION_SCOPE = "project-personalization";
+
+/**
+ * The steps that are expected to change this hook's answer -- named, never implied. Both the
+ * machine-readable observation and the human-facing message are built from this one list, so
+ * the declaration and the prose cannot drift apart.
+ * @param {"missing"|"default-markers"} reason
+ * @returns {string[]}
+ */
+export function resolvingSteps(reason) {
+  const setupStep =
+    reason === "missing"
+      ? "`node setup.mjs` (see SETUP.md) — writes pipeline.user.yaml, then compiles the runtime configs (.claude/settings.json, pipeline.json, pipeline.yaml)."
+      : "`node setup.mjs` (see SETUP.md) — replaces the unconfigured setup intent, then compiles the runtime configs (.claude/settings.json, pipeline.json, pipeline.yaml).";
+  if (reason !== "missing") return [setupStep];
+  return [
+    setupStep,
+    "the onboarding authority-seed step — writes pipeline.user.yaml itself during a greenfield run, often seconds after this message.",
+  ];
+}
+
+/**
+ * The machine-readable form of exactly what the message below says.
+ * @param {"missing"|"default-markers"} reason
+ */
+export function buildObservation(reason) {
+  return {
+    schema: OBSERVATION_SCHEMA,
+    scope: OBSERVATION_SCOPE,
+    status: "personalization-incomplete",
+    kind: "point-in-time",
+    authoritative: false,
+    blocking: false,
+    observed: reason,
+    resolvedBy: resolvingSteps(reason),
+  };
+}
+
 // ---- message builder (pure) ----------------------------------------------------------------
 /** @param {"missing"|"default-markers"} reason */
 export function buildSetupIncompleteMessage(reason) {
@@ -84,30 +144,96 @@ export function buildSetupIncompleteMessage(reason) {
       ? "pipeline.user.yaml is still missing (fresh clone)."
       : "pipeline.user.yaml still carries the unconfigured setup intent.";
   return [
-    "Setup not complete — run `node setup.mjs` (see SETUP.md).",
+    "Setup observation (point-in-time, not a gate): project personalization has not run yet.",
     `- ${detail}`,
-    "- setup.mjs writes pipeline.user.yaml and then automatically compiles the runtime configs (.claude/settings.json, pipeline.json, pipeline.yaml).",
+    "- Resolved by:",
+    ...resolvingSteps(reason).map((step) => `  - ${step}`),
+    "- Scope: this hook looks only at pipeline.user.yaml, at this moment. It is not the pipeline-start readiness verdict — `pipeline-start-preflight` answers a different question (plugin distribution identity) and can correctly report `ready` while personalization has not run.",
   ].join("\n");
+}
+
+// ---- reconciliation with the start preflight (pure, no I/O, no import of the preflight) ------
+/**
+ * Can one human hold BOTH statements at once without either of them being wrong?
+ *
+ * The defect this answers: a greenfield session saw this hook report setup as incomplete and
+ * `pipeline-start-preflight` report `ready` in the same moment, with nothing telling the
+ * operator that the two were answering different questions.
+ *
+ * Deliberately NOT a comparison of words. Three cases:
+ *   - the hook stayed silent            -> nothing can contradict anything;
+ *   - the preflight declares the SAME scope (should the two ever be put on one source)
+ *                                       -> the verdicts must then be identical;
+ *   - the scopes are disjoint           -> reconcilable only while this hook declares itself
+ *                                          a point-in-time, non-authoritative, non-blocking
+ *                                          observation that names what will change it.
+ * A preflight that does not declare its scope is NOT reconcilable: an undeclared "ready" is
+ * precisely what the operator mistook for a verdict about setup.
+ *
+ * @param {{preflight?: object|null, observation?: object|null}} args
+ * @returns {{reconcilable: boolean, basis: string, detail?: string}}
+ */
+export function reconcileSetupObservation({ preflight, observation } = {}) {
+  if (observation === null || observation === undefined) {
+    return { reconcilable: true, basis: "hook-silent" };
+  }
+  const preflightScope =
+    typeof preflight?.statusScope === "string" && preflight.statusScope !== ""
+      ? preflight.statusScope
+      : null;
+  if (preflightScope === null) {
+    return {
+      reconcilable: false,
+      basis: "undeclared-preflight-scope",
+      detail: "the start preflight did not declare what its status ranges over",
+    };
+  }
+  if (preflightScope === observation.scope) {
+    return preflight.status === observation.status
+      ? { reconcilable: true, basis: "same-scope-identical" }
+      : {
+          reconcilable: false,
+          basis: "same-scope-conflict",
+          detail: "both components claim one scope and report different statuses",
+        };
+  }
+  const declared =
+    observation.kind === "point-in-time"
+    && observation.authoritative === false
+    && observation.blocking === false
+    && Array.isArray(observation.resolvedBy)
+    && observation.resolvedBy.length > 0;
+  return declared
+    ? { reconcilable: true, basis: "declared-snapshot-disjoint-scope" }
+    : {
+        reconcilable: false,
+        basis: "undeclared-second-verdict",
+        detail: "a second component reporting on a different scope without declaring itself a non-authoritative point-in-time observation that names its resolving step",
+      };
 }
 
 // ---- output decision (pure) ------------------------------------------------------------------
 /**
  * @param {{fileExists: boolean, parsed: object|null}} args
- * @returns {{stdout: string, json: boolean, payload?: object}}
+ * @returns {{stdout: string, json: boolean, payload?: object, observation: object|null}}
  */
 export function decideOutput({ fileExists, parsed }) {
   let reason = null;
   if (!fileExists) reason = "missing";
   else if (isStillDefault(parsed)) reason = "default-markers";
 
-  if (!reason) return { stdout: "", json: false };
+  if (!reason) return { stdout: "", json: false, observation: null };
 
   const message = buildSetupIncompleteMessage(reason);
   const payload = {
     systemMessage: message,
     hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: message },
   };
-  return { stdout: JSON.stringify(payload) + "\n", json: true, payload };
+  // `observation` stays OFF the wire on purpose: the emitted SessionStart JSON keeps exactly
+  // its historical two-field shape (no new key for a runner to reject), and the declaration
+  // the operator reads is the message itself. The object is the same declaration in
+  // machine-readable form, for the reconciliation contract and its tests.
+  return { stdout: JSON.stringify(payload) + "\n", json: true, payload, observation: buildObservation(reason) };
 }
 
 /**
