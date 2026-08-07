@@ -57,6 +57,48 @@ What ADR-0051 actually requires, and what this ADR states as its operative meani
 - **Path and filesystem neutrality.** No assumption of a separator, a case-folding
   rule, or a permission model that holds on only one platform.
 
+### 2a. No runner may be a precondition for another (PO rule, 2026-08-07)
+
+> *"claude darf keine vorraussetzung für codex sein und andersherum genau so!
+> jeder runner muss autark für sich sauber funktionieren."*
+
+Decision 2 forbids a **silent single-runner default**. It does not, on its own
+wording, forbid something worse that has now been measured: a path that correctly
+identifies the active runner and still requires the *other* runner's binary to
+complete. Neutrality is not autonomy, and this clause states the stronger rule
+the PO named.
+
+**Every runner must complete every supported flow on its own.** No supported path
+may require a second runner's executable, session, daemon, or artifact to be
+installed, running, or launchable — not as a fallback, not as a one-time setup
+step, not "only during onboarding". A flow that cannot be completed with just the
+active runner present is not a platform gap and not a documentation gap; it is a
+defect in that flow.
+
+**The live instance this clause is written from.** A Claude session onboarding an
+empty repository publishes a restart barrier that can only be cleared by
+`completeRuntimeReadback`, which demands an authenticated launch ticket issued by
+`scripts/codex-onboarding-launch.mjs`. The guard refuses every tool call to that
+launcher by design, so the human must run Codex in an external terminal. Until
+they do, the lifecycle never reaches `ready` and the guard refuses every write in
+the project — the repository is inert. The barrier's own runtime targets are
+exclusively `.codex/*` files, which a Claude session never reads. Tracked as
+`backlog/items/2026-08-07-onboarding-restart-flow-is-codex-only-not-runner-aware.md`,
+where the third repro records this in full.
+
+**What this rules out as a fix, and why it matters for design.** Threading the
+runner through the action that *offers* the restart is necessary but not
+sufficient: a runner-aware action still has nothing to route a Claude session to.
+Satisfying this clause means either a native clearing path for each runner, or —
+smaller and probably correct — not publishing a barrier whose targets belong to a
+runner that is not the active one. Either way the test is the same: remove the
+other runner from the machine entirely and see whether the flow completes.
+
+**Scope.** This binds supported flows, not optional integrations. A capability
+that exists only for one runner (a Codex sandbox route, a Claude-specific hook
+surface) is fine as long as no *shared* flow depends on it. What is forbidden is a
+dependency in the path everyone must walk.
+
 ### 3. Human cross-platform verification is optional, on top, and never a gate
 
 The PO performs manual runner/platform verification independently and in parallel with

@@ -69,7 +69,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0054](0054-arbitheon-authority-directory-and-precedence-chain.md) | `.arbitheon/` authority directory, three-tier precedence chain, configurable location | accepted (design + sequencing), implementation staged | 2026-08-06 |
 | [0055](0055-critical-human-proof-waiver.md) | The Ed25519 human hard gate gets a sanctioned off-switch | accepted, refined by 0056 | 2026-08-06 |
 | [0056](0056-push-approval-mode.md) | The push gate stays; how a human clears it becomes a configured mode | accepted | 2026-08-06 |
-| [0057](0057-runner-platform-support-is-an-implementation-obligation.md) | Runner/platform support is an implementation obligation, not a per-cell evidence duty | accepted | 2026-08-06 |
+| [0057](0057-runner-platform-support-is-an-implementation-obligation.md) | Runner/platform support is an implementation obligation, not a per-cell evidence duty; **2026-08-07 addition (Decision 2a):** no runner may be a precondition for another — each must complete every supported flow alone | accepted | 2026-08-06 |
 | [0058](0058-guard-maintenance-window.md) | Signed, time-boxed maintenance window lets the PO lift GS-6/TP-* with no in-session activation step | accepted | 2026-08-07 |
 | [0059](0059-signed-human-guard-override.md) | Human Guard Override gains a signed admission path, usable in `signature` mode for everything else it already classifies | accepted | 2026-08-07 |
 | [0060](0060-handover-placement-and-rotation.md) | Mid-task findings go into the handover because a fresh context is a Goldfish; durable rules go into ADRs; the handover gains a retention obligation whose mechanism is still open | accepted (placement) / open (rotation) | 2026-08-07 |
@@ -92,7 +92,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0054](0054-arbitheon-authority-directory-and-precedence-chain.md) | Steps 2–4 (third tier + configurable name, writes to the top tier, completeness-gated cleanup) each need their own dispatch; the lower tiers may not be deleted until the completeness check is green |
 | [0055](0055-critical-human-proof-waiver.md) | PRD approval (`approve-plan`) is still unattributed and not proof-bound — the remaining half of the 2026-08-05 backlog item |
 | [0056](0056-push-approval-mode.md) | `deploy` and `publication` have no source-of-truth mode; add one only if an operator asks |
-| [0057](0057-runner-platform-support-is-an-implementation-obligation.md) | Build the mechanical R1/R2 checks — a literal-runner-default check first, then a both-shell-rendering check |
+| [0057](0057-runner-platform-support-is-an-implementation-obligation.md) | Build the mechanical R1/R2 checks — a literal-runner-default check first, then a both-shell-rendering check; **Decision 2a** additionally needs the "remove the other runner and see whether the flow completes" check, and the Codex-only onboarding barrier it was written from is still open |
 | [0058](0058-guard-maintenance-window.md) | A dedicated guard against the same-session worktree-merge bypass path is not yet built (see ADR-0058 Consequences/Follow-up) |
 | [0060](0060-handover-placement-and-rotation.md) | Decision 5 open — the concrete handover rotation mechanism is a PO decision |
 | [0061](0061-uniform-human-approval-ceremony.md) | Decision 6 open — the one-command ceremony has to be designed (what one approval covers, prepare+sign collapsed, `OVERRIDE <rule-id>` folded in); every gate shipped today is non-conformant until it lands |
