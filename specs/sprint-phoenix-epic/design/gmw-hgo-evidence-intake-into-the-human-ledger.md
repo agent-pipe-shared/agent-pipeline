@@ -286,7 +286,7 @@ All field names are from the validated payload (§3.1) unless prefixed `envelope
 | | `scope.artifacts` | plan + spec `{path, sha256}`, digests re-checked against the signed intent | the layered, source-established set of §7.5 — representable `eligiblePaths`, else the present `policy.project` entries; **never** a plan/spec pair, which HGO does not have | H-AC-04 "artifact" | digest-verified at intake |
 | | `scope.environment` | `local-checkout` | `local-checkout` | H-AC-04 "environment" | deterministic |
 | | `validity.singleUse` | `false` (a window is time-boxed, not single-use) | `true` | H-AC-04 "single-use" | structural |
-| **when** | `validity.notBeforeEpochMs` / `expiresAtEpochMs` | `installedAtMs` / `min(signed expiresAtMs, installedAtMs + MAX_WINDOW_TTL_MS)` — the **same formula** the enforcement path uses (`:542-545`) | authorization time / capability expiry | H-AC-04 "validity", H-AC-11 "time" | — |
+| **when** | `validity.notBeforeEpochMs` / `expiresAtEpochMs` | `installedAtMs` / `min(signed expiresAtMs, installedAtMs + MAX_WINDOW_TTL_MS)` — the **same formula** the enforcement path uses (`:542-545`). The two halves have **different provenance**, and §7.3 turns on that: `installedAtMs` is an unsigned per-process clock read (`const installedAtMs = nowMs;`, `:456`, which the module's own comment marks as "NOT part of the signed subject", carrying "no security weight of its own", `:446-447`), while the upper bound is in practice the **signed** `subject.expiresAtMs` itself — the `min` cannot select the ceiling term at install, because `GMW-EXPIRY-TOO-FAR` (`:443-445`) already refuses any request whose signed bound exceeds `nowMs + MAX_WINDOW_TTL_MS`; the ceiling bites only afterwards, against an `installedAtMs` tampered downward. The intake takes **one** clock read per install and passes it to both the builder and `installGuardMaintenanceWindow` (`nowMs`, `:383`), so this record's `notBeforeEpochMs` *is* that process's `installedAtMs` rather than an approximation of it | authorization time / capability expiry | H-AC-04 "validity", H-AC-11 "time" | — |
 | | `envelope.occurredAtEpochMs`, `envelope.observedAtEpochMs` | local clock at the transition | local clock | H-AC-11 "time and assurance" | — |
 | | `timeAssurance` (payload and envelope) | **`locally-observed`, always** | `locally-observed` | H-AC-05 (never claim trusted time) | there is no attested time source anywhere in this path |
 | **why** | `reasonCode` | signed `subject.reasonCode` if the final GMW carries one; otherwise `GUARD.MAINTENANCE.WINDOW_UNATTESTED` (§5.3) | stable code per HGO outcome, e.g. `GUARD.OVERRIDE.CONSUMED` | H-AC-11 "stable reason code" | signed → attested by the same proof; unsigned → explicitly marked as unattested by the code itself |
@@ -744,28 +744,110 @@ The single specified behaviour:
 2. Otherwise it appends. If the store returns `idempotent-replay` or fails
    `GES-IDEMPOTENCY-CONFLICT`, the intake re-reads the committed event under that
    key and **adopts** it — continuing to §7.4's step (d) — if and only if all of:
-   the committed payload validates as the same decision class with the same
-   `decisionId`; its `scope`, `ruleDigest`, `policyDigest` and `validity` are
-   byte-identical to what the intake was about to append; and, for a `granted`
-   append, that grant resolves as live and non-disposed in the same read (a
-   `requested` record has nothing to dispose). Adoption is what makes the race
-   benign: both racers end up bound to one and the same ledger decision, which is
-   exactly the state a sequential identical re-install produces, and the window each
-   of them arms is the same signed window with the same signed bound.
-3. In every other case — a different decision committed under the intake's key, or
-   a committed decision that is already revoked or expired — the intake **fails
-   closed with the retryable code `GAL-GRANT-RACE` and no window is armed.** The
-   operator re-runs the identical `{request, proof}`: no re-signing, no new ceremony
-   (§1). Case 3 is not decorative; it is the interleaving in which a racer would
-   otherwise arm a window against an already-disposed grant, which §8.5 would then
-   deny anyway — arming it would be capability the ledger does not back.
+   (a) the committed payload validates as the same decision class with the same
+   `decisionId`; (b) its `scope`, `ruleDigest`, `policyDigest`,
+   `validity.expiresAtEpochMs` and `validity.singleUse` are **byte-identical** to
+   what the intake was about to append; (c) its `validity.notBeforeEpochMs`, which
+   is deliberately **not** compared for equality, passes both of the two checks
+   stated below; and (d) for a `granted` append, that grant resolves as live and
+   non-disposed in the same read (a `requested` record has nothing to dispose).
+   Adoption is what makes the race benign: both racers end up bound to one and the
+   same ledger decision, which is exactly the state a sequential identical
+   re-install produces, and the window each of them arms is the same signed window
+   with the same signed bound.
+3. In every other case — a different decision committed under the intake's key, a
+   committed decision that is already revoked or expired, or one whose
+   `notBeforeEpochMs` fails either check below — the intake **fails closed with the
+   retryable code `GAL-GRANT-RACE` and no window is armed.** The operator re-runs
+   the identical `{request, proof}`: no re-signing, no new ceremony (§1). Case 3 is
+   not decorative; it is the interleaving in which a racer would otherwise arm a
+   window against an already-disposed grant, which §8.5 would then deny anyway —
+   arming it would be capability the ledger does not back.
+
+**Which fields are inside the identity check, and why one cannot be.** Every field
+in (b) is a pure function of the signed request plus a public catalogue, so two
+honest racers derive the same bytes or one of them is not honest: `scope` and
+`ruleDigest` come from the signed subject and the signed intent (§4), `policyDigest`
+from §5.5's closed preimage of signed and published constants, `singleUse` is the
+constant `false`, and `expiresAtEpochMs` is the signed `subject.expiresAtMs` itself
+— `min(signed, installedAtMs + MAX_WINDOW_TTL_MS)` cannot select the clock term at
+install, because `GMW-EXPIRY-TOO-FAR` (`guard-maintenance-window.mjs:443-445`)
+already refused every request whose signed bound exceeds `nowMs +
+MAX_WINDOW_TTL_MS` (§4). The bound that actually bounds the lift is therefore still
+compared byte for byte, and it is a signed value.
+
+`validity.notBeforeEpochMs` is not such a field. It is GMW's `installedAtMs`, and
+`installedAtMs` is a per-process clock read — `const installedAtMs = nowMs;`
+(`:456`), marked by the module's own comment as "NOT part of the signed subject",
+carrying "no security weight of its own" (`:446-447`). It is not derived from the
+signed request at all, so **two honest racers necessarily disagree on it**, and a
+byte-identity test over it would decide the race by clock coincidence: adopt if two
+processes happened to read the same millisecond, fail closed otherwise. That is not
+a stricter check, it is a nondeterministic one, and in every non-coincidental
+interleaving it makes the adoption branch unreachable for the GMW path —
+reproducing exactly the defect the previous revision removed when it found that the
+`GAL-GRANT-RACE` `assertAppend` precondition could not fire. It also catches nothing
+an adversary controls: an agent choosing its own clock cannot alter what another
+process already committed, and every field that *is* derived from the signature is
+compared above. This design already draws that line for identifiers — the ids above
+come from the request digest and the stream state, never from a clock, and §12's U-4
+pins that "a changed `installedAtMs` changes **no** id at all". A value excluded
+from a decision's identity cannot be reintroduced as the test of that identity.
+
+**What binds `notBeforeEpochMs` instead — H-AC-04's validity dimension is verified,
+not dropped.** The check becomes constructive rather than comparative, the same move
+§5.5 makes for `policyDigest`: recompute from a declared preimage instead of
+comparing against a value someone hands you. Adoption requires **both** of:
+
+- **(i) Formula.** `validity.expiresAtEpochMs === min(signed subject.expiresAtMs,
+  validity.notBeforeEpochMs + MAX_WINDOW_TTL_MS)` — the enforcement path's own
+  formula (`:542-545`), evaluated on the committed pair. Since (b) has already
+  pinned the left side to the signed bound, this says the committed `notBefore` is
+  recent enough that the signed expiry is still the binding term, which is exactly
+  the condition `install` enforces at `:443-445`. It refuses any committed record
+  whose two halves were not produced by this formula — including one whose
+  `notBefore` sits far enough in the past that the machine-local window would expire
+  before the ledger claims it does.
+- **(ii) In force at the adopter's own clock.** `notBeforeEpochMs <= nowMs <=
+  expiresAtEpochMs`. This is not a new predicate: `resolveHumanGovernanceAuthority`
+  evaluates it on every read and denies with `expired` outside that interval
+  (`human-governance-ledger.mjs:56`), so (d)'s liveness resolution performs it. It
+  is named here so the bound is verified deliberately rather than inherited by
+  accident, and because (d) does not apply to a `requested` record: that record
+  grants nothing and carries `outcome: "pending"`, so (i) is the whole of its
+  validity check, while the capability-bearing `granted` record is held to (i) and
+  (ii) together. The kernel applies the same interval to its own one-shot
+  consumption helper (`human-governance-decision.mjs:51-52`).
+
+**What adoption asserts, precisely.** The adopter does not claim that it computed
+the committed record. It binds to a grant another process committed for the same
+signed request, and `notBeforeEpochMs` records when *that* grant took effect — the
+true value for the one decision both racers end up bound to. The adopter's own clock
+read was never a fact about the ledger; it was its prediction of what it would have
+written had it won. The sequential path already works this way and is already
+accepted: step 1 skips the append when a live grant exists and arms the window
+against a `notBeforeEpochMs` from an *earlier* install, with no comparison at all
+(§6, "same signed request re-installed while a grant is live"). A race path stricter
+than the supported sequential path it converges to would be an inconsistency, not
+extra safety.
+
+**And the residual divergence narrows, it never grants.** The second arming rewrites
+`window.json` with its own `installedAtMs` (`:456`, `:467`), so the machine-local
+record can start marginally later than the adopted `notBeforeEpochMs`. Under the
+intersection rule (§8.5) a lift needs the window record *and* a live grant, so the
+effective start is the later of the two, never the earlier; the upper bound cannot
+diverge at all, since both sides evaluate to the same signed `expiresAtMs` by the
+argument above.
 
 The byte-identical branch is the rare one, not the rule: `occurredAtEpochMs` comes
 from the local clock, so two appends of the same decision are normally not
-byte-identical and the conflict path is what fires. Treating that conflict as a
-signal rather than an error is safe **only** because of the verification in (2); an
-unverified "a conflict means someone else already wrote my record" is precisely the
-assumption this section refuses to make.
+byte-identical and the conflict path is what fires. That is also why the intake's
+own comparison is field-level: the store's is over the whole intent, envelope clock
+fields included (`governance-event-store.mjs:642`), so it answers "are these the
+same bytes" while the intake has to answer "is this the same decision". Treating
+that conflict as a signal rather than an error is safe **only** because of the
+verification in (2); an unverified "a conflict means someone else already wrote my
+record" is precisely the assumption this section refuses to make.
 
 `assertAppend` is not unused by this design — it is load-bearing where it is
 reachable. The kernel's own consumption helper binds the live-grant check to the
@@ -773,7 +855,10 @@ same stream lock (`human-governance-ledger.mjs:209-223`, `HGL-CONSUME-NOT-LIVE`)
 and §7.5's HGO consumption goes through that helper rather than re-implementing it.
 If a later revision ever moves these identifiers off the stream state — a clock or
 nonce suffix would do it — the precondition becomes reachable again and must be
-reinstated together with a test that can fail without it.
+reinstated together with a test that can fail without it. The same tripwire guards
+the identity check above, for the same reason: a clock value belongs in neither an
+identifier nor an adoption predicate, and admitting it into either is the change
+that reopens this section.
 
 The race specified here is **per request**. Two *different* signed requests
 installed concurrently produce two independent request/grant chains, while GMW's
@@ -1324,14 +1409,23 @@ test, rather than breaking the intake silently.
   when the observed candidate differs from the capability's.
 - **I-12** Concurrency, asserting §7.3's one specified behaviour and no other. (a)
   Two concurrent installs of the same signed request leave exactly one `requested`
-  and one `granted` in the stream; **both** racers adopt that one grant, both arm the
-  window (the second arming is the supported identical re-install, GMW `:451-455`),
-  and neither errors; a subsequent install then appends nothing. (b) The fail-closed
-  half: a racer that finds, under its own idempotency key, a committed decision that
-  is already revoked arms **no** window and fails with `GAL-GRANT-RACE`. (c) A
-  regression assertion that the intake never relies on an `assertAppend` precondition
-  for (a) — the same-key branch is what decides it
-  (`governance-event-store.mjs:640-644`).
+  and one `granted` in the stream: the racer that reaches the stream lock first
+  appends, the other **adopts** that committed grant under §7.3's step 2, both arm
+  the window (the second arming is the supported identical re-install, GMW
+  `:451-455`), and neither errors; a subsequent install then appends nothing. The
+  load-bearing assertion is that adoption happens **although the adopting racer's own
+  computed `validity.notBeforeEpochMs` differs from the committed one** — the test
+  drives the two builders with two different fixed clock reads so this is pinned
+  rather than left to timing — while the adopted record's `scope`, `ruleDigest`,
+  `policyDigest`, `validity.expiresAtEpochMs` and `validity.singleUse` are
+  byte-identical to what that racer built, and its `expiresAtEpochMs` equals the
+  signed `subject.expiresAtMs`. (b) The fail-closed half, one case per step-3 branch,
+  each arming **no** window and failing with `GAL-GRANT-RACE`: a committed decision
+  that is already revoked; one differing in any field of the byte-identity set; one
+  whose `notBeforeEpochMs` breaks §7.3's formula check (i); and one outside the
+  adopter's own clock interval (ii). (c) A regression assertion that the intake never
+  relies on an `assertAppend` precondition for (a) — the same-key branch is what
+  decides it (`governance-event-store.mjs:640-644`).
 - **I-13** Expiry: a window that expires unused gets exactly one `expired`
   disposition from reconcile, and a second reconcile appends nothing.
 - **I-14** Reconstruction (AC-8): a fixture-based test renders one window's full
