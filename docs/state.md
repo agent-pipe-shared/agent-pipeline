@@ -661,7 +661,26 @@ post-merge redesign packages have landed code this session:
   **The corrected threat model also puts R2's premise itself in question, and
   that must be re-examined rather than assumed:** GS-6 already refuses agent
   writes into the live plugin root, so an *agent* cannot alter the installed
-  copy in the first place. The residual R2 was created to close ("a forked or
+  copy in the first place.
+  **CORRECTION (2026-08-07, after the rework returned): that premise is true
+  only of the WRITE lane, and I stated it without that qualifier.** The rework's
+  finding SL-1, re-verified independently at source, is that the shell lane has
+  no control reaching the live plugin root: the gate-strength needles exclude it
+  deliberately, and the compensating control the code's own comment cites,
+  `isForbiddenCrossRepositoryMutation`
+  (`plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs:514-577`), is an
+  enumerated executable allowlist — `codex` plugin subcommands, one named Python
+  script, `git -C`, a fixed `cp/mv/rm/…/rsync` set, `sed -i` — with `return
+  false` for everything else at `:577`. An interpreter is on none of those
+  lists. So the sentence above understates what an agent can reach, and the
+  conclusion it supported ("R2's premise is largely a human-adversary scenario")
+  is weaker than written: part of class A′ is a guard defect, not an attestation
+  gap. Tracked separately and NOT folded into R2, because R2 is about
+  provenance of the installed distribution while this is in-session tampering:
+  `backlog/items/2026-08-07-live-plugin-root-undefended-in-the-shell-lane.md`.
+  Neither the dispatch nor the Elephant executed it — a proof of concept here
+  is an actual disarming of the enforcing guard.
+  The residual R2 was created to close ("a forked or
   locally altered marketplace copy passes readiness undetected") is therefore
   largely a *human*-adversary scenario — the class the PO has just placed out
   of scope — with an accidental-drift/misconfiguration remainder that is a
