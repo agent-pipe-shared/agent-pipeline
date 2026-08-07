@@ -75,7 +75,31 @@ post-merge redesign packages have landed code this session:
   limitation) or, if that genuinely cannot complete, an honest report of that
   fact as the evidence — never a substitute self-authored artifact standing
   in for the real one.
-- `WP2-WP3-partA-implementation`
+- **`WP2-WP3-partA-implementation` landed**, 4 commits `99396a7`/`57636b2`/`cc11803`/`77a7d79`
+  (base `ed22bcc`): new `plugins/pipeline-core/lib/public-core-origin-allowlist.mjs`
+  (+test), the origin/content attestation + advisory `nextAction` in
+  `pipeline-start-preflight.mjs` (+test, with a new deterministic `observe()`
+  DI seam added — disclosed deviation, mirrors the existing
+  `private-overlay-activation.mjs` pattern, needed so the suite doesn't spawn
+  a real `git` subprocess against this session's own dirty working tree), one
+  new `GATE_STRENGTH_PATHS` entry (GS-8) in `guard-gate-strength.mjs`, and the
+  two companion doc edits (`SKILL.md` Step 1/4, `onboarding-recovery.md`). All
+  named DoD checks passed (27/27 + 19/19 + 1/1 + 10 new cases + doc-contracts).
+  **Evidence gathered the same way WP5's own dispatch did**
+  (`specs/sprint-phoenix-epic/evidence/wp2wp3-parta-implementation-verify-77a7d79.json`,
+  gitignored, self-authored per-command summary, not a real `verify.mjs` run)
+  — carries the same F2/F3-shaped weakness the WP5 Critic review just found;
+  do NOT reuse this artifact as-is for this package's own Critic dispatch,
+  gather real evidence first (see WP5 rework note above). **Next:** Part A
+  needs its own independent Critic review (T1, architecture/guardrail class —
+  touches `guard-gate-strength.mjs` and the bootstrap readiness gate) before
+  any PO gate, per the design's own "two separate implementation dispatches
+  and two separate Critic reviews" — not yet dispatched. **Open item, not a
+  defect:** the dispatch flagged `runner-profiles-v3.mjs`/`.test.mjs` as
+  concurrently modified by "something else" on the shared checkout — this is
+  the sibling `WP5-phx2-rework-1` dispatch (still in flight at the time),
+  doing exactly what it was briefed to do; not a real conflict, both
+  packages' file sets are disjoint.
   (goldfish-deep), against the finalized design (`0d8ed74`), **Part A only**
   — the bootstrap self-application origin/content allowlist. Part B
   (Codex-under-WSL freshness) is deliberately NOT dispatched yet: the design
