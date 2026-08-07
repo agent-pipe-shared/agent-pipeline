@@ -223,11 +223,15 @@ if (matched) {
   } catch { /* an unusable window is not a lift; the refusal below still stands */ }
 
   // Which clearances count is one setting, and it is not this guard's to decide
-  // (ADR-0056). `signature` -- the value here and the fail-closed default for anything
-  // unreadable or unrecognised -- means an in-session capability is NOT a clearance:
-  // the v2 protocol's activation step is an ordinary command, and a ready session may run
-  // ordinary commands, so an agent could arm its own override and the refusal below would
-  // be theatre. Only `chat` admits it, and then it is labelled for what it is.
+  // (ADR-0056). Reading it still matters -- the message below and the CLI continuation
+  // it prints must name the CURRENTLY CONFIGURED mode's actual next step -- but it no
+  // longer gates WHETHER an attempt to consume happens at all (ADR-0059 Decision 3):
+  // consuming only ever succeeds against a genuinely armed, matching capability, and in
+  // `signature` mode that capability can now only have been armed by a verified external
+  // Ed25519 signature (`authorizeHumanGuardOverrideBySignature()`) -- the in-session
+  // `activate: true` path stays refused for that mode by `authorizeHumanGuardOverride()`
+  // itself (defense in depth, ADR-0059 Decision 1). So attempting to consume unconditionally
+  // is harmless: it can never admit an edit an agent armed by itself.
   //
   // The setting lives in pipeline.user.yaml. An earlier version of this comment claimed
   // GS-1 refuses that file "through both the write lane and the shell lane", and that the
@@ -245,15 +249,12 @@ if (matched) {
   // committedUnchanged in critical-human-proof-policy.
   let approvalMode = "signature";
   try { approvalMode = readPushApprovalMode(projectDir)?.mode ?? "signature"; } catch { approvalMode = "signature"; }
-  const overrideAdmitted = approvalMode === "chat";
 
   let consumed = { status: "absent" };
-  if (overrideAdmitted) {
-    try {
-      consumed = consumeHumanGuardOverride({ rootDir: projectDir, pluginRoot: PLUGIN_ROOT, toolName, toolInput, denials });
-    } catch {
-      consumed = { status: "absent" }; // an unusable capability is not an authorization
-    }
+  try {
+    consumed = consumeHumanGuardOverride({ rootDir: projectDir, pluginRoot: PLUGIN_ROOT, toolName, toolInput, denials });
+  } catch {
+    consumed = { status: "absent" }; // an unusable capability is not an authorization
   }
   if (consumed.status === "consumed") {
     process.stderr.write(
@@ -263,16 +264,36 @@ if (matched) {
   }
 
   // Offering the route is a convenience, never a gate: if the request cannot be recorded
-  // the refusal still stands, it just carries no copyable next step.
+  // the refusal still stands, it just carries no copyable next step. Attempted unconditionally
+  // now (Decision 3) -- both `chat` and `signature` mode have a real, working next step
+  // (Decision 4), so there is no mode left to withhold it from.
   let overrideGuidance = "";
-  if (overrideAdmitted && (consumed.status === "absent" || consumed.status === "replan")) {
+  if (consumed.status === "absent" || consumed.status === "replan") {
     try {
       const planned = recordHumanGuardDenial({ rootDir: projectDir, pluginRoot: PLUGIN_ROOT, toolName, toolInput, denials });
       if (planned.status === "planned") {
+        const script = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+        // ADR-0059 Decision 4: name the exact next command for the CURRENTLY CONFIGURED
+        // mode, not just the mode-common `plan` step -- mirrors the continuation
+        // codex-pretool-guard.mjs's own adapter prints, adapted to this guard's shorter
+        // "for this exact edit" message shape.
+        const continuation = approvalMode === "chat"
+          ? [
+            `Then (the human confirms in-session; this is attribution, not proof):`,
+            `${process.execPath} ${JSON.stringify(script)} prepare-authorization --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256-from-plan> --reason "<human-reason>"`,
+            `${process.execPath} ${JSON.stringify(script)} authorize --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256> --selection-sha256 <selection-sha256> --reason "<human-reason>" --reason-sha256 <reason-sha256> --activate`,
+          ].join("\n")
+          : [
+            `Then, outside this session (presence of a valid, correctly-bound Ed25519 ` +
+              `signature IS the authorization -- there is no in-session activate step for this mode):`,
+            `${process.execPath} ${JSON.stringify(script)} prepare-authorization --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256-from-plan> --reason "<fixed HGO_SIGNATURE_REASON text>"`,
+            `${process.execPath} ${JSON.stringify(script)} authorize-by-signature --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256> --proof <external-proof.json>`,
+          ].join("\n");
         overrideGuidance = [
           "",
           "Human override available for this exact edit (one use; audited; the human confirms):",
-          `${process.execPath} ${JSON.stringify(join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"))} plan --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256}`,
+          `${process.execPath} ${JSON.stringify(script)} plan --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256}`,
+          continuation,
         ].join("\n");
       }
     } catch { /* no route offered; the refusal below is unchanged */ }
@@ -285,14 +306,15 @@ if (matched) {
     `Why: an implementing Goldfish MUST NOT modify, weaken, skip or delete the tests/checks ` +
       `that gate its own implementation (QG-04 / roles/goldfish.md GF-04). A genuine test ` +
       `change is its own, explicitly briefed task.`,
-    overrideAdmitted
+    approvalMode === "chat"
       ? `Clearance: gates.push_approval is "chat", so an in-session audited override is ` +
         `admitted for this exact edit — see below. It is attribution, not proof.`
-      : `Clearance: gates.push_approval is "${approvalMode}", so no in-session override is ` +
-        `admitted — the v2 activation step is an ordinary command and a ready session may ` +
-        `run ordinary commands, so accepting it here would let an agent clear its own gate. ` +
-        `The PO edits ${guardConfigRelPath} (or the test file itself) directly, outside ` +
-        `this session.`,
+      : `Clearance: gates.push_approval is "${approvalMode}", so the in-session activation ` +
+        `step is refused — a ready session could otherwise clear its own gate. A signed ` +
+        `override is admitted instead: presence of a valid, correctly-bound external ` +
+        `Ed25519 signature IS the authorization — see below for the exact next command. ` +
+        `(The PO may still edit ${guardConfigRelPath} or the test file directly, outside ` +
+        `this session, instead.)`,
     overrideGuidance,
   ]);
 }
