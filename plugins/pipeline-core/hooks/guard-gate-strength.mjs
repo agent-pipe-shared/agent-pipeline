@@ -46,6 +46,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
+import { isNeverLiftableKernelPath, windowCoversRule } from "../lib/guard-maintenance-window.mjs";
 
 export const GATE_STRENGTH_PATHS = Object.freeze([
   Object.freeze({
@@ -151,12 +152,18 @@ if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mj
 
   const projectDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
   let matched = null;
+  let absolute = null;
+  let matchedLivePluginRoot = null;
 
   // GS-6 first, and independently of the marker check below: the live plugin root is Pipeline
   // code by definition, wherever it sits and whatever the surrounding project looks like.
   try {
-    const absolute = isAbsolute(filePath) ? resolve(filePath) : resolve(projectDir, filePath);
-    if (insideLivePlugin(absolute)) matched = LIVE_PLUGIN_RULE;
+    absolute = isAbsolute(filePath) ? resolve(filePath) : resolve(projectDir, filePath);
+    const roots = livePluginRoots();
+    if (insideLivePlugin(absolute, roots)) {
+      matched = LIVE_PLUGIN_RULE;
+      matchedLivePluginRoot = roots.find((root) => insideLivePlugin(absolute, [root])) ?? null;
+    }
   } catch { /* fall through to the path rules */ }
 
   if (matched === null) {
@@ -168,6 +175,27 @@ if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mj
     const governed = ["pipeline.user.yaml", "project/pipeline.yaml", ".claude/pipeline.yaml", "project/guard-config.json", ".claude/guard-config.json"]
       .some((marker) => existsSync(join(resolve(projectDir), marker)));
     if (!governed) process.exit(0);
+  }
+
+  // GMW (ADR-0058): the ONLY new allow path for this file, and only for GS-6. The
+  // hardcoded kernel is checked FIRST and unconditionally, before any window lookup
+  // -- a path in NEVER_LIFTABLE_KERNEL_PATHS is refused even under an active,
+  // correctly-scoped, unexpired window that claims to cover it. GS-1..GS-5/GS-7 are
+  // untouched by this block (ADR-0058 Decision 2); it fires only when `matched` is
+  // the live-plugin rule set above.
+  if (matched === LIVE_PLUGIN_RULE) {
+    try {
+      const isKernel = isNeverLiftableKernelPath(filePath, { rootDir: projectDir, livePluginRoot: matchedLivePluginRoot });
+      if (!isKernel) {
+        const { covered, window } = windowCoversRule({ rootDir: projectDir, ruleId: "GS-6" });
+        if (covered) {
+          process.stderr.write(
+            `[pipeline-guard-maintenance-window] GS-6 lifted: expires ${new Date(window.expiresAtMs).toISOString()}, reason: ${window.reason}\n`,
+          );
+          process.exit(0);
+        }
+      }
+    } catch { /* an unusable window is not a lift; the refusal below still stands */ }
   }
 
   process.stderr.write([
