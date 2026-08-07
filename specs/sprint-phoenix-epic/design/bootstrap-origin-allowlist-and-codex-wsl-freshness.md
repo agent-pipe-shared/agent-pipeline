@@ -1,8 +1,19 @@
 # Bootstrap origin-allowlist and Codex-under-WSL freshness boundary — design
 
-Owner: Pipeline maintainers. Status: DESIGN ONLY — no `.mjs`/`.json`/`.yaml` file was
-changed to produce this document; every claim below was checked against the real files on
-this branch (commit `cbf3050` and descendants), not inferred from the backlog items alone.
+Owner: Pipeline maintainers. Status: DESIGN ONLY in intent — this document specifies changes
+to `.mjs`/`.json`/`.yaml` files, it does not make them; every claim below was checked against
+the real files on this branch (commit `cbf3050` and descendants), not inferred from the backlog
+items alone. **One bounded exception, corrected per Critic finding F4 (MINOR, delta re-review
+`412d33d`), because the earlier absolute claim here — "no `.mjs`/`.json`/`.yaml` file was
+changed to produce this document" — was falsified by the very revision that carried it:** the
+`WP2-WP3-partA-rework-2` revision (commit `ac8bd06`) changed five lines of
+`plugins/pipeline-core/scripts/pipeline-start-preflight.mjs` in the same commit — comment text
+only, no executable line — so that comment's citation of §A.7 points at the bullet that same
+revision added. Apart from that one comment-text fix, no revision of this document has changed
+a `.mjs`, `.json`, or `.yaml` file, and none has changed an executable line — verified against
+the full file list of every commit touching this document up to and including the
+`WP2-WP3-partA-rework-3` revision that writes this sentence, whose own commits change only this
+document and one Markdown backlog item.
 Companion backlog items:
 `backlog/items/2026-08-07-self-application-integrity-check-absent.md` (Part A) and
 `backlog/items/2026-08-07-ruleset-freshness-wsl-subsystem-absent.md` (Part B). Both record
@@ -403,8 +414,13 @@ make silently.
      `"plugin-refresh-required"` — advisory-only, no recovery action required, bootstrap
      continues normally with the advisory noted in the confirmation line.
 
-   None of these three files is touched by this design-document revision itself (this document
-   stays design-only, per the header) — and neither are the two further files §A.3 items 1 and 3
+   None of the changes specified in these three bullets is made by any revision of this design
+   document itself (this document stays design-only in intent, per the header) — **corrected
+   per Critic finding F4 (MINOR, delta re-review `412d33d`) from the earlier absolute "none of
+   these three files is touched" claim, which the `WP2-WP3-partA-rework-2` revision (`ac8bd06`)
+   had already falsified** by editing five comment lines (no executable line) in
+   `pipeline-start-preflight.mjs` to repoint that comment's §A.7 citation; that one bounded
+   exception is disclosed in the header — and neither are the two further files §A.3 items 1 and 3
    touch (the new constant module, and `guard-gate-strength.mjs`, which gains the one
    `GATE_STRENGTH_PATHS` entry protecting that module), which together with these three make up
    the **five files touched in total** §A.6 states, **corrected here
