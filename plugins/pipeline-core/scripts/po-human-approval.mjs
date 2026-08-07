@@ -21,7 +21,7 @@ import { readPublicRepositoryFile, verifyThreatModelApprovalRequest } from "../l
 import { CRITICAL_ACTION_KINDS, createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
-const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication> --subject-sha256 <sha256> --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication>";
+const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication> --subject-sha256 <sha256> --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | sign-intent --repo-root <repo> --directory <external-dir> --intent-sha256 <sha256>";
 const own = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 const SHA = /^[a-f0-9]{64}$/u;
 const text = (value) => typeof value === "string" && value.trim() !== "";
@@ -80,13 +80,14 @@ export function parseHumanArgs(argv) {
     const key = tokens[index]; const value = tokens[index + 1];
     if (!key?.startsWith("--") || typeof value !== "string" || value.startsWith("--")) return { error: USAGE };
     const normalized = key.slice(2).replace(/-([a-z])/gu, (_, letter) => letter.toUpperCase());
-    if (!new Set(["directory", "repoRoot", "keyReference", "featureId", "plan", "spec", "model", "kind", "subjectSha256", "expiresAt"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
+    if (!new Set(["directory", "repoRoot", "keyReference", "featureId", "plan", "spec", "model", "kind", "subjectSha256", "expiresAt", "intentSha256"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
     supplied.add(normalized); values[normalized] = value; index += 1;
   }
-  if (!new Set(["setup", "prepare", "prepare-all", "approve", "approve-all", "verify", "verify-all", "prepare-critical", "approve-critical", "verify-critical"]).has(command) || !text(values.directory) || !isAbsolute(values.directory)
+  if (!new Set(["setup", "prepare", "prepare-all", "approve", "approve-all", "verify", "verify-all", "prepare-critical", "approve-critical", "verify-critical", "sign-intent"]).has(command) || !text(values.directory) || !isAbsolute(values.directory)
     || !text(values.repoRoot) || !isAbsolute(values.repoRoot)) return { error: USAGE };
   if (command.endsWith("-all") && (values.featureId || values.plan || values.spec || values.model)) return { error: USAGE };
   if (command.endsWith("-critical") && !CRITICAL_ACTION_KINDS.includes(values.kind)) return { error: USAGE };
+  if (command === "sign-intent" && !SHA.test(values.intentSha256 ?? "")) return { error: USAGE };
   return values;
 }
 
@@ -170,6 +171,25 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
     const result = runApprovalRequest(["prepare", "--repo-root", repository, "--feature-id", featureId, "--plan", args.plan ?? "specs/2026-07-24-sprint-cyborg-epic/prd_cyborg-epic.md", "--spec", args.spec ?? "specs/2026-07-24-sprint-cyborg-epic/spec.md", "--model", args.model ?? `specs/${featureId}/threat-model.json`]);
     write(paths.request, `${JSON.stringify(result, null, 2)}\n`, { mode: 0o600 });
     return { ok: true, code: "PO-HUMAN-REQUEST-READY", candidate: result.value.candidate, intentSha256: result.value.approvalIntent.sha256 };
+  }
+  if (args.command === "sign-intent") {
+    if (!exists(paths.privateKey) || !exists(paths.publicKey) || !exists(paths.authority)) fail("run setup before sign-intent");
+    const intentSha256 = args.intentSha256;
+    const manual = {
+      intent: artifactPath(directory, "intent-manual.txt"),
+      signature: artifactPath(directory, "signature-manual.bin"),
+      proof: artifactPath(directory, "proof-manual.json"),
+    };
+    write(manual.intent, intentSha256, { mode: 0o600 });
+    try { command("openssl", ["pkeyutl", "-sign", "-rawin", "-inkey", paths.privateKey, "-in", manual.intent, "-out", manual.signature], dependencies); }
+    finally { rmSync(manual.intent, { force: true }); }
+    try {
+      const authority = json(paths.authority); const publicKey = read(paths.publicKey, "utf8");
+      if (!own(authority, ["keyReference", "publicKeySha256"]) || !text(authority.keyReference) || authority.publicKeySha256 !== publicKeyPolicy(publicKey, authority.keyReference).publicKeySha256) fail("external trust policy does not match the local public key");
+      const proof = { schema: "pipeline.po-approval-proof.v1", intentSha256, keyReference: authority.keyReference, publicKey, signatureBase64: Buffer.from(read(manual.signature)).toString("base64") };
+      write(manual.proof, `${JSON.stringify(proof, null, 2)}\n`, { mode: 0o600 });
+    } finally { rmSync(manual.signature, { force: true }); }
+    return { ok: true, code: "PO-HUMAN-SIGN-INTENT-READY", intentSha256 };
   }
   if (!exists(paths.request) || !exists(paths.publicKey) || !exists(paths.authority)) fail("run setup and prepare before approving");
   const request = approvalRequestFromExternalJson(json(paths.request));
