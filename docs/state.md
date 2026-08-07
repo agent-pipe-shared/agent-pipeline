@@ -3,9 +3,9 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-07
+**Last updated:** 2026-08-08
 **Project status:** ACTIVE
-**Current block:** 0.5.3 released to `main` (GMW/ADR-0058 + HGO-Sig/ADR-0059 + onboarding repairs, two Critic rounds, 255/255 Verify); the priority thread is now the human-authorization ceremony itself — the PO issued a binding order on it during the release, recorded as [ADR-0061](adr/0061-uniform-human-approval-ceremony.md); Nova A completion still paused on genuine ADR-gated/evidence-gated blockers
+**Current block:** hardening the local `0.5.4` candidate against the greenfield-onboarding defect handover, unattended, under a signed 4-hour Guard Maintenance Window; 0.5.3 is released to `main` and the human-authorization ceremony recorded as [ADR-0061](adr/0061-uniform-human-approval-ceremony.md) remains the governing thread; Nova A completion still paused on genuine ADR-gated/evidence-gated blockers
 **Repair baseline:** `5d2b83dcc765d50801f4491e1bd9bed32090112b`
 **Release version:** `0.5.3` released
 **Release state:** version `0.5.3` · tag `v0.5.3` · commit `2740041d59458f949b597905816af12048502469` · tree `e72cca9b69e105ec6aac9833c4ac0bccb385d25b` · status `published`
@@ -16,7 +16,64 @@ the supplied authoritative release identity; it is not a claimed release time.
 The historical candidate-qualification sections below are retained as
 session history and no longer describes the current publication disposition.
 
-## 2026-08-07 Nova REL-053 — 0.5.3 published, and the PO order that came out of publishing it (current)
+## 2026-08-08 Nova GF-054 — the greenfield handover, hardened into the 0.5.4 local candidate (current)
+
+A parallel session onboarded an empty repository with the Claude runner and
+handed over twelve defects with code locations. All twelve are filed in
+`backlog/`; this section records what was repaired and what deliberately was
+not. The PO chose the full scope, gate chain included, and then set the work
+running unattended overnight.
+
+**Repaired and independently re-verified.** Every suite below was re-run by the
+Elephant rather than accepted from the implementing Goldfish's report — the
+standing rule after a report once described a state the suite did not confirm.
+
+| Commit | What it closes | Suites, re-run |
+|---|---|---|
+| `88d316d` | Two guard false denials: the apply family refused the exact argv its own planner returns for `--intent session`, and a null-device stderr suppressor was classified as a cross-repository mutation | guard-lifecycle-ready 44/0 |
+| `b649567` | Kickoff promotion binds the PRD as the plan and digest-binds the Spec to it, so a promoted feature can pass the plan gate | onboarding-continuity 100/0, po-gate-authority 36/0 |
+| `03d6a97` | The Resume-Hint sanitizer matches forbidden shapes instead of the characters they contain | resume-hint 4/0, differential 30 rejected before and after, none newly accepted |
+| `864c7f1` | A Claude-onboarded project publishes no unclearable Codex restart barrier and its runner identity reaches the kickoff entry points and the CLI | project-onboarding-v3 100/0, codex-onboarding-runtime 19/0, onboarding-runner-identity 8/0, e2e 4/0 |
+| `7d6359f` | A promoted kickoff retires its provisional anchors with a supersession marker | onboarding-continuity 107/0 |
+| `43b3aaa` | The SessionStart hook and the start preflight each declare what their verdict ranges over, so `ready` can no longer be read as "setup complete" | setup-check 72/0, preflight 22/0 |
+
+**Two contract corrections, named as such rather than absorbed silently.**
+`864c7f1` rewrote a regression pin that asserted a non-codex runner still sat
+behind a published barrier at `restart-required`; the launcher-versus-manual
+distinction it protected survives in a new unknown-runner case, but the barrier's
+existence for such a runner was the defect itself. `43b3aaa` extended, not
+relaxed, an existing preflight key-list assertion to admit `statusScope`.
+
+**Facts worth carrying forward that no code records.**
+
+1. **A maintenance-window signature dies on an unrelated write.** The window
+   request binds the live plugin tree at preparation time, so any concurrent
+   Goldfish write between `prepare` and `install` voids a signature the human has
+   already given. Filed as
+   `backlog/items/2026-08-08-a-maintenance-window-signature-is-voided-by-an-unrelated-file-write.md`;
+   it is the same family as the `GG-03` token the classifier burned on
+   2026-08-07 and it violates ADR-0061 directly. The working practice until it is
+   fixed: let the tree fall quiet, then prepare, then sign, then install, and
+   start no dispatch in between.
+2. **`MAX_WINDOW_TTL_MS` is four hours and is enforced twice** — at signing and
+   again at install, against walking an old window forward from a later "now". A
+   request for longer is silently clamped, not refused. An unattended session
+   must therefore front-load everything that writes plugin sources and leave
+   read-only work for afterwards.
+3. **Goldfish finals truncate on long verification sweeps.** Two dispatches in
+   this block ended mid-sentence while running their suites, with the code
+   written and no report. Both were recoverable by resuming the agent with the
+   concrete failure, and in one case the Elephant simply ran the suites itself.
+   The report-early duty in the briefing template is what makes this cheap;
+   without a persisted running log the work would have been re-done.
+
+**Not repaired, deliberately.** The PO language defect and the seeded-project
+contract (authority tier, always-green verify command, absent gates chapter)
+were dispatched in this block; their disposition is recorded by their own commits
+or, where a dispatch stopped, by the stop report in its backlog item. Everything
+still open keeps its backlog item and its ledger entry.
+
+## 2026-08-07 Nova REL-053 — 0.5.3 published, and the PO order that came out of publishing it
 
 **Released.** `main` = `2740041d59458f949b597905816af12048502469`, tag `v0.5.3`
 on the same commit, GitHub release created. `docs/release-state.json`
