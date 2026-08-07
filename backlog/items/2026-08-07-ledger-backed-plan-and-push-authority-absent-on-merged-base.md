@@ -78,6 +78,20 @@ the old base. Scope, sequencing, and which of the six affected files get
 touched first are still open — this decision fixes the *direction*, not the
 implementation plan.
 
+**Design phase (2026-08-07):** a scoped design was produced — commit `ad49c48`,
+`specs/sprint-phoenix-epic/design/phx-2-additive-ledger-authority.md`.
+**Critic review: FAIL.** Full findings:
+`specs/sprint-phoenix-epic/evidence/wp5-phx2-design-critic-review-ad49c48.md`
+(gitignored evidence artifact). Three MAJOR findings, none fatal to the
+approach: (1) `repositoryFingerprint` sourced from the wrong root, breaking
+worktree-invariance for the exact threat the design claims to close; (2) the
+write mechanism omits directory creation, guaranteeing `ENOENT` on first use
+everywhere, with recovery blocked behind an unrelated existing guard; (3) the
+integration point is structurally unreachable in `chat` mode, contradicting
+the design's own "alongside the signature/chat gate" framing. Plus two MINOR
+findings. Next step: a rework dispatch addressing all five findings, then a
+bounded delta Critic re-review — not implementation yet.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:** accepted (direction only — main's model is the baseline;
