@@ -118,6 +118,7 @@
           "docs/nova-execution-plane-threat-model.md",
           "docs/po-approval-proof-contract.md",
           "docs/po-human-approval.md",
+          "docs/push-release-flow.md",
           "docs/release-0.4-readiness.md",
           "docs/release-0.4.2-readiness.md",
           "docs/release-0.4.3-readiness.md",
