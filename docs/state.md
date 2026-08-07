@@ -265,6 +265,66 @@ the gate prints `(operating-model §7)` into its operator-visible fix string.
 Note (c) is a one-line change but sits in a `harness/scripts/` file, so it
 follows the ordinary briefed-task path rather than an in-session edit.
 
+**Residual R1: Critic round 4/4 — PASS, no findings. R1 is Critic-clean
+(`21b24c4`).** Report at
+`specs/sprint-phoenix-epic/evidence/phx-r1-rework-3-critic-review-21b24c4.md`.
+This was the last autonomous round the contract allows; it did not need a PO
+course gate. The Critic re-derived every load-bearing number in the delta from
+source rather than from the document — the five write-lane markers, the eleven
+shell-lane markers (6 literals + 7 runtime-projection targets, minus 2 that
+collide), the 3/2/8 divergence split, and the three-not-four marker count in the
+test fixture — and each one held. It also confirmed that neither acceptance-criteria
+change lowered a bar: AC-R1-6's old unconditional claim was **false** in an
+ungoverned checkout and is now corrected *and* additionally constrained, and
+AC-R1-9 went from one condition to two plus two failure clauses.
+
+Six candidate findings were examined and deliberately dropped, each with its
+reason recorded — including one the Critic could have inflated (AC-R1-9's
+write-lane clause is too strong in a self-hosted install where the source copy
+*is* the live plugin root, but the same criterion mandates reproducing residual
+3, which states that case explicitly). That is the review behaving as designed:
+the near-misses are visible, so the PASS is readable rather than merely asserted.
+
+**Elephant error, recorded because it cost real budget: I dispatched a Critic
+review for a package that was already Critic-clean and PO-accepted.** The
+WP5/PHX-2 implementation review over `8b34e1f` / `6bdaeb0` / `f16b8f2` had
+already run its full cycle earlier — review 1 FAIL (`906bcb0`), rework
+(`db271b5`, `befadd2`, `f01f111`), delta review PASS (`0a774df`), PO gate
+accepted (`b911d50`, recorded above at the WP5 entry). I re-dispatched it from a
+post-compaction handover that listed it as outstanding, without first checking
+the evidence directory or the log — both of which say plainly that it is closed.
+The dispatch was stopped once the duplication was confirmed. Two things follow:
+its review object was **stale** (the three original commits, superseded by the
+rework), so any finding it produced would have been against code that no longer
+exists; and the check that would have prevented this is one `git log` on the
+package's own evidence file, which is cheaper than the review it replaces.
+**Rule for this session's remaining dispatches: before dispatching a review,
+confirm from the repository — not from a handover paragraph — that the package
+has no closing verdict.**
+
+**New backlog item, security-relevant, found out-of-diff by that same round-4
+Critic and independently re-verified before filing:**
+`backlog/items/2026-08-07-module-scope-manifest-read-rearms-the-disarm-by-config-fault.md`.
+`plugins/pipeline-core/lib/runtime-projection-v3.mjs:99-118` carries a twenty-line
+comment describing a defect it fixed: reading the shipped owned-key manifest at
+module scope meant a malformed JSON file threw during ES-module evaluation, so
+the fail-closed admission hooks died before `main()` existed, node exited 1, and
+`hooks/hooks.json` defines exit 1 as **allow**. A config fault disarmed a
+fail-closed gate. Both hooks named in that comment now do it again, through the
+module's *other*, unmemoized export: `guard-lifecycle-ready.mjs:43` and
+`codex-pretool-guard.mjs:200`. Because `guard-lifecycle-ready.mjs` is wired to
+both `Bash|PowerShell` and `Edit|Write|NotebookEdit`, one unparseable shipped
+JSON file opens both lanes at once. No proof-of-concept was run and none should
+be: the demonstration would disarm the guard currently protecting the session.
+The claim rests on reading four files and on the exit semantics the wiring states
+about itself.
+
+This is the third instance this session of the same class — **knowledge recorded
+in the right words, in the wrong place to be enforced.** The comment is accurate,
+sits next to the fixed call site, and did not reach the two files that most
+needed it, because nothing checks it. The unregistered-verify-suites item and the
+stale-citation sweep are the other two.
+
 **STANDING RULE — one human approval clears the whole chain (APS, 2026-08-07).
 Highest-precedence process rule; applies to every human approval, without
 exception.** Verbatim: *"oberste regel ab jetzt, wenn der human etwas freigeben
