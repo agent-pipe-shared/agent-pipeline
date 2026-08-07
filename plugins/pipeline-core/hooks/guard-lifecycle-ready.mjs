@@ -926,12 +926,43 @@ function sanctionedPipelineStateArgs(args) {
   return sanctionedPoAuthorityRebindArgs(args);
 }
 
+/**
+ * The closed value set of the repair script's own parser (`SUPPORTED_LANGUAGES`), which
+ * is also the set the gate prints as `<de|en>`. Kept as a literal rather than imported:
+ * this hook stays self-contained, and the suite pins it against the script's source so
+ * the two cannot drift apart silently.
+ */
+const PO_PROFILE_REPAIR_LANGUAGES = new Set(["de", "en"]);
+
+/**
+ * `--human-facing <de|en>` is the language route the repair script writes into the apply
+ * argv it emits itself (`buildPlan`'s `action.argv`) and the gate names as the operator's
+ * next step ("add --human-facing <de|en>"). Until this branch existed, every clause below
+ * refused that exact argv, so the printed route dead-ended in precisely the state it
+ * exists for -- a freshly onboarded or half-configured project whose lifecycle is not
+ * ready.
+ *
+ * Admission stays as narrow as its siblings. The flag is accepted POSITIONALLY, in the
+ * single position the script emits it -- directly after `--root <root>`, ahead of the
+ * digest -- against the closed set above, with an exact total `args.length` per shape and
+ * the digest and `--activate` still checked by position. A reordered, duplicated,
+ * out-of-set or padded variant matches no branch; no length range and no wildcard word is
+ * introduced.
+ */
 function sanctionedPoProfileRepairArgs(args, root) {
-  if (args[0] === "plan") return exactRoot(args, root, 1) && args.length === 3;
+  const languageAt = (index) => args[index] === "--human-facing"
+    && PO_PROFILE_REPAIR_LANGUAGES.has(args[index + 1]);
+  const digestActivateAt = (index) => args[index] === "--plan-sha256"
+    && HEX.test(args[index + 1] ?? "")
+    && args[index + 2] === "--activate";
+  if (args[0] === "plan") {
+    return exactRoot(args, root, 1)
+      && (args.length === 3 || (languageAt(3) && args.length === 5));
+  }
   return args[0] === "apply"
     && exactRoot(args, root, 1)
-    && args[3] === "--plan-sha256" && HEX.test(args[4] ?? "")
-    && args[5] === "--activate" && args.length === 6;
+    && ((digestActivateAt(3) && args.length === 6)
+      || (languageAt(3) && digestActivateAt(5) && args.length === 8));
 }
 
 function sanctionedProjectAuthorityMigrationArgs(args, root) {

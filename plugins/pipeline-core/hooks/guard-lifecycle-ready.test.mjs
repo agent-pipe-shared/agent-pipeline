@@ -7,6 +7,8 @@ import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import {
   mkdirSync,
   mkdtempSync,
+  readFileSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -754,6 +756,82 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
         requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
       }).exitCode, 2, command);
     }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * GUARDARGV-2. The repair script writes `--human-facing <de|en>` into the apply argv it
+ * emits itself, and the gate prints "add --human-facing <de|en>" as the operator's next
+ * step -- while the guard refused that exact command in the one state it is offered in.
+ *
+ * Everything asserted here is taken from the script rather than restated: the closed
+ * value set from its parser's own `SUPPORTED_LANGUAGES`, the apply argv from what `plan`
+ * actually emits. A change on either side therefore breaks this test rather than the
+ * operator's repair route. The refusals pin that the admission stayed positional and
+ * closed -- out-of-set, reordered, duplicated and padded variants must not ride along.
+ */
+test("non-ready Bash admits the repair script's own --human-facing argv, positionally and closed", () => {
+  const path = realpathSync(root());
+  const script = PO_PROFILE_REPAIR_SCRIPT;
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "language:\n  human_facing: \"en\"\n");
+    writeFileSync(join(path, ".claude", "pipeline.yaml"), "language:\n  human_facing: en\n");
+    const declared = readFileSync(script, "utf8").match(/const SUPPORTED_LANGUAGES = (\[[^\]]*\]);/u);
+    assert.ok(declared, "the repair script still declares one closed language set");
+    const languages = JSON.parse(declared[1].includes("'") ? declared[1].replace(/'/gu, "\"") : declared[1]);
+    assert.deepEqual([...languages].sort(), ["de", "en"]);
+    const digest = "e".repeat(64);
+    const admit = (command) => {
+      assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+      assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
+      }), { exitCode: 0, stderr: "" }, command);
+    };
+    const refuse = (command) => {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
+      }).exitCode, 2, command);
+    };
+    for (const language of languages) {
+      admit(`node '${script}' plan --root '${path}' --human-facing ${language}`);
+      admit(`node '${script}' apply --root '${path}' --human-facing ${language} --plan-sha256 ${digest} --activate`);
+    }
+    // The pre-existing shapes stay admitted unchanged.
+    admit(`node '${script}' plan --root '${path}'`);
+    admit(`node '${script}' apply --root '${path}' --plan-sha256 ${digest} --activate`);
+    // The apply argv the script emits itself, taken from its own plan output.
+    const planned = spawnSync(
+      process.execPath,
+      [script, "plan", "--root", path, "--human-facing", "de"],
+      { encoding: "utf8" },
+    );
+    assert.equal(planned.status, 0, planned.stdout);
+    const emitted = JSON.parse(planned.stdout).applyAction.argv;
+    assert.deepEqual(emitted.slice(0, 5), [script, "apply", "--root", path, "--human-facing"]);
+    const word = (value) => (/^[A-Za-z0-9_.:=-]+$/u.test(value) ? value : `'${value}'`);
+    admit(`node ${emitted.map(word).join(" ")}`);
+    for (const command of [
+      `node '${script}' plan --root '${path}' --human-facing fr`,
+      `node '${script}' plan --root '${path}' --human-facing DE`,
+      `node '${script}' plan --root '${path}' --human-facing`,
+      `node '${script}' plan --root '${path}' --human-facing de --human-facing de`,
+      `node '${script}' plan --human-facing de --root '${path}'`,
+      `node '${script}' plan --root '${path}' --human-facing de --activate`,
+      `node '${script}' plan --root '${path}' --human-facing de --plan-sha256 ${digest} --activate`,
+      `node '${script}' apply --root '${path}' --human-facing fr --plan-sha256 ${digest} --activate`,
+      `node '${script}' apply --root '${path}' --plan-sha256 ${digest} --human-facing de --activate`,
+      `node '${script}' apply --root '${path}' --human-facing de --human-facing en --plan-sha256 ${digest} --activate`,
+      `node '${script}' apply --root '${path}' --human-facing de --plan-sha256 ${digest} --activate --bypass`,
+      `node '${script}' apply --root '${path}' --human-facing de --plan-sha256 zz --activate`,
+      `node '${script}' apply --root '${path}' --human-facing de --plan-sha256 ${digest}`,
+      `node '${script}' apply --root /tmp/other --human-facing de --plan-sha256 ${digest} --activate`,
+      `node '${script}' plan --root '${path}' --human-facing de && touch bypass`,
+      `node '${script}' repair --root '${path}' --human-facing de`,
+      `node '${PROJECT_AUTHORITY_MIGRATION_SCRIPT}' plan --root '${path}' --human-facing de`,
+    ]) refuse(command);
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
