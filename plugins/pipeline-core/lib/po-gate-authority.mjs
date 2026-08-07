@@ -51,6 +51,7 @@ export const PO_GATE_PROFILE_RECEIPT_RELATIVE_PATH = join(
 );
 export const PO_GATE_PRD_LANGUAGE_MARKER = (language) => `<!-- po-language: ${language} -->`;
 
+const PO_GATE_PROFILE_SOURCE = "pipeline.user.yaml";
 const SUPPORTED_LANGUAGES = new Set(["de", "en"]);
 const SHA256 = /^[0-9a-f]{64}$/u;
 const PRD_NAME = /^prd_[^/\\]+\.md$/u;
@@ -445,12 +446,27 @@ function loadReceipt(gitCommonDir) {
   return { receipt, raw };
 }
 
-function readProjection(root) {
-  const sourceBytes = readPhysicalFile(root, "pipeline.user.yaml");
-  const authority = resolveProjectAuthorityPaths({ rootDir: root });
+/**
+ * The exact pair of project-relative files the PO profile receipt binds.
+ *
+ * Every writer of that receipt MUST bind these two files, because this is what
+ * the authority validator reads back. Resolving the runtime manifest a second
+ * time somewhere else is how the receipt silently starts binding the other
+ * authority tier: the two manifest tiers are only *seeded* equal, never
+ * guaranteed equal, so a divergence turns a freshly published receipt into a
+ * PO-PROFILE-RECEIPT-STALE rejection with no human-visible cause.
+ */
+export function poGateProfileProjectionPaths(rootDir) {
+  const authority = resolveProjectAuthorityPaths({ rootDir });
   const manifest = authority.status === "ready"
     ? authority.manifest
-    : (existsSync(join(root, NEUTRAL_MANIFEST)) ? NEUTRAL_MANIFEST : LEGACY_MANIFEST);
+    : (existsSync(join(rootDir, NEUTRAL_MANIFEST)) ? NEUTRAL_MANIFEST : LEGACY_MANIFEST);
+  return { source: PO_GATE_PROFILE_SOURCE, manifest };
+}
+
+function readProjection(root) {
+  const { source, manifest } = poGateProfileProjectionPaths(root);
+  const sourceBytes = readPhysicalFile(root, source);
   const runtimeBytes = readPhysicalFile(root, manifest);
   return {
     sourceBytes,

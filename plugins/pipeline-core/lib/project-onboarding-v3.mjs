@@ -46,6 +46,7 @@ import { applyRunnerProfileMigrationV3, inspectRunnerProfileMigrationV3, planRun
 import { loadRunnerProfilesV3Registry, validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
 import { loadManifest, validateManifest } from "./manifest.mjs";
 import {
+  poGateProfileProjectionPaths,
   validatePoGateAuthorityForRepository,
   validatePoGateProfileForRepository,
 } from "./po-gate-authority.mjs";
@@ -187,9 +188,16 @@ function projectAuthorityPaths(root, fs) {
   };
 }
 
+// The receipt this publishes is only valid if it binds exactly the two files
+// the PO-gate authority reads back, so the pair is resolved by that authority
+// and never named here. Naming the runtime manifest locally is what broke a
+// fresh kickoff: the receipt bound the legacy-tier `.claude/pipeline.yaml`
+// while the validator read the neutral-tier `project/pipeline.yaml`, which
+// only *looked* correct while both tiers happened to be seeded byte-identical.
 function initializeKickoffPoProfile(root, fs) {
-  const sourceBytes = readBoundPhysicalFile(safePath(root, SOURCE, fs), fs);
-  const runtimeBytes = readBoundPhysicalFile(safePath(root, ".claude/pipeline.yaml", fs), fs);
+  const projection = poGateProfileProjectionPaths(root);
+  const sourceBytes = readBoundPhysicalFile(safePath(root, projection.source, fs), fs);
+  const runtimeBytes = readBoundPhysicalFile(safePath(root, projection.manifest, fs), fs);
   const initialized = fs.initializePoGateProfileReceipt({
     rootDir: root,
     userYamlText: sourceBytes,
