@@ -95,35 +95,37 @@ freehand). Status:
    confirmed not needed (main already has an equivalent). See
    `backlog/evidence/2026-08-07-project-authority-failclosed-closure.md`.
 2. **`self-application-integrity-check-absent`** and
-3. **`ruleset-freshness-wsl-subsystem-absent`** — **investigated, PO decision
-   needed, no code changed.** Confirmed: `ruleset-freshness-host.mjs`
-   (Phoenix-only, merged in cleanly) has a currently broken import chain
-   across `ruleset-freshness.mjs`/`codex-host-plugin-list.mjs`/
-   `pipeline-start-preflight.mjs`. The redispatched agent correctly stopped
-   rather than force a fix: pre-merge, the self-application origin-allowlist
-   check was folded into the bootstrap **readiness gate's `status` decision**
-   itself in `pipeline-start-preflight.mjs` — not an additive field, core
-   gate semantics. A correct fix therefore needs a PO decision on whether
-   that check becomes part of ordinary bootstrap readiness again (reusing
-   `public-core-observation.mjs`/`ruleset-source.mjs`, already proven safe on
-   the private-overlay path) before any implementation, plus a decision on
-   whether the WSL host-authorized network-boundary concept is still wanted
-   given main's simpler direct-read replacement. Full detail, including a
-   name-collision risk (`inspectRulesetFreshness`) and a stale sentence found
-   in `harness/session-bootstrap.md:159`, in both backlog items' Proposal
-   sections.
+3. **`ruleset-freshness-wsl-subsystem-absent`** — **investigated, PO decided,
+   design dispatched.** `ruleset-freshness-host.mjs` (Phoenix-only, merged in
+   cleanly) has a currently broken import chain across
+   `ruleset-freshness.mjs`/`codex-host-plugin-list.mjs`/
+   `pipeline-start-preflight.mjs`; the pre-merge origin-allowlist check was
+   folded into the bootstrap **readiness gate's `status` decision** itself,
+   not an additive field. **PO decisions (APS, 2026-08-07):** (a) restore the
+   origin-allowlist check into ordinary bootstrap readiness, reusing the
+   existing `public-core-observation.mjs`/`ruleset-source.mjs` primitives
+   (already proven safe on the private-overlay path), not Phoenix's old
+   separate API surface; (b) repair the WSL host-authorized network-boundary
+   mechanism, but **scoped specifically to Codex running under WSL** — not a
+   universal requirement for every runner/host. A combined design (not
+   implementation) covering both is dispatched, following WP5's now-proven
+   design-first → Critic-review → implement sequence.
 4. **`governance-product-verify-suites-deregistered`** — blocked on 1–3's
    outcome, not started.
-5. **`ledger-backed-plan-and-push-authority-absent-on-merged-base`** — design
-   phase (not implementation) done: commit `ad49c48`,
-   `specs/sprint-phoenix-epic/design/phx-2-additive-ledger-authority.md`. A
-   scoped additive mechanism (one new ~100-line lib module, two call sites,
-   opt-in gate key) — explicitly NOT reviving Phoenix's full pre-merge
-   `pipeline-state.mjs`/`plan-spec-state-v2.mjs` subsystems, explicitly not
-   claiming to close the `chat`-mode human-presence gap. Per CLAUDE.md's
-   self-application rule (checkpoint deliverables get an independent Critic
-   review before the PO's gate), a Critic review of this design is
-   dispatched and pending before any implementation work starts on it.
+5. **`ledger-backed-plan-and-push-authority-absent-on-merged-base`** —
+   design done (commit `ad49c48`), **Critic review: FAIL** (3 MAJOR + 2
+   MINOR findings — wrong repository-identity-primitive sourcing breaking
+   the exact worktree threat the design claimed to close; a missing
+   directory-creation step guaranteeing failure on first use everywhere;
+   an integration point structurally unreachable in `chat` mode,
+   contradicting the design's own framing). Full findings:
+   `specs/sprint-phoenix-epic/evidence/wp5-phx2-design-critic-review-ad49c48.md`
+   (gitignored). None of the findings require abandoning the approach — a
+   rework dispatch addressing all 5 is running, to be followed by a bounded
+   delta Critic re-review before any implementation. This is exactly the
+   outcome CLAUDE.md's self-application rule (Critic review before the PO's
+   gate) exists to catch, on the first design produced under it this
+   session.
 
 **Infra finding, 2026-08-07:** the `isolation: "worktree"` dispatch option
 pinned two of three agents' worktrees to `6e2c9b2` (origin/main's pre-merge
