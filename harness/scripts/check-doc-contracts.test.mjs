@@ -13,6 +13,7 @@ import {
   extractMarkdownLinks,
   isExcludedRepoPath,
   stripFencedCode,
+  stripHtmlComments,
 } from "./check-doc-contracts.mjs";
 
 const SCRIPT = fileURLToPath(new URL("./check-doc-contracts.mjs", import.meta.url));
@@ -122,6 +123,12 @@ test.after(() => {
 test("fenced code is removed without losing line structure", () => {
   const value = "ok\n```md\n[bad](missing.md)\n```\nend";
   assert.equal(stripFencedCode(value), "ok\n\n\n\nend");
+});
+
+test("HTML comments are removed to a fixed point without preserving nested delimiters", () => {
+  assert.equal(stripHtmlComments("before<!-- hidden -->after"), "beforeafter");
+  assert.equal(stripHtmlComments("before<!-- outer <!-- inner -->after"), "beforeafter");
+  assert.equal(stripHtmlComments("before<!-- unterminated"), "before");
 });
 
 test("anchors implement unicode, explicit ids, setext, and duplicate suffixes", () => {

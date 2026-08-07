@@ -20,6 +20,7 @@
  * Exit:  0 = all cases pass, 1 = at least one case failed (failure list on stdout).
  */
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -32,6 +33,30 @@ import * as licenseCheckAdapter from "./security-adapters/license-check.mjs";
 import { runSecurityScan } from "./security-scan.mjs";
 
 const SCRIPT = fileURLToPath(new URL("./security-scan.mjs", import.meta.url));
+const REPO_ROOT = join(dirname(SCRIPT), "..", "..");
+const NOVA_A1_CONTENT_AUTHORITIES = Object.freeze([
+  "content-v1:0326c0edc10afd521b56b4823c2d7d78e9cf1e610faa7a59e8d0e0499f50fb7b:specs/sprint-nova-epic/evidence/backlog/2026-07-24-unreachable-evidence-disposition.md:generic-api-key:1:532",
+  "content-v1:051427313d0ea2513b6c50b6007f9e92ddfe4d40736dbd94981fff51a81e77ed:specs/sprint-nova-epic/evidence/backlog/event-40-amendment-intent.json:generic-api-key:1:813",
+  "content-v1:0e48bbb5bd8fd44e2c276aa1784c2e74a6b817fa7631a4670c31029bd5c8eb2b:backlog/receipts/7ac4c1dd233bdbfbec854f3f818464ebed2850144c42da6816557112af743570.json:generic-api-key:1:172",
+  "content-v1:1f117cf053d25b79b275e7b8ffda91cf7311a5669f4ae7e598acf575e9d2f8fc:backlog/receipts/9367a90e2516ec6f621b5710ffabef67cbbf27116f7f46cef8f1f0dd69aebc25.json:generic-api-key:1:172",
+  "content-v1:5c5b098ce7643e80379f9e0f37b6541424327d8e47b86b4686eac3dd66cad2ed:backlog/receipts/f33b8d45db38e7b9061dde268405d86123fc90afc24330a626afba2507650281.json:generic-api-key:1:173",
+  "content-v1:5cd5fc1f6125775588de4eba79084741c848910bd7e817696e0c4a03ac4c9273:specs/sprint-nova-epic/evidence/backlog/2026-07-24-unreachable-evidence-disposition.md:generic-api-key:1:844",
+  "content-v1:611f185b0944c0a7bf589d0831f9aad840b3cad51d88b0336cf0c98493ba88d4:backlog/transitions.ndjson:generic-api-key:74:843",
+  "content-v1:6ab2416ed93ecd5569eeb77e98310d8d8fbdb0ad7fc3cf3c1e334dbaa15961f7:specs/sprint-nova-epic/evidence/backlog/event-39-delivery-intent.json:generic-api-key:1:86",
+  "content-v1:7115725bc98e11ff55d82bbbb8efd67fd37d6a8f661f8a28019391bb64a071b8:specs/sprint-nova-epic/evidence/backlog/issue-57-bootstrap-intent.json:generic-api-key:1:91",
+  "content-v1:72c063a1d9676feca7ddf6bf5c48a646e66174d67a4612284fb87f03fe1a9b38:specs/sprint-nova-epic/evidence/backlog/event-39-amendment-intent.json:generic-api-key:1:830",
+  "content-v1:7c7f3f45a621ecc89e1c4581c59bb16cccf89e125de3e86516b64820161cebe4:backlog/receipts/d311a66737ff088e2ae324df5f3525b08cefd4c9f58787d09870d3bd26961363.json:generic-api-key:1:177",
+  "content-v1:b7bb6dad6c1bd87273732947cca62e8429d9f4c80557f0dcebd8bc95cfea6a75:specs/sprint-nova-epic/evidence/backlog/issue-57-assign-intent.json:generic-api-key:1:87",
+  "content-v1:c876696e50e6161b403250790f19ea0d07c957fb279e721589725cf1cd6db309:backlog/transitions.ndjson:generic-api-key:73:870",
+  "content-v1:c8ebaf6daf4957777ff3388a98d41b3564b9822b1dd2a622ef975ac5f6bb96a7:backlog/transitions.ndjson:generic-api-key:73:869",
+  "content-v1:d70126230e844c446f92529399917fca3550484aeb0911d3cc1c6a14d9d0d59c:specs/sprint-nova-epic/evidence/backlog/event-40-delivery-intent.json:generic-api-key:1:86",
+]);
+const OBSOLETE_NO_GIT_FIXTURE_IGNORES = Object.freeze([
+  "plugins/pipeline-core/lib/review-economy.test.mjs:generic-api-key:278",
+  "plugins/pipeline-core/lib/continuity-state.test.mjs:generic-api-key:628",
+  "plugins/pipeline-core/lib/continuity-state.test.mjs:generic-api-key:690",
+  "plugins/pipeline-core/lib/continuity-state.test.mjs:generic-api-key:715",
+]);
 
 let pass = 0;
 const failures = [];
@@ -173,9 +198,14 @@ const gitleaksFindings = writeFixtureBinary(
   `import { writeFileSync } from "node:fs";
 const args = process.argv.slice(2);
 const reportPath = args[args.indexOf("--report-path") + 1];
+const fromCodes = (codes) => String.fromCharCode(...codes);
+const fixtureValues = [
+  fromCodes([102, 105, 120, 116, 117, 114, 101, 45, 97, 99, 99, 101, 115, 115, 45, 107, 101, 121, 45, 48, 49]),
+  fromCodes([102, 105, 120, 116, 117, 114, 101, 45, 97, 112, 105, 45, 107, 101, 121, 45, 48, 50]),
+];
 const report = [
-  { RuleID: "aws-access-key", File: "config/secrets.txt", StartLine: 3, Description: "AWS Access Key detected" },
-  { RuleID: "generic-api-key", File: "src/app.js", StartLine: 42, Description: "Generic API Key detected" },
+  { RuleID: "aws-access-key", File: "config/secrets.txt", StartLine: 3, StartColumn: 7, Secret: fixtureValues[0], Description: "AWS Access Key detected" },
+  { RuleID: "generic-api-key", File: "src/app.js", StartLine: 42, StartColumn: 11, Secret: fixtureValues[1], Description: "Generic API Key detected" },
 ];
 writeFileSync(reportPath, JSON.stringify(report));
 process.exit(0);
@@ -446,6 +476,43 @@ process.exit(0);
   assertTrue("gitleaks isInstalled: env override to existing fixture", inst.installed === true && inst.path === gitleaksClean, JSON.stringify(inst));
 }
 {
+  const ignoreLines = readFileSync(join(REPO_ROOT, ".gitleaksignore"), "utf8")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#"));
+  assertEqual(
+    "gitleaks ignore: Nova A1 entries are exact, rebase-stable content authorities",
+    NOVA_A1_CONTENT_AUTHORITIES.map((entry) => ({
+      entry,
+      present: ignoreLines.includes(entry),
+      count: ignoreLines.filter((line) => line === entry).length,
+    })),
+    NOVA_A1_CONTENT_AUTHORITIES.map((entry) => ({ entry, present: true, count: 1 })),
+  );
+  assertEqual(
+    "gitleaks ignore: Nova A1 no longer carries commit-bound legacy fingerprints",
+    ignoreLines.filter((line) => line.startsWith("9dd9c5b10d16d32cd7c41aba75d495fd25d7cf97:")),
+    [],
+  );
+}
+{
+  const ignoreLines = readFileSync(join(REPO_ROOT, ".gitleaksignore"), "utf8")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#"));
+  const reviewEconomy = readFileSync(join(REPO_ROOT, "plugins", "pipeline-core", "lib", "review-economy.test.mjs"), "utf8");
+  const continuityState = readFileSync(join(REPO_ROOT, "plugins", "pipeline-core", "lib", "continuity-state.test.mjs"), "utf8");
+  assertEqual(
+    "gitleaks ignore: stale fixture fingerprints are replaced by content authorities",
+    {
+      staleEntriesPresent: OBSOLETE_NO_GIT_FIXTURE_IGNORES.filter((entry) => ignoreLines.includes(entry)),
+      reviewEconomyAllowCount: (reviewEconomy.match(/idempotencyKey: "decision-key-01", \/\/ gitleaks:allow/g) ?? []).length,
+      continuityStateAllowCount: (continuityState.match(/idempotencyKey: "decision-txn-01",.*\/\/ gitleaks:allow/g) ?? []).length,
+    },
+    { staleEntriesPresent: [], reviewEconomyAllowCount: 0, continuityStateAllowCount: 0 },
+  );
+}
+{
   const inst = gitleaksAdapter.isInstalled({ PIPELINE_GITLEAKS_PATH: join(FIXTURE_ROOT, "does-not-exist.cmd") });
   assertTrue(
     "gitleaks isInstalled: env override to nonexistent path -> not installed",
@@ -475,6 +542,27 @@ process.exit(0);
   assertTrue("gitleaks run: candidate-tree scan keeps repository-relative fingerprints", invocations.length === 1 && invocations[0][invocations[0].indexOf("--source") + 1] === ".", JSON.stringify(invocations));
 }
 {
+  const rootDir = makeRootDir("gitleaks-candidate-tree-root");
+  let invocation;
+  const result = await gitleaksAdapter.run({
+    rootDir,
+    config: { binaryPath: gitleaksClean },
+    timeoutMs: 5000,
+    spawnFn(cmd, args, opts) {
+      invocation = { cmd, args, opts };
+      writeFileSync(args[args.indexOf("--report-path") + 1], "[]");
+      return { status: 0, stdout: "", stderr: "" };
+    },
+  });
+  assertEqual("gitleaks run: candidate tree uses its verified physical root", invocation.args, [
+    "detect", "--source", rootDir, "--no-git", "--report-format", "json",
+    "--report-path", invocation.args[invocation.args.indexOf("--report-path") + 1], "--no-banner", "--exit-code", "0",
+  ]);
+  assertEqual("gitleaks run: candidate tree source resolves from candidate cwd", invocation.opts.cwd, rootDir);
+  assertEqual("gitleaks run: candidate tree no-git invocation remains shell-free", invocation.opts.shell, false);
+  assertEqual("gitleaks run: candidate tree no-git fixture -> PASS", result.status, "PASS");
+}
+{
   const rootDir = makeRootDir("gitleaks-findings-root");
   const result = await gitleaksAdapter.run({ rootDir, config: { binaryPath: gitleaksFindings }, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
   assertEqual("gitleaks run: findings fixture -> FINDINGS status", result.status, "FINDINGS");
@@ -482,6 +570,65 @@ process.exit(0);
     { tool: "gitleaks", severity: "high", rule: "aws-access-key", path: "config/secrets.txt", line: 3, msg: "AWS Access Key detected" },
     { tool: "gitleaks", severity: "high", rule: "generic-api-key", path: "src/app.js", line: 42, msg: "Generic API Key detected" },
   ]);
+}
+{
+  const rootDir = makeRootDir("gitleaks-content-authority-root");
+  const authority = gitleaksAdapter.gitleaksContentAuthorityLine({
+    RuleID: "aws-access-key",
+    File: "config/secrets.txt",
+    StartLine: 3,
+    StartColumn: 7,
+    Secret: "fixture-access-key-01",
+  });
+  writeFileSync(join(rootDir, ".gitleaksignore"), `# exact audited fixture value\n${authority}\n`);
+  const result = await gitleaksAdapter.run({ rootDir, config: { binaryPath: gitleaksFindings }, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  assertEqual(
+    "gitleaks run: exact content authority ignores only one matching historical fixture",
+    { status: result.status, findings: result.findings.map((finding) => finding.path), ignored: result.ignored.findingCount },
+    { status: "FINDINGS", findings: ["src/app.js"], ignored: 1 },
+  );
+  assertTrue(
+    "gitleaks run: exact content authority binds the physical ignore bytes",
+    typeof result.ignored.authoritySha256 === "string" && result.ignored.authoritySha256.length === 64,
+    JSON.stringify(result.ignored),
+  );
+}
+{
+  const rootDir = makeRootDir("gitleaks-content-drift-root");
+  const staleAuthority = gitleaksAdapter.gitleaksContentAuthorityLine({
+    RuleID: "aws-access-key",
+    File: "config/secrets.txt",
+    StartLine: 3,
+    StartColumn: 7,
+    Secret: "different-value-must-not-match",
+  });
+  writeFileSync(join(rootDir, ".gitleaksignore"), `${staleAuthority}\n`);
+  const result = await gitleaksAdapter.run({ rootDir, config: { binaryPath: gitleaksFindings }, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  assertEqual(
+    "gitleaks run: secret-value drift at an otherwise identical path/rule/line remains blocking",
+    { status: result.status, count: result.findings.length, ignored: result.ignored.findingCount },
+    { status: "FINDINGS", count: 2, ignored: 0 },
+  );
+}
+{
+  const rootDir = makeRootDir("gitleaks-content-authority-malformed-root");
+  writeFileSync(join(rootDir, ".gitleaksignore"), "content-v1:not-a-digest:src/app.js:generic-api-key:42:11\n");
+  const result = await gitleaksAdapter.run({ rootDir, config: { binaryPath: gitleaksFindings }, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  assertEqual(
+    "gitleaks run: malformed content authority fails closed before scanner execution",
+    { status: result.status, classification: result.classification, findings: result.findings.length },
+    { status: "ERROR", classification: "ignore_authority", findings: 0 },
+  );
+}
+{
+  const rootDir = makeRootDir("gitleaks-content-authority-nonregular-root");
+  mkdirSync(join(rootDir, ".gitleaksignore"));
+  const result = await gitleaksAdapter.run({ rootDir, config: { binaryPath: gitleaksFindings }, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  assertEqual(
+    "gitleaks run: non-regular content authority fails closed",
+    { status: result.status, classification: result.classification },
+    { status: "ERROR", classification: "ignore_authority" },
+  );
 }
 {
   const rootDir = makeRootDir("gitleaks-crash-root");
@@ -884,6 +1031,163 @@ governance:
 }
 
 {
+  const rootDir = makeRootDir("runner-gitleaks-content-authority-root");
+  writeManifest(
+    rootDir,
+    `schema: pipeline.manifest.v0
+
+gates:
+  security:
+    mode: blocking
+    type: automated
+
+security:
+  scanners:
+    gitleaks:
+      enabled: true
+    osv-scanner:
+      enabled: false
+    semgrep:
+      enabled: false
+    license-check:
+      enabled: false
+`,
+  );
+  const authority = gitleaksAdapter.gitleaksContentAuthorityLine({
+    RuleID: "aws-access-key",
+    File: "config/secrets.txt",
+    StartLine: 3,
+    StartColumn: 7,
+    Secret: "fixture-access-key-01",
+  });
+  writeFileSync(join(rootDir, ".gitleaksignore"), `${authority}\n`);
+  const { evidence, exitCode } = await runSecurityScan({
+    rootDir,
+    env: { PIPELINE_GITLEAKS_PATH: gitleaksFindings },
+    spawnFn: fixtureSpawnFn,
+    timeoutMs: 5000,
+    assessTrustedExecutablePath: mockAssessFixtureBinary,
+  });
+  assertEqual(
+    "runner: exact Gitleaks content authority is visible without hiding an unmatched secret",
+    {
+      exitCode,
+      findings: evidence.findings.map((finding) => finding.path),
+      ignored: evidence.scanners[0].ignored.findingCount,
+      policy: evidence.scanners[0].ignored.policy,
+    },
+    {
+      exitCode: 2,
+      findings: ["src/app.js"],
+      ignored: 1,
+      policy: "pipeline.gitleaks-content-fingerprint.v1",
+    },
+  );
+  assertEqual(
+    "runner: security policy binds the exact Gitleaks ignore authority bytes",
+    evidence.policy.inputs.gitleaksIgnoreSha256,
+    createHash("sha256").update(readFileSync(join(rootDir, ".gitleaksignore"))).digest("hex"),
+  );
+}
+
+{
+  const rootDir = makeRootDir("runner-neutral-policy-binding-root");
+  const neutralManifest = `schema: pipeline.manifest.v0
+
+security:
+  scanners:
+    gitleaks:
+      enabled: false
+    osv-scanner:
+      enabled: false
+    semgrep:
+      enabled: false
+    license-check:
+      enabled: true
+
+governance:
+  policies_path: governance/neutral-policies
+`;
+  const legacyManifest = `schema: pipeline.manifest.v0
+
+security:
+  scanners:
+    gitleaks:
+      enabled: false
+    osv-scanner:
+      enabled: false
+    semgrep:
+      enabled: false
+    license-check:
+      enabled: false
+
+governance:
+  policies_path: governance/legacy-policies
+`;
+  const neutralAllowlist = JSON.stringify({ allow: ["MIT"], deny: [] });
+  const legacyAllowlist = JSON.stringify({ allow: [], deny: ["MIT"] });
+  const declaredLicenses = JSON.stringify({ dependencies: [{ name: "pkgA", version: "1.0.0", license: "MIT" }] });
+  mkdirSync(join(rootDir, "project"), { recursive: true });
+  mkdirSync(join(rootDir, ".claude"), { recursive: true });
+  mkdirSync(join(rootDir, "governance", "neutral-policies"), { recursive: true });
+  mkdirSync(join(rootDir, "governance", "legacy-policies"), { recursive: true });
+  writeFileSync(join(rootDir, "project", "pipeline.yaml"), neutralManifest);
+  writeFileSync(join(rootDir, ".claude", "pipeline.yaml"), legacyManifest);
+  writeFileSync(join(rootDir, "governance", "neutral-policies", "license-allowlist.json"), neutralAllowlist);
+  writeFileSync(join(rootDir, "governance", "legacy-policies", "license-allowlist.json"), legacyAllowlist);
+  writeFileSync(join(rootDir, "third-party-licenses.json"), declaredLicenses);
+
+  const { evidence, exitCode } = await runSecurityScan({ rootDir, env: {}, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
+  assertEqual("runner: neutral authority selects its enabled license policy without legacy fallback", {
+    exitCode,
+    scanners: evidence.scanners.map((scanner) => [scanner.tool, scanner.status]),
+  }, { exitCode: 0, scanners: [["license-check", "PASS"]] });
+  assertEqual("runner: neutral authority evidence binds exact non-null manifest and license-policy digests", {
+    manifestSha256: evidence.policy?.inputs?.manifestSha256,
+    declaredLicensesSha256: evidence.policy?.inputs?.declaredLicensesSha256,
+    licenseAllowlistSha256: evidence.policy?.inputs?.licenseAllowlistSha256,
+  }, {
+    manifestSha256: digest(neutralManifest),
+    declaredLicensesSha256: digest(declaredLicenses),
+    licenseAllowlistSha256: digest(neutralAllowlist),
+  });
+  assertTrue("runner: neutral policy evidence does not bind legacy or mixed authority bytes",
+    evidence.policy.inputs.manifestSha256 !== digest(legacyManifest)
+      && evidence.policy.inputs.licenseAllowlistSha256 !== digest(legacyAllowlist),
+    JSON.stringify(evidence.policy));
+}
+
+{
+  const rootDir = makeRootDir("runner-mixed-authority-root");
+  mkdirSync(join(rootDir, "project"), { recursive: true });
+  mkdirSync(join(rootDir, ".claude"), { recursive: true });
+  writeFileSync(join(rootDir, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  writeFileSync(join(rootDir, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  writeFileSync(join(rootDir, ".claude", "pipeline-state.json"), "{\"schema\":\"pipeline.state.v0\"}\n");
+  const { evidence, exitCode } = await runSecurityScan({ rootDir, env: {}, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  assertEqual("runner: mixed authority is fail-closed instead of falling back to legacy", {
+    exitCode,
+    authority: evidence.execution.projectAuthority,
+    scanners: evidence.scanners.map((scanner) => [scanner.status, scanner.classification]),
+  }, {
+    exitCode: 2,
+    authority: { status: "mixed", source: null },
+    scanners: [
+      ["ERROR", "project_authority"],
+      ["ERROR", "project_authority"],
+      ["ERROR", "project_authority"],
+      ["ERROR", "project_authority"],
+    ],
+  });
+  assertEqual("runner: mixed authority evidence binds no legacy manifest", {
+    authoritySource: evidence.policy.inputs.authoritySource,
+    manifestPath: evidence.policy.inputs.manifestPath,
+    manifestSha256: evidence.policy.inputs.manifestSha256,
+  }, { authoritySource: null, manifestPath: null, manifestSha256: null });
+}
+
+{
   const rootDir = makeRootDir("runner-child-preflight-eperm-root");
   const env = {
     PIPELINE_GITLEAKS_PATH: gitleaksClean,
@@ -1035,6 +1339,88 @@ security:
   assertEqual("runner: all scanners disabled -> exit 0", exitCode, 0);
 }
 
+// ===============================================================================================
+// N3 -- semgrep.rules_dir containment guard (Critic follow-up finding, CYB-2I-1R3)
+// ===============================================================================================
+
+{
+  // A manifest-supplied (candidate-controlled, potentially untrusted) rules_dir that resolves
+  // outside rootDir must be caught and fail closed -- never passed through to the adapter, never
+  // silently dropped. `PIPELINE_SEMGREP_PATH` deliberately points at the CRASH fixture (which
+  // would itself produce a "scanner_error"-classified ERROR with a totally different reason text
+  // if it were ever actually invoked) so a passing assertion on classification/reason here also
+  // proves the adapter was never called at all.
+  const rootDir = makeRootDir("runner-rulesdir-escape-root");
+  writeManifest(
+    rootDir,
+    `schema: pipeline.manifest.v0
+
+gates:
+  security:
+    mode: blocking
+    type: automated
+
+security:
+  scanners:
+    gitleaks:
+      enabled: false
+    osv-scanner:
+      enabled: false
+    semgrep:
+      enabled: true
+      rules_dir: "../../etc"
+    license-check:
+      enabled: false
+`,
+  );
+  const env = { PIPELINE_SEMGREP_PATH: semgrepCrash };
+  const { evidence, exitCode } = await runSecurityScan({ rootDir, env, spawnFn: fixtureSpawnFn, timeoutMs: 5000, assessTrustedExecutablePath: mockAssessFixtureBinary });
+  assertEqual(
+    "runner: semgrep rules_dir escaping rootDir -> ERROR/manifest_config_invalid, adapter never invoked (N3)",
+    { status: evidence.scanners[0].status, classification: evidence.scanners[0].classification, findings: evidence.scanners[0].findingCount },
+    { status: "ERROR", classification: "manifest_config_invalid", findings: 0 },
+  );
+  assertIncludes("runner: rules_dir escape reason names the offending manifest value", evidence.scanners[0].reason, "rules_dir");
+  assertIncludes("runner: rules_dir escape reason states it resolves outside rootDir", evidence.scanners[0].reason, "outside rootDir");
+  assertEqual("runner: rules_dir escape forces blocking-class -> exit 2", exitCode, 2);
+}
+
+{
+  // An ordinary, in-tree rules_dir value is unaffected by the N3 containment guard: the adapter
+  // still runs normally and produces its real result (here, the clean fixture's PASS).
+  const rootDir = makeRootDir("runner-rulesdir-intree-root");
+  writeManifest(
+    rootDir,
+    `schema: pipeline.manifest.v0
+
+gates:
+  security:
+    mode: blocking
+    type: automated
+
+security:
+  scanners:
+    gitleaks:
+      enabled: false
+    osv-scanner:
+      enabled: false
+    semgrep:
+      enabled: true
+      rules_dir: "tooling/semgrep-rules"
+    license-check:
+      enabled: false
+`,
+  );
+  const env = { PIPELINE_SEMGREP_PATH: semgrepClean };
+  const { evidence, exitCode } = await runSecurityScan({ rootDir, env, spawnFn: fixtureSpawnFn, timeoutMs: 5000, assessTrustedExecutablePath: mockAssessFixtureBinary });
+  assertEqual(
+    "runner: ordinary in-tree semgrep rules_dir is unaffected by the N3 containment guard -> PASS",
+    { status: evidence.scanners[0].status, findings: evidence.scanners[0].findingCount },
+    { status: "PASS", findings: 0 },
+  );
+  assertEqual("runner: in-tree rules_dir -> exit 0 (clean)", exitCode, 0);
+}
+
 {
   // Exact-candidate evidence is produced only from a detached materialization,
   // never from the caller's attached worktree.
@@ -1060,6 +1446,11 @@ security:
       enabled: false
 `,
   );
+  writeLicenseFiles(rootDir, {
+    allowlist: { allow: ["MIT"], deny: [] },
+    declared: { dependencies: [{ name: "fixture", license: "MIT" }] },
+  });
+  writeFileSync(join(rootDir, ".claude", "pipeline.json"), JSON.stringify({ project: "security-fixture" }));
   writeFileSync(join(rootDir, "governed.txt"), "committed candidate bytes\\n");
   commitFixture(rootDir);
   const { evidence, exitCode } = await runSecurityScan({ rootDir, env: {}, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
@@ -1067,6 +1458,12 @@ security:
     exitCode, status: evidence.candidate.status, method: evidence.candidate.snapshot.method,
     verified: evidence.candidate.snapshot.verifiedBeforeAfter,
   }, { exitCode: 0, status: "clean", method: "git-detached-worktree.v1", verified: true });
+  assertTrue("runner: detached snapshot policy digests are bound before snapshot cleanup",
+    [evidence.policy.inputs.manifestSha256, evidence.policy.inputs.declaredLicensesSha256,
+      evidence.policy.inputs.licenseAllowlistSha256].every((digest) => /^[0-9a-f]{64}$/u.test(digest)),
+    JSON.stringify(evidence.policy.inputs));
+  assertEqual("runner: detached snapshot project identity is bound before snapshot cleanup",
+    evidence.project, "security-fixture");
   assertTrue("runner: exact candidate omits private worktree path", !JSON.stringify(evidence).includes(rootDir), JSON.stringify(evidence));
 }
 

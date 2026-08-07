@@ -33,10 +33,10 @@ function digest(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-check("F1 protected inventory is closed and names the current post-Storm baseline", () => {
+check("F1 protected inventory is closed and names the autonomous-Critic policy baseline", () => {
   assert.deepEqual(Object.keys(inventory), ["schema", "baselineLabel", "files"]);
   assert.equal(inventory.schema, "pipeline.codex-isolated-critic-protected-preimage.v1");
-  assert.equal(inventory.baselineLabel, "post-storm-v0.4.6-candidate");
+  assert.equal(inventory.baselineLabel, "nova-autonomous-critic-review-policy");
   assert.deepEqual(inventory.files.map((entry) => entry.path), EXPECTED_PATHS);
   assert.equal(new Set(inventory.files.map((entry) => entry.path)).size, EXPECTED_PATHS.length);
 });

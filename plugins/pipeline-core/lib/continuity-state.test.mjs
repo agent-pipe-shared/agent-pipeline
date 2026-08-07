@@ -4,10 +4,12 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
   CONTINUITY_STATE_CODES,
+  applyRunnerNativeContinuation,
   applyCourseDecisionIntent,
   applyDecisionSelection,
   beginCloseTransition,
   bindContinuitySessionCleanup,
+  bindContinuityResultForClose,
   clearCourseDecisionReceipt,
   clearDecisionSelection,
   compareAndSwapContinuity,
@@ -19,10 +21,14 @@ import {
   recordCloseFinalVerify,
   recordCloseReadback,
   recordCourseDecisionBrief,
+  reconcileRunnerNativeContinuation,
   releaseContinuitySessionCleanup,
   validateContinuityState,
+  planLegacyContinuityAdoption,
+  applyLegacyContinuityAdoption,
 } from "./continuity-state.mjs";
 import { computeContinuityFinalDigest } from "./continuity-host-adapter.mjs";
+import { computePoGoalDecisionReceiptDigest, computeRunnerNativeContinuationDigest } from "./runner-native-continuation.mjs";
 import { validateAgainstSchema } from "./schema-lite.mjs";
 
 let passed = 0;
@@ -219,6 +225,179 @@ check("valid queue state passes runtime and supported schema subset", () => {
   const value = state();
   assert.deepEqual(validateContinuityState(value, FEATURE), { ok: true, code: "CS-VALID" });
   assert.equal(validateAgainstSchema(value, schemaLiteSchema).valid, true);
+});
+
+check("Result-close binding changes only revision, Result, review action and resume", () => {
+  const current = state({
+    authority: {
+      prd: { path: "specs/prd.md", sha256: A },
+      spec: { path: "specs/spec.md", sha256: B },
+      result: null,
+    },
+    queueHead: queueHead({ nextAction: "review", dispatch: null }),
+  });
+  const applied = bindContinuityResultForClose(current, {
+    expectedRevision: 0,
+    result: { path: "specs/result.md", sha256: C },
+  }, FEATURE);
+  assert.equal(applied.ok, true);
+  assert.equal(applied.code, "CS-RESULT-CLOSE-APPLIED");
+  assert.equal(applied.state.revision, 1);
+  assert.deepEqual(applied.state.authority.result, { path: "specs/result.md", sha256: C });
+  assert.equal(applied.state.queueHead.nextAction, "close");
+  assert.deepEqual(applied.state.resume, {
+    mode: "immediate", sourceRevision: 1, reasonCode: "active-turn",
+  });
+  const expected = structuredClone(current);
+  expected.revision = 1;
+  expected.authority.result = { path: "specs/result.md", sha256: C };
+  expected.queueHead.nextAction = "close";
+  expected.resume = { mode: "immediate", sourceRevision: 1, reasonCode: "active-turn" };
+  assert.deepEqual(applied.state, expected);
+});
+
+check("Result-close binding accepts only its exact committed replay", () => {
+  const current = state({
+    authority: {
+      prd: { path: "specs/prd.md", sha256: A },
+      spec: { path: "specs/spec.md", sha256: B },
+      result: null,
+    },
+    queueHead: queueHead({ nextAction: "review", dispatch: null }),
+  });
+  const request = {
+    expectedRevision: 0,
+    result: { path: "specs/result.md", sha256: C },
+  };
+  const applied = bindContinuityResultForClose(current, request, FEATURE);
+  const replay = bindContinuityResultForClose(applied.state, request, FEATURE);
+  assert.equal(replay.ok, true);
+  assert.equal(replay.code, "CS-RESULT-CLOSE-REPLAY");
+  assert.equal(replay.mutated, false);
+  const conflict = bindContinuityResultForClose(applied.state, {
+    ...request, result: { path: "specs/result.md", sha256: D },
+  }, FEATURE);
+  assert.equal(conflict.code, "CS-RESULT-CLOSE-CONFLICT");
+});
+
+check("Result-close binding makes an exact bootstrap-bound Result close-ready", () => {
+  const current = state({
+    revision: 2,
+    authority: {
+      prd: { path: "specs/prd.md", sha256: A },
+      spec: { path: "specs/spec.md", sha256: B },
+      result: { path: "specs/result.md", sha256: C },
+    },
+    queueHead: queueHead({ nextAction: "review", dispatch: null }),
+    resume: { mode: "immediate", sourceRevision: 2, reasonCode: "active-turn" },
+  });
+  const applied = bindContinuityResultForClose(current, {
+    expectedRevision: 2,
+    result: { path: "specs/result.md", sha256: C },
+  }, FEATURE);
+  assert.equal(applied.ok, true);
+  assert.equal(applied.code, "CS-RESULT-CLOSE-APPLIED");
+  assert.equal(applied.state.revision, 3);
+  assert.equal(applied.state.queueHead.nextAction, "close");
+  assert.deepEqual(applied.state.authority.result, current.authority.result);
+});
+
+check("Result-close binding rejects non-review, retries and active lifecycle work", () => {
+  const base = state({
+    authority: {
+      prd: { path: "specs/prd.md", sha256: A },
+      spec: { path: "specs/spec.md", sha256: B },
+      result: null,
+    },
+    queueHead: queueHead({ nextAction: "review", dispatch: null }),
+  });
+  const request = {
+    expectedRevision: 0,
+    result: { path: "specs/result.md", sha256: C },
+  };
+  for (const mutate of [
+    (value) => { value.queueHead.nextAction = "verify"; },
+    (value) => { value.queueHead.productRetryCount = 1; },
+    (value) => { value.recovery = {
+      originLaneId: "lane-a", originDispatchId: "dispatch-a", originAttemptId: "attempt-a",
+      environmentEvidenceSha256: A, sameLaneRetryProhibited: true,
+      fallbackStatus: "failed", fallbackLaneId: "lane-b", fallbackDispatchId: "dispatch-b",
+      narrowingContractSha256: B, originProductRetryCount: 0, resultDigest: null, count: 1,
+    }; value.queueHead = null; value.blocker = {
+      type: "environment", signature: "blocked", resumeCondition: { kind: "manual", evidenceSha256: null },
+      decisionBrief: null,
+    }; },
+    (value) => { value.closeTransition = {}; },
+  ]) {
+    const changed = structuredClone(base);
+    mutate(changed);
+    assert.equal(bindContinuityResultForClose(changed, request, FEATURE).ok, false);
+  }
+  assert.equal(bindContinuityResultForClose(base, { ...request, expectedRevision: 1 }, FEATURE).code, "CS-STALE");
+  assert.equal(bindContinuityResultForClose(base, request, "other-feature").ok, false);
+});
+
+// AC-047-27 pure adoption contract: the planner is exact, read-only, and the
+// apply transition changes only the approved authority/result and queue action.
+check("legacy adoption plan/apply accepts the exact six-key request", () => {
+  const legacy = state({
+    featureId: "codex-onboarding-0.4.5", revision: 3,
+    authority: {
+      prd: { path: "specs/2026-07-25-codex-onboarding-0.4.5/prd_codex-onboarding-0.4.5.md", sha256: "9825ca78a3765dc71ee2793ef9f84f2eaf998bf297086d869be3562d792cdb94" },
+      spec: { path: "specs/2026-07-25-codex-onboarding-0.4.5/spec.md", sha256: "5a95aa55b393a88e0d7ab1a8006957fc04d80bcae24399b40f3ffa8e4eb3cf70" }, result: null,
+    },
+    queueHead: { packageId: "continuity-adoption", actionId: "review-active-feature", nextAction: "review", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null },
+    capacity: { concurrencyLimit: 4, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" },
+  });
+  delete legacy.closeTransition;
+  const request = {
+    expectedRevision: 3,
+    currentPrd: { path: "specs/2026-07-25-codex-onboarding-0.4.5/prd_codex-onboarding-0.4.5.md", sha256: "217eff325fffa5d82d5d49f31883c426dca74c42879aaae0a70da87be8e492ae" },
+    spec: { path: "specs/2026-07-25-codex-onboarding-0.4.5/spec.md", sha256: "5a95aa55b393a88e0d7ab1a8006957fc04d80bcae24399b40f3ffa8e4eb3cf70" },
+    result: { path: "specs/2026-07-25-codex-onboarding-0.4.5/result.md", sha256: "ceed30ddce48d921f2afbbb44d02a3fe5301302ad07fab3f41dfbc149f657b73" },
+    closeEvidence: { path: "specs/2026-07-25-codex-onboarding-0.4.5/legacy-continuity-close-evidence.md", sha256: "8fe8c79f464e2a3f93f2e300fb6e74cccf6791f5920f4a857597f516d97917a1" },
+    history: { commit: "7a62a4ef9febba844cf5be8a659177b37c6a5da5", path: "specs/2026-07-25-codex-onboarding-0.4.5/prd_codex-onboarding-0.4.5.md", sha256: "9825ca78a3765dc71ee2793ef9f84f2eaf998bf297086d869be3562d792cdb94" },
+  };
+  const planned = planLegacyContinuityAdoption(legacy, request);
+  assert.equal(planned.ok, true);
+  const applied = applyLegacyContinuityAdoption(legacy, request, "codex-onboarding-0.4.5");
+  assert.equal(applied.ok, true);
+  assert.equal(applied.state.revision, 4);
+  assert.equal(applied.state.queueHead.nextAction, "close");
+  assert.deepEqual(applied.state.authority.spec, legacy.authority.spec);
+  assert.deepEqual(applied.state.runtime, legacy.runtime);
+  assert.equal(Object.hasOwn(applied.state, "closeTransition"), false);
+  const forged = structuredClone(legacy);
+  forged.revision += 1;
+  forged.authority.prd.sha256 = "f".repeat(64);
+  assert.equal(compareAndSwapContinuity(legacy, { expectedRevision: 3, next: forged }, "codex-onboarding-0.4.5").code, "CS-PROTECTED-AUTHORITY");
+
+  const requestMutations = [
+    ["top-level extra", (r) => { r.extra = true; }], ["missing history", (r) => { delete r.history; }],
+    ["currentPrd extra", (r) => { r.currentPrd.extra = true; }], ["spec missing sha", (r) => { delete r.spec.sha256; }],
+    ["result extra", (r) => { r.result.extra = true; }], ["closeEvidence missing path", (r) => { delete r.closeEvidence.path; }],
+    ["history extra", (r) => { r.history.extra = true; }], ["wrong feature", (r) => { legacy.featureId = FEATURE; }],
+    ["wrong revision", (r) => { r.expectedRevision = 2; }], ["wrong package", (r) => { legacy.queueHead.packageId = "wrong"; }],
+    ["wrong action", (r) => { legacy.queueHead.actionId = "wrong"; }], ["wrong nextAction", (r) => { legacy.queueHead.nextAction = "close"; }],
+    ["retry drift", (r) => { legacy.queueHead.productRetryCount = 1; }], ["dispatch", (r) => { legacy.queueHead.dispatch = {}; }],
+    ["blocker", (r) => { legacy.blocker = {}; }], ["ack", (r) => { legacy.acknowledgedFinal = {}; }],
+    ["recovery", (r) => { legacy.recovery = {}; }], ["decision", (r) => { legacy.decisionTxn = {}; }],
+    ["close transition", (r) => { legacy.closeTransition = {}; }],
+  ];
+  for (const [label, mutate] of requestMutations) {
+    const pristine = structuredClone(legacy); const req = structuredClone(request); mutate(req, legacy); const supplied = structuredClone(legacy);
+    const result = planLegacyContinuityAdoption(legacy, req);
+    assert.equal(result.ok, false, `mutation rejected: ${label}`);
+    assert.deepEqual(legacy, supplied, `input unchanged: ${label}`);
+    Object.assign(legacy, pristine);
+  }
+});
+
+check("legacy adoption rejects extra request keys and authority/root drift", () => {
+  const base = state({ featureId: "codex-onboarding-0.4.5", revision: 3, closeTransition: null });
+  assert.equal(planLegacyContinuityAdoption(base, { expectedRevision: 3, extra: true }).ok, false);
+  const malformed = structuredClone(base); malformed.closeTransition = undefined;
+  assert.equal(planLegacyContinuityAdoption(malformed, {}).ok, false);
 });
 
 check("runtime may carry only a redacted session-cleanup descriptor handle", () => {
@@ -717,7 +896,7 @@ for (const [name, mutate] of [
 
 function decisionTxn() {
   return {
-    idempotencyKey: "decision-txn-01",
+    idempotencyKey: "decision-txn-fixture",
     briefSha256: B,
     intentSha256: C,
     selectedOptionId: "defer",
@@ -779,7 +958,7 @@ check("matching durable decision receipt clears marker at dispatchable revision"
     resume: { mode: "resume-on-next-turn", sourceRevision: 1, reasonCode: "blocker" },
   });
   const receipt = {
-    idempotencyKey: "decision-txn-01", briefSha256: B, intentSha256: C,
+    idempotencyKey: "decision-txn-fixture", briefSha256: B, intentSha256: C,
     selectedOptionId: "defer", receiptSha256: D, selectedRevision: 1, dispatchableRevision: 2,
   };
   const cleared = clearDecisionSelection(current, { expectedRevision: 1, receipt }, FEATURE);
@@ -804,7 +983,7 @@ check("mismatched decision receipt is zero mutation", () => {
 
 check("clearing without a live decision marker never claims replay", () => {
   const receipt = {
-    idempotencyKey: "decision-txn-01", briefSha256: B, intentSha256: C,
+    idempotencyKey: "decision-txn-fixture", briefSha256: B, intentSha256: C,
     selectedOptionId: "defer", receiptSha256: D, selectedRevision: 1, dispatchableRevision: 2,
   };
   const result = clearDecisionSelection(state(), { expectedRevision: 0, receipt }, FEATURE);
@@ -1150,6 +1329,111 @@ check("persisted close transition fails closed on authority or delivery-candidat
 check("closed code vocabulary has no raw-data channel", () => {
   assert.equal(new Set(CONTINUITY_STATE_CODES).size, CONTINUITY_STATE_CODES.length);
   assert.equal(CONTINUITY_STATE_CODES.every((code) => /^CS-[A-Z0-9-]+$/.test(code)), true);
+});
+
+const NATIVE_NOW = "2026-07-25T12:00:00.000Z";
+const nativeRunner = { runnerId: "codex", adapterVersion: "v2", capability: "available" };
+function nativeState(overrides = {}) {
+  return state({
+    revision: 3,
+    queueHead: queueHead({ packageId: "b0", actionId: "implement", nextAction: "verify", dispatch: null }),
+    resume: { mode: "immediate", sourceRevision: 3, reasonCode: "active-turn" },
+    ...overrides,
+  });
+}
+function nativeAdapter(calls) {
+  return async ({ action, generation }) => {
+    calls.push({ action, generation });
+    if (action === "clear") return { ok: true, code: "CGH-CLEARED", status: "cleared", readback: { goalIdSha256: null, generation, status: "cleared" } };
+    if (action === "pause") return { ok: true, code: "CGH-PAUSED", status: "paused", readback: { goalIdSha256: D, generation, observedAt: NATIVE_NOW, status: "paused" } };
+    return { ok: true, code: "CGH-ACTIVE", status: "active", readback: { goalIdSha256: D, generation, observedAt: NATIVE_NOW, status: "active" } };
+  };
+}
+async function asyncCheck(name, fn) { await fn(); passed += 1; process.stdout.write(`ok ${passed} - ${name}\n`); }
+
+await asyncCheck("native goal activation returns an adapter-readback-bound CAS successor", async () => {
+  const calls = []; const current = nativeState(); delete current.authority.plan;
+  assert.equal(validateContinuityState(current, FEATURE).ok, true);
+  const result = await reconcileRunnerNativeContinuation({ continuity: current, activeFeature: { id: FEATURE, planPath: "specs/prd.md", phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, acceptance: [{ criterionId: "native-goal", status: "pending", evidenceSha256: null }], evidence: [{ kind: "test", path: "evidence/verify.json", fileSha256: D, recordSha256: null }], event: { kind: "activate", atRevision: 3 }, adapter: nativeAdapter(calls) });
+  assert.equal(result.ok, true); assert.deepEqual(calls, [{ action: "set", generation: 0 }]);
+  assert.equal(result.next.nativeContinuation.status, "active");
+  assert.equal(result.next.nativeContinuation.subject.planSha256, current.authority.prd.sha256);
+  assert.equal(compareAndSwapContinuity(current, { expectedRevision: result.expectedRevision, next: result.next }, FEATURE).code, "CS-PROTECTED-NATIVE-CONTINUATION");
+  assert.equal(applyRunnerNativeContinuation(current, { expectedRevision: result.expectedRevision, next: result.next }, FEATURE).ok, true);
+});
+
+await asyncCheck("additive input persists a bounded digest and continues without duplicate goal activation", async () => {
+  const calls = [];
+  const activated = await reconcileRunnerNativeContinuation({ continuity: nativeState(), activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "activate", atRevision: 3 }, adapter: nativeAdapter(calls) });
+  const added = await reconcileRunnerNativeContinuation({ continuity: activated.next, activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, additiveInput: { kind: "question", evidenceSha256: D }, adapter: nativeAdapter(calls) });
+  assert.equal(added.ok, true); assert.equal(added.action, "none"); assert.equal(calls.length, 1);
+  assert.equal(added.next.nativeContinuation.progress.at(-1).kind, "input-question");
+});
+
+await asyncCheck("resume refreshes the active native-goal readback without advancing its generation", async () => {
+  const calls = [];
+  const activated = await reconcileRunnerNativeContinuation({ continuity: nativeState(), activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "activate", atRevision: 3 }, adapter: nativeAdapter(calls) });
+  const resumed = await reconcileRunnerNativeContinuation({ continuity: activated.next, activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "resume", atRevision: 4 }, adapter: nativeAdapter(calls) });
+  assert.equal(resumed.ok, true); assert.equal(resumed.code, "RNC-REFRESH"); assert.equal(resumed.action, "set");
+  assert.deepEqual(calls, [{ action: "set", generation: 0 }, { action: "set", generation: 0 }]);
+  assert.equal(resumed.next.nativeContinuation.status, "active");
+  assert.equal(resumed.next.nativeContinuation.generation.number, 0);
+  assert.equal(resumed.next.nativeContinuation.readback.observedAt, NATIVE_NOW);
+});
+
+await asyncCheck("a recorded PO decision resumes the same native Goal after an exact paused readback", async () => {
+  const calls = [];
+  const activated = await reconcileRunnerNativeContinuation({ continuity: nativeState(), activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "activate", atRevision: 3 }, adapter: nativeAdapter(calls) });
+  const paused = await reconcileRunnerNativeContinuation({ continuity: activated.next, activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "po-gate", atRevision: 4, evidenceSha256: D }, adapter: nativeAdapter(calls) });
+  assert.equal(paused.action, "pause"); assert.equal(paused.continuation.status, "paused-po-gate");
+  const poDecisionReceipt = { schema: "pipeline.po-goal-decision-receipt.v1", featureId: FEATURE, continuationId: "nova-b0", pausedRecordSha256: paused.continuation.recordSha256, pauseRevision: paused.continuation.terminal.atRevision, resolvedRevision: 5, decision: "resume", receiptSha256: null };
+  poDecisionReceipt.receiptSha256 = computePoGoalDecisionReceiptDigest(poDecisionReceipt);
+  const resumed = await reconcileRunnerNativeContinuation({ continuity: paused.next, activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "po-gate-resolved", atRevision: 5, evidenceSha256: poDecisionReceipt.receiptSha256, pausedRecordSha256: paused.continuation.recordSha256, poDecisionReceipt }, adapter: nativeAdapter(calls) });
+  assert.equal(resumed.action, "set"); assert.equal(resumed.continuation.status, "active");
+  assert.equal(resumed.continuation.generation.number, paused.continuation.generation.number);
+  assert.equal(resumed.continuation.reason.evidenceSha256, poDecisionReceipt.receiptSha256);
+  assert.deepEqual(resumed.continuation.resolution, poDecisionReceipt);
+  assert.deepEqual(calls, [{ action: "set", generation: 0 }, { action: "pause", generation: 0 }, { action: "set", generation: 0 }]);
+});
+
+await asyncCheck("a later named PO gate clears the prior resolution receipt before persisting its new pause", async () => {
+  const calls = [];
+  const activated = await reconcileRunnerNativeContinuation({ continuity: nativeState(), activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "activate", atRevision: 3 }, adapter: nativeAdapter(calls) });
+  const firstPause = await reconcileRunnerNativeContinuation({ continuity: activated.next, activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "po-gate", atRevision: 4, evidenceSha256: D }, adapter: nativeAdapter(calls) });
+  const receipt = { schema: "pipeline.po-goal-decision-receipt.v1", featureId: FEATURE, continuationId: "nova-b0", pausedRecordSha256: firstPause.continuation.recordSha256, pauseRevision: firstPause.continuation.terminal.atRevision, resolvedRevision: 5, decision: "resume", receiptSha256: null };
+  receipt.receiptSha256 = computePoGoalDecisionReceiptDigest(receipt);
+  const resumed = await reconcileRunnerNativeContinuation({ continuity: firstPause.next, activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "po-gate-resolved", atRevision: 5, evidenceSha256: receipt.receiptSha256, pausedRecordSha256: firstPause.continuation.recordSha256, poDecisionReceipt: receipt }, adapter: nativeAdapter(calls) });
+  const secondPause = await reconcileRunnerNativeContinuation({ continuity: resumed.next, activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "po-gate", atRevision: 6, evidenceSha256: E }, adapter: nativeAdapter(calls) });
+  assert.equal(secondPause.ok, true); assert.equal(secondPause.continuation.status, "paused-po-gate"); assert.equal(secondPause.continuation.resolution, null);
+});
+
+await asyncCheck("resume degrades stale active-goal identity instead of trusting it or overwriting user control", async () => {
+  const calls = [];
+  const activated = await reconcileRunnerNativeContinuation({ continuity: nativeState(), activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "activate", atRevision: 3 }, adapter: nativeAdapter(calls) });
+  const resumed = await reconcileRunnerNativeContinuation({ continuity: activated.next, activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "compact-reentry", atRevision: 4 }, adapter: async (input) => { calls.push(input); return { ok: false, code: "CGH-ACTIVE-IDENTITY-MISMATCH", status: "unavailable", readback: null }; } });
+  assert.equal(resumed.ok, true); assert.equal(resumed.code, "RNC-REFRESH"); assert.equal(resumed.next.nativeContinuation.status, "unavailable");
+  assert.equal(resumed.next.nativeContinuation.runner.capability, "unavailable");
+  assert.equal(resumed.next.nativeContinuation.readback, null);
+  assert.equal(resumed.next.nativeContinuation.terminal.atRevision, 4);
+  assert.deepEqual(calls.map(({ action, generation }) => ({ action, generation })), [{ action: "set", generation: 0 }, { action: "set", generation: 0 }]);
+});
+
+await asyncCheck("verified completion requires acceptance evidence and unsupported capability persists degraded evidence", async () => {
+  const calls = [];
+  const activated = await reconcileRunnerNativeContinuation({ continuity: nativeState(), activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, acceptance: [{ criterionId: "native-goal", status: "passed", evidenceSha256: D }], event: { kind: "activate", atRevision: 3 }, adapter: nativeAdapter(calls) });
+  const complete = await reconcileRunnerNativeContinuation({ continuity: activated.next, activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "verified-completion", atRevision: 4, evidenceSha256: D }, adapter: nativeAdapter(calls) });
+  assert.equal(complete.continuation.status, "achieved");
+  const unavailable = await reconcileRunnerNativeContinuation({ continuity: nativeState(), activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: { runnerId: "claude", adapterVersion: "v1", capability: "available" }, event: { kind: "activate", atRevision: 3 }, adapter: async () => ({ ok: false, code: "CLG-CAPABILITY", status: "unavailable", readback: null }) });
+  assert.equal(unavailable.ok, true); assert.equal(unavailable.continuation.status, "unavailable");
+});
+
+await asyncCheck("generic CAS cannot forge or replace native readback evidence", async () => {
+  const calls = []; const current = nativeState();
+  const activated = await reconcileRunnerNativeContinuation({ continuity: current, activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "activate", atRevision: 3 }, adapter: nativeAdapter(calls) });
+  const forged = structuredClone(activated.next);
+  forged.nativeContinuation.readback.goalIdSha256 = E;
+  forged.nativeContinuation.recordSha256 = computeRunnerNativeContinuationDigest(forged.nativeContinuation);
+  assert.equal(compareAndSwapContinuity(current, { expectedRevision: 3, next: forged }, FEATURE).code, "CS-PROTECTED-NATIVE-CONTINUATION");
 });
 
 process.stdout.write(`1..${passed}\n# pass ${passed}\n`);

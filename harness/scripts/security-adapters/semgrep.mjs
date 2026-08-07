@@ -20,6 +20,15 @@
  * SEVERITY MAPPING (per briefing, semgrep's three native severities -- high confidence, not
  * a guess): `extra.severity` "ERROR" -> high, "WARNING" -> medium, "INFO" -> info. Any other
  * or missing value maps defensively to "medium" (never silently dropped, never crashes).
+ *
+ * CAPABILITY_CONTRACT_V2 (CYB-2D, additive): a frozen, machine-readable transcription of the
+ * behavior documented above, exported for CYB-2E's later aggregator work to read a uniform
+ * capability contract across all four scanner adapters without re-deriving it from prose
+ * comments. Purely additive data -- does not change any existing behavior in this file. Its
+ * `networkBehavior` is represented honestly as conditional: local-only when `config.rulesDir`
+ * names a local rules directory, but network-optional when absent (the `"auto"` fallback is
+ * semgrep's own built-in registry mode, whose network use is controlled by the semgrep binary
+ * itself, not by this adapter).
  */
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -180,3 +189,56 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
 
   return { status: findings.length > 0 ? "FINDINGS" : "PASS", classification: findings.length > 0 ? "findings" : "success", findings, raw: stdout };
 }
+
+/**
+ * CAPABILITY_CONTRACT_V2 -- machine-readable capability-contract descriptor (CYB-2D). A pure,
+ * static, additive transcription of behavior this file already has and already documents in
+ * its header comment above -- consumed by CYB-2E's later aggregator work to read a uniform
+ * capability contract across all four adapters without re-deriving it from prose. Adding this
+ * export changes none of `run()`/`isInstalled()`/`mapSemgrepSeverity()`'s existing behavior.
+ */
+export const CAPABILITY_CONTRACT_V2 = Object.freeze({
+  contractVersion: "v2",
+  tool: name,
+  kind: "capability",
+  capabilityId: "cap.sast",
+  controlRef: null,
+  supportedEcosystems: null,
+  supportedEcosystemsNote:
+    "semgrep's rule-based static analysis is language/rule-scoped, not package-ecosystem-scoped, in this adapter -- config.rulesDir (when present) names a local rules directory passed verbatim as --config, and this adapter does not itself declare or restrict a language/ecosystem allowlist",
+  toolVersionConstraint: null,
+  networkBehavior: "network-optional",
+  networkBehaviorNote:
+    "offline when config.rulesDir names a local rules directory (used verbatim as --config); the 'auto' fallback used when config.rulesDir is absent is semgrep's own built-in ruleset-registry mode, which may involve a network fetch depending on the real semgrep binary's own behavior -- this adapter does not itself control or guarantee that",
+  requiredInputs: ["rootDir"],
+  requiredInputsNote:
+    "config.rulesDir is optional -- when absent, run() falls back to the literal string \"auto\" as semgrep's --config value",
+  severityNormalization: Object.freeze({
+    source: "extra.severity",
+    mapping: Object.freeze({ ERROR: "high", WARNING: "medium", INFO: "info" }),
+    fallback: Object.freeze({
+      value: "medium",
+      rule: "defensive fallback for any other or missing extra.severity value -- never silently dropped, never crashes",
+    }),
+  }),
+  confidenceNormalization: null,
+  coverageLimitations: Object.freeze([
+    "Coverage is entirely determined by the active rule set -- a local rules directory (config.rulesDir, if configured) or semgrep's own built-in 'auto' registry mode when not configured; this adapter does not itself enumerate which rules ran.",
+    "Single-shot, full scan per invocation over rootDir (`semgrep scan --json --config <rules_dir||auto> <root>`) -- no incremental/diff mechanism; every run() call re-scans the entirety of rootDir from scratch.",
+  ]),
+  exitCodeMapping: Object.freeze({
+    completed:
+      "zero child exit AND a JSON body carrying a results[] array AND no error payload -- only this combination is a completed scan (PASS/FINDINGS based on findings.length)",
+    nonzero: "scanner_error (ERROR) -- any nonzero child exit, fail-closed regardless of stdout content",
+    errorPayload:
+      "scanner_error (ERROR) -- JSON body carries a non-empty errors[] array, even at exit 0 with an otherwise clean-looking results[] array",
+    missingResults:
+      "scanner_error (ERROR) -- JSON body lacks a results[] array (or it is not an array), even at exit 0 and even if stdout otherwise looks like a clean report",
+  }),
+  timeoutContract: Object.freeze({
+    defaultMs: 60000,
+    cancellable: true,
+    mechanism: "node:child_process spawnSync timeout option (ETIMEDOUT)",
+  }),
+  evidenceFields: Object.freeze(["tool", "severity", "rule", "path", "line", "msg"]),
+});

@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.publication-executor-result.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "status",
+    "code",
+    "channel",
+    "transactionId",
+    "destinationDigest",
+    "destinationRef",
+    "candidateOid",
+    "candidateTree",
+    "authorityRawSha256",
+    "publicationReceiptDigest",
+    "executorSha256",
+    "pushAttempted",
+    "readback",
+    "receiptSha256"
+  ],
+  "properties": {
+    "schema": { "const": "pipeline.publication-executor-result.v1" },
+    "status": { "enum": ["closed", "reapproval-required", "blocked-recovery"] },
+    "code": { "enum": ["PX-CLOSED", "PX-REAPPROVAL-REQUIRED", "PX-BLOCKED-RECOVERY"] },
+    "channel": { "enum": ["private", "neutral-public"] },
+    "transactionId": { "type": "string", "pattern": "^[A-Za-z0-9._:@/-]{1,200}$" },
+    "destinationDigest": { "$ref": "#/$defs/sha256" },
+    "destinationRef": { "const": "refs/heads/main" },
+    "candidateOid": { "$ref": "#/$defs/oid" },
+    "candidateTree": { "$ref": "#/$defs/oid" },
+    "authorityRawSha256": { "$ref": "#/$defs/sha256" },
+    "publicationReceiptDigest": {
+      "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }]
+    },
+    "executorSha256": { "$ref": "#/$defs/sha256" },
+    "pushAttempted": { "type": "boolean" },
+    "readback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repositoryKind", "alternatesDisabled", "oid", "tree"],
+      "properties": {
+        "repositoryKind": { "const": "fresh-disposable" },
+        "alternatesDisabled": { "const": true },
+        "oid": { "oneOf": [{ "$ref": "#/$defs/oid" }, { "type": "null" }] },
+        "tree": { "oneOf": [{ "$ref": "#/$defs/oid" }, { "type": "null" }] }
+      }
+    },
+    "receiptSha256": { "$ref": "#/$defs/sha256" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "closed" } } },
+      "then": {
+        "properties": {
+          "code": { "const": "PX-CLOSED" },
+          "publicationReceiptDigest": { "$ref": "#/$defs/sha256" }
+        }
+      },
+      "else": {
+        "properties": {
+          "publicationReceiptDigest": { "type": "null" }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "oid": { "type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

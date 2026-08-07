@@ -3,7 +3,7 @@
 
 /** Fixed Linux systemd-inhibit payload: it exits on controller loss/mismatch. */
 import { readLinuxProcessIdentity, SESSION_POWER_LEASE_SECONDS } from "../lib/session-power.mjs";
-import { pathToFileURL } from "node:url";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 function parse(argv) {
   if (argv.length !== 6 || argv[0] !== "--controller-pid" || argv[2] !== "--controller-start" || argv[4] !== "--lease-seconds") throw new Error("fixed helper arguments are invalid");
@@ -24,5 +24,5 @@ function main(argv = process.argv.slice(2)) {
   return 0;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) process.exitCode = main();
+if (isDirectInvocation(import.meta.url)) process.exitCode = main();
 export { main, ownerIsExact, parse };

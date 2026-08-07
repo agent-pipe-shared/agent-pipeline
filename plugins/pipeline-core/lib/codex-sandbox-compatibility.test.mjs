@@ -8,8 +8,10 @@ import test from "node:test";
 import { INTERMEDIATE_LITERAL, WEAK_LITERAL, buildCompatibilityProjection, canonicalJson, classifyCompatibility, compatibilityReceiptDigest, decideFallback, deriveAssurance, loadCompatibilityPolicy, sha256, validateCompatibilityPolicy } from "./codex-sandbox-compatibility.mjs";
 
 const D = "a".repeat(64);
+const CLI_VERSION = "0.146.0";
+const CLI_SHA256 = "d".repeat(64);
 test("F4 policy and projection schemas parse and close their root vocabulary", () => {
-  for (const path of [new URL("../config/codex-sandbox-compatibility.schema.json", import.meta.url), new URL("../scripts/codex-sandbox-compatibility-receipt.schema.json", import.meta.url)]) {
+  for (const path of [new URL("../config/codex-sandbox-compatibility.v2.schema.json", import.meta.url), new URL("../scripts/codex-sandbox-compatibility-receipt.schema.json", import.meta.url)]) {
     const schema = JSON.parse(readFileSync(path, "utf8"));
     assert.equal(schema.additionalProperties, false);
   }
@@ -19,7 +21,7 @@ function observation(policy) {
   const nowMs = 1_000_000;
   const preflightReceipt = {
     schema: "pipeline.codex-sandbox-preflight.v1",
-    cli: { version: entry.cliVersion, artifactSha256: entry.releasedArtifactSha256 },
+    cli: { version: CLI_VERSION, artifactSha256: CLI_SHA256 },
     profile: { id: entry.permissionProfileId, rawSha256: entry.permissionProfileSha256 },
     platform: { kernelClass: entry.kernelClass, filesystemClass: entry.filesystemClass },
     networkEnabled: true,
@@ -27,7 +29,7 @@ function observation(policy) {
     eligibility: "intermediate",
   };
   return {
-    runnerId: entry.runnerId, cliVersion: entry.cliVersion, releasedArtifactSha256: entry.releasedArtifactSha256,
+    runnerId: entry.runnerId, cliVersion: CLI_VERSION, releasedArtifactSha256: CLI_SHA256,
     kernelClass: entry.kernelClass, filesystemClass: entry.filesystemClass, permissionProfileId: entry.permissionProfileId,
     permissionProfileSha256: entry.permissionProfileSha256, bootId: "boot-1", nowMs,
     preflight: { bootId: "boot-1", observedAtMs: nowMs - 1, rawSha256: sha256(Buffer.from(canonicalJson(preflightReceipt))), schemaSha256: entry.preflightSchemaSha256, receipt: preflightReceipt },
@@ -36,17 +38,21 @@ function observation(policy) {
 }
 function proven(kind) { return { state: "proven", evidence: [{ kind, locator: "receipt", rawSha256: D }] }; }
 
-test("committed registry is closed, exact-versioned and has exactly one fallback", () => {
-  const { value } = loadCompatibilityPolicy();
+test("committed registry is closed, semantic-version-agnostic and has exactly one fallback", () => {
+  const { path, value } = loadCompatibilityPolicy();
   assert.equal(validateCompatibilityPolicy(value), value);
+  assert.match(path, /codex-sandbox-compatibility\.v2\.json$/u);
   assert.equal(value.fallback.assuranceLiteral, WEAK_LITERAL);
-  assert.equal(value.entries.every((entry) => entry.cliVersion === "0.144.6" && !/[<>=*]/.test(entry.cliVersion)), true);
+  assert.equal(value.entries.every((entry) => entry.compatibilityClass === "codex-sandbox-state-v1" && !Object.hasOwn(entry, "cliVersion") && !Object.hasOwn(entry, "releasedArtifactSha256")), true);
 });
 
-test("unknown version, artifact and stale/foreign-boot evidence fail closed", () => {
+test("newer attested versions pass while binary drift and stale/foreign-boot evidence fail closed", () => {
   const policy = loadCompatibilityPolicy().value;
-  const unknown = observation(policy); unknown.cliVersion = "0.144.7";
-  assert.equal(classifyCompatibility(policy, unknown).state, "unsupported");
+  const newer = observation(policy); newer.cliVersion = "0.146.0"; newer.preflight.receipt.cli.version = newer.cliVersion;
+  newer.preflight.rawSha256 = sha256(Buffer.from(canonicalJson(newer.preflight.receipt)));
+  assert.equal(classifyCompatibility(policy, newer).state, "intermediate-preflight-eligible");
+  const binaryDrift = observation(policy); binaryDrift.releasedArtifactSha256 = "b".repeat(64);
+  assert.equal(classifyCompatibility(policy, binaryDrift).state, "diagnostic-only");
   const stale = observation(policy); stale.nowMs += policy.maxEvidenceAgeMs + 1;
   assert.equal(classifyCompatibility(policy, stale).state, "intermediate-preflight-candidate");
   const foreign = observation(policy); foreign.preflight.bootId = "boot-2";

@@ -1,0 +1,12 @@
+{
+  "schema": "pipeline.threat-model-approval-receipt.v1",
+  "receiptId": "po-cyb-4-2026-08-01",
+  "authority": "human",
+  "decision": "approved",
+  "candidate": {
+    "commit": "e7cca89b0e166eac3711d4173a67f261c7229938",
+    "tree": "7afe1851e8baefadd97aa126c0a548e8b3b4cdfa"
+  },
+  "policyRevision": "cyb-4-policy-v1",
+  "modelDigest": "16285da645b4a8fa3c74adde01a3db6fbb718c5d6b92511a86506664407c2d2f"
+}

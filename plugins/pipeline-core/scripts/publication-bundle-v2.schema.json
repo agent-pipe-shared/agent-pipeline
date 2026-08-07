@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.publication-channel.v2",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema", "channel", "transactionId", "revision", "priorStateSha256", "phase", "repositoryFingerprint", "sourceCommit", "sourceTree", "remoteFingerprint", "remoteName", "destinationRef", "remotePreimageOid", "candidateOid", "candidateTree", "ancestry", "identityProbe", "verifyEvidence", "securityEvidence", "criticEvidence", "releasePreflightEvidence", "capabilityPreflight", "fastForwardProof", "executorSha256", "neutralEvidence", "approval", "pushIntent", "observation", "readback", "reason", "receiptDigest"],
+  "properties": {
+    "schema": {"const": "pipeline.publication-channel.v2"}, "channel": {"enum": ["private", "neutral-public"]}, "transactionId": {"type": "string"},
+    "revision": {"type": "integer", "minimum": 0}, "priorStateSha256": {"$ref": "#/$defs/nullableDigest"},
+    "phase": {"enum": ["prepared", "approved", "push-authorized", "pushed-observed", "readback-running", "closed", "reapproval-required", "blocked-recovery"]},
+    "repositoryFingerprint": {"$ref": "#/$defs/digest"}, "sourceCommit": {"$ref": "#/$defs/oid"}, "sourceTree": {"$ref": "#/$defs/oid"},
+    "remoteFingerprint": {"$ref": "#/$defs/digest"}, "remoteName": {"type": "string"}, "destinationRef": {"type": "string", "pattern": "^refs/heads/[A-Za-z0-9._/-]+$"},
+    "remotePreimageOid": {"oneOf": [{"$ref": "#/$defs/oid"}, {"type": "null"}]}, "candidateOid": {"$ref": "#/$defs/oid"}, "candidateTree": {"$ref": "#/$defs/oid"},
+    "ancestry": {"type": "object", "additionalProperties": false, "required": ["baseOid", "candidateOid", "descends"], "properties": {"baseOid": {"oneOf": [{"$ref": "#/$defs/oid"}, {"type": "null"}]}, "candidateOid": {"$ref": "#/$defs/oid"}, "descends": {"const": true}}},
+    "identityProbe": {"$ref": "#/$defs/evidence"}, "verifyEvidence": {"$ref": "#/$defs/evidence"}, "securityEvidence": {"$ref": "#/$defs/evidence"}, "criticEvidence": {"$ref": "#/$defs/evidence"}, "releasePreflightEvidence": {"$ref": "#/$defs/evidence"},
+    "capabilityPreflight": {"$ref": "./publication-capability-preflight.schema.json"},
+    "fastForwardProof": {"type": "object", "additionalProperties": false, "required": ["baseOid", "candidateOid", "descends", "proofSha256"], "properties": {"baseOid": {"oneOf": [{"$ref": "#/$defs/oid"}, {"type": "null"}]}, "candidateOid": {"$ref": "#/$defs/oid"}, "descends": {"const": true}, "proofSha256": {"$ref": "#/$defs/digest"}}},
+    "executorSha256": {"$ref": "#/$defs/digest"}, "neutralEvidence": {"oneOf": [{"$ref": "./publication-bundle.schema.json#/$defs/neutralEvidence"}, {"type": "null"}]},
+    "approval": {"oneOf": [{"$ref": "./publication-bundle.schema.json#/$defs/approval"}, {"type": "null"}]}, "pushIntent": {"oneOf": [{"$ref": "./publication-bundle.schema.json#/$defs/pushIntent"}, {"type": "null"}]}, "observation": {"oneOf": [{"$ref": "./publication-bundle.schema.json#/$defs/observation"}, {"type": "null"}]}, "readback": {"oneOf": [{"$ref": "./publication-bundle.schema.json#/$defs/readback"}, {"type": "null"}]}, "reason": {"type": ["string", "null"]}, "receiptDigest": {"$ref": "#/$defs/nullableDigest"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "nullableDigest": {"oneOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]},
+    "oid": {"type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"},
+    "evidence": {"type": "object", "additionalProperties": false, "required": ["path", "rawDigest", "commit", "tree"], "properties": {"path": {"type": "string"}, "rawDigest": {"$ref": "#/$defs/digest"}, "commit": {"$ref": "#/$defs/oid"}, "tree": {"$ref": "#/$defs/oid"}}}
+  }
+}

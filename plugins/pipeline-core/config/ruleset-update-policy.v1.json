@@ -1,0 +1,6 @@
+{
+  "schema": "pipeline.ruleset-update-policy.v1",
+  "policyId": "pipeline-core-security-update-policy",
+  "policyVersion": 1,
+  "entries": []
+}

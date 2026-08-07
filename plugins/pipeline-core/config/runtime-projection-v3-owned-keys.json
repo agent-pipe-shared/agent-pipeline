@@ -20,6 +20,7 @@
       "ownedKeys": ["language.human_facing", "modelRouting", "runnerRoutes", "criticExport", "session.keep_awake"],
       "nativeModelAliases": {
         "fable": "fable",
+        "haiku": "haiku",
         "opus": "opus",
         "sonnet": "sonnet-5"
       },

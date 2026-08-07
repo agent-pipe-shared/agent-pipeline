@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.publication-capability-preflight.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "preflightId", "candidate", "remote", "destinationRef", "remotePreimage", "credential", "permissions", "workflowUpdate", "policy", "executor", "status", "reasons", "recordSha256"],
+  "properties": {
+    "schema": {"const": "pipeline.publication-capability-preflight.v1"},
+    "preflightId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"},
+    "candidate": {"type": "object", "additionalProperties": false, "required": ["commit", "tree"], "properties": {"commit": {"$ref": "#/$defs/oid"}, "tree": {"$ref": "#/$defs/oid"}}},
+    "remote": {"type": "object", "additionalProperties": false, "required": ["name", "fingerprint", "status", "evidenceSha256"], "properties": {"name": {"type": "string"}, "fingerprint": {"$ref": "#/$defs/digest"}, "status": {"enum": ["available", "unavailable", "insufficient"]}, "evidenceSha256": {"$ref": "#/$defs/digest"}}},
+    "destinationRef": {"type": "string", "pattern": "^refs/heads/[A-Za-z0-9._/-]+$"},
+    "remotePreimage": {"oneOf": [{"$ref": "#/$defs/oid"}, {"type": "null"}]},
+    "credential": {"$ref": "#/$defs/requiredCell"}, "permissions": {"$ref": "#/$defs/requiredCell"},
+    "workflowUpdate": {"$ref": "#/$defs/cell"}, "policy": {"$ref": "#/$defs/requiredCell"}, "executor": {"$ref": "#/$defs/requiredCell"},
+    "status": {"enum": ["ready", "blocked"]},
+    "reasons": {"type": "array", "uniqueItems": true, "items": {"enum": ["ambiguous-endpoint", "transport-unavailable", "credentials-unavailable", "ref-permission-insufficient", "workflow-permission-missing", "repository-policy-rejected", "executor-unavailable"]}},
+    "recordSha256": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "oid": {"type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"},
+    "status": {"enum": ["available", "unavailable", "insufficient", "not-required"]},
+    "cell": {"type": "object", "additionalProperties": false, "required": ["status", "evidenceSha256"], "properties": {"status": {"$ref": "#/$defs/status"}, "evidenceSha256": {"$ref": "#/$defs/digest"}}},
+    "requiredCell": {"type": "object", "additionalProperties": false, "required": ["status", "evidenceSha256"], "properties": {"status": {"enum": ["available", "unavailable", "insufficient"]}, "evidenceSha256": {"$ref": "#/$defs/digest"}}}
+  }
+}

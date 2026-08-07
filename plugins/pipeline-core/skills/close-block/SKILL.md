@@ -1,16 +1,82 @@
 ---
 name: close-block
-description: "Session/block close ritual, parametrized by the project's .claude/pipeline.json (operating-model §8): run close.pre extensions, verify + machine evidence, drift checks (handover freshness, CLAUDE.md length gate, memory mirror, stale worktrees), handover + HISTORY sync (single source), telemetry line (MP-20), mandatory self-retro, close.post extensions, final commit. Invoke at a block/task boundary or before a planned session cut."
+description: "Durable block-close ritual only: finalizes a stopped topic or a real runtime transfer. Normal same-topic restarts use handover-only and must not invoke this ritual."
 disable-model-invocation: true
-argument-hint: "[block-id or short session label]"
-allowed-tools: Bash(git add:*), Bash(git commit:*), Bash(git log:*), Bash(git diff:*)
+argument-hint: "<durable-stop|runtime-transfer> [block-id or short session label]"
+allowed-tools: Bash(git add:*), Bash(git commit:*), Bash(git log:*), Bash(git diff:*), Bash(node plugins/pipeline-core/scripts/close-coordinator.mjs:*)
 ---
+
+## Hard entry gate — never close a normal restart
+
+`close-block` is not a generic session-cut, restart, Compact, or “save the
+handover” command. Before reading calibration, running an extension, Verify,
+cleanup, or *any* close-coordinator command, the caller must supply exactly
+one explicit intent as the first argument:
+
+- `durable-stop`: the PO has decided not to continue the current topic after
+  this block; or
+- `runtime-transfer`: the PO is deliberately transferring the work to another
+  PC, CLI/runtime, or separately operated environment.
+
+No intent, a mere short restart, a context-window cut, “continue tomorrow”,
+or an ambiguous request to save progress is a refusal: report
+`CLOSE-INTENT-REQUIRED`, perform no close-block step, and use the
+**handover-only route** below. Do not infer either intent from a session name,
+a pending working tree, an active feature, or a request to start a new chat.
+The executable coordinator enforces the same contract: `plan-start` and
+`apply-start` require the matching digest-bound `--close-intent` value.
+
+### Handover-only route for normal continuation
+
+For a same-topic restart, write only the calibrated handover file with the
+current worktree state, explicit unfinished items, and the next re-entry step.
+Capture a sanitised resume hint when material input needs to cross the session
+boundary. Then recommend a new session that begins with `pipeline-start`.
+Do **not** invoke `close-block`, `close-feature`, `close-coordinator`, Verify,
+cleanup, HISTORY/telemetry/retro, a final commit, or a plugin installation as
+part of this route. An ordinary handover is not proof of a completed block.
+
+H5 compatibility rule: after this gate admits a durable intent, close-block delegates checkpoint/finalization planning
+to the unified close coordinator. It must not maintain a parallel completion
+state or require push; inspect → plan-transition → confirmed `--activate`
+apply, with publication and release handled as separate gates.
+
+## Mandatory H5 dispatcher
+
+The coordinator decides which close mode is legal. The numbered ritual below
+supplies tracked effects and evidence to that one state machine; it is not an
+independent sequence and must not advance when its coordinator phase is stale.
+
+1. Run `close-coordinator.mjs inspect` for the active lifecycle and use only a
+   phase listed in its `next` result.
+2. For a **checkpoint**, plan `checkpointed`, present its exact plan digest and
+   returned action, and apply it only after confirmation. Stop there:
+   `activeFeature` remains active; do not close State, create a final close
+   commit, publish, release, or run cleanup.
+3. For **completion**, advance in this exact order:
+   `feature-close-prepared` (then execute only its returned, separately
+   confirmed State-writer action, including any continuity close request) →
+   complete the ritual's tracked Result/backlog/handover/HISTORY/telemetry/
+   retrospective effects → bind them as `tracked-close-finalized` → create the
+   one final tracked commit → `candidate-frozen` → persist exact private
+   Verify/Security evidence → `final-verify-green`.
+4. After `final-verify-green`, a no-push close uses confirmed descriptor-bound
+   cleanup and ends at `closed-local`. Publication is a separate authorization
+   branch (`publication-authorized` → `published` → `readback-confirmed` →
+   cleanup → `delivered`). Release eligibility and promotion each require
+   another independent authorization; neither is implied by close or push.
+5. Every transition is first a read-only `plan-transition`. Show the exact
+   request/action digest and execute only the returned `--activate` action
+   after confirmation. A changed plan, State byte, candidate OID/tree,
+   evidence file, destination, or coordinator CAS requires a new plan.
 
 # close-block — session close ritual (parametrized)
 
 Normative sources (agent-pipeline repo — canon pointers, not runtime reads): `docs/operating-model.md` §5–§8, `harness/checklists/session-close.md`, `policies/model-policy.md` MP-16/MP-19/MP-20, ADR-0012 (handover), single source of truth. `disable-model-invocation: true` is deliberate: closing writes a commit — the PO times it, the model never self-triggers it. This skill runs IN the main context (no fork): it needs the session's own state (`/usage`, `/context`, what actually happened this block).
 
-Block label: `$ARGUMENTS` (optional; used in the telemetry line and HISTORY entry).
+Intent: first argument, exactly `durable-stop` or `runtime-transfer` (mandatory).
+The remaining arguments form the optional block label used in the telemetry
+line and HISTORY entry.
 
 ## Step 0 — Read the project calibration (parametrization)
 
@@ -22,7 +88,7 @@ Read `.claude/pipeline.json` of the current project. Keys starting with `$` are 
 | `verify` | step 3 gate run (the ONE verify command) | — (required) |
 | `claudeMdMaxLines` | step 4 length gate | warn "uncalibrated length gate" (no silent number) |
 | `handover` | step 5 target file | `docs/state.md` (convention, operating-model §6) |
-| `wipLimit` | step 4 stale-worktree/WIP check | 1 (base rule) |
+| `wipLimit` | step 4 stale-worktree/WIP check | 3 (base rule) -- caps concurrently open blocks/worktrees, not parallel Goldfish within one block |
 | `ritualExtensions` | steps 1 and 9 extension points | none |
 
 **File missing or required fields missing → fail-safe, no silent guessing (operating-model §8):** announce explicitly that the project is **"uncalibrated"**, STOP for all writing steps of this ritual, offer to draft the calibration from the field table above (canonical filled example: `templates/pipeline.json.example` in the agent-pipeline repo; an installed plugin cannot read repo templates, so generate the draft from the field list) and name the new file to the PO for confirmation. Read-only reporting of the session state stays allowed.

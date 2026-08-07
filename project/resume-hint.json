@@ -1,0 +1,26 @@
+{
+  "schema": "pipeline.resume-hint.v1",
+  "nonAuthoritative": true,
+  "context": {
+    "intent": "Harden the local Pipeline candidate so that a silently failing bootstrap cannot leave repository write access behind, then exercise the gated push on the feature branch.",
+    "scope": [
+      "Six wired hooks and the mandatory bootstrap preflight were silently disarmed by a symlinked plugin root; fixed, with a suite that executes them through a real symlink, and the same defect swept from 73 plugin scripts in thirteen spellings.",
+      "Three ungated write paths are closed, the notebook editing tool that reached no matcher, the gate-strength refusal that an ordinary shell command walked around, and the PowerShell lane that every decision ignored.",
+      "The independent Critic returned FAIL with eight findings. Its blocker was that the new test-path override could be armed by the agent it constrains; the override now follows the clearance mode and admits an in-session clearance only where the configuration explicitly says so.",
+      "Still to do, install the refreshed local build, then the signed push. Three Critic findings stay open by decision, no test walks the new allow path, the shell and write lanes match those paths differently, and the new gating suites carry no protected-path entry."
+    ],
+    "constraints": [
+      "Feature branch only, with no merge to the main branch and no release.",
+      "The push gate demands a detached signature the agent cannot produce, so the human signs outside the session.",
+      "The clearance setting lives in the user configuration, which the gate-strength guard refuses to the agent through both the write and the shell lane.",
+      "The enforcing plugin copy is deliberately separate from the checkout, so guard changes take effect only after the operator reinstalls."
+    ],
+    "questions": [
+      "Whether the test-path override should gain a detached proof of its own kind rather than only following the clearance mode.",
+      "Whether the remaining shell route into the enforcing plugin root should get a second independent control rather than relying on a single guard."
+    ]
+  },
+  "createdAt": "2026-08-06T15:34:50.055Z",
+  "basis": null,
+  "contentSha256": "eac0bcd611b69c730561a95c879fb741845e3c179a7581c918a20e9a5efb1c92"
+}

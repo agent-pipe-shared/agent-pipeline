@@ -11,6 +11,7 @@ import {
   DECISION_MAX_AGE_MS,
   ReleaseVersionDecisionError,
   canonicalJson,
+  checkReleaseVersionPlanSecurityCompleteness,
   createReleaseVersionPlanJournal,
   compareStableVersions,
   createReleaseVersionDecision,
@@ -21,6 +22,7 @@ import {
   releaseVersionPlanJournalPath,
   releaseVersionPlanPath,
   recoverReleaseVersionPlan,
+  sealAndStoreReleaseVersionPlan,
   storeReleaseVersionDecision,
   storeReleaseVersionPlan,
   validateReleaseVersionDecision,
@@ -30,6 +32,16 @@ import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs"
 
 const NOW = Date.parse("2026-07-19T12:00:00.000Z");
 const h = (char, length = 64) => char.repeat(length);
+function selection(promotionChannel = "stable", targetVersion = "0.4.7", overrides = {}) {
+  return {
+    promotionChannel,
+    targetVersion,
+    targetTag: `v${targetVersion}`,
+    candidateCommit: h("f", 40),
+    candidateTree: h("e", 40),
+    ...overrides,
+  };
+}
 function channel(version, offsetMs = 0, overrides = {}) {
   return {
     repositoryFingerprint: h(version[0] === "0" ? "a" : "b"),
@@ -43,11 +55,12 @@ function channel(version, offsetMs = 0, overrides = {}) {
     ...overrides,
   };
 }
-function input(privateVersion = "0.3.1", publicVersion = "0.3.1", overrides = {}) {
+function input(privateVersion = "0.4.6", publicVersion = "0.4.6", overrides = {}) {
   return {
     private: channel(privateVersion),
     neutralPublic: channel(publicVersion, 60_000),
     proofs: { private: { annotated: true, peeledCommitAncestor: true }, neutralPublic: { annotated: true, peeledCommitAncestor: true } },
+    selection: selection(),
     observedAt: new Date(NOW).toISOString(),
     ...overrides,
   };
@@ -71,7 +84,7 @@ function planInput(overrides = {}) {
     documentEvidenceSha256: h("1"),
     externalPrerequisite: { itemId: "pipeline.source-available-commercial-licensing", closureCommit: h("2", 40), resultSha256: h("3"), transitionSha256: h("4"), privateLicenseGateSha256: h("5"), neutralPublicLicenseGateSha256: h("6") },
     privateProductCandidate: { repositoryFingerprint: decision.private.repositoryFingerprint, commit: h("7", 40), tree: h("8", 40) },
-    neutralPublicProductCandidate: { repositoryFingerprint: decision.neutralPublic.repositoryFingerprint, commit: h("9", 40), tree: h("a", 40) },
+    neutralPublicProductCandidate: { repositoryFingerprint: decision.neutralPublic.repositoryFingerprint, commit: decision.selection.candidateCommit, tree: decision.selection.candidateTree },
     versionSurfaces: versionSurfaces(decision.targetVersion),
     recovery: null,
     createdAt: new Date(NOW).toISOString(),
@@ -79,15 +92,84 @@ function planInput(overrides = {}) {
   };
 }
 
+/**
+ * Schema-shaped v2 envelope+verdict pair for `checkReleaseVersionPlanSecurityCompleteness`'s own
+ * cases below -- mirrors `security-completeness-gate.test.mjs`'s `exactV2Envelope`/
+ * `exactV2Verdict`/`writePair` fixture shapes exactly (this module's own tests otherwise stay
+ * fully in-memory; the four completeness-gate cases below are the only ones that need a real
+ * temp `projectDir` because `checkSecurityCompleteness`, unlike everything else in this file,
+ * reads real evidence files off disk by design).
+ */
+function writeReleasePlanSecurityEvidence(dir, {
+  commit,
+  tree,
+  status = "PASS",
+  classification = "clean",
+  outcome = "pass",
+  blocking = false,
+  offendingCapabilities = [],
+}) {
+  const envelope = {
+    schema: "pipeline.security-evidence.v2",
+    policy: { configurationSha256: h("e") },
+    input: { commit, tree, inputSha256: h("f") },
+    environment: { platform: process.platform, nodeVersion: process.version },
+    capabilities: [{
+      capabilityId: "cap.secrets",
+      tool: { name: "gitleaks", version: null },
+      rulePack: { ref: "gitleaks-default", digest: null },
+      status,
+      classification,
+      findings: [],
+      coverage: {
+        subject: "candidate-tree",
+        exclusions: [],
+        ignored: [],
+        unsupportedScope: [],
+        truncation: { truncated: false, scannedFileCount: null, totalEligibleFileCount: null },
+        dataAge: { ageSeconds: 0, snapshotAt: null },
+      },
+      reason: null,
+    }],
+  };
+  const verdict = {
+    schema: "pipeline.security-verdict.v2",
+    producedFrom: "pipeline.security-evidence.v2",
+    exitAuthority: "v1-blocking-logic",
+    note: "fixture",
+    v1ExitCode: 0,
+    plan: { required: ["cap.secrets"], optional: [], planDigest: h("g"), source: "fixture", resolvedPolicyDigest: h("h") },
+    capabilityOutcomes: { "cap.secrets": outcome },
+    verdict: { blocking, offendingCapabilities },
+    controls: [],
+  };
+  const envelopePath = join(dir, "evidence/security-latest.v2.json");
+  const verdictPath = join(dir, "evidence/security-latest.v2.verdict.json");
+  mkdirSync(dirname(envelopePath), { recursive: true });
+  writeFileSync(envelopePath, JSON.stringify(envelope));
+  writeFileSync(verdictPath, JSON.stringify(verdict));
+}
+
 const cases = [
-  ["greater current baseline derives v0.4.0", () => {
+  ["explicit stable patch selection preserves 0.4.7 without forcing next minor", () => {
     const decision = createReleaseVersionDecision(input(), { nowMs: NOW });
-    assert.equal(decision.targetVersion, "0.4.0");
-    assert.equal(decision.targetTag, "v0.4.0");
+    assert.equal(decision.selection.promotionChannel, "stable");
+    assert.equal(decision.targetVersion, "0.4.7");
+    assert.equal(decision.targetTag, "v0.4.7");
     assert.equal(validateReleaseVersionDecision(decision, { nowMs: NOW }), true);
   }],
-  ["higher neutral-public baseline wins", () => assert.equal(createReleaseVersionDecision(input("0.3.1", "2.7.9"), { nowMs: NOW }).targetVersion, "2.8.0")],
-  ["minor rollover keeps major and resets patch", () => assert.equal(nextMinorVersion("9.999.4"), "9.1000.0")],
+  ["explicit beta selection binds exact prerelease channel, version, tag and candidate", () => {
+    const decision = createReleaseVersionDecision(input("0.4.6", "0.4.6", { selection: selection("beta", "0.4.7-beta.1") }), { nowMs: NOW });
+    assert.equal(decision.selection.promotionChannel, "beta");
+    assert.equal(decision.targetVersion, "0.4.7-beta.1");
+    assert.equal(decision.targetTag, "v0.4.7-beta.1");
+    assert.equal(decision.selection.candidateCommit, h("f", 40));
+  }],
+  ["higher observed baseline constrains but does not choose an explicit target", () => {
+    const decision = createReleaseVersionDecision(input("0.4.6", "2.7.9", { selection: selection("stable", "2.7.10") }), { nowMs: NOW });
+    assert.equal(decision.targetVersion, "2.7.10");
+  }],
+  ["next-minor helper remains recommendation metadata only", () => assert.equal(nextMinorVersion("9.999.4"), "9.1000.0")],
   ["SemVer comparison is numeric, not lexical", () => assert.equal(compareStableVersions("0.10.0", "0.9.99"), 1)],
   ["prerelease, build metadata, and substituted tag fail closed", () => {
     for (const values of [
@@ -95,6 +177,27 @@ const cases = [
       input("1.0.0+build", "1.0.0"),
       input("1.0.0", "1.0.0", { private: channel("1.0.0", 0, { highestStableTag: "v1.0.1" }) }),
     ]) assert.throws(() => createReleaseVersionDecision(values, { nowMs: NOW }), ReleaseVersionDecisionError);
+  }],
+  ["alpha, missing selection, implicit target and malformed beta identifiers fail closed", () => {
+    const missing = input(); delete missing.selection;
+    const implicit = input(); implicit.selection = { promotionChannel: "stable" };
+    for (const value of [
+      input("0.4.6", "0.4.6", { selection: selection("alpha", "0.4.7") }),
+      missing,
+      implicit,
+      input("0.4.6", "0.4.6", { selection: selection("beta", "0.4.7-beta.01") }),
+      input("0.4.6", "0.4.6", { selection: selection("beta", "0.04.7-beta.1") }),
+      input("0.4.6", "0.4.6", { selection: selection("stable", "0.4.7-beta.1") }),
+      input("0.4.6", "0.4.6", { selection: selection("beta", "0.4.7") }),
+    ]) assert.throws(() => createReleaseVersionDecision(value, { nowMs: NOW }), ReleaseVersionDecisionError);
+  }],
+  ["selection tag mismatch and a target not above observed stable fail closed", () => {
+    assert.throws(() => createReleaseVersionDecision(input("0.4.6", "0.4.6", {
+      selection: selection("stable", "0.4.7", { targetTag: "v0.4.8" }),
+    }), { nowMs: NOW }), ReleaseVersionDecisionError);
+    assert.throws(() => createReleaseVersionDecision(input("0.4.7", "0.4.7", {
+      selection: selection("beta", "0.4.7-beta.1"),
+    }), { nowMs: NOW }), ReleaseVersionDecisionError);
   }],
   ["missing annotated or ancestral proof fails before a decision exists", () => {
     for (const proofs of [
@@ -112,6 +215,8 @@ const cases = [
     const decision = createReleaseVersionDecision(input(), { nowMs: NOW });
     const changed = structuredClone(decision); changed.neutralPublic.tree = h("f", 40);
     assert.throws(() => validateReleaseVersionDecision(changed, { nowMs: NOW }), ReleaseVersionDecisionError);
+    const substitutedSelection = structuredClone(decision); substitutedSelection.selection.candidateCommit = h("1", 40);
+    assert.throws(() => validateReleaseVersionDecision(substitutedSelection, { nowMs: NOW }), ReleaseVersionDecisionError);
   }],
   ["private storage uses exactly one no-replace canonical record path", () => {
     const common = mkdtempSync(join(tmpdir(), "release-version-decision-"));
@@ -133,13 +238,14 @@ const cases = [
     const inputValue = planInput();
     const plan = createReleaseVersionPlan(inputValue, { nowMs: NOW });
     assert.equal(plan.status, "sealed");
-    assert.equal(plan.targetVersion, "0.4.0");
+    assert.equal(plan.targetVersion, "0.4.7");
+    assert.deepEqual(plan.selection, inputValue.decision.selection);
     assert.equal(plan.versions.codexMarketplaceResolved, plan.targetVersion);
     assert.equal(plan.surfaceDigests.private.length, 5);
     assert.equal(validateReleaseVersionPlan(plan, { decision: inputValue.decision, nowMs: NOW }), true);
   }],
   ["surface consistency requires exact VERSION bytes and all resolved versions", () => {
-    const target = "0.4.0";
+    const target = "0.4.7";
     const missingNewline = versionSurfaces(target); missingNewline.private[0].bytes = target;
     const marketplaceMismatch = versionSurfaces(target); marketplaceMismatch.neutralPublic[4].bytes = manifest("0.4.1");
     const duplicate = versionSurfaces(target); duplicate.private[4].surface = "claudePlugin";
@@ -148,10 +254,14 @@ const cases = [
   ["plan rejects decision substitution and candidate channel mismatch", () => {
     const source = planInput();
     const plan = createReleaseVersionPlan(source, { nowMs: NOW });
-    const otherDecision = createReleaseVersionDecision(input("1.0.0", "1.0.0"), { nowMs: NOW });
+    const otherDecision = createReleaseVersionDecision(input("1.0.0", "1.0.0", { selection: selection("stable", "1.0.1") }), { nowMs: NOW });
     assert.throws(() => validateReleaseVersionPlan(plan, { decision: otherDecision, nowMs: NOW }), ReleaseVersionDecisionError);
+    const substitutedPlan = structuredClone(plan); substitutedPlan.selection.candidateTree = h("2", 40);
+    assert.throws(() => validateReleaseVersionPlan(substitutedPlan, { decision: source.decision, nowMs: NOW }), ReleaseVersionDecisionError);
     const badCandidate = planInput(); badCandidate.privateProductCandidate.repositoryFingerprint = h("f");
     assert.throws(() => createReleaseVersionPlan(badCandidate, { nowMs: NOW }), ReleaseVersionDecisionError);
+    const substitutedPublicCandidate = planInput(); substitutedPublicCandidate.neutralPublicProductCandidate.commit = h("9", 40);
+    assert.throws(() => createReleaseVersionPlan(substitutedPublicCandidate, { nowMs: NOW }), (error) => error instanceof ReleaseVersionDecisionError && error.code === "RVP-CANDIDATE");
   }],
   ["sealed plan storage is private, immutable, and retains an explicit-ID journal", () => {
     const common = mkdtempSync(join(tmpdir(), "release-version-plan-"));
@@ -202,6 +312,153 @@ const cases = [
       writeFileSync(recordPath, "third-bytes", "utf8");
       assert.throws(() => recoverReleaseVersionPlan({ gitCommonDir: common, repoFingerprint: h("c"), planId: plan.planId, decision: source.decision }, { nowMs: NOW }), ReleaseVersionDecisionError);
     } finally { rmSync(common, { recursive: true, force: true }); }
+  }],
+  ["release plan completeness gate (CYB-2I-3): fresh bound non-blocking pair is a pass (empty failure array)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "release-plan-completeness-"));
+    try {
+      const source = planInput();
+      const plan = createReleaseVersionPlan(source, { nowMs: NOW });
+      writeReleasePlanSecurityEvidence(dir, { commit: plan.privateProductCandidate.commit, tree: plan.privateProductCandidate.tree });
+      const failures = checkReleaseVersionPlanSecurityCompleteness(plan, { projectDir: dir });
+      assert.deepStrictEqual(failures, []);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  }],
+  ["release plan completeness gate (CYB-2I-3): blocking verdict surfaces the shared gate's own failure line", () => {
+    const dir = mkdtempSync(join(tmpdir(), "release-plan-completeness-"));
+    try {
+      const source = planInput();
+      const plan = createReleaseVersionPlan(source, { nowMs: NOW });
+      writeReleasePlanSecurityEvidence(dir, {
+        commit: plan.privateProductCandidate.commit,
+        tree: plan.privateProductCandidate.tree,
+        status: "SKIPPED",
+        classification: "binary_missing",
+        outcome: "required-capability-missing",
+        blocking: true,
+        offendingCapabilities: [{ capabilityId: "cap.secrets", outcome: "required-capability-missing" }],
+      });
+      const failures = checkReleaseVersionPlanSecurityCompleteness(plan, { projectDir: dir });
+      assert.deepStrictEqual(failures, [
+        "evidence/security-latest.v2.verdict.json: required capability cap.secrets did not reach an accepted state (outcome=required-capability-missing)",
+      ]);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  }],
+  ["release plan completeness gate (CYB-2I-3): missing evidence fails closed with both reasons reported", () => {
+    const dir = mkdtempSync(join(tmpdir(), "release-plan-completeness-"));
+    try {
+      const source = planInput();
+      const plan = createReleaseVersionPlan(source, { nowMs: NOW });
+      const failures = checkReleaseVersionPlanSecurityCompleteness(plan, { projectDir: dir });
+      assert.deepStrictEqual(failures, [
+        "evidence/security-latest.v2.json missing",
+        "evidence/security-latest.v2.verdict.json missing",
+      ]);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  }],
+  ["release plan completeness gate (CYB-2I-3): evidence bound to a different commit/tree than the plan's own private candidate is caught", () => {
+    const dir = mkdtempSync(join(tmpdir(), "release-plan-completeness-"));
+    try {
+      const source = planInput();
+      const plan = createReleaseVersionPlan(source, { nowMs: NOW });
+      writeReleasePlanSecurityEvidence(dir, { commit: h("1", 40), tree: h("2", 40) }); // bound to a DIFFERENT commit/tree than plan.privateProductCandidate
+      const failures = checkReleaseVersionPlanSecurityCompleteness(plan, { projectDir: dir });
+      assert.deepStrictEqual(failures, [
+        "evidence/security-latest.v2.json: input commit does not match the sealed plan's private candidate",
+        "evidence/security-latest.v2.json: input tree does not match the sealed plan's private candidate",
+      ]);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  }],
+  ["release plan completeness gate (CYB-2I-3): requires an already-sealed plan", () => {
+    const source = planInput();
+    const plan = createReleaseVersionPlan(source, { nowMs: NOW });
+    const notSealed = { ...plan, status: "draft" };
+    assert.throws(
+      () => checkReleaseVersionPlanSecurityCompleteness(notSealed, { projectDir: "/irrelevant" }),
+      (error) => error instanceof ReleaseVersionDecisionError && error.code === "RVP-COMPLETENESS",
+    );
+  }],
+  ["release plan completeness gate (CYB-2I-3): requires a caller-supplied projectDir (no process.cwd() default)", () => {
+    const source = planInput();
+    const plan = createReleaseVersionPlan(source, { nowMs: NOW });
+    assert.throws(
+      () => checkReleaseVersionPlanSecurityCompleteness(plan, {}),
+      (error) => error instanceof ReleaseVersionDecisionError && error.code === "RVP-COMPLETENESS",
+    );
+  }],
+  ["release AC8 caller (CYB-2I-3R): non-blocking verdict stores exactly what storeReleaseVersionPlan itself would", () => {
+    const projectDir = mkdtempSync(join(tmpdir(), "release-plan-caller-pass-"));
+    const common = mkdtempSync(join(tmpdir(), "release-version-plan-caller-"));
+    try {
+      const source = planInput();
+      const plan = createReleaseVersionPlan(source, { nowMs: NOW });
+      writeReleasePlanSecurityEvidence(projectDir, { commit: plan.privateProductCandidate.commit, tree: plan.privateProductCandidate.tree });
+      const sealed = sealAndStoreReleaseVersionPlan({ gitCommonDir: common, repoFingerprint: h("d"), plan, decision: source.decision, projectDir }, { nowMs: NOW });
+      assert.equal(sealed.status, "stored");
+      const recordPath = releaseVersionPlanPath({ gitCommonDir: common, repoFingerprint: h("d"), planId: plan.planId });
+      assert.equal(readFileSync(recordPath, "utf8"), canonicalJson(plan));
+      // Equivalence proof: a direct storeReleaseVersionPlan() replay call against the exact
+      // state sealAndStoreReleaseVersionPlan() just wrote must see status "replay" with the
+      // SAME path/journalPath/recordSha256 -- if the orchestrator had stored anything
+      // different, storeReleaseVersionPlan's own RVP-CONFLICT check would throw here instead.
+      const directReplay = storeReleaseVersionPlan({ gitCommonDir: common, repoFingerprint: h("d"), plan, decision: source.decision }, { nowMs: NOW });
+      assert.equal(directReplay.status, "replay");
+      assert.equal(directReplay.path, sealed.path);
+      assert.equal(directReplay.journalPath, sealed.journalPath);
+      assert.equal(directReplay.recordSha256, sealed.recordSha256);
+    } finally {
+      rmSync(projectDir, { recursive: true, force: true });
+      rmSync(common, { recursive: true, force: true });
+    }
+  }],
+  ["release AC8 caller (CYB-2I-3R): blocking verdict fails closed before storeReleaseVersionPlan ever runs (no record/journal written)", () => {
+    const projectDir = mkdtempSync(join(tmpdir(), "release-plan-caller-block-"));
+    const common = mkdtempSync(join(tmpdir(), "release-version-plan-caller-"));
+    try {
+      const source = planInput();
+      const plan = createReleaseVersionPlan(source, { nowMs: NOW });
+      writeReleasePlanSecurityEvidence(projectDir, {
+        commit: plan.privateProductCandidate.commit,
+        tree: plan.privateProductCandidate.tree,
+        status: "SKIPPED",
+        classification: "binary_missing",
+        outcome: "required-capability-missing",
+        blocking: true,
+        offendingCapabilities: [{ capabilityId: "cap.secrets", outcome: "required-capability-missing" }],
+      });
+      assert.throws(
+        () => sealAndStoreReleaseVersionPlan({ gitCommonDir: common, repoFingerprint: h("e"), plan, decision: source.decision, projectDir }, { nowMs: NOW }),
+        (error) => error instanceof ReleaseVersionDecisionError && error.code === "RVP-SECURITY-INCOMPLETE"
+          && error.message.includes("required capability cap.secrets did not reach an accepted state"),
+      );
+      const recordPath = releaseVersionPlanPath({ gitCommonDir: common, repoFingerprint: h("e"), planId: plan.planId });
+      const journalPath = releaseVersionPlanJournalPath({ gitCommonDir: common, repoFingerprint: h("e"), planId: plan.planId });
+      assert.equal(existsSync(recordPath), false);
+      assert.equal(existsSync(journalPath), false);
+    } finally {
+      rmSync(projectDir, { recursive: true, force: true });
+      rmSync(common, { recursive: true, force: true });
+    }
+  }],
+  ["release AC8 caller (CYB-2I-3R): missing evidence fails closed through the orchestrator too, observed via the caller not the gate directly", () => {
+    const projectDir = mkdtempSync(join(tmpdir(), "release-plan-caller-missing-"));
+    const common = mkdtempSync(join(tmpdir(), "release-version-plan-caller-"));
+    try {
+      const source = planInput();
+      const plan = createReleaseVersionPlan(source, { nowMs: NOW });
+      assert.throws(
+        () => sealAndStoreReleaseVersionPlan({ gitCommonDir: common, repoFingerprint: h("f"), plan, decision: source.decision, projectDir }, { nowMs: NOW }),
+        (error) => error instanceof ReleaseVersionDecisionError && error.code === "RVP-SECURITY-INCOMPLETE"
+          && error.message.includes("evidence/security-latest.v2.json missing")
+          && error.message.includes("evidence/security-latest.v2.verdict.json missing"),
+      );
+      const recordPath = releaseVersionPlanPath({ gitCommonDir: common, repoFingerprint: h("f"), planId: plan.planId });
+      const journalPath = releaseVersionPlanJournalPath({ gitCommonDir: common, repoFingerprint: h("f"), planId: plan.planId });
+      assert.equal(existsSync(recordPath), false);
+      assert.equal(existsSync(journalPath), false);
+    } finally {
+      rmSync(projectDir, { recursive: true, force: true });
+      rmSync(common, { recursive: true, force: true });
+    }
   }],
 ];
 

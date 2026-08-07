@@ -33,10 +33,16 @@ or accepted from a project file.
    ticket, and receipt are distinct identities. Every handoff binds their
    exact digests plus the repository fingerprint, source digest, complete
    runtime-target digest, transaction, and writer generation.
-4. Repository-private state is outside portable project authority. It must use
-   the physical Git common directory, or the explicitly classified
-   host-managed private directory, with private ownership/mode assurance and
-   no symlink traversal.
+4. Repository-private runtime state (tickets, owner nonces, cleanup
+   descriptors, transaction journals, and receipts) is outside portable
+   project authority. It must use the physical Git common directory, or the
+   explicitly classified host-managed private directory, with private
+   ownership/mode assurance and no symlink traversal. The portable lifecycle
+   projection may live at the runner-neutral `project/pipeline-state.json`
+   authority, but publication and authority migration reject it while
+   `continuity.runtime.sessionCleanup` is non-null. The legacy
+   `.claude/pipeline-state.json` remains a compatibility input only and is
+   never copied into a portable candidate with a machine-local handle.
 5. A shell command is a write-capable boundary. In a governed non-ready root,
    Bash, Edit, Write, and apply_patch remain blocked except for an exact
    plugin-local lifecycle/remediation command with closed arguments.
@@ -70,6 +76,15 @@ or accepted from a project file.
    incompatible workspace sandbox. This avoids false `EPERM`, invalid-layout,
    socket-unavailable, and DNS results without widening mutation authority,
    project access, Critic/Advisor isolation, or assurance.
+10. Native Codex-goal reconciliation is a local host-control boundary. The
+    adapter accepts only the Unix-socket path returned in memory by the
+    sanctioned health observation, never an endpoint from project authority or
+    user content. Before connecting it requires a same-UID, non-symlink Unix
+    socket with no group/world permissions; it then requires a bounded
+    WebSocket upgrade whose accept value matches its fresh client nonce. It
+    accepts bounded unmasked server frames only, resolves exactly one active
+    thread whose `cwd` equals the project root, and keeps the socket path and
+    raw thread ID out of Pipeline State and evidence.
 
 ## Attacker capabilities
 
@@ -77,9 +92,10 @@ The model assumes an attacker or concurrent process may alter project files,
 replace a target between plan and commit, replay or duplicate a ticket, inject
 a foreign private-state file, present a wrong executable/helper identity,
 reuse the writer generation, race barrier publication, forge App-Server
-availability, or invoke a write through Bash instead of a structured edit
-tool. It also assumes project content may contain shell metacharacters and
-paths with spaces.
+availability or its socket endpoint, send malformed or oversized WebSocket
+frames, return multiple/stale foreign thread candidates, or invoke a write
+through Bash instead of a structured edit tool. It also assumes project
+content may contain shell metacharacters and paths with spaces.
 
 The model does not treat a same-user fully compromised host as a secret-safe
 execution environment. OS isolation is supplied by the selected host
@@ -112,6 +128,12 @@ transport, not invented by onboarding.
 - Lifecycle admission is intent-bound. Stronger session and dispatch intents
   repeat their capability probes and cannot reuse onboarding/bootstrap
   readiness.
+- The App-Server goal adapter is client-only: it never starts or restarts a
+  server, discovers no endpoint from repository data, sends only bounded
+  JSON-RPC frames, and treats socket, handshake, frame, response, thread, or
+  readback ambiguity as typed unavailable evidence. A `set` or `clear` action
+  is not a Pipeline success claim until its exact `thread/goal/get` readback
+  verifies the requested state.
 - Host initialization first durably publishes a private pending intent bound
   to the reviewed plan and root. It exclusively reserves `.git`, durably binds
   that directory's device/inode identity before `git init`, and records the
@@ -181,6 +203,118 @@ starting a new Codex thread; it does not rewrite consumer authority. Existing
 restart-required private state remains controlling until its exact readback or
 an explicit, independently reviewed recovery handles it.
 
+## PO authority rebind transaction
+
+The narrow PO-authority rebind accepts only one stale authority shape: the
+current physical PRD, the approved PO-gate PRD digest, and the Continuity PRD
+authority must all name the same old PRD bytes, while their Spec binding equals
+the one older PRD marker. A mismatched Continuity PRD authority is corruption,
+not a repair candidate. This prevents the rebind command from becoming a
+general State-authority editor.
+
+Before replacing either authority file, apply durably publishes one private,
+single-link transaction record below `.claude/`. It contains the exact
+confirmed plan digest and the authenticated preimage bytes/digests/modes for
+the PRD and State together with their intended postimage digests. PRD and
+State replacements use same-directory temporary files, file fsync, atomic
+rename, and directory fsync. The record remains authoritative until both
+postimages pass PO-gate, Continuity, and V4 readback, after which it is removed
+and the containing directory is synced.
+
+If a process stops during the transaction, a replay of the same exact confirmed
+action first authenticates the record and accepts only the recorded
+preimage/postimage combinations. Two unchanged preimages are a prepared, not a
+committed, transaction: replay durably clears the record, revalidates the
+original closed plan, republishes the record, and performs the authorized
+transition. A mixed pair is restored to both recorded preimages; the record is
+removed only after verified rollback, and a newly observed plan and PO
+confirmation are then required. Two exact postimages are also restored to both
+recorded preimages and require a new plan: after a process stop, matching bytes
+cannot prove that the writer-owned inodes were not replaced with same-byte
+objects. An unknown, linked, hard-linked, identity-drifted, malformed,
+wrong-plan, or unprovable record fails closed and is preserved. On Windows the
+existing repository PO-profile receipt supplies the native owner/DACL
+assurance before any transaction is admitted; POSIX retains the private
+State/journal modes. No replay can widen authority, silently accept stale
+preimages, force-close a feature, or convert a manual State edit into a valid
+rebind.
+
+## Neutral multi-generation PO authority decision
+
+The neutral PO decision is a separate trust boundary from the narrow
+stale-marker rebind. It handles repositories where the current PRD marker,
+persisted `planApproval.poGateAuthority`, Continuity authority, and current
+PRD/Spec bytes may represent more than two independently drifted generations.
+Historical authority is evidence to disclose and bind, not authority to reuse
+as the current postimage.
+
+The planner admits a historical PO-gate surface only when its enclosing plan
+approval and authority have exact closed schemas, canonical timestamps, the
+active feature's exact canonical PRD/Spec paths, lowercase SHA-256 values, and
+typed language/profile provenance. Continuity must independently pass its full
+schema and feature validation, retain the same canonical document paths, have
+no active blocker, dispatch, decision transaction, or close transition, and
+have a safely incrementable revision. Historical PO-gate and Continuity
+digests are deliberately not required to equal each other or the current
+documents; equality would recreate the actionless multi-generation deadlock.
+
+Current authority remains stricter and independent:
+
+- the PO-profile receipt must be current, repository-valid, exact-schema, and
+  contain lowercase source, runtime, receipt, and repository-fingerprint
+  digests;
+- exactly one regular, non-linked PRD with the active feature's canonical
+  `prd_*.md` name must exist beside the canonical `spec.md`;
+- the PRD carries exactly one valid lowercase Spec marker and exactly one
+  language marker matching the current PO profile; and
+- current PRD/Spec identities, bytes, permissions, paths, State identity,
+  revision, and all historical/current authority surfaces enter the neutral
+  plan digest.
+
+The plan exposes both current document candidates plus the current marker,
+persisted PO gate, Continuity authority, and historical/current profile
+provenance. It never infers a winner. Selection is a separate read-only,
+plan-bound operation. Only the exact subsequently confirmed selection digest
+may activate the existing transactional writer.
+
+At apply time every document, State, profile, identity, permission, plan, and
+selection preimage is reobserved. The writer converges the PRD marker,
+PO-gate authority, and Continuity authority to the independently validated
+current PRD/Spec bytes and current PO profile, preserves unrelated Continuity,
+increments its revision exactly once, returns the feature to `design`, and
+requires `bootstrap`, `session`, and `dispatch` V4 readback. Existing
+transaction-journal, atomic-replace, durability, rollback, same-byte identity,
+and replay rules remain controlling. Drift or an invalid historical/current
+surface is a typed zero-mutation refusal; an ambiguous write follows the
+journal-bound rollback/recovery contract and cannot report success.
+
+An attacker may supply self-consistent stale provenance, independently chosen
+historical digests, a marker from a third generation, malformed or extra
+schema keys, non-canonical paths, uppercase digests, a stale current profile,
+or a changed profile after selection. None can become current authority
+without the independently valid current profile/documents, complete neutral
+disclosure, explicit PO selection, separately confirmed apply, and exact
+readback. Human Guard Override cannot authorize planning, selection, State,
+Continuity, Runtime, PRD-marker, or profile mutations.
+
+Rollback of this extension is a source revert before release followed by
+installation of the prior plugin candidate in a new Codex thread. It does not
+rewrite consumer State or guess an older authority generation. A consumer
+already in a multi-generation partial state remains fail-closed until a
+reviewed candidate supplies this neutral plan or another separately approved
+typed recovery is designed.
+
+## Closed-feature re-entry
+
+The normal State writer deliberately removes active Continuity when it closes
+the current feature. That is a transition boundary, not pristine state and not
+damaged Continuity. Bootstrap admits only the complete writer-shaped closed
+audit and the immediately following unapproved `design` state produced by
+`set-feature`. Cleanup recovery remains active in both shapes, so an orphan or
+retained descriptor still blocks. Bare inactive state, malformed audit
+entries, invalid close artifacts, a non-design active feature, lingering
+approval, or orphan Continuity remains fail-closed.
+
 The v2 host-init receipt is the first release candidate that carries the
 physical Git postimage. The earlier v1 shape existed only in unpublished local
 0.4.5 test candidates and is deliberately non-authoritative under this
@@ -193,7 +327,7 @@ unbound postimage. Released 0.4.4 issued no host-init receipt.
 |---|---|---|
 | Raw launch tokens necessarily exist in the directly invoked helper environment until consumed or expired. The helper removes them before starting the strict App Server child. Process inspection by the same fully compromised OS account is outside the protection offered here. | `pipeline-core` security maintainers | 2026-10-31 |
 | Directory durability has platform-specific limits already represented by the private-state assurance layer; unsupported assurance never becomes a strong success claim. | `pipeline-core` runtime maintainers | 2026-10-31 |
-| The Bash exemption recognizes only exact plugin-local remediation command shapes. Novel legitimate recovery commands remain blocked and require a reviewed lifecycle change or manual PO execution rather than a broad shell bypass. | `pipeline-core` guardrail maintainers | 2026-10-31 |
+| The Bash exemption recognizes only exact plugin-local remediation command shapes, including the four reviewed V4 recovery/validation shapes above. Novel legitimate recovery commands remain blocked and require a reviewed lifecycle change or manual PO execution rather than a broad shell bypass. | `pipeline-core` guardrail maintainers | 2026-10-31 |
 | The Push-Gate accepts the documented override prefix only when its assignment is a literal shell value. Dynamic Bash or PowerShell assignment forms remain part of the raw command and fail the one-standalone-command parser, preventing command substitution from piggybacking on an approved push. | `pipeline-core` guardrail maintainers | 2026-10-31 |
 | One fresh host initialization retains five small writer-owned transaction captures below private `.claude/.runtime/agent-pipeline/.host-init-quarantine-*` directories. They are non-authoritative and avoid an ungrounded inode-safe deletion claim; bounded garbage collection requires a future native identity-bound host primitive. | `pipeline-core` runtime maintainers | 2026-10-31 |
 

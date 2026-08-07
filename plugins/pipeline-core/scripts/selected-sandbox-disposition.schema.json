@@ -1,0 +1,724 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.selected-sandbox-disposition.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "dispositionId",
+    "duty",
+    "transport",
+    "fingerprint",
+    "state",
+    "failure",
+    "attempt",
+    "challenge",
+    "childReceipt",
+    "expiry",
+    "forceReprobe",
+    "assurance",
+    "previousSha256",
+    "recordSha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pipeline.selected-sandbox-disposition.v1"
+    },
+    "dispositionId": {
+      "$ref": "#/$defs/id"
+    },
+    "duty": {
+      "$ref": "#/$defs/id"
+    },
+    "transport": {
+      "$ref": "#/$defs/id"
+    },
+    "fingerprint": {
+      "$ref": "#/$defs/fingerprint"
+    },
+    "state": {
+      "enum": [
+        "unprobed",
+        "probing",
+        "available-attested",
+        "transient-unavailable",
+        "terminal-unavailable",
+        "invalidated"
+      ]
+    },
+    "failure": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/failure"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "attempt": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/attempt"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "challenge": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/challenge"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "childReceipt": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/childReceipt"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "expiry": {
+      "$ref": "#/$defs/expiry"
+    },
+    "forceReprobe": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/authority"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "assurance": {
+      "$ref": "#/$defs/assurance"
+    },
+    "previousSha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "recordSha256": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "unprobed"
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "failure": {
+            "type": "null"
+          },
+          "attempt": {
+            "type": "null"
+          },
+          "challenge": {
+            "type": "null"
+          },
+          "childReceipt": {
+            "type": "null"
+          },
+          "expiry": {
+            "$ref": "#/$defs/noExpiry"
+          },
+          "forceReprobe": {
+            "type": "null"
+          },
+          "assurance": {
+            "$ref": "#/$defs/notObservedAssurance"
+          },
+          "previousSha256": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "probing"
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "failure": {
+            "type": "null"
+          },
+          "attempt": {
+            "$ref": "#/$defs/attempt"
+          },
+          "challenge": {
+            "$ref": "#/$defs/challenge"
+          },
+          "childReceipt": {
+            "type": "null"
+          },
+          "expiry": {
+            "$ref": "#/$defs/noExpiry"
+          },
+          "assurance": {
+            "$ref": "#/$defs/notObservedAssurance"
+          },
+          "previousSha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "available-attested"
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "failure": {
+            "type": "null"
+          },
+          "attempt": {
+            "$ref": "#/$defs/attempt"
+          },
+          "challenge": {
+            "$ref": "#/$defs/challenge"
+          },
+          "childReceipt": {
+            "$ref": "#/$defs/childReceipt"
+          },
+          "expiry": {
+            "$ref": "#/$defs/noExpiry"
+          },
+          "assurance": {
+            "$ref": "#/$defs/observedAssurance"
+          },
+          "previousSha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "transient-unavailable"
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "failure": {
+            "$ref": "#/$defs/transientFailure"
+          },
+          "attempt": {
+            "$ref": "#/$defs/attempt"
+          },
+          "challenge": {
+            "type": "null"
+          },
+          "childReceipt": {
+            "type": "null"
+          },
+          "expiry": {
+            "$ref": "#/$defs/transientExpiry"
+          },
+          "assurance": {
+            "$ref": "#/$defs/notObservedAssurance"
+          },
+          "previousSha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "terminal-unavailable"
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "failure": {
+            "$ref": "#/$defs/terminalFailure"
+          },
+          "attempt": {
+            "$ref": "#/$defs/attempt"
+          },
+          "challenge": {
+            "type": "null"
+          },
+          "childReceipt": {
+            "type": "null"
+          },
+          "expiry": {
+            "$ref": "#/$defs/sessionExpiry"
+          },
+          "assurance": {
+            "$ref": "#/$defs/notObservedAssurance"
+          },
+          "previousSha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "invalidated"
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "failure": {
+            "type": "null"
+          },
+          "attempt": {
+            "type": "null"
+          },
+          "challenge": {
+            "type": "null"
+          },
+          "childReceipt": {
+            "type": "null"
+          },
+          "expiry": {
+            "$ref": "#/$defs/fingerprintDriftExpiry"
+          },
+          "forceReprobe": {
+            "type": "null"
+          },
+          "assurance": {
+            "$ref": "#/$defs/notObservedAssurance"
+          },
+          "previousSha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]{0,127}$"
+    },
+    "safeReceiptPath": {
+      "type": "string",
+      "pattern": "^(?!/)(?!.*\\\\)(?!.*//)(?!.*\\.{1,2}(?:/|$))(?!.*(?:^|/)(?:Users|home|private|var)(?:/|$)).{1,512}$"
+    },
+    "fingerprint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runnerSha256",
+        "hostBootSha256",
+        "platformClass",
+        "architectureClass",
+        "sandboxSha256",
+        "profileSha256",
+        "policySha256",
+        "duty",
+        "contractVersion"
+      ],
+      "properties": {
+        "runnerSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "hostBootSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "platformClass": {
+          "$ref": "#/$defs/id"
+        },
+        "architectureClass": {
+          "$ref": "#/$defs/id"
+        },
+        "sandboxSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "profileSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "policySha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "duty": {
+          "$ref": "#/$defs/id"
+        },
+        "contractVersion": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "class",
+        "observationReceiptSha256"
+      ],
+      "properties": {
+        "class": {
+          "enum": [
+            "transient-unavailable",
+            "terminal-unavailable"
+          ]
+        },
+        "observationReceiptSha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "transientFailure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "class",
+        "observationReceiptSha256"
+      ],
+      "properties": {
+        "class": {
+          "const": "transient-unavailable"
+        },
+        "observationReceiptSha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "terminalFailure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "class",
+        "observationReceiptSha256"
+      ],
+      "properties": {
+        "class": {
+          "const": "terminal-unavailable"
+        },
+        "observationReceiptSha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attemptId",
+        "index",
+        "startedMonotonicMs"
+      ],
+      "properties": {
+        "attemptId": {
+          "$ref": "#/$defs/id"
+        },
+        "index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "startedMonotonicMs": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "challenge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nonceSha256",
+        "bits"
+      ],
+      "properties": {
+        "nonceSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "bits": {
+          "const": 256
+        }
+      }
+    },
+    "childReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "childIdSha256",
+        "attemptId",
+        "nonceSha256",
+        "duty",
+        "transport",
+        "subjectSha256",
+        "assurance",
+        "resultSha256",
+        "terminal"
+      ],
+      "properties": {
+        "childIdSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "attemptId": {
+          "$ref": "#/$defs/id"
+        },
+        "nonceSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "duty": {
+          "$ref": "#/$defs/id"
+        },
+        "transport": {
+          "$ref": "#/$defs/id"
+        },
+        "subjectSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "assurance": {
+          "const": "sandbox-read-only-except-coordinator-scratch-network-open"
+        },
+        "resultSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "terminal": {
+          "const": true
+        }
+      }
+    },
+    "expiry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "eligibleAfterMonotonicMs"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "session",
+            "transient-ttl",
+            "fingerprint-drift",
+            "none"
+          ]
+        },
+        "eligibleAfterMonotonicMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "noExpiry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "eligibleAfterMonotonicMs"
+      ],
+      "properties": {
+        "kind": {
+          "const": "none"
+        },
+        "eligibleAfterMonotonicMs": {
+          "type": "null"
+        }
+      }
+    },
+    "transientExpiry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "eligibleAfterMonotonicMs"
+      ],
+      "properties": {
+        "kind": {
+          "const": "transient-ttl"
+        },
+        "eligibleAfterMonotonicMs": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "sessionExpiry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "eligibleAfterMonotonicMs"
+      ],
+      "properties": {
+        "kind": {
+          "const": "session"
+        },
+        "eligibleAfterMonotonicMs": {
+          "type": "null"
+        }
+      }
+    },
+    "fingerprintDriftExpiry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "eligibleAfterMonotonicMs"
+      ],
+      "properties": {
+        "kind": {
+          "const": "fingerprint-drift"
+        },
+        "eligibleAfterMonotonicMs": {
+          "type": "null"
+        }
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "decisionId",
+        "receiptPath",
+        "receiptSha256"
+      ],
+      "properties": {
+        "kind": {
+          "const": "po-force-reprobe"
+        },
+        "decisionId": {
+          "$ref": "#/$defs/id"
+        },
+        "receiptPath": {
+          "$ref": "#/$defs/safeReceiptPath"
+        },
+        "receiptSha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "assurance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requested",
+        "observed",
+        "evidenceSha256"
+      ],
+      "properties": {
+        "requested": {
+          "const": "selected-sandbox"
+        },
+        "observed": {
+          "enum": [
+            "not-observed",
+            "sandbox-read-only-except-coordinator-scratch-network-open"
+          ]
+        },
+        "evidenceSha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "notObservedAssurance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requested",
+        "observed",
+        "evidenceSha256"
+      ],
+      "properties": {
+        "requested": {
+          "const": "selected-sandbox"
+        },
+        "observed": {
+          "const": "not-observed"
+        },
+        "evidenceSha256": {
+          "type": "null"
+        }
+      }
+    },
+    "observedAssurance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requested",
+        "observed",
+        "evidenceSha256"
+      ],
+      "properties": {
+        "requested": {
+          "const": "selected-sandbox"
+        },
+        "observed": {
+          "const": "sandbox-read-only-except-coordinator-scratch-network-open"
+        },
+        "evidenceSha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  }
+}

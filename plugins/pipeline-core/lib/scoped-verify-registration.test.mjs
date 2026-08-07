@@ -184,6 +184,17 @@ function scopedRegistrationFailureFixture() {
     copyFileSync(join(repoRoot, "harness", "scripts", "verify.mjs"), writer);
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "scoped-verify-registration.mjs"), registration);
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "windows-assurance-verify-registration.mjs"), windowsRegistration);
+    copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "verify-resume.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "verify-resume.mjs"));
+    copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "windows-private-state.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "windows-private-state.mjs"));
+    // verify.mjs resolves the manifest tier through the authority resolver (ADR-0054);
+    // the fixture root must carry it and its one local dependency.
+    copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "project-authority.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "project-authority.mjs"));
+    copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "worktree-lifecycle.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "worktree-lifecycle.mjs"));
+    mkdirSync(join(fixtureRoot, "plugins", "pipeline-core", "scripts"), { recursive: true });
+    writeFileSync(
+      join(fixtureRoot, "plugins", "pipeline-core", "scripts", "verify-journal.mjs"),
+      'export function runVerifyJournal() { throw new Error("journal must not run after scoped-registration failure"); }\n',
+    );
     copyFileSync(join(repoRoot, PRD_PATH), prd);
     copyFileSync(join(repoRoot, WINDOWS_ASSURANCE_MATRIX_PATH), windowsAssuranceMatrix);
     for (const suite of WINDOWS_ASSURANCE_SUITES) {

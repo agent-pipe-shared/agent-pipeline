@@ -1,7 +1,7 @@
 # pipeline.yaml.example -- canonical, fully-commented example of the OPTIONAL declarative
 # pipeline manifest (schema id: pipeline.manifest.v0). Use this as a reference for a
 # DIRECTLY AUTHORED manifest only. Compiler-managed installs author pipeline.user.yaml and
-# let setup.mjs regenerate .claude/pipeline.yaml; do not mix the two ownership modes. Every
+# let setup.mjs regenerate the manifest at the resolved authority tier; do not mix the two ownership modes. Every
 # top-level section is optional -- an
 # absent manifest is a fully supported "not opted in yet" state, byte-identical to today's
 # non-manifest behavior (plugins/pipeline-core/lib/manifest.mjs: loadManifest() returns

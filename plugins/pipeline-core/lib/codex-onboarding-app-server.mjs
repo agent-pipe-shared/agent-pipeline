@@ -17,6 +17,12 @@ import {
 
 const HEALTH_SCRIPT = fileURLToPath(new URL("../scripts/codex-app-server-health.mjs", import.meta.url));
 const INTENTS = new Set(["onboarding", "bootstrap", "session", "dispatch"]);
+/**
+ * The App Server is a Codex daemon. A runner listed here has no such concept
+ * at all, for any intent, so its component is `not-applicable` — distinct from
+ * `not-requested`, which means one intent does not need an existing concept.
+ */
+export const RUNNERS_WITHOUT_APP_SERVER = new Set(["claude"]);
 const EXECUTION_DENIED = new Set(["EPERM", "EACCES", "EROFS"]);
 const RECOVER_CODES = new Set([
   "CAS-DAEMON-UNREACHABLE",
@@ -84,10 +90,14 @@ export function mapCodexAppServerObservation(observation, { required = true } = 
  */
 export function observeOnboardingAppServer({
   intent,
+  runner = "codex",
   observe = observeCodexAppServer,
   observationOptions = {},
 } = {}) {
   if (!INTENTS.has(intent)) fail("COAS-INTENT", "App-Server intent is invalid");
+  // A runner without any App-Server concept never observes the daemon and
+  // never claims one is running; the honest component is not-applicable.
+  if (RUNNERS_WITHOUT_APP_SERVER.has(runner)) return component(false, "not-applicable", null);
   if (intent === "onboarding") return component(false, "not-requested", null);
   let observation;
   try {
@@ -118,7 +128,9 @@ function commandAction(healthScript, flag, {
 function validComponent(value) {
   if (!isObject(value) || Object.keys(value).length !== 3 || typeof value.required !== "boolean") return false;
   if (value.required === false) {
-    return value.status === "not-requested" && value.code === null;
+    // Two distinct, code-free non-required reasons: this intent does not need
+    // the capability here, or this runner has no such capability at all.
+    return (value.status === "not-requested" || value.status === "not-applicable") && value.code === null;
   }
   if (typeof value.code !== "string" || !CAS_CODE.test(value.code)) return false;
   if (value.status === "running") return value.code === "CAS-READY";

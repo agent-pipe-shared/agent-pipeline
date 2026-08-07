@@ -9,7 +9,8 @@ import { planFeaturePackageBootstrap, planFeaturePackageTransition, validateFeat
 
 const root = mkdtempSync(join(tmpdir(), "feature-topology-"));
 const hash = (value) => createHash("sha256").update(value).digest("hex");
-const file = (path, bytes) => { mkdirSync(join(root, path, ".."), { recursive: true }); writeFileSync(join(root, path), bytes); return { path, sha256: hash(bytes) }; };
+const fileIn = (base, path, bytes) => { mkdirSync(join(base, path, ".."), { recursive: true }); writeFileSync(join(base, path), bytes); return { path, sha256: hash(bytes) }; };
+const file = (path, bytes) => fileIn(root, path, bytes);
 try {
   const id = "safe-feature"; const base = `specs/${id}`;
   const artifacts = [
@@ -56,3 +57,17 @@ try {
   assert.match(validateFeatureTopology(root).findings.join("\n"), /digest does not bind/u);
   console.log("feature-package-topology: 13 passed, 0 failed");
 } finally { rmSync(root, { recursive: true, force: true }); }
+
+// Regression guard: a clean forward-slash relative artifact path (the exact
+// shape every real package uses) must validate OK on every platform,
+// including native Windows, where a platform-default node:path normalize()
+// would otherwise rewrite it to backslashes and reject it as unsafe.
+const posixRoot = mkdtempSync(join(tmpdir(), "feature-topology-posix-path-"));
+try {
+  const id = "posix-path-feature"; const base = `specs/${id}`;
+  const prd = fileIn(posixRoot, `${base}/prd.md`, "prd\n");
+  const manifest = { schema: "pipeline.feature-package.v1", feature: { id, rigor: 1 }, state: "draft", artifacts: [{ class: "prd", path: prd.path, sha256: prd.sha256, authority: true, mutability: "mutable", retention: "active" }], candidate: null, supersedes: null };
+  fileIn(posixRoot, `${base}/lifecycle.json`, `${JSON.stringify(manifest)}\n`);
+  assert.equal(validateFeatureTopology(posixRoot).ok, true);
+  console.log("feature-package-topology: forward-slash path regression, 1 passed, 0 failed");
+} finally { rmSync(posixRoot, { recursive: true, force: true }); }

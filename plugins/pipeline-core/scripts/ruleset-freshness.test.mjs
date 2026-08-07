@@ -2,846 +2,485 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
 
 import {
-  createFreshnessHostAction,
-  FRESHNESS_HOST_RESULT_SCHEMA,
-  FRESHNESS_HOST_CONTROL_SCHEMA,
-  FRESHNESS_HOST_RECEIPT_SCHEMA,
-  FRESHNESS_HOST_TRANSPORT_SCHEMA,
-  FRESHNESS_NETWORK_PREFLIGHT_SCHEMA,
-  freshnessHostPlanForEnvironment,
-  inspectClaudeRulesetFreshness,
-  inspectCliRulesetFreshness,
-  inspectRulesetFreshness,
-  observePublicRemoteIdentity,
-  PUBLIC_MARKETPLACE_URL,
-  RULESET_FRESHNESS_SCHEMA,
-  withFreshnessHostRequest,
+  inspectPipelineUpdateAvailability,
+  migrateLegacyRulesetFreshness,
+  PIPELINE_UPDATE_AVAILABILITY_SCHEMA,
+  repositoryWritePermitted,
+  resolvePipelineUpdateChannelConfig,
+  runPipelineUpdateAvailabilityCli,
 } from "./ruleset-freshness.mjs";
-import { executeRulesetFreshnessHostAction, inspectHostRulesetFreshness, main as hostMain } from "./ruleset-freshness-host.mjs";
+import {
+  readProjectPipelineUpdateChannel,
+  resolvePipelineUpdateChannel,
+} from "./pipeline-update-channel.mjs";
 
 const roots = [];
-const SCRIPT = fileURLToPath(new URL("./ruleset-freshness.mjs", import.meta.url));
-const HOST_SCRIPT = fileURLToPath(new URL("./ruleset-freshness-host.mjs", import.meta.url));
 function git(cwd, ...args) {
   const out = spawnSync("git", args, { cwd, encoding: "utf8" });
   assert.equal(out.status, 0, out.stderr);
   return out.stdout.trim();
+}
+function configure(repo) {
+  git(repo, "config", "user.email", "ruleset@example.invalid");
+  git(repo, "config", "user.name", "Ruleset Test");
+}
+function manifestPath(repo) {
+  return join(repo, "plugins", "pipeline-core", ".codex-plugin", "plugin.json");
+}
+function commitVersion(repo, version, name) {
+  mkdirSync(join(repo, "plugins", "pipeline-core", ".codex-plugin"), { recursive: true });
+  writeFileSync(manifestPath(repo), `${JSON.stringify({ name: "pipeline-core", version })}\n`);
+  writeFileSync(join(repo, `${name}.txt`), `${name}\n`);
+  git(repo, "add", ".");
+  git(repo, "commit", "-q", "-m", name);
 }
 function commit(repo, name) {
   writeFileSync(join(repo, `${name}.txt`), `${name}\n`);
   git(repo, "add", `${name}.txt`);
   git(repo, "commit", "-q", "-m", name);
 }
-function fixture(name) {
+function fixture(name, version = "0.4.7") {
   const root = mkdtempSync(join(tmpdir(), `ruleset-freshness-${name}-`));
   roots.push(root);
   const remote = join(root, "public.git");
   const source = join(root, "source");
   git(root, "init", "--bare", "-q", remote);
   git(root, "init", "-q", "-b", "main", source);
-  git(source, "config", "user.email", "ruleset@example.invalid");
-  git(source, "config", "user.name", "Ruleset Test");
-  commit(source, "base");
+  configure(source);
+  commitVersion(source, version, "base");
   git(source, "remote", "add", "public", remote);
   git(source, "push", "-q", "public", "main");
   git(remote, "symbolic-ref", "HEAD", "refs/heads/main");
-  return { root, remote, source };
+  return { root, remote, source, pluginRoot: join(source, "plugins", "pipeline-core") };
 }
-function sourceObservation(sha, sourceClass = "marketplace-public", installedSha = sha) {
+function writeNeutralCalibration(repo, value) {
+  const projectDir = join(repo, "project");
+  mkdirSync(projectDir, { recursive: true });
+  writeFileSync(join(projectDir, "pipeline.yaml"), "schemaVersion: 4\n");
+  writeFileSync(join(projectDir, "pipeline.json"), JSON.stringify(value));
+}
+function snapshot(repo) {
   return {
-    schema: "pipeline.ruleset-source.v1",
-    runner: "codex",
-    selectedPlugin: { id: "pipeline-core@agent-pipeline", version: "0.4.6+test" },
-    source: { class: sourceClass },
-    loadedIdentity: { status: "available", algorithm: "git-sha1", value: sha },
-    installedIdentity: { status: "available", algorithm: "git-sha1", value: installedSha },
+    head: git(repo, "rev-parse", "HEAD"),
+    refs: git(repo, "show-ref"),
+    config: git(repo, "config", "--local", "--list"),
+    status: git(repo, "status", "--porcelain=v1"),
+    index: readFileSync(join(repo, ".git", "index")).toString("base64"),
   };
 }
-function remoteObservation(sha) {
-  return { status: "ready", identity: { status: "available", algorithm: "git-sha1", value: sha } };
-}
-function readyHostControlObservation(version = "0.146.0") {
+function blockingPolicy(build) {
   return {
-    schema: "pipeline.codex-app-server-health.v1",
-    status: "ready",
-    code: "CAS-READY",
-    phase: "observe",
-    daemon: {
-      status: "running",
-      backend: "pid",
-      appServerVersion: version,
-      cliVersion: version,
-      managedCodexVersion: version,
-      socketPath: "/private/codex-control.sock",
-      managedCodexPath: "/private/codex",
-    },
-  };
-}
-function daemonIdentitySha256(daemon) {
-  const keys = ["status", "backend", "managedCodexPath", "managedCodexVersion", "socketPath", "cliVersion", "appServerVersion"];
-  const canonical = JSON.stringify(Object.fromEntries(keys.map((key) => [key, daemon[key]])));
-  return createHash("sha256").update(canonical).digest("hex");
-}
-function expectedControlIdentitySha256() {
-  return daemonIdentitySha256(readyHostControlObservation().daemon);
-}
-function hostAction(boundaryId) {
-  return createFreshnessHostAction(boundaryId, expectedControlIdentitySha256());
-}
-function preflightBinding() {
-  return {
-    executionBoundary: "host-authorized-wsl",
-    boundaryId: "pipeline-start-host-authorized-wsl",
-    preflightSha256: "c".repeat(64),
-  };
-}
-function hostExecutionReceipt(action, publicHeadOid) {
-  const control = readyHostControlObservation();
-  return {
-    schema: FRESHNESS_HOST_RECEIPT_SCHEMA,
-    boundaryId: action.boundaryId,
-    action,
-    requestSha256: action.requestSha256,
-    hostControl: {
-      schema: FRESHNESS_HOST_CONTROL_SCHEMA,
-      code: "CAS-READY",
-      appServerVersion: "0.146.0",
-      daemonIdentitySha256: daemonIdentitySha256(control.daemon),
-    },
-    childStarted: true,
-    executable: "/usr/bin/git",
-    argv: ["ls-remote", PUBLIC_MARKETPLACE_URL, "HEAD"],
-    exitCode: 0,
-    publicHeadOid,
+    schema: "pipeline.ruleset-update-policy.v1",
+    policyId: "pipeline-core-security-update-policy",
+    policyVersion: 1,
+    entries: [{
+      id: "security-fixture",
+      disposition: "blocking",
+      publicSecurityReason: "This fixture build is affected by a public security issue.",
+      match: { type: "exact-loaded-builds", builds: [build] },
+    }],
   };
 }
 
-test.after(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
-
-test("the default public remote observation is fixed, injected, and coordinate-free", () => {
-  const calls = [];
-  const sha = "d".repeat(40);
-  const observed = observePublicRemoteIdentity({
-    spawn(command, args, options) {
-      calls.push({ command, args, options });
-      return { status: 0, signal: null, stdout: `${sha}\tHEAD\n` };
-    },
-  });
-  assert.deepEqual(observed, {
-    status: "ready",
-    identity: { status: "available", algorithm: "git-sha1", value: sha },
-    reason: null,
-  });
-  assert.deepEqual(calls[0].args, ["ls-remote", PUBLIC_MARKETPLACE_URL, "HEAD"]);
-  assert.equal(JSON.stringify(observed).includes("github.com"), false);
+test.after(() => {
+  for (const root of roots) rmSync(root, { recursive: true, force: true });
 });
 
-test("a known restricted sandbox binds exactly one data-minimized network-open host action", () => {
-  const { source } = fixture("selected-host-transport");
-  const loaded = git(source, "rev-parse", "HEAD");
-  let sandboxAttempts = 0;
-  const actions = [];
-  const boundaryId = "freshness-host-boundary-1";
-  const value = inspectRulesetFreshness(source, {
-    sourceObservation: sourceObservation(loaded),
-    networkPreflight: {
-      schema: FRESHNESS_NETWORK_PREFLIGHT_SCHEMA,
-      network: "restricted",
-      boundaryId,
-      expectedControlIdentitySha256: expectedControlIdentitySha256(),
-    },
-    hostTransport: {
-      schema: FRESHNESS_HOST_TRANSPORT_SCHEMA,
-      boundaryId,
-      access: "read-only",
-      network: "enabled",
-      execute(action) {
-        actions.push(action);
-        return {
-          schema: FRESHNESS_HOST_RESULT_SCHEMA,
-          requestSha256: action.requestSha256,
-          status: "completed",
-          stdout: `${loaded}\tHEAD\n`,
-          receipt: hostExecutionReceipt(action, loaded),
-        };
-      },
-    },
-    spawn() {
-      sandboxAttempts += 1;
-      throw new Error("known restricted sandbox must not be attempted");
-    },
+test("loaded Pipeline equal/ahead results are metadata and never mutate the source", () => {
+  const { remote, source, pluginRoot } = fixture("equal-ahead");
+  const before = snapshot(source);
+  let value = inspectPipelineUpdateAvailability(source, {
+    remoteUrl: remote,
+    pluginRoot,
+    policy: null,
+    selfApplication: true,
   });
-  assert.equal(value.status, "equal");
-  assert.equal(sandboxAttempts, 0);
-  assert.equal(actions.length, 1);
-  assert.deepEqual(actions[0], hostAction(boundaryId));
-  assert.equal(JSON.stringify(actions[0]).includes(source), false);
-  assert.equal(JSON.stringify(actions[0]).includes(process.env.HOME ?? "not-set"), false);
+  assert.equal(value.schema, PIPELINE_UPDATE_AVAILABILITY_SCHEMA);
+  assert.deepEqual(Object.keys(value).sort(), [
+    "blocking",
+    "channel",
+    "channelSource",
+    "commit",
+    "loaded",
+    "marketplace",
+    "pipelineUpdateAvailability",
+    "policyDisposition",
+    "reason",
+    "ref",
+    "schema",
+    "status",
+    "updateAvailable",
+    "updateRecommended",
+    "version",
+  ]);
+  assert.equal("branch" in value || "upstream" in value || "writePermitted" in value, false);
+  assert.equal(value.status, "current");
+  assert.equal(value.channel, "alpha");
+  assert.equal(value.ref, "refs/heads/main");
+  assert.equal(value.commit, before.head);
+  assert.equal(value.pipelineUpdateAvailability, "current");
+  assert.equal(value.updateRecommended, false);
+  assert.equal(value.blocking, false);
+  assert.deepEqual(snapshot(source), before);
+
+  commit(source, "local");
+  const aheadBefore = snapshot(source);
+  value = inspectPipelineUpdateAvailability(source, {
+    remoteUrl: remote,
+    pluginRoot,
+    policy: null,
+    selfApplication: true,
+  });
+  assert.equal(value.status, "local-ahead");
+  assert.equal(value.loaded.commit, aheadBefore.head);
+  assert.equal(value.marketplace.commit, before.head);
+  assert.equal(value.blocking, false);
+  assert.deepEqual(snapshot(source), aheadBefore);
 });
 
-test("a restricted preflight without its exact selected host transport fails closed without a sandbox attempt", () => {
-  let attempts = 0;
-  const observed = observePublicRemoteIdentity({
-    networkPreflight: {
-      schema: FRESHNESS_NETWORK_PREFLIGHT_SCHEMA,
-      network: "restricted",
-      boundaryId: "freshness-host-boundary-2",
-      expectedControlIdentitySha256: expectedControlIdentitySha256(),
-    },
-    spawn() { attempts += 1; return { status: 0, stdout: `${"a".repeat(40)}\tHEAD\n` }; },
+test("closed update-channel configuration defaults by distribution topology", () => {
+  assert.deepEqual(resolvePipelineUpdateChannel({
+    selfApplication: true,
+  }), {
+    status: "ready", channel: "alpha", source: "distribution-default",
+    topology: "local-self-development", reason: null,
   });
-  assert.deepEqual(observed, { status: "remote-unavailable", identity: null, reason: "host-transport-required" });
-  assert.equal(attempts, 0);
+  assert.deepEqual(resolvePipelineUpdateChannel({
+    repoPath: "/tmp/consumer",
+    pluginRoot: "/opt/pipeline-core",
+  }), {
+    status: "ready", channel: "stable", source: "distribution-default",
+    topology: "installed-consumer", reason: null,
+  });
+  assert.equal(resolvePipelineUpdateChannel({ installedSource: "local-development" }).channel, "stable");
+  assert.equal(resolvePipelineUpdateChannel({ updateChannel: "alpha" }).channel, "stable");
 });
 
-test("WSL CLI planning emits a bound host request and never restores a default sandbox fallback", () => {
-  const plan = freshnessHostPlanForEnvironment({ WSL_DISTRO_NAME: "Ubuntu" }, expectedControlIdentitySha256());
-  assert.deepEqual(plan.networkPreflight, {
-    schema: FRESHNESS_NETWORK_PREFLIGHT_SCHEMA,
-    network: "restricted",
-    boundaryId: "pipeline-start-host-authorized-wsl",
-    expectedControlIdentitySha256: expectedControlIdentitySha256(),
+test("self-application topology keeps alpha when the loaded cache is outside its source checkout", () => {
+  const { root, remote, source } = fixture("self-application-cache");
+  const cache = join(root, "loaded-cache");
+  git(root, "clone", "-q", remote, cache);
+  const cachePluginRoot = join(cache, "plugins", "pipeline-core");
+  const channel = resolvePipelineUpdateChannelConfig(source, {
+    pluginRoot: cachePluginRoot,
+    selfApplication: true,
   });
-  const unavailable = {
-    schema: RULESET_FRESHNESS_SCHEMA,
-    status: "remote-unavailable",
-    source: "marketplace-public",
-    loadedSha: "a".repeat(40),
-    remoteSha: null,
-    ahead: null,
-    behind: null,
-    writePermitted: false,
-    reason: "host-transport-required",
-  };
-  const output = withFreshnessHostRequest(unavailable, plan);
-  assert.deepEqual(output.nextAction, hostAction("pipeline-start-host-authorized-wsl"));
-  assert.equal(JSON.stringify(output).includes("/home/"), false);
-  assert.equal(JSON.stringify(output).includes(".codex"), false);
-  assert.equal(freshnessHostPlanForEnvironment({}), null);
-  assert.equal(withFreshnessHostRequest(unavailable, null), unavailable);
+  assert.equal(channel.channel, "alpha");
+  assert.equal(channel.topology, "local-self-development");
+  assert.equal(resolvePipelineUpdateChannelConfig(source, {
+    pluginRoot: cachePluginRoot,
+  }).channel, "stable");
+  const value = inspectPipelineUpdateAvailability(source, {
+    remoteUrl: remote, pluginRoot: cachePluginRoot, policy: null, selfApplication: true,
+  });
+  assert.equal(value.channel, "alpha");
+  assert.equal(value.ref, "refs/heads/main");
 });
 
-test("the normal Codex freshness entrypoint forwards a selected host transport", () => {
-  const loaded = "a".repeat(40);
-  const boundaryId = "freshness-host-boundary-cli";
-  let directAttempts = 0;
-  let hostCalls = 0;
-  const value = inspectCliRulesetFreshness({
-    repoPath: "/private/consumer-not-forwarded",
-    codexObservation: { status: "ready", observation: sourceObservation(loaded) },
-    networkPreflight: {
-      schema: FRESHNESS_NETWORK_PREFLIGHT_SCHEMA,
-      network: "restricted",
-      boundaryId,
-      expectedControlIdentitySha256: expectedControlIdentitySha256(),
-    },
-    hostTransport: {
-      schema: FRESHNESS_HOST_TRANSPORT_SCHEMA,
-      boundaryId,
-      access: "read-only",
-      network: "enabled",
-      execute(action) {
-        hostCalls += 1;
-        assert.deepEqual(action, hostAction(boundaryId));
-        return {
-          schema: FRESHNESS_HOST_RESULT_SCHEMA,
-          requestSha256: action.requestSha256,
-          status: "completed",
-          stdout: `${loaded}\tHEAD\n`,
-          receipt: hostExecutionReceipt(action, loaded),
-        };
-      },
-    },
-    // The direct spawn seam is intentionally absent from this entrypoint. A
-    // hostile fallback would therefore have to reach the host transport first.
-    inspectClaude() { directAttempts += 1; throw new Error("Claude fallback must not run"); },
-  });
-  assert.equal(value.status, "equal");
-  assert.equal(hostCalls, 1);
-  assert.equal(directAttempts, 0);
-});
-
-test("a direct Codex invocation cannot claim freshness on a selected host boundary without its receipt", () => {
-  const loaded = "a".repeat(40);
-  const value = inspectCliRulesetFreshness({
-    repoPath: "/private/consumer-not-forwarded",
-    codexObservation: { status: "ready", observation: sourceObservation(loaded) },
-    networkPreflight: {
-      schema: FRESHNESS_NETWORK_PREFLIGHT_SCHEMA,
-      network: "restricted",
-      boundaryId: "freshness-host-boundary-direct",
-      expectedControlIdentitySha256: expectedControlIdentitySha256(),
-    },
-  });
-  assert.equal(value.status, "remote-unavailable");
-  assert.equal(value.writePermitted, false);
-  assert.equal(value.reason, "remote-unavailable");
-});
-
-test("the dedicated WSL host adapter executes only the fixed public action", () => {
-  const action = hostAction("pipeline-start-host-authorized-wsl");
-  const sha = "e".repeat(40);
-  const calls = [];
-  const output = executeRulesetFreshnessHostAction(action, {
-    spawn(command, args, options) {
-      calls.push({ command, args, options });
-      return { pid: 3456, status: 0, stdout: `${sha}\tHEAD\nprivate diagnostic that must not escape` };
-    },
-    observeHostControl() { return readyHostControlObservation(); },
-  });
-  assert.deepEqual(calls[0].args, ["ls-remote", PUBLIC_MARKETPLACE_URL, "HEAD"]);
-  assert.equal(calls[0].command, "/usr/bin/git");
-  assert.equal(calls[0].options.cwd, "/");
-  assert.equal(calls[0].options.shell, false);
-  assert.deepEqual(calls[0].options.env, {
-    GIT_ASKPASS: "/bin/false",
-    GIT_CONFIG_COUNT: "0",
-    GIT_CONFIG_GLOBAL: "/dev/null",
-    GIT_CONFIG_NOSYSTEM: "1",
-    GIT_OPTIONAL_LOCKS: "0",
-    GIT_TERMINAL_PROMPT: "0",
-    HOME: "/nonexistent",
-    LANG: "C",
-    LC_ALL: "C",
-    PATH: "/usr/bin:/bin",
-    SSH_ASKPASS: "/bin/false",
-  });
-  assert.deepEqual(output, {
-    schema: FRESHNESS_HOST_RESULT_SCHEMA,
-    requestSha256: action.requestSha256,
-    status: "completed",
-    stdout: `${sha}\tHEAD\n`,
-    receipt: hostExecutionReceipt(action, sha),
-  });
-  assert.equal(JSON.stringify(output).includes("private diagnostic"), false);
-  assert.equal(JSON.stringify(output).includes("/private/codex-control.sock"), false);
-  assert.equal(JSON.stringify(output).includes("/private/codex"), false);
-
-  const substituted = { ...action, boundaryId: "other-boundary" };
-  assert.equal(executeRulesetFreshnessHostAction(substituted, {
-    spawn() { throw new Error("substituted action must never run"); },
-  }), null);
-});
-
-test("the dedicated WSL host adapter ignores hostile PATH and Git URL-rewrite state", () => {
-  const action = hostAction("pipeline-start-host-authorized-wsl");
-  const sha = "f".repeat(40);
-  const hostileEnvironment = {
-    PATH: "/tmp/attacker-bin",
-    HOME: "/tmp/attacker-home",
-    GIT_DIR: "/tmp/attacker-repository",
-    GIT_CONFIG_COUNT: "1",
-    GIT_CONFIG_KEY_0: "url.https://attacker.invalid/.insteadof",
-    GIT_CONFIG_VALUE_0: PUBLIC_MARKETPLACE_URL,
-  };
-  const previousEnvironment = Object.fromEntries(Object.keys(hostileEnvironment)
-    .map((key) => [key, process.env[key]]));
-  Object.assign(process.env, hostileEnvironment);
-  const calls = [];
-  let output;
-  try {
-    output = executeRulesetFreshnessHostAction(action, {
-      spawn(command, args, options) {
-        calls.push({ command, args, options });
-        return { pid: 3457, status: 0, stdout: `${sha}\tHEAD\n` };
-      },
-      observeHostControl() { return readyHostControlObservation(); },
+test("persisted project channel config is closed, read-only, and takes precedence", () => {
+  const { remote, source, pluginRoot } = fixture("project-channel-config");
+  const configDir = join(source, "project");
+  for (const channel of ["alpha", "beta", "stable"]) {
+    writeNeutralCalibration(source, {
+      pipelineUpdateChannel: channel,
+      ignoredRemote: "https://example.invalid/not-a-channel.git",
+      ignoredRef: "refs/heads/untrusted",
     });
-  } finally {
-    for (const [key, value] of Object.entries(previousEnvironment)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
+    const persisted = readProjectPipelineUpdateChannel(source);
+    assert.equal(persisted.status, "ready");
+    assert.equal(persisted.updateChannel, channel);
+    assert.equal(resolvePipelineUpdateChannelConfig(source, {
+      pluginRoot, selfApplication: true,
+    }).channel, channel);
+    if (channel === "alpha") {
+      const value = inspectPipelineUpdateAvailability(source, {
+        remoteUrl: remote, pluginRoot, policy: null, selfApplication: true,
+      });
+      assert.equal(value.channel, "alpha");
+      assert.equal(value.ref, "refs/heads/main");
+      assert.equal(value.status, "current");
+      assert.equal(JSON.stringify(value).includes("example.invalid"), false);
     }
   }
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].command, "/usr/bin/git");
-  assert.equal(calls[0].options.env.PATH, "/usr/bin:/bin");
-  assert.equal(calls[0].options.env.GIT_CONFIG_GLOBAL, "/dev/null");
-  assert.equal(calls[0].options.env.GIT_CONFIG_NOSYSTEM, "1");
-  for (const key of ["PATH", "HOME", "GIT_DIR", "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0"]) {
-    assert.equal(Object.hasOwn(calls[0].options.env, key), key === "PATH" || key === "HOME");
-  }
-  assert.equal(calls[0].options.env.GIT_CONFIG_COUNT, "0");
-  assert.equal(output.status, "completed");
+  writeFileSync(join(configDir, "pipeline.json"), JSON.stringify({ pipelineUpdateChannel: "main" }));
+  assert.equal(readProjectPipelineUpdateChannel(source).status, "unknown");
+  writeFileSync(join(configDir, "pipeline.json"), "{not json");
+  const malformed = readProjectPipelineUpdateChannel(source);
+  assert.equal(malformed.status, "unknown");
+  const unavailable = inspectPipelineUpdateAvailability(source, {
+    remoteUrl: remote, pluginRoot, policy: null, selfApplication: true,
+  });
+  assert.equal(unavailable.status, "unknown");
+  assert.equal(unavailable.reason, "channel-unavailable");
+  assert.equal(unavailable.channel, null);
+  assert.equal(unavailable.ref, null);
 });
 
-test("the host adapter produces the complete freshness result through its fixed transport", () => {
-  const loaded = "a".repeat(40);
-  const observed = inspectHostRulesetFreshness({
-    repoPath: "/private/consumer-not-forwarded",
-    loadedPluginRoot: "/private/plugin-not-forwarded",
-    codexObservation: { status: "ready", observation: sourceObservation(loaded) },
-    preflightBinding: preflightBinding(),
-    observeHostControl() { return readyHostControlObservation(); },
-    execute(action) {
-      assert.deepEqual(action, hostAction("pipeline-start-host-authorized-wsl"));
-      return {
-        schema: FRESHNESS_HOST_RESULT_SCHEMA,
-        requestSha256: action.requestSha256,
-        status: "completed",
-        stdout: `${loaded}\tHEAD\n`,
-        receipt: hostExecutionReceipt(action, loaded),
-      };
-    },
-  });
-  assert.equal(observed.status, "equal");
-  assert.equal(observed.remoteSha, loaded);
-  assert.equal(JSON.stringify(observed).includes("/private/"), false);
-  const unavailable = inspectHostRulesetFreshness({
-    repoPath: "/private/consumer-not-forwarded",
-    loadedPluginRoot: "/private/plugin-not-forwarded",
-    codexObservation: { status: "ready", observation: sourceObservation(loaded) },
-    preflightBinding: preflightBinding(),
-    observeHostControl() { return readyHostControlObservation(); },
-    execute() { return null; },
-  });
-  assert.equal(unavailable.status, "remote-unavailable");
-  assert.equal(unavailable.writePermitted, false);
-  assert.notEqual(unavailable.status, "equal");
-});
-
-test("a completed host response without the closed Freshness execution receipt fails closed", () => {
-  const loaded = "a".repeat(40);
-  const boundaryId = "freshness-host-boundary-receipt";
-  const base = hostExecutionReceipt(hostAction(boundaryId), loaded);
-  for (const receipt of [
-    null,
-    { ...base, boundaryId: "other-boundary" },
-    { ...base, action: { ...base.action, boundaryId: "other-boundary" } },
-    { ...base, hostControl: null },
-    { ...base, hostControl: { ...base.hostControl, code: "CAS-DAEMON-UNREACHABLE" } },
-    { ...base, hostControl: { ...base.hostControl, appServerVersion: "" } },
-    { ...base, hostControl: { ...base.hostControl, daemonIdentitySha256: "not-a-sha256" } },
-    { ...base, hostControl: { ...base.hostControl, daemonIdentitySha256: "b".repeat(64) } },
-    { ...base, childStarted: false },
-    { ...base, executable: "git" },
-    { ...base, exitCode: 1 },
-    { ...base, publicHeadOid: "b".repeat(40) },
-  ]) {
-    const observed = inspectRulesetFreshness("/private/consumer-not-forwarded", {
-      sourceObservation: sourceObservation(loaded),
-      networkPreflight: {
-        schema: FRESHNESS_NETWORK_PREFLIGHT_SCHEMA,
-        network: "restricted",
-        boundaryId,
-        expectedControlIdentitySha256: expectedControlIdentitySha256(),
-      },
-      hostTransport: {
-        schema: FRESHNESS_HOST_TRANSPORT_SCHEMA,
-        boundaryId,
-        access: "read-only",
-        network: "enabled",
-        execute(action) {
-          return {
-            schema: FRESHNESS_HOST_RESULT_SCHEMA,
-            requestSha256: action.requestSha256,
-            status: "completed",
-            stdout: `${loaded}\tHEAD\n`,
-            receipt,
-          };
-        },
-      },
-    });
-    assert.equal(observed.status, "remote-unavailable");
-    assert.equal(observed.writePermitted, false);
-    assert.equal(observed.reason, "remote-unavailable");
-  }
-});
-
-test("the host executor rejects a successful-looking Git result without proof that its child started", () => {
-  const action = hostAction("pipeline-start-host-authorized-wsl");
-  const output = executeRulesetFreshnessHostAction(action, {
-    spawn() { return { status: 0, stdout: `${"a".repeat(40)}\tHEAD\n` }; },
-    observeHostControl() { return readyHostControlObservation(); },
-  });
-  assert.equal(output.status, "unavailable");
-  assert.equal(output.receipt, null);
-});
-
-test("the host executor does not issue completed when host control is absent or unready", () => {
-  const action = hostAction("pipeline-start-host-authorized-wsl");
-  let gitCalls = 0;
-  for (const hostControl of [
-    null,
-    { ...readyHostControlObservation(), status: "stale", code: "CAS-DAEMON-UNREACHABLE" },
-  ]) {
-    const output = executeRulesetFreshnessHostAction(action, {
-      spawn() {
-        gitCalls += 1;
-        return { pid: 7890, status: 0, stdout: `${"a".repeat(40)}\tHEAD\n` };
-      },
-      observeHostControl() { return hostControl; },
-    });
-    assert.equal(output.status, "unavailable");
-    assert.equal(output.receipt, null);
-  }
-  assert.equal(gitCalls, 0);
-});
-
-test("a control identity exchanged after host selection fails before Git starts", () => {
-  const loaded = "a".repeat(40);
-  const firstControl = readyHostControlObservation();
-  const secondControl = readyHostControlObservation();
-  secondControl.daemon.socketPath = "/private/replaced-control.sock";
-  secondControl.daemon.managedCodexPath = "/private/replaced-codex";
-  let observations = 0;
-  let gitCalls = 0;
-  const observed = inspectHostRulesetFreshness({
-    repoPath: "/private/consumer-not-forwarded",
-    loadedPluginRoot: "/private/plugin-not-forwarded",
-    codexObservation: { status: "ready", observation: sourceObservation(loaded) },
-    preflightBinding: preflightBinding(),
-    observeHostControl() {
-      observations += 1;
-      return observations === 1 ? firstControl : secondControl;
-    },
-    execute(action, options) {
-      return executeRulesetFreshnessHostAction(action, {
-        ...options,
-        spawn() {
-          gitCalls += 1;
-          return { pid: 7890, status: 0, stdout: `${loaded}\tHEAD\n` };
-        },
-      });
-    },
-  });
-  assert.equal(observed.status, "remote-unavailable");
-  assert.equal(observed.writePermitted, false);
-  assert.equal(observations, 2);
-  assert.equal(gitCalls, 0);
-  assert.equal(JSON.stringify(observed).includes("/private/"), false);
-});
-
-test("missing or invalid host control identity cannot select a freshness action", () => {
-  const loaded = "a".repeat(40);
-  for (const control of [null, { ...readyHostControlObservation(), status: "stale", code: "CAS-DAEMON-UNREACHABLE" }]) {
-    let executeCalls = 0;
-    const observed = inspectHostRulesetFreshness({
-      repoPath: "/private/consumer-not-forwarded",
-      loadedPluginRoot: "/private/plugin-not-forwarded",
-      codexObservation: { status: "ready", observation: sourceObservation(loaded) },
-      preflightBinding: preflightBinding(),
-      observeHostControl() { return control; },
-      execute() { executeCalls += 1; throw new Error("must not execute without a selected identity"); },
-    });
-    assert.equal(observed.status, "remote-unavailable");
-    assert.equal(observed.writePermitted, false);
-    assert.equal(executeCalls, 0);
-    assert.equal(JSON.stringify(observed).includes("/private/"), false);
-  }
-});
-
-test("the host adapter rejects direct or unbound CLI invocation before it can claim freshness", () => {
-  const rejected = spawnSync(process.execPath, [HOST_SCRIPT, "--repo", process.cwd()], {
-    encoding: "utf8",
-    env: process.env,
-  });
-  assert.equal(rejected.status, 64);
-  assert.equal(rejected.stdout, "");
-
-  const loaded = "a".repeat(40);
-  const preflight = { executionBoundary: "host-authorized-wsl", boundaryId: "pipeline-start-host-authorized-wsl", preflightSha256: "d".repeat(64) };
-  const output = hostMain(["--repo", process.cwd(), "--preflight-sha256", preflight.preflightSha256], {
-    observePreflight() { return null; },
-  });
-  assert.equal(output, 2);
-  const unbound = inspectHostRulesetFreshness({
-    repoPath: "/private/consumer-not-forwarded",
-    loadedPluginRoot: "/private/plugin-not-forwarded",
-    codexObservation: { status: "ready", observation: sourceObservation(loaded) },
-    observeHostControl() { return readyHostControlObservation(); },
-    execute() { throw new Error("unbound host invocation must not execute"); },
-  });
-  assert.equal(unbound.status, "remote-unavailable");
-  assert.equal(unbound.writePermitted, false);
-});
-
-test("self-application accepts equal and descendant loaded rulesets without consumer HEAD", () => {
-  const { root, remote, source } = fixture("ahead");
-  const preHeadConsumer = join(root, "pre-head-consumer");
-  const base = git(source, "rev-parse", "HEAD");
-  let value = inspectRulesetFreshness(preHeadConsumer, {
-    sourceObservation: sourceObservation(base, "self-application"),
-    loadedPluginRoot: source,
-    remoteObservation: remoteObservation(base),
-    remoteUrl: remote,
-  });
-  assert.equal(value.schema, RULESET_FRESHNESS_SCHEMA);
-  assert.equal(value.status, "equal");
-  assert.equal(value.writePermitted, true);
-  commit(source, "local");
-  const local = git(source, "rev-parse", "HEAD");
-  value = inspectRulesetFreshness(preHeadConsumer, {
-    sourceObservation: sourceObservation(local, "self-application"),
-    loadedPluginRoot: source,
-    remoteObservation: remoteObservation(base),
-    remoteUrl: remote,
-  });
-  assert.equal(value.status, "ahead");
-  assert.equal(value.ahead, 1);
-  assert.equal(value.behind, 0);
-  assert.equal(value.writePermitted, true);
-});
-
-test("self-application keeps behind and diverged distinct", () => {
-  const { root, remote, source } = fixture("noncurrent");
+test("alpha observes only remote main", () => {
+  const { root, remote, source, pluginRoot } = fixture("alpha-main");
   const publisher = join(root, "publisher");
   git(root, "clone", "-q", remote, publisher);
-  git(publisher, "config", "user.email", "ruleset@example.invalid");
-  git(publisher, "config", "user.name", "Ruleset Test");
-  commit(publisher, "public-new");
+  configure(publisher);
+  commitVersion(publisher, "0.4.8", "main-next");
   git(publisher, "push", "-q", "origin", "main");
-  const publicHead = git(publisher, "rev-parse", "HEAD");
-  let local = git(source, "rev-parse", "HEAD");
-  let value = inspectRulesetFreshness(source, {
-    sourceObservation: sourceObservation(local, "self-application"), loadedPluginRoot: source,
-    remoteObservation: remoteObservation(publicHead), remoteUrl: remote,
+  git(publisher, "tag", "v9.0.0");
+  git(publisher, "push", "-q", "origin", "v9.0.0");
+
+  const value = inspectPipelineUpdateAvailability(source, {
+    remoteUrl: remote,
+    pluginRoot,
+    policy: null,
+    projectConfig: { status: "ready", updateChannel: "alpha" },
   });
-  assert.equal(value.status, "behind");
-  assert.equal(value.writePermitted, false);
-  commit(source, "private-new");
-  local = git(source, "rev-parse", "HEAD");
-  value = inspectRulesetFreshness(source, {
-    sourceObservation: sourceObservation(local, "self-application"), loadedPluginRoot: source,
-    remoteObservation: remoteObservation(publicHead), remoteUrl: remote,
-  });
-  assert.equal(value.status, "diverged");
-  assert.equal(value.writePermitted, false);
+  assert.equal(value.channel, "alpha");
+  assert.equal(value.ref, "refs/heads/main");
+  assert.equal(value.version, "0.4.8");
+  assert.equal(value.status, "update-available");
 });
 
-test("a restricted selected host never falls back to an ambient self-application fetch", () => {
-  const { root, remote, source } = fixture("restricted-self-application");
+test("beta selects the highest valid beta or stable tag, including annotated tags", () => {
+  const { root, remote, source, pluginRoot } = fixture("beta-tags");
   const publisher = join(root, "publisher");
   git(root, "clone", "-q", remote, publisher);
-  git(publisher, "config", "user.email", "ruleset@example.invalid");
-  git(publisher, "config", "user.name", "Ruleset Test");
-  commit(publisher, "public-new");
-  git(publisher, "push", "-q", "origin", "main");
-  const loaded = git(source, "rev-parse", "HEAD");
-  const publicHead = git(publisher, "rev-parse", "HEAD");
-  const boundaryId = "restricted-self-application-host";
-  let hostCalls = 0;
-  let ambientFetches = 0;
-  const value = inspectRulesetFreshness(join(root, "pre-head-consumer"), {
-    sourceObservation: sourceObservation(loaded, "self-application"),
-    loadedPluginRoot: source,
+  configure(publisher);
+  commitVersion(publisher, "0.5.0-beta.2", "beta-two");
+  git(publisher, "tag", "-a", "v0.5.0-beta.2", "-m", "beta two");
+  commitVersion(publisher, "0.5.0-beta.3", "beta-three");
+  git(publisher, "tag", "v0.5.0-beta.3");
+  git(publisher, "tag", "v0.5.1-beta.01");
+  commitVersion(publisher, "0.5.0", "stable-promotion");
+  git(publisher, "tag", "-a", "v0.5.0", "-m", "stable promotion");
+  git(publisher, "tag", "v0.5.1");
+  git(publisher, "tag", "v99.0.0");
+  git(publisher, "tag", "vnot-semver");
+  git(publisher, "push", "-q", "origin", "main", "--tags");
+
+  const value = inspectPipelineUpdateAvailability(source, {
     remoteUrl: remote,
-    networkPreflight: {
-      schema: FRESHNESS_NETWORK_PREFLIGHT_SCHEMA,
-      network: "restricted",
-      boundaryId,
-      expectedControlIdentitySha256: expectedControlIdentitySha256(),
-    },
-    hostTransport: {
-      schema: FRESHNESS_HOST_TRANSPORT_SCHEMA,
-      boundaryId,
-      access: "read-only",
-      network: "enabled",
-      execute(action) {
-        hostCalls += 1;
-        return {
-          schema: FRESHNESS_HOST_RESULT_SCHEMA,
-          requestSha256: action.requestSha256,
-          status: "completed",
-          stdout: `${publicHead}\tHEAD\n`,
-          receipt: hostExecutionReceipt(action, publicHead),
-        };
-      },
-    },
-    spawn(command, args, options) {
-      if (args.includes("fetch")) ambientFetches += 1;
-      return spawnSync(command, args, options);
-    },
+    pluginRoot,
+    policy: null,
+    projectConfig: { status: "ready", updateChannel: "beta" },
   });
-  assert.equal(value.status, "comparison-unavailable");
-  assert.equal(value.reason, "remote-object-unavailable");
-  assert.equal(value.writePermitted, false);
-  assert.equal(hostCalls, 1);
-  assert.equal(ambientFetches, 0);
+  assert.equal(value.channel, "beta");
+  assert.equal(value.ref, "refs/tags/v0.5.0");
+  assert.equal(value.version, "0.5.0");
+  assert.equal(value.commit, git(publisher, "rev-parse", "v0.5.0^{}"));
+  assert.equal(value.status, "update-available");
+
+  git(remote, "update-ref", "-d", "refs/tags/v0.5.0");
+  const prerelease = inspectPipelineUpdateAvailability(source, {
+    remoteUrl: remote,
+    pluginRoot,
+    policy: null,
+    projectConfig: { status: "ready", updateChannel: "beta" },
+  });
+  assert.equal(prerelease.ref, "refs/tags/v0.5.0-beta.3");
+  assert.equal(prerelease.version, "0.5.0-beta.3");
 });
 
-test("consumer mismatch, offline public remote, and loaded/installed disagreement remain typed", () => {
-  const { source } = fixture("typed");
-  const loaded = git(source, "rev-parse", "HEAD");
-  const remote = "b".repeat(40);
-  const mismatch = inspectRulesetFreshness(source, {
-    sourceObservation: sourceObservation(loaded), remoteObservation: remoteObservation(remote),
+test("stable selects only the highest final release tag and invalid or absent tags fail typed", () => {
+  const { root, remote, source, pluginRoot } = fixture("stable-tags");
+  const publisher = join(root, "publisher");
+  git(root, "clone", "-q", remote, publisher);
+  configure(publisher);
+  commitVersion(publisher, "0.6.0-beta.9", "prerelease");
+  git(publisher, "tag", "v0.6.0-beta.9");
+  commitVersion(publisher, "0.5.1", "final");
+  git(publisher, "tag", "v0.5.1");
+  git(publisher, "tag", "v0.5");
+  git(publisher, "push", "-q", "origin", "main", "--tags");
+  const stable = inspectPipelineUpdateAvailability(source, {
+    remoteUrl: remote,
+    pluginRoot,
+    policy: null,
+    projectConfig: { status: "ready", updateChannel: "stable" },
   });
-  assert.equal(mismatch.status, "loaded-remote-mismatch");
-  assert.equal(mismatch.writePermitted, false);
+  assert.equal(stable.ref, "refs/tags/v0.5.1");
+  assert.equal(stable.version, "0.5.1");
+  assert.equal(stable.status, "update-available");
 
-  const offline = inspectRulesetFreshness(source, {
-    sourceObservation: sourceObservation(loaded), remoteObservation: { status: "remote-unavailable", identity: null, reason: "timeout" },
+  const empty = fixture("stable-empty");
+  git(empty.source, "tag", "vnot-semver");
+  git(empty.source, "push", "-q", "public", "vnot-semver");
+  const unavailable = inspectPipelineUpdateAvailability(empty.source, {
+    remoteUrl: empty.remote,
+    pluginRoot: empty.pluginRoot,
+    policy: null,
+    projectConfig: { status: "ready", updateChannel: "stable" },
   });
-  assert.equal(offline.status, "remote-unavailable");
-  assert.equal(offline.reason, "timeout");
-
-  const disagree = inspectRulesetFreshness(source, {
-    sourceObservation: sourceObservation(loaded, "marketplace-public", "c".repeat(40)), remoteObservation: remoteObservation(loaded),
-  });
-  assert.equal(disagree.status, "loaded-installed-mismatch");
+  assert.equal(unavailable.status, "unknown");
+  assert.equal(unavailable.reason, "channel-unavailable");
+  assert.equal(unavailable.ref, null);
+  assert.equal(unavailable.commit, null);
 });
 
-test("private and local sources do not perform or claim public remote freshness", () => {
-  const { source } = fixture("private-local");
-  const loaded = git(source, "rev-parse", "HEAD");
-  for (const sourceClass of ["marketplace-private", "local-development"]) {
-    const value = inspectRulesetFreshness(source, { sourceObservation: sourceObservation(loaded, sourceClass) });
-    assert.equal(value.status, sourceClass);
-    assert.equal(value.writePermitted, false);
-    assert.equal(value.reason, "public-remote-not-selected");
-  }
-});
+test("older loaded Pipeline is update-available but ordinary repository writes stay permitted", () => {
+  const { root, remote, source, pluginRoot } = fixture("older");
+  const publisher = join(root, "publisher");
+  git(root, "clone", "-q", remote, publisher);
+  configure(publisher);
+  commitVersion(publisher, "0.4.8", "public-new");
+  git(publisher, "push", "-q", "origin", "main");
 
-test("freshness diagnostics never include private remote coordinates", () => {
-  const { source } = fixture("privacy");
-  const loaded = git(source, "rev-parse", "HEAD");
-  const privateRemote = "https://user:token@private.example.invalid/agent-pipeline.git";
-  const value = inspectRulesetFreshness(source, {
-    sourceObservation: sourceObservation(loaded, "marketplace-private"),
-    remoteUrl: privateRemote,
+  const value = inspectPipelineUpdateAvailability(source, {
+    remoteUrl: remote,
+    pluginRoot,
+    policy: null,
+    selfApplication: true,
   });
-  assert.equal(JSON.stringify(value).includes(privateRemote), false);
-  assert.equal(JSON.stringify(value).includes("private.example.invalid"), false);
+  assert.equal(value.status, "update-available");
+  assert.equal(value.updateAvailable, true);
+  assert.equal(value.updateRecommended, true);
+  assert.equal(value.policyDisposition.disposition, "advisory");
+  assert.equal(value.blocking, false);
+  assert.equal(repositoryWritePermitted({ status: "equal" }, value), true);
 });
 
-test("CLI source and freshness diagnostics never disclose HOME, cache, or private coordinates", () => {
-  const privateRepo = "/private/work/consumer-987";
-  const childEnv = { ...process.env };
-  delete childEnv.NODE_TEST_CONTEXT;
-  const run = spawnSync(process.execPath, [SCRIPT, "--repo", privateRepo], {
-    encoding: "utf8",
-    env: childEnv,
+test("loaded identity is independent from a Phoenix-shaped project checkout", () => {
+  const { root, remote, source, pluginRoot } = fixture("phoenix");
+  const projectRemote = join(root, "project.git");
+  const project = join(root, "project");
+  git(root, "init", "--bare", "-q", projectRemote);
+  git(root, "init", "-q", "-b", "sprint_phoenix", project);
+  configure(project);
+  commit(project, "phoenix");
+  git(project, "remote", "add", "origin", projectRemote);
+  git(project, "push", "-q", "-u", "origin", "sprint_phoenix");
+
+  const publisher = join(root, "publisher");
+  git(root, "clone", "-q", remote, publisher);
+  configure(publisher);
+  commitVersion(publisher, "0.4.8", "marketplace-moved");
+  git(publisher, "push", "-q", "origin", "main");
+
+  const value = inspectPipelineUpdateAvailability(project, {
+    remoteUrl: remote,
+    pluginRoot,
+    policy: null,
+    projectConfig: { status: "ready", updateChannel: "alpha" },
   });
-  const combined = `${run.stdout ?? ""}${run.stderr ?? ""}`;
-  assert.equal(combined.includes(privateRepo), false);
-  if (typeof process.env.HOME === "string" && process.env.HOME.length > 0) assert.equal(combined.includes(process.env.HOME), false);
-  if (typeof process.env.CODEX_HOME === "string" && process.env.CODEX_HOME.length > 0) assert.equal(combined.includes(process.env.CODEX_HOME), false);
-  // Codex's workspace sandbox can deny nested process creation before the
-  // child reaches the CLI. That denial has no child output to inspect; a
-  // normal host run remains the end-to-end assertion below.
-  if (run.error?.code === "EPERM") return;
-  assert.equal(run.error, undefined);
-  assert.equal(run.status, 2);
-  const payload = JSON.parse(run.stdout);
-  assert.equal(payload.schema, RULESET_FRESHNESS_SCHEMA);
-  assert.equal(typeof payload.status, "string");
+  assert.equal(value.status, "update-available");
+  assert.equal(value.loaded.commit, git(source, "rev-parse", "HEAD"));
+  assert.notEqual(value.loaded.commit, git(project, "rev-parse", "HEAD"));
+  assert.equal(repositoryWritePermitted({ status: "equal", branch: "sprint_phoenix", upstream: "origin/sprint_phoenix" }, value), true);
 });
 
-test("Claude compatibility treats only the exact reviewed marketplace as public", () => {
-  const { root, source } = fixture("claude-marketplace-source");
-  const loaded = git(source, "rev-parse", "HEAD");
-  const settings = join(root, "settings.json");
-  let remoteCalls = 0;
-  for (const sourceConfig of [
-    { source: "gitlab", host: "git.internal.example", repo: "platform/agent-pipeline" },
-    { source: "github", repo: "another-org/agent-pipeline" },
-  ]) {
-    writeFileSync(settings, JSON.stringify({ extraKnownMarketplaces: { "agent-pipeline": { source: sourceConfig } } }));
-    const value = inspectClaudeRulesetFreshness(source, {
-      settingsPath: settings,
-      spawn() { remoteCalls += 1; throw new Error("private marketplace must not be queried"); },
-    });
-    assert.equal(value.status, "marketplace-private");
-    assert.equal(value.writePermitted, false);
-    assert.equal(value.reason, "public-remote-not-selected");
-  }
-  assert.equal(remoteCalls, 0);
-
-  writeFileSync(settings, JSON.stringify({
-    extraKnownMarketplaces: { "agent-pipeline": { source: { source: "github", repo: "agent-pipe-shared/agent-pipeline" } } },
-  }));
-  const publicValue = inspectClaudeRulesetFreshness(source, {
-    settingsPath: settings,
-    loadedSha: loaded,
-    remoteObservation: remoteObservation(loaded),
+test("offline and divergent loaded builds are typed unknown and nonblocking", () => {
+  const { root, remote, source, pluginRoot } = fixture("unknown");
+  const publisher = join(root, "publisher");
+  git(root, "clone", "-q", remote, publisher);
+  configure(publisher);
+  commitVersion(publisher, "0.4.8", "public");
+  git(publisher, "push", "-q", "origin", "main");
+  commitVersion(source, "0.4.8-local.1", "private");
+  const diverged = inspectPipelineUpdateAvailability(source, {
+    remoteUrl: remote,
+    pluginRoot,
+    policy: null,
+    selfApplication: true,
   });
-  assert.equal(publicValue.status, "equal");
-  assert.equal(publicValue.writePermitted, true);
-});
+  assert.equal(diverged.status, "unknown");
+  assert.equal(diverged.reason, "loaded-marketplace-diverged");
+  assert.equal(diverged.blocking, false);
 
-test("Claude compatibility rejects unsafe marketplace coordinates", () => {
-  const { source } = fixture("claude-unsafe-marketplace");
-  const value = inspectClaudeRulesetFreshness(source, {
-    remoteUrl: "http://marketplace.example/agent-pipeline.git",
-    spawn() { throw new Error("unsafe marketplace must not be queried"); },
+  const offline = inspectPipelineUpdateAvailability(source, {
+    remoteUrl: join(source, "missing.git"),
+    pluginRoot,
+    policy: null,
+    selfApplication: true,
   });
-  assert.equal(value.status, "source-unavailable");
-  assert.equal(value.writePermitted, false);
-  assert.equal(value.reason, "claude-marketplace-unavailable");
+  assert.equal(offline.status, "unknown");
+  assert.equal(offline.reason, "remote-unavailable");
+  assert.equal(offline.blocking, false);
+  assert.equal(JSON.stringify(offline).includes("missing.git"), false);
 });
 
-test("CLI preserves typed Codex results without entering the Claude adapter", () => {
-  const { root } = fixture("codex-typed-results");
-  let readyClaudeCalls = 0;
-  const ready = inspectCliRulesetFreshness({
-    repoPath: join(root, "valid-but-pre-head-consumer"),
-    codexObservation: { status: "ready", observation: sourceObservation("a".repeat(40), "marketplace-private") },
-    inspectClaude() { readyClaudeCalls += 1; throw new Error("Claude fallback must not run"); },
+test("only an exact plugin-shipped security policy match blocks", () => {
+  const { remote, source, pluginRoot } = fixture("policy", "0.4.6");
+  const commit = git(source, "rev-parse", "HEAD");
+  const matched = inspectPipelineUpdateAvailability(source, {
+    remoteUrl: remote,
+    pluginRoot,
+    policy: blockingPolicy({ version: "0.4.6", commit }),
   });
-  assert.equal(ready.status, "marketplace-private");
-  assert.equal(ready.writePermitted, false);
-  assert.equal(readyClaudeCalls, 0);
+  assert.equal(matched.policyDisposition.status, "matched");
+  assert.equal(matched.policyDisposition.blocking, true);
+  assert.equal(matched.blocking, true);
+  assert.equal(matched.updateRecommended, true);
+  assert.equal(repositoryWritePermitted({ status: "equal" }, matched), false);
 
-  const preHead = {
-    ...sourceObservation("a".repeat(40)),
-    loadedIdentity: { status: "unavailable" },
-    installedIdentity: { status: "unavailable" },
-  };
-  const typed = [
-    { status: "pre-head", observation: preHead },
-    { status: "codex-plugin-list-ambiguous", observation: null },
-    { status: "loaded-installed-mismatch", observation: sourceObservation("a".repeat(40), "marketplace-public", "b".repeat(40)) },
-    { status: "self-application-unattested", observation: null },
-    { status: "invalid-input", observation: null },
-  ];
-  for (const codexObservation of typed) {
-    let claudeCalls = 0;
-    const value = inspectCliRulesetFreshness({
-      repoPath: join(root, "valid-but-pre-head-consumer"),
-      codexObservation,
-      inspectClaude() { claudeCalls += 1; throw new Error("Claude fallback must not run"); },
-    });
-    assert.equal(value.status, codexObservation.status);
-    assert.equal(value.writePermitted, false);
-    assert.equal(claudeCalls, 0);
-  }
+  const mismatch = inspectPipelineUpdateAvailability(source, {
+    remoteUrl: remote,
+    pluginRoot,
+    policy: blockingPolicy({ version: "0.4.6", commit: "f".repeat(40) }),
+  });
+  assert.equal(mismatch.policyDisposition.status, "not-matched");
+  assert.equal(mismatch.blocking, false);
+  assert.equal(repositoryWritePermitted({ status: "equal" }, mismatch), true);
 });
 
-test("CLI falls back to Claude only for a genuine unavailable Codex discovery", () => {
-  const expected = {
-    schema: RULESET_FRESHNESS_SCHEMA,
-    status: "marketplace-private",
-    source: "marketplace-private",
-    loadedSha: null,
-    remoteSha: null,
-    ahead: null,
-    behind: null,
-    writePermitted: false,
-    reason: "public-remote-not-selected",
-  };
-  let received = null;
-  const value = inspectCliRulesetFreshness({
-    repoPath: "C:\\portable\\consumer",
+test("legacy writePermitted is update metadata and cannot override repository freshness", () => {
+  const legacy = {
+    schema: "pipeline.ruleset-freshness.v1",
+    status: "behind",
     loadedSha: "a".repeat(40),
-    codexObservation: { status: "codex-plugin-list-unavailable", observation: null },
-    inspectClaude(repo, options) {
-      received = { repo, options };
-      return expected;
-    },
+    remoteSha: "b".repeat(40),
+    writePermitted: false,
+  };
+  const migrated = migrateLegacyRulesetFreshness(legacy);
+  assert.equal(migrated.status, "update-available");
+  assert.equal(migrated.reason, "legacy-ruleset-freshness-migrated");
+  assert.equal(repositoryWritePermitted({ status: "equal" }, legacy), true);
+  assert.equal(repositoryWritePermitted({ status: "behind" }, { ...legacy, writePermitted: true }), false);
+});
+
+test("availability CLI rejects the removed direct channel bypass", () => {
+  let stderr = "";
+  const execution = runPipelineUpdateAvailabilityCli(["--channel", "alpha"], {
+    stderr: { write: (chunk) => { stderr += chunk; } },
   });
-  assert.equal(value, expected);
-  assert.deepEqual(received, {
-    repo: "C:\\portable\\consumer",
-    options: { loadedSha: "a".repeat(40) },
-  });
+  assert.equal(execution.exitCode, 64);
+  assert.match(stderr, /usage/u);
+});
+
+test("availability CLI reads only neutral channel authority and otherwise defaults stable", () => {
+  const alphaRoot = mkdtempSync(join(tmpdir(), "ruleset-freshness-cli-alpha-"));
+  const consumerRoot = mkdtempSync(join(tmpdir(), "ruleset-freshness-cli-consumer-"));
+  roots.push(alphaRoot, consumerRoot);
+  writeNeutralCalibration(alphaRoot, { pipelineUpdateChannel: "alpha" });
+  mkdirSync(join(alphaRoot, ".claude"), { recursive: true });
+  writeFileSync(join(alphaRoot, ".claude", "pipeline.yaml"), "schemaVersion: 4\n");
+  writeFileSync(join(alphaRoot, ".claude", "pipeline.json"), JSON.stringify({ pipelineUpdateChannel: "stable" }));
+
+  const invoke = (repo) => {
+    let stdout = "";
+    const execution = runPipelineUpdateAvailabilityCli([
+      "--repo",
+      repo,
+      "--loaded-version",
+      "0.4.7",
+      "--loaded-commit",
+      "a".repeat(40),
+    ], {
+      stdout: { write: (chunk) => { stdout += chunk; } },
+    });
+    return { ...execution, stdout };
+  };
+
+  const alpha = invoke(alphaRoot);
+  assert.equal(alpha.exitCode, 0);
+  assert.equal(JSON.parse(alpha.stdout).channel, "alpha");
+  assert.equal(JSON.parse(alpha.stdout).channelSource, "project-config");
+
+  const consumer = invoke(consumerRoot);
+  assert.equal(consumer.exitCode, 0);
+  assert.equal(JSON.parse(consumer.stdout).channel, "stable");
+  assert.equal(JSON.parse(consumer.stdout).channelSource, "distribution-default");
 });

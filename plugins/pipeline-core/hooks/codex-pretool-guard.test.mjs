@@ -2,7 +2,15 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  closeSync,
+  mkdtempSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,6 +19,7 @@ import { spawnSync } from "node:child_process";
 const hookDir = dirname(fileURLToPath(import.meta.url));
 const pluginRoot = join(hookDir, "..");
 const adapter = join(hookDir, "codex-pretool-guard.mjs");
+const humanOverrideScript = join(pluginRoot, "scripts", "guard-human-override.mjs");
 let passed = 0;
 
 function fixture() {
@@ -27,12 +36,22 @@ function run(input, root = fixture(), {
     cwd: root,
     ...input,
   };
-  return spawnSync(process.execPath, [adapter], {
-    cwd: hookCwd,
-    env: { ...process.env, CLAUDE_PROJECT_DIR: claudeProjectDir },
-    encoding: "utf8",
-    input: typeof envelope === "string" ? envelope : JSON.stringify(envelope),
-  });
+  const inputRoot = mkdtempSync(join(tmpdir(), "codex-pretool-input-"));
+  const inputPath = join(inputRoot, "input.json");
+  writeFileSync(inputPath, typeof envelope === "string" ? envelope : JSON.stringify(envelope));
+  const inputFd = openSync(inputPath, "r");
+  try {
+    return spawnSync(process.execPath, [adapter], {
+      cwd: hookCwd,
+      env: { ...process.env, CLAUDE_PROJECT_DIR: claudeProjectDir },
+      encoding: "utf8",
+      stdio: [inputFd, "pipe", "pipe"],
+      timeout: 8_000,
+    });
+  } finally {
+    closeSync(inputFd);
+    rmSync(inputRoot, { recursive: true, force: true });
+  }
 }
 
 function check(name, fn) {
@@ -76,9 +95,15 @@ check("descriptor uses quoted PLUGIN_ROOT with Windows parity for both routing f
     const hook = entry.hooks[0];
     assert.equal(hook.command, "node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"");
     assert.equal(hook.commandWindows, hook.command);
-    assert.equal(hook.timeout, 10);
+    assert.equal(hook.timeout, 45);
     assert.match(hook.statusMessage, /^Checking Agent-Pipeline /);
   }
+});
+
+check("Human override Git observation keeps a bounded cold-repository budget", () => {
+  const source = readFileSync(adapter, "utf8");
+  assert.match(source, /\{ capMs: 2_000, reserveMs: 750 \}/u);
+  assert.doesNotMatch(source, /\{ capMs: 300, reserveMs: 400 \}/u);
 });
 
 check("Bash, apply_patch, Edit and Write each reach their intended guard family", () => {
@@ -125,6 +150,163 @@ check("multiple Bash guard denials are aggregated into one Codex decision", () =
   assert.match(output.permissionDecisionReason, /guard-push/);
 });
 
+check("bounded rg-to-rg search filtering remains read-only without an override loop", () => {
+  const root = fixture();
+  const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
+  git("init", "-q", "-b", "main");
+  git("config", "user.name", "Fixture");
+  git("config", "user.email", "fixture@example.invalid");
+  writeFileSync(join(root, "README.md"), "fixture\n");
+  git("add", "README.md");
+  git("commit", "-q", "-m", "fixture");
+  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  const startedAt = Date.now();
+  const output = run({
+    tool_name: "Bash",
+    tool_input: { command: "rg --files . | rg lifecycle" },
+  }, root);
+  const elapsedMs = Date.now() - startedAt;
+  assert.ok(elapsedMs < 2_000, `grammar denial exceeded strict elapsed bound: ${elapsedMs}ms`);
+  assert.equal(output.status, 0, output.stderr);
+  assert.equal(output.stdout, "");
+});
+
+check("attended Human override admits only the exact next tool call and is then consumed", () => {
+  const root = fixture();
+  const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
+  git("init", "-q", "-b", "main");
+  git("config", "user.name", "Fixture");
+  git("config", "user.email", "fixture@example.invalid");
+  writeFileSync(join(root, "README.md"), "fixture\n");
+  git("add", "README.md");
+  git("commit", "-q", "-m", "fixture");
+  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  const input = { tool_name: "Write", tool_input: { file_path: "notes.md", content: "attended\n" } };
+  const first = decision(run(input, root));
+  assert.equal(first.permissionDecision, "deny");
+  const request = first.permissionDecisionReason.match(/--request-sha256 ([a-f0-9]{64})/u)?.[1];
+  assert.match(request ?? "", /^[a-f0-9]{64}$/u);
+  const planned = spawnSync(process.execPath, [
+    humanOverrideScript, "plan", "--repo", root, "--request-sha256", request,
+  ], { cwd: root, encoding: "utf8", shell: false });
+  assert.equal(planned.status, 0, planned.stderr);
+  const plan = JSON.parse(planned.stdout);
+  const reason = "PO explicitly approved this exact attended test write";
+  const prepared = spawnSync(process.execPath, [
+    humanOverrideScript,
+    "prepare-authorization",
+    "--repo",
+    root,
+    "--request-sha256",
+    request,
+    "--plan-sha256",
+    plan.planSha256,
+    "--reason",
+    reason,
+  ], { cwd: root, encoding: "utf8", shell: false });
+  assert.equal(prepared.status, 0, prepared.stderr);
+  const authorization = JSON.parse(prepared.stdout);
+  const authorized = spawnSync(process.execPath, [
+    ...authorization.authorizeAction.argv,
+  ], { cwd: root, encoding: "utf8", shell: false });
+  assert.equal(authorized.status, 0, authorized.stderr);
+  const allowed = run(input, root);
+  assert.equal(allowed.status, 0, allowed.stderr);
+  assert.equal(allowed.stdout, "");
+  assert.match(allowed.stderr, /exact one-time capability consumed/u);
+  const replay = decision(run(input, root));
+  assert.equal(replay.permissionDecision, "deny");
+});
+
+check("Pipeline Author Repair selects one exact source root and consumes one patch", () => {
+  const root = fixture();
+  const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
+  git("init", "-q", "-b", "main");
+  git("config", "user.name", "Fixture");
+  git("config", "user.email", "fixture@example.invalid");
+  writeFileSync(join(root, "README.md"), "fixture\n");
+  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  const sourceRoot = join(root, "plugins", "pipeline-core");
+  mkdirSync(join(sourceRoot, ".codex-plugin"), { recursive: true });
+  mkdirSync(join(sourceRoot, "lib"), { recursive: true });
+  writeFileSync(join(sourceRoot, ".codex-plugin", "plugin.json"), '{"name":"pipeline-core","version":"0.4.7"}\n');
+  writeFileSync(join(sourceRoot, "lib", "repair.mjs"), "export const repaired = false;\n");
+  git("add", "README.md", "pipeline.user.yaml", "plugins/pipeline-core");
+  git("commit", "-q", "-m", "fixture");
+  const input = {
+    tool_name: "apply_patch",
+    tool_input: {
+      command: "*** Begin Patch\n*** Update File: plugins/pipeline-core/lib/repair.mjs\n@@\n-export const repaired = false;\n+export const repaired = true;\n*** End Patch",
+    },
+  };
+  const first = decision(run(input, root));
+  assert.equal(first.permissionDecision, "deny");
+  assert.match(first.permissionDecisionReason, /Pipeline Author Repair is available/u);
+  assert.match(first.permissionDecisionReason, new RegExp(`--author-source-root ${JSON.stringify(sourceRoot)}`, "u"));
+  const request = first.permissionDecisionReason.match(/--request-sha256 ([a-f0-9]{64})/u)?.[1];
+  assert.match(request ?? "", /^[a-f0-9]{64}$/u);
+  const planned = spawnSync(process.execPath, [
+    humanOverrideScript, "plan", "--repo", root, "--request-sha256", request,
+    "--author-source-root", sourceRoot,
+  ], { cwd: root, encoding: "utf8", shell: false });
+  assert.equal(planned.status, 0, planned.stderr);
+  const plan = JSON.parse(planned.stdout);
+  assert.equal(plan.mode, "pipeline-author-repair");
+  assert.equal(plan.authorSourceRoot, sourceRoot);
+  const reason = "PO explicitly approved this exact source repair";
+  const prepared = spawnSync(process.execPath, [
+    humanOverrideScript, "prepare-authorization", "--repo", root,
+    "--request-sha256", request, "--plan-sha256", plan.planSha256,
+    "--reason", reason, "--author-source-root", sourceRoot,
+  ], { cwd: root, encoding: "utf8", shell: false });
+  assert.equal(prepared.status, 0, prepared.stderr);
+  const authorization = JSON.parse(prepared.stdout);
+  const authorized = spawnSync(process.execPath, authorization.authorizeAction.argv, {
+    cwd: root, encoding: "utf8", shell: false,
+  });
+  assert.equal(authorized.status, 0, authorized.stderr);
+  const allowed = run(input, root);
+  assert.equal(allowed.status, 0, allowed.stderr);
+  assert.equal(allowed.stdout, "");
+  assert.match(allowed.stderr, /exact one-time capability consumed/u);
+  assert.equal(decision(run(input, root)).permissionDecision, "deny");
+});
+
+check("local plugin-cache installation returns one external boundary without an audit retry loop", () => {
+  const output = decision(run({
+    tool_name: "Bash",
+    tool_input: { command: "codex plugin add pipeline-core@agent-pipeline-local" },
+  }, join(pluginRoot, "..", "..")));
+  assert.equal(output.permissionDecision, "deny");
+  assert.match(output.permissionDecisionReason, /GUARD-CROSS-REPO-MUTATION/u);
+  assert.match(output.permissionDecisionReason, /HGO-EXTERNAL-PLUGIN-CACHE-BOUNDARY/u);
+  assert.match(output.permissionDecisionReason, /separate-session-rooted-at-plugin-cache/u);
+  assert.doesNotMatch(output.permissionDecisionReason, /verify-audit/u);
+  assert.doesNotMatch(output.permissionDecisionReason, /effect-reconciliation-required/u);
+  assert.doesNotMatch(output.permissionDecisionReason, /Human override available/u);
+});
+
+check("override persistence failure remains a sanitized fail-closed denial", () => {
+  const root = fixture();
+  const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
+  git("init", "-q", "-b", "main");
+  git("config", "user.name", "Fixture");
+  git("config", "user.email", "fixture@example.invalid");
+  writeFileSync(join(root, "README.md"), "fixture\n");
+  git("add", "README.md");
+  git("commit", "-q", "-m", "fixture");
+  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  mkdirSync(join(root, ".git", "agent-pipeline"), { recursive: true, mode: 0o700 });
+  writeFileSync(join(root, ".git", "agent-pipeline", "human-guard-overrides"), "not-a-directory\n", { mode: 0o600 });
+  const denied = decision(run({
+    tool_name: "Write",
+    tool_input: { file_path: "notes.md", content: "still denied\n" },
+  }, root));
+  assert.equal(denied.permissionDecision, "deny");
+  assert.match(denied.permissionDecisionReason, /HGO-ADAPTER-FAILURE/u);
+  assert.doesNotMatch(denied.permissionDecisionReason, /EEXIST|stack|node:fs/u);
+});
+
 check("Codex routes a documented Git override prefix to the Push-Gate's actual command", () => {
   const root = fixture();
   writeFileSync(join(root, ".claude", "pipeline.yaml"), [
@@ -168,6 +350,34 @@ check("runtime-only V3 targets activate lifecycle enforcement in the outer adapt
   }
 });
 
+check("Codex outer adapter admits only the exact pre-ready V4 recovery diagnostics", () => {
+  const root = fixture();
+  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  const onboarding = join(pluginRoot, "scripts", "project-onboarding-v3.mjs");
+  const authority = join(pluginRoot, "scripts", "v3-bootstrap-authority.mjs");
+  const digest = "d".repeat(64);
+  for (const command of [
+    `node '${onboarding}' plan-source-recovery --root '${root}'`,
+    `node '${onboarding}' plan-manifest-repair --root '${root}'`,
+    `node '${onboarding}' apply-manifest-repair --root '${root}' --plan-sha256 ${digest} --activate`,
+    `node '${authority}' --root '${root}'`,
+  ]) {
+    const result = run({ tool_name: "Bash", tool_input: { command } }, root);
+    assert.equal(result.status, 0, `${command}\n${result.stderr}`);
+    assert.equal(result.stdout, "", command);
+  }
+  for (const command of [
+    `node '${onboarding}' apply-manifest-repair --root '${root}' --activate`,
+    `node '${onboarding}' apply-manifest-repair --root '${root}' --plan-sha256 ${digest} --activate $(touch bypassed)`,
+    `node '${authority}' --root '${root}' --extra`,
+    `node '${authority}' --root '${root}'; touch bypassed`,
+  ]) {
+    const output = decision(run({ tool_name: "Bash", tool_input: { command } }, root));
+    assert.equal(output.permissionDecision, "deny", command);
+    assert.match(output.permissionDecisionReason, /guard-lifecycle-ready/u, command);
+  }
+});
+
 check("Codex native cwd wins over a stale inherited CLAUDE_PROJECT_DIR", () => {
   const current = mkdtempSync(join(tmpdir(), "codex-pretool-current-"));
   const stale = fixture();
@@ -197,6 +407,7 @@ check("governed bootstrap can read only its loaded pipeline-start skill and curr
     `sed -n '1,260p' '${skill}'`,
     `cat -- "${skill}"`,
     `Get-Content -LiteralPath "${skill}"`,
+    `Get-Content -LiteralPath "${skill}" -Raw`,
     "pwd",
     "pwd -P",
   ]) {
@@ -210,6 +421,36 @@ check("governed bootstrap can read only its loaded pipeline-start skill and curr
   }, root));
   assert.equal(chained.permissionDecision, "deny");
   assert.match(chained.permissionDecisionReason, /guard-lifecycle-ready/);
+  assert.doesNotMatch(chained.permissionDecisionReason, /effect-reconciliation-required/);
+  for (const command of [
+    `gc -LiteralPath "${skill}" -Raw`,
+    `Get-Content -Path "${skill}" -Raw`,
+    `Get-Content -LiteralPath "${skill}" -Encoding utf8`,
+    `Get-Content -LiteralPath "${skill}" -Raw | Select-Object -First 1`,
+  ]) {
+    const output = decision(run({ tool_name: "Bash", tool_input: { command } }, root));
+    assert.equal(output.permissionDecision, "deny", command);
+  }
+});
+
+check("outer Codex routing admits the exact bounded diagnostic pipeline while non-ready", () => {
+  const root = fixture();
+  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  const allowed = run({
+    tool_name: "Bash",
+    tool_input: { command: "rg -n lifecycle . 2>/dev/null | head -n 40" },
+  }, root);
+  assert.equal(allowed.status, 0, allowed.stderr);
+  assert.equal(allowed.stdout, "");
+  for (const command of [
+    "rg -n lifecycle . 2>diagnostic.log | head -n 40",
+    "rg -n lifecycle . | head -n 0",
+    "rg -n lifecycle . | tee diagnostic.log",
+  ]) {
+    const output = decision(run({ tool_name: "Bash", tool_input: { command } }, root));
+    assert.equal(output.permissionDecision, "deny", command);
+    assert.match(output.permissionDecisionReason, /GUARD-(?:REDIRECT|OPERATOR|LIFECYCLE)/u, command);
+  }
 });
 
 check("lifecycle readiness is additive and aggregates with existing write guards", () => {

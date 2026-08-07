@@ -1,0 +1,736 @@
+{
+  "schema": "pipeline.verify-evidence.v0",
+  "project": "agent-pipeline",
+  "command": "node harness/scripts/verify.mjs",
+  "commit": "ddd0d6ab89ba7579d28d4b4273feb7896b35f10c",
+  "tree": "b34931aac6734f20e9656d8ab6ceff782f0abe74",
+  "candidate": {
+    "start": {
+      "status": "clean",
+      "commit": "ddd0d6ab89ba7579d28d4b4273feb7896b35f10c",
+      "tree": "b34931aac6734f20e9656d8ab6ceff782f0abe74"
+    },
+    "finish": {
+      "status": "clean",
+      "commit": "ddd0d6ab89ba7579d28d4b4273feb7896b35f10c",
+      "tree": "b34931aac6734f20e9656d8ab6ceff782f0abe74"
+    },
+    "binding": "exact"
+  },
+  "finishedAt": "2026-07-27T07:44:12.359Z",
+  "steps": [
+    {
+      "name": "setup-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "routing-projection-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "routing-projection-check",
+      "exitCode": 0
+    },
+    {
+      "name": "route-receipt-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "recovery-preview-attestation-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "artifact-lifecycle-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "artifact-lifecycle-check",
+      "exitCode": 0
+    },
+    {
+      "name": "artifact-topology-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "artifact-topology-check",
+      "exitCode": 0
+    },
+    {
+      "name": "afk-ledger-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "state-budget-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "state-budget-check",
+      "exitCode": 0
+    },
+    {
+      "name": "repository-freshness-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "ruleset-freshness-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "bootstrap-env-check-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "critic-bare-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "codex-critic-host-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "codex-critic-isolation-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "codex-isolated-critic-contract-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "claude-critic-host-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "continuity-host-adapter-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "continuity-state-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "main-session-route-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "session-power-core-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "session-power-controller-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "session-power-cli-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "session-cleanup-power-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "session-cleanup-binding-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "review-economy-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "guard-git-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "guard-apply-patch-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "guard-testpath-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "staleness-check-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "guard-devplan-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "guard-lifecycle-ready-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "codex-pretool-guard-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "codex-session-start-hint-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "guard-push-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "stop-suggest-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "post-compact-reground-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "setup-check-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "statusline-context-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "yaml-lite-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "schema-lite-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "runner-profiles-v2-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "runtime-projection-v2-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "runner-profile-migration-v2-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "runner-profiles-v3-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "runtime-projection-v3-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "runner-profile-migration-v3-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "project-onboarding-v3-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "project-onboarding-ready-gate-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "codex-onboarding-runtime-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "codex-onboarding-capabilities-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "onboarding-continuity-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "codex-onboarding-app-server-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "project-onboarding-e2e-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "project-authority-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "project-authority-migration-cli-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "feature-package-topology-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "human-role-label-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "human-role-rendering-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "advisory-receipt-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "advisory-coordinator-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "critic-export-policy-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "advisory-host-bridge-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "codex-sandbox-preflight-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "codex-sandbox-compatibility-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "codex-sandbox-select-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "codex-sandbox-runtime-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "codex-app-server-health-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "codex-advisory-app-server-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "codex-advisory-bootstrap-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "codex-host-advisor-route-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "codex-host-repository-init-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "host-advisor-status-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "host-advisor-workspace-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "codex-plugin-validator-parity-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "worktree-lifecycle-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "lifecycle-ready-enforcement-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "advisor-consult-v3-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "sandboxed-readonly-duty-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "sandboxed-readonly-host-bridge-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "spec-readiness-host-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "pipeline-start-v3-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "pipeline-start-preflight-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "runner-usage-v1-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "p3b-runner-conformance-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "git-cmd-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "workflow-writer-preflight-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "workflow-runner-boundary-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "control-execution-exchange-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "po-gate-authority-fixture-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "public-core-observation-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "private-overlay-activation-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "private-overlay-runtime-projection-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "po-gate-profile-publisher-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "private-overlay-bootstrap-status-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "private-overlay-activation-cli-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "private-overlay-activation-e2e-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "codex-private-overlay-activation-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "po-language-projection-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "po-language-projection-check",
+      "exitCode": 0
+    },
+    {
+      "name": "error-register-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "error-register-check",
+      "exitCode": 0
+    },
+    {
+      "name": "critic-fail-closed-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "critic-fail-closed-check",
+      "exitCode": 0
+    },
+    {
+      "name": "agents-adapter-migration-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "agents-adapter-migration-check",
+      "exitCode": 0
+    },
+    {
+      "name": "validate-manifest-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "capture-observation-intake-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "github-issue-operations-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "github-actions-permissions-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "github-actions-permissions-check",
+      "exitCode": 0
+    },
+    {
+      "name": "migrate-backlog-state-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "spec-retention-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "spec-retention-check",
+      "exitCode": 0
+    },
+    {
+      "name": "observation-governance-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "document-hooks-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "document-identifier-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "document-lifecycle-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "document-hooks-manifest-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "private-document-binding-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "release-version-plan-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "product-capability-inventory-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "pipeline-state-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "doc-contract-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "doc-contract-check",
+      "exitCode": 0
+    },
+    {
+      "name": "language-canon-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "language-canon-check",
+      "exitCode": 0
+    },
+    {
+      "name": "license-contract-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "license-contract-check",
+      "exitCode": 0
+    },
+    {
+      "name": "pr-contributor-gate-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "security-scan-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "no-autoupdate-key-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "phase26-invariants-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "phase26-invariants-check",
+      "exitCode": 0
+    },
+    {
+      "name": "sdlc-run-graph-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "phase3-sdlc-coherence-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "phase3-sdlc-coherence-check",
+      "exitCode": 0
+    },
+    {
+      "name": "sdlc-efficiency-metrics-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "check-ownership-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "backlog-state-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "parallel-dispatch-planner-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "continuity-status-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "continuity-status-cli-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "delivery-course-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "critic-packet-governance-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "windows-private-state-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "symlink-capability-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "runner-native-continuation-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "local-supervisor-state-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "local-supervisor-setup-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "local-worker-supervisor-core-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "local-worker-supervisor-cli-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "codex-goal-host-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "claude-goal-host-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "nova-backlog-reconciliation-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "nova-backlog-reconciler-cli-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "nova-runner-capability-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "nova-sandbox-disposition-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "nova-invocation-reliability-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "nova-invocation-preflight-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "nova-execution-plane-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "nova-scheduling-lifecycle-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "nova-critic-lineage-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "nova-critic-packet-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "nova-benchmark-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "nova-release-preflight-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "nova-increment-receipt-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "scoped-verify-registration-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "workflow-preflight-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "interaction-continuity-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "trusted-tool-resolution-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "advisory-receipt-assurance-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "toolchain-preflight-tests",
+      "exitCode": 0
+    },
+    {
+      "name": "validate-manifest",
+      "exitCode": 0
+    },
+    {
+      "name": "security-scan",
+      "exitCode": 0
+    }
+  ],
+  "exitCode": 0
+}

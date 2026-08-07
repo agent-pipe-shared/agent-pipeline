@@ -7,7 +7,7 @@
   "autonomy": "standing-approved",
   "branchModel": "direct-main",
   "verification": "docs+tests",
-  "wipLimit": 1,
+  "wipLimit": 3,
   "worktree": "optional",
   "claudeMdMaxLines": 200,
   "stakes": "hoch (Guardrail-Quelle aller Projekte)",
@@ -18,12 +18,13 @@
     "$comment": "Real A12 extension (not fictional): close.pre runs the CLAUDE.md length gate before every close of this repo.",
     "close.pre": [
       "node harness/scripts/check-claude-md-lines.mjs",
-      "node plugins/pipeline-core/scripts/check-spec-retention.mjs"
+      "node plugins/pipeline-core/scripts/check-spec-retention.mjs",
+      "node plugins/pipeline-core/scripts/check-close-security-completeness.mjs"
     ]
   },
   "humanRoles": {
     "po": {
-      "displayLabel": "PO"
+      "displayLabel": "Human"
     }
   }
 }

@@ -675,8 +675,46 @@ function traceStatSize(info) {
   if (!Number.isSafeInteger(size) || size < 0) fail("trace size is outside the safe bound");
   return size;
 }
-function traceBinding(info) { return Object.freeze({ dev: String(info.dev), ino: String(info.ino) }); }
-function sameTraceBinding(left, right) { return left?.dev === right?.dev && left?.ino === right?.ino; }
+function traceStatNanoseconds(info, key) {
+  const nanoseconds = info[`${key}Ns`];
+  if (typeof nanoseconds === "bigint") return nanoseconds.toString();
+  const milliseconds = info[`${key}Ms`];
+  if (typeof milliseconds !== "number" || !Number.isFinite(milliseconds) || milliseconds < 0) fail(`trace ${key} time is unavailable`);
+  return BigInt(Math.trunc(milliseconds * 1_000_000)).toString();
+}
+function traceBinding(info) {
+  return Object.freeze({
+    dev: String(info.dev),
+    ino: String(info.ino),
+    birthtimeNs: traceStatNanoseconds(info, "birthtime"),
+  });
+}
+function sameTraceBinding(left, right) {
+  return left?.dev === right?.dev
+    && left?.ino === right?.ino
+    && left?.birthtimeNs === right?.birthtimeNs;
+}
+
+function traceFinalizedIdentity(info, rootSha256) {
+  assertTraceSha256(rootSha256, "trace finalized root");
+  return Object.freeze({
+    ...traceBinding(info),
+    ctimeNs: traceStatNanoseconds(info, "ctime"),
+    mtimeNs: traceStatNanoseconds(info, "mtime"),
+    size: traceStatSize(info),
+    rootSha256,
+  });
+}
+
+function sameTraceFinalizedIdentity(left, right) {
+  return left?.dev === right?.dev
+    && left?.ino === right?.ino
+    && left?.birthtimeNs === right?.birthtimeNs
+    && left?.ctimeNs === right?.ctimeNs
+    && left?.mtimeNs === right?.mtimeNs
+    && left?.size === right?.size
+    && left?.rootSha256 === right?.rootSha256;
+}
 
 function validateTraceStat(info, expectedBinding = null) {
   if (!info.isFile()) fail("trace target is not a regular file");
@@ -845,8 +883,36 @@ function verifyTraceRecords(buffer, maxEvents, privacy) {
   return Object.freeze({ records: Object.freeze(records), rootSha256: terminal.record_sha256, priorRootSha256: prior, outcome: terminal.payload.outcome, cause: terminal.payload.cause });
 }
 
-export async function verifySecureTraceStore({ tracePath, binding, repoRoot, fixtureRoot, forbiddenRoots = [], maxBytes = DEFAULT_TRACE_BYTES, maxEvents = DEFAULT_TRACE_EVENTS, privateIdentifiers = [], privateRoots = [], io: ioOverrides = {} } = {}) {
-  if (!binding || typeof binding.dev !== "string" || typeof binding.ino !== "string") fail("trace verification requires the original device/inode binding");
+async function verifySecureTraceHandle({ handle, tracePath, binding, finalizedIdentity = null, maxBytes, maxEvents, privacy, io }) {
+  const before = validateTraceStat(await handle.stat({ bigint: true }), binding);
+  if (before.size > maxBytes) fail("trace byte bound exceeded");
+  const buffer = await readBoundedTrace(handle, maxBytes);
+  const afterInfo = await handle.stat({ bigint: true });
+  const after = validateTraceStat(afterInfo, binding);
+  if (before.size !== after.size || buffer.length !== after.size) fail("trace size changed during verification");
+  const pathInfoRaw = await io.lstat(tracePath, { bigint: true });
+  const pathInfo = validateTraceStat(pathInfoRaw, binding);
+  if (pathInfo.size !== after.size) fail("trace path size is inconsistent");
+  const checked = verifyTraceRecords(buffer, maxEvents, privacy);
+  const handleIdentity = traceFinalizedIdentity(afterInfo, checked.rootSha256);
+  const pathIdentity = traceFinalizedIdentity(pathInfoRaw, checked.rootSha256);
+  if (!sameTraceFinalizedIdentity(handleIdentity, pathIdentity)) fail("trace finalized path identity changed");
+  if (finalizedIdentity && !sameTraceFinalizedIdentity(handleIdentity, finalizedIdentity)) fail("trace finalized identity changed");
+  return Object.freeze({
+    ok: true,
+    binding,
+    finalizedIdentity: handleIdentity,
+    bytes: buffer.length,
+    recordCount: checked.records.length,
+    rootSha256: checked.rootSha256,
+    priorRootSha256: checked.priorRootSha256,
+    outcome: checked.outcome,
+    cause: checked.cause,
+  });
+}
+
+export async function verifySecureTraceStore({ tracePath, binding, finalizedIdentity = null, repoRoot, fixtureRoot, forbiddenRoots = [], maxBytes = DEFAULT_TRACE_BYTES, maxEvents = DEFAULT_TRACE_EVENTS, privateIdentifiers = [], privateRoots = [], io: ioOverrides = {} } = {}) {
+  if (!binding || typeof binding.dev !== "string" || typeof binding.ino !== "string" || typeof binding.birthtimeNs !== "string") fail("trace verification requires the original device/inode/birthtime binding");
   for (const [value, label] of [[maxBytes, "trace byte bound"], [maxEvents, "trace event bound"]]) assertTraceSafeInteger(value, label, { nonnegative: true });
   if (maxBytes < 1 || maxEvents < 2) fail("trace verification bounds are too small");
   const privacy = Object.freeze({ privateIdentifiers: assertDebugPrivateValues(privateIdentifiers, "trace privateIdentifiers"), privateRoots: assertDebugPrivateValues(privateRoots, "trace privateRoots") });
@@ -854,15 +920,7 @@ export async function verifySecureTraceStore({ tracePath, binding, repoRoot, fix
   await validateTraceLocation({ tracePath, repoRoot, fixtureRoot, forbiddenRoots, target: "present", io });
   const handle = await io.open(tracePath, constants.O_RDONLY | constants.O_NOFOLLOW);
   try {
-    const before = validateTraceStat(await handle.stat({ bigint: true }), binding);
-    if (before.size > maxBytes) fail("trace byte bound exceeded");
-    const buffer = await readBoundedTrace(handle, maxBytes);
-    const after = validateTraceStat(await handle.stat({ bigint: true }), binding);
-    if (before.size !== after.size || buffer.length !== after.size) fail("trace size changed during verification");
-    const pathInfo = validateTraceStat(await io.lstat(tracePath), binding);
-    if (pathInfo.size !== after.size) fail("trace path size is inconsistent");
-    const checked = verifyTraceRecords(buffer, maxEvents, privacy);
-    return Object.freeze({ ok: true, binding, bytes: buffer.length, recordCount: checked.records.length, rootSha256: checked.rootSha256, priorRootSha256: checked.priorRootSha256, outcome: checked.outcome, cause: checked.cause });
+    return await verifySecureTraceHandle({ handle, tracePath, binding, finalizedIdentity, maxBytes, maxEvents, privacy, io });
   } finally {
     await handle.close();
   }
@@ -881,7 +939,7 @@ export async function createSecureTraceStore({ tracePath, repoRoot, fixtureRoot,
     const opened = validateTraceStat(await handle.stat({ bigint: true }));
     await assertTraceParents(tracePath, io);
     if (await io.realpath(tracePath) !== tracePath) fail("created trace path is not canonical");
-    validateTraceStat(await io.lstat(tracePath), opened.binding);
+    validateTraceStat(await io.lstat(tracePath, { bigint: true }), opened.binding);
 
     let state = "open";
     let count = 0;
@@ -1016,9 +1074,34 @@ export async function createSecureTraceStore({ tracePath, repoRoot, fixtureRoot,
         count = finalCount; bytes = predictedBytes; previousHash = finalRecord.record_sha256; previousMonotonic = monotonic;
         if (typeof handle.datasync === "function") await handle.datasync();
         else await handle.sync();
+        // Verify once while the creator descriptor is still live. On real
+        // filesystems an unlinked inode cannot be reused while this descriptor
+        // is held, so the pathname observation cannot alias a replacement.
+        const verifiedOpenHandle = await verifySecureTraceStore({
+          tracePath,
+          binding: opened.binding,
+          repoRoot,
+          fixtureRoot,
+          forbiddenRoots,
+          maxBytes,
+          maxEvents,
+          ...privacy,
+          io: ioOverrides,
+        });
         await handle.close();
         state = "closed";
-        return verifySecureTraceStore({ tracePath, binding: opened.binding, repoRoot, fixtureRoot, forbiddenRoots, maxBytes, maxEvents, ...privacy, io: ioOverrides });
+        return verifySecureTraceStore({
+          tracePath,
+          binding: opened.binding,
+          finalizedIdentity: verifiedOpenHandle.finalizedIdentity,
+          repoRoot,
+          fixtureRoot,
+          forbiddenRoots,
+          maxBytes,
+          maxEvents,
+          ...privacy,
+          io: ioOverrides,
+        });
       });
     }
 

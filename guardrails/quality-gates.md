@@ -19,7 +19,7 @@ Rule IDs: `QG-xx`.
 
 ## QG-02 — verify-script contract: ONE script, three consumers
 
-- Each project **MUST** define exactly ONE verify entry point (`{{VERIFY_COMMAND}}`, e.g. `pnpm verify` — named in the project calibration `.claude/pipeline.json`, field `verify`) that runs the full chain.
+- Each project **MUST** define exactly ONE verify entry point (`{{VERIFY_COMMAND}}`, e.g. `pnpm verify` — named in the project calibration at its resolved authority tier — `project/pipeline.json`, else `.claude/pipeline.json` — field `verify`) that runs the full chain.
 - Exactly three consumers execute the IDENTICAL command:
   1. **Stop hook** — blocks the Goldfish turn from ending while red (exit 2 + stderr feedback),
   2. **Goldfish submission** — the run that writes the evidence artifact (QG-03),
@@ -56,7 +56,7 @@ Rule IDs: `QG-xx`.
 - Task/feature status lists (where used) are also JSON, and the agent may change ONLY the designated status field (e.g. `passes`) — strongly-worded, per the long-running-agents harness pattern.
 - The completion report maps results three-valued: passed / failed / not verifiable — "not verifiable" is stated honestly, never rounded up to green.
 - **Why:** Script-written JSON is tamper-evident and machine-checkable; models are measurably less likely to inappropriately rewrite JSON than Markdown. Self-written "evidence" is the failure mode, not a mitigation.
-- **Verification:** The Critic's trajectory check compares artifact vs. claims: does the artifact exist, did the script write it (timestamps/trajectory), does the commit SHA match the diff? **Delivered (reduced scope: no registry, no expiry fields — see QG-05/QG-06 CUT disposition):** writer = `harness/scripts/verify.mjs` (self-application, `.claude/pipeline.json` field `verify`); canonical artifact path = `evidence/verify-latest.json` (git-ignored — a regenerated status snapshot, not a durable audit trail).
+- **Verification:** The Critic's trajectory check compares artifact vs. claims: does the artifact exist, did the script write it (timestamps/trajectory), does the commit SHA match the diff? **Delivered (reduced scope: no registry, no expiry fields — see QG-05/QG-06 CUT disposition):** writer = `harness/scripts/verify.mjs` (self-application, project calibration field `verify`); canonical artifact path = `evidence/verify-latest.json` (git-ignored — a regenerated status snapshot, not a durable audit trail).
 
 ## QG-04 — Test-role separation: the implementor never touches its own tests
 
@@ -77,7 +77,7 @@ Rule IDs: `QG-xx`.
 
 - A gate is either BLOCKING or DELETED. An ad-hoc, undocumented warn-only state is a temporary exception and **MUST** carry: reason, owner (the PO), and an expiry date. At expiry it is promoted to blocking or deleted — no third option, no silent extension.
 - **MUST NOT** introduce "documented instead of fixed" risks: a known gap with a TODO comment and no due date is a finding, not a mitigation.
-- **Revision (`docs/adr/0027-gate-philosophy.md`):** the pipeline manifest (`.claude/pipeline.yaml`) introduces per-gate modes `blocking | warn | off` as a first-class, PROJECT-level CALIBRATION field — this does not reopen QG-06's binary principle. A manifest gate is still binary at any given moment (its `mode` is one explicit value, never an undeclared drift); `warn` in the manifest **MUST** carry a justifying comment directly in the manifest file (the manifest-level equivalent of QG-06's reason/owner/expiry fields, in a leaner form appropriate to a machine-read config). Documented configuration is not silent decay (a known anti-pattern) — an undocumented or unjustified `warn`/`off` is still exactly the violation this rule exists to catch.
+- **Revision (`docs/adr/0027-gate-philosophy.md`):** the pipeline manifest (`project/pipeline.yaml`, else `.claude/pipeline.yaml`) introduces per-gate modes `blocking | warn | off` as a first-class, PROJECT-level CALIBRATION field — this does not reopen QG-06's binary principle. A manifest gate is still binary at any given moment (its `mode` is one explicit value, never an undeclared drift); `warn` in the manifest **MUST** carry a justifying comment directly in the manifest file (the manifest-level equivalent of QG-06's reason/owner/expiry fields, in a leaner form appropriate to a machine-read config). Documented configuration is not silent decay (a known anti-pattern) — an undocumented or unjustified `warn`/`off` is still exactly the violation this rule exists to catch.
 - **Why:** Warn-only becomes permanent by default — <PROJECT_A>'s Lighthouse gate stayed warn-only from introduction ("once calibrated, set to error" never happened); <PROJECT_B>'s action-pinning TODO survived from project start.
 - **Verification:** Gate registry fields `status` + `expires` are machine-checkable; the `/close` drift check flags expired warn-only gates; the Critic checklist contains "are there documented-instead-of-fixed risks?". **CUT (same disposition as QG-05):** no registry implementation at one-dev scale; re-trigger: first gate-expiry incident, or more than one verify gate per project. Manifest gate modes are additionally reviewed via the Critic checklist item above — an unjustified `warn`/`off` in a manifest is the same finding class as an undocumented legacy warn-only gate.
 

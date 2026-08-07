@@ -227,7 +227,7 @@ for (const [name, mutate, code] of [
 }
 
 for (const protectedPath of [
-  ".claude/pipeline-state.json", ".claude", "docs/state.md", "specs/prd.md",
+  "project/pipeline-state.json", ".claude/pipeline-state.json", ".claude", "docs/state.md", "specs/prd.md",
   "specs/spec.md", "specs/result.md",
 ]) {
   check(`non-Coordinator write allowlist rejects protected path ${protectedPath}`, () => {

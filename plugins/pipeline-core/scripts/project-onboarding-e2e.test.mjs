@@ -10,15 +10,23 @@
  * CLI process would test the sandbox rather than onboarding behavior.
  */
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { main as onboardingCli } from "./project-onboarding-v3.mjs";
 import { main as authorityCli } from "./v3-bootstrap-authority.mjs";
+import { main as migrationCli } from "./runner-profile-migration-v3.mjs";
 import { inspectRepositoryFreshness } from "./repository-freshness.mjs";
 import { applyProjectOnboardingKickoffV4, planProjectOnboardingKickoffV4 } from "../lib/project-onboarding-v3.mjs";
+import {
+  consumeRuntimeReadback,
+  issueLaunchTicket,
+  readRestartBarrier,
+  sha256,
+} from "../lib/codex-onboarding-runtime.mjs";
 import { ProjectOnboardingReadyError } from "../lib/project-onboarding-ready-gate.mjs";
 import { applyHostRepositoryInit, planHostRepositoryInit } from "./codex-host-repository-init.mjs";
 import { evaluateLifecycleReadyGuard } from "../hooks/guard-lifecycle-ready.mjs";
@@ -34,12 +42,13 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 const onboarding = join(here, "project-onboarding-v3.mjs");
 const authority = join(here, "v3-bootstrap-authority.mjs");
+const migration = join(here, "runner-profile-migration-v3.mjs");
 
-// Keep every disposable root below this checked-out test directory. Codex's
-// workspace sandbox grants the test process its project tree, whereas a
-// child whose cwd is an unrelated OS temp directory loses Git capability
-// before the shipped CLI can exercise its own behavior.
-function root() { return mkdtempSync(join(here, ".pipeline onboarding e2e with spaces-")); }
+// The shipped plugin cache is intentionally read-only. Keep disposable
+// repositories in the platform temp directory so this process-level harness
+// remains runnable from source checkouts and installed Linux, macOS and
+// Windows plugin caches alike.
+function root() { return mkdtempSync(join(tmpdir(), "pipeline onboarding e2e with spaces-")); }
 function dispose(path) { rmSync(path, { recursive: true, force: true }); }
 function cliGit(command, args, options = {}) {
   if (command !== "git") return { status: 1, stderr: "unexpected program" };
@@ -81,12 +90,20 @@ function cliGit(command, args, options = {}) {
 }
 function run(script, args, cwd) {
   let stdout = "";
-  const main = script === onboarding ? onboardingCli : script === authority ? authorityCli : null;
+  const main = script === onboarding
+    ? onboardingCli
+    : script === authority
+      ? authorityCli
+      : script === migration
+        ? migrationCli
+        : null;
   assert.ok(main, `unsupported CLI entry point: ${script}`);
   const status = main(args, {
     write: (chunk) => { stdout += chunk; },
+    writePreview: () => {},
     deps: {
       spawnSync: cliGit,
+      codexExecutable: process.execPath,
       observeOnboardingAppServer: ({ intent }) => intent === "onboarding"
         ? { required: false, status: "not-requested", code: null }
         : { required: true, status: "running", code: "CAS-READY" },
@@ -97,6 +114,57 @@ function run(script, args, cwd) {
 function actionArgs(result) {
   assert.equal(result.nextAction?.kind, "command");
   return result.nextAction.argv.slice(1);
+}
+
+function completeRuntimeReadback(path, now = 50_000) {
+  const barrier = readRestartBarrier({ rootDir: path, spawn: cliGit });
+  const issued = issueLaunchTicket({
+    rootDir: path,
+    barrierSha256: barrier.rawSha256,
+    now,
+    spawn: cliGit,
+    codexExecutable: process.execPath,
+  });
+  consumeRuntimeReadback({
+    rootDir: path,
+    ticketId: issued.ticketId,
+    token: issued.token,
+    now: now + 1,
+    spawn: cliGit,
+    receipt: {
+      schema: "pipeline.codex-project-runtime-readback.v1",
+      barrierSha256: barrier.rawSha256,
+      repositoryFingerprint: barrier.barrier.repositoryFingerprint,
+      sourceSha256: barrier.barrier.sourceSha256,
+      runtimeTargetsSha256: barrier.barrier.runtimeTargetsSha256,
+      readerGenerationSha256: sha256(Buffer.alloc(32, 0xb6)),
+      effectiveConfigSha256: sha256("e2e-effective"),
+      validatedAgentsSha256: sha256("e2e-agents"),
+      ticketId: issued.ticketId,
+      observedAtEpochMs: now + 1,
+    },
+  });
+}
+function makeReady(path) {
+  const portable = run(onboarding, ["plan", "--root", path], path);
+  assert.equal(run(onboarding, actionArgs(portable.json), path).json.status, "runtime-initialization-required");
+  const runtime = run(onboarding, ["plan-runtime", "--root", path], path);
+  assert.equal(run(onboarding, actionArgs(runtime.json), path).json.status, "restart-required");
+  completeRuntimeReadback(path);
+  const goal = "Recover one governed project";
+  const kickoff = planProjectOnboardingKickoffV4({
+    rootDir: path,
+    goal,
+    deps: { spawnSync: cliGit },
+  });
+  const ready = applyProjectOnboardingKickoffV4({
+    rootDir: path,
+    goal,
+    planSha256: kickoff.planSha256,
+    activate: true,
+    deps: { spawnSync: cliGit },
+  });
+  assert.equal(ready.status, "ready");
 }
 function git(args, cwd) {
   const result = spawnSync("git", args, { cwd, encoding: "utf8" });
@@ -221,10 +289,10 @@ test("read-only host-control paths receive portable host-managed onboarding", ()
       tool_input: { file_path: "src/game.mjs" },
     }, crossViewDependencies).exitCode, 0, "exact cross-view failure accepts intact kickoff bindings");
     for (const relative of [
-      ".claude/pipeline-state.json",
+      "project/pipeline-state.json",
       "docs/state.md",
-      "specs/kickoff-initial-prd.md",
-      "specs/kickoff-initial-spec.md",
+      kickoff.targets.prd.path,
+      kickoff.targets.spec.path,
     ]) {
       const target = join(path, relative);
       const original = readFileSync(target);
@@ -251,7 +319,7 @@ test("read-only host-control paths receive portable host-managed onboarding", ()
     assert.equal(physicalFreshness.result.status, "host-managed");
     assert.equal(physicalFreshness.result.reason, null);
     assert.equal(physicalFreshness.result.fetchAttempted, false);
-    const calibrationPath = join(path, ".claude", "pipeline.json");
+    const calibrationPath = join(path, "project", "pipeline.json");
     const localOnlyCalibration = JSON.parse(readFileSync(calibrationPath, "utf8"));
     localOnlyCalibration.repositoryMode = "local-only";
     writeFileSync(calibrationPath, `${JSON.stringify(localOnlyCalibration, null, 2)}\n`);
@@ -355,4 +423,45 @@ test("an existing linked Git worktree is adopted without replacing its .git poin
     assert.equal(readback.status, 1);
     assert.equal(readback.json.status, "restart-required");
   } finally { dispose(container); }
+});
+
+test("ready roots recover a missing manifest and a governed V3 registry checkout through shipped CLIs", () => {
+  const path = root();
+  try {
+    makeReady(path);
+    assert.equal(run(onboarding, ["inspect", "--root", path], path).json.status, "ready");
+
+    const manifestPath = join(path, ".claude", "pipeline.yaml");
+    unlinkSync(manifestPath);
+    const missing = run(onboarding, ["inspect", "--root", path], path);
+    assert.equal(missing.json.status, "runtime-initialization-required");
+    assert.equal(missing.json.diagnostics[0].code, "runtime_missing");
+    const runtimePlan = run(onboarding, actionArgs(missing.json), path);
+    assert.equal(runtimePlan.json.status, "runtime-initialization-required");
+    const runtimeApplied = run(onboarding, actionArgs(runtimePlan.json), path);
+    assert.equal(runtimeApplied.json.status, "restart-required");
+    completeRuntimeReadback(path, 60_000);
+    assert.equal(run(onboarding, ["inspect", "--root", path], path).json.status, "ready");
+
+    const sourcePath = join(path, "pipeline.user.yaml");
+    const currentSource = readFileSync(sourcePath, "utf8");
+    const governedCheckout = currentSource.replace(
+      /^critic_export:\r?\n(?:[ \t].*(?:\r?\n|$))*/mu,
+      "",
+    );
+    assert.notEqual(governedCheckout, currentSource);
+    writeFileSync(sourcePath, governedCheckout);
+    const stale = run(onboarding, ["inspect", "--root", path], path);
+    assert.equal(stale.json.status, "migration-required");
+    assert.equal(stale.json.diagnostics[0].code, "stale_generated_projection");
+    assert.equal(stale.json.nextAction.argv[0], migration);
+    assert.equal(stale.json.nextAction.argv[1], "plan");
+    const migrationInspection = run(migration, ["inspect", "--root", path], path);
+    assert.equal(migrationInspection.json.sourceKind, "v3-refresh");
+    const migrationPlan = run(migration, actionArgs(stale.json), path);
+    assert.equal(migrationPlan.json.status, "ready");
+    const migrated = run(migration, ["apply", "--root", path, "--activate"], path);
+    assert.equal(migrated.json.status, "applied");
+    assert.equal(run(onboarding, ["inspect", "--root", path], path).json.status, "ready");
+  } finally { dispose(path); }
 });

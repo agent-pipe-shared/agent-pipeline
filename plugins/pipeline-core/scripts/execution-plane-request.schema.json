@@ -1,0 +1,440 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.execution-plane-request.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "requestId",
+    "subject",
+    "adapter",
+    "locality",
+    "workspace",
+    "network",
+    "mounts",
+    "writePaths",
+    "resources",
+    "sidecars",
+    "credentialLease",
+    "heartbeat",
+    "timeout",
+    "cancellation",
+    "resultDelivery",
+    "frozenBinding",
+    "requestSha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pipeline.execution-plane-request.v1"
+    },
+    "requestId": {
+      "$ref": "#/$defs/id"
+    },
+    "subject": {
+      "$ref": "pipeline.nova-execution-subject.v1"
+    },
+    "adapter": {
+      "$ref": "#/$defs/adapter"
+    },
+    "locality": {
+      "enum": [
+        "in-process",
+        "local-process",
+        "local-isolated",
+        "external-synthetic"
+      ]
+    },
+    "workspace": {
+      "$ref": "#/$defs/workspace"
+    },
+    "network": {
+      "$ref": "#/$defs/network"
+    },
+    "mounts": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/mount"
+      }
+    },
+    "writePaths": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/path"
+      }
+    },
+    "resources": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/capacityValue"
+      }
+    },
+    "sidecars": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/sidecar"
+      }
+    },
+    "credentialLease": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/credentialLease"
+        }
+      ]
+    },
+    "heartbeat": {
+      "$ref": "#/$defs/heartbeat"
+    },
+    "timeout": {
+      "$ref": "#/$defs/timeout"
+    },
+    "cancellation": {
+      "$ref": "#/$defs/cancellation"
+    },
+    "resultDelivery": {
+      "$ref": "#/$defs/resultDelivery"
+    },
+    "frozenBinding": {
+      "$ref": "#/$defs/frozenBinding"
+    },
+    "requestSha256": {
+      "$ref": "#/$defs/sha"
+    }
+  },
+  "$defs": {
+    "sha": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(?:/|$))(?!.*//)(?!.*\\\\)[^\\u0000]+$"
+    },
+    "adapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "version",
+        "implementationSha256"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/id"
+        },
+        "version": {
+          "$ref": "#/$defs/id"
+        },
+        "implementationSha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    },
+    "workspace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identitySha256",
+        "separation",
+        "assuranceEvidenceSha256"
+      ],
+      "properties": {
+        "identitySha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "separation": {
+          "enum": [
+            "observed",
+            "not-observed",
+            "unavailable"
+          ]
+        },
+        "assuranceEvidenceSha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    },
+    "network": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "egressClasses"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "none",
+            "restricted",
+            "open"
+          ]
+        },
+        "egressClasses": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        }
+      }
+    },
+    "mount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceClass",
+        "targetClass",
+        "mode",
+        "evidenceSha256"
+      ],
+      "properties": {
+        "sourceClass": {
+          "$ref": "#/$defs/id"
+        },
+        "targetClass": {
+          "$ref": "#/$defs/id"
+        },
+        "mode": {
+          "enum": [
+            "read-only",
+            "read-write"
+          ]
+        },
+        "evidenceSha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    },
+    "capacityValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unit",
+        "value",
+        "source",
+        "status"
+      ],
+      "properties": {
+        "unit": {
+          "$ref": "#/$defs/id"
+        },
+        "value": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "source": {
+          "$ref": "#/$defs/id"
+        },
+        "status": {
+          "enum": [
+            "known",
+            "unknown",
+            "unavailable"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "known"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "sidecar": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "evidenceSha256"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/id"
+        },
+        "evidenceSha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    },
+    "credentialLease": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "leaseSha256"
+      ],
+      "properties": {
+        "leaseSha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    },
+    "heartbeat": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "intervalMs",
+        "orphanAfterMs"
+      ],
+      "properties": {
+        "intervalMs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "orphanAfterMs": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "timeout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "absoluteMs",
+        "maxPauseMs"
+      ],
+      "properties": {
+        "absoluteMs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxPauseMs": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "cancellation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "supported",
+        "deadlineMs"
+      ],
+      "properties": {
+        "supported": {
+          "type": "boolean"
+        },
+        "deadlineMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "supported": {
+                "const": true
+              }
+            },
+            "required": [
+              "supported"
+            ]
+          },
+          "then": {
+            "properties": {
+              "deadlineMs": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "deadlineMs": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "resultDelivery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "maxBytes",
+        "destinationClass"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "inline-digest",
+            "import-only"
+          ]
+        },
+        "maxBytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "destinationClass": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "frozenBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "controlExecutionExchangeSha256",
+        "invocationRequestSha256"
+      ],
+      "properties": {
+        "controlExecutionExchangeSha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "invocationRequestSha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    }
+  }
+}

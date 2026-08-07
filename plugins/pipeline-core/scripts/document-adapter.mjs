@@ -11,7 +11,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { issueDocumentId, readDocumentIdReservation } from "../lib/document-identifiers.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
@@ -22,6 +21,7 @@ import {
   writePrivateFileNoReplaceAtomic,
 } from "../lib/private-boundary.mjs";
 import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const PRIVATE_DOCUMENT_ADAPTER_SCHEMA = "pipeline.private-document-adapter.v1";
 export const DOCUMENT_RENDERER_STDIO_PROTOCOL = "pipeline.document-renderer-stdio.v1";
@@ -219,7 +219,7 @@ export function main(argv = process.argv.slice(2)) {
   return 0;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectInvocation(import.meta.url)) {
   try { process.exitCode = main(); }
   catch (error) { process.stderr.write(`${error instanceof DocumentAdapterError ? error.code : "DA-ARGUMENT"}: ${error.message}\n`); process.exitCode = 2; }
 }

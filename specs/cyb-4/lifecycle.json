@@ -1,0 +1,36 @@
+{
+  "schema": "pipeline.feature-package.v1",
+  "feature": {
+    "id": "cyb-4",
+    "rigor": 2
+  },
+  "state": "draft",
+  "artifacts": [
+    {
+      "class": "prd",
+      "path": "specs/cyb-4/prd.md",
+      "sha256": "bbae8d6c6e7f7c10caad94824255135efc73902a98dccad885dad228866c7501",
+      "authority": true,
+      "mutability": "mutable",
+      "retention": "active"
+    },
+    {
+      "class": "threat-model",
+      "path": "specs/cyb-4/threat-model.json",
+      "sha256": "e4dd68ea838cabd33f8e746a4805846121cce20852dea4806e5799d878d36acc",
+      "authority": false,
+      "mutability": "immutable",
+      "retention": "retain"
+    },
+    {
+      "class": "candidate-evidence",
+      "path": "specs/cyb-4/threat-model-approval-receipt.json",
+      "sha256": "2749b0bbd27dcce6ef8537cd9551dfa0be44a393236636552660c96b5859711c",
+      "authority": false,
+      "mutability": "immutable",
+      "retention": "retain"
+    }
+  ],
+  "candidate": null,
+  "supersedes": null
+}

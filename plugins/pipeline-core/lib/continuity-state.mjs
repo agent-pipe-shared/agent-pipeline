@@ -1,16 +1,27 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Pure validation and transition proposals for pipeline.continuity.v0. */
 import { normalizeContinuityHostObservation } from "./continuity-host-adapter.mjs";
+import {
+  buildRunnerNativeContinuationRequest,
+  computeRunnerNativeContinuationDigest,
+  materializeRunnerNativeContinuation,
+  materializeRunnerNativeTerminal,
+  planNativeGoalTransition,
+  projectRunnerNativeProgress,
+  recordRunnerNativeAdditiveInput,
+  validateRunnerNativeContinuation,
+} from "./runner-native-continuation.mjs";
 
 const ROOT_KEYS = new Set([
   "schema", "featureId", "revision", "runtime", "authority", "queueHead", "blocker",
   "acknowledgedFinal", "resume", "recovery", "decisionTxn", "capacity",
   "closeTransition",
+  "nativeContinuation",
 ]);
 const RUNTIME_KEYS = new Set(["humanFacingLanguage", "activeDuty", "sessionCleanup"]);
 const SESSION_CLEANUP_KEYS = new Set(["sessionId", "descriptorSha256"]);
 const ARTIFACT_KEYS = new Set(["path", "sha256"]);
-const AUTHORITY_KEYS = new Set(["prd", "spec", "result"]);
+const AUTHORITY_KEYS = new Set(["prd", "spec", "result", "plan"]);
 const QUEUE_KEYS = new Set([
   "packageId", "actionId", "nextAction", "productRetryCount",
   "environmentRerouteCount", "dispatch",
@@ -58,6 +69,7 @@ const CLOSE_COMPLETE_REQUEST_KEYS = new Set(["expectedRevision", "result"]);
 const CAS_KEYS = new Set(["expectedRevision", "next"]);
 const SESSION_CLEANUP_BIND_KEYS = new Set(["expectedRevision", "sessionCleanup"]);
 const SESSION_CLEANUP_RELEASE_KEYS = new Set(["expectedRevision", "sessionCleanup"]);
+const RESULT_CLOSE_BIND_KEYS = new Set(["expectedRevision", "result"]);
 const FINAL_REQUEST_KEYS = new Set(["expectedRevision", "observation", "next"]);
 const DECISION_APPLY_KEYS = new Set(["expectedRevision", "decisionTxn", "queueHead", "blocker", "resume"]);
 const DECISION_CLEAR_KEYS = new Set(["expectedRevision", "receipt"]);
@@ -82,7 +94,8 @@ const FALLBACK_POLICIES = new Set(["defer", "pre-authorized-mapped-fallback"]);
 const HUMAN_FACING_LANGUAGES = new Set(["de", "en"]);
 const CLOSE_PHASES = new Set(["state-cas", "verified", "delivered", "readback", "closed"]);
 const INTERRUPT_BLOCKER_TYPES = new Set(["authority", "security", "scope"]);
-const MAX_STATE_BYTES = 8_192;
+export const CONTINUITY_STATE_MAX_BYTES = 8_192;
+const MAX_STATE_BYTES = CONTINUITY_STATE_MAX_BYTES;
 
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -128,10 +141,20 @@ function validArtifact(value) {
 }
 
 function validAuthority(value) {
-  return exactKeys(value, AUTHORITY_KEYS)
+  return allowedKeys(value, AUTHORITY_KEYS, ["prd", "spec", "result"])
     && validArtifact(value.prd)
     && validArtifact(value.spec)
-    && (value.result === null || validArtifact(value.result));
+    && (value.result === null || validArtifact(value.result))
+    && (value.plan === undefined || validArtifact(value.plan));
+}
+
+function validNativeContinuationBinding(value, state) {
+  if (value === undefined || value === null) return true;
+  return validateRunnerNativeContinuation(value).ok
+    && value.subject.featureId === state.featureId
+    && value.subject.planSha256 === state.authority.prd.sha256
+    && value.subject.specSha256 === state.authority.spec.sha256
+    && value.subject.queueRevision <= state.revision;
 }
 
 function validRuntime(value) {
@@ -356,7 +379,7 @@ function result(ok, code, state = null, mutated = false) {
 
 /** Validate one bounded continuity object. */
 export function validateContinuityState(value, activeFeatureId = undefined) {
-  if (!allowedKeys(value, ROOT_KEYS, [...ROOT_KEYS].filter((key) => key !== "closeTransition"))
+  if (!allowedKeys(value, ROOT_KEYS, [...ROOT_KEYS].filter((key) => key !== "closeTransition" && key !== "nativeContinuation"))
     || value.schema !== "pipeline.continuity.v0"
     || !safeId(value.featureId)
     || !safeInteger(value.revision)
@@ -371,7 +394,8 @@ export function validateContinuityState(value, activeFeatureId = undefined) {
     || !validRecovery(value.recovery, value)
     || !validDecisionTxn(value.decisionTxn, value.revision)
     || !validCapacity(value.capacity)
-    || !validCloseTransition(value.closeTransition, value)) {
+    || !validCloseTransition(value.closeTransition, value)
+    || !validNativeContinuationBinding(value.nativeContinuation, value)) {
     return { ok: false, code: "CS-INVALID" };
   }
   let bytes;
@@ -445,6 +469,7 @@ function compareAndSwap(current, request, activeFeatureId, {
   allowDecisionChange = false,
   allowResultAuthorityChange = false,
   allowCloseTransitionChange = false,
+  allowNativeContinuationChange = false,
 } = {}) {
   const before = validateContinuityState(current, activeFeatureId);
   if (!before.ok || !exactKeys(request, CAS_KEYS) || !safeInteger(request.expectedRevision)) {
@@ -460,6 +485,9 @@ function compareAndSwap(current, request, activeFeatureId, {
   if (!allowCloseTransitionChange
     && !sameJson(current.closeTransition ?? null, request.next.closeTransition ?? null)) {
     return result(false, "CS-PROTECTED-CLOSE-TRANSITION");
+  }
+  if (!allowNativeContinuationChange && !sameJson(current.nativeContinuation ?? null, request.next.nativeContinuation ?? null)) {
+    return result(false, "CS-PROTECTED-NATIVE-CONTINUATION");
   }
   if (!sameJson(current.runtime, request.next.runtime)
     || !sameJson(current.authority.prd, request.next.authority.prd)
@@ -483,6 +511,104 @@ function compareAndSwap(current, request, activeFeatureId, {
 /** Validate a pure compare-and-swap proposal; performs no I/O. */
 export function compareAndSwapContinuity(current, request, activeFeatureId = undefined) {
   return compareAndSwap(current, request, activeFeatureId);
+}
+
+/** Apply a controller-produced runner-native continuation projection. */
+export function applyRunnerNativeContinuation(current, request, activeFeatureId = undefined) {
+  const applied = compareAndSwap(current, request, activeFeatureId, { allowNativeContinuationChange: true });
+  if (!applied.ok) return applied;
+  return { ...applied, continuation: structuredClone(request.next.nativeContinuation ?? null) };
+}
+
+function refreshNativeContinuation(current, event, adapterResult, reasonCode = "active-goal-retained", reasonEvidenceSha256 = null, resolution = null) {
+  if (!validateRunnerNativeContinuation(current).ok) return { ok: false, code: "RNC-SCHEMA", continuation: null };
+  const request = {
+    ok: true,
+    request: {
+      continuationId: current.continuationId,
+      subject: structuredClone(current.subject),
+      objective: structuredClone(current.objective),
+      acceptance: structuredClone(current.acceptance),
+      evidence: structuredClone(current.evidence),
+      progress: structuredClone(current.progress),
+      runner: structuredClone(current.runner),
+    },
+  };
+  const retainedResolution = resolution ?? current.resolution;
+  const materialized = materializeRunnerNativeContinuation({
+    request,
+    generation: current.generation.number,
+    adapterResult,
+    observedAt: adapterResult?.readback?.observedAt,
+    reasonCode: retainedResolution !== null && resolution === null ? current.reason.code : reasonCode,
+    reasonEvidenceSha256: reasonEvidenceSha256 ?? current.reason.evidenceSha256,
+    resolution: retainedResolution,
+  });
+  if (!materialized.ok) return materialized;
+  const continuation = materialized.continuation;
+  if (continuation.status !== "active") {
+    continuation.terminal = { ...continuation.terminal, atRevision: event.atRevision };
+    continuation.recordSha256 = computeRunnerNativeContinuationDigest(continuation);
+  }
+  return validateRunnerNativeContinuation(continuation).ok
+    ? { ok: true, code: "RNC-REFRESH", continuation }
+    : { ok: false, code: "RNC-SCHEMA", continuation: null };
+}
+
+/** Runner-native continuation controller; adapter remains the caller's authority. */
+export async function reconcileRunnerNativeContinuation({ continuity, activeFeature, continuationId, runner, acceptance = [], evidence = [], event, additiveInput = null, adapter } = {}) {
+  if (typeof adapter !== "function" || !isObject(activeFeature) || !safeId(activeFeature.id) || !safeId(continuationId)
+    || !validateContinuityState(continuity, activeFeature.id).ok) return { ok: false, code: "RNC-CONTROLLER-INPUT" };
+  const current = continuity.nativeContinuation ?? null;
+  if (additiveInput !== null) {
+    if (current === null) return { ok: false, code: "RNC-CONTROLLER-INPUT" };
+    const added = recordRunnerNativeAdditiveInput({ continuation: current, input: additiveInput });
+    if (!added.ok) return { ok: false, code: added.code };
+    const next = structuredClone(continuity); next.revision += 1; next.nativeContinuation = added.continuation;
+    return { ok: true, code: added.code, action: "none", expectedRevision: continuity.revision, next, continuation: next.nativeContinuation };
+  }
+  if (!isObject(event) || !safeId(event.kind) || !safeInteger(event.atRevision) || event.atRevision !== continuity.revision) return { ok: false, code: "RNC-CONTROLLER-EVENT" };
+  if (current === null) {
+    const progress = projectRunnerNativeProgress({ continuity, acceptance, evidence });
+    if (!progress.ok) return { ok: false, code: progress.code };
+    // `activeFeature` is the persisted State object and carries its planPath.
+    // The native-goal record intentionally exposes only its bounded identity.
+    const subjectFeature = { id: activeFeature.id, phase: activeFeature.phase };
+    const request = buildRunnerNativeContinuationRequest({ continuationId, activeFeature: subjectFeature, continuity, runner, acceptance, evidence, progress: progress.progress });
+    if (!request.ok) return { ok: false, code: request.code };
+    const adapterResult = await adapter({ action: "set", generation: 0, subject: request.request.subject, objective: request.request.objective });
+    const materialized = materializeRunnerNativeContinuation({ request, generation: 0, adapterResult, observedAt: adapterResult?.readback?.observedAt, reasonCode: event.kind });
+    if (!materialized.ok) return { ok: false, code: materialized.code };
+    const next = structuredClone(continuity); next.revision += 1; next.nativeContinuation = materialized.continuation;
+    return { ok: true, code: "RNC-SET", action: "set", expectedRevision: continuity.revision, next, continuation: next.nativeContinuation };
+  }
+  const transition = planNativeGoalTransition({ continuation: current, event });
+  if (!transition.ok) return { ok: false, code: transition.code };
+  if (transition.action === "none") {
+    // A retained generation is not a licence to trust a historical readback.
+    // The adapter performs a matching get, does not duplicate a matching set,
+    // and refuses to overwrite a different active user-controlled goal.
+    if (current.status === "active" && ["activate", "resume", "compact-reentry"].includes(event.kind)) {
+      const adapterResult = await adapter({ action: "set", generation: current.generation.number, subject: current.subject, objective: current.objective });
+      const refreshed = refreshNativeContinuation(current, event, adapterResult);
+      if (!refreshed.ok) return { ok: false, code: refreshed.code };
+      const next = structuredClone(continuity); next.revision += 1; next.nativeContinuation = refreshed.continuation;
+      return { ok: true, code: refreshed.code, action: "set", expectedRevision: continuity.revision, next, continuation: next.nativeContinuation };
+    }
+    return { ok: true, code: transition.code, action: "none", expectedRevision: continuity.revision, next: structuredClone(continuity), continuation: structuredClone(current) };
+  }
+  if (transition.action === "set") {
+    const adapterResult = await adapter({ action: "set", generation: transition.generation, subject: current.subject, objective: current.objective });
+    const resumed = refreshNativeContinuation(current, event, adapterResult, transition.reasonCode, event.evidenceSha256, event.poDecisionReceipt);
+    if (!resumed.ok) return { ok: false, code: resumed.code };
+    const next = structuredClone(continuity); next.revision += 1; next.nativeContinuation = resumed.continuation;
+    return { ok: true, code: transition.code, action: "set", expectedRevision: continuity.revision, next, continuation: next.nativeContinuation };
+  }
+  const adapterResult = await adapter({ action: transition.action, generation: current.generation.number, subject: current.subject, objective: current.objective });
+  const terminal = materializeRunnerNativeTerminal({ continuation: current, transition, event, adapterResult });
+  if (!terminal.ok) return { ok: false, code: terminal.code };
+  const next = structuredClone(continuity); next.revision += 1; next.nativeContinuation = terminal.continuation;
+  return { ok: true, code: terminal.code, action: transition.action, expectedRevision: continuity.revision, next, continuation: next.nativeContinuation };
 }
 
 /**
@@ -551,6 +677,83 @@ export function releaseContinuitySessionCleanup(current, request, activeFeatureI
   return after.ok
     ? result(true, "CS-SESSION-CLEANUP-RELEASED", next, true)
     : result(false, after.code);
+}
+
+/**
+ * Bind one already-written Result and make an idle review head close-ready.
+ *
+ * Result bytes and the project approval are I/O-layer concerns.  This pure
+ * transition owns only the closed continuity mutation surface: one revision,
+ * a Result authority (newly bound or already bootstrap-bound), review -> close,
+ * and the immediate resume marker. Exact committed replay is a zero-write
+ * success.
+ */
+export function bindContinuityResultForClose(current, request, activeFeatureId = undefined) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, RESULT_CLOSE_BIND_KEYS)
+    || !safeInteger(request.expectedRevision) || !validArtifact(request.result)) {
+    return result(false, before.ok ? "CS-RESULT-CLOSE-REQUEST" : before.code);
+  }
+  const idle = current.queueHead !== null
+    && current.queueHead.dispatch === null
+    && current.queueHead.productRetryCount === 0
+    && current.queueHead.environmentRerouteCount === 0
+    && current.blocker === null
+    && current.recovery === null
+    && current.decisionTxn === null
+    && current.closeTransition == null;
+  if (!idle) return result(false, "CS-RESULT-CLOSE-PREIMAGE");
+
+  const replayResume = {
+    mode: "immediate",
+    sourceRevision: request.expectedRevision + 1,
+    reasonCode: "active-turn",
+  };
+  if (current.authority.result !== null) {
+    if (!sameJson(current.authority.result, request.result)) {
+      return result(false, "CS-RESULT-CLOSE-CONFLICT");
+    }
+    if (current.revision === request.expectedRevision + 1
+      && current.queueHead.nextAction === "close"
+      && sameJson(current.resume, replayResume)) {
+      return result(true, "CS-RESULT-CLOSE-REPLAY", structuredClone(current), false);
+    }
+    if (request.expectedRevision !== current.revision || current.queueHead.nextAction !== "review") {
+      return result(false, "CS-RESULT-CLOSE-CONFLICT");
+    }
+  }
+  if (request.expectedRevision !== current.revision) return result(false, "CS-STALE");
+  if (current.queueHead.nextAction !== "review") return result(false, "CS-RESULT-CLOSE-PREIMAGE");
+
+  const next = structuredClone(current);
+  next.revision += 1;
+  if (next.authority.result === null) next.authority.result = structuredClone(request.result);
+  next.queueHead.nextAction = "close";
+  next.resume = {
+    mode: "immediate",
+    sourceRevision: next.revision,
+    reasonCode: "active-turn",
+  };
+  const after = validateContinuityState(next, activeFeatureId);
+  if (!after.ok) return result(false, after.code);
+  const scoped = next.revision === current.revision + 1
+    && sameJson(next.runtime, current.runtime)
+    && sameJson(next.authority.prd, current.authority.prd)
+    && sameJson(next.authority.spec, current.authority.spec)
+    && sameJson(next.acknowledgedFinal, current.acknowledgedFinal)
+    && next.queueHead.packageId === current.queueHead.packageId
+    && next.queueHead.actionId === current.queueHead.actionId
+    && next.queueHead.productRetryCount === current.queueHead.productRetryCount
+    && next.queueHead.environmentRerouteCount === current.queueHead.environmentRerouteCount
+    && sameJson(next.queueHead.dispatch, current.queueHead.dispatch)
+    && sameJson(next.blocker, current.blocker)
+    && sameJson(next.recovery, current.recovery)
+    && sameJson(next.decisionTxn, current.decisionTxn)
+    && sameJson(next.capacity, current.capacity)
+    && sameJson(next.closeTransition, current.closeTransition);
+  return scoped
+    ? result(true, "CS-RESULT-CLOSE-APPLIED", next, true)
+    : result(false, "CS-RESULT-CLOSE-SCOPE");
 }
 
 function adapterAck(acknowledgedFinal) {
@@ -992,7 +1195,124 @@ export function clearCourseDecisionReceipt(current, request, activeFeatureId = u
   });
 }
 
+// AC-047-27: the sole legacy continuity adoption transition.  This is
+// intentionally separate from the generic CAS path so ordinary callers cannot
+// widen authority or adopt an arbitrary Result.
+const LEGACY_ADOPTION = Object.freeze({
+  featureId: "codex-onboarding-0.4.5",
+  revision: 3,
+  prdSha256: "9825ca78a3765dc71ee2793ef9f84f2eaf998bf297086d869be3562d792cdb94",
+  specSha256: "5a95aa55b393a88e0d7ab1a8006957fc04d80bcae24399b40f3ffa8e4eb3cf70",
+  currentPrdSha256: "217eff325fffa5d82d5d49f31883c426dca74c42879aaae0a70da87be8e492ae",
+  resultSha256: "ceed30ddce48d921f2afbbb44d02a3fe5301302ad07fab3f41dfbc149f657b73",
+  currentPrdPath: "specs/2026-07-25-codex-onboarding-0.4.5/prd_codex-onboarding-0.4.5.md",
+  specPath: "specs/2026-07-25-codex-onboarding-0.4.5/spec.md",
+  resultPath: "specs/2026-07-25-codex-onboarding-0.4.5/result.md",
+  historicalPrdCommit: "7a62a4ef9febba844cf5be8a659177b37c6a5da5",
+  closeEvidencePath: "specs/2026-07-25-codex-onboarding-0.4.5/legacy-continuity-close-evidence.md",
+  closeEvidenceSha256: "8fe8c79f464e2a3f93f2e300fb6e74cccf6791f5920f4a857597f516d97917a1",
+  releaseTag: "v0.4.6",
+  releaseCommit: "9d1b3dc108eb77629ace5b82002120f5539abd8d",
+  releaseTree: "282a8b5c5b0581e042985bfb373a66be0eb2d08b",
+  releaseTagObject: "78359ae1ba7e0194111e531c060db615e4994e40",
+});
+
+function legacyPreimage(current) {
+  const normalized = isObject(current) && !Object.hasOwn(current, "closeTransition")
+    ? { ...current, closeTransition: null } : current;
+  return validateContinuityState(normalized, LEGACY_ADOPTION.featureId).ok
+    && current.featureId === LEGACY_ADOPTION.featureId
+    && current.revision === LEGACY_ADOPTION.revision
+    && current.authority.prd.sha256 === LEGACY_ADOPTION.prdSha256
+    && current.authority.spec.sha256 === LEGACY_ADOPTION.specSha256
+    && current.authority.result === null
+    && current.queueHead.packageId === "continuity-adoption"
+    && current.queueHead.actionId === "review-active-feature"
+    && current.queueHead.nextAction === "review"
+    && current.queueHead.productRetryCount === 0
+    && current.queueHead.environmentRerouteCount === 0
+    && current.queueHead.dispatch === null
+    && current.blocker === null
+    && current.acknowledgedFinal === null
+    && current.recovery === null
+    && current.decisionTxn === null
+    && (current.closeTransition === null || !Object.hasOwn(current, "closeTransition"));
+}
+
+export function planLegacyContinuityAdoption(current, request = {}) {
+  if (!legacyPreimage(current)) return result(false, "CS-LEGACY-PREIMAGE");
+  const requestKeys = ["expectedRevision", "currentPrd", "spec", "result", "closeEvidence", "history"];
+  const exactArtifact = (value) => exactKeys(value, ARTIFACT_KEYS);
+  const exactHistory = (value) => exactKeys(value, new Set(["commit", "path", "sha256"]))
+    && gitOid(value.commit) && safePath(value.path) && digest(value.sha256);
+  if (!isObject(request) || Object.keys(request).length !== requestKeys.length
+    || !requestKeys.every((key) => Object.hasOwn(request, key))
+    || !exactArtifact(request.currentPrd) || !exactArtifact(request.spec)
+    || !exactArtifact(request.result) || !exactArtifact(request.closeEvidence)
+    || !exactHistory(request.history)
+    || request.currentPrd.path !== LEGACY_ADOPTION.currentPrdPath
+    || request.spec.path !== LEGACY_ADOPTION.specPath
+    || request.result.path !== LEGACY_ADOPTION.resultPath
+    || request.closeEvidence.path !== LEGACY_ADOPTION.closeEvidencePath
+    || request.history.path !== LEGACY_ADOPTION.currentPrdPath
+    || request.history.commit !== LEGACY_ADOPTION.historicalPrdCommit
+    || request.history.sha256 !== LEGACY_ADOPTION.prdSha256
+    || request.currentPrd.sha256 !== LEGACY_ADOPTION.currentPrdSha256
+    || request.spec.sha256 !== LEGACY_ADOPTION.specSha256
+    || request.result.sha256 !== LEGACY_ADOPTION.resultSha256
+    || request.closeEvidence.sha256 !== LEGACY_ADOPTION.closeEvidenceSha256
+    || request.expectedRevision !== LEGACY_ADOPTION.revision) {
+    return result(false, "CS-LEGACY-BINDING");
+  }
+  return result(true, "CS-LEGACY-ADOPTION-PLAN", {
+    featureId: LEGACY_ADOPTION.featureId,
+    expectedRevision: LEGACY_ADOPTION.revision,
+    authorityDigests: {
+      historicalPrdSha256: LEGACY_ADOPTION.prdSha256,
+      currentPrdSha256: LEGACY_ADOPTION.currentPrdSha256,
+      specSha256: LEGACY_ADOPTION.specSha256,
+      resultSha256: LEGACY_ADOPTION.resultSha256,
+    },
+  });
+}
+
+export function applyLegacyContinuityAdoption(current, request = {}, activeFeatureId = undefined) {
+  const planned = planLegacyContinuityAdoption(current, request);
+  if (!planned.ok || activeFeatureId !== undefined && activeFeatureId !== LEGACY_ADOPTION.featureId) {
+    return result(false, planned.ok ? "CS-LEGACY-FEATURE" : planned.code);
+  }
+  const next = structuredClone(current);
+  next.revision += 1;
+  next.authority.prd = structuredClone(request.currentPrd);
+  next.authority.result = structuredClone(request.result);
+  next.queueHead.nextAction = "close";
+  const after = validateContinuityState(
+    Object.hasOwn(next, "closeTransition") ? next : { ...next, closeTransition: null },
+    LEGACY_ADOPTION.featureId,
+  );
+  if (!after.ok || next.revision !== current.revision + 1
+    || !sameJson(current.runtime, next.runtime) || !sameJson(current.authority.spec, next.authority.spec)
+    || !sameJson(current.acknowledgedFinal, next.acknowledgedFinal)
+    || next.queueHead.packageId !== current.queueHead.packageId
+    || next.queueHead.actionId !== current.queueHead.actionId
+    || next.queueHead.productRetryCount !== current.queueHead.productRetryCount
+    || next.queueHead.environmentRerouteCount !== current.queueHead.environmentRerouteCount
+    || !sameJson(current.queueHead.dispatch, next.queueHead.dispatch)
+    || !sameJson(current.blocker, next.blocker) || !sameJson(current.resume, next.resume)
+    || !sameJson(current.recovery, next.recovery) || !sameJson(current.decisionTxn, next.decisionTxn)
+    || !sameJson(current.capacity, next.capacity) || !sameJson(current.closeTransition, next.closeTransition)
+    || next.queueHead.nextAction !== "close") return result(false, after.ok ? "CS-LEGACY-SCOPE" : after.code);
+  return result(true, "CS-LEGACY-ADOPTION-APPLIED", next, true);
+}
+
+export const LEGACY_CONTINUITY_ADOPTION = LEGACY_ADOPTION;
+
 export const CONTINUITY_STATE_CODES = Object.freeze([
+  "CS-RESULT-CLOSE-REQUEST", "CS-RESULT-CLOSE-PREIMAGE",
+  "CS-RESULT-CLOSE-CONFLICT", "CS-RESULT-CLOSE-REPLAY",
+  "CS-RESULT-CLOSE-APPLIED", "CS-RESULT-CLOSE-SCOPE",
+  "CS-LEGACY-PREIMAGE", "CS-LEGACY-BINDING", "CS-LEGACY-FEATURE", "CS-LEGACY-SCOPE",
+  "CS-LEGACY-ADOPTION-PLAN", "CS-LEGACY-ADOPTION-APPLIED",
   "CS-INVALID", "CS-STATE-BUDGET", "CS-VALID", "CS-REQUEST", "CS-STALE",
   "CS-SESSION-CLEANUP-REQUEST", "CS-SESSION-CLEANUP-ALREADY-BOUND",
   "CS-SESSION-CLEANUP-PROTECTED", "CS-SESSION-CLEANUP-TOO-LATE",
@@ -1017,5 +1337,3 @@ export const CONTINUITY_STATE_CODES = Object.freeze([
   "CS-CLOSE-DELIVERY-RECORDED", "CS-CLOSE-READBACK-BLOCKED",
   "CS-CLOSE-READBACK-RECORDED", "CS-CLOSE-COMPLETE-BLOCKED", "CS-CLOSE-CLOSED",
 ]);
-
-export const CONTINUITY_STATE_MAX_BYTES = MAX_STATE_BYTES;

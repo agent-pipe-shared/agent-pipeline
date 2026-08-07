@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Local entry point for the one approved control-decomposition acceptance. */
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { runControlDecomposition } from "./codex-isolation-control-decomposition.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const ARTIFACTS = Object.freeze([
@@ -28,7 +29,7 @@ export async function run({ commit, repoRoot = root } = {}) {
   });
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectInvocation(import.meta.url)) {
   try {
     const result = await run(parseArgs(process.argv.slice(2)));
     if (!result.ok) {

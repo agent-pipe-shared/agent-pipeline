@@ -12,6 +12,8 @@ import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { AUTHORITY_ARTIFACTS, resolveAuthorityArtifactPath } from "../../plugins/pipeline-core/lib/project-authority.mjs";
+
 import { checkObservationGovernance } from "./check-observation-governance.mjs";
 
 const decoder = new TextDecoder("utf-8", { fatal: true });
@@ -95,7 +97,7 @@ export function checkStatefulDesignContracts(surfaces) {
   for (const [surfaceIndex, surface] of STATEFUL_DESIGN_SURFACES.entries()) {
     const text = surfaces[surface];
     if (typeof text !== "string") continue;
-    const visibleText = stripFencedCode(text).replace(/<!--[\s\S]*?-->/g, "");
+    const visibleText = stripHtmlComments(stripFencedCode(text));
     const operativeText = extractMarkdownSection(visibleText, STATEFUL_DESIGN_OPERATIVE_HEADINGS[surfaceIndex]);
     for (const contract of STATEFUL_DESIGN_CONTRACTS) {
       if (!operativeText.includes(contract.phrases[surfaceIndex])) {
@@ -104,6 +106,19 @@ export function checkStatefulDesignContracts(surfaces) {
     }
   }
   return findings;
+}
+
+export function stripHtmlComments(value) {
+  let remaining = value;
+  let output = "";
+  while (true) {
+    const start = remaining.indexOf("<!--");
+    if (start === -1) return output + remaining;
+    output += remaining.slice(0, start);
+    const end = remaining.indexOf("-->", start + 4);
+    if (end === -1) return output;
+    remaining = remaining.slice(end + 3);
+  }
 }
 
 export function stripFencedCode(markdown) {
@@ -128,7 +143,7 @@ export function stripFencedCode(markdown) {
 
 function cleanHeading(value) {
   return value
-    .replace(/<[^>]*>/g, "")
+    .replace(/[<>]/g, "")
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/[`*_~]/g, "")
@@ -441,7 +456,8 @@ export function checkRepository(rootInput, options = {}) {
     }
   }
 
-  const calibrationPath = ".claude/pipeline.json";
+  // Whichever tier the project's authority actually resolves to (ADR-0054).
+  const calibrationPath = resolveAuthorityArtifactPath("calibration", { rootDir: root }).relPath;
   try {
     const raw = readRepoText(calibrationPath);
     const keyCount = [...raw.matchAll(/"handover"\s*:/g)].length;
@@ -476,7 +492,9 @@ export function checkRepository(rootInput, options = {}) {
   }
 
   const trackedStatefulDesignSurfaces = STATEFUL_DESIGN_SURFACES.filter((path) => trackedPaths.has(path));
-  const pipelineRepository = trackedPaths.has(".claude/pipeline.yaml");
+  // Tier-union, not resolver-routed: this asks "does this repository carry a
+  // pipeline manifest at all", so an artifact at ANY tier answers yes (ADR-0054).
+  const pipelineRepository = Object.values(AUTHORITY_ARTIFACTS.manifest).some((path) => trackedPaths.has(path));
   let statefulDesignContracts = "not-applicable";
   if (pipelineRepository) {
     statefulDesignContracts = "checked";

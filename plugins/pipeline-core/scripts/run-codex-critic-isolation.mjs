@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Local host entry point for the approved profile-bound isolation acceptance. */
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 import { CODEX_CRITIC_ARTIFACTS, runProfileBoundIsolation } from "./codex-critic-isolation.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
@@ -57,7 +58,7 @@ export async function run({ commit, repoRoot = root, debugLog } = {}) {
   return Object.freeze(publicResult);
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectInvocation(import.meta.url)) {
   let debugMode = false;
   try {
     const args = parseArgs(process.argv.slice(2));

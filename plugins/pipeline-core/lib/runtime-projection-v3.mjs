@@ -40,7 +40,7 @@ export const CODEX_CUSTOM_AGENT_METADATA = Object.freeze({
   critic: Object.freeze({
     name: "critic",
     description: "Independent read-only critic",
-    developerInstructions: "Act as an independent, read-only Critic. Inspect only the explicitly provided scope, preserve privacy boundaries, and report evidence-backed findings without mutating files or claiming unobserved model identity.",
+    developerInstructions: "Act as an independent, read-only Critic. Your bootstrap role is closed as critic: when pipeline-start is required, use its compact critic path and never Elephant onboarding, State, handover, or history. Inspect only the explicitly provided scope, preserve privacy boundaries, and report evidence-backed findings without mutating files or claiming unobserved model identity.",
   }),
 });
 
@@ -94,8 +94,35 @@ function frozen(value) {
   return value;
 }
 
-const FROZEN_OWNED_KEYS = frozen(JSON.parse(readFileSync(OWNED_KEYS_PATH, "utf8")));
-const FROZEN_OWNED_KEYS_JSON = JSON.stringify(stableValue(FROZEN_OWNED_KEYS));
+let frozenOwnedKeysMemo = null;
+
+/**
+ * Resolve the committed owned-key manifest LAZILY, never as a module-scope
+ * side effect, and memoize the result.
+ *
+ * The manifest is a JSON config read from disk.  Reading and freezing it at
+ * module scope meant a missing, unreadable, or malformed
+ * `config/runtime-projection-v3-owned-keys.json` threw out of this module's
+ * top-level scope -- so merely IMPORTING this file crashed, before any
+ * function in any importer could run.  The fail-closed admission hooks
+ * (`hooks/guard-lifecycle-ready.mjs`, `hooks/codex-pretool-guard.mjs`) import
+ * it, and an ES-module-evaluation throw kills them before `main()` exists:
+ * node exits 1, which `hooks/hooks.json` defines as "allow + config warning".
+ * A config fault therefore DISARMED a deliberately fail-closed gate.
+ *
+ * Deferring the read keeps importing this module free of disk access.  The
+ * failure now surfaces only inside whichever function actually needs the
+ * manifest, at the moment it is called, on that function's existing failure
+ * path -- exactly where its callers already handle errors.  A failed read is
+ * not memoized, so a repaired manifest is picked up by the next call.
+ */
+function frozenOwnedKeys() {
+  if (frozenOwnedKeysMemo === null) {
+    const manifest = frozen(JSON.parse(readFileSync(OWNED_KEYS_PATH, "utf8")));
+    frozenOwnedKeysMemo = { manifest, json: JSON.stringify(stableValue(manifest)) };
+  }
+  return frozenOwnedKeysMemo;
+}
 
 export const RUNTIME_PROJECTION_V3_OWNED_KEYS_PATH = OWNED_KEYS_PATH;
 
@@ -104,8 +131,12 @@ export function loadRuntimeProjectionV3OwnedKeys(path = OWNED_KEYS_PATH) {
 }
 
 function isCommittedManifest(manifest) {
+  // The committed manifest is resolved OUTSIDE the guard below: an unreadable
+  // or malformed shipped manifest is a config fault that must surface, not a
+  // caller-supplied manifest that merely fails to compare.
+  const committedJson = frozenOwnedKeys().json;
   try {
-    return JSON.stringify(stableValue(manifest)) === FROZEN_OWNED_KEYS_JSON;
+    return JSON.stringify(stableValue(manifest)) === committedJson;
   } catch {
     return false;
   }
@@ -141,6 +172,13 @@ function v2CompatibilityIntent(intent) {
   // Repository export consent gates advisory dispatch only. It has no runtime
   // projection and must not leak into the closed V2 byte-rendering kernel.
   delete compatibilityIntent.advisor_export;
+  // `gates.push_approval` (ADR-0056) selects how a human clears the push gate. It is
+  // a V3-only setting read directly at gate time, has no V2 byte rendering, and would
+  // otherwise be rejected by V2's own closed gates key set.
+  if (compatibilityIntent.gates !== null && typeof compatibilityIntent.gates === "object") {
+    compatibilityIntent.gates = { ...compatibilityIntent.gates };
+    delete compatibilityIntent.gates.push_approval;
+  }
   return {
     ...compatibilityIntent,
     schema: "pipeline.user.v2",
@@ -185,11 +223,28 @@ function requestedRoute(cell) {
   };
 }
 
-function renderClaudeModelRouting(target, intent, eol) {
+function renderYamlBlock(lines, eol, { followingTopLevelBlock = false } = {}) {
+  // Generated YAML owns its trailing separator.  A following top-level block
+  // receives one intentional blank line; a terminal generated block receives
+  // exactly one final EOL, so regeneration heals any manual EOF whitespace.
+  return `${lines.join(eol)}${eol}${followingTopLevelBlock ? eol : ""}`;
+}
+
+function hasFollowingTopLevelBlock(bytes, range) {
+  return range.end < bytes.length;
+}
+
+function renderClaudeModelRouting(target, intent, eol, placement = {}) {
+  const claudeAliases = Object.keys(target.nativeModelAliases).sort().join(", ");
+  const codexModelIds = [...new Set([
+    ...Object.values(intent.routing.profiles).flatMap((profile) => Object.values(profile).map((phase) => phase.codex?.selector?.value)),
+    ...Object.values(intent.routing.duties).flatMap((duty) => duty.codex?.selector?.value ? [duty.codex.selector.value] : []),
+  ].filter(Boolean))].sort().join(", ");
   const lines = [
     "modelRouting:",
     "  # Generated V3 Claude compatibility projection; pipeline.user.v3 is the only routing authority.",
     "  # Requested selectors are not advisor-receipt, route-receipt, or effective-model evidence.",
+    `  # Adapter selector catalog — Claude aliases: ${claudeAliases}; Codex/OpenAI model IDs: ${codexModelIds}.`,
   ];
   const routes = [];
   for (const binding of target.bindings) {
@@ -204,11 +259,11 @@ function renderClaudeModelRouting(target, intent, eol) {
     lines.push(`    effort: ${cell.effort}`);
     routes.push({ targetKey: binding.targetKey, cell: describeBinding(binding), ...requestedRoute(cell) });
   }
-  return { bytes: `${lines.join(eol)}${eol}${eol}`, routes };
+  return { bytes: renderYamlBlock(lines, eol, placement), routes };
 }
 
-function renderCriticExport(intent, eol) {
-  return [
+function renderCriticExport(intent, eol, placement = {}) {
+  return renderYamlBlock([
     "criticExport:",
     `  policy: ${intent.critic_export.schema}`,
     `  mode: ${intent.critic_export.mode}`,
@@ -217,9 +272,7 @@ function renderCriticExport(intent, eol) {
     "  packetBoundary: candidate-diff-and-allowlisted-references",
     "  hostGate: visible-not-bypassed",
     "  providerGate: visible-not-bypassed",
-    "",
-    "",
-  ].join(eol);
+  ], eol, placement);
 }
 
 function topLevelBlockRange(bytes, key) {
@@ -332,14 +385,21 @@ function replaceClaudeTarget(v2Target, target, intent, originalBytes) {
   }
   const eol = afterBytes.includes("\r\n") ? "\r\n" : "\n";
   const range = topLevelBlockRange(afterBytes, "modelRouting");
-  const rendered = renderClaudeModelRouting(target, intent, eol);
+  // criticExport is always projected after modelRouting, so modelRouting is
+  // never terminal in the final V3 YAML projection.
+  const rendered = renderClaudeModelRouting(target, intent, eol, { followingTopLevelBlock: true });
   afterBytes = `${afterBytes.slice(0, range.start)}${rendered.bytes}${afterBytes.slice(range.end)}`;
-  const criticExportBytes = renderCriticExport(intent, eol);
   const existingCriticExport = optionalTopLevelBlockRange(afterBytes, "criticExport");
   if (existingCriticExport) {
+    const criticExportBytes = renderCriticExport(intent, eol, {
+      followingTopLevelBlock: hasFollowingTopLevelBlock(afterBytes, existingCriticExport),
+    });
     afterBytes = `${afterBytes.slice(0, existingCriticExport.start)}${criticExportBytes}${afterBytes.slice(existingCriticExport.end)}`;
   } else {
     const projectedRouting = topLevelBlockRange(afterBytes, "modelRouting");
+    const criticExportBytes = renderCriticExport(intent, eol, {
+      followingTopLevelBlock: hasFollowingTopLevelBlock(afterBytes, projectedRouting),
+    });
     afterBytes = `${afterBytes.slice(0, projectedRouting.end)}${criticExportBytes}${afterBytes.slice(projectedRouting.end)}`;
   }
   if (optionalTopLevelBlockRange(afterBytes, "runnerRoutes")) {
@@ -640,7 +700,8 @@ function projectValidatedIntent(intent, { source, baselines }) {
     return emptyPlan(compatibility.status, source, diagnostics);
   }
 
-  const manifestTargets = Object.fromEntries(FROZEN_OWNED_KEYS.targets.map((target) => [target.path, target]));
+  const committedOwnedKeys = frozenOwnedKeys();
+  const manifestTargets = Object.fromEntries(committedOwnedKeys.manifest.targets.map((target) => [target.path, target]));
   let targets;
   try {
     targets = compatibility.targets.map((target) => {
@@ -679,7 +740,7 @@ function projectValidatedIntent(intent, { source, baselines }) {
     }]);
   }
 
-  const decisionConflicts = FROZEN_OWNED_KEYS.targets.flatMap((target) => {
+  const decisionConflicts = committedOwnedKeys.manifest.targets.flatMap((target) => {
     if (!target.decision || target.projection !== "codex-custom-agent-v3") return [];
     const bytes = baselineBytes(baselines?.[target.path]);
     if (bytes === null) return [];
@@ -709,9 +770,9 @@ function projectValidatedIntent(intent, { source, baselines }) {
     source,
     intentSha256: sha256(JSON.stringify(stableValue(intent))),
     ownedKeyManifest: {
-      schema: FROZEN_OWNED_KEYS.schema,
-      sha256: sha256(FROZEN_OWNED_KEYS_JSON),
-      targets: FROZEN_OWNED_KEYS.targets.map((target) => ({
+      schema: committedOwnedKeys.manifest.schema,
+      sha256: sha256(committedOwnedKeys.json),
+      targets: committedOwnedKeys.manifest.targets.map((target) => ({
         path: target.path,
         format: target.format,
         projection: target.projection,
@@ -729,7 +790,9 @@ export function planRuntimeProjectionV3(intent, {
   source = "pipeline.user.v3",
   baselines = {},
   registry = loadRunnerProfilesV3Registry(),
-  ownedKeyManifest = FROZEN_OWNED_KEYS,
+  // Evaluated at call time, not at definition time: the committed manifest is
+  // read on demand exactly like every other reference below.
+  ownedKeyManifest = frozenOwnedKeys().manifest,
 } = {}) {
   if (!isCommittedManifest(ownedKeyManifest)) return manifestFailure(source);
   const validation = validatePipelineUserV3(intent, { source, registry });
@@ -749,8 +812,9 @@ export function planRuntimeProjectionV3Json(text, options = {}) {
 
 export function readRuntimeProjectionV3Baselines(rootDir) {
   const baselines = readRuntimeProjectionV2Baselines(rootDir);
-  const target = FROZEN_OWNED_KEYS.targets.find((entry) => entry.path === ".claude/pipeline.json");
-  const advisor = FROZEN_OWNED_KEYS.targets.find((entry) => entry.path === ".codex/agents/consult-advisor.toml");
+  const ownedTargets = frozenOwnedKeys().manifest.targets;
+  const target = ownedTargets.find((entry) => entry.path === ".claude/pipeline.json");
+  const advisor = ownedTargets.find((entry) => entry.path === ".codex/agents/consult-advisor.toml");
   if (!target || !advisor) throw new Error("V3 owned target is missing");
   const root = resolve(rootDir);
   for (const entry of [target, advisor]) {

@@ -1,0 +1,59 @@
+{
+  "schema": "pipeline.nova-design-advisor-disposition.v1",
+  "observedAt": "2026-07-31T22:34:26Z",
+  "featureId": "sprint-nova-epic",
+  "reason": "risk-review",
+  "status": "typed-unavailable",
+  "candidate": {
+    "commit": "7f47613908e4be862865aaa92c8b888d066585c4",
+    "tree": "0ab81c85412432d424db0961d6d439a8e5fd6c2f"
+  },
+  "reviewScope": [
+    {
+      "path": "specs/sprint-nova-epic/acceptance.md",
+      "sha256": "2ebd702edc8c67d04260a811703b8a6297acb479ef2c6c7f6ec37716960f6b5b"
+    },
+    {
+      "path": "specs/sprint-nova-epic/design/post-v0.4.7-delivery-loop.md",
+      "sha256": "81c1d6962b371df62f38f060e23e8aed1cde33b6fe3ee567d57cffd5a66ca527"
+    },
+    {
+      "path": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
+      "sha256": "01e891d225703ed27832fa85dec63653a979daf4abd02c206fb00ef3188c521f"
+    },
+    {
+      "path": "specs/sprint-nova-epic/spec.md",
+      "sha256": "5ba6e45ec8ac0083ca83375181c7536b4d558d03147c9acd883214fe499b76e5"
+    }
+  ],
+  "releasedContractBase": {
+    "commit": "89cb12b99e3fd86ac44878d0c23b278f00538921",
+    "tree": "b6537dcaa7bee526d9a393e2603b28648f4b0438"
+  },
+  "attempts": [
+    {
+      "route": "fresh-read-only-primary",
+      "terminal": "timed-out",
+      "answerObserved": false
+    },
+    {
+      "route": "fresh-read-only-fallback",
+      "terminal": "timed-out",
+      "answerObserved": false
+    }
+  ],
+  "workspace": {
+    "beforeSha256": "3b8dc6994f6bc347669c489bf1028cf2a025b2af57b75cec2903876bfe6f4349",
+    "afterSha256": "3b8dc6994f6bc347669c489bf1028cf2a025b2af57b75cec2903876bfe6f4349",
+    "unchanged": true
+  },
+  "assurance": "no attested selected-sandbox execution; OS isolation and model identity are not asserted",
+  "gateDecisionByAdvisor": false,
+  "poDispositionRequired": true,
+  "claims": {
+    "advisorAnswer": false,
+    "advisorSuccess": false,
+    "designApproved": false,
+    "implementationAuthorized": false
+  }
+}

@@ -38,6 +38,11 @@
  *      high, >=4 medium, else low.
  *   3. else "high" (intentional fallback -- a CVSS vector string without a directly
  *      parseable numeric score is not decoded here, it falls through to this default).
+ *
+ * CAPABILITY_CONTRACT_V2 (CYB-2D, additive): a frozen, machine-readable transcription of the
+ * behavior documented above, exported for CYB-2E's later aggregator work to read a uniform
+ * capability contract across all four scanner adapters without re-deriving it from prose
+ * comments. Purely additive data -- does not change any existing behavior in this file.
  */
 import { existsSync } from "node:fs";
 import { delimiter as PATH_DELIM, join as pathJoin } from "node:path";
@@ -305,3 +310,66 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
 
   return { status: findings.length > 0 ? "FINDINGS" : "PASS", classification: findings.length > 0 ? "findings" : "success", findings, raw: stdout };
 }
+
+/**
+ * CAPABILITY_CONTRACT_V2 -- machine-readable capability-contract descriptor (CYB-2D). A pure,
+ * static, additive transcription of behavior this file already has and already documents in
+ * its header comment above -- consumed by CYB-2E's later aggregator work to read a uniform
+ * capability contract across all four scanner adapters without re-deriving it from prose. Adding
+ * this export changes none of `run()`/`isInstalled()`/`checkV2()`/`mapOsvSeverity()`'s existing
+ * behavior.
+ */
+export const CAPABILITY_CONTRACT_V2 = Object.freeze({
+  contractVersion: "v2",
+  tool: name,
+  kind: "capability",
+  capabilityId: "cap.sca",
+  controlRef: null,
+  supportedEcosystems: null,
+  supportedEcosystemsNote:
+    "auto-detected by the underlying osv-scanner binary from lockfiles/manifests found under rootDir; this adapter does not itself enumerate or restrict ecosystems",
+  toolVersionConstraint:
+    "osv-scanner major version 2 required (v1 syntax incompatible); enforced by checkV2()'s --version probe before scanning",
+  networkBehavior: "unknown",
+  networkBehaviorNote:
+    "this adapter does not control osv-scanner's own network access for vulnerability-database lookups; whether the invoked osv-scanner binary queries a remote OSV database or uses a local/offline cache is a property of the binary's own configuration, not something this adapter file declares or restricts",
+  requiredInputs: ["rootDir"],
+  severityNormalization: Object.freeze({
+    tiers: Object.freeze([
+      Object.freeze({
+        order: 1,
+        source: "vuln.database_specific.severity",
+        rule: "native severity string (e.g. CRITICAL/HIGH/MEDIUM/LOW, some ecosystems use MODERATE), lower-cased; 'moderate' normalized to 'medium'; used only if the result is a recognized severity value",
+      }),
+      Object.freeze({
+        order: 2,
+        source: "vuln.severity[].score",
+        rule: "first entry that parses as a plain finite number (a numeric CVSS base score), bucketed: >=9 critical, >=7 high, >=4 medium, else low",
+      }),
+      Object.freeze({
+        order: 3,
+        source: "fallback",
+        value: "high",
+        rule: "intentional fixed fallback when neither a recognized native severity string nor a parseable numeric score is available (e.g. only a CVSS vector string is present, which is not decoded here)",
+      }),
+    ]),
+  }),
+  confidenceNormalization: null,
+  coverageLimitations: Object.freeze([
+    "SKIPPED (not scanned), not ERROR, when no package manifests/lockfiles exist at all under rootDir -- osv-scanner exits 128 with stdout/stderr containing \"No package sources found\", the one honest special-cased branch in run()'s exit-code handling.",
+    "This adapter hands the entire rootDir to osv-scanner's own ecosystem auto-detection via `osv-scanner scan source --format json -r <rootDir>` -- it does not itself enumerate, filter, or restrict which ecosystems/lockfile types get scanned.",
+    "Only the top-level v2 JSON shape (`results[].source.path`, `results[].packages[].package.{name,version}`, `.vulnerabilities[].id`, `.groups[]`) is validated before extraction; any other fields present in the real osv-scanner output are ignored, not validated, and never surfaced as findings.",
+  ]),
+  exitCodeMapping: Object.freeze({
+    "0": "clean -- valid completed run, no findings",
+    "1": "findings present -- valid completed run, NEVER conflated with ERROR (osv-scanner's normal vulnerabilities-found signal)",
+    "128": "SKIPPED only when stdout/stderr contains \"No package sources found\" (no package manifests/lockfiles under rootDir); any OTHER exit 128 stays ERROR (fail-closed)",
+    other: "ERROR (scanner_error) -- fail-closed for any exit code not covered above (including a non-matching 128)",
+  }),
+  timeoutContract: Object.freeze({
+    defaultMs: 60000,
+    cancellable: true,
+    mechanism: "node:child_process spawnSync timeout option (ETIMEDOUT), enforced on both the checkV2() version probe and the main scan spawn in run()",
+  }),
+  evidenceFields: Object.freeze(["tool", "severity", "rule", "path", "line", "msg"]),
+});

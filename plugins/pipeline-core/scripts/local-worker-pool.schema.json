@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.local-worker-pool.v1",
+  "description": "Portable structural grammar only. Consumers must call validateLocalWorkerPool for candidate bindings, monotonic-time ordering, capacity arithmetic, and lease/heartbeat relational constraints; this schema is never an admission authority by itself.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "poolId", "candidate", "queueRevision", "capacity", "workers", "admissionSet", "cleanupOwner", "serialFallback"],
+  "properties": {
+    "schema": { "const": "pipeline.local-worker-pool.v1" },
+    "poolId": { "$ref": "#/$defs/id" },
+    "candidate": { "$ref": "#/$defs/candidate" },
+    "queueRevision": { "type": "integer", "minimum": 0 },
+    "capacity": { "$ref": "#/$defs/capacity" },
+    "workers": { "type": "array", "maxItems": 256, "items": { "$ref": "#/$defs/worker" } },
+    "admissionSet": { "type": "array", "maxItems": 256, "items": { "$ref": "#/$defs/admission" } },
+    "cleanupOwner": { "$ref": "#/$defs/cleanupOwner" },
+    "serialFallback": { "type": "boolean" }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "sha": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "oid": { "type": "string", "pattern": "^[a-f0-9]{40}$|^[a-f0-9]{64}$" },
+    "path": { "type": "string", "minLength": 1, "maxLength": 512, "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//).+$" },
+    "candidate": { "type": "object", "additionalProperties": false, "required": ["repositorySha256", "baseCommit", "candidateCommit"], "properties": { "repositorySha256": { "$ref": "#/$defs/sha" }, "baseCommit": { "$ref": "#/$defs/oid" }, "candidateCommit": { "$ref": "#/$defs/oid" } } },
+    "bound": { "type": "object", "additionalProperties": false, "required": ["concurrentTasks", "required"], "properties": { "concurrentTasks": { "type": ["integer", "null"], "minimum": 0 }, "required": { "type": "boolean" } } },
+    "reserved": { "type": "object", "additionalProperties": false, "required": ["elephant", "verify", "critic"], "properties": { "elephant": { "type": "integer", "minimum": 0 }, "verify": { "type": "integer", "minimum": 0 }, "critic": { "type": "integer", "minimum": 0 } } },
+    "effective": { "type": "object", "additionalProperties": false, "required": ["status", "concurrentTasks", "reasonCodes"], "properties": { "status": { "enum": ["available", "unavailable"] }, "concurrentTasks": { "type": ["integer", "null"], "minimum": 0 }, "reasonCodes": { "type": "array", "items": { "$ref": "#/$defs/id" } } } },
+    "capacity": { "type": "object", "additionalProperties": false, "required": ["configured", "operator", "certified", "observed", "pressure", "reserved", "effective"], "properties": { "configured": { "$ref": "#/$defs/bound" }, "operator": { "$ref": "#/$defs/bound" }, "certified": { "$ref": "#/$defs/bound" }, "observed": { "$ref": "#/$defs/bound" }, "pressure": { "$ref": "#/$defs/bound" }, "reserved": { "$ref": "#/$defs/reserved" }, "effective": { "$ref": "#/$defs/effective" } } },
+    "lease": { "type": "object", "additionalProperties": false, "required": ["leaseId", "subjectSha256", "repository", "baseCommit", "candidateCommit", "worktreePathSha256", "writePaths", "ownerNonce", "issuedMonotonicMs", "expiresMonotonicMs", "cleanupState", "evidenceSha256"], "properties": { "leaseId": { "$ref": "#/$defs/id" }, "subjectSha256": { "$ref": "#/$defs/sha" }, "repository": { "$ref": "#/$defs/sha" }, "baseCommit": { "$ref": "#/$defs/oid" }, "candidateCommit": { "$ref": "#/$defs/oid" }, "worktreePathSha256": { "$ref": "#/$defs/sha" }, "writePaths": { "type": "array", "minItems": 1, "maxItems": 256, "items": { "$ref": "#/$defs/path" } }, "ownerNonce": { "$ref": "#/$defs/id" }, "issuedMonotonicMs": { "type": "integer", "minimum": 0 }, "expiresMonotonicMs": { "type": "integer", "minimum": 1 }, "cleanupState": { "enum": ["active", "cleanup-pending", "cleaned", "blocked"] }, "evidenceSha256": { "$ref": "#/$defs/sha" } } },
+    "heartbeat": { "type": "object", "additionalProperties": false, "required": ["intervalMs", "orphanAfterMs", "lastObservedMonotonicMs", "evidenceSha256"], "properties": { "intervalMs": { "type": "integer", "minimum": 1000, "maximum": 60000 }, "orphanAfterMs": { "type": "integer", "minimum": 3000, "maximum": 600000 }, "lastObservedMonotonicMs": { "type": "integer", "minimum": 0 }, "evidenceSha256": { "$ref": "#/$defs/sha" } } },
+    "worker": { "type": "object", "additionalProperties": false, "required": ["subjectSha256", "workspaceLease", "process", "heartbeat", "state", "lastTransitionMonotonicMs", "stateEvidenceSha256"], "properties": { "subjectSha256": { "$ref": "#/$defs/sha" }, "workspaceLease": { "$ref": "#/$defs/lease" }, "process": { "type": "object", "additionalProperties": false, "required": ["identitySha256", "separation", "assuranceEvidenceSha256"], "properties": { "identitySha256": { "$ref": "#/$defs/sha" }, "separation": { "enum": ["observed", "not-observed", "unavailable"] }, "assuranceEvidenceSha256": { "$ref": "#/$defs/sha" } } }, "heartbeat": { "$ref": "#/$defs/heartbeat" }, "state": { "enum": ["created", "admitted", "running", "cancel-requested", "cancelled", "timed-out", "orphan-suspected", "orphaned", "recovered", "completed", "rejected"] }, "lastTransitionMonotonicMs": { "type": "integer", "minimum": 0 }, "stateEvidenceSha256": { "$ref": "#/$defs/sha" } } },
+    "admission": { "type": "object", "additionalProperties": false, "required": ["taskId", "subjectSha256", "requestSha256", "baseCommit", "candidateCommit", "writePaths", "state"], "properties": { "taskId": { "$ref": "#/$defs/id" }, "subjectSha256": { "$ref": "#/$defs/sha" }, "requestSha256": { "$ref": "#/$defs/sha" }, "baseCommit": { "$ref": "#/$defs/oid" }, "candidateCommit": { "$ref": "#/$defs/oid" }, "writePaths": { "type": "array", "minItems": 1, "maxItems": 256, "items": { "$ref": "#/$defs/path" } }, "state": { "enum": ["pending", "admitted", "rejected", "completed", "invalidated"] } } },
+    "cleanupOwner": { "type": "object", "additionalProperties": false, "required": ["subjectSha256", "ownerNonce", "evidenceSha256"], "properties": { "subjectSha256": { "$ref": "#/$defs/sha" }, "ownerNonce": { "$ref": "#/$defs/id" }, "evidenceSha256": { "$ref": "#/$defs/sha" } } }
+  }
+}

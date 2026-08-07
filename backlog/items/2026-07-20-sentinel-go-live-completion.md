@@ -3,11 +3,15 @@ schema: "pipeline.backlog-item.v1"
 id: "pipeline.sentinel-go-live-completion"
 type: "workflow-improvement"
 owner: "pipeline"
-status: "open"
+status: "closed"
 created: "2026-07-20"
 source: "Public transfer completeness review of remaining Sentinel go-live obligations"
 due: "2026-08-10"
 expires: "2026-08-17"
+closed_at: "2026-07-24"
+closure_repository: "self"
+closure_commit: "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb"
+closure_evidence: "backlog/evidence/2026-07-24-po-sentinel-closure-disposition.md"
 ---
 
 # Complete the Sentinel Public go-live boundary

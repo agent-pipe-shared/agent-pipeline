@@ -10,12 +10,17 @@ import { existsSync, lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync 
 import { tmpdir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
 
 import {
   hasCodexHostControlLayout,
   readCodexHostRepositoryInitAdmission,
 } from "../lib/codex-host-layout.mjs";
+import {
+  LEGACY_CALIBRATION,
+  NEUTRAL_CALIBRATION,
+  resolveProjectAuthorityPaths,
+} from "../lib/project-authority.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const SCHEMA = "pipeline.repository-freshness.v0";
 const FETCH_TIMEOUT_MS = 8000;
@@ -69,7 +74,13 @@ function outputBase(status, fields = {}) {
 }
 
 function declaredRepositoryMode(repo) {
-  const calibration = join(repo, ".claude", "pipeline.json");
+  const authority = resolveProjectAuthorityPaths({ rootDir: repo });
+  const calibration = join(
+    repo,
+    authority.status === "ready"
+      ? authority.calibration
+      : (existsSync(join(repo, NEUTRAL_CALIBRATION)) ? NEUTRAL_CALIBRATION : LEGACY_CALIBRATION),
+  );
   if (!existsSync(calibration)) return { mode: "remote-tracked" };
   try {
     const parsed = JSON.parse(readFileSync(calibration, "utf8"));
@@ -308,7 +319,7 @@ function parseArgs(argv) {
   return null;
 }
 
-const isCli = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+const isCli = isDirectInvocation(import.meta.url);
 if (isCli) {
   const repo = parseArgs(process.argv.slice(2));
   if (!repo) {

@@ -38,8 +38,9 @@ export/tool substitution.
 ## Consequences
 
 ADR-0038 remains the route, fallback, and receipt authority, but its mandatory
-Epic/Feature advisory rule is superseded by the consent gate in this ADR.
-Projects that approve export receive the full registered advisory duty.
+Epic/Feature advisory rule is superseded first by the consent gate in this ADR
+and then by ADR-0047's on-demand trigger boundary. Projects that approve export
+may use the full registered advisory duty for a concrete demand.
 Projects that do not approve it retain a functional Pipeline with advisory
 visibly disabled. Bash availability does not weaken the selected sandbox or
 the execution-evidence gate.
@@ -99,8 +100,9 @@ Lücken dürfen weder als Erfolg noch als still erlaubte Substitution gelten.
 ## Folgen
 
 ADR-0038 bleibt Route-, Fallback- und Receipt-Autorität; seine Pflicht für Epic
-und Feature wird jedoch durch dieses Consent-Gate ersetzt. Mit Zustimmung läuft
-die registrierte Duty vollständig. Ohne Zustimmung bleibt die Pipeline
+und Feature wird durch dieses Consent-Gate und anschließend durch die
+On-demand-Grenze aus ADR-0047 ersetzt. Mit Zustimmung darf die registrierte
+Duty für einen konkreten Demand laufen. Ohne Zustimmung bleibt die Pipeline
 funktionsfähig und Advisory sichtbar deaktiviert. Bash schwächt weder Sandbox
 noch Ausführungsevidenz.
 

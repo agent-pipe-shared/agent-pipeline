@@ -1,6 +1,11 @@
 # Release 0.4.6
 
-**Status:** local-only patch candidate preparation. The existing local
+> **Historical preparation record (superseded).** `v0.4.6` is delivered and
+> closed; the sequence below is retained as provenance only, not current work
+> or authority. Its old local-tag and candidate language is historical, not a
+> current action.
+
+**Historical status:** this was local-only patch candidate preparation. The existing local
 `v0.4.6` tag points to the old commit
 `3c96cb083bbdfcf68ce583513070ad2c67f4a5cf`; no corresponding remote tag or
 release is claimed. This document authorizes neither moving nor deleting that

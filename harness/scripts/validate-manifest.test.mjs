@@ -1346,6 +1346,10 @@ writeFileSync(
   const push = gateConfig(manifest, "push");
   record(
     "gateConfig KNOWN  gateConfig(manifest, \"push\") returns this repo's committed push-gate config",
+    // `required` since 2026-08-06 (PO decision, ADR-0054 tier reconciliation). Commit
+    // fb0e9ac set it on 2026-08-02 but only in the legacy tier, so the resolver kept
+    // serving `standing-approved` and this assertion kept passing against a value the
+    // repository had already decided against.
     push && push.mode === "blocking" && push.type === "human" && push.approval === "required",
     `push=${JSON.stringify(push)}`,
   );

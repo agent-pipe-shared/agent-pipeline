@@ -17,7 +17,10 @@ test("Critic findings stay bound to the candidate diff and direct regressions", 
 });
 
 test("a fix re-review cannot create an unbounded Critic loop", () => {
+  assert.match(skill, /MUST start at the exact\s+candidate commit reviewed by the immediately preceding Critic/u);
+  assert.match(skill, /`PREVIOUS_CRITIC_CANDIDATE\.\.NEW_CANDIDATE`/u);
+  assert.match(skill, /broad range\s+\(for example `main\.\.HEAD`\) on a re-review is a dispatch defect/u);
   assert.match(skill, /Recheck only the prior\s+findings, their fixes, and direct regressions introduced by those fixes\./u);
-  assert.match(skill, /Do not\s+restart a broad hunt, reopen cleared categories, or create a Critic-of-Critic\s+loop/u);
+  assert.match(skill, /Do not restart a broad hunt,[\s\S]*Critic-of-Critic loop/u);
   assert.match(skill, /unless the PO explicitly authorizes a larger new review scope\./u);
 });

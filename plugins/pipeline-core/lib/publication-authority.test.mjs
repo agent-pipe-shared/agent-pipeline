@@ -7,9 +7,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   approvePublicationAuthority, authorizePublicationAuthority, blockPublicationAuthority,
-  closePublicationAuthority, observePublicationAuthority, preparePublicationAuthority,
+  beginPublicationExecutionAuthority, closePublicationAuthority,
+  closePublicationExecutionAuthority, observePublicationAuthority,
+  observePublicationExecutionAuthority, preparePublicationAuthority,
   publicationAuthorityPaths, readPublicationAuthority, rearmPublicationAuthority,
-  startPublicationReadback,
+  startPublicationExecutionReadback, startPublicationReadback,
 } from "./publication-authority.mjs";
 import { publicationDigest, publicationUncertaintyDigest } from "./publication-bundle.mjs";
 
@@ -74,4 +76,25 @@ complete = startPublicationReadback({ ...args(complete, completeRoot), expectedR
 complete = closePublicationAuthority({ ...args(complete, completeRoot), expectedRevision: 4, expectedStateSha256: publicationDigest(complete.record.publication), fetchedRef: "refs/heads/main", fetchedOid: h("e", 40), fetchedTree: h("f", 40), completedAt: 4 });
 check("closed receipt reference preserves the final receipt digest", () => assert.equal(complete.reference.receiptDigest, complete.record.publication.receiptDigest));
 rmSync(completeRoot, { recursive: true, force: true });
+
+const executorRoot = common();
+let executor = preparePublicationAuthority({ gitCommonDir: executorRoot, input: input("private", "executor-1") });
+executor = approvePublicationAuthority({ ...args(executor, executorRoot), expectedRevision: 0, expectedStateSha256: publicationDigest(executor.record.publication), approvalId: "executor-po", attribution: "PO", approvedAt: 100, expiresAt: 200 });
+executor = authorizePublicationAuthority({ ...args(executor, executorRoot), expectedRevision: 1, expectedStateSha256: publicationDigest(executor.record.publication), now: 110, command: ["git", "push", "--porcelain", "origin", `${h("e", 40)}:refs/heads/main`] });
+const authorizedRaw = executor.rawDigest;
+executor = beginPublicationExecutionAuthority({ ...args(executor, executorRoot), expectedRevision: 2, expectedStateSha256: publicationDigest(executor.record.publication), attemptId: "1".repeat(32), executorSha256: h("2"), startedAt: 120 });
+check("executor consumes authority before effect and rejects a second begin", () => {
+  assert.equal(executor.record.status, "executing");
+  assert.equal(executor.record.execution.authorizationRawSha256, authorizedRaw);
+  assert.throws(() => beginPublicationExecutionAuthority({ ...args(executor, executorRoot), expectedRevision: 2, expectedStateSha256: publicationDigest(executor.record.publication), attemptId: "2".repeat(32), executorSha256: h("3"), startedAt: 121 }), /state|push-authorized|blocked/);
+});
+executor = observePublicationExecutionAuthority({ ...args(executor, executorRoot), expectedRevision: 2, expectedStateSha256: publicationDigest(executor.record.publication), observedOid: h("e", 40), observedAt: 130, status: "observed" });
+executor = startPublicationExecutionReadback({ ...args(executor, executorRoot), expectedRevision: 3, expectedStateSha256: publicationDigest(executor.record.publication), repositoryKind: "fresh-disposable", alternatesDisabled: true, destinationRef: "refs/heads/main" });
+executor = closePublicationExecutionAuthority({ ...args(executor, executorRoot), expectedRevision: 4, expectedStateSha256: publicationDigest(executor.record.publication), fetchedRef: "refs/heads/main", fetchedOid: h("e", 40), fetchedTree: h("f", 40), completedAt: 140 });
+check("executor-only transitions retain consumed status through exact close", () => {
+  assert.equal(executor.record.status, "consumed");
+  assert.equal(executor.record.publication.phase, "closed");
+  assert.equal(executor.reference.receiptDigest, executor.record.publication.receiptDigest);
+});
+rmSync(executorRoot, { recursive: true, force: true });
 console.log(`publication-authority: ${tests} tests passed`);

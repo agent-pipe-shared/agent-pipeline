@@ -32,7 +32,8 @@
  * guard-config on the machine can never leak into union expectations.
  */
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -76,6 +77,45 @@ function check(id, command, expectExit, { projectDir = EMPTY_DIR, stderrIncludes
   } else {
     failures.push(`${id}: ${problems.join("; ")} — cmd: ${command}`);
     console.log(`FAIL  ${id} — ${problems.join("; ")}`);
+  }
+}
+function checkLedger(id, projectDir, predicate) {
+  let entry = null;
+  let problem = null;
+  try {
+    const lines = readFileSync(join(projectDir, ".claude", "guard-override.log.jsonl"), "utf8").trim().split("\n");
+    entry = JSON.parse(lines.at(-1));
+    if (!predicate(entry)) problem = "ledger entry did not satisfy its target-binding contract";
+  } catch {
+    problem = "ledger entry could not be read";
+  }
+  if (problem === null) {
+    pass++;
+    console.log(`PASS  ${id}`);
+  } else {
+    failures.push(`${id}: ${problem}`);
+    console.log(`FAIL  ${id} — ${problem}`);
+  }
+}
+function checkNoLedgerToken(id, projectDir, rule, token) {
+  let problem = null;
+  try {
+    const entries = readFileSync(join(projectDir, ".claude", "guard-override.log.jsonl"), "utf8")
+      .split("\n")
+      .filter((line) => line.trim() !== "")
+      .map((line) => JSON.parse(line));
+    if (entries.some((entry) => entry?.rule === rule && entry?.token === token)) {
+      problem = "rejected cross-target selector was recorded in the coordinator ledger";
+    }
+  } catch (error) {
+    problem = `ledger could not be read (${error.message})`;
+  }
+  if (problem === null) {
+    pass++;
+    console.log(`PASS  ${id}`);
+  } else {
+    failures.push(`${id}: ${problem}`);
+    console.log(`FAIL  ${id} — ${problem}`);
   }
 }
 const BLOCK = 2, ALLOW = 0, WARN = 1;
@@ -137,6 +177,11 @@ check("R10 block  bare restore .", "git restore .", BLOCK);
 check("R10 allow  checkout branch", "git checkout main", ALLOW);
 check("R10 allow  restore single file", "git restore src/app.js", ALLOW);
 check("R10 allow  checkout ./subpath (anchor)", "git checkout ./src", ALLOW);
+
+// ---- Rule 21: destructive branch adoption -------------------------------------------------
+check("R21 block  checkout --force branch", "git checkout --force origin/feat/remote-adoption", BLOCK, { stderrIncludes: ["GG-21"] });
+check("R21 block  switch -f branch", "git switch -f origin/feat/remote-adoption", BLOCK, { stderrIncludes: ["GG-21"] });
+check("R21 allow  ordinary fetch", "git fetch origin refs/heads/main:refs/remotes/origin/main", ALLOW);
 
 // ---- Rule 11: secret/state staging block (.env all three; secrets.yaml <PROJECT_B>; <PROJECT_C> SSH keys) ----------
 check("R11 block  add .env", "git add .env", BLOCK);
@@ -234,6 +279,8 @@ check("CFG block  union active without any config", "git add secrets.yaml", BLOC
 // Ledger-bearing dir: .claude/ pre-created so appendFileSync into guard-override.log.jsonl succeeds.
 const OV_DIR = mkdtempSync(join(tmpdir(), "guard-test-override-"));
 mkdirSync(join(OV_DIR, ".claude"), { recursive: true });
+mkdirSync(join(OV_DIR, "nested-target"), { recursive: true });
+const OV_ABSOLUTE_TARGET = mkdtempSync(join(tmpdir(), "guard-test-override-absolute-target-"));
 // Deliberately WITHOUT .claude/ — simulates an unwritable/missing ledger directory (AC-5).
 const OV_NOLEDGER_DIR = mkdtempSync(join(tmpdir(), "guard-test-override-noledger-"));
 
@@ -473,14 +520,84 @@ check("GO-CFG allow  -C interposed harmless command with the same config loaded"
   stderrEmpty: true,
 });
 
-// AR-3: an override armed for a rule applies identically when the command is normalized
-// through a `-C`-interposed form (fresh token, reusing the OV_DIR ledger from the P4-01 cases).
+// CYB-5c: an override may not consume a coordinator ledger through another -C target.
 check(
-  "GO-OV warn   override armed for GG-07 applies through a -C-interposed command (AR-3)",
+  "GO-OV block  override armed for GG-07 rejects a cross-target -C command",
   "PIPELINE_GUARD_OVERRIDE='GG-07|20260704-10|override through -C interposition, the PO approved' git -C sub reset --hard HEAD~1",
-  WARN,
-  { projectDir: OV_DIR, stderrIncludes: ["GG-07", "20260704-10", "OVERRIDE APPLIED"] },
+  BLOCK,
+  { projectDir: OV_DIR, stderrIncludes: ["GG-07", "command target and ledger target"] },
 );
+check(
+  "GO-OV warn   override accepts an explicit same-root relative -C target",
+  "PIPELINE_GUARD_OVERRIDE='GG-07|20260704-12|same physical target, the PO approved' git -C . reset --hard HEAD~1",
+  WARN,
+  { projectDir: OV_DIR, stderrIncludes: ["GG-07", "OVERRIDE APPLIED"] },
+);
+checkLedger(
+  "GO-OV ledger target binding stores only an opaque physical-target digest",
+  OV_DIR,
+  (entry) => entry.targetSha256 === createHash("sha256").update(OV_DIR).digest("hex")
+    && !Object.values(entry).some((value) => typeof value === "string" && value.includes(OV_ABSOLUTE_TARGET)),
+);
+check(
+  "GO-OV block  override rejects a relative cross-target -C target",
+  "PIPELINE_GUARD_OVERRIDE='GG-07|20260704-13|relative cross target, the PO approved' git -C nested-target reset --hard HEAD~1",
+  BLOCK,
+  { projectDir: OV_DIR, stderrIncludes: ["GG-07", "command target and ledger target"] },
+);
+check(
+  "GO-OV block  override rejects an absolute cross-target -C target",
+  `PIPELINE_GUARD_OVERRIDE='GG-07|20260704-14|absolute cross target, the PO approved' git -C ${OV_ABSOLUTE_TARGET} reset --hard HEAD~1`,
+  BLOCK,
+  { projectDir: OV_DIR, stderrIncludes: ["GG-07", "command target and ledger target"] },
+);
+// Target selectors that cannot be physically proven to be the coordinator root
+// must fail closed. A rejected selector never consumes or records its token,
+// proved by the ordinary same-token retry immediately after each rejection.
+for (const [label, selector, token] of [
+  ["--git-dir=", `--git-dir=${OV_ABSOLUTE_TARGET}`, "20260704-15"],
+  ["--git-dir space", `--git-dir ${OV_ABSOLUTE_TARGET}`, "20260704-16"],
+  ["--work-tree=", `--work-tree=${OV_ABSOLUTE_TARGET}`, "20260704-17"],
+  ["--work-tree space", `--work-tree ${OV_ABSOLUTE_TARGET}`, "20260704-18"],
+]) {
+  check(
+    `GO-OV block  override rejects a cross-target ${label} selector`,
+    `PIPELINE_GUARD_OVERRIDE='GG-07|${token}|selector target is intentionally separate' git ${selector} reset --hard HEAD~1`,
+    BLOCK,
+    { projectDir: OV_DIR, stderrIncludes: ["GG-07", "command target and ledger target"] },
+  );
+  checkNoLedgerToken(`GO-OV ledger ${label} rejection records no coordinator token`, OV_DIR, "GG-07", token);
+  check(
+    `GO-OV warn   ${label} rejection leaves token unconsumed`,
+    `PIPELINE_GUARD_OVERRIDE='GG-07|${token}|ordinary same-root reset is intentionally approved' git reset --hard HEAD~1`,
+    WARN,
+    { projectDir: OV_DIR, stderrIncludes: ["GG-07", token, "OVERRIDE APPLIED"] },
+  );
+}
+for (const [label, assignment, token] of [
+  ["GIT_DIR environment", `GIT_DIR=${OV_ABSOLUTE_TARGET}`, "20260704-19"],
+  ["GIT_WORK_TREE environment", `GIT_WORK_TREE=${OV_ABSOLUTE_TARGET}`, "20260704-20"],
+  ["PowerShell GIT_DIR environment", `$env:GIT_DIR = '${OV_ABSOLUTE_TARGET}'`, "20260704-21"],
+  ["PowerShell GIT_WORK_TREE environment", `$env:GIT_WORK_TREE = '${OV_ABSOLUTE_TARGET}'`, "20260704-22"],
+]) {
+  check(
+    `GO-OV block  override rejects a cross-target ${label} selector`,
+    label.startsWith("PowerShell")
+      ? `$env:PIPELINE_GUARD_OVERRIDE = 'GG-07|${token}|environment target is intentionally separate'; ${assignment}; git reset --hard HEAD~1`
+      : `PIPELINE_GUARD_OVERRIDE='GG-07|${token}|environment target is intentionally separate' ${assignment} git reset --hard HEAD~1`,
+    BLOCK,
+    { projectDir: OV_DIR, stderrIncludes: ["GG-07", "command target and ledger target"] },
+  );
+  checkNoLedgerToken(`GO-OV ledger ${label} rejection records no coordinator token`, OV_DIR, "GG-07", token);
+  check(
+    `GO-OV warn   ${label} rejection leaves token unconsumed`,
+    label.startsWith("PowerShell")
+      ? `$env:PIPELINE_GUARD_OVERRIDE = 'GG-07|${token}|ordinary same-root reset is intentionally approved'; git reset --hard HEAD~1`
+      : `PIPELINE_GUARD_OVERRIDE='GG-07|${token}|ordinary same-root reset is intentionally approved' git reset --hard HEAD~1`,
+    WARN,
+    { projectDir: OV_DIR, stderrIncludes: ["GG-07", token, "OVERRIDE APPLIED"] },
+  );
+}
 
 // ---- Rule 14: interpreter/remote wrapper with quoted destructive payload (raw-string rule,
 // <PROJECT_B>-M4-C F1, AP sprint 2026-07-04) -----------------------------------------------------------
@@ -612,6 +729,59 @@ check(
   'git commit -m "run git config core.hooksPath"',
   ALLOW,
 );
+
+// ---- GIT-03: correlation data in commit metadata (2026-08-06) ------------------------------------
+//
+// The rule is older than this suite and had no enforcement anywhere until now. What it
+// costs to leave unenforced is not hypothetical: 74 commits in one session carried a
+// provider co-author trailer and a session URL, and 53 were public before a human noticed.
+// GIT03-1 is that message.
+const GIT03_DIR = mkdtempSync(join(tmpdir(), "guard-test-git03-"));
+writeFileSync(join(GIT03_DIR, "dirty.txt"),
+  "feat(x): a thing\n\nAI-Assisted: true\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01Fx\n");
+writeFileSync(join(GIT03_DIR, "clean.txt"), "feat(x): a thing\n\nWhy it matters.\n\nAI-Assisted: true\n");
+// GIT03_OUTSIDE_DIR is a sibling of the project root, the shape of an agent's own scratch
+// directory -- the ordinary place a commit message gets composed, and the exact path class
+// that made this rule's "no override" claim untrue before F3.
+const GIT03_OUTSIDE_DIR = mkdtempSync(join(tmpdir(), "guard-test-git03-outside-"));
+writeFileSync(join(GIT03_OUTSIDE_DIR, "clean.txt"), "feat(x): a thing\n\nWhy it matters.\n\nAI-Assisted: true\n");
+
+check("GIT03-1 block  provider co-author and session URL via -F", "git commit -F dirty.txt", BLOCK, {
+  projectDir: GIT03_DIR,
+  stderrIncludes: ["GIT-03-PROVIDER-COAUTHOR", "GIT-03-SESSION-URL", "no override for this rule"],
+});
+check("GIT03-2 allow  a clean message via -F", "git commit -F clean.txt", ALLOW, { projectDir: GIT03_DIR });
+check("GIT03-3 block  an inline session trailer", 'git commit -m "fix: y" -m "Session-Id: 01Fx"', BLOCK, {
+  projectDir: GIT03_DIR,
+  stderrIncludes: ["GIT-03-CORRELATION-TRAILER"],
+});
+// A human co-author is legitimate; a rule that refused all co-authorship would be turned
+// off by the people it is meant to protect.
+check("GIT03-4 allow  a human co-author", 'git commit -m "feat: pair work" -m "Co-Authored-By: Jane Roe <jane@example.org>"', ALLOW, {
+  projectDir: GIT03_DIR,
+});
+// The correlation half is not overridable. The override mechanism exists for rules whose
+// violation is recoverable, and published history is not.
+check("GIT03-5 block  an armed override does not open the correlation rule",
+  'PIPELINE_GUARD_OVERRIDE=\'GIT-03|tok|because\' git commit -F dirty.txt', BLOCK, {
+    projectDir: GIT03_DIR,
+    stderrIncludes: ["GIT-03-PROVIDER-COAUTHOR"],
+  });
+// The marker half is a convention, so it stays off unless the project asks for it --
+// otherwise every ordinary commit in every consumer project would start failing.
+check("GIT03-6 allow  a missing marker is not enforced by default", 'git commit -m "chore: bump"', ALLOW, {
+  projectDir: GIT03_DIR,
+});
+// GIT03-7 -- F3, 2026-08-06 Critic round. Before this fix, a -F path outside projectDir made
+// commitMessageFindings' readFile throw, the throw was swallowed, and the commit went
+// uninspected -- allowed, message content notwithstanding. The content here is clean on
+// purpose: the point is that an UNVERIFIABLE message must block on its own, not that this
+// particular file happens to carry a violation.
+check("GIT03-7 block  a -F file outside the project root, even with clean content",
+  `git commit -F ${join(GIT03_OUTSIDE_DIR, "clean.txt")}`, BLOCK, {
+    projectDir: GIT03_DIR,
+    stderrIncludes: ["GIT-03-UNREADABLE-MESSAGE-FILE", "no override for this rule"],
+  });
 
 // ---- Summary -------------------------------------------------------------------------------------
 for (const dir of [EMPTY_DIR, CFG_DIR, BROKEN_DIR, OV_DIR, OV_NOLEDGER_DIR, CFG_GITOPT_DIR]) {

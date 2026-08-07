@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import { existsSync, lstatSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 import {
   ProjectOnboardingReadyError,
@@ -12,7 +13,12 @@ import {
 } from "../lib/project-onboarding-ready-gate.mjs";
 import {
   KickoffError,
+  applyOnboardingKickoffPromotionCleanupRecovery,
+  applyOnboardingSessionCleanupPrivatization,
   bindOnboardingSessionCleanup,
+  confirmOnboardingSessionCleanupPrivatization,
+  planOnboardingKickoffPromotionCleanupRecovery,
+  planOnboardingSessionCleanupPrivatization,
   readOnboardingSessionCleanupBinding,
   releaseOnboardingSessionCleanup,
 } from "../lib/onboarding-continuity.mjs";
@@ -36,12 +42,22 @@ import {
   sealTemporaryResource,
   startSessionDescriptor,
 } from "../lib/worktree-lifecycle.mjs";
+import {
+  LEGACY_STATE,
+  NEUTRAL_STATE,
+  resolveProjectAuthorityPaths,
+} from "../lib/project-authority.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const USAGE = `Usage:
   session-cleanup.mjs start --repo <checkout> [--session <safe-id>]
   session-cleanup.mjs status --repo <checkout>
   session-cleanup.mjs release-binding --repo <checkout>
+  session-cleanup.mjs plan-privatization --repo <checkout>
+  session-cleanup.mjs confirm-privatization --repo <checkout> --plan-sha256 <sha256> --accept
+  session-cleanup.mjs apply-privatization --repo <checkout> --plan-sha256 <sha256> --activate
   session-cleanup.mjs plan-recovery --repo <checkout>
+  session-cleanup.mjs plan-human-recovery --repo <checkout>
   session-cleanup.mjs apply-recovery --repo <checkout> --plan-sha256 <sha256> --activate
   session-cleanup.mjs register-intent --repo <checkout> (--session <id> | --session-descriptor <id> --expected-descriptor-sha256 <sha256>) --resource-id <id> --type <scratch-file|scratch-directory> --path <absolute> --content-class <scratch|disposable-control|generated-output> --policy <unlink-file|remove-directory>
   session-cleanup.mjs finalize --repo <checkout> (--session <id> | --session-descriptor <id> --expected-descriptor-sha256 <sha256>) --resource-id <id> [--canary <relative-file>]
@@ -53,10 +69,66 @@ Mutating commands require a local --session-descriptor or
 PIPELINE_SESSION_OWNER_NONCE/--owner-nonce-file <0600-file>. Cleanup validates
 the complete manifest before removing any target. Hygiene is read-only and emits
 a redacted receipt.
+
+Every command accepts an optional --runner claude|codex, naming the invoking
+runner explicitly for the project-onboarding readiness gate (ADR-0051). When
+omitted, this CLI entry boundary derives it from CLAUDECODE in its own
+environment, mirroring pipeline-start-preflight.mjs; an explicit --runner
+always wins and an invalid explicit value fails closed.
 `;
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SESSION_POWER_SCRIPT = join(HERE, "session-power.mjs");
 const POWER_RESULT_KEYS = new Set(["schema", "operation", "sessionId", "status", "revision", "failureClass", "observedAt"]);
+
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+/**
+ * A failure to construct automatic cleanup is a PO decision point, never a
+ * deletion permission. This deliberately creates no apply action: the PO can
+ * retain the evidence or choose an attended host recovery after reviewing the
+ * exact observed category.
+ */
+function planHumanRecovery(repo, dependencies = {}) {
+  const planRecovery = dependencies.planSessionCleanupRecoveryFn
+    ?? planSessionCleanupRecovery;
+  let observed;
+  try {
+    const recovery = planRecovery({ rootDir: repo });
+    observed = {
+      status: typeof recovery?.status === "string" ? recovery.status : "observation-unavailable",
+      code: null,
+    };
+  } catch (error) {
+    observed = {
+      status: "observation-unavailable",
+      code: typeof error?.code === "string" && /^[A-Z0-9-]{3,80}$/u.test(error.code)
+        ? error.code
+        : "SESSION-CLEANUP-OBSERVATION-UNAVAILABLE",
+    };
+  }
+  const payload = {
+    schema: "pipeline.session-cleanup-human-recovery-plan.v1",
+    status: "decision-required",
+    root: repo,
+    observed,
+    candidates: [
+      {
+        id: "retain-and-observe",
+        mutation: false,
+        effect: "retain-exact-state",
+      },
+      {
+        id: "attended-host-recovery",
+        mutation: false,
+        effect: "requires-separate-po-confirmed-host-action",
+      },
+    ],
+    automaticMutation: false,
+  };
+  return { ...payload, planSha256: sha256(JSON.stringify(payload)) };
+}
 
 /**
  * The descriptor-bound cleanup command is the one narrow close pathway that
@@ -111,15 +183,17 @@ function drainSessionPower(repo, session) {
 function parseArgs(argv) {
   const [command, ...rest] = argv;
   if (!new Set([
-    "start", "status", "release-binding", "plan-recovery", "apply-recovery",
+    "start", "status", "release-binding", "plan-privatization", "confirm-privatization", "apply-privatization",
+    "plan-recovery", "plan-human-recovery", "apply-recovery",
     "register-intent", "finalize", "seal", "cleanup", "hygiene",
   ]).has(command)) throw new Error(USAGE);
   const flags = {};
   for (let index = 0; index < rest.length; index += 2) {
     const key = rest[index];
-    if (key === "--activate") {
-      if (flags.activate === true) throw new Error("Duplicate option: --activate");
-      flags.activate = true;
+    if (key === "--activate" || key === "--accept") {
+      const name = key.slice(2);
+      if (flags[name] === true) throw new Error(`Duplicate option: ${key}`);
+      flags[name] = true;
       index -= 1;
       continue;
     }
@@ -129,13 +203,14 @@ function parseArgs(argv) {
     if (name in flags) throw new Error(`Duplicate option: ${key}`);
     flags[name] = value;
   }
-  const common = new Set(["repo", "session", "session-descriptor", "expected-descriptor-sha256", "owner-nonce-file"]);
+  const common = new Set(["repo", "session", "session-descriptor", "expected-descriptor-sha256", "owner-nonce-file", "runner"]);
   const extra = command === "register-intent" ? ["resource-id", "type", "path", "content-class", "policy"]
     : new Set(["finalize", "seal"]).has(command) ? ["resource-id", "canary"] : [];
-  const allowed = command === "start" ? new Set(["repo", "session"])
-    : new Set(["status", "release-binding"]).has(command) ? new Set(["repo"])
-      : command === "plan-recovery" ? new Set(["repo"])
-        : command === "apply-recovery" ? new Set(["repo", "plan-sha256", "activate"])
+  const allowed = command === "start" ? new Set(["repo", "session", "runner"])
+    : new Set(["status", "release-binding"]).has(command) ? new Set(["repo", "runner"])
+      : new Set(["plan-recovery", "plan-human-recovery", "plan-privatization"]).has(command) ? new Set(["repo", "runner"])
+      : command === "confirm-privatization" ? new Set(["repo", "plan-sha256", "accept", "runner"])
+      : new Set(["apply-recovery", "apply-privatization"]).has(command) ? new Set(["repo", "plan-sha256", "activate", "runner"])
       : new Set([...common, ...extra]);
   for (const name of Object.keys(flags)) if (!allowed.has(name)) throw new Error(`Unknown option: --${name}`);
   return { command, flags };
@@ -144,6 +219,24 @@ function parseArgs(argv) {
 function required(flags, name) {
   if (!flags[name]) throw new Error(`Missing --${name}\n${USAGE}`);
   return flags[name];
+}
+
+const RUNNERS = new Set(["claude", "codex"]);
+
+/**
+ * Resolve the invoking runner at this CLI entry boundary (ADR-0051): an
+ * explicit --runner always wins; absent one, the ambient CLAUDECODE marker is
+ * the legitimate source here (mirrors pipeline-start-preflight.mjs), and the
+ * resolved value becomes an explicit argument to the gate from this point on
+ * -- the gate itself never reads the environment
+ * (ready-gate-env-var-runner-authority).
+ */
+function resolveRunner(flags, env) {
+  if (flags.runner !== undefined) {
+    if (!RUNNERS.has(flags.runner)) throw new Error(`Invalid --runner: ${flags.runner}\n${USAGE}`);
+    return flags.runner;
+  }
+  return env.CLAUDECODE === "1" ? "claude" : "codex";
 }
 
 function ownerNonce(flags, env) {
@@ -177,6 +270,7 @@ function sessionOwner(repo, flags, env) {
 export function main(argv = process.argv.slice(2), env = process.env, dependencies = {}) {
   const { command, flags } = parseArgs(argv);
   const repo = required(flags, "repo");
+  const runner = resolveRunner(flags, env);
   const requireReady = dependencies.requireProjectOnboardingReadyFn ?? requireProjectOnboardingReady;
   const startDescriptor = dependencies.startSessionDescriptorFn ?? startSessionDescriptor;
   const checkHygiene = dependencies.checkSessionHygieneFn ?? checkSessionHygiene;
@@ -211,15 +305,73 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
       descriptors,
     };
   } else if (command === "plan-recovery") {
-    output = planSessionCleanupRecovery({ rootDir: repo });
+    const promotionRecovery = planOnboardingKickoffPromotionCleanupRecovery({ rootDir: repo });
+    output = promotionRecovery.status === "not-applicable"
+      ? planSessionCleanupRecovery({ rootDir: repo })
+      : promotionRecovery;
+  } else if (command === "plan-human-recovery") {
+    output = planHumanRecovery(repo, dependencies);
   } else if (command === "apply-recovery") {
-    output = applySessionCleanupRecovery({
+    const planSha256 = required(flags, "plan-sha256");
+    const promotionRecovery = planOnboardingKickoffPromotionCleanupRecovery({ rootDir: repo });
+    output = promotionRecovery.status === "not-applicable"
+      ? applySessionCleanupRecovery({ rootDir: repo, expectedPlanSha256: planSha256, activate: flags.activate === true })
+      : applyOnboardingKickoffPromotionCleanupRecovery({ rootDir: repo, expectedPlanSha256: planSha256, activate: flags.activate === true });
+  } else if (command === "plan-privatization") {
+    const planPrivatization = dependencies.planOnboardingSessionCleanupPrivatizationFn
+      ?? planOnboardingSessionCleanupPrivatization;
+    output = planPrivatization({ rootDir: repo });
+  } else if (command === "apply-privatization") {
+    const applyPrivatization = dependencies.applyOnboardingSessionCleanupPrivatizationFn
+      ?? applyOnboardingSessionCleanupPrivatization;
+    output = applyPrivatization({
       rootDir: repo,
       expectedPlanSha256: required(flags, "plan-sha256"),
       activate: flags.activate === true,
     });
+    if (output.recovery === "owner-observation-recovery") {
+      let lifecycleReady = false;
+      try {
+        requireReady({ rootDir: repo, intent: "bootstrap", runner });
+        lifecycleReady = true;
+      } catch {
+        lifecycleReady = false;
+      }
+      const inspectOwner = dependencies.inspectSessionOwnerRuntimeFn
+        ?? inspectSessionOwnerRuntime;
+      let ownerStatus = "unavailable";
+      try {
+        const binding = readOnboardingSessionCleanupBinding({ rootDir: repo });
+        if (binding.status === "bound" && binding.sessionCleanup !== null) {
+          const observed = inspectOwner(repo, binding.sessionCleanup.sessionId, {
+            expectedDescriptorSha256: binding.sessionCleanup.descriptorSha256,
+          });
+          if (observed?.status === "live" || observed?.status === "not-live" || observed?.status === "reused") {
+            ownerStatus = observed.status;
+          }
+        }
+      } catch {
+        ownerStatus = "unavailable";
+      }
+      if (!lifecycleReady || ownerStatus === "unavailable") {
+        output = {
+          ...output,
+          status: "blocked",
+          lifecycleStatus: lifecycleReady ? "ready" : "unavailable",
+          ownerObservation: ownerStatus,
+        };
+      }
+    }
+  } else if (command === "confirm-privatization") {
+    const confirmPrivatization = dependencies.confirmOnboardingSessionCleanupPrivatizationFn
+      ?? confirmOnboardingSessionCleanupPrivatization;
+    output = confirmPrivatization({
+      rootDir: repo,
+      expectedPlanSha256: required(flags, "plan-sha256"),
+      accept: flags.accept === true,
+    });
   } else if (command === "start") {
-    requireReady({ rootDir: repo, intent: "session" });
+    requireReady({ rootDir: repo, intent: "session", runner });
     const readBinding = dependencies.readOnboardingSessionCleanupBindingFn
       ?? readOnboardingSessionCleanupBinding;
     const bindCleanup = dependencies.bindOnboardingSessionCleanupFn
@@ -231,7 +383,25 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
     const retireDescriptor = dependencies.retireSessionDescriptorFn
       ?? retireSessionDescriptor;
     const binding = readBinding({ rootDir: repo });
-    if (binding.status === "bound") {
+    if (new Set(["closed-unbound", "design-unbound", "released"]).has(binding.status)) {
+      const activeDescriptors = listDescriptors(repo);
+      if (activeDescriptors.length !== 0) {
+        throw new WorktreeLifecycleError(
+          "WT-SESSION-UNBOUND-DESCRIPTOR",
+          "an active cleanup descriptor exists outside a bindable continuity state",
+        );
+      }
+      output = {
+        ok: true,
+        code: "WT-SESSION-NOT-REQUIRED",
+        bindingStatus: binding.status,
+      };
+    } else if (binding.status === "closed-bound") {
+      throw new WorktreeLifecycleError(
+        "WT-SESSION-RECOVERY-REQUIRED",
+        "the closed cleanup binding must complete its typed recovery before a new session starts",
+      );
+    } else if (binding.status === "bound") {
       if (flags.session && flags.session !== binding.sessionCleanup.sessionId) {
         throw new WorktreeLifecycleError(
           "WT-SESSION-BINDING",
@@ -286,7 +456,11 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
       };
     }
   } else if (command === "release-binding") {
-    requireReady({ rootDir: repo, intent: "session" });
+    // This is a narrow, exact post-cleanup CAS release.  Requiring general
+    // onboarding readiness here creates a cycle when a legacy authority's
+    // migration is blocked solely by the stale cleanup tuple that this command
+    // is designed to release.  The closure receipt and persisted tuple below
+    // remain the complete mutation authority.
     const readBinding = dependencies.readOnboardingSessionCleanupBindingFn
       ?? readOnboardingSessionCleanupBinding;
     const inspectClosure = dependencies.inspectSessionClosureFn
@@ -355,7 +529,11 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
       let cleanupBinding = null;
       if (command === "cleanup") {
         drainSessionPower(repo, session);
-        if (existsSync(join(repo, ".claude", "pipeline-state.json"))) {
+        const authority = resolveProjectAuthorityPaths({ rootDir: repo });
+        const statePath = authority.status === "ready"
+          ? authority.state
+          : (existsSync(join(repo, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE);
+        if (existsSync(join(repo, statePath))) {
           const readBinding = dependencies.readOnboardingSessionCleanupBindingFn
             ?? readOnboardingSessionCleanupBinding;
           const observed = readBinding({ rootDir: repo });
@@ -404,7 +582,7 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
   return exitCode || (output.ok === false ? 2 : 0);
 }
 
-const invokedDirectly = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+const invokedDirectly = isDirectInvocation(import.meta.url);
 if (invokedDirectly) {
   try {
     process.exitCode = main();

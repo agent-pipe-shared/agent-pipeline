@@ -13,6 +13,7 @@ import { createHash } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const HERE = new URL(".", import.meta.url);
 export const DEFAULT_ROOT = resolve(fileURLToPath(new URL("../../../", HERE)));
@@ -152,7 +153,7 @@ export function checkSpecRetention(root = DEFAULT_ROOT, inventoryPath = "governa
   return { ok: findings.length === 0, findings };
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+if (isDirectInvocation(import.meta.url)) {
   const inventoryIndex = process.argv.indexOf("--inventory");
   const inventory = inventoryIndex >= 0 ? process.argv[inventoryIndex + 1] : "governance/spec-retention.json";
   const outcome = checkSpecRetention(DEFAULT_ROOT, inventory);

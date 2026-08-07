@@ -125,7 +125,7 @@ record("legacy migration seeds every absent Claude runtime subset without wideni
         }
         assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
         for (const path of omitted) assert.equal(existsSync(join(root, path)), true, "activation writes the planned target");
-        assert.match(readFileSync(join(root, ".claude/pipeline.yaml"), "utf8"), /session:\n  keep_awake: false\n/u);
+        assert.match(readFileSync(join(root, ".claude/pipeline.yaml"), "utf8"), /session:\n  keep_awake: true\n/u);
       } finally { rmSync(root, { recursive: true, force: true }); }
     }
   }
@@ -186,12 +186,12 @@ record("v2 -> v3 is one-way, digest-only, and old design.advisory cannot disable
     assert.equal(intent.routing.duties.advisory.eligibility.epic, "required");
     assert.equal(intent.routing.duties.advisory.claude.adapter, "native-fable");
     assert.equal(intent.routing.duties.advisory.codex.adapter, "host-consult");
-    assert.equal(intent.advisor_export, undefined);
-    assert.deepEqual(validatePipelineUserV3(intent).advisoryExport, { consent: "missing", enabled: true });
-    assert.deepEqual(intent.roles, { po: { display_label: "PO" } });
-    assert.deepEqual(intent.session, { keep_awake: false });
-    assert.deepEqual(JSON.parse(readFileSync(join(root, ".claude/pipeline.json"), "utf8")).humanRoles, { po: { displayLabel: "PO" } });
-    assert.match(readFileSync(join(root, ".claude/pipeline.yaml"), "utf8"), /session:\n  keep_awake: false\n/u);
+    assert.deepEqual(intent.advisor_export, { consent: "approved" });
+    assert.deepEqual(validatePipelineUserV3(intent).advisoryExport, { consent: "approved", enabled: true });
+    assert.deepEqual(intent.roles, { po: { display_label: "Human" } });
+    assert.deepEqual(intent.session, { keep_awake: true });
+    assert.deepEqual(JSON.parse(readFileSync(join(root, ".claude/pipeline.json"), "utf8")).humanRoles, { po: { displayLabel: "Human" } });
+    assert.match(readFileSync(join(root, ".claude/pipeline.yaml"), "utf8"), /session:\n  keep_awake: true\n/u);
     assert.equal(planRunnerProfileMigrationV3({ rootDir: root }).status, "noop");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
@@ -418,6 +418,49 @@ record("stale, wrong-plan, and replayed recovery authorizations fail closed", ()
   }
 });
 
+record("a cached preview acknowledgement cannot authorize a second recovery", () => {
+  const root = fixture(yaml(v2Intent()));
+  try {
+    const plan = planRunnerProfileMigrationV3({ rootDir: root });
+    assert.equal(applyRunnerProfileMigrationV3(plan, {
+      rootDir: root,
+      activate: true,
+      interruptAfterRename: ({ index }) => index === 1,
+    }).status, "interrupted");
+    const recoveryPlan = planPendingTransactionRecoveryV3({ rootDir: root });
+    assert.equal(recoveryPlan.status, "ready");
+    const pending = durableSnapshot(root);
+
+    let cachedAcknowledgement; let firstInvocationId;
+    const authorization = authorizePendingTransactionRecoveryV3(recoveryPlan, {
+      deliverPreview: (_preview, invocation) => {
+        firstInvocationId = invocation.invocationId;
+        cachedAcknowledgement = previewAck(invocation, "ack-cached");
+        return cachedAcknowledgement;
+      },
+    });
+    assert.equal(authorization.status, "authorized");
+
+    let secondInvocationId;
+    const replayed = authorizePendingTransactionRecoveryV3(recoveryPlan, {
+      deliverPreview: (_preview, invocation) => {
+        secondInvocationId = invocation.invocationId;
+        return cachedAcknowledgement;
+      },
+    });
+    assert.notEqual(replayed.status, "authorized", "a cached acknowledgement never earns a fresh authorization");
+    assert.equal(replayed.status, "preview-failed");
+    assert.notEqual(secondInvocationId, firstInvocationId, "every authorization attempt binds a fresh invocation identity");
+    assert.equal(replayed.diagnostics[0].code, "rp-invocation-mismatch");
+    assert.deepEqual(durableSnapshot(root), pending, "a rejected preview performs no recovery mutation");
+    assert.equal(applyPendingTransactionRecoveryV3(recoveryPlan, {
+      rootDir: root,
+      authorization: replayed,
+    }).status, "authorization-required");
+    assert.deepEqual(durableSnapshot(root), pending);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 record("stale source invalidates a reviewed plan before staging", () => {
   const root = fixture(yaml(v2Intent()));
   try {
@@ -529,7 +572,7 @@ record("historical Public aliases migrate atomically without pre-seeded Codex fi
     assert.deepEqual(applied.changes.find((change) => change.path === "pipeline.user.yaml").preWrite, byPath["pipeline.user.yaml"].preWrite);
     const intent = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
     assert.equal(validatePipelineUserV3(intent).ok, true);
-    assert.deepEqual(intent.session, { keep_awake: false });
+    assert.deepEqual(intent.session, { keep_awake: true });
     assert.equal(readFileSync(join(root, ".codex/config.toml"), "utf8"), "");
     const generated = [
       readFileSync(join(root, ".codex/config.toml"), "utf8"),
@@ -587,8 +630,9 @@ record("Issue #58 V0 consumers reach a read-only V3 bootstrap authority without 
     assert.equal(v3BootstrapAuthorityCli(["--root", root], {
       write: (chunk) => { authorityOutput += String(chunk); },
       deps: authorityDeps,
-    }), 1);
-    assert.equal(JSON.parse(authorityOutput).status, "projection-current");
+    }), 0);
+    assert.equal(JSON.parse(authorityOutput).status, "ready");
+    assert.equal(JSON.parse(authorityOutput).runtimeReadback, "not-applicable");
     const followUp = runCli(["plan", "--root", root]);
     assert.equal(followUp.status, 0);
     assert.equal(followUp.json.status, "noop");
@@ -616,7 +660,7 @@ record("accepted v1 and v2 inputs share the same legacy-only absent-Codex additi
       assert.equal(plan.sourceKind, sourceKind);
       assert.ok(plan.targets.filter((target) => target.before.status === "absent").every((target) => target.path.startsWith(".codex/")));
       assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
-      assert.equal(parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8")).session.keep_awake, false);
+      assert.equal(parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8")).session.keep_awake, true);
       assert.equal(planRunnerProfileMigrationV3({ rootDir: root }).status, "noop");
     } finally { rmSync(root, { recursive: true, force: true }); }
   }

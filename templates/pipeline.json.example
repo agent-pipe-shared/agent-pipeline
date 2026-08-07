@@ -1,5 +1,5 @@
 {
-  "$comment": "Project calibration for the Agent-Pipeline ritual skills (schema: operating-model §8; consumed by pipeline-start step 3 and close-block step 0). Copy to <project>/.claude/pipeline.json, adapt, COMMIT. Keys starting with '$' are documentation and ignored by the skills. This is a FILLED example for the fictional project 'acme-notes' (a small Next.js notes app) - every value below is example data, replace it. Project DENIES do NOT live here: they live in the committed .claude/settings.json and/or .claude/guard-config.json.",
+  "$comment": "Project calibration for the Agent-Pipeline ritual skills (schema: operating-model §8; consumed by pipeline-start step 3 and close-block step 0). Copy to <project>/project/pipeline.json (legacy projects that never migrated: <project>/.claude/pipeline.json), adapt, COMMIT. Keys starting with '$' are documentation and ignored by the skills. This is a FILLED example for the fictional project 'acme-notes' (a small Next.js notes app) - every value below is example data, replace it. Project DENIES do NOT live here: they live in the committed .claude/settings.json and/or .claude/guard-config.json.",
   "project": "acme-notes",
   "verify": "pnpm verify",
   "$verify": "THE one gate command: format -> lint -> typecheck -> tests -> build wrapped in a single script. Stop hook, goldfish delivery and CI must call this same command.",
@@ -9,8 +9,8 @@
   "$branchModel": "e.g. direct-push+staging | pr-flow.",
   "verification": "tests+browser",
   "$verification": "Human verification form, e.g. tests+browser | live-devices | pie-human.",
-  "wipLimit": 1,
-  "$wipLimit": "Max open human-gate processes in this project.",
+  "wipLimit": 3,
+  "$wipLimit": "Work-in-progress limit: how many blocks (work packages that end in a human/PO gate at close, docs/operating-model.md §5/§6) may be open at once in this project -- checked at block-dispatch time and at close (`git worktree list`, plugins/pipeline-core/skills/close-block/SKILL.md step 4). NOT a cap on Goldfish subagents running in parallel within one already-open block -- that stays separately uncapped as long as their files/state don't conflict (docs/operating-model.md ~line 103-105).",
   "rollback": "git revert <merge-commit-sha> on main; re-run verify",
   "$rollback": "Per-project rollback procedure: how to revert a bad merge in this project. Required whenever a merge proceeds while a mandatory human verification is still pending: documents HOW to step back to the pre-merge state in an emergency, paired with the rollback anchor (pre-merge tag/commit ref recorded in the handover file).",
   "worktree": "on-write",

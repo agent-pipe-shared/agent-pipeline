@@ -1,0 +1,32 @@
+{
+  "schema": "pipeline.nova-po-scope-approval.v1",
+  "decisionId": "nova-b5-49-native-transfer-close-20260802",
+  "status": "approved",
+  "recordedAt": "2026-08-02T09:14:28Z",
+  "authority": {
+    "approver": "PO",
+    "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
+    "planSha256": "32f09de4ffdc99cef2e6557d4084088af6c454c2b326b2f7ebb002c7bdcd0a75",
+    "specPath": "specs/sprint-nova-epic/spec.md",
+    "specSha256": "7bd576df0086af89bc8677cf6ff1375382456f39b620ae03ead7fef7bf1a3b18"
+  },
+  "candidate": {
+    "commit": "d076b0d29f7d965d9b650eefd3f513235e7234f2",
+    "tree": "acb55987ebb0dbeb8c7d6bbea56cd323b2173d30",
+    "branch": "feat/sprint-nova-codex-v046"
+  },
+  "scope": {
+    "issue": 49,
+    "disposition": "nova-close-by-boundary-transfer",
+    "successorIssue": 72,
+    "nativeAppleSilicon": "excluded-from-nova",
+    "novaClaim": "synthetic-and-non-native-boundary-only"
+  },
+  "constraints": [
+    "does-not-close-successor-issue",
+    "does-not-claim-native-apple-silicon-execution",
+    "does-not-substitute-hosted-intel-or-synthetic-evidence-for-native-evidence",
+    "successor-requires-its-own-candidate-evidence-and-po-close"
+  ],
+  "recordSha256": "9ddc1ff842828935a759a30168a1ffe39b4446d6b68ff7e48ba37097626bf176"
+}

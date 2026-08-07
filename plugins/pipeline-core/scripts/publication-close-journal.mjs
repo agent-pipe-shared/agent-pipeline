@@ -7,10 +7,49 @@ import {
 } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { validatePublication } from "../lib/publication-bundle.mjs";
+import {
+  assertPrivateRegularFile,
+  ensurePrivateDirectory,
+} from "../lib/private-boundary.mjs";
 
 export const LIFECYCLE_SCHEMA = "pipeline.publication-lifecycle.v1";
 export const JOURNAL_SCHEMA = "pipeline.publication-close-journal.v1";
 export const JOURNAL_PHASES = Object.freeze(["pending", "implementation-result-bound", "feature-closed", "backlog-closed", "close-block-committed", "final-verify-green", "delivery-authorized"]);
+// H5 close-coordinator phases.  The legacy journal phases above remain
+// readable for AC-047-27 compatibility; new callers use this single state
+// machine and never create a parallel lifecycle.
+export const COORDINATOR_SCHEMA = "pipeline.close-coordinator.v1";
+export const COORDINATOR_PHASES = Object.freeze(["active", "checkpointed", "feature-close-prepared", "tracked-close-finalized", "candidate-frozen", "final-verify-green", "publication-authorized", "published", "readback-confirmed", "cleanup-complete", "closed-local", "delivered", "release-eligible", "promoted"]);
+const COORDINATOR_NEXT = Object.freeze({
+  active: ["checkpointed"], checkpointed: ["feature-close-prepared"],
+  "feature-close-prepared": ["tracked-close-finalized"],
+  "tracked-close-finalized": ["candidate-frozen"],
+  "candidate-frozen": ["final-verify-green"],
+  "final-verify-green": ["publication-authorized", "cleanup-complete"],
+  "publication-authorized": ["published"], published: ["readback-confirmed"],
+  "readback-confirmed": ["cleanup-complete"],
+  "cleanup-complete": ["closed-local", "delivered"],
+  "closed-local": ["release-eligible"], delivered: ["release-eligible"],
+  "release-eligible": ["promoted"], promoted: [],
+});
+export const coordinatorNextPhases = (phase) => [...(COORDINATOR_NEXT[phase] ?? [])];
+
+// `terminal` must mean terminal for the coordinator state machine, not merely
+// that the local feature-close obligation has been met.  `closed-local` and
+// `delivered` deliberately retain optional release/promotion descendants, so
+// they are closure-complete but not workflow-terminal.
+const CLOSURE_COMPLETE_PHASES = new Set(["closed-local", "delivered", "release-eligible", "promoted"]);
+export function coordinatorCompletion(phase) {
+  if (!COORDINATOR_PHASES.includes(phase)) throw new Error("coordinator phase invalid");
+  const next = coordinatorNextPhases(phase);
+  return {
+    scope: "feature-closure",
+    state: CLOSURE_COMPLETE_PHASES.has(phase) ? "complete" : "in-progress",
+    phase,
+    next,
+    workflowTerminal: next.length === 0,
+  };
+}
 const HEX40_64 = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 const HEX64 = /^[0-9a-f]{64}$/;
 const CHANNELS = ["private", "neutral-public"];
@@ -60,6 +99,200 @@ export function validateCloseJournal(journal) {
   }
   if (journal.phase !== prior) throw new Error("journal phase/effects mismatch");
   return true;
+}
+
+function validateCoordinatorAuthority(value) {
+  assertKeys(value, ["implementationResultSha256", "pipelineStateSha256", "planSha256", "prdSha256", "specSha256"], "coordinator authority");
+  for (const key of ["pipelineStateSha256", "planSha256", "prdSha256", "specSha256"]) {
+    assertHex(value[key], `coordinator authority.${key}`, true);
+  }
+  if (value.implementationResultSha256 !== null) {
+    assertHex(value.implementationResultSha256, "coordinator authority.implementationResultSha256", true);
+  }
+}
+
+function validateCoordinatorActiveFeature(value, featureId) {
+  assertKeys(value, ["id", "phase", "planPath"], "coordinator activeFeature");
+  if (value.id !== featureId || typeof value.planPath !== "string" || value.planPath.length === 0
+    || isAbsolute(value.planPath) || value.planPath.split(/[\\/]/u).includes("..")
+    || typeof value.phase !== "string" || value.phase.length === 0) {
+    throw new Error("coordinator activeFeature invalid");
+  }
+}
+
+function validateCoordinatorPublication(value, phase) {
+  if (value === null) {
+    if (["published", "readback-confirmed", "delivered"].includes(phase)) {
+      throw new Error("coordinator publication missing");
+    }
+    return;
+  }
+  assertKeys(value, ["channel", "destinationDigest", "oid", "publicationReceiptDigest", "readbackReceiptDigest", "ref", "tree"], "coordinator publication");
+  if (!["private", "neutral-public"].includes(value.channel)
+    || typeof value.ref !== "string" || !/^refs\/heads\/[A-Za-z0-9._/-]+$/u.test(value.ref)) {
+    throw new Error("coordinator publication invalid");
+  }
+  for (const key of ["destinationDigest", "publicationReceiptDigest"]) assertHex(value[key], `coordinator publication.${key}`, true);
+  for (const key of ["oid", "tree"]) assertHex(value[key], `coordinator publication.${key}`);
+  if (value.readbackReceiptDigest !== null) assertHex(value.readbackReceiptDigest, "coordinator publication.readbackReceiptDigest", true);
+  if (["readback-confirmed", "delivered", "release-eligible", "promoted"].includes(phase)
+    && value.readbackReceiptDigest === null) throw new Error("coordinator readback receipt missing");
+}
+
+function validateCoordinatorPublicationAuthorization(value, phase) {
+  if (value === null) {
+    if (["publication-authorized", "published", "readback-confirmed", "delivered"].includes(phase)) {
+      throw new Error("coordinator publication authorization missing");
+    }
+    return;
+  }
+  assertKeys(value, ["channel", "destinationDigest", "evidenceSha256"], "coordinator publication authorization");
+  if (!["private", "neutral-public"].includes(value.channel)) {
+    throw new Error("coordinator publication authorization invalid");
+  }
+  assertHex(value.destinationDigest, "coordinator publication authorization.destinationDigest", true);
+  assertHex(value.evidenceSha256, "coordinator publication authorization.evidenceSha256", true);
+}
+
+export function validateCloseCoordinator(state) {
+  assertKeys(state, ["schema", "lifecycleId", "revision", "priorStateSha256", "phase", "featureId", "activeFeature", "authority", "candidateOid", "candidateTree", "effects", "publicationAuthorization", "publication", "cleanup"], "close coordinator");
+  if (state.schema !== COORDINATOR_SCHEMA || !COORDINATOR_PHASES.includes(state.phase) || !Number.isInteger(state.revision) || state.revision < 0) throw new Error("close coordinator invalid");
+  assertId(state.lifecycleId, "lifecycleId"); assertId(state.featureId, "featureId");
+  validateCoordinatorActiveFeature(state.activeFeature, state.featureId);
+  validateCoordinatorAuthority(state.authority);
+  if (state.revision === 0 ? state.priorStateSha256 !== null : !HEX64.test(state.priorStateSha256 ?? "")) throw new Error("coordinator prior digest invalid");
+  for (const key of ["candidateOid", "candidateTree"]) if (state[key] !== null) assertHex(state[key], `coordinator.${key}`);
+  if (!Array.isArray(state.effects) || state.effects.length !== state.revision) throw new Error("coordinator effects/revision mismatch");
+  let previous = "active";
+  for (const effect of state.effects) {
+    assertKeys(effect, ["phase", "inputDigest", "observedDigest", "operationSha256"], "coordinator effect");
+    if (!(COORDINATOR_NEXT[previous]?.includes(effect.phase) || (previous === "cleanup-complete" && effect.phase === "cleanup-complete"))) throw new Error("coordinator effect order invalid");
+    assertHex(effect.inputDigest, "coordinator inputDigest", true);
+    assertHex(effect.observedDigest, "coordinator observedDigest", true);
+    assertHex(effect.operationSha256, "coordinator operationSha256", true);
+    previous = effect.phase;
+  }
+  if (state.phase !== previous) throw new Error("coordinator phase/effects mismatch");
+  if (state.phase === "candidate-frozen" || COORDINATOR_PHASES.indexOf(state.phase) > COORDINATOR_PHASES.indexOf("candidate-frozen")) {
+    if (!state.candidateOid || !state.candidateTree) throw new Error("candidate must be frozen");
+  }
+  validateCoordinatorPublicationAuthorization(state.publicationAuthorization, state.phase);
+  validateCoordinatorPublication(state.publication, state.phase);
+  assertKeys(state.cleanup, ["evidenceDigest", "status"], "coordinator cleanup");
+  if (!["not-started", "complete", "uncertain"].includes(state.cleanup.status)
+    || (state.cleanup.status === "not-started"
+      ? state.cleanup.evidenceDigest !== null
+      : !HEX64.test(state.cleanup.evidenceDigest ?? ""))) throw new Error("coordinator cleanup invalid");
+  if (["closed-local", "delivered", "release-eligible", "promoted"].includes(state.phase) && state.cleanup.status !== "complete") throw new Error("cleanup incomplete");
+  return true;
+}
+
+export function createCloseCoordinator(input) {
+  if (!input || typeof input !== "object") throw new Error("create coordinator input invalid");
+  const state = { schema: COORDINATOR_SCHEMA, lifecycleId: input.lifecycleId, revision: 0, priorStateSha256: null, phase: "active", featureId: input.featureId ?? input.lifecycleId, activeFeature: structuredClone(input.activeFeature ?? null), authority: structuredClone(input.authority ?? {}), candidateOid: input.candidateOid ?? null, candidateTree: input.candidateTree ?? null, effects: [], publicationAuthorization: null, publication: null, cleanup: { status: "not-started", evidenceDigest: null } };
+  validateCloseCoordinator(state); return state;
+}
+
+export function advanceCloseCoordinator(state, args) {
+  validateCloseCoordinator(state);
+  if (!args || typeof args !== "object") throw new Error("coordinator advance arguments invalid");
+  const required = ["expectedRevision", "expectedStateSha256", "phase", "inputDigest", "observedDigest", "operationSha256"];
+  for (const key of required) if (!(key in args)) throw new Error(`coordinator advance argument ${key} missing`);
+  const allowed = new Set([...required, "candidateOid", "candidateTree", "authorization", "publicationAuthorization", "publication", "cleanupStatus", "cleanupEvidenceDigest", "authority"]);
+  if (Object.keys(args).some((key) => !allowed.has(key))) throw new Error("coordinator advance arguments invalid");
+  assertCas(state, args.expectedRevision, args.expectedStateSha256, "coordinator");
+  assertHex(args.inputDigest, "inputDigest", true); assertHex(args.observedDigest, "observedDigest", true);
+  if (args.phase === state.phase) {
+    if (state.phase === "cleanup-complete" && state.cleanup.status === "uncertain" && args.cleanupStatus === "complete") {
+      const recovered = {
+        ...state,
+        cleanup: { status: "complete", evidenceDigest: args.cleanupEvidenceDigest ?? null },
+        revision: state.revision + 1,
+        priorStateSha256: args.expectedStateSha256,
+        effects: [...state.effects, {
+          phase: "cleanup-complete",
+          inputDigest: args.inputDigest,
+          observedDigest: args.observedDigest,
+          operationSha256: args.operationSha256,
+        }],
+      };
+      validateCloseCoordinator(recovered); return recovered;
+    }
+    const prior = state.effects.at(-1); if (prior && prior.inputDigest === args.inputDigest && prior.observedDigest === args.observedDigest) return state;
+    throw new Error("conflicting coordinator replay");
+  }
+  if (!COORDINATOR_NEXT[state.phase]?.includes(args.phase)) throw new Error("coordinator transition invalid");
+  let authority = state.authority;
+  if (args.authority !== undefined) {
+    if (args.phase !== "feature-close-prepared" || state.phase !== "checkpointed") throw new Error("coordinator authority update phase invalid");
+    validateCoordinatorAuthority(args.authority);
+    if (args.authority.prdSha256 !== state.authority.prdSha256
+      || args.authority.specSha256 !== state.authority.specSha256
+      || args.authority.planSha256 !== state.authority.planSha256
+      || (state.authority.implementationResultSha256 !== null
+        && args.authority.implementationResultSha256 !== state.authority.implementationResultSha256)) {
+      throw new Error("coordinator authority replacement forbidden");
+    }
+    authority = structuredClone(args.authority);
+  }
+  if (args.phase === "feature-close-prepared" && authority.implementationResultSha256 === null) {
+    throw new Error("feature close requires an implementation Result digest");
+  }
+  const candidateOid = args.phase === "candidate-frozen" ? (args.candidateOid ?? null) : state.candidateOid;
+  const candidateTree = args.phase === "candidate-frozen" ? (args.candidateTree ?? null) : state.candidateTree;
+  if (args.phase === "candidate-frozen") { assertHex(candidateOid, "candidateOid"); assertHex(candidateTree, "candidateTree"); }
+  if (state.candidateOid && args.candidateOid !== undefined && args.phase !== "candidate-frozen" && args.candidateOid !== state.candidateOid) throw new Error("candidate replacement forbidden");
+  if (state.candidateTree && args.candidateTree !== undefined && args.phase !== "candidate-frozen" && args.candidateTree !== state.candidateTree) throw new Error("candidate replacement forbidden");
+  if (args.phase === "final-verify-green"
+    && (args.candidateOid !== state.candidateOid || args.candidateTree !== state.candidateTree)) {
+    throw new Error("final verification candidate mismatch");
+  }
+  if (args.phase === "publication-authorized") {
+    if (args.authorization !== true) throw new Error("publication authorization required");
+    validateCoordinatorPublicationAuthorization(args.publicationAuthorization, "publication-authorized");
+  }
+  if (["release-eligible", "promoted"].includes(args.phase) && args.authorization !== true) {
+    throw new Error(`${args.phase} authorization required`);
+  }
+  if (args.phase === "published") {
+    validateCoordinatorPublication(args.publication, "published");
+    if (args.publication.oid !== state.candidateOid || args.publication.tree !== state.candidateTree
+      || args.publication.channel !== state.publicationAuthorization?.channel
+      || args.publication.destinationDigest !== state.publicationAuthorization?.destinationDigest
+      || args.publication.readbackReceiptDigest !== null) throw new Error("publication candidate mismatch");
+  }
+  if (args.phase === "readback-confirmed") {
+    validateCoordinatorPublication(args.publication, "readback-confirmed");
+    if (state.publication === null
+      || args.publication.oid !== state.candidateOid || args.publication.tree !== state.candidateTree
+      || args.publication.channel !== state.publication.channel
+      || args.publication.destinationDigest !== state.publication.destinationDigest
+      || args.publication.ref !== state.publication.ref
+      || args.publication.publicationReceiptDigest !== state.publication.publicationReceiptDigest) {
+      throw new Error("publication readback mismatch");
+    }
+  }
+  const cleanup = args.phase === "cleanup-complete" ? { status: args.cleanupStatus ?? "complete", evidenceDigest: args.cleanupEvidenceDigest ?? null } : state.cleanup;
+  if (args.phase === "cleanup-complete") { if (!["complete", "uncertain"].includes(cleanup.status) || !HEX64.test(cleanup.evidenceDigest ?? "")) throw new Error("cleanup evidence required"); }
+  const post = {
+    ...state,
+    revision: state.revision + 1,
+    priorStateSha256: args.expectedStateSha256,
+    phase: args.phase,
+    authority,
+    candidateOid,
+    candidateTree,
+    publicationAuthorization: args.publicationAuthorization ?? state.publicationAuthorization,
+    publication: args.publication ?? state.publication,
+    cleanup,
+    effects: [...state.effects, {
+      phase: args.phase,
+      inputDigest: args.inputDigest,
+      observedDigest: args.observedDigest,
+      operationSha256: args.operationSha256,
+    }],
+  };
+  validateCloseCoordinator(post); return post;
 }
 
 export function createCloseJournal(input) {
@@ -179,13 +412,55 @@ function ensureDirectoryChain(root, components) {
   let current = root;
   for (const component of components) {
     current = join(current, component);
-    if (!existsSync(current)) mkdirSync(current, { mode: 0o700 });
+    ensurePrivateDirectory(current);
     const stat = lstatSync(current);
-    if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error("publication-close directory unsafe");
+    if (!stat.isDirectory() || stat.isSymbolicLink()
+      || (process.platform !== "win32" && (stat.mode & 0o777) !== 0o700)) {
+      throw new Error("publication-close directory unsafe");
+    }
   }
   return current;
 }
-function syncDirectory(path) { const fd = openSync(path, constants.O_RDONLY); try { fsyncSync(fd); } finally { closeSync(fd); } }
+function unsupportedDirectoryDurability(error, platform) {
+  return platform === "win32"
+    && ["EPERM", "EINVAL", "EISDIR", "EACCES", "ENOTSUP"].includes(error?.code);
+}
+
+/**
+ * Flush the publication-close parent directory where the host supports it.
+ *
+ * Native Windows does not expose a portable Node directory-fsync primitive:
+ * opening or syncing a directory can reject an otherwise durable regular-file
+ * replacement.  Only that narrow, typed platform limitation is tolerated.
+ * POSIX and unrelated Windows I/O failures remain fail-closed.
+ */
+export function syncPublicationCloseDirectory(path, {
+  platform = process.platform,
+  open = openSync,
+  fsync = fsyncSync,
+  close = closeSync,
+} = {}) {
+  let fd;
+  try {
+    fd = open(path, constants.O_RDONLY);
+  } catch (error) {
+    if (unsupportedDirectoryDurability(error, platform)) {
+      return { status: "unsupported", stage: "open", code: error.code };
+    }
+    throw error;
+  }
+  try {
+    fsync(fd);
+    return { status: "synced" };
+  } catch (error) {
+    if (unsupportedDirectoryDurability(error, platform)) {
+      return { status: "unsupported", stage: "fsync", code: error.code };
+    }
+    throw error;
+  } finally {
+    close(fd);
+  }
+}
 function assertContained(root, candidate) { const rel = relative(root, candidate); if (rel.startsWith("..") || isAbsolute(rel)) throw new Error("publication-close path escaped"); }
 
 export function publicationClosePaths(gitCommonDir, lifecycleId) {
@@ -194,7 +469,7 @@ export function publicationClosePaths(gitCommonDir, lifecycleId) {
   const common = realpathSync(gitCommonDir);
   const directory = resolve(common, "agent-pipeline", "publication-close", lifecycleId);
   assertContained(common, directory);
-  return { common, lifecycleId, directory, journal: join(directory, "journal.json"), lifecycle: join(directory, "lifecycle.json"), lock: join(directory, "writer.lock") };
+  return { common, lifecycleId, directory, journal: join(directory, "journal.json"), coordinator: join(directory, "coordinator.json"), lifecycle: join(directory, "lifecycle.json"), lock: join(directory, "writer.lock") };
 }
 
 function withLock(paths, action) {
@@ -216,8 +491,7 @@ function withLock(paths, action) {
 }
 
 function readMode0600(path, validator) {
-  const stat = lstatSync(path);
-  if (!stat.isFile() || stat.isSymbolicLink() || (stat.mode & 0o777) !== 0o600) throw new Error("publication state permissions invalid");
+  assertPrivateRegularFile(path, "publication state");
   const raw = readFileSync(path);
   let value;
   try { value = JSON.parse(raw); } catch { throw new Error("publication state torn or invalid JSON"); }
@@ -231,7 +505,9 @@ function durableReplace(path, value) {
   try {
     const fd = openSync(temporary, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0), 0o600);
     try { writeFileSync(fd, bytes); fsyncSync(fd); } finally { closeSync(fd); }
-    renameSync(temporary, path); chmodSync(path, 0o600); syncDirectory(dirname(path));
+    renameSync(temporary, path); chmodSync(path, 0o600);
+    assertPrivateRegularFile(path, "publication state");
+    syncPublicationCloseDirectory(dirname(path));
     return { rawDigest: hash(bytes), bytes };
   } catch (error) {
     if (existsSync(temporary)) unlinkSync(temporary);
@@ -262,6 +538,45 @@ export function readCloseJournal(gitCommonDir, lifecycleId) {
   const paths = publicationClosePaths(gitCommonDir, lifecycleId);
   const stored = readMode0600(paths.journal, validateCloseJournal);
   return { journal: stored.value, rawDigest: stored.rawDigest, path: paths.journal, nextPhase: JOURNAL_PHASES[JOURNAL_PHASES.indexOf(stored.value.phase) + 1] ?? null };
+}
+
+/** Durable CAS persistence for the H5 coordinator (same private authority). */
+export function storeCloseCoordinator({ gitCommonDir, coordinator, expectedRawSha256 }) {
+  validateCloseCoordinator(coordinator);
+  const paths = publicationClosePaths(gitCommonDir, coordinator.lifecycleId);
+  return withLock(paths, () => {
+    const exists = existsSync(paths.coordinator);
+    if (!exists && expectedRawSha256 !== null) throw new Error("close coordinator missing for CAS");
+    if (exists) {
+      const current = readMode0600(paths.coordinator, validateCloseCoordinator);
+      if (current.rawDigest !== expectedRawSha256) throw new Error("stale close coordinator raw CAS");
+      const wanted = jsonBytes(coordinator);
+      if (current.raw.equals(Buffer.from(wanted))) return { path: paths.coordinator, rawDigest: current.rawDigest, written: false };
+      if (coordinator.revision !== current.value.revision + 1
+        || coordinator.priorStateSha256 !== hash(current.value)
+        || coordinator.lifecycleId !== current.value.lifecycleId
+        || coordinator.featureId !== current.value.featureId
+        || canonical(coordinator.activeFeature) !== canonical(current.value.activeFeature)
+        || (canonical(coordinator.authority) !== canonical(current.value.authority)
+          && !(current.value.phase === "checkpointed"
+            && coordinator.phase === "feature-close-prepared"
+            && coordinator.authority.prdSha256 === current.value.authority.prdSha256
+            && coordinator.authority.specSha256 === current.value.authority.specSha256
+            && coordinator.authority.planSha256 === current.value.authority.planSha256
+            && (current.value.authority.implementationResultSha256 === null
+              || coordinator.authority.implementationResultSha256 === current.value.authority.implementationResultSha256)))) {
+        throw new Error("close coordinator transition invalid");
+      }
+    } else if (coordinator.revision !== 0) throw new Error("initial close coordinator revision invalid");
+    const stored = durableReplace(paths.coordinator, coordinator);
+    return { path: paths.coordinator, rawDigest: stored.rawDigest, written: true };
+  });
+}
+
+export function readCloseCoordinator(gitCommonDir, lifecycleId) {
+  const paths = publicationClosePaths(gitCommonDir, lifecycleId);
+  const stored = readMode0600(paths.coordinator, validateCloseCoordinator);
+  return { coordinator: stored.value, rawDigest: stored.rawDigest, path: paths.coordinator, nextPhase: COORDINATOR_NEXT[stored.value.phase]?.[0] ?? null };
 }
 
 export function storePublicationLifecycle({ gitCommonDir, lifecycle, expectedRawSha256 }) {

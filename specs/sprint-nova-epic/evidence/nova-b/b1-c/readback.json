@@ -1,0 +1,14 @@
+{
+  "schema": "pipeline.nova-b1-c.gate-readback.v1",
+  "candidate": {
+    "commit": "b8a2540a4666719fca466e9f64267f62ad785bc7",
+    "tree": "151e16ce739f911b9a378818f6d07c59a39dd987"
+  },
+  "artifacts": {
+    "verify": "specs/sprint-nova-epic/evidence/nova-b/b1-c/verify.json",
+    "security": "specs/sprint-nova-epic/evidence/nova-b/b1-c/security.json",
+    "critic": "specs/sprint-nova-epic/evidence/nova-b/b1-c/critic.json"
+  },
+  "status": "passed",
+  "note": "Evidence commit is intentionally separate from the verified product candidate; it does not alter the candidate binding."
+}

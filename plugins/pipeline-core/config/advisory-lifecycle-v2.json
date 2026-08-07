@@ -1,0 +1,49 @@
+{
+  "schema": "pipeline.advisory-lifecycle-policy.v2",
+  "routeAuthority": "pipeline.runner-profiles.v3",
+  "bootstrap": {
+    "mode": "capability-preflight-only",
+    "profiles": {
+      "epic": "preflight",
+      "feature": "preflight",
+      "mini": "disabled"
+    },
+    "states": ["available", "degraded", "unavailable", "disabled", "unknown"],
+    "prohibitedEffects": [
+      "advisor-child",
+      "model-request",
+      "question-export",
+      "consultation-receipt",
+      "consultation-budget"
+    ]
+  },
+  "consultation": {
+    "mode": "on-demand",
+    "triggerReasons": [
+      "architecture-tradeoff",
+      "decision-ambiguity",
+      "evidence-conflict",
+      "recovery-choice",
+      "risk-review"
+    ],
+    "nonTriggerEvents": [
+      "session-start",
+      "profile-selection",
+      "restart",
+      "resume",
+      "re-entry",
+      "compact",
+      "unchanged-handover",
+      "configured-route",
+      "consent-present"
+    ],
+    "reuse": "same-reuse-key-no-repeat",
+    "materialDrift": [
+      "question",
+      "reason",
+      "evidence",
+      "candidate",
+      "route-policy"
+    ]
+  }
+}

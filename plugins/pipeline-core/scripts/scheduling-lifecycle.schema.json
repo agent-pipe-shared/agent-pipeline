@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.scheduling-lifecycle.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "queue",
+    "plannerInputSha256",
+    "plannerReceiptSha256",
+    "subjectSetSha256",
+    "revision",
+    "selected",
+    "blocked",
+    "completed",
+    "failed",
+    "cancelled",
+    "invalidated",
+    "previousSha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pipeline.scheduling-lifecycle.v1"
+    },
+    "queue": {
+      "$ref": "#/$defs/queue"
+    },
+    "plannerInputSha256": {
+      "$ref": "#/$defs/sha"
+    },
+    "plannerReceiptSha256": {
+      "$ref": "#/$defs/sha"
+    },
+    "subjectSetSha256": {
+      "$ref": "#/$defs/sha"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "selected": {
+      "$ref": "#/$defs/items"
+    },
+    "blocked": {
+      "$ref": "#/$defs/items"
+    },
+    "completed": {
+      "$ref": "#/$defs/items"
+    },
+    "failed": {
+      "$ref": "#/$defs/items"
+    },
+    "cancelled": {
+      "$ref": "#/$defs/items"
+    },
+    "invalidated": {
+      "$ref": "#/$defs/items"
+    },
+    "previousSha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/sha"
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "revision": {
+            "const": 0
+          }
+        },
+        "required": [
+          "revision"
+        ]
+      },
+      "then": {
+        "properties": {
+          "previousSha256": {
+            "type": "null"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "previousSha256": {
+            "$ref": "#/$defs/sha"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "oid": {
+      "type": "string",
+      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit",
+        "tree"
+      ],
+      "properties": {
+        "commit": {
+          "$ref": "#/$defs/oid"
+        },
+        "tree": {
+          "$ref": "#/$defs/oid"
+        }
+      }
+    },
+    "queue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "queueId",
+        "candidate",
+        "revision",
+        "packagesSha256"
+      ],
+      "properties": {
+        "queueId": {
+          "$ref": "#/$defs/id"
+        },
+        "candidate": {
+          "$ref": "#/$defs/candidate"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "packagesSha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    },
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packageId",
+        "reason",
+        "evidenceSha256"
+      ],
+      "properties": {
+        "packageId": {
+          "$ref": "#/$defs/id"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "evidenceSha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    },
+    "items": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/item"
+      }
+    }
+  }
+}

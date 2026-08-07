@@ -12,7 +12,7 @@
  * for `approve-push` end to end (spawnSync the actual CLI as a subprocess, mirroring
  * how a Goldfish/Elephant would invoke it).
  */
-import { chmodSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, readdirSync, renameSync, symlinkSync, writeSync } from "node:fs";
+import { chmodSync, linkSync, lstatSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, readdirSync, renameSync, symlinkSync, writeSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
@@ -28,20 +28,12 @@ import {
   readState,
   statePath,
   CONTINUITY_LOCK_SCHEMA_ID,
-  RECOVERY_BRIDGE_CONSUME_RECEIPT_SCHEMA,
-  RECOVERY_BRIDGE_DECISION_SCHEMA,
-  RECOVERY_BRIDGE_PUBLIC_COMMIT_REQUEST_SCHEMA,
   SCHEMA_ID,
-  recoveryBridgeDecisionDigest,
-  transitionRecoveryBridgeDecision,
-  validateRecoveryBridgeDecision,
 } from "./pipeline-state.mjs";
 import { computeContinuityFinalDigest } from "../../plugins/pipeline-core/lib/continuity-host-adapter.mjs";
 import { loadManifestSafe } from "../../plugins/pipeline-core/lib/manifest.mjs";
 import { loadStateSafe, resolveSuggestion } from "../../plugins/pipeline-core/hooks/stop-suggest.mjs";
 import { COURSE_KINDS, buildCourseDecisionBrief, sha256Canonical } from "../../plugins/pipeline-core/lib/review-economy.mjs";
-import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
-import { planFeaturePackageBootstrap } from "../../plugins/pipeline-core/lib/feature-package-topology.mjs";
 import {
   PO_GATE_AUTHORITY_EVIDENCE_SCHEMA,
   PO_GATE_AUTHORITY_EVIDENCE_V2_SCHEMA,
@@ -53,18 +45,558 @@ import {
   serializePoGateProfileReceipt,
 } from "../../plugins/pipeline-core/lib/po-gate-authority.mjs";
 import { hardenWindowsPrivateDirectory } from "../../plugins/pipeline-core/lib/windows-private-state.mjs";
-import { canonicalSha256, canonicalizeJson } from "../../plugins/pipeline-core/lib/governance-event.mjs";
-import { appendHumanGovernanceDecision } from "../../plugins/pipeline-core/lib/human-governance-ledger.mjs";
+import {
+  advanceCloseCoordinator,
+  createCloseCoordinator,
+  lifecycleDigest as closeCoordinatorDigest,
+} from "../../plugins/pipeline-core/scripts/publication-close-journal.mjs";
 
 const CLI = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
 const ALL_DIRS = [];
-// Keep test replay tokens separate from the CLI spelling so secret scanners do
-// not confuse deterministic idempotency fixtures with credentials.
-const IDEMPOTENCY_FLAG = "--idempotency" + "-key";
+const NOVA_APPROVED_BY = "agent-pipe-shared (PO, 2026-07-27 Nova re-Critic corrections)";
+const PHOENIX_SPEC_BOUND_BY = "PO reauthorization for Phoenix R-14 digest binding";
 function freshDir(prefix) {
   const dir = mkdtempSync(join(tmpdir(), `pipeline-state-${prefix}-`));
   ALL_DIRS.push(dir);
   return dir;
+}
+
+// ---- PS53: AC-047-28 PO authority rebind --------------------------------------------------
+function seedPoAuthorityRebind(prefix = "po-rebind") {
+  const dir = freshDir(prefix);
+  const featureDir = join(dir, "specs", "nova-shaped");
+  mkdirSync(featureDir, { recursive: true });
+  mkdirSync(dirname(statePath(dir)), { recursive: true });
+  const planPath = "specs/nova-shaped/prd_nova.md";
+  const specPath = "specs/nova-shaped/spec.md";
+  const oldSpecSha = createHash("sha256").update("# older Spec\n").digest("hex");
+  writeFileSync(join(dir, specPath), "# later Spec\n");
+  const newSpecSha = createHash("sha256").update(readFileSync(join(dir, specPath))).digest("hex");
+  writeFileSync(join(dir, planPath), `<!-- po-language: en -->\n<!-- technical-spec-sha256: ${oldSpecSha} -->\n# Nova-shaped PRD\n`);
+  const planSha = createHash("sha256").update(readFileSync(join(dir, planPath))).digest("hex");
+  const profile = { schema: "pipeline.po-gate-authority-evidence.v1", humanFacing: "en", sourceSha256: A, runtimeSha256: B, receiptSha256: C, repositoryFingerprint: D };
+  const continuity = {
+    schema: "pipeline.continuity.v0", featureId: "nova-shaped", revision: 3,
+    runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator" },
+    authority: { prd: { path: planPath, sha256: planSha }, spec: { path: specPath, sha256: oldSpecSha }, result: null },
+    queueHead: { packageId: "nova", actionId: "rebind", nextAction: "review", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null },
+    blocker: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" }, recovery: null, decisionTxn: null,
+    capacity: { concurrencyLimit: 4, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" },
+  };
+  const state = {
+    schema: SCHEMA_ID, activeFeature: { id: "nova-shaped", planPath, phase: "implementation" }, planApproved: true,
+    planApproval: { schema: "pipeline.plan-approval.v2", approvedBy: NOVA_APPROVED_BY, approvedAt: "2026-07-26T14:08:37.500Z", specBoundBy: PHOENIX_SPEC_BOUND_BY, specBoundAt: "2026-07-26T14:08:37.500Z", poGateAuthority: {
+      ...profile, schema: "pipeline.po-gate-authority.v2", planPath, planSha256: planSha, specPath, specSha256: oldSpecSha,
+    } }, continuity, updatedAt: "2026-07-26T14:08:37.500Z",
+  };
+  writeFileSync(statePath(dir), JSON.stringify(state, null, 2) + "\n");
+  const deps = {
+    dir, now: () => "2026-07-28T10:00:00.000Z", ownerNonce: () => `rebind-${String(++nonceSequence).padStart(8, "0")}`,
+    poGateProfile: () => ({ ok: true, value: profile }),
+    poGateAuthority: ({ expectedPlanSha256, expectedSpecSha256 }) => expectedSpecSha256 === newSpecSha && typeof expectedPlanSha256 === "string"
+      ? { ok: true, value: { ...profile, schema: "pipeline.po-gate-authority.v2", planPath, planSha256: expectedPlanSha256, specPath, specSha256: newSpecSha } }
+      : { ok: false, code: "PO-GATE-AUTHORITY-STALE" },
+    v4Inspection: () => ({ status: "ready" }),
+  };
+  return { dir, deps, planPath, specPath, oldSpecSha, newSpecSha, profile };
+}
+
+function runPoAuthorityRebindTests() {
+{
+  const fixture = seedPoAuthorityRebind("po-rebind-retained-history");
+  const state = readState(fixture.dir).state;
+  state.closedFeatures = [{ id: "retained-history", evidence: "x".repeat(8_500) }];
+  writeFileSync(statePath(fixture.dir), JSON.stringify(state, null, 2) + "\n");
+  const planned = captureConsole(() => run(["po-authority-rebind-plan"], fixture.deps));
+  const plan = JSON.parse(planned.text || "{}");
+  ok("PS53a retained root history above the continuity budget remains rebindable", planned.value === 0
+    && plan.schema === "pipeline.po-authority-rebind-plan.v1"
+    && plan.preimage?.state?.sha256
+    && Buffer.byteLength(readFileSync(statePath(fixture.dir))) > 8_192);
+}
+
+{
+  const fixture = seedPoAuthorityRebind();
+  const beforePrd = readFileSync(join(fixture.dir, fixture.planPath), "utf8");
+  const beforeState = readFileSync(statePath(fixture.dir), "utf8");
+  const planned = captureConsole(() => run(["po-authority-rebind-plan"], fixture.deps));
+  const plan = JSON.parse(planned.text || "{}");
+  ok("PS53a Nova-shaped stale marker yields a closed digest-bound plan", planned.value === 0 && plan.schema === "pipeline.po-authority-rebind-plan.v1" && plan.planSha256 && plan.applyAction?.requiresConfirmation === true && plan.applyAction?.argv?.includes("--updated-at"));
+  ok("PS53b planning binds matching stale authority preimages without writes", plan.preimage?.planApproval?.poGateAuthority?.planSha256 === plan.preimage?.continuityAuthority?.prd?.sha256 && readFileSync(join(fixture.dir, fixture.planPath), "utf8") === beforePrd && readFileSync(statePath(fixture.dir), "utf8") === beforeState);
+  const missingConfirmation = captureConsoleError(() => run(["po-authority-rebind-apply", "--plan-sha256", plan.planSha256, "--updated-at", plan.plannedAt], fixture.deps));
+  ok("PS53c apply rejects a missing explicit confirmation byte-null", missingConfirmation.value === 2 && readFileSync(statePath(fixture.dir), "utf8") === beforeState);
+  const applied = captureConsole(() => run(plan.applyAction.argv.slice(1), fixture.deps));
+  const after = readState(fixture.dir).state;
+  const afterPrd = readFileSync(join(fixture.dir, fixture.planPath), "utf8");
+  ok("PS53d Nova-shaped confirmed apply preserves Human approvals and converges marker, PO gate and Continuity in design", applied.value === 0 && afterPrd.includes(fixture.newSpecSha) && after.activeFeature.phase === "design" && after.planApproval.approvedBy === NOVA_APPROVED_BY && after.planApproval.specBoundBy === PHOENIX_SPEC_BOUND_BY && after.planApproval.poGateAuthority.specSha256 === fixture.newSpecSha && after.continuity.authority.spec.sha256 === fixture.newSpecSha && after.continuity.authority.prd.sha256 === after.planApproval.poGateAuthority.planSha256 && after.continuity.revision === 4);
+  const replayBytes = readFileSync(statePath(fixture.dir), "utf8");
+  const replay = captureConsoleError(() => run(plan.applyAction.argv.slice(1), fixture.deps));
+  ok("PS53e replay is a closed refusal after a verified non-no-op", replay.value === 2 && readFileSync(statePath(fixture.dir), "utf8") === replayBytes);
+}
+
+{
+  const fixture = seedPoAuthorityRebind("po-decision-general-drift");
+  const state = readState(fixture.dir).state;
+  state.activeFeature.phase = "design";
+  writeFileSync(statePath(fixture.dir), JSON.stringify(state, null, 2) + "\n");
+  writeFileSync(
+    join(fixture.dir, fixture.planPath),
+    `${readFileSync(join(fixture.dir, fixture.planPath), "utf8")}\nHuman-reviewed scope expansion.\n`,
+  );
+  const beforePrd = readFileSync(join(fixture.dir, fixture.planPath), "utf8");
+  const beforeState = readFileSync(statePath(fixture.dir), "utf8");
+  const planned = captureConsole(() => run(["po-authority-decision-plan"], fixture.deps));
+  const plan = JSON.parse(planned.text || "{}");
+  ok("PS54a general PRD/Spec drift yields two neutral physical candidates", planned.value === 0
+    && plan.schema === "pipeline.po-authority-decision-plan.v1"
+    && plan.status === "planned"
+    && JSON.stringify(plan.candidates?.map((candidate) => candidate.id)) === JSON.stringify(["prd", "spec"])
+    && plan.selectionActions?.find((action) => action.selectedCandidate === "prd")?.status === "unavailable"
+    && plan.selectionActions?.find((action) => action.selectedCandidate === "spec")?.requiresConfirmation === true
+    && readFileSync(join(fixture.dir, fixture.planPath), "utf8") === beforePrd
+    && readFileSync(statePath(fixture.dir), "utf8") === beforeState);
+  const specSelection = plan.selectionActions.find((action) => action.selectedCandidate === "spec");
+  const selected = captureConsole(() => run(specSelection.argv.slice(1), fixture.deps));
+  const selection = JSON.parse(selected.text || "{}");
+  ok("PS54b explicit Spec selection returns a separately digest-bound confirmed apply", selected.value === 0
+    && selection.schema === "pipeline.po-authority-selection.v1"
+    && selection.selectedCandidate === "spec"
+    && /^[a-f0-9]{64}$/u.test(selection.selectionDigest)
+    && selection.applyAction?.requiresConfirmation === true
+    && selection.applyAction?.argv?.includes("--selection-digest")
+    && readFileSync(join(fixture.dir, fixture.planPath), "utf8") === beforePrd
+    && readFileSync(statePath(fixture.dir), "utf8") === beforeState);
+  const applied = captureConsole(() => run(selection.applyAction.argv.slice(1), fixture.deps));
+  const after = readState(fixture.dir).state;
+  ok("PS54c confirmed decision apply converges marker and both authority surfaces in design", applied.value === 0
+    && JSON.parse(applied.text).code === "PO-DECISION-APPLIED"
+    && readFileSync(join(fixture.dir, fixture.planPath), "utf8").includes(fixture.newSpecSha)
+    && after.activeFeature.phase === "design"
+    && after.planApproval.poGateAuthority.specSha256 === fixture.newSpecSha
+    && after.continuity.authority.spec.sha256 === fixture.newSpecSha
+    && after.continuity.revision === 4);
+}
+
+{
+  const fixture = seedPoAuthorityRebind("po-decision-coherent-docs-stale-state");
+  const prdPath = join(fixture.dir, fixture.planPath);
+  const coherentPrd = readFileSync(prdPath, "utf8").replace(fixture.oldSpecSha, fixture.newSpecSha);
+  writeFileSync(prdPath, `${coherentPrd}\nReconciled product scope.\n`);
+  const beforePrd = readFileSync(prdPath);
+  const beforeState = readFileSync(statePath(fixture.dir), "utf8");
+  const planned = captureConsole(() => run(["po-authority-decision-plan"], fixture.deps));
+  const plan = JSON.parse(planned.text || "{}");
+  const selectionAction = plan.selectionActions?.find((action) => action.selectedCandidate === "spec");
+  const selected = captureConsole(() => run(selectionAction.argv.slice(1), fixture.deps));
+  const selection = JSON.parse(selected.text || "{}");
+  const observedV4Intents = [];
+  const applied = captureConsole(() => run(selection.applyAction.argv.slice(1), {
+    ...fixture.deps,
+    replaceRebindPrdFdContents: () => { throw new Error("coherent PRD must not be rewritten"); },
+    replaceRebindStateFdContents: (fd, bytes) => { writeSync(fd, bytes, 0, bytes.length, 0); },
+    v4Inspection: ({ intent }) => {
+      observedV4Intents.push(intent);
+      return { status: "ready" };
+    },
+  }));
+  const after = readState(fixture.dir).state;
+  ok("PS54d coherent documents with stale State yield the same PO plan and design re-entry", planned.value === 0
+    && plan.transition?.kind === "po-authority-design-review"
+    && plan.transition?.documentMutationRequired === false
+    && plan.transition?.bindingMutationRequired === true
+    && applied.value === 0
+    && after.activeFeature.phase === "design"
+    && after.planApproval.poGateAuthority.planSha256 === createHash("sha256").update(beforePrd).digest("hex")
+    && after.planApproval.poGateAuthority.specSha256 === fixture.newSpecSha
+    && after.continuity.authority.prd.sha256 === after.planApproval.poGateAuthority.planSha256
+    && after.continuity.authority.spec.sha256 === fixture.newSpecSha
+    && after.continuity.revision === 4
+    && JSON.stringify(observedV4Intents) === JSON.stringify(["bootstrap", "session", "dispatch"])
+    && readFileSync(prdPath).equals(beforePrd)
+    && readFileSync(statePath(fixture.dir), "utf8") !== beforeState);
+}
+
+{
+  const fixture = seedPoAuthorityRebind("po-decision-phoenix-multigeneration");
+  const prdPath = join(fixture.dir, fixture.planPath);
+  const coherentPrd = `${readFileSync(prdPath, "utf8").replace(fixture.oldSpecSha, fixture.newSpecSha)}\nPhoenix current scope.\n`;
+  writeFileSync(prdPath, coherentPrd);
+  const currentPlanSha256 = createHash("sha256").update(readFileSync(prdPath)).digest("hex");
+  const state = readState(fixture.dir).state;
+  state.planApproval.poGateAuthority = {
+    ...fixture.profile,
+    schema: "pipeline.po-gate-authority.v2",
+    planPath: fixture.planPath,
+    planSha256: currentPlanSha256,
+    specPath: fixture.specPath,
+    specSha256: fixture.newSpecSha,
+  };
+  const preservedContinuity = structuredClone(state.continuity);
+  writeFileSync(statePath(fixture.dir), JSON.stringify(state, null, 2) + "\n");
+  const planned = captureConsole(() => run(["po-authority-decision-plan"], fixture.deps));
+  const plan = JSON.parse(planned.text || "{}");
+  const selectionAction = plan.selectionActions?.find((action) => action.selectedCandidate === "spec");
+  const selected = selectionAction
+    ? captureConsole(() => run(selectionAction.argv.slice(1), fixture.deps))
+    : { value: 2, text: "" };
+  const selection = JSON.parse(selected.text || "{}");
+  const observedV4Intents = [];
+  const applied = selection.applyAction
+    ? captureConsole(() => run(selection.applyAction.argv.slice(1), {
+      ...fixture.deps,
+      replaceRebindPrdFdContents: () => { throw new Error("coherent Phoenix PRD must not be rewritten"); },
+      replaceRebindStateFdContents: (fd, bytes) => { writeSync(fd, bytes, 0, bytes.length, 0); },
+      v4Inspection: ({ intent }) => {
+        observedV4Intents.push(intent);
+        return { status: "ready" };
+      },
+    }))
+    : { value: 2, text: "" };
+  const after = readState(fixture.dir).state;
+  const expectedContinuity = structuredClone(preservedContinuity);
+  expectedContinuity.revision += 1;
+  expectedContinuity.authority.prd.sha256 = currentPlanSha256;
+  expectedContinuity.authority.spec.sha256 = fixture.newSpecSha;
+  ok("PS55a Phoenix-shaped current documents with only older Continuity yield a neutral bound plan", planned.value === 0
+    && plan.authoritySurfaces?.currentDocuments?.prd?.sha256 === currentPlanSha256
+    && plan.authoritySurfaces?.persistedPoGateAuthority?.planSha256 === currentPlanSha256
+    && plan.authoritySurfaces?.continuityAuthority?.prd?.sha256 === preservedContinuity.authority.prd.sha256
+    && plan.transition?.documentMutationRequired === false
+    && plan.transition?.bindingMutationRequired === true);
+  ok("PS55b Phoenix-shaped confirmed apply preserves payload and converges all three intents", selected.value === 0
+    && applied.value === 0
+    && after.activeFeature.phase === "design"
+    && after.planApproval.approvedBy === NOVA_APPROVED_BY
+    && after.planApproval.specBoundBy === PHOENIX_SPEC_BOUND_BY
+    && after.planApproval.poGateAuthority.planSha256 === currentPlanSha256
+    && after.planApproval.poGateAuthority.specSha256 === fixture.newSpecSha
+    && JSON.stringify(after.continuity) === JSON.stringify(expectedContinuity)
+    && JSON.stringify(observedV4Intents) === JSON.stringify(["bootstrap", "session", "dispatch"])
+    && readFileSync(prdPath, "utf8") === coherentPrd);
+}
+
+{
+  const fixture = seedPoAuthorityRebind("po-decision-nova-multigeneration");
+  const state = readState(fixture.dir).state;
+  state.activeFeature.phase = "design";
+  const historicalProfile = {
+    humanFacing: "de",
+    sourceSha256: "1".repeat(64),
+    runtimeSha256: "2".repeat(64),
+    receiptSha256: "3".repeat(64),
+    repositoryFingerprint: "4".repeat(64),
+  };
+  state.planApproval.poGateAuthority = {
+    schema: "pipeline.po-gate-authority.v2",
+    ...historicalProfile,
+    planPath: fixture.planPath,
+    planSha256: "5".repeat(64),
+    specPath: fixture.specPath,
+    specSha256: "6".repeat(64),
+  };
+  state.continuity.authority.prd.sha256 = "7".repeat(64);
+  state.continuity.authority.spec.sha256 = "8".repeat(64);
+  const preservedContinuity = structuredClone(state.continuity);
+  writeFileSync(statePath(fixture.dir), JSON.stringify(state, null, 2) + "\n");
+  const currentPrdSha256 = createHash("sha256").update(readFileSync(join(fixture.dir, fixture.planPath))).digest("hex");
+  const planned = captureConsole(() => run(["po-authority-decision-plan"], fixture.deps));
+  const plan = JSON.parse(planned.text || "{}");
+  const selectionAction = plan.selectionActions?.find((action) => action.selectedCandidate === "spec");
+  const selected = selectionAction
+    ? captureConsole(() => run(selectionAction.argv.slice(1), fixture.deps))
+    : { value: 2, text: "" };
+  const selection = JSON.parse(selected.text || "{}");
+  const observedV4Intents = [];
+  const applied = selection.applyAction
+    ? captureConsole(() => run(selection.applyAction.argv.slice(1), {
+      ...fixture.deps,
+      v4Inspection: ({ intent }) => {
+        observedV4Intents.push(intent);
+        return { status: "ready" };
+      },
+    }))
+    : { value: 2, text: "" };
+  const after = readState(fixture.dir).state;
+  const afterPrdSha256 = createHash("sha256").update(readFileSync(join(fixture.dir, fixture.planPath))).digest("hex");
+  const expectedContinuity = structuredClone(preservedContinuity);
+  expectedContinuity.revision += 1;
+  expectedContinuity.authority.prd.sha256 = afterPrdSha256;
+  expectedContinuity.authority.spec.sha256 = fixture.newSpecSha;
+  ok("PS55c Nova-shaped four-generation drift discloses marker, documents, PO gate, Continuity and both profiles", planned.value === 0
+    && plan.preimage?.currentPrdMarker?.technicalSpecSha256 === fixture.oldSpecSha
+    && plan.authoritySurfaces?.currentDocuments?.prd?.sha256 === currentPrdSha256
+    && plan.authoritySurfaces?.currentDocuments?.spec?.sha256 === fixture.newSpecSha
+    && plan.authoritySurfaces?.persistedPoGateAuthority?.planSha256 === "5".repeat(64)
+    && plan.authoritySurfaces?.continuityAuthority?.prd?.sha256 === "7".repeat(64)
+    && plan.authoritySurfaces?.profileProvenance?.historical?.sourceSha256 === historicalProfile.sourceSha256
+    && plan.authoritySurfaces?.profileProvenance?.current?.sourceSha256 === fixture.profile.sourceSha256
+    && plan.transition?.documentMutationRequired === true
+    && plan.transition?.bindingMutationRequired === true);
+  ok("PS55d Nova-shaped confirmed apply converges to current documents/profile exactly once and preserves payload", selected.value === 0
+    && applied.value === 0
+    && after.activeFeature.phase === "design"
+    && after.planApproval.poGateAuthority.humanFacing === fixture.profile.humanFacing
+    && after.planApproval.poGateAuthority.sourceSha256 === fixture.profile.sourceSha256
+    && after.planApproval.poGateAuthority.runtimeSha256 === fixture.profile.runtimeSha256
+    && after.planApproval.poGateAuthority.receiptSha256 === fixture.profile.receiptSha256
+    && after.planApproval.poGateAuthority.repositoryFingerprint === fixture.profile.repositoryFingerprint
+    && after.planApproval.poGateAuthority.planSha256 === afterPrdSha256
+    && after.planApproval.poGateAuthority.specSha256 === fixture.newSpecSha
+    && JSON.stringify(after.continuity) === JSON.stringify(expectedContinuity)
+    && JSON.stringify(observedV4Intents) === JSON.stringify(["bootstrap", "session", "dispatch"]));
+  const replayBytes = readFileSync(statePath(fixture.dir), "utf8");
+  const replay = selection.applyAction
+    ? captureConsoleError(() => run(selection.applyAction.argv.slice(1), fixture.deps))
+    : { value: 0 };
+  ok("PS55e Nova-shaped completed selection replay fails closed without a second revision", replay.value === 2
+    && readFileSync(statePath(fixture.dir), "utf8") === replayBytes
+    && readState(fixture.dir).state.continuity.revision === preservedContinuity.revision + 1);
+}
+
+{
+  const malformedHistoricalCases = [
+    ["schema", (state) => { state.planApproval.poGateAuthority.schema = "pipeline.po-gate-authority.v1"; }],
+    ["extra key", (state) => { state.planApproval.poGateAuthority.extra = true; }],
+    ["noncanonical path", (state) => { state.planApproval.poGateAuthority.planPath = `./${state.activeFeature.planPath}`; }],
+    ["uppercase digest", (state) => { state.planApproval.poGateAuthority.specSha256 = state.planApproval.poGateAuthority.specSha256.toUpperCase(); }],
+    ["provenance type", (state) => { state.planApproval.poGateAuthority.humanFacing = 7; }],
+    ["Continuity path", (state) => { state.continuity.authority.spec.path = `./${state.continuity.authority.spec.path}`; }],
+    ["Continuity schema", (state) => { state.continuity.schema = "pipeline.continuity.v1"; }],
+    ["Continuity extra key", (state) => { state.continuity.extra = true; }],
+  ];
+  for (const [name, mutate] of malformedHistoricalCases) {
+    const fixture = seedPoAuthorityRebind(`po-decision-malformed-${name.replaceAll(" ", "-")}`);
+    const state = readState(fixture.dir).state;
+    mutate(state);
+    writeFileSync(statePath(fixture.dir), JSON.stringify(state, null, 2) + "\n");
+    const before = readFileSync(statePath(fixture.dir), "utf8");
+    const rejected = captureConsoleError(() => run(["po-authority-decision-plan"], fixture.deps));
+    ok(`PS55f malformed historical ${name} is a typed byte-null refusal`, rejected.value === 2
+      && /PO-DECISION-(?:PRIOR-AUTHORITY|CONTINUITY)/u.test(rejected.text)
+      && readFileSync(statePath(fixture.dir), "utf8") === before);
+  }
+}
+
+{
+  const malformedProfileCases = [
+    ["schema", { schema: "pipeline.po-gate-authority-evidence.v0" }],
+    ["extra key", { extra: true }],
+    ["uppercase digest", { receiptSha256: C.toUpperCase() }],
+  ];
+  for (const [name, change] of malformedProfileCases) {
+    const fixture = seedPoAuthorityRebind(`po-decision-current-profile-${name.replaceAll(" ", "-")}`);
+    const before = readFileSync(statePath(fixture.dir), "utf8");
+    const rejected = captureConsoleError(() => run(["po-authority-decision-plan"], {
+      ...fixture.deps,
+      poGateProfile: () => ({ ok: true, value: { ...fixture.profile, ...change } }),
+    }));
+    ok(`PS55g malformed current profile ${name} is a typed byte-null refusal`, rejected.value === 2
+      && /PO-DECISION-CURRENT-AUTHORITY/u.test(rejected.text)
+      && readFileSync(statePath(fixture.dir), "utf8") === before);
+  }
+}
+
+{
+  const fixture = seedPoAuthorityRebind("po-decision-current-marker-invalid");
+  const prdPath = join(fixture.dir, fixture.planPath);
+  writeFileSync(prdPath, readFileSync(prdPath, "utf8").replace(fixture.oldSpecSha, fixture.oldSpecSha.toUpperCase()));
+  const before = readFileSync(statePath(fixture.dir), "utf8");
+  const rejected = captureConsoleError(() => run(["po-authority-decision-plan"], fixture.deps));
+  ok("PS55h malformed current PRD marker is a typed byte-null refusal", rejected.value === 2
+    && /PO-DECISION-PRD-MARKER/u.test(rejected.text)
+    && readFileSync(statePath(fixture.dir), "utf8") === before);
+}
+
+{
+  const fixture = seedPoAuthorityRebind("po-decision-current-profile-drift");
+  const planned = captureConsole(() => run(["po-authority-decision-plan"], fixture.deps));
+  const plan = JSON.parse(planned.text || "{}");
+  const selectionAction = plan.selectionActions?.find((action) => action.selectedCandidate === "spec");
+  const selected = selectionAction
+    ? captureConsole(() => run(selectionAction.argv.slice(1), fixture.deps))
+    : { value: 2, text: "" };
+  const selection = JSON.parse(selected.text || "{}");
+  const before = readFileSync(statePath(fixture.dir), "utf8");
+  const rejected = selection.applyAction
+    ? captureConsoleError(() => run(selection.applyAction.argv.slice(1), {
+      ...fixture.deps,
+      poGateProfile: () => ({ ok: true, value: { ...fixture.profile, receiptSha256: "9".repeat(64) } }),
+    }))
+    : { value: 0 };
+  ok("PS55i current-profile drift after selection fails closed before mutation", planned.value === 0
+    && selected.value === 0
+    && rejected.value === 2
+    && readFileSync(statePath(fixture.dir), "utf8") === before);
+}
+
+{
+  const fixture = seedPoAuthorityRebind("po-decision-selection-drift");
+  const state = readState(fixture.dir).state;
+  state.activeFeature.phase = "design";
+  writeFileSync(statePath(fixture.dir), JSON.stringify(state, null, 2) + "\n");
+  writeFileSync(join(fixture.dir, fixture.planPath), `${readFileSync(join(fixture.dir, fixture.planPath), "utf8")}\nDrifted PRD.\n`);
+  const plan = JSON.parse(captureConsole(() => run(["po-authority-decision-plan"], fixture.deps)).text || "{}");
+  const specSelection = plan.selectionActions.find((action) => action.selectedCandidate === "spec");
+  const selection = JSON.parse(captureConsole(() => run(specSelection.argv.slice(1), fixture.deps)).text || "{}");
+  writeFileSync(join(fixture.dir, fixture.specPath), "# drift after selection\n");
+  const beforeState = readFileSync(statePath(fixture.dir), "utf8");
+  const rejected = captureConsoleError(() => run(selection.applyAction.argv.slice(1), fixture.deps));
+  ok("PS54e document drift after selection is byte-null", rejected.value === 2
+    && readFileSync(statePath(fixture.dir), "utf8") === beforeState);
+}
+
+{
+  const fixture = seedPoAuthorityRebind("po-rebind-mismatched-authority");
+  const state = readState(fixture.dir).state; state.continuity.authority.prd.sha256 = "d".repeat(64);
+  writeFileSync(statePath(fixture.dir), JSON.stringify(state, null, 2) + "\n");
+  const rejected = captureConsoleError(() => run(["po-authority-rebind-plan"], fixture.deps));
+  ok("PS53f mismatched stale Continuity PRD authority is not a repair target", rejected.value === 2);
+}
+{
+  const fixture = seedPoAuthorityRebind("po-rebind-drift");
+  const planned = captureConsole(() => run(["po-authority-rebind-plan"], fixture.deps)); const plan = JSON.parse(planned.text || "{}");
+  writeFileSync(join(fixture.dir, fixture.specPath), "# changed after plan\n");
+  const before = readFileSync(statePath(fixture.dir), "utf8");
+  const drift = captureConsoleError(() => run(plan.applyAction.argv.slice(1), fixture.deps));
+  ok("PS53g Spec preimage drift blocks apply before mutation", drift.value === 2 && readFileSync(statePath(fixture.dir), "utf8") === before);
+}
+
+{
+  const fixture = seedPoAuthorityRebind("po-rebind-human-postimage-drift");
+  const planned = captureConsole(() => run(["po-authority-rebind-plan"], fixture.deps));
+  const plan = JSON.parse(planned.text || "{}");
+  const prdBefore = readFileSync(join(fixture.dir, fixture.planPath), "utf8");
+  const stateBefore = readFileSync(statePath(fixture.dir), "utf8");
+  let postimageEvidence = null;
+  const rejected = captureConsoleError(() => run(plan.applyAction.argv.slice(1), {
+    ...fixture.deps,
+    afterRebindStateWritten: () => {
+      const postimageState = readState(fixture.dir).state;
+      postimageState.planApproval.approvedBy = PHOENIX_SPEC_BOUND_BY;
+      writeFileSync(statePath(fixture.dir), JSON.stringify(postimageState, null, 2) + "\n");
+    },
+    observeRebindPostimageEvidence: (evidence) => { postimageEvidence = evidence; },
+  }));
+  ok("PS53u valid Human postimage drift fails state-value readback and restores exact preimages", rejected.value === 2
+    && postimageEvidence?.predicates?.stateValue?.ok === false
+    && /rollback verified/iu.test(rejected.text)
+    && readFileSync(join(fixture.dir, fixture.planPath), "utf8") === prdBefore
+    && readFileSync(statePath(fixture.dir), "utf8") === stateBefore);
+}
+
+{
+  const fixture = seedPoAuthorityRebind("po-rebind-write-fault");
+  const planned = captureConsole(() => run(["po-authority-rebind-plan"], fixture.deps)); const plan = JSON.parse(planned.text || "{}");
+  const prdBefore = readFileSync(join(fixture.dir, fixture.planPath), "utf8"); const stateBefore = readFileSync(statePath(fixture.dir), "utf8");
+  const prdPrepare = captureConsoleError(() => run(plan.applyAction.argv.slice(1), { ...fixture.deps, replaceRebindPrdFdContents: () => { throw new Error("injected PRD prepare failure"); } }));
+  ok("PS53g PRD prepare failure is byte-null before the transaction begins", prdPrepare.value === 2 && /rollback verified/i.test(prdPrepare.text) && readFileSync(join(fixture.dir, fixture.planPath), "utf8") === prdBefore && readFileSync(statePath(fixture.dir), "utf8") === stateBefore);
+  const statePrepare = captureConsoleError(() => run(plan.applyAction.argv.slice(1), { ...fixture.deps, replaceRebindStateFdContents: () => { throw new Error("injected State prepare failure"); } }));
+  ok("PS53h State prepare failure rolls the already-written PRD back completely", statePrepare.value === 2 && /rollback verified/i.test(statePrepare.text) && readFileSync(join(fixture.dir, fixture.planPath), "utf8") === prdBefore && readFileSync(statePath(fixture.dir), "utf8") === stateBefore);
+  let stateRenameFaulted = false;
+  const renamedPlan = JSON.parse(captureConsole(() => run(["po-authority-rebind-plan"], fixture.deps)).text || "{}");
+  const stateRenameEffect = captureConsoleError(() => run(renamedPlan.applyAction.argv.slice(1), { ...fixture.deps, renameRebindState: (from, to) => { renameSync(from, to); if (!stateRenameFaulted) { stateRenameFaulted = true; throw new Error("injected State rename-effect failure"); } } }));
+  ok("PS53i State rename-effect failure rolls both postimages back completely", stateRenameEffect.value === 2 && /rollback verified/i.test(stateRenameEffect.text) && readFileSync(join(fixture.dir, fixture.planPath), "utf8") === prdBefore && readFileSync(statePath(fixture.dir), "utf8") === stateBefore);
+  const replanned = captureConsole(() => run(["po-authority-rebind-plan"], fixture.deps)); const repairPlan = JSON.parse(replanned.text || "{}");
+  const readbackFault = captureConsoleError(() => run(repairPlan.applyAction.argv.slice(1), {
+    ...fixture.deps,
+    v4Inspection: ({ intent }) => ({
+      status: "partial",
+      diagnostics: [{ code: `injected_${intent}_readback` }],
+    }),
+  }));
+  ok("PS53j postimage V4 failure rolls both authority surfaces back without logging readback payload", readbackFault.value === 2
+    && /postimage readback failed/iu.test(readbackFault.text)
+    && !/pipeline\.po-authority-postimage-readback\.v1/u.test(readbackFault.text)
+    && !/injected_(bootstrap|session|dispatch)_readback/u.test(readbackFault.text)
+    && /rollback verified/iu.test(readbackFault.text)
+    && readFileSync(join(fixture.dir, fixture.planPath), "utf8") === prdBefore
+    && readFileSync(statePath(fixture.dir), "utf8") === stateBefore);
+}
+
+{
+  const fixture = seedPoAuthorityRebind("po-rebind-crash-prepared");
+  const planned = captureConsole(() => run(["po-authority-rebind-plan"], fixture.deps)); const plan = JSON.parse(planned.text || "{}");
+  const prdBefore = readFileSync(join(fixture.dir, fixture.planPath), "utf8"); const stateBefore = readFileSync(statePath(fixture.dir), "utf8");
+  const journal = `${statePath(fixture.dir)}.po-authority-rebind.v1`;
+  const interrupted = captureConsoleError(() => run(plan.applyAction.argv.slice(1), {
+    ...fixture.deps, afterRebindTransactionPrepared: () => { throw new Error("injected crash after journal prepare"); },
+  }));
+  ok("PS53k prepared-journal crash retains exact preimages and its recovery anchor", interrupted.value === 2 && existsSync(journal)
+    && readFileSync(join(fixture.dir, fixture.planPath), "utf8") === prdBefore && readFileSync(statePath(fixture.dir), "utf8") === stateBefore);
+  const resumed = captureConsole(() => run(plan.applyAction.argv.slice(1), fixture.deps));
+  const after = readState(fixture.dir).state;
+  ok("PS53l exact confirmed replay resumes a prepared transaction without a false no-op", resumed.value === 0 && JSON.parse(resumed.text).code === "PO-REBIND-APPLIED"
+    && !existsSync(journal) && after.planApproval.poGateAuthority.specSha256 === fixture.newSpecSha && after.continuity.revision === 4);
+}
+{
+  const fixture = seedPoAuthorityRebind("po-rebind-crash-mixed");
+  const planned = captureConsole(() => run(["po-authority-rebind-plan"], fixture.deps)); const plan = JSON.parse(planned.text || "{}");
+  const prdBefore = readFileSync(join(fixture.dir, fixture.planPath), "utf8"); const stateBefore = readFileSync(statePath(fixture.dir), "utf8");
+  const journal = `${statePath(fixture.dir)}.po-authority-rebind.v1`;
+  const interrupted = captureConsoleError(() => run(plan.applyAction.argv.slice(1), {
+    ...fixture.deps, afterRebindPrdWritten: () => { throw new Error("injected crash after PRD commit"); },
+  }));
+  ok("PS53m mixed-journal crash preserves the journal and exposes no success", interrupted.value === 2 && existsSync(journal)
+    && readFileSync(join(fixture.dir, fixture.planPath), "utf8") !== prdBefore && readFileSync(statePath(fixture.dir), "utf8") === stateBefore);
+  const recovered = captureConsoleError(() => run(plan.applyAction.argv.slice(1), fixture.deps));
+  const replanned = captureConsole(() => run(["po-authority-rebind-plan"], fixture.deps));
+  ok("PS53n mixed replay rolls back completely and permits a fresh closed plan", recovered.value === 2 && /recovered its interrupted transaction/i.test(recovered.text)
+    && !existsSync(journal) && readFileSync(join(fixture.dir, fixture.planPath), "utf8") === prdBefore
+    && readFileSync(statePath(fixture.dir), "utf8") === stateBefore && replanned.value === 0);
+}
+{
+  const fixture = seedPoAuthorityRebind("po-rebind-crash-committed");
+  const planned = captureConsole(() => run(["po-authority-rebind-plan"], fixture.deps)); const plan = JSON.parse(planned.text || "{}");
+  const journal = `${statePath(fixture.dir)}.po-authority-rebind.v1`;
+  const prdPath = join(fixture.dir, fixture.planPath); const stateFilePath = statePath(fixture.dir);
+  const prdBefore = readFileSync(prdPath, "utf8"); const stateBefore = readFileSync(stateFilePath, "utf8");
+  const interrupted = captureConsoleError(() => run(plan.applyAction.argv.slice(1), {
+    ...fixture.deps, afterRebindStateWritten: () => { throw new Error("injected crash after State commit"); },
+  }));
+  const postPrd = readFileSync(prdPath); const postState = readFileSync(stateFilePath);
+  ok("PS53o committed-journal crash retains both postimages and its recovery anchor", interrupted.value === 2 && existsSync(journal)
+    && postPrd.includes(fixture.newSpecSha) && readState(fixture.dir).state.continuity.revision === 4);
+  const postPrdIdentity = lstatSync(prdPath); const postStateIdentity = lstatSync(stateFilePath);
+  writeFileSync(`${prdPath}.replacement`, postPrd); renameSync(`${prdPath}.replacement`, prdPath);
+  writeFileSync(`${stateFilePath}.replacement`, postState); renameSync(`${stateFilePath}.replacement`, stateFilePath);
+  const replacedPrdIdentity = lstatSync(prdPath); const replacedStateIdentity = lstatSync(stateFilePath);
+  const replay = captureConsoleError(() => run(plan.applyAction.argv.slice(1), fixture.deps));
+  const replanned = captureConsole(() => run(["po-authority-rebind-plan"], fixture.deps));
+  ok("PS53p same-byte postimage inode replacement is rolled back and requires a fresh plan",
+    postPrdIdentity.ino !== replacedPrdIdentity.ino && postStateIdentity.ino !== replacedStateIdentity.ino
+    && replay.value === 2 && /recovered its interrupted transaction/i.test(replay.text) && !existsSync(journal)
+    && readFileSync(prdPath, "utf8") === prdBefore && readFileSync(stateFilePath, "utf8") === stateBefore
+    && replanned.value === 0);
+}
+
+if (symlinkCapable) {
+  const fixture = seedPoAuthorityRebind("po-rebind-link");
+  const prd = join(fixture.dir, fixture.planPath); const real = `${prd}.real`;
+  renameSync(prd, real); symlinkSync(real, prd);
+  const rejected = captureConsoleError(() => run(["po-authority-rebind-plan"], fixture.deps));
+  ok("PS53q linked PRD is refused before any plan or mutation", rejected.value === 2 && readFileSync(statePath(fixture.dir), "utf8").includes("nova-shaped"));
+}
+{
+  const fixture = seedPoAuthorityRebind("po-rebind-hardlink");
+  const prd = join(fixture.dir, fixture.planPath);
+  linkSync(prd, `${prd}.hard`);
+  const rejected = captureConsoleError(() => run(["po-authority-rebind-plan"], fixture.deps));
+  ok("PS53r hard-linked PRD is refused before any plan or mutation", rejected.value === 2 && readFileSync(statePath(fixture.dir), "utf8").includes("nova-shaped"));
+}
+{
+  const fixture = seedPoAuthorityRebind("po-rebind-permission-drift");
+  const planned = captureConsole(() => run(["po-authority-rebind-plan"], fixture.deps)); const plan = JSON.parse(planned.text || "{}");
+  const beforePrd = readFileSync(join(fixture.dir, fixture.planPath), "utf8"); const beforeState = readFileSync(statePath(fixture.dir), "utf8");
+  chmodSync(join(fixture.dir, fixture.planPath), 0o600);
+  const rejected = captureConsoleError(() => run(plan.applyAction.argv.slice(1), fixture.deps));
+  ok("PS53s permission/identity drift blocks apply before mutation", rejected.value === 2 && readFileSync(join(fixture.dir, fixture.planPath), "utf8") === beforePrd && readFileSync(statePath(fixture.dir), "utf8") === beforeState);
+}
+{
+  const fixture = seedPoAuthorityRebind("po-rebind-profile-security");
+  const before = readFileSync(statePath(fixture.dir), "utf8");
+  const rejected = captureConsoleError(() => run(["po-authority-rebind-plan"], { ...fixture.deps, poGateProfile: () => ({ ok: false, code: "PO-PROFILE-AUTHORITY-UNAVAILABLE" }) }));
+  ok("PS53t failed existing PO-profile DACL assurance blocks planning byte-null", rejected.value === 2 && readFileSync(statePath(fixture.dir), "utf8") === before);
+}
 }
 
 let pass = 0;
@@ -98,16 +630,9 @@ function captureConsoleError(action) {
     console.error = original;
   }
 }
-
-function captureConsoleLog(action) {
-  const original = console.log;
-  const messages = [];
-  console.log = (...args) => messages.push(args.join(" "));
-  try {
-    return { value: action(), text: messages.join("\n") };
-  } finally {
-    console.log = original;
-  }
+function captureConsole(action) {
+  const original = console.log; const messages = []; console.log = (...args) => messages.push(args.join(" "));
+  try { return { value: action(), text: messages.join("\n") }; } finally { console.log = original; }
 }
 
 const FIXED_NOW = () => "2026-07-07T21:00:00.000Z";
@@ -130,70 +655,17 @@ const C = createHash("sha256").update(RESULT_FIXTURE).digest("hex");
 const D = "d".repeat(64);
 const CONTINUITY_FEATURE = "phase26-test";
 
-function recoveryBridgeDecision(overrides = {}) {
-  const decision = {
-    schema: RECOVERY_BRIDGE_DECISION_SCHEMA,
-    decisionId: "rb-0123456789abcdef",
-    decisionSha256: "0".repeat(64),
-    featureId: "sprint-phoenix-epic",
-    operation: "reconcile-mutable-design",
-    manifest: "specs/sprint-phoenix-epic/lifecycle.json",
-    artifactPath: "specs/sprint-phoenix-epic/RECOVERY.md",
-    assurance: "po-gate-bound",
-    manifestPreimageSha256: A,
-    recoveryPostimageSha256: B,
-    prdSha256: C,
-    specSha256: D,
-    poApproval: {
-      planPath: "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
-      planSha256: C,
-      specPath: "specs/sprint-phoenix-epic/spec.md",
-      specSha256: D,
-      approvalSha256: A,
-    },
-    approvedBy: "PO",
-    approvedAt: "2026-08-01T00:00:00.000Z",
-    expiresAt: "2026-10-30T00:00:00.000Z",
-    status: "issued",
-    ...overrides,
-  };
-  decision.decisionSha256 = recoveryBridgeDecisionDigest(decision);
-  return decision;
-}
-
-function recoveryBridgeCommitRequest(decision, overrides = {}) {
-  return {
-    schema: RECOVERY_BRIDGE_PUBLIC_COMMIT_REQUEST_SCHEMA,
-    decisionSha256: decision.decisionSha256,
-    decisionId: decision.decisionId,
-    featureId: decision.featureId,
-    operation: decision.operation,
-    manifest: decision.manifest,
-    artifactPath: decision.artifactPath,
-    assurance: decision.assurance,
-    manifestPreimageSha256: decision.manifestPreimageSha256,
-    recoveryPostimageSha256: decision.recoveryPostimageSha256,
-    prdSha256: decision.prdSha256,
-    specSha256: decision.specSha256,
-    poApproval: decision.poApproval,
-    approvedBy: decision.approvedBy,
-    approvedAt: decision.approvedAt,
-    expiresAt: decision.expiresAt,
-    ...overrides,
-  };
-}
-
-function recoveryBridgeConsumeReceipt(decision, overrides = {}) {
-  return {
-    ...recoveryBridgeCommitRequest(decision),
-    schema: RECOVERY_BRIDGE_CONSUME_RECEIPT_SCHEMA,
-    readback: {
-      manifest: decision.manifest,
-      artifactPath: decision.artifactPath,
-      recoveryPostimageSha256: decision.recoveryPostimageSha256,
-    },
-    ...overrides,
-  };
+if (process.env.PIPELINE_STATE_PS53_ONLY === "1") {
+  runPoAuthorityRebindTests();
+  for (const dir of ALL_DIRS) rmSync(dir, { recursive: true, force: true });
+  const total = pass + failures.length;
+  console.log(`\n${pass}/${total} cases passed.`);
+  if (failures.length > 0) {
+    console.log("Failures:");
+    for (const failure of failures) console.log(`  - ${failure}`);
+    process.exit(1);
+  }
+  process.exit(0);
 }
 
 function injectedPoGateAuthority(planPath) {
@@ -219,41 +691,89 @@ function injectedPoGateAuthority(planPath) {
       : { ok: false, code: "PO-GATE-AUTHORITY-STALE" };
 }
 
-function humanDecisionFixture(dir, authority, featureId, { action = "APPROVE_PLAN", candidate = { commit: "b".repeat(40), tree: "c".repeat(40) } } = {}) {
-  const reference = {
-    schema: "pipeline.human-decision-reference.v1",
-    decisionId: `${action.toLowerCase().replaceAll("_", "-")}-${featureId}`,
-    decisionDigest: "e".repeat(64),
-    candidate,
-    checkpoint: {
-      repositoryFingerprint: authority.repositoryFingerprint,
-      streamId: "human",
-      sequence: 1,
-      eventDigest: "f".repeat(64),
-      candidateCommit: candidate.commit,
-      candidateTree: candidate.tree,
+function injectedPoGateProfile() {
+  return () => ({
+    ok: true,
+    code: "PO-PROFILE-AUTHORITY-VALID",
+    value: {
+      schema: PO_GATE_AUTHORITY_EVIDENCE_SCHEMA,
+      humanFacing: "de",
+      sourceSha256: A,
+      runtimeSha256: B,
+      receiptSha256: C,
+      repositoryFingerprint: D,
+    },
+  });
+}
+
+function lifecycleDeps(dir, planPath, overrides = {}) {
+  return {
+    dir,
+    now: FIXED_NOW,
+    poGateAuthority: injectedPoGateAuthority(planPath),
+    poGateProfile: injectedPoGateProfile(),
+    ...overrides,
+  };
+}
+
+function lifecycleContinuity(featureId, authority) {
+  return {
+    schema: "pipeline.continuity.v0",
+    featureId,
+    revision: 0,
+    runtime: {
+      humanFacingLanguage: authority.humanFacing,
+      activeDuty: "Coordinator",
+      sessionCleanup: null,
+    },
+    authority: {
+      prd: { path: authority.planPath, sha256: authority.planSha256 },
+      spec: { path: authority.specPath, sha256: authority.specSha256 },
+      result: null,
+    },
+    queueHead: {
+      packageId: "initial-planning",
+      actionId: "review-plan",
+      nextAction: "review",
+      productRetryCount: 0,
+      environmentRerouteCount: 0,
+      dispatch: null,
+    },
+    blocker: null,
+    acknowledgedFinal: null,
+    resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" },
+    recovery: null,
+    decisionTxn: null,
+    capacity: {
+      concurrencyLimit: 4,
+      reservedCriticSlots: 1,
+      reservedRecoverySlots: 1,
+      fallbackPolicy: "defer",
     },
   };
-  const scope = {
-    repositoryFingerprint: authority.repositoryFingerprint,
-    candidate,
-    packageId: featureId,
-    action,
-    environment: "local",
-    artifacts: [
-      { path: authority.planPath, sha256: authority.planSha256 },
-      { path: authority.specPath, sha256: authority.specSha256 },
-    ],
-  };
-  return {
-    file: writeRequest(dir, `human-decision-${featureId}`, reference),
-    humanAuthority: ({ request }) => request?.decisionId === reference.decisionId
-      ? { ok: true, value: { schema: "pipeline.governance-authority-readback.v1", granted: true, decisionId: reference.decisionId, decisionDigest: reference.decisionDigest, scope, singleUse: true } }
-      : { ok: false, code: "PS-HUMAN-AUTHORITY-READBACK" },
-    humanConsumption: ({ request }) => request?.decisionId === reference.decisionId
-      ? { ok: true, value: { schema: "pipeline.governance-authority-consumption-readback.v1", consumed: true, decisionId: reference.decisionId, decisionDigest: reference.decisionDigest, consumptionDecisionId: request.consumption.decisionId, checkpoint: { repositoryFingerprint: authority.repositoryFingerprint, streamId: "human", sequence: 2, eventDigest: "a".repeat(64), candidateCommit: candidate.commit, candidateTree: candidate.tree }, outcome: "appended" } }
-      : { ok: false, code: "PS-HUMAN-CONSUMPTION-READBACK" },
-  };
+}
+
+function initializeLifecycleContinuity(dir, featureId, planPath) {
+  const observed = injectedPoGateAuthority(planPath)();
+  if (!observed.ok) return 2;
+  const requestFile = writeRequest(
+    dir,
+    `lifecycle-continuity-${featureId}`,
+    lifecycleContinuity(featureId, observed.value),
+  );
+  return run(
+    continuityArgs("continuity-init", "absent", requestFile),
+    continuityDeps(dir),
+  );
+}
+
+function submitAndApprove(dir, planPath) {
+  const activeFeature = readState(dir).state.activeFeature;
+  const initialized = initializeLifecycleContinuity(dir, activeFeature.id, planPath);
+  const deps = lifecycleDeps(dir, planPath);
+  const submitted = run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps);
+  const approved = run(["approve-plan", "--by", "po-test"], deps);
+  return { initialized, submitted, approved };
 }
 
 function seedSubprocessPoGateAuthority(dir, planPath) {
@@ -294,36 +814,24 @@ function seedSubprocessPoGateAuthority(dir, planPath) {
   chmodSync(receiptPath, 0o600);
 }
 
-function governanceRegistry(fingerprint) {
-  return { schema: "pipeline.governance-stream-registry.v1", repositoryFingerprint: fingerprint, canonicalization: "RFC8785", digestAlgorithm: "sha-256", eventDigestDomain: "pipeline.governance-event.v1\0", storageRoot: "governance/events", streams: [
-    { streamId: "human", origin: "human", authorityClass: "human-authority", relativeRoot: "human", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
-    { streamId: "agent", origin: "agent", authorityClass: "non-authoritative", relativeRoot: "agent", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
-    { streamId: "lifecycle", origin: "lifecycle", authorityClass: "non-authoritative", relativeRoot: "lifecycle", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
-  ] };
-}
-
-function governanceCapturePolicy() {
-  return { schema: "pipeline.governance-capture-policy.v1", policyId: "fixture", revision: "d".repeat(64), defaultAction: "deny", streams: [
-    { origin: "human", purpose: "authority-history", materiality: "required", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
-    { origin: "agent", purpose: "declared-assumption", materiality: "policy-selected", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
-    { origin: "lifecycle", purpose: "deterministic-lifecycle", materiality: "required", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
-  ], sanitizedReceipt: { allowEventId: true, allowEventDigest: true, allowCheckpoint: true, allowReasonText: false } };
-}
-
-async function seedSubprocessHumanAuthority(dir, planPath, featureId, action = "APPROVE_PLAN") {
-  const git = (...args) => spawnSync("git", args, { cwd: dir, encoding: "utf8" }).stdout.trim();
-  const fingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: join(dir, ".git"), primaryRoot: dir });
-  const candidate = { commit: git("rev-parse", "HEAD"), tree: git("rev-parse", "HEAD^{tree}") };
-  const policy = governanceCapturePolicy();
-  mkdirSync(join(dir, "governance", "events"), { recursive: true });
-  writeFileSync(join(dir, "governance", "events", "registry.json"), `${canonicalizeJson(governanceRegistry(fingerprint))}\n`);
-  writeFileSync(join(dir, "governance", "events", "capture-policy.json"), `${canonicalizeJson(policy)}\n`);
+function initializeSubprocessLifecycleContinuity(dir, featureId, planPath, env) {
   const specPath = `${planPath.slice(0, planPath.lastIndexOf("/") + 1)}spec.md`;
-  const decision = { decisionId: `${action.toLowerCase().replaceAll("_", "-")}-${featureId}`, event: "granted", outcome: "granted", authorityClass: "product-owner", identityAssurance: "locally-attributed", timeAssurance: "locally-observed", scope: { repositoryFingerprint: fingerprint, candidate, packageId: featureId, action, environment: "local", artifacts: [{ path: planPath, sha256: createHash("sha256").update(readFileSync(join(dir, planPath))).digest("hex") }, { path: specPath, sha256: createHash("sha256").update(readFileSync(join(dir, specPath))).digest("hex") }] }, reasonCode: "APPROVED", policyDigest: "a".repeat(64), ruleDigest: "f".repeat(64), validity: { notBeforeEpochMs: 1, expiresAtEpochMs: 4_102_444_800_000, singleUse: true }, links: { requestDecisionId: "request-1", consumesDecisionId: null, revokesDecisionId: null, expiresDecisionId: null, supersedesDecisionId: null, correctsDecisionId: null } };
-  const unavailable = { state: "not-applicable" };
-  const intent = { schema: "pipeline.governance-event-envelope.v1", payloadSchema: "pipeline.human-governance-decision.v1", canonicalization: "RFC8785", digestAlgorithm: "sha-256", eventId: `human-event-${action.toLowerCase().replaceAll("_", "-")}-${featureId}`, idempotencyKey: `human-idempotency-${action.toLowerCase().replaceAll("_", "-")}-${featureId}`, origin: "human", authorityClass: "human-authority", eventType: "human.granted", occurredAtEpochMs: 2, observedAtEpochMs: 2, timeAssurance: "locally-observed", repositoryFingerprint: fingerprint, sourceUri: `urn:pipeline:repository:${fingerprint}`, streamId: "human", correlation: { featureId: unavailable, packageId: unavailable, requestId: unavailable, sessionId: unavailable, dispatchId: unavailable, traceId: unavailable }, candidate, artifacts: [unavailable], policy: { policyDigest: unavailable, configurationDigest: unavailable, capturePolicyDigest: canonicalSha256(policy), redactionPolicyDigest: unavailable }, classification: "repository-public-safe", storageProfile: "repository-public-safe", retentionCompatibility: "repository-retained", disclosureClass: "repository-visible", payload: decision };
-  const receipt = await appendHumanGovernanceDecision({ repositoryRoot: dir, repositoryFingerprint: fingerprint, intent });
-  return writeRequest(dir, `human-decision-${action.toLowerCase().replaceAll("_", "-")}-${featureId}`, { schema: "pipeline.human-decision-reference.v1", decisionId: decision.decisionId, decisionDigest: canonicalSha256(decision), candidate, checkpoint: receipt.checkpoint });
+  const authority = {
+    humanFacing: "de",
+    planPath,
+    planSha256: createHash("sha256").update(readFileSync(join(dir, planPath))).digest("hex"),
+    specPath,
+    specSha256: createHash("sha256").update(readFileSync(join(dir, specPath))).digest("hex"),
+  };
+  const requestFile = writeRequest(
+    dir,
+    `subprocess-lifecycle-continuity-${featureId}`,
+    lifecycleContinuity(featureId, authority),
+  );
+  return spawnSync(process.execPath, [
+    CLI,
+    ...continuityArgs("continuity-init", "absent", requestFile),
+  ], { encoding: "utf8", env });
 }
 
 function continuityIdentity(overrides = {}) {
@@ -468,23 +976,6 @@ function continuityArgs(sub, revision, requestFile, token = "token-00000001") {
   return [sub, "--expected-revision", String(revision), "--request-file", requestFile, "--lock-token", token];
 }
 
-function sameAuthorityRevisionApproval(approval, request) {
-  return JSON.stringify(approval) === JSON.stringify({
-    schema: "pipeline.continuity-authority-revision-approval.v1", featureId: request.featureId, phase: "design",
-    oldAuthority: request.oldAuthority, nextAuthority: request.nextAuthority, decision: request.decision,
-    candidate: request.candidate, evidence: request.evidence, expiresAt: request.expiresAt,
-  });
-}
-
-function authorityRevisionDeps(dir, boundRequest, overrides = {}) {
-  return continuityDeps(dir, {
-    gitBinding: () => ({ ok: true, commit: boundRequest.candidate.commit, tree: boundRequest.candidate.tree }),
-    authorityRevisionApproval: ({ repoRoot, ...approval }) => sameAuthorityRevisionApproval(approval, boundRequest)
-      ? { ok: true, value: approval } : { ok: false, code: "PO-DESIGN-REVISION-STALE" },
-    ...overrides,
-  });
-}
-
 function finalTransactionFixture(dir, name = "txn") {
   seedContinuityRoot(dir);
   const initial = continuityState();
@@ -535,16 +1026,6 @@ function canonicalFixtureJson(value) {
   ok("PS02 approve-plan with empty --by refused (exit 2)", code === 2, `got ${code}`);
 }
 
-// ---- PS02b: approve-plan requires a checkpoint-bound human decision -------------------
-{
-  const dir = freshDir("refuse-approve-no-human-decision");
-  const poGateAuthority = injectedPoGateAuthority("p.md");
-  run(["set-feature", "--id", "missing-human-decision", "--plan-path", "p.md"], { dir, now: FIXED_NOW });
-  const code = run(["approve-plan", "--by", "po-test"], { dir, now: FIXED_NOW, poGateAuthority });
-  ok("PS02b approve-plan without --human-decision-file refused (exit 2)", code === 2, `got ${code}`);
-  ok("PS02c missing human decision leaves plan unapproved", readState(dir).state?.planApproved === false);
-}
-
 // ---- PS03: revoke-plan without --by is refused -----------------------------------------
 {
   const dir = freshDir("refuse-revoke-no-by");
@@ -571,45 +1052,35 @@ function canonicalFixtureJson(value) {
   ok("PS05b file left byte-identical (no silent overwrite)", after === before);
 }
 
-// ---- PS05c: mixed authority never revives a stale legacy State -------------------------
-{
-  const dir = freshDir("mixed-authority");
-  mkdirSync(join(dir, ".claude"), { recursive: true });
-  mkdirSync(join(dir, "project"), { recursive: true });
-  writeFileSync(join(dir, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
-  writeFileSync(join(dir, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
-  writeFileSync(join(dir, ".claude", "pipeline-state.json"), JSON.stringify({ schema: SCHEMA_ID, activeFeature: { id: "stale-legacy", planPath: "p.md", phase: "implementation" } }) + "\n");
-  ok(
-    "PS05c mixed authority selects neutral State and ignores stale legacy State",
-    statePath(dir) === join(dir, "project", "pipeline-state.json") && readState(dir).status === "absent",
-  );
-}
-
 // ---- PS06: approve-plan shape correct ---------------------------------------------------
 {
   const dir = freshDir("approve-shape");
-  const poGateAuthority = injectedPoGateAuthority(".claude/plans/x.md");
-  const human = humanDecisionFixture(dir, poGateAuthority().value, "ap1-pipeline-tuning");
   run(["set-feature", "--id", "ap1-pipeline-tuning", "--plan-path", ".claude/plans/x.md"], { dir, now: FIXED_NOW });
-  const code = run(["approve-plan", "--by", "po-test", "--human-decision-file", human.file], {
+  const initialized = initializeLifecycleContinuity(
     dir,
-    now: FIXED_NOW,
-    poGateAuthority,
-    humanAuthority: human.humanAuthority,
-  });
+    "ap1-pipeline-tuning",
+    ".claude/plans/x.md",
+  );
+  const submitted = run(
+    ["submit-plan", "--by", "coordinator", "--profile", "feature"],
+    lifecycleDeps(dir, ".claude/plans/x.md"),
+  );
+  const code = run(["approve-plan", "--by", "po-test"], lifecycleDeps(dir, ".claude/plans/x.md"));
+  ok("PS06a-1 continuity-init exit 0", initialized === 0, `got ${initialized}`);
+  ok("PS06a0 submit-plan exit 0", submitted === 0, `got ${submitted}`);
   ok("PS06a approve-plan exit 0", code === 0, `got ${code}`);
   const state = readState(dir).state;
   ok("PS06b schema field correct", state.schema === SCHEMA_ID);
   ok("PS06c planApproved true", state.planApproved === true);
   ok(
-    "PS06d planApproval is exact v3 and binds the verified human decision, Plan and Spec authority",
-    state.planApproval?.schema === "pipeline.plan-approval.v3"
+    "PS06d planApproval is exact v4 and binds the submitted Plan, Spec, profile authority, and an empty audit seal",
+    state.planSubmission?.schema === "pipeline.plan-submission.v1"
+      && state.planApproval?.schema === "pipeline.plan-approval.v4"
       && state.planApproval?.approvedBy === "po-test"
       && state.planApproval?.approvedAt === FIXED_NOW()
-      && state.planApproval?.specBoundBy === "po-test"
-      && state.planApproval?.specBoundAt === FIXED_NOW()
-      && state.planApproval?.poGateAuthority?.schema === PO_GATE_AUTHORITY_EVIDENCE_V2_SCHEMA
-      && state.planApproval?.humanDecision?.decisionId === "approve-plan-ap1-pipeline-tuning",
+      && state.planApproval?.submissionSha256
+      && state.planApproval?.priorInvalidationSha256 === null
+      && state.planApproval?.poGateAuthority?.schema === PO_GATE_AUTHORITY_EVIDENCE_V2_SCHEMA,
   );
   ok("PS06e activeFeature preserved from set-feature", state.activeFeature?.id === "ap1-pipeline-tuning");
 }
@@ -617,15 +1088,11 @@ function canonicalFixtureJson(value) {
 // ---- PS07: set-feature resets planApproved to false + phase design ---------------------
 {
   const dir = freshDir("set-feature-reset");
-  const poGateAuthority = injectedPoGateAuthority("p1.md");
-  const human = humanDecisionFixture(dir, poGateAuthority().value, "f1");
   run(["set-feature", "--id", "f1", "--plan-path", "p1.md"], { dir, now: FIXED_NOW });
-  run(["approve-plan", "--by", "po-test", "--human-decision-file", human.file], {
-    dir,
-    now: FIXED_NOW,
-    poGateAuthority,
-    humanAuthority: human.humanAuthority,
-  });
+  const approved = readState(dir).state;
+  approved.planApproved = true;
+  approved.planApproval = { approvedBy: "legacy-po", approvedAt: FIXED_NOW() };
+  writeFileSync(statePath(dir), `${JSON.stringify(approved, null, 2)}\n`);
   run(["set-feature", "--id", "f2", "--plan-path", "p2.md"], { dir, now: FIXED_NOW });
   const state = readState(dir).state;
   ok("PS07a new feature resets planApproved=false", state.planApproved === false);
@@ -634,27 +1101,62 @@ function canonicalFixtureJson(value) {
   ok("PS07d activeFeature reflects the NEW feature", state.activeFeature?.id === "f2");
 }
 
-// ---- PS08: revoke-plan sets planApproved=false + records revocation -------------------
+// ---- PS08: reopen-design invalidates exact submission/approval authority --------------
 {
   const dir = freshDir("revoke");
-  const poGateAuthority = injectedPoGateAuthority("p1.md");
-  const human = humanDecisionFixture(dir, poGateAuthority().value, "f1");
   run(["set-feature", "--id", "f1", "--plan-path", "p1.md"], { dir, now: FIXED_NOW });
-  run(["approve-plan", "--by", "po-test", "--human-decision-file", human.file], {
-    dir,
-    now: FIXED_NOW,
-    poGateAuthority,
-    humanAuthority: human.humanAuthority,
-  });
-  const code = run(["revoke-plan", "--by", "po-test"], { dir, now: FIXED_NOW });
-  ok("PS08a revoke-plan exit 0", code === 0, `got ${code}`);
+  submitAndApprove(dir, "p1.md");
+  const code = run(["reopen-design", "--by", "po-test"], { dir, now: FIXED_NOW });
+  ok("PS08a reopen-design exit 0", code === 0, `got ${code}`);
   const state = readState(dir).state;
-  ok("PS08b planApproved false after revoke", state.planApproved === false);
-  ok("PS08c exact v2 planRevocation recorded", state.planRevocation?.schema === "pipeline.plan-revocation.v2" && state.planRevocation?.revokedBy === "po-test");
+  ok("PS08b planApproved false after reopen", state.planApproved === false && state.activeFeature.phase === "design");
+  ok("PS08c exact invalidation recorded", state.planInvalidation?.schema === "pipeline.plan-invalidation.v1" && state.planInvalidation?.invalidatedBy === "po-test");
   const beforeReplay = readFileSync(statePath(dir), "utf8");
-  const replay = run(["revoke-plan", "--by", "po-test"], { dir, now: () => "2026-07-07T22:00:00.000Z" });
-  ok("PS08d revoke-plan replay accepts the stored timestamp after an ambiguous response", replay === 0, `got ${replay}`);
-  ok("PS08e revoke-plan replay leaves state byte-identical", readFileSync(statePath(dir), "utf8") === beforeReplay);
+  const replay = run(["reopen-design", "--by", "po-test"], { dir, now: () => "2026-07-07T22:00:00.000Z" });
+  ok("PS08d reopen replay accepts the stored timestamp after an ambiguous response", replay === 0, `got ${replay}`);
+  ok("PS08e reopen replay leaves state byte-identical", readFileSync(statePath(dir), "utf8") === beforeReplay);
+}
+
+// ---- PS08a: seal v3 approval retained across an invalidation into exact v4 -------------
+{
+  const dir = freshDir("approval-audit-seal");
+  const planPath = "specs/seal/prd_seal.md";
+  run(["set-feature", "--id", "approval-audit-seal", "--plan-path", planPath], { dir, now: FIXED_NOW });
+  submitAndApprove(dir, planPath);
+  const deps = lifecycleDeps(dir, planPath);
+  const reopened = run(["reopen-design", "--by", "po-test"], deps);
+  const successorDeps = lifecycleDeps(dir, planPath, { now: () => "2026-07-08T21:00:00.000Z" });
+  const successorSubmitted = run(["submit-plan", "--by", "coordinator", "--profile", "feature"], successorDeps);
+  const successorApproved = run(["approve-plan", "--by", "po-test"], successorDeps);
+  const legacy = readState(dir).state;
+  const { priorInvalidationSha256: _ignored, ...v3Approval } = legacy.planApproval;
+  const historicalV3 = {
+    ...legacy,
+    planApproved: true,
+    planApproval: { ...v3Approval, schema: "pipeline.plan-approval.v3" },
+  };
+  writeFileSync(statePath(dir), `${JSON.stringify(historicalV3, null, 2)}\n`);
+  const beforeSeal = readState(dir).state;
+  const sealed = captureConsole(() => run(["seal-plan-approval"], successorDeps));
+  const afterSeal = readState(dir).state;
+  ok("PS08a-1 fixture reopens a prior approval before retaining a successor v3 audit record", reopened === 0 && successorSubmitted === 0 && successorApproved === 0 && beforeSeal.planInvalidation?.schema === "pipeline.plan-invalidation.v1");
+  ok("PS08a-2 seal-plan-approval upgrades only a retained v3 approval and emits its audit receipt", sealed.value === 0 && sealed.text.includes("Plan approval audit seal written"));
+  ok(
+    "PS08a-3 seal readback is exact v4 and binds the canonical retained invalidation",
+    afterSeal.planApproved === true
+      && afterSeal.planApproval?.schema === "pipeline.plan-approval.v4"
+      && afterSeal.planApproval?.priorInvalidationSha256 === sha256Canonical(beforeSeal.planInvalidation)
+      && afterSeal.planApproval?.approvedBy === beforeSeal.planApproval?.approvedBy
+      && afterSeal.planApproval?.approvedAt === beforeSeal.planApproval?.approvedAt
+      && afterSeal.planApproval?.submissionSha256 === beforeSeal.planApproval?.submissionSha256
+      && JSON.stringify(afterSeal.planApproval?.poGateAuthority) === JSON.stringify(beforeSeal.planApproval?.poGateAuthority),
+  );
+  ok("PS08a-4 exact v4 readback permits the implementation lifecycle transition", run(["set-phase", "--phase", "implementation"], successorDeps) === 0);
+  const beforeReplay = readFileSync(statePath(dir), "utf8");
+  const replay = captureConsoleError(() => run(["seal-plan-approval"], successorDeps));
+  ok("PS08a-5 seal replay rejects the already-v4 approval without a false success claim or mutation", replay.value === 2 && replay.text.includes("PLAN-APPROVAL-SEAL-V3-REQUIRED") && readFileSync(statePath(dir), "utf8") === beforeReplay);
+  const malformed = captureConsoleError(() => run(["seal-plan-approval", "--by", "po-test"], successorDeps));
+  ok("PS08a-6 seal CLI refuses caller arguments without mutating the exact v4 readback", malformed.value === 2 && readFileSync(statePath(dir), "utf8") === beforeReplay);
 }
 
 // ---- PS08f: bind-plan-spec replay keeps the stored bind time --------------------------
@@ -687,15 +1189,8 @@ function canonicalFixtureJson(value) {
 // ---- PS09: set-phase updates only phase ------------------------------------------------
 {
   const dir = freshDir("set-phase");
-  const poGateAuthority = injectedPoGateAuthority("p1.md");
-  const human = humanDecisionFixture(dir, poGateAuthority().value, "f1");
   run(["set-feature", "--id", "f1", "--plan-path", "p1.md"], { dir, now: FIXED_NOW });
-  run(["approve-plan", "--by", "po-test", "--human-decision-file", human.file], {
-    dir,
-    now: FIXED_NOW,
-    poGateAuthority,
-    humanAuthority: human.humanAuthority,
-  });
+  submitAndApprove(dir, "p1.md");
   const code = run(["set-phase", "--phase", "implementation"], { dir, now: FIXED_NOW });
   ok("PS09a set-phase exit 0", code === 0, `got ${code}`);
   const state = readState(dir).state;
@@ -704,35 +1199,23 @@ function canonicalFixtureJson(value) {
   ok("PS09d activeFeature id/planPath untouched by set-phase", state.activeFeature?.id === "f1" && state.activeFeature?.planPath === "p1.md");
 }
 
-// ---- PS10: approve-push projects a consumed, candidate-bound human decision ------------
+// ---- PS10: approve-push rejects attribution-only approval ------------------------------
 {
   const dir = freshDir("approve-push-shape");
-  const authority = injectedPoGateAuthority("p-push.md")().value;
-  const candidate = { commit: "b".repeat(40), tree: "c".repeat(40) };
-  const human = humanDecisionFixture(dir, authority, "push-feature", { action: "APPROVE_PUSH", candidate });
-  run(["set-feature", "--id", "push-feature", "--plan-path", "p-push.md"], { dir, now: FIXED_NOW });
-  const code = run(["approve-push", "--by", "po-test", "--human-decision-file", human.file], { dir, now: FIXED_NOW, nowEpochMs: () => 50, gitCandidate: () => ({ ok: true, candidate }), humanAuthority: human.humanAuthority, humanConsumption: human.humanConsumption });
-  ok("PS10a approve-push exit 0", code === 0, `got ${code}`);
-  const state = readState(dir).state;
-  ok(
-    "PS10b pushApproval stores only a candidate-bound human-decision receipt",
-    state.pushApproval?.lastApproved?.approvedBy === "po-test" &&
-      state.pushApproval?.lastApproved?.approvedAt === FIXED_NOW() &&
-      state.pushApproval?.lastApproved?.candidate?.commit === candidate.commit &&
-      state.pushApproval?.lastApproved?.humanDecision?.decisionId === human.humanAuthority({ request: { decisionId: "approve-push-push-feature" } }).value.decisionId &&
-      state.pushApproval?.lastApproved?.consumption?.schema === "pipeline.human-decision-consumption.v1",
-  );
+  const code = run(["approve-push", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
+  ok("PS10a approve-push without a critical proof is refused", code === 2, `got ${code}`);
+  ok("PS10b attribution-only approval leaves state absent", readState(dir).status === "absent");
 }
 
-// ---- PS11: approve-push fails cleanly when the exact candidate is unavailable ----------
+// ---- PS11: approve-push fails cleanly when git rev-parse HEAD fails -------------------
 {
   const dir = freshDir("approve-push-no-git");
   const code = run(["approve-push", "--by", "po-test"], {
     dir,
     now: FIXED_NOW,
-    gitCandidate: () => ({ ok: false, error: "not a git repository" }),
+    gitHead: () => ({ ok: false, error: "not a git repository" }),
   });
-  ok("PS11 approve-push without a resolvable candidate refused (exit 2)", code === 2, `got ${code}`);
+  ok("PS11 approve-push without a resolvable HEAD refused (exit 2)", code === 2, `got ${code}`);
 }
 
 // ---- PS12: real subprocess invocation end-to-end (real git repo) ----------------------
@@ -749,30 +1232,38 @@ function canonicalFixtureJson(value) {
 
   const planPath = "specs/e2e/prd_e2e.md";
   seedSubprocessPoGateAuthority(dir, planPath);
-  const humanDecisionFile = await seedSubprocessHumanAuthority(dir, planPath, "e2e");
   const res1 = spawnSync(process.execPath, [CLI, "set-feature", "--id", "e2e", "--plan-path", planPath], {
     encoding: "utf8",
     env: { ...process.env, CLAUDE_PROJECT_DIR: dir },
   });
   ok("PS12a subprocess set-feature exit 0", res1.status === 0, `stderr: ${res1.stderr}`);
+  const e2eEnv = { ...process.env, CLAUDE_PROJECT_DIR: dir };
+  const continuity = initializeSubprocessLifecycleContinuity(dir, "e2e", planPath, e2eEnv);
+  ok("PS12a1 subprocess continuity-init exit 0", continuity.status === 0, `stderr: ${continuity.stderr}`);
 
-  const res2 = spawnSync(process.execPath, [CLI, "approve-plan", "--by", "po-test", "--human-decision-file", humanDecisionFile], {
+  const submitted = spawnSync(process.execPath, [
+    CLI, "submit-plan", "--by", "coordinator", "--profile", "feature",
+  ], {
+    encoding: "utf8",
+    env: e2eEnv,
+  });
+  ok("PS12b0 subprocess submit-plan exit 0", submitted.status === 0, `stderr: ${submitted.stderr}`);
+
+  const res2 = spawnSync(process.execPath, [CLI, "approve-plan", "--by", "po-test"], {
     encoding: "utf8",
     env: { ...process.env, CLAUDE_PROJECT_DIR: dir },
   });
   ok("PS12b subprocess approve-plan exit 0", res2.status === 0, `stderr: ${res2.stderr}`);
 
-  const pushDecisionFile = await seedSubprocessHumanAuthority(dir, planPath, "e2e", "APPROVE_PUSH");
-
-  const res3 = spawnSync(process.execPath, [CLI, "approve-push", "--by", "po-test", "--human-decision-file", pushDecisionFile], {
+  const res3 = spawnSync(process.execPath, [CLI, "approve-push", "--by", "po-test"], {
     encoding: "utf8",
     env: { ...process.env, CLAUDE_PROJECT_DIR: dir },
   });
-  ok("PS12c subprocess approve-push exit 0", res3.status === 0, `stderr: ${res3.stderr}`);
+  ok("PS12c subprocess approve-push without critical proof is refused", res3.status === 2, `stderr: ${res3.stderr}`);
 
   const finalState = JSON.parse(readFileSync(statePath(dir), "utf8"));
   ok("PS12d final state has planApproved true", finalState.planApproved === true);
-  ok("PS12e final state pushApproval candidate matches real HEAD", finalState.pushApproval?.lastApproved?.candidate?.commit === head);
+  ok("PS12e final state has no attribution-only pushApproval", finalState.pushApproval === undefined);
   ok("PS12f state file is pretty-printed (contains newline+indent)", readFileSync(statePath(dir), "utf8").includes("\n  "));
 }
 
@@ -839,7 +1330,6 @@ function canonicalFixtureJson(value) {
 
   const planPath = "specs/f1-integration/prd_f1-integration.md";
   seedSubprocessPoGateAuthority(dir, planPath);
-  const humanDecisionFile = await seedSubprocessHumanAuthority(dir, planPath, "f1-integration-test");
 
   const env = { ...process.env, CLAUDE_PROJECT_DIR: dir };
   const r1 = spawnSync(process.execPath, [CLI, "set-feature", "--id", "f1-integration-test", "--plan-path", planPath], {
@@ -847,7 +1337,18 @@ function canonicalFixtureJson(value) {
     env,
   });
   ok("PS14a F1-integration: real set-feature subprocess exit 0", r1.status === 0, `stderr: ${r1.stderr}`);
-  const r2 = spawnSync(process.execPath, [CLI, "approve-plan", "--by", "po-test", "--human-decision-file", humanDecisionFile], { encoding: "utf8", env });
+  const continuity = initializeSubprocessLifecycleContinuity(
+    dir,
+    "f1-integration-test",
+    planPath,
+    env,
+  );
+  ok("PS14a-1 F1-integration: real continuity-init subprocess exit 0", continuity.status === 0, `stderr: ${continuity.stderr}`);
+  const submitted = spawnSync(process.execPath, [
+    CLI, "submit-plan", "--by", "coordinator", "--profile", "feature",
+  ], { encoding: "utf8", env });
+  ok("PS14a0 F1-integration: real submit-plan subprocess exit 0", submitted.status === 0, `stderr: ${submitted.stderr}`);
+  const r2 = spawnSync(process.execPath, [CLI, "approve-plan", "--by", "po-test"], { encoding: "utf8", env });
   ok("PS14b F1-integration: real approve-plan subprocess exit 0", r2.status === 0, `stderr: ${r2.stderr}`);
   const r3 = spawnSync(process.execPath, [CLI, "set-phase", "--phase", "implementation"], { encoding: "utf8", env });
   ok("PS14c F1-integration: real set-phase subprocess exit 0", r3.status === 0, `stderr: ${r3.stderr}`);
@@ -903,11 +1404,12 @@ function canonicalFixtureJson(value) {
 // ---- PS18: close-feature with an activeFeature -- full shape assertion -----------------
 {
   const dir = freshDir("close-feature-shape");
-  const poGateAuthority = injectedPoGateAuthority("p-close.md");
-  const candidate = { commit: "b".repeat(40), tree: "c".repeat(40) };
-  const pushHuman = humanDecisionFixture(dir, poGateAuthority().value, "f-close", { action: "APPROVE_PUSH", candidate });
   run(["set-feature", "--id", "f-close", "--plan-path", "p-close.md"], { dir, now: FIXED_NOW });
-  run(["approve-push", "--by", "po-test", "--human-decision-file", pushHuman.file], { dir, now: FIXED_NOW, nowEpochMs: () => 50, gitCandidate: () => ({ ok: true, candidate }), humanAuthority: pushHuman.humanAuthority, humanConsumption: pushHuman.humanConsumption });
+  run(["approve-plan", "--by", "po-test"], {
+    dir,
+    now: FIXED_NOW,
+    poGateAuthority: injectedPoGateAuthority("p-close.md"),
+  });
   const code = run(["close-feature", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
   ok("PS18a close-feature exit 0", code === 0, `got ${code}`);
   const state = readState(dir).state;
@@ -926,7 +1428,80 @@ function canonicalFixtureJson(value) {
       state.closedFeatures[0].forCommit === "abc123deadbeef",
     JSON.stringify(state.closedFeatures),
   );
-  ok("PS18g pushApproval preserved", state.pushApproval?.lastApproved?.candidate?.commit === candidate.commit);
+  ok("PS18g close-feature does not synthesize a pushApproval", state.pushApproval === undefined);
+}
+
+// ---- PS19: close-feature best-effort on a git failure (DEVIATION vs. approve-push) -----
+{
+  const dir = freshDir("close-feature-coordinator");
+  run(["set-feature", "--id", "f-coordinated", "--plan-path", "specs/f/plan.md"], { dir, now: FIXED_NOW });
+  const activeFeature = readState(dir).state.activeFeature;
+  const coordinatedStateSha256 = createHash("sha256")
+    .update(readFileSync(statePath(dir)))
+    .digest("hex");
+  let coordinator = createCloseCoordinator({
+    lifecycleId: "close-f-coordinated",
+    featureId: activeFeature.id,
+    activeFeature,
+    authority: {
+      implementationResultSha256: null,
+      pipelineStateSha256: coordinatedStateSha256,
+      planSha256: B,
+      prdSha256: C,
+      specSha256: D,
+    },
+  });
+  for (const phase of ["checkpointed", "feature-close-prepared"]) {
+    coordinator = advanceCloseCoordinator(coordinator, {
+      expectedRevision: coordinator.revision,
+      expectedStateSha256: closeCoordinatorDigest(coordinator),
+      phase,
+      inputDigest: A,
+      observedDigest: B,
+      operationSha256: D,
+      ...(phase === "feature-close-prepared"
+        ? { authority: { ...coordinator.authority, implementationResultSha256: D } }
+        : {}),
+    });
+  }
+  const digest = closeCoordinatorDigest(coordinator);
+  const deps = {
+    dir,
+    now: FIXED_NOW,
+    gitHead: FIXED_GIT_HEAD,
+    gitCommonDir: () => ({ ok: true, path: dir }),
+    readCloseCoordinator: () => ({ coordinator, rawDigest: C }),
+  };
+  const rejected = run([
+    "close-feature", "--by", "po-test",
+    "--coordinator-lifecycle", coordinator.lifecycleId,
+    "--coordinator-sha256", D,
+  ], deps);
+  ok("PS18h close-feature rejects a stale coordinator digest", rejected === 2, `got ${rejected}`);
+  const exactStateBytes = readFileSync(statePath(dir), "utf8");
+  const driftedState = JSON.parse(exactStateBytes);
+  driftedState.updatedAt = "2026-07-07T21:00:01.000Z";
+  writeFileSync(statePath(dir), JSON.stringify(driftedState, null, 2) + "\n");
+  const stateDriftRejected = run([
+    "close-feature", "--by", "po-test",
+    "--coordinator-lifecycle", coordinator.lifecycleId,
+    "--coordinator-sha256", digest,
+  ], deps);
+  ok("PS18i coordinator-bound close rejects byte-level Pipeline State drift", stateDriftRejected === 2);
+  writeFileSync(statePath(dir), exactStateBytes);
+  const code = run([
+    "close-feature", "--by", "po-test",
+    "--coordinator-lifecycle", coordinator.lifecycleId,
+    "--coordinator-sha256", digest,
+  ], deps);
+  const closed = readState(dir).state.closedFeatures?.[0]?.coordinatorClose;
+  ok("PS18j exact feature-close-prepared coordinator permits the State sub-effect", code === 0, `got ${code}`);
+  ok("PS18k close audit binds the exact coordinator lifecycle/revision/digest",
+    closed?.lifecycleId === coordinator.lifecycleId
+      && closed?.revision === coordinator.revision
+      && closed?.stateSha256 === digest
+      && closed?.phase === "feature-close-prepared",
+    JSON.stringify(closed));
 }
 
 // ---- PS19: close-feature best-effort on a git failure (DEVIATION vs. approve-push) -----
@@ -1295,7 +1870,7 @@ function canonicalFixtureJson(value) {
   ok("PS38b initialized continuity is persisted at revision 0", state.continuity?.revision === 0);
   ok("PS38c continuity feature is bound to activeFeature.id", state.continuity?.featureId === state.activeFeature?.id);
   ok("PS38d owned lock is released", !existsSync(continuityLockPath(dir)));
-  ok("PS38e same-directory temp is absent after rename", !readdirSync(join(dir, ".claude")).some((name) => name.includes(".tmp.")));
+  ok("PS38e same-directory temp is absent after rename", !readdirSync(dirname(statePath(dir))).some((name) => name.includes(".tmp.")));
 }
 
 // ---- PS39: exact CAS advances once and stale replay is byte-null ---------------------------
@@ -2101,11 +2676,15 @@ if (symlinkCapable) {
   const before = readFileSync(statePath(dir), "utf8");
   const continuityBefore = structuredClone(readState(dir).state.continuity);
   const foreign = acquireContinuityLock(dir, "continuity-owner-01", continuityDeps(dir));
-  const blocked = run(["set-phase", "--phase", "verify"], { dir, now: FIXED_NOW });
+  const blocked = run([
+    "approve-deploy", "--env", "test", "--artifact", "candidate", "--by", "po-test",
+  ], { dir, now: FIXED_NOW });
   ok("PS47a legacy writer is blocked by the shared continuity lock", blocked === 2, `got ${blocked}`);
   ok("PS47b blocked legacy writer performs zero byte mutation", readFileSync(statePath(dir), "utf8") === before);
   releaseContinuityLock(foreign);
-  const allowed = run(["set-phase", "--phase", "verify"], { dir, now: FIXED_NOW });
+  const allowed = run([
+    "approve-deploy", "--env", "test", "--artifact", "candidate", "--by", "po-test",
+  ], { dir, now: FIXED_NOW });
   ok("PS47c serialized legacy writer succeeds after lock release", allowed === 0, `got ${allowed}`);
   ok("PS47d non-lifecycle legacy transition preserves continuity exactly", JSON.stringify(readState(dir).state.continuity) === JSON.stringify(continuityBefore));
 }
@@ -2148,6 +2727,67 @@ if (symlinkCapable) {
   ok("PS48f closed audit entry persists the exact close request", JSON.stringify(final.closedFeatures?.at(-1)?.continuityClose) === JSON.stringify(closeRequest));
 }
 
+// ---- PS48G: bound cleanup must close before continuity can be removed -------------------------
+{
+  const prepareBoundClose = (name) => {
+    const dir = freshDir(name);
+    seedContinuityRoot(dir);
+    mkdirSync(join(dir, "specs"), { recursive: true });
+    mkdirSync(join(dir, "evidence"), { recursive: true });
+    writeFileSync(join(dir, "specs", "result.md"), RESULT_FIXTURE);
+    writeFileSync(join(dir, "evidence", "close.json"), "bound cleanup close evidence\n");
+    const resultSha256 = createHash("sha256").update(RESULT_FIXTURE).digest("hex");
+    const closeEvidenceSha256 = createHash("sha256").update("bound cleanup close evidence\n").digest("hex");
+    const closeReady = continuityState();
+    closeReady.authority.result.sha256 = resultSha256;
+    closeReady.queueHead = continuityQueue({ nextAction: "close", dispatch: null });
+    closeReady.runtime.sessionCleanup = {
+      sessionId: "session-bound-close",
+      descriptorSha256: "e".repeat(64),
+    };
+    run(continuityArgs("continuity-init", "absent", writeRequest(dir, "bound-close-init", closeReady)), continuityDeps(dir));
+    const closeRequest = {
+      schema: "pipeline.continuity-close.v0",
+      featureId: CONTINUITY_FEATURE,
+      expectedRevision: 0,
+      result: { path: "specs/result.md", sha256: resultSha256 },
+      closeEvidence: { path: "evidence/close.json", sha256: closeEvidenceSha256 },
+    };
+    return { dir, closeRequestFile: writeRequest(dir, "bound-close-request", closeRequest) };
+  };
+
+  const active = prepareBoundClose("continuity-bound-cleanup-active");
+  const activeBefore = readFileSync(statePath(active.dir), "utf8");
+  const refused = run([
+    "close-feature", "--by", "po-test", "--continuity-close-request", active.closeRequestFile,
+  ], {
+    dir: active.dir,
+    now: FIXED_NOW,
+    gitHead: FIXED_GIT_HEAD,
+    inspectSessionClosureFn: () => ({ status: "active", closedAt: null }),
+  });
+  ok("PS48g close-feature refuses to discard an active cleanup binding", refused === 2);
+  ok("PS48h refused bound close is byte-identical", readFileSync(statePath(active.dir), "utf8") === activeBefore);
+
+  const closed = prepareBoundClose("continuity-bound-cleanup-closed");
+  const closedBefore = readFileSync(statePath(closed.dir), "utf8");
+  const accepted = run([
+    "close-feature", "--by", "po-test", "--continuity-close-request", closed.closeRequestFile,
+  ], {
+    dir: closed.dir,
+    now: FIXED_NOW,
+    gitHead: FIXED_GIT_HEAD,
+    inspectSessionClosureFn: (root, sessionId, options) => {
+      ok("PS48i close binds the exact descriptor identity", root === closed.dir
+        && sessionId === "session-bound-close"
+        && options.expectedDescriptorSha256 === "e".repeat(64));
+      return { status: "closed", closedAt: FIXED_NOW(), receiptSha256: "f".repeat(64) };
+    },
+  });
+  ok("PS48j neutral close rejects even an already-closed portable cleanup binding", accepted === 2);
+  ok("PS48k rejected hostile neutral close remains byte-identical", readFileSync(statePath(closed.dir), "utf8") === closedBefore);
+}
+
 // ---- PS49: post-rename durability failure is never mislabeled as zero mutation ---------------
 {
   const dir = freshDir("continuity-post-rename");
@@ -2171,14 +2811,14 @@ if (symlinkCapable) {
   });
   ok("PS49c pre-rename failure reports committed=false", preRename.ok === false && preRename.committed === false);
   ok("PS49d pre-rename failure preserves target byte-identically", readFileSync(statePath(dir), "utf8") === before);
-  ok("PS49e pre-rename failure cleans its owned temp", !readdirSync(join(dir, ".claude")).some((name) => name.includes(`.tmp.${second.ownerNonce}`)));
+  ok("PS49e pre-rename failure cleans its owned temp", !readdirSync(dirname(statePath(dir))).some((name) => name.includes(`.tmp.${second.ownerNonce}`)));
   releaseContinuityLock(second);
 }
 
 // ---- PS50: lock publication is atomic despite an unrelated interrupted candidate ------------
 {
   const dir = freshDir("continuity-lock-publication");
-  mkdirSync(join(dir, ".claude"), { recursive: true });
+  mkdirSync(dirname(continuityLockPath(dir)), { recursive: true });
   writeFileSync(`${continuityLockPath(dir)}.candidate.orphan-nonce`, "partial-record");
   const lock = acquireContinuityLock(dir, "token-publish-001", continuityDeps(dir, { ownerNonce: () => "nonce-publish-001" }));
   const record = JSON.parse(readFileSync(continuityLockPath(dir), "utf8"));
@@ -2202,7 +2842,7 @@ if (symlinkCapable) {
   const estimateEvidence = {
     schema: "pipeline.gate-estimate-evidence.v1",
     featureId: "eta-feature",
-    gate: "security",
+    gate: "prd",
     observedAt: FIXED_NOW(),
     basis: [{ kind: "verify-run", reference: "evidence/verify.json", digest: A }],
     note: "One bounded check remains.",
@@ -2211,570 +2851,119 @@ if (symlinkCapable) {
   writeFileSync(join(dir, "evidence", "eta.json"), evidenceBytes);
   const evidenceSha256 = createHash("sha256").update(evidenceBytes).digest("hex");
   run(["set-feature", "--id", "eta-feature", "--plan-path", "specs/eta/prd_eta.md"], { dir, now: FIXED_NOW });
-  run(["set-phase", "--phase", "implementation"], { dir, now: FIXED_NOW });
   const args = [
-    "set-gate-estimate", "--id", "eta-security-1", "--expected-current-id", "absent",
-    "--feature-id", "eta-feature", "--gate", "security", "--object-format", "sha1", "--source-oid", oid,
+    "set-gate-estimate", "--id", "eta-prd-1", "--expected-current-id", "absent",
+    "--feature-id", "eta-feature", "--gate", "prd", "--object-format", "sha1", "--source-oid", oid,
     "--evidence-path", "evidence/eta.json", "--evidence-sha256", evidenceSha256,
     "--min-minutes", "20", "--max-minutes", "45", "--by", "coordinator",
   ];
   const recorded = run(args, { dir, now: FIXED_NOW });
   const stored = readState(dir).state;
   ok("PS51a set-gate-estimate writes only a source/evidence-bound coordinator record", recorded === 0
-    && stored.gateEstimate?.id === "eta-security-1"
+    && stored.gateEstimate?.id === "eta-prd-1"
     && stored.gateEstimate?.sourceOid === oid
     && stored.gateEstimate?.evidence?.sha256 === evidenceSha256
     && stored.gateEstimate?.recordedBy === "coordinator", JSON.stringify(stored.gateEstimate));
   const beforeReplay = readFileSync(statePath(dir), "utf8");
-  const replay = run(args.map((value, index) => index === 4 ? "eta-security-1" : value), { dir, now: () => "2026-07-08T00:00:00.000Z" });
+  const replay = run(args.map((value, index) => index === 4 ? "eta-prd-1" : value), { dir, now: () => "2026-07-08T00:00:00.000Z" });
   ok("PS51b identical estimate retry is a zero-write CAS replay", replay === 0 && readFileSync(statePath(dir), "utf8") === beforeReplay);
   const beforeRejected = readFileSync(statePath(dir), "utf8");
   const rejected = run([...args.slice(0, -1), "operator"], { dir, now: FIXED_NOW });
   ok("PS51c non-coordinator estimate attribution is refused without mutation", rejected === 2 && readFileSync(statePath(dir), "utf8") === beforeRejected);
-  const advanced = run(["set-phase", "--phase", "security-scan"], { dir, now: FIXED_NOW });
+  const advanced = run([
+    "approve-deploy", "--env", "test", "--artifact", "candidate", "--by", "po-test",
+  ], { dir, now: FIXED_NOW });
   ok("PS51d a later successful state mutation clears the persisted estimate", advanced === 0 && readState(dir).state.gateEstimate === undefined);
 }
 
-// ---- PHX0A: closed feature bootstrap and design-authority revision writers ----------------
+// ---- PS52: AC-047-27 legacy continuity adoption planner/apply ----------------------------
 {
-  const dir = freshDir("phx-feature-bootstrap");
-  mkdirSync(join(dir, ".claude"), { recursive: true });
-  const id = "phx-feature"; const base = `specs/${id}`;
-  const prdBytes = "# PHX bootstrap\n"; const prdPath = `${base}/prd.md`;
-  mkdirSync(join(dir, base), { recursive: true }); writeFileSync(join(dir, prdPath), prdBytes);
-  const manifestBytes = `${JSON.stringify({
-    schema: "pipeline.feature-package.v1", feature: { id, rigor: 1 }, state: "draft",
-    artifacts: [{ class: "prd", path: prdPath, sha256: createHash("sha256").update(prdBytes).digest("hex"), authority: true, mutability: "mutable", retention: "active" }], candidate: null, supersedes: null,
-  })}\n`;
-  const manifestPath = `${base}/lifecycle.json`;
-  const preview = planFeaturePackageBootstrap(dir, manifestPath, { targetState: "draft", manifestBytes });
-  const request = { schema: "pipeline.feature-package-transition-request.v1", operation: "bootstrap-draft", manifest: manifestPath, manifestPreimage: "absent", targetState: "draft", manifestBytes, planReceipt: preview.receipt, artifactSetSha256: sha256Canonical(JSON.parse(manifestBytes).artifacts.map(({ class: artifactClass, path, authority, mutability, retention }) => ({ class: artifactClass, path, authority, mutability, retention }))), authority: { class: "lifecycle-bootstrap", decision: null }, candidate: null, evidence: null, idempotencyKey: "phx-test-01", expiresAt: "2030-01-01T00:00:00.000Z" };
-  const requestFile = writeRequest(dir, "feature-request", request);
-  const requestSha = sha256Canonical(request);
-  const planned = run(["feature-package-plan", "--manifest", manifestPath, "--proposal-file", writeRequest(dir, "feature-proposal", { operation: "bootstrap-draft", targetState: "draft", manifestBytes }), IDEMPOTENCY_FLAG, "phx-test-01", "--expires-at", "2030-01-01T00:00:00.000Z"], { dir });
-  const applied = run(["feature-package-apply", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-feature-lock-01"], { dir });
-  const beforeReplay = readFileSync(join(dir, manifestPath), "utf8");
-  const replay = run(["feature-package-apply", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-feature-lock-01"], { dir });
-  const changed = { ...request, manifestBytes: manifestBytes.replace('"draft"', '"conflict"') };
-  const conflict = run(["feature-package-apply", "--request-file", writeRequest(dir, "feature-conflict", changed), "--request-sha256", sha256Canonical(changed), "--lock-token", "phx-feature-lock-01"], { dir });
-  ok("PHX0A1 absent manifest draft preview is consumed by exact bound apply", planned === 0 && applied === 0 && readFileSync(join(dir, manifestPath), "utf8") === manifestBytes);
-  ok("PHX0A2 feature bootstrap replay is verified zero-write and conflict fails closed", replay === 0 && readFileSync(join(dir, manifestPath), "utf8") === beforeReplay && conflict === 2);
-  const receipt = JSON.parse(readFileSync(join(dir, `${base}/evidence/lifecycle/feature-package-phx-test-01.json`), "utf8"));
-  ok("PHX0A3 feature receipt is public-safe and contains no machine path", receipt.outcome === "committed" && !JSON.stringify(receipt).includes(dir));
-}
-
-{
-  const dir = freshDir("phx-feature-reconcile");
-  const id = "sprint-phoenix-epic"; const base = `specs/${id}`; const planPath = `${base}/prd_phoenix-epic.md`;
-  const resultHistorical = "# Phoenix Result\n";
-  const resultPostimage = `${resultHistorical}\`\`\`pipeline-result\n{"courseDecisionIntents":[],"courseDecisionReceipts":[],"decisionBriefs":[],"finalIntegrations":[]}\n\`\`\`\n`;
-  const artifact = (artifactClass, path, bytes, authority = false) => {
-    mkdirSync(dirname(join(dir, path)), { recursive: true }); writeFileSync(join(dir, path), bytes);
-    return { class: artifactClass, path, sha256: createHash("sha256").update(`stale:${path}`).digest("hex"), authority, mutability: "mutable", retention: artifactClass === "design" ? "retain" : "active" };
-  };
-  const artifacts = [
-    artifact("prd", planPath, "# Phoenix PRD\n", true),
-    artifact("spec", `${base}/spec.md`, "# Phoenix Spec\n", true),
-    artifact("acceptance", `${base}/acceptance.md`, "# Phoenix Acceptance\n", true),
-    artifact("design", `${base}/design/architecture.md`, "# Phoenix Architecture\n"),
-    artifact("result", `${base}/result.md`, resultPostimage, true),
+  const dir = freshDir("legacy-adoption-ac047");
+  const legacyRoot = join(dir, "specs", "2026-07-25-codex-onboarding-0.4.5");
+  mkdirSync(legacyRoot, { recursive: true });
+  for (const name of ["prd_codex-onboarding-0.4.5.md", "spec.md", "result.md", "legacy-continuity-close-evidence.md"]) writeFileSync(join(legacyRoot, name), readFileSync(join(process.cwd(), "specs", "2026-07-25-codex-onboarding-0.4.5", name)));
+  const continuity = { schema: "pipeline.continuity.v0", featureId: "codex-onboarding-0.4.5", revision: 3, runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator" }, authority: { prd: { path: "specs/2026-07-25-codex-onboarding-0.4.5/prd_codex-onboarding-0.4.5.md", sha256: "9825ca78a3765dc71ee2793ef9f84f2eaf998bf297086d869be3562d792cdb94" }, spec: { path: "specs/2026-07-25-codex-onboarding-0.4.5/spec.md", sha256: "5a95aa55b393a88e0d7ab1a8006957fc04d80bcae24399b40f3ffa8e4eb3cf70" }, result: null }, queueHead: { packageId: "continuity-adoption", actionId: "review-active-feature", nextAction: "review", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null }, blocker: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" }, recovery: null, decisionTxn: null, capacity: { concurrencyLimit: 4, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" } };
+  const stateValue = { schema: SCHEMA_ID, activeFeature: { id: "codex-onboarding-0.4.5", planPath: continuity.authority.prd.path, phase: "implementation" }, planApproved: true, planApproval: { schema: "pipeline.plan-approval.v2", approvedBy: "PO", approvedAt: "2026-07-26T14:08:37.500Z", specBoundBy: "PO", specBoundAt: "2026-07-26T14:08:37.500Z", poGateAuthority: { schema: "pipeline.po-gate-authority.v2", humanFacing: "en", sourceSha256: "2a0f69551b46963d6d49ef0faaf9db5c28d27c4f681a9d4dd0be1a81b297da10", runtimeSha256: "071b0236f6054bbeea2140830320a88d1c6a9e733d7294ad0bb976fd2e28c897", receiptSha256: "c4fc5171dc507a81908b30137bbf537355626f957d1ccbb9bee3a8ae9db02aa2", repositoryFingerprint: "6af2655d04c85a0e2faff67dedc2116a845874502dbe31c20e4c28372ea7885f", planPath: continuity.authority.prd.path, planSha256: "217eff325fffa5d82d5d49f31883c426dca74c42879aaae0a70da87be8e492ae", specPath: "specs/2026-07-25-codex-onboarding-0.4.5/spec.md", specSha256: continuity.authority.spec.sha256 } }, continuity, updatedAt: "2026-07-26T14:08:37.500Z" };
+  delete continuity.closeTransition;
+  mkdirSync(dirname(statePath(dir)), { recursive: true }); writeFileSync(statePath(dir), JSON.stringify(stateValue) + "\n");
+  const request = { expectedRevision: 3, currentPrd: { path: continuity.authority.prd.path, sha256: "217eff325fffa5d82d5d49f31883c426dca74c42879aaae0a70da87be8e492ae" }, spec: continuity.authority.spec, result: { path: "specs/2026-07-25-codex-onboarding-0.4.5/result.md", sha256: "ceed30ddce48d921f2afbbb44d02a3fe5301302ad07fab3f41dfbc149f657b73" }, closeEvidence: { path: "specs/2026-07-25-codex-onboarding-0.4.5/legacy-continuity-close-evidence.md", sha256: "8fe8c79f464e2a3f93f2e300fb6e74cccf6791f5920f4a857597f516d97917a1" }, history: { commit: "7a62a4ef9febba844cf5be8a659177b37c6a5da5", path: continuity.authority.prd.path, sha256: continuity.authority.prd.sha256 } };
+  const reqPath = writeRequest(dir, "legacy-request", request); const observed = { head: "9d1b3dc108eb77629ace5b82002120f5539abd8d", tagObject: "78359ae1ba7e0194111e531c060db615e4994e40", commit: "9d1b3dc108eb77629ace5b82002120f5539abd8d", tree: "282a8b5c5b0581e042985bfb373a66be0eb2d08b", remoteCommit: "9d1b3dc108eb77629ace5b82002120f5539abd8d", remoteTagObject: "78359ae1ba7e0194111e531c060db615e4994e40", remoteTagCommit: "9d1b3dc108eb77629ace5b82002120f5539abd8d", historicalPrdSha256: continuity.authority.prd.sha256 };
+  const planned = captureConsole(() => run(["continuity-adoption-plan", "--request-file", reqPath], { dir, legacyGitObservation: () => observed, now: FIXED_NOW })); const payload = JSON.parse(planned.text || "{}");
+  ok("PS52a exact legacy request yields a digest-bound plan", planned.value === 0 && payload.applyAction?.requiresConfirmation === true && payload.applyAction?.mutation === true && payload.applyAction?.requiresHostBoundary === true && payload.planSha256);
+  ok("PS52a1 apply action is absolute and digest/confirmation bound", typeof payload.applyAction?.executable === "string" && payload.applyAction.executable.startsWith("/") && payload.applyAction.argv?.includes("--activate") && payload.applyAction.argv?.includes(payload.planSha256));
+  const before = readFileSync(statePath(dir), "utf8"); ok("PS52b planner is read-only", readFileSync(statePath(dir), "utf8") === before);
+  const rootDrift = JSON.parse(before); rootDrift.updatedAt = "2026-07-26T14:08:37.501Z"; writeFileSync(statePath(dir), JSON.stringify(rootDrift) + "\n");
+  const driftPlan = captureConsoleError(() => run(["continuity-adoption-plan", "--request-file", reqPath], { dir, legacyGitObservation: () => observed, now: FIXED_NOW }));
+  ok("PS52b1 updatedAt/root drift is refused without mutation", driftPlan.value === 2 && readFileSync(statePath(dir), "utf8") === JSON.stringify(rootDrift) + "\n");
+  writeFileSync(statePath(dir), before);
+  const rootMutations = [
+    ["root extra", (s) => { s.extra = true; }], ["activeFeature extra", (s) => { s.activeFeature.extra = true; }],
+    ["activeFeature wrong id", (s) => { s.activeFeature.id = "wrong"; }], ["approval extra", (s) => { s.planApproval.extra = true; }],
+    ["approval actor", (s) => { s.planApproval.approvedBy = "other"; }], ["approval timestamp", (s) => { s.planApproval.approvedAt = "2026-07-26T14:08:37.501Z"; }],
+    ["authority extra", (s) => { s.planApproval.poGateAuthority.extra = true; }], ["authority digest", (s) => { s.planApproval.poGateAuthority.sourceSha256 = A; }],
   ];
-  artifacts[4].mutability = "append-only"; artifacts[4].sha256 = createHash("sha256").update(resultHistorical).digest("hex");
-  const manifestPath = `${base}/lifecycle.json`;
-  const manifest = { schema: "pipeline.feature-package.v1", feature: { id, rigor: 2 }, state: "draft", artifacts, candidate: null, supersedes: null };
-  const before = `${JSON.stringify(manifest, null, 2)}\n`;
-  writeFileSync(join(dir, manifestPath), before);
-  const poGateAuthority = injectedPoGateAuthority(planPath); const authority = poGateAuthority().value;
-  mkdirSync(join(dir, ".claude"), { recursive: true });
-  const approval = { schema: "pipeline.plan-approval.v2", approvedBy: "PO", approvedAt: "2026-07-27T00:00:00.000Z", specBoundBy: "PO", specBoundAt: "2026-07-27T00:00:00.000Z", poGateAuthority: authority };
-  writeFileSync(statePath(dir), `${JSON.stringify({ schema: SCHEMA_ID, activeFeature: { id, planPath, phase: "implementation" }, planApproved: true, planApproval: approval }, null, 2)}\n`);
-  const continuity = continuityState({
-    featureId: id,
-    authority: {
-      prd: { path: planPath, sha256: createHash("sha256").update("# Phoenix PRD\n").digest("hex") },
-      spec: { path: `${base}/spec.md`, sha256: createHash("sha256").update("# Phoenix Spec\n").digest("hex") },
-      result: { path: `${base}/result.md`, sha256: createHash("sha256").update(resultPostimage).digest("hex") },
-    },
-    queueHead: continuityQueue({ dispatch: null }),
-  });
-  run(continuityArgs("continuity-init", "absent", writeRequest(dir, "reconcile-continuity-init", continuity)), continuityDeps(dir));
-  const proposed = writeRequest(dir, "reconcile-proposal", { operation: "reconcile-draft", targetState: "draft" });
-  const planned = captureConsoleLog(() => run(["feature-package-plan", "--manifest", manifestPath, "--proposal-file", proposed, IDEMPOTENCY_FLAG, "phx-reconcile-01", "--expires-at", "2030-01-01T00:00:00.000Z"], { dir, poGateAuthority }));
-  const plan = JSON.parse(planned.text); const request = plan.request;
-  const requestFile = writeRequest(dir, "reconcile-request", request);
-  const denied = { ...request, authority: { ...request.authority, decision: { ...request.authority.decision, approvalSha256: createHash("sha256").update("mismatched approval").digest("hex") } } };
-  const deniedCode = run(["feature-package-apply", "--request-file", writeRequest(dir, "reconcile-denied", denied), "--request-sha256", sha256Canonical(denied), "--lock-token", "phx-reconcile-lock-01"], { dir, poGateAuthority });
-  const deniedPreserved = readFileSync(join(dir, manifestPath), "utf8") === before;
-  const applied = run(["feature-package-apply", "--request-file", requestFile, "--request-sha256", sha256Canonical(request), "--lock-token", "phx-reconcile-lock-01"], { dir, poGateAuthority });
-  const after = readFileSync(join(dir, manifestPath), "utf8"); const afterValue = JSON.parse(after);
-  const changedDigests = manifest.artifacts.filter((entry, index) => entry.sha256 !== afterValue.artifacts[index].sha256).length;
-  const replay = run(["feature-package-apply", "--request-file", requestFile, "--request-sha256", sha256Canonical(request), "--lock-token", "phx-reconcile-lock-01"], { dir, poGateAuthority });
-  ok("PHX0A4 existing draft plan binds exactly the active PO approval", planned.value === 0 && request.operation === "reconcile-draft" && request.manifestPreimage === createHash("sha256").update(before).digest("hex") && request.authority.decision.approvalSha256 === sha256CanonicalJson(approval));
-  ok("PHX0A5 existing draft reconciliation rejects a mismatched PO decision without mutation", deniedCode === 2 && deniedPreserved);
-  const receipt = JSON.parse(readFileSync(join(dir, `${base}/evidence/lifecycle/feature-package-phx-reconcile-01.json`), "utf8"));
-  ok("PHX0A6 existing draft reconciliation updates only the five planned digest bindings, including the proven append-only Result, and replays zero-write", applied === 0 && changedDigests === 5 && afterValue.artifacts[4].sha256 === createHash("sha256").update(resultPostimage).digest("hex") && afterValue.state === "draft" && JSON.stringify(afterValue.feature) === JSON.stringify(manifest.feature) && JSON.stringify(afterValue.candidate) === "null" && JSON.stringify(afterValue.supersedes) === "null" && replay === 0 && readFileSync(join(dir, manifestPath), "utf8") === after && /^fp-[a-f0-9]{16}$/.test(receipt.correlation) && !/[a-f0-9]{32}/.test(JSON.stringify(receipt)));
-  writeFileSync(join(dir, manifestPath), after.replace("  \"schema\":", "\t\"schema\" :").replaceAll("\n", "\r\n"));
-  writeFileSync(join(dir, planPath), "# Phoenix PRD revised\n");
-  writeFileSync(join(dir, `${base}/acceptance.md`), "# Phoenix Acceptance revised\n");
-  const partialProposal = writeRequest(dir, "reconcile-partial-proposal", { operation: "reconcile-draft", targetState: "draft" });
-  const partialPlanned = captureConsoleLog(() => run(["feature-package-plan", "--manifest", manifestPath, "--proposal-file", partialProposal, IDEMPOTENCY_FLAG, "partial-draft-reconciliation", "--expires-at", "2030-01-01T00:00:00.000Z"], { dir, poGateAuthority }));
-  const partialRequest = JSON.parse(partialPlanned.text).request; const partialBeforeBytes = readFileSync(join(dir, manifestPath), "utf8"); const partialBefore = JSON.parse(partialBeforeBytes);
-  const partialApplied = run(["feature-package-apply", "--request-file", writeRequest(dir, "reconcile-partial-request", partialRequest), "--request-sha256", sha256Canonical(partialRequest), "--lock-token", "partial-draft-reconciliation-lock"], { dir, poGateAuthority });
-  const partialAfterBytes = readFileSync(join(dir, manifestPath), "utf8"); const partialAfter = JSON.parse(partialAfterBytes);
-  const partialChanges = partialBefore.artifacts.filter((entry, index) => entry.sha256 !== partialAfter.artifacts[index].sha256).length;
-  const expectedPartialBytes = partialBeforeBytes.replace(partialBefore.artifacts[0].sha256, partialAfter.artifacts[0].sha256).replace(partialBefore.artifacts[2].sha256, partialAfter.artifacts[2].sha256);
-  ok("PHX0A7 draft reconciliation binds and updates only the two artifacts that drifted without reformatting other bytes", partialApplied === 0 && partialChanges === 2 && partialBefore.artifacts[1].sha256 === partialAfter.artifacts[1].sha256 && partialBefore.artifacts[3].sha256 === partialAfter.artifacts[3].sha256 && partialAfterBytes === expectedPartialBytes && partialAfterBytes.includes("\r\n\t\"schema\" :"));
-  writeFileSync(join(dir, `${base}/result.md`), `# Rewritten Result\n\`\`\`pipeline-result\n{"courseDecisionIntents":[],"courseDecisionReceipts":[],"decisionBriefs":[],"finalIntegrations":[]}\n\`\`\`\n`);
-  const resultAttackBefore = readFileSync(join(dir, manifestPath), "utf8");
-  const resultAttack = captureConsoleLog(() => run(["feature-package-plan", "--manifest", manifestPath, "--proposal-file", writeRequest(dir, "reconcile-result-attack", { operation: "reconcile-draft", targetState: "draft" }), IDEMPOTENCY_FLAG, "result-rewrite-attack", "--expires-at", "2030-01-01T00:00:00.000Z"], { dir, poGateAuthority }));
-  ok("PHX0A7a Result reconciliation refuses a rewritten historical prefix before any manifest mutation", resultAttack.value === 2 && readFileSync(join(dir, manifestPath), "utf8") === resultAttackBefore);
-}
-
-// ---- PHX0A: one explicit mutable non-authority design-artifact reconciliation ----
-{
-  const dir = freshDir("phx-mutable-design-reconcile");
-  const id = "sprint-phoenix-design"; const base = `specs/${id}`; const planPath = `${base}/prd_phoenix-epic.md`;
-  const designPath = `${base}/design/architecture.md`;
-  const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
-  const artifact = (artifactClass, path, bytes, { authority = false, mutability = "mutable" } = {}) => {
-    mkdirSync(dirname(join(dir, path)), { recursive: true }); writeFileSync(join(dir, path), bytes);
-    return { class: artifactClass, path, sha256: digest(`stale:${path}`), authority, mutability, retention: artifactClass === "design" ? "retain" : "active" };
-  };
-  const artifacts = [
-    artifact("prd", planPath, "# Phoenix PRD\n", { authority: true }),
-    artifact("spec", `${base}/spec.md`, "# Phoenix Spec\n", { authority: true }),
-    artifact("acceptance", `${base}/acceptance.md`, "# Phoenix Acceptance\n", { authority: true }),
-    artifact("design", designPath, "# Mutable architecture\n"),
-  ];
-  artifacts[0].sha256 = digest("# Phoenix PRD\n");
-  const manifestPath = `${base}/lifecycle.json`;
-  const manifest = { schema: "pipeline.feature-package.v1", feature: { id, rigor: 2 }, state: "draft", artifacts, candidate: null, supersedes: null };
-  const before = `${JSON.stringify(manifest, null, 2)}\n`;
-  writeFileSync(join(dir, manifestPath), before);
-  const poGateAuthority = injectedPoGateAuthority(planPath); const authority = poGateAuthority().value;
-  mkdirSync(join(dir, ".claude"), { recursive: true });
-  const approval = { schema: "pipeline.plan-approval.v2", approvedBy: "PO", approvedAt: "2026-07-27T00:00:00.000Z", specBoundBy: "PO", specBoundAt: "2026-07-27T00:00:00.000Z", poGateAuthority: authority };
-  writeFileSync(statePath(dir), `${JSON.stringify({ schema: SCHEMA_ID, activeFeature: { id, planPath, phase: "implementation" }, planApproved: true, planApproval: approval }, null, 2)}\n`);
-  const planArgs = (entry, key = "phx-mutable-design-01") => ["feature-package-plan", "--manifest", manifestPath, "--proposal-file", writeRequest(dir, `mutable-proposal-${key}`, entry), IDEMPOTENCY_FLAG, key, "--expires-at", "2030-01-01T00:00:00.000Z"];
-  const proposal = { operation: "reconcile-mutable-design", targetState: "draft", artifactPath: designPath };
-  const wrongPath = run(planArgs({ ...proposal, artifactPath: "../escape.md" }, "phx-mutable-design-path"), { dir, poGateAuthority });
-  const wrongShape = (change, key) => {
-    const variant = structuredClone(manifest); change(variant.artifacts[3]);
-    writeFileSync(join(dir, manifestPath), `${JSON.stringify(variant, null, 2)}\n`);
-    const result = run(planArgs(proposal, key), { dir, poGateAuthority });
-    writeFileSync(join(dir, manifestPath), before);
-    return result;
-  };
-  const wrongClass = wrongShape((entry) => { entry.class = "plan"; }, "phx-mutable-design-class");
-  const wrongMutability = wrongShape((entry) => { entry.mutability = "immutable"; }, "phx-mutable-design-mutability");
-  const wrongAuthority = wrongShape((entry) => { entry.authority = true; }, "phx-mutable-design-authority");
-  const noopManifest = structuredClone(manifest); noopManifest.artifacts[3].sha256 = digest("# Mutable architecture\n");
-  writeFileSync(join(dir, manifestPath), `${JSON.stringify(noopManifest, null, 2)}\n`);
-  const noop = run(planArgs(proposal, "phx-mutable-design-noop"), { dir, poGateAuthority });
-  writeFileSync(join(dir, manifestPath), before);
-  const planned = captureConsoleLog(() => run(planArgs(proposal), { dir, poGateAuthority }));
-  const request = JSON.parse(planned.text).request;
-  const requestFile = writeRequest(dir, "mutable-design-request", request);
-  writeFileSync(join(dir, manifestPath), `${before}\n`);
-  const drift = run(["feature-package-apply", "--request-file", requestFile, "--request-sha256", sha256Canonical(request), "--lock-token", "phx-mutable-design-drift"], { dir, poGateAuthority });
-  const driftPreserved = readFileSync(join(dir, manifestPath), "utf8") === `${before}\n`;
-  writeFileSync(join(dir, manifestPath), before);
-  const mismatched = structuredClone(request); mismatched.authority.decision.approvalSha256 = digest("wrong approval");
-  const denied = run(["feature-package-apply", "--request-file", writeRequest(dir, "mutable-design-denied", mismatched), "--request-sha256", sha256Canonical(mismatched), "--lock-token", "phx-mutable-design-denied"], { dir, poGateAuthority });
-  const deniedPreserved = readFileSync(join(dir, manifestPath), "utf8") === before;
-  const applied = run(["feature-package-apply", "--request-file", requestFile, "--request-sha256", sha256Canonical(request), "--lock-token", "phx-mutable-design-apply"], { dir, poGateAuthority });
-  const after = readFileSync(join(dir, manifestPath), "utf8"); const afterValue = JSON.parse(after);
-  const changedDigests = manifest.artifacts.map((entry, index) => entry.sha256 === afterValue.artifacts[index].sha256 ? 0 : 1);
-  const receiptPath = join(dir, `${base}/evidence/lifecycle/feature-package-phx-mutable-design-01.json`);
-  const receipt = JSON.parse(readFileSync(receiptPath, "utf8"));
-  const replay = run(["feature-package-apply", "--request-file", requestFile, "--request-sha256", sha256Canonical(request), "--lock-token", "phx-mutable-design-apply"], { dir, poGateAuthority });
-  const journalPath = join(dir, ".claude/feature-package-transaction.json");
-  const journal = { schema: "pipeline.feature-package-transaction.v1", request, requestSha256: sha256Canonical(request) };
-  writeFileSync(journalPath, `${JSON.stringify(journal)}\n`);
-  const recovery = run(["feature-package-recover", "--request-file", requestFile, "--request-sha256", sha256Canonical(request), "--lock-token", "phx-mutable-design-recover"], { dir, poGateAuthority });
-  const recoveryReplayed = recovery === 0 && !existsSync(journalPath) && readFileSync(join(dir, manifestPath), "utf8") === after;
-  writeFileSync(journalPath, `${JSON.stringify(journal)}\n`); writeFileSync(join(dir, manifestPath), `${after}\n`);
-  const recoveryDrift = run(["feature-package-recover", "--request-file", requestFile, "--request-sha256", sha256Canonical(request), "--lock-token", "phx-mutable-design-recover-drift"], { dir, poGateAuthority });
-  ok("PHX0A7 mutable-design plan binds exactly one explicit non-authority mutable design artifact", planned.value === 0 && request.operation === "reconcile-mutable-design" && request.artifactPath === designPath && request.manifestPreimage === digest(before) && request.authority.decision.approvalSha256 === sha256CanonicalJson(approval));
-  ok("PHX0A8 mutable-design plan rejects traversal, wrong class, immutable, authority, and noop proposals without manifest mutation", wrongPath === 2 && wrongClass === 2 && wrongMutability === 2 && wrongAuthority === 2 && noop === 2);
-  ok("PHX0A9 mutable-design apply rejects manifest preimage drift and a mismatched PO approval without mutation", drift === 2 && driftPreserved && denied === 2 && deniedPreserved);
-  ok("PHX0A10 mutable-design apply/readback changes exactly its one digest and preserves every other lifecycle binding", applied === 0 && changedDigests.reduce((total, changed) => total + changed, 0) === 1 && changedDigests[3] === 1 && afterValue.artifacts[3].sha256 === digest("# Mutable architecture\n") && JSON.stringify(afterValue.feature) === JSON.stringify(manifest.feature) && afterValue.state === manifest.state && afterValue.candidate === null && afterValue.supersedes === null && receipt.operation === "reconcile-mutable-design");
-  ok("PHX0A11 mutable-design retry is zero-write; exact journal recovery replays and drifted recovery fails closed", replay === 0 && readFileSync(receiptPath, "utf8") === `${JSON.stringify(receipt)}\n` && recoveryReplayed && recoveryDrift === 2 && existsSync(journalPath));
-}
-
-{
-  const dir = freshDir("phx-authority-revision");
-  seedContinuityRoot(dir);
-  const artifact = (path, bytes) => { writeFileSync(join(dir, path), bytes); return { path, sha256: createHash("sha256").update(bytes).digest("hex") }; };
-  const oldPrd = artifact("specs/prd.md", "old prd\n"); const oldSpec = artifact("specs/spec.md", "old spec\n");
-  const nextPrd = artifact("specs/prd-next.md", "next prd\n"); const nextSpec = artifact("specs/spec-next.md", "next spec\n");
-  const initial = continuityState({ authority: { prd: oldPrd, spec: oldSpec, result: { path: "specs/result.md", sha256: C } }, queueHead: continuityQueue({ dispatch: null }) });
-  run(continuityArgs("continuity-init", "absent", writeRequest(dir, "phx-init", initial)), continuityDeps(dir));
-  const stateBefore = readState(dir).state;
-  const request = { schema: "pipeline.continuity-authority-revision-request.v1", featureId: CONTINUITY_FEATURE, expectedRevision: 0, preStateSha256: sha256CanonicalJson(stateBefore), oldAuthority: { prd: oldPrd, spec: oldSpec }, nextAuthority: { prd: nextPrd, spec: nextSpec }, decision: { id: "decision-01", sha256: A, scope: { featureId: CONTINUITY_FEATURE, phase: "design" } }, candidate: { commit: "a".repeat(40), tree: "b".repeat(40) }, evidence: { sha256: B }, idempotencyKey: "phx-revision-01", expiresAt: "2030-01-01T00:00:00.000Z" };
-  const requestFile = writeRequest(dir, "authority-request", request); const requestSha = sha256Canonical(request);
-  const revisionDeps = authorityRevisionDeps(dir, request);
-  const generic = structuredClone(initial); generic.revision = 1; generic.authority.prd = nextPrd; generic.authority.spec = nextSpec;
-  const genericDenied = run(continuityArgs("continuity-cas", 0, writeRequest(dir, "generic-authority-cas", generic)), continuityDeps(dir));
-  const forged = structuredClone(request); forged.decision.sha256 = D;
-  const forgedFile = writeRequest(dir, "forged-authority-request", forged);
-  const forgedDenied = run(["continuity-authority-revision-apply", "--request-file", forgedFile, "--request-sha256", sha256Canonical(forged), "--lock-token", "phx-authority-lock-forged"], revisionDeps);
-  const planned = run(["continuity-authority-revision-plan", "--proposal-file", requestFile], revisionDeps);
-  const applied = run(["continuity-authority-revision-apply", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-authority-lock-01"], revisionDeps);
-  const after = readState(dir).state; const replay = run(["continuity-authority-revision-apply", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-authority-lock-01"], revisionDeps);
-  ok("PHX0A4 generic CAS rejects authority mutation while a forged self-declared decision is refused", genericDenied === 2 && forgedDenied === 2 && planned === 0 && applied === 0 && after.continuity.authority.prd.sha256 === nextPrd.sha256);
-  ok("PHX0A5 dedicated authority revision replay is zero-write with a public-safe receipt", replay === 0 && after.continuityAuthorityRevisionReceipts.length === 1 && !JSON.stringify(after.continuityAuthorityRevisionReceipts[0]).includes(dir));
-}
-
-// ---- PHX0A: revision recovery retains only exact pre/postimage-bound state -----------------
-{
-  const dir = freshDir("phx-authority-revision-recovery");
-  seedContinuityRoot(dir);
-  const artifact = (path, bytes) => { writeFileSync(join(dir, path), bytes); return { path, sha256: createHash("sha256").update(bytes).digest("hex") }; };
-  const oldPrd = artifact("specs/recovery-prd.md", "old prd\n"); const oldSpec = artifact("specs/recovery-spec.md", "old spec\n");
-  const nextPrd = artifact("specs/recovery-prd-next.md", "next prd\n"); const nextSpec = artifact("specs/recovery-spec-next.md", "next spec\n");
-  const initial = continuityState({ authority: { prd: oldPrd, spec: oldSpec, result: { path: "specs/result.md", sha256: C } }, queueHead: continuityQueue({ dispatch: null }) });
-  run(continuityArgs("continuity-init", "absent", writeRequest(dir, "recovery-init", initial)), continuityDeps(dir));
-  const before = readFileSync(statePath(dir), "utf8"); const stateBefore = readState(dir).state;
-  const request = { schema: "pipeline.continuity-authority-revision-request.v1", featureId: CONTINUITY_FEATURE, expectedRevision: 0, preStateSha256: sha256CanonicalJson(stateBefore), oldAuthority: { prd: oldPrd, spec: oldSpec }, nextAuthority: { prd: nextPrd, spec: nextSpec }, decision: { id: "decision-recovery-01", sha256: A, scope: { featureId: CONTINUITY_FEATURE, phase: "design" } }, candidate: { commit: "a".repeat(40), tree: "b".repeat(40) }, evidence: { sha256: B }, idempotencyKey: "phx-recovery-01", expiresAt: "2030-01-01T00:00:00.000Z" };
-  const requestFile = writeRequest(dir, "recovery-authority-request", request); const requestSha = sha256Canonical(request);
-  const bound = authorityRevisionDeps(dir, request); const crash = authorityRevisionDeps(dir, request, { replaceStateFdContents: () => { throw new Error("injected crash seam"); } });
-  let renameCount = 0;
-  const postCrash = authorityRevisionDeps(dir, request, { renameSync: (from, to) => { renameSync(from, to); if (++renameCount === 2) throw new Error("injected postimage crash seam"); } });
-  const applyArgs = ["continuity-authority-revision-apply", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-recovery-lock-01"];
-  const crashed = run(applyArgs, crash);
-  const preview = captureConsoleLog(() => run(["continuity-authority-revision-recover"], bound));
-  const restore = run(["continuity-authority-revision-recover", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-recovery-lock-02", "--mode", "restore"], bound);
-  const restoredPreimage = readFileSync(statePath(dir), "utf8") === before;
-  const postCrashed = run(applyArgs, postCrash);
-  const postRestore = run(["continuity-authority-revision-recover", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-recovery-lock-03", "--mode", "restore"], bound);
-  const restoredPostimage = readFileSync(statePath(dir), "utf8") === before;
-  const crashedAgain = run(applyArgs, crash);
-  const complete = run(["continuity-authority-revision-recover", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-recovery-lock-04", "--mode", "complete"], bound);
-  const after = readState(dir).state;
-  ok("PHX0A6a crash seam retains a typed preview and restore clears only the retained preimage journal", crashed === 2 && preview.value === 2 && preview.text.includes("recovery-required") && restore === 0 && restoredPreimage);
-  ok("PHX0A6b postimage crash can restore exactly the retained preimage", postCrashed === 2 && postRestore === 0 && restoredPostimage);
-  ok("PHX0A6c a second interrupted transaction completes only the retained postimage", crashedAgain === 2 && complete === 0 && after.continuity.revision === 1 && after.continuity.authority.prd.sha256 === nextPrd.sha256 && !existsSync(join(dir, ".claude", "continuity-authority-revision-transaction.json")));
-}
-
-{
-  const dir = freshDir("phx-authority-revision-recovery-drift");
-  seedContinuityRoot(dir);
-  const artifact = (path, bytes) => { writeFileSync(join(dir, path), bytes); return { path, sha256: createHash("sha256").update(bytes).digest("hex") }; };
-  const oldPrd = artifact("specs/drift-prd.md", "old prd\n"); const oldSpec = artifact("specs/drift-spec.md", "old spec\n");
-  const nextPrd = artifact("specs/drift-prd-next.md", "next prd\n"); const nextSpec = artifact("specs/drift-spec-next.md", "next spec\n");
-  const initial = continuityState({ authority: { prd: oldPrd, spec: oldSpec, result: { path: "specs/result.md", sha256: C } }, queueHead: continuityQueue({ dispatch: null }) });
-  run(continuityArgs("continuity-init", "absent", writeRequest(dir, "drift-init", initial)), continuityDeps(dir));
-  const stateBefore = readState(dir).state;
-  const request = { schema: "pipeline.continuity-authority-revision-request.v1", featureId: CONTINUITY_FEATURE, expectedRevision: 0, preStateSha256: sha256CanonicalJson(stateBefore), oldAuthority: { prd: oldPrd, spec: oldSpec }, nextAuthority: { prd: nextPrd, spec: nextSpec }, decision: { id: "decision-drift-01", sha256: A, scope: { featureId: CONTINUITY_FEATURE, phase: "design" } }, candidate: { commit: "a".repeat(40), tree: "b".repeat(40) }, evidence: { sha256: B }, idempotencyKey: "phx-drift-01", expiresAt: "2030-01-01T00:00:00.000Z" };
-  const requestFile = writeRequest(dir, "drift-authority-request", request); const requestSha = sha256Canonical(request);
-  const bound = authorityRevisionDeps(dir, request); const crash = authorityRevisionDeps(dir, request, { replaceStateFdContents: () => { throw new Error("injected crash seam"); } });
-  const crashed = run(["continuity-authority-revision-apply", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-drift-lock-01"], crash);
-  const drifted = { ...readState(dir).state, updatedAt: "2026-07-08T00:00:00.000Z" };
-  writeFileSync(statePath(dir), JSON.stringify(drifted, null, 2) + "\n");
-  const refused = run(["continuity-authority-revision-recover", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-drift-lock-02", "--mode", "complete"], bound);
-  ok("PHX0A6d recovery refuses State drift and retains the bound journal without a false completion claim", crashed === 2 && refused === 2 && readState(dir).state.continuity.revision === 0 && existsSync(join(dir, ".claude", "continuity-authority-revision-transaction.json")));
-}
-
-{
-  const dir = freshDir("phx-authority-revision-recovery-invalid");
-  mkdirSync(join(dir, ".claude"), { recursive: true });
-  writeFileSync(join(dir, ".claude", "continuity-authority-revision-transaction.json"), "{ invalid journal");
-  const recovery = captureConsoleLog(() => run(["continuity-authority-revision-recover"], continuityDeps(dir)));
-  ok("PHX0A6e malformed retained journals are typed recovery-invalid, never a no-recovery success", recovery.value === 2 && recovery.text.includes("recovery-invalid"));
-}
-
-{
-  const dir = freshDir("phx-authority-revision-recovery-postimage-forgery");
-  seedContinuityRoot(dir);
-  const artifact = (path, bytes) => { writeFileSync(join(dir, path), bytes); return { path, sha256: createHash("sha256").update(bytes).digest("hex") }; };
-  const oldPrd = artifact("specs/forgery-prd.md", "old prd\n"); const oldSpec = artifact("specs/forgery-spec.md", "old spec\n");
-  const nextPrd = artifact("specs/forgery-prd-next.md", "next prd\n"); const nextSpec = artifact("specs/forgery-spec-next.md", "next spec\n");
-  const initial = continuityState({ authority: { prd: oldPrd, spec: oldSpec, result: { path: "specs/result.md", sha256: C } }, queueHead: continuityQueue({ dispatch: null }) });
-  run(continuityArgs("continuity-init", "absent", writeRequest(dir, "forgery-init", initial)), continuityDeps(dir));
-  const before = readFileSync(statePath(dir), "utf8"); const stateBefore = readState(dir).state;
-  const request = { schema: "pipeline.continuity-authority-revision-request.v1", featureId: CONTINUITY_FEATURE, expectedRevision: 0, preStateSha256: sha256CanonicalJson(stateBefore), oldAuthority: { prd: oldPrd, spec: oldSpec }, nextAuthority: { prd: nextPrd, spec: nextSpec }, decision: { id: "decision-forgery-01", sha256: A, scope: { featureId: CONTINUITY_FEATURE, phase: "design" } }, candidate: { commit: "a".repeat(40), tree: "b".repeat(40) }, evidence: { sha256: B }, ["idempotency" + "Key"]: "phx-forgery-01", expiresAt: "2030-01-01T00:00:00.000Z" };
-  const requestFile = writeRequest(dir, "forgery-authority-request", request); const requestSha = sha256Canonical(request);
-  const bound = authorityRevisionDeps(dir, request); const crash = authorityRevisionDeps(dir, request, { replaceStateFdContents: () => { throw new Error("injected crash seam"); } });
-  const crashed = run(["continuity-authority-revision-apply", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-forgery-lock-01"], crash);
-  const journalPath = join(dir, ".claude", "continuity-authority-revision-transaction.json"); const journal = JSON.parse(readFileSync(journalPath, "utf8"));
-  const forgedPost = JSON.parse(journal.postStateBytes); forgedPost.continuity.authority.prd = oldPrd;
-  journal.postStateBytes = JSON.stringify(forgedPost, null, 2) + "\n";
-  journal.postStateBytesSha256 = createHash("sha256").update(journal.postStateBytes).digest("hex");
-  journal.postStateSha256 = sha256CanonicalJson(forgedPost);
-  writeFileSync(journalPath, `${canonicalFixtureJson(journal)}\n`);
-  const refused = run(["continuity-authority-revision-recover", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-forgery-lock-02", "--mode", "complete"], bound);
-  ok("PHX0A6f self-consistent forged journal postimage cannot complete or change the retained preimage", crashed === 2 && refused === 2 && readFileSync(statePath(dir), "utf8") === before && existsSync(journalPath));
-  const legacyTen = structuredClone(journal); legacyTen.schema = "pipeline.continuity-authority-revision-transaction.v1";
-  legacyTen.updatedAt = JSON.parse(legacyTen.preStateBytes).updatedAt;
-  writeFileSync(journalPath, `${canonicalFixtureJson(legacyTen)}\n`);
-  const legacyTenPreview = captureConsoleLog(() => run(["continuity-authority-revision-recover"], bound));
-  const legacyTenComplete = run(["continuity-authority-revision-recover", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-forgery-lock-03", "--mode", "complete"], bound);
-  const legacyTenRestore = run(["continuity-authority-revision-recover", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-forgery-lock-04", "--mode", "restore"], bound);
-  const legacyNine = structuredClone(journal); legacyNine.schema = "pipeline.continuity-authority-revision-transaction.v1";
-  writeFileSync(journalPath, `${canonicalFixtureJson(legacyNine)}\n`);
-  const legacyNinePreview = captureConsoleLog(() => run(["continuity-authority-revision-recover"], bound));
-  const legacyNineComplete = run(["continuity-authority-revision-recover", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-forgery-lock-05", "--mode", "complete"], bound);
-  const legacyNineRestore = run(["continuity-authority-revision-recover", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-forgery-lock-06", "--mode", "restore"], bound);
-  const malformedExtra = { ...legacyNine, unexpected: "rejected" };
-  writeFileSync(journalPath, `${canonicalFixtureJson(malformedExtra)}\n`);
-  const extraPreview = captureConsoleLog(() => run(["continuity-authority-revision-recover"], bound));
-  const malformedMissing = structuredClone(legacyNine); delete malformedMissing.postStateBytes;
-  writeFileSync(journalPath, `${canonicalFixtureJson(malformedMissing)}\n`);
-  const missingPreview = captureConsoleLog(() => run(["continuity-authority-revision-recover"], bound));
-  ok("PHX0A6g both historical v1 forms are restore-only; malformed extra/missing variants are invalid", legacyTenPreview.value === 2 && legacyTenPreview.text.includes("recovery-legacy-restore-only") && legacyTenComplete === 2 && legacyTenRestore === 0 && legacyNinePreview.value === 2 && legacyNinePreview.text.includes("recovery-legacy-restore-only") && legacyNineComplete === 2 && legacyNineRestore === 0 && extraPreview.value === 2 && extraPreview.text.includes("recovery-invalid") && missingPreview.value === 2 && missingPreview.text.includes("recovery-invalid") && readFileSync(statePath(dir), "utf8") === before);
-}
-
-{
-  const dir = freshDir("phx-authority-revision-recovery-timestamp-forgery");
-  seedContinuityRoot(dir);
-  const artifact = (path, bytes) => { writeFileSync(join(dir, path), bytes); return { path, sha256: createHash("sha256").update(bytes).digest("hex") }; };
-  const oldPrd = artifact("specs/time-prd.md", "old prd\n"); const oldSpec = artifact("specs/time-spec.md", "old spec\n");
-  const nextPrd = artifact("specs/time-prd-next.md", "next prd\n"); const nextSpec = artifact("specs/time-spec-next.md", "next spec\n");
-  const initial = continuityState({ authority: { prd: oldPrd, spec: oldSpec, result: { path: "specs/result.md", sha256: C } }, queueHead: continuityQueue({ dispatch: null }) });
-  run(continuityArgs("continuity-init", "absent", writeRequest(dir, "time-init", initial)), continuityDeps(dir));
-  const before = readFileSync(statePath(dir), "utf8"); const stateBefore = readState(dir).state;
-  const request = { schema: "pipeline.continuity-authority-revision-request.v1", featureId: CONTINUITY_FEATURE, expectedRevision: 0, preStateSha256: sha256CanonicalJson(stateBefore), oldAuthority: { prd: oldPrd, spec: oldSpec }, nextAuthority: { prd: nextPrd, spec: nextSpec }, decision: { id: "decision-time-01", sha256: A, scope: { featureId: CONTINUITY_FEATURE, phase: "design" } }, candidate: { commit: "a".repeat(40), tree: "b".repeat(40) }, evidence: { sha256: B }, idempotencyKey: "phx-time-01", expiresAt: "2030-01-01T00:00:00.000Z" };
-  const requestFile = writeRequest(dir, "time-authority-request", request); const requestSha = sha256Canonical(request);
-  const bound = authorityRevisionDeps(dir, request); const crash = authorityRevisionDeps(dir, request, { replaceStateFdContents: () => { throw new Error("injected crash seam"); } });
-  const crashed = run(["continuity-authority-revision-apply", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-time-lock-01"], crash);
-  const journalPath = join(dir, ".claude", "continuity-authority-revision-transaction.json"); const journal = JSON.parse(readFileSync(journalPath, "utf8"));
-  const forgedPost = JSON.parse(journal.postStateBytes); forgedPost.updatedAt = "2029-12-31T00:00:00.000Z";
-  journal.postStateBytes = JSON.stringify(forgedPost, null, 2) + "\n";
-  journal.postStateBytesSha256 = createHash("sha256").update(journal.postStateBytes).digest("hex");
-  journal.postStateSha256 = sha256CanonicalJson(forgedPost);
-  writeFileSync(journalPath, `${canonicalFixtureJson(journal)}\n`);
-  const refused = run(["continuity-authority-revision-recover", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-time-lock-02", "--mode", "complete"], bound);
-  ok("PHX0A6h timestamp-only self-consistent postimage forgery is refused without State mutation", crashed === 2 && refused === 2 && readFileSync(statePath(dir), "utf8") === before && existsSync(journalPath));
-}
-
-
-{
-  const now = "2026-08-01T00:00:00.000Z";
-  const issued = recoveryBridgeDecision();
-  const initial = validateRecoveryBridgeDecision(issued, { now });
-  const committed = transitionRecoveryBridgeDecision(issued, "public-commit", recoveryBridgeCommitRequest(issued), { now });
-  const consumed = transitionRecoveryBridgeDecision(committed.value, "consume", recoveryBridgeConsumeReceipt(committed.value), { now });
-  ok("TP5 Recovery Bridge validates its exact schemas and digest through issued, public-committed, and consumed", initial.ok
-    && issued.decisionSha256 === recoveryBridgeDecisionDigest({ ...issued, status: "consumed" })
-    && committed.ok && committed.value.status === "public-committed"
-    && consumed.ok && consumed.value.status === "consumed"
-    && validateRecoveryBridgeDecision(consumed.value, { now }).ok
-    && issued.status === "issued");
-}
-
-{
-  const now = "2026-08-01T00:00:00.000Z";
-  const issued = recoveryBridgeDecision();
-  const committed = transitionRecoveryBridgeDecision(issued, "public-commit", recoveryBridgeCommitRequest(issued), { now });
-  const publicReplay = transitionRecoveryBridgeDecision(committed.value, "public-commit", recoveryBridgeCommitRequest(committed.value), { now });
-  const consumed = transitionRecoveryBridgeDecision(committed.value, "consume", recoveryBridgeConsumeReceipt(committed.value), { now });
-  const consumeReplay = transitionRecoveryBridgeDecision(consumed.value, "consume", recoveryBridgeConsumeReceipt(consumed.value), { now });
-  ok("TP5 Recovery Bridge rejects public-commit and consume replays", committed.ok && consumed.ok
-    && publicReplay.ok === false && publicReplay.code === "RB-TRANSITION"
-    && consumeReplay.ok === false && consumeReplay.code === "RB-TRANSITION");
-}
-
-{
-  const expiresAt = "2026-08-02T00:00:00.000Z";
-  const expired = recoveryBridgeDecision({ expiresAt });
-  const validation = validateRecoveryBridgeDecision(expired, { now: expiresAt });
-  const transition = transitionRecoveryBridgeDecision(expired, "public-commit", recoveryBridgeCommitRequest(expired), { now: expiresAt });
-  const badSchema = validateRecoveryBridgeDecision({ ...expired, schema: "pipeline.recovery-bridge-decision.v0" });
-  const staleDigest = validateRecoveryBridgeDecision({ ...expired, prdSha256: "e".repeat(64) });
-  ok("TP5 Recovery Bridge rejects expired, schema-drifted, and digest-drifted decisions", validation.ok === false
-    && validation.code === "RB-DECISION-EXPIRED"
-    && transition.ok === false && transition.code === "RB-DECISION-EXPIRED"
-    && badSchema.ok === false && badSchema.code === "RB-DECISION-SCHEMA"
-    && staleDigest.ok === false && staleDigest.code === "RB-DECISION-DIGEST");
-}
-
-{
-  const now = "2026-08-01T00:00:00.000Z";
-  const issued = recoveryBridgeDecision();
-  const retargeted = recoveryBridgeDecision({ artifactPath: "specs/sprint-phoenix-epic/OTHER.md" });
-  const changedTarget = validateRecoveryBridgeDecision(retargeted, { now });
-  const changedCommitTarget = transitionRecoveryBridgeDecision(issued, "public-commit", recoveryBridgeCommitRequest(issued, {
-    artifactPath: "specs/sprint-phoenix-epic/OTHER.md",
-  }), { now });
-  const committed = transitionRecoveryBridgeDecision(issued, "public-commit", recoveryBridgeCommitRequest(issued), { now });
-  const changedReceipt = transitionRecoveryBridgeDecision(committed.value, "consume", recoveryBridgeConsumeReceipt(committed.value, {
-    readback: {
-      manifest: committed.value.manifest,
-      artifactPath: committed.value.artifactPath,
-      recoveryPostimageSha256: "e".repeat(64),
-    },
-  }), { now });
-  ok("TP5 Recovery Bridge rejects changed decision targets, public bindings, and consume readbacks", changedTarget.ok === false
-    && changedTarget.code === "RB-DECISION-TARGET"
-    && changedCommitTarget.ok === false && changedCommitTarget.code === "RB-PUBLIC-COMMIT-BINDING"
-    && committed.ok
-    && changedReceipt.ok === false && changedReceipt.code === "RB-CONSUME-READBACK-BINDING");
-}
-
-
-function recoveryBridgeExecutableFixture() {
-  const dir = freshDir("recovery-bridge-executable");
-  const base = "specs/sprint-phoenix-epic";
-  const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
-  const put = (path, bytes) => { mkdirSync(dirname(join(dir, path)), { recursive: true }); writeFileSync(join(dir, path), bytes); return digest(bytes); };
-  const prdPath = base + "/prd_phoenix-epic.md"; const specPath = base + "/spec.md"; const recoveryPath = base + "/RECOVERY.md";
-  const prdSha256 = put(prdPath, "# Recovery Bridge PRD\n"); const specSha256 = put(specPath, "# Recovery Bridge Spec\n");
-  put(base + "/acceptance.md", "# Acceptance\n"); const recoveryPostimageSha256 = put(recoveryPath, "# Recovered design\n");
-  const manifestPath = base + "/lifecycle.json";
-  const manifest = { schema: "pipeline.feature-package.v1", feature: { id: "sprint-phoenix-epic", rigor: 2 }, state: "draft", artifacts: [
-    { class: "prd", path: prdPath, sha256: prdSha256, authority: true, mutability: "mutable", retention: "active" },
-    { class: "spec", path: specPath, sha256: specSha256, authority: true, mutability: "mutable", retention: "active" },
-    { class: "acceptance", path: base + "/acceptance.md", sha256: digest("# Acceptance\n"), authority: true, mutability: "mutable", retention: "active" },
-    { class: "design", path: recoveryPath, sha256: digest("stale recovery"), authority: false, mutability: "mutable", retention: "retain" },
-  ], candidate: null, supersedes: null };
-  const manifestBytes = JSON.stringify(manifest, null, 2) + "\n"; writeFileSync(join(dir, manifestPath), manifestBytes);
-  const poGateAuthority = {
-    schema: PO_GATE_AUTHORITY_EVIDENCE_V2_SCHEMA,
-    humanFacing: "de",
-    sourceSha256: A,
-    runtimeSha256: B,
-    receiptSha256: C,
-    repositoryFingerprint: D,
-    planPath: prdPath,
-    planSha256: prdSha256,
-    specPath,
-    specSha256,
-  };
-  const planApproval = {
-    schema: "pipeline.plan-approval.v2",
-    approvedBy: "PO",
-    approvedAt: "2026-08-01T00:00:00.000Z",
-    specBoundBy: "PO",
-    specBoundAt: "2026-08-01T00:00:00.000Z",
-    poGateAuthority,
-  };
-  mkdirSync(join(dir, ".claude"), { recursive: true }); writeFileSync(statePath(dir), JSON.stringify({ schema: SCHEMA_ID, planApproved: true, activeFeature: { id: "sprint-phoenix-epic", planPath: prdPath, phase: "implementation" }, planApproval }));
-  const gitCommonDir = join(dir, "git-common"); mkdirSync(gitCommonDir, { recursive: true });
-  const decision = recoveryBridgeDecision({ manifestPreimageSha256: digest(manifestBytes), recoveryPostimageSha256, prdSha256, specSha256, poApproval: { planPath: prdPath, planSha256: prdSha256, specPath, specSha256, approvalSha256: sha256Canonical(planApproval) }, expiresAt: "2026-09-01T00:00:00.000Z" });
-  const poGateAuthorityCheck = ({ expectedPlanSha256, expectedSpecSha256 } = {}) => expectedPlanSha256 === prdSha256 && expectedSpecSha256 === specSha256 ? { ok: true, value: poGateAuthority } : { ok: false, code: "PO-GATE-AUTHORITY-STALE" };
-  return { dir, digest, manifest, manifestBytes, manifestPath, decision, recoveryPath, gitCommonDir, poGateAuthorityCheck };
-}
-
-{
-  const fixture = recoveryBridgeExecutableFixture(); const now = () => "2026-08-01T00:00:00.000Z";
-  const plan = captureConsoleLog(() => run(["recovery-bridge-plan", "--decision-file", writeRequest(fixture.dir, "bridge-decision", fixture.decision)], { dir: fixture.dir, now, poGateAuthority: fixture.poGateAuthorityCheck }));
-  const request = plan.value === 0 ? JSON.parse(plan.text).request : null;
-  const planWith = (decision, name) => run(["recovery-bridge-plan", "--decision-file", writeRequest(fixture.dir, name, decision)], { dir: fixture.dir, now, poGateAuthority: fixture.poGateAuthorityCheck });
-  const attribution = planWith(recoveryBridgeDecision({ ...fixture.decision, approvedBy: "agent" }), "bridge-attribution");
-  const expiry = planWith(recoveryBridgeDecision({ ...fixture.decision, expiresAt: "2026-08-01T00:00:00.000Z" }), "bridge-expiry");
-  const chronology = planWith(recoveryBridgeDecision({ ...fixture.decision, approvedAt: "2026-10-01T00:00:00.000Z" }), "bridge-chronology");
-  const unapprovedState = (() => {
-    const path = statePath(fixture.dir); const original = readFileSync(path, "utf8");
-    writeFileSync(path, JSON.stringify({ ...JSON.parse(original), planApproved: false }) + "\n");
-    const code = planWith(fixture.decision, "bridge-unapproved-state"); writeFileSync(path, original);
-    return code;
-  })();
-  const prdDrift = (() => { writeFileSync(join(fixture.dir, "specs/sprint-phoenix-epic/prd_phoenix-epic.md"), "drift\n"); const code = planWith(fixture.decision, "bridge-prd-drift"); writeFileSync(join(fixture.dir, "specs/sprint-phoenix-epic/prd_phoenix-epic.md"), "# Recovery Bridge PRD\n"); return code; })();
-  const specDrift = (() => { writeFileSync(join(fixture.dir, "specs/sprint-phoenix-epic/spec.md"), "drift\n"); const code = planWith(fixture.decision, "bridge-spec-drift"); writeFileSync(join(fixture.dir, "specs/sprint-phoenix-epic/spec.md"), "# Recovery Bridge Spec\n"); return code; })();
-  const recoveryDrift = (() => { writeFileSync(join(fixture.dir, fixture.recoveryPath), "drift\n"); const code = planWith(fixture.decision, "bridge-recovery-drift"); writeFileSync(join(fixture.dir, fixture.recoveryPath), "# Recovered design\n"); return code; })();
-  const manifestDrift = (() => { writeFileSync(join(fixture.dir, fixture.manifestPath), fixture.manifestBytes + "\n"); const code = planWith(fixture.decision, "bridge-manifest-drift"); writeFileSync(join(fixture.dir, fixture.manifestPath), fixture.manifestBytes); return code; })();
-  const generic = run(["feature-package-plan", "--manifest", fixture.manifestPath, "--proposal-file", writeRequest(fixture.dir, "generic-fixed-target", { operation: "reconcile-mutable-design", targetState: "draft", artifactPath: fixture.recoveryPath }), IDEMPOTENCY_FLAG, "rb-generic-01", "--expires-at", "2026-09-01T00:00:00.000Z"], { dir: fixture.dir, now });
-  ok("TP5 Recovery Bridge executable planner requires the bound PO gate and rejects authority or artifact drift", plan.value === 0 && request?.authority?.class === "recovery-bridge" && attribution === 2 && expiry === 2 && chronology === 2 && unapprovedState === 2 && prdDrift === 2 && specDrift === 2 && recoveryDrift === 2 && manifestDrift === 2 && generic === 2);
-}
-
-{
-  const fixture = recoveryBridgeExecutableFixture(); const now = () => "2026-08-01T00:00:00.000Z";
-  const planned = captureConsoleLog(() => run(["recovery-bridge-plan", "--decision-file", writeRequest(fixture.dir, "bridge-apply-decision", fixture.decision)], { dir: fixture.dir, now, poGateAuthority: fixture.poGateAuthorityCheck }));
-  const request = JSON.parse(planned.text).request; const requestFile = writeRequest(fixture.dir, "bridge-apply-request", request);
-  const deps = { dir: fixture.dir, now, poGateAuthority: fixture.poGateAuthorityCheck, gitCommonDir: () => ({ ok: true, path: fixture.gitCommonDir }) };
-  const forged = structuredClone(request); forged.authority.class = "po-approval";
-  const forgedNormal = run(["feature-package-apply", "--request-file", writeRequest(fixture.dir, "bridge-forged-normal", forged), "--request-sha256", sha256Canonical(forged), "--lock-token", "rb-forged"], deps);
-  const applied = run(["feature-package-apply", "--request-file", requestFile, "--request-sha256", sha256Canonical(request), "--lock-token", "rb-apply"], deps);
-  const after = JSON.parse(readFileSync(join(fixture.dir, fixture.manifestPath), "utf8"));
-  const changed = fixture.manifest.artifacts.map((entry, index) => entry.sha256 === after.artifacts[index].sha256 ? 0 : 1);
-  const journalPath = join(fixture.gitCommonDir, "agent-pipeline", "recovery-bridge", fixture.decision.decisionId, "journal.json");
-  const journal = JSON.parse(readFileSync(journalPath, "utf8"));
-  const replay = run(["feature-package-apply", "--request-file", requestFile, "--request-sha256", sha256Canonical(request), "--lock-token", "rb-replay"], deps);
-  const interruptionJournal = join(fixture.dir, ".claude", "feature-package-transaction.json");
-  writeFileSync(interruptionJournal, JSON.stringify({ request }) + "\n");
-  const recovery = run(["feature-package-recover", "--request-file", requestFile, "--request-sha256", sha256Canonical(request), "--lock-token", "rb-recover"], deps);
-  ok("TP5 Recovery Bridge executable apply changes only RECOVERY, consumes, rejects replay, and recovers exact interruption phases", planned.value === 0 && forgedNormal === 2 && applied === 0 && changed.reduce((sum, value) => sum + value, 0) === 1 && changed[3] === 1 && journal.decision.status === "consumed" && !existsSync(join(fixture.dir, ".claude", "recovery-bridge-transaction.json")) && replay === 2 && recovery === 0);
-}
-
-{
-  const now = () => "2026-08-01T00:00:00.000Z";
-  const refusal = (name, prepare, common) => {
-    const fixture = recoveryBridgeExecutableFixture(); const planned = captureConsoleLog(() => run(["recovery-bridge-plan", "--decision-file", writeRequest(fixture.dir, name + "-decision", fixture.decision)], { dir: fixture.dir, now, poGateAuthority: fixture.poGateAuthorityCheck }));
-    const request = JSON.parse(planned.text).request; const before = readFileSync(join(fixture.dir, fixture.manifestPath), "utf8"); prepare(fixture);
-    const code = run(["feature-package-apply", "--request-file", writeRequest(fixture.dir, name + "-request", request), "--request-sha256", sha256Canonical(request), "--lock-token", name + "-lock"], { dir: fixture.dir, now, poGateAuthority: fixture.poGateAuthorityCheck, gitCommonDir: () => ({ ok: true, path: common(fixture) }) });
-    return code === 2 && readFileSync(join(fixture.dir, fixture.manifestPath), "utf8") === before;
-  };
-  const missing = refusal("rb-private-missing", () => {}, () => join("/tmp", "missing-recovery-private-store"));
-  const relative = refusal("rb-private-relative", () => {}, () => "relative-private-store");
-  const malformed = refusal("rb-private-malformed", (fixture) => { const path = join(fixture.gitCommonDir, "agent-pipeline", "recovery-bridge", fixture.decision.decisionId); mkdirSync(path, { recursive: true }); writeFileSync(join(path, "journal.json"), "{ malformed"); }, (fixture) => fixture.gitCommonDir);
-  const symlinked = refusal("rb-private-symlink", (fixture) => { const link = join(fixture.dir, "common-link"); symlinkSync(fixture.gitCommonDir, link); fixture.privateLink = link; }, (fixture) => fixture.privateLink);
-  ok("TP5 Recovery Bridge private store rejects missing, nonabsolute, malformed, and symlinked stores without manifest mutation", missing && relative && malformed && symlinked);
-}
-
-{
-  const fixture = recoveryBridgeExecutableFixture(); const now = () => "2026-08-01T00:00:00.000Z";
-  const planned = captureConsoleLog(() => run(["recovery-bridge-plan", "--decision-file", writeRequest(fixture.dir, "critic-recovery-decision", fixture.decision)], { dir: fixture.dir, now, poGateAuthority: fixture.poGateAuthorityCheck }));
-  const request = JSON.parse(planned.text).request; const requestFile = writeRequest(fixture.dir, "critic-recovery-request", request);
-  const deps = { dir: fixture.dir, now, poGateAuthority: fixture.poGateAuthorityCheck, gitCommonDir: () => ({ ok: true, path: fixture.gitCommonDir }) };
-  const committed = transitionRecoveryBridgeDecision(fixture.decision, "public-commit", recoveryBridgeCommitRequest(fixture.decision), { now: now() });
-  const privateDirectory = join(fixture.gitCommonDir, "agent-pipeline", "recovery-bridge", fixture.decision.decisionId); mkdirSync(privateDirectory, { recursive: true });
-  writeFileSync(join(privateDirectory, "journal.json"), JSON.stringify({ schema: "pipeline.recovery-bridge-transaction.v1", decision: committed.value, requestSha256: sha256Canonical(request) }) + "\n");
-  const genericJournal = join(fixture.dir, ".claude", "feature-package-transaction.json");
-  const before = JSON.parse(readFileSync(join(fixture.dir, fixture.manifestPath), "utf8"));
-  const recovery = run(["feature-package-recover", "--request-file", requestFile, "--request-sha256", sha256Canonical(request), "--lock-token", "rb-critic-recover"], deps);
-  const after = JSON.parse(readFileSync(join(fixture.dir, fixture.manifestPath), "utf8"));
-  const terminal = JSON.parse(readFileSync(join(privateDirectory, "journal.json"), "utf8"));
-  const changed = before.artifacts.map((entry, index) => entry.sha256 === after.artifacts[index].sha256 ? 0 : 1);
-  const nonBridge = structuredClone(request); nonBridge.authority = { class: "lifecycle-bootstrap", decision: null };
-  const nonBridgeRecover = run(["feature-package-recover", "--request-file", writeRequest(fixture.dir, "critic-non-bridge-request", nonBridge), "--request-sha256", sha256Canonical(nonBridge), "--lock-token", "rb-critic-non-bridge"], deps);
-  ok("TP5 Critic Recovery Bridge resume consumes an exact private public-committed transaction without a generic journal", planned.value === 0 && committed.ok && !existsSync(genericJournal) && recovery === 0 && terminal.decision.status === "consumed" && changed.reduce((sum, value) => sum + value, 0) === 1 && changed[3] === 1 && nonBridgeRecover === 2);
-}
-{
-  const fixture = recoveryBridgeExecutableFixture(); const now = () => "2026-08-01T00:00:00.000Z";
-  const planned = captureConsoleLog(() => run(["recovery-bridge-plan", "--decision-file", writeRequest(fixture.dir, "status-decision", fixture.decision)], { dir: fixture.dir, now, poGateAuthority: fixture.poGateAuthorityCheck }));
-  const request = JSON.parse(planned.text).request; const requestFile = writeRequest(fixture.dir, "status-request", request);
-  const deps = { dir: fixture.dir, now, poGateAuthority: fixture.poGateAuthorityCheck, gitCommonDir: () => ({ ok: true, path: fixture.gitCommonDir }) };
-  const committed = transitionRecoveryBridgeDecision(fixture.decision, "public-commit", recoveryBridgeCommitRequest(fixture.decision), { now: now() });
-  const privateDirectory = join(fixture.gitCommonDir, "agent-pipeline", "recovery-bridge", fixture.decision.decisionId); mkdirSync(privateDirectory, { recursive: true });
-  const privateJournal = join(privateDirectory, "journal.json"); writeFileSync(privateJournal, JSON.stringify({ schema: "pipeline.recovery-bridge-transaction.v1", decision: committed.value, requestSha256: sha256Canonical(request) }) + "\n");
-  const pendingStatus = run(["feature-package-status"], deps);
-  const recovery = run(["feature-package-recover", "--request-file", requestFile, "--request-sha256", sha256Canonical(request), "--lock-token", "rb-status-recover"], deps);
-  const terminal = JSON.parse(readFileSync(privateJournal, "utf8")); const readyStatus = run(["feature-package-status"], deps);
-  const legacyTerminal = structuredClone(terminal);
-  legacyTerminal.decision.assurance = "operator-local-attested";
-  legacyTerminal.decision.decisionSha256 = recoveryBridgeDecisionDigest(legacyTerminal.decision);
-  writeFileSync(privateJournal, JSON.stringify(legacyTerminal) + "\n");
-  const legacyJournalStatus = run(["feature-package-status"], deps);
-  writeFileSync(privateJournal, JSON.stringify(terminal) + "\n");
-  let legacyJournalSymlinkStatus = 2;
-  if (symlinkCapable) {
-    const externalLegacyJournal = join(fixture.dir, "legacy-terminal-journal.json");
-    writeFileSync(externalLegacyJournal, JSON.stringify(legacyTerminal) + "\n");
-    rmSync(privateJournal);
-    symlinkSync(externalLegacyJournal, privateJournal);
-    legacyJournalSymlinkStatus = run(["feature-package-status"], deps);
+  for (const [label, mutate] of rootMutations) {
+    const altered = JSON.parse(before); mutate(altered); const bytes = JSON.stringify(altered) + "\n"; writeFileSync(statePath(dir), bytes);
+    const rejectedRoot = captureConsoleError(() => run(["continuity-adoption-plan", "--request-file", reqPath], { dir, legacyGitObservation: () => observed, now: FIXED_NOW }));
+    ok(`PS52-root-${label}`, rejectedRoot.value === 2 && readFileSync(statePath(dir), "utf8") === bytes);
+    writeFileSync(statePath(dir), before);
   }
-  const malformedFixture = recoveryBridgeExecutableFixture(); const malformedPath = join(malformedFixture.gitCommonDir, "agent-pipeline", "recovery-bridge", malformedFixture.decision.decisionId); mkdirSync(malformedPath, { recursive: true }); writeFileSync(join(malformedPath, "journal.json"), "{ malformed");
-  const malformedStatus = run(["feature-package-status"], { dir: malformedFixture.dir, now, gitCommonDir: () => ({ ok: true, path: malformedFixture.gitCommonDir }) });
-  const symlinkFixture = recoveryBridgeExecutableFixture(); const commonLink = join(symlinkFixture.dir, "common-link"); symlinkSync(symlinkFixture.gitCommonDir, commonLink);
-  const symlinkStatus = run(["feature-package-status"], { dir: symlinkFixture.dir, now, gitCommonDir: () => ({ ok: true, path: commonLink }) });
-  ok("TP5 Recovery Bridge status accepts consumed legacy journals and fails closed for malformed or symlinked journals", planned.value === 0 && committed.ok && pendingStatus === 2 && recovery === 0 && terminal.decision.status === "consumed" && readyStatus === 0 && legacyJournalStatus === 0 && legacyJournalSymlinkStatus === 2 && malformedStatus === 2 && symlinkStatus === 2);
+  const candidateHead = structuredClone(observed); candidateHead.head = A.slice(0, 40);
+  const candidateHeadPlan = captureConsole(() => run(["continuity-adoption-plan", "--request-file", reqPath], { dir, legacyGitObservation: () => candidateHead, now: FIXED_NOW }));
+  ok("PS52-release-candidate-head may differ from the release tag", candidateHeadPlan.value === 0 && readFileSync(statePath(dir), "utf8") === before);
+  for (const [label, mutate] of [["tagObject", (o) => { o.tagObject = A.slice(0, 40); }], ["commit", (o) => { o.commit = A.slice(0, 40); }], ["tree", (o) => { o.tree = A.slice(0, 40); }], ["remoteCommit", (o) => { o.remoteCommit = A.slice(0, 40); }], ["remoteTagObject", (o) => { o.remoteTagObject = A.slice(0, 40); }], ["remoteTagCommit", (o) => { o.remoteTagCommit = A.slice(0, 40); }], ["historical bytes", (o) => { o.historicalPrdSha256 = A; }]]) {
+    const altered = structuredClone(observed); mutate(altered); const rejectedRelease = captureConsoleError(() => run(["continuity-adoption-plan", "--request-file", reqPath], { dir, legacyGitObservation: () => altered, now: FIXED_NOW }));
+    ok(`PS52-release-${label}`, rejectedRelease.value === 2 && readFileSync(statePath(dir), "utf8") === before);
+  }
+  for (const [label, mutate] of [["artifact missing", (r) => { r.result.path = "missing.md"; }], ["artifact hash", (r) => { r.spec.sha256 = A; }], ["history mismatch", (r) => { r.history.commit = A.slice(0, 40); }]]) {
+    const altered = structuredClone(request); mutate(altered); const alteredPath = writeRequest(dir, `legacy-${label.replace(/ /g, "-")}`, altered);
+    const rejectedArtifact = captureConsoleError(() => run(["continuity-adoption-plan", "--request-file", alteredPath], { dir, legacyGitObservation: () => observed, now: FIXED_NOW }));
+    ok(`PS52-artifact-${label}`, rejectedArtifact.value === 2 && readFileSync(statePath(dir), "utf8") === before);
+  }
+  if (symlinkCapable) {
+    const target = join(legacyRoot, "result.md"); const moved = join(legacyRoot, "result.real"); renameSync(target, moved); symlinkSync(moved, target);
+    const symlinkRejected = captureConsoleError(() => run(["continuity-adoption-plan", "--request-file", reqPath], { dir, legacyGitObservation: () => observed, now: FIXED_NOW }));
+    ok("PS52-artifact-symlink", symlinkRejected.value === 2 && readFileSync(statePath(dir), "utf8") === before);
+    rmSync(target); renameSync(moved, target);
+  }
+  const oversized = "{" + "x".repeat(70_000) + "}"; writeFileSync(statePath(dir), oversized);
+  const oversizedRejected = captureConsoleError(() => run(["continuity-adoption-plan", "--request-file", reqPath], { dir, legacyGitObservation: () => observed, now: FIXED_NOW }));
+  ok("PS52-state-oversized", oversizedRejected.value === 2 && readFileSync(statePath(dir), "utf8") === oversized);
+  writeFileSync(statePath(dir), before);
+  const driftedState = JSON.parse(before); driftedState.updatedAt = "2026-07-26T14:08:37.501Z"; writeFileSync(statePath(dir), JSON.stringify(driftedState) + "\n");
+  const staleApply = captureConsoleError(() => run(["continuity-adoption-apply", "--request-file", reqPath, "--plan-sha256", payload.planSha256, "--activate"], { dir, legacyGitObservation: () => observed, now: FIXED_NOW }));
+  ok("PS52c1 State drift between plan/apply is refused byte-null", staleApply.value === 2 && readFileSync(statePath(dir), "utf8") === JSON.stringify(driftedState) + "\n");
+  writeFileSync(statePath(dir), before);
+  const preRename = captureConsoleError(() => run(["continuity-adoption-apply", "--request-file", reqPath, "--plan-sha256", payload.planSha256, "--activate"], { dir, legacyGitObservation: () => observed, now: FIXED_NOW, replaceStateFdContents: () => { throw new Error("injected pre-rename"); } }));
+  ok("PS52c2 pre-rename write failure reports committed=false and zero mutation", preRename.value === 2 && /zero mutation/i.test(preRename.text) && readFileSync(statePath(dir), "utf8") === before);
+  const postRename = captureConsoleError(() => run(["continuity-adoption-apply", "--request-file", reqPath, "--plan-sha256", payload.planSha256, "--activate"], { dir, legacyGitObservation: () => observed, now: FIXED_NOW, syncDirectory: () => ({ ok: false, supported: true }) }));
+  const postState = readState(dir).state;
+  ok("PS52c3 post-rename directory-sync failure reports committed durability and revision4", postRename.value === 2 && /durability|committed/i.test(postRename.text) && !/zero mutation/i.test(postRename.text) && postState.continuity?.revision === 4);
+  writeFileSync(statePath(dir), before);
+  for (const [label, readback] of [["malformed", () => ({ status: "malformed" })], ["drifted", (root) => ({ status: "ok", state: { ...root, updatedAt: "drifted" } })], ["planApproved drift", (root) => ({ status: "ok", state: { ...root, planApproved: false } })], ["planApproval drift", (root) => ({ status: "ok", state: { ...root, planApproval: { ...root.planApproval, approvedBy: "other" } } })]]) {
+    writeFileSync(statePath(dir), before);
+    const injectedReadback = captureConsoleError(() => run(["continuity-adoption-apply", "--request-file", reqPath, "--plan-sha256", payload.planSha256, "--activate"], {
+      dir, legacyGitObservation: () => observed, now: FIXED_NOW,
+      readLegacyAdoptionPostimage: () => readback(readState(dir).state),
+    }));
+    ok(`PS52c4 postimage-${label} readback fails closed without success claim`, injectedReadback.value === 2 && !/CS-LEGACY-ADOPTION-APPLIED.*written/i.test(injectedReadback.text));
+  }
+  writeFileSync(statePath(dir), before);
+  const apply = captureConsoleError(() => run(["continuity-adoption-apply", "--request-file", reqPath, "--plan-sha256", payload.planSha256, "--activate"], { dir, legacyGitObservation: () => observed, now: FIXED_NOW }));
+  ok("PS52c exact apply advances revision and close action", apply.value === 0 && readState(dir).state.continuity.revision === 4 && readState(dir).state.continuity.queueHead.nextAction === "close");
+  const replayBefore = readFileSync(statePath(dir), "utf8"); const replay = captureConsoleError(() => run(["continuity-adoption-apply", "--request-file", reqPath, "--plan-sha256", payload.planSha256, "--activate"], { dir, legacyGitObservation: () => observed, now: FIXED_NOW }));
+  ok("PS52d conflicting replay is refused without mutation", replay.value === 2 && readFileSync(statePath(dir), "utf8") === replayBefore);
+  writeFileSync(statePath(dir), before);
+  const lock = acquireContinuityLock(dir, "ps52-lock", continuityDeps(dir));
+  const locked = captureConsoleError(() => run(["continuity-adoption-apply", "--request-file", reqPath, "--plan-sha256", payload.planSha256, "--activate"], { dir, legacyGitObservation: () => observed, now: FIXED_NOW }));
+  ok("PS52d1 lock contention refuses apply with zero State mutation", locked.value === 2 && readFileSync(statePath(dir), "utf8") === before);
+  releaseContinuityLock(lock);
+  const driftPath = writeRequest(dir, "legacy-drift", { ...request, extra: true }); const rejected = captureConsoleError(() => run(["continuity-adoption-plan", "--request-file", driftPath], { dir, legacyGitObservation: () => observed, now: FIXED_NOW }));
+  ok("PS52e extra request key is rejected", rejected.value === 2 && readFileSync(statePath(dir), "utf8") === before);
 }
-{
-  const dir = freshDir("result-reconcile"); const now = () => "2026-08-01T16:58:12.623Z";
-  mkdirSync(join(dir, ".claude")); mkdirSync(join(dir, "specs", "feature"), { recursive: true });
-  const prd = "# PRD\n"; const spec = "# Spec\n"; const historical = "# Historical Result\n\nPreserve this evidence.\n";
-  writeFileSync(join(dir, "specs", "feature", "prd_feature.md"), prd); writeFileSync(join(dir, "specs", "feature", "spec.md"), spec); writeFileSync(join(dir, "specs", "feature", "result.md"), historical);
-  const hash = (value) => createHash("sha256").update(value).digest("hex");
-  const state = { schema: SCHEMA_ID, planApproved: true, updatedAt: now(), activeFeature: { id: "feature", planPath: "specs/feature/prd_feature.md", phase: "implementation" }, continuity: continuityState({ featureId: "feature", revision: 11, runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator", sessionCleanup: null }, authority: { prd: { path: "specs/feature/prd_feature.md", sha256: hash(prd) }, spec: { path: "specs/feature/spec.md", sha256: hash(spec) }, result: { path: "specs/feature/result.md", sha256: D } }, queueHead: continuityQueue({ nextAction: "review", dispatch: null }), resume: { mode: "immediate", sourceRevision: 11, reasonCode: "active-turn" } }) };
-  writeFileSync(join(dir, ".claude", "pipeline-state.json"), JSON.stringify(state, null, 2) + "\n");
-  const planned = captureConsoleLog(() => run(["continuity-result-reconcile-plan"], { dir, now })); const plan = JSON.parse(planned.text);
-  const args = ["continuity-result-reconcile-apply", "--expected-revision", String(plan.expectedRevision), "--expected-state-sha256", plan.preStateSha256, "--expected-post-state-sha256", plan.postStateSha256, "--updated-at", plan.updatedAt, "--plan-sha256", plan.planSha256, "--activate", "true"];
-  const applied = run(args, continuityDeps(dir, { now })); const replay = run(args, continuityDeps(dir, { now }));
-  const result = readFileSync(join(dir, "specs", "feature", "result.md"), "utf8"); const after = JSON.parse(readFileSync(join(dir, ".claude", "pipeline-state.json"), "utf8"));
-  ok("TP5 stale Result authority reconciliation preserves history, appends one canonical fence, binds State, and replays without mutation", planned.value === 0 && applied === 0 && replay === 0 && result === `${historical}\`\`\`pipeline-result\n{\"courseDecisionIntents\":[],\"courseDecisionReceipts\":[],\"decisionBriefs\":[],\"finalIntegrations\":[]}\n\`\`\`\n` && after.continuity.revision === 12 && after.continuity.authority.result.sha256 === plan.result.sha256);
-}
+
+runPoAuthorityRebindTests();
+
 // ---- Cleanup ------------------------------------------------------------------------------
 for (const dir of ALL_DIRS) {
   try {

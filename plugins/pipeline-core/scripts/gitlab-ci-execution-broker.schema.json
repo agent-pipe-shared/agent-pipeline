@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.gitlab-ci-execution-broker.v1",
+  "$comment": "This schema owns the closed structural record contract. The broker runtime additionally verifies candidate admission, digests, recursive predecessor/retry lineage, allowed transitions, ordering and relational timing; CLI acceptance requires both checks.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "requestId", "candidate", "target", "clock", "attempt", "retryOf", "job", "idempotencyKey", "state", "cancellation", "observations", "predecessor", "previousSha256", "recordSha256"],
+  "properties": {
+    "schema": {"const": "pipeline.gitlab-ci-execution-broker.v1"},
+    "requestId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$"},
+    "candidate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["baseCommit", "baseTree", "commit", "tree"],
+      "properties": {
+        "baseCommit": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+        "baseTree": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+        "commit": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
+        "tree": {"type": "string", "pattern": "^[a-f0-9]{40}$"}
+      }
+    },
+    "target": {
+      "type": "object", "additionalProperties": false,
+      "required": ["baseUrlClass", "projectCoordinatesSha256", "operatorAuthoritySha256"],
+      "properties": {
+        "baseUrlClass": {"enum": ["gitlab-com", "self-managed"]},
+        "projectCoordinatesSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "operatorAuthoritySha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+      }
+    },
+    "clock": {"const": "local-monotonic-ms", "description": "All submittedAt, requestedAt and observedAt values are local broker monotonic milliseconds; provider order is represented only by providerSequence."},
+    "attempt": {"type": "integer", "minimum": 0},
+    "retryOf": {"anyOf": [{"type": "null"}, {"$ref": "#"}]},
+    "job": {
+      "anyOf": [
+        {"type": "null"},
+        {"type": "object", "additionalProperties": false, "required": ["jobIdSha256", "tokenMode", "submittedAt"], "properties": {"jobIdSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "tokenMode": {"const": "ci-job-token-only"}, "submittedAt": {"type": "integer", "minimum": 0}}}
+      ]
+    },
+    "idempotencyKey": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "state": {"enum": ["requested", "submitted", "provider-running", "succeeded-unverified", "reconciled", "cancel-requested", "cancelled", "failed", "unavailable", "expired"]},
+    "cancellation": {
+      "anyOf": [
+        {"type": "null"},
+        {"type": "object", "additionalProperties": false, "required": ["jobIdSha256", "preStateSha256", "requestedAt"], "properties": {"jobIdSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "preStateSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "requestedAt": {"type": "integer", "minimum": 0}}}
+      ]
+    },
+    "observations": {
+      "type": "array", "maxItems": 64,
+      "items": {"type": "object", "additionalProperties": false, "required": ["sequence", "providerState", "providerSequence", "jobIdSha256", "candidateCommit", "targetSha256", "observedAt", "observationSha256"], "properties": {"sequence": {"type": "integer", "minimum": 1}, "providerState": {"enum": ["queued", "running", "success", "failed", "cancel-requested", "cancelled", "unavailable"]}, "providerSequence": {"oneOf": [{"type": "integer", "minimum": 0}, {"const": "not-provided"}]}, "jobIdSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "candidateCommit": {"type": "string", "pattern": "^[a-f0-9]{40}$"}, "targetSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "observedAt": {"type": "integer", "minimum": 0}, "observationSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}}}
+    },
+    "predecessor": {"anyOf": [{"type": "null"}, {"$ref": "#"}]},
+    "previousSha256": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"},
+    "recordSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  }
+}

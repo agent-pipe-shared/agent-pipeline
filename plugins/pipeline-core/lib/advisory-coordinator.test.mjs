@@ -4,6 +4,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { createAdvisoryDemand } from "./advisory-lifecycle-v2.mjs";
 import { ADVISORY_FABLE_ATTEMPTS, coordinateAdvisory } from "./advisory-coordinator.mjs";
 import { validateAdvisoryReceipt } from "./advisory-receipt.mjs";
 
@@ -16,6 +17,27 @@ const DISPATCH = Object.freeze({
 
 function identity(provider, modelId, effort = "not-applicable") {
   return { provider, modelId, effort };
+}
+
+function request(overrides = {}) {
+  const value = {
+    profile: "epic",
+    runner: "codex",
+    question: "Which concrete choice is safer?",
+    dispatch: DISPATCH,
+    ...overrides,
+  };
+  if (value.demand === undefined && typeof value.question === "string") {
+    value.demand = createAdvisoryDemand({
+      runner: value.runner,
+      profile: value.profile,
+      reason: "risk-review",
+      question: value.question,
+      evidenceSha256: "e".repeat(64),
+      dispatch: value.dispatch,
+    }).demand;
+  }
+  return value;
 }
 
 function options(overrides = {}) {
@@ -31,7 +53,7 @@ function options(overrides = {}) {
 
 test("Codex host-consult is deferred to the host flow without adapter or receipt", async () => {
   let calls = 0;
-  const result = await coordinateAdvisory({ profile: "epic", runner: "codex", question: "Host?", dispatch: DISPATCH }, options({
+  const result = await coordinateAdvisory(request({ question: "Host?" }), options({
     invokeNative: async () => { calls += 1; },
     invokeConsult: async () => { calls += 1; },
   }));
@@ -46,7 +68,7 @@ test("Codex host-consult is deferred to the host flow without adapter or receipt
 test("only an explicit declined advisor export consent disables advisory before dispatch", async () => {
   for (const advisorExport of [{ consent: "declined" }]) {
     let calls = 0;
-    const result = await coordinateAdvisory({ profile: "epic", runner: "codex", question: "Must this stay local?", dispatch: DISPATCH }, options({
+    const result = await coordinateAdvisory(request({ question: "Must this stay local?" }), options({
       advisorExport,
       invokeNative: async () => { calls += 1; },
       invokeConsult: async () => { calls += 1; },
@@ -61,7 +83,7 @@ test("only an explicit declined advisor export consent disables advisory before 
 
 test("Claude retries Fable, then uses explicit same-runner Opus and records the fallback", async () => {
   const calls = [];
-  const result = await coordinateAdvisory({ profile: "feature", runner: "claude", question: "Is option A coherent?", dispatch: DISPATCH }, options({
+  const result = await coordinateAdvisory(request({ profile: "feature", runner: "claude", question: "Is option A coherent?" }), options({
     invokeNative: async (call) => {
       calls.push(call);
       if (call.adapter === "native-fable") return { status: "unavailable" };
@@ -84,7 +106,7 @@ test("Claude retries Fable, then uses explicit same-runner Opus and records the 
 
 test("Claude falls through failed native adapters only to a fresh read-only Claude consult", async () => {
   const consultCalls = [];
-  const result = await coordinateAdvisory({ profile: "epic", runner: "claude", question: "What is the least risky cutover?", dispatch: DISPATCH }, options({
+  const result = await coordinateAdvisory(request({ runner: "claude", question: "What is the least risky cutover?" }), options({
     invokeNative: async () => ({ status: "timed-out" }),
     invokeConsult: async (call) => {
       consultCalls.push(call);
@@ -110,8 +132,8 @@ test("mini and malformed batched questions fail before an adapter is called", as
     invokeNative: async () => { calls += 1; },
     invokeConsult: async () => { calls += 1; },
   });
-  const mini = await coordinateAdvisory({ profile: "mini", runner: "codex", question: "Advise?", dispatch: DISPATCH }, opts);
-  const batched = await coordinateAdvisory({ profile: "epic", runner: "codex", question: ["A?", "B?"], dispatch: DISPATCH }, opts);
+  const mini = await coordinateAdvisory(request({ profile: "mini", question: "Advise?" }), opts);
+  const batched = await coordinateAdvisory(request({ question: ["A?", "B?"] }), opts);
   assert.equal(mini.code, "advisory_disabled");
   assert.equal(batched.code, "invalid_question");
   assert.equal(calls, 0);
@@ -121,11 +143,30 @@ test("any registry route mutation, including a runner switch, is rejected before
   const registry = (await import("./runner-profiles-v3.mjs")).loadRunnerProfilesV3Registry();
   registry.duties.advisory.claude.fallbacks[0].runner = "codex";
   let calls = 0;
-  const result = await coordinateAdvisory({ profile: "epic", runner: "claude", question: "Switch?", dispatch: DISPATCH }, options({
+  const result = await coordinateAdvisory(request({ runner: "claude", question: "Switch?" }), options({
     registry,
     invokeNative: async () => { calls += 1; },
     invokeConsult: async () => { calls += 1; },
   }));
   assert.equal(result.code, "route_contract_invalid");
+  assert.equal(calls, 0);
+});
+
+test("missing, lifecycle-only, stale and already-used demand never invokes an adapter", async () => {
+  let calls = 0;
+  const invoke = async () => { calls += 1; return { status: "answered" }; };
+  const missing = request({ runner: "claude", demand: null });
+  assert.equal((await coordinateAdvisory(missing, options({ invokeNative: invoke, invokeConsult: invoke }))).code, "advisory_demand_required");
+  const stale = request({ runner: "claude", question: "Bound question" });
+  stale.question = "Changed question";
+  assert.equal((await coordinateAdvisory(stale, options({ invokeNative: invoke, invokeConsult: invoke }))).code, "advisory_demand_binding_mismatch");
+  const first = request({ runner: "claude", question: "Do not repeat this?" });
+  const completed = await coordinateAdvisory(first, options());
+  const repeated = await coordinateAdvisory({ ...first, priorConsultation: completed.consultationRecord }, options({
+    invokeNative: invoke,
+    invokeConsult: invoke,
+  }));
+  assert.equal(repeated.code, "advisory_reused_no_repeat");
+  assert.equal(repeated.answer, null);
   assert.equal(calls, 0);
 });

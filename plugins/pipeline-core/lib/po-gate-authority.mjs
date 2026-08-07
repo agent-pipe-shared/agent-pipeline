@@ -33,7 +33,13 @@ import { TextDecoder } from "node:util";
 
 import { parseYaml } from "./yaml-lite.mjs";
 import { assessWindowsPrivatePath } from "./windows-private-state.mjs";
-import { LEGACY_MANIFEST, NEUTRAL_MANIFEST, readProjectAuthority } from "./project-authority.mjs";
+import {
+  LEGACY_MANIFEST,
+  LEGACY_STATE,
+  NEUTRAL_MANIFEST,
+  NEUTRAL_STATE,
+  resolveProjectAuthorityPaths,
+} from "./project-authority.mjs";
 
 export const PO_GATE_PROFILE_RECEIPT_SCHEMA = "pipeline.po-gate-profile-receipt.v1";
 export const PO_GATE_AUTHORITY_EVIDENCE_SCHEMA = "pipeline.po-gate-authority-evidence.v1";
@@ -268,7 +274,14 @@ function gitWorktreeRootCandidate(root) {
   return process.platform === "win32" ? root.replaceAll("/", sep) : root;
 }
 
-/** Parse `git worktree list --porcelain -z` without exposing paths in errors. */
+/**
+ * Parse `git worktree list --porcelain -z` without exposing paths in errors.
+ * A record may carry a `prunable <reason>` field when Git itself has already
+ * determined the registration's working directory no longer exists (the
+ * reason text is Git's own and is not a stable contract -- only the field's
+ * presence is the signal). Surface that as `prunable: boolean` on the entry;
+ * never drop the entry or fail the parse over it.
+ */
 export function parseGitWorktreeList(raw) {
   if (typeof raw !== "string" || !raw.endsWith("\0")) return null;
   const records = raw.split("\0\0").filter((record) => record.length > 0);
@@ -281,8 +294,9 @@ export function parseGitWorktreeList(raw) {
     const head = fields.find((field) => field.startsWith("HEAD "))?.slice(5);
     const branch = fields.find((field) => field.startsWith("branch "))?.slice(7) ?? null;
     const detached = fields.includes("detached");
+    const prunable = fields.some((field) => field.startsWith("prunable "));
     if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/u.test(head ?? "") || (branch === null) === !detached) return null;
-    entries.push({ root, head, branch, detached });
+    entries.push({ root, head, branch, detached, prunable });
   }
   if (entries.length === 0 || new Set(entries.map(({ root }) => root)).size !== entries.length) return null;
   return entries;
@@ -322,13 +336,37 @@ function gitObservation(root, args, spawn = spawnSync) {
 export function resolvePoGateRepositoryTopology(repoRoot, deps = {}) {
   const start = assertPhysicalDirectory(realpathSync(resolve(repoRoot)));
   const observedRoot = assertPhysicalDirectory(realpathSync(gitObservation(start, ["rev-parse", "--show-toplevel"], deps.spawn).trim()));
-  if (observedRoot !== start) throw new Error("repository root mismatch");
+  // `start` is derived from the caller's (possibly mis-cased) current working
+  // directory; plain `realpathSync` on Windows preserves whatever casing it is
+  // given rather than normalizing to the filesystem's on-disk canonical
+  // casing, while Git's own `--show-toplevel` output already resolves to that
+  // disk-canonical casing regardless of the cwd casing it was invoked with.
+  // Re-derive both sides through the native OS realpath immediately before
+  // comparing (never before -- `start`/`observedRoot` themselves, and every
+  // value returned below, must stay byte-identical to today) so a same-directory
+  // case mismatch is corrected without ever treating two genuinely different
+  // physical directories as equal: `realpathSync.native` only normalizes the
+  // casing of a path that already resolves to one real directory, and is a
+  // no-op on case-sensitive/POSIX filesystems.
+  if (realpathSync.native(observedRoot) !== realpathSync.native(start)) throw new Error("repository root mismatch");
   const commonRaw = gitObservation(start, ["rev-parse", "--path-format=absolute", "--git-common-dir"], deps.spawn).trim();
   const gitCommonDir = assertPhysicalDirectory(realpathSync(isAbsolute(commonRaw) ? commonRaw : resolve(start, commonRaw)));
   const worktrees = parseGitWorktreeList(gitObservation(start, ["worktree", "list", "--porcelain", "-z"], deps.spawn));
   const primary = selectPrimaryWorktree(worktrees);
   if (worktrees === null || primary === null) throw new Error("Git worktree topology unavailable");
-  const registeredWorktreeRoots = worktrees.map(({ root }) => assertPhysicalDirectory(realpathSync(root)));
+  // Exclude registrations Git itself has already marked `prunable` (their working
+  // directory no longer physically exists) before the physical-directory assertion,
+  // rather than letting a stale registration's ENOENT abort topology resolution
+  // entirely. This is fail-CLOSED, not fail-open: `registeredWorktreeRoots` is only
+  // ever consumed to check that the *current* root is a member of it, so removing
+  // entries can only shrink that set and can only turn a would-be acceptance into a
+  // rejection, never the reverse -- a stale registration can never legitimately be
+  // the current root, because the current root demonstrably exists (it was just
+  // realpath'd above). Non-prunable entries still go through the unrelaxed
+  // assertPhysicalDirectory/realpathSync check below and still throw on failure.
+  const registeredWorktreeRoots = worktrees
+    .filter((entry) => !entry.prunable)
+    .map(({ root }) => assertPhysicalDirectory(realpathSync(root)));
   return {
     repoRoot: observedRoot,
     gitCommonDir,
@@ -400,11 +438,7 @@ function loadReceipt(gitCommonDir) {
 
 function readProjection(root) {
   const sourceBytes = readPhysicalFile(root, "pipeline.user.yaml");
-  // The runtime projection is whichever manifest the project authority resolves
-  // to, not a fixed path.  Binding the legacy path on a repository that has
-  // migrated to the neutral layout would make the receipt describe a file that
-  // is no longer the authority -- it fails closed, but it fails on every gate.
-  const authority = readProjectAuthority({ rootDir: root });
+  const authority = resolveProjectAuthorityPaths({ rootDir: root });
   const manifest = authority.status === "ready"
     ? authority.manifest
     : (existsSync(join(root, NEUTRAL_MANIFEST)) ? NEUTRAL_MANIFEST : LEGACY_MANIFEST);
@@ -485,10 +519,14 @@ function validatePoGateProfileSnapshot({ repoRoot, gitCommonDir, primaryRoot, re
 }
 
 function activeFeatureState(repoRoot) {
-  const authority = readProjectAuthority({ rootDir: repoRoot });
-  if (authority.status !== "ready") return { status: "unavailable" };
-  if (authority.state === null) return { status: "absent" };
-  const raw = readPhysicalFile(repoRoot, authority.state);
+  const authority = resolveProjectAuthorityPaths({ rootDir: repoRoot });
+  const statePath = authority.status === "ready"
+    ? authority.state
+    : NEUTRAL_STATE;
+  const raw = readPhysicalFile(
+    repoRoot,
+    statePath ?? (authority.source === "legacy" ? LEGACY_STATE : NEUTRAL_STATE),
+  );
   const state = JSON.parse(decodeUtf8(raw));
   if (!Object.prototype.hasOwnProperty.call(state, "activeFeature")) return { status: "absent" };
   const active = state?.activeFeature;
@@ -595,9 +633,6 @@ export function validatePoGateAuthority({
   }
   if (active.status === "invalid") {
     return fail("PO-GATE-ACTIVE-FEATURE-INVALID", "The active feature and planPath are missing or unsafe.", PRD_REPAIR);
-  }
-  if (active.status === "unavailable") {
-    return fail("PO-GATE-STATE-AUTHORITY-UNAVAILABLE", "The authoritative State projection is unavailable or mixed.", PRD_REPAIR);
   }
   if (active.status === "absent") {
     if (expectedPlanSha256 !== undefined || expectedSpecSha256 !== undefined) {

@@ -22,7 +22,7 @@ import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import test from "node:test";
 
-import { observeCodexOnboardingCapabilities } from "./codex-onboarding-capabilities.mjs";
+import { diagnoseCodexOnboardingSessionCapability, observeCodexOnboardingCapabilities } from "./codex-onboarding-capabilities.mjs";
 import { hasCodexExistingGitControlMount } from "./codex-host-layout.mjs";
 
 const roots = [];
@@ -125,18 +125,39 @@ function initializedHostManagedRoot(label = "initialized host") {
   const root = makeRoot(label);
   git(root, ["init", "--initial-branch=main"]);
   mkdirSync(join(root, ".codex"));
-  mkdirSync(join(root, ".claude"), { recursive: true });
+  mkdirSync(join(root, "project"), { recursive: true });
   mkdirSync(join(root, "docs"), { recursive: true });
-  mkdirSync(join(root, "specs"), { recursive: true });
+  const featureId = "kickoff-host-capability";
+  const prdPath = `specs/${featureId}/prd_${featureId}.md`;
+  const specPath = `specs/${featureId}/spec.md`;
+  mkdirSync(join(root, "specs", featureId), { recursive: true });
+  const prdBytes = "# Initial PRD\n";
+  const specBytes = "# Initial Spec\n";
+  const prdSha256 = sha256(Buffer.from(prdBytes));
+  const specSha256 = sha256(Buffer.from(specBytes));
+  const state = {
+    schema: "pipeline.state.v0",
+    activeFeature: { id: featureId, planPath: prdPath, phase: "design" },
+    planApproved: false,
+    continuity: {
+      schema: "pipeline.continuity.v0", featureId, revision: 0,
+      runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator" },
+      authority: { prd: { path: prdPath, sha256: prdSha256 }, spec: { path: specPath, sha256: specSha256 }, result: null },
+      queueHead: { packageId: "kickoff", actionId: "review", nextAction: "review", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null },
+      blocker: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" }, recovery: null, decisionTxn: null,
+      capacity: { concurrencyLimit: 4, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" },
+    },
+  };
   const files = {
-    ".claude/pipeline.json": `${JSON.stringify({
+    "project/pipeline.yaml": "schema: pipeline.manifest.v0\n",
+    "project/pipeline.json": `${JSON.stringify({
       repositoryMode: "host-managed",
       handover: "docs/state.md",
     }, null, 2)}\n`,
-    ".claude/pipeline-state.json": "{\"schema\":\"pipeline.state.v1\"}\n",
+    "project/pipeline-state.json": `${JSON.stringify(state)}\n`,
     "docs/state.md": "# Initial state\n",
-    "specs/kickoff-initial-prd.md": "# Initial PRD\n",
-    "specs/kickoff-initial-spec.md": "# Initial Spec\n",
+    [prdPath]: prdBytes,
+    [specPath]: specBytes,
   };
   for (const [path, bytes] of Object.entries(files)) writeFileSync(join(root, path), bytes);
   const history = {
@@ -145,11 +166,11 @@ function initializedHostManagedRoot(label = "initialized host") {
       kind: "kickoff",
       transactionSha256: "a".repeat(64),
       goalSha256: "b".repeat(64),
-      calibrationSha256: sha256(Buffer.from(files[".claude/pipeline.json"])),
-      stateSha256: sha256(Buffer.from(files[".claude/pipeline-state.json"])),
+      calibrationSha256: sha256(Buffer.from(files["project/pipeline.json"])),
+      stateSha256: sha256(Buffer.from(files["project/pipeline-state.json"])),
       handoverSha256: sha256(Buffer.from(files["docs/state.md"])),
-      prdSha256: sha256(Buffer.from(files["specs/kickoff-initial-prd.md"])),
-      specSha256: sha256(Buffer.from(files["specs/kickoff-initial-spec.md"])),
+      prdSha256,
+      specSha256,
     }],
   };
   mkdirSync(join(root, ".git", "agent-pipeline", "onboarding"), { recursive: true });
@@ -583,6 +604,17 @@ test("fault injection after session creation rolls back the exact descriptor and
     sessionCapability: "failed",
     worktreeCapability: "not-required",
   });
+  assert.deepEqual(treeSnapshot(root), before);
+});
+
+test("session capability diagnosis redacts the failed descriptor lifecycle stage", () => {
+  const root = localRepository("session diagnosis");
+  const before = treeSnapshot(root);
+  const result = diagnoseCodexOnboardingSessionCapability({
+    rootDir: root,
+    deps: { faultInjector(step) { if (step === "session-probe-created") throw new Error("fixture failure"); } },
+  });
+  assert.deepEqual(result, { schema: "pipeline.session-capability-diagnosis.v1", status: "unavailable", stage: "descriptor-retirement" });
   assert.deepEqual(treeSnapshot(root), before);
 });
 

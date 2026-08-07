@@ -2,13 +2,16 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { cpSync, mkdtempSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { main as planRuntimeProjectionV3Cli } from "../scripts/plan-runtime-projection-v3.mjs";
 import { loadRunnerProfilesV3Registry } from "./runner-profiles-v3.mjs";
 import {
+  CODEX_CUSTOM_AGENT_METADATA,
   codexCustomAgentSeed,
   loadRuntimeProjectionV3OwnedKeys,
   planRuntimeProjectionV3,
@@ -30,6 +33,12 @@ const PREFIX = "# unowned-prefix\nlanguage:\n  human_facing: en\n  unowned_langu
 const OWNED = "modelRouting:\n  stale: true\n";
 const LEGACY_RUNNER_ROUTES = "runnerRoutes:\n  worktype_feature_advisor:\n    runner: claude\n  worktype_mini_advisor:\n    runner: claude\n";
 const SUFFIX = "unownedAfter: exact\n";
+
+assert.match(
+  CODEX_CUSTOM_AGENT_METADATA.critic.developerInstructions,
+  /bootstrap role is closed as critic[\s\S]*compact critic path[\s\S]*never Elephant onboarding, State, handover, or history/u,
+  "Codex Critic projection must close its bootstrap role before the generic SessionStart reminder",
+);
 
 for (const role of ["implementor", "critic"]) {
   const source = readFileSync(join(process.cwd(), ".codex", "agents", `${role}.toml`), "utf8");
@@ -56,11 +65,11 @@ function completeIntent() {
   };
 }
 
-function writeFixture(root) {
+function writeFixture(root, { pipelineYaml = `${PREFIX}${OWNED}${LEGACY_RUNNER_ROUTES}${SUFFIX}` } = {}) {
   const files = {
     ".claude/settings.json": "{\n  \"unowned\": true\n}\n",
     ".claude/pipeline.json": "{\n  \"project\": \"fixture\",\n  \"unowned\": true\n}\n",
-    ".claude/pipeline.yaml": `${PREFIX}${OWNED}${LEGACY_RUNNER_ROUTES}${SUFFIX}`,
+    ".claude/pipeline.yaml": pipelineYaml,
     ".codex/config.toml": "profile = \"keep\"\n",
     ".codex/agents/implementor.toml": "model = \"old\"\nmodel_reasoning_effort = \"low\"\nname = \"keep\"\n[metadata]\nmodel = \"nested\"\n",
     ".codex/agents/critic.toml": "model = \"old\"\nmodel_reasoning_effort = \"medium\"\nname = \"keep\"\n[metadata]\nmodel_reasoning_effort = \"nested\"\n",
@@ -73,9 +82,9 @@ function writeFixture(root) {
   }
 }
 
-function fixtureRoot() {
+function fixtureRoot(options) {
   const root = mkdtempSync(join(tmpdir(), "runtime-projection-v3-test-"));
-  writeFixture(root);
+  writeFixture(root, options);
   return root;
 }
 
@@ -112,6 +121,7 @@ test("V3 plan projects epic/feature advisory and excludes mini advisory", () => 
     assert.match(claude.after.bytes, /hostGate: visible-not-bypassed/u);
     assert.match(claude.after.bytes, /providerGate: visible-not-bypassed/u);
     assert.match(claude.after.bytes, /elephant_epic_design/u);
+    assert.match(claude.after.bytes, /Adapter selector catalog — Claude aliases: fable, haiku, opus, sonnet; Codex\/OpenAI model IDs: gpt-5\.6-luna, gpt-5\.6-sol, gpt-5\.6-terra\./u);
     assert.match(claude.after.bytes, /language:\n  human_facing: de\n  unowned_language_sentinel: exact/u);
     assert.match(claude.after.bytes, /language:\n  human_facing: de\n  unowned_language_sentinel: exact\nsession:\n  keep_awake: true\ncustomBefore: exact\n/u);
     assert.ok(claude.after.bytes.endsWith(SUFFIX));
@@ -192,6 +202,81 @@ test("V3 repeated projection is a no-change plan", () => {
     assert.equal(second.status, "ready");
     assert.ok(second.targets.every((entry) => !entry.changed));
     assert.equal(second.decisionConflicts.length, 0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("V3 YAML rendering uses one final LF for a terminal generated projection", () => {
+  const root = fixtureRoot({ pipelineYaml: `${PREFIX}${OWNED}` });
+  try {
+    const plan = planRuntimeProjectionV3(completeIntent(), { baselines: readRuntimeProjectionV3Baselines(root) });
+    assert.equal(plan.status, "ready");
+    const bytes = target(plan, ".claude/pipeline.yaml").after.bytes;
+    assert.ok(bytes.endsWith("\n"));
+    assert.equal(bytes.endsWith("\n\n"), false);
+    assert.equal(
+      bytes.slice(-"  providerGate: visible-not-bypassed\n".length),
+      "  providerGate: visible-not-bypassed\n",
+      "the terminal owned criticExport block has exactly one final LF",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("V3 YAML rendering keeps the generated separator before an unowned following block", () => {
+  const root = fixtureRoot({ pipelineYaml: `${PREFIX}${OWNED}${SUFFIX}` });
+  try {
+    const plan = planRuntimeProjectionV3(completeIntent(), { baselines: readRuntimeProjectionV3Baselines(root) });
+    assert.equal(plan.status, "ready");
+    const bytes = target(plan, ".claude/pipeline.yaml").after.bytes;
+    assert.ok(bytes.endsWith(SUFFIX));
+    assert.equal(
+      bytes.slice(bytes.indexOf("  providerGate: visible-not-bypassed")),
+      "  providerGate: visible-not-bypassed\n\nunownedAfter: exact\n",
+      "the unowned following header keeps the generated blank-line separator",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("V3 YAML rendering preserves CRLF placement for terminal and nonterminal projections", () => {
+  for (const [name, baseline, expectedEnd] of [
+    ["terminal", `${PREFIX}${OWNED}`, "  providerGate: visible-not-bypassed\r\n"],
+    ["nonterminal", `${PREFIX}${OWNED}${SUFFIX}`, "  providerGate: visible-not-bypassed\r\n\r\nunownedAfter: exact\r\n"],
+  ]) {
+    const root = fixtureRoot({ pipelineYaml: baseline.replace(/\n/gu, "\r\n") });
+    try {
+      const plan = planRuntimeProjectionV3(completeIntent(), { baselines: readRuntimeProjectionV3Baselines(root) });
+      assert.equal(plan.status, "ready", name);
+      const bytes = target(plan, ".claude/pipeline.yaml").after.bytes;
+      assert.equal(/(?<!\r)\n/u.test(bytes), false, `${name} must not introduce LF-only endings`);
+      assert.ok(bytes.endsWith(expectedEnd), name);
+      if (name === "terminal") assert.equal(bytes.endsWith("\r\n\r\n"), false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("V3 regeneration removes manual terminal YAML whitespace drift", () => {
+  const root = fixtureRoot({ pipelineYaml: `${PREFIX}${OWNED}` });
+  try {
+    const first = planRuntimeProjectionV3(completeIntent(), { baselines: readRuntimeProjectionV3Baselines(root) });
+    assert.equal(first.status, "ready");
+    const canonical = target(first, ".claude/pipeline.yaml").after.bytes;
+    const drifted = Object.fromEntries(first.targets.map((entry) => [entry.path, { status: "present", bytes: entry.after.bytes }]));
+    drifted[".claude/pipeline.yaml"] = { status: "present", bytes: `${canonical}\n` };
+    const repaired = planRuntimeProjectionV3(completeIntent(), { baselines: drifted });
+    assert.equal(repaired.status, "ready");
+    assert.equal(target(repaired, ".claude/pipeline.yaml").changed, true);
+    assert.equal(target(repaired, ".claude/pipeline.yaml").after.bytes, canonical);
+    const stable = planRuntimeProjectionV3(completeIntent(), {
+      baselines: Object.fromEntries(repaired.targets.map((entry) => [entry.path, { status: "present", bytes: entry.after.bytes }])),
+    });
+    assert.equal(target(stable, ".claude/pipeline.yaml").changed, false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -353,6 +438,111 @@ test("V3 missing or duplicate owned language scalar fails closed", () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  }
+});
+
+// ---------------------------------------------------------------------------
+// F4 (Critic review CLAUDE-RUNNER-01, round 2): the committed owned-key
+// manifest is resolved LAZILY, so importing this module never touches disk.
+//
+// The manifest used to be read, parsed and frozen at module scope. A missing,
+// unreadable, or malformed `config/runtime-projection-v3-owned-keys.json`
+// therefore threw during ES-module evaluation -- merely IMPORTING this file
+// crashed, before any function in any importer could run. The fail-closed
+// admission hooks import it, and node's exit 1 is "allow + config warning"
+// under `hooks/hooks.json`, so a config fault DISARMED the gate. The probe
+// below spawns a real child process against a staged plugin copy, because an
+// import-time side effect can only be observed at real module-evaluation time.
+// ---------------------------------------------------------------------------
+
+const PLUGIN_ROOT = fileURLToPath(new URL("..", import.meta.url));
+const OWNED_KEYS_RELATIVE = join("config", "runtime-projection-v3-owned-keys.json");
+
+const LOAD_SAFETY_PROBE = `
+const observed = { importFailure: null, planFailure: null, baselineFailure: null };
+let module = null;
+try {
+  module = await import("./lib/runtime-projection-v3.mjs");
+} catch (error) {
+  observed.importFailure = String(error?.message ?? error);
+}
+if (module) {
+  try {
+    module.planRuntimeProjectionV3({ schema: "pipeline.user.v3" });
+    observed.planFailure = false;
+  } catch (error) {
+    observed.planFailure = String(error?.message ?? error);
+  }
+  try {
+    module.readRuntimeProjectionV3Baselines(process.argv[2]);
+    observed.baselineFailure = false;
+  } catch (error) {
+    observed.baselineFailure = String(error?.message ?? error);
+  }
+}
+process.stdout.write(JSON.stringify(observed));
+`;
+
+/** Stage a self-contained plugin copy, optionally breaking the shipped manifest. */
+function probeStagedManifest(breakManifest) {
+  const stage = mkdtempSync(join(tmpdir(), "runtime-projection-v3-load-"));
+  const fixture = fixtureRoot();
+  try {
+    const withoutTests = (source) => !source.endsWith(".test.mjs");
+    for (const directory of ["config", "lib", "scripts"]) {
+      cpSync(join(PLUGIN_ROOT, directory), join(stage, directory), { recursive: true, filter: withoutTests });
+    }
+    breakManifest(join(stage, OWNED_KEYS_RELATIVE));
+    const probe = join(stage, "load-safety-probe.mjs");
+    writeFileSync(probe, LOAD_SAFETY_PROBE);
+    const run = spawnSync(process.execPath, [probe, fixture], { encoding: "utf8", timeout: 120_000 });
+    assert.equal(run.error, undefined, String(run.error));
+    assert.equal(run.status, 0, `probe exited ${run.status}: ${run.stderr}`);
+    return JSON.parse(run.stdout);
+  } finally {
+    rmSync(stage, { recursive: true, force: true });
+    rmSync(fixture, { recursive: true, force: true });
+  }
+}
+
+test("importing the V3 projector never reads the owned-key manifest from disk", () => {
+  // Control: with the shipped manifest intact the very same probe imports AND
+  // completes both calls, so a reported failure below is the manifest fault
+  // and not an unrelated staging defect.
+  const intact = probeStagedManifest(() => {});
+  assert.equal(intact.importFailure, null);
+  assert.equal(intact.planFailure, false);
+  assert.equal(intact.baselineFailure, false);
+
+  for (const [name, breakManifest] of [
+    ["absent", (path) => unlinkSync(path)],
+    ["invalid-json", (path) => writeFileSync(path, "{ \"schema\": \n")],
+  ]) {
+    const observed = probeStagedManifest(breakManifest);
+    assert.equal(observed.importFailure, null, `${name}: import must not throw`);
+    assert.equal(typeof observed.planFailure, "string", `${name}: planRuntimeProjectionV3 must surface the fault`);
+    assert.equal(typeof observed.baselineFailure, "string", `${name}: readRuntimeProjectionV3Baselines must surface the fault`);
+  }
+});
+
+test("the committed owned-key manifest default parameter resolves at call time", () => {
+  const root = fixtureRoot();
+  try {
+    const baselines = readRuntimeProjectionV3Baselines(root);
+    // The default expression is `frozenOwnedKeys().manifest`; JS evaluates it
+    // per call, so omitting the option must equal passing the committed
+    // manifest explicitly -- byte for byte, diagnostics included.
+    const byDefault = planRuntimeProjectionV3(completeIntent(), { source: "fixture", baselines });
+    const explicit = planRuntimeProjectionV3(completeIntent(), {
+      source: "fixture",
+      baselines,
+      ownedKeyManifest: loadRuntimeProjectionV3OwnedKeys(),
+    });
+    assert.equal(byDefault.status, "ready");
+    assert.deepEqual(explicit, byDefault);
+    assert.equal(byDefault.ownedKeyManifest.schema, loadRuntimeProjectionV3OwnedKeys().schema);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 

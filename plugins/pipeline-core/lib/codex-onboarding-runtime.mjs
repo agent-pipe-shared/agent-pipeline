@@ -12,10 +12,14 @@ import {
   openSync, readFileSync, readdirSync, realpathSync, renameSync, rmdirSync, unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadRuntimeProjectionV3OwnedKeys } from "./runtime-projection-v3.mjs";
+import {
+  assessWindowsPrivatePath,
+  hardenWindowsPrivateDirectory,
+} from "./windows-private-state.mjs";
 
 export const BARRIER_SCHEMA = "pipeline.codex-runtime-restart-barrier.v1";
 export const TICKET_SCHEMA = "pipeline.codex-onboarding-launch.v1";
@@ -28,16 +32,18 @@ const NATIVE_FS = {
 };
 const HEX = /^[a-f0-9]{64}$/u;
 const ID = /^[A-Za-z0-9._-]{1,80}$/u;
-const BARRIER_KEYS = [
+const LEGACY_BARRIER_KEYS = [
   "schema", "revision", "priorStateSha256", "repositoryFingerprint", "sourceSha256",
   "runtimeTargets", "runtimeTargetsSha256", "transactionId", "writerGenerationSha256",
   "launcherSha256", "helperSha256", "codexExecutableSha256", "state",
 ];
-const TICKET_KEYS = [
+const BARRIER_KEYS = [...LEGACY_BARRIER_KEYS, "codexExecutablePath"];
+const LEGACY_TICKET_KEYS = [
   "schema", "ticketId", "revision", "priorStateSha256", "issuedAtEpochMs", "expiresAtEpochMs",
   "barrierSha256", "repositoryFingerprint", "expectedSourceSha256", "expectedRuntimeTargetsSha256",
   "writerGenerationSha256", "tokenSha256", "state", "consumedBy",
 ];
+const TICKET_KEYS = [...LEGACY_TICKET_KEYS, "failure"];
 const READBACK_KEYS = [
   "schema", "barrierSha256", "repositoryFingerprint", "sourceSha256", "runtimeTargetsSha256",
   "readerGenerationSha256", "effectiveConfigSha256", "validatedAgentsSha256", "ticketId", "observedAtEpochMs",
@@ -51,6 +57,19 @@ const CURRENT_READBACK_KEYS = [
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const LAUNCHER_PATH = join(HERE, "..", "scripts", "codex-onboarding-launch.mjs");
 export const HELPER_PATH = join(HERE, "..", "scripts", "codex-project-runtime-readback-host.mjs");
+
+export class CodexOnboardingRuntimeError extends Error {
+  constructor(code, phase, message) {
+    super(message);
+    this.name = "CodexOnboardingRuntimeError";
+    this.code = code;
+    this.phase = phase;
+  }
+}
+
+function runtimeError(code, phase, message) {
+  return new CodexOnboardingRuntimeError(code, phase, message);
+}
 
 export function canonicalJson(value) {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
@@ -68,6 +87,43 @@ function expectHex(value, label) { if (typeof value !== "string" || !HEX.test(va
 function expectId(value, label) { if (typeof value !== "string" || !ID.test(value)) throw new Error(`${label} is invalid`); }
 function expectEpoch(value, label) { if (!Number.isSafeInteger(value) || value < 0) throw new Error(`${label} is invalid`); }
 function runtimeFilesystem(overrides = {}) { return { ...NATIVE_FS, ...overrides }; }
+function runtimePlatform(fs = NATIVE_FS) { return fs.platform ?? process.platform; }
+function windowsAssurance(path, created, fs, label) {
+  const inspect = created
+    ? (fs.hardenWindowsPrivateDirectoryFn ?? hardenWindowsPrivateDirectory)
+    : (fs.assessWindowsPrivatePathFn ?? assessWindowsPrivatePath);
+  const state = inspect(path, fs.windowsAssuranceOptions);
+  if (state?.status !== "secure") {
+    throw runtimeError(
+      state?.status === "insecure" ? "private-state-object-unsafe" : "private-state-assurance-unavailable",
+      "private-root-assurance",
+      `${label} Windows assurance is unavailable or unsafe`,
+    );
+  }
+}
+function assurePrivateDirectory(path, created, fs = NATIVE_FS, label = "private-state directory") {
+  physicalDirectory(path, label, fs);
+  if (runtimePlatform(fs) === "win32") {
+    windowsAssurance(path, created, fs, label);
+  } else {
+    if ((fs.lstatSync(path).mode & 0o777) !== 0o700) fs.chmodSync(path, 0o700);
+    if ((fs.lstatSync(path).mode & 0o777) !== 0o700) {
+      throw runtimeError("private-state-object-unsafe", "private-root-assurance", `${label} is not private`);
+    }
+  }
+  return path;
+}
+function assurePrivateFile(path, fs = NATIVE_FS, label = "private-state file") {
+  physicalFile(path, label, fs);
+  const info = fs.lstatSync(path);
+  if (info.nlink !== 1) throw runtimeError("private-state-object-unsafe", "private-root-assurance", `${label} is not singly linked`);
+  if (runtimePlatform(fs) === "win32") {
+    windowsAssurance(path, false, fs, label);
+  } else if ((info.mode & 0o777) !== 0o600) {
+    throw runtimeError("private-state-object-unsafe", "private-root-assurance", `${label} is not mode 0600`);
+  }
+  return info;
+}
 function physicalDirectory(path, label, fs = NATIVE_FS) {
   const info = fs.lstatSync(path);
   if (!info.isDirectory() || info.isSymbolicLink() || fs.realpathSync(path) !== path) throw new Error(`${label} is not a physical directory`);
@@ -95,7 +151,7 @@ function fsyncDirectory(path, fs = NATIVE_FS) {
   let fd;
   try { fd = fs.openSync(path, "r"); fs.fsyncSync(fd); }
   catch (error) {
-    if (!(process.platform === "win32" && ["EPERM", "EINVAL", "EISDIR", "ENOTSUP"].includes(error?.code))) throw error;
+    if (!(runtimePlatform(fs) === "win32" && ["EPERM", "EINVAL", "EISDIR", "ENOTSUP"].includes(error?.code))) throw error;
   } finally { if (fd !== undefined) fs.closeSync(fd); }
 }
 function directoryIdentity(path, fs = NATIVE_FS) {
@@ -120,14 +176,14 @@ function ensurePrivateDirectory(root, parts, createdDirectories = [], createdDir
   let cursor = root;
   for (const part of parts) {
     cursor = safeJoin(root, relative(root, cursor), part);
+    let created = false;
     if (!fs.existsSync(cursor)) {
       fs.mkdirSync(cursor, { mode: 0o700 });
+      created = true;
       createdDirectories.push(cursor);
       createdDirectoryRecords.push(directoryIdentity(cursor, fs));
     }
-    physicalDirectory(cursor, "private-state directory", fs);
-    if ((fs.lstatSync(cursor).mode & 0o777) !== 0o700) { fs.chmodSync(cursor, 0o700); }
-    if ((fs.lstatSync(cursor).mode & 0o777) !== 0o700) throw new Error("private-state directory is not private");
+    assurePrivateDirectory(cursor, created, fs);
   }
   return cursor;
 }
@@ -155,7 +211,25 @@ export function resolveOnboardingPrivateState(rootDir, repositoryCapability = "l
   let base; let parts;
   if (repositoryCapability === "host-managed") {
     const claude = safeJoin(root, ".claude");
-    physicalDirectory(claude, ".claude", fs);
+    let created = false;
+    // A fresh host-managed root deliberately has no compatibility projection
+    // yet.  Its private restart state still needs a local, physical parent;
+    // create that directory only as part of the private-state transaction,
+    // never as portable authority output.
+    if (create && !fs.existsSync(claude)) {
+      fs.mkdirSync(claude, { mode: 0o700 });
+      created = true;
+      createdDirectories.push(claude);
+      createdDirectoryRecords.push(directoryIdentity(claude, fs));
+    }
+    // Read-only callers may need the logical private paths before the first
+    // host-managed writer creates `.claude`.  Treat that as absent state, not
+    // as a private-state error; once it exists, retain the physical/private
+    // assurance checks without exception.
+    if (created || fs.existsSync(claude)) {
+      physicalDirectory(claude, ".claude", fs);
+      assurePrivateDirectory(claude, created, fs, ".claude");
+    }
     base = claude; parts = [".runtime", "agent-pipeline", "onboarding"];
   } else if (repositoryCapability === "local") {
     base = readGitCommonDirectory(root, spawn, fs);
@@ -164,7 +238,13 @@ export function resolveOnboardingPrivateState(rootDir, repositoryCapability = "l
   let directory = base;
   for (const part of parts) directory = safeJoin(base, relative(base, directory), part);
   if (create) directory = ensurePrivateDirectory(base, parts, createdDirectories, createdDirectoryRecords, fs);
-  else if (fs.existsSync(directory)) physicalDirectory(directory, "private-state directory", fs);
+  else if (fs.existsSync(directory)) {
+    let cursor = base;
+    for (const part of parts) {
+      cursor = safeJoin(base, relative(base, cursor), part);
+      assurePrivateDirectory(cursor, false, fs);
+    }
+  }
   return {
     root,
     directory,
@@ -187,10 +267,7 @@ function privatePaths(rootDir, repositoryCapability, options = {}) {
   });
 }
 function readStored(path, validator, label, fs = NATIVE_FS) {
-  physicalFile(path, label, fs);
-  const info = fs.lstatSync(path);
-  if (info.nlink !== 1) throw new Error(`${label} is not singly linked`);
-  if ((info.mode & 0o777) !== 0o600) throw new Error(`${label} is not mode 0600`);
+  const info = assurePrivateFile(path, fs, label);
   const raw = fs.readFileSync(path);
   let value; try { value = JSON.parse(raw); } catch { throw new Error(`${label} is malformed`); }
   validator(value);
@@ -228,6 +305,7 @@ function writeAtomic(path, value, fs = NATIVE_FS, publication = null, expected =
     const opened = fs.fstatSync(fd);
     temporaryIdentity = { path: temporary, dev: String(opened.dev), ino: String(opened.ino) };
     fs.writeFileSync(fd, bytes); fs.fsyncSync(fd); fs.closeSync(fd); fd = undefined;
+    assurePrivateFile(temporary, fs, "atomic private-state temporary");
     publicationPrecondition(path, expected, fs);
     fs.renameSync(temporary, path);
     const published = fs.lstatSync(path);
@@ -235,7 +313,9 @@ function writeAtomic(path, value, fs = NATIVE_FS, publication = null, expected =
     if (publication) Object.assign(publication, {
       path, dev: String(published.dev), ino: String(published.ino), sha256: sha256(bytes),
     });
-    fs.chmodSync(path, 0o600); fsyncDirectory(dirname(path), fs);
+    if (runtimePlatform(fs) !== "win32") fs.chmodSync(path, 0o600);
+    assurePrivateFile(path, fs, "published private state");
+    fsyncDirectory(dirname(path), fs);
   } catch (error) {
     primaryError = error;
   }
@@ -264,10 +344,12 @@ function withWriterLock(paths, action, fs = NATIVE_FS) {
   try {
     fs.mkdirSync(paths.lock, { mode: 0o700 });
     lockIdentity = directoryIdentity(paths.lock, fs);
-    physicalDirectory(paths.lock, "private-state lock", fs);
+    assurePrivateDirectory(paths.lock, true, fs, "private-state lock");
     result = action();
   } catch (error) {
-    primaryError = error;
+    primaryError = error?.code === "EEXIST"
+      ? runtimeError("writer-lock-unavailable", "restart-barrier-persist", "private-state writer lock is unavailable")
+      : error;
   }
   let cleanupError = null;
   if (lockIdentity) {
@@ -286,8 +368,7 @@ function ensureTickets(paths, fs = NATIVE_FS) {
   return ensurePrivateDirectory(paths.directory, ["tickets"], [], [], fs);
 }
 function readLaunchTicketSet(paths, fs = NATIVE_FS) {
-  physicalDirectory(paths.tickets, "launch ticket directory", fs);
-  if ((fs.lstatSync(paths.tickets).mode & 0o777) !== 0o700) throw new Error("launch ticket directory is not private");
+  assurePrivateDirectory(paths.tickets, false, fs, "launch ticket directory");
   return fs.readdirSync(paths.tickets, { withFileTypes: true })
     .sort((left, right) => left.name.localeCompare(right.name))
     .map((entry) => {
@@ -322,27 +403,47 @@ export function validateRuntimeTargets(runtimeTargets) {
   return true;
 }
 export function validateRestartBarrier(value) {
-  exactKeys(value, BARRIER_KEYS, "restart barrier");
+  const keys = Object.hasOwn(value ?? {}, "codexExecutablePath")
+    ? BARRIER_KEYS
+    : LEGACY_BARRIER_KEYS;
+  exactKeys(value, keys, "restart barrier");
   if (value.schema !== BARRIER_SCHEMA || !Number.isSafeInteger(value.revision) || value.revision < 0) throw new Error("restart barrier schema/revision invalid");
   if (value.revision === 0 ? value.priorStateSha256 !== null : !HEX.test(value.priorStateSha256 ?? "")) throw new Error("restart barrier CAS predecessor invalid");
   for (const key of ["repositoryFingerprint", "sourceSha256", "runtimeTargetsSha256", "writerGenerationSha256", "launcherSha256", "helperSha256", "codexExecutableSha256"]) expectHex(value[key], key);
+  if (Object.hasOwn(value, "codexExecutablePath")
+    && (typeof value.codexExecutablePath !== "string" || !isAbsolute(value.codexExecutablePath))) {
+    throw new Error("Codex executable path is invalid");
+  }
   expectId(value.transactionId, "transactionId"); validateRuntimeTargets(value.runtimeTargets);
   if (value.runtimeTargetsSha256 !== canonicalSha256(value.runtimeTargets)) throw new Error("restart barrier target digest invalid");
   if (!new Set(["restart-required", "cleared"]).has(value.state)) throw new Error("restart barrier state invalid");
   return true;
 }
 export function validateLaunchTicket(value) {
-  exactKeys(value, TICKET_KEYS, "launch ticket");
+  const keys = Object.hasOwn(value ?? {}, "failure") ? TICKET_KEYS : LEGACY_TICKET_KEYS;
+  exactKeys(value, keys, "launch ticket");
   if (value.schema !== TICKET_SCHEMA || !Number.isSafeInteger(value.revision) || value.revision < 0) throw new Error("launch ticket schema/revision invalid");
   if (value.revision === 0 ? value.priorStateSha256 !== null : !HEX.test(value.priorStateSha256 ?? "")) throw new Error("launch ticket CAS predecessor invalid");
   expectId(value.ticketId, "ticketId"); expectEpoch(value.issuedAtEpochMs, "issuedAtEpochMs"); expectEpoch(value.expiresAtEpochMs, "expiresAtEpochMs");
   if (value.expiresAtEpochMs !== value.issuedAtEpochMs + 300000) throw new Error("launch ticket expiry invalid");
   for (const key of ["barrierSha256", "repositoryFingerprint", "expectedSourceSha256", "expectedRuntimeTargetsSha256", "writerGenerationSha256", "tokenSha256"]) expectHex(value[key], key);
-  if (!new Set(["issued", "consumed"]).has(value.state)) throw new Error("launch ticket state invalid");
-  if (value.state === "issued" ? value.consumedBy !== null : !value.consumedBy || typeof value.consumedBy !== "object") throw new Error("launch ticket consumer invalid");
+  if (!new Set(["issued", "consumed", "failed"]).has(value.state)) throw new Error("launch ticket state invalid");
+  if (value.state === "consumed"
+    ? !value.consumedBy || typeof value.consumedBy !== "object"
+    : value.consumedBy !== null) throw new Error("launch ticket consumer invalid");
   if (value.state === "consumed") {
     exactKeys(value.consumedBy, ["readerGenerationSha256", "effectiveConfigSha256", "validatedAgentsSha256"], "launch ticket consumer");
     for (const key of Object.keys(value.consumedBy)) expectHex(value.consumedBy[key], key);
+  }
+  if (Object.hasOwn(value, "failure")) {
+    if (value.state === "failed") {
+      exactKeys(value.failure, ["code", "failedAtEpochMs"], "launch ticket failure");
+      if (typeof value.failure.code !== "string"
+        || !/^[a-z][a-z0-9-]{0,63}$/u.test(value.failure.code)) throw new Error("launch ticket failure code invalid");
+      expectEpoch(value.failure.failedAtEpochMs, "failedAtEpochMs");
+    } else if (value.failure !== null) throw new Error("launch ticket failure must be null");
+  } else if (value.state === "failed") {
+    throw new Error("legacy launch ticket cannot claim failed state");
   }
   return true;
 }
@@ -375,49 +476,115 @@ export function validateCurrentRuntimeReadback(value) {
   if (canonicalSha256(receipt) !== value.receiptSha256) throw new Error("current runtime readback receipt digest invalid");
   return true;
 }
-function pathDigest(path) { physicalFile(path, "bound runtime executable"); return sha256(readFileSync(path)); }
-export function resolveRuntimeExecutable(name = "codex", pathValue = process.env.PATH ?? "") {
-  for (const directory of pathValue.split(process.platform === "win32" ? ";" : ":")) {
-    if (!directory) continue;
-    const candidate = join(directory, name);
-    try {
-      const executable = realpathSync(candidate);
-      return realpathSync(physicalFile(executable, "Codex executable"));
-    } catch {}
-  }
-  throw new Error("Codex executable is unavailable");
+function pathDigest(path, fs = NATIVE_FS) { physicalFile(path, "bound runtime executable", fs); return sha256(fs.readFileSync(path)); }
+function executableDescriptor(path, requestedName, platform, resolution, fs) {
+  const physicalPath = fs.realpathSync(path);
+  physicalFile(physicalPath, "Codex executable", fs);
+  return Object.freeze({
+    schema: "pipeline.codex-runtime-executable.v1",
+    platform,
+    requestedName,
+    physicalPath,
+    sha256: pathDigest(physicalPath, fs),
+    resolution,
+  });
 }
-export function prepareRuntimeRestartBinding({ rootDir, sourceSha256, runtimeTargets, codexExecutable = undefined, random = randomBytes } = {}) {
+export function resolveRuntimeExecutable(
+  name = "codex",
+  pathValue = process.env.PATH ?? "",
+  {
+    platform = process.platform,
+    pathext = process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD",
+    deps = {},
+  } = {},
+) {
+  const fs = runtimeFilesystem({ ...deps, platform });
+  const windows = platform === "win32";
+  const requested = String(name);
+  if (windows && !new Set(["codex", "codex.exe"]).has(requested.toLowerCase())) {
+    throw runtimeError("runtime-executable-unsafe", "runtime-executable-resolution", "requested Codex executable form is unsafe");
+  }
+  const controlledExtensions = String(pathext).split(";").map((value) => value.trim().toLowerCase());
+  if (windows && !controlledExtensions.includes(".exe")) {
+    throw runtimeError("runtime-executable-unavailable", "runtime-executable-resolution", "native Codex executable is unavailable");
+  }
+  let unsafeCandidate = false;
+  for (const directory of pathValue.split(windows ? ";" : ":")) {
+    if (!directory) continue;
+    const candidate = join(directory, windows && !requested.toLowerCase().endsWith(".exe") ? `${requested}.exe` : requested);
+    try {
+      const candidateInfo = fs.lstatSync(candidate);
+      unsafeCandidate = true;
+      if (windows && candidateInfo.isSymbolicLink()) {
+        continue;
+      }
+      const executable = fs.realpathSync(candidate);
+      if (windows && executable.toLowerCase() !== resolve(candidate).toLowerCase()) {
+        continue;
+      }
+      return executableDescriptor(
+        executable,
+        requested,
+        platform,
+        windows ? "windows-pathext-exe" : "posix-path-direct",
+        fs,
+      );
+    } catch (error) {
+      if (error instanceof CodexOnboardingRuntimeError) unsafeCandidate = true;
+    }
+  }
+  throw runtimeError(
+    unsafeCandidate ? "runtime-executable-unsafe" : "runtime-executable-unavailable",
+    "runtime-executable-resolution",
+    unsafeCandidate ? "Codex executable candidate is unsafe" : "Codex executable is unavailable",
+  );
+}
+function boundExecutable(value, options = {}) {
+  if (value && typeof value === "object" && value.schema === "pipeline.codex-runtime-executable.v1") return value;
+  if (typeof value === "string") {
+    const fs = runtimeFilesystem(options.deps);
+    return executableDescriptor(fs.realpathSync(value), basename(value), options.platform ?? process.platform, "explicit-physical-path", fs);
+  }
+  return resolveRuntimeExecutable("codex", options.pathValue ?? process.env.PATH ?? "", options);
+}
+export function prepareRuntimeRestartBinding({
+  rootDir, sourceSha256, runtimeTargets, codexExecutable = undefined, random = randomBytes,
+  runtimeOptions = {},
+} = {}) {
   expectHex(sourceSha256, "sourceSha256"); validateRuntimeTargets(runtimeTargets);
-  const executable = realpathSync(codexExecutable ?? resolveRuntimeExecutable()); physicalFile(executable, "Codex executable");
+  const executable = boundExecutable(codexExecutable, runtimeOptions);
   return {
     repositoryFingerprint: repositoryFingerprint(rootDir), sourceSha256, runtimeTargets: structuredClone(runtimeTargets),
     runtimeTargetsSha256: canonicalSha256(runtimeTargets), transactionId: random(20).toString("hex"),
     writerGenerationSha256: sha256(random(32)), launcherSha256: pathDigest(LAUNCHER_PATH), helperSha256: pathDigest(HELPER_PATH),
-    codexExecutable: executable, codexExecutableSha256: pathDigest(executable),
+    codexExecutable: executable.physicalPath, codexExecutableDescriptor: executable,
+    codexExecutableSha256: executable.sha256,
   };
 }
-export function runtimeRestartBindingCurrent(barrier, { codexExecutable = undefined } = {}) {
+export function runtimeRestartBindingCurrent(barrier, { codexExecutable = undefined, runtimeOptions = {} } = {}) {
   validateRestartBarrier(barrier);
-  const executable = realpathSync(codexExecutable ?? resolveRuntimeExecutable());
-  physicalFile(executable, "Codex executable");
-  return pathDigest(executable) === barrier.codexExecutableSha256
+  if (!Object.hasOwn(barrier, "codexExecutablePath")) return false;
+  const executable = boundExecutable(codexExecutable, runtimeOptions);
+  return executable.physicalPath === barrier.codexExecutablePath
+    && executable.sha256 === barrier.codexExecutableSha256
     && pathDigest(LAUNCHER_PATH) === barrier.launcherSha256
     && pathDigest(HELPER_PATH) === barrier.helperSha256;
 }
 export function readRestartBarrier({ rootDir, repositoryCapability = "local", ...options } = {}) {
   const paths = privatePaths(rootDir, repositoryCapability, options);
-  if (!existsSync(paths.directory) || !existsSync(paths.barrier)) return { status: "absent", paths, barrier: null, rawSha256: null };
-  const stored = readStored(paths.barrier, validateRestartBarrier, "restart barrier");
+  const fs = runtimeFilesystem(options.deps);
+  if (!fs.existsSync(paths.directory) || !fs.existsSync(paths.barrier)) return { status: "absent", paths, barrier: null, rawSha256: null };
+  const stored = readStored(paths.barrier, validateRestartBarrier, "restart barrier", fs);
   return { status: "present", paths, barrier: stored.value, rawSha256: stored.rawSha256 };
 }
 export function readCurrentRuntimeReadback({ rootDir, repositoryCapability = "local", ...options } = {}) {
   const paths = privatePaths(rootDir, repositoryCapability, options);
-  if (!existsSync(paths.barrier) || !existsSync(paths.currentReadback)) {
+  const fs = runtimeFilesystem(options.deps);
+  if (!fs.existsSync(paths.barrier) || !fs.existsSync(paths.currentReadback)) {
     return { status: "absent", paths, barrier: null, marker: null, barrierSha256: null, readbackSha256: null };
   }
-  const barrier = readStored(paths.barrier, validateRestartBarrier, "restart barrier");
-  const marker = readStored(paths.currentReadback, validateCurrentRuntimeReadback, "current runtime readback");
+  const barrier = readStored(paths.barrier, validateRestartBarrier, "restart barrier", fs);
+  const marker = readStored(paths.currentReadback, validateCurrentRuntimeReadback, "current runtime readback", fs);
   if (barrier.value.state !== "cleared"
     || marker.value.barrierSha256 !== barrier.rawSha256
     || marker.value.priorBarrierSha256 !== barrier.value.priorStateSha256
@@ -426,7 +593,7 @@ export function readCurrentRuntimeReadback({ rootDir, repositoryCapability = "lo
     || marker.value.runtimeTargetsSha256 !== barrier.value.runtimeTargetsSha256) {
     throw new Error("current runtime readback is not bound to the cleared barrier");
   }
-  const ticket = readStored(ticketPath(paths, marker.value.ticketId), validateLaunchTicket, "launch ticket");
+  const ticket = readStored(ticketPath(paths, marker.value.ticketId), validateLaunchTicket, "launch ticket", fs);
   if (ticket.rawSha256 !== marker.value.ticketSha256 || ticket.value.state !== "consumed"
     || ticket.value.barrierSha256 !== marker.value.priorBarrierSha256
     || ticket.value.repositoryFingerprint !== marker.value.repositoryFingerprint
@@ -490,6 +657,7 @@ export function persistRestartBarrier({ rootDir, repositoryCapability = "local",
         && prior.value.runtimeTargetsSha256 === binding.runtimeTargetsSha256
         && prior.value.launcherSha256 === binding.launcherSha256
         && prior.value.helperSha256 === binding.helperSha256
+        && prior.value.codexExecutablePath === binding.codexExecutable
         && prior.value.codexExecutableSha256 === binding.codexExecutableSha256) {
         return { paths, barrier: prior.value, rawSha256: prior.rawSha256, written: false, createdDirectories };
       }
@@ -498,7 +666,8 @@ export function persistRestartBarrier({ rootDir, repositoryCapability = "local",
         repositoryFingerprint: binding.repositoryFingerprint, sourceSha256: binding.sourceSha256,
         runtimeTargets: binding.runtimeTargets, runtimeTargetsSha256: binding.runtimeTargetsSha256, transactionId: binding.transactionId,
         writerGenerationSha256: binding.writerGenerationSha256, launcherSha256: binding.launcherSha256,
-        helperSha256: binding.helperSha256, codexExecutableSha256: binding.codexExecutableSha256, state: "restart-required",
+        helperSha256: binding.helperSha256, codexExecutablePath: binding.codexExecutable,
+        codexExecutableSha256: binding.codexExecutableSha256, state: "restart-required",
       };
       validateRestartBarrier(barrier);
       publication.replacedExisting = prior !== null;
@@ -540,7 +709,7 @@ export function issueLaunchTicket({ rootDir, repositoryCapability = "local", bar
     const current = readStored(paths.barrier, validateRestartBarrier, "restart barrier", fs);
     const barrier = current.value;
     if (barrier.state !== "restart-required" || current.rawSha256 !== barrierSha256) throw new Error("restart barrier changed before launch");
-    const executable = realpathSync(options.codexExecutable ?? resolveRuntimeExecutable());
+    const executable = boundExecutable(options.codexExecutable, options.runtimeOptions);
     if (!runtimeRestartBindingCurrent(barrier, { codexExecutable: executable })) throw new Error("restart binding drifted");
     ensureTickets(paths, fs);
     const tickets = readLaunchTicketSet(paths, fs);
@@ -551,7 +720,7 @@ export function issueLaunchTicket({ rootDir, repositoryCapability = "local", bar
       schema: TICKET_SCHEMA, ticketId, revision: 0, priorStateSha256: null, issuedAtEpochMs: now, expiresAtEpochMs: now + 300000,
       barrierSha256, repositoryFingerprint: barrier.repositoryFingerprint, expectedSourceSha256: barrier.sourceSha256,
       expectedRuntimeTargetsSha256: barrier.runtimeTargetsSha256, writerGenerationSha256: barrier.writerGenerationSha256,
-      tokenSha256: sha256(token), state: "issued", consumedBy: null,
+      tokenSha256: sha256(token), state: "issued", consumedBy: null, failure: null,
     };
     validateLaunchTicket(ticket);
     writeAtomic(
@@ -561,7 +730,56 @@ export function issueLaunchTicket({ rootDir, repositoryCapability = "local", bar
       null,
       { status: "absent" },
     );
-    return { ticketId, token, expiresAtEpochMs: ticket.expiresAtEpochMs, executable, barrier };
+    return { ticketId, token, expiresAtEpochMs: ticket.expiresAtEpochMs, executable: executable.physicalPath, barrier };
+  }, fs);
+}
+export function failLaunchTicket({
+  rootDir,
+  repositoryCapability = "local",
+  barrierSha256,
+  ticketId,
+  token,
+  failureCode,
+  now = Date.now(),
+  ...options
+} = {}) {
+  expectHex(barrierSha256, "barrierSha256");
+  expectId(ticketId, "ticketId");
+  if (!Buffer.isBuffer(token) || token.length !== 32) throw new Error("launch token is invalid");
+  if (typeof failureCode !== "string"
+    || !/^[a-z][a-z0-9-]{0,63}$/u.test(failureCode)) throw new Error("launch failure code is invalid");
+  expectEpoch(now, "clock");
+  const fs = runtimeFilesystem(options.deps);
+  const paths = privatePaths(rootDir, repositoryCapability, options);
+  return withWriterLock(paths, () => {
+    const barrier = readStored(paths.barrier, validateRestartBarrier, "restart barrier", fs);
+    if (barrier.rawSha256 !== barrierSha256) throw new Error("restart barrier changed before launch failure");
+    const ticket = readSoleLiveLaunchTicket(paths, barrier.rawSha256, ticketId, now, fs);
+    if (ticket.value.state !== "issued"
+      || ticket.value.tokenSha256 !== sha256(token)
+      || now < ticket.value.issuedAtEpochMs
+      || now >= ticket.value.expiresAtEpochMs) throw new Error("launch ticket is unavailable or replayed");
+    const failed = {
+      ...ticket.value,
+      revision: ticket.value.revision + 1,
+      priorStateSha256: ticket.rawSha256,
+      state: "failed",
+      consumedBy: null,
+      failure: { code: failureCode, failedAtEpochMs: now },
+    };
+    validateLaunchTicket(failed);
+    const rawSha256 = writeAtomic(
+      ticketPath(paths, ticketId),
+      failed,
+      fs,
+      null,
+      { status: "present", ...ticket },
+    );
+    return {
+      ticket: failed,
+      rawSha256,
+      retryAllowed: true,
+    };
   }, fs);
 }
 export function authenticateLaunchTicket({ rootDir, repositoryCapability = "local", ticketId, token, now = Date.now(), ...options } = {}) {

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "pipeline.public-release-state.v1",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema", "version", "tag", "commit", "tree", "publicationStatus", "releaseUrlClass", "observedAt", "recordSha256"],
+  "properties": {
+    "schema": {"const": "pipeline.public-release-state.v1"}, "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "tag": {"type": "string", "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$"}, "commit": {"$ref": "#/$defs/oid"}, "tree": {"$ref": "#/$defs/oid"},
+    "publicationStatus": {"enum": ["published", "unpublished"]}, "releaseUrlClass": {"enum": ["public-release", "none"]},
+    "observedAt": {"type": "string", "format": "date-time"}, "recordSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  },
+  "$defs": {"oid": {"type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"}}
+}

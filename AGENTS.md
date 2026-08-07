@@ -2,8 +2,11 @@
 
 This file is a pointer, not a second ruleset.
 
-Before project work, invoke `pipeline-core:pipeline-start`. It is the required
-methodological entry and loads the calibrated runtime authorities.
+At an actual session start or runtime re-entry, invoke
+`pipeline-core:pipeline-start`. It is the required methodological entry and
+loads the calibrated runtime authorities. Do not repeat it for an ordinary new
+task, user message, tool result, commit, test, PO response, or active-goal
+continuation within the same ready session.
 
 Authorities: runtime manifest `.claude/pipeline.yaml` and Operating Model
 `docs/operating-model.md`. Follow their re-entry rule.

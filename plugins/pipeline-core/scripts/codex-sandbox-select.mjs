@@ -22,6 +22,12 @@ import {
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { resolvePoGateRepositoryTopology } from "../lib/po-gate-authority.mjs";
 import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
+import { projectSandboxFailure } from "../lib/sandbox-failure.mjs";
+
+/** Preserve an inner native sandbox cause when this selector is an outer adapter. */
+export function propagateSandboxFailure(failure, adapterClass = "codex-sandbox-selector") {
+  return projectSandboxFailure(failure, adapterClass);
+}
 
 const DUTIES = new Set(["advisory", "readiness", "critic"]);
 const FAILURE_CLASSES = new Set(["policy-drift", "host-unsupported", "evidence-stale", "preflight-failed", "profile-drift", "host-mode-unavailable"]);
@@ -202,7 +208,7 @@ function defaultCompatibilityProjection(observed) {
   const actual = toolchain(observed);
   const actualHost = host(observed);
   const preflightReceipt = observed.compatibilityObservation.preflight?.receipt;
-  if (actual.cliVersion !== entry.cliVersion || actual.cliSha256 !== entry.releasedArtifactSha256
+  if (actual.cliVersion !== preflightReceipt?.cli?.version || actual.cliSha256 !== preflightReceipt?.cli?.artifactSha256
     || actual.selectionSchemaSha256 !== SELECTION_SCHEMA_SHA256 || actual.observedHelperSha256 !== preflightReceipt?.observedHelper?.artifactSha256
     || actualHost.platformClass !== "linux-wsl2" || actualHost.filesystemClass !== expectedFilesystem
     || actualHost.bootIdSha256 !== sha256(String(observed.compatibilityObservation.bootId))) {

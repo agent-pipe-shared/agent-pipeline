@@ -1,0 +1,72 @@
+{
+  "schema": "pipeline.threat-model.v1",
+  "candidate": {
+    "commit": "aee422c80c7f214e9fa41f6bb78b9d8b877c9ad3",
+    "tree": "989cf0a74087b5942f9df97da04d5a7bc9d40846"
+  },
+  "policyRevision": "cyb-5-policy-v1",
+  "classification": "public",
+  "entities": [
+    {
+      "id": "asset-2f7120eb99d780aa",
+      "kind": "asset",
+      "label": "pipeline-authority-and-evidence",
+      "relationships": ["boundary-797b3b8fa078a88b", "boundary-31a6cbe7f7a5e8c2", "boundary-7c0a3d27b5e19a44"]
+    },
+    {
+      "id": "boundary-797b3b8fa078a88b",
+      "kind": "boundary",
+      "label": "untrusted-context-to-agent-authority",
+      "relationships": ["threat-a5d0ad1c6a7d81e5"]
+    },
+    {
+      "id": "threat-a5d0ad1c6a7d81e5",
+      "kind": "threat",
+      "label": "context-injection-and-authority-laundering",
+      "relationships": ["mitigation-39b1d514df203ba7"]
+    },
+    {
+      "id": "mitigation-39b1d514df203ba7",
+      "kind": "mitigation",
+      "label": "untrusted-by-default-and-bounded-task-manifest",
+      "relationships": []
+    },
+    {
+      "id": "boundary-31a6cbe7f7a5e8c2",
+      "kind": "boundary",
+      "label": "untrusted-ci-event-to-privileged-execution",
+      "relationships": ["threat-94cb1d4a0f1dc949"]
+    },
+    {
+      "id": "threat-94cb1d4a0f1dc949",
+      "kind": "threat",
+      "label": "ci-confused-deputy-and-host-fallback",
+      "relationships": ["mitigation-2f8d532f0d052f83"]
+    },
+    {
+      "id": "mitigation-2f8d532f0d052f83",
+      "kind": "mitigation",
+      "label": "isolation-validation-and-receipt-bound-fallback",
+      "relationships": []
+    },
+    {
+      "id": "boundary-7c0a3d27b5e19a44",
+      "kind": "boundary",
+      "label": "agent-to-external-security-authority",
+      "relationships": ["threat-9db14f6e33a72c10"]
+    },
+    {
+      "id": "threat-9db14f6e33a72c10",
+      "kind": "threat",
+      "label": "self-labeled-security-exception",
+      "relationships": ["mitigation-7e9234c8a0df2b61"]
+    },
+    {
+      "id": "mitigation-7e9234c8a0df2b61",
+      "kind": "mitigation",
+      "label": "detached-proof-and-external-trust-policy",
+      "relationships": []
+    }
+  ],
+  "lifecycle": "approved"
+}

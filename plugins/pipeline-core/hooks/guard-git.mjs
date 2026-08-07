@@ -56,15 +56,13 @@
  *   parsed from the RAW command, before quote-stripping. `process.env.PIPELINE_GUARD_
  *   OVERRIDE` is honored as a fallback for the PO's own session-level arming; when both
  *   are present the inline prefix wins and the ignored env arming is noted on stderr.
- *   Value normally has 3 segments split on the first two "|" (reason may itself contain
- *   "|"); a Phoenix-governed repository requires a fourth authority-reference segment.
- *   The token and reason are mandatory and non-empty.
+ *   Value = exactly 3 segments split on the first two "|" (reason may itself contain
+ *   "|"); token is a fresh one-time value, reason is mandatory and non-empty.
  *
- *   One-time semantics: a consumption ledger `.claude/guard-override.log.jsonl` (same
- *   $CLAUDE_PROJECT_DIR lookup as guard-config.json) records one JSON line per
- *   successful non-Phoenix override `{ts, rule, token, reason, command}`. In a
- *   Phoenix-governed repository, a checkpoint-bound canonical human decision is the
- *   sole consumption ledger; no command or reason content is persisted locally.
+ *   One-time semantics: a consumption ledger `.claude/guard-override.log.jsonl` bound to
+ *   the physical command target records one JSON line per successful override
+ *   `{ts, rule, token, reason, command, targetSha256}`. A `rule|token` pair
+ *   already in the ledger is consumed forever — re-presenting it blocks.
  *
  *   Evaluation order: ALL deny rules are always evaluated; consumption is decided on
  *   the FINAL verdict. Only when every matching rule equals the single armed rule id
@@ -222,16 +220,19 @@
  *   printf '{"tool_input":{"command":"git add secrets.yaml"}}'          | node plugins/pipeline-core/hooks/guard-git.mjs; echo $?
  *   printf '{"tool_input":{"command":"git push origin main"}}'          | node plugins/pipeline-core/hooks/guard-git.mjs; echo $?
  */
-import { readFileSync, appendFileSync, existsSync } from "node:fs";
+import { existsSync, readFileSync, appendFileSync, realpathSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { spawnSync } from "node:child_process";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve, sep } from "node:path";
 
+import { commitMessageFindings, markerPolicyMode } from "../lib/commit-message-policy.mjs";
 import { stripQuotedSegments, normalizeGlobalGitOptions } from "../lib/git-cmd.mjs";
-
-const GOVERNANCE_AUTHORITY_CLI = fileURLToPath(new URL("../scripts/governance-authority.mjs", import.meta.url));
-const PHOENIX_OVERRIDE_REFERENCE_SCHEMA = "pipeline.git-override-authority-reference.v1";
+import {
+  LEGACY_GUARD_AUDIT,
+  LEGACY_GUARD_CONFIG,
+  NEUTRAL_GUARD_AUDIT,
+  NEUTRAL_GUARD_CONFIG,
+  resolveProjectAuthorityPaths,
+} from "../lib/project-authority.mjs";
 
 // ---- read tool input (fail-open) --------------------------------------------------
 let cmd = "";
@@ -327,6 +328,16 @@ const UNION_BLOCKERS = [
     re: /\bgit\s+(checkout|restore)\s+(\.|\*)\s*($|[|&;])/,
     why: "Bare `git checkout .` / `git restore .` discards all working-tree changes.",
     origin: "<PROJECT_C> (checkout .) + <PROJECT_B> (bare-dot form); restore-dot combined",
+  },
+  {
+    id: "GG-21",
+    // A branch checkout with --force discards colliding tracked and untracked
+    // control artifacts. Fetch is intentionally not restricted; this closes
+    // only the destructive follow-up that turned remote adoption into an
+    // unrecoverable mixed authority state.
+    re: /\bgit\s+(checkout|switch)\b[^|&;]*\s(?:--force|-f)\b/,
+    why: "Force checkout discards or overlays local repository state; archive/adopt the checkout explicitly first.",
+    origin: "remote-authority adoption recovery",
   },
   {
     id: "GG-11",
@@ -460,10 +471,18 @@ const PRENORM_BLOCKERS = [
 
 // ---- per-project extra denies (config, not fork) ----------------------------------
 const projectDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
-const configPath = join(projectDir, ".claude", "guard-config.json");
+const authority = resolveProjectAuthorityPaths({ rootDir: projectDir });
+const guardConfigRelPath = authority.status === "ready"
+  ? authority.guardConfig
+  : (existsSync(join(projectDir, NEUTRAL_GUARD_CONFIG)) ? NEUTRAL_GUARD_CONFIG : LEGACY_GUARD_CONFIG);
+const guardAuditRelPath = authority.status === "ready"
+  ? authority.guardAudit
+  : (existsSync(join(projectDir, NEUTRAL_GUARD_AUDIT)) ? NEUTRAL_GUARD_AUDIT : LEGACY_GUARD_AUDIT);
+const configPath = join(projectDir, guardConfigRelPath);
 const warnings = [];
 /** @type {Array<{id: string, re: RegExp, why: string, origin: string}>} */
 const EXTRA_BLOCKERS = [];
+let projectConfig = null;
 let rawConfig = null;
 try {
   rawConfig = readFileSync(configPath, "utf8");
@@ -473,6 +492,7 @@ try {
 if (rawConfig !== null) {
   try {
     const cfg = JSON.parse(rawConfig);
+    projectConfig = cfg;
     const list = cfg?.extraDenyPatterns;
     if (list !== undefined && !Array.isArray(list)) {
       warnings.push('"extraDenyPatterns" is not an array -> ignored');
@@ -490,7 +510,7 @@ if (rawConfig !== null) {
             typeof entry?.reason === "string" && entry.reason !== ""
               ? entry.reason
               : `Project deny pattern matched: ${entry.pattern}`,
-          origin: "project guard-config (.claude/guard-config.json)",
+          origin: `project guard-config (${guardConfigRelPath})`,
         });
       } catch (e) {
         warnings.push(`extraDenyPatterns[${i}]: invalid regex (${e.message}) -> entry skipped`);
@@ -522,24 +542,16 @@ function parseInlineArming(rawCmd) {
   return null;
 }
 
-/** Split a legacy three- or Phoenix four-segment override value. */
+/** Split "<rule>|<token>|<reason>" on the FIRST TWO "|" — reason may itself contain "|". */
 function splitOverrideValue(value) {
   const firstPipe = value.indexOf("|");
   if (firstPipe === -1) return null;
   const secondPipe = value.indexOf("|", firstPipe + 1);
   if (secondPipe === -1) return null;
-  const remainder = value.slice(secondPipe + 1);
-  const thirdPipe = remainder.indexOf("|");
-  return thirdPipe === -1 ? {
+  return {
     rule: value.slice(0, firstPipe),
     token: value.slice(firstPipe + 1, secondPipe),
-    authorityReference: null,
-    reason: remainder,
-  } : {
-    rule: value.slice(0, firstPipe),
-    token: value.slice(firstPipe + 1, secondPipe),
-    authorityReference: remainder.slice(0, thirdPipe),
-    reason: remainder.slice(thirdPipe + 1),
+    reason: value.slice(secondPipe + 1),
   };
 }
 
@@ -561,27 +573,60 @@ if (inlineArm) {
   armingRaw = envArmRaw;
 }
 
-/** @type {null | {malformed: true, reason: string} | {malformed: false, rule: string, token: string, authorityReference: string | null, reason: string}} */
+/** @type {null | {malformed: true, reason: string} | {malformed: false, rule: string, token: string, reason: string}} */
 let arming = null;
 if (armingRaw !== null) {
   const parsed = splitOverrideValue(armingRaw);
-  if (!parsed || parsed.rule === "" || parsed.token === "" || parsed.reason === "") {
+  if (process.env.PIPELINE_REQUIRE_TYPED_HUMAN_OVERRIDE === "1") {
+    arming = { malformed: true, reason: "the Codex adapter requires a digest-bound attended Human override capability" };
+  } else if (!parsed || parsed.rule === "" || parsed.token === "" || parsed.reason === "") {
     arming = { malformed: true, reason: "fewer than three segments, or an empty rule/token/reason" };
   } else if (!KNOWN_RULE_IDS.has(parsed.rule)) {
     arming = { malformed: true, reason: `rule id "${parsed.rule}" is unknown to the union and the loaded guard-config` };
   } else {
-    arming = { malformed: false, rule: parsed.rule, token: parsed.token, authorityReference: parsed.authorityReference, reason: parsed.reason };
+    arming = { malformed: false, rule: parsed.rule, token: parsed.token, reason: parsed.reason };
   }
 }
 
 // ---- override mechanism: consumption ledger -------------------------------------------
-function ledgerPath() {
-  return join(projectDir, ".claude", "guard-override.log.jsonl");
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
 }
-function readLedgerEntries() {
+function overrideTarget() {
+  let coordinator;
+  try { coordinator = realpathSync(projectDir); } catch { return { ok: false }; }
+  const roots = new Set([coordinator]);
+  // An override ledger may be written only when every git invocation is bound to
+  // the coordinator's one physical project root. `-C` can be confirmed with a
+  // realpath comparison below. `--git-dir` and `--work-tree` can each select a
+  // different repository/worktree without a safe root proof in this hook, so an
+  // armed override rejects them before either consumption lookup or append.
+  // GIT_DIR/GIT_WORK_TREE have the same target-selection power even when passed
+  // through a shell assignment or env wrapper, so they are rejected as well.
+  // (Detection intentionally covers both --option=value and --option <value>.)
+  const targetCommand = inlineArm?.remainder ?? cmd;
+  if (/(?:^|[\s;&|])(?:GIT_DIR|GIT_WORK_TREE)\s*=|\$env:(?:GIT_DIR|GIT_WORK_TREE)\s*=/iu.test(targetCommand)) return { ok: false };
+  for (const segment of targetCommand.split(/[;&|]+/u)) {
+    if (!/\bgit\b/u.test(segment)) continue;
+    const gitIndex = segment.search(/\bgit\b/u);
+    const gitTail = segment.slice(gitIndex + 3);
+    if (/(?:^|\s)--(?:git-dir|work-tree)(?:\s|=|$)/u.test(gitTail)) return { ok: false };
+    for (const match of segment.matchAll(/(?:^|\s)-C\s+((?:"[^"]*"|'[^']*'|[^\s;&|])+)/gu)) {
+      const raw = match[1];
+      const value = (raw.startsWith("\"") && raw.endsWith("\"")) || (raw.startsWith("'") && raw.endsWith("'")) ? raw.slice(1, -1) : raw;
+      try { roots.add(realpathSync(resolve(coordinator, value))); } catch { return { ok: false }; }
+    }
+  }
+  if (roots.size !== 1 || !roots.has(coordinator)) return { ok: false };
+  return { ok: true, root: coordinator, sha256: sha256(coordinator) };
+}
+function ledgerPath(target) {
+  return join(target.root, guardAuditRelPath);
+}
+function readLedgerEntries(target) {
   let raw;
   try {
-    raw = readFileSync(ledgerPath(), "utf8");
+    raw = readFileSync(ledgerPath(target), "utf8");
   } catch {
     return []; // absent/unreadable ledger -> nothing consumed yet
   }
@@ -597,72 +642,16 @@ function readLedgerEntries() {
   }
   return entries;
 }
-function findConsumption(rule, token) {
-  return readLedgerEntries().find((e) => e && e.rule === rule && e.token === token) ?? null;
+function findConsumption(rule, token, target) {
+  return readLedgerEntries(target).find((e) => e && e.rule === rule && e.token === token && (!e.targetSha256 || e.targetSha256 === target.sha256)) ?? null;
 }
-function appendLedger(entry) {
+function appendLedger(entry, target) {
   try {
-    appendFileSync(ledgerPath(), JSON.stringify(entry) + "\n");
+    appendFileSync(ledgerPath(target), JSON.stringify(entry) + "\n");
     return true;
   } catch {
     return false; // fail-closed: caller must NOT apply the override
   }
-}
-
-function exactKeys(value, keys) { return value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key)); }
-function phoenixGovernedProject() { return existsSync(join(projectDir, "governance", "events", "registry.json")); }
-function currentCandidate() {
-  const invoked = spawnSync("git", ["-C", projectDir, "rev-parse", "HEAD", "HEAD^{tree}"], { encoding: "utf8", timeout: 5000 });
-  const lines = invoked.status === 0 ? invoked.stdout.trim().split("\n") : [];
-  return lines.length === 2 && /^[a-f0-9]{40,64}$/u.test(lines[0]) && /^[a-f0-9]{40,64}$/u.test(lines[1]) ? { commit: lines[0], tree: lines[1] } : null;
-}
-function readPhoenixOverrideReference(reference) {
-  if (typeof reference !== "string" || reference === "" || reference.length > 512) return null;
-  let value;
-  try { value = JSON.parse(readFileSync(reference, "utf8")); } catch { return null; }
-  if (!exactKeys(value, ["schema", "authorityRequest", "consumption"]) || value.schema !== PHOENIX_OVERRIDE_REFERENCE_SCHEMA
-    || !exactKeys(value.authorityRequest, ["schema", "repositoryFingerprint", "decisionId", "candidate", "checkpoint", "nowEpochMs"])
-    || value.authorityRequest.schema !== "pipeline.governance-authority-request.v1"
-    || !exactKeys(value.consumption, ["decisionId", "eventId", "idempotencyKey", "observedAtEpochMs"])) return null;
-  return value;
-}
-function invokeGovernanceAuthority(flag, request) {
-  const invoked = spawnSync(process.execPath, [GOVERNANCE_AUTHORITY_CLI, "--repo", projectDir, flag, JSON.stringify(request)], { encoding: "utf8", timeout: 5000 });
-  if (invoked.status !== 0) return null;
-  try { return JSON.parse(invoked.stdout); } catch { return null; }
-}
-function consumePhoenixOverrideAuthority(reference, rule) {
-  const expectedCandidate = currentCandidate();
-  if (!expectedCandidate) return "the current repository candidate could not be read";
-  const authority = invokeGovernanceAuthority("--request-json", reference.authorityRequest);
-  const scope = authority?.scope;
-  let guardDigest;
-  try { guardDigest = createHash("sha256").update(readFileSync(fileURLToPath(import.meta.url))).digest("hex"); } catch { return "the guarded artifact digest could not be read"; }
-  if (authority?.granted !== true || authority.decisionId !== reference.authorityRequest.decisionId
-    || !exactKeys(scope, ["repositoryFingerprint", "candidate", "packageId", "action", "environment", "artifacts"])
-    || !exactKeys(scope.candidate, ["commit", "tree"])
-    || scope.candidate.commit !== expectedCandidate.commit || scope.candidate.tree !== expectedCandidate.tree
-    || scope.action !== `OVERRIDE.${rule}` || scope.environment !== "local"
-    || !Array.isArray(scope.artifacts) || !scope.artifacts.some((artifact) => exactKeys(artifact, ["path", "sha256"]) && artifact.path === "plugins/pipeline-core/hooks/guard-git.mjs" && artifact.sha256 === guardDigest)) {
-    return "the canonical human-governance decision does not authorize this exact override tuple";
-  }
-  const consume = {
-    schema: "pipeline.governance-authority-consume-request.v1",
-    repositoryFingerprint: reference.authorityRequest.repositoryFingerprint,
-    decisionId: authority.decisionId,
-    decisionDigest: authority.decisionDigest,
-    candidate: expectedCandidate,
-    checkpoint: reference.authorityRequest.checkpoint,
-    observedAtEpochMs: reference.consumption.observedAtEpochMs,
-    consumption: {
-      decisionId: reference.consumption.decisionId,
-      eventId: reference.consumption.eventId,
-      idempotencyKey: reference.consumption.idempotencyKey,
-    },
-  };
-  const consumed = invokeGovernanceAuthority("--consume-request-json", consume);
-  if (consumed?.consumed !== true || consumed.outcome !== "appended" || consumed.decisionId !== authority.decisionId) return "the canonical human-governance decision could not be consumed";
-  return null;
 }
 
 // ---- verdict -------------------------------------------------------------------------
@@ -675,15 +664,12 @@ function formatBlockHeader(rule) {
   );
 }
 function overrideProcedureText(rule) {
-  const phoenixReference = phoenixGovernedProject()
-    ? `\n  Phoenix:    PIPELINE_GUARD_OVERRIDE="${rule.id}|<token>|<authority-reference.json>|<reason>" <command>\n  The reference must resolve and consume a canonical decision scoped to OVERRIDE.${rule.id}.`
-    : "";
   return (
     `Override: if this is genuinely intended, run the double-confirmation procedure (guardrails/git.md GIT-04) — ` +
     `explain the command and the reason, get the PO's confirmation, then their explicit "OVERRIDE ${rule.id}", ` +
     `then arm and re-run:\n` +
     `  Bash:       PIPELINE_GUARD_OVERRIDE="${rule.id}|<token>|<reason>" <command>\n` +
-    `  PowerShell: $env:PIPELINE_GUARD_OVERRIDE='${rule.id}|<token>|<reason>'; <command>` + phoenixReference + `\n` +
+    `  PowerShell: $env:PIPELINE_GUARD_OVERRIDE='${rule.id}|<token>|<reason>'; <command>\n` +
     `Fallback (mechanism unavailable): the PO runs the command manually in their own terminal — the guard binds agents, not humans.`
   );
 }
@@ -712,23 +698,26 @@ function blockOverrideConsumed(rule, priorEntry) {
 function blockLedgerFailure(rule) {
   const lines = [
     formatBlockHeader(rule),
-    `Override NOT applied: the audit ledger (.claude/guard-override.log.jsonl) could not be written — ` +
+    `Override NOT applied: the audit ledger (${guardAuditRelPath}) could not be written — ` +
       `fail-closed, an override without an audit record is never applied.`,
     overrideProcedureText(rule),
     ...notices,
   ];
   emit(2, lines);
 }
-function blockHumanAuthorityFailure(rule, reason) {
-  emit(2, [formatBlockHeader(rule), `Override NOT applied: ${reason}.`, overrideProcedureText(rule), ...notices]);
+function blockTargetBindingFailure(rule) {
+  emit(2, [
+    formatBlockHeader(rule),
+    "Override NOT applied: command target and ledger target are not one confirmed physical project — fail-closed.",
+    overrideProcedureText(rule),
+    ...notices,
+  ]);
 }
-function allowWithOverride(canonicalAuthority = false) {
+function allowWithOverride() {
   const lines = [
     `[git-guard] OVERRIDE APPLIED (one-time): rule ${arming.rule}, token ${arming.token}.`,
     `Reason: ${arming.reason}`,
-    canonicalAuthority
-      ? "Ledger: canonical human-governance decision consumed (no local command or reason persisted)."
-      : "Ledger: .claude/guard-override.log.jsonl (appended without command or reason content).",
+    `Ledger: ${guardAuditRelPath} (appended).`,
     ...notices,
   ];
   emit(1, lines);
@@ -736,6 +725,50 @@ function allowWithOverride(canonicalAuthority = false) {
 
 // All deny rules are always evaluated; consumption is decided on the FINAL verdict
 // (evaluation order and consumption semantics) — never exit on first match.
+// ---- GIT-03: correlation data must not enter commit metadata -------------------------
+//
+// Deliberately evaluated BEFORE the deny-rule union and deliberately NOT overridable. The
+// override mechanism exists for rules whose violation is recoverable; this one's is not.
+// A commit that reaches a public remote carrying a session URL cannot be un-published, and
+// this repository has the receipts: 53 of 74 such commits were already public and
+// unrewritable by the time a human noticed by reading them.
+//
+// The marker half (`AI-Assisted: true`) is config-gated and defaults to off -- see
+// ../lib/commit-message-policy.mjs for why the two halves are not the same kind of rule.
+{
+  const markerMode = markerPolicyMode(projectConfig);
+  const inspection = commitMessageFindings(cmd, {
+    readFile: (path) => {
+      // Message files are read from inside the project only. A `-F ../../elsewhere` is not
+      // followed: this check exists to read what is about to be committed here. A refusal
+      // here is not a pass -- commitMessageFindings reports it as GIT-03-UNREADABLE-MESSAGE-FILE,
+      // a blocking finding, precisely because "outside the project" is where an agent's own
+      // scratch directory usually lives (2026-08-06 Critic round, F3).
+      const projectRoot = resolve(projectDir);
+      const absolute = resolve(projectDir, path);
+      if (!absolute.startsWith(`${projectRoot}${sep}`) && absolute !== projectRoot) {
+        throw new Error("outside the project");
+      }
+      return readFileSync(absolute, "utf8");
+    },
+    requireMarker: markerMode !== "off",
+  });
+  const blocking = inspection.findings.filter((f) => f.code !== "GIT-03-MARKER-MISSING" || markerMode === "blocking");
+  const warningOnly = inspection.findings.filter((f) => f.code === "GIT-03-MARKER-MISSING" && markerMode === "warn");
+  if (blocking.length > 0) {
+    emit(2, [
+      `BLOCKED (git-guard GIT-03, plugin pipeline-core): this commit message carries ${blocking.map((f) => f.detail).join(" and ")}.`,
+      `Codes: ${blocking.map((f) => f.code).join(", ")}. Inspected: ${inspection.sources.join(", ")}.`,
+      "guardrails/git.md GIT-03: the anonymous `AI-Assisted: true` marker is the COMPLETE assistance signal.",
+      "Provider or model co-author trailers, session URLs or IDs, and account identifiers turn public history into a correlation index, and public history cannot be unpublished.",
+      "There is no override for this rule. Rewrite the message.",
+    ]);
+  }
+  if (warningOnly.length > 0) {
+    notices.push("[git-guard] WARN: commit message carries no `AI-Assisted: true` line (GIT-03; commitTrailerPolicy is \"warn\").");
+  }
+}
+
 const matched = [];
 for (const rule of UNION_BLOCKERS) if (rule.re.test(normalizedC)) matched.push(rule);
 for (const rule of RAW_BLOCKERS) if (rule.re.test(rawForQuoteRules)) matched.push(rule);
@@ -745,27 +778,22 @@ for (const rule of EXTRA_BLOCKERS) if (rule.re.test(normalizedStripped)) matched
 if (matched.length > 0) {
   const overrideCoversAll = arming && !arming.malformed && matched.every((r) => r.id === arming.rule);
   if (overrideCoversAll) {
-    if (phoenixGovernedProject()) {
-      const authorityReference = readPhoenixOverrideReference(arming.authorityReference);
-      if (!authorityReference) blockHumanAuthorityFailure(matched[0], "a closed Phoenix authority reference is required");
-      const authorityFailure = consumePhoenixOverrideAuthority(authorityReference, arming.rule);
-      if (authorityFailure) blockHumanAuthorityFailure(matched[0], authorityFailure);
-      allowWithOverride(true);
+    const target = overrideTarget();
+    if (!target.ok) blockTargetBindingFailure(matched[0]);
+    const prior = findConsumption(arming.rule, arming.token, target);
+    if (prior) {
+      blockOverrideConsumed(matched[0], prior);
     } else {
-      const prior = findConsumption(arming.rule, arming.token);
-      if (prior) {
-        blockOverrideConsumed(matched[0], prior);
-      } else {
-        const appended = appendLedger({
-          ts: new Date().toISOString(),
-          rule: arming.rule,
-          token: arming.token,
-          reason: arming.reason,
-          command: cmd,
-        });
-        if (appended) allowWithOverride();
-        else blockLedgerFailure(matched[0]);
-      }
+      const appended = appendLedger({
+        ts: new Date().toISOString(),
+        rule: arming.rule,
+        token: arming.token,
+        reason: arming.reason,
+        command: cmd,
+        targetSha256: target.sha256,
+      }, target);
+      if (appended) allowWithOverride();
+      else blockLedgerFailure(matched[0]);
     }
   } else {
     const blocking = arming && !arming.malformed ? (matched.find((r) => r.id !== arming.rule) ?? matched[0]) : matched[0];

@@ -16,7 +16,6 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 
 import {
   SUPPORTED_ADAPTER,
@@ -32,6 +31,7 @@ import {
   validateAfkWorkerResult,
 } from "../lib/afk-capability-worker.mjs";
 import { executeAfkEntryHostTransaction } from "../lib/afk-transaction-host.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const MAX_INPUT = 512 * 1024;
 const SHA256 = /^[0-9a-f]{64}$/u;
@@ -306,6 +306,6 @@ export async function main(argv = process.argv.slice(2), io = {}) {
   return outcome.ok ? EXIT.OK : EXIT.BLOCKED;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectInvocation(import.meta.url)) {
   process.exitCode = await main();
 }

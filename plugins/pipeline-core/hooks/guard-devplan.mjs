@@ -19,15 +19,14 @@
  * SOURCES OF TRUTH (both OPTIONAL — this hook is opt-in end to end)
  *   - Manifest gate: `.claude/pipeline.yaml`, `gates.dev-plan` (`mode`: blocking|warn|
  *     off, `type`: human) — read via `plugins/pipeline-core/lib/manifest.mjs`.
- *   - State: the `pipeline.state.v0` path returned by the runner-neutral
- *     `readProjectAuthority()` resolver, written ONLY by
- *     `harness/scripts/pipeline-state.mjs` — this hook is a READER, never a writer.
+ *   - State: `.claude/pipeline-state.json` (schema `pipeline.state.v0`), written ONLY
+ *     by `harness/scripts/pipeline-state.mjs` — this hook is a READER, never a writer.
  *
  * EXIT SEMANTICS (shared with the rest of the guard family): 0 allow · 2 block
  * (stderr reason) · 1 allow + non-blocking WARN.
  *
  * FAIL-OPEN (exit 0, silent): no manifest at all · gate "dev-plan" absent · gate mode
- * "off" · no resolved state file · state has no `activeFeature`. Every one of these means
+ * "off" · no state file · state has no `activeFeature`. Every one of these means
  * "nothing to enforce yet" — never a paralysis-by-default trap (mirrors guard-
  * testpath.mjs's "NO CONFIG → NO-OP" philosophy).
  *
@@ -42,15 +41,19 @@
  *
  * EXEMPT PATHS (normalized: backslashes → forward slashes, matched case-insensitively,
  * PREFIX match — same normalization style as guard-testpath.mjs):
- *   - Defaults: `docs/`, `specs/`, `.claude/`, `backlog/` (drafting/reviewing the plan
- *     itself, or touching guardrail/state config, is never blocked by this gate).
- *   - The active feature's own `activeFeature.planPath` (so writing the plan draft
- *     that is AWAITING approval is never blocked by the very gate that reads it).
+ *   - Defaults: `docs/`, `specs/`, `.claude/`, `backlog/`. The exact PRD/Spec
+ *     authority is editable only while the lifecycle is `draft`; after submission
+ *     (`awaiting-approval`) and after approval it remains immutable even though it is
+ *     under an otherwise exempt prefix.
+ *   - The active feature's own `activeFeature.planPath` while the lifecycle is
+ *     `draft` (so the gate cannot block the design bytes it requires the author to
+ *     prepare).
  *   - `gates.dev-plan.exemptPaths` (array of path-prefix strings) from the manifest,
  *     if present — project-specific additional exemptions.
  *
  * ABSOLUTE PATHS AND THE PROJECT ROOT (C1 fix, from a critic review):
- * Claude Code's Edit/Write PreToolUse contract typically delivers `tool_input.file_path`
+ * Claude Code's write PreToolUse contract typically delivers the target path (read via
+ * `lib/tool-write-target.mjs`: `file_path` for Edit/Write, `notebook_path` for NotebookEdit)
  * ABSOLUTE (e.g. `{{REPO_ROOT}}\docs\state.md`), which never starts with a relative
  * prefix like `docs/` — matching from character 0 against the exempt list above would
  * therefore never exempt anything, blocking even the plan file and docs/specs/backlog
@@ -126,90 +129,21 @@
  *
  * VERIFY: node plugins/pipeline-core/hooks/guard-devplan.test.mjs
  */
-import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { join, relative, isAbsolute, posix } from "node:path";
-import { fileURLToPath } from "node:url";
+import { existsSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { join, relative, isAbsolute, posix, resolve } from "node:path";
 
 import { loadManifest, gateConfig } from "../lib/manifest.mjs";
-import { readProjectAuthority } from "../lib/project-authority.mjs";
+import {
+  LEGACY_STATE,
+  NEUTRAL_STATE,
+  resolveProjectAuthorityPaths,
+  validatePortablePipelineState,
+} from "../lib/project-authority.mjs";
+import { derivePlanLifecycle } from "../lib/plan-spec-state-v2.mjs";
+import { writeTargetPath } from "../lib/tool-write-target.mjs";
 
 const DEFAULT_EXEMPT_PREFIXES = ["docs/", "specs/", ".claude/", "backlog/"];
-const GOVERNANCE_AUTHORITY_CLI = fileURLToPath(new URL("../scripts/governance-authority.mjs", import.meta.url));
-const SHA256 = /^[a-f0-9]{64}$/u;
-const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
-
-function exact(value, keys) {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-    && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
-}
-
-/**
- * H-AC-12 migration boundary. A mutable `planApproved` projection is never
- * authority by itself: the exact v3 reference must still resolve from the
- * canonical human ledger at the current read. Cyborg's PO-proof verification
- * is deliberately owned by that authority CLI rather than this hook.
- */
-function hasLedgerBackedPlanApproval(state, projectDir) {
-  const approval = state?.planApproval;
-  const feature = state?.activeFeature;
-  if (state?.planApproved !== true
-    || !exact(approval, ["schema", "approvedBy", "approvedAt", "specBoundBy", "specBoundAt", "poGateAuthority", "humanDecision"])
-    || approval.schema !== "pipeline.plan-approval.v3"
-    || !exact(feature, ["id", "planPath", "phase"])
-    || !exact(approval.poGateAuthority, ["schema", "humanFacing", "sourceSha256", "runtimeSha256", "receiptSha256", "repositoryFingerprint", "planPath", "planSha256", "specPath", "specSha256"])
-    || approval.poGateAuthority.planPath !== feature.planPath
-    || !SHA256.test(approval.poGateAuthority.planSha256 ?? "")
-    || !SHA256.test(approval.poGateAuthority.specSha256 ?? "")) return false;
-  const reference = approval.humanDecision;
-  if (!exact(reference, ["schema", "decisionId", "decisionDigest", "candidate", "checkpoint"])
-    || reference.schema !== "pipeline.human-decision-reference.v1"
-    || typeof reference.decisionId !== "string"
-    || !SHA256.test(reference.decisionDigest ?? "")
-    || !exact(reference.candidate, ["commit", "tree"])
-    || !OID.test(reference.candidate.commit ?? "")
-    || !OID.test(reference.candidate.tree ?? "")
-    || !exact(reference.checkpoint, ["repositoryFingerprint", "streamId", "sequence", "eventDigest", "candidateCommit", "candidateTree"])
-    || !SHA256.test(reference.checkpoint.repositoryFingerprint ?? "")
-    || reference.checkpoint.candidateCommit !== reference.candidate.commit
-    || reference.checkpoint.candidateTree !== reference.candidate.tree
-    || reference.checkpoint.repositoryFingerprint !== approval.poGateAuthority.repositoryFingerprint) return false;
-  const request = {
-    schema: "pipeline.governance-authority-request.v1",
-    repositoryFingerprint: reference.checkpoint.repositoryFingerprint,
-    decisionId: reference.decisionId,
-    candidate: reference.candidate,
-    checkpoint: reference.checkpoint,
-    nowEpochMs: Date.now(),
-  };
-  const invoked = spawnSync(process.execPath, [
-    GOVERNANCE_AUTHORITY_CLI,
-    "--repo", projectDir,
-    "--request-json", JSON.stringify(request),
-  ], { encoding: "utf8", timeout: 5000, shell: false });
-  if (invoked.status !== 0) return false;
-  let readback;
-  try { readback = JSON.parse(invoked.stdout); } catch { return false; }
-  if (!exact(readback, ["schema", "granted", "decisionId", "decisionDigest", "scope", "singleUse"])
-    || readback.schema !== "pipeline.governance-authority-readback.v1"
-    || readback.granted !== true
-    || readback.decisionId !== reference.decisionId
-    || readback.decisionDigest !== reference.decisionDigest
-    || readback.singleUse !== true
-    || !exact(readback.scope, ["repositoryFingerprint", "candidate", "packageId", "action", "environment", "artifacts"])
-    || readback.scope.repositoryFingerprint !== reference.checkpoint.repositoryFingerprint
-    || JSON.stringify(readback.scope.candidate) !== JSON.stringify(reference.candidate)
-    || readback.scope.packageId !== feature.id
-    || readback.scope.action !== "APPROVE_PLAN"
-    || readback.scope.environment !== "local"
-    || !Array.isArray(readback.scope.artifacts)) return false;
-  const expected = [
-    { path: approval.poGateAuthority.planPath, sha256: approval.poGateAuthority.planSha256 },
-    { path: approval.poGateAuthority.specPath, sha256: approval.poGateAuthority.specSha256 },
-  ];
-  return expected.every((artifact) => readback.scope.artifacts.some((entry) => exact(entry, ["path", "sha256"])
-    && entry.path === artifact.path && entry.sha256 === artifact.sha256));
-}
 
 function emit(code, lines) {
   process.stderr.write(lines.filter(Boolean).join("\n") + "\n");
@@ -224,7 +158,7 @@ function normalize(p) {
 let filePath = "";
 try {
   const input = JSON.parse(readFileSync(0, "utf8"));
-  filePath = String(input?.tool_input?.file_path ?? "");
+  filePath = writeTargetPath(input?.tool_input, String(input?.tool_name ?? ""));
 } catch {
   process.exit(0); // fail-open: guard is a safety net, not a prison
 }
@@ -274,28 +208,18 @@ const gate = gateConfig(manifest, "dev-plan");
 if (!gate || gate.mode === "off") process.exit(0);
 
 // ---- state: activeFeature / planApproved (fail-open on absent, WARN on malformed) --
-// The project-authority resolver is the sole path-precedence decision. In particular,
-// a migrated repository with a neutral `project/pipeline-state.json` must not silently
-// fall back to a deleted `.claude/pipeline-state.json` and thereby lose an active gate.
-const authority = readProjectAuthority({ rootDir: projectDir });
-if (authority.status !== "ready") {
-  emit(1, [
-    `[guard-devplan] WARN: project State authority is unavailable (${authority.reason ?? authority.status}).`,
-    `Dev-Plan gate is being skipped (fail-open) -- repair the resolved project authority before implementation edits.`,
-  ]);
-}
-if (!authority.state) process.exit(0); // no State projection -- no active feature to enforce
-
-const statePath = join(projectDir, authority.state);
+const projectAuthority = resolveProjectAuthorityPaths({ rootDir: projectDir });
+const statePath = join(
+  projectDir,
+  projectAuthority.status === "ready"
+    ? projectAuthority.state
+    : (existsSync(join(projectDir, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE),
+);
 let stateRaw;
 try {
   stateRaw = readFileSync(statePath, "utf8");
 } catch {
-  emit(1, [
-    `[guard-devplan] WARN: resolved State ${authority.state} is not readable.`,
-    `Dev-Plan gate is being skipped (fail-open) -- repair the state file (rewrite only via ` +
-      `harness/scripts/pipeline-state.mjs, never by hand).`,
-  ]);
+  process.exit(0); // no state file at all -- fail-open
 }
 let state;
 try {
@@ -313,30 +237,71 @@ if (!activeFeature || typeof activeFeature !== "object" || typeof activeFeature.
   process.exit(0); // no active feature -- nothing to enforce
 }
 
-const ledgerBackedPlanApproval = hasLedgerBackedPlanApproval(state, projectDir);
-if (ledgerBackedPlanApproval) process.exit(0); // ledger-backed approval -- allow
+if (statePath === join(projectDir, NEUTRAL_STATE)) {
+  const portability = validatePortablePipelineState(state);
+  if (!portability.ok) {
+    emit(gate.mode === "warn" ? 1 : 2, [
+      `[guard-devplan] ${gate.mode === "warn" ? "WARN" : "BLOCKED"}: neutral State contains private cleanup identity (${portability.code}).`,
+      "Repair through the sanctioned cleanup recovery transaction; direct State edits are not authority.",
+    ]);
+  }
+}
+
+function fileSha256(path) {
+  try { return createHash("sha256").update(readFileSync(resolve(projectDir, path))).digest("hex"); }
+  catch { return null; }
+}
+
+const submitted = state.planSubmission;
+const approvalAuthority = state.planApproval?.poGateAuthority;
+const planPath = typeof submitted?.planPath === "string"
+  ? submitted.planPath
+  : approvalAuthority?.planPath;
+const specPath = typeof submitted?.specPath === "string"
+  ? submitted.specPath
+  : approvalAuthority?.specPath;
+const lifecycle = derivePlanLifecycle(state, {
+  ...(typeof planPath === "string" ? { planSha256: fileSha256(planPath) } : {}),
+  ...(typeof specPath === "string" ? { specSha256: fileSha256(specPath) } : {}),
+});
+if (lifecycle.status === "implementing" && lifecycle.ok && lifecycle.nextAction === null) {
+  process.exit(0);
+}
 
 // ---- exempt paths -------------------------------------------------------------------
 const exemptPrefixes = [...DEFAULT_EXEMPT_PREFIXES];
-if (typeof activeFeature.planPath === "string" && activeFeature.planPath !== "") {
+if (lifecycle.status === "draft"
+  && typeof activeFeature.planPath === "string"
+  && activeFeature.planPath !== "") {
   exemptPrefixes.push(activeFeature.planPath);
 }
 if (Array.isArray(gate.exemptPaths)) {
   for (const p of gate.exemptPaths) if (typeof p === "string" && p !== "") exemptPrefixes.push(p);
 }
 
-const isExempt = exemptPrefixes.some((prefix) => normalizedPath.startsWith(normalize(prefix)));
+const authoritativePaths = [planPath, specPath]
+  .filter((path) => typeof path === "string")
+  .map(normalize);
+const touchesAuthority = authoritativePaths.some((path) => normalizedPath === path);
+const isDraftAuthority = lifecycle.status === "draft" && touchesAuthority;
+const isExempt = isDraftAuthority
+  || (!touchesAuthority
+    && exemptPrefixes.some((prefix) => normalizedPath.startsWith(normalize(prefix))));
 if (isExempt) process.exit(0);
 
 // ---- verdict --------------------------------------------------------------------------
+const lifecycleReason = lifecycle.nextAction === "reopen-design"
+  ? "Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing."
+  : lifecycle.status === "awaiting-approval"
+    ? "The submitted Plan/Spec is immutable until approval or a sanctioned `reopen-design --by <name>`."
+    : lifecycle.status === "approved"
+      ? "The approved design must enter implementation through `set-phase --phase implementation`, or be reopened before design edits."
+      : "The feature is still in draft design and has no implementation authority.";
 const message = [
-  `BLOCKED (guard-devplan, plugin pipeline-core): Feature "${activeFeature.id}" has no current ledger-backed plan approval.`,
+  `BLOCKED (guard-devplan, plugin pipeline-core): Feature "${activeFeature.id}" lifecycle is "${lifecycle.status ?? "invalid"}".`,
   `Plan: ${typeof activeFeature.planPath === "string" ? activeFeature.planPath : "(no planPath recorded in state)"}`,
   `File: ${filePath}`,
-  `Why: The Dev-Plan gate (.claude/pipeline.yaml, gate "dev-plan") requires a recorded approval BEFORE ` +
-    `implementation edits (docs/operating-model.md §3.2 step 3b). Record a checkpoint-bound ` +
-    `human decision and approve through: node harness/scripts/pipeline-state.mjs approve-plan ` +
-    `--by <name> --human-decision-file <repo-relative-reference>.`,
+  `Why: ${lifecycleReason}`,
 ];
 
 if (gate.mode === "warn") emit(1, message);

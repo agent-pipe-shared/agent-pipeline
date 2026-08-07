@@ -1,16 +1,22 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 /** Non-blocking SessionStart projection of validated compact continuity state. */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import {
   continuityDispatchAllowed,
   validateContinuityState,
 } from "../lib/continuity-state.mjs";
 import { buildContinuationLine } from "../lib/interaction-continuity.mjs";
 import { reconcileMainSessionRoute } from "../lib/main-session-route.mjs";
-import { readProjectAuthority } from "../lib/project-authority.mjs";
+import { boundedPayload, measureBootstrapPayload } from "../lib/bootstrap-payload-budget.mjs";
+import {
+  LEGACY_STATE,
+  NEUTRAL_STATE,
+  resolveProjectAuthorityPaths,
+} from "../lib/project-authority.mjs";
 
 const OUTER_SCHEMA = "pipeline.state.v0";
 
@@ -150,18 +156,19 @@ export function buildRegroundMessage(stateOrProjection) {
   if (!projection.workResumptionAllowed && projection.runtime === null) {
     return `POST_COMPACT_REGROUND ${canonical}`;
   }
-  const language = projection.runtime.humanFacingLanguage;
+  const language = projection.runtime?.humanFacingLanguage ?? "en";
+  const activeDuty = projection.runtime?.activeDuty ?? null;
   if (language === "de") {
     return [
       "Re-Grounding nach /compact.",
-      `Aktive Duty: ${JSON.stringify(projection.runtime.activeDuty)}.`,
+      `Aktive Duty: ${JSON.stringify(activeDuty)}.`,
       `Validierte Continuity-Projektion: ${canonical}`,
       continuation,
     ].join("\n");
   }
   return [
     "Re-grounding after /compact.",
-    `Active duty: ${JSON.stringify(projection.runtime.activeDuty)}.`,
+    `Active duty: ${JSON.stringify(activeDuty)}.`,
     `Validated continuity projection: ${canonical}`,
     continuation,
   ].join("\n");
@@ -171,12 +178,21 @@ export function buildRegroundMessage(stateOrProjection) {
 export function decideOutput(input, state) {
   if (!shouldActivate(input)) return { stdout: "", json: false };
   const projection = resolveRegroundProjection(state, input);
-  const message = buildRegroundMessage(projection);
+  const bounded = boundedPayload(projection, { mode: "compact" });
+  const message = buildRegroundMessage(bounded.value);
+  const measurement = measureBootstrapPayload(message, { mode: "compact" });
   const payload = {
     systemMessage: message,
-    hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: message },
+    hookSpecificOutput: {
+      hookEventName: "SessionStart",
+      additionalContext: message,
+      bootstrapPayloadMeasurement: measurement,
+      originalBootstrapPayloadMeasurement: bounded.originalMeasurement,
+      bootstrapPayloadTruncated: bounded.truncated === true,
+      bootstrapPayloadOverBudget: bounded.overBudget === true,
+    },
   };
-  return { stdout: `${JSON.stringify(payload)}\n`, json: true, payload, projection };
+  return { stdout: `${JSON.stringify(payload)}\n`, json: true, payload, projection, measurement };
 }
 
 /** Real hook boundary. It always exits zero and never writes repository state. */
@@ -190,14 +206,14 @@ export function run() {
   }
   if (!shouldActivate(input)) process.exit(0);
 
-  const authority = readProjectAuthority({ rootDir });
-  const statePath = authority.status === "ready" && authority.state
+  const authority = resolveProjectAuthorityPaths({ rootDir });
+  const statePath = authority.status === "ready"
     ? authority.state
-    : authority.status === "missing" ? ".claude/pipeline-state.json" : null;
-  const state = statePath ? loadStateSafe(join(rootDir, statePath)) : null;
+    : (existsSync(join(rootDir, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE);
+  const state = loadStateSafe(join(rootDir, statePath));
   const { stdout } = decideOutput(input, state);
   if (stdout) process.stdout.write(stdout);
   process.exit(0);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) run();
+if (isDirectInvocation(import.meta.url)) run();

@@ -18,6 +18,12 @@ import {
   readdirSync,
 } from "node:fs";
 import { join, relative } from "node:path";
+import {
+  NEUTRAL_CALIBRATION,
+  NEUTRAL_MANIFEST,
+  NEUTRAL_STATE,
+  resolveProjectAuthorityPaths,
+} from "./project-authority.mjs";
 
 export const CODEX_HOST_CONTROL_PATHS = Object.freeze([".agents", ".codex", ".git"]);
 export const CODEX_HOST_REPOSITORY_INIT_DIRECTORY = ".claude/.runtime/agent-pipeline/onboarding/host-repository-init";
@@ -26,12 +32,24 @@ export const CODEX_HOST_REPOSITORY_INIT_INTENT = `${CODEX_HOST_REPOSITORY_INIT_D
 export const CODEX_HOST_REPOSITORY_INIT_RECEIPT = `${CODEX_HOST_REPOSITORY_INIT_DIRECTORY}/receipt.json`;
 export const CODEX_HOST_REPOSITORY_INIT_MARKER = `${CODEX_HOST_REPOSITORY_INIT_DIRECTORY}/marker.json`;
 const REQUIRED_CODEX_HOST_CONTROL_PATHS = Object.freeze([".codex", ".git"]);
-const HOST_INIT_AUTHORITY_PATHS = Object.freeze([
-  "pipeline.user.yaml",
-  ".claude/pipeline.json",
-  ".claude/pipeline.yaml",
-  ".claude/settings.json",
-]);
+function projectAuthorityPaths(root) {
+  const authority = resolveProjectAuthorityPaths({ rootDir: root });
+  if (authority.status === "ready") return authority;
+  return {
+    calibration: NEUTRAL_CALIBRATION,
+    manifest: NEUTRAL_MANIFEST,
+    state: NEUTRAL_STATE,
+  };
+}
+
+function hostInitAuthorityPaths(root) {
+  const authority = projectAuthorityPaths(root);
+  return [
+    "pipeline.user.yaml",
+    authority.calibration,
+    authority.manifest,
+  ];
+}
 
 function readonlyEmptyDirectory(root, name, { access = accessSync, fsConstants = constants, lstat = lstatSync, readdir = readdirSync } = {}) {
   const path = join(root, name);
@@ -144,10 +162,11 @@ export function codexHostRepositoryAuthoritySha256(root, {
   ...io
 } = {}) {
   const rows = [];
-  for (const path of HOST_INIT_AUTHORITY_PATHS) {
+  const authority = projectAuthorityPaths(root);
+  for (const path of hostInitAuthorityPaths(root)) {
     const observed = readPhysicalBoundFile(root, path, { lstat, readFile, ...io });
     if (!observed) return null;
-    const bytes = path === ".claude/pipeline.json" && calibrationBytes !== null
+    const bytes = path === authority.calibration && calibrationBytes !== null
       ? calibrationBytes
       : observed.bytes;
     rows.push({ path, sha256: sha256(bytes) });
@@ -161,7 +180,8 @@ function hostManagedBytesForCanonicalLocalOnly(root, {
   ...io
 } = {}) {
   try {
-    const observed = readPhysicalBoundFile(root, ".claude/pipeline.json", {
+    const calibrationPath = projectAuthorityPaths(root).calibration;
+    const observed = readPhysicalBoundFile(root, calibrationPath, {
       lstat,
       readFile,
       ...io,
@@ -224,7 +244,8 @@ function boundKickoffHistory(root, historyPath, options = {}) {
   if (!observed) return null;
   let calibrationBytes;
   try {
-    const calibration = readPhysicalBoundFile(root, ".claude/pipeline.json", options);
+    const authority = projectAuthorityPaths(root);
+    const calibration = readPhysicalBoundFile(root, authority.calibration, options);
     if (!calibration) return null;
     calibrationBytes = calibration.bytes;
     const calibrationValue = JSON.parse(calibrationBytes.toString("utf8"));
@@ -241,12 +262,19 @@ function boundKickoffHistory(root, historyPath, options = {}) {
     return null;
   }
   const latest = observed.history.transactions.at(-1);
+  const stateBytes = readBound(projectAuthorityPaths(root).state);
+  if (stateBytes === null) return null;
+  let state;
+  try { state = JSON.parse(stateBytes.toString("utf8")); } catch { return null; }
+  const prdPath = state?.continuity?.authority?.prd?.path;
+  const specPath = state?.continuity?.authority?.spec?.path;
+  if (typeof prdPath !== "string" || typeof specPath !== "string") return null;
   const bindings = {
     calibrationSha256: calibrationBytes,
-    stateSha256: readBound(".claude/pipeline-state.json"),
+    stateSha256: stateBytes,
     handoverSha256: readBound("docs/state.md"),
-    prdSha256: readBound("specs/kickoff-initial-prd.md"),
-    specSha256: readBound("specs/kickoff-initial-spec.md"),
+    prdSha256: readBound(prdPath),
+    specSha256: readBound(specPath),
   };
   function readBound(path) {
     return readPhysicalBoundFile(root, path, options)?.bytes ?? null;

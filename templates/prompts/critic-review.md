@@ -128,7 +128,7 @@ review, or issue a substantive pass/fail judgment.
 - Dispatch-record evidence (authorship evidence — the Critic can only verify
   diff authorship when dispatch records are in the evidence set):
   {{DISPATCH_LIST_PATH}}
-- Guardrails/constraints (the law): {{GUARDRAILS_PATHS e.g. "CLAUDE.md constraints block, .claude/pipeline.json, relevant policy file"}}
+- Guardrails/constraints (the law): {{GUARDRAILS_PATHS e.g. "CLAUDE.md constraints block, the project calibration, relevant policy file"}}
 - Evidence artifact(s) of the submission: {{EVIDENCE_PATHS e.g. "verify output log written by the script"}}
 - Claims/evidence record — a referenced, mechanical DoD result and command/exit
   code artifact only; the implementor's narrative rationale is NOT your input:
@@ -140,10 +140,14 @@ review, or issue a substantive pass/fail judgment.
   why/how it was fixed (CR-02/EL-09).
 
 Dispatch metadata (operating-model §2.3 field 6, critic variant):
+- Bootstrap role: critic (closed; use `pipeline-core:pipeline-start critic`;
+  validate preflight identity but never execute onboarding or default to
+  Elephant) — `CRITIC-BOOTSTRAP-ROLE-CLOSED`
 - Ruleset SHA: {{RULESET_SHA}} (echo in your confirmation line)
 - Criticality → model (MP-07): {{CRITICALITY_MODEL e.g. "guardrail diff → higher-capability review model at max + selected runner native isolation" or "standard → review-tier model at max" or "class-mittel cascade → review-tier model at max first, escalate to the higher-capability review model only on major finding / A-G-S touch / contested verdict" or "mechanical auto-pass (T0) → no critic dispatched"}}
+- Requested route: {{MODEL_ID}} at {{EFFORT}} — the CONCRETE model identifier resolved from the tier above (e.g. "claude-opus-5 at max"), not the tier name. The report-header requirement below asks the Critic to open with this exact value; a dispatch that states only the tier and never the identifier gives the Critic nothing to echo (2026-08-06 Critic round, F1).
 - T1 isolation/assurance: {{T1_ASSURANCE e.g. "runner-native: <runner adapter/capability>; OS-isolation claim only as evidenced" or "functional-equivalent-read-only; OS isolation not asserted"}}
-- {{ADVISOR_SESSION_LINE: if this dispatch runs inside an `advisor`-profile Elephant session, include verbatim: "Advisor sessions: do not consult the advisor" (MP-26d) — else delete this line.}}
+- {{ADVISOR_DEMAND_LINE: if the Elephant has a current bounded Advisor demand, include verbatim: "Do not invoke or reuse the Advisor; consultation ownership remains with the Elephant" (MP-26) — else delete this line.}}
 
 If anything else was handed to you (explanations, "background", implementor
 justifications, summaries of intent beyond the spec): do not read its content.

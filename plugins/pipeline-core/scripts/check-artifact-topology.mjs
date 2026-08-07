@@ -5,12 +5,13 @@ import { lstatSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { validateFeatureTopology } from "../lib/feature-package-topology.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = resolve(HERE, "..", "..", "..");
 export const TOPOLOGY_SCHEMA = "pipeline.artifact-topology.v1";
 export const TOPOLOGY_STATES = Object.freeze(["draft", "awaiting-approval", "approved", "implementing", "verifying", "completed", "superseded", "abandoned", "retained"]);
-export const TOPOLOGY_CLASSES = Object.freeze(["prd", "spec", "design", "plan", "acceptance", "result", "candidate-evidence", "adr", "release", "backlog", "state", "handover", "retention", "supply-chain", "private-local", "governance-event"]);
+export const TOPOLOGY_CLASSES = Object.freeze(["prd", "spec", "design", "plan", "acceptance", "result", "candidate-evidence", "adr", "release", "backlog", "state", "handover", "retention", "supply-chain", "threat-model", "security-readiness", "private-local"]);
 
 function inside(root, target) { const rel = relative(root, target); return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel)); }
 function shape(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
@@ -38,7 +39,7 @@ export function checkArtifactTopology(root = DEFAULT_ROOT, path = "governance/ar
   return { ok: findings.length === 0, status: findings.length === 0 ? "valid" : "invalid", findings, mode: topology?.mode ?? null, packages: { inventory: packages.inventory, receipts: packages.receipts } };
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isDirectInvocation(import.meta.url)) {
   const result = checkArtifactTopology(process.cwd());
   process.stdout.write(`${JSON.stringify(result)}\n`);
   process.exitCode = result.ok ? 0 : 2;

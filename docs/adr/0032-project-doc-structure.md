@@ -39,6 +39,12 @@ Specification:
 
 Adoption by an existing project: on the PO's initiative, per project (no fixed date). CycloneDX need assessment: if a project needs a more formal SBOM (e.g. a client requirement).
 
+## Amendment 2026-08-01 — CYB-3 SBOM lifecycle authority
+
+This amendment retains the greenfield decision and the prohibition on automatic historical migration. For an explicitly adopted lifecycle, `pipeline.sbom-manifest.v1` is the one canonical, immutable inventory record. It binds the exact candidate, governed source-input digests, adapter identity/configuration, pinned CycloneDX 1.6 and SPDX 2.3 payloads, component provenance/relationships, declared completeness, freshness, export privacy classification and canonical digest.
+
+An SBOM is inventory evidence only: findings, VEX disposition, risk acceptance and release approval remain separately typed. The lifecycle states are closed as `complete`, `stale`, `invalid`, `partial`, `unsupported`, `unavailable` and `not-applicable`; only a fresh, complete, validated record can later be bound to a release. CycloneDX remains a project-selected adapter, not a universal tooling mandate. Existing baseline artifacts remain byte-stable until an explicit, preview-first migration is separately approved.
+
 <!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
 
 # ADR-0032: Projekt-Doku-Struktur — Release-Traceability, SBOM-Konvention, lebendes Architektur-Dokument (GREENFIELD)
@@ -79,3 +85,9 @@ Präzisierung:
 ## Wiedervorlage
 
 Adoption durch ein Bestandsprojekt: auf the PO-Initiative, projekt-individuell (kein fester Termin). CycloneDX-Bedarfsprüfung: falls ein Projekt eine formalere SBOM braucht (z. B. Auftraggeber-Anforderung).
+
+## Ergänzung 2026-08-01 — CYB-3 SBOM-Lifecycle-Authority
+
+Diese Ergänzung erhält die Greenfield-Entscheidung und das Verbot automatischer historischer Migration. Nach ausdrücklicher Projektadoption ist `pipeline.sbom-manifest.v1` der einzige kanonische, unveränderliche Inventarnachweis. Er bindet exakten Kandidaten, Source-Input-Digests, Adapteridentität/-konfiguration, festgelegte CycloneDX-1.6- und SPDX-2.3-Payloads, Komponentenherkunft/-beziehungen, Vollständigkeit, Frische, Export-Privacy und den kanonischen Digest.
+
+Eine SBOM ist ausschließlich Inventar: Findings, VEX, Risikoakzeptanz und Release-Freigabe bleiben getrennte Records. Die Zustände sind geschlossen (`complete`, `stale`, `invalid`, `partial`, `unsupported`, `unavailable`, `not-applicable`); eine spätere Release-Bindung darf nur einen frischen, vollständigen und validierten Record verwenden. Bestehende Baseline-Artefakte bleiben bis zu einer ausdrücklich genehmigten, preview-basierten Migration byte-stabil.

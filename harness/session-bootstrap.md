@@ -4,7 +4,14 @@
 
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · as of 2026-07-03
 
-**Status:** Binding harness protocol. Fulfills the mission requirement "bootstrap docs" — show the plugin state (SHA/version), check it against the remote state, and define offline behavior and the refresh ritual. Applies to **every new session in every connected project** (`<PROJECT_A>`, `<PROJECT_B>`, `<PROJECT_C>`, the Pipeline repo itself), on both machines, independent of local paths. The executable form is built in Phase 3 as a skill (agent-facing, English — → ADR-0011 Language, in `docs/adr/`); this document is the human-readable spec and is the reference on any discrepancy.
+**Status:** Historical harness protocol plus maintained bootstrap rationale.
+For every `pipeline.user.v3` project, the executable
+`plugins/pipeline-core/skills/pipeline-start/SKILL.md` and ADR-0047 are
+authoritative on profiles and Advisor behavior. All later
+`advisor|design-first|speed`, startup Advisor, Advisor-hygiene and MP-26g probe
+passages in this historical protocol are superseded and must not be executed.
+V3 uses `epic|feature|mini`; bootstrap performs only model-free Advisor
+capability preflight and never launches a consultation.
 
 ---
 
@@ -53,43 +60,22 @@ Implemented as a skill (Phase 3): **`/pipeline-core:pipeline-start`** (canonical
 2. **One line in the project's CLAUDE.md** ("Run `/pipeline-core:pipeline-start` first") as an advisory fallback. If the skill invocation fails ("unknown skill"), that is precisely the evidence of case **F1** (ruleset missing) — the fallback thus detects the absence of the main layer.
 3. The **confirmation line** (Step 6) makes execution auditable for the PO and for hooks.
 
-#### V3 advisor-export override (ADR-0040)
+#### V2 Advisor lifecycle override (ADR-0047)
 
-For `pipeline.user.v3`, validate `advisor_export` before every advisory action.
-Missing consent and `consent: declined` are valid, accepted Advisory-off
-states: bootstrap performs no adapter probe, selected-sandbox lookup, child,
-export, or receipt, and may complete with `Advisory disabled-no-consent ·
-Receipt n/a`. The read-only `node setup.mjs` check never writes this decision;
-it prints the exact explicit workflow command
-`node setup.mjs --configure-advisor-export`, whose disclosure names the single
-question and allowlisted repository candidate material and defaults to decline.
+For `pipeline.user.v3`, validate `advisor_export`, but do not invoke the frozen
+V3 route during bootstrap. Epic/Feature runs only the local
+`pipeline.advisory-capability-preflight.v2`; Mini and declined consent are
+disabled. The preflight has no question and exactly zero child launches, model
+requests, exports, receipts and consultation-budget milliseconds. It reports
+`available|degraded|unavailable|disabled|unknown` with explicit assurance.
 
-With `consent: approved`, Epic/Feature invokes only the registered same-runner
-primary duty. Claude routing and Read/Grep/Glob consult tools are unchanged.
-Codex uses the repository-owned closed launcher (never a raw `node -e` export)
-and one ephemeral native App-Server turn on `openai/gpt-5.6-sol`; standing V3
-consent replaces per-run export approval. Its one bounded UTF-8 question is
-passed only on stdin, never in launcher argv. Codex receives exactly
-Read/Grep/Glob/Bash only inside the exact selected
-`network-open/read-only` transport; an unbound host shell/consult is not a
-fallback. No-child, wrong identity, missing profile readback, incomplete stdio
-or incomplete cleanup remains non-success without a duplicate consult. Such a
-primary failure is printed as `Advisory degraded-direct-subagent · Receipt n/a
-· Reason CODE`; bootstrap may complete and run one separate fresh read-only
-direct subagent. That degraded fallback emits no Pipeline Advisory receipt or
-attestation, satisfies no review/readiness/gate claim, and is never
-auto-applied. A
-missing configured tool result must name the blocked claim, include a copyable
-platform-appropriate install command whose own installer prerequisites were
-verified or embedded in the command, and report `installAttempted:false`;
-bootstrap never runs that command automatically. npm is not a substitute for
-Gitleaks, OSV-Scanner, or Semgrep. Standard user-local pipx/Go binary locations
-are recognized explicitly, and probe scratch must use bounded temporary
-storage instead of being mistaken for a missing installation.
-`execution_environment`, `probe_timeout`, and `probe_error` are host-boundary
-observations, not missing installations: rerun no-flag setup/self-application
-preflight through the host-authorized local read-only boundary and never
-recommend reinstalling from those statuses.
+Session start, profile selection, restart, resume, re-entry, Compact, unchanged
+handover, configured route and consent are not consultation triggers. A real
+same-runner consultation requires one concrete question, allowlisted reason,
+bounded evidence and a current digest-bound `pipeline.advisory-demand.v2`.
+Identical consultation records are not repeated; material question, reason,
+evidence, candidate or route-policy drift requires a fresh demand. ADR-0040
+continues to govern consent and tool/export boundaries.
 
 ### Step 1 — Determine plugin presence + loaded state
 
@@ -170,26 +156,29 @@ This step ends in a **third mandatory confirmation line** (printed directly unde
   refresh command in that project. Retain only the sanitized bridge status;
   private coordinates and receipts remain private.
 
-- **Requirement:** run `node plugins/pipeline-core/scripts/ruleset-freshness.mjs --repo "$PWD"`. It derives the remote from the committed `.claude/settings.json`, uses bounded remote access and a disposable bare repository, and never changes source refs/config. Consumer installs require equality. In the Agent-Pipeline self-application checkout, `equal|ahead` is current; `behind|diverged` is stale; `unknown` is unchecked. On Codex, use the host-authorized network-open/read-only command boundary directly instead of first producing a known sandbox DNS failure.
-- **Note (mechanism, only on a STALE warning from the SessionStart hook):** if the plugin's SessionStart hook reports a STALE warning IN THIS SESSION naming the installed SHA and remote SHA by name, Step 2 may adopt that result as equivalent evidence instead of re-running `ls-remote` itself. The real hook output otherwise only has a constant fresh-path bootstrap line without SHAs — it looks identical whether the SHAs match or the hook fired fail-open for lack of resolvability, and is therefore NOT usable as substitution proof. If only that constant line is present, or no hook output exists at all, Step 2 still requires its own `ls-remote`.
+- **Requirement:** run `node plugins/pipeline-core/scripts/ruleset-freshness.mjs --repo "$PWD"`. Despite its compatibility filename, it emits the distinct closed `pipeline.pipeline-update-availability.v1` result: the actually loaded plugin version/commit evidence versus the marketplace default commit, with `current|update-available|local-ahead|unknown`, `updateRecommended`, and a digest-bound policy disposition. Ordinary marketplace drift is advisory metadata and never repository write authority. Compatibility readers migrate the old `pipeline.ruleset-freshness.v1.writePermitted` field as update metadata only and use repository freshness for ordinary write admission. Only an exact match in the loaded plugin's shipped `pipeline.ruleset-update-policy.v1` may block, bound to policy id/version/digest and a public security reason. Absence, mismatch, generic behind/diverged output, and feature drift do not block. The helper uses bounded remote access and a disposable bare repository and never changes refs/config/worktree. On Codex, use the host-authorized network-open/read-only command boundary directly instead of first producing a known sandbox DNS failure.
+- **Visible separation:** record `pipelineUpdateAvailability` with its selected `channel` and `ref`, and record `repositoryFreshness` with its branch/upstream status. The SessionStart hook delegates to the same channel-aware update helper, always prints `repositoryFreshness=not-observed`, and never supplies repository write admission.
+- **Channel authority:** consumers default to `stable`; this Agent-Pipeline self-repository carries explicit `alpha`. `beta` is opt-in only through the read-only `node plugins/pipeline-core/scripts/pipeline-update-channel.mjs plan --repo "$PWD" --channel beta` and the returned, separately confirmed `applyAction`. There is no onboarding question, direct calibration edit, automatic channel change, or channel inference from the host plugin source.
+- **Note (mechanism, only on an UPDATE AVAILABLE warning from the SessionStart hook):** the hook warning is a nonblocking notification and may supply the selected channel/ref and named loaded/marketplace commits, but the bootstrap helper still owns the closed update result and exact security-policy disposition. Offline/unavailable output is `unknown`, fail-open, and never a freshness claim.
 - **Why:** third-party marketplaces don't auto-update; without this check, two-machine cache drift replaces the old copy-paste drift.
-- **Verification:** SHA match = current. Mismatch = stale → case **F2**. Remote unreachable → case **F3**. The check needs network + credentials for the private repo (see §5).
-- **Working repository (every writable governed project, including self-application):** run `node "${CLAUDE_PLUGIN_ROOT}/scripts/repository-freshness.mjs"` (from this repo's source checkout: `node plugins/pipeline-core/scripts/repository-freshness.mjs`). This is separate from marketplace/plugin freshness. The helper fetches into a disposable bare repository, never into the working checkout. `equal` and `ahead` permit writing; `behind`, `diverged`, `detached`, `no-upstream`, and `unknown` stop writes/dispatch while read-only diagnosis remains allowed. `unknown` (including fetch failure, timeout, unavailable upstream, or insufficient shallow history) is never reported as fresh. Other unmerged remote branches are bounded informational output only and never change the selected branch.
+- **Verification:** `update-available` = operator update recommended, nonblocking. Only an exact blocking policy match is case **F2**. Remote unreachable = case **F3** update metadata. The check needs network + credentials for the private repo (see §5).
+- **Working repository (every writable governed project, including self-application):** run `node "${CLAUDE_PLUGIN_ROOT}/scripts/repository-freshness.mjs"` (from this repo's source checkout: `node plugins/pipeline-core/scripts/repository-freshness.mjs`). This is the separate `pipeline.repository-freshness.v0` result and the sole ordinary repository-write freshness authority. It compares checked-out `HEAD` only with that branch's configured upstream through a disposable bare repository, never the marketplace default branch, and never fetches into the working checkout. Thus `sprint_phoenix == origin/sprint_phoenix` is `equal` even when `main` differs. `equal` and `ahead` permit writing; `behind`, `diverged`, `detached`, `no-upstream`, and `unknown` stop writes/dispatch while read-only diagnosis remains allowed. `unknown` (including fetch failure, timeout, unavailable upstream, or insufficient shallow history) is never reported as fresh. Other unmerged remote branches are bounded informational output only and never change the selected branch.
+- **Host source is separate:** official-versus-local Pipeline source selection is host-wide across all repositories sharing one Codex App Server. It changes only through the explicit attended operator flow with affected sessions closed; one App Server cannot honestly claim simultaneous Pipeline versions per repository.
 - **Honesty boundary:** this is a point-in-time protocol gate, not an atomic lock; a remote can advance immediately afterwards. The helper never runs pull, merge, rebase, checkout, or config/ref writes in the source checkout. SessionStart context alone is not an unbypassable OS-level write barrier.
 
 ### Step 3 — Read the project calibration file (existence check first!)
 
-- **Requirement:** first check that the calibration file **exists** (working name, uniform: `.claude/pipeline.json`), then read it fully. Expected minimum required fields (field sketch → `docs/operating-model.md` §8): verify command(s), autonomy level, branch model, worktree rule, stakes rating, project constraints.
+- **Requirement:** first check that the calibration file **exists** at its resolved authority tier (`project/pipeline.json`, else the legacy `.claude/pipeline.json`), then read it fully. Expected minimum required fields (field sketch → `docs/operating-model.md` §8): verify command(s), autonomy level, branch model, worktree rule, stakes rating, project constraints.
 - **Requirement (denies):** project **denies** don't live in the calibration file, but in the committed `.claude/settings.json` resp. the git-guard config — this step checks the denies **there** (existence of the committed permission/guard entries).
 - **Why:** the central skills are parameterized and read this file — without it, rituals run with wrong defaults, in the worst case with the wrong project's guardrails.
 - **Verification:** file exists and contains the required fields; if missing or incomplete → case **F4**.
-- **Decided:** mechanism + field sketch → `docs/operating-model.md` §8; **schema format:** JSON (`.claude/pipeline.json`, shipped with the plugin).
+- **Decided:** mechanism + field sketch → `docs/operating-model.md` §8; **schema format:** JSON (`pipeline.json` at the resolved tier, shipped with the plugin).
 
 ### Step 4 — Read the handover/state file
 
 - **Requirement:** read the project's handover file in full (in the Pipeline repo: `docs/state.md`). It is the **sole authoritative state source**; memory is only a mirror.
 - **Why:** the hand-maintained triple baton has provably lied; the pipeline replaces it with one source — so every session must read exactly that one.
-- **Verification:** the last-update date is extractable (it goes into the confirmation line). **Drift threshold (default):** a warning applies if the project repo's last commit is NEWER than the handover state AND the delta since then contains at least one non-docs commit (pure docs deltas don't trigger a warning); a project can document a deviating threshold via a `$driftThreshold` comment field in `.claude/pipeline.json` (the default applies if the field is absent).
+- **Verification:** the last-update date is extractable (it goes into the confirmation line). **Drift threshold (default):** a warning applies if the project repo's last commit is NEWER than the handover state AND the delta since then contains at least one non-docs commit (pure docs deltas don't trigger a warning); a project can document a deviating threshold via a `$driftThreshold` comment field in the project calibration (the default applies if the field is absent).
 
 ### Step 5 — Project gates available?
 
@@ -197,11 +186,11 @@ This step ends in a **third mandatory confirmation line** (printed directly unde
 - **Why:** without a runnable verify, the evidence duty can't be fulfilled — a Goldfish that can't deliver evidence later is wasted token budget; this should surface at session start, not at task end.
 - **Verification:** path/command comes from the calibration file (Step 3); existence check passed. If the script is missing → treat like F4 (STOP for write work, offer to create it).
 
-### Step 5b — Reload reminder (on detected staleness or a native update notification)
+### Step 5b — Explicit operator update reminder
 
-- **Requirement:** if case **F2** applies (Step 2 found staleness) OR the native `/plugin → Marketplaces` update notification appeared in this session, prompt the PO to run `/reload-plugins` — **BEFORE** the confirmation line (Step 6) is printed. The refresh alone (marketplace update + `plugin update … --scope project`) does not reload an already-running session; only `/reload-plugins` does (no hook can do this automatically for the running session).
+- **Requirement:** if Step 2 reports `updateRecommended:true` OR a native marketplace update notification appeared, notify the PO and offer the runner's explicit operator boundary before the confirmation line: Claude uses its marketplace/plugin update plus `/reload-plugins`; Codex uses `/plugins` then `/new`. The helper never updates, restarts, retargets, checks out, rebases, merges, or copies source.
 - **Why:** without this reminder a session silently keeps running on the old cache state even though the refresh was already offered/executed — the reload step is the missing last handgrip of the refresh ritual (§5.2, D2/ADR-0001 addendum 2026-07-11).
-- **Verification:** if F2 applies or the native notification appeared, a `/reload-plugins` prompt sentence is evidenced BEFORE the confirmation line (session transcript). If neither applies, this step is dropped outright — no extra text in the confirmation line itself (unchanged, → Step 6).
+- **Verification:** if an update is recommended or a native notification appeared, the applicable operator reminder is evidenced BEFORE the confirmation line. Only an exact security-policy match blocks; ordinary update availability remains advisory.
 
 ### Step 6 — Emit self-confirmation (format mandatory)
 
@@ -211,7 +200,7 @@ This step ends in a **third mandatory confirmation line** (printed directly unde
 
   Defined additions (only these, each appended with "·"):
   - on F3: "· Staleness unchecked (offline, cache state)"
-  - on accepted F2: "· NOTE: ruleset stale (\<n\> commits behind remote)"
+  - on an advisory update: "· NOTE: Pipeline update available (operator action recommended)"
   - on short bootstrap (same-day, §6.4): "· Staleness same-day cached (full check \<HH:MM\>)"
   - on speed bootstrap (§6.5): "· Profile speed — light bootstrap (details → §6.5)"; the extra lines for model/effort (§6.1) and role prohibitions (§6.1) are omitted here — they still apply unchanged in substance, they're just not repeated as separate lines on the speed path (ONE confirmation line instead of three).
   - on F4 (calibration and/or handover missing — the EXPECTED initial state in projects not yet migrated): the affected field carries the value "MISSING (F4)" instead of a placeholder — i.e. "Calibration MISSING (F4)" resp. "State MISSING (F4)" — PLUS the mandatory suffix "· F4: read-only analysis only until calibration/handover is created".
@@ -227,12 +216,14 @@ This step ends in a **third mandatory confirmation line** (printed directly unde
 | Case | Finding | Behavior (mandatory) |
 |---|---|---|
 | **F1** | **Ruleset completely missing** (plugin not installed, skills not findable) | **STOP.** Inform the PO. Only **minimal-safe mode** permitted (definition below). No confirmation line — the session counts as not bootstrapped. **Self-application special case:** in the Pipeline repo itself, the checkout IS the source — F1 here only means "plugin not installed": working with the checkout files remains allowed (ruleset + guardrails exist as files), installation via the committed self-binding (`.claude/settings.json`) resp. `claude --plugin-dir` (§5.2) is recommended. |
-| **F2** | **Plugin stale** (installed SHA ≠ remote HEAD) | Warn + offer the canonical scope-aware refresh ritual (D1, Project-Scope is the only supported install/update scope, → ADR-0001 addendum 2026-07-11): `claude plugin marketplace update agent-pipeline` → `claude plugin update pipeline-core@agent-pipeline --scope project` (the unscoped command fails with "not found," default scope is user; empirically observed) → then `/reload-plugins`. Continuing work is allowed, **except** the delta contains guardrail/hook changes (paths `hooks/`, `agents/`, permission specs) — then refresh first, then work. Verification for the delta: in the local checkout of the central repo, `git fetch` + `git log --name-only <installed>..origin/main`; if no checkout exists, default-safe applies: **when in doubt, refresh** (the refresh is cheap, the risk of stale guardrails is not). The confirmation line carries the NOTE addition. |
+| **F2** | Exact loaded-plugin `pipeline.ruleset-update-policy.v1` security entry matched | **STOP before confirmation.** Report the bound policy id/version/digest, exact matched entry, and public security reason; offer only the runner-specific operator update. Ordinary update availability, generic behind/diverged output, policy absence/mismatch, and feature drift are not F2 and never block repository writes. |
 | **F3** | **Offline / remote unreachable** | Warn + continue working with the cache state (the cache is a complete copy, everyday operation is offline-capable). Catch up the staleness check at the next connectivity (at the latest at the next bootstrap). The confirmation line carries the offline addition. |
 | **F4** | **Calibration or handover file missing** | **STOP for write work.** Offer to create it from the central template (templates live in the Pipeline repo/plugin). Read-only analysis remains allowed. **The confirmation line is still printed** (F4 is the expected initial state, not a bootstrap failure — unlike F1): affected field = "MISSING (F4)" + mandatory suffix, format in Step 6. Newly created files must be named to the PO for confirmation (new calibration = a project policy decision, not a unilateral agent act). |
 | **F5** | **Crash recovery** (traces of a not-cleanly-closed run: orphaned worktrees per `git worktree list`, open WIP/🟡 items, or in-flight dispatches per the handover, unresolved "to be filled in at close" telemetry placeholders) | **Report BEFORE starting work.** The bootstrap scans for worktree remnants and open WIP items while reading the handover (Step 4) and lists findings explicitly — never clean up silently, never pass over silently. The PO or the Elephant decides: clean up, continue, or log as an open item in the handover. Then normal bootstrap completion. |
 
-**Why F2 has the guardrail exception:** a stale ruleset with old hooks means the session works under **weaker protection rules than decided** — exactly the state the pipeline is meant to abolish. Feature/docs deltas can wait; protection deltas cannot.
+**Why F2 is exact:** only a reviewed, plugin-shipped security policy may
+elevate a named vulnerable loaded build. Marketplace movement alone is not a
+security classification or repository-write authority.
 
 **Minimal-safe mode (F1 only):**
 
@@ -338,6 +329,14 @@ The Elephant must additionally be able to speak to the session-lifecycle policy 
 
   > "Bootstrap check passed: ruleset \<SHA from assignment\> loaded · Project \<name\> · Calibration \<file|n/a\> · State n/a (Critic sees no history) · Role Critic"
 
+- **Closed role binding:** `agent: critic`, an active `critic-review` skill, or
+  dispatch metadata `Bootstrap role: critic` selects the compact Critic path
+  before preflight even when an adapter omitted the optional skill argument.
+  The Elephant default is permitted only without a role carrier. Critic
+  validates preflight identity but never executes onboarding or reads State,
+  handover, or history; contradictory role carriers stop before those reads.
+  `CRITIC-BOOTSTRAP-ROLE-CLOSED`.
+
 ### 6.4 Short bootstrap (same-day light bootstrap, Elephant)
 
 **Preconditions (ALL must hold, otherwise full bootstrap):**
@@ -394,10 +393,10 @@ The Elephant must additionally be able to speak to the session-lifecycle policy 
 ## 7. Open items
 
 - **PARTIALLY DONE:** the machine-readable source for the installed plugin SHA is verified on the main PC: `~/.claude/plugins/installed_plugins.json`, field `gitCommitSha` (details → Step 1). Naming the source in the `/pipeline-core:pipeline-start` skill has been backfilled. **Only the laptop cross-check remains OPEN** (two-machine validation, Sprint 1).
-- **DONE:** SessionStart hook wired up — `plugins/pipeline-core/hooks/staleness-check.mjs` (matcher `startup|resume|clear`, timeout 15s, fail-open, read-only) injects the bootstrap prompt line (anchoring 1) and, on staleness, the SHA finding (Step-2 substitution, see there); passed the T1 Critic path. Only the two-machine E2E remains open (laptop; Sprint 1).
-- **Decided:** mechanism and field sketch of the project calibration file are in `docs/operating-model.md` §8 (working name `.claude/pipeline.json`). **Schema format decided (shipped with the plugin):** JSON (`.claude/pipeline.json`); the `pipeline-start`/`close-block` skills read this format.
+- **DONE:** SessionStart hook wired up — `plugins/pipeline-core/hooks/staleness-check.mjs` (matcher `startup|resume|clear`, timeout 15s, fail-open, read-only) delegates to the channel-aware Pipeline-update helper and injects the bootstrap prompt plus visible `pipelineUpdateAvailability` channel/ref metadata alongside `repositoryFreshness=not-observed`; it never supplies repository write admission or performs an update.
+- **Decided:** mechanism and field sketch of the project calibration file are in `docs/operating-model.md` §8. **Schema format decided (shipped with the plugin):** JSON (`pipeline.json` at the resolved authority tier — `project/`, else the legacy `.claude/`); the `pipeline-start`/`close-block` skills read this format.
 - **Decided:** handover file canonicalized (convention `docs/state.md`), relationship to HISTORY fixed — → `docs/operating-model.md` §6 + ADR-0012. **OPEN (Phase 4):** only the handover template + the final template name per project remain.
-- **DONE:** the handover drift-check threshold (Step 4) calibrated — default "HEAD newer than handover AND ≥1 non-docs commit in the delta," per-project override via `$driftThreshold` in `.claude/pipeline.json`.
+- **DONE:** the handover drift-check threshold (Step 4) calibrated — default "HEAD newer than handover AND ≥1 non-docs commit in the delta," per-project override via `$driftThreshold` in the project calibration.
 - **⚠ UNCERTAIN:** whether `autoUpdate` on the `extraKnownMarketplaces` entry has any effect outside managed settings — hence this protocol relies on explicit refreshes; re-evaluate the ritual in §5 if the docs situation changes.
 
 <!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
@@ -455,32 +454,24 @@ Als Skill implementiert (Phase 3): **`/pipeline-core:pipeline-start`** (kanonisc
 2. **Eine Zeile in der Projekt-CLAUDE.md** („Führe zuerst `/pipeline-core:pipeline-start` aus") als advisory Fallback. Schlägt die Skill-Invokation fehl („unknown skill"), ist genau das der Nachweis von Fall **F1** (Regelwerk fehlt) — der Fallback detektiert also die Abwesenheit der Hauptschicht.
 3. Die **Bestätigungszeile** (Schritt 6) macht den Vollzug für den PO und für Hooks prüfbar.
 
-#### V3-Override für Advisor-Export (ADR-0040)
+#### V2-Override für den Advisor-Lifecycle (ADR-0047)
 
-Bei `pipeline.user.v3` wird `advisor_export` vor jeder Advisory-Aktion
-validiert. Fehlende Zustimmung und `consent: declined` sind gültige,
-akzeptierte Advisory-aus-Zustände: Der Bootstrap startet weder Adapter-Probe,
-Sandbox-Auswahl, Kind noch Export oder Receipt und darf mit `Advisory
-disabled-no-consent · Receipt n/a` abschließen. Der Read-only-Check
-`node setup.mjs` schreibt diese Entscheidung nie, sondern zeigt den exakten
-expliziten Befehl `node setup.mjs --configure-advisor-export`; dessen
-Offenlegung nennt die einzelne Frage und das allowlist-begrenzte
-Repository-Kandidatenmaterial und lehnt standardmäßig ab.
+Bei `pipeline.user.v3` wird `advisor_export` validiert, die eingefrorene
+V3-Route im Bootstrap aber nicht aufgerufen. Epic/Feature führt ausschließlich
+den lokalen `pipeline.advisory-capability-preflight.v2` aus; Mini und abgelehnte
+Zustimmung sind deaktiviert. Der Preflight hat keine Frage und exakt null
+Kindstarts, Modellrequests, Exporte, Receipts und Consultation-Budget. Er
+meldet `available|degraded|unavailable|disabled|unknown` mit ausdrücklicher
+Assurance.
 
-Mit `consent: approved` läuft für Epic/Feature ausschließlich die registrierte
-Same-Runner-Duty. Claude-Routing und Read/Grep/Glob bleiben unverändert. Codex
-erhält Read/Grep/Glob/Bash ausschließlich im exakt ausgewählten
-`network-open/read-only`-Transport; eine ungebundene Host-Shell bzw. ein
-ungebundener Consult ist kein Fallback. No-child, falsche Identität, fehlendes
-Profil-Readback oder unvollständige stdio-/Cleanup-Evidenz bleibt ohne
-doppelten Consult ein Nicht-Erfolg. Ein fehlendes konfiguriertes Werkzeug nennt
-den blockierten Claim und einen kopierbaren plattformgerechten Installbefehl,
-dessen Installer-Voraussetzungen geprüft oder im Befehl enthalten sind, sowie
-`installAttempted:false`; der Bootstrap führt ihn nie automatisch aus. npm ist
-kein Ersatz für Gitleaks, OSV-Scanner oder Semgrep. Standardmäßige lokale
-pipx-/Go-Binary-Verzeichnisse werden explizit erkannt; Probe-Scratch liegt in
-gebundenem temporärem Speicher und darf nicht als fehlende Installation
-fehlklassifiziert werden.
+Session-Start, Profilwahl, Restart, Resume, Re-entry, Compact, unverändertes
+Handover, konfigurierte Route und Zustimmung sind keine Consultation-Trigger.
+Eine echte Same-Runner-Consultation braucht genau eine konkrete Frage, einen
+erlaubten Grund, begrenzte Evidenz und einen aktuellen Digest-gebundenen
+`pipeline.advisory-demand.v2`. Identische Consultation-Records werden nicht
+wiederholt; materieller Drift bei Frage, Grund, Evidenz, Kandidat oder
+Route-Policy verlangt einen neuen Demand. ADR-0040 regelt weiterhin Consent
+und Tool-/Exportgrenzen.
 
 ### Schritt 1 — Plugin-Präsenz + geladenen Stand ermitteln
 
@@ -551,13 +542,13 @@ Dieser Schritt endet in einer **dritten verbindlichen Bestätigungszeile** (Deut
 
 > „Rollen-Verbote geladen: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — Implementierung nur per Goldfish-Dispatch (Stufe-0 per OM §3.3; weitere Ausnahmen nur durch den PO); PRD-Gate: lesbar vorlegen + auf ‚freigegeben' warten"
 
-### Schritt 2 — Staleness-Check gegen den Marketplace-Remote
+### Schritt 2 — Repository-Freshness und Pipeline-Update-Verfügbarkeit
 
-- **Gebot:** Führe `node plugins/pipeline-core/scripts/ruleset-freshness.mjs --repo "$PWD"` aus. Der Helper leitet das Remote aus der committeten `.claude/settings.json` ab, nutzt begrenzten Remote-Zugriff und ein wegwerfbares Bare-Repository und verändert keine Source-Refs/-Config. Consumer-Installationen verlangen Gleichheit. Im Agent-Pipeline-Self-Application-Checkout gilt `equal|ahead` als aktuell, `behind|diverged` als stale und `unknown` als ungeprüft. Unter Codex wird direkt die host-autorisierte network-open/read-only Befehlsgrenze verwendet, statt zuerst einen bekannten Sandbox-DNS-Fehler zu erzeugen.
-- **Hinweis (Mechanismus, nur bei STALE-Warnung des SessionStart-Hooks):** Meldet der SessionStart-Hook des Plugins in DIESER Session eine STALE-Warnung, die installierten SHA und Remote-SHA namentlich nennt, darf Schritt 2 dieses Ergebnis als gleichwertige Evidenz übernehmen statt `ls-remote` selbst erneut auszuführen. Die reale Hook-Ausgabe kennt sonst nur eine konstante Fresh-Pfad-Bootstrap-Zeile ohne SHAs — sie fällt identisch aus, ob die SHAs übereinstimmen oder der Hook mangels Auflösbarkeit fail-open ausgelöst hat, und taugt deshalb NICHT als Substitutionsnachweis. Liegt nur diese konstante Zeile vor oder fehlt jede Hook-Ausgabe, gilt Schritt 2 unverändert per eigenem `ls-remote`.
+- **Gebot:** Führe `node plugins/pipeline-core/scripts/ruleset-freshness.mjs --repo "$PWD"` aus. Trotz Kompatibilitäts-Dateiname liefert der Helper das getrennte geschlossene Ergebnis `pipeline.pipeline-update-availability.v1`: tatsächlich geladene Plugin-Version/Commit-Evidenz gegen den Marketplace-Default-Commit, mit `current|update-available|local-ahead|unknown`, `updateRecommended` und digest-gebundener Policy-Disposition. Gewöhnliche Marketplace-Drift ist nur beratende Metadaten und niemals Repository-Schreibautorität. Kompatibilitätsleser migrieren das alte Feld `pipeline.ruleset-freshness.v1.writePermitted` nur als Update-Metadatum und verwenden Repository-Freshness für gewöhnliche Schreibzulassung. Nur ein exakter Treffer in der vom geladenen Plugin gelieferten `pipeline.ruleset-update-policy.v1` darf blockieren; Policy-Abwesenheit/-Mismatch, generisches behind/diverged und Feature-Drift blockieren nicht. Der Helper verändert keine Refs/Config/Worktree.
+- **Hinweis:** Eine UPDATE-AVAILABLE-Warnung des SessionStart-Hooks ist eine nichtblockierende Benachrichtigung. Der Bootstrap-Helper bleibt für das geschlossene Update-Ergebnis und die exakte Security-Policy-Disposition zuständig.
 - **Warum:** Drittanbieter-Marketplaces auto-updaten nicht; ohne diesen Check ersetzt Zwei-Rechner-Cache-Drift die alte Copy-Paste-Drift.
-- **Prüfweise:** SHA-Gleichheit = aktuell. Abweichung = stale → Fall **F2**. Remote nicht erreichbar → Fall **F3**. Der Check braucht Netz + Credentials fürs private Repo (siehe §5).
-- **Arbeits-Repository (jedes beschreibbare governte Projekt, einschließlich Self-Application):** Führe `node "${CLAUDE_PLUGIN_ROOT}/scripts/repository-freshness.mjs"` aus (aus dem Quell-Checkout dieses Repos: `node plugins/pipeline-core/scripts/repository-freshness.mjs`). Das ist vom Marketplace-/Plugin-Freshness-Check getrennt. Der Helper fetcht nur in ein wegwerfbares Bare-Repository, nie in den Arbeits-Checkout. `equal` und `ahead` erlauben Schreiben; `behind`, `diverged`, `detached`, `no-upstream` und `unknown` stoppen Schreibarbeit/Dispatch, Read-only-Diagnose bleibt erlaubt. `unknown` (einschließlich Fetch-Fehler, Timeout, nicht auflösbarem Upstream oder unzureichender Shallow-Historie) wird niemals als frisch ausgegeben. Andere ungemergte Remote-Branches sind begrenzte Information und ändern nie den gewählten Branch.
+- **Prüfweise:** `update-available` empfiehlt eine Operator-Aktualisierung und blockiert nicht. Nur ein exakter blocking Policy-Treffer ist Fall **F2**. Nicht erreichbarer Remote ist F3-Update-Metadatum.
+- **Arbeits-Repository (jedes beschreibbare governte Projekt, einschließlich Self-Application):** Führe `node "${CLAUDE_PLUGIN_ROOT}/scripts/repository-freshness.mjs"` aus. Dieses getrennte `pipeline.repository-freshness.v0`-Ergebnis ist die einzige gewöhnliche Freshness-Autorität für Repository-Schreiben. Es vergleicht `HEAD` nur mit dem konfigurierten Upstream dieses Branches, nie mit dem Marketplace-Default-Branch. Damit bleibt `sprint_phoenix == origin/sprint_phoenix` auch bei abweichendem `main` gleich und schreibbar. Der Helper fetcht nur in ein wegwerfbares Bare-Repository, nie in den Arbeits-Checkout. `equal` und `ahead` erlauben Schreiben; `behind`, `diverged`, `detached`, `no-upstream` und `unknown` stoppen Schreibarbeit/Dispatch.
 - **Ehrlichkeitsgrenze:** Das ist ein Zeitpunkt-Protokollgate, kein atomarer Lock; der Remote kann direkt danach fortschreiten. Der Helper führt im Quell-Checkout weder Pull, Merge, Rebase, Checkout noch Config-/Ref-Schreibzugriffe aus. SessionStart-Kontext allein ist keine technisch unumgehbare Betriebssystem-Schreibsperre.
 
 ### Schritt 3 — Projekt-Kalibrierungsdatei lesen (Existenz-Check zuerst!)
@@ -580,11 +571,11 @@ Dieser Schritt endet in einer **dritten verbindlichen Bestätigungszeile** (Deut
 - **Warum:** Ohne lauffähiges verify ist die Evidenzpflicht nicht erfüllbar — ein Goldfish, der später nicht abgeben kann, ist verschwendetes Token-Budget; das soll am Sessionstart auffallen, nicht am Taskende.
 - **Prüfweise:** Pfad/Kommando stammt aus der Kalibrierungsdatei (Schritt 3); Existenz-Check bestanden. Fehlt das Skript → wie F4 behandeln (STOP für schreibende Arbeit, Anlage anbieten).
 
-### Schritt 5b — Reload-Reminder (bei erkannter Staleness oder nativer Update-Notification)
+### Schritt 5b — Expliziter Operator-Update-Reminder
 
-- **Gebot:** Liegt Fall **F2** vor (Schritt 2 hat Staleness festgestellt) ODER ist in dieser Session die native `/plugin → Marketplaces`-Update-Notification erschienen, fordere den PO auf, `/reload-plugins` auszuführen — **BEVOR** die Bestätigungszeile (Schritt 6) gedruckt wird. Der Refresh (Marketplace-Update + `plugin update … --scope project`) allein lädt eine bereits laufende Session nicht neu; erst `/reload-plugins` tut das (kein Hook kann das für die laufende Session automatisch erledigen).
+- **Gebot:** Meldet Schritt 2 `updateRecommended:true` ODER erschien eine native Update-Notification, informiere den PO vor der Bestätigungszeile und biete die echte Operator-Grenze an: Claude nutzt Marketplace-/Plugin-Update plus `/reload-plugins`; Codex `/plugins` plus `/new`. Der Helper aktualisiert oder startet nie automatisch neu und führt weder Retarget, Checkout, Rebase, Merge noch Source-Kopie aus.
 - **Warum:** Ohne diesen Reminder bleibt eine Session unbemerkt auf dem alten Cache-Stand weiterlaufen, obwohl der Refresh bereits angeboten/ausgeführt wurde — der Reload-Schritt ist der fehlende letzte Handgriff des Refresh-Rituals (§5.2, D2/ADR-0001-Nachtrag 2026-07-11).
-- **Prüfweise:** Trifft F2 zu oder erschien die native Notification, ist ein `/reload-plugins`-Aufforderungssatz VOR der Bestätigungszeile nachweisbar (Session-Verlauf). Trifft keiner der beiden Fälle zu, entfällt dieser Schritt ersatzlos — kein Zusatztext in der Bestätigungszeile selbst (die bleibt unverändert, → Schritt 6).
+- **Prüfweise:** Bei empfohlener Aktualisierung oder nativer Notification ist der passende Operator-Reminder vor der Bestätigungszeile nachweisbar. Nur ein exakter Security-Policy-Treffer blockiert.
 
 ### Schritt 6 — Selbstbestätigung ausgeben (Format verbindlich)
 
@@ -594,7 +585,7 @@ Dieser Schritt endet in einer **dritten verbindlichen Bestätigungszeile** (Deut
 
   Definierte Zusätze (nur diese, jeweils angehängt mit „·"):
   - bei F3: „· Staleness ungeprüft (offline, Cache-Stand)"
-  - bei akzeptiertem F2: „· HINWEIS: Regelwerk stale (\<n\> Commits hinter Remote)"
+  - bei beratendem Update: „· HINWEIS: Pipeline-Update verfügbar (Operator-Aktion empfohlen)"
   - bei Kurz-Bootstrap (same-day, §6.4): „· Staleness same-day gecacht (voller Check \<HH:MM\>)"
   - bei Speed-Bootstrap (§6.5): „· Profil speed — Leicht-Bootstrap (Details → §6.5)"; die Zusatzzeilen für Modell/Effort (§6.1) und Rollen-Verbote (§6.1) entfallen dabei — sie gelten inhaltlich unverändert weiter, werden im Speed-Pfad nur nicht als eigene Zeilen wiederholt (EINE Bestätigungszeile statt drei).
   - bei F4 (Kalibrierung und/oder Handover fehlt — der ERWARTETE Erstzustand in noch nicht migrierten Projekten): das betroffene Feld trägt statt eines Platzhalters den Wert „FEHLT (F4)" — also „Kalibrierung FEHLT (F4)" bzw. „Stand FEHLT (F4)" —, PLUS Pflicht-Suffix „· F4: nur Read-only-Analyse bis Kalibrierung/Handover angelegt".
@@ -610,12 +601,14 @@ Dieser Schritt endet in einer **dritten verbindlichen Bestätigungszeile** (Deut
 | Fall | Befund | Verhalten (verbindlich) |
 |---|---|---|
 | **F1** | **Regelwerk fehlt komplett** (Plugin nicht installiert, Skills nicht auffindbar) | **STOP.** Den PO informieren. Nur **Minimal-Safe-Mode** erlaubt (Definition unten). Keine Bestätigungszeile — die Session gilt als nicht gebootstrapped. **Selbstanwendungs-Sonderfall:** Im Pipeline-Repo selbst ist der Checkout die Quelle — F1 bedeutet hier nur „Plugin nicht installiert": Arbeit mit den Checkout-Dateien bleibt erlaubt (Regelwerk + Guardrails liegen als Dateien vor), Installation über die committete Selbst-Bindung (`.claude/settings.json`) bzw. `claude --plugin-dir` (§5.2) wird empfohlen. |
-| **F2** | **Plugin stale** (installierter SHA ≠ Remote-HEAD) | Warnen + das kanonische scope-bewusste Refresh-Ritual anbieten (D1, Project-Scope ist der einzige unterstützte Install-/Update-Scope, → ADR-0001-Nachtrag 2026-07-11): `claude plugin marketplace update agent-pipeline` → `claude plugin update pipeline-core@agent-pipeline --scope project` (das unscoped Kommando schlägt mit „not found" fehl, Default-Scope ist user; empirisch beobachtet) → danach `/reload-plugins`. Weiterarbeit erlaubt, **außer** das Delta enthält Guardrail-/Hook-Änderungen (Pfade `hooks/`, `agents/`, Permission-Vorgaben) — dann erst Refresh, dann Arbeit. Prüfweise fürs Delta: im lokalen Checkout des zentralen Repos `git fetch` + `git log --name-only <installiert>..origin/main`; ist kein Checkout vorhanden, gilt Default-Safe: **im Zweifel refreshen** (der Refresh ist billig, das Risiko veralteter Guardrails nicht). Bestätigungszeile trägt den HINWEIS-Zusatz. |
+| **F2** | Exakter Security-Eintrag der geladenen `pipeline.ruleset-update-policy.v1` trifft | **STOP vor Bestätigung.** Gebundene Policy-ID/-Version/-Digest, exakten Eintrag und öffentlichen Security-Grund melden; nur das runnerspezifische Operator-Update anbieten. Gewöhnliche Update-Verfügbarkeit, generisches behind/diverged, Policy-Abwesenheit/-Mismatch und Feature-Drift sind nicht F2 und blockieren Repository-Schreiben nie. |
 | **F3** | **Offline / Remote nicht erreichbar** | Warnen + mit Cache-Stand weiterarbeiten (der Cache ist eine vollständige Kopie, Alltagsbetrieb ist offline-fähig). Staleness-Check bei nächster Konnektivität **nachholen** (spätestens beim nächsten Bootstrap). Bestätigungszeile trägt den Offline-Zusatz. |
 | **F4** | **Kalibrierungs- oder Handover-Datei fehlt** | **STOP für schreibende Arbeit.** Anlage aus dem zentralen Template anbieten (Templates liegen im Pipeline-Repo/Plugin). Read-only-Analyse bleibt erlaubt. **Die Bestätigungszeile wird trotzdem gedruckt** (F4 ist der erwartete Erstzustand, kein Bootstrap-Versagen — anders als F1): betroffenes Feld = „FEHLT (F4)" + Pflicht-Suffix, Format in Schritt 6. Neu angelegte Dateien sind dem PO zur Bestätigung zu nennen (neue Kalibrierung = Projekt-Policy-Entscheidung, kein Agenten-Alleingang). |
 | **F5** | **Crash-Recovery** (Spuren eines nicht sauber geschlossenen Laufs: verwaiste Worktrees per `git worktree list`, offene WIP-/🟡-Vorgänge oder in-flight-Dispatches laut Handover, unaufgelöste „wird beim Close ergänzt"-Telemetrie-Platzhalter) | **Melden VOR Arbeitsbeginn.** Der Bootstrap scannt beim Handover-Lesen (Schritt 4) auf Worktree-Leichen und offene WIP-Vorgänge und listet Funde explizit — nie still aufräumen, nie still übergehen. Der PO bzw. der Elephant entscheidet: aufräumen, fortsetzen oder als offenen Punkt ins Handover. Danach normaler Bootstrap-Abschluss. |
 
-**Warum F2 die Guardrail-Ausnahme hat:** Ein stales Regelwerk mit alten Hooks bedeutet, dass die Session unter **schwächeren Schutzregeln arbeitet als beschlossen** — genau der Zustand, den die Pipeline abschaffen soll. Feature-/Doku-Deltas dürfen warten, Schutz-Deltas nicht.
+**Warum F2 exakt ist:** Nur eine geprüfte, Plugin-gelieferte Security-Policy
+darf einen benannten verwundbaren Loaded Build hochstufen. Marketplace-Bewegung
+allein ist weder Security-Klassifikation noch Repository-Schreibautorität.
 
 **Minimal-Safe-Mode (nur F1):**
 
@@ -780,7 +773,7 @@ Der Elephant muss außerdem zur Session-Lifecycle-Politik auskunftsfähig sein (
 ## 7. Offene Punkte
 
 - **TEILERLEDIGT:** Maschinenlesbare Quelle für den installierten Plugin-SHA ist auf dem Haupt-PC verifiziert: `~/.claude/plugins/installed_plugins.json`, Feld `gitCommitSha` (Details → Schritt 1). Die Quellen-Nennung im `/pipeline-core:pipeline-start`-Skill ist nachgezogen. **OFFEN bleibt nur die Laptop-Gegenprobe** (Zwei-Rechner-Validierung, Sprint 1).
-- **ERLEDIGT:** SessionStart-Hook verdrahtet — `plugins/pipeline-core/hooks/staleness-check.mjs` (Matcher `startup|resume|clear`, Timeout 15 s, fail-open, read-only) injiziert die Bootstrap-Aufforderungszeile (Verankerung 1) und bei Staleness den SHA-Befund (Schritt-2-Substitution, s. dort); T1-Critic-Pfad durchlaufen. Offen nur noch Zwei-Rechner-E2E (Laptop; Sprint 1).
+- **ERLEDIGT:** SessionStart-Hook verdrahtet — `plugins/pipeline-core/hooks/staleness-check.mjs` (Matcher `startup|resume|clear`, Timeout 15 s, fail-open, read-only) delegiert an den channel-aware Pipeline-Update-Helper und zeigt `pipelineUpdateAvailability` mit Channel/Ref getrennt von `repositoryFreshness=not-observed`; er entscheidet keine Schreibzulassung und führt kein Update aus.
 - **Entschieden:** Mechanismus und Feldskizze der Projekt-Kalibrierungsdatei stehen in docs/operating-model.md §8 (Arbeitsname `.claude/pipeline.json`). **Schema-Format entschieden (mit der Plugin-Lieferung):** JSON (`.claude/pipeline.json`); die Skills `pipeline-start`/`close-block` lesen dieses Format.
 - **Entschieden:** Handover-Datei kanonisch (Konvention `docs/state.md`), Verhältnis zu HISTORY festgeschrieben — → docs/operating-model.md §6 + ADR-0012. **OFFEN (Phase 4):** nur noch das Handover-Template + der endgültige Template-Name je Projekt.
 - **ERLEDIGT:** Schwellwert des Handover-Drift-Checks (Schritt 4) kalibriert — Default „HEAD neuer als Handover UND ≥1 Nicht-Doku-Commit im Delta", per-Projekt-Override via `$driftThreshold` in `.claude/pipeline.json`.

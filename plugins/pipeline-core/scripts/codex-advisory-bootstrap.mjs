@@ -1,15 +1,22 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 
-/** Closed bootstrap launcher: V3 opt-out authority -> one native Codex advisory. */
-import { createHash, randomUUID } from "node:crypto";
+/**
+ * Compatibility-named launcher for one concrete on-demand Codex consultation.
+ * Session bootstrap never invokes this command.
+ */
+import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { existsSync, lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 import { TextDecoder } from "node:util";
 
+import {
+  advisoryEvidenceBundleSha256,
+  buildAdvisoryEvidenceBundle,
+  createAdvisoryDemand,
+} from "../lib/advisory-lifecycle-v2.mjs";
 import { derivePoGateRepositoryFingerprint, resolvePoGateRepositoryTopology } from "../lib/po-gate-authority.mjs";
 import {
   ProjectOnboardingReadyError,
@@ -19,10 +26,10 @@ import { validatePipelineUserV3 } from "../lib/runner-profiles-v3.mjs";
 import { parseYaml } from "../lib/yaml-lite.mjs";
 import { resolveSystemExecutable } from "./tool-identity.mjs";
 import { runAdvisoryHostBridge } from "./advisory-host-bridge.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/;
-const USAGE = "usage: codex-advisory-bootstrap.mjs --profile <epic|feature> --dispatch-id <id> --queue-revision <n> --session-id <id> --expected-descriptor-sha256 <sha256> --receipt <path> [--reference <repo-relative-path>] < question.txt";
-const sha256 = (value) => createHash("sha256").update(value).digest("hex");
+const USAGE = "usage: codex-advisory-bootstrap.mjs --profile <epic|feature> --reason <trigger> --evidence-sha256 <sha256> --dispatch-id <id> --queue-revision <n> --session-id <id> --expected-descriptor-sha256 <sha256> --receipt <path> --reference <repo-relative-path> [--reference <repo-relative-path> ...] < question.txt";
 const UTF8 = new TextDecoder("utf-8", { fatal: true });
 
 async function readQuestionBytes(input) {
@@ -53,6 +60,8 @@ function parseArgs(argv) {
     if (next === undefined) throw new Error(USAGE);
     if (token === "--reference") value.references.push(next);
     else if (token === "--profile") value.profile = next;
+    else if (token === "--reason") value.reason = next;
+    else if (token === "--evidence-sha256") value.evidenceSha256 = next;
     else if (token === "--dispatch-id") value.dispatchId = next;
     else if (token === "--queue-revision") value.queueRevision = Number(next);
     else if (token === "--session-id") value.sessionId = next;
@@ -60,10 +69,12 @@ function parseArgs(argv) {
     else if (token === "--receipt") value.receipt = next;
     else throw new Error(USAGE);
   }
-  if (!["epic", "feature"].includes(value.profile) || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/.test(value.dispatchId ?? "")
+  if (!["epic", "feature"].includes(value.profile)
+    || !/^[a-z][a-z0-9-]{0,63}$/.test(value.reason ?? "") || !SHA256.test(value.evidenceSha256 ?? "")
+    || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/.test(value.dispatchId ?? "")
     || !Number.isSafeInteger(value.queueRevision) || value.queueRevision < 0
     || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/.test(value.sessionId ?? "") || !SHA256.test(value.descriptorSha256 ?? "")
-    || typeof value.receipt !== "string" || value.receipt.length === 0
+    || typeof value.receipt !== "string" || value.receipt.length === 0 || value.references.length === 0
     || value.references.some((entry) => typeof entry !== "string" || entry.startsWith("/") || entry.split("/").some((part) => !part || part === "." || part === ".."))) throw new Error(USAGE);
   return value;
 }
@@ -74,12 +85,16 @@ export async function runCodexAdvisoryBootstrap(argv = process.argv.slice(2), de
   (dependencies.requireProjectOnboardingReadyFn ?? requireProjectOnboardingReady)({
     rootDir: repoRoot,
     intent: "dispatch",
+    runner: "codex",
   });
   const source = parseYaml(readFileSync(join(repoRoot, "pipeline.user.yaml"), "utf8"));
   const authority = validatePipelineUserV3(source, { source: "pipeline.user.yaml" });
   if (!authority.ok || authority.advisoryExport?.consent === "declined") throw new Error("pipeline.user.v3 advisor_export is explicitly declined");
   const topology = (dependencies.resolveTopologyFn ?? resolvePoGateRepositoryTopology)(repoRoot);
   const repoFingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: topology.gitCommonDir, primaryRoot: topology.primaryRoot });
+  const evidenceBundle = buildAdvisoryEvidenceBundle(repoRoot, args.references);
+  const evidenceSha256 = advisoryEvidenceBundleSha256(evidenceBundle);
+  if (evidenceSha256 !== args.evidenceSha256) throw new Error("advisory evidence digest does not match the physical allowlisted bundle");
   const questionBytes = await (dependencies.readQuestionBytesFn ?? readQuestionBytes)(process.stdin);
   const question = decodeQuestion(questionBytes);
   const resolveExecutable = dependencies.resolveExecutableFn ?? resolveSystemExecutable;
@@ -97,14 +112,26 @@ export async function runCodexAdvisoryBootstrap(argv = process.argv.slice(2), de
   const temp = realpathSync((dependencies.mkdtempFn ?? mkdtempSync)(join(tmpdir(), "pipeline-codex-advisory-")));
   const inputPath = join(temp, `${randomUUID()}.json`);
   try {
+    const dispatch = { dispatchId: args.dispatchId, queueRevision: args.queueRevision, candidateCommit, candidateTree };
+    const demand = createAdvisoryDemand({
+      runner: "codex",
+      profile: args.profile,
+      reason: args.reason,
+      question,
+      evidenceSha256,
+      dispatch,
+    });
+    if (!demand.ok) throw new Error(demand.code);
     const input = {
       profile: args.profile,
       runner: "codex",
       question,
-      dispatch: { dispatchId: args.dispatchId, queueRevision: args.queueRevision, candidateCommit, candidateTree },
-      references: [...args.references],
+      dispatch,
+      demand: demand.demand,
+      references: evidenceBundle.references.map(({ path }) => path),
+      evidenceBundle,
       advisorExport: source.advisor_export ?? { consent: "default" },
-      sandboxContext: { repoFingerprint, referenceSetSha256: sha256(JSON.stringify([...new Set(args.references)].sort())) },
+      sandboxContext: { repoFingerprint, referenceSetSha256: evidenceSha256 },
       sandboxRuntime: { schema: "pipeline.codex-sandbox-runtime.v1", repoRoot, codexPath, observedHelperPath, sessionCleanup: { sessionId: args.sessionId, descriptorSha256: args.descriptorSha256 } },
     };
     writeFileSync(inputPath, JSON.stringify(input), { flag: "wx", mode: 0o600 });
@@ -112,7 +139,7 @@ export async function runCodexAdvisoryBootstrap(argv = process.argv.slice(2), de
   } finally { rmSync(temp, { recursive: true, force: true }); }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectInvocation(import.meta.url)) {
   runCodexAdvisoryBootstrap().then((code) => { process.exitCode = code; }, (error) => {
     const detail = error instanceof ProjectOnboardingReadyError
       ? `${error.code}: project onboarding readiness denied advisory dispatch`

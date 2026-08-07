@@ -9,15 +9,14 @@
  * Hermetics: every spawn sets CLAUDE_PROJECT_DIR to a fresh temp dir so this machine's
  * real .claude/pipeline.yaml / pipeline-state.json can never leak into these cases.
  */
-import { execFileSync, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { appendHumanGovernanceDecision } from "../lib/human-governance-ledger.mjs";
-import { canonicalSha256, canonicalizeJson } from "../lib/governance-event.mjs";
-import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
-import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
+
+import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
 
 const GUARD = fileURLToPath(new URL("./guard-devplan.mjs", import.meta.url));
 
@@ -35,13 +34,13 @@ function writeState(dir, obj) {
   mkdirSync(join(dir, ".claude"), { recursive: true });
   writeFileSync(join(dir, ".claude", "pipeline-state.json"), typeof obj === "string" ? obj : JSON.stringify(obj));
 }
-function writeNeutralManifest(dir, yamlText) {
-  mkdirSync(join(dir, "project"), { recursive: true });
-  writeFileSync(join(dir, "project", "pipeline.yaml"), yamlText);
+function sha256(bytes) {
+  return createHash("sha256").update(bytes).digest("hex");
 }
-function writeNeutralState(dir, obj) {
-  mkdirSync(join(dir, "project"), { recursive: true });
-  writeFileSync(join(dir, "project", "pipeline-state.json"), typeof obj === "string" ? obj : JSON.stringify(obj));
+function writeAuthorityDocs(dir) {
+  mkdirSync(join(dir, "specs", "feature"), { recursive: true });
+  writeFileSync(join(dir, AUTHORITY_PLAN_PATH), AUTHORITY_PLAN_BYTES);
+  writeFileSync(join(dir, AUTHORITY_SPEC_PATH), AUTHORITY_SPEC_BYTES);
 }
 
 function runGuard(toolName, filePath, projectDir) {
@@ -84,16 +83,57 @@ const MANIFEST_CUSTOM_EXEMPT =
 const MANIFEST_SYNTAX_BROKEN = "schema: pipeline.manifest.v0\ngates:\n  dev-plan: &anchor\n    mode: blocking\n";
 
 const PLAN_PATH = ".claude/plans/2026-07-07-ap1-pipeline-tuning.md";
+const AUTHORITY_PLAN_PATH = "specs/feature/prd.md";
+const AUTHORITY_SPEC_PATH = "specs/feature/spec.md";
+const AUTHORITY_PLAN_BYTES = "# PRD\n";
+const AUTHORITY_SPEC_BYTES = "# Spec\n";
+const PLAN_SUBMISSION = {
+  schema: "pipeline.plan-submission.v1",
+  featureId: "authority-feature",
+  planPath: AUTHORITY_PLAN_PATH,
+  planSha256: sha256(AUTHORITY_PLAN_BYTES),
+  specPath: AUTHORITY_SPEC_PATH,
+  specSha256: sha256(AUTHORITY_SPEC_BYTES),
+  profile: "feature",
+  profileSha256: "3".repeat(64),
+  submittedBy: "Coordinator",
+  submittedAt: "2026-07-31T14:00:00.000Z",
+};
+const AWAITING_AUTHORITY_STATE = {
+  schema: "pipeline.state.v0",
+  activeFeature: { id: "authority-feature", planPath: AUTHORITY_PLAN_PATH, phase: "design" },
+  planApproved: false,
+  planSubmission: PLAN_SUBMISSION,
+};
+const DRAFT_AUTHORITY_STATE = {
+  ...AWAITING_AUTHORITY_STATE,
+  planInvalidation: {
+    schema: "pipeline.plan-invalidation.v1",
+    featureId: "authority-feature",
+    invalidatedSubmissionSha256: sha256CanonicalJson(PLAN_SUBMISSION),
+    invalidatedApprovalSha256: null,
+    invalidatedBy: "PO",
+    invalidatedAt: "2026-07-31T14:05:00.000Z",
+    reason: "reopen-design",
+  },
+};
 // NOTE: no top-level `phase` field here -- `phase` lives
 // EXCLUSIVELY inside `activeFeature.phase` (via pipeline-state.mjs `set-phase`); a
 // top-level `phase` key was a legacy leftover this hook has never read and would have
 // silently masked a schema drift.
 const UNAPPROVED_STATE = {
   schema: "pipeline.state.v0",
-  activeFeature: { id: "ap1-pipeline-tuning", planPath: PLAN_PATH },
+  activeFeature: { id: "ap1-pipeline-tuning", planPath: PLAN_PATH, phase: "design" },
   planApproved: false,
 };
-const APPROVED_STATE = { ...UNAPPROVED_STATE, planApproved: true };
+const APPROVED_STATE = {
+  ...UNAPPROVED_STATE,
+  planApproved: true,
+  planApproval: {
+    approvedBy: "PO",
+    approvedAt: "2026-07-30T20:00:00.000Z",
+  },
+};
 const NO_FEATURE_STATE = { schema: "pipeline.state.v0" };
 
 // ---- DP01 no manifest at all -> allow --------------------------------------------------
@@ -132,14 +172,22 @@ const NO_FEATURE_STATE = { schema: "pipeline.state.v0" };
   check("DP05 allow  no activeFeature in state", "Edit", "src/foo.ts", ALLOW, { projectDir: dir, stderrEmpty: true });
 }
 
-// ---- DP06 mutable legacy planApproved must not become authority --------------------------
+// ---- DP06 approval alone stays design-gated; implementation phase admits edits ----------
 {
   const dir = freshDir("approved");
   writeManifest(dir, MANIFEST_BLOCKING);
   writeState(dir, APPROVED_STATE);
-  check("DP06 block  legacy planApproved true without ledger decision", "Edit", "src/foo.ts", BLOCK, {
+  check("DP06 block approved design before explicit implementation phase", "Edit", "src/foo.ts", BLOCK, {
     projectDir: dir,
-    stderrIncludes: ["ledger-backed plan approval"],
+    stderrIncludes: ["approved", "set-phase"],
+  });
+  writeState(dir, {
+    ...APPROVED_STATE,
+    activeFeature: { ...APPROVED_STATE.activeFeature, phase: "implementation" },
+  });
+  check("DP06b allow exact approved implementation", "Edit", "src/foo.ts", ALLOW, {
+    projectDir: dir,
+    stderrEmpty: true,
   });
 }
 
@@ -367,98 +415,39 @@ const NO_FEATURE_STATE = { schema: "pipeline.state.v0" };
   });
 }
 
-// ---- DP25 neutral State authority remains enforced after legacy State retirement --------
-// The production migration retains the manifest compatibility projection but removes
-// `.claude/pipeline-state.json`. The guard must resolve and enforce the neutral State,
-// rather than treating the missing legacy path as "no active feature".
+// ---- DP25 exact PRD/Spec authority is editable only in draft ----------------------------
 {
-  const dir = freshDir("neutral-state-authority");
+  const dir = freshDir("draft-authority");
   writeManifest(dir, MANIFEST_BLOCKING);
-  writeNeutralManifest(dir, MANIFEST_BLOCKING);
-  writeNeutralState(dir, UNAPPROVED_STATE);
-  check("DP25 block  unapproved neutral State without legacy State", "Edit", "src/foo.ts", BLOCK, {
+  writeAuthorityDocs(dir);
+  writeState(dir, DRAFT_AUTHORITY_STATE);
+  check("DP25 allow  draft exact PRD authority", "Edit", AUTHORITY_PLAN_PATH, ALLOW, {
     projectDir: dir,
-    stderrIncludes: ["ap1-pipeline-tuning", "guard-devplan"],
+    stderrEmpty: true,
+  });
+  check("DP25b allow  draft exact Spec authority", "Edit", AUTHORITY_SPEC_PATH, ALLOW, {
+    projectDir: dir,
+    stderrEmpty: true,
+  });
+  check("DP25c block  draft implementation path remains gated", "Edit", "src/implementation.mjs", BLOCK, {
+    projectDir: dir,
+    stderrIncludes: ["authority-feature", "draft"],
   });
 }
 
-// ---- DP26 v3 state must still resolve its exact ledger decision -------------------------
-function humanRegistry(fingerprint) {
-  return {
-    schema: "pipeline.governance-stream-registry.v1",
-    repositoryFingerprint: fingerprint,
-    canonicalization: "RFC8785",
-    digestAlgorithm: "sha-256",
-    eventDigestDomain: "pipeline.governance-event.v1\0",
-    storageRoot: "governance/events",
-    streams: [
-      { streamId: "human", origin: "human", authorityClass: "human-authority", relativeRoot: "human", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
-      { streamId: "agent", origin: "agent", authorityClass: "non-authoritative", relativeRoot: "agent", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
-      { streamId: "lifecycle", origin: "lifecycle", authorityClass: "non-authoritative", relativeRoot: "lifecycle", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
-    ],
-  };
-}
-function humanCapturePolicy() {
-  return {
-    schema: "pipeline.governance-capture-policy.v1",
-    policyId: "guard-devplan-fixture",
-    revision: "d".repeat(64),
-    defaultAction: "deny",
-    streams: [
-      { origin: "human", purpose: "authority-history", materiality: "required", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
-      { origin: "agent", purpose: "declared-assumption", materiality: "policy-selected", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
-      { origin: "lifecycle", purpose: "deterministic-lifecycle", materiality: "required", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
-    ],
-    sanitizedReceipt: { allowEventId: true, allowEventDigest: true, allowCheckpoint: true, allowReasonText: false },
-  };
-}
-async function ledgerBackedState(dir) {
-  execFileSync("git", ["init", "-q", dir]);
-  const planPath = "specs/ap1/plan.md";
-  const repository = discoverRepository(dir);
-  const fingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: repository.commonDir, primaryRoot: repository.primaryRoot });
-  const policy = humanCapturePolicy();
-  mkdirSync(join(dir, "governance", "events"), { recursive: true });
-  writeFileSync(join(dir, "governance", "events", "registry.json"), `${canonicalizeJson(humanRegistry(fingerprint))}\n`);
-  writeFileSync(join(dir, "governance", "events", "capture-policy.json"), `${canonicalizeJson(policy)}\n`);
-  const candidate = { commit: "b".repeat(40), tree: "c".repeat(40) };
-  const authority = {
-    schema: "pipeline.po-gate-authority.v2", humanFacing: "en", sourceSha256: "1".repeat(64), runtimeSha256: "2".repeat(64), receiptSha256: "3".repeat(64), repositoryFingerprint: fingerprint,
-    planPath, planSha256: "4".repeat(64), specPath: "specs/ap1/spec.md", specSha256: "5".repeat(64),
-  };
-  const decision = {
-    decisionId: "grant-devplan-1", event: "granted", outcome: "granted", authorityClass: "product-owner", identityAssurance: "locally-attributed", timeAssurance: "locally-observed",
-    scope: { repositoryFingerprint: fingerprint, candidate, packageId: "ap1-pipeline-tuning", action: "APPROVE_PLAN", environment: "local", artifacts: [{ path: authority.planPath, sha256: authority.planSha256 }, { path: authority.specPath, sha256: authority.specSha256 }] },
-    reasonCode: "APPROVED", policyDigest: "6".repeat(64), ruleDigest: "7".repeat(64), validity: { notBeforeEpochMs: 1, expiresAtEpochMs: 2_000_000_000_000, singleUse: true },
-    links: { requestDecisionId: "request-devplan-1", consumesDecisionId: null, revokesDecisionId: null, expiresDecisionId: null, supersedesDecisionId: null, correctsDecisionId: null },
-  };
-  const receipt = await appendHumanGovernanceDecision({
-    repositoryRoot: dir,
-    repositoryFingerprint: fingerprint,
-    intent: {
-      schema: "pipeline.governance-event-envelope.v1", payloadSchema: "pipeline.human-governance-decision.v1", canonicalization: "RFC8785", digestAlgorithm: "sha-256", eventId: "human-devplan-event-1", idempotencyKey: "human-devplan-idempotency-1", origin: "human", authorityClass: "human-authority", eventType: "human.granted", occurredAtEpochMs: 2, observedAtEpochMs: 2, timeAssurance: "locally-observed", repositoryFingerprint: fingerprint, sourceUri: `urn:pipeline:repository:${fingerprint}`, streamId: "human", correlation: { featureId: { state: "not-applicable" }, packageId: { state: "not-applicable" }, requestId: { state: "not-applicable" }, sessionId: { state: "not-applicable" }, dispatchId: { state: "not-applicable" }, traceId: { state: "not-applicable" } }, candidate, artifacts: [{ state: "not-applicable" }], policy: { policyDigest: { state: "not-applicable" }, configurationDigest: { state: "not-applicable" }, capturePolicyDigest: canonicalSha256(policy), redactionPolicyDigest: { state: "not-applicable" } }, classification: "repository-public-safe", storageProfile: "repository-public-safe", retentionCompatibility: "repository-retained", disclosureClass: "repository-visible", payload: decision,
-    },
-  });
-  return {
-    schema: "pipeline.state.v0", activeFeature: { id: "ap1-pipeline-tuning", planPath, phase: "implementation" }, planApproved: true,
-    planApproval: { schema: "pipeline.plan-approval.v3", approvedBy: "PO", approvedAt: "2026-08-02T00:00:00.000Z", specBoundBy: "PO", specBoundAt: "2026-08-02T00:00:00.000Z", poGateAuthority: authority, humanDecision: { schema: "pipeline.human-decision-reference.v1", decisionId: decision.decisionId, decisionDigest: canonicalSha256(decision), candidate, checkpoint: receipt.checkpoint } },
-  };
-}
+// ---- DP26 submitted PRD/Spec authority remains immutable while awaiting approval --------
 {
-  const dir = freshDir("ledger-approved");
+  const dir = freshDir("awaiting-authority");
   writeManifest(dir, MANIFEST_BLOCKING);
-  writeState(dir, await ledgerBackedState(dir));
-  check("DP26 allow  v3 plan approval resolves exact ledger decision", "Edit", "src/foo.ts", ALLOW, { projectDir: dir, stderrEmpty: true });
-}
-{
-  const dir = freshDir("ledger-checkpoint-drift");
-  writeManifest(dir, MANIFEST_BLOCKING);
-  const state = structuredClone(await ledgerBackedState(dir));
-  state.planApproval.humanDecision.checkpoint.eventDigest = "f".repeat(64);
-  writeState(dir, state);
-  check("DP27 block  v3 decision checkpoint drift cannot authorize", "Edit", "src/foo.ts", BLOCK, {
+  writeAuthorityDocs(dir);
+  writeState(dir, AWAITING_AUTHORITY_STATE);
+  check("DP26 block  awaiting-approval exact PRD authority", "Edit", AUTHORITY_PLAN_PATH, BLOCK, {
     projectDir: dir,
-    stderrIncludes: ["ledger-backed plan approval"],
+    stderrIncludes: ["awaiting-approval", "immutable"],
+  });
+  check("DP26b block  awaiting-approval exact Spec authority", "Edit", AUTHORITY_SPEC_PATH, BLOCK, {
+    projectDir: dir,
+    stderrIncludes: ["awaiting-approval", "immutable"],
   });
 }
 

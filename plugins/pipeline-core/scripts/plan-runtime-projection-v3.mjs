@@ -4,7 +4,6 @@
 /** Read-only CLI for the V3 runtime projection planner. */
 import { readFileSync } from "node:fs";
 import { extname, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 
 import {
   planRuntimeProjectionV3,
@@ -12,6 +11,7 @@ import {
 } from "../lib/runtime-projection-v3.mjs";
 import { validatePipelineUserV3 } from "../lib/runner-profiles-v3.mjs";
 import { parseYaml } from "../lib/yaml-lite.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const PLAN_SCHEMA = "pipeline.runtime-projection-plan.v3";
 
@@ -107,4 +107,4 @@ export function main(args = process.argv.slice(2), { write = process.stdout.writ
   return plan.status === "ready" ? 0 : 1;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) process.exit(main());
+if (isDirectInvocation(import.meta.url)) process.exit(main());

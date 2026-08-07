@@ -1,6 +1,6 @@
 ---
 name: consult-advisor
-description: "Consent-gated fresh read-only advisor. Codex uses the selected-sandbox Sol route with Read/Grep/Glob/Bash; Claude retains the registered Read/Grep/Glob consult fallback. Exactly one question, fresh context, no memory, mutation, gate decision or auto-application."
+description: "Demand- and consent-gated fresh read-only advisor. Codex uses the selected-sandbox Sol route with Read/Grep/Glob/Bash; Claude retains the registered Read/Grep/Glob consult fallback. Exactly one concrete question/reason, fresh context, no bootstrap invocation, memory, mutation, gate decision or auto-application."
 effort: max
 maxTurns: 10
 tools: Read, Grep, Glob
@@ -18,6 +18,10 @@ The complete execution and receipt contract lives in
 
 ## Contract
 
+- Start only after the coordinator validates the current
+  `pipeline.advisory-demand.v2`. Session start, resume, re-entry and Compact
+  never dispatch this agent, and an unchanged reuse key never dispatches it
+  twice.
 - Begin from a fresh context. Do not request or consume chat history, a
   handover, implementor rationale, inherited memory, or a previous consult.
 - Answer exactly **one** supplied question from repository inspection. Claude

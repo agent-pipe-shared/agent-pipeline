@@ -2,7 +2,7 @@
 ═══════════════════════════════════════════════════════════════════════════
 TEMPLATE: Project Handover (`docs/state.md`) — Agent-Pipeline v0.1.0-draft
 Source of truth: ADR-0012 (handover canonicalization). This file is the
-central per-project handover template referenced by `.claude/pipeline.json`
+central per-project handover template referenced by the project calibration
 → `handover` (default `docs/state.md`).
 Language: this TEMPLATE is English (agent-facing, ADR-0011 — templates/ is
 listed as agent-facing). Every INSTANCE (a project's actual `docs/state.md`)
@@ -16,7 +16,7 @@ do not swap languages mid-project.
 
 USAGE
 1. Copy this file to `docs/state.md` in the target project repo (path fixed
-   by ADR-0012 and by the project's `.claude/pipeline.json` → `handover`
+   by ADR-0012 and by the project's calibration → `handover`
    field; do not rename or relocate without updating both).
 2. Replace every {{PLACEHOLDER}}, delete this comment block.
 3. This file is the ONLY canonical stand-source (ADR-0012). HISTORY.md stays
@@ -41,7 +41,7 @@ HARD RULES (checkable)
   WIP limit — until the PO verifies; live-deploy still needs separate
   sign-off per the global rule, merging code is not the same as shipping
   it live). The anchor's FORM depends on the project's `branchModel`
-  (`.claude/pipeline.json`):
+  (the project calibration):
     - `branchModel: direct-push+staging` (fast-forward only, no merge
       commit): a pushed TAG `rollback/<date>-<block>` on the pre-ff `main`
       SHA.

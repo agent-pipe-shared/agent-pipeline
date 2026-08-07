@@ -104,6 +104,30 @@ check("configured non-origin upstream is honored", () => {
   expect(result.status === "equal" && result.upstream === "mirror/main", `status/upstream=${result.status}/${result.upstream}`);
 });
 
+check("Phoenix branch equality follows only origin/sprint_phoenix while marketplace-shaped main differs", () => {
+  const { root, remote, seed, checkout } = fixture("phoenix-upstream");
+  git(seed, "checkout", "-q", "-b", "sprint_phoenix");
+  commit(seed, "phoenix");
+  git(seed, "push", "-q", "-u", "origin", "sprint_phoenix");
+  git(checkout, "fetch", "-q", "origin", "sprint_phoenix");
+  git(checkout, "checkout", "-q", "-b", "sprint_phoenix", "origin/sprint_phoenix");
+
+  const publisher = join(root, "publisher");
+  git(root, "clone", "-q", "-b", "main", remote, publisher);
+  configure(publisher);
+  commit(publisher, "main-moved");
+  git(publisher, "push", "-q", "origin", "main");
+
+  const before = snapshot(checkout);
+  const result = inspectRepositoryFreshness(checkout).result;
+  expect(result.status === "equal", `status=${result.status}`);
+  expect(result.branch === "sprint_phoenix" && result.upstream === "origin/sprint_phoenix",
+    `branch/upstream=${result.branch}/${result.upstream}`);
+  expect(result.ahead === 0 && result.behind === 0, "Phoenix counts must be 0/0");
+  expect(result.otherUnmergedRemoteBranches.includes("main"), "differing main should remain bounded metadata");
+  expect(JSON.stringify(snapshot(checkout)) === JSON.stringify(before), "Phoenix checkout changed");
+});
+
 check("ahead is writable and counted", () => {
   const { checkout } = fixture("ahead");
   commit(checkout, "local");

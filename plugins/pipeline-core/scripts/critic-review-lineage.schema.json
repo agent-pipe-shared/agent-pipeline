@@ -1,0 +1,684 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.critic-review-lineage.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "reviewId",
+    "parentReviewId",
+    "candidate",
+    "diff",
+    "references",
+    "packages",
+    "coverage",
+    "request",
+    "lane",
+    "verdict",
+    "findings",
+    "correction",
+    "invalidation",
+    "course",
+    "previousSha256",
+    "recordSha256"
+  ],
+  "properties": {
+    "schema": {"const": "pipeline.critic-review-lineage.v1"},
+    "reviewId": {"$ref": "#/$defs/id"},
+    "parentReviewId": {
+      "anyOf": [
+        {"$ref": "#/$defs/id"},
+        {"type": "null"}
+      ]
+    },
+    "candidate": {"$ref": "#/$defs/candidate"},
+    "diff": {"$ref": "#/$defs/diff"},
+    "references": {"$ref": "#/$defs/references"},
+    "packages": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/package"}
+    },
+    "coverage": {"$ref": "#/$defs/coverage"},
+    "request": {"$ref": "#/$defs/request"},
+    "lane": {"$ref": "#/$defs/lane"},
+    "verdict": {"$ref": "#/$defs/verdict"},
+    "findings": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/finding"}
+    },
+    "correction": {
+      "anyOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/correction"}
+      ]
+    },
+    "invalidation": {"$ref": "#/$defs/invalidation"},
+    "course": {"$ref": "#/$defs/course"},
+    "previousSha256": {
+      "anyOf": [
+        {"$ref": "#/$defs/digest"},
+        {"type": "null"}
+      ]
+    },
+    "recordSha256": {"$ref": "#/$defs/digest"}
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"parentReviewId": {"type": "null"}},
+        "required": ["parentReviewId"]
+      },
+      "then": {
+        "properties": {
+          "previousSha256": {"type": "null"},
+          "correction": {"type": "null"},
+          "lane": {
+            "properties": {"freshFromReviewId": {"type": "null"}}
+          },
+          "findings": {
+            "items": {
+              "allOf": [
+                {"$ref": "#/$defs/finding"},
+                {
+                  "properties": {
+                    "priorFindingId": {"type": "null"},
+                    "status": {"const": "open"}
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "verdict": {
+                  "properties": {"status": {"enum": ["pending", "failed"]}},
+                  "required": ["status"]
+                }
+              },
+              "required": ["verdict"]
+            },
+            "then": {
+              "properties": {"findings": {"maxItems": 0}}
+            }
+          }
+        ]
+      },
+      "else": {
+        "properties": {
+          "previousSha256": {"$ref": "#/$defs/digest"},
+          "lane": {
+            "properties": {"freshFromReviewId": {"$ref": "#/$defs/id"}}
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "coverage": {
+            "properties": {"complete": {"const": true}},
+            "required": ["complete"]
+          }
+        },
+        "required": ["coverage"]
+      },
+      "then": {
+        "properties": {
+          "coverage": {
+            "properties": {"receiptSha256": {"$ref": "#/$defs/digest"}}
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "coverage": {
+            "properties": {"receiptSha256": {"type": "null"}}
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "verdict": {
+            "properties": {"status": {"const": "pending"}},
+            "required": ["status"]
+          }
+        },
+        "required": ["verdict"]
+      },
+      "then": {
+        "properties": {
+          "verdict": {
+            "properties": {
+              "schemaValid": {"const": false},
+              "resultSha256": {"type": "null"},
+              "failure": {"type": "null"}
+            }
+          },
+          "coverage": {
+            "properties": {
+              "complete": {"const": false},
+              "receiptSha256": {"type": "null"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "verdict": {
+            "properties": {"status": {"const": "no-findings"}},
+            "required": ["status"]
+          }
+        },
+        "required": ["verdict"]
+      },
+      "then": {
+        "properties": {
+          "verdict": {
+            "properties": {
+              "schemaValid": {"const": true},
+              "resultSha256": {"$ref": "#/$defs/digest"},
+              "failure": {"type": "null"}
+            }
+          },
+          "coverage": {
+            "properties": {
+              "complete": {"const": true},
+              "receiptSha256": {"$ref": "#/$defs/digest"}
+            }
+          },
+          "findings": {
+            "items": {
+              "allOf": [
+                {"$ref": "#/$defs/finding"},
+                {
+                  "properties": {
+                    "status": {"enum": ["fixed", "withdrawn", "superseded"]}
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "verdict": {
+            "properties": {"status": {"const": "findings"}},
+            "required": ["status"]
+          }
+        },
+        "required": ["verdict"]
+      },
+      "then": {
+        "properties": {
+          "verdict": {
+            "properties": {
+              "schemaValid": {"const": true},
+              "resultSha256": {"$ref": "#/$defs/digest"},
+              "failure": {"type": "null"}
+            }
+          },
+          "coverage": {
+            "properties": {
+              "complete": {"const": true},
+              "receiptSha256": {"$ref": "#/$defs/digest"}
+            }
+          },
+          "findings": {
+            "contains": {
+              "type": "object",
+              "properties": {"status": {"const": "open"}},
+              "required": ["status"]
+            },
+            "minContains": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "verdict": {
+            "properties": {"status": {"const": "failed"}},
+            "required": ["status"]
+          }
+        },
+        "required": ["verdict"]
+      },
+      "then": {
+        "properties": {
+          "verdict": {
+            "properties": {
+              "schemaValid": {"const": false},
+              "failure": {
+                "enum": [
+                  "no-result",
+                  "empty",
+                  "timeout",
+                  "child",
+                  "malformed",
+                  "incomplete",
+                  "drift",
+                  "internal"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "verdict": {
+            "properties": {"failure": {"const": "no-result"}},
+            "required": ["failure"]
+          }
+        },
+        "required": ["verdict"]
+      },
+      "then": {
+        "properties": {
+          "verdict": {
+            "properties": {"resultSha256": {"type": "null"}}
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "verdict": {
+            "properties": {
+              "failure": {"enum": ["empty", "malformed", "incomplete"]}
+            },
+            "required": ["failure"]
+          }
+        },
+        "required": ["verdict"]
+      },
+      "then": {
+        "properties": {
+          "verdict": {
+            "properties": {"resultSha256": {"$ref": "#/$defs/digest"}}
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "verdict": {
+            "properties": {"failure": {"const": "incomplete"}},
+            "required": ["failure"]
+          }
+        },
+        "required": ["verdict"]
+      },
+      "then": {
+        "properties": {
+          "coverage": {
+            "properties": {
+              "complete": {"const": false},
+              "receiptSha256": {"type": "null"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "invalidation": {
+            "properties": {"kind": {"const": "none"}},
+            "required": ["kind"]
+          }
+        },
+        "required": ["invalidation"]
+      },
+      "then": {
+        "properties": {
+          "invalidation": {
+            "properties": {
+              "reason": {"type": "null"},
+              "evidenceSha256": {"type": "null"}
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "invalidation": {
+            "properties": {
+              "reason": {
+                "enum": [
+                  "explicit-broad-review",
+                  "delta-bindings-invalid",
+                  "unknown-changed-path",
+                  "trust-boundary-change",
+                  "impact-ambiguous",
+                  "prior-review-failure"
+                ]
+              },
+              "evidenceSha256": {"$ref": "#/$defs/digest"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "course": {
+            "properties": {"status": {"const": "admitted"}},
+            "required": ["status"]
+          }
+        },
+        "required": ["course"]
+      },
+      "then": {
+        "properties": {
+          "course": {
+            "properties": {
+              "reviewRound": {"maximum": 4},
+              "correctionCommitCount": {"maximum": 3}
+            }
+          },
+          "request": {
+            "properties": {"mode": {"enum": ["full", "delta"]}}
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "parentReviewId": {"$ref": "#/$defs/id"},
+          "request": {
+            "properties": {
+              "mode": {"const": "none"},
+              "admissionCode": {"const": "RE-PO-COURSE-GATE"}
+            }
+          },
+          "verdict": {
+            "properties": {"status": {"const": "pending"}}
+          },
+          "correction": {"type": "null"},
+          "invalidation": {
+            "properties": {"kind": {"const": "none"}}
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "oid": {
+      "type": "string",
+      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.\\.?/)(?!.*//)[A-Za-z0-9._/-]+$"
+    },
+    "pathSet": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/path"}
+    },
+    "idSet": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/id"}
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "tree"],
+      "properties": {
+        "commit": {"$ref": "#/$defs/oid"},
+        "tree": {"$ref": "#/$defs/oid"}
+      }
+    },
+    "diff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["base", "sha256", "changedPaths"],
+      "properties": {
+        "base": {"$ref": "#/$defs/oid"},
+        "sha256": {"$ref": "#/$defs/digest"},
+        "changedPaths": {"$ref": "#/$defs/pathSet"}
+      }
+    },
+    "references": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["packetSha256", "requestSha256", "diffPathsSha256", "governanceSha256"],
+      "properties": {
+        "packetSha256": {"$ref": "#/$defs/digest"},
+        "requestSha256": {"$ref": "#/$defs/digest"},
+        "diffPathsSha256": {"$ref": "#/$defs/digest"},
+        "governanceSha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "subjectSha256", "changedPaths", "integrationEdges"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "subjectSha256": {"$ref": "#/$defs/digest"},
+        "changedPaths": {"$ref": "#/$defs/pathSet"},
+        "integrationEdges": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/id"}
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["changedPaths", "acceptanceIds", "integrationEdges", "complete", "receiptSha256"],
+      "properties": {
+        "changedPaths": {"$ref": "#/$defs/pathSet"},
+        "acceptanceIds": {"$ref": "#/$defs/idSet"},
+        "integrationEdges": {"$ref": "#/$defs/idSet"},
+        "complete": {"type": "boolean"},
+        "receiptSha256": {
+          "anyOf": [
+            {"$ref": "#/$defs/digest"},
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["packetId", "requestSha256", "compiledSha256", "mode", "admissionCode"],
+      "properties": {
+        "packetId": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{32}$"
+        },
+        "requestSha256": {"$ref": "#/$defs/digest"},
+        "compiledSha256": {"$ref": "#/$defs/digest"},
+        "mode": {"enum": ["full", "delta", "none"]},
+        "admissionCode": {
+          "type": "string",
+          "pattern": "^RE-[A-Z0-9-]{1,96}$"
+        }
+      }
+    },
+    "lane": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["laneId", "contextSha256", "independent", "evidenceSha256", "freshFromReviewId"],
+      "properties": {
+        "laneId": {"$ref": "#/$defs/id"},
+        "contextSha256": {"$ref": "#/$defs/digest"},
+        "independent": {"const": true},
+        "evidenceSha256": {"$ref": "#/$defs/digest"},
+        "freshFromReviewId": {
+          "anyOf": [
+            {"$ref": "#/$defs/id"},
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "verdict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "schemaValid", "resultSha256", "failure"],
+      "properties": {
+        "status": {"enum": ["pending", "no-findings", "findings", "failed"]},
+        "schemaValid": {"type": "boolean"},
+        "resultSha256": {
+          "anyOf": [
+            {"$ref": "#/$defs/digest"},
+            {"type": "null"}
+          ]
+        },
+        "failure": {
+          "enum": [
+            null,
+            "no-result",
+            "empty",
+            "timeout",
+            "child",
+            "malformed",
+            "incomplete",
+            "drift",
+            "internal"
+          ]
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "priorFindingId", "severity", "status", "evidenceSha256"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "priorFindingId": {
+          "anyOf": [
+            {"$ref": "#/$defs/id"},
+            {"type": "null"}
+          ]
+        },
+        "severity": {"enum": ["critical", "high", "medium", "low"]},
+        "status": {"enum": ["open", "fixed", "withdrawn", "superseded"]},
+        "evidenceSha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "correction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "deltaSha256", "impactSha256"],
+      "properties": {
+        "commit": {"$ref": "#/$defs/oid"},
+        "deltaSha256": {"$ref": "#/$defs/digest"},
+        "impactSha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "invalidation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "reason", "evidenceSha256"],
+      "properties": {
+        "kind": {"enum": ["none", "full-review-required"]},
+        "reason": {
+          "anyOf": [
+            {
+              "enum": [
+                "explicit-broad-review",
+                "delta-bindings-invalid",
+                "unknown-changed-path",
+                "trust-boundary-change",
+                "impact-ambiguous",
+                "prior-review-failure"
+              ]
+            },
+            {"type": "null"}
+          ]
+        },
+        "evidenceSha256": {
+          "anyOf": [
+            {"$ref": "#/$defs/digest"},
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "course": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reviewRound", "correctionCommitCount", "maxReviewRounds", "maxCorrectionCommits", "status"],
+      "properties": {
+        "reviewRound": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "correctionCommitCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "maxReviewRounds": {"const": 4},
+        "maxCorrectionCommits": {"const": 3},
+        "status": {"enum": ["admitted", "po-course-gate"]}
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"status": {"const": "po-course-gate"}},
+            "required": ["status"]
+          },
+          "then": {
+            "anyOf": [
+              {
+                "properties": {"reviewRound": {"minimum": 5}},
+                "required": ["reviewRound"]
+              },
+              {
+                "properties": {"correctionCommitCount": {"minimum": 4}},
+                "required": ["correctionCommitCount"]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

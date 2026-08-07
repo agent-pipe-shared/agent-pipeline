@@ -10,7 +10,7 @@ Governing principle: **deterministic before probabilistic.** Stage 1 is machine 
 
 ## 1. Stage 1 — deterministic gate chain (blocking)
 
-**Rule:** The fixed chain **format → lint → typecheck → tests → build** runs as ONE verify script per project (`{{VERIFY_COMMAND}}` from `.claude/pipeline.json`). Stop hook, goldfish delivery, and CI execute the same command.
+**Rule:** The fixed chain **format → lint → typecheck → tests → build** runs as ONE verify script per project (`{{VERIFY_COMMAND}}` from the project calibration). Stop hook, goldfish delivery, and CI execute the same command.
 **Why:** Three diverging check paths are three truths (anti-pattern AP1); one script makes "green" unambiguous (ADR-0005).
 **Check:** The evidence artifact names script + commit state + exit code; CI demonstrably calls the same command.
 

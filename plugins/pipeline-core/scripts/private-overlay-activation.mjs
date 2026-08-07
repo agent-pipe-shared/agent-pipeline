@@ -14,7 +14,7 @@ import {
 import { spawnSync as nodeSpawnSync } from "node:child_process";
 import { dirname, isAbsolute, resolve, sep } from "node:path";
 import { TextDecoder } from "node:util";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 import { publishPoGateProfileReceipt } from "../lib/po-gate-profile-publisher.mjs";
 import { readPrivateOverlayBootstrapStatus } from "../lib/private-overlay-bootstrap-status.mjs";
@@ -28,6 +28,7 @@ import {
   planPrivateOverlayRuntimeProjection,
 } from "../lib/private-overlay-runtime-projection.mjs";
 import { observeCodexPublicCoreIdentity, observePublicCoreIdentity } from "../lib/public-core-observation.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const EVIDENCE_SCHEMA = "pipeline.private-overlay-activation-evidence.v1";
 const PLAN_SCHEMA = "pipeline.private-overlay-runtime-projection-plan.v1";
@@ -576,6 +577,6 @@ export function mainCodexHost(argv, dependencyOverrides = {}) {
   } });
 }
 
-if (process.argv[1] !== undefined && pathToFileURL(realpathSync(process.argv[1])).href === import.meta.url) {
+if (isDirectInvocation(import.meta.url)) {
   process.exitCode = main(process.argv.slice(2));
 }

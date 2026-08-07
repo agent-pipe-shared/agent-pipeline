@@ -38,6 +38,7 @@ import {
   deriveCriticPacketGovernance,
   validateCriticPacketGovernance,
 } from "../lib/critic-packet-governance.mjs";
+import { validateCriticLineagePacketAdmission } from "../lib/critic-review-lineage.mjs";
 
 export const PACKET_SCHEMA = "pipeline.critic-candidate-packet.v1";
 export const STATE_SCHEMA = "pipeline.critic-candidate-state.v1";
@@ -455,15 +456,24 @@ export function prepareCandidatePacket(options, { now = new Date(), nonce = rand
   }
 }
 
-export function claimCandidatePacket({ controlRoot, packetId, adapter, claimantNonce }, { now = new Date() } = {}) {
+export function claimCandidatePacket({ controlRoot, packetId, adapter, claimantNonce, lineage = null }, { now = new Date() } = {}) {
   const { packetDir, packet } = packetContext(controlRoot, packetId);
   assertLive(packet, now);
   if (packet.route.adapter !== adapter || !SHA256.test(claimantNonce)) fail("CPP-CLAIM", "Claim adapter or nonce mismatch.");
   revalidateCandidate(packet);
   const state = currentState(packetDir, packet);
   if (state.phase !== "prepared") fail("CPP-CLAIM", "Packet is not claimable.");
+  let criticReviewLineageSha256 = null;
+  if (lineage !== null) {
+    const admission = validateCriticLineagePacketAdmission(lineage, packet);
+    if (!admission.ok) fail("CPP-LINEAGE", `Critic lineage is not admissible: ${admission.code}`);
+    criticReviewLineageSha256 = admission.lineageSha256;
+  }
   const timestamp = nowIso(now);
-  const claim = { schema: RECORD_SCHEMA, packetId, packetDigest: sha256(canonicalJson(packet)), revision: 2, priorStateDigest: sha256(canonicalJson(state)), timestamp, phase: "claimed", body: { adapter, claimantNonce } };
+  const body = criticReviewLineageSha256 === null
+    ? { adapter, claimantNonce }
+    : { adapter, claimantNonce, criticReviewLineageSha256 };
+  const claim = { schema: RECORD_SCHEMA, packetId, packetDigest: sha256(canonicalJson(packet)), revision: 2, priorStateDigest: sha256(canonicalJson(state)), timestamp, phase: "claimed", body };
   publishExclusive(join(packetDir, "claim.json"), claim);
   replaceState(join(packetDir, "state.json"), recordBody(packet, 2, claim.priorStateDigest, "claimed", claim.body, timestamp));
   return { ok: true, code: "CPP-CLAIMED", packet, claim };

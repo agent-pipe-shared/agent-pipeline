@@ -4,6 +4,14 @@
  * Public, dependency-free contract for recovery-preview delivery attestation.
  * The callback receives only the public invocation binding; no preview payload,
  * private receipt, path, or runtime evidence is persisted by this module.
+ *
+ * What `callbackTimeoutMs` does NOT do (QG-05): it is not a pre-emptive
+ * interrupt and cannot abort a running callback. The elapsed time is measured
+ * with a monotonic clock and classified POST HOC, only after the synchronous
+ * callback has already returned or thrown; a callback that overran the bound
+ * is then reported as RP-CALLBACK-TIMEOUT. A synchronous callback that never
+ * returns is never classified at all — it hangs the calling process, because
+ * JavaScript cannot interrupt synchronous caller-supplied code.
  */
 export const RECOVERY_PREVIEW_SCHEMA = "pipeline.recovery-preview.v1";
 export const RECOVERY_PREVIEW_ACK_SCHEMA = "pipeline.recovery-preview-ack.v1";
@@ -19,11 +27,22 @@ function exactKeys(value, keys) {
     && keys.every((key) => Object.hasOwn(value, key));
 }
 
+// RegExp.test() coerces its argument via String(value); the explicit typeof
+// guard keeps the runtime contract identical to the published schema's
+// "type": "string" declaration instead of accepting stringifiable values.
+function safeId(value) {
+  return typeof value === "string" && SAFE_ID.test(value);
+}
+
+function safeDigest(value) {
+  return typeof value === "string" && SHA256.test(value);
+}
+
 function validInvocation(value) {
   return exactKeys(value, ["schema", "invocationId", "previewDigest"])
     && value.schema === RECOVERY_PREVIEW_SCHEMA
-    && SAFE_ID.test(value.invocationId ?? "")
-    && SHA256.test(value.previewDigest ?? "");
+    && safeId(value.invocationId)
+    && safeDigest(value.previewDigest);
 }
 
 function invalid(code) {
@@ -52,7 +71,7 @@ export function attestRecoveryPreviewDelivery({
   if (!validInvocation(invocation)) return invalid("RP-INVOCATION-INVALID");
   if (typeof callback !== "function") return invalid("RP-CALLBACK-ABSENT");
   if (!Array.isArray(usedAcknowledgementIds)
-    || usedAcknowledgementIds.some((value) => !SAFE_ID.test(value ?? ""))
+    || usedAcknowledgementIds.some((value) => !safeId(value))
     || new Set(usedAcknowledgementIds).size !== usedAcknowledgementIds.length) {
     return invalid("RP-USED-ACKS-INVALID");
   }
@@ -68,24 +87,31 @@ export function attestRecoveryPreviewDelivery({
     return invalid("RP-CALLBACK-THREW");
   }
   if (callbackExceeded(startedAt, callbackTimeoutMs)) return invalid("RP-CALLBACK-TIMEOUT");
-  if (acknowledgement && typeof acknowledgement.then === "function") return invalid("RP-CALLBACK-ASYNC");
-  if (!exactKeys(acknowledgement, ["schema", "invocationId", "previewDigest", "acknowledgementId", "delivery"])) {
-    return invalid("RP-ACK-MALFORMED");
-  }
-  if (acknowledgement.schema !== RECOVERY_PREVIEW_ACK_SCHEMA
-    || acknowledgement.delivery !== "delivered"
-    || !SAFE_ID.test(acknowledgement.acknowledgementId ?? "")) {
-    return invalid("RP-ACK-MALFORMED");
-  }
-  if (acknowledgement.invocationId !== invocation.invocationId) return invalid("RP-INVOCATION-MISMATCH");
-  if (acknowledgement.previewDigest !== invocation.previewDigest) return invalid("RP-DIGEST-MISMATCH");
-  if (usedAcknowledgementIds.includes(acknowledgement.acknowledgementId)) return invalid("RP-ACK-REPLAY");
+  // Inspecting a caller-supplied acknowledgement runs caller-supplied code:
+  // property getters can throw. Every such escape is typed as RP-ACK-MALFORMED
+  // so no failure path leaves this module as an untyped exception.
+  try {
+    if (acknowledgement && typeof acknowledgement.then === "function") return invalid("RP-CALLBACK-ASYNC");
+    if (!exactKeys(acknowledgement, ["schema", "invocationId", "previewDigest", "acknowledgementId", "delivery"])) {
+      return invalid("RP-ACK-MALFORMED");
+    }
+    if (acknowledgement.schema !== RECOVERY_PREVIEW_ACK_SCHEMA
+      || acknowledgement.delivery !== "delivered"
+      || !safeId(acknowledgement.acknowledgementId)) {
+      return invalid("RP-ACK-MALFORMED");
+    }
+    if (acknowledgement.invocationId !== invocation.invocationId) return invalid("RP-INVOCATION-MISMATCH");
+    if (acknowledgement.previewDigest !== invocation.previewDigest) return invalid("RP-DIGEST-MISMATCH");
+    if (usedAcknowledgementIds.includes(acknowledgement.acknowledgementId)) return invalid("RP-ACK-REPLAY");
 
-  return {
-    ok: true,
-    code: "RP-DELIVERY-ATTESTED",
-    delivered: true,
-    acknowledgement,
-    usedAcknowledgementIds: [...usedAcknowledgementIds, acknowledgement.acknowledgementId],
-  };
+    return {
+      ok: true,
+      code: "RP-DELIVERY-ATTESTED",
+      delivered: true,
+      acknowledgement,
+      usedAcknowledgementIds: [...usedAcknowledgementIds, acknowledgement.acknowledgementId],
+    };
+  } catch {
+    return invalid("RP-ACK-MALFORMED");
+  }
 }

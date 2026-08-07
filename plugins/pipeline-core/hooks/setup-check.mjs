@@ -58,8 +58,8 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
 
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { parseYaml } from "../lib/yaml-lite.mjs";
 
 export const DEFAULT_SETUP_INTENT = "unconfigured";
@@ -145,6 +145,6 @@ export function run() {
 
 // Only auto-run when executed directly (`node setup-check.mjs`), never on import
 // (the test file imports the functions above without triggering the real CLI/exit).
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectInvocation(import.meta.url)) {
   run();
 }

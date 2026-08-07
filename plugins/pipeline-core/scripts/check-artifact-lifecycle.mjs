@@ -14,11 +14,21 @@ import { createHash } from "node:crypto";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = resolve(HERE, "..", "..", "..");
 export const LIFECYCLE_SCHEMA = "pipeline.artifact-lifecycle.v1";
 export const CANONICAL_HUMAN_STATE_PATH = "docs/state.md";
-export const CANONICAL_MACHINE_STATE_PATH = ".claude/pipeline-state.json";
+/**
+ * The machine State head is wherever the project's authority tier puts it
+ * (ADR-0054), so it is resolved per root rather than frozen at module load.
+ * The legacy literal remains the fallback for a project with no authority.
+ */
+export function canonicalMachineStatePath(root = DEFAULT_ROOT) {
+  return resolveAuthorityArtifactPath("state", { rootDir: root }).relPath;
+}
 export const CLOSE_LIFECYCLE_STATUS = Object.freeze({
   intent: "close-intent",
   "state-cas": "close-cas",
@@ -303,9 +313,10 @@ export function checkArtifactLifecycle(root = DEFAULT_ROOT, resultPath) {
     findings.push("artifactLifecycle.status is required");
     return { ok: false, findings };
   }
-  if (status.machineStatePath !== CANONICAL_MACHINE_STATE_PATH) findings.push(`artifactLifecycle.status.machineStatePath must equal ${CANONICAL_MACHINE_STATE_PATH}`);
+  const machineStatePath = canonicalMachineStatePath(root);
+  if (status.machineStatePath !== machineStatePath) findings.push(`artifactLifecycle.status.machineStatePath must equal ${machineStatePath}`);
   if (status.humanStatePath !== CANONICAL_HUMAN_STATE_PATH) findings.push(`artifactLifecycle.status.humanStatePath must equal ${CANONICAL_HUMAN_STATE_PATH}`);
-  const machinePath = readableFile(root, CANONICAL_MACHINE_STATE_PATH, findings, "canonical machine pipeline state");
+  const machinePath = readableFile(root, machineStatePath, findings, "canonical machine pipeline state");
   const humanPath = readableFile(root, CANONICAL_HUMAN_STATE_PATH, findings, "canonical human state");
   if (typeof status.phase !== "string" || status.phase.length === 0 || typeof status.resultStatus !== "string" || status.resultStatus.length === 0) {
     findings.push("artifactLifecycle.status must bind phase and resultStatus");
@@ -412,7 +423,7 @@ function cliArgs(argv) {
   return index === -1 ? null : argv[index + 1] ?? null;
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+if (isDirectInvocation(import.meta.url)) {
   const resultPath = cliArgs(process.argv.slice(2));
   if (!resultPath) {
     console.log("SKIP artifact lifecycle: no --result metadata supplied (explicit rigor-1/2 opt-in only).");

@@ -5,6 +5,12 @@ import { createHash } from "node:crypto";
 
 import { INTERMEDIATE_LITERAL, canonicalJson } from "./codex-sandbox-compatibility.mjs";
 import { sandboxSelectionDigest, validateSandboxSelection } from "../scripts/codex-sandbox-select.mjs";
+import { projectSandboxFailure } from "./sandbox-failure.mjs";
+
+/** Duty adapters append their class without replacing a more specific cause. */
+export function propagateDutySandboxFailure(failure, duty = "narrow-duty") {
+  return projectSandboxFailure(failure, duty);
+}
 
 const DUTIES = new Set(["advisory", "readiness", "critic"]);
 const SHA256 = /^[a-f0-9]{64}$/;

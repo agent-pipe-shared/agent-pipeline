@@ -55,6 +55,18 @@ const H = Object.freeze({
   preflight: "8".repeat(64),
   evidence: "9".repeat(64),
 });
+const CRITIC_REVIEW_SKILL_PATH = new URL("../skills/critic-review/SKILL.md", import.meta.url);
+
+test("Critic policy permits autonomous review only after the standard green Verify gate", () => {
+  const skill = readFileSync(CRITIC_REVIEW_SKILL_PATH, "utf8");
+  assert.match(skill, /^disable-model-invocation: false$/m);
+  assert.match(skill, /dispatch this standard review gate autonomously/);
+  assert.match(skill, /applicable plan gate is recorded/);
+  assert.match(skill, /deterministic Verify chain is green/);
+  assert.doesNotMatch(skill, /only the PO \(or the Elephant relaying the PO's explicit instruction/);
+  assert.match(skill, /immediately before every Critic\s+spawn, run `scripts\/critic-dispatch-preflight\.mjs`/);
+  assert.match(skill, /not Critic work: do\s+not spawn a child, create a packet or substitute prose\/evidence/);
+});
 
 class MemoryPersistence {
   constructor() {

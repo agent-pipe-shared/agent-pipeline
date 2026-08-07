@@ -1,0 +1,9 @@
+// SPDX-License-Identifier: SUL-1.0
+import assert from "node:assert/strict";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
+import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA, verifyPoApprovalProof } from "./po-approval-proof.mjs";
+const intent = createPoApprovalIntent({ kind: "threat-model", featureId: "cyb-4", planSha256: "a".repeat(64), specSha256: "b".repeat(64), candidate: { commit: "c".repeat(40), tree: "d".repeat(40) }, policyRevision: "policy-v1", subjectSha256: "e".repeat(64), decision: "approved" });
+const pair = generateKeyPairSync("ed25519"); const publicKey = pair.publicKey.export({ type: "spki", format: "pem" }); const trustPolicy = { keyReference: "local-device-key", publicKeySha256: createHash("sha256").update(publicKey).digest("hex") }; const proof = { schema: PO_APPROVAL_PROOF_SCHEMA, intentSha256: intent.sha256, keyReference: trustPolicy.keyReference, publicKey, signatureBase64: sign(null, Buffer.from(intent.sha256), pair.privateKey).toString("base64") };
+assert.equal(verifyPoApprovalProof({ intent, trustPolicy, proof }).verified, true); assert.equal(verifyPoApprovalProof({ intent: { ...intent, sha256: "0".repeat(64) }, trustPolicy, proof }).verified, false); assert.equal(verifyPoApprovalProof({ intent, trustPolicy: { ...trustPolicy, keyReference: "other" }, proof }).verified, false); assert.equal(verifyPoApprovalProof({ intent, trustPolicy, proof: { ...proof, signatureBase64: sign(null, Buffer.from("wrong"), pair.privateKey).toString("base64") } }).verified, false);
+const override = createPoApprovalIntent({ kind: "manual-override", featureId: "nova-7", planSha256: "f".repeat(64), specSha256: "a".repeat(64), candidate: { commit: "b".repeat(40), tree: "c".repeat(40) }, policyRevision: "policy-v2", subjectSha256: "d".repeat(64), decision: "allow-once" });
+assert.equal(override.value.kind, "manual-override"); console.log("5 PO approval proof checks passed");

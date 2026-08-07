@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.macos-acceptance.v1",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema", "acceptanceId", "candidate", "hardwareClass", "os", "toolchain", "bootstrapSha256", "filesystem", "runnerReports", "lifecycle", "gates", "cleanup", "evidence", "status", "recordSha256"],
+  "properties": {
+    "schema": {"const":"pipeline.macos-acceptance.v1"}, "acceptanceId": {"$ref":"#/$defs/id"},
+    "candidate": {"type":"object", "additionalProperties":false, "required":["commit","tree"], "properties":{"commit":{"$ref":"#/$defs/oid"},"tree":{"$ref":"#/$defs/oid"}}},
+    "hardwareClass":{"enum":["apple-silicon","intel","hosted-ci","synthetic"]},
+    "os":{"type":"object","additionalProperties":false,"required":["version","build","architecture"],"properties":{"version":{"$ref":"#/$defs/text"},"build":{"$ref":"#/$defs/text"},"architecture":{"$ref":"#/$defs/text"}}},
+    "toolchain":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["tool","version","executableSha256"],"properties":{"tool":{"$ref":"#/$defs/id"},"version":{"$ref":"#/$defs/text"},"executableSha256":{"$ref":"#/$defs/sha"}}}},
+    "bootstrapSha256":{"$ref":"#/$defs/sha"},
+    "filesystem":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["capability","status","evidenceSha256"],"properties":{"capability":{"$ref":"#/$defs/id"},"status":{"enum":["observed","not-observed","denied","unavailable"]},"evidenceSha256":{"type":["string","null"],"pattern":"^[a-f0-9]{64}$"}}}},
+    "runnerReports":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["reportId","recordSha256","status"],"properties":{"reportId":{"$ref":"#/$defs/id"},"recordSha256":{"$ref":"#/$defs/sha"},"status":{"enum":["observed","not-observed","denied","unavailable"]}}}},
+    "lifecycle":{"type":"object","additionalProperties":false,"required":["stage","keepAwakeRequested","keepAwakeObserved","keepAwakeBoundMs","inputAuthoritySha256","interruptionState","completionDelivery","resumeTokenSha256","backgroundInputChannel"],"properties":{"stage":{"enum":["not-started","bootstrapped","running","interrupted","completed","cleaned"]},"keepAwakeRequested":{"$ref":"#/$defs/keepAwake"},"keepAwakeObserved":{"$ref":"#/$defs/keepAwake"},"keepAwakeBoundMs":{"type":"integer","minimum":0},"inputAuthoritySha256":{"type":["string","null"],"pattern":"^[a-f0-9]{64}$"},"interruptionState":{"enum":["not-interrupted","interrupted","resumed"]},"completionDelivery":{"enum":["not-delivered","delivered","denied","unavailable"]},"resumeTokenSha256":{"type":["string","null"],"pattern":"^[a-f0-9]{64}$"},"backgroundInputChannel":{"const":"none"}}},
+    "gates":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["gate","status","evidenceSha256"],"properties":{"gate":{"$ref":"#/$defs/id"},"status":{"enum":["passed","failed","unavailable","not-run"]},"evidenceSha256":{"type":["string","null"],"pattern":"^[a-f0-9]{64}$"}}}},
+    "cleanup":{"type":"object","additionalProperties":false,"required":["status","evidenceSha256"],"properties":{"status":{"enum":["not-requested","completed","denied","unavailable"]},"evidenceSha256":{"type":["string","null"],"pattern":"^[a-f0-9]{64}$"}}},
+    "evidence":{"type":"array","items":{"$ref":"#/$defs/evidence"}}, "status":{"enum":["recorded","failed","unavailable","native-closure-passed"]}, "recordSha256":{"$ref":"#/$defs/sha"}
+  },
+  "$defs": {
+    "sha":{"type":"string","pattern":"^[a-f0-9]{64}$"}, "oid":{"type":"string","pattern":"^(?:[a-f0-9]{40}|[a-f0-9]{64})$"}, "id":{"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}, "text":{"type":"string","minLength":1,"maxLength":160,"pattern":"^(?!.*(?:keychain|secret|password|token|account|private|serial|/Users/|/home/|~/|[A-Za-z]:\\\\))[A-Za-z0-9._+ -]+$"}, "keepAwake":{"enum":["not-requested","observed-active","denied","unavailable","expired"]},
+    "evidence":{"type":"object","additionalProperties":false,"required":["kind","path","fileSha256","recordSha256"],"properties":{"kind":{"$ref":"#/$defs/id"},"path":{"type":["string","null"],"pattern":"^(?!/)(?!.*\\\\)(?!.*//)(?!.*\\.{1,2}(?:/|$))(?!.*(?:^|/)(?:Users|home|private|var)(?:/|$))[A-Za-z0-9._/@:-]{1,512}$"},"fileSha256":{"$ref":"#/$defs/sha"},"recordSha256":{"type":["string","null"],"pattern":"^[a-f0-9]{64}$"}}}
+  }
+}

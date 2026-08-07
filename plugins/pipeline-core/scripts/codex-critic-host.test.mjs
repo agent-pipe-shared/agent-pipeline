@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -28,6 +28,7 @@ import { sha256Canonical } from "../lib/review-economy.mjs";
 import {
   PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES,
   ProjectOnboardingReadyError,
+  requireProjectOnboardingReady,
 } from "../lib/project-onboarding-ready-gate.mjs";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
@@ -213,6 +214,10 @@ function requestFor(candidate, ruleset) {
     rigor: "2",
     risk: "high",
     trigger_row: "T1",
+    task_authority: {
+      manifest: { operations: ["read"], paths: [".claude/**", "docs/**", "evidence/**", "governance/**", "plugins/**", "policies/**", "roles/**", "specs/**", "templates/**"] },
+      request: { operations: ["read"], paths: [".claude/pipeline.json", "specs/review.md", "policies/guard.md", "evidence/verify-latest.json"] },
+    },
     review_economy: {
       round: 1,
       correction_commits: 0,
@@ -454,9 +459,10 @@ check("every controlling non-ready dispatch status and gate failure precedes Cri
       reviewRoot: negativeReviewRoot,
       observers,
     }, {
-      requireProjectOnboardingReadyFn({ rootDir, intent }) {
+      requireProjectOnboardingReadyFn({ rootDir, intent, runner }) {
         assert.equal(rootDir, repo);
         assert.equal(intent, "dispatch");
+        assert.equal(runner, "codex");
         throw failure;
       },
       createCheckout() { checkouts += 1; },
@@ -611,13 +617,44 @@ const preparedRecord = readJsonBounded(preparedPath);
 const prepared = preparedRecord.value;
 
 check("prepare emits fixed native Sol/xhigh route", () => {
-  assert.deepEqual(criticGateCalls, [{ rootDir: repo, intent: "dispatch" }]);
+  assert.deepEqual(criticGateCalls, [{ rootDir: repo, intent: "dispatch", runner: "codex" }]);
   assert.equal(preparedResult.model, "gpt-5.6-sol");
   assert.equal(preparedResult.effort, "xhigh");
   assert.equal(prepared.route.duty, "criticNormal");
   assert.equal(prepared.hostContract.forkTurns, "none");
   assert.equal(prepared.assurance, T1_ASSURANCE);
   assert.deepEqual(prepared.request.normal_lane_authorization, legacyRequest.normal_lane_authorization);
+});
+check("the exact runner value prepareNativeCritic sends the gate is accepted by the real onboarding readiness gate, not merely present in a captured argument", () => {
+  // The injected requireProjectOnboardingReadyFn substitute used throughout this
+  // suite accepts any arguments, so a captured-argument assertion alone (above)
+  // cannot prove that the literal string prepareNativeCritic sends ("codex") is a
+  // value the real gate's own validation accepts. Drive the real gate directly,
+  // with only its own `inspect` dependency replaced, to prove that.
+  let inspected;
+  const result = requireProjectOnboardingReady({
+    rootDir: repo,
+    intent: "dispatch",
+    runner: "codex",
+    inspect(options) {
+      inspected = options;
+      return {
+        schema: "pipeline.project-onboarding.v4",
+        status: "ready",
+        root: realpathSync(repo),
+        runner: options.runner,
+        intent: options.intent,
+        repository: {},
+        runtime: {},
+        continuity: {},
+        appServer: {},
+        nextAction: null,
+        diagnostics: [],
+      };
+    },
+  });
+  assert.deepEqual(inspected, { rootDir: repo, intent: "dispatch", runner: "codex" });
+  assert.equal(result.status, "ready");
 });
 check("prepared packet is private and no observer path leaks", () => {
   // Native Windows mode is a synthetic constant, not real POSIX permission bits; the

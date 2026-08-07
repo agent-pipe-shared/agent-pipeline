@@ -40,6 +40,32 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: git -C candidate fetch --no-tags ../trusted-gate "$BASE_SHA"
 
+      # F1 (CYB-2I-1R): generates PR-bound security evidence for the untrusted candidate --
+      # the trusted checkout's own security-scan.mjs, run against the candidate directory
+      # (mirrors the two steps above: trusted script, candidate target). Writes
+      # candidate/evidence/security-latest.v2.json + .verdict.json, bound to the candidate's own
+      # HEAD commit/tree, which the completeness check below can then find and validate. Static
+      # scanners only (gitleaks/semgrep/osv-scanner/license-check) -- no PR code is ever executed,
+      # consistent with the untrusted, credential-free candidate checkout above.
+      #
+      # `|| true`: this step's OWN exit code (security-scan.mjs's v1 severity-threshold verdict)
+      # is deliberately NOT this gate's pass/fail authority -- evidence is written unconditionally
+      # by security-scan.mjs even on a blocking/error verdict, and AC8 (cyb-2-feature-spec.md)
+      # designates the SAME v2 policy-complete completeness evaluator every other call site
+      # (guard-push.mjs, Close, Release) consumes as the sole authority here too, via the next
+      # step's checkSecurityCompleteness call -- never security-scan.mjs's own independent v1
+      # exit code, which would otherwise short-circuit the job before that evaluator ever runs.
+      #
+      # `timeout-minutes: 3`: defensive per-step bound, not evidence the job's overall 5-minute
+      # timeout is insufficient -- a full-repository-scale local measurement (this repo's own
+      # HEAD, all four scanners, three of them actually installed and running) completed in ~10s
+      # wall-clock; 3 minutes leaves ample headroom for a single misbehaving scanner while still
+      # leaving most of the job's total budget for the two checkouts, the fetch, and the
+      # completeness-check step below.
+      - name: Generate PR-bound security evidence for the untrusted candidate
+        timeout-minutes: 3
+        run: node trusted-gate/harness/scripts/security-scan.mjs --root candidate || true
+
       - name: Verify current CLA acceptance and every PR commit DCO sign-off
         run: >-
           node trusted-gate/harness/scripts/check-pr-contributor-gates.mjs

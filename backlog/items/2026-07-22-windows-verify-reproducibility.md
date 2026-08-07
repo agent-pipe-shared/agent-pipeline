@@ -3,10 +3,14 @@ schema: "pipeline.backlog-item.v1"
 id: "pipeline.windows-verify-reproducibility"
 type: "defect"
 owner: "pipeline"
-status: "open"
+status: "closed"
 created: "2026-07-22"
 source: "specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md"
 tracking: "PO-approved Sentinel scope extension; no implementation or closure claim."
+closed_at: "2026-07-24"
+closure_repository: "self"
+closure_commit: "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb"
+closure_evidence: "backlog/evidence/2026-07-24-po-sentinel-closure-disposition.md"
 ---
 
 # pipeline.windows-verify-reproducibility

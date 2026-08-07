@@ -20,7 +20,7 @@
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { loadManifest, DEFAULT_MANIFEST_RELPATH } from "../../plugins/pipeline-core/lib/manifest.mjs";
+import { loadManifest } from "../../plugins/pipeline-core/lib/manifest.mjs";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(SCRIPT_DIR, "..", "..");
@@ -77,8 +77,12 @@ export function formatSummary(manifest) {
  * (flat) layout keeps the original `rootDir = dirname(manifestPath)` behavior unchanged.
  */
 export function resolveTarget(arg, { repoRoot = REPO_ROOT, cwd = process.cwd() } = {}) {
-  const targetPath = arg ? (isAbsolute(arg) ? arg : resolve(cwd, arg)) : join(repoRoot, DEFAULT_MANIFEST_RELPATH);
+  if (!arg) return { rootDir: repoRoot, manifestRelPath: undefined };
+  const targetPath = isAbsolute(arg) ? arg : resolve(cwd, arg);
   const parentDir = dirname(targetPath);
+  if (basename(parentDir) === "project") {
+    return { rootDir: dirname(parentDir), manifestRelPath: join("project", basename(targetPath)) };
+  }
   if (basename(parentDir) === ".claude") {
     return { rootDir: dirname(parentDir), manifestRelPath: join(".claude", basename(targetPath)) };
   }

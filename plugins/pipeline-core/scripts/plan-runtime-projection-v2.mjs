@@ -9,7 +9,6 @@
  */
 import { readFileSync } from "node:fs";
 import { extname, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 
 import { validatePipelineUserV2 } from "../lib/runner-profiles-v2.mjs";
 import {
@@ -17,6 +16,7 @@ import {
   readRuntimeProjectionV2Baselines,
 } from "../lib/runtime-projection-v2.mjs";
 import { parseYaml } from "../lib/yaml-lite.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 function usage() {
   return "Usage: node plugins/pipeline-core/scripts/plan-runtime-projection-v2.mjs --intent <pipeline.user.v2.json-or-yaml> [--root <project-dir>] [--include-bytes]";
@@ -121,4 +121,4 @@ export function main(args = process.argv.slice(2), { write = process.stdout.writ
   return plan.status === "ready" ? 0 : 1;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) process.exit(main());
+if (isDirectInvocation(import.meta.url)) process.exit(main());

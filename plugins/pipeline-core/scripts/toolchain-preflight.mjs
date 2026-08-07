@@ -1,15 +1,72 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
+/**
+ * Capability-completeness projection (AC10, CYB-2G) -------------------------
+ *
+ * `evaluateCapabilityCompleteness(preflightResult, requiredCapabilities)`
+ * (defined below, after `runToolchainPreflight()`) is a pure, read-only
+ * derivation over an ALREADY-COMPUTED `runToolchainPreflight()` output. It
+ * never probes, never touches the filesystem or git, and never re-runs any
+ * check -- it only reads `preflightResult.results` (the tool -> status array
+ * `runToolchainPreflight()` already produced) plus the caller-supplied list
+ * of required `cap.*` ids. `preflightResult` is exactly the object
+ * `runToolchainPreflight()` returns (or an equivalently shaped fixture).
+ *
+ * Tool -> capability-root mapping (CYB-1F Section 3 frozen thirteen roots;
+ * only the roots an actual `FIXED_TOOLS` scanner backs today are reachable):
+ *   gitleaks     -> cap.secrets
+ *   osv-scanner  -> cap.sca
+ *   semgrep      -> cap.sast
+ * `node` and `git` are toolchain prerequisites, not security capabilities,
+ * and are excluded from the capability-level report entirely. `license-check`
+ * is a catalog CONTROL, not a capability family (CYB-1F F-4, ratified
+ * 2026-07-25) -- it never receives a cap.* required/missing/unsupported/
+ * available/optional verdict. Its own readiness is surfaced only through the
+ * informative `licenseControl` field on the report (design-latitude call for
+ * this task: an informative field, not simply omitted, so a caller can still
+ * see whether the license-check control is ready without ever mistaking it
+ * for a capability-root verdict).
+ *
+ * Five-state decision logic. Every candidate `cap.*` id (the union of the
+ * caller's `requiredCapabilities` and every `cap.*` root the preflight result
+ * has information about) is classified by a 2x3 matrix over
+ * (listed-by-caller? x underlying-tool-readiness):
+ *
+ *   |                  | tool ready | tool exists, not ready | no tool maps |
+ *   | ---------------- | ---------- | ----------------------- | ------------ |
+ *   | in requiredCaps  | required   | missing                 | unsupported  |
+ *   | not in requiredCaps | available | optional              | (omitted)    |
+ *
+ *   - "required": in the caller's list and the mapped tool's status is
+ *     "ready".
+ *   - "missing": in the caller's list, a tool maps to it, but that tool's
+ *     status is anything other than "ready" (binary_missing, not_required
+ *     because the scanner is disabled in the manifest, incompatible_version,
+ *     probe_error, etc).
+ *   - "unsupported": in the caller's list, but no known tool maps to this
+ *     cap.* root at all in this codebase today.
+ *   - "available": NOT in the caller's list, a tool maps to it, and the
+ *     preflight result shows that tool is "ready".
+ *   - "optional": NOT in the caller's list, a tool maps to it, and the
+ *     preflight result has information about it (a status other than the
+ *     baseline "not_required") but that status is not "ready".
+ *   - (omitted): NOT in the caller's list AND (no tool maps to it, OR the
+ *     mapped tool's status is absent/"not_required", i.e. the preflight has
+ *     no information about it at all) -- dropped from the report entirely
+ *     rather than surfaced as a sixth "not-applicable" verdict.
+ */
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { loadManifest } from "../lib/manifest.mjs";
+import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { probeGitleaks } from "./security-readiness/gitleaks-readiness.mjs";
 import { probeOsvScanner } from "./security-readiness/osv-scanner-readiness.mjs";
 import { probeSemgrep } from "./security-readiness/semgrep-readiness.mjs";
 import { buildHandle, executableIdentity, resolveSystemExecutable, resolveTrustedSystemExecutable, runProbe, sha256 } from "./tool-identity.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const TOOLCHAIN_SCHEMA = "pipeline.toolchain-preflight.v1";
 export const FIXED_TOOLS = Object.freeze(["node", "git", "gitleaks", "osv-scanner", "semgrep", "license-check"]);
@@ -134,8 +191,26 @@ export function defaultGitProbe({ rootDir, tempDir, now = new Date(), platform =
   if (runProbeFn(observed.identity.realPath, ["diff", "--name-only", "HEAD", "HEAD", "--"], probeOptions).ok) capabilities.push("diff-paths");
   return { ok: true, status: "ready", handle: buildHandle("git", observed.identity, match?.[1] ?? null, capabilities, now.toISOString()) };
 }
+/**
+ * The exact candidate this probe observed. An identity attestation that does not say
+ * WHICH tree it probed cannot be consumed as gate evidence (ADR-0051 candidate
+ * binding); an unavailable or dirty repository yields null rather than a guess.
+ */
+function probedCandidate(rootDir) {
+  const git = (args) => {
+    const result = spawnSync("git", args, { cwd: rootDir, encoding: "utf8", shell: false, timeout: 5000 });
+    return result.status === 0 && !result.error ? String(result.stdout).trim() : null;
+  };
+  const commit = git(["rev-parse", "HEAD"]);
+  const tree = git(["rev-parse", "HEAD^{tree}"]);
+  const status = spawnSync("git", ["status", "--porcelain=v1"], { cwd: rootDir, encoding: "utf8", shell: false, timeout: 5000 });
+  if (!commit || !tree || !/^[0-9a-f]{40,64}$/u.test(commit) || !/^[0-9a-f]{40,64}$/u.test(tree)) return null;
+  if (status.status !== 0 || String(status.stdout).length !== 0) return null;
+  return { commit, tree };
+}
+
 function manifestDigest(rootDir) {
-  const path = join(rootDir, ".claude", "pipeline.yaml");
+  const { path } = resolveAuthorityArtifactPath("manifest", { rootDir });
   if (!existsSync(path)) return null;
   try { return createHash("sha256").update(readFileSync(path)).digest("hex"); } catch { return null; }
 }
@@ -167,7 +242,7 @@ export function runToolchainPreflight({ rootDir, manifestResult = null, platform
   const handles = {};
   if (loaded.status === "invalid") {
     const overall = overallStatus(Object.values(baseResults), true, false);
-    return { schema: TOOLCHAIN_SCHEMA, ...overall, manifest: { status: "invalid", digest: manifestDigest(root) }, securityGate: "blocking", platform: selectedPlatform, results: FIXED_TOOLS.map((tool) => actionableResult(baseResults[tool], selectedPlatform)), preparedHandles: handles, exitCode: 2 };
+    return { schema: TOOLCHAIN_SCHEMA, ...overall, candidate: probedCandidate(root), manifest: { status: "invalid", digest: manifestDigest(root) }, securityGate: "blocking", platform: selectedPlatform, results: FIXED_TOOLS.map((tool) => actionableResult(baseResults[tool], selectedPlatform)), preparedHandles: handles, exitCode: 2 };
   }
   const now = deps.now ?? new Date();
   const nodeObserved = (deps.probeNodeFn ?? defaultNodeProbe)({ rootDir: root, tempDir, now });
@@ -196,6 +271,7 @@ export function runToolchainPreflight({ rootDir, manifestResult = null, platform
   const exitCode = overall.ok ? 0 : gateMode === "blocking" ? 2 : gateMode === "warn" ? 1 : 0;
   return {
     schema: TOOLCHAIN_SCHEMA, ...overall,
+    candidate: probedCandidate(root),
     manifest: { status: loaded.status, digest: manifestDigest(root) },
     securityGate: gateMode,
     platform: selectedPlatform,
@@ -203,6 +279,31 @@ export function runToolchainPreflight({ rootDir, manifestResult = null, platform
     preparedHandles: handles,
     exitCode,
   };
+}
+
+export const CAPABILITY_TOOL_ROOTS = Object.freeze({ gitleaks: "cap.secrets", "osv-scanner": "cap.sca", semgrep: "cap.sast" });
+
+export function evaluateCapabilityCompleteness(preflightResult, requiredCapabilities) {
+  if (!preflightResult || !Array.isArray(preflightResult.results)) throw new TypeError("evaluateCapabilityCompleteness: preflightResult.results must be the results array produced by runToolchainPreflight()");
+  if (!Array.isArray(requiredCapabilities) || !requiredCapabilities.every((id) => typeof id === "string")) throw new TypeError("evaluateCapabilityCompleteness: requiredCapabilities must be a string[] of cap.* ids");
+  const statusByTool = new Map(preflightResult.results.map((entry) => [entry.tool, entry.status]));
+  const toolByCapability = new Map(Object.entries(CAPABILITY_TOOL_ROOTS).map(([tool, capability]) => [capability, tool]));
+  const requiredSet = new Set(requiredCapabilities);
+  const discovered = new Set([...toolByCapability.keys()].filter((capability) => {
+    const status = statusByTool.get(toolByCapability.get(capability));
+    return status !== undefined && status !== "not_required";
+  }));
+  const candidates = [...new Set([...requiredSet, ...discovered])].sort();
+  const capabilities = candidates.map((capability) => {
+    const tool = toolByCapability.get(capability) ?? null;
+    const isRequired = requiredSet.has(capability);
+    if (tool === null) return { capability, status: "unsupported", tool: null };
+    const ready = statusByTool.get(tool) === "ready";
+    return { capability, status: isRequired ? (ready ? "required" : "missing") : (ready ? "available" : "optional"), tool };
+  });
+  const licenseStatus = statusByTool.get("license-check");
+  const licenseControl = licenseStatus === undefined ? null : { control: "license-check", status: licenseStatus, note: "catalog control (CYB-1F F-4), not a cap.* capability-root verdict" };
+  return { schema: "pipeline.capability-completeness.v1", capabilities, licenseControl };
 }
 
 function parseArgs(argv) {
@@ -213,7 +314,7 @@ function parseArgs(argv) {
   }
   return { rootDir };
 }
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isDirectInvocation(import.meta.url)) {
   try { const output = runToolchainPreflight(parseArgs(process.argv.slice(2))); process.stdout.write(`${JSON.stringify(output, null, 2)}\n`); process.exitCode = output.exitCode; }
   catch (error) { process.stderr.write(`toolchain-preflight: ${error.message}\n`); process.exitCode = 2; }
 }

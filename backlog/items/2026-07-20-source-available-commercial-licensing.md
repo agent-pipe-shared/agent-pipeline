@@ -10,8 +10,8 @@ due: "2026-08-10"
 expires: "2026-08-17"
 closed_at: "2026-07-21"
 closure_repository: "self"
-closure_commit: "2ddf3592ea004bd6e2a830a61bb02c931238070f"
-closure_evidence: "backlog/evidence/2026-07-23-snt-1-activation-result.json"
+closure_commit: "03de3d47868d6d4c4b5710b174703fed99529dfa"
+closure_evidence: "specs/sprint-nova-epic/evidence/backlog/2026-07-24-unreachable-evidence-disposition.md"
 ---
 
 # Establish the Public Core source-available licensing boundary

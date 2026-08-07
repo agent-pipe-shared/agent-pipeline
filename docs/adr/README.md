@@ -28,7 +28,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0014](0014-critic-contract.md) | Critic contract (E12, A10) | accepted | 2026-07-03 |
 | [0015](0015-self-application.md) | Self-application of the pipeline to the pipeline repo (E13) | accepted | 2026-07-03 |
 | [0016](0016-git-hosting-github.md) | Git hosting — staying with GitHub (E14) | accepted | 2026-07-06 |
-| [0017](0017-push-policy-standing-approval.md) | Push policy — standing approval for `main` push (E15) | accepted | 2026-07-06 |
+| [0017](0017-push-policy-standing-approval.md) | Push policy — standing approval for `main` push (E15) | superseded for this repo by the 2026-08-06 PO decision (see 0055/0056) | 2026-07-06 |
 | [0018](0018-retro-process-elephant-authored.md) | Retro-process revision — Elephant authors the close retro itself (E18) | accepted | 2026-07-06 |
 | [0019](0019-project-scoping-one-repo-one-elephant.md) | Project boundary — one repo, one Elephant at a time (E19) | accepted | 2026-07-06 |
 | [0020](0020-el01-enforcement-goldfish-duty.md) | EL-01 enforcement — implementation only as a briefed Goldfish dispatch (E20) | accepted | 2026-07-06 |
@@ -49,15 +49,27 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0035](0035-codex-native-normal-critic.md) | Codex normal Critic through a native host boundary | accepted | 2026-07-15 |
 | [0036](0036-runner-honest-profiles-v2.md) | Runner-honest profiles and usage contracts v2 | accepted | 2026-07-17 |
 | [0037](0037-batman-bounded-assurance.md) | Batman bounded assurance, static Verify extension and typed delivery | accepted | 2026-07-18 |
-| [0038](0038-runner-neutral-advisory-v3.md) | Runner-neutral advisory duty v3 | accepted | 2026-07-19 |
+| [0038](0038-runner-neutral-advisory-v3.md) | Runner-neutral advisory duty v3 | accepted route registry; session trigger superseded by 0047 | 2026-07-19 |
 | [0039](0039-hawkeye-lifecycle-boundaries.md) | Hawkeye lifecycle boundaries for session power and regulated documents | proposed | 2026-07-19 |
-| [0040](0040-advisor-consent-and-readonly-bash.md) | Explicit advisor export consent and sandbox-bound Bash | accepted; partially superseded by 0041 | 2026-07-19 |
-| [0041](0041-po-authorized-codex-functional-equivalent.md) | PO-authorized Codex functional-equivalent gate pass | accepted | 2026-07-20 |
+| [0040](0040-advisor-consent-and-readonly-bash.md) | Explicit advisor export consent and sandbox-bound Bash | accepted; partially superseded by 0041 and 0047 | 2026-07-19 |
+| [0041](0041-po-authorized-codex-functional-equivalent.md) | PO-authorized Codex functional-equivalent gate pass | accepted transport; trigger governed by 0047 | 2026-07-20 |
 | [0042](0042-global-observation-and-document-governance.md) | Global observation intake and document-lifecycle governance | accepted | 2026-07-20 |
 | [0043](0043-post-go-live-sprint-model.md) | Post-go-live Sprint model and common-base branch rule | accepted | 2026-07-22 |
 | [0044](0044-control-execution-boundary.md) | Provider-neutral control/execution boundary | accepted | 2026-07-23 |
 | [0045](0045-canonical-artifact-topology.md) | Canonical artifact topology | accepted | 2026-07-24 |
 | [0046](0046-project-authority-layering.md) | Project authority layering | accepted | 2026-07-24 |
+| [0047](0047-model-free-advisor-preflight-v2.md) | Model-free Advisor preflight and on-demand consultation v2 | accepted | 2026-07-29 |
+| [0047-N](0047-local-supervisor-state-authority.md) | Local supervisor state authority (repository-local numbering collision retained) | accepted | 2026-07-26 |
+| [0048](0048-local-goldfish-supervisor.md) | Local Goldfish supervisor | accepted | 2026-07-26 |
+| [0049](0049-gitlab-ci-constrained-remote-executor-pilot.md) | GitLab CI constrained remote-executor pilot | accepted | 2026-07-27 |
+| [0050](0050-candidate-bound-verify-run-journal.md) | Candidate-bound private Verify run journal | accepted | 2026-08-01 |
+| [0051](0051-dual-runner-tri-platform-development-contract.md) | Dual-runner (Claude Code + Codex), tri-platform (Windows/macOS/Unix-WSL) development contract | accepted; its "support" clause clarified by 0057 | 2026-08-04 |
+| [0052](0052-marketplace-identity-restoration-and-local-dev-separation.md) | Restore the published marketplace identity and give local development its own | accepted | 2026-08-06 |
+| [0053](0053-setup-generator-authority-resolved-targets.md) | `setup.mjs` writes to the resolved project-authority tier, not a hardcoded legacy path | accepted (generator fix), partially deferred (stale-mirror removal) | 2026-08-06 |
+| [0054](0054-arbitheon-authority-directory-and-precedence-chain.md) | `.arbitheon/` authority directory, three-tier precedence chain, configurable location | accepted (design + sequencing), implementation staged | 2026-08-06 |
+| [0055](0055-critical-human-proof-waiver.md) | The Ed25519 human hard gate gets a sanctioned off-switch | accepted, refined by 0056 | 2026-08-06 |
+| [0056](0056-push-approval-mode.md) | The push gate stays; how a human clears it becomes a configured mode | accepted | 2026-08-06 |
+| [0057](0057-runner-platform-support-is-an-implementation-obligation.md) | Runner/platform support is an implementation obligation, not a per-cell evidence duty | accepted | 2026-08-06 |
 
 ### Resubmissions
 
@@ -70,6 +82,13 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0010](0010-session-bootstrap.md) | Bootstrap building block (phase 3), two-machine validation (phase 4) |
 | [0016](0016-git-hosting-github.md) | **2026-08-31** — bundled with the price review (0006); tipping triggers GH-T1–GH-T7 tracked ongoing in the tooling radar |
 | [0023](0023-elephant-context-diet.md) | Measurement-goal check at the next feature session (Elephant share ≤50%, feature session <$30, wall time −30%, first-pass unchanged) |
+| [0051](0051-dual-runner-tri-platform-development-contract.md) | Revisit/supersede when the planned Antigravity runner is actually realized |
+| [0052](0052-marketplace-identity-restoration-and-local-dev-separation.md) | PO acceptance required before publication (published supply-chain surface); first confirmed `claude plugin install` against the separate local marketplace root should be recorded here or in a successor entry |
+| [0053](0053-setup-generator-authority-resolved-targets.md) | Repository-wide legacy-path migration (Full Verify plus roughly a dozen other files) must land before the deferred `.claude/pipeline.json`/`.claude/pipeline.yaml` stale-mirror removal can be completed |
+| [0054](0054-arbitheon-authority-directory-and-precedence-chain.md) | Steps 2–4 (third tier + configurable name, writes to the top tier, completeness-gated cleanup) each need their own dispatch; the lower tiers may not be deleted until the completeness check is green |
+| [0055](0055-critical-human-proof-waiver.md) | PRD approval (`approve-plan`) is still unattributed and not proof-bound — the remaining half of the 2026-08-05 backlog item |
+| [0056](0056-push-approval-mode.md) | `deploy` and `publication` have no source-of-truth mode; add one only if an operator asks |
+| [0057](0057-runner-platform-support-is-an-implementation-obligation.md) | Build the mechanical R1/R2 checks — a literal-runner-default check first, then a both-shell-rendering check |
 
 ### Conventions
 
@@ -122,15 +141,20 @@ Architecture Decision Records der Agent-Pipeline. Die ADRs formalisieren das kan
 | [0035](0035-codex-native-normal-critic.md) | Normaler Codex-Critic über eine native Host-Grenze | akzeptiert | 2026-07-15 |
 | [0036](0036-runner-honest-profiles-v2.md) | Runner-ehrliche Profile und Usage-Verträge v2 | akzeptiert | 2026-07-17 |
 | [0037](0037-batman-bounded-assurance.md) | Batman — begrenzte Absicherung, statische Verify-Erweiterung und typisierte Auslieferung | akzeptiert | 2026-07-18 |
-| [0038](0038-runner-neutral-advisory-v3.md) | Runner-neutrale Advisory-Duty v3 | akzeptiert | 2026-07-19 |
+| [0038](0038-runner-neutral-advisory-v3.md) | Runner-neutrale Advisory-Duty v3 | akzeptierte Route Registry; Session-Trigger durch 0047 ersetzt | 2026-07-19 |
 | [0039](0039-hawkeye-lifecycle-boundaries.md) | Hawkeye-Lifecycle-Grenzen für Wachhalten und regulierte Dokumente | vorgeschlagen | 2026-07-19 |
-| [0040](0040-advisor-consent-and-readonly-bash.md) | Explizite Advisor-Exportfreigabe und Sandbox-gebundenes Bash | akzeptiert; teilweise durch 0041 ersetzt | 2026-07-19 |
-| [0041](0041-po-authorized-codex-functional-equivalent.md) | PO-autorisierter Codex-Funktionsäquivalenz-Pass für Gates | akzeptiert | 2026-07-20 |
+| [0040](0040-advisor-consent-and-readonly-bash.md) | Explizite Advisor-Exportfreigabe und Sandbox-gebundenes Bash | akzeptiert; teilweise durch 0041 und 0047 ersetzt | 2026-07-19 |
+| [0041](0041-po-authorized-codex-functional-equivalent.md) | PO-autorisierter Codex-Funktionsäquivalenz-Pass für Gates | akzeptierter Transport; Trigger durch 0047 geregelt | 2026-07-20 |
 | [0042](0042-global-observation-and-document-governance.md) | Globale Observation-Aufnahme und Dokument-Lifecycle-Governance | akzeptiert | 2026-07-20 |
 | [0043](0043-post-go-live-sprint-model.md) | Post-Go-live-Sprint-Modell und Common-Base-Branch-Regel | akzeptiert | 2026-07-22 |
 | [0044](0044-control-execution-boundary.md) | Anbieterneutrale Kontroll-/Ausführungsgrenze | akzeptiert | 2026-07-23 |
 | [0045](0045-canonical-artifact-topology.md) | Kanonische Artefakt-Topologie | akzeptiert | 2026-07-24 |
 | [0046](0046-project-authority-layering.md) | Projekt-Authority-Layering | akzeptiert | 2026-07-24 |
+| [0047](0047-model-free-advisor-preflight-v2.md) | Modellfreier Advisor-Preflight und On-demand-Consultation v2 | akzeptiert | 2026-07-29 |
+| [0047-N](0047-local-supervisor-state-authority.md) | Lokale Supervisor-State-Authority (repo-lokale Nummernkollision beibehalten) | akzeptiert | 2026-07-26 |
+| [0048](0048-local-goldfish-supervisor.md) | Lokaler Goldfish-Supervisor | akzeptiert | 2026-07-26 |
+| [0049](0049-gitlab-ci-constrained-remote-executor-pilot.md) | GitLab-CI-Pilot für eingeschränkte Remote-Ausführung | akzeptiert | 2026-07-27 |
+| [0050](0050-candidate-bound-verify-run-journal.md) | Kandidatengebundenes privates Verify-Run-Journal | akzeptiert | 2026-08-01 |
 
 ## Wiedervorlagen
 

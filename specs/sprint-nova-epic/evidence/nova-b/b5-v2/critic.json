@@ -1,0 +1,22 @@
+{
+  "schema": "pipeline.nova-b5-v2.critic-evidence.v1",
+  "candidate": {
+    "commit": "7c0b0bedf48ac9fadac5d145504819439c3f2309",
+    "tree": "7089d7c5092c8780dd5188a649bbc9b43dc131c9"
+  },
+  "review": {
+    "mode": "fresh independent critic",
+    "assurance": "functional-equivalent-read-only; OS isolation not asserted",
+    "verdict": "pass",
+    "findings": []
+  },
+  "reviewedPaths": [
+    "plugins/pipeline-core/lib/nova-candidate-freeze.mjs",
+    "plugins/pipeline-core/lib/nova-candidate-freeze.test.mjs",
+    "plugins/pipeline-core/scripts/nova-b5-candidate-freeze-v2.schema.json",
+    "specs/sprint-nova-epic/implementation/issue-acceptance-matrix.md",
+    "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
+    "specs/sprint-nova-epic/spec.md"
+  ],
+  "scope": "B5 post-v0.4.7 candidate-freeze V2 contract only; no native Apple-Silicon, hosted or Intel execution claim."
+}

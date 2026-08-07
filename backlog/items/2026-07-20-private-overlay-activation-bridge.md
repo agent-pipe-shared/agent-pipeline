@@ -3,11 +3,15 @@ schema: "pipeline.backlog-item.v1"
 id: "pipeline.private-overlay-activation-bridge"
 type: "workflow-improvement"
 owner: "pipeline"
-status: "in_progress"
+status: "closed"
 created: "2026-07-20"
 source: "Public review of the slim private-overlay consumer activation boundary"
 due: "2026-08-10"
 expires: "2026-08-17"
+closed_at: "2026-07-24"
+closure_repository: "self"
+closure_commit: "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb"
+closure_evidence: "backlog/evidence/2026-07-24-completed-companion-deliveries.md"
 ---
 
 # Activate pinned private overlays through the Public Core

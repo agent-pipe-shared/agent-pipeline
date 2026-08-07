@@ -36,6 +36,13 @@ import {
   codexHostRepositoryAuthoritySha256,
   readCodexHostRepositoryInitAdmission,
 } from "../lib/codex-host-layout.mjs";
+import {
+  NEUTRAL_CALIBRATION,
+  NEUTRAL_MANIFEST,
+  NEUTRAL_STATE,
+  resolveProjectAuthorityPaths,
+} from "../lib/project-authority.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const PLAN_SCHEMA = "pipeline.codex-host-repository-init-plan.v1";
 const APPLY_SCHEMA = "pipeline.codex-host-repository-init-apply.v1";
@@ -59,17 +66,47 @@ const INITIAL_GIT_PATHS = new Set([
   "refs/heads",
   "refs/tags",
 ]);
-const REQUIRED = [
-  "pipeline.user.yaml",
-  ".claude/pipeline.json",
-  ".claude/pipeline.yaml",
-  ".claude/settings.json",
-  ".claude/pipeline-state.json",
-  "docs/state.md",
-  "specs/kickoff-initial-prd.md",
-  "specs/kickoff-initial-spec.md",
-  ".claude/.runtime/agent-pipeline/onboarding/continuity-history.json",
-];
+function portableAuthorityPaths(root) {
+  const authority = resolveProjectAuthorityPaths({ rootDir: root });
+  return authority.status === "ready"
+    ? authority
+    : {
+      calibration: NEUTRAL_CALIBRATION,
+      manifest: NEUTRAL_MANIFEST,
+      state: NEUTRAL_STATE,
+    };
+}
+
+function safeProjectPath(value) {
+  return typeof value === "string"
+    && value.length > 0
+    && !value.startsWith("/")
+    && !value.includes("\\")
+    && !value.split("/").some((part) => part === "" || part === "." || part === "..");
+}
+
+function requiredPortablePaths(root, read = readFileSync) {
+  const authority = portableAuthorityPaths(root);
+  let state;
+  try { state = JSON.parse(read(join(root, authority.state)).toString("utf8")); } catch {
+    throw new Error("portable continuity state is unreadable");
+  }
+  const prdPath = state?.continuity?.authority?.prd?.path;
+  const specPath = state?.continuity?.authority?.spec?.path;
+  if (!safeProjectPath(prdPath) || !safeProjectPath(specPath)) {
+    throw new Error("portable continuity authority paths are unsafe");
+  }
+  return [
+    "pipeline.user.yaml",
+    authority.calibration,
+    authority.manifest,
+    authority.state,
+    "docs/state.md",
+    prdPath,
+    specPath,
+    ".claude/.runtime/agent-pipeline/onboarding/continuity-history.json",
+  ];
+}
 
 function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
@@ -95,13 +132,14 @@ function safeRoot(rootDir, fs = {}) {
 function portableSnapshot(root, fs = {}) {
   const read = fs.readFileSync ?? readFileSync;
   const lstat = fs.lstatSync ?? lstatSync;
-  const files = REQUIRED.map((path) => {
+  const authority = portableAuthorityPaths(root);
+  const files = requiredPortablePaths(root, read).map((path) => {
     const absolute = join(root, path);
     const stat = lstat(absolute);
     if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`required portable file is unsafe: ${path}`);
     return { path, sha256: sha256(read(absolute)) };
   });
-  const calibrationBytes = read(join(root, ".claude/pipeline.json"));
+  const calibrationBytes = read(join(root, authority.calibration));
   const calibration = JSON.parse(calibrationBytes.toString("utf8"));
   if (calibration?.repositoryMode !== "host-managed") {
     throw new Error("portable calibration is not host-managed");
@@ -1196,5 +1234,5 @@ export function main(argv = process.argv.slice(2)) {
   return ["ready", "restart-required"].includes(result.status) ? 0 : 2;
 }
 
-const invokedDirectly = process.argv[1] && resolve(fileURLToPath(import.meta.url)) === resolve(process.argv[1]);
+const invokedDirectly = isDirectInvocation(import.meta.url);
 if (invokedDirectly) process.exitCode = main();

@@ -81,11 +81,14 @@
           "docs/governance-event-export.md",
           "docs/governance-replay.md",
           "docs/licensing.md",
+          "docs/macos-support.md",
           "docs/observation-intake.md",
           "docs/operating-model.md",
           "docs/organization-policy-packs.md",
+          "docs/runner-support.md",
           "docs/runtime-boundary.md",
-          "docs/v3-consumer-onboarding.md"
+          "docs/v3-consumer-onboarding.md",
+          "docs/whats-new-0.5.0.md"
         ]
       },
       {
@@ -109,22 +112,35 @@
         "lifecycle": "maintained",
         "paths": [
           "docs/artifact-topology.md",
+          "docs/claude-local-plugin-development.md",
           "docs/codex-local-plugin-development.md",
           "docs/codex-onboarding-threat-model.md",
           "docs/contributor-gate-security.md",
           "docs/critic-isolation-threat-model.md",
           "docs/github-actions-token-permissions.md",
+          "docs/gitlab-ci-pilot-threat-model.md",
           "docs/governance-events.md",
+          "docs/human-guard-override-threat-model.md",
+          "docs/local-supervisor-state-threat-model.md",
           "docs/marketplace-supply-chain-threat-model.md",
           "docs/next-session-setup-prompt.md",
+          "docs/nova-execution-plane-threat-model.md",
           "docs/phoenix-governance-threat-model.md",
+          "docs/po-approval-proof-contract.md",
+          "docs/po-human-approval.md",
           "docs/release-0.4-readiness.md",
           "docs/release-0.4.2-readiness.md",
           "docs/release-0.4.3-readiness.md",
           "docs/release-0.4.4-readiness.md",
           "docs/release-0.4.5-readiness.md",
           "docs/release-0.4.6-readiness.md",
+          "docs/release-0.5.0-readiness.md",
+          "docs/release-0.5.2-readiness.md",
+          "docs/runner-platform-conformance.md",
+          "docs/security-incident-response.md",
+          "docs/security-support-policy.md",
           "docs/sentinel-scope-extension-threat-model.md",
+          "docs/sprint-cyborg-tp-waiver.md",
           "docs/state.md"
         ]
       },
@@ -179,6 +195,18 @@
           "docs/adr/0045-canonical-artifact-topology.md",
           "docs/adr/0046-project-authority-layering.md",
           "docs/adr/0047-governance-event-kernel.md",
+          "docs/adr/0047-local-supervisor-state-authority.md",
+          "docs/adr/0047-model-free-advisor-preflight-v2.md",
+          "docs/adr/0048-local-goldfish-supervisor.md",
+          "docs/adr/0049-gitlab-ci-constrained-remote-executor-pilot.md",
+          "docs/adr/0050-candidate-bound-verify-run-journal.md",
+          "docs/adr/0051-dual-runner-tri-platform-development-contract.md",
+          "docs/adr/0052-marketplace-identity-restoration-and-local-dev-separation.md",
+          "docs/adr/0053-setup-generator-authority-resolved-targets.md",
+          "docs/adr/0054-arbitheon-authority-directory-and-precedence-chain.md",
+          "docs/adr/0055-critical-human-proof-waiver.md",
+          "docs/adr/0056-push-approval-mode.md",
+          "docs/adr/0057-runner-platform-support-is-an-implementation-obligation.md",
           "docs/adr/README.md"
         ]
       },
@@ -211,6 +239,7 @@
         "lifecycle": "maintained",
         "paths": [
           "docs/product-capability-inventory.json",
+          "docs/release-state.json",
           "docs/spec-archive/2026-07-20-sentinel-recovery/manifest.json"
         ]
       }

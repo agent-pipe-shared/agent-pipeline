@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const POLICY_SCHEMA = "pipeline.codex-sandbox-compatibility-policy.v1";
+export const POLICY_SCHEMA = "pipeline.codex-sandbox-compatibility-policy.v2";
 export const PROJECTION_SCHEMA = "pipeline.codex-sandbox-compatibility-receipt.v1";
 export const INTERMEDIATE_LITERAL = "sandbox-read-only-except-coordinator-scratch; input/network isolation not asserted";
 export const WEAK_LITERAL = "functional-equivalent-read-only; OS isolation not asserted";
@@ -16,7 +16,7 @@ export const STATES = Object.freeze(["unsupported", "diagnostic-only", "intermed
 const SHA256 = /^[0-9a-f]{64}$/;
 const SAFE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/;
 const HERE = dirname(fileURLToPath(import.meta.url));
-const POLICY_PATH = join(HERE, "../config/codex-sandbox-compatibility.v1.json");
+const POLICY_PATH = join(HERE, "../config/codex-sandbox-compatibility.v2.json");
 
 export class CompatibilityError extends Error {
   constructor(code, message) { super(message); this.name = "CompatibilityError"; this.code = code; }
@@ -53,14 +53,15 @@ export function validateCompatibilityPolicy(policy) {
   if (allowedFailures.some((code) => !policy.fallback.allowedFailureCodes.includes(code))) fail("F4-FALLBACK", "fallback failure allowlist drifted");
   const ids = new Set(); const tuples = new Set();
   for (const entry of policy.entries) {
-    exactKeys(entry, ["id", "runnerId", "primaryLaneId", "fallbackLaneId", "cliVersion", "releasedArtifactSha256", "kernelClass", "filesystemClass", "permissionProfileId", "permissionProfileSha256", "preflightSchemaSha256", "networkEnabled", "initialState"], "entry");
-    for (const [name, value] of Object.entries({ id: entry.id, runnerId: entry.runnerId, primaryLaneId: entry.primaryLaneId, fallbackLaneId: entry.fallbackLaneId, cliVersion: entry.cliVersion, kernelClass: entry.kernelClass, permissionProfileId: entry.permissionProfileId })) safe(value, name);
-    for (const [name, value] of Object.entries({ releasedArtifactSha256: entry.releasedArtifactSha256, permissionProfileSha256: entry.permissionProfileSha256, preflightSchemaSha256: entry.preflightSchemaSha256 })) digest(value, name);
+    exactKeys(entry, ["id", "runnerId", "primaryLaneId", "fallbackLaneId", "compatibilityClass", "kernelClass", "filesystemClass", "permissionProfileId", "permissionProfileSha256", "preflightSchemaSha256", "networkEnabled", "initialState"], "entry");
+    for (const [name, value] of Object.entries({ id: entry.id, runnerId: entry.runnerId, primaryLaneId: entry.primaryLaneId, fallbackLaneId: entry.fallbackLaneId, compatibilityClass: entry.compatibilityClass, kernelClass: entry.kernelClass, permissionProfileId: entry.permissionProfileId })) safe(value, name);
+    for (const [name, value] of Object.entries({ permissionProfileSha256: entry.permissionProfileSha256, preflightSchemaSha256: entry.preflightSchemaSha256 })) digest(value, name);
     if (!new Set(["native-linux", "wsl-native", "drvfs"]).has(entry.filesystemClass) || typeof entry.networkEnabled !== "boolean"
       || !new Set(["diagnostic-only", "intermediate-preflight-candidate"]).has(entry.initialState)
       || entry.fallbackLaneId !== policy.fallback.laneId || entry.runnerId !== policy.fallback.runnerId
       || entry.initialState === "intermediate-preflight-candidate" && (!entry.networkEnabled || entry.permissionProfileId !== "codex-critic-intermediate.v1")) fail("F4-POLICY", "entry contradicts its assurance boundary");
-    const tuple = [entry.runnerId, entry.cliVersion, entry.releasedArtifactSha256, entry.kernelClass, entry.filesystemClass, entry.permissionProfileSha256].join("|");
+    if (entry.compatibilityClass !== "codex-sandbox-state-v1") fail("F4-POLICY", "entry declares an unknown semantic compatibility class");
+    const tuple = [entry.runnerId, entry.compatibilityClass, entry.kernelClass, entry.filesystemClass, entry.permissionProfileSha256].join("|");
     if (ids.has(entry.id) || tuples.has(tuple)) fail("F4-POLICY", "duplicate compatibility entry");
     ids.add(entry.id); tuples.add(tuple);
   }
@@ -68,8 +69,7 @@ export function validateCompatibilityPolicy(policy) {
 }
 
 function findEntry(policy, observation) {
-  return policy.entries.filter((entry) => entry.runnerId === observation.runnerId && entry.cliVersion === observation.cliVersion
-    && entry.releasedArtifactSha256 === observation.releasedArtifactSha256 && entry.kernelClass === observation.kernelClass
+  return policy.entries.filter((entry) => entry.runnerId === observation.runnerId && entry.kernelClass === observation.kernelClass
     && entry.filesystemClass === observation.filesystemClass && entry.permissionProfileId === observation.permissionProfileId
     && entry.permissionProfileSha256 === observation.permissionProfileSha256);
 }
@@ -84,14 +84,17 @@ function receiptBound(evidence) {
 export function classifyCompatibility(policy, observation) {
   validateCompatibilityPolicy(policy);
   exactKeys(observation, ["runnerId", "cliVersion", "releasedArtifactSha256", "kernelClass", "filesystemClass", "permissionProfileId", "permissionProfileSha256", "bootId", "nowMs", "preflight", "runner", "shadow", "activation", "routePostimageSha256"], "observation");
+  if (typeof observation.cliVersion !== "string" || !SAFE.test(observation.cliVersion) || !SHA256.test(observation.releasedArtifactSha256)) {
+    return { state: "unsupported", entry: null, reason: "invalid-current-toolchain-identity" };
+  }
   const matches = findEntry(policy, observation);
   if (matches.length !== 1) return { state: "unsupported", entry: null, reason: "no-exact-policy-entry" };
   const entry = matches[0];
   if (!fresh(observation.preflight, observation, policy.maxEvidenceAgeMs)) return { state: entry.initialState, entry, reason: "fresh-preflight-required" };
   const preflight = observation.preflight.receipt;
   if (!receiptBound(observation.preflight) || observation.preflight.schemaSha256 !== entry.preflightSchemaSha256
-    || preflight.schema !== "pipeline.codex-sandbox-preflight.v1" || preflight.cli?.version !== entry.cliVersion
-    || preflight.cli?.artifactSha256 !== entry.releasedArtifactSha256 || preflight.profile?.id !== entry.permissionProfileId
+    || preflight.schema !== "pipeline.codex-sandbox-preflight.v1" || preflight.cli?.version !== observation.cliVersion
+    || preflight.cli?.artifactSha256 !== observation.releasedArtifactSha256 || preflight.profile?.id !== entry.permissionProfileId
     || preflight.profile?.rawSha256 !== entry.permissionProfileSha256 || preflight.platform?.kernelClass !== entry.kernelClass
     || preflight.platform?.filesystemClass !== entry.filesystemClass || preflight.networkEnabled !== entry.networkEnabled
     || preflight.terminalCode !== "ok") return { state: "diagnostic-only", entry, reason: "preflight-binding-mismatch" };

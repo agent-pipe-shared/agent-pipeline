@@ -45,6 +45,7 @@ import {
   compileSettingsJson,
   compilePipelineJson,
   renderPipelineYaml,
+  resolveCompiledRuntimeTargets,
   validateCompiledPipelineYaml,
   publishPoGateProfileReceipt,
   validateSharedLock,
@@ -425,10 +426,11 @@ function managedPolicyLockYaml({ mode = "strict", status = "source-unverified" }
   }
   const rendered = messages.join("\n");
   ok(
-    "run: lifecycle remediation includes its executable and shell-quotes every argv element",
+    "run: lifecycle remediation omits typed action data from logs",
     code === 2
-      && rendered.includes("review and run: node '/plugin/project onboarding-v3.mjs' plan --root ")
-      && rendered.includes(`'${root}; touch must-stay-inert'`),
+      && rendered.includes("governed onboarding requires its next typed recovery action")
+      && !rendered.includes("project onboarding-v3.mjs")
+      && !rendered.includes("touch must-stay-inert"),
   );
   rmSync(root, { recursive: true, force: true });
 }
@@ -589,6 +591,95 @@ for (const [name, source] of [
 }
 
 // ======================================================================================
+// resolveCompiledRuntimeTargets — ADR-0053: generator writes to the resolved
+// project-authority tier instead of a hardcoded legacy path.
+// ======================================================================================
+{
+  const root = mkdtempSync(join(tmpdir(), "setup-targets-neutral-"));
+  mkdirSync(join(root, "project"), { recursive: true });
+  writeFileSync(join(root, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  const targets = resolveCompiledRuntimeTargets(root);
+  ok(
+    "resolveCompiledRuntimeTargets: a neutral-authority project gets project/ write targets",
+    targets.source === "neutral"
+      && targets.calibrationPath === join(root, "project", "pipeline.json")
+      && targets.manifestPath === join(root, "project", "pipeline.yaml"),
+    JSON.stringify(targets),
+  );
+  rmSync(root, { recursive: true, force: true });
+}
+{
+  const root = mkdtempSync(join(tmpdir(), "setup-targets-legacy-"));
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  const targets = resolveCompiledRuntimeTargets(root);
+  ok(
+    "resolveCompiledRuntimeTargets: a legacy-authority project still gets .claude/ write targets (never silently migrated by running setup)",
+    targets.source === "legacy"
+      && targets.calibrationPath === join(root, ".claude", "pipeline.json")
+      && targets.manifestPath === join(root, ".claude", "pipeline.yaml"),
+    JSON.stringify(targets),
+  );
+  rmSync(root, { recursive: true, force: true });
+}
+{
+  // F2 (Critic dispatch CRITIC-REMEDY-09): the resolver's "missing" status is
+  // keyed off the manifest (pipeline.yaml) only -- a project holding only a
+  // legacy calibration (.claude/pipeline.json), never having adopted the
+  // optional manifest, also resolves as "missing". Seeding that project at
+  // the neutral tier would orphan its live .claude/pipeline.json; it must
+  // stay on the legacy tier instead, exactly like a "ready"/legacy project.
+  const root = mkdtempSync(join(tmpdir(), "setup-targets-missing-with-legacy-calibration-"));
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  writeFileSync(join(root, ".claude", "pipeline.json"), "{}\n");
+  const targets = resolveCompiledRuntimeTargets(root);
+  ok(
+    "resolveCompiledRuntimeTargets: a 'missing'-status project with only a legacy calibration (no manifest anywhere) still gets .claude/ write targets, not orphaned onto project/",
+    targets.source === "legacy"
+      && targets.calibrationPath === join(root, ".claude", "pipeline.json")
+      && targets.manifestPath === join(root, ".claude", "pipeline.yaml")
+      && !existsSync(join(root, "project")),
+    JSON.stringify(targets),
+  );
+  rmSync(root, { recursive: true, force: true });
+}
+{
+  const root = mkdtempSync(join(tmpdir(), "setup-targets-pristine-"));
+  const targets = resolveCompiledRuntimeTargets(root);
+  ok(
+    "resolveCompiledRuntimeTargets: a pristine project (no authority manifest at either tier) is deliberately seeded at the neutral tier",
+    targets.source === "neutral"
+      && targets.calibrationPath === join(root, "project", "pipeline.json")
+      && targets.manifestPath === join(root, "project", "pipeline.yaml")
+      && !existsSync(join(root, "project"))
+      && !existsSync(join(root, ".claude")),
+    JSON.stringify(targets),
+  );
+  rmSync(root, { recursive: true, force: true });
+}
+{
+  // ADR-0053's documented fallback for an ambiguous/broken on-disk authority state
+  // (here: `mixed` -- a neutral manifest present alongside orphaned legacy calibration
+  // with no neutral calibration of its own -- see project-authority.mjs `authority()`):
+  // this generator does not attempt to repair it and keeps the legacy target rather
+  // than guessing.
+  const root = mkdtempSync(join(tmpdir(), "setup-targets-mixed-"));
+  mkdirSync(join(root, "project"), { recursive: true });
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  writeFileSync(join(root, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  writeFileSync(join(root, ".claude", "pipeline.json"), "{}\n");
+  const targets = resolveCompiledRuntimeTargets(root);
+  ok(
+    "resolveCompiledRuntimeTargets: an ambiguous/broken authority state (e.g. mixed) falls back to the legacy target instead of guessing",
+    targets.source === "legacy"
+      && targets.calibrationPath === join(root, ".claude", "pipeline.json")
+      && targets.manifestPath === join(root, ".claude", "pipeline.yaml"),
+    JSON.stringify(targets),
+  );
+  rmSync(root, { recursive: true, force: true });
+}
+
+// ======================================================================================
 // applyAboPreset
 // ======================================================================================
 {
@@ -668,7 +759,7 @@ for (const [name, source] of [
   const a = applyAutonomyPreset("konservativ");
   ok(
     "applyAutonomyPreset konservativ: gated / feature-branch",
-    a.push_policy === "gated" && a.branch_model === "feature-branch" && a.wip_limit === 1,
+    a.push_policy === "gated" && a.branch_model === "feature-branch" && a.wip_limit === 3,
     JSON.stringify(a),
   );
 }
@@ -676,7 +767,7 @@ for (const [name, source] of [
   const a = applyAutonomyPreset("autonom");
   ok(
     "applyAutonomyPreset autonom: standing-approved / direct-main",
-    a.push_policy === "standing-approved" && a.branch_model === "direct-main" && a.wip_limit === 1,
+    a.push_policy === "standing-approved" && a.branch_model === "direct-main" && a.wip_limit === 3,
     JSON.stringify(a),
   );
 }

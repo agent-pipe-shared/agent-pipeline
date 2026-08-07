@@ -150,6 +150,10 @@ function windowsAssuranceRegistrationFailureFixture() {
     copyFileSync(join(repoRoot, "harness", "scripts", "verify.mjs"), writer);
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "scoped-verify-registration.mjs"), scopedRegistration);
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "windows-assurance-verify-registration.mjs"), windowsRegistration);
+    copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "verify-resume.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "verify-resume.mjs"));
+    copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "windows-private-state.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "windows-private-state.mjs"));
+    mkdirSync(join(fixtureRoot, "plugins", "pipeline-core", "scripts"), { recursive: true });
+    copyFileSync(join(repoRoot, "plugins", "pipeline-core", "scripts", "verify-journal.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "scripts", "verify-journal.mjs"));
     copyFileSync(join(repoRoot, "specs", "2026-07-19-sprint-sentinel-epic", "prd_sentinel-epic.md"), prd);
     copyFileSync(join(repoRoot, AUTHORITY_PATH), authority);
     for (const suite of [

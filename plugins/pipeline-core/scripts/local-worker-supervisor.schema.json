@@ -1,0 +1,626 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.invalid/schemas/local-worker-supervisor.schema.json",
+  "title": "Nova B1-I local worker supervisor contracts",
+  "x-pipeline-validation": {
+    "contract": "pipeline.local-worker-supervisor-validation.v1",
+    "structuralSchema": "local-worker-supervisor.schema.json#/$defs/request",
+    "semanticValidator": "validateLocalWorkerSupervisorRequest",
+    "acceptance": "structural-and-semantic",
+    "semanticRules": [
+      "cleanup-lease-relations",
+      "cross-item-uniqueness",
+      "cross-worker-timing-equality",
+      "digest-equality",
+      "lexical-ordering",
+      "relative-timing-bounds"
+    ]
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/request" },
+    { "$ref": "#/$defs/plan" },
+    { "$ref": "#/$defs/record" },
+    { "$ref": "#/$defs/result" },
+    { "$ref": "#/$defs/cancel" }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "oid": {
+      "type": "string",
+      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "safePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!/)(?!.*//)(?!.*/$)(?!\\.{1,2}(?:/|$))(?!.*/\\.{1,2}(?:/|$))[A-Za-z0-9._/-]+$"
+    },
+    "processIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nonce",
+        "pid",
+        "processStartSha256",
+        "bootSha256",
+        "executableSha256"
+      ],
+      "properties": {
+        "nonce": { "$ref": "#/$defs/id" },
+        "pid": { "type": "integer", "minimum": 1 },
+        "processStartSha256": { "$ref": "#/$defs/sha256" },
+        "bootSha256": { "$ref": "#/$defs/sha256" },
+        "executableSha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "workerRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "taskId",
+        "subjectSha256",
+        "leaseId",
+        "writePaths",
+        "instruction",
+        "instructionSha256",
+        "heartbeatIntervalMs",
+        "orphanAfterMs"
+      ],
+      "properties": {
+        "taskId": { "$ref": "#/$defs/id" },
+        "subjectSha256": { "$ref": "#/$defs/sha256" },
+        "leaseId": { "$ref": "#/$defs/id" },
+        "writePaths": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/safePath" }
+        },
+        "instruction": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32768
+        },
+        "instructionSha256": { "$ref": "#/$defs/sha256" },
+        "heartbeatIntervalMs": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 60000
+        },
+        "orphanAfterMs": {
+          "type": "integer",
+          "minimum": 3000,
+          "maximum": 600000
+        }
+      }
+    },
+    "fixtureRunner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "executable",
+        "executableSha256",
+        "model",
+        "effort",
+        "timeoutMs",
+        "maxOutputBytes",
+        "fixture"
+      ],
+      "properties": {
+        "kind": { "const": "fixture" },
+        "executable": { "type": "string", "minLength": 1 },
+        "executableSha256": { "$ref": "#/$defs/sha256" },
+        "model": { "type": "null" },
+        "effort": { "type": "null" },
+        "timeoutMs": { "type": "integer", "minimum": 100, "maximum": 600000 },
+        "maxOutputBytes": { "type": "integer", "minimum": 1024, "maximum": 1048576 },
+        "fixture": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["delayMs", "exitCode", "behavior"],
+          "properties": {
+            "delayMs": { "type": "integer", "minimum": 100, "maximum": 30000 },
+            "exitCode": { "type": "integer", "minimum": 0, "maximum": 125 },
+            "behavior": {
+              "enum": ["first-authorized", "ignored-unauthorized", "none"]
+            }
+          }
+        }
+      }
+    },
+    "codexRunner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "executable",
+        "executableSha256",
+        "model",
+        "effort",
+        "timeoutMs",
+        "maxOutputBytes",
+        "fixture"
+      ],
+      "properties": {
+        "kind": { "const": "codex-exec" },
+        "executable": { "type": "string", "minLength": 1 },
+        "executableSha256": { "$ref": "#/$defs/sha256" },
+        "model": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        },
+        "effort": {
+          "enum": ["low", "medium", "high", "xhigh"]
+        },
+        "timeoutMs": { "type": "integer", "minimum": 100, "maximum": 600000 },
+        "maxOutputBytes": { "type": "integer", "minimum": 1024, "maximum": 1048576 },
+        "fixture": { "type": "null" }
+      }
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "repository",
+        "dispatch",
+        "supervisor",
+        "git",
+        "pool",
+        "runner",
+        "workers"
+      ],
+      "properties": {
+        "schema": {
+          "const": "pipeline.local-worker-supervisor-request.v1"
+        },
+        "repository": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "fingerprint",
+            "sourceRoot",
+            "sourceRootSha256",
+            "baseCommit",
+            "candidateCommit",
+            "candidateSha256"
+          ],
+          "properties": {
+            "fingerprint": { "$ref": "#/$defs/sha256" },
+            "sourceRoot": { "type": "string", "minLength": 1 },
+            "sourceRootSha256": { "$ref": "#/$defs/sha256" },
+            "baseCommit": { "$ref": "#/$defs/oid" },
+            "candidateCommit": { "$ref": "#/$defs/oid" },
+            "candidateSha256": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "dispatch": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "dispatchId",
+            "attempt",
+            "queueRevision",
+            "packageSha256"
+          ],
+          "properties": {
+            "dispatchId": { "$ref": "#/$defs/id" },
+            "attempt": { "type": "integer", "minimum": 0 },
+            "queueRevision": { "type": "integer", "minimum": 0 },
+            "packageSha256": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "supervisor": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "subject",
+            "ownerNonce",
+            "heartbeatMs",
+            "orphanAfterMs",
+            "cleanupLeaseMs",
+            "recoveryReserve"
+          ],
+          "properties": {
+            "subject": { "$ref": "#/$defs/id" },
+            "ownerNonce": { "$ref": "#/$defs/id" },
+            "heartbeatMs": { "type": "integer", "minimum": 1000, "maximum": 60000 },
+            "orphanAfterMs": { "type": "integer", "minimum": 3000, "maximum": 600000 },
+            "cleanupLeaseMs": { "type": "integer", "minimum": 3001, "maximum": 3600000 },
+            "recoveryReserve": { "type": "integer", "minimum": 1, "maximum": 16 }
+          }
+        },
+        "git": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["executable", "executableSha256"],
+          "properties": {
+            "executable": { "type": "string", "minLength": 1 },
+            "executableSha256": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "pool": {
+          "$ref": "local-worker-pool.schema.json"
+        },
+        "runner": {
+          "oneOf": [
+            { "$ref": "#/$defs/fixtureRunner" },
+            { "$ref": "#/$defs/codexRunner" }
+          ]
+        },
+        "workers": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": { "$ref": "#/$defs/workerRequest" }
+        }
+      }
+    },
+    "planWorkspace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "taskId",
+        "subjectSha256",
+        "leaseId",
+        "workspaceMember",
+        "workspacePathSha256"
+      ],
+      "properties": {
+        "taskId": { "$ref": "#/$defs/id" },
+        "subjectSha256": { "$ref": "#/$defs/sha256" },
+        "leaseId": { "$ref": "#/$defs/id" },
+        "workspaceMember": { "$ref": "#/$defs/id" },
+        "workspacePathSha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "status",
+        "requestSha256",
+        "poolSha256",
+        "sourceStatusSha256",
+        "effectiveCapacity",
+        "workspaces",
+        "providerExecutionRequired",
+        "planSha256"
+      ],
+      "properties": {
+        "schema": { "const": "pipeline.local-worker-supervisor-plan.v1" },
+        "status": {
+          "enum": ["ready", "serial-fallback-required"]
+        },
+        "requestSha256": { "$ref": "#/$defs/sha256" },
+        "poolSha256": { "$ref": "#/$defs/sha256" },
+        "sourceStatusSha256": { "$ref": "#/$defs/sha256" },
+        "effectiveCapacity": { "type": "integer", "minimum": 0, "maximum": 16 },
+        "workspaces": {
+          "type": "array",
+          "maxItems": 16,
+          "items": { "$ref": "#/$defs/planWorkspace" }
+        },
+        "providerExecutionRequired": { "type": "boolean" },
+        "planSha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "changedFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "kind", "mode", "bytes", "sha256"],
+      "properties": {
+        "path": { "$ref": "#/$defs/safePath" },
+        "kind": { "enum": ["added", "modified", "deleted"] },
+        "mode": {
+          "oneOf": [
+            { "enum": ["100644", "100755"] },
+            { "type": "null" }
+          ]
+        },
+        "bytes": { "type": "integer", "minimum": 0, "maximum": 1048576 },
+        "sha256": {
+          "oneOf": [
+            { "$ref": "#/$defs/sha256" },
+            { "type": "null" }
+          ]
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "kind": { "const": "added" },
+            "mode": { "enum": ["100644", "100755"] },
+            "sha256": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        {
+          "properties": {
+            "kind": { "const": "modified" },
+            "mode": { "enum": ["100644", "100755"] },
+            "sha256": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        {
+          "properties": {
+            "kind": { "const": "deleted" },
+            "mode": { "type": "null" },
+            "bytes": { "const": 0 },
+            "sha256": { "type": "null" }
+          }
+        }
+      ]
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "taskId",
+        "subjectSha256",
+        "candidateCommit",
+        "status",
+        "exitCode",
+        "signal",
+        "changed",
+        "changeManifestSha256",
+        "stdoutSha256",
+        "stderrSha256",
+        "startedMonotonicMs",
+        "completedMonotonicMs",
+        "resultSha256"
+      ],
+      "properties": {
+        "schema": { "const": "pipeline.local-worker-supervisor-result.v1" },
+        "taskId": { "$ref": "#/$defs/id" },
+        "subjectSha256": { "$ref": "#/$defs/sha256" },
+        "candidateCommit": { "$ref": "#/$defs/oid" },
+        "status": {
+          "enum": [
+            "completed",
+            "failed",
+            "cancelled",
+            "timed-out",
+            "recovery-required"
+          ]
+        },
+        "exitCode": {
+          "oneOf": [
+            { "type": "integer", "minimum": 0, "maximum": 255 },
+            { "type": "null" }
+          ]
+        },
+        "signal": {
+          "oneOf": [
+            { "enum": ["SIGTERM", "SIGKILL", "SIGHUP", "SIGINT"] },
+            { "type": "null" }
+          ]
+        },
+        "changed": {
+          "type": "array",
+          "maxItems": 64,
+          "items": { "$ref": "#/$defs/changedFile" }
+        },
+        "changeManifestSha256": { "$ref": "#/$defs/sha256" },
+        "stdoutSha256": { "$ref": "#/$defs/sha256" },
+        "stderrSha256": { "$ref": "#/$defs/sha256" },
+        "startedMonotonicMs": { "type": "integer", "minimum": 0 },
+        "completedMonotonicMs": { "type": "integer", "minimum": 0 },
+        "resultSha256": { "$ref": "#/$defs/sha256" }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "status": { "const": "completed" },
+            "exitCode": { "const": 0 },
+            "signal": { "type": "null" }
+          }
+        },
+        {
+          "properties": {
+            "status": { "const": "failed" }
+          },
+          "anyOf": [
+            { "properties": { "exitCode": { "type": "null" } } },
+            { "properties": { "exitCode": { "type": "integer", "minimum": 1, "maximum": 255 } } },
+            { "properties": { "signal": { "enum": ["SIGTERM", "SIGKILL", "SIGHUP", "SIGINT"] } } }
+          ]
+        },
+        { "properties": { "status": { "const": "cancelled" } } },
+        { "properties": { "status": { "const": "timed-out" } } },
+        { "properties": { "status": { "const": "recovery-required" } } }
+      ]
+    },
+    "recordWorker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "taskId",
+        "subjectSha256",
+        "leaseId",
+        "writePathsSha256",
+        "workspaceMember",
+        "workspacePathSha256",
+        "state",
+        "cleanupState",
+        "process",
+        "startedMonotonicMs",
+        "completedMonotonicMs",
+        "result"
+      ],
+      "properties": {
+        "taskId": { "$ref": "#/$defs/id" },
+        "subjectSha256": { "$ref": "#/$defs/sha256" },
+        "leaseId": { "$ref": "#/$defs/id" },
+        "writePathsSha256": { "$ref": "#/$defs/sha256" },
+        "workspaceMember": { "$ref": "#/$defs/id" },
+        "workspacePathSha256": { "$ref": "#/$defs/sha256" },
+        "state": {
+          "enum": [
+            "created",
+            "running",
+            "completed",
+            "failed",
+            "cancelled",
+            "timed-out",
+            "recovery-required"
+          ]
+        },
+        "cleanupState": {
+          "enum": ["active", "cleanup-pending", "cleaned", "blocked"]
+        },
+        "process": {
+          "oneOf": [
+            { "$ref": "#/$defs/processIdentity" },
+            { "type": "null" }
+          ]
+        },
+        "startedMonotonicMs": {
+          "oneOf": [
+            { "type": "integer", "minimum": 0 },
+            { "type": "null" }
+          ]
+        },
+        "completedMonotonicMs": {
+          "oneOf": [
+            { "type": "integer", "minimum": 0 },
+            { "type": "null" }
+          ]
+        },
+        "result": {
+          "oneOf": [
+            { "$ref": "#/$defs/result" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "repositoryFingerprint",
+        "sourceRootSha256",
+        "sourceStatusSha256",
+        "candidate",
+        "dispatch",
+        "requestSha256",
+        "planSha256",
+        "poolSha256",
+        "status",
+        "owner",
+        "lease",
+        "effectiveCapacity",
+        "workers",
+        "recordSha256"
+      ],
+      "properties": {
+        "schema": { "const": "pipeline.local-worker-supervisor-record.v1" },
+        "repositoryFingerprint": { "$ref": "#/$defs/sha256" },
+        "sourceRootSha256": { "$ref": "#/$defs/sha256" },
+        "sourceStatusSha256": { "$ref": "#/$defs/sha256" },
+        "candidate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["baseCommit", "candidateCommit", "candidateSha256"],
+          "properties": {
+            "baseCommit": { "$ref": "#/$defs/oid" },
+            "candidateCommit": { "$ref": "#/$defs/oid" },
+            "candidateSha256": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "dispatch": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "dispatchId",
+            "attempt",
+            "queueRevision",
+            "packageSha256"
+          ],
+          "properties": {
+            "dispatchId": { "$ref": "#/$defs/id" },
+            "attempt": { "type": "integer", "minimum": 0 },
+            "queueRevision": { "type": "integer", "minimum": 0 },
+            "packageSha256": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "requestSha256": { "$ref": "#/$defs/sha256" },
+        "planSha256": { "$ref": "#/$defs/sha256" },
+        "poolSha256": { "$ref": "#/$defs/sha256" },
+        "status": {
+          "enum": [
+            "created",
+            "admitting",
+            "running",
+            "draining",
+            "completed",
+            "degraded",
+            "cancelled",
+            "recovery-required"
+          ]
+        },
+        "owner": { "$ref": "#/$defs/processIdentity" },
+        "lease": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "heartbeatMs",
+            "orphanAfterMs",
+            "lastHeartbeatMonotonicMs",
+            "cleanupExpiresMonotonicMs"
+          ],
+          "properties": {
+            "heartbeatMs": { "type": "integer", "minimum": 1000, "maximum": 60000 },
+            "orphanAfterMs": { "type": "integer", "minimum": 3000, "maximum": 600000 },
+            "lastHeartbeatMonotonicMs": { "type": "integer", "minimum": 0 },
+            "cleanupExpiresMonotonicMs": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "effectiveCapacity": { "type": "integer", "minimum": 1, "maximum": 16 },
+        "workers": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": { "$ref": "#/$defs/recordWorker" }
+        },
+        "recordSha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "cancel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "requestSha256",
+        "planSha256",
+        "recordSha256",
+        "owner",
+        "issuedMonotonicMs",
+        "cancelNonce",
+        "cancelSha256"
+      ],
+      "properties": {
+        "schema": { "const": "pipeline.local-worker-supervisor-cancel.v1" },
+        "requestSha256": { "$ref": "#/$defs/sha256" },
+        "planSha256": { "$ref": "#/$defs/sha256" },
+        "recordSha256": { "$ref": "#/$defs/sha256" },
+        "owner": { "$ref": "#/$defs/processIdentity" },
+        "issuedMonotonicMs": { "type": "integer", "minimum": 0 },
+        "cancelNonce": { "$ref": "#/$defs/id" },
+        "cancelSha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  }
+}

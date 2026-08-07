@@ -5,7 +5,6 @@ import { randomBytes as nodeRandomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { readFile as nodeReadFile } from "node:fs/promises";
 import { isAbsolute, resolve, sep } from "node:path";
-import { pathToFileURL } from "node:url";
 
 import {
   SUPPORTED_ADAPTER,
@@ -19,6 +18,12 @@ import {
   sha256Canonical,
 } from "../lib/afk-assumption-mode.mjs";
 import { executeAfkActivationHostTransaction } from "../lib/afk-transaction-host.mjs";
+import {
+  LEGACY_STATE,
+  NEUTRAL_STATE,
+  resolveProjectAuthorityPaths,
+} from "../lib/project-authority.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const EXIT = Object.freeze({ OK: 0, BLOCKED: 2 });
 export const MAX_STDIN_BYTES = 262_144;
@@ -125,7 +130,11 @@ export async function activateFromBytes(rawInstruction, dependencies = {}) {
   let activatedAt;
   try {
     root = dependencies.root ? resolve(dependencies.root) : trustedRoot(dependencies.cwd ?? process.cwd());
-    statePreimage = await readFile(inside(root, ".claude/pipeline-state.json"));
+    const projectAuthority = resolveProjectAuthorityPaths({ rootDir: root });
+    const statePath = projectAuthority.status === "ready"
+      ? projectAuthority.state
+      : (projectAuthority.source === "legacy" ? LEGACY_STATE : NEUTRAL_STATE);
+    statePreimage = await readFile(inside(root, statePath));
     authority = Object.fromEntries(await Promise.all(["prd", "spec", "courseBrief"].map(async (key) => {
       const path = instruction.authority[key].path;
       return [key, { path, bytes: await readFile(inside(root, path)) }];
@@ -225,6 +234,6 @@ export async function main(argv = process.argv.slice(2), io = {}) {
   return outcome.ok ? EXIT.OK : EXIT.BLOCKED;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectInvocation(import.meta.url)) {
   process.exitCode = await main();
 }

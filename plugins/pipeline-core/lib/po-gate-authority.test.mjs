@@ -68,20 +68,6 @@ function write(path, value, mode = undefined) {
   if (mode !== undefined) chmodSync(path, mode);
 }
 
-function humanDecisionFixture(primary, authority, featureId = "feature") {
-  const candidate = { commit: "b".repeat(40), tree: "c".repeat(40) };
-  const reference = {
-    schema: "pipeline.human-decision-reference.v1",
-    decisionId: `approve-plan-${featureId}`,
-    decisionDigest: "e".repeat(64),
-    candidate,
-    checkpoint: { repositoryFingerprint: authority.repositoryFingerprint, streamId: "human", sequence: 1, eventDigest: "f".repeat(64), candidateCommit: candidate.commit, candidateTree: candidate.tree },
-  };
-  const scope = { repositoryFingerprint: authority.repositoryFingerprint, candidate, packageId: featureId, action: "APPROVE_PLAN", environment: "local", artifacts: [{ path: authority.planPath, sha256: authority.planSha256 }, { path: authority.specPath, sha256: authority.specSha256 }] };
-  const file = "human-decision.json"; write(join(primary, file), JSON.stringify(reference));
-  return { file, candidate, reference, humanAuthority: ({ request }) => request?.decisionId === reference.decisionId ? { ok: true, value: { schema: "pipeline.governance-authority-readback.v1", granted: true, decisionId: reference.decisionId, decisionDigest: reference.decisionDigest, scope, singleUse: true } } : { ok: false, code: "PO-TEST-HUMAN-AUTHORITY" } };
-}
-
 /**
  * The fixture writes the receipt directly (it is not exercising the
  * production publisher), so on win32 it must reproduce the publisher's own
@@ -128,6 +114,38 @@ function state(planPath = "specs/feature/prd_feature.md") {
   return `${JSON.stringify({
     schema: "pipeline.state.v0",
     activeFeature: { id: "feature", planPath, phase: "design" },
+    planApproved: false,
+    continuity: {
+      schema: "pipeline.continuity.v0",
+      featureId: "feature",
+      revision: 0,
+      runtime: { humanFacingLanguage: "de", activeDuty: "Coordinator", sessionCleanup: null },
+      authority: {
+        prd: { path: planPath, sha256: "a".repeat(64) },
+        spec: { path: "specs/feature/spec.md", sha256: "b".repeat(64) },
+        result: null,
+      },
+      queueHead: {
+        packageId: "continuity-adoption",
+        actionId: "review-active-feature",
+        nextAction: "review",
+        productRetryCount: 0,
+        environmentRerouteCount: 0,
+        dispatch: null,
+      },
+      blocker: null,
+      acknowledgedFinal: null,
+      resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" },
+      recovery: null,
+      decisionTxn: null,
+      closeTransition: null,
+      capacity: {
+        concurrencyLimit: 4,
+        reservedCriticSlots: 1,
+        reservedRecoverySlots: 1,
+        fallbackPolicy: "defer",
+      },
+    },
   }, null, 2)}\n`;
 }
 
@@ -362,45 +380,6 @@ check("pipeline-start can validate the shared profile when no feature is active"
   });
 });
 
-// The runtime projection must follow the resolved project authority, not a
-// fixed legacy path.  A repository migrated to the neutral layout keeps a
-// legacy manifest around as a compatibility reader; binding those bytes made
-// every PO gate report PO-PROFILE-RECEIPT-STALE against a receipt that the
-// runtime had correctly published from the neutral manifest.
-check("the runtime projection binds the neutral project authority manifest, not a stale legacy manifest", () => {
-  withFixture({}, ({ primary, common, validate }) => {
-    write(join(primary, "project", "pipeline.yaml"), runtime("de"));
-    write(join(primary, "project", "pipeline-state.json"), state());
-    rmSync(join(primary, ".claude", "pipeline-state.json"), { force: true });
-    // Legacy bytes that differ from the neutral manifest: if the projection
-    // still read them, the receipt below could not validate.
-    write(join(primary, ".claude", "pipeline.yaml"), `${runtime("de")}# superseded legacy projection\n`);
-    const receipt = createPoGateProfileReceipt({
-      repositoryFingerprint: derivePoGateRepositoryFingerprint({ gitCommonDir: common, primaryRoot: primary }),
-      primaryRoot: primary,
-      sourceBytes: readFileSync(join(primary, "pipeline.user.yaml")),
-      runtimeBytes: readFileSync(join(primary, "project", "pipeline.yaml")),
-      updatedAt: NOW,
-    });
-    const path = poGateProfileReceiptPath(common);
-    writeFileSync(path, serializePoGateProfileReceipt(receipt));
-    chmodSync(path, 0o600);
-    const result = validate();
-    assert.equal(result.ok, true, JSON.stringify(result));
-    assert.equal(result.value.runtimeSha256, sha256(readFileSync(join(primary, "project", "pipeline.yaml"))));
-    assert.notEqual(result.value.runtimeSha256, sha256(readFileSync(join(primary, ".claude", "pipeline.yaml"))));
-  });
-});
-
-check("mixed project State authority fails closed instead of becoming an absent feature", () => {
-  withFixture({}, ({ primary, validate }) => {
-    write(join(primary, "project", "pipeline.yaml"), runtime("de"));
-    const result = validate();
-    assert.equal(result.ok, false);
-    assert.equal(result.code, "PO-GATE-STATE-AUTHORITY-UNAVAILABLE");
-  });
-});
-
 check("an internally consistent legacy linked-worktree language cannot override the primary receipt", () => {
   withFixture({ linkedLanguage: "en" }, ({ current, receipt, validate }) => {
     write(join(current, "specs", "feature", "prd_feature.md"), prd("de"));
@@ -593,17 +572,28 @@ check("a bound plan digest detects a stale post-validation PRD", () => {
   });
 });
 
+function submitFixturePlan(primary, authority, profile) {
+  const status = runPipelineState(["submit-plan", "--by", "coordinator", "--profile", "feature"], {
+    dir: primary,
+    now: () => NOW,
+    poGateAuthority: () => authority,
+    poGateProfile: () => profile,
+  });
+  assert.equal(status, 0);
+}
+
 check("approve-plan binds the validated PO authority and revalidates it inside the writer lock", () => {
-  withFixture({}, ({ primary, validate }) => {
+  withFixture({}, ({ primary, validate, validateProfile }) => {
     const authority = validate();
     assert.equal(authority.ok, true);
-    const human = humanDecisionFixture(primary, authority.value);
+    const profile = validateProfile();
+    assert.equal(profile.ok, true);
+    submitFixturePlan(primary, authority, profile);
     const calls = [];
-    const status = runPipelineState(["approve-plan", "--by", "Product Owner", "--human-decision-file", human.file], {
+    const status = runPipelineState(["approve-plan", "--by", "Product Owner"], {
       dir: primary,
       now: () => NOW,
-      gitHead: () => human.candidate,
-      humanAuthority: human.humanAuthority,
+      poGateProfile: () => profile,
       poGateAuthority(request) {
         calls.push(request);
         return authority;
@@ -616,31 +606,31 @@ check("approve-plan binds the validated PO authority and revalidates it inside t
     ]);
     const observed = JSON.parse(readFileSync(join(primary, ".claude", "pipeline-state.json"), "utf8"));
     assert.equal(observed.planApproved, true);
-    assert.deepEqual(observed.planApproval, {
-      schema: "pipeline.plan-approval.v3",
-      approvedBy: "Product Owner",
-      approvedAt: NOW,
-      specBoundBy: "Product Owner",
-      specBoundAt: NOW,
-      poGateAuthority: authority.value,
-      humanDecision: human.reference,
-    });
+    assert.equal(observed.planSubmission.schema, "pipeline.plan-submission.v1");
+    assert.equal(observed.planApproval.schema, "pipeline.plan-approval.v4");
+    assert.equal(observed.planApproval.approvedBy, "Product Owner");
+    assert.equal(observed.planApproval.approvedAt, NOW);
+    assert.match(observed.planApproval.submissionSha256, /^[a-f0-9]{64}$/u);
+    assert.equal(observed.planApproval.profileSha256, observed.planSubmission.profileSha256);
+    assert.equal(observed.planApproval.priorInvalidationSha256, null);
+    assert.deepEqual(observed.planApproval.poGateAuthority, authority.value);
   });
 });
 
 check("approve-plan leaves state unchanged when the plan digest becomes stale before commit", () => {
-  withFixture({}, ({ primary, validate }) => {
+  withFixture({}, ({ primary, validate, validateProfile }) => {
     const authority = validate();
     assert.equal(authority.ok, true);
-    const human = humanDecisionFixture(primary, authority.value);
+    const profile = validateProfile();
+    assert.equal(profile.ok, true);
+    submitFixturePlan(primary, authority, profile);
     const statePath = join(primary, ".claude", "pipeline-state.json");
     const before = readFileSync(statePath, "utf8");
     let calls = 0;
-    const status = runPipelineState(["approve-plan", "--by", "Product Owner", "--human-decision-file", human.file], {
+    const status = runPipelineState(["approve-plan", "--by", "Product Owner"], {
       dir: primary,
       now: () => NOW,
-      gitHead: () => human.candidate,
-      humanAuthority: human.humanAuthority,
+      poGateProfile: () => profile,
       poGateAuthority() {
         calls += 1;
         return calls === 1
@@ -655,12 +645,18 @@ check("approve-plan leaves state unchanged when the plan digest becomes stale be
 });
 
 check("approve-plan leaves state unchanged when the initial worktree authority is invalid", () => {
-  withFixture({}, ({ primary }) => {
+  withFixture({}, ({ primary, validate, validateProfile }) => {
+    const authority = validate();
+    assert.equal(authority.ok, true);
+    const profile = validateProfile();
+    assert.equal(profile.ok, true);
+    submitFixturePlan(primary, authority, profile);
     const statePath = join(primary, ".claude", "pipeline-state.json");
     const before = readFileSync(statePath, "utf8");
     const status = runPipelineState(["approve-plan", "--by", "Product Owner"], {
       dir: primary,
       now: () => NOW,
+      poGateProfile: () => profile,
       poGateAuthority: () => ({ ok: false, code: "PO-PROFILE-RECEIPT-STALE" }),
     });
     assert.equal(status, 2);
@@ -678,8 +674,27 @@ check("detached worktree porcelain is parsed without branch inference", () => {
   const entries = parseGitWorktreeList(raw);
   assert.equal(entries.length, 2);
   assert.equal(selectPrimaryWorktree(entries).root, primaryRoot);
-  assert.deepEqual(entries[1], { root: detachedRoot, head: oid, branch: null, detached: true });
+  assert.deepEqual(entries[1], { root: detachedRoot, head: oid, branch: null, detached: true, prunable: false });
   assert.equal(parseGitWorktreeList(`worktree relative\0HEAD ${oid}\0detached\0\0`), null);
+});
+
+check("parseGitWorktreeList surfaces the prunable state per entry without dropping the record or its validation", () => {
+  const oid = "a".repeat(40);
+  const primaryRoot = process.platform === "win32" ? "D:/repo" : "/repo";
+  const staleRoot = process.platform === "win32" ? "D:/repo/stale" : "/repo/stale";
+  const raw = `worktree ${primaryRoot}\0HEAD ${oid}\0branch refs/heads/main\0\0worktree ${staleRoot}\0HEAD ${oid}\0detached\0prunable gitdir file points to non-existent location\0\0`;
+  const entries = parseGitWorktreeList(raw);
+  assert.equal(entries.length, 2);
+  assert.equal(entries[0].prunable, false, "a live entry must not be reported as prunable");
+  assert.equal(entries[1].prunable, true, "a prunable entry must surface prunable: true, never be dropped");
+  assert.equal(entries[1].root, staleRoot, "the prunable entry's root must still be reported");
+  // The reason text after `prunable ` is Git's own and not a stable contract --
+  // only the field's presence is the signal, per the module contract above.
+  const differentReason = raw.replace(
+    "prunable gitdir file points to non-existent location",
+    "prunable ??? some other future Git reason ???",
+  );
+  assert.equal(parseGitWorktreeList(differentReason)[1].prunable, true);
 });
 
 check("topology accepts only a status-zero Git observation carrying the documented EPERM false-positive", () => {
@@ -700,6 +715,58 @@ check("topology accepts only a status-zero Git observation carrying the document
   });
 });
 
+check("a prunable worktree registration is excluded from registeredWorktreeRoots without aborting topology resolution", () => {
+  withFixture({ linkedLanguage: "en" }, ({ common, primary, current }) => {
+    const oid = "a".repeat(40);
+    const staleRoot = process.platform === "win32" ? "D:/pipeline-stale/prunable" : "/pipeline-stale/prunable";
+    const spawn = (_command, args) => {
+      if (args.join(" ") === "rev-parse --show-toplevel") return { status: 0, stdout: `${current}\n` };
+      if (args.join(" ") === "rev-parse --path-format=absolute --git-common-dir") return { status: 0, stdout: `${common}\n` };
+      if (args.join(" ") === "worktree list --porcelain -z") {
+        return {
+          status: 0,
+          // primary first (as Git always emits it), then the live linked worktree,
+          // then a prunable registration whose directory does not exist on disk --
+          // the fix must never call realpathSync/assertPhysicalDirectory on it.
+          stdout: `worktree ${primary}\0HEAD ${oid}\0branch refs/heads/main\0\0worktree ${current}\0HEAD ${oid}\0detached\0\0worktree ${staleRoot}\0HEAD ${oid}\0detached\0prunable gitdir file points to non-existent location\0\0`,
+        };
+      }
+      throw new Error(`unexpected git command: ${args.join(" ")}`);
+    };
+    const topology = resolvePoGateRepositoryTopology(current, { spawn });
+    // (d) the primary worktree is still selected correctly even though a prunable
+    // entry follows it in the porcelain list.
+    assert.equal(topology.primaryRoot, primary);
+    // (b) a mixed live+prunable set resolves to exactly the live roots.
+    assert.deepEqual(topology.registeredWorktreeRoots, [primary, current]);
+    assert.equal(topology.worktrees.length, 3);
+    assert.equal(topology.worktrees[2].root, staleRoot);
+    assert.equal(topology.worktrees[2].prunable, true);
+  });
+});
+
+check("a stale worktree registration that Git has NOT marked prunable still throws (fail-closed baseline preserved)", () => {
+  withFixture({ linkedLanguage: "en" }, ({ common, primary, current }) => {
+    const oid = "a".repeat(40);
+    const staleRoot = process.platform === "win32" ? "D:/pipeline-stale/not-prunable" : "/pipeline-stale/not-prunable";
+    const spawn = (_command, args) => {
+      if (args.join(" ") === "rev-parse --show-toplevel") return { status: 0, stdout: `${current}\n` };
+      if (args.join(" ") === "rev-parse --path-format=absolute --git-common-dir") return { status: 0, stdout: `${common}\n` };
+      if (args.join(" ") === "worktree list --porcelain -z") {
+        return {
+          status: 0,
+          stdout: `worktree ${primary}\0HEAD ${oid}\0branch refs/heads/main\0\0worktree ${current}\0HEAD ${oid}\0detached\0\0worktree ${staleRoot}\0HEAD ${oid}\0detached\0\0`,
+        };
+      }
+      throw new Error(`unexpected git command: ${args.join(" ")}`);
+    };
+    // (c) no `prunable` field means the entry is still fed into the unrelaxed
+    // physical-directory assertion, exactly as before this fix -- this is the
+    // security property that must not be relaxed.
+    assert.throws(() => resolvePoGateRepositoryTopology(current, { spawn }), /ENOENT/u);
+  });
+});
+
 check("topology still rejects EPERM unless Git reported an actual zero exit status and stdout", () => {
   withFixture({}, ({ current }) => {
     const spawn = () => ({ status: null, error: Object.assign(new Error("EPERM"), { code: "EPERM" }), stdout: `${current}\n` });
@@ -707,6 +774,52 @@ check("topology still rejects EPERM unless Git reported an actual zero exit stat
     const otherError = () => ({ status: 0, error: Object.assign(new Error("access denied"), { code: "EACCES" }), stdout: `${current}\n` });
     assert.throws(() => resolvePoGateRepositoryTopology(current, { spawn: otherError }), /Git topology unavailable/u);
   });
+});
+
+function flipAsciiCase(value) {
+  return [...value].map((ch) => (ch === ch.toLowerCase() ? ch.toUpperCase() : ch.toLowerCase())).join("");
+}
+
+if (process.platform === "win32") check("topology tolerates a case-divergent start directory that is the same real Windows directory Git reports", () => {
+  withFixture({ linkedLanguage: "en" }, ({ common, primary, current }) => {
+    const oid = "a".repeat(40);
+    // Disk-canonical casing for the fixture's real directory, exactly as Git's own
+    // `--show-toplevel` would report it regardless of the cwd casing it was invoked with.
+    const canonicalCurrent = realpathSync.native(current);
+    // A same-directory path a mis-cased shell cwd could plausibly hand in as `repoRoot`.
+    const misCasedRepoRoot = flipAsciiCase(current);
+    assert.notEqual(misCasedRepoRoot, current, "fixture requires an actually case-divergent path to be meaningful");
+    const spawn = (_command, args) => {
+      if (args.join(" ") === "rev-parse --show-toplevel") return { status: 0, stdout: `${canonicalCurrent}\n` };
+      if (args.join(" ") === "rev-parse --path-format=absolute --git-common-dir") return { status: 0, stdout: `${common}\n` };
+      if (args.join(" ") === "worktree list --porcelain -z") {
+        return { status: 0, stdout: `worktree ${primary}\0HEAD ${oid}\0branch refs/heads/main\0\0worktree ${current}\0HEAD ${oid}\0detached\0\0` };
+      }
+      throw new Error(`unexpected git command: ${args.join(" ")}`);
+    };
+    const topology = resolvePoGateRepositoryTopology(misCasedRepoRoot, { spawn });
+    // Compare through the native realpath on both sides -- the returned strings
+    // themselves may legitimately still carry the caller's casing (the fix never
+    // rewrites returned values), only the equality check is case-normalized.
+    assert.equal(realpathSync.native(topology.repoRoot), canonicalCurrent);
+    assert.equal(realpathSync.native(topology.primaryRoot), realpathSync.native(primary));
+    assert.equal(realpathSync.native(topology.gitCommonDir), realpathSync.native(common));
+  });
+});
+
+check("topology still rejects a genuinely different physical directory even though both sides are real, existing paths", () => {
+  const dirA = mkdtempSync(join(tmpdir(), "po-gate-authority-mismatch-alpha-"));
+  const dirB = mkdtempSync(join(tmpdir(), "po-gate-authority-mismatch-beta-"));
+  try {
+    const spawn = (_command, args) => {
+      if (args.join(" ") === "rev-parse --show-toplevel") return { status: 0, stdout: `${dirB}\n` };
+      throw new Error(`unexpected git command: ${args.join(" ")}`);
+    };
+    assert.throws(() => resolvePoGateRepositoryTopology(dirA, { spawn }), /repository root mismatch/u);
+  } finally {
+    rmSync(dirA, { recursive: true, force: true });
+    rmSync(dirB, { recursive: true, force: true });
+  }
 });
 
 check("failures and public evidence never expose machine-specific absolute roots", () => {

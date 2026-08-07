@@ -7,6 +7,9 @@ import { basename, dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
+import { checkSecurityCompleteness } from "../../plugins/pipeline-core/lib/security-completeness-gate.mjs";
+import { loadManifest, gateConfig } from "../../plugins/pipeline-core/lib/manifest.mjs";
+
 export const RECEIPT_SCHEMA = "agent-pipeline.pr-contributor-gate.v2";
 export const CLA_PATH = "CONTRIBUTOR_LICENSE_AGREEMENT.md";
 export const ALLOWED_ACTIONS = new Set(["opened", "reopened", "synchronize", "edited"]);
@@ -129,12 +132,47 @@ export function validatePrContributorGates({ root, claRoot, event }) {
   if (baseSha === null) errors.push(error("PR_BASE_SHA_INVALID"));
   if (baseRef !== "main") errors.push(error("PR_BASE_REF_INVALID"));
 
-  const cla = typeof claRoot === "string" && claRoot.length > 0 ? readClaContract(claRoot) : { error: error("CLA_ROOT_INVALID") };
+  const claRootValid = typeof claRoot === "string" && claRoot.length > 0;
+  const cla = claRootValid ? readClaContract(claRoot) : { error: error("CLA_ROOT_INVALID") };
   if (cla.error) errors.push(cla.error);
   const acceptance = !cla.error && login !== null && senderLogin !== null ? inspectAcceptance(event, cla, login, senderLogin) : { accepted: false };
   if (acceptance.error) errors.push(acceptance.error);
   const dco = baseSha && headSha ? checkDcoRange(root, baseSha, headSha) : { status: "failed", checkedCommits: 0, failures: [error("DCO_RANGE_IDENTIFIERS_INVALID")] };
   errors.push(...dco.failures);
+
+  // Gate-activation guard (F2, CYB-2I-1R; re-rooted to `claRoot` per Critic finding N1,
+  // CYB-2I-1R2): mirrors guard-push.mjs's/check-close-security-completeness.mjs's own "opt-in,
+  // nothing configured -> skip" pattern, but the activation *decision* (whether the `security`
+  // gate is on/off) is read from `claRoot` -- the trusted base checkout the PR author cannot
+  // write to -- NOT from `root` (the untrusted PR candidate). Reading `root` here let a PR
+  // author flip `gates.security.mode: off` (or delete `.claude/pipeline.yaml` entirely) in their
+  // OWN branch to silently disable the very check meant to constrain them: every other AC8 call
+  // site (Push/Close/Release) already reads a manifest the actor being gated does not control,
+  // this call site now does too. The evidence being *evaluated* is UNCHANGED and correctly stays
+  // bound to `root`/`headSha` (the candidate's own commit/tree) -- only the root supplying
+  // `loadManifest`/`gateConfig` moves.
+  //
+  // Design decision (N1 follow-up, CYB-2I-1R2): a missing/invalid `claRoot` (the same
+  // typeof/length check the CLA_ROOT_INVALID path above already applies) is NEVER treated as
+  // "gate absent, skip" -- that would let an unreadable trusted root silently disable the gate
+  // too, defeating the whole point of this fix. Instead it fails closed: `securityGateActive`
+  // is forced `true`, so the completeness check below still runs against `root`/`headSha`'s own
+  // evidence (and, absent a valid trusted root to prove otherwise, will in practice fail closed
+  // on missing/unbound evidence) -- the same "unknown state -> treat as blocking" posture
+  // `CLA_ROOT_INVALID` and `DCO_RANGE_IDENTIFIERS_INVALID` already take elsewhere in this file.
+  const manifestResult = headSha && claRootValid ? loadManifest(claRoot) : null;
+  const securityGate = manifestResult ? gateConfig(manifestResult.manifest, "security") : null;
+  const securityGateActive = !claRootValid
+    || (manifestResult
+      && manifestResult.status !== "absent"
+      && securityGate
+      && securityGate.mode !== "off");
+  if (headSha && securityGateActive) {
+    const treeResult = git(root, ["rev-parse", `${headSha}^{tree}`]);
+    const headTree = treeResult.status === 0 ? treeResult.stdout.trim() : null;
+    const completenessFailures = checkSecurityCompleteness({ projectDir: root, commit: headSha, tree: headTree, subjectLabel: "the reviewed PR head" });
+    errors.push(...completenessFailures.map((detail) => error("SECURITY_COMPLETENESS_BLOCKING", detail)));
+  }
 
   return {
     schema: RECEIPT_SCHEMA,

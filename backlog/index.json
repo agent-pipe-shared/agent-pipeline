@@ -3,17 +3,29 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "2849de19fb7f0d0f34d6f2cbe6ed6d5171445abb09fa02132bc9a1d0d707e2b1"
+    "transitionHead": "2d3f2c613ccf023a671452cec1a358f110e39f291c3282cb5fb55d99ddcc8eb4"
   },
   "counts": {
-    "open": 30,
-    "in_progress": 3,
-    "closed": 2
+    "open": 22,
+    "in_progress": 21,
+    "closed": 19
   },
   "items": [
     {
+      "id": "pipeline.adr-0051-follow-up-gaps-untracked",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-05",
+      "source": "T1 Critic review (Opus, functional-equivalent-read-only) of commits 7f5ac97/d622dc3/9429b94/b14391c, finding F5, Sprint Nova session 2026-08-04/05",
+      "closedAt": "2026-08-06",
+      "closureRepository": "self",
+      "closureCommit": "bee2f41a3498a65412284f7786d406188288261b",
+      "closureEvidence": "backlog/evidence/2026-08-06-third-reconciliation-pass.md"
+    },
+    {
       "id": "pipeline.afk-assumption-mode",
-      "status": "open",
+      "status": "in_progress",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-19",
@@ -21,8 +33,17 @@
       "tracking": "Sentinel recovery baseline; no completion claim."
     },
     {
+      "id": "pipeline.backlog-delivery-status-reconciliation",
+      "status": "in_progress",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-07-25",
+      "source": "Approved Nova A1 issue #57 bootstrap authority and reviewed canonical backlog intake.",
+      "tracking": "Nova A / issue #57"
+    },
+    {
       "id": "pipeline.canonical-worktree-lifecycle",
-      "status": "open",
+      "status": "in_progress",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-07-19",
@@ -30,16 +51,36 @@
       "tracking": "Sentinel recovery baseline; no completion claim."
     },
     {
-      "id": "pipeline.close-spec-retention-and-consent",
+      "id": "pipeline.claude-dir-leftovers-defeat-runner-neutral-project-migration",
       "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-05",
+      "source": "PO observation, Sprint Nova session 2026-08-05, plus a concrete misdiagnosis it caused in that same session (Elephant read .claude/pipeline.yaml as authority and drew the wrong conclusion about the push gate); independently confirmed and extended by the T1 Critic of candidate 8d9b3df as finding F-E (major), which withdrew its own earlier, too-generous disposition of the same drift"
+    },
+    {
+      "id": "pipeline.claude-has-no-start-time-opt-in-adoption-path",
+      "status": "open",
+      "type": "idea",
+      "owner": "pipeline",
+      "created": "2026-08-05",
+      "source": "PO observation, Sprint Nova session 2026-08-05, in the same session that reproduced the setup.mjs marketplace collision by hand"
+    },
+    {
+      "id": "pipeline.close-spec-retention-and-consent",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-21",
-      "source": "2026-07-21 full-close retro: Spec-retention authority drift and durable advisor-export consent readback"
+      "source": "2026-07-21 full-close retro: Spec-retention authority drift and durable advisor-export consent readback",
+      "closedAt": "2026-08-06",
+      "closureRepository": "self",
+      "closureCommit": "00fcc336cfd163d85fed20aa0a7ec2dbcfb6c31a",
+      "closureEvidence": "backlog/evidence/2026-08-06-third-reconciliation-pass.md"
     },
     {
       "id": "pipeline.closed-input-channel-review-economics",
-      "status": "open",
+      "status": "in_progress",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-20",
@@ -47,7 +88,7 @@
     },
     {
       "id": "pipeline.codex-plugin-validator-host-parity",
-      "status": "open",
+      "status": "in_progress",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-19",
@@ -56,7 +97,7 @@
     },
     {
       "id": "pipeline.codex-sandbox-critic-longterm",
-      "status": "open",
+      "status": "in_progress",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-07-19",
@@ -65,15 +106,23 @@
     },
     {
       "id": "pipeline.critic-context-isolation",
-      "status": "open",
+      "status": "in_progress",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-20",
       "source": "Public V3 Foundation stabilization close retro: an independent Critic run was discarded after an out-of-band coordinator status message reached its context"
     },
     {
-      "id": "pipeline.cross-repository-override-ledger-binding",
+      "id": "pipeline.critical-human-proof-not-wired-to-push-and-prd-gates",
       "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-05",
+      "source": "PO question during Sprint Nova session, 2026-08-05: asked whether the ed25519 human-proof mechanism (built for Sprint Cyborg) needed one-time setup before this session's branch push. Investigation found it exists but is not enforced for either of the two human gates it was meant to secure."
+    },
+    {
+      "id": "pipeline.cross-repository-override-ledger-binding",
+      "status": "in_progress",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-20",
@@ -81,7 +130,7 @@
     },
     {
       "id": "pipeline.dispatch-provenance",
-      "status": "open",
+      "status": "in_progress",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-20",
@@ -107,7 +156,7 @@
     },
     {
       "id": "pipeline.elephant-direct-implementation-under-afk-authorization",
-      "status": "open",
+      "status": "in_progress",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-23",
@@ -115,7 +164,7 @@
     },
     {
       "id": "pipeline.evidence-bound-review-retry-economics",
-      "status": "open",
+      "status": "in_progress",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-20",
@@ -123,7 +172,7 @@
     },
     {
       "id": "pipeline.execution-model-switchback",
-      "status": "open",
+      "status": "in_progress",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-19",
@@ -131,16 +180,80 @@
       "tracking": "Sentinel recovery baseline; no completion claim."
     },
     {
-      "id": "pipeline.multi-cli-efficiency-pilots",
+      "id": "pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions",
       "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "0.5.2 release session, 2026-08-07: PO asked why a release cannot run end-to-end through the Pipeline with only the final signature as the human step, for the version-surface strip specifically."
+    },
+    {
+      "id": "pipeline.guard-lifecycle-ready-blocks-claude-memory-writes",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-07-29",
+      "source": "Sprint Cyborg epic, self-application finding #2 (Elephant self-observation while implementing CYB-2E; PO decision Option B recorded in docs/state.md, session 2026-07-29)"
+    },
+    {
+      "id": "pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-06",
+      "source": "GATE-HONESTY-11 dispatch briefing, finding N1 (major), Sprint Nova session 2026-08-06"
+    },
+    {
+      "id": "pipeline.local-worker-supervisor-cli-suite-flakes-under-full-verify",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-06",
+      "source": "Sprint Nova session, 2026-08-06: Full Verify on candidate 9f5bfc9 failed with local-worker-supervisor-cli-tests=1, the same suite passed 9/9 standalone immediately afterwards, and an unchanged re-run of Full Verify on the same candidate and clean tree went green."
+    },
+    {
+      "id": "pipeline.managed-onboarding-success-contract",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-07-25",
+      "source": "close-block self-retro, 0.4.4 managed-workspace onboarding hotfix"
+    },
+    {
+      "id": "pipeline.multi-cli-efficiency-pilots",
+      "status": "in_progress",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-20",
       "source": "Public transfer completeness review of post-v0.3 Multi-CLI design and measurement work"
     },
     {
-      "id": "pipeline.nonblocking-interaction-continuity",
+      "id": "pipeline.native-windows-verify-red-suite-class",
       "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "ADR-0051 Follow-up section names this as one of two gaps to track as a dated backlog item; created per backlog/items/2026-08-05-adr-0051-follow-up-gaps-untracked.md's proposal, executed 2026-08-06 night autonomous backlog reconciliation."
+    },
+    {
+      "id": "pipeline.neutral-authority-tier-is-a-frozen-snapshot-the-compiler-never-updates",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-06",
+      "source": "Sprint Nova session, 2026-08-06, ADR-0054 step 1 (routing hardcoded readers through resolveProjectAuthorityPaths). Comparing the two authority tiers before routing more readers to the resolver revealed that the tier the resolver PREFERS is the one nothing maintains."
+    },
+    {
+      "id": "pipeline.no-gate-is-tested-end-to-end-for-satisfiability",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-06",
+      "source": "PO question, 2026-08-06: why does an agent keep stopping and asking instead of working under the operating model. Investigating produced a structural answer rather than a behavioural one — four gate defects in a single session, none found by the suite."
+    },
+    {
+      "id": "pipeline.nonblocking-interaction-continuity",
+      "status": "in_progress",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-07-19",
@@ -149,15 +262,71 @@
     },
     {
       "id": "pipeline.observation-intake-document-governance",
-      "status": "in_progress",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-20",
-      "source": "PO-approved parallel Sentinel work and Critic scope correction"
+      "source": "PO-approved parallel Sentinel work and Critic scope correction",
+      "closedAt": "2026-07-24",
+      "closureRepository": "self",
+      "closureCommit": "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb",
+      "closureEvidence": "backlog/evidence/2026-07-24-completed-companion-deliveries.md"
+    },
+    {
+      "id": "pipeline.onboarding-lifecycle-plan-hardcodes-the-codex-runner",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-06",
+      "source": "Smoke test of the 0.5.2 release candidate in an empty directory, 2026-08-06: a fresh consumer following the tool's OWN printed next actions ends up with a Codex-configured project inside a Claude bootstrap.",
+      "closedAt": "2026-08-06",
+      "closureRepository": "self",
+      "closureCommit": "c860e1dd5bb11f2f02c5d9ade2aeb84c1787107a",
+      "closureEvidence": "backlog/evidence/2026-08-06-onboarding-runner-identity-reverification.md"
+    },
+    {
+      "id": "pipeline.onboarding-ready-path-unconditional-restart-barrier-read",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "ADR-0051 Follow-up section names this as one of two gaps to track as a dated backlog item; created per backlog/items/2026-08-05-adr-0051-follow-up-gaps-untracked.md's proposal, executed 2026-08-06 night autonomous backlog reconciliation."
+    },
+    {
+      "id": "pipeline.pipeline-state-rebind-codex-default-runner",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-05",
+      "source": "Read-only skills audit, Sprint Nova session 2026-08-05 (finding 1 of 6); re-raised as T1 Critic finding F-B (major) against candidate 8d9b3df for lacking a dated tracking artifact",
+      "closedAt": "2026-08-06",
+      "closureRepository": "self",
+      "closureCommit": "7514fb95f23d6b30bd42bbed2435f2dc4d76ca61",
+      "closureEvidence": "backlog/evidence/2026-08-06-second-reconciliation-pass.md"
+    },
+    {
+      "id": "pipeline.po-gate-authority-path-canonicalization",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-07-25",
+      "source": "Self-observation during Sprint Cyborg CYB-0 follow-up (approve-plan dispatch), 2026-07-24/25; direct reproduction via `node -e` against `resolvePoGateRepositoryTopology`.",
+      "closedAt": "2026-08-06",
+      "closureRepository": "self",
+      "closureCommit": "3652d92ac02757d5bf0fde1e816e4f70710a0a1b",
+      "closureEvidence": "backlog/evidence/2026-08-06-second-reconciliation-pass.md"
+    },
+    {
+      "id": "pipeline.po-gate-authority-receipt-readback",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-07-25",
+      "source": "Self-observation during Sprint Cyborg CYB-0 follow-up (approve-plan dispatch), 2026-07-24/25; reproduced a second time 2026-07-25 (see docs/state.md, \"PO GATE ANSWERED\" entry) — repro confirmed, root cause still not isolated."
     },
     {
       "id": "pipeline.po-gate-worktree-authority",
-      "status": "open",
+      "status": "in_progress",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-07-19",
@@ -166,15 +335,19 @@
     },
     {
       "id": "pipeline.private-overlay-activation-bridge",
-      "status": "in_progress",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-20",
-      "source": "Public review of the slim private-overlay consumer activation boundary"
+      "source": "Public review of the slim private-overlay consumer activation boundary",
+      "closedAt": "2026-07-24",
+      "closureRepository": "self",
+      "closureCommit": "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb",
+      "closureEvidence": "backlog/evidence/2026-07-24-completed-companion-deliveries.md"
     },
     {
       "id": "pipeline.project-scoped-github-issue-operations",
-      "status": "open",
+      "status": "in_progress",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-20",
@@ -182,16 +355,40 @@
     },
     {
       "id": "pipeline.push-guard-worktree-target",
-      "status": "in_progress",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
-      "tracking": "Sentinel recovery baseline; no completion claim."
+      "tracking": "Sentinel recovery baseline; no completion claim.",
+      "closedAt": "2026-07-24",
+      "closureRepository": "self",
+      "closureCommit": "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb",
+      "closureEvidence": "backlog/evidence/2026-07-24-po-sentinel-closure-disposition.md"
+    },
+    {
+      "id": "pipeline.ready-gate-env-var-runner-authority",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-05",
+      "source": "T1 Critic review of candidate 8d9b3df, finding F-A (major), Sprint Nova session 2026-08-05",
+      "closedAt": "2026-08-06",
+      "closureRepository": "self",
+      "closureCommit": "f5e41744edfcc0f8cb76e36036cde90fa989582f",
+      "closureEvidence": "backlog/evidence/2026-08-06-second-reconciliation-pass.md"
+    },
+    {
+      "id": "pipeline.recovery-preview-ack-unstable-getter-poisons-replay-ledger",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-07-27",
+      "source": "CYB-A0 round-2 Critic re-review (new-issue N1), found while verifying the fix for round-1 F1-F5 in plugins/pipeline-core/lib/recovery-preview-attestation.mjs"
     },
     {
       "id": "pipeline.recovery-preview-callback-attestation",
-      "status": "open",
+      "status": "in_progress",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-07-20",
@@ -207,21 +404,73 @@
       "tracking": "Sentinel recovery baseline; no completion claim."
     },
     {
-      "id": "pipeline.sentinel-go-live-completion",
+      "id": "pipeline.release-preflight-has-a-builder-but-no-cli",
+      "status": "in_progress",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-06",
+      "source": "sprint_phoenix handover finding 1, 2026-08-06. The gate-evidence half was closed by publication-gate-evidence.mjs; the release-preflight half was not, and is recorded separately so the remainder is not lost inside a partly-fixed finding."
+    },
+    {
+      "id": "pipeline.restart-launch-is-codex-only-for-every-runner",
       "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-06",
+      "source": "Manual re-run of the empty-directory onboarding smoke test in scratch/onboarding-smoke-test while re-verifying backlog/items/2026-08-06-onboarding-lifecycle-plan-hardcodes-the-codex-runner.md (see backlog/evidence/2026-08-06-onboarding-runner-identity-reverification.md), 2026-08-06."
+    },
+    {
+      "id": "pipeline.runtime-projection-v2-eager-manifest-load",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-07-27",
+      "source": "discovered as a sibling of Critic finding F4 (CLAUDE-RUNNER-01 delta review round 2) during briefing-i's fix of `plugins/pipeline-core/lib/runtime-projection-v3.mjs` (commit `894261d`)"
+    },
+    {
+      "id": "pipeline.security-scan-cross-branch-gitleaks-findings",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-07-25",
+      "source": "Observed during Sprint Cyborg WIN-PGA-2 post-rebase baseline verify (feat/sprint-cyborg-claude rebased onto v0.4.4), 2026-07-25.",
+      "closedAt": "2026-07-29",
+      "closureRepository": "self",
+      "closureCommit": "83111227cb59eff7d186c49aadc6963f78232b77",
+      "closureEvidence": "backlog/items/2026-07-25-security-scan-cross-branch-gitleaks-findings.md"
+    },
+    {
+      "id": "pipeline.sentinel-go-live-completion",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-20",
-      "source": "Public transfer completeness review of remaining Sentinel go-live obligations"
+      "source": "Public transfer completeness review of remaining Sentinel go-live obligations",
+      "closedAt": "2026-07-24",
+      "closureRepository": "self",
+      "closureCommit": "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb",
+      "closureEvidence": "backlog/evidence/2026-07-24-po-sentinel-closure-disposition.md"
     },
     {
       "id": "pipeline.session-keep-awake",
-      "status": "open",
+      "status": "in_progress",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.setup-mjs-marketplace-name-collision-defeats-local-dev-installs",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-05",
+      "source": "Live reproduction on this machine, Sprint Nova session 2026-08-05 (two separate clobbers of the local marketplace registration, both traced to setup.mjs's compileSettingsJson() output)",
+      "closedAt": "2026-08-06",
+      "closureRepository": "self",
+      "closureCommit": "d3db4a07dee565c1eeee2eb1e1e77ffcd2ca4e0a",
+      "closureEvidence": "backlog/evidence/2026-08-06-second-reconciliation-pass.md"
     },
     {
       "id": "pipeline.source-available-commercial-licensing",
@@ -232,8 +481,8 @@
       "source": "Sentinel SNT-1 licensing gate recovered during Public Core transfer",
       "closedAt": "2026-07-21",
       "closureRepository": "self",
-      "closureCommit": "2ddf3592ea004bd6e2a830a61bb02c931238070f",
-      "closureEvidence": "backlog/evidence/2026-07-23-snt-1-activation-result.json"
+      "closureCommit": "03de3d47868d6d4c4b5710b174703fed99529dfa",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-07-24-unreachable-evidence-disposition.md"
     },
     {
       "id": "pipeline.spec-retention-on-close",
@@ -254,7 +503,7 @@
     },
     {
       "id": "pipeline.t1-governance-path-preflight",
-      "status": "open",
+      "status": "in_progress",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-19",
@@ -262,8 +511,17 @@
       "tracking": "Sentinel recovery baseline; no completion claim."
     },
     {
-      "id": "pipeline.verify-gate-scoped-registration",
+      "id": "pipeline.unified-human-authorization-ux",
       "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-02",
+      "source": "PO product-direction decision during Sprint Cyborg CYB-4 PO-proof UX review, 2026-08-02",
+      "tracking": "Current CYB-4 helper is a compatible first adapter only; no programme-wide migration or closure is claimed."
+    },
+    {
+      "id": "pipeline.verify-gate-scoped-registration",
+      "status": "in_progress",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-19",
@@ -272,21 +530,29 @@
     },
     {
       "id": "pipeline.windows-directory-durability",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-07-22",
       "source": "specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md",
-      "tracking": "PO-approved Sentinel scope extension; no implementation or closure claim."
+      "tracking": "PO-approved Sentinel scope extension; no implementation or closure claim.",
+      "closedAt": "2026-07-24",
+      "closureRepository": "self",
+      "closureCommit": "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb",
+      "closureEvidence": "backlog/evidence/2026-07-24-po-sentinel-closure-disposition.md"
     },
     {
       "id": "pipeline.windows-private-state-assurance",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-07-22",
       "source": "specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md",
-      "tracking": "PO-approved Sentinel scope extension; no implementation or closure claim."
+      "tracking": "PO-approved Sentinel scope extension; no implementation or closure claim.",
+      "closedAt": "2026-07-24",
+      "closureRepository": "self",
+      "closureCommit": "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb",
+      "closureEvidence": "backlog/evidence/2026-07-24-po-sentinel-closure-disposition.md"
     },
     {
       "id": "pipeline.windows-runtime-baseline-containment",
@@ -303,21 +569,41 @@
     },
     {
       "id": "pipeline.windows-trusted-tool-resolution",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-07-22",
       "source": "specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md",
-      "tracking": "PO-approved Sentinel scope extension; no implementation or closure claim."
+      "tracking": "PO-approved Sentinel scope extension; no implementation or closure claim.",
+      "closedAt": "2026-07-24",
+      "closureRepository": "self",
+      "closureCommit": "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb",
+      "closureEvidence": "backlog/evidence/2026-07-24-po-sentinel-closure-disposition.md"
+    },
+    {
+      "id": "pipeline.windows-verify-brittle-test-hygiene",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-07-25",
+      "source": "Decision-D native-Windows verify baseline investigation, 2026-07-24 (docs/state.md \"Root-cause classification of the 11 reds\"); corrected 2026-07-25 after direct reproduction — see \"Correction\" below.",
+      "closedAt": "2026-08-06",
+      "closureRepository": "self",
+      "closureCommit": "79da4a76c985ea512764dde2894865a5c7ccf816",
+      "closureEvidence": "backlog/evidence/2026-08-06-third-reconciliation-pass.md"
     },
     {
       "id": "pipeline.windows-verify-reproducibility",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-07-22",
       "source": "specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md",
-      "tracking": "PO-approved Sentinel scope extension; no implementation or closure claim."
+      "tracking": "PO-approved Sentinel scope extension; no implementation or closure claim.",
+      "closedAt": "2026-07-24",
+      "closureRepository": "self",
+      "closureCommit": "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb",
+      "closureEvidence": "backlog/evidence/2026-07-24-po-sentinel-closure-disposition.md"
     }
   ]
 }

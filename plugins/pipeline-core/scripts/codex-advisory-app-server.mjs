@@ -6,6 +6,7 @@ import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { buildSandboxInvocation } from "./codex-sandbox-preflight.mjs";
+import { validateAdvisoryEvidenceBundleForRepository } from "../lib/advisory-lifecycle-v2.mjs";
 
 const CHILD = realpathSync(fileURLToPath(new URL("./codex-advisory-app-server-child.mjs", import.meta.url)));
 const MODEL = "gpt-5.6-sol";
@@ -13,10 +14,16 @@ const PROVIDER = "openai";
 
 export async function invokeCodexAdvisoryAppServer(payload, dependencies = {}) {
   const selected = payload?.sandboxTransport;
+  const evidence = validateAdvisoryEvidenceBundleForRepository(
+    selected?.scratch?.repoRoot,
+    payload?.evidenceBundle,
+    selected?.dispatch?.referenceSetSha256 ?? null,
+  );
   if (!selected || selected.requested?.runner !== "codex" || selected.requested?.model !== MODEL
     || selected.profile?.base !== ":read-only" || selected.profile?.network?.enabled !== true
     || selected.profile?.scratchRootSha256 !== selected.scratch?.sha256
-    || typeof selected.scratch?.sandboxStateJson !== "string" || typeof selected.scratch?.sandboxStateSha256 !== "string") {
+    || typeof selected.scratch?.sandboxStateJson !== "string" || typeof selected.scratch?.sandboxStateSha256 !== "string"
+    || !evidence.ok) {
     throw new Error("selected Codex advisory transport is invalid");
   }
   const invocation = (dependencies.buildSandboxInvocationFn ?? buildSandboxInvocation)({
@@ -42,7 +49,14 @@ export async function invokeCodexAdvisoryAppServer(payload, dependencies = {}) {
     child.once("error", (error) => resolve({ code: null, signal: null, error: error?.code ?? "spawn-error" }));
     child.once("close", (code, signal) => resolve({ code, signal, error: null }));
   });
-  child.stdin.end(JSON.stringify({ codexPath: selected.scratch.codexPath, cwd: selected.scratch.repoRoot, scratchPath: selected.scratch.path, question: payload.question }));
+  child.stdin.end(JSON.stringify({
+    codexPath: selected.scratch.codexPath,
+    cwd: selected.scratch.repoRoot,
+    scratchPath: selected.scratch.path,
+    question: payload.question,
+    evidenceBundle: payload.evidenceBundle,
+    evidenceSha256: evidence.bundleSha256,
+  }));
   const terminal = await close;
   let result = null;
   if (bytes <= 8 * 1024 * 1024) {

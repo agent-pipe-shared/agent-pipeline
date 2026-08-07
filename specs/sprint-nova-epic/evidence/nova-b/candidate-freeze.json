@@ -1,0 +1,46 @@
+{
+  "schema": "pipeline.nova-b5-candidate-freeze.v1",
+  "candidate": {
+    "commit": "f365a09ced53b82ea01afc40e75a555e71248a71",
+    "tree": "d43e621484ec81b83ea59faef94ea7eae4d81db1",
+    "branch": "feat/sprint-nova-codex-v046"
+  },
+  "base": {
+    "release": "v0.4.6",
+    "commit": "9d1b3dc108eb77629ace5b82002120f5539abd8d"
+  },
+  "portfolio": {
+    "bindingPath": "specs/sprint-nova-epic/design/backlog-spec-bindings.json",
+    "bindingSha256": "22489179a7c7a3967f9652de42e39e4ce464e2eab0730372a0b34872aabd3fe1",
+    "issueCount": 17,
+    "cyborgInput": "none"
+  },
+  "backlog": {
+    "status": "green",
+    "indexSha256": "b9da26b5ed79c22c8b840335d4b6d2ec7fd4de7771b4de57d67a4431d200eb7a",
+    "statusSha256": "11e1933119a53e4a75086d21558c378ae6fcf67a04e96a5d7520640d23ee6863",
+    "ledgerSha256": "b5fc777aaed5fb9e1097e5c1dea2ccb1958434a31e6f40e2bfe32dbf769134e9"
+  },
+  "gates": {
+    "verify": {
+      "path": "specs/sprint-nova-epic/evidence/nova-b/verify.json",
+      "sha256": "2d1848b76981d873d21a201b8262d00e03553a82641d90d0a8e2408a44f72578",
+      "exitCode": 0,
+      "binding": "exact-clean-candidate"
+    },
+    "security": {
+      "path": "specs/sprint-nova-epic/evidence/nova-b/security.json",
+      "sha256": "753955f2f5f13e105e0f42e2fdd6891df68e77c2e252efc2361090f5ac9c4ad6",
+      "exitCode": 0,
+      "binding": "clean-exact-candidate"
+    }
+  },
+  "deferred": [
+    "B2-I remote broker integration",
+    "B3-I direct Antigravity implementation",
+    "live B4 forge operation",
+    "B6 native Apple Silicon lifecycle, Critic and PO close"
+  ],
+  "status": "frozen-awaiting-external-native-gates",
+  "recordSha256": "6b7c2eff10e4cbc7af9a415f045909fac5d0623eac5db39ae83a8407d91d4e85"
+}

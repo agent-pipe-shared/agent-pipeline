@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.invocation-attempt.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "attemptId", "invocationId", "index", "requestSha256", "launchDecision", "failureClass", "started", "ended", "resultSha256", "previousSha256", "recordSha256"],
+  "properties": {
+    "schema": { "const": "pipeline.invocation-attempt.v1" }, "attemptId": { "type": "string", "minLength": 1, "maxLength": 256 }, "invocationId": { "type": "string", "minLength": 1, "maxLength": 256 }, "index": { "type": "integer", "minimum": 0 }, "requestSha256": { "$ref": "#/$defs/sha256" }, "launchDecision": { "enum": ["launch", "suppressed"] }, "failureClass": { "type": ["string", "null"], "enum": ["request-invalid", "chain-invalid", "authority-invalid", "selected-sandbox-terminal", "selected-sandbox-transient", "transport-transient", "host-pressure", "denied", "unavailable", "malformed-result", "timeout", "cancelled", "internal-error", "succeeded-unverified", null] }, "started": { "$ref": "#/$defs/observationOrNull" }, "ended": { "$ref": "#/$defs/observationOrNull" }, "resultSha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }, "previousSha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }, "recordSha256": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": { "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "observation": { "type": "object", "additionalProperties": false, "required": ["source", "monotonicMs", "wallTime", "rawSha256"], "properties": { "source": { "type": "string", "minLength": 1, "maxLength": 64 }, "monotonicMs": { "type": "integer", "minimum": 0 }, "wallTime": { "type": ["string", "null"], "format": "date-time" }, "rawSha256": { "$ref": "#/$defs/sha256" } } }, "observationOrNull": { "anyOf": [{ "$ref": "#/$defs/observation" }, { "type": "null" }] } }
+}

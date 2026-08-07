@@ -21,6 +21,16 @@ feature branches and dogfooding rounds. Feedback welcome.*
 > required next document is `SETUP.md`; deeper and conceptual documentation
 > is optional reference.
 
+> **0.5.1 interim release:** Codex consumers now retain the `0.5.0`
+> security/readiness delivery while gaining the Nova recovery path for the
+> ordinary bootstrap happy path. If the PRD and Spec authorities drift,
+> bootstrap offers only the exact read-only, digest-bound rebind plan; a
+> separately approved apply then returns the session to `ready`. It never
+> broadens lifecycle writes or silently edits bound documents. See the
+> [consumer onboarding guide](docs/v3-consumer-onboarding.md) for the full
+> lifecycle and [What’s new in 0.5.0](docs/whats-new-0.5.0.md) for the
+> security/readiness baseline.
+
 ## The problem
 
 Teams building with coding agents tend to reinvent the same conventions per repo —
@@ -111,6 +121,9 @@ selected-sandbox execution; OS isolation and model identity are not asserted`.
 
 Model routing lives in V3 profiles (`epic`, `feature`, `mini`), with model and
 effort selected per phase and runner.
+Session bootstrap observes Advisor capability locally without a model request.
+An actual Advisor runs only on demand for one concrete, reasoned and
+digest-bound question; start, resume, re-entry and Compact never launch it.
 
 ```mermaid
 flowchart LR
@@ -189,8 +202,9 @@ codebase. Three independent dials set that:
 
 - **Rigor per task** — issue-only / delta-spec / spec-anchored
 - **Governance mode per rule set** — advisory / enforcing / off
-- **Session profile per session** — design / advisor / speed (model, effort,
-  and advisor per profile: `pipeline.user.yaml` → `worktypes`)
+- **Work profile per topic** — epic / feature / mini (model and effort per
+  phase/runner in `pipeline.user.yaml`; Advisor capability is model-free at
+  bootstrap and consultation is on demand)
 
 ## Why this holds up at enterprise scale
 
@@ -399,6 +413,9 @@ behauptet`.
 
 Das Modellrouting liegt in V3-Profilen (`epic`, `feature`, `mini`); Modell und
 Effort werden je Phase und Runner ausgewählt.
+Der Session-Bootstrap beobachtet Advisor-Capability lokal ohne Modellrequest.
+Ein echter Advisor läuft nur on demand für genau eine konkrete, begründete und
+Digest-gebundene Frage; Start, Resume, Re-entry und Compact starten ihn nie.
 
 ```mermaid
 flowchart LR
@@ -479,8 +496,9 @@ Enterprise-Codebasis. Drei unabhängige Regler stellen das ein:
 
 - **Rigor pro Aufgabe** — Issue-only / Delta-Spec / Spec-verankert
 - **Governance-Modus pro Regelwerk** — advisory / enforcing / off
-- **Session-Profil pro Sitzung** — Design / Advisor / Speed (Modell, Effort
-  und Advisor je Profil: `pipeline.user.yaml` → `worktypes`)
+- **Arbeitsprofil pro Thema** — Epic / Feature / Mini (Modell und Effort je
+  Phase/Runner in `pipeline.user.yaml`; Advisor-Capability ist im Bootstrap
+  modellfrei und Consultation läuft on demand)
 
 ## Warum das auch im Unternehmenskontext trägt
 
@@ -553,6 +571,13 @@ Claude-Code-spezifisch ist.
   normative Dokument: Rollen, SDLC, Review-System, Session-Lifecycle, Handover,
   Projekt-Kalibrierung.
 - [`LICENSE`](LICENSE) und [`LICENSE-DOCS`](LICENSE-DOCS) verwenden die source-available Sustainable Use License 1.0 (SUL-1.0) mit der Agent-Pipeline Additional Permission; siehe [`docs/licensing.md`](docs/licensing.md).
+
+### Close lifecycle
+
+Feature completion is coordinated by the restart-safe H5 close coordinator.
+It supports checkpoint/resume, one frozen candidate with exact final Verify,
+local-only close without push, and separately authorized publication/readback.
+Release and promotion are optional later transitions.
 
 ## Danksagung
 

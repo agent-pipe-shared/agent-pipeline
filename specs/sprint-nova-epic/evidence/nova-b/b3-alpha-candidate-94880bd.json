@@ -1,0 +1,42 @@
+{
+  "schema": "pipeline.nova-b3-alpha-candidate-evidence.v1",
+  "candidate": {
+    "commit": "94880bd15b50848627e14c19e19508b04003a412",
+    "tree": "ea2f87fbeecb8b302b1c4f891035a5701761eba7",
+    "branch": "feat/sprint-nova-codex-v046"
+  },
+  "descriptor": {
+    "path": "plugins/pipeline-core/scripts/antigravity-alpha-adapter.mjs",
+    "sha256": "52ca2df520dd41cc4bcc05926e085039665ba9a554e2fff16cc84722def1b988",
+    "readbackSha256": "25c5612eb709dabb1abdb1a1ba6a49fcf438a90c75631b2e6c6fbc8f17d41225"
+  },
+  "decision": {
+    "path": "specs/sprint-nova-epic/evidence/nova-b/antigravity-contract-decision-amendment-v1.json",
+    "sha256": "cbd12aedac2df6c9d3901338f1334a13501b4305a9d2f6a0b604db97765093c2",
+    "status": "blocked",
+    "directExecution": "not-delivered"
+  },
+  "verification": {
+    "path": "plugins/pipeline-core/scripts/antigravity-alpha-adapter.test.mjs",
+    "sha256": "919ea5ccd05ff3422e79f11a9ce0d774cbd48756cdf89e8b9518f639c46aac59",
+    "passed": 5,
+    "total": 5
+  },
+  "assurance": {
+    "agyDiscovery": "not-attempted",
+    "agyInstallation": "not-authorized",
+    "agyAuthentication": "not-authorized",
+    "agyNetwork": "not-authorized",
+    "agyInvocation": "unavailable",
+    "advisor": "unavailable",
+    "review": "unavailable",
+    "write": "unavailable"
+  },
+  "transfer": {
+    "issue": 69,
+    "sprint": "none",
+    "requirement": "dedicated-agy-sprint"
+  },
+  "status": "candidate-bound-documentation-only",
+  "recordSha256": "a6068e43296a25a3b674d1a7422d78c37327d6050805b6071d19e62ccc51b996"
+}

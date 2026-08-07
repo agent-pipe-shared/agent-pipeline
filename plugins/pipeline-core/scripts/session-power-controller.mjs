@@ -14,7 +14,6 @@ import { spawn } from "node:child_process";
 import { chmodSync, existsSync, lstatSync, unlinkSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
 import net, { Socket } from "node:net";
-import { pathToFileURL } from "node:url";
 
 import {
   SESSION_POWER_HEARTBEAT_SECONDS,
@@ -27,6 +26,7 @@ import {
   withSessionPowerLock,
   writeSessionPowerRecord,
 } from "../lib/session-power.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const CONFIG_SCHEMA = "pipeline.session-power-controller-config.v1";
 const ACK_SCHEMA = "pipeline.session-power-controller-ack.v1";
@@ -217,6 +217,6 @@ async function direct() {
   await runController(config, pipe);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectInvocation(import.meta.url)) {
   direct().catch(() => { process.exitCode = 3; });
 }

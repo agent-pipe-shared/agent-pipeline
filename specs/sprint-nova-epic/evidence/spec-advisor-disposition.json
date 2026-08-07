@@ -1,0 +1,122 @@
+{
+  "schema": "pipeline.nova-spec-advisor-disposition.v1",
+  "reviewedAt": "2026-07-24T20:25:30Z",
+  "task": "/root/nova_spec_advisor",
+  "role": "consult-advisor",
+  "profile": "epic",
+  "route": "host-bound-consult",
+  "questionSha256": "d6eb44a2d7f6f9a2c23e1a998940c714ed0a05e5755197b790341dbac33dacfd",
+  "reviewedCandidate": {
+    "commit": "66f506a87b92f804077d6eeea2bcb6535d0e0f6a",
+    "tree": "42d0162b29743b268476eac068f3a75aa224a1ba",
+    "specSha256": "70a05c4f6745406f450990d104b81864c88128be8d75b9303a02ae77af1cf938",
+    "specDiffSha256": "0dd534bf0c7f67d98e2083da26c8e4c62472c8d6497d3b30c113f53fb327deaa",
+    "prdSha256": "879423cdb24d542b7f9275bc9da4591fcdfd38145fdddee9142ce82eee53402e",
+    "acceptanceSha256": "f15c417360fd8757ce42a410f3735f61b7cd17f9ff165c59fb65257e9103c855"
+  },
+  "correctedCandidate": {
+    "specSha256": "47a952040fd3a50ba2b02c04d4b4c7c0d3b7a32d58e4a736858d19fda1eae8b9",
+    "acceptanceSha256": "69779547a926df01768e7c518158e030ee777cb51ee82a66d009631d431d9f2c"
+  },
+  "workspaceBoundary": {
+    "parentMutationBetweenLaunchAndReturn": false,
+    "advisorRoleWasReadOnly": true,
+    "hostAdvisorStatusReceipt": null,
+    "status": "causally-observed-without-durable-host-status"
+  },
+  "assurance": "no attested selected-sandbox execution; OS isolation and model identity are not asserted",
+  "gateDecisionByAdvisor": false,
+  "findings": [
+    {
+      "id": "NSA-01",
+      "severity": "blocker",
+      "topic": "acceptance-collision-contradiction",
+      "status": "corrected",
+      "disposition": "NVA-G05 now distinguishes one physical/global resource from an independent-branch merge collision."
+    },
+    {
+      "id": "NSA-02",
+      "severity": "blocker",
+      "topic": "self-referential-receipts",
+      "status": "corrected",
+      "disposition": "Semantic receipts exclude themselves; increment evidence uses tested candidate plus E1 readback and gate-only E2 without an enclosing-commit self-reference."
+    },
+    {
+      "id": "NSA-03",
+      "severity": "blocker",
+      "topic": "canonical-ledger-and-legacy-journal-identifiers",
+      "status": "corrected",
+      "disposition": "The Spec now names transitions.ndjson and the actual pipeline.backlog-transaction.v1 compatibility schema."
+    },
+    {
+      "id": "NSA-04",
+      "severity": "blocker",
+      "topic": "transition-v1-semantic-widening",
+      "status": "corrected",
+      "disposition": "Transition v1 remains frozen; additive transition v2 defines mixed-ledger chaining and in-progress evidence amendment."
+    },
+    {
+      "id": "NSA-05",
+      "severity": "blocker",
+      "topic": "unauthorized-state-stores",
+      "status": "corrected",
+      "disposition": "Nova A is in-memory/immutable-evidence only; B1-I/B2-I are blocked behind a separate executor/state/credential ADR."
+    },
+    {
+      "id": "NSA-06",
+      "severity": "blocker",
+      "topic": "journal-removal-before-final-readback",
+      "status": "corrected",
+      "disposition": "Final readback occurs while preimages remain; canonical idempotency receipt, committed phase, lock owner and stale recovery are explicit."
+    },
+    {
+      "id": "NSA-07",
+      "severity": "major",
+      "topic": "legacy-mutation-bypass",
+      "status": "corrected",
+      "disposition": "Every exported writer is routed, retired or projection-only, with negative authority tests required."
+    },
+    {
+      "id": "NSA-08",
+      "severity": "major",
+      "topic": "open-record-shapes",
+      "status": "corrected",
+      "disposition": "All registry records now have required root keys, nested closed types, bounds, nullability, discriminators and stable error classes."
+    },
+    {
+      "id": "NSA-09",
+      "severity": "major",
+      "topic": "planner-failure-replan",
+      "status": "corrected",
+      "disposition": "Only verified work enters completed; dependent terminal projection, unrelated continuation and queue revision are exact."
+    },
+    {
+      "id": "NSA-10",
+      "severity": "major",
+      "topic": "vacuous-positive-and-lifecycle-criteria",
+      "status": "corrected",
+      "disposition": "Positive selected-child evidence, N+1 same-envelope pool proof, pause/restart and monotonic orphan behavior are non-vacuous."
+    },
+    {
+      "id": "NSA-11",
+      "severity": "major",
+      "topic": "non-exact-slice-paths",
+      "status": "corrected",
+      "disposition": "A1/A7/B3-R/B5/B6 evidence, schema, fixture, documentation and bounded runtime templates are enumerated; deferred adapters stay blocked."
+    },
+    {
+      "id": "NSA-12",
+      "severity": "major",
+      "topic": "unfrozen-benchmark-scoring",
+      "status": "corrected",
+      "disposition": "Warm-up, repetitions, clock, scoring thresholds, stop conditions and rollback are fixed as nova-efficiency-v1."
+    },
+    {
+      "id": "NSA-13",
+      "severity": "major",
+      "topic": "stale-lifecycle-binding",
+      "status": "corrected-by-readiness-package",
+      "disposition": "The readiness package binds the final corrected Spec/acceptance and moves lifecycle to awaiting-approval without implementation authority."
+    }
+  ]
+}

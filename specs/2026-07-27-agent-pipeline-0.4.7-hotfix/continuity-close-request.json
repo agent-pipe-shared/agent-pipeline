@@ -1,0 +1,13 @@
+{
+  "schema": "pipeline.continuity-close.v0",
+  "featureId": "agent-pipeline-0.4.7-hotfix",
+  "expectedRevision": 21,
+  "result": {
+    "path": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/result.md",
+    "sha256": "d2367448d8b72d1466ff995dd7c8dfa54a470334643afd290aa12cb19ddd9cf2"
+  },
+  "closeEvidence": {
+    "path": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/close-evidence.md",
+    "sha256": "ba896d8d08f16b70270267899717c9a758e7782fa73de4219ce2d115b089bd6b"
+  }
+}

@@ -8,7 +8,7 @@
  * projection drift.  `--write` is the explicit, local writer used after a
  * deliberate item transition; it never changes Markdown items or the ledger.
  */
-import { existsSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -19,12 +19,15 @@ import {
   ITEM_SCHEMA,
   SENTINEL_RECOVERY_CATALOG_SCHEMA,
   TRANSITION_SCHEMA,
+  TRANSITION_V2_SCHEMA,
   canonicalJson,
   parseBacklogItem,
   parseTransitionLedger,
   planBacklogEvidenceAmendment,
+  planBacklogReachabilityRepair,
   planBacklogTransition,
   planElephantAfkLedgerRepair,
+  planManagedOnboardingLedgerRepair,
   projectBacklog,
   renderBacklogItem,
   transitionHash,
@@ -32,6 +35,8 @@ import {
   validateSentinelRecoveryCatalog,
   validateTransitionLedger,
 } from "../lib/backlog-state.mjs";
+import { validateBacklogDeliveryIntent } from "../lib/backlog-delivery-reconciliation.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = resolve(HERE, "..", "..", "..");
@@ -97,10 +102,95 @@ function regularFile(root, repoPath) {
   const full = resolve(root, repoPath);
   if (relative(root, full).startsWith("..")) return false;
   try {
-    return statSync(full).isFile();
+    return !lstatSync(full).isSymbolicLink() && statSync(full).isFile();
   } catch {
     return false;
   }
+}
+
+function authorityApproval() { return { ok: true, code: "AUTHORITY:VALID" }; }
+
+function gitFileBytes(root, commit, repoPath) {
+  const result = spawnSync("git", ["show", `${commit}:${repoPath}`], { cwd: root, encoding: null });
+  return result.status === 0 && Buffer.isBuffer(result.stdout) ? result.stdout : null;
+}
+
+/**
+ * v2 ordinary transitions point at their immutable delivery intent.  The
+ * checker revalidates that intent and its exact authority receipt on every
+ * read; a bare v2 event can therefore never become self-authorizing.
+ */
+function authorizeCanonicalOrdinaryEvidence(root, { event, evidence }) {
+  if (evidence?.kind !== "backlog-delivery-intent" || !regularFile(root, evidence.reference)) return null;
+  let intent;
+  try { intent = JSON.parse(readFileSync(join(root, evidence.reference), "utf8")); } catch { return null; }
+  if (!validateBacklogDeliveryIntent(intent).ok) return null;
+  const expected = intent.operation === "initialize" ? [null, "open"]
+    : intent.operation === "assign" ? ["open", "in_progress"] : null;
+  if (!expected || event.id !== intent.item.id || event.from !== expected[0] || event.to !== expected[1]) return null;
+  const authority = intent.authority;
+  if (!regularFile(root, authority.receiptPath)) return null;
+  let receiptBytes;
+  let receipt;
+  try { receiptBytes = readFileSync(join(root, authority.receiptPath)); receipt = JSON.parse(receiptBytes); } catch { return null; }
+  if (createHash("sha256").update(receiptBytes).digest("hex") !== authority.receiptSha256) return null;
+  const receiptKeys = ["schema", "decisionId", "status", "authorizedBy", "operation", "item", "candidate", "recordSha256"];
+  if (!receipt || typeof receipt !== "object" || Array.isArray(receipt)
+    || Object.keys(receipt).sort().join("\n") !== receiptKeys.sort().join("\n")
+    || receipt.schema !== "pipeline.backlog-delivery-authority.v1" || receipt.status !== "approved"
+    || receipt.decisionId !== authority.decisionId || receipt.operation !== intent.operation
+    || typeof receipt.authorizedBy !== "string" || receipt.authorizedBy.length === 0
+    || !receipt.item || Object.keys(receipt.item).sort().join("\n") !== ["id", "path"].join("\n") || receipt.item.id !== intent.item.id || receipt.item.path !== intent.item.path
+    || !(receipt.candidate === null || (receipt.candidate && Object.keys(receipt.candidate).sort().join("\n") === ["commit", "tree"].join("\n")))
+    || JSON.stringify(receipt.candidate) !== JSON.stringify(intent.candidate)
+    || !/^[a-f0-9]{64}$/u.test(receipt.recordSha256 ?? "")) return null;
+  const receiptRecord = { ...receipt }; delete receiptRecord.recordSha256;
+  if (createHash("sha256").update(canonicalJson(receiptRecord)).digest("hex") !== receipt.recordSha256) return null;
+  if ((intent.operation === "initialize" && authority.kind !== "backlog-intake")
+    || (intent.operation === "assign" && authority.kind !== "implementation-activation")) return null;
+  if (evidence.commit !== intent.candidate?.commit) {
+    // A rebase may preserve an already approved delivery intent while dropping
+    // its old candidate object.  The replacement evidence commit is accepted
+    // only when it contains the exact current intent and PO receipt bytes.
+    // This is deliberately a byte-for-byte continuity proof, not a broad
+    // historical-commit waiver.
+    const intentBytes = readFileSync(join(root, evidence.reference));
+    const rebasedIntentBytes = gitFileBytes(root, evidence.commit, evidence.reference);
+    const rebasedReceiptBytes = gitFileBytes(root, evidence.commit, authority.receiptPath);
+    if (!rebasedIntentBytes || !rebasedReceiptBytes
+      || Buffer.compare(rebasedIntentBytes, intentBytes) !== 0
+      || Buffer.compare(rebasedReceiptBytes, receiptBytes) !== 0) return null;
+  }
+  return authorityApproval();
+}
+
+/**
+ * A repair disposition is both the amendment's immutable reference and its
+ * typed PO authority.  It deliberately enumerates every repaired historical
+ * event rather than allowing a broad repair grant.
+ */
+function authorizeCanonicalEvidenceAmendment({ evidence, dispositionBytes, dispositionSha256 }) {
+  let disposition;
+  try { disposition = JSON.parse(Buffer.from(dispositionBytes).toString("utf8")); } catch { return null; }
+  const keys = ["schema", "decisionId", "status", "authorizedBy", "candidate", "amendments", "recordSha256"];
+  if (!disposition || typeof disposition !== "object" || Array.isArray(disposition)
+    || Object.keys(disposition).sort().join("\n") !== keys.sort().join("\n")
+    || disposition.schema !== "pipeline.backlog-evidence-repair-disposition.v1"
+    || disposition.status !== "approved" || typeof disposition.decisionId !== "string" || disposition.decisionId.length === 0
+    || typeof disposition.authorizedBy !== "string" || disposition.authorizedBy.length === 0
+    || !disposition.candidate || Object.keys(disposition.candidate).sort().join("\n") !== ["commit", "tree"].join("\n")
+    || disposition.candidate.commit !== evidence.replacementCommit || !/^[a-f0-9]{40}$/u.test(disposition.candidate.tree ?? "")
+    || !Array.isArray(disposition.amendments)
+    || !/^[a-f0-9]{64}$/u.test(disposition.recordSha256 ?? "")) return null;
+  const record = { ...disposition }; delete record.recordSha256;
+  if (createHash("sha256").update(canonicalJson(record)).digest("hex") !== disposition.recordSha256) return null;
+  if (dispositionSha256 !== evidence.dispositionSha256) return null;
+  const amendmentKeys = ["targetSequence", "targetEntryHash", "targetCommit", "replacementCommit", "idempotencyKey"];
+  const match = disposition.amendments.find((entry) => entry && typeof entry === "object" && !Array.isArray(entry)
+    && Object.keys(entry).sort().join("\n") === amendmentKeys.sort().join("\n") && entry.targetSequence === evidence.targetSequence
+    && entry.targetEntryHash === evidence.targetEntryHash && entry.targetCommit === evidence.targetCommit
+    && entry.replacementCommit === evidence.replacementCommit && entry.idempotencyKey === evidence.idempotencyKey);
+  return match ? authorityApproval() : null;
 }
 
 function projectReadbackFindings(root, item) {
@@ -126,6 +216,35 @@ function projectReadbackFindings(root, item) {
 function localCommitExists(root, oid) {
   const result = spawnSync("git", ["cat-file", "-e", `${oid}^{commit}`], { cwd: root, stdio: "ignore" });
   return result.status === 0;
+}
+
+export function reachabilityAmendmentFindings(root, event) {
+  const findings = [];
+  const label = `ledger event ${event.sequence}`;
+  const reference = event?.evidence?.reference;
+  if (!regularFile(root, reference)) return [`${label}: reachability amendment reference is missing`];
+  const blob = spawnSync("git", ["rev-parse", `${event.evidence.commit}:${reference}`], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  const blobOid = String(blob.stdout ?? "").trim();
+  if (blob.status !== 0 || blobOid !== event.evidence.referenceBlobOid) {
+    findings.push(`${label}: referenceBlobOid does not bind the reachable commit projection`);
+  }
+  const historical = spawnSync("git", ["show", `${event.evidence.commit}:${reference}`], {
+    cwd: root,
+    encoding: null,
+  });
+  const historicalSha = historical.status === 0
+    ? createHash("sha256").update(historical.stdout).digest("hex")
+    : null;
+  // The amendment binds the exact historical projection at evidence.commit.
+  // Current item bytes are deliberately not part of that historical binding:
+  // they may legitimately evolve, including in a later ledger recovery.
+  if (historicalSha !== event.evidence.referenceSha256) {
+    findings.push(`${label}: referenceSha256 does not bind the exact retained projection`);
+  }
+  return findings;
 }
 
 function atomicWrite(path, content) {
@@ -216,10 +335,9 @@ function checkSchemas(root, findings) {
 }
 
 /** Build the validated data plus projections without writing anything. */
-export function loadBacklogState(root = DEFAULT_ROOT, { checkCommit = true } = {}) {
+export function loadBacklogState(root = DEFAULT_ROOT, { checkCommit = true, authorizeAmendment = null, authorizeOrdinaryEvidence = null, ignoreTransaction = false } = {}) {
   const findings = [];
-  if (existsSync(join(root, TRANSACTION_PATH))) findings.push(`${TRANSACTION_PATH} requires recovery before backlog state can be trusted`);
-  checkSchemas(root, findings);
+  if (!ignoreTransaction && existsSync(join(root, TRANSACTION_PATH))) findings.push(`${TRANSACTION_PATH} requires recovery before backlog state can be trusted`);
   if (existsSync(join(root, SENTINEL_RECOVERY_CATALOG_PATH))) {
     const catalogText = readText(join(root, SENTINEL_RECOVERY_CATALOG_PATH), findings, SENTINEL_RECOVERY_CATALOG_PATH);
     if (catalogText !== null) {
@@ -243,6 +361,7 @@ export function loadBacklogState(root = DEFAULT_ROOT, { checkCommit = true } = {
   if (itemNames.length === 0) findings.push(`${ITEMS_DIR} must contain at least one current item`);
 
   const items = [];
+  const itemBytes = new Map();
   for (const name of itemNames) {
     const repoPath = `${ITEMS_DIR}/${name}`;
     const text = readText(join(root, repoPath), findings, repoPath);
@@ -254,13 +373,42 @@ export function loadBacklogState(root = DEFAULT_ROOT, { checkCommit = true } = {
     // project an item without a canonical id would otherwise throw and hide the
     // fail-closed backlog diagnosis behind a TypeError.
     if (parsed.item && parsed.ok) items.push(parsed.item);
+    if (parsed.item && parsed.ok) itemBytes.set(parsed.item.metadata.id, text);
   }
 
   const ledgerText = readText(join(root, LEDGER_PATH), findings, LEDGER_PATH);
   const ledger = parseTransitionLedger(ledgerText ?? "", { path: LEDGER_PATH });
   findings.push(...ledger.errors);
+  checkSchemas(root, findings);
+  if (ledger.events.some((event) => event?.schema === TRANSITION_V2_SCHEMA)) {
+    const repoPath = "backlog/schemas/transition-v2.schema.json";
+    const text = readText(join(root, repoPath), findings, repoPath);
+    if (text !== null) {
+      try {
+        if (JSON.parse(text)?.$id !== TRANSITION_V2_SCHEMA) findings.push(`${repoPath} must declare $id ${TRANSITION_V2_SCHEMA}`);
+      } catch { findings.push(`${repoPath} is not valid JSON`); }
+    }
+  }
   const commitExists = checkCommit ? (oid) => localCommitExists(root, oid) : null;
-  findings.push(...validateTransitionLedger(ledger.events, items, { commitExists }));
+  const readDispositionBytes = (repoPath) => {
+    if (!regularFile(root, repoPath)) return null;
+    try { return readFileSync(join(root, repoPath)); } catch { return null; }
+  };
+  findings.push(...validateTransitionLedger(ledger.events, items, {
+    commitExists,
+    readDispositionBytes,
+    authorizeAmendment: authorizeAmendment ?? authorizeCanonicalEvidenceAmendment,
+    authorizeOrdinaryEvidence: authorizeOrdinaryEvidence ?? ((input) => authorizeCanonicalOrdinaryEvidence(root, input)),
+  }));
+  for (const event of ledger.events) {
+    if (event?.id === "pipeline.managed-onboarding-success-contract" && event?.evidence?.kind === "missing-initial-ledger-repair") {
+      const bytes = itemBytes.get(event.id);
+      if (typeof bytes !== "string" || event.evidence.itemSha256 !== createHash("sha256").update(bytes).digest("hex")) findings.push(`ledger event ${event.sequence}: itemSha256 does not bind the current item bytes`);
+    }
+    if (event?.evidence?.kind === "reachability-amendment") {
+      findings.push(...reachabilityAmendmentFindings(root, event));
+    }
+  }
 
   for (const item of items) {
     const metadata = item.metadata;
@@ -581,6 +729,73 @@ export function applyElephantAfkLedgerRepair(root = DEFAULT_ROOT, input, options
   return transaction.ok ? { ...current, ok: true, findings: [], wrote: true, transition: planned.event } : { ...current, ok: false, findings: transaction.findings, wrote: false, transition: null };
 }
 
+/** Repair exactly the one missing 0.4.7 managed-onboarding initial event. */
+export function applyManagedOnboardingLedgerRepair(root = DEFAULT_ROOT, input, options = {}) {
+  const current = checkBacklogState(root, options);
+  const expectedFinding = "items: pipeline.managed-onboarding-success-contract has no transition-ledger entry";
+  if (current.findings.length !== 1 || current.findings[0] !== expectedFinding) return { ...current, ok: false, findings: ["managed onboarding ledger repair requires its single exact missing-event finding", ...current.findings], wrote: false, transition: null };
+  if (options.checkCommit !== false && !localCommitExists(root, input?.evidenceCommit)) return { ...current, ok: false, findings: ["managed onboarding ledger repair evidence commit is not reachable"], wrote: false, transition: null };
+  const managedItem = current.items.find((entry) => entry.metadata.id === input?.id);
+  const managedBytes = managedItem ? readFileSync(join(root, managedItem.path)) : null;
+  if (!managedBytes || createHash("sha256").update(managedBytes).digest("hex") !== input?.itemSha256) return { ...current, ok: false, findings: ["managed onboarding ledger repair item bytes changed"], wrote: false, transition: null };
+  const planned = planManagedOnboardingLedgerRepair(current.items, current.events, input);
+  if (!planned.ok) return { ...current, ok: false, findings: planned.errors, wrote: false, transition: null };
+  const item = current.items.find((entry) => entry.metadata.id === input.id);
+  const ledgerBefore = readFileSync(join(root, LEDGER_PATH), "utf8");
+  const targets = [
+    { path: item.path, after: readFileSync(join(root, item.path), "utf8") },
+    { path: LEDGER_PATH, after: `${ledgerBefore}${JSON.stringify(planned.event)}\n` },
+    { path: STATUS_PATH, after: planned.projection.statusText },
+    { path: INDEX_PATH, after: planned.projection.indexText },
+  ];
+  const transaction = writeBacklogTransaction(root, targets, options);
+  return transaction.ok ? { ...current, ok: true, findings: [], wrote: true, transition: planned.event } : { ...current, ok: false, findings: transaction.findings, wrote: false, transition: null };
+}
+
+/** Append only the two AC-047-99 reachability amendments and regenerate projections. */
+export function applyBacklogReachabilityRepair(root = DEFAULT_ROOT, input, options = {}) {
+  const current = checkBacklogState(root, options);
+  const expectedFindings = [
+    "ledger event 39: evidence.commit is not a reachable local Git commit",
+    "ledger event 40: evidence.commit is not a reachable local Git commit",
+  ];
+  if (current.findings.join("\n") !== expectedFindings.join("\n")) {
+    return {
+      ...current,
+      ok: false,
+      findings: ["reachability repair requires exactly the canonical events 39/40 findings", ...current.findings],
+      wrote: false,
+      transitions: [],
+    };
+  }
+  if (options.checkCommit !== false && !localCommitExists(root, input?.commit)) {
+    return { ...current, ok: false, findings: ["reachability repair commit is not reachable"], wrote: false, transitions: [] };
+  }
+  const planned = planBacklogReachabilityRepair(current.items, current.events, input);
+  if (!planned.ok) {
+    return { ...current, ok: false, findings: planned.errors, wrote: false, transitions: [] };
+  }
+  for (const event of planned.appended) {
+    const referenceFindings = reachabilityAmendmentFindings(root, event);
+    if (referenceFindings.length > 0) {
+      return { ...current, ok: false, findings: referenceFindings, wrote: false, transitions: [] };
+    }
+  }
+  const ledgerBefore = readFileSync(join(root, LEDGER_PATH), "utf8");
+  const targets = [
+    {
+      path: LEDGER_PATH,
+      after: `${ledgerBefore}${planned.appended.map((event) => JSON.stringify(event)).join("\n")}\n`,
+    },
+    { path: STATUS_PATH, after: planned.projection.statusText },
+    { path: INDEX_PATH, after: planned.projection.indexText },
+  ];
+  const transaction = writeBacklogTransaction(root, targets, options);
+  return transaction.ok
+    ? { ...current, ok: true, findings: [], wrote: true, transitions: planned.appended }
+    : { ...current, ok: false, findings: transaction.findings, wrote: false, transitions: [] };
+}
+
 function cli() {
   const args = process.argv.slice(2);
   const write = args.includes("--write");
@@ -599,4 +814,4 @@ function cli() {
     : "Backlog state, transition ledger, closure evidence, and generated projections are valid.");
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) cli();
+if (isDirectInvocation(import.meta.url)) cli();

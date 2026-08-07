@@ -14,7 +14,7 @@ USAGE
 
 HARD RULES FOR THE RESULTING FILE (checkable)
 - MUST stay under {{CLAUDE_MD_MAX_LINES}} lines (default 200; the authoritative
-  number lives in `.claude/pipeline.json` → `claudeMdMaxLines`).
+  number lives in the project calibration → `claudeMdMaxLines`).
   Why: CLAUDE.md is loaded into EVERY session; growth taxes every session start
   (a real project's CLAUDE.md reached 578 lines / >40k tokens).
   Check: `(Get-Content CLAUDE.md | Measure-Object -Line).Lines` — length gate in
@@ -52,7 +52,7 @@ HARD RULES FOR THE RESULTING FILE (checkable)
   (binding committed in `.claude/settings.json`: `extraKnownMarketplaces` +
   `enabledPlugins`). Roles, rituals, review rules come from the plugin — they are
   NOT restated here (no copy-paste inheritance).
-- Project calibration: `.claude/pipeline.json` — verify command, autonomy level,
+- Project calibration: `project/pipeline.json` (legacy projects: `.claude/pipeline.json`) — verify command, autonomy level,
   branch model, worktree rule, WIP limit, stakes, risk zones, ritual extensions
   (schema format: JSON; canonical example:
   `templates/pipeline.json.example` in the agent-pipeline repo).

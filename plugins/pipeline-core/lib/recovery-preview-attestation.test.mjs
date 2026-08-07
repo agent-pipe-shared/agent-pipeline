@@ -29,10 +29,14 @@ test("accepts one exact acknowledgement and returns the consumed-id postimage", 
 });
 
 test("missing, empty, and throwing callbacks never claim delivery", () => {
-  for (const callback of [undefined, () => undefined, () => { throw new Error("callback failure"); }]) {
+  const cases = [
+    [undefined, "RP-CALLBACK-ABSENT"],
+    [() => undefined, "RP-ACK-MALFORMED"],
+    [() => { throw new Error("callback failure"); }, "RP-CALLBACK-THREW"],
+  ];
+  for (const [callback, code] of cases) {
     const result = attestRecoveryPreviewDelivery({ invocation: INVOCATION, callback });
-    assert.equal(result.delivered, false);
-    assert.notEqual(result.code, "RP-DELIVERY-ATTESTED");
+    assert.deepEqual(result, { ok: false, code, delivered: false });
   }
 });
 
@@ -79,10 +83,32 @@ test("callback timeout bounds are closed and invalid values do not invoke the ca
 });
 
 test("malformed acknowledgements fail closed", () => {
-  for (const value of [null, {}, { ...ack(), extra: "not allowed" }, { ...ack(), delivery: "" }]) {
+  const values = [
+    null,
+    {},
+    { ...ack(), extra: "not allowed" },
+    { ...ack(), delivery: "" },
+    { ...ack(), schema: "pipeline.recovery-preview-ack.v2" },
+    { ...ack(), schema: undefined },
+    { ...ack(), acknowledgementId: "ack 01" },
+    { ...ack(), acknowledgementId: "" },
+  ];
+  for (const value of values) {
     const result = attestRecoveryPreviewDelivery({ invocation: INVOCATION, callback: () => value });
-    assert.equal(result.code, "RP-ACK-MALFORMED");
-    assert.equal(result.delivered, false);
+    assert.deepEqual(result, { ok: false, code: "RP-ACK-MALFORMED", delivered: false });
+  }
+});
+
+test("a throwing acknowledgement getter is typed instead of escaping as an exception", () => {
+  const getters = ["schema", "delivery", "acknowledgementId", "invocationId", "previewDigest"];
+  for (const property of getters) {
+    const acknowledgement = Object.defineProperty(ack(), property, {
+      enumerable: true,
+      configurable: true,
+      get() { throw new Error("acknowledgement getter failure"); },
+    });
+    const result = attestRecoveryPreviewDelivery({ invocation: INVOCATION, callback: () => acknowledgement });
+    assert.deepEqual(result, { ok: false, code: "RP-ACK-MALFORMED", delivered: false });
   }
 });
 
@@ -104,4 +130,36 @@ test("invalid invocation and used-acknowledgement state fail closed", () => {
   assert.equal(attestRecoveryPreviewDelivery({ invocation: null, callback: () => ack() }).code, "RP-INVOCATION-INVALID");
   assert.equal(attestRecoveryPreviewDelivery({ invocation: INVOCATION, callback: () => ack(), usedAcknowledgementIds: ["bad id"] }).code, "RP-USED-ACKS-INVALID");
   assert.equal(createRecoveryPreviewInvocation({ invocationId: "", previewDigest: DIGEST }), null);
+});
+
+test("a duplicated used-acknowledgement id is rejected before the callback runs", () => {
+  let invoked = false;
+  for (const usedAcknowledgementIds of [["ack-00", "ack-00"], ["ack-00", "ack-01", "ack-00"]]) {
+    const result = attestRecoveryPreviewDelivery({
+      invocation: INVOCATION,
+      callback: () => { invoked = true; return ack(); },
+      usedAcknowledgementIds,
+    });
+    assert.deepEqual(result, { ok: false, code: "RP-USED-ACKS-INVALID", delivered: false });
+  }
+  assert.equal(invoked, false, "duplicate used-acknowledgement state never reaches the callback");
+});
+
+test("non-string ids and digests are rejected instead of being coerced by the regex", () => {
+  assert.equal(createRecoveryPreviewInvocation({ invocationId: 12345, previewDigest: DIGEST }), null);
+  assert.equal(createRecoveryPreviewInvocation({ invocationId: "preview-01", previewDigest: { toString: () => DIGEST } }), null);
+  assert.equal(createRecoveryPreviewInvocation({ invocationId: ["preview-01"], previewDigest: DIGEST }), null);
+  assert.equal(attestRecoveryPreviewDelivery({
+    invocation: { schema: INVOCATION.schema, invocationId: 12345, previewDigest: DIGEST },
+    callback: () => ack(),
+  }).code, "RP-INVOCATION-INVALID");
+  assert.deepEqual(attestRecoveryPreviewDelivery({
+    invocation: INVOCATION,
+    callback: () => ack({ acknowledgementId: 12345 }),
+  }), { ok: false, code: "RP-ACK-MALFORMED", delivered: false });
+  assert.deepEqual(attestRecoveryPreviewDelivery({
+    invocation: INVOCATION,
+    callback: () => ack(),
+    usedAcknowledgementIds: [12345],
+  }), { ok: false, code: "RP-USED-ACKS-INVALID", delivered: false });
 });

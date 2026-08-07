@@ -62,11 +62,34 @@ report a missing active plan.
 
 ## Triage
 
-- **Decision:** Open; implement before the next Sentinel Close.
-- **Rationale:** Normative planning authority must survive Close and
-  Public/Private reconciliation.
-- **Assignment:** Pipeline Elephant; implementation through a briefed
-  Goldfish package after design and PO approval.
-- **Date:** 2026-07-20
+- **Decision:** Substantially delivered; stays open, narrowed to acceptance
+  criterion 2 only. Note: `expires: 2026-08-03` above has passed
+  (re-triaged 2026-08-06) — administrative follow-up needed regardless of
+  the technical disposition below.
+- **Rationale (re-verified 2026-08-06 night):** `governance/spec-retention.json`
+  (schema `pipeline.spec-retention.v2`) binds the Sentinel PRD/Spec/
+  acceptance/design/recovery/platform-support files to an archive manifest
+  at `docs/spec-archive/2026-07-20-sentinel-recovery/manifest.json`, and
+  `check-spec-retention.mjs` (created `00fcc33`) enforces it fail-closed —
+  registered twice in `verify.mjs` (`spec-retention-tests`,
+  `spec-retention-check`). Re-run live: `node
+  plugins/pipeline-core/scripts/check-spec-retention.mjs` → valid;
+  `node plugins/pipeline-core/scripts/check-spec-retention.test.mjs` → SR01-SR05
+  pass, including `SR02 rejects omitted active Spec even when an archive copy
+  remains` and `SR03 rejects archive byte drift` — this satisfies acceptance
+  criterion 1 directly. `docs/state.md:2166-2189` links the recovered files,
+  satisfying criteria 3 and 4. Criterion 5 (public/private separation) is
+  satisfied by the same archive's Public-safe scoping.
+  **Criterion 2 remains genuinely open:** no dedicated Public/Private
+  transfer-classification module exists (searched for
+  `classifyTransfer`/`transfer-classification`/similar — no hits;
+  `close-block/SKILL.md` has no "retention"/"consent" step naming transfer
+  time specifically). Retention is enforced only at Verify time via the
+  check above, not as an explicit typed-blocked decision at the moment of
+  Public/Private transfer itself, which is what criterion 2 asks for.
+- **Assignment:** delivered (criteria 1, 3, 4, 5), `00fcc33` and the Sentinel
+  recovery work. Criterion 2 (transfer-time typed-blocked classification)
+  unassigned.
+- **Date:** 2026-08-06
 
 AI-Assisted: true

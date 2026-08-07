@@ -2,11 +2,15 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import test from "node:test";
 
-import { main } from "./codex-private-overlay-activation.mjs";
+import {
+  main,
+  observePrivateOverlayRoute,
+} from "./codex-private-overlay-activation.mjs";
 
 // Fixed argv-shape literals; wrapped through resolve() so they stay
 // host-canonical (production requires resolve(path) === path) on whichever
@@ -15,8 +19,11 @@ const PROJECT_ROOT = resolve("/private/project");
 const SOURCE_PLUGIN_ROOT = resolve("/local/marketplace/plugins/pipeline-core");
 const SENTINEL = "private-host-sentinel";
 const PLAN_SHA256 = "a".repeat(64);
-const USAGE = "Usage: codex-private-overlay-activation.mjs <inspect|plan|authority-plan|status|load-context> --project-root <absolute-path>\n       codex-private-overlay-activation.mjs <activate|authority-activate> --project-root <absolute-path> --expected-plan-sha256 <64hex>\n";
+const USAGE = "Usage: codex-private-overlay-activation.mjs route --project-root <absolute-path>\n       codex-private-overlay-activation.mjs <inspect|plan|authority-plan|status|load-context> --project-root <absolute-path>\n       codex-private-overlay-activation.mjs <activate|authority-activate> --project-root <absolute-path> --expected-plan-sha256 <64hex>\n";
 const REJECTION = '{"schema":"pipeline.codex-private-overlay-source-resolution.v1","status":"rejected","reasonCodes":["SNT-A-CODEX-SOURCE-UNAVAILABLE"]}\n';
+const PUBLIC_ROUTE = '{"schema":"pipeline.codex-private-overlay-route.v1","status":"public","reasonCodes":["SNT-A-ROUTE-PUBLIC"]}\n';
+const LOCKED_ROUTE = '{"schema":"pipeline.codex-private-overlay-route.v1","status":"locked","reasonCodes":["SNT-A-ROUTE-LOCKED"]}\n';
+const REJECTED_ROUTE = '{"schema":"pipeline.codex-private-overlay-route.v1","status":"rejected","reasonCodes":["SNT-A-ROUTE-UNAVAILABLE"]}\n';
 
 function pluginEntry(overrides = {}) {
   return {
@@ -71,6 +78,106 @@ function capture(argv, overrides = {}) {
   return { code, stdout, stderr, calls };
 }
 
+test("route emits an explicit public or locked result without resolving a marketplace source", () => {
+  const root = mkdtempSync(join(tmpdir(), "codex-private-overlay-route-"));
+  let hostCalls = 0;
+  const overrides = {
+    spawnSync() { hostCalls += 1; throw new Error("must not spawn"); },
+    activationMain() { hostCalls += 1; return 2; },
+  };
+  try {
+    assert.deepEqual(capture(["route", "--project-root", root], overrides), {
+      code: 0,
+      stdout: PUBLIC_ROUTE,
+      stderr: "",
+      calls: [],
+    });
+    mkdirSync(join(root, ".agent-pipeline"));
+    assert.deepEqual(capture(["route", "--project-root", root], overrides), {
+      code: 0,
+      stdout: PUBLIC_ROUTE,
+      stderr: "",
+      calls: [],
+    });
+    writeFileSync(join(root, ".agent-pipeline", "core.lock.json"), "{}\n");
+    assert.deepEqual(capture(["route", "--project-root", root], overrides), {
+      code: 0,
+      stdout: LOCKED_ROUTE,
+      stderr: "",
+      calls: [],
+    });
+    assert.equal(hostCalls, 0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("route rejects unsafe or unavailable physical marker topology", () => {
+  const root = mkdtempSync(join(tmpdir(), "codex-private-overlay-route-invalid-"));
+  try {
+    writeFileSync(join(root, ".agent-pipeline"), "not a directory\n");
+    assert.deepEqual(capture(["route", "--project-root", root]), {
+      code: 2,
+      stdout: REJECTED_ROUTE,
+      stderr: "",
+      calls: [],
+    });
+    assert.deepEqual(capture(["route", "--project-root", resolve(root, "missing")]), {
+      code: 2,
+      stdout: REJECTED_ROUTE,
+      stderr: "",
+      calls: [],
+    });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("route rejects symlink, hard-link, and physical-identity drift without platform-dependent fixtures", () => {
+  const overlay = join(PROJECT_ROOT, ".agent-pipeline");
+  const lock = join(overlay, "core.lock.json");
+  const entry = ({ directory = false, file = false, symlink = false, nlink = 1 } = {}) => ({
+    isDirectory: () => directory,
+    isFile: () => file,
+    isSymbolicLink: () => symlink,
+    nlink,
+  });
+  const cases = [
+    {
+      lstatSync(path) {
+        if (path === PROJECT_ROOT) return entry({ directory: true });
+        if (path === overlay) return entry({ symlink: true });
+        throw new Error("unexpected path");
+      },
+      realpathSync: (path) => path,
+    },
+    {
+      lstatSync(path) {
+        if (path === PROJECT_ROOT || path === overlay) return entry({ directory: true });
+        if (path === lock) return entry({ file: true, nlink: 2 });
+        throw new Error("unexpected path");
+      },
+      realpathSync: (path) => path,
+    },
+    {
+      lstatSync(path) {
+        if (path === PROJECT_ROOT || path === overlay) return entry({ directory: true });
+        if (path === lock) return entry({ file: true });
+        throw new Error("unexpected path");
+      },
+      realpathSync(path) {
+        return path === lock ? resolve(PROJECT_ROOT, "other.lock.json") : path;
+      },
+    },
+  ];
+  for (const dependencies of cases) {
+    assert.deepEqual(
+      observePrivateOverlayRoute(PROJECT_ROOT, dependencies),
+      JSON.parse(REJECTED_ROUTE),
+    );
+  }
+});
+
 test("inspect resolves with the exact fixed Codex argv and injects only the local source root", () => {
   const spawnCalls = [];
   const result = capture(["inspect", "--project-root", PROJECT_ROOT], {
@@ -119,17 +226,37 @@ test("never forwards the host plugin-list version to an activation argument", ()
 });
 
 test("accepts only a local marketplace root that exactly contains the selected plugin", () => {
+  const physicalSource = resolve("/physical/source/plugins/pipeline-core");
   const result = capture(["inspect", "--project-root", PROJECT_ROOT], {
     spawnSync: successfulSpawn(document([pluginEntry({
       marketplaceSource: { sourceType: "local", source: resolve("/local/marketplace") },
     })])),
+    realpathSync(path) {
+      assert.equal(path, SOURCE_PLUGIN_ROOT);
+      return physicalSource;
+    },
   });
   assert.deepEqual(result, {
     code: 0,
     stdout: "",
     stderr: "",
-    calls: [["inspect", "--project-root", PROJECT_ROOT, "--source-plugin-root", SOURCE_PLUGIN_ROOT]],
+    calls: [["inspect", "--project-root", PROJECT_ROOT, "--source-plugin-root", physicalSource]],
   });
+});
+
+test("rejects a local marketplace source whose physical target cannot be resolved safely", () => {
+  for (const realpathSync of [
+    () => { throw new Error("missing target"); },
+    () => "relative/target",
+  ]) {
+    const result = capture(["inspect", "--project-root", PROJECT_ROOT], {
+      spawnSync: successfulSpawn(document([pluginEntry({
+        marketplaceSource: { sourceType: "local", source: resolve("/local/marketplace") },
+      })])),
+      realpathSync,
+    });
+    assert.deepEqual(result, { code: 2, stdout: REJECTION, stderr: "", calls: [] });
+  }
 });
 
 test("rejects simultaneous isolated local-development and official installations", () => {
@@ -195,7 +322,10 @@ test("invalid public invocations emit fixed usage before source resolution", () 
   const cases = [
     [],
     ["inspect"],
+    ["route"],
     ["unknown", "--project-root", PROJECT_ROOT],
+    ["route", "--project-root", "relative"],
+    ["route", "--project-root", PROJECT_ROOT, "--expected-plan-sha256", PLAN_SHA256],
     ["inspect", "--project-root", "relative"],
     ["inspect", "--project-root", PROJECT_ROOT, "--project-root", PROJECT_ROOT],
     ["inspect", "--project-root", PROJECT_ROOT, "--source-plugin-root", SOURCE_PLUGIN_ROOT],
@@ -299,8 +429,9 @@ test("delegate exceptions and open dependency injection remain sanitized", () =>
 
 test("wrapper has no filesystem mutation surface and success writes only through the delegated main", () => {
   const source = readFileSync(new URL("./codex-private-overlay-activation.mjs", import.meta.url), "utf8");
-  assert.doesNotMatch(source, /from "node:fs"|writeFile|mkdir|rename|unlink|chmod|rmSync/u);
-  assert.doesNotMatch(source, /--host-plugin-version|core\.lock|process\.env\.(?!PATH)/u);
+  assert.doesNotMatch(source, /writeFile|mkdir|rename|unlink|chmod|rmSync/u);
+  assert.doesNotMatch(source, /--host-plugin-version|process\.env\.(?!PATH)/u);
+  assert.match(source, /lstatSync/u);
   let hostCalls = 0;
   const result = capture(["plan", "--project-root", PROJECT_ROOT], {
     spawnSync: () => { hostCalls += 1; return successfulSpawn()(); },

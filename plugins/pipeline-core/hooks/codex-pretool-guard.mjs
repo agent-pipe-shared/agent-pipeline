@@ -2,17 +2,41 @@
 // SPDX-License-Identifier: SUL-1.0
 
 /** Translate provider-neutral guard exits into Codex PreToolUse denials. */
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, read, realpathSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { evaluateLifecycleReadyGuard, isSanctionedLifecycleCommand } from "./guard-lifecycle-ready.mjs";
+import { isSanctionedLifecycleCommand } from "./guard-lifecycle-ready.mjs";
+import {
+  consumeHumanGuardOverride,
+  recordHumanGuardDenial,
+} from "../lib/human-guard-override.mjs";
 import { loadRuntimeProjectionV3OwnedKeys } from "../lib/runtime-projection-v3.mjs";
+import {
+  nativeHookSessionId,
+  rememberedNativeHookFailure,
+  rememberNativeHookFailure,
+} from "../lib/native-hook-failure-memory.mjs";
+import { parseGuardCommand } from "./guard-command-grammar.mjs";
 
 const DEBUG_PREFIX = "[pipeline.codex-pretool.v1]";
 const PLUGIN_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const PIPELINE_START_SKILL = join(PLUGIN_ROOT, "skills", "pipeline-start", "SKILL.md");
+const LIFECYCLE_GUARD = join(PLUGIN_ROOT, "hooks", "guard-lifecycle-ready.mjs");
+const HOOK_STARTED_AT = Date.now();
+// `apply_patch` delegates its path checks to two sequential legacy guards for
+// every touched file.  The provider timeout therefore needs room for the
+// complete bounded chain plus a final typed-recovery window; a 9s adapter
+// budget made a multi-file patch impossible even when every guard was healthy.
+const HOOK_BUDGET_MS = 42_000;
+const STDIN_TIMEOUT_MS = 1_000;
+const STDIN_MAX_BYTES = 1024 * 1024;
+const NESTED_GUARD_BUDGETS = Object.freeze({
+  "guard-apply-patch.mjs": { capMs: 36_000, reserveMs: 5_000 },
+  default: { capMs: 8_000, reserveMs: 5_000 },
+});
 let completed = false;
 
 function diagnostic(code, fields = {}) {
@@ -20,6 +44,15 @@ function diagnostic(code, fields = {}) {
     .filter(([, value]) => value !== undefined && value !== null && value !== "")
     .map(([key, value]) => `${key}=${JSON.stringify(String(value).slice(0, 160))}`);
   process.stderr.write(`${DEBUG_PREFIX} code=${code}${tokens.length === 0 ? "" : ` ${tokens.join(" ")}`}\n`);
+}
+
+function humanOverrideFailureFields(error) {
+  const git = String(error?.message ?? "").match(/\(operation=([A-Za-z0-9._=-]+), outcome=([A-Za-z0-9._=-]+)\)/u);
+  return {
+    name: error?.name,
+    code: error?.code,
+    ...(git ? { operation: git[1], outcome: git[2] } : {}),
+  };
 }
 
 function deny(reason, debug = undefined) {
@@ -34,6 +67,75 @@ function deny(reason, debug = undefined) {
     },
   })}\n`);
   process.exit(0);
+}
+
+function remainingBudgetMs(reserveMs = 0) {
+  return HOOK_BUDGET_MS - (Date.now() - HOOK_STARTED_AT) - reserveMs;
+}
+
+function timedOutSpawnResult() {
+  const error = new Error("Codex PreToolUse hook budget is exhausted");
+  error.code = "ETIMEDOUT";
+  return { status: null, signal: "SIGTERM", error, stdout: "", stderr: "" };
+}
+
+function boundedSpawn(executable, args, options, { capMs, reserveMs }) {
+  const available = remainingBudgetMs(reserveMs);
+  if (available <= 0) return timedOutSpawnResult();
+  return spawnSync(executable, args, {
+    ...options,
+    timeout: Math.max(1, Math.min(capMs, available)),
+  });
+}
+
+function readStdinBounded(timeoutMs = STDIN_TIMEOUT_MS) {
+  return new Promise((resolveInput, rejectInput) => {
+    const chunks = [];
+    let bytesRead = 0;
+    let settled = false;
+    const finish = (callback, result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      callback(result);
+    };
+    const timer = setTimeout(() => {
+      const error = new Error("Codex PreToolUse input did not close in time");
+      error.code = "HOOK-STDIN-TIMEOUT";
+      finish(rejectInput, error);
+    }, timeoutMs);
+    const readNext = () => {
+      if (settled) return;
+      const buffer = Buffer.allocUnsafe(64 * 1024);
+      read(0, buffer, 0, buffer.length, null, (error, count) => {
+        if (settled) return;
+        if (error) {
+          finish(rejectInput, error);
+          return;
+        }
+        if (count === 0) {
+          finish(resolveInput, Buffer.concat(chunks, bytesRead).toString("utf8"));
+          return;
+        }
+        bytesRead += count;
+        if (bytesRead > STDIN_MAX_BYTES) {
+          const oversized = new Error("Codex PreToolUse input exceeds its byte limit");
+          oversized.code = "HOOK-STDIN-OVERSIZED";
+          finish(rejectInput, oversized);
+          return;
+        }
+        chunks.push(buffer.subarray(0, count));
+        const value = Buffer.concat(chunks, bytesRead).toString("utf8");
+        try {
+          JSON.parse(value);
+          finish(resolveInput, value);
+        } catch {
+          readNext();
+        }
+      });
+    };
+    readNext();
+  });
 }
 
 // Codex reports a bare "hook exited with code 1" when an uncaught adapter
@@ -53,9 +155,9 @@ process.on("unhandledRejection", (reason) => {
 });
 
 let rawInput;
-try { rawInput = readFileSync(0, "utf8"); }
+try { rawInput = await readStdinBounded(); }
 catch (error) {
-  deny("Codex PreToolUse input could not be read; pipeline guards fail closed.", {
+  deny("Codex PreToolUse input was unavailable within the hook budget; pipeline guards fail closed.", {
     code: "stdin-read-failed",
     fields: { name: error?.name, code: error?.code },
   });
@@ -68,6 +170,9 @@ catch { deny("Codex PreToolUse input is not valid JSON; pipeline guards fail clo
 const toolName = String(input?.tool_name ?? "");
 const filePath = input?.tool_input?.file_path;
 const command = String(input?.tool_input?.command ?? "");
+const toolInputSha256 = createHash("sha256")
+  .update(JSON.stringify(input?.tool_input ?? {}))
+  .digest("hex");
 // Codex supplies the session working directory in the native hook envelope and
 // also launches the hook from that directory. CLAUDE_PROJECT_DIR belongs to
 // the Claude compatibility surface and may be inherited from another process;
@@ -88,41 +193,39 @@ try {
 const lifecycleGoverned = [
   ".agent-pipeline/core.lock.json",
   "pipeline.user.yaml",
+  "project/pipeline.json",
+  "project/pipeline.yaml",
   ".claude/pipeline.json",
   ".claude/pipeline.yaml",
   ...loadRuntimeProjectionV3OwnedKeys().targets.map((target) => target.path),
 ].some((marker) => existsSync(join(projectRoot, marker)));
 const isLifecycleTool = toolName === "Bash" && isSanctionedLifecycleCommand(command, projectRoot);
 
-function unquote(value) {
-  const trimmed = value.trim();
-  if (trimmed.length >= 2
-    && ((trimmed.startsWith("\"") && trimmed.endsWith("\""))
-      || (trimmed.startsWith("'") && trimmed.endsWith("'")))) {
-    return trimmed.slice(1, -1);
-  }
-  return trimmed;
-}
-
 /** Permit only the bootstrap's own immutable identity/read step. */
 export function isBootstrapReadCommand(value, {
   pipelineStartSkill = PIPELINE_START_SKILL,
   platform = process.platform,
 } = {}) {
-  if (typeof value !== "string" || value.trim() === "" || /[\0\r\n;&|<>()`]/u.test(value)) return false;
+  if (typeof value !== "string" || value.trim() === "") return false;
   const command = value.trim();
   if (/^pwd(?:\s+-P)?$/u.test(command)) return true;
+  const parsed = parseGuardCommand(command, process.cwd(), { platform });
+  if (parsed.parseStatus !== "accepted" || parsed.segments.length !== 1
+    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return false;
+  const { executable, argv } = parsed.segments[0];
   let target = null;
-  const sed = command.match(/^sed\s+-n\s+["']?\d+(?:,\d+)?p["']?\s+(.+)$/u);
-  if (sed) target = sed[1];
-  const cat = command.match(/^cat\s+(?:--\s+)?(.+)$/u);
-  if (!target && cat) target = cat[1];
-  const powerShell = command.match(/^(?:Get-Content|gc)\s+(?:(?:-LiteralPath|-Path)\s+)?(.+)$/iu);
-  if (!target && powerShell) target = powerShell[1];
-  const cmdType = platform === "win32" ? command.match(/^type\s+(.+)$/iu) : null;
-  if (!target && cmdType) target = cmdType[1];
+  if (executable === "sed" && argv.length === 3 && argv[0] === "-n"
+    && /^\d+(?:,\d+)?p$/u.test(argv[1])) target = argv[2];
+  if (executable === "cat" && (argv.length === 1 || (argv.length === 2 && argv[0] === "--"))) {
+    target = argv.at(-1);
+  }
+  if (/^Get-Content$/iu.test(executable)
+    && (argv.length === 2 || argv.length === 3)
+    && /^-LiteralPath$/iu.test(argv[0])
+    && (argv.length === 2 || /^-Raw$/iu.test(argv[2]))) target = argv[1];
+  if (platform === "win32" && /^type$/iu.test(executable) && argv.length === 1) target = argv[0];
   if (!target) return false;
-  try { return resolve(unquote(target)) === resolve(pipelineStartSkill); }
+  try { return resolve(target) === resolve(pipelineStartSkill); }
   catch { return false; }
 }
 
@@ -140,6 +243,7 @@ if (toolName === "Bash" && (typeof input?.tool_input?.command !== "string" || in
 if (["Edit", "Write"].includes(toolName) && (typeof filePath !== "string" || filePath.trim() === "")) {
   deny(`${toolName} input has no unambiguous file_path; pipeline write guards fail closed.`);
 }
+const hookSessionId = nativeHookSessionId(input);
 
 const guardNames = toolName === "Bash"
   ? [
@@ -160,34 +264,273 @@ const guardNames = toolName === "Bash"
 const denials = [];
 const warnings = [];
 for (const guardName of guardNames) {
+  const memoryInput = {
+    rootDir: projectRoot, sessionId: hookSessionId, toolName,
+    toolInput: input?.tool_input ?? {}, guard: guardName,
+  };
+  const remembered = rememberedNativeHookFailure(memoryInput);
+  if (remembered) {
+    denials.push({ guard: guardName, reason: remembered.reason });
+    diagnostic("native-hook-failure-suppressed", { guard: guardName, code: remembered.code });
+    continue;
+  }
   const guard = fileURLToPath(new URL(`./${guardName}`, import.meta.url));
-  const result = spawnSync(process.execPath, [guard], {
+  const result = boundedSpawn(process.execPath, [guard], {
     cwd: projectRoot,
     // Existing provider-neutral guards still consume CLAUDE_PROJECT_DIR.
     // Bind that compatibility variable to Codex's native, physical cwd rather
     // than forwarding a possibly stale inherited value.
-    env: { ...process.env, CLAUDE_PROJECT_DIR: projectRoot },
+    env: {
+      ...process.env,
+      CLAUDE_PROJECT_DIR: projectRoot,
+      PIPELINE_REQUIRE_TYPED_HUMAN_OVERRIDE: "1",
+    },
     encoding: "utf8",
     input: rawInput,
-    // A Codex hook has a ten-second outer budget. Bound each nested guard so
-    // two sequential guards cannot turn a diagnosable timeout into an opaque
-    // host-level exit-1 failure.
-    timeout: 4_000,
-  });
+  }, NESTED_GUARD_BUDGETS[guardName] ?? NESTED_GUARD_BUDGETS.default);
   const detail = String(result.stderr ?? "").trim();
-  if (result.status === 2) denials.push(detail || `${guardName} denied the tool call.`);
+  if (result.status === 2) denials.push({
+    guard: guardName,
+    reason: detail || `${guardName} denied the tool call.`,
+  });
   else if (result.status === 1) warnings.push(detail || `${guardName} returned a warning.`);
   else if (result.status !== 0) {
     const failure = result.error?.code ?? result.error?.name ?? result.signal ?? `exit-${String(result.status)}`;
     diagnostic("nested-guard-failed", { guard: guardName, failure });
-    denials.push(`${guardName} failed unexpectedly (${failure}); pipeline guards fail closed.`);
+    const reason = `${guardName} failed unexpectedly (${failure}); pipeline guards fail closed.`;
+    rememberNativeHookFailure(memoryInput, { code: failure, reason });
+    denials.push({
+      guard: guardName,
+      reason,
+    });
   }
 }
 if (lifecycleShouldRun) {
-  const lifecycle = evaluateLifecycleReadyGuard(input, { projectDir: projectRoot });
-  if (lifecycle.exitCode === 2) denials.push(String(lifecycle.stderr ?? "guard-lifecycle-ready denied the tool call.").trim());
-  else if (lifecycle.exitCode === 1) warnings.push(String(lifecycle.stderr ?? "guard-lifecycle-ready returned a warning.").trim());
+  const lifecycleGuard = "guard-lifecycle-ready.mjs";
+  const lifecycleMemoryInput = {
+    rootDir: projectRoot, sessionId: hookSessionId, toolName,
+    toolInput: input?.tool_input ?? {}, guard: lifecycleGuard,
+  };
+  const remembered = rememberedNativeHookFailure(lifecycleMemoryInput);
+  if (remembered) {
+    denials.push({ guard: lifecycleGuard, reason: remembered.reason });
+    diagnostic("native-hook-failure-suppressed", { guard: lifecycleGuard, code: remembered.code });
+  } else {
+  // Authoritative, not inferred (ADR-0051): guard-lifecycle-ready.mjs has
+  // exactly two production callers -- this boundedSpawn and
+  // guard-apply-patch.mjs's GUARDS spawn list -- both reachable only from
+  // Codex-only entry points (guard-apply-patch.mjs is itself spawned only
+  // from here). It appears in no hook configuration of either runner
+  // (codex-hooks.json registers only codex-session-start-hint.mjs and
+  // codex-pretool-guard.mjs), which is why `codex` is authoritative here
+  // rather than inferred. A stray CLAUDECODE=1 inherited from the
+  // propagated environment below must not silently reassign the runner the
+  // spawned guard admits under.
+  const lifecycle = boundedSpawn(process.execPath, [LIFECYCLE_GUARD, "--runner", "codex"], {
+    cwd: projectRoot,
+    env: { ...process.env, CLAUDE_PROJECT_DIR: projectRoot },
+    encoding: "utf8",
+    input: rawInput,
+  }, { capMs: 3_000, reserveMs: 1_500 });
+  const detail = String(lifecycle.stderr ?? "").trim();
+  if (lifecycle.status === 2) denials.push({
+    guard: lifecycleGuard,
+    reason: detail || "guard-lifecycle-ready denied the tool call.",
+  });
+  else if (lifecycle.status === 1) warnings.push(detail || "guard-lifecycle-ready returned a warning.");
+  else if (lifecycle.status !== 0) {
+    const failure = lifecycle.error?.code ?? lifecycle.error?.name
+      ?? lifecycle.signal ?? `exit-${String(lifecycle.status)}`;
+    diagnostic("lifecycle-guard-failed", { failure });
+    const reason = `${lifecycleGuard} failed within the hook budget (${failure}); pipeline guards fail closed.`;
+    rememberNativeHookFailure(lifecycleMemoryInput, { code: failure, reason });
+    denials.push({
+      guard: lifecycleGuard,
+      reason,
+    });
+  }
+  }
 }
-if (denials.length > 0) deny(denials.join("\n"));
+const GRAMMAR_DENIAL = /\bGUARD-(?:PARSE|OPERATOR|REDIRECT)-UNAPPROVED\b/u;
+const grammarOnlyDenial = denials.length > 0
+  && denials.every((entry) => entry.guard === "guard-lifecycle-ready.mjs"
+    && GRAMMAR_DENIAL.test(entry.reason));
+const crossRepositoryOnlyDenial = denials.length > 0
+  && denials.every((entry) => entry.guard === "guard-lifecycle-ready.mjs"
+    && /\bGUARD-CROSS-REPO-MUTATION\b/u.test(entry.reason));
+if (denials.length > 0) {
+  // Closed shell-grammar refusals have no side effect to reconcile and are
+  // not authority decisions. Routing them through the one-time Human-override
+  // ledger creates a misleading verify-audit/retry loop.
+  if (grammarOnlyDenial) {
+    deny(denials.map((entry) => entry.reason).join("\n"));
+  }
+  // A consumer session cannot attest or mutate the Codex plugin cache.  This
+  // is an external authority boundary, not an effect that an in-repository
+  // Human-override audit can reconcile.  Returning verify-audit here creates
+  // an infinite retry loop without changing the allowed execution boundary.
+  if (crossRepositoryOnlyDenial) {
+    deny([
+      denials.map((entry) => entry.reason).join("\n"),
+      "Guard recovery route:",
+      JSON.stringify({
+        status: "external-operator-required",
+        code: "HGO-EXTERNAL-PLUGIN-CACHE-BOUNDARY",
+        nextAction: {
+          kind: "external-operator",
+          executionBoundary: "separate-session-rooted-at-plugin-cache",
+          invocation: "user-copy-only",
+          action: { toolName, toolInputSha256, repositoryRoot: projectRoot },
+          reason: "the Codex plugin cache is outside this repository's physical authority boundary",
+        },
+      }),
+    ].join("\n"));
+  }
+  const overrideSpawn = (executable, args, options) => boundedSpawn(
+    executable,
+    args,
+    options,
+    // Repository identity needs several independent Git observations.  A
+    // 300ms per-child cap made the audited escape hatch unavailable in large
+    // or cold repositories even though the same Git operations succeeded
+    // directly.  The global hook budget still bounds the complete adapter.
+    { capMs: 2_000, reserveMs: 750 },
+  );
+  let consumed;
+  try {
+    consumed = consumeHumanGuardOverride({
+      rootDir: projectRoot,
+      pluginRoot: PLUGIN_ROOT,
+      toolName,
+      toolInput: input?.tool_input ?? {},
+      denials,
+      spawn: overrideSpawn,
+    });
+  } catch (error) {
+    diagnostic("human-override-consume-failed", humanOverrideFailureFields(error));
+    consumed = { status: "invalid", code: "HGO-ADAPTER-FAILURE" };
+  }
+  if (consumed.status === "consumed") {
+    process.stderr.write(
+      `[pipeline-human-override] exact one-time capability consumed; plan=${consumed.planSha256}.\n`,
+    );
+    completed = true;
+    process.exit(0);
+  }
+  let overrideGuidance = "";
+  if (consumed.status === "absent" || consumed.status === "replan") {
+    try {
+      const planned = recordHumanGuardDenial({
+        rootDir: projectRoot,
+        pluginRoot: PLUGIN_ROOT,
+        toolName,
+        toolInput: input?.tool_input ?? {},
+        denials,
+        spawn: overrideSpawn,
+      });
+      if (planned.status === "planned") {
+        const script = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+        overrideGuidance = [
+          "",
+          "Human override available for this exact action (one use; audited; explicit confirmation required):",
+          `${process.execPath} ${JSON.stringify(script)} plan --repo ${JSON.stringify(projectRoot)} --request-sha256 ${planned.requestSha256}`,
+        ].join("\n");
+      } else if (planned.status === "author-repair-required") {
+        const script = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+        overrideGuidance = [
+          "",
+          "Pipeline Author Repair is available for this exact source action (one use; audited; explicit confirmation required):",
+          `${process.execPath} ${JSON.stringify(script)} plan --repo ${JSON.stringify(projectRoot)} --request-sha256 ${planned.requestSha256} --author-source-root ${JSON.stringify(planned.candidateSourceRoot)}`,
+        ].join("\n");
+      } else if (new Set(["narrower-recovery-required", "external-operator-required"]).has(planned.status)) {
+        overrideGuidance = [
+          "",
+          "Guard recovery route:",
+          JSON.stringify(planned),
+        ].join("\n");
+      } else {
+        overrideGuidance = [
+          "",
+          "Guard recovery route:",
+          JSON.stringify({
+            status: "effect-reconciliation-required",
+            code: planned.code ?? "HGO-UNCLASSIFIED",
+            nextAction: {
+              kind: "typed-recovery",
+              action: {
+                executable: process.execPath,
+                argv: [join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"), "verify-audit", "--repo", projectRoot],
+                mutation: false,
+                requiresConfirmation: false,
+                executionBoundary: "local-process",
+                expected: { schema: "pipeline.human-guard-override-audit-verification.v1", status: "valid" },
+              },
+              after: "retry the identical original action to obtain a fresh bound plan",
+            },
+          }),
+        ].join("\n");
+      }
+    } catch (error) {
+      diagnostic("human-override-plan-failed", humanOverrideFailureFields(error));
+      const hostBoundary = error?.code === "HGO-GIT" || error?.code === "HGO-ROOT"
+        || error?.code === "HGO-COMMON-DIR";
+      overrideGuidance = [
+        "",
+        "Guard recovery route:",
+        JSON.stringify(hostBoundary
+          ? {
+            status: "external-operator-required",
+            code: "HGO-EXTERNAL-REPOSITORY-OBSERVATION",
+            nextAction: {
+              kind: "external-operator",
+              executionBoundary: "attended-host-terminal",
+              invocation: "user-copy-only",
+              action: { toolName, toolInputSha256, repositoryRoot: projectRoot },
+              reason: "the host repository preimage cannot be attested inside this guard process",
+            },
+          }
+          : {
+            status: "effect-reconciliation-required",
+            code: "HGO-DECISION-RECORD-UNAVAILABLE",
+            nextAction: {
+              kind: "typed-recovery",
+              action: {
+                executable: process.execPath,
+                argv: [join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"), "verify-audit", "--repo", projectRoot],
+                mutation: false,
+                requiresConfirmation: false,
+                executionBoundary: "local-process",
+                expected: { schema: "pipeline.human-guard-override-audit-verification.v1", status: "valid" },
+              },
+              after: "retry the identical original action to obtain a fresh bound plan",
+            },
+          }),
+      ].join("\n");
+    }
+  } else {
+    overrideGuidance = [
+      "",
+      "Human override rejected; override admission is not operation success.",
+      "Guard recovery route:",
+      JSON.stringify({
+        status: "effect-reconciliation-required",
+        code: consumed.code ?? "HGO-CAPABILITY-INVALID",
+        nextAction: {
+          kind: "typed-recovery",
+          action: {
+            executable: process.execPath,
+            argv: [join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"), "verify-audit", "--repo", projectRoot],
+            mutation: false,
+            requiresConfirmation: false,
+            executionBoundary: "local-process",
+            expected: { schema: "pipeline.human-guard-override-audit-verification.v1", status: "valid" },
+          },
+          after: "retry the identical original action to obtain a fresh bound plan",
+        },
+      }),
+    ].join("\n");
+  }
+  deny(`${denials.map((entry) => entry.reason).join("\n")}${overrideGuidance}`);
+}
 if (warnings.length > 0) process.stderr.write(`${warnings.join("\n")}\n`);
 completed = true;

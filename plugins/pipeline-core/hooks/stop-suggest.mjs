@@ -208,12 +208,35 @@
  * with a resolvable next phase, or a staged context-budget warning, applies):
  *   node plugins/pipeline-core/hooks/stop-suggest.mjs
  */
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
-import { join, dirname } from "node:path";
-import { pathToFileURL } from "node:url";
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  writeFileSync,
+} from "node:fs";
+import {
+  dirname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  sep,
+} from "node:path";
 
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { loadManifestSafe, activePhases, gateConfig } from "../lib/manifest.mjs";
-import { readProjectAuthority } from "../lib/project-authority.mjs";
+import {
+  LEGACY_STATE,
+  NEUTRAL_STATE,
+  resolveProjectAuthorityPaths,
+} from "../lib/project-authority.mjs";
+import {
+  coordinatorNextPhases,
+  readCloseCoordinator,
+} from "../scripts/publication-close-journal.mjs";
 
 // ---- phase -> gate mapping (ONE small table; later phases are one-line additions) -------
 export const PHASE_GATE_MAP = {
@@ -305,12 +328,27 @@ function buildCompletionMessage(manifest) {
  * @param {object|null} state - result of `loadStateSafe()`
  * @returns {string|null}
  */
-export function resolveSuggestion(manifest, state) {
+export function resolveCoordinatorSuggestion(coordinator) {
+  const phase = coordinator?.phase;
+  if (typeof phase !== "string" || phase === "") return null;
+  const next = coordinatorNextPhases(phase);
+  if (next.length === 0 || ["closed-local", "delivered", "promoted"].includes(phase)) return null;
+  if (phase === "checkpointed") {
+    return "Pipeline close: checkpoint is durable; resume the active feature, or use feature-close-prepared only after completion.";
+  }
+  return `Pipeline close: next transition is ${next[0]} (current: ${phase}).`;
+}
+
+export function resolveSuggestion(manifest, state, coordinator = null) {
   if (!manifest || typeof manifest !== "object") return null;
   if (!state || typeof state !== "object") return null;
 
   const activeFeature = state.activeFeature;
   if (!activeFeature || typeof activeFeature !== "object") return null;
+
+  // H5 private coordinator state is authoritative when discovered. Project
+  // State never gets to project or forge a coordinator phase.
+  if (coordinator !== null) return resolveCoordinatorSuggestion(coordinator);
 
   const currentPhase = activeFeature.phase;
   if (typeof currentPhase !== "string" || currentPhase === "") return null;
@@ -323,6 +361,68 @@ export function resolveSuggestion(manifest, state) {
 
   const nextPhase = activeList[idx + 1];
   return buildTransitionMessage(currentPhase, nextPhase, manifest, activeFeature);
+}
+
+function physicalDirectory(path) {
+  const info = lstatSync(path);
+  return info.isDirectory() && !info.isSymbolicLink() && realpathSync(path) === path;
+}
+
+function resolveGitCommonDirectorySafe(rootDir) {
+  try {
+    const root = realpathSync(resolve(rootDir));
+    const dotGit = join(root, ".git");
+    const info = lstatSync(dotGit);
+    let gitDirectory;
+    if (info.isDirectory() && !info.isSymbolicLink() && realpathSync(dotGit) === dotGit) {
+      gitDirectory = dotGit;
+    } else if (info.isFile() && !info.isSymbolicLink() && info.size <= 4096) {
+      const match = /^gitdir: ([^\r\n]+)\r?\n?$/u.exec(readFileSync(dotGit, "utf8"));
+      if (!match) return null;
+      gitDirectory = realpathSync(resolve(root, match[1]));
+      if (!physicalDirectory(gitDirectory)) return null;
+    } else {
+      return null;
+    }
+    const commonMarker = join(gitDirectory, "commondir");
+    const common = existsSync(commonMarker)
+      ? realpathSync(resolve(gitDirectory, readFileSync(commonMarker, "utf8").trim()))
+      : gitDirectory;
+    if (!physicalDirectory(common)) return null;
+    const rel = relative(common, gitDirectory);
+    if (rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return null;
+    return common;
+  } catch {
+    return null;
+  }
+}
+
+/** Read-only, fail-open discovery of exactly one coordinator for this feature. */
+export function loadCloseCoordinatorSafe(rootDir, state) {
+  const featureId = state?.activeFeature?.id;
+  if (typeof featureId !== "string" || featureId === "") return null;
+  const common = resolveGitCommonDirectorySafe(rootDir);
+  if (common === null) return null;
+  const parent = join(common, "agent-pipeline", "publication-close");
+  try {
+    if (!physicalDirectory(parent)) return null;
+    const matches = [];
+    for (const entry of readdirSync(parent, { withFileTypes: true })) {
+      if (!entry.isDirectory() || !/^[A-Za-z0-9._-]{1,100}$/u.test(entry.name)) continue;
+      try {
+        const stored = readCloseCoordinator(common, entry.name);
+        if (stored.coordinator.featureId === featureId) matches.push(stored.coordinator);
+      } catch {
+        // One malformed/unsafe private lifecycle is not authority for a hint.
+      }
+    }
+    const nonterminal = matches.filter((value) => !["closed-local", "delivered", "promoted"].includes(value.phase));
+    if (nonterminal.length === 1) return nonterminal[0];
+    if (nonterminal.length === 0 && matches.length === 1) return matches[0];
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -509,12 +609,11 @@ export function contextTier(usedPct) {
  */
 export function absoluteContextTier(totalTokens) {
   if (typeof totalTokens !== "number" || !Number.isFinite(totalTokens)) return "none";
-  // 250k is documented (Elephant decision 2026-07-10) as the "strongest soft" floor -- but it
-  // maps to the SAME "overdue" tier as the 200k floor. There is no 4th soft tier between
-  // "overdue" and the percent-gated "block"; the 250k number is an urgency-framing distinction
-  // in the decision record, not a separate machine-checkable state.
-  if (totalTokens >= 200000) return "overdue"; // also covers the 250k "strongest soft" floor
-  if (totalTokens >= 180000) return "warn";
+  // Claude Code's large context windows need a later proactive checkpoint: begin the soft
+  // nudge at 400k and escalate its wording at 500k. There is no 4th soft tier between
+  // "overdue" and the percent-gated "block"; the absolute ladder never blocks a session.
+  if (totalTokens >= 500000) return "overdue";
+  if (totalTokens >= 400000) return "warn";
   return "none";
 }
 
@@ -851,12 +950,14 @@ export function run() {
   const stopHookActive = resolveStopHookActiveFromInput(stdinInput);
 
   const manifest = loadManifestSafe(rootDir);
-  const authority = readProjectAuthority({ rootDir });
-  const statePath = authority.status === "ready" && authority.state
+  const authority = resolveProjectAuthorityPaths({ rootDir });
+  const stateRelPath = authority.status === "ready"
     ? authority.state
-    : authority.status === "missing" ? ".claude/pipeline-state.json" : null;
-  const state = statePath ? loadStateSafe(join(rootDir, statePath)) : null;
-  const phaseMessage = resolveSuggestion(manifest, state);
+    : (existsSync(join(rootDir, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE);
+  const stateFilePath = join(rootDir, stateRelPath);
+  const state = loadStateSafe(stateFilePath);
+  const coordinator = loadCloseCoordinatorSafe(rootDir, state);
+  const phaseMessage = resolveSuggestion(manifest, state, coordinator);
 
   // G-B context-budget part: only reachable with a resolvable session_id (no session_id ->
   // no usage-file path to read -> tier stays "none", contextMessage stays null -- silently
@@ -912,6 +1013,6 @@ export function run() {
 
 // Only auto-run when executed directly (`node stop-suggest.mjs`), never on import (the test
 // file imports the functions above without triggering the real CLI/exit).
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectInvocation(import.meta.url)) {
   run();
 }

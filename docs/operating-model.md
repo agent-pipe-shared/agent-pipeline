@@ -68,8 +68,8 @@ person or model:
 | Profile | Use it for | Process effect |
 | --- | --- | --- |
 | `mini` | A genuinely small, bounded, reversible change. | Light process; advisory is disabled. Deterministic checks still apply. |
-| `feature` | One coherent product or engineering change. | Full feature lifecycle; advisory is required. |
-| `epic` | Multi-block, architectural or cross-cutting work. | Full lifecycle and advisory; plan work is decomposed into smaller deliverable blocks. |
+| `feature` | One coherent product or engineering change. | Full feature lifecycle; model-free Advisor capability preflight is required and consultation is on demand. |
+| `epic` | Multi-block, architectural or cross-cutting work. | Full lifecycle; model-free Advisor capability preflight is required, consultation is on demand, and plan work is decomposed into smaller deliverable blocks. |
 
 Every profile has a `design_phase` and an `execution_phase`. A **phase** is a
 lifecycle state; it is not a profile. A **Sprint** is a planning window that
@@ -79,9 +79,10 @@ groups work. Neither term changes a runner or authorizes a shortcut.
 
 The route registry distinguishes duties such as `implement`, `mechanic`,
 `deep`, `test_author`, `readiness`, `critic_normal`, `critic_high_risk` and
-`advisory`. Optional duties are opt-in. Advisory is required for `feature` and
-`epic`, disabled for `mini`, and emits a bound advisory receipt rather than an
-implementation decision.
+`advisory`. Optional duties are opt-in. Advisor capability preflight is
+model-free for `feature` and `epic` and disabled for `mini`. Actual Advisory is
+on demand: one concrete question, reason and digest-bound evidence produce a
+sanitized receipt rather than an implementation decision.
 
 ## 4. The lifecycle
 
@@ -143,6 +144,14 @@ normative shape is:
 5. **Dispatch.** Give a Goldfish one outcome, exact context paths, DoD checks,
    prohibitions, stop conditions and route metadata. Independent tasks may run
    in parallel when their files and state do not conflict.
+
+   The Elephant SHALL treat an absent early progress message as neutral, not as
+   a worker failure. Before interrupting a dispatched worker, it SHALL allow a
+   reasonable bounded execution window and inspect the worker's status plus the
+   emerging owned-file diff. An interrupt requires a concrete error,
+   scope/prohibition breach, conflicting mutation, or explicit stop request;
+   impatience alone is not evidence. This is orchestration discipline, not a
+   claim that a worker has passed its DoD.
 6. **Verify.** Run the project's single configured verify command. The result
    is machine evidence containing the command and result, not “looks good”.
 7. **Critic.** Review the delta only after the applicable deterministic chain
@@ -173,6 +182,48 @@ optional security tool is reported as `SKIPPED`, never as `PASS`. A typed
 unavailable runner capability stops that capability honestly; it is not an
 invitation to weaken permissions, invent evidence or change runner/model.
 
+### Gate discipline and autonomous happy path
+
+The compiled repository manifest is the sole source for the number and kind of
+human gates. A calibrated two-gate workflow has exactly those two configured
+human decision points; it does not acquire additional chat confirmations while
+work is in progress. Once the applicable plan gate is recorded, ordinary
+implementation is autonomous: bounded edits, focused checks, state readback,
+one-line commits, Verify, Critic preparation and the next approved block are
+agent work.
+
+**Plan approval is an execution mandate, not a per-step conversation.** A
+recorded PRD/Spec approval covers every implementation choice and recovery
+needed to meet its accepted scope: normal design details, task ordering, test
+fixes, internal refactors, evidence collection and Critic follow-up. The agent
+must decide those matters, record material decisions in governed artifacts, and
+return outcomes for acceptance. It must not turn ordinary alternatives or
+uncertainty into repeated PO questions. A question is permitted only when
+alternatives materially change approved scope, acceptance criteria, priority,
+risk, cost, an external or irreversible consequence, or a configured gate.
+Present such alternatives together at that boundary; do not serialise them into
+implementation-time approval prompts.
+
+**Pipeline-use consent is likewise one bounded bootstrap consent.** When the
+human agrees to use the Pipeline in a repository, that authorises its disclosed
+local happy path through the first usable kickoff: plans/readbacks, portable
+seed, any plan-disclosed local Git initialization, runtime initialization,
+restart preparation and kickoff artifacts. The agent reports the bounded effect
+once and then executes the digest-bound steps autonomously; it does not ask the
+same human to approve every internal plan digest. A restart resumes this local
+onboarding from its sanctioned state. This consent never covers remote/adoption
+work, publication, deployment, destructive operations, a scope change, or an
+actual configured plan/acceptance gate.
+
+Do not ask the PO to re-approve routine progress, a guard's first denial, a
+test retry, a bounded recovery already returned by the system, or a normal
+commit. Ask only for a configured decision or acceptance gate, an explicit
+scope/priority trade-off, an irreversible or externally consequential action,
+or a typed hard block for which the supplied safe recovery actions cannot make
+progress. A guard denial is not itself a human gate: execute its exact typed
+read-only or lifecycle recovery first. This discipline preserves human
+judgment without turning the PO into an implementation relay.
+
 ## 6. Evidence, review and recovery
 
 Evidence binds a result to its candidate and records what was actually
@@ -193,8 +244,8 @@ guarded even when a model or prompt asks for them.
 ## 7. Project calibration and extensions
 
 The portable core is shared; each repository supplies a small committed
-calibration in `.claude/pipeline.json` and, where used, a declarative
-`.claude/pipeline.yaml`. The V3 source selects language, routing, profiles,
+calibration and, where used, a declarative manifest, both at the project's
+resolved authority tier (`project/*`, else the legacy `.claude/*`; ADR-0046/ADR-0054). The V3 source selects language, routing, profiles,
 duties and policy defaults. Use the templates rather than copying an existing
 repo's private details.
 
@@ -251,7 +302,8 @@ bounded triage content; it is not briefing context for a Goldfish or Critic.
 ## 10. Glossary
 
 - **Acceptance criteria / DoD:** observable checks that define completion.
-- **Advisory:** a fresh, bounded second opinion for Feature/Epic; not approval.
+- **Advisory:** an on-demand, fresh, bounded second opinion for one concrete
+  Feature/Epic question; not bootstrap and not approval.
 - **Calibration:** the repo-local configuration that adapts the shared model.
 - **Critic:** independent fresh-context read-only reviewer.
 - **Duty:** a routed unit of work, such as implement or readiness.
@@ -343,8 +395,8 @@ und kein Modell:
 | Profil | Verwende es für | Prozesseffekt |
 | --- | --- | --- |
 | `mini` | Eine wirklich kleine, begrenzte und reversible Änderung. | Leichter Prozess; Advisory ist deaktiviert. Deterministische Checks bleiben Pflicht. |
-| `feature` | Eine zusammenhängende Produkt- oder Engineering-Änderung. | Voller Feature-Lifecycle; Advisory ist erforderlich. |
-| `epic` | Mehrblock-, Architektur- oder querschnittliche Arbeit. | Voller Lifecycle und Advisory; der Plan wird in kleinere lieferbare Blöcke zerlegt. |
+| `feature` | Eine zusammenhängende Produkt- oder Engineering-Änderung. | Voller Feature-Lifecycle; modellfreier Advisor-Capability-Preflight ist erforderlich, Consultation läuft on demand. |
+| `epic` | Mehrblock-, Architektur- oder querschnittliche Arbeit. | Voller Lifecycle; modellfreier Advisor-Capability-Preflight ist erforderlich, Consultation läuft on demand, der Plan wird in kleinere lieferbare Blöcke zerlegt. |
 
 Jedes Profil hat eine `design_phase` und eine `execution_phase`. Eine **Phase**
 ist ein Lifecycle-Zustand, kein Profil. Ein **Sprint** ist ein
@@ -355,9 +407,10 @@ Abkürzung.
 
 Die Route Registry unterscheidet Duties wie `implement`, `mechanic`, `deep`,
 `test_author`, `readiness`, `critic_normal`, `critic_high_risk` und
-`advisory`. Optionale Duties sind Opt-in. Advisory ist für `feature` und
-`epic` erforderlich, für `mini` deaktiviert und erzeugt eine gebundene
-Advisory-Receipt statt einer Implementierungsentscheidung.
+`advisory`. Optionale Duties sind Opt-in. Der Advisor-Capability-Preflight ist
+für `feature` und `epic` modellfrei und für `mini` deaktiviert. Echte Advisory
+läuft on demand: Eine konkrete Frage, ein Grund und digest-gebundene Evidenz
+erzeugen eine sanitierte Receipt statt einer Implementierungsentscheidung.
 
 ## 4. Der Lifecycle
 
@@ -460,6 +513,53 @@ nicht verfügbare Runner-Fähigkeit stoppt diese Fähigkeit ehrlich; sie ist kei
 Einladung, Berechtigungen zu lockern, Evidenz zu erfinden oder Runner/Modell zu
 wechseln.
 
+### Gate-Disziplin und autonomer Happy Path
+
+Das kompilierte Repository-Manifest ist die einzige Autorität für Anzahl und
+Art menschlicher Gates. Ein auf zwei Gates kalibrierter Ablauf hat genau diese
+beiden konfigurierten menschlichen Entscheidungspunkte; während der Arbeit
+entstehen keine zusätzlichen Chat-Bestätigungen. Sobald das nötige Plan-Gate
+aufgezeichnet ist, läuft die gewöhnliche Implementierung autonom: begrenzte
+Änderungen, fokussierte Checks, State-Readback, einzeilige Commits, Verify,
+Critic-Vorbereitung und der nächste freigegebene Block sind Agentenarbeit.
+
+**Eine Planfreigabe ist ein Ausführungsmandat, kein Gespräch für jeden
+Einzelschritt.** Eine aufgezeichnete PRD-/Spec-Freigabe deckt jede
+Umsetzungsentscheidung und Recovery ab, die nötig ist, um den akzeptierten
+Scope zu erfüllen: normale Designdetails, Reihenfolge der Arbeit, Test-Fixes,
+interne Refactors, Evidenzsammlung und Critic-Nacharbeit. Der Agent entscheidet
+diese Punkte, hält materielle Entscheidungen in den governeden Artefakten fest
+und legt Ergebnisse zur Abnahme vor. Er darf gewöhnliche Alternativen oder
+Unsicherheit nicht in wiederholte PO-Fragen verwandeln. Eine Frage ist nur
+zulässig, wenn Alternativen den freigegebenen Scope, Akzeptanzkriterien,
+Priorität, Risiko, Kosten, eine externe oder irreversible Folge oder ein
+konfiguriertes Gate materiell verändern. Solche Alternativen werden an dieser
+Grenze gemeinsam vorgelegt, nicht als Folge von Freigabeaufforderungen während
+der Umsetzung.
+
+**Die Zustimmung zur Pipeline-Nutzung ist ebenso eine einmalige, begrenzte
+Bootstrap-Zustimmung.** Wenn der Mensch der Pipeline-Nutzung in einem
+Repository zustimmt, autorisiert das den offengelegten lokalen Happy Path bis
+zum ersten nutzbaren Kickoff: Pläne/Readbacks, portablen Seed, eine im Plan
+offengelegte lokale Git-Initialisierung, Runtime-Initialisierung,
+Restart-Vorbereitung und Kickoff-Artefakte. Der Agent benennt die begrenzte
+Wirkung einmal und führt die digest-gebundenen Schritte dann autonom aus; er
+fragt nicht nach jeder internen Plan-Prüfsumme erneut. Ein Neustart setzt dieses
+lokale Onboarding aus seinem sanktionierten Zustand fort. Diese Zustimmung
+deckt niemals Remote-/Adoption-Arbeit, Veröffentlichung, Deployment,
+destruktive Operationen, Scope-Änderungen oder ein tatsächlich konfiguriertes
+Plan-/Abnahme-Gate ab.
+
+Den PO nicht erneut für normalen Fortschritt, die erste Guard-Ablehnung, einen
+Test-Repeat, eine bereits zurückgegebene begrenzte Recovery oder einen normalen
+Commit fragen. Fragen nur bei einem konfigurierten Entscheidungs- oder
+Abnahme-Gate, einem expliziten Scope-/Prioritäts-Trade-off, einer irreversiblen
+oder extern wirksamen Aktion oder einem typisierten harten Block, für den die
+gelieferten sicheren Recovery-Aktionen nicht weiterführen. Eine Guard-Ablehnung
+ist kein menschliches Gate: zuerst ihre exakte typisierte Read-only- oder
+Lifecycle-Recovery ausführen. So bleibt menschliches Urteil sichtbar, ohne den
+PO zum Implementierungs-Relay zu machen.
+
 <a id="7-feedback-loop"></a>
 
 ## 6. Evidenz, Review und Recovery
@@ -546,8 +646,16 @@ Briefing-Kontext.
 
 ## 10. Glossar
 
+### H5 Close-Koordinator
+
+Feature-Schließen folgt einer einzigen, wiederaufnahmefähigen Zustandsmaschine
+mit Checkpoint, getrackten Abschlussmutationen, Kandidaten-Freeze und exakt
+gebundener Verifikation. Lokales Schließen (`closed-local`) benötigt keinen
+Push; Veröffentlichung und Readback sind getrennte, autorisierte Übergänge.
+
 - **Acceptance Criteria / DoD:** Beobachtbare Checks, die Abschluss definieren.
-- **Advisory:** Frische, begrenzte zweite Meinung für Feature/Epic, keine Freigabe.
+- **Advisory:** On-demand, frische und begrenzte zweite Meinung zu genau einer
+  konkreten Feature-/Epic-Frage; weder Bootstrap noch Freigabe.
 - **Calibration:** Repo-lokale Konfiguration zur Anpassung des gemeinsamen Modells.
 - **Critic:** Unabhängiger Read-only-Reviewer mit frischem Kontext.
 - **Duty:** Geroutete Arbeitseinheit, etwa Implementierung oder Readiness.

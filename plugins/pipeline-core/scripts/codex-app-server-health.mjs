@@ -10,11 +10,13 @@
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const CODEX_APP_SERVER_HEALTH_SCHEMA = "pipeline.codex-app-server-health.v1";
 export const CODEX_APP_SERVER_DOCTOR_SCHEMA = "pipeline.codex-app-server-doctor.v1";
 const VERSION_KEYS = ["status", "backend", "managedCodexPath", "managedCodexVersion", "socketPath", "cliVersion", "appServerVersion"];
 const OPERATOR_ACTION = "codex app-server daemon restart && codex doctor";
+const MODEL_PROBE = fileURLToPath(new URL("./codex-app-server-model-probe.mjs", import.meta.url));
 
 function isObject(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
 function isNonEmptyString(value) { return typeof value === "string" && value.length > 0; }
@@ -45,6 +47,20 @@ function invoke(executable, args, spawn = spawnSync) {
   });
 }
 
+function observeModelReadiness(daemon, spawn = spawnSync) {
+  const result = spawn(process.execPath, [MODEL_PROBE, daemon.managedCodexPath], {
+    encoding: "utf8",
+    shell: false,
+    timeout: 65_000,
+    env: { PATH: process.env.PATH, SystemRoot: process.env.SystemRoot },
+  });
+  if (result?.status !== 0) return false;
+  try {
+    const value = JSON.parse(String(result.stdout ?? ""));
+    return value?.schema === "pipeline.codex-app-server-model-probe.v1" && value.status === "ready" && value.code === "CAS-MODEL-READY";
+  } catch { return false; }
+}
+
 function unavailable(code, phase, detail = null) {
   return {
     schema: CODEX_APP_SERVER_HEALTH_SCHEMA,
@@ -72,7 +88,7 @@ function stale(code, phase, detail = null) {
 }
 
 /** The single read-only daemon version observation. */
-export function observeCodexAppServer({ executable = "codex", spawn = spawnSync } = {}) {
+export function observeCodexAppServer({ executable = "codex", spawn = spawnSync, requireModelReady = false } = {}) {
   const result = invoke(executable, ["app-server", "daemon", "version"], spawn);
   const failure = executionFailure(result);
   if (failure !== null) return unavailable(failure, "observe", result?.error?.code ?? null);
@@ -81,6 +97,9 @@ export function observeCodexAppServer({ executable = "codex", spawn = spawnSync 
   if (daemon === null) return stale("CAS-DAEMON-INVALID-OBSERVATION", "observe");
   if (daemon.cliVersion !== daemon.appServerVersion || daemon.managedCodexVersion !== daemon.appServerVersion) {
     return stale("CAS-DAEMON-VERSION-DRIFT", "observe", daemon);
+  }
+  if (requireModelReady && !observeModelReadiness(daemon, spawn)) {
+    return stale("CAS-MODEL-UNAVAILABLE", "observe", daemon);
   }
   return {
     schema: CODEX_APP_SERVER_HEALTH_SCHEMA,
@@ -99,8 +118,8 @@ export function observeCodexAppServer({ executable = "codex", spawn = spawnSync 
  * observation. It never invokes a model, starts a pipeline worker, or claims
  * that the current host exposes background wakeups.
  */
-export function checkCodexAppServer({ recover = false, executable = "codex", spawn = spawnSync } = {}) {
-  const first = observeCodexAppServer({ executable, spawn });
+export function checkCodexAppServer({ recover = false, executable = "codex", spawn = spawnSync, requireModelReady = false } = {}) {
+  const first = observeCodexAppServer({ executable, spawn, requireModelReady });
   if (first.status === "ready" || recover !== true || first.code === "CAS-CODEX-UNAVAILABLE" || first.code === "CAS-EXECUTION-UNAVAILABLE") return first;
   const restart = invoke(executable, ["app-server", "daemon", "restart"], spawn);
   const failure = executionFailure(restart);
@@ -114,7 +133,7 @@ export function checkCodexAppServer({ recover = false, executable = "codex", spa
       detail: failure ?? (restart.stderr?.trim() || null),
     };
   }
-  const after = observeCodexAppServer({ executable, spawn });
+  const after = observeCodexAppServer({ executable, spawn, requireModelReady });
   if (after.status !== "ready") {
     return { ...after, code: "CAS-DAEMON-RECOVERY-FAILED", phase: "recover", recovery: "failed" };
   }
@@ -145,10 +164,11 @@ export function doctorCodexAppServer({ executable = "codex", spawn = spawnSync }
 }
 
 function parseArgs(argv) {
-  if (argv.length === 0) return { mode: "health", recover: false };
-  if (argv.length === 1 && argv[0] === "--recover") return { mode: "health", recover: true };
+  if (argv.length === 0) return { mode: "health", recover: false, requireModelReady: false };
+  if (argv.length === 1 && argv[0] === "--recover") return { mode: "health", recover: true, requireModelReady: false };
+  if (argv.length === 1 && argv[0] === "--critic-ready") return { mode: "health", recover: false, requireModelReady: true };
   if (argv.length === 1 && argv[0] === "--doctor") return { mode: "doctor", recover: false };
-  throw new Error("Usage: codex-app-server-health.mjs [--recover|--doctor]");
+  throw new Error("Usage: codex-app-server-health.mjs [--recover|--critic-ready|--doctor]");
 }
 
 export function run(argv = process.argv.slice(2), deps = {}) {
@@ -159,7 +179,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
     const parsed = parseArgs(argv);
     const result = parsed.mode === "doctor"
       ? doctorCodexAppServer(operationDeps)
-      : checkCodexAppServer({ recover: parsed.recover, ...operationDeps });
+      : checkCodexAppServer({ recover: parsed.recover, requireModelReady: parsed.requireModelReady, ...operationDeps });
     write(`${JSON.stringify(result)}\n`);
     return result.status === "ready" || result.status === "completed" ? 0 : 2;
   } catch (error) {
@@ -168,4 +188,4 @@ export function run(argv = process.argv.slice(2), deps = {}) {
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exitCode = run();
+if (isDirectInvocation(import.meta.url)) process.exitCode = run();

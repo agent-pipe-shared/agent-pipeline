@@ -64,13 +64,13 @@ test("host route carries one bounded primary and one smaller fail-open fallback"
     agentName: "consult-advisor",
     model: "gpt-5.6-sol",
     effort: "max",
-    timeoutMs: 60_000,
+    timeoutMs: 180_000,
   });
   assert.deepEqual(resolved.policy.fallback, {
     agentName: "consult-advisor-fast",
     model: "gpt-5.6-terra",
     effort: "high",
-    timeoutMs: 45_000,
+    timeoutMs: 90_000,
     forkTurns: "none",
   });
   assert.equal(resolved.policy.workspaceGuard, "sha256-before-between-after");

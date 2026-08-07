@@ -9,11 +9,12 @@
  */
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
-import { isAbsolute, join, normalize, relative, resolve, sep } from "node:path";
+import { isAbsolute, join, posix, relative, resolve, sep } from "node:path";
+import { PLAN_LIFECYCLE_STATUSES } from "./plan-spec-state-v2.mjs";
 
 export const FEATURE_PACKAGE_SCHEMA = "pipeline.feature-package.v1";
-export const FEATURE_STATES = Object.freeze(["draft", "awaiting-approval", "approved", "implementing", "verifying", "completed", "superseded", "abandoned", "retained"]);
-export const FEATURE_CLASSES = Object.freeze(["prd", "spec", "design", "plan", "acceptance", "result", "candidate-evidence"]);
+export const FEATURE_STATES = Object.freeze([...PLAN_LIFECYCLE_STATUSES, "verifying", "completed", "superseded", "abandoned", "retained"]);
+export const FEATURE_CLASSES = Object.freeze(["prd", "spec", "design", "plan", "acceptance", "result", "candidate-evidence", "supply-chain", "threat-model"]);
 const ACTIVE_STATES = new Set(["awaiting-approval", "approved", "implementing", "verifying", "completed"]);
 const SHA256 = /^[a-f0-9]{64}$/u;
 const OID = /^[a-f0-9]{40,64}$/u;
@@ -24,7 +25,7 @@ function exact(value, keys) { return object(value) && Object.keys(value).sort().
 function digest(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
 function canonicalRelative(root, value) {
   if (typeof value !== "string" || value.length === 0 || isAbsolute(value) || value.includes("\\")) return null;
-  const cleaned = normalize(value);
+  const cleaned = posix.normalize(value);
   if (cleaned !== value || value.split("/").some((part) => part === "." || part === ".." || part.length === 0)) return null;
   const full = resolve(root, value);
   const rel = relative(root, full);
@@ -116,6 +117,8 @@ export function validateFeaturePackage(rootDir = process.cwd(), manifestPath) {
     if (typeof artifact.authority !== "boolean" || !["mutable", "append-only", "immutable"].includes(artifact.mutability) || !["active", "retain", "archive"].includes(artifact.retention)) findings.push(`${label}: authority, mutability, or retention is invalid`);
     if (artifact.authority && !["prd", "spec", "acceptance", "result"].includes(artifact.class)) findings.push(`${label}: only authority classes may be authoritative`);
     if (artifact.class === "candidate-evidence" && (artifact.authority || artifact.mutability !== "immutable")) findings.push(`${label}: candidate evidence is immutable non-authority evidence`);
+    if (artifact.class === "supply-chain" && (artifact.authority || artifact.mutability !== "immutable")) findings.push(`${label}: supply-chain evidence is immutable non-authority evidence`);
+    if (artifact.class === "threat-model" && (artifact.authority || artifact.mutability !== "immutable")) findings.push(`${label}: threat-model evidence is immutable non-authority evidence`);
     classes.set(artifact.class, [...(classes.get(artifact.class) ?? []), artifact]);
   }
   const required = value?.state === "draft" ? ["prd"] : ACTIVE_STATES.has(value?.state) ? ["prd", "spec", "acceptance", "result", "candidate-evidence"] : [];
@@ -136,8 +139,37 @@ export function planFeaturePackageTransition(rootDir = process.cwd(), manifestPa
   if (!checked.ok) return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "invalid-current-package", findings: checked.findings };
   if (!FEATURE_STATES.includes(nextState)) return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "invalid-target-state", findings: [] };
   if (checked.receipt.state === nextState) return { schema: "pipeline.feature-package-transition-plan.v1", status: "noop", manifest: checked.receipt.manifest, from: nextState, to: nextState, changes: [] };
-  if (["completed", "retained"].includes(checked.receipt.state) || ["draft", "abandoned"].includes(nextState)) return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "invalid-transition", findings: [] };
-  return { schema: "pipeline.feature-package-transition-plan.v1", status: "preview", manifest: checked.receipt.manifest, from: checked.receipt.state, to: nextState, changes: [{ path: checked.receipt.manifest, operation: "replace-manifest-state" }], requiredAuthority: nextState === "awaiting-approval" ? "po" : "lifecycle" };
+  const from = checked.receipt.state;
+  const admitted = new Set([
+    "draft:awaiting-approval",
+    "awaiting-approval:draft",
+    "awaiting-approval:approved",
+    "approved:draft",
+    "approved:implementing",
+    "implementing:draft",
+    "implementing:verifying",
+    "verifying:completed",
+    "verifying:implementing",
+  ]);
+  if (!admitted.has(`${from}:${nextState}`)) {
+    return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "invalid-transition", findings: [] };
+  }
+  const operation = from === "draft" && nextState === "awaiting-approval"
+    ? "submit"
+    : nextState === "draft"
+      ? "reopen-design"
+      : from === "awaiting-approval" && nextState === "approved"
+        ? "approve"
+        : "replace-manifest-state";
+  return {
+    schema: "pipeline.feature-package-transition-plan.v1",
+    status: "preview",
+    manifest: checked.receipt.manifest,
+    from,
+    to: nextState,
+    changes: [{ path: checked.receipt.manifest, operation }],
+    requiredAuthority: operation === "approve" ? "po" : "lifecycle",
+  };
 }
 
 /**

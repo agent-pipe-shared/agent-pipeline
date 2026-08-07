@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.close-coordinator.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "lifecycleId", "revision", "priorStateSha256", "phase", "featureId", "activeFeature", "authority", "candidateOid", "candidateTree", "effects", "publicationAuthorization", "publication", "cleanup"],
+  "properties": {
+    "schema": { "const": "pipeline.close-coordinator.v1" },
+    "lifecycleId": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,100}$" },
+    "revision": { "type": "integer", "minimum": 0 },
+    "priorStateSha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+    "phase": { "enum": ["active", "checkpointed", "feature-close-prepared", "tracked-close-finalized", "candidate-frozen", "final-verify-green", "publication-authorized", "published", "readback-confirmed", "cleanup-complete", "closed-local", "delivered", "release-eligible", "promoted"] },
+    "featureId": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,100}$" },
+    "activeFeature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "planPath", "phase"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,100}$" },
+        "planPath": { "type": "string", "minLength": 1 },
+        "phase": { "type": "string", "minLength": 1 }
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["implementationResultSha256", "pipelineStateSha256", "planSha256", "prdSha256", "specSha256"],
+      "properties": {
+        "implementationResultSha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+        "pipelineStateSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "planSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "prdSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "specSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "candidateOid": { "type": ["string", "null"], "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" },
+    "candidateTree": { "type": ["string", "null"], "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" },
+    "effects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["phase", "inputDigest", "observedDigest", "operationSha256"],
+        "properties": {
+          "phase": { "enum": ["checkpointed", "feature-close-prepared", "tracked-close-finalized", "candidate-frozen", "final-verify-green", "publication-authorized", "published", "readback-confirmed", "cleanup-complete", "closed-local", "delivered", "release-eligible", "promoted"] },
+          "inputDigest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "observedDigest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "operationSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        }
+      }
+    },
+    "publicationAuthorization": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["channel", "destinationDigest", "evidenceSha256"],
+          "properties": {
+            "channel": { "enum": ["private", "neutral-public"] },
+            "destinationDigest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "evidenceSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+          }
+        }
+      ]
+    },
+    "publication": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["channel", "destinationDigest", "oid", "publicationReceiptDigest", "readbackReceiptDigest", "ref", "tree"],
+          "properties": {
+            "channel": { "enum": ["private", "neutral-public"] },
+            "destinationDigest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "oid": { "type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" },
+            "publicationReceiptDigest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "readbackReceiptDigest": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+            "ref": { "type": "string", "pattern": "^refs/heads/[A-Za-z0-9._/-]+$" },
+            "tree": { "type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" }
+          }
+        }
+      ]
+    },
+    "cleanup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "evidenceDigest"],
+      "properties": {
+        "status": { "enum": ["not-started", "complete", "uncertain"] },
+        "evidenceDigest": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" }
+      }
+    }
+  }
+}

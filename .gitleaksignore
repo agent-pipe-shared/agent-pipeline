@@ -15,11 +15,6 @@ f06d6b57f3cd5d06e8ab3a5e5389aa4a6e5b0f26:specs/2026-07-11-plugin-scope-kanon/prd
 5add084a1be90f0ec780c07d671d68927eeac634:harness/scripts/pipeline-state.test.mjs:generic-api-key:1601
 5add084a1be90f0ec780c07d671d68927eeac634:harness/scripts/pipeline-state.test.mjs:generic-api-key:1726
 5add084a1be90f0ec780c07d671d68927eeac634:harness/scripts/pipeline-state.test.mjs:generic-api-key:1774
-# Equivalent exact fingerprints for the current worktree scanner mode.
-plugins/pipeline-core/lib/review-economy.test.mjs:generic-api-key:278
-plugins/pipeline-core/lib/continuity-state.test.mjs:generic-api-key:628
-plugins/pipeline-core/lib/continuity-state.test.mjs:generic-api-key:690
-plugins/pipeline-core/lib/continuity-state.test.mjs:generic-api-key:715
 # Historical false positives from the recovered Sentinel spec metadata. The
 # current Public files contain no inherited digest values; these exact
 # commit/path/rule/line fingerprints are retained narrowly for history scans.
@@ -37,6 +32,14 @@ e32f34c5aa03f2498844a7fa5d35be5b612c051b:harness/scripts/pipeline-state.test.mjs
 e32f34c5aa03f2498844a7fa5d35be5b612c051b:harness/scripts/pipeline-state.test.mjs:generic-api-key:1774
 # Nova A1 deterministic digest/idempotency records. These exact historical
 # fingerprints are non-secret evidence values; do not widen to a path or rule.
+# NOTE (2026-08-07 merge into 0.5.2): the legacy commit:path:rule:line format
+# below is parsed without error by the 0.5.2 gitleaks.mjs adapter but is no
+# longer functionally honored as a suppression (parseContentAuthorityLine
+# returns kind:"legacy", and the loader's `if (parsed.kind !== "content")
+# continue;` skips it before adding to the active entries set). Kept here as
+# a historical record only; see
+# specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md for the
+# reconversion-to-content-v1 follow-up this requires.
 9dd9c5b10d16d32cd7c41aba75d495fd25d7cf97:backlog/transitions.ndjson:generic-api-key:73
 9dd9c5b10d16d32cd7c41aba75d495fd25d7cf97:backlog/transitions.ndjson:generic-api-key:74
 9dd9c5b10d16d32cd7c41aba75d495fd25d7cf97:specs/sprint-nova-epic/evidence/backlog/2026-07-24-unreachable-evidence-disposition.md:generic-api-key:1
@@ -64,3 +67,29 @@ plugins/pipeline-core/lib/continuity-state.test.mjs:generic-api-key:807
 specs/sprint-phoenix-epic/evidence/lifecycle/feature-package-phx-0a-r3-reconcile.json:generic-api-key:1
 harness/scripts/pipeline-state.test.mjs:generic-api-key:2294
 harness/scripts/pipeline-state.test.mjs:generic-api-key:2488
+# Commit-rewrite-stable false-positive authority. Each content-v1 entry binds
+# the exact path, rule, line, column, and SHA-256 of the scanner's recognized
+# value. The adapter rejects malformed/duplicate entries and never treats a
+# path, rule, line, or changed value alone as authority.
+content-v1:0326c0edc10afd521b56b4823c2d7d78e9cf1e610faa7a59e8d0e0499f50fb7b:specs/sprint-nova-epic/evidence/backlog/2026-07-24-unreachable-evidence-disposition.md:generic-api-key:1:532
+content-v1:051427313d0ea2513b6c50b6007f9e92ddfe4d40736dbd94981fff51a81e77ed:specs/sprint-nova-epic/evidence/backlog/event-40-amendment-intent.json:generic-api-key:1:813
+content-v1:0de92398a731f54893cdcd8d8e20b1e3ae55a38cdba7c665cb0873183889ef35:specs/sprint-phoenix-epic/evidence/lifecycle/feature-package-phx-0a-r3-reconcile.json:generic-api-key:1:433
+content-v1:0e48bbb5bd8fd44e2c276aa1784c2e74a6b817fa7631a4670c31029bd5c8eb2b:backlog/receipts/7ac4c1dd233bdbfbec854f3f818464ebed2850144c42da6816557112af743570.json:generic-api-key:1:172
+content-v1:1f117cf053d25b79b275e7b8ffda91cf7311a5669f4ae7e598acf575e9d2f8fc:backlog/receipts/9367a90e2516ec6f621b5710ffabef67cbbf27116f7f46cef8f1f0dd69aebc25.json:generic-api-key:1:172
+content-v1:34111b4b42bdb0081a92384d8bd80984611b2a0418a1f9e3f68974fde3e5951a:specs/sprint-phoenix-epic/evidence/lifecycle/feature-package-phx-0a-r3-reconcile.json:generic-api-key:1:106
+content-v1:4546e8f371a4c4a3567a32dd2d1a18597e5c0c9036aa3cbd520b99bded0b6825:harness/scripts/pipeline-state.test.mjs:generic-api-key:2080:131
+content-v1:5c5b098ce7643e80379f9e0f37b6541424327d8e47b86b4686eac3dd66cad2ed:backlog/receipts/f33b8d45db38e7b9061dde268405d86123fc90afc24330a626afba2507650281.json:generic-api-key:1:173
+content-v1:5cd5fc1f6125775588de4eba79084741c848910bd7e817696e0c4a03ac4c9273:specs/sprint-nova-epic/evidence/backlog/2026-07-24-unreachable-evidence-disposition.md:generic-api-key:1:844
+content-v1:611f185b0944c0a7bf589d0831f9aad840b3cad51d88b0336cf0c98493ba88d4:backlog/transitions.ndjson:generic-api-key:74:843
+content-v1:6ab2416ed93ecd5569eeb77e98310d8d8fbdb0ad7fc3cf3c1e334dbaa15961f7:specs/sprint-nova-epic/evidence/backlog/event-39-delivery-intent.json:generic-api-key:1:86
+content-v1:7115725bc98e11ff55d82bbbb8efd67fd37d6a8f661f8a28019391bb64a071b8:specs/sprint-nova-epic/evidence/backlog/issue-57-bootstrap-intent.json:generic-api-key:1:91
+content-v1:72c063a1d9676feca7ddf6bf5c48a646e66174d67a4612284fb87f03fe1a9b38:specs/sprint-nova-epic/evidence/backlog/event-39-amendment-intent.json:generic-api-key:1:830
+content-v1:7c7f3f45a621ecc89e1c4581c59bb16cccf89e125de3e86516b64820161cebe4:backlog/receipts/d311a66737ff088e2ae324df5f3525b08cefd4c9f58787d09870d3bd26961363.json:generic-api-key:1:177
+content-v1:ed750ca435e7cf7cd41c16fd429bb3b3049395623fdd241737c90bc95063429a:backlog/transitions.ndjson:sentry-access-token:42:540
+content-v1:8c19215eefae95d28bc3840ead52d2cdb3d979e54179d9ca36d7f5b1add7b80c:backlog/transitions.ndjson:sentry-access-token:43:501
+content-v1:b7bb6dad6c1bd87273732947cca62e8429d9f4c80557f0dcebd8bc95cfea6a75:specs/sprint-nova-epic/evidence/backlog/issue-57-assign-intent.json:generic-api-key:1:87
+content-v1:bd4ad36f1f59efa3913913b0bbdc133a7993d9b325ae56a672cc94688f157e7e:harness/scripts/pipeline-state.test.mjs:generic-api-key:2204:477
+content-v1:c7fd9a9af55669aa1d94ad41d161c31c30981ca5db7671bc114a1534e44501d4:specs/2026-07-24-sprint-cyborg-epic/briefing-gitleaks-in-tree-fixture-fp-fix.md:generic-api-key:59:13
+content-v1:c876696e50e6161b403250790f19ea0d07c957fb279e721589725cf1cd6db309:backlog/transitions.ndjson:generic-api-key:73:870
+content-v1:c8ebaf6daf4957777ff3388a98d41b3564b9822b1dd2a622ef975ac5f6bb96a7:backlog/transitions.ndjson:generic-api-key:73:869
+content-v1:d70126230e844c446f92529399917fca3550484aeb0911d3cc1c6a14d9d0d59c:specs/sprint-nova-epic/evidence/backlog/event-40-delivery-intent.json:generic-api-key:1:86

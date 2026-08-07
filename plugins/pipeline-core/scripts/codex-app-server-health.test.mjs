@@ -53,4 +53,20 @@ check("invalid or version-drift output is stale and never accepted as a worker c
   assert.equal(drift.code, "CAS-DAEMON-VERSION-DRIFT");
 });
 
-process.stdout.write(`${passed}/5 checks passed.\n`);
+check("Critic readiness requires a successful bounded model-start probe", () => {
+  const ready = observeCodexAppServer({
+    requireModelReady: true,
+    spawn: (_bin, args) => args[0] === "app-server"
+      ? health()
+      : response(0, JSON.stringify({ schema: "pipeline.codex-app-server-model-probe.v1", status: "ready", code: "CAS-MODEL-READY", detail: null })),
+  });
+  assert.equal(ready.code, "CAS-READY");
+  const unavailable = observeCodexAppServer({
+    requireModelReady: true,
+    spawn: (_bin, args) => args[0] === "app-server" ? health() : response(2, ""),
+  });
+  assert.equal(unavailable.status, "stale");
+  assert.equal(unavailable.code, "CAS-MODEL-UNAVAILABLE");
+});
+
+process.stdout.write(`${passed}/6 checks passed.\n`);

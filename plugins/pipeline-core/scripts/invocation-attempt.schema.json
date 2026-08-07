@@ -1,0 +1,286 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.invocation-attempt.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "attemptId",
+    "invocationId",
+    "index",
+    "requestSha256",
+    "launchDecision",
+    "failureClass",
+    "started",
+    "ended",
+    "resultSha256",
+    "previousSha256",
+    "recordSha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pipeline.invocation-attempt.v1"
+    },
+    "attemptId": {
+      "$ref": "#/$defs/id"
+    },
+    "invocationId": {
+      "$ref": "#/$defs/id"
+    },
+    "index": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 255
+    },
+    "requestSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "launchDecision": {
+      "enum": [
+        "launch",
+        "suppressed"
+      ]
+    },
+    "failureClass": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/failureClass"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "started": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/timedObservation"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "ended": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/timedObservation"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "resultSha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "previousSha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "recordSha256": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "launchDecision": {
+            "const": "suppressed"
+          }
+        },
+        "required": [
+          "launchDecision"
+        ]
+      },
+      "then": {
+        "properties": {
+          "started": {
+            "type": "null"
+          },
+          "ended": {
+            "type": "null"
+          },
+          "resultSha256": {
+            "type": "null"
+          },
+          "failureClass": {
+            "enum": [
+              "request-invalid",
+              "chain-invalid",
+              "authority-invalid",
+              "selected-sandbox-terminal",
+              "selected-sandbox-transient"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "launchDecision": {
+            "const": "launch"
+          }
+        },
+        "required": [
+          "launchDecision"
+        ]
+      },
+      "then": {
+        "properties": {
+          "started": {
+            "$ref": "#/$defs/timedObservation"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "launchDecision": {
+            "const": "launch"
+          },
+          "ended": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "launchDecision",
+          "ended"
+        ]
+      },
+      "then": {
+        "properties": {
+          "failureClass": {
+            "type": "null"
+          },
+          "resultSha256": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "failureClass": {
+            "const": "succeeded-unverified"
+          }
+        },
+        "required": [
+          "failureClass"
+        ]
+      },
+      "then": {
+        "properties": {
+          "ended": {
+            "$ref": "#/$defs/timedObservation"
+          },
+          "resultSha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "resultSha256": {
+            "$ref": "#/$defs/sha256"
+          }
+        },
+        "required": [
+          "resultSha256"
+        ]
+      },
+      "then": {
+        "properties": {
+          "failureClass": {
+            "const": "succeeded-unverified"
+          },
+          "ended": {
+            "$ref": "#/$defs/timedObservation"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]{0,127}$"
+    },
+    "failureClass": {
+      "type": "string",
+      "enum": [
+        "request-invalid",
+        "chain-invalid",
+        "authority-invalid",
+        "selected-sandbox-terminal",
+        "selected-sandbox-transient",
+        "transport-transient",
+        "host-pressure",
+        "denied",
+        "unavailable",
+        "malformed-result",
+        "timeout",
+        "cancelled",
+        "internal-error",
+        "succeeded-unverified"
+      ]
+    },
+    "timedObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "monotonicMs",
+        "wallTime",
+        "rawSha256"
+      ],
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/id"
+        },
+        "monotonicMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "wallTime": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rawSha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  }
+}

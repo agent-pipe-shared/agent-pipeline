@@ -22,6 +22,7 @@ import {
 } from "node:fs";
 import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
+import { checkSecurityCompleteness } from "../lib/security-completeness-gate.mjs";
 
 export const RELEASE_VERSION_DECISION_SCHEMA = "pipeline.release-version-decision.v1";
 export const RELEASE_VERSION_PLAN_SCHEMA = "pipeline.release-version-plan.v1";
@@ -32,6 +33,7 @@ export const CHANNEL_FETCH_SKEW_MS = 5 * 60 * 1000;
 const SHA256 = /^[0-9a-f]{64}$/u;
 const OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
 const STABLE_VERSION = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/u;
+const BETA_VERSION = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-beta\.(0|[1-9][0-9]*)$/u;
 const SAFE_REF = /^refs\/(?:heads|tags)\/[A-Za-z0-9._/-]+$/u;
 const SAFE_REPOSITORY_PATH = /^(?!\/)(?!.*(?:^|\/)\.\.?$)(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9._@+\-/]+$/u;
 const VERSION_SURFACES = Object.freeze(["versionFile", "codexPlugin", "claudePlugin", "codexMarketplaceResolved", "claudeMarketplaceResolved"]);
@@ -105,6 +107,32 @@ export function nextMinorVersion(version) {
   return `${major}.${minor + 1n}.0`;
 }
 
+function parsePromotionVersion(value, promotionChannel, label) {
+  if (promotionChannel === "stable") return parseStableVersion(value, label);
+  if (promotionChannel !== "beta" || typeof value !== "string") fail("RVD-CHANNEL", `${label} requires an explicit beta or stable promotion channel`);
+  const match = BETA_VERSION.exec(value);
+  if (!match) fail("RVD-SEMVER", `${label} must be X.Y.Z-beta.N without build metadata or leading zeroes`);
+  return match.slice(1, 4).map((part) => BigInt(part));
+}
+
+const SELECTION_KEYS = ["promotionChannel", "targetVersion", "targetTag", "candidateCommit", "candidateTree"];
+function validateReleaseSelection(selection, privateChannel, neutralPublicChannel) {
+  exactKeys(selection, SELECTION_KEYS, "release promotion selection");
+  if (!new Set(["beta", "stable"]).has(selection.promotionChannel)) fail("RVD-CHANNEL", "release promotion channel must explicitly be beta or stable; alpha is not publishable");
+  const targetCore = parsePromotionVersion(selection.targetVersion, selection.promotionChannel, "target version");
+  if (selection.targetTag !== `v${selection.targetVersion}`) fail("RVD-TAG", "target tag must exactly be v plus target version");
+  if (!OID.test(selection.candidateCommit ?? "") || !OID.test(selection.candidateTree ?? "")
+    || selection.candidateCommit.length !== selection.candidateTree.length) fail("RVD-CANDIDATE", "selected candidate commit/tree must be exact same-format Git object IDs");
+  const privateStable = parseStableVersion(privateChannel.highestStableVersion, "private highest stable version");
+  const publicStable = parseStableVersion(neutralPublicChannel.highestStableVersion, "neutral-public highest stable version");
+  for (const baseline of [privateStable, publicStable]) {
+    let comparison = 0;
+    for (let index = 0; index < 3 && comparison === 0; index += 1) comparison = targetCore[index] < baseline[index] ? -1 : targetCore[index] > baseline[index] ? 1 : 0;
+    if (comparison <= 0) fail("RVD-TARGET", "selected target release line must be above every observed stable baseline");
+  }
+  return true;
+}
+
 const CHANNEL_KEYS = ["repositoryFingerprint", "ref", "commit", "tree", "highestStableTag", "highestStableVersion", "peeledCommit", "fetchedAt"];
 function validateChannel(channel, label) {
   exactKeys(channel, CHANNEL_KEYS, `${label} channel`);
@@ -120,6 +148,7 @@ function decisionPayload(decision) {
   return {
     private: decision.private,
     neutralPublic: decision.neutralPublic,
+    selection: decision.selection,
     targetVersion: decision.targetVersion,
     targetTag: decision.targetTag,
     observedAt: decision.observedAt,
@@ -143,18 +172,13 @@ function validateFreshness(decision, nowMs) {
 
 /** Validate the closed durable record and optionally re-check its freshness. */
 export function validateReleaseVersionDecision(decision, { nowMs = null } = {}) {
-  exactKeys(decision, ["schema", "decisionId", "private", "neutralPublic", "targetVersion", "targetTag", "observedAt"], "release version decision");
+  exactKeys(decision, ["schema", "decisionId", "private", "neutralPublic", "selection", "targetVersion", "targetTag", "observedAt"], "release version decision");
   if (decision.schema !== RELEASE_VERSION_DECISION_SCHEMA) fail("RVD-SCHEMA", "release version decision schema is invalid");
   if (typeof decision.decisionId !== "string" || !SHA256.test(decision.decisionId)) fail("RVD-ID", "release version decision ID is invalid");
   validateChannel(decision.private, "private");
   validateChannel(decision.neutralPublic, "neutral-public");
-  parseStableVersion(decision.targetVersion, "target version");
-  if (decision.targetTag !== `v${decision.targetVersion}`) fail("RVD-TAG", "target tag must exactly be v plus target version");
-  const greaterBaseline = compareStableVersions(decision.private.highestStableVersion, decision.neutralPublic.highestStableVersion) >= 0
-    ? decision.private.highestStableVersion
-    : decision.neutralPublic.highestStableVersion;
-  const expectedTarget = nextMinorVersion(greaterBaseline);
-  if (decision.targetVersion !== expectedTarget || compareStableVersions(decision.targetVersion, decision.private.highestStableVersion) <= 0 || compareStableVersions(decision.targetVersion, decision.neutralPublic.highestStableVersion) <= 0) fail("RVD-TARGET", "target version must be the next minor above the greater channel baseline");
+  validateReleaseSelection(decision.selection, decision.private, decision.neutralPublic);
+  if (decision.targetVersion !== decision.selection.targetVersion || decision.targetTag !== decision.selection.targetTag) fail("RVD-TARGET", "decision target fields must equal the explicit promotion selection");
   if (decision.decisionId !== releaseVersionDecisionId(decisionPayload(decision))) fail("RVD-ID", "release version decision ID does not bind the complete observation");
   if (nowMs !== null) {
     if (!Number.isSafeInteger(nowMs) || nowMs < 0) fail("RVD-TIME", "observer clock is invalid");
@@ -169,23 +193,23 @@ export function validateReleaseVersionDecision(decision, { nowMs = null } = {}) 
  * neither proof prose nor a mutable Git response becomes release authority.
  */
 export function createReleaseVersionDecision(input, { nowMs = Date.now() } = {}) {
-  exactKeys(input, ["private", "neutralPublic", "proofs", "observedAt"], "release version decision input");
+  exactKeys(input, ["private", "neutralPublic", "proofs", "selection", "observedAt"], "release version decision input");
   exactKeys(input.proofs, ["private", "neutralPublic"], "channel proofs");
   for (const channel of ["private", "neutralPublic"]) {
     exactKeys(input.proofs[channel], ["annotated", "peeledCommitAncestor"], `${channel} proof`);
     if (input.proofs[channel].annotated !== true || input.proofs[channel].peeledCommitAncestor !== true) fail("RVD-TAG-PROOF", `${channel} requires an annotated tag whose peeled commit is ancestral to the observed ref`);
   }
-  const greaterBaseline = compareStableVersions(input.private.highestStableVersion, input.neutralPublic.highestStableVersion) >= 0
-    ? input.private.highestStableVersion
-    : input.neutralPublic.highestStableVersion;
-  const targetVersion = nextMinorVersion(greaterBaseline);
+  validateChannel(input.private, "private");
+  validateChannel(input.neutralPublic, "neutral-public");
+  validateReleaseSelection(input.selection, input.private, input.neutralPublic);
   const candidate = {
     schema: RELEASE_VERSION_DECISION_SCHEMA,
     decisionId: "0".repeat(64),
     private: structuredClone(input.private),
     neutralPublic: structuredClone(input.neutralPublic),
-    targetVersion,
-    targetTag: `v${targetVersion}`,
+    selection: structuredClone(input.selection),
+    targetVersion: input.selection.targetVersion,
+    targetTag: input.selection.targetTag,
     observedAt: input.observedAt,
   };
   candidate.decisionId = releaseVersionDecisionId(decisionPayload(candidate));
@@ -311,7 +335,6 @@ function validateRecovery(value) {
 function validateVersions(versions, targetVersion) {
   exactKeys(versions, VERSION_SURFACES, "release versions");
   for (const surface of VERSION_SURFACES) {
-    parseStableVersion(versions[surface], `${surface} version`);
     if (versions[surface] !== targetVersion) fail("RVP-VERSION", `${surface} must equal targetVersion`);
   }
 }
@@ -347,6 +370,7 @@ function planPayload(plan) {
     evidenceRevision: plan.evidenceRevision,
     documentEvidenceSha256: plan.documentEvidenceSha256,
     externalPrerequisite: plan.externalPrerequisite,
+    selection: plan.selection,
     targetVersion: plan.targetVersion,
     targetTag: plan.targetTag,
     privateProductCandidate: plan.privateProductCandidate,
@@ -366,8 +390,9 @@ export function releaseVersionPlanId(payload) {
  * digests.  Marketplace inputs are already resolved provider manifests; this
  * helper deliberately does not fetch, read a tree, or invoke a marketplace.
  */
-export function deriveVersionSurfaceConsistency(versionSurfaces, targetVersion) {
-  parseStableVersion(targetVersion, "target version");
+export function deriveVersionSurfaceConsistency(versionSurfaces, targetVersion, promotionChannel = null) {
+  const resolvedChannel = promotionChannel ?? (typeof targetVersion === "string" && BETA_VERSION.test(targetVersion) ? "beta" : "stable");
+  parsePromotionVersion(targetVersion, resolvedChannel, "target version");
   exactKeys(versionSurfaces, ["private", "neutralPublic"], "version surfaces");
   const derived = {};
   for (const channel of ["private", "neutralPublic"]) {
@@ -394,7 +419,6 @@ export function deriveVersionSurfaceConsistency(versionSurfaces, targetVersion) 
         if (!isPlainObject(manifest) || typeof manifest.version !== "string") fail("RVP-VERSION", `${channel} ${surface} has no string version`);
         version = manifest.version;
       }
-      parseStableVersion(version, `${channel} ${surface} version`);
       if (version !== targetVersion) fail("RVP-VERSION", `${channel} ${surface} does not equal targetVersion`);
       records.push({ surface, path: entry.path, sha256: sha256(entry.bytes) });
     }
@@ -409,13 +433,11 @@ export function deriveVersionSurfaceConsistency(versionSurfaces, targetVersion) 
 
 /** Validate the immutable sealed plan without dereferencing external evidence or licensing state. */
 export function validateReleaseVersionPlan(plan, { decision = null, nowMs = null } = {}) {
-  exactKeys(plan, ["schema", "planId", "decisionId", "decisionSha256", "evidenceRevision", "documentEvidenceSha256", "externalPrerequisite", "targetVersion", "targetTag", "privateProductCandidate", "neutralPublicProductCandidate", "versions", "surfaceDigests", "recovery", "status", "createdAt"], "release version plan");
+  exactKeys(plan, ["schema", "planId", "decisionId", "decisionSha256", "evidenceRevision", "documentEvidenceSha256", "externalPrerequisite", "selection", "targetVersion", "targetTag", "privateProductCandidate", "neutralPublicProductCandidate", "versions", "surfaceDigests", "recovery", "status", "createdAt"], "release version plan");
   if (plan.schema !== RELEASE_VERSION_PLAN_SCHEMA || plan.status !== "sealed") fail("RVP-SCHEMA", "release version plan schema/status is invalid");
   if (!SHA256.test(plan.planId ?? "") || !SHA256.test(plan.decisionId ?? "") || !SHA256.test(plan.decisionSha256 ?? "") || !SHA256.test(plan.documentEvidenceSha256 ?? "")) fail("RVP-DIGEST", "release version plan digest is invalid");
   if (!Number.isSafeInteger(plan.evidenceRevision) || plan.evidenceRevision < 1) fail("RVP-EVIDENCE", "release version plan evidence revision is invalid");
   validateExternalPrerequisite(plan.externalPrerequisite);
-  parseStableVersion(plan.targetVersion, "target version");
-  if (plan.targetTag !== `v${plan.targetVersion}`) fail("RVP-VERSION", "target tag does not match target version");
   validateCandidate(plan.privateProductCandidate, "private");
   validateCandidate(plan.neutralPublicProductCandidate, "neutral-public");
   validateVersions(plan.versions, plan.targetVersion);
@@ -425,8 +447,15 @@ export function validateReleaseVersionPlan(plan, { decision = null, nowMs = null
   if (plan.planId !== releaseVersionPlanId(planPayload(plan))) fail("RVP-ID", "plan ID does not bind its complete sealed payload");
   if (decision === null) fail("RVP-DECISION", "a plan validator requires its fixed decision record");
   validateReleaseVersionDecision(decision, nowMs === null ? {} : { nowMs });
-  if (plan.decisionId !== decision.decisionId || plan.decisionSha256 !== sha256(canonicalJson(decision)) || plan.targetVersion !== decision.targetVersion || plan.targetTag !== decision.targetTag) fail("RVP-DECISION", "plan does not bind the supplied current decision");
+  if (plan.decisionId !== decision.decisionId || plan.decisionSha256 !== sha256(canonicalJson(decision))
+    || canonicalJson(plan.selection) !== canonicalJson(decision.selection)
+    || plan.targetVersion !== decision.targetVersion || plan.targetTag !== decision.targetTag) fail("RVP-DECISION", "plan does not bind the supplied current decision and explicit promotion selection");
   if (plan.privateProductCandidate.repositoryFingerprint !== decision.private.repositoryFingerprint || plan.neutralPublicProductCandidate.repositoryFingerprint !== decision.neutralPublic.repositoryFingerprint) fail("RVP-CANDIDATE", "product candidate channel fingerprints do not bind the decision");
+  // beta/stable is the public distribution promotion. The private product
+  // candidate remains a separately bound dual-product identity, while the
+  // selected release candidate must be the exact neutral-public product.
+  if (plan.neutralPublicProductCandidate.commit !== decision.selection.candidateCommit
+    || plan.neutralPublicProductCandidate.tree !== decision.selection.candidateTree) fail("RVP-CANDIDATE", "neutral-public product candidate does not match the explicit promotion selection");
   return true;
 }
 
@@ -439,9 +468,11 @@ export function createReleaseVersionPlan(input, { nowMs = Date.now() } = {}) {
   validateCandidate(input.privateProductCandidate, "private");
   validateCandidate(input.neutralPublicProductCandidate, "neutral-public");
   if (input.privateProductCandidate.repositoryFingerprint !== input.decision.private.repositoryFingerprint || input.neutralPublicProductCandidate.repositoryFingerprint !== input.decision.neutralPublic.repositoryFingerprint) fail("RVP-CANDIDATE", "product candidate fingerprint does not match its decision channel");
+  if (input.neutralPublicProductCandidate.commit !== input.decision.selection.candidateCommit
+    || input.neutralPublicProductCandidate.tree !== input.decision.selection.candidateTree) fail("RVP-CANDIDATE", "neutral-public product candidate does not match the explicit promotion selection");
   validateRecovery(input.recovery);
   timestamp(input.createdAt, "plan createdAt");
-  const consistent = deriveVersionSurfaceConsistency(input.versionSurfaces, input.decision.targetVersion);
+  const consistent = deriveVersionSurfaceConsistency(input.versionSurfaces, input.decision.targetVersion, input.decision.selection.promotionChannel);
   const plan = {
     schema: RELEASE_VERSION_PLAN_SCHEMA,
     planId: "0".repeat(64),
@@ -450,6 +481,7 @@ export function createReleaseVersionPlan(input, { nowMs = Date.now() } = {}) {
     evidenceRevision: input.evidenceRevision,
     documentEvidenceSha256: input.documentEvidenceSha256,
     externalPrerequisite: structuredClone(input.externalPrerequisite),
+    selection: structuredClone(input.decision.selection),
     targetVersion: input.decision.targetVersion,
     targetTag: input.decision.targetTag,
     privateProductCandidate: structuredClone(input.privateProductCandidate),
@@ -463,6 +495,78 @@ export function createReleaseVersionPlan(input, { nowMs = Date.now() } = {}) {
   plan.planId = releaseVersionPlanId(planPayload(plan));
   validateReleaseVersionPlan(plan, { decision: input.decision, nowMs });
   return plan;
+}
+
+/**
+ * AC8's Release call site (CYB-2I-3, Sprint Cyborg Wave 6) for the shared completeness
+ * evaluator (`checkSecurityCompleteness`, `../lib/security-completeness-gate.mjs`, CYB-2I-0):
+ * runs it against a SEALED release-version plan's own bound PRIVATE-channel product candidate
+ * (`plan.privateProductCandidate.commit`/`.tree`).
+ *
+ * WHY A SEPARATE FUNCTION INSTEAD OF A DIRECT CALL INSIDE `createReleaseVersionPlan()`: this
+ * module's own header comment documents `createReleaseVersionPlan()` as a pure function -- zero
+ * fs/git/network access, every fact supplied by the caller as already-fetched data -- and this
+ * file's own `release-version-plan.test.mjs` in-memory-fixture style depends on that purity
+ * remaining true (no real filesystem, no real git repo, anywhere in that test file). Calling
+ * `checkSecurityCompleteness` (which reads two evidence files off disk) FROM INSIDE
+ * `createReleaseVersionPlan()` would break that invariant. This function is therefore its own
+ * independent, fs-touching seam -- exactly the shape `checkCloseSecurityCompleteness`
+ * (`../scripts/check-close-security-completeness.mjs`, the Close call site) and the inline
+ * `checkSecurityCompleteness` call in the PR call site
+ * (`harness/scripts/check-pr-contributor-gates.mjs`) already use for AC8's other two call sites.
+ * `createReleaseVersionPlan()` itself is UNCHANGED by this addition.
+ *
+ * WHY THE PRIVATE CANDIDATE ONLY, NOT ALSO `neutralPublicProductCandidate`:
+ * `checkSecurityCompleteness` reads its two evidence files (`evidence/security-latest.v2.json`/
+ * `.verdict.json`, by default) from a `projectDir` that only this repository's OWN
+ * `security-scan.mjs` run ever populates -- for the private working tree/CI that actually runs
+ * security scanning. A neutral-public/mirror repository is a publication TARGET whose content is
+ * derived FROM the already-scanned private candidate at publish time; there is no code path in
+ * this repo that runs `security-scan.mjs` against a neutral-public checkout or writes it its own
+ * local `evidence/security-latest.v2*.json` pair, so it has no independent completeness evidence
+ * to bind against. Gating on `neutralPublicProductCandidate` instead (or in addition) would
+ * either always fail closed against a `projectDir` that structurally cannot carry matching
+ * evidence, or require inventing a whole parallel evidence-production path for the mirror --
+ * out of this task's scope (see this module's own header comment on scope, and Field 1 of this
+ * sub-package's briefing, CYB-2I-3).
+ *
+ * USAGE CONTRACT FOR A FUTURE CALLER (none exists in this repo yet -- see this module's own
+ * header comment; do not read this as documentation of an operating CLI): whatever future
+ * release-orchestration caller runs `createReleaseVersionPlan()` + `storeReleaseVersionPlan()`
+ * together MUST invoke this function on the freshly sealed plan, AFTER sealing but BEFORE
+ * `storeReleaseVersionPlan()` durably persists it, and MUST treat a non-empty return value as a
+ * hard block on that store call -- true pre-mutation gating, mirroring how `checkCloseSecurityCompleteness`'s
+ * and the PR call site's own callers already gate their next step on a non-empty failures array.
+ * This function itself performs no gating DECISION and no storage -- it only evaluates and
+ * reports, exactly like `checkSecurityCompleteness` itself.
+ *
+ * PURITY OF **THIS** FUNCTION: unlike `createReleaseVersionPlan()`, this function deliberately
+ * DOES touch the filesystem (via `checkSecurityCompleteness`) -- but stays just as parameterized
+ * as `checkSecurityCompleteness` itself: `projectDir` is supplied entirely by ITS caller, with no
+ * `process.cwd()` default of its own anywhere in this function.
+ *
+ * @param {object} plan - a SEALED release-version plan (typically `createReleaseVersionPlan()`'s
+ *   own return value) -- only `plan.privateProductCandidate.commit`/`.tree` are read.
+ * @param {object} params
+ * @param {string} params.projectDir - directory the evidence files are read relative to
+ *   (forwarded to `checkSecurityCompleteness` unchanged; no default).
+ * @param {string} [params.envelopePath] - forwarded to `checkSecurityCompleteness` unchanged.
+ * @param {string} [params.verdictPath] - forwarded to `checkSecurityCompleteness` unchanged.
+ * @returns {string[]} failure reasons; empty = pass (identical contract to
+ *   `checkSecurityCompleteness` itself).
+ */
+export function checkReleaseVersionPlanSecurityCompleteness(plan, { projectDir, envelopePath, verdictPath } = {}) {
+  if (plan?.schema !== RELEASE_VERSION_PLAN_SCHEMA || plan?.status !== "sealed") fail("RVP-COMPLETENESS", "release version plan completeness check requires an already-sealed release version plan");
+  validateCandidate(plan.privateProductCandidate, "private");
+  if (typeof projectDir !== "string" || projectDir.length === 0) fail("RVP-COMPLETENESS", "release version plan completeness check requires a caller-supplied projectDir");
+  return checkSecurityCompleteness({
+    projectDir,
+    commit: plan.privateProductCandidate.commit,
+    tree: plan.privateProductCandidate.tree,
+    envelopePath,
+    verdictPath,
+    subjectLabel: "the sealed plan's private candidate",
+  });
 }
 
 function releasePlanDirectory(gitCommonDir, repoFingerprint) {
@@ -615,4 +719,69 @@ export function storeReleaseVersionPlan({ gitCommonDir, repoFingerprint, plan, d
   }
   const result = recoverReleaseVersionPlan({ gitCommonDir, repoFingerprint, planId: plan.planId, decision }, { nowMs });
   return { ...result, status: result.status === "stored" ? "stored" : "replay" };
+}
+
+/**
+ * AC8's Release call site's own orchestrator (CYB-2I-3R): sequences an already-sealed plan
+ * through the shared completeness gate and then storage-or-fail-closed, giving
+ * `checkReleaseVersionPlanSecurityCompleteness` (CYB-2I-3, above) its first real caller in this
+ * repo -- fulfilling the "USAGE CONTRACT FOR A FUTURE CALLER" paragraph documented on that
+ * function's own header comment.
+ *
+ * Sequencing contract (fixed, exactly three steps, in order):
+ *   1. `plan` must already be a SEALED plan (the caller is responsible for having called
+ *      `createReleaseVersionPlan()` first -- this function never builds a plan itself and
+ *      accepts no plan-construction inputs at all).
+ *   2. Evaluate `checkReleaseVersionPlanSecurityCompleteness(plan, { projectDir, envelopePath,
+ *      verdictPath })`.
+ *   3a. A non-empty `failures` array fails closed via `RVP-SECURITY-INCOMPLETE` (message includes
+ *       every failure reason) WITHOUT ever calling `storeReleaseVersionPlan()` -- no record/
+ *       journal write of any kind happens on this path.
+ *   3b. An empty `failures` array calls `storeReleaseVersionPlan({ gitCommonDir, repoFingerprint,
+ *       plan, decision }, { nowMs })` and returns its result UNCHANGED (this function performs no
+ *       storage of its own; `storeReleaseVersionPlan()`'s own idempotent/replay behavior is
+ *       untouched by this wrapper).
+ *
+ * `createReleaseVersionPlan()` and `storeReleaseVersionPlan()` are both UNCHANGED by this
+ * addition -- this function only composes them; see `checkReleaseVersionPlanSecurityCompleteness`'s
+ * own header comment above for why the gate check lives in its own fs-touching function rather
+ * than inside the pure `createReleaseVersionPlan()`.
+ *
+ * NOT covered by this gate (deliberate): `recoverReleaseVersionPlan()`. Recovery only ever
+ * replays/repairs a plan that already has a "prepared"-or-later journal on disk -- i.e. a plan
+ * that already passed this exact gate once, at the original `sealAndStoreReleaseVersionPlan()`
+ * call that produced that journal. Re-running the security check at recovery time would (a)
+ * re-derive a NEW pass/fail against whatever `evidence/security-latest.v2*.json` pair happens to
+ * sit in `projectDir` at repair time -- which a later, unrelated `security-scan.mjs` run may have
+ * long since overwritten with evidence bound to a *different* (newer) commit/tree than the
+ * recovering plan's own `privateProductCandidate` -- spuriously blocking recovery of already-
+ * authorized state on a resource that has nothing to do with the plan's own validity; (b) change
+ * `recoverReleaseVersionPlan()`'s existing signature/behavior for already-passing callers, which
+ * this sub-package's own prohibitions forbid. Recovery therefore stays exactly as it is today,
+ * reached only through `storeReleaseVersionPlan()`'s own existing journal-driven path, never
+ * through this function directly.
+ *
+ * @param {object} params
+ * @param {string} params.gitCommonDir - forwarded to `storeReleaseVersionPlan` unchanged.
+ * @param {string} params.repoFingerprint - forwarded to `storeReleaseVersionPlan` unchanged.
+ * @param {object} params.plan - an already-sealed release version plan (typically
+ *   `createReleaseVersionPlan()`'s own return value).
+ * @param {object} params.decision - forwarded to `storeReleaseVersionPlan` unchanged.
+ * @param {string} params.projectDir - forwarded to `checkReleaseVersionPlanSecurityCompleteness`
+ *   unchanged (no default; the caller supplies it explicitly, same as that function's own
+ *   contract).
+ * @param {string} [params.envelopePath] - forwarded to `checkReleaseVersionPlanSecurityCompleteness`
+ *   unchanged.
+ * @param {string} [params.verdictPath] - forwarded to `checkReleaseVersionPlanSecurityCompleteness`
+ *   unchanged.
+ * @param {object} [options]
+ * @param {number} [options.nowMs] - forwarded to `storeReleaseVersionPlan` unchanged.
+ * @returns {object} `storeReleaseVersionPlan()`'s own return value, unchanged.
+ */
+export function sealAndStoreReleaseVersionPlan({ gitCommonDir, repoFingerprint, plan, decision, projectDir, envelopePath, verdictPath }, { nowMs = Date.now() } = {}) {
+  const failures = checkReleaseVersionPlanSecurityCompleteness(plan, { projectDir, envelopePath, verdictPath });
+  if (failures.length > 0) {
+    fail("RVP-SECURITY-INCOMPLETE", `release version plan fails security completeness, storage refused: ${failures.join("; ")}`);
+  }
+  return storeReleaseVersionPlan({ gitCommonDir, repoFingerprint, plan, decision }, { nowMs });
 }

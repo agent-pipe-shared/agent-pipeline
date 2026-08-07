@@ -17,7 +17,7 @@ USAGE (Elephant)
    Never paste chat history, never paste your reasoning about alternatives.
 3. Dispatch as subagent (default: `goldfish-implementor`, effort `medium` per MP-27).
    Deviation from the role default REQUIRES the model justification in field 6.
-4. Writing tasks: worktree per project calibration (`.claude/pipeline.json`).
+4. Writing tasks: worktree per project calibration (`project/pipeline.json`, else `.claude/pipeline.json`).
 5. Light profile (stage-0 / bounded implementation ONLY): set field 6 `Profile: light` for a
    condensed 3-field report, reference-inlining, no baseline verify. Route mechanical work to
    `goldfish-mechanic`/`low` and bounded implementation to `goldfish-implementor`/`medium`. Use
@@ -41,7 +41,7 @@ report — never guess.
 First output line (compact bootstrap confirmation, verbatim canonical format,
 with the ruleset SHA from field 6):
 
-> Bootstrap check passed: ruleset {{RULESET_SHA}} loaded · Project {{PROJECT_NAME}} · Calibration {{CALIBRATION_FILE default: .claude/pipeline.json}} · State briefing {{TASK_ID}}/{{DATE}} · Role Goldfish
+> Bootstrap check passed: ruleset {{RULESET_SHA}} loaded · Project {{PROJECT_NAME}} · Calibration {{CALIBRATION_FILE default: the resolved calibration tier}} · State briefing {{TASK_ID}}/{{DATE}} · Role Goldfish
 
 If this briefing lacks the ruleset SHA, that is a briefing defect: stop and
 report back to the Elephant — do not research it yourself.
@@ -94,7 +94,7 @@ Fixed BEFORE this run — they are the contract, not negotiable during the run.
 - No-go paths: {{NO_GO_PATHS e.g. "prisma/migrations/**, .claude/**" or "none beyond project denies"}}
 - Project denies apply (committed `.claude/settings.json` / git-guard).
 - **Commit discipline:** never `git add -A` / a bare `git commit` — only `git commit -- <own paths>`; new files need `git add -- <path>` (pathspec) before the commit, same paths in both.
-- {{ADVISOR_SESSION_LINE: if this dispatch runs inside an `advisor`-profile Elephant session, include verbatim: "Advisor sessions: do not consult the advisor" (MP-26d) — else delete this line.}}
+- {{ADVISOR_DEMAND_LINE: if the Elephant has a current bounded Advisor demand, include verbatim: "Do not invoke or reuse the Advisor; consultation ownership remains with the Elephant" (MP-26) — else delete this line.}}
 - **Restore-before-yield:** if your task runs state-changing tests (fault injection, live-state mutation, temporary breakage to prove a check catches it), restore the touched state BEFORE every yield/turn end — never end a turn with a live fault injection left lying in the checkout.
 - {{SANITIZATION_DOD: if this dispatch's report/commits/artifacts could carry local paths, spell the check out as a concrete grep-pattern list instead of principle-prose — e.g. repo-root absolute-path pattern, scratchpad-path pattern, user-directory pattern (`C:\Users\<name>` / `/home/<name>`), known secret/token formats — else delete this line (a principle-prose sanitization DoD has let a repo-root path through).}}
 - {{ACCOUNTING_ATTRIBUTION: if this briefing touches booking/accounting/financial data, require an explicit attribution/source line for every evidence entry the goldfish produces — the source of each figure/label, never a goldfish-invented label (e.g. an ad hoc session name not present in the source data); keep booking facts and delivery evidence in visibly separate fields, never merged into one prose line — else delete this line (an inline accounting briefing has let a goldfish invent an ad-hoc session label inside an evidence line).}}
@@ -122,7 +122,7 @@ Stop and report (do not keep iterating) when ANY of these occurs:
 
 - Ruleset SHA/version (always, from the Elephant's bootstrap): `{{RULESET_SHA}}`
   — echo it in your confirmation line.
-- Model/effort for this run: {{MODEL_EFFORT default: "the implement-tier model / medium"}}.
+- Model/effort for this run: {{MODEL_EFFORT — the CONCRETE model identifier resolved from the role default, not the tier name, e.g. "claude-sonnet-5 / medium"; default: implement-tier model / medium}}.
 - Model justification (ONLY if deviating from the Goldfish default, MP-05):
   {{MODEL_JUSTIFICATION e.g. ">15 files across two subsystems → the design-tier model per MP-05 criterion 1" or "n/a — role default"}}
 - Worktree: {{WORKTREE e.g. "yes — per calibration `worktree: on-write`" or "no — read-only task"}}

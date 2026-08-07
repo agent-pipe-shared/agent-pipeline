@@ -2,25 +2,38 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import { spawnSync as nodeSpawnSync } from "node:child_process";
-import { dirname, isAbsolute, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { lstatSync as nodeLstatSync, realpathSync as nodeRealpathSync } from "node:fs";
+import { dirname, isAbsolute, join, resolve } from "node:path";
+import {
+  resolveCodexLocalMarketplacePluginPath,
+} from "../lib/codex-host-plugin-list.mjs";
 import { resolveTrustedSystemExecutable } from "../lib/trusted-tool-resolution.mjs";
 
 import { mainCodexHost as activationMain } from "./private-overlay-activation.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const SCHEMA = "pipeline.codex-private-overlay-source-resolution.v1";
+const ROUTE_SCHEMA = "pipeline.codex-private-overlay-route.v1";
 const REJECTION = Object.freeze({
   schema: SCHEMA,
   status: "rejected",
   reasonCodes: ["SNT-A-CODEX-SOURCE-UNAVAILABLE"],
 });
-const USAGE = "Usage: codex-private-overlay-activation.mjs <inspect|plan|authority-plan|status|load-context> --project-root <absolute-path>\n       codex-private-overlay-activation.mjs <activate|authority-activate> --project-root <absolute-path> --expected-plan-sha256 <64hex>\n";
+const USAGE = "Usage: codex-private-overlay-activation.mjs route --project-root <absolute-path>\n       codex-private-overlay-activation.mjs <inspect|plan|authority-plan|status|load-context> --project-root <absolute-path>\n       codex-private-overlay-activation.mjs <activate|authority-activate> --project-root <absolute-path> --expected-plan-sha256 <64hex>\n";
 const SHA256 = /^[0-9a-f]{64}$/u;
 const PLUGIN_VERSION = /^[A-Za-z0-9][A-Za-z0-9.+_-]{0,127}$/u;
 const MAX_JSON_BYTES = 64 * 1024;
 const TIMEOUT_MS = 5000;
 const MAX_BUFFER = 128 * 1024;
-const DEPENDENCY_KEYS = Object.freeze(["spawnSync", "resolveExecutable", "activationMain", "write", "writeError"]);
+const DEPENDENCY_KEYS = Object.freeze([
+  "spawnSync",
+  "resolveExecutable",
+  "lstatSync",
+  "realpathSync",
+  "activationMain",
+  "write",
+  "writeError",
+]);
 
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -36,7 +49,7 @@ function canonicalLine(value) {
 }
 
 function invocation(argv) {
-  if (!Array.isArray(argv) || !["inspect", "plan", "authority-plan", "status", "load-context", "activate", "authority-activate"].includes(argv[0])) return undefined;
+  if (!Array.isArray(argv) || !["route", "inspect", "plan", "authority-plan", "status", "load-context", "activate", "authority-activate"].includes(argv[0])) return undefined;
   const parsed = { command: argv[0] };
   for (let index = 1; index < argv.length; index += 1) {
     const flag = argv[index];
@@ -61,11 +74,16 @@ function dependencies(overrides) {
   const selected = {
     spawnSync: overrides.spawnSync ?? nodeSpawnSync,
     resolveExecutable: overrides.resolveExecutable ?? resolveTrustedSystemExecutable,
+    lstatSync: overrides.lstatSync ?? nodeLstatSync,
+    realpathSync: overrides.realpathSync ?? nodeRealpathSync,
     activationMain: overrides.activationMain ?? activationMain,
     write: overrides.write ?? process.stdout.write.bind(process.stdout),
     writeError: overrides.writeError ?? process.stderr.write.bind(process.stderr),
   };
-  return Object.values(selected).every((value) => typeof value === "function") ? selected : null;
+  return Object.entries(selected).every(([key, value]) =>
+    typeof value === "function")
+    ? selected
+    : null;
 }
 
 function safeWrite(overrides, channel, value) {
@@ -83,6 +101,57 @@ function localAbsolute(path) {
     && !path.includes("\0")
     && isAbsolute(path)
     && resolve(path) === path;
+}
+
+function routeResult(status, reasonCode) {
+  return Object.freeze({
+    schema: ROUTE_SCHEMA,
+    status,
+    reasonCodes: [reasonCode],
+  });
+}
+
+function missing(error) {
+  return error !== null
+    && typeof error === "object"
+    && error.code === "ENOENT";
+}
+
+function observedEntry(path, expected, lstatSync, realpathSync) {
+  const info = lstatSync(path);
+  if (info.isSymbolicLink()
+    || (expected === "directory" && !info.isDirectory())
+    || (expected === "file" && (!info.isFile() || info.nlink !== 1))
+    || realpathSync(path) !== path) throw new Error("unsafe physical entry");
+}
+
+/** Select the public or locked bootstrap branch without inspecting private bytes. */
+export function observePrivateOverlayRoute(projectRoot, dependencyOverrides = {}) {
+  const lstatSync = dependencyOverrides.lstatSync ?? nodeLstatSync;
+  const realpathSync = dependencyOverrides.realpathSync ?? nodeRealpathSync;
+  if (!localAbsolute(projectRoot)
+    || typeof lstatSync !== "function"
+    || typeof realpathSync !== "function") {
+    return routeResult("rejected", "SNT-A-ROUTE-UNAVAILABLE");
+  }
+  try {
+    observedEntry(projectRoot, "directory", lstatSync, realpathSync);
+    const overlay = join(projectRoot, ".agent-pipeline");
+    try { observedEntry(overlay, "directory", lstatSync, realpathSync); }
+    catch (error) {
+      if (missing(error)) return routeResult("public", "SNT-A-ROUTE-PUBLIC");
+      throw error;
+    }
+    const lock = join(overlay, "core.lock.json");
+    try { observedEntry(lock, "file", lstatSync, realpathSync); }
+    catch (error) {
+      if (missing(error)) return routeResult("public", "SNT-A-ROUTE-PUBLIC");
+      throw error;
+    }
+    return routeResult("locked", "SNT-A-ROUTE-LOCKED");
+  } catch {
+    return routeResult("rejected", "SNT-A-ROUTE-UNAVAILABLE");
+  }
 }
 
 function safeGitMarketplaceSource(value) {
@@ -108,7 +177,7 @@ function safeMarketplaceSource(value, pluginRoot) {
     && value.source === dirname(dirname(pluginRoot));
 }
 
-function sourcePluginRoot(document) {
+function sourcePluginRoot(document, realpathSync) {
   if (!exactObject(document, ["installed", "available"])
     || !Array.isArray(document.installed)
     || !Array.isArray(document.available)) return null;
@@ -137,10 +206,15 @@ function sourcePluginRoot(document) {
   if (!safeMarketplaceSource(entry.marketplaceSource, entry.source.path)) return null;
   if (entry.pluginId === "pipeline-core@agent-pipeline-local"
     && entry.marketplaceSource.sourceType !== "local") return null;
-  return { path: entry.source.path, version: entry.version };
+  let sourcePath = entry.source.path;
+  if (entry.marketplaceSource.sourceType === "local") {
+    sourcePath = resolveCodexLocalMarketplacePluginPath(sourcePath, realpathSync);
+    if (sourcePath === null) return null;
+  }
+  return { path: sourcePath, version: entry.version };
 }
 
-function resolveSourceRoot(spawn, resolveExecutable) {
+function resolveSourceRoot(spawn, resolveExecutable, realpathSync) {
   let executable;
   try { executable = resolveExecutable("codex"); } catch { return null; }
   if (!isObject(executable) || executable.ok !== true || !localAbsolute(executable.path)) return null;
@@ -171,7 +245,7 @@ function resolveSourceRoot(spawn, resolveExecutable) {
     || Buffer.byteLength(result.stdout, "utf8") > MAX_JSON_BYTES) return null;
   let document;
   try { document = JSON.parse(result.stdout); } catch { return null; }
-  return sourcePluginRoot(document);
+  return sourcePluginRoot(document, realpathSync);
 }
 
 function activationArgv(parsed, sourceRoot) {
@@ -196,7 +270,16 @@ export function main(argv, dependencyOverrides = {}) {
     safeWrite(dependencyOverrides, "write", canonicalLine(REJECTION));
     return 2;
   }
-  const hostPlugin = resolveSourceRoot(deps.spawnSync, deps.resolveExecutable);
+  if (parsed.command === "route") {
+    const route = observePrivateOverlayRoute(parsed.projectRoot, deps);
+    safeWrite(dependencyOverrides, "write", canonicalLine(route));
+    return route.status === "rejected" ? 2 : 0;
+  }
+  const hostPlugin = resolveSourceRoot(
+    deps.spawnSync,
+    deps.resolveExecutable,
+    deps.realpathSync,
+  );
   if (hostPlugin === null) {
     safeWrite(dependencyOverrides, "write", canonicalLine(REJECTION));
     return 2;
@@ -212,6 +295,6 @@ export function main(argv, dependencyOverrides = {}) {
   }
 }
 
-if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isDirectInvocation(import.meta.url)) {
   process.exitCode = main(process.argv.slice(2));
 }

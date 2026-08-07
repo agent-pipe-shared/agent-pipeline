@@ -141,7 +141,7 @@
       "additionalProperties": false,
       "properties": {
         "kind": { "const": "alias" },
-        "value": { "enum": ["fable", "opus", "sonnet"] }
+        "value": { "enum": ["fable", "haiku", "opus", "sonnet"] }
       }
     },
     "codexSelector": {

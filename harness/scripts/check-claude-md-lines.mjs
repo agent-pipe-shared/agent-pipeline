@@ -8,8 +8,9 @@
  * a non-zero exit stops the close ritual with an explicit report.
  *
  * Behavior:
- *   - Reads `claudeMdMaxLines` from <projectRoot>/.claude/pipeline.json (default 200
- *     when the file or field is absent — the template default, CLAUDE.project.md).
+ *   - Reads `claudeMdMaxLines` from the project's resolved calibration tier
+ *     (ADR-0054; `project/pipeline.json` or `.claude/pipeline.json`), default 200
+ *     when the file or field is absent — the template default, CLAUDE.project.md.
  *   - Counts the lines of <projectRoot>/CLAUDE.md.
  *   - Exit 0: within the limit (prints the count as evidence).
  *   - Exit 2: over the limit, with a plain-text reason (consolidate, move to
@@ -22,15 +23,18 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { resolveAuthorityArtifactPath } from "../../plugins/pipeline-core/lib/project-authority.mjs";
+
 const root = process.env.CLAUDE_PROJECT_DIR || process.cwd();
 
 let maxLines = 200; // template default (templates/CLAUDE.project.md)
 let limitSource = "default (200)";
 try {
-  const calibration = JSON.parse(readFileSync(join(root, ".claude", "pipeline.json"), "utf8"));
+  const resolved = resolveAuthorityArtifactPath("calibration", { rootDir: root });
+  const calibration = JSON.parse(readFileSync(resolved.path, "utf8"));
   if (Number.isInteger(calibration?.claudeMdMaxLines) && calibration.claudeMdMaxLines > 0) {
     maxLines = calibration.claudeMdMaxLines;
-    limitSource = ".claude/pipeline.json (claudeMdMaxLines)";
+    limitSource = `${resolved.relPath} (claudeMdMaxLines)`;
   }
 } catch {
   // Calibration absent/unreadable → template default. The length gate must not

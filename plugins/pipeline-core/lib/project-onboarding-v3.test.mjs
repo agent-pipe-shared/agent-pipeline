@@ -5,32 +5,59 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
   chmodSync, closeSync, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, mkdtempSync,
-  openSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync,
+  openSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, linkSync, unlinkSync, writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  applyProjectOnboardingManifestRepairV4,
   applyProjectOnboardingKickoffV4,
+  applyProjectOnboardingKickoffPromotionV4,
   applyProjectOnboardingLifecycleV4,
+  applyProjectOnboardingManifestRepair,
   applyProjectOnboardingV3,
   inspectProjectOnboardingV3,
+  planProjectOnboardingManifestRepair,
+  planProjectOnboardingSourceRecovery,
   planProjectOnboardingKickoffV4,
+  planProjectOnboardingKickoffPromotionV4,
   planProjectOnboardingLifecycleV4,
+  planProjectOnboardingManifestRepairV4,
+  planProjectOnboardingSourceRecoveryV4,
   planProjectOnboardingV3,
+  planProjectPartialAuthorityAdoption,
+  applyProjectPartialAuthorityAdoption,
+  applyProjectOnboardingReinstall,
+  planProjectOnboardingReinstall,
+  planProjectRemoteAdoptionV4,
+  applyProjectRemoteAdoptionV4,
   renderProjectOnboardingAction,
 } from "./project-onboarding-v3.mjs";
 import { planRunnerProfileMigrationV3 } from "./runner-profile-migration-v3.mjs";
 import { validateV3BootstrapAuthority } from "../scripts/v3-bootstrap-authority.mjs";
 import { parseYaml } from "./yaml-lite.mjs";
 import { validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
+import { validCurrentPlanApproval, validPlanSubmission } from "./plan-spec-state-v2.mjs";
 import { main as onboardingCli } from "../scripts/project-onboarding-v3.mjs";
+import { main as sessionCleanupCli } from "../scripts/session-cleanup.mjs";
+import { run as pipelineStateRun } from "../scripts/pipeline-state.mjs";
 import {
-  canonicalJson, consumeRuntimeReadback, issueLaunchTicket, readCurrentRuntimeReadback, readRestartBarrier,
+  canonicalJson, CodexOnboardingRuntimeError, consumeRuntimeReadback, issueLaunchTicket, readCurrentRuntimeReadback, readRestartBarrier,
   removeRestartBarrierCas, sha256,
 } from "./codex-onboarding-runtime.mjs";
 import { observeOnboardingAppServer } from "./codex-onboarding-app-server.mjs";
+import { readOnboardingSessionCleanupBinding } from "./onboarding-continuity.mjs";
+import { cleanupSession, retireSessionDescriptor, startSessionDescriptor } from "./worktree-lifecycle.mjs";
+import {
+  applyProjectAuthoritySessionCleanupRecovery,
+  planProjectAuthoritySessionCleanupRecovery,
+} from "./project-authority.mjs";
+import { captureResumeHint, discardResumeHint, inspectResumeHint } from "./resume-hint.mjs";
+import { inspectObservationGovernanceBootstrap } from "./observation-governance-bootstrap.mjs";
+import { validatePoGateAuthorityForRepository } from "./po-gate-authority.mjs";
+import { initializePoGateProfileReceipt as initializeActualPoGateProfileReceipt } from "./po-gate-profile-publisher.mjs";
 
 let passed = 0; const failures = [];
 function test(name, run) { try { run(); passed += 1; console.log(`PASS  ${name}`); } catch (error) { failures.push(`${name}: ${error.message}`); console.log(`FAIL  ${name} -- ${error.message}`); } }
@@ -80,14 +107,37 @@ function fakeAppServer({ intent }) {
 }
 const fakeDeps = {
   spawnSync: fakeGit,
+  codexExecutable: process.execPath,
   observeCodexOnboardingCapabilities: fakeCapabilities,
   observeOnboardingAppServer: fakeAppServer,
+  observePersistedPoAuthority() {
+    return { status: "absent" };
+  },
+  initializePoGateProfileReceipt() {
+    return {
+      ok: true,
+      code: "PO-PROFILE-RECEIPT-INITIALIZED",
+      humanFacing: "en",
+      receiptSha256: "0".repeat(64),
+    };
+  },
+  planSessionCleanupRecovery() {
+    return {
+      schema: "pipeline.session-cleanup-recovery-plan.v1",
+      status: "not-needed",
+    };
+  },
 };
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
+const PROJECT_AUTHORITY_MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/project-authority-migration.mjs", import.meta.url));
 const MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/runner-profile-migration-v3.mjs", import.meta.url));
 const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
 const ONBOARDING_LAUNCH_SCRIPT = fileURLToPath(new URL("../scripts/codex-onboarding-launch.mjs", import.meta.url));
 const APP_SERVER_HEALTH_SCRIPT = fileURLToPath(new URL("../scripts/codex-app-server-health.mjs", import.meta.url));
+const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
+const PLUGIN_PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
+const SESSION_CLEANUP_SCRIPT = fileURLToPath(new URL("../scripts/session-cleanup.mjs", import.meta.url));
+const SESSION_CAPABILITY_DIAGNOSE_SCRIPT = fileURLToPath(new URL("../scripts/session-capability-diagnose.mjs", import.meta.url));
 function names(path) { return readdirSync(path).sort(); }
 function yaml(value, indent = "") {
   return Object.entries(value).map(([key, child]) => {
@@ -142,12 +192,18 @@ function initializeRestartRequiredRoot(path, deps = fakeDeps) {
   return readRestartBarrier({ rootDir: path, spawn: fakeGit });
 }
 
+function initializeRuntimeProjectionRoot(path, deps = fakeDeps) {
+  const barrier = initializeRestartRequiredRoot(path, deps);
+  clearRuntimeBarrier(path, barrier);
+}
+
 function clearRuntimeBarrier(path, barrier) {
   const issued = issueLaunchTicket({
     rootDir: path,
     barrierSha256: barrier.rawSha256,
     now: 40_000,
     spawn: fakeGit,
+    codexExecutable: process.execPath,
   });
   consumeRuntimeReadback({
     rootDir: path,
@@ -155,6 +211,7 @@ function clearRuntimeBarrier(path, barrier) {
     token: issued.token,
     now: 40_001,
     spawn: fakeGit,
+    codexExecutable: process.execPath,
     receipt: {
       schema: "pipeline.codex-project-runtime-readback.v1",
       barrierSha256: barrier.rawSha256,
@@ -197,14 +254,17 @@ function assertSingleLineAction(action, expected) {
 
 function assertBoundedRestartCopyCommand(action) {
   const copy = action?.launch?.copyCommand;
-  assert.deepEqual(Object.keys(copy).sort(), ["maxColumns", "posix", "powershell"]);
+  assert.deepEqual(Object.keys(copy).sort(), ["cmd", "maxColumns", "posix", "powershell"]);
   assert.equal(copy.maxColumns, 72);
-  for (const command of [copy.posix, copy.powershell]) {
+  for (const command of [copy.posix, copy.powershell, copy.cmd]) {
     assert.equal(typeof command, "string");
-    assert.equal(command.split("\n").every((line) => line.length <= copy.maxColumns), true);
+    assert.equal(command.split(/\r?\n/u).every((line) => line.length <= copy.maxColumns), true);
   }
   if (process.platform !== "win32") {
-    const assignments = copy.posix.split("\n").slice(0, -4).join("\n");
+    const lines = copy.posix.split("\n");
+    const assignments = lines.slice(0, -1).join("\n");
+    assert.equal(lines.at(-1), 'node "$P" --root "$R" --barrier-sha256 "$B" --activate');
+    assert.equal(lines.some((line) => line.endsWith("\\")), false);
     const probe = spawnSync("bash", ["-c", `${assignments}\nprintf '%s\\0%s\\0%s' "$P" "$R" "$B"`], {
       encoding: "buffer",
       shell: false,
@@ -216,6 +276,12 @@ function assertBoundedRestartCopyCommand(action) {
       action.launch.argv[4],
     ]);
   }
+  const powershellLines = copy.powershell.split("\n");
+  assert.equal(powershellLines.at(-1), "& node $P --root $R --barrier-sha256 $B --activate");
+  assert.equal(powershellLines.some((line) => line.endsWith("`")), false);
+  const cmdLines = copy.cmd.split("\r\n");
+  assert.equal(cmdLines.at(-1), 'node "%P%" --root "%R%" --barrier-sha256 "%B%" --activate');
+  assert.equal(cmdLines.some((line) => line.endsWith("^")), false);
   return copy;
 }
 
@@ -334,7 +400,21 @@ test("repository capability failures map exactly and stop before source/runtime 
       assert.deepEqual(observed.repository, repository, componentStatus);
       assert.equal(observed.diagnostics.length, 1, componentStatus);
       assert.equal(observed.diagnostics[0].code, diagnosticCode, componentStatus);
-      assert.equal(observed.nextAction, null, componentStatus);
+      if (componentStatus === "session-capability-unavailable") {
+        assertSingleLineAction(observed.nextAction, {
+          kind: "command",
+          executable: "node",
+          argv: [SESSION_CAPABILITY_DIAGNOSE_SCRIPT, "--repo", path],
+          mutation: true,
+          requiresConfirmation: false,
+          expected: {
+            schema: "pipeline.session-capability-diagnosis.v1",
+            statuses: ["ready", "unavailable", "precondition-unavailable"],
+          },
+        });
+      } else {
+        assert.equal(observed.nextAction, null, componentStatus);
+      }
       assert.deepEqual(observed.continuity, {
         status: "unavailable",
         stateSha256: null,
@@ -440,6 +520,868 @@ test("App Server is observed only on the ready path and exactly once for require
       assert.deepEqual(observed.appServer, { required: true, status: "running", code: "CAS-READY" }, intent);
       assert.equal(calls, 1, intent);
     }
+  } finally { dispose(path); }
+});
+
+test("runtime-current bootstrap exposes cleanup recovery before App Server or session start", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path);
+    const applyAction = {
+      kind: "command",
+      executable: "node",
+      argv: [
+        "/fixture/session-cleanup.mjs",
+        "apply-recovery",
+        "--repo",
+        path,
+        "--plan-sha256",
+        "a".repeat(64),
+        "--activate",
+      ],
+      mutation: true,
+      requiresConfirmation: true,
+      expected: {
+        schema: "pipeline.session-cleanup-recovery-apply.v1",
+        statuses: ["retired"],
+      },
+    };
+    const observed = inspectProjectOnboardingV3({
+      rootDir: path,
+      intent: "bootstrap",
+      deps: {
+        ...fakeDeps,
+        observeOnboardingAppServer() {
+          throw new Error("cleanup recovery must precede App Server observation");
+        },
+        planSessionCleanupRecovery({ rootDir, scriptPath }) {
+          assert.equal(rootDir, path);
+          assert.equal(scriptPath.endsWith("/scripts/session-cleanup.mjs"), true);
+          return {
+            schema: "pipeline.session-cleanup-recovery-plan.v1",
+            status: "ready",
+            recovery: "retire-orphans",
+            applyAction,
+          };
+        },
+      },
+    });
+    assert.equal(observed.status, "partial");
+    assert.equal(observed.runtime.status, "readback-current");
+    assert.deepEqual(observed.nextAction, applyAction);
+    assertDiagnostic(observed, "cleanup_recovery_required");
+
+    let activeSessionAppServerCalls = 0;
+    const activeSession = inspectProjectOnboardingV3({
+      rootDir: path,
+      intent: "session",
+      deps: {
+        ...fakeDeps,
+        observeOnboardingAppServer(options) {
+          activeSessionAppServerCalls += 1;
+          return fakeAppServer(options);
+        },
+        planSessionCleanupRecovery() {
+          return {
+            schema: "pipeline.session-cleanup-recovery-plan.v1",
+            status: "cleanup-required",
+          };
+        },
+      },
+    });
+    assert.equal(activeSession.status, "ready");
+    assert.equal(activeSession.nextAction, null);
+    assert.equal(activeSessionAppServerCalls, 1);
+
+    const humanRecoveryAction = {
+      kind: "command",
+      executable: "node",
+      argv: [SESSION_CLEANUP_SCRIPT, "plan-human-recovery", "--repo", path],
+      mutation: false,
+      requiresConfirmation: false,
+      expected: {
+        schema: "pipeline.session-cleanup-human-recovery-plan.v1",
+        statuses: ["decision-required"],
+      },
+    };
+
+    const unavailable = inspectProjectOnboardingV3({
+      rootDir: path,
+      intent: "bootstrap",
+      deps: {
+        ...fakeDeps,
+        observeOnboardingAppServer() {
+          throw new Error("unavailable cleanup recovery must precede App Server observation");
+        },
+        planSessionCleanupRecovery() {
+          return {
+            schema: "pipeline.session-cleanup-recovery-plan.v1",
+            status: "orphan-recovery-unavailable",
+            activeDescriptorCount: 2,
+          };
+        },
+      },
+    });
+    assert.equal(unavailable.status, "partial");
+    assert.deepEqual(unavailable.nextAction, humanRecoveryAction);
+    assertDiagnostic(unavailable, "cleanup_recovery_unavailable");
+
+    const unobserved = inspectProjectOnboardingV3({
+      rootDir: path,
+      intent: "bootstrap",
+      deps: {
+        ...fakeDeps,
+        observeOnboardingAppServer() {
+          throw new Error("failed cleanup observation must precede App Server observation");
+        },
+        planSessionCleanupRecovery() {
+          throw new Error("private cleanup state unreadable");
+        },
+      },
+    });
+    assert.equal(unobserved.status, "partial");
+    assert.deepEqual(unobserved.nextAction, humanRecoveryAction);
+    assertDiagnostic(unobserved, "cleanup_recovery_observation_unavailable");
+  } finally { dispose(path); }
+});
+
+test("PRD/Spec drift exposes only the validated digest-bound PO rebind action", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path);
+    const writer = PLUGIN_PIPELINE_STATE_SCRIPT;
+    const planSha256 = "b".repeat(64);
+    const plannedAt = "2026-07-29T09:00:00.000Z";
+    const applyArgv = [
+      writer,
+      "po-authority-rebind-apply",
+      "--plan-sha256",
+      planSha256,
+      "--updated-at",
+      plannedAt,
+      "--activate",
+    ];
+    const diagnosticAction = {
+      kind: "command",
+      executable: process.execPath,
+      argv: [writer, "po-authority-rebind-plan"],
+      mutation: false,
+      requiresConfirmation: false,
+      expected: { schema: "pipeline.po-authority-rebind-plan.v1" },
+    };
+    const observed = inspectProjectOnboardingV3({
+      rootDir: path,
+      intent: "dispatch",
+      deps: {
+        ...fakeDeps,
+        validatePoGateAuthorityForRepository() {
+          return { ok: false, code: "PO-GATE-PRD-SPEC-MISMATCH" };
+        },
+        spawnSync(command, args, options) {
+          if (command === process.execPath
+            && JSON.stringify(args) === JSON.stringify([writer, "po-authority-rebind-plan"])) {
+            assert.equal(options.cwd, path);
+            assert.equal(options.shell, false);
+            return {
+              status: 0,
+              stderr: "",
+              stdout: JSON.stringify({
+                schema: "pipeline.po-authority-rebind-plan.v1",
+                root: path,
+                plannedAt,
+                planSha256,
+                applyAction: {
+                  executable: process.execPath,
+                  argv: applyArgv,
+                  mutation: true,
+                  requiresConfirmation: true,
+                  requiresHostBoundary: true,
+                },
+              }),
+            };
+          }
+          return fakeGit(command, args, options);
+        },
+      },
+    });
+    assert.equal(observed.status, "partial");
+    assertDiagnostic(observed, "po_authority_rebind_required");
+    assertSingleLineAction(observed.nextAction, {
+      kind: "command",
+      executable: process.execPath,
+      argv: applyArgv,
+      mutation: true,
+      requiresConfirmation: true,
+      expected: {
+        schema: "pipeline.po-authority-rebind-apply.v1",
+        statuses: ["applied"],
+      },
+    });
+
+    const invalidPlan = inspectProjectOnboardingV3({
+      rootDir: path,
+      intent: "dispatch",
+      deps: {
+        ...fakeDeps,
+        validatePoGateAuthorityForRepository() {
+          return { ok: false, code: "PO-GATE-PRD-SPEC-MISMATCH" };
+        },
+        spawnSync(command, args, options) {
+          if (command === process.execPath) {
+            return { status: 0, stderr: "", stdout: JSON.stringify({
+              schema: "pipeline.po-authority-rebind-plan.v1",
+              root: path,
+              plannedAt,
+              planSha256,
+              applyAction: {
+                executable: process.execPath,
+                argv: [...applyArgv, "--unexpected"],
+                mutation: true,
+                requiresConfirmation: true,
+                requiresHostBoundary: true,
+              },
+            }) };
+          }
+          return fakeGit(command, args, options);
+        },
+      },
+    });
+    assert.equal(invalidPlan.status, "partial");
+    assertSingleLineAction(invalidPlan.nextAction, diagnosticAction);
+    assertDiagnostic(invalidPlan, "po_authority_rebind_planner_plan_invalid");
+
+    const rejectedPlan = inspectProjectOnboardingV3({
+      rootDir: path,
+      intent: "dispatch",
+      deps: {
+        ...fakeDeps,
+        validatePoGateAuthorityForRepository() {
+          return { ok: false, code: "PO-GATE-PRD-SPEC-MISMATCH" };
+        },
+        spawnSync(command, args, options) {
+          if (command === process.execPath
+            && JSON.stringify(args) === JSON.stringify([writer, "po-authority-rebind-plan"])) {
+            assert.equal(options.cwd, path);
+            return { status: 2, stderr: "closed preimage mismatch\n", stdout: "" };
+          }
+          return fakeGit(command, args, options);
+        },
+      },
+    });
+    assert.equal(rejectedPlan.status, "partial");
+    assertSingleLineAction(rejectedPlan.nextAction, diagnosticAction);
+    assertDiagnostic(rejectedPlan, "po_authority_rebind_planner_rejected");
+  } finally { dispose(path); }
+});
+
+test("unapproved kickoff state has no PO authority to rebind", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path);
+    const deps = { ...fakeDeps };
+    delete deps.observePersistedPoAuthority;
+    const observed = inspectProjectOnboardingV3({ rootDir: path, intent: "session", deps });
+    assert.equal(observed.status, "ready", JSON.stringify(observed.diagnostics));
+    assert.equal(observed.nextAction, null);
+    assert.equal(observed.diagnostics.length, 0);
+    const statePath = join(path, "project/pipeline-state.json");
+    const malformedApproved = JSON.parse(readFileSync(statePath, "utf8"));
+    malformedApproved.planApproved = true;
+    writeFileSync(statePath, `${JSON.stringify(malformedApproved, null, 2)}\n`);
+    const rejected = inspectProjectOnboardingV3({ rootDir: path, intent: "session", deps });
+    assert.equal(rejected.status, "partial");
+  } finally { dispose(path); }
+});
+
+test("V4 exposes only the read-only completed-cleanup recovery planner while authority is nonportable", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path);
+    const statePath = join(path, "project/pipeline-state.json");
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+    state.continuity.runtime.sessionCleanup = {
+      sessionId: "session-legacy-closed",
+      descriptorSha256: "a".repeat(64),
+    };
+    writeFileSync(statePath, `${JSON.stringify(state)}\n`);
+    const observed = inspectProjectOnboardingV3({
+      rootDir: path,
+      intent: "session",
+      deps: {
+        ...fakeDeps,
+        planProjectAuthoritySessionCleanupRecovery() {
+          return {
+            schema: "pipeline.project-authority-recovery.v1",
+            status: "ready",
+            operation: "sanitize-completed-session-cleanup",
+            targets: [{ path: "project/pipeline-state.json" }],
+          };
+        },
+      },
+    });
+    assert.equal(observed.status, "invalid");
+    assertDiagnostic(observed, "project_authority_invalid");
+    assertSingleLineAction(observed.nextAction, {
+      kind: "command",
+      executable: "node",
+      argv: [PROJECT_AUTHORITY_MIGRATION_SCRIPT, "recover", "--root", path],
+      mutation: false,
+      requiresConfirmation: false,
+      expected: {
+        schema: "pipeline.project-authority-recovery.v1",
+        statuses: ["ready", "none", "recovery-unavailable", "recovery-required"],
+      },
+    });
+  } finally { dispose(path); }
+});
+
+test("completed legacy cleanup recovery returns session V4 to ready after exact apply", () => {
+  const path = root();
+  try {
+    hostGit(path, ["init", "-q"]);
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path);
+    const descriptor = startSessionDescriptor(path, { sessionId: "session-v4-legacy-closed" });
+    assert.equal(cleanupSession(path, {
+      sessionId: descriptor.sessionId, ownerNonce: descriptor.ownerNonce,
+    }, { allowAbsent: true }).ok, true);
+    retireSessionDescriptor(path, {
+      sessionId: descriptor.sessionId, ownerNonce: descriptor.ownerNonce, descriptorSha256: descriptor.descriptorSha256,
+    });
+    const statePath = join(path, "project/pipeline-state.json");
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+    state.continuity.runtime.sessionCleanup = {
+      sessionId: descriptor.sessionId,
+      descriptorSha256: descriptor.descriptorSha256,
+    };
+    writeFileSync(statePath, `${JSON.stringify(state)}\n`);
+    const blocked = inspectProjectOnboardingV3({ rootDir: path, intent: "session", deps: fakeDeps });
+    assert.equal(blocked.status, "invalid");
+    assertSingleLineAction(blocked.nextAction, {
+      kind: "command",
+      executable: "node",
+      argv: [PROJECT_AUTHORITY_MIGRATION_SCRIPT, "recover", "--root", path],
+      mutation: false,
+      requiresConfirmation: false,
+      expected: {
+        schema: "pipeline.project-authority-recovery.v1",
+        statuses: ["ready", "none", "recovery-unavailable", "recovery-required"],
+      },
+    });
+    const plan = planProjectAuthoritySessionCleanupRecovery({ rootDir: path });
+    assert.equal(plan.status, "ready");
+    assert.equal(applyProjectAuthoritySessionCleanupRecovery(plan, { rootDir: path, activate: true }).status, "recovered");
+    const ready = inspectProjectOnboardingV3({ rootDir: path, intent: "session", deps: fakeDeps });
+    assert.equal(ready.status, "ready", JSON.stringify(ready.diagnostics));
+    assert.equal(ready.nextAction, null);
+  } finally { dispose(path); }
+});
+
+test("active historical cleanup binding exposes privatization and returns V4 to ready after confirmed apply", () => {
+  const path = root();
+  let output = "";
+  const invokeCleanup = (args, dependencies = {}) => {
+    output = "";
+    const status = sessionCleanupCli(args, {}, {
+      ...dependencies,
+      writeFn(value) { output += value; },
+    });
+    assert.equal(status, 0);
+    return JSON.parse(output);
+  };
+  try {
+    hostGit(path, ["init", "-q"]);
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path);
+    const descriptor = startSessionDescriptor(path, {
+      sessionId: "session-v4-active-private",
+      ownerNonce: "session-v4-active-private-owner",
+    });
+    const statePath = join(path, "project/pipeline-state.json");
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+    state.continuity.runtime.sessionCleanup = {
+      sessionId: descriptor.sessionId,
+      descriptorSha256: descriptor.descriptorSha256,
+    };
+    writeFileSync(statePath, `${JSON.stringify(state)}\n`);
+
+    const blocked = inspectProjectOnboardingV3({
+      rootDir: path,
+      intent: "session",
+      deps: fakeDeps,
+    });
+    assert.equal(blocked.status, "invalid");
+    assertSingleLineAction(blocked.nextAction, {
+      kind: "command",
+      executable: "node",
+      argv: [SESSION_CLEANUP_SCRIPT, "plan-privatization", "--repo", path],
+      mutation: false,
+      requiresConfirmation: false,
+      expected: {
+        schema: "pipeline.session-cleanup-privatization-plan.v1",
+        statuses: ["ready", "noop"],
+      },
+    });
+
+    const plan = invokeCleanup(["plan-privatization", "--repo", path]);
+    assert.equal(plan.status, "ready");
+    assert.match(plan.planSha256, /^[a-f0-9]{64}$/u);
+    assert.equal(JSON.stringify(plan).includes(descriptor.sessionId), false);
+    assert.equal(JSON.stringify(plan).includes(descriptor.descriptorSha256), false);
+    const applied = invokeCleanup(plan.applyAction.argv.slice(1));
+    assert.equal(applied.status, "applied");
+    const portable = JSON.parse(readFileSync(statePath, "utf8"));
+    assert.equal(portable.continuity.runtime.sessionCleanup, null);
+    assert.deepEqual(readOnboardingSessionCleanupBinding({ rootDir: path }).sessionCleanup, {
+      sessionId: descriptor.sessionId,
+      descriptorSha256: descriptor.descriptorSha256,
+    });
+    const ready = inspectProjectOnboardingV3({
+      rootDir: path,
+      intent: "session",
+      deps: fakeDeps,
+    });
+    assert.equal(ready.status, "ready", JSON.stringify(ready.diagnostics));
+    const reused = invokeCleanup(["start", "--repo", path], {
+      requireProjectOnboardingReadyFn() {
+        return {
+          schema: "pipeline.project-onboarding-ready-gate.v1",
+          status: "ready",
+          intent: "session",
+        };
+      },
+    });
+    assert.equal(reused.code, "WT-SESSION-REUSED");
+    assert.equal(reused.sessionId, descriptor.sessionId);
+    assert.equal(reused.descriptorSha256, descriptor.descriptorSha256);
+  } finally { dispose(path); }
+});
+
+test("nonportable cleanup authority keeps a null nextAction when privatization is unavailable", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path);
+    const statePath = join(path, "project/pipeline-state.json");
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+    state.continuity.runtime.sessionCleanup = {
+      sessionId: "session-without-descriptor",
+      descriptorSha256: "b".repeat(64),
+    };
+    writeFileSync(statePath, `${JSON.stringify(state)}\n`);
+    for (const privatization of [
+      () => { throw new Error("malformed cleanup binding"); },
+      () => ({ schema: "pipeline.session-cleanup-privatization-plan.v1", status: "unavailable" }),
+    ]) {
+      const observed = inspectProjectOnboardingV3({
+        rootDir: path,
+        intent: "session",
+        deps: {
+          ...fakeDeps,
+          planProjectAuthoritySessionCleanupRecovery() {
+            return { schema: "pipeline.project-authority-recovery.v1", status: "recovery-unavailable" };
+          },
+          planOnboardingSessionCleanupPrivatization: privatization,
+        },
+      });
+      assert.equal(observed.status, "invalid");
+      assert.equal(observed.nextAction, null);
+    }
+  } finally { dispose(path); }
+});
+
+test("exact revoke-plan v2 postimage keeps repeated PRD and Spec design edits writable", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path);
+    const statePath = join(path, "project/pipeline-state.json");
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+    const planPath = state.activeFeature.planPath;
+    const planSha256 = sha256(readFileSync(join(path, planPath)));
+    const specPath = planPath.replace(/-prd\.md$/u, "-spec.md");
+    const specSha256 = sha256(readFileSync(join(path, specPath)));
+    const revokedAt = "2026-07-30T20:51:44.348Z";
+    state.continuity.authority.prd = { path: planPath, sha256: planSha256 };
+    state.continuity.authority.spec = { path: specPath, sha256: specSha256 };
+    state.planApproved = false;
+    state.updatedAt = revokedAt;
+    state.planApproval = {
+      schema: "pipeline.plan-approval.v2",
+      approvedBy: "PO",
+      approvedAt: "2026-07-29T06:42:02.837Z",
+      specBoundBy: "PO",
+      specBoundAt: "2026-07-29T17:35:13.045Z",
+      poGateAuthority: {
+        schema: "pipeline.po-gate-authority.v2",
+        humanFacing: "en",
+        sourceSha256: "a".repeat(64),
+        runtimeSha256: "b".repeat(64),
+        receiptSha256: "c".repeat(64),
+        repositoryFingerprint: "d".repeat(64),
+        planPath,
+        planSha256,
+        specPath,
+        specSha256,
+      },
+    };
+    state.planRevocation = {
+      schema: "pipeline.plan-revocation.v2",
+      planPath,
+      planSha256,
+      specPath,
+      specSha256,
+      revokedBy: "PO",
+      revokedAt,
+    };
+    writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+    const deps = { ...fakeDeps };
+    delete deps.observePersistedPoAuthority;
+    const observed = inspectProjectOnboardingV3({ rootDir: path, intent: "session", deps });
+    assert.equal(observed.status, "ready", JSON.stringify(observed.diagnostics));
+    assert.equal(observed.nextAction, null);
+    assert.deepEqual(observed.diagnostics, []);
+
+    writeFileSync(join(path, planPath), `${readFileSync(join(path, planPath), "utf8")}\nFirst revised product decision.\n`);
+    const afterPrdEdit = inspectProjectOnboardingV3({ rootDir: path, intent: "session", deps });
+    assert.equal(afterPrdEdit.status, "ready", JSON.stringify(afterPrdEdit.diagnostics));
+    writeFileSync(join(path, specPath), `${readFileSync(join(path, specPath), "utf8")}\nFirst revised technical contract.\n`);
+    writeFileSync(join(path, planPath), `${readFileSync(join(path, planPath), "utf8")}\nSecond revised product decision.\n`);
+    const afterRepeatedEdits = inspectProjectOnboardingV3({ rootDir: path, intent: "session", deps });
+    assert.equal(afterRepeatedEdits.status, "ready", JSON.stringify(afterRepeatedEdits.diagnostics));
+    assert.equal(afterRepeatedEdits.nextAction, null);
+
+    state.planRevocation.specSha256 = "e".repeat(64);
+    writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+    const rejected = inspectProjectOnboardingV3({ rootDir: path, intent: "session", deps });
+    assert.equal(rejected.status, "partial");
+    assertDiagnostic(rejected, "po_authority_rebind_unavailable");
+  } finally { dispose(path); }
+});
+
+test("general PRD/Spec drift exposes the same neutral read-only decision plan for all intents", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path);
+    const writer = PLUGIN_PIPELINE_STATE_SCRIPT;
+    const planSha256 = "c".repeat(64);
+    const plannedAt = "2026-07-29T10:00:00.000Z";
+    const selectionArgv = [
+      writer,
+      "po-authority-decision-select",
+      "--plan-sha256",
+      planSha256,
+      "--planned-at",
+      plannedAt,
+      "--selection",
+      "spec",
+    ];
+    const deps = {
+      ...fakeDeps,
+      validatePoGateAuthorityForRepository() {
+        return { ok: false, code: "PO-GATE-PRD-SPEC-MISMATCH" };
+      },
+      spawnSync(command, args, options) {
+        if (command === process.execPath
+          && JSON.stringify(args) === JSON.stringify([writer, "po-authority-rebind-plan"])) {
+          return { status: 2, stderr: "narrow shape unavailable", stdout: "" };
+        }
+        if (command === process.execPath
+          && JSON.stringify(args) === JSON.stringify([writer, "po-authority-decision-plan"])) {
+          assert.equal(options.cwd, path);
+          return {
+            status: 0,
+            stderr: "",
+            stdout: JSON.stringify({
+              schema: "pipeline.po-authority-decision-plan.v1",
+              status: "planned",
+              root: path,
+              plannedAt,
+              planSha256,
+              candidates: [
+                { id: "prd", role: "product-requirements", path: "specs/prd.md", sha256: "d".repeat(64) },
+                { id: "spec", role: "technical-specification", path: "specs/spec.md", sha256: "e".repeat(64) },
+              ],
+              selectionActions: [
+                { selectedCandidate: "prd", status: "unavailable", code: "PO-DECISION-REFERENCED-SPEC-BYTES-UNAVAILABLE", mutation: false },
+                {
+                  selectedCandidate: "spec",
+                  status: "available",
+                  executable: process.execPath,
+                  argv: selectionArgv,
+                  mutation: false,
+                  requiresConfirmation: true,
+                },
+              ],
+            }),
+          };
+        }
+        return fakeGit(command, args, options);
+      },
+    };
+    for (const intent of ["bootstrap", "session", "dispatch"]) {
+      const observed = inspectProjectOnboardingV3({ rootDir: path, intent, deps });
+      assert.equal(observed.status, "partial", intent);
+      assertDiagnostic(observed, "po_authority_decision_required");
+      assert.deepEqual(observed.nextAction, {
+        kind: "command",
+        executable: process.execPath,
+        argv: [writer, "po-authority-decision-plan"],
+        mutation: false,
+        requiresConfirmation: false,
+        expected: {
+          schema: "pipeline.po-authority-decision-plan.v1",
+          statuses: ["planned"],
+        },
+      });
+    }
+  } finally { dispose(path); }
+});
+
+test("neutral PO decision apply requires all transactional V4 postimage readbacks to become ready", () => {
+  const path = root();
+  const profile = {
+    schema: "pipeline.po-gate-authority-evidence.v1",
+    humanFacing: "en",
+    sourceSha256: "a".repeat(64),
+    runtimeSha256: "b".repeat(64),
+    receiptSha256: "c".repeat(64),
+    repositoryFingerprint: "d".repeat(64),
+  };
+  const capture = (invoke) => {
+    let stdout = ""; let stderr = "";
+    const log = console.log; const error = console.error;
+    console.log = (...values) => { stdout += `${values.join(" ")}\n`; };
+    console.error = (...values) => { stderr += `${values.join(" ")}\n`; };
+    try { return { exit: invoke(), stdout, stderr }; }
+    finally { console.log = log; console.error = error; }
+  };
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path);
+    const featureDir = join(path, "specs", "nova-shaped");
+    mkdirSync(featureDir, { recursive: true });
+    const planPath = "specs/nova-shaped/prd_nova.md";
+    const specPath = "specs/nova-shaped/spec.md";
+    const oldSpecSha = sha256("# older Spec\n");
+    writeFileSync(join(path, specPath), "# current Spec\n");
+    const newSpecSha = sha256(readFileSync(join(path, specPath)));
+    writeFileSync(join(path, planPath), `<!-- po-language: en -->\n<!-- technical-spec-sha256: ${newSpecSha} -->\n# Nova PRD\n\nReconciled scope.\n`);
+    const planSha = sha256(readFileSync(join(path, planPath)));
+    const continuity = {
+      schema: "pipeline.continuity.v0", featureId: "nova-shaped", revision: 3,
+      runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator" },
+      authority: { prd: { path: planPath, sha256: planSha }, spec: { path: specPath, sha256: oldSpecSha }, result: null },
+      queueHead: { packageId: "nova", actionId: "decision", nextAction: "review", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null },
+      blocker: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" }, recovery: null, decisionTxn: null,
+      capacity: { concurrencyLimit: 4, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" },
+    };
+    writeFileSync(join(path, "project/pipeline-state.json"), `${JSON.stringify({
+      schema: "pipeline.state.v0", activeFeature: { id: "nova-shaped", planPath, phase: "design" }, planApproved: true,
+      planApproval: { schema: "pipeline.plan-approval.v2", approvedBy: "PO", approvedAt: "2026-07-26T14:08:37.500Z", specBoundBy: "PO", specBoundAt: "2026-07-26T14:08:37.500Z", poGateAuthority: { ...profile, schema: "pipeline.po-gate-authority.v2", planPath, planSha256: planSha, specPath, specSha256: oldSpecSha } },
+      continuity, updatedAt: "2026-07-26T14:08:37.500Z",
+    }, null, 2)}\n`);
+    const authority = ({ expectedPlanSha256, expectedSpecSha256 }) => expectedSpecSha256 === newSpecSha
+      ? { ok: true, value: { ...profile, schema: "pipeline.po-gate-authority.v2", planPath, planSha256: expectedPlanSha256, specPath, specSha256: newSpecSha } }
+      : { ok: false, code: "PO-GATE-AUTHORITY-STALE" };
+    const writerDeps = { dir: path, now: () => "2026-07-30T10:00:00.000Z", ownerNonce: () => "postimage-red-0001", poGateProfile: () => ({ ok: true, value: profile }), poGateAuthority: authority };
+    const plan = JSON.parse(capture(() => pipelineStateRun(["po-authority-decision-plan"], writerDeps)).stdout);
+    const selectionAction = plan.selectionActions.find((action) => action.selectedCandidate === "spec");
+    const selection = JSON.parse(capture(() => pipelineStateRun(selectionAction.argv.slice(1), writerDeps)).stdout);
+    const beforePrd = readFileSync(join(path, planPath), "utf8");
+    const beforeState = readFileSync(join(path, "project/pipeline-state.json"), "utf8");
+    const readbacks = [];
+    let postimageEvidence = null;
+    const v4Inspection = ({ rootDir, intent, deps: transactionDeps }) => {
+      const result = inspectProjectOnboardingV3({
+        rootDir,
+        intent,
+        deps: {
+          ...fakeDeps,
+          observePersistedPoAuthority: undefined,
+          validatePoGateAuthorityForRepository: authority,
+          ...transactionDeps,
+        },
+      });
+      readbacks.push({ intent, status: result.status, predicate: result.diagnostics?.[0]?.code ?? null });
+      return result;
+    };
+    const applied = capture(() => pipelineStateRun(selection.applyAction.argv.slice(1), {
+      ...writerDeps,
+      v4Inspection,
+      observeRebindPostimageEvidence: (evidence) => { postimageEvidence = evidence; },
+    }));
+    const exact = JSON.stringify(readbacks);
+    assert.equal(applied.exit, 0, `decision postimage must be V4-ready; observed ${exact}; writer stderr: ${applied.stderr.trim()}`);
+    assert.deepEqual(readbacks, [
+      { intent: "bootstrap", status: "ready", predicate: null },
+      { intent: "session", status: "ready", predicate: null },
+      { intent: "dispatch", status: "ready", predicate: null },
+    ]);
+    assert.deepEqual(
+      postimageEvidence.predicates.v4Intents.map(({ intent, ok, status }) => ({ intent, ok, status })),
+      [
+        { intent: "bootstrap", ok: true, status: "ready" },
+        { intent: "session", ok: true, status: "ready" },
+        { intent: "dispatch", ok: true, status: "ready" },
+      ],
+    );
+    assert.equal(Object.values(postimageEvidence.predicates).flat().every((predicate) => predicate.ok), true);
+    assert.equal(readFileSync(join(path, planPath), "utf8"), beforePrd);
+    assert.notEqual(readFileSync(join(path, "project/pipeline-state.json"), "utf8"), beforeState);
+  } finally { dispose(path); }
+});
+
+test("V4 authority drift reopens the historical approval instead of rebinding it", () => {
+  const path = root();
+  const profile = {
+    schema: "pipeline.po-gate-authority-evidence.v1", humanFacing: "en",
+    sourceSha256: "a".repeat(64), runtimeSha256: "b".repeat(64), receiptSha256: "c".repeat(64), repositoryFingerprint: "d".repeat(64),
+  };
+  const capture = (invoke) => {
+    let stdout = ""; const log = console.log;
+    console.log = (...values) => { stdout += `${values.join(" ")}\n`; };
+    try { return { exit: invoke(), stdout }; } finally { console.log = log; }
+  };
+  try {
+    mkdirSync(join(path, "project"), { recursive: true });
+    const featureDir = join(path, "specs", "v4-drift"); mkdirSync(featureDir, { recursive: true });
+    const planPath = "specs/v4-drift/prd_v4.md"; const specPath = "specs/v4-drift/spec.md";
+    const oldSpecSha = sha256("# prior Spec\n"); writeFileSync(join(path, specPath), "# changed Spec\n");
+    const currentSpecSha = sha256(readFileSync(join(path, specPath)));
+    writeFileSync(join(path, planPath), `<!-- po-language: en -->\n<!-- technical-spec-sha256: ${oldSpecSha} -->\n# V4 PRD\n`);
+    const planSha = sha256(readFileSync(join(path, planPath)));
+    const historicalAuthority = { ...profile, schema: "pipeline.po-gate-authority.v2", planPath, planSha256: planSha, specPath, specSha256: oldSpecSha };
+    const submission = { schema: "pipeline.plan-submission.v1", featureId: "v4-drift", planPath, planSha256: planSha, specPath, specSha256: oldSpecSha, profile: "epic", profileSha256: "e".repeat(64), submittedBy: "Coordinator", submittedAt: "2026-08-02T09:00:00.000Z" };
+    const continuity = { schema: "pipeline.continuity.v0", featureId: "v4-drift", revision: 3, runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator" }, authority: { prd: { path: planPath, sha256: planSha }, spec: { path: specPath, sha256: oldSpecSha }, result: null }, queueHead: { packageId: "v4", actionId: "review", nextAction: "review", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null }, blocker: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" }, recovery: null, decisionTxn: null, capacity: { concurrencyLimit: 4, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" } };
+    const approval = { schema: "pipeline.plan-approval.v4", approvedBy: "PO", approvedAt: "2026-08-02T09:05:00.000Z", submissionSha256: sha256(canonicalJson(submission)), profileSha256: submission.profileSha256, poGateAuthority: historicalAuthority, priorInvalidationSha256: null };
+    assert.equal(validPlanSubmission(submission), true);
+    assert.equal(validCurrentPlanApproval(approval), true);
+    writeFileSync(join(path, "project/pipeline-state.json"), `${JSON.stringify({ schema: "pipeline.state.v0", activeFeature: { id: "v4-drift", planPath, phase: "implementation" }, planApproved: true, planSubmission: submission, planApproval: approval, continuity, updatedAt: "2026-08-02T09:06:00.000Z" }, null, 2)}\n`);
+    const authority = ({ expectedPlanSha256, expectedSpecSha256 }) => expectedSpecSha256 === currentSpecSha
+      ? { ok: true, value: { ...profile, schema: "pipeline.po-gate-authority.v2", planPath, planSha256: expectedPlanSha256, specPath, specSha256: currentSpecSha } }
+      : { ok: false, code: "PO-GATE-AUTHORITY-STALE" };
+    const writerDeps = {
+      dir: path,
+      now: () => "2026-08-02T10:00:00.000Z",
+      ownerNonce: () => "v4-reopen-0001",
+      poGateProfile: () => ({ ok: true, value: profile }),
+      poGateAuthority: authority,
+    };
+    const result = capture(() => pipelineStateRun(["po-authority-decision-plan"], writerDeps));
+    assert.equal(result.exit, 0);
+    const plan = JSON.parse(result.stdout);
+    const selectionAction = plan.selectionActions.find((action) => action.selectedCandidate === "spec");
+    const selection = JSON.parse(capture(() => pipelineStateRun(selectionAction.argv.slice(1), writerDeps)).stdout);
+    const applied = capture(() => pipelineStateRun(selection.applyAction.argv.slice(1), {
+      ...writerDeps,
+      v4Inspection: () => ({ status: "ready", diagnostics: [] }),
+    }));
+    assert.equal(plan.status, "planned"); assert.equal(plan.transition.toPhase, "design");
+    assert.equal(selection.selectedCandidate, "spec");
+    assert.equal(applied.exit, 0, applied.stdout);
+    assert.equal(plan.preimage.planApproval.schema, "pipeline.plan-approval.v4");
+    const state = JSON.parse(readFileSync(join(path, "project/pipeline-state.json"), "utf8"));
+    assert.equal(state.activeFeature.phase, "design");
+    assert.equal(state.planApproved, false);
+    assert.equal(state.planApproval.schema, "pipeline.plan-approval.v4");
+    assert.equal(state.planApproval.poGateAuthority.specSha256, oldSpecSha);
+    assert.equal(state.planInvalidation.reason, "reopen-design");
+    assert.equal(state.continuity.revision, 4);
+  } finally { dispose(path); }
+});
+
+test("coherent current documents with stale persisted authority require the same neutral decision for all intents", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path);
+    const writer = PLUGIN_PIPELINE_STATE_SCRIPT;
+    const planSha256 = "8".repeat(64);
+    const plannedAt = "2026-07-29T10:30:00.000Z";
+    const selectionArgv = [
+      writer,
+      "po-authority-decision-select",
+      "--plan-sha256",
+      planSha256,
+      "--planned-at",
+      plannedAt,
+      "--selection",
+      "spec",
+    ];
+    let validatedExpected = 0;
+    const deps = {
+      ...fakeDeps,
+      observePersistedPoAuthority() {
+        return {
+          status: "observed",
+          planSha256: "1".repeat(64),
+          specSha256: "2".repeat(64),
+        };
+      },
+      validatePoGateAuthorityForRepository(options) {
+        assert.equal(options.expectedPlanSha256, "1".repeat(64));
+        assert.equal(options.expectedSpecSha256, "2".repeat(64));
+        validatedExpected += 1;
+        return { ok: false, code: "PO-GATE-PLAN-DIGEST-STALE" };
+      },
+      spawnSync(command, args, options) {
+        if (command === process.execPath
+          && JSON.stringify(args) === JSON.stringify([writer, "po-authority-decision-plan"])) {
+          assert.equal(options.cwd, path);
+          return {
+            status: 0,
+            stderr: "",
+            stdout: JSON.stringify({
+              schema: "pipeline.po-authority-decision-plan.v1",
+              status: "planned",
+              root: path,
+              plannedAt,
+              planSha256,
+              candidates: [
+                { id: "prd", role: "product-requirements", path: "specs/prd.md", sha256: "3".repeat(64) },
+                { id: "spec", role: "technical-specification", path: "specs/spec.md", sha256: "4".repeat(64) },
+              ],
+              selectionActions: [
+                { selectedCandidate: "prd", status: "unavailable", code: "PO-DECISION-REFERENCED-SPEC-BYTES-UNAVAILABLE", mutation: false },
+                {
+                  selectedCandidate: "spec",
+                  status: "available",
+                  executable: process.execPath,
+                  argv: selectionArgv,
+                  mutation: false,
+                  requiresConfirmation: true,
+                },
+              ],
+            }),
+          };
+        }
+        return fakeGit(command, args, options);
+      },
+    };
+    for (const intent of ["bootstrap", "session", "dispatch"]) {
+      const observed = inspectProjectOnboardingV3({ rootDir: path, intent, deps });
+      assert.equal(observed.status, "partial", intent);
+      assertDiagnostic(observed, "po_authority_decision_required");
+      assert.deepEqual(observed.nextAction?.argv, [writer, "po-authority-decision-plan"]);
+    }
+    assert.equal(validatedExpected, 3);
   } finally { dispose(path); }
 });
 
@@ -615,6 +1557,73 @@ test("host-bound ready-path App-Server health smoke is read-only and typed", () 
   } finally { dispose(path); }
 });
 
+test("a Claude Code session never observes the Codex App-Server and reports not-applicable", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path);
+    let calls = 0;
+    const observed = inspectProjectOnboardingV3({
+      rootDir: path,
+      intent: "bootstrap",
+      runner: "claude",
+      deps: {
+        ...fakeDeps,
+        observeOnboardingAppServer(options) {
+          calls += 1;
+          return observeOnboardingAppServer(options);
+        },
+      },
+    });
+    assert.equal(calls, 0);
+    assert.equal(observed.runner, "claude");
+    assert.equal(observed.status, "ready");
+    assert.deepEqual(observed.appServer, { required: false, status: "not-applicable", code: null });
+  } finally { dispose(path); }
+});
+
+test("omitting --runner keeps the historical Codex App-Server requirement", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path);
+    const observed = inspectProjectOnboardingV3({
+      rootDir: path,
+      intent: "bootstrap",
+      deps: fakeDeps,
+    });
+    assert.equal(observed.runner, "codex");
+    assert.equal(observed.appServer.required, true);
+  } finally { dispose(path); }
+});
+
+test("a V3 source enabling only Claude admits a Claude Code session instead of hard-failing as Codex-disabled", () => {
+  const path = root();
+  try {
+    const portable = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    assert.equal(applyProjectOnboardingV3(portable, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+    const sourcePath = join(path, "pipeline.user.yaml");
+    const claudeOnlySource = readFileSync(sourcePath, "utf8")
+      .replace(/enabled:\n(\s*-\s*"[^"]*"\n)+/u, 'enabled:\n    - "claude"\n')
+      .replace(/default: "?codex"?/u, 'default: "claude"');
+    writeFileSync(sourcePath, claudeOnlySource);
+    const observedClaude = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, intent: "bootstrap", runner: "claude" });
+    assert.notEqual(observedClaude.status, "invalid");
+    assert.equal(observedClaude.status, "runtime-initialization-required");
+    assert.equal(observedClaude.runner, "claude");
+    assert.equal(observedClaude.diagnostics.every((entry) => entry.code !== "source_invalid"), true);
+    // The same claude-only source still hard-fails an invoking Codex session:
+    // admission is bound to the real invoking runner, not opened up generally.
+    const observedCodex = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, intent: "bootstrap", runner: "codex" });
+    assert.equal(observedCodex.status, "invalid");
+    assert.equal(observedCodex.runner, "codex");
+    assert.equal(observedCodex.diagnostics[0].code, "source_invalid");
+    assert.equal(observedCodex.diagnostics[0].message, "codex is not enabled by the source authority");
+  } finally { dispose(path); }
+});
+
 test("blank real root inspect and plan are read-only", () => {
   const path = root();
   try {
@@ -634,8 +1643,30 @@ test("blank real root inspect and plan are read-only", () => {
     assert.equal(plan.status, "ready");
     assert.deepEqual(names(path), []);
     assert.deepEqual(plan.targets.map((target) => target.path), [
-      ".claude/pipeline.json", ".claude/pipeline.yaml", ".claude/settings.json", "pipeline.user.yaml",
+      "pipeline.user.yaml", "project/pipeline.json", "project/pipeline.yaml",
     ]);
+  } finally { dispose(path); }
+});
+
+test("healthy legacy authority exposes one typed runner-neutral migration action", () => {
+  const path = root();
+  try {
+    initializeRestartRequiredRoot(path);
+    rmSync(join(path, "project"), { recursive: true, force: true });
+    const inspected = inspectProjectOnboardingV3({ rootDir: path, intent: "bootstrap", deps: fakeDeps });
+    assert.equal(inspected.status, "migration-required");
+    assertDiagnostic(inspected, "project_authority_migration_required");
+    assertSingleLineAction(inspected.nextAction, {
+      kind: "command",
+      executable: "node",
+      argv: [PROJECT_AUTHORITY_MIGRATION_SCRIPT, "plan", "--root", path],
+      mutation: false,
+      requiresConfirmation: false,
+      expected: {
+        schema: "pipeline.project-authority.v1",
+        statuses: ["ready", "noop", "recovery-required", "invalid-source"],
+      },
+    });
   } finally { dispose(path); }
 });
 
@@ -654,15 +1685,17 @@ test("bootstrap inspection of a blank local root offers the portable seed instea
 test("a git-only Codex control mount carries host-managed state through the restart barrier", (t) => {
   if (process.platform === "win32") return;
   const path = root();
+  const runtimeDeps = { codexExecutable: process.execPath };
   try {
     mkdirSync(join(path, ".git"));
     chmodSync(join(path, ".git"), 0o500);
-    const portable = planProjectOnboardingLifecycleV4({ rootDir: path, operation: "portable" });
+    const portable = planProjectOnboardingLifecycleV4({ rootDir: path, operation: "portable", deps: runtimeDeps });
     const portableDigest = portable.nextAction.argv[portable.nextAction.argv.indexOf("--plan-sha256") + 1];
-    assert.equal(applyProjectOnboardingLifecycleV4({ rootDir: path, operation: "portable", planSha256: portableDigest, activate: true }).status, "runtime-initialization-required");
-    const runtime = planProjectOnboardingLifecycleV4({ rootDir: path, operation: "runtime" });
+    assert.equal(applyProjectOnboardingLifecycleV4({ rootDir: path, operation: "portable", planSha256: portableDigest, activate: true, deps: runtimeDeps }).status, "runtime-initialization-required");
+    const runtime = planProjectOnboardingLifecycleV4({ rootDir: path, operation: "runtime", deps: runtimeDeps });
     const runtimeDigest = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
-    assert.equal(applyProjectOnboardingLifecycleV4({ rootDir: path, operation: "runtime", planSha256: runtimeDigest, activate: true }).status, "restart-required");
+    const initialized = applyProjectOnboardingLifecycleV4({ rootDir: path, operation: "runtime", planSha256: runtimeDigest, activate: true, deps: runtimeDeps });
+    assert.equal(initialized.status, "restart-required", JSON.stringify(initialized));
     assert.equal(readRestartBarrier({ rootDir: path, repositoryCapability: "host-managed" }).status, "present");
   } finally {
     try { chmodSync(join(path, ".git"), 0o700); } catch {}
@@ -760,7 +1793,7 @@ test("matrix source/runtime progress actions are exact, diagnostic-bound, and co
     assert.equal(portable.repository.status, "local-uninitialized");
     assertDiagnostic(portable, "portable_seed_missing");
     assertSingleLineAction(portable.nextAction, action(
-      [ONBOARDING_SCRIPT, "plan", "--root", empty],
+      [ONBOARDING_SCRIPT, "plan", "--root", empty, "--runner", "codex"],
       ["portable-seed-required"],
     ));
 
@@ -772,7 +1805,7 @@ test("matrix source/runtime progress actions are exact, diagnostic-bound, and co
     assert.equal(adoption.repository.status, "local-valid-writable");
     assertDiagnostic(adoption, "adoption_required");
     assertSingleLineAction(adoption.nextAction, action(
-      [ONBOARDING_SCRIPT, "plan", "--root", existing],
+      [ONBOARDING_SCRIPT, "plan", "--root", existing, "--runner", "codex"],
       ["adoption-required"],
     ));
 
@@ -797,7 +1830,7 @@ test("matrix source/runtime progress actions are exact, diagnostic-bound, and co
     assert.equal(missing.runtime.status, "missing");
     assertDiagnostic(missing, "runtime_missing");
     assertSingleLineAction(missing.nextAction, action(
-      [ONBOARDING_SCRIPT, "plan-runtime", "--root", runtime],
+      [ONBOARDING_SCRIPT, "plan-runtime", "--root", runtime, "--runner", "codex"],
       ["runtime-initialization-required"],
     ));
   } finally {
@@ -826,7 +1859,7 @@ test("every lifecycle plan exposes the exact digest-bound apply status contract 
     });
     const portableDigest = portable.nextAction.argv[portable.nextAction.argv.indexOf("--plan-sha256") + 1];
     assert.match(assertSingleLineAction(portable.nextAction, applyAction(
-      [ONBOARDING_SCRIPT, "apply-portable-seed", "--root", portableRoot, "--plan-sha256", portableDigest, "--activate"],
+      [ONBOARDING_SCRIPT, "apply-portable-seed", "--root", portableRoot, "--plan-sha256", portableDigest, "--activate", "--runner", "codex"],
       ["runtime-initialization-required", "restart-required", "kickoff-required"],
     )), /'[^']*with spaces[^']*'/u);
 
@@ -843,7 +1876,7 @@ test("every lifecycle plan exposes the exact digest-bound apply status contract 
     });
     const runtimeDigest = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
     assertSingleLineAction(runtime.nextAction, applyAction(
-      [ONBOARDING_SCRIPT, "initialize-runtime", "--root", runtimeRoot, "--plan-sha256", runtimeDigest, "--activate"],
+      [ONBOARDING_SCRIPT, "initialize-runtime", "--root", runtimeRoot, "--plan-sha256", runtimeDigest, "--activate", "--runner", "codex"],
       ["restart-required"],
     ));
     assert.equal(applyProjectOnboardingLifecycleV4({
@@ -863,7 +1896,7 @@ test("every lifecycle plan exposes the exact digest-bound apply status contract 
     });
     const repairDigest = repair.nextAction.argv[repair.nextAction.argv.indexOf("--plan-sha256") + 1];
     assertSingleLineAction(repair.nextAction, applyAction(
-      [ONBOARDING_SCRIPT, "apply-repair", "--root", runtimeRoot, "--plan-sha256", repairDigest, "--activate"],
+      [ONBOARDING_SCRIPT, "apply-repair", "--root", runtimeRoot, "--plan-sha256", repairDigest, "--activate", "--runner", "codex"],
       ["restart-required", "kickoff-required", "ready"],
     ));
   } finally {
@@ -886,7 +1919,7 @@ test("a projection-current upgraded repository must establish a barrier before n
     assert.equal(observed.status, "runtime-attestation-required");
     assert.equal(observed.runtime.status, "projection-current");
     assertDiagnostic(observed, "restart_required");
-    assert.deepEqual(observed.nextAction.argv, [ONBOARDING_SCRIPT, "plan-readback", "--root", path]);
+    assert.deepEqual(observed.nextAction.argv, [ONBOARDING_SCRIPT, "plan-readback", "--root", path, "--runner", "codex"]);
 
     const planned = planProjectOnboardingLifecycleV4({
       rootDir: path,
@@ -902,6 +1935,8 @@ test("a projection-current upgraded repository must establish a barrier before n
       "--plan-sha256",
       digest,
       "--activate",
+      "--runner",
+      "codex",
     ]);
     const beforeRuntime = treeSnapshot(join(path, ".codex"));
     const applied = applyProjectOnboardingLifecycleV4({
@@ -924,10 +1959,12 @@ test("a stale pending restart binding yields a replaceable readback plan", () =>
   const path = root();
   try {
     const stale = initializeRestartRequiredRoot(path);
-    writeFileSync(stale.paths.barrier, canonicalJson({
+    const legacyBarrier = {
       ...stale.barrier,
       launcherSha256: "f".repeat(64),
-    }));
+    };
+    delete legacyBarrier.codexExecutablePath;
+    writeFileSync(stale.paths.barrier, canonicalJson(legacyBarrier));
 
     const observed = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
     assert.equal(observed.status, "runtime-attestation-required");
@@ -938,6 +1975,8 @@ test("a stale pending restart binding yields a replaceable readback plan", () =>
       "plan-readback",
       "--root",
       path,
+      "--runner",
+      "codex",
     ]);
 
     const planned = planProjectOnboardingLifecycleV4({
@@ -957,6 +1996,7 @@ test("a stale pending restart binding yields a replaceable readback plan", () =>
     const rebound = readRestartBarrier({ rootDir: path, spawn: fakeGit });
     assert.notEqual(rebound.rawSha256, stale.rawSha256);
     assert.notEqual(rebound.barrier.launcherSha256, "f".repeat(64));
+    assert.equal(rebound.barrier.codexExecutablePath, stale.barrier.codexExecutablePath);
   } finally {
     dispose(path);
   }
@@ -1010,7 +2050,7 @@ test("a symlinked runtime target parent fails closed without touching its destin
     const projectBefore = treeSnapshot(path);
     const outsideBefore = treeSnapshot(outside);
     const observed = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
-    assert.equal(observed.status, "runtime-target-read-only");
+    assert.equal(observed.status, "runtime-target-read-only", JSON.stringify(observed));
     assertDiagnostic(observed, "runtime_target_read_only");
     assert.equal(observed.nextAction, null);
     assert.deepEqual(treeSnapshot(path), projectBefore);
@@ -1076,7 +2116,7 @@ test("portable and runtime apply replays are zero-write with identical canonical
         argv: [
           ONBOARDING_LAUNCH_SCRIPT,
           "--root",
-          runtimeRoot,
+          ".",
           "--barrier-sha256",
           runtimeApplied.runtime.barrierSha256,
           "--activate",
@@ -1090,7 +2130,7 @@ test("portable and runtime apply replays are zero-write with identical canonical
       requiresConfirmation: true,
       expectedStatuses: runtimeApplied.nextAction.expectedStatuses,
     };
-    assert.match(assertSingleLineAction(runtimeApplied.nextAction, expectedRestart), /'[^']*with spaces[^']*'/u);
+    assertSingleLineAction(runtimeApplied.nextAction, expectedRestart);
     const runtimeBytes = treeSnapshot(runtimeRoot);
     const runtimeReplayed = applyProjectOnboardingLifecycleV4({
       rootDir: runtimeRoot,
@@ -1124,9 +2164,63 @@ test("invalid current runtime readback maps exactly and exposes no action", () =
       barrierSha256: null,
       readbackSha256: null,
     });
-    assertDiagnostic(observed, "runtime_readback_unavailable");
+    assertDiagnostic(observed, "native_runtime_readback_unavailable");
+    assert.equal(observed.diagnostics[0].path, "$.runtime.native-runtime-readback");
     assert.equal(observed.nextAction, null);
   } finally { dispose(path); }
+});
+
+test("runtime initialization preserves the exact executable and private-state failure phase", () => {
+  for (const failure of [
+    {
+      code: "runtime-executable-unavailable",
+      phase: "runtime-executable-resolution",
+      diagnostic: "runtime_executable_unavailable",
+      inject: "prepareRuntimeRestartBinding",
+    },
+    {
+      code: "private-state-assurance-unavailable",
+      phase: "private-root-assurance",
+      diagnostic: "private_state_assurance_unavailable",
+      inject: "persistRestartBarrier",
+    },
+  ]) {
+    const path = root();
+    try {
+      const seed = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+      assert.equal(applyProjectOnboardingV3(seed, {
+        rootDir: path,
+        activate: true,
+        deps: fakeDeps,
+      }).status, "applied");
+      const plan = planProjectOnboardingLifecycleV4({
+        rootDir: path,
+        deps: fakeDeps,
+        operation: "runtime",
+      });
+      const digest = plan.nextAction.argv[plan.nextAction.argv.indexOf("--plan-sha256") + 1];
+      const injectedDeps = {
+        ...fakeDeps,
+        [failure.inject]() {
+          throw new CodexOnboardingRuntimeError(failure.code, failure.phase, "private fixture detail");
+        },
+      };
+      const observed = applyProjectOnboardingLifecycleV4({
+        rootDir: path,
+        deps: injectedDeps,
+        operation: "runtime",
+        planSha256: digest,
+        activate: true,
+      });
+      assert.equal(observed.status, "runtime-readback-unavailable");
+      assert.equal(observed.nextAction, null);
+      assert.equal(observed.diagnostics.length, 1);
+      assert.equal(observed.diagnostics[0].code, failure.diagnostic);
+      assert.equal(observed.diagnostics[0].path, `$.runtime.${failure.phase}`);
+      assert.equal(JSON.stringify(observed).includes("private fixture detail"), false);
+      assert.equal(existsSync(join(path, ".git", "agent-pipeline", "onboarding", "restart-barrier.json")), false);
+    } finally { dispose(path); }
+  }
 });
 
 test("runtime plan preimage drift preserves external bytes and maps to exact projection repair", () => {
@@ -1159,7 +2253,7 @@ test("runtime plan preimage drift preserves external bytes and maps to exact pro
     assertSingleLineAction(mixed.nextAction, {
       kind: "command",
       executable: "node",
-      argv: [ONBOARDING_SCRIPT, "plan-repair", "--root", path],
+      argv: [ONBOARDING_SCRIPT, "plan-repair", "--root", path, "--runner", "codex"],
       mutation: false,
       requiresConfirmation: false,
       expected: {
@@ -1181,7 +2275,7 @@ test("runtime plan preimage drift preserves external bytes and maps to exact pro
     assertSingleLineAction(observed.nextAction, {
       kind: "command",
       executable: "node",
-      argv: [ONBOARDING_SCRIPT, "plan-repair", "--root", path],
+      argv: [ONBOARDING_SCRIPT, "plan-repair", "--root", path, "--runner", "codex"],
       mutation: false,
       requiresConfirmation: false,
       expected: {
@@ -1270,6 +2364,17 @@ test("public kickoff plan/apply carries goal as one argv element and reconstruct
     const planned = invoke(["kickoff", "plan", "--root", path, "--goal", goal]);
     assert.equal(planned.code, 0, stderr);
     assert.equal(planned.result.goal, goal);
+    const kickoffId = planned.result.targets.state.value.activeFeature.id;
+    const expectedPrd = `specs/${kickoffId}/prd_${kickoffId}.md`;
+    const expectedSpec = `specs/${kickoffId}/spec.md`;
+    assert.equal(planned.result.targets.prd.path, expectedPrd);
+    assert.equal(planned.result.targets.spec.path, expectedSpec);
+    assert.equal(planned.result.targets.state.value.activeFeature.planPath, expectedPrd);
+    assert.equal(planned.result.targets.state.value.continuity.authority.prd.path, expectedPrd);
+    assert.equal(planned.result.targets.state.value.continuity.authority.spec.path, expectedSpec);
+    assert.match(planned.result.targets.prd.content, /^<!-- po-language: en -->\n<!-- technical-spec-sha256: [a-f0-9]{64} -->/u);
+    assert.equal(planned.result.targets.prd.content.includes(`technical-spec-sha256: ${planned.result.targets.spec.afterSha256}`), true);
+    assert.equal(planned.result.targets.spec.content.includes("Initial PRD SHA-256"), false);
     assert.deepEqual(planned.result.applyAction.argv, [
       ONBOARDING_SCRIPT,
       "kickoff", "apply", "--root", path, "--goal", goal,
@@ -1305,6 +2410,217 @@ test("public kickoff plan/apply carries goal as one argv element and reconstruct
     assert.equal(replayed.result.status, "ready");
     assert.equal(replayed.result.continuity.status, "valid");
     assert.equal(existsSync(join(path, "nope")), false);
+  } finally { dispose(path); }
+});
+
+test("a local kickoff provisions its PO profile inside the confirmed kickoff action", () => {
+  const path = root();
+  const calls = [];
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path, "Provision the first local profile", {
+      ...fakeDeps,
+      initializePoGateProfileReceipt(input) {
+        calls.push(input);
+        return {
+          ok: true,
+          code: "PO-PROFILE-RECEIPT-PUBLISHED",
+          humanFacing: "en",
+          receiptSha256: "1".repeat(64),
+        };
+      },
+    });
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].rootDir, path);
+    assert.match(String(calls[0].userYamlText), /human_facing: "en"/u);
+    assert.match(String(calls[0].runtimeYamlText), /human_facing: en/u);
+  } finally { dispose(path); }
+});
+
+test("a real fresh local kickoff is immediately a valid canonical PO authority", () => {
+  const path = root();
+  try {
+    hostGit(path, ["init", "--initial-branch=main"]);
+    const localDeps = { ...fakeDeps, initializePoGateProfileReceipt: initializeActualPoGateProfileReceipt };
+    const barrier = initializeRestartRequiredRoot(path, localDeps);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path, "Create one canonical fresh feature", localDeps);
+    const authority = validatePoGateAuthorityForRepository({ repoRoot: path });
+    assert.equal(authority.ok, true, JSON.stringify(authority));
+    const stderr = [];
+    const exit = pipelineStateRun(["submit-plan", "--by", "coordinator", "--profile", "feature"], {
+      dir: path,
+      now: () => "2026-08-01T12:00:00.000Z",
+      writeError: (value) => stderr.push(value),
+    });
+    assert.equal(exit, 0, stderr.join(""));
+  } finally { dispose(path); }
+});
+
+test("kickoff promotion replaces only the exact unapproved seed and is replay-safe across profiles", () => {
+  for (const profile of ["epic", "feature", "mini"]) {
+    const path = root();
+    try {
+      const barrier = initializeRestartRequiredRoot(path); clearRuntimeBarrier(path, barrier);
+      completeKickoff(path, `Promotion ${profile}`);
+      mkdirSync(join(path, "specs", profile), { recursive: true });
+      const prdPath = `specs/${profile}/prd-${profile}.md`;
+      const specPath = `specs/${profile}/spec.md`;
+      const designInputPath = `specs/${profile}/design-input.md`;
+      writeFileSync(join(path, prdPath), `# ${profile} PRD\n`);
+      writeFileSync(join(path, specPath), `# ${profile} Spec\n`);
+      writeFileSync(join(path, designInputPath), `# ${profile} design input\n`);
+      const args = {
+        rootDir: path, profile, featureId: `${profile}-work`, planPath: specPath,
+        prdPath, specPath, designInputPath, deps: fakeDeps,
+      };
+      const plan = planProjectOnboardingKickoffPromotionV4(args);
+      assert.equal(plan.schema, "pipeline.codex-onboarding-kickoff-promotion-plan.v1");
+      assert.equal(plan.targets.state.value.planApproved, false);
+      assert.equal(plan.targets.state.value.planSubmission, undefined);
+      const applied = applyProjectOnboardingKickoffPromotionV4({ ...args, planSha256: plan.planSha256, activate: true });
+      assert.equal(applied.status, "ready");
+      const state = JSON.parse(readFileSync(join(path, "project", "pipeline-state.json"), "utf8"));
+      assert.equal(state.activeFeature.id, `${profile}-work`);
+      assert.equal(state.activeFeature.planPath, specPath);
+      assert.equal(state.planApproved, false);
+      assert.equal(state.planSubmission, undefined);
+      assert.equal(state.planApproval, undefined);
+      const replayed = applyProjectOnboardingKickoffPromotionV4({ ...args, planSha256: plan.planSha256, activate: true });
+      assert.equal(replayed.status, "ready");
+    } finally { dispose(path); }
+  }
+});
+
+test("kickoff promotion CLI requires a design-input path", () => {
+  const path = root();
+  const output = [];
+  try {
+    const code = onboardingCli([
+      "kickoff", "promote", "plan", "--root", path,
+      "--profile", "feature", "--id", "evidence-work",
+      "--plan-path", "specs/evidence/spec.md", "--prd-path", "specs/evidence/prd.md",
+      "--spec-path", "specs/evidence/spec.md",
+    ], { write: (chunk) => output.push(chunk) });
+    assert.equal(code, 2);
+    assert.match(output.join(""), /--design-input-path/u);
+  } finally { dispose(path); }
+});
+
+test("public cleanup privatization preserves the historical kickoff seed for CLI promotion", () => {
+  const path = root();
+  let onboardingOutput = "";
+  let onboardingError = "";
+  let cleanupOutput = "";
+  const invokeOnboarding = (args) => {
+    onboardingOutput = "";
+    onboardingError = "";
+    const code = onboardingCli(args, {
+      deps: fakeDeps,
+      write: (chunk) => { onboardingOutput += chunk; },
+      writeError: (chunk) => { onboardingError += chunk; },
+    });
+    return { code, result: onboardingOutput ? JSON.parse(onboardingOutput) : null };
+  };
+  const invokeCleanup = (args) => {
+    cleanupOutput = "";
+    const code = sessionCleanupCli(args, {}, {
+      writeFn(value) { cleanupOutput += value; },
+    });
+    return { code, result: cleanupOutput ? JSON.parse(cleanupOutput) : null };
+  };
+  try {
+    hostGit(path, ["init", "-q"]);
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    const kickoff = completeKickoff(path, "Promote the privatized historical kickoff");
+    const descriptor = startSessionDescriptor(path, {
+      sessionId: "session-kickoff-promote-private",
+      ownerNonce: "session-kickoff-promote-private-owner",
+    });
+    const statePath = join(path, "project", "pipeline-state.json");
+    const historical = JSON.parse(readFileSync(statePath, "utf8"));
+    historical.continuity.revision = 1;
+    historical.continuity.runtime.sessionCleanup = {
+      sessionId: descriptor.sessionId,
+      descriptorSha256: descriptor.descriptorSha256,
+    };
+    writeFileSync(statePath, `${JSON.stringify(historical)}\n`);
+
+    const privatization = invokeCleanup(["plan-privatization", "--repo", path]);
+    assert.equal(privatization.code, 0);
+    assert.equal(privatization.result.status, "ready");
+    const privatized = invokeCleanup(privatization.result.applyAction.argv.slice(1));
+    assert.equal(privatized.code, 0);
+    assert.equal(privatized.result.status, "applied");
+    const seed = JSON.parse(readFileSync(statePath, "utf8"));
+    assert.equal(seed.continuity.revision, 1);
+    assert.equal(seed.continuity.runtime.sessionCleanup, null);
+    assert.equal(seed.continuity.resume.mode, "resume-on-next-turn");
+    assert.equal(seed.continuity.resume.sourceRevision, 0);
+    const seedSha256 = sha256(readFileSync(statePath));
+
+    mkdirSync(join(path, "specs", "post-private"), { recursive: true });
+    const prdPath = "specs/post-private/prd.md";
+    const specPath = "specs/post-private/spec.md";
+    const designInputPath = "specs/post-private/design-input.md";
+    writeFileSync(join(path, prdPath), "# Post-private PRD\n");
+    writeFileSync(join(path, specPath), "# Post-private specification\n");
+    writeFileSync(join(path, designInputPath), "# Post-private design input\n");
+    const promoteArgs = [
+      "kickoff", "promote", "plan", "--root", path,
+      "--profile", "feature", "--id", "post-private-work",
+      "--plan-path", specPath, "--prd-path", prdPath, "--spec-path", specPath,
+      "--design-input-path", designInputPath,
+    ];
+    const planned = invokeOnboarding(promoteArgs);
+    assert.equal(planned.code, 0, onboardingError);
+    assert.equal(planned.result.schema, "pipeline.codex-onboarding-kickoff-promotion-plan.v1");
+    assert.equal(planned.result.kickoff.revision, 1);
+    assert.equal(planned.result.kickoff.transactionSha256, kickoff.transactionSha256);
+    assert.equal(planned.result.targets.state.beforeSha256, seedSha256);
+    assert.equal(planned.result.targets.state.value.continuity.revision, 2);
+    assert.equal(planned.result.targets.state.value.continuity.resume.sourceRevision, 2);
+    assert.equal(planned.result.targets.history.value.transactions[1].beforeStateSha256, seedSha256);
+    assert.equal(planned.result.targets.history.value.transactions[1].previousTransactionSha256,
+      kickoff.transactionSha256);
+
+    const applied = invokeOnboarding(planned.result.applyAction.argv.slice(1));
+    assert.equal(applied.code, 0, onboardingError);
+    assert.equal(applied.result.status, "ready");
+    assert.equal(applied.result.continuity.status, "valid");
+    const after = readFileSync(statePath);
+    const promoted = JSON.parse(after.toString("utf8"));
+    assert.equal(promoted.activeFeature.id, "post-private-work");
+    assert.equal(promoted.continuity.revision, 2);
+    assert.equal(promoted.continuity.resume.sourceRevision, 2);
+
+    const replayed = invokeOnboarding(planned.result.applyAction.argv.slice(1));
+    assert.equal(replayed.code, 0, onboardingError);
+    assert.equal(replayed.result.status, "ready");
+    assert.equal(replayed.result.continuity.status, "valid");
+    assert.deepEqual(readFileSync(statePath), after);
+  } finally { dispose(path); }
+});
+
+test("kickoff promotion fails closed for authority drift, a real active feature, and plan replay mismatch", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path); clearRuntimeBarrier(path, barrier);
+    completeKickoff(path, "Promotion failures");
+    mkdirSync(join(path, "specs"), { recursive: true });
+    writeFileSync(join(path, "specs", "real-prd.md"), "# PRD\n");
+    writeFileSync(join(path, "specs", "real-spec.md"), "# Spec\n");
+    writeFileSync(join(path, "specs", "design-input.md"), "# Design input\n");
+    const args = { rootDir: path, profile: "feature", featureId: "real-work", planPath: "specs/real-spec.md", prdPath: "specs/real-prd.md", specPath: "specs/real-spec.md", designInputPath: "specs/design-input.md", deps: fakeDeps };
+    const plan = planProjectOnboardingKickoffPromotionV4(args);
+    writeFileSync(join(path, "specs", "real-spec.md"), "# changed\n");
+    assert.throws(() => applyProjectOnboardingKickoffPromotionV4({ ...args, planSha256: plan.planSha256, activate: true }), /promotion plan digest/u);
+    writeFileSync(join(path, "specs", "real-spec.md"), "# Spec\n");
+    const applied = applyProjectOnboardingKickoffPromotionV4({ ...args, planSha256: plan.planSha256, activate: true });
+    assert.equal(applied.status, "ready");
+    assert.throws(() => planProjectOnboardingKickoffPromotionV4({ ...args, featureId: "other-work" }), /exact unapproved kickoff seed/u);
   } finally { dispose(path); }
 });
 
@@ -1354,7 +2670,7 @@ test("current runtime exposes closed continuity outcomes while required App Serv
     const continuityAction = {
       kind: "command",
       executable: "node",
-      argv: [ONBOARDING_SCRIPT, "plan-repair", "--root", pristine],
+      argv: [ONBOARDING_SCRIPT, "plan-repair", "--root", pristine, "--runner", "codex"],
       mutation: false,
       requiresConfirmation: false,
       expected: {
@@ -1387,7 +2703,7 @@ test("current runtime exposes closed continuity outcomes while required App Serv
     assert.equal(compound.continuity.status, "damaged");
     assert.equal(compound.nextAction, null);
 
-    writeFileSync(join(unavailable, ".claude", "pipeline-state.json"), "{broken", { flag: "wx" });
+    writeFileSync(join(unavailable, "project", "pipeline-state.json"), "{broken", { flag: "wx" });
     const unreadable = inspectProjectOnboardingV3({
       rootDir: unavailable,
       intent: "onboarding",
@@ -1399,14 +2715,119 @@ test("current runtime exposes closed continuity outcomes while required App Serv
   } finally { dispose(pristine); dispose(unavailable); }
 });
 
+test("closed feature re-entry stays ready through the sanctioned set-feature transition", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    for (const authorityPath of [
+      join(path, ".claude", "pipeline-state.json"),
+      join(path, "docs", "state.md"),
+      join(path, ".git", "agent-pipeline", "onboarding", "continuity-history.json"),
+    ]) {
+      if (existsSync(authorityPath)) unlinkSync(authorityPath);
+    }
+    const runStateCommand = (...args) => spawnSync(process.execPath, [
+      PIPELINE_STATE_SCRIPT,
+      ...args,
+    ], {
+      cwd: path,
+      encoding: "utf8",
+      shell: false,
+      env: { ...process.env, CLAUDE_PROJECT_DIR: path },
+    });
+    const startWithoutDescriptor = () => {
+      let output = "";
+      let descriptorStarts = 0;
+      const status = sessionCleanupCli(["start", "--repo", path], {}, {
+        requireProjectOnboardingReadyFn() {
+          return {
+            schema: "pipeline.project-onboarding-ready-gate.v1",
+            status: "ready",
+            intent: "session",
+          };
+        },
+        readOnboardingSessionCleanupBindingFn(options) {
+          return readOnboardingSessionCleanupBinding({ ...options, spawn: fakeGit });
+        },
+        listActiveSessionDescriptorsFn() { return []; },
+        startSessionDescriptorFn() {
+          descriptorStarts += 1;
+          throw new Error("transition boundary must not create a descriptor");
+        },
+        writeFn(value) { output += value; },
+      });
+      assert.equal(status, 0);
+      assert.equal(descriptorStarts, 0);
+      return JSON.parse(output);
+    };
+
+    const initial = runStateCommand(
+      "set-feature",
+      "--id", "previous-feature",
+      "--plan-path", "specs/previous/prd.md",
+    );
+    assert.equal(initial.status, 0, initial.stderr);
+    const designBeforeClose = inspectProjectOnboardingV3({
+      rootDir: path,
+      intent: "bootstrap",
+      deps: fakeDeps,
+    });
+    assert.equal(designBeforeClose.status, "ready");
+    assert.equal(designBeforeClose.continuity.status, "valid");
+
+    const closedByWriter = runStateCommand("close-feature", "--by", "PO");
+    assert.equal(closedByWriter.status, 0, closedByWriter.stderr);
+    const closed = inspectProjectOnboardingV3({
+      rootDir: path,
+      intent: "bootstrap",
+      deps: fakeDeps,
+    });
+    assert.equal(closed.status, "ready");
+    assert.equal(closed.continuity.status, "valid");
+    assert.deepEqual(startWithoutDescriptor(), {
+      ok: true,
+      code: "WT-SESSION-NOT-REQUIRED",
+      bindingStatus: "closed-unbound",
+    });
+
+    const selected = runStateCommand(
+      "set-feature",
+      "--id", "next-feature",
+      "--plan-path", "specs/next/prd.md",
+    );
+    assert.equal(selected.status, 0, selected.stderr);
+    const design = inspectProjectOnboardingV3({
+      rootDir: path,
+      intent: "bootstrap",
+      deps: fakeDeps,
+    });
+    assert.equal(design.status, "ready");
+    assert.equal(design.continuity.status, "valid");
+    assert.deepEqual(startWithoutDescriptor(), {
+      ok: true,
+      code: "WT-SESSION-NOT-REQUIRED",
+      bindingStatus: "design-unbound",
+    });
+  } finally {
+    dispose(path);
+  }
+});
+
 test("portable seed is manifest-valid, then onboarding owns the runtime initialization transaction", () => {
   const path = root();
   try {
     const plan = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    assert.deepEqual(
+      plan.targets.map((target) => target.path),
+      ["pipeline.user.yaml", "project/pipeline.json", "project/pipeline.yaml"],
+      "fresh onboarding seeds only the canonical project authority; runtime targets are initialized later",
+    );
     assert.equal(applyProjectOnboardingV3(plan, { rootDir: path, activate: false, deps: fakeDeps }).status, "activation-required");
     const applied = applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: fakeDeps });
     assert.equal(applied.status, "applied");
     assert.equal(existsSync(join(path, ".git")), true);
+    assert.equal(existsSync(join(path, ".claude")), false, "portable seed must not create legacy Claude authority files");
     assert.equal(existsSync(join(path, ".codex")), false);
     assert.equal(inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps }).status, "runtime-initialization-required");
     const runtimePlan = planProjectOnboardingLifecycleV4({ rootDir: path, deps: fakeDeps, operation: "runtime" });
@@ -1429,17 +2850,17 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
     assert.equal(planRunnerProfileMigrationV3({ rootDir: path }).status, "noop");
     const source = parseYaml(readFileSync(join(path, "pipeline.user.yaml"), "utf8"));
     assert.deepEqual(source.runners, { enabled: ["claude", "codex"], default: "codex" });
-    assert.equal(source.advisor_export.consent, "declined");
+    assert.equal(source.advisor_export.consent, "approved");
     assert.equal(source.autonomy.push_policy, "gated");
     assert.equal(source.autonomy.branch_model, "feature-branch");
     assert.equal(source.gates.security, "warn");
-    const calibration = JSON.parse(readFileSync(join(path, ".claude/pipeline.json"), "utf8"));
+    const calibration = JSON.parse(readFileSync(join(path, "project/pipeline.json"), "utf8"));
     assert.equal(calibration.verify, "git diff --check");
     assert.equal(calibration.repositoryMode, "local-only");
     assert.equal(existsSync(join(path, "docs/state.md")), false, "handover stays a project decision; normal bootstrap deliberately remains F4 until it exists");
     const barrier = readRestartBarrier({ rootDir: path, spawn: fakeGit });
     const issued = issueLaunchTicket({
-      rootDir: path, barrierSha256: barrier.rawSha256, now: 40_000, spawn: fakeGit,
+      rootDir: path, barrierSha256: barrier.rawSha256, now: 40_000, spawn: fakeGit, codexExecutable: process.execPath,
     });
     consumeRuntimeReadback({
       rootDir: path,
@@ -1447,6 +2868,7 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
       token: issued.token,
       now: 40_001,
       spawn: fakeGit,
+      codexExecutable: process.execPath,
       receipt: {
         schema: "pipeline.codex-project-runtime-readback.v1",
         barrierSha256: barrier.rawSha256,
@@ -1516,7 +2938,7 @@ test("a recognized read-only host control layout receives portable onboarding wi
     assertSingleLineAction(inspected.nextAction, {
       kind: "command",
       executable: "node",
-      argv: [ONBOARDING_SCRIPT, "plan", "--root", path],
+      argv: [ONBOARDING_SCRIPT, "plan", "--root", path, "--runner", "codex"],
       mutation: false,
       requiresConfirmation: false,
       expected: {
@@ -1530,20 +2952,26 @@ test("a recognized read-only host control layout receives portable onboarding wi
     assert.equal(planned.git.mode, "host-managed");
     assert.equal(planned.git.initializesGit, false);
     assert.deepEqual(planned.targets.map((target) => target.path), [
-      ".claude/pipeline.json", ".claude/pipeline.yaml", ".claude/settings.json", "pipeline.user.yaml",
+      "pipeline.user.yaml", "project/pipeline.json", "project/pipeline.yaml",
     ]);
     const applied = applyProjectOnboardingV3(planned, { rootDir: path, activate: true, deps: fakeDeps });
     assert.equal(applied.status, "applied");
     assert.equal(applied.git.mode, "host-managed");
     assert.equal(applied.authority.runtimeProjection, "missing");
-    const postSeed = inspectProjectOnboardingV3({ rootDir: path });
+    const cleanupNotNeededDeps = {
+      planSessionCleanupRecovery: fakeDeps.planSessionCleanupRecovery,
+    };
+    const postSeed = inspectProjectOnboardingV3({
+      rootDir: path,
+      deps: cleanupNotNeededDeps,
+    });
     assert.equal(postSeed.status, "kickoff-required");
     assert.equal(postSeed.runtime.status, "plugin-managed-unattested");
     assert.equal(postSeed.nextAction.kind, "collect-input");
     const kickoff = completeKickoff(
       path,
       "Build one small HTML game from the supplied design",
-      {},
+      cleanupNotNeededDeps,
       "host-repository-init-required",
     );
     assert.equal(kickoff.repositoryCapability, "host-managed");
@@ -1552,6 +2980,7 @@ test("a recognized read-only host control layout receives portable onboarding wi
       rootDir: path,
       intent: "bootstrap",
       deps: {
+        ...cleanupNotNeededDeps,
         observeOnboardingAppServer() {
           appServerCalls += 1;
           throw new Error("pre-init App-Server observation must not run");
@@ -1583,6 +3012,7 @@ test("a recognized read-only host control layout receives portable onboarding wi
       rootDir: path,
       intent: "session",
       deps: {
+        ...cleanupNotNeededDeps,
         observeCodexOnboardingCapabilities: fakeCapabilities,
         classifyOnboardingContinuity: () => postKickoff.continuity,
         observeOnboardingAppServer() {
@@ -1689,8 +3119,9 @@ test("portable rollback preserves a target whose identity changed after exclusiv
         writeFileSync(target, bytes, options);
         return;
       }
-      unlinkSync(firstTarget);
-      writeFileSync(firstTarget, "foreign bytes\n", { flag: "wx", mode: 0o600 });
+      const foreign = `${firstTarget}.foreign`;
+      writeFileSync(foreign, "foreign bytes\n", { flag: "wx", mode: 0o600 });
+      renameSync(foreign, firstTarget);
       throw new Error("synthetic identity race");
     },
   };
@@ -1735,18 +3166,368 @@ test("a fresh portable seed remains non-ready until its missing Codex runtime is
   } finally { dispose(path); }
 });
 
+test("Codex bootstrap accepts a dual-runner source whose default runner is Claude", () => {
+  const path = root();
+  try {
+    const plan = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    assert.equal(applyProjectOnboardingV3(plan, {
+      rootDir: path,
+      activate: true,
+      deps: fakeDeps,
+    }).status, "applied");
+    const sourcePath = join(path, "pipeline.user.yaml");
+    const source = readFileSync(sourcePath, "utf8")
+      .replace('  default: "codex"\n', '  default: "claude"\n');
+    writeFileSync(sourcePath, source);
+    const inspected = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    assert.equal(inspected.status, "runtime-initialization-required");
+    assert.equal(inspected.runtime.status, "missing");
+    assert.equal(inspected.runner, "codex");
+  } finally { dispose(path); }
+});
+
 test("an invalid generated manifest is never accepted as a current fresh authority", () => {
   const path = root();
   try {
     const plan = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
     assert.equal(applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
-    writeFileSync(join(path, ".claude", "pipeline.yaml"), "not: a canonical pipeline manifest\n");
+    writeFileSync(join(path, "project", "pipeline.yaml"), "not: a canonical pipeline manifest\n");
     const inspected = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
     assert.equal(inspected.schema, "pipeline.project-onboarding.v4");
     assert.equal(inspected.status, "partial");
     assertDiagnostic(inspected, "manifest_invalid");
-    assert.equal(inspected.nextAction, null);
+    assert.deepEqual(inspected.nextAction.argv, [
+      ONBOARDING_SCRIPT,
+      "plan-manifest-repair",
+      "--root",
+      path,
+          "--runner",
+      "codex",
+    ]);
+    const disposition = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
+    assert.equal(disposition.status, "unrepairable");
+    assertDiagnostic(disposition, "canonical_manifest_requires_owner_repair");
   } finally { dispose(path); }
+});
+
+test("manifest-only repair is source/preimage/plan bound, confirmed, and read back", () => {
+  const path = root();
+  try {
+    initializeRuntimeProjectionRoot(path);
+    const manifestPath = join(path, ".claude", "pipeline.yaml");
+    unlinkSync(manifestPath);
+    const invalid = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    assert.equal(invalid.status, "runtime-initialization-required");
+
+    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
+    assert.equal(plan.status, "ready", JSON.stringify(plan));
+    assert.equal(plan.target.path, ".claude/pipeline.yaml");
+    assert.equal(plan.target.preservation, "absent-target-only");
+    assert.match(plan.planSha256, /^[a-f0-9]{64}$/u);
+    assert.equal(plan.applyAction.mutation, true);
+    assert.equal(plan.applyAction.requiresConfirmation, true);
+    assert.deepEqual(plan.applyAction.argv, [
+      ONBOARDING_SCRIPT,
+      "apply-manifest-repair",
+      "--root",
+      path,
+      "--plan-sha256",
+      plan.planSha256,
+      "--activate",
+    ]);
+
+    const wrong = applyProjectOnboardingManifestRepairV4({
+      rootDir: path,
+      planSha256: "0".repeat(64),
+      activate: true,
+      deps: fakeDeps,
+    });
+    assert.equal(wrong.status, "runtime-initialization-required");
+    assert.equal(existsSync(manifestPath), false);
+
+    writeFileSync(manifestPath, "foreign: manifest bytes\n");
+    const drifted = applyProjectOnboardingManifestRepairV4({
+      rootDir: path,
+      planSha256: plan.planSha256,
+      activate: true,
+      deps: fakeDeps,
+    });
+    assert.equal(drifted.status, "partial");
+    assert.equal(readFileSync(manifestPath, "utf8"), "foreign: manifest bytes\n");
+    unlinkSync(manifestPath);
+
+    const repaired = applyProjectOnboardingManifestRepairV4({
+      rootDir: path,
+      planSha256: plan.planSha256,
+      activate: true,
+      deps: fakeDeps,
+    });
+    assert.equal(repaired.status, "kickoff-required");
+    assert.equal(readFileSync(manifestPath, "utf8").includes("human_facing: en"), true);
+  } finally { dispose(path); }
+});
+
+test("manifest repair never claims ready when post-publication durability is unavailable", () => {
+  const path = root();
+  try {
+    initializeRuntimeProjectionRoot(path);
+    unlinkSync(join(path, ".claude", "pipeline.yaml"));
+    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
+    const result = applyProjectOnboardingManifestRepairV4({
+      rootDir: path,
+      planSha256: plan.planSha256,
+      activate: true,
+      deps: {
+        ...fakeDeps,
+        fsyncDirectory() { throw new Error("synthetic durability failure"); },
+      },
+    });
+    assert.equal(result.status, "partial");
+    assertDiagnostic(result, "manifest_repair_durability_unavailable");
+    assert.equal(existsSync(join(path, ".claude", "pipeline.yaml")), true);
+  } finally { dispose(path); }
+});
+
+test("manifest repair rejects non-UTF-8 unowned bytes without rewriting them", () => {
+  const path = root();
+  try {
+    initializeRuntimeProjectionRoot(path);
+    const manifestPath = join(path, ".claude", "pipeline.yaml");
+    const original = Buffer.concat([
+      readFileSync(manifestPath),
+      Buffer.from("# invalid-unowned-byte: ", "utf8"),
+      Buffer.from([0xff]),
+      Buffer.from("\n", "utf8"),
+    ]);
+    writeFileSync(manifestPath, original);
+    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
+    assert.equal(plan.status, "unrepairable");
+    assertDiagnostic(plan, "manifest_unowned_bytes_unpreservable");
+    assert.equal(readFileSync(manifestPath).compare(original), 0);
+  } finally { dispose(path); }
+});
+
+test("manifest repair rejects source drift before publication and leaves the manifest absent", () => {
+  const path = root();
+  try {
+    initializeRuntimeProjectionRoot(path);
+    const manifestPath = join(path, ".claude", "pipeline.yaml");
+    const sourcePath = join(path, "pipeline.user.yaml");
+    unlinkSync(manifestPath);
+    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
+    let injected = false;
+    const result = applyProjectOnboardingManifestRepairV4({
+      rootDir: path,
+      planSha256: plan.planSha256,
+      activate: true,
+      deps: {
+        ...fakeDeps,
+        openSync(target, ...args) {
+          const fd = openSync(target, ...args);
+          if (!injected && String(target).includes(".pipeline-manifest-repair-")) {
+            injected = true;
+            writeFileSync(sourcePath, `${readFileSync(sourcePath, "utf8")}# concurrent source drift\n`);
+          }
+          return fd;
+        },
+      },
+    });
+    assert.equal(result.status, "runtime-initialization-required");
+    assert.equal(existsSync(manifestPath), false);
+    assert.equal(injected, true);
+  } finally { dispose(path); }
+});
+
+test("manifest repair stays inside its pinned parent when the pathname becomes a symlink", () => {
+  const path = root();
+  const outside = root();
+  try {
+    initializeRuntimeProjectionRoot(path);
+    const parent = join(path, ".claude");
+    const displaced = join(path, ".claude-displaced");
+    unlinkSync(join(parent, "pipeline.yaml"));
+    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
+    let injected = false;
+    const result = applyProjectOnboardingManifestRepairV4({
+      rootDir: path,
+      planSha256: plan.planSha256,
+      activate: true,
+      deps: {
+        ...fakeDeps,
+        linkSync(source, target) {
+          if (!injected && String(source).includes(".pipeline-manifest-repair-")) {
+            injected = true;
+            renameSync(parent, displaced);
+            symlinkSync(outside, parent, "dir");
+          }
+          linkSync(source, target);
+        },
+      },
+    });
+    assert.equal(result.status, "partial");
+    assertDiagnostic(result, "manifest_repair_parent_changed_after_commit");
+    assert.equal(injected, true);
+    assert.equal(existsSync(join(outside, "pipeline.yaml")), false);
+    assert.equal(existsSync(join(displaced, "pipeline.yaml")), false);
+    assert.equal(readdirSync(displaced).some((name) => name.startsWith(".pipeline-manifest-repair-quarantine-")), true);
+  } finally { dispose(path); dispose(outside); }
+});
+
+test("manifest repair quarantines a publication-boundary source race", () => {
+  const path = root();
+  try {
+    initializeRuntimeProjectionRoot(path);
+    const manifestPath = join(path, ".claude", "pipeline.yaml");
+    const sourcePath = join(path, "pipeline.user.yaml");
+    unlinkSync(manifestPath);
+    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
+    let injected = false;
+    const result = applyProjectOnboardingManifestRepairV4({
+      rootDir: path,
+      planSha256: plan.planSha256,
+      activate: true,
+      deps: {
+        ...fakeDeps,
+        linkSync(source, target) {
+          linkSync(source, target);
+          if (!injected && String(source).includes(".pipeline-manifest-repair-")) {
+            injected = true;
+            writeFileSync(sourcePath, `${readFileSync(sourcePath, "utf8")}# publication-boundary drift\n`);
+          }
+        },
+      },
+    });
+    assert.equal(result.status, "partial");
+    assertDiagnostic(result, "manifest_repair_source_changed_after_commit");
+    assert.equal(injected, true);
+    assert.equal(existsSync(manifestPath), false);
+  } finally { dispose(path); }
+});
+
+test("manifest repair retains its publication binding through final durability readback", () => {
+  const path = root();
+  try {
+    initializeRuntimeProjectionRoot(path);
+    const manifestPath = join(path, ".claude", "pipeline.yaml");
+    const sourcePath = join(path, "pipeline.user.yaml");
+    unlinkSync(manifestPath);
+    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
+    let syncs = 0;
+    const result = applyProjectOnboardingManifestRepairV4({
+      rootDir: path,
+      planSha256: plan.planSha256,
+      activate: true,
+      deps: {
+        ...fakeDeps,
+        fsyncDirectory() {
+          syncs += 1;
+          if (syncs === 2) {
+            writeFileSync(sourcePath, `${readFileSync(sourcePath, "utf8")}# final-readback drift\n`);
+          }
+        },
+      },
+    });
+    assert.equal(result.status, "partial");
+    assertDiagnostic(result, "manifest_repair_source_changed_after_commit");
+    assert.equal(syncs, 2);
+    assert.equal(existsSync(manifestPath), false);
+  } finally { dispose(path); }
+});
+
+test("manifest repair atomically preserves a target that appears at publication", () => {
+  const path = root();
+  try {
+    initializeRuntimeProjectionRoot(path);
+    const manifestPath = join(path, ".claude", "pipeline.yaml");
+    unlinkSync(manifestPath);
+    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
+    let injected = false;
+    const result = applyProjectOnboardingManifestRepairV4({
+      rootDir: path,
+      planSha256: plan.planSha256,
+      activate: true,
+      deps: {
+        ...fakeDeps,
+        linkSync(source, target) {
+          if (!injected && String(target).endsWith("/pipeline.yaml")) {
+            injected = true;
+            writeFileSync(manifestPath, "foreign: publication race\n", { flag: "wx" });
+          }
+          linkSync(source, target);
+        },
+      },
+    });
+    assert.equal(result.status, "partial");
+    assert.equal(injected, true);
+    assert.equal(readFileSync(manifestPath, "utf8"), "foreign: publication race\n");
+  } finally { dispose(path); }
+});
+
+test("manifest repair never quarantines a foreign post-publication target", () => {
+  const path = root();
+  try {
+    initializeRuntimeProjectionRoot(path);
+    const manifestPath = join(path, ".claude", "pipeline.yaml");
+    unlinkSync(manifestPath);
+    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
+    let injected = false;
+    const result = applyProjectOnboardingManifestRepairV4({
+      rootDir: path,
+      planSha256: plan.planSha256,
+      activate: true,
+      deps: {
+        ...fakeDeps,
+        linkSync(source, target) {
+          linkSync(source, target);
+          if (!injected && String(target).endsWith("/pipeline.yaml")) {
+            injected = true;
+            unlinkSync(target);
+            writeFileSync(manifestPath, "foreign: post-publication swap\n", { flag: "wx" });
+          }
+        },
+      },
+    });
+    assert.equal(result.status, "partial");
+    assertDiagnostic(result, "manifest_repair_rollback_incomplete");
+    assert.equal(injected, true);
+    assert.equal(readFileSync(manifestPath, "utf8"), "foreign: post-publication swap\n");
+    assert.equal(
+      readdirSync(join(path, ".claude")).some((name) => name.startsWith(".pipeline-manifest-repair-quarantine-")),
+      false,
+    );
+  } finally { dispose(path); }
+});
+
+test("source recovery planner distinguishes invalid authority and unsupported runner transitions", () => {
+  const invalid = root(); const unsupported = root();
+  try {
+    writeFileSync(join(invalid, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+    const observedInvalid = inspectProjectOnboardingV3({ rootDir: invalid, deps: fakeDeps });
+    assert.equal(observedInvalid.status, "invalid");
+    assert.deepEqual(observedInvalid.nextAction.argv, [
+      ONBOARDING_SCRIPT,
+      "plan-source-recovery",
+      "--root",
+      invalid,
+          "--runner",
+      "codex",
+    ]);
+    const invalidPlan = planProjectOnboardingSourceRecoveryV4({ rootDir: invalid, deps: fakeDeps });
+    assert.equal(invalidPlan.status, "unrepairable");
+    assert.equal(invalidPlan.category, "invalid-authority");
+    assertDiagnostic(invalidPlan, "source_authority_unrepairable");
+
+    const seed = planProjectOnboardingV3({ rootDir: unsupported, deps: fakeDeps });
+    assert.equal(applyProjectOnboardingV3(seed, { rootDir: unsupported, activate: true, deps: fakeDeps }).status, "applied");
+    const sourcePath = join(unsupported, "pipeline.user.yaml");
+    writeFileSync(sourcePath, readFileSync(sourcePath, "utf8").replace(/default: "?codex"?/u, "default: \"claude\""));
+    const observedUnsupported = inspectProjectOnboardingV3({ rootDir: unsupported, deps: fakeDeps });
+    assert.equal(observedUnsupported.status, "runtime-initialization-required");
+    const unsupportedPlan = planProjectOnboardingSourceRecoveryV4({ rootDir: unsupported, deps: fakeDeps });
+    assert.equal(unsupportedPlan.status, "unrepairable");
+    assert.equal(unsupportedPlan.category, "unsupported-source-transition");
+    assertDiagnostic(unsupportedPlan, "source_runner_transition_unsupported");
+  } finally { dispose(invalid); dispose(unsupported); }
 });
 
 test("owned runtime drift and invalid V3 sources stay in closed lifecycle classifications", () => {
@@ -1766,7 +3547,7 @@ test("owned runtime drift and invalid V3 sources stay in closed lifecycle classi
     assertSingleLineAction(observedDrift.nextAction, {
       kind: "command",
       executable: "node",
-      argv: [ONBOARDING_SCRIPT, "plan-repair", "--root", drifted],
+      argv: [ONBOARDING_SCRIPT, "plan-repair", "--root", drifted, "--runner", "codex"],
       mutation: false,
       requiresConfirmation: false,
       expected: {
@@ -1780,7 +3561,491 @@ test("owned runtime drift and invalid V3 sources stay in closed lifecycle classi
     assert.equal(observedInvalid.status, "invalid");
     assert.equal(observedInvalid.runner, null);
     assert.equal(observedInvalid.diagnostics[0].code, "source_invalid");
+    assert.equal(observedInvalid.nextAction.argv[1], "plan-source-recovery");
   } finally { dispose(drifted); dispose(invalid); }
+});
+
+test("H3 recovery planners are typed, read-only, and closed on invalid source evidence", () => {
+  const path = root();
+  try {
+    const before = readdirSync(path);
+    const source = planProjectOnboardingSourceRecovery({ rootDir: path, deps: fakeDeps });
+    assert.equal(source.schema, "pipeline.project-onboarding-source-recovery.v1");
+    assert.equal(source.status, "unrepairable");
+    assert.equal(source.category, "invalid-authority");
+    assert.equal(source.nextAction, null);
+    const manifest = planProjectOnboardingManifestRepair({ rootDir: path, deps: fakeDeps });
+    assert.equal(manifest.schema, "pipeline.project-onboarding-manifest-repair-plan.v1");
+    assert.equal(manifest.status, "unrepairable");
+    assert.deepEqual(readdirSync(path), before);
+  } finally { dispose(path); }
+});
+
+test("H3 manifest repair uses a real V3 authority fixture and returns ready readback", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path, fakeDeps);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path, "H3 manifest repair ready readback", fakeDeps);
+    const ready = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, intent: "bootstrap" });
+    assert.equal(ready.status, "ready");
+    unlinkSync(join(path, ".claude", "pipeline.yaml"));
+    const before = names(path);
+    const plan = planProjectOnboardingManifestRepair({ rootDir: path, deps: fakeDeps });
+    assert.equal(plan.status, "ready");
+    assert.deepEqual(names(path), before);
+    const repeat = planProjectOnboardingManifestRepair({ rootDir: path, deps: fakeDeps });
+    assert.equal(repeat.planSha256, plan.planSha256);
+    const applied = applyProjectOnboardingManifestRepair({ rootDir: path, planSha256: plan.planSha256, activate: true, deps: fakeDeps });
+    assert.equal(applied.status, "ready", JSON.stringify(applied));
+    assert.equal(applied.readback.status, "ready");
+    assert.equal(inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, intent: "bootstrap" }).status, "ready");
+  } finally { dispose(path); }
+});
+
+function readyManifestFixture() {
+  const path = root();
+  const barrier = initializeRestartRequiredRoot(path, fakeDeps);
+  clearRuntimeBarrier(path, barrier);
+  completeKickoff(path, "H3 manifest repair authority", fakeDeps);
+  unlinkSync(join(path, ".claude", "pipeline.yaml"));
+  return path;
+}
+
+test("H3 manifest repair rejects wrong digest and missing activation without writes", () => {
+  const path = readyManifestFixture();
+  try {
+    const plan = planProjectOnboardingManifestRepair({ rootDir: path, deps: fakeDeps });
+    const before = names(path);
+    assert.equal(applyProjectOnboardingManifestRepair({ rootDir: path, planSha256: "0".repeat(64), activate: true, deps: fakeDeps }).status, "invalid-plan");
+    assert.equal(applyProjectOnboardingManifestRepair({ rootDir: path, planSha256: plan.planSha256, activate: false, deps: fakeDeps }).status, "activation-required");
+    assert.deepEqual(names(path), before);
+  } finally { dispose(path); }
+});
+
+test("H3 manifest repair preserves absent target after source drift and target appearance races", () => {
+  const drift = readyManifestFixture();
+  try {
+    const plan = planProjectOnboardingManifestRepair({ rootDir: drift, deps: fakeDeps });
+    writeFileSync(join(drift, "pipeline.user.yaml"), `${readFileSync(join(drift, "pipeline.user.yaml"), "utf8")}\n# drift\n`);
+    const result = applyProjectOnboardingManifestRepair({ rootDir: drift, planSha256: plan.planSha256, activate: true, deps: fakeDeps });
+    assert.equal(result.status, "invalid-plan");
+    assert.equal(existsSync(join(drift, ".claude", "pipeline.yaml")), false);
+  } finally { dispose(drift); }
+  for (const kind of ["file", "symlink", "hardlink"]) {
+    const path = readyManifestFixture();
+    try {
+      const plan = planProjectOnboardingManifestRepair({ rootDir: path, deps: fakeDeps });
+      const target = join(path, ".claude", "pipeline.yaml");
+      if (kind === "file") writeFileSync(target, "foreign\n");
+      else if (kind === "symlink") symlinkSync(join(path, "pipeline.user.yaml"), target);
+      else linkSync(join(path, "pipeline.user.yaml"), target);
+      const result = applyProjectOnboardingManifestRepair({ rootDir: path, planSha256: plan.planSha256, activate: true, deps: fakeDeps });
+      assert.equal(result.status, "invalid-plan");
+      assert.equal(lstatSync(target).isSymbolicLink(), kind === "symlink");
+    } finally { dispose(path); }
+  }
+});
+
+test("H3 manifest repair rolls back only owned output on fsync and publication races", () => {
+  const fsyncRoot = readyManifestFixture();
+  try {
+    const plan = planProjectOnboardingManifestRepair({ rootDir: fsyncRoot, deps: fakeDeps });
+    assert.equal(plan.status, "ready", JSON.stringify(plan));
+    const failing = { ...fakeDeps, fsyncSync() { throw new Error("injected fsync failure"); } };
+    const result = applyProjectOnboardingManifestRepair({ rootDir: fsyncRoot, planSha256: plan.planSha256, activate: true, deps: failing });
+    assert.equal(result.status, "rolled-back", JSON.stringify({
+      result,
+      planned: plan,
+      replanned: planProjectOnboardingManifestRepair({ rootDir: fsyncRoot, deps: failing }),
+    }));
+    assert.equal(existsSync(join(fsyncRoot, ".claude", "pipeline.yaml")), false);
+  } finally { dispose(fsyncRoot); }
+  const raceRoot = readyManifestFixture();
+  try {
+    const plan = planProjectOnboardingManifestRepair({ rootDir: raceRoot, deps: fakeDeps });
+    assert.equal(plan.status, "ready", JSON.stringify(plan));
+    const nativeLink = linkSync; const nativeLstat = lstatSync; let linked = false; let swapped = false;
+    const target = join(raceRoot, ".claude", "pipeline.yaml");
+    const race = {
+      ...fakeDeps,
+      linkSync(temp, destination) { nativeLink(temp, destination); linked = true; },
+      lstatSync(candidate) {
+        const info = nativeLstat(candidate);
+        if (linked && !swapped && candidate === target) {
+          swapped = true;
+          unlinkSync(candidate);
+          writeFileSync(candidate, "foreign publication\n");
+        }
+        return info;
+      },
+    };
+    const result = applyProjectOnboardingManifestRepair({ rootDir: raceRoot, planSha256: plan.planSha256, activate: true, deps: race });
+    assert.equal(result.status, "rolled-back", JSON.stringify({
+      result,
+      planned: plan,
+      replanned: planProjectOnboardingManifestRepair({ rootDir: raceRoot, deps: race }),
+    }));
+    assert.equal(readFileSync(join(raceRoot, ".claude", "pipeline.yaml"), "utf8"), "foreign publication\n");
+  } finally { dispose(raceRoot); }
+});
+
+test("H3 manifest repair fails closed on V4 readback failure and physical-root symlink", () => {
+  const path = readyManifestFixture();
+  try {
+    const plan = planProjectOnboardingManifestRepair({ rootDir: path, deps: fakeDeps });
+    assert.equal(plan.status, "ready", JSON.stringify(plan));
+    const failingReadback = { ...fakeDeps, inspectProjectOnboardingV3() { return { status: "partial", diagnostics: [] }; } };
+    const result = applyProjectOnboardingManifestRepair({ rootDir: path, planSha256: plan.planSha256, activate: true, deps: failingReadback });
+    assert.equal(result.status, "rolled-back", JSON.stringify({
+      result,
+      planned: plan,
+      replanned: planProjectOnboardingManifestRepair({ rootDir: path, deps: failingReadback }),
+    }));
+    assert.equal(existsSync(join(path, ".claude", "pipeline.yaml")), false);
+  } finally { dispose(path); }
+  const real = readyManifestFixture(); const link = `${real}-link`;
+  try {
+    symlinkSync(real, link);
+    const result = planProjectOnboardingManifestRepair({ rootDir: link, deps: fakeDeps });
+    assert.equal(result.status, "unrepairable");
+  } finally { dispose(real); try { unlinkSync(link); } catch {} }
+});
+
+test("H3 source recovery exposes authentic invalid, unsupported, and current categories", () => {
+  const invalid = root();
+  try { assert.equal(planProjectOnboardingSourceRecovery({ rootDir: invalid, deps: fakeDeps }).category, "invalid-authority"); } finally { dispose(invalid); }
+  const unsupported = root();
+  try {
+    writeFileSync(join(unsupported, "pipeline.user.yaml"), yaml(v0Source()));
+    assert.equal(planProjectOnboardingSourceRecovery({ rootDir: unsupported, deps: fakeDeps }).category, "unsupported-source-transition");
+  } finally { dispose(unsupported); }
+  const current = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(current, fakeDeps); clearRuntimeBarrier(current, barrier); completeKickoff(current, "H3 current authority", fakeDeps);
+    assert.equal(planProjectOnboardingSourceRecovery({ rootDir: current, deps: fakeDeps }).category, "current-authority");
+  } finally { dispose(current); }
+});
+
+test("H3 source recovery distinguishes stale generated projection from unavailable evidence", () => {
+  const stale = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(stale, fakeDeps);
+    clearRuntimeBarrier(stale, barrier);
+    completeKickoff(stale, "H3 stale projection authority", fakeDeps);
+    unlinkSync(join(stale, ".claude", "pipeline.yaml"));
+    const inspected = inspectProjectOnboardingV3({ rootDir: stale, deps: fakeDeps });
+    assert.notEqual(inspected.status, "ready", JSON.stringify(inspected));
+    const plan = planProjectOnboardingSourceRecovery({ rootDir: stale, deps: fakeDeps });
+    assert.equal(plan.category, "stale-generated-projection");
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.nextAction?.mutation, false);
+  } finally { dispose(stale); }
+
+  const unavailable = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(unavailable, fakeDeps);
+    clearRuntimeBarrier(unavailable, barrier);
+    completeKickoff(unavailable, "H3 unavailable evidence authority", fakeDeps);
+    const unavailableDeps = {
+      ...fakeDeps,
+      classifyOnboardingContinuity: () => ({
+        status: "damaged",
+        stateSha256: null,
+        handoverSha256: null,
+        historySha256: null,
+      }),
+    };
+    const inspected = inspectProjectOnboardingV3({ rootDir: unavailable, deps: unavailableDeps });
+    assert.equal(inspected.status, "continuity-damaged", JSON.stringify(inspected));
+    const plan = planProjectOnboardingSourceRecovery({ rootDir: unavailable, deps: unavailableDeps });
+    assert.equal(plan.category, "unavailable-evidence");
+    assert.equal(plan.status, "unrepairable");
+    assert.equal(plan.nextAction, null);
+  } finally { dispose(unavailable); }
+});
+
+function remoteAdoptionGitFixture({ includesCodex = false, includesAgents = false, failUpstreamBind = false } = {}) {
+  const oid = "a".repeat(40); const calls = [];
+  const spawn = (command, args, options = {}) => {
+    calls.push({ command, args: [...args], cwd: options.cwd });
+    if (command !== "git") return { status: 1, stderr: "unexpected program" };
+    const cwd = options.cwd;
+    if (args[0] === "ls-remote") return { status: 0, stdout: `${oid}\trefs/heads/remote-adoption\n`, stderr: "" };
+    if (args[0] === "init") {
+      mkdirSync(join(cwd, ".git", "objects"), { recursive: true });
+      mkdirSync(join(cwd, ".git", "refs"), { recursive: true });
+      writeFileSync(join(cwd, ".git", "HEAD"), "ref: refs/heads/main\n");
+      writeFileSync(join(cwd, ".git", "config"), "");
+      return { status: 0, stdout: "", stderr: "" };
+    }
+    if (args[0] === "remote" && args[1] === "add") {
+      writeFileSync(join(cwd, ".git", "config"), `[remote \"origin\"]\n\turl = ${args[3]}\n`);
+      return { status: 0, stdout: "", stderr: "" };
+    }
+    if (args[0] === "fetch") {
+      mkdirSync(join(cwd, ".git", "refs", "remotes", "origin"), { recursive: true });
+      writeFileSync(join(cwd, ".git", "refs", "remotes", "origin", "remote-adoption"), `${oid}\n`);
+      return { status: 0, stdout: "", stderr: "" };
+    }
+    if (args[0] === "rev-parse" && args[1] === "--is-inside-work-tree") return { status: 0, stdout: "true\n", stderr: "" };
+    if (args[0] === "rev-parse") return { status: 0, stdout: `${oid}\n`, stderr: "" };
+    if (args[0] === "ls-tree") return { status: 0, stdout: includesCodex ? ".codex/config.toml\n" : includesAgents ? ".agents/implementor.toml\n" : "pipeline.user.yaml\n", stderr: "" };
+    if (args[0] === "checkout") {
+      mkdirSync(join(cwd, ".git", "refs", "heads"), { recursive: true });
+      writeFileSync(join(cwd, ".git", "refs", "heads", "remote-adoption"), `${oid}\n`);
+      writeFileSync(join(cwd, ".git", "HEAD"), "ref: refs/heads/remote-adoption\n");
+      writeFileSync(join(cwd, "pipeline.user.yaml"), yaml(v0Source()));
+      return { status: 0, stdout: "", stderr: "" };
+    }
+    if (args[0] === "branch" && args[1] === "--set-upstream-to") {
+      if (failUpstreamBind) return { status: 1, stderr: "injected upstream failure" };
+      writeFileSync(join(cwd, ".git", "config"), `${readFileSync(join(cwd, ".git", "config"), "utf8")}[branch \"remote-adoption\"]\n\tremote = origin\n\tmerge = refs/heads/remote-adoption\n`);
+      return { status: 0, stdout: "", stderr: "" };
+    }
+    return { status: 1, stderr: `unexpected git ${args.join(" ")}` };
+  };
+  return { oid, calls, spawn };
+}
+
+test("remote branch adoption plans read-only, preserves .codex, and advances only to the branch authority migration", () => {
+  const target = root(); const fixture = remoteAdoptionGitFixture();
+  try {
+    mkdirSync(join(target, ".codex"));
+    writeFileSync(join(target, ".codex", "control.toml"), "reserved = true\n");
+    mkdirSync(join(target, ".agents"));
+    writeFileSync(join(target, ".agents", "control.toml"), "reserved = true\n");
+    const beforeCodex = lstatSync(join(target, ".codex"));
+    const beforeAgents = lstatSync(join(target, ".agents"));
+    const remoteDeps = { ...fakeDeps, spawnSync: fixture.spawn };
+    const plan = planProjectRemoteAdoptionV4({
+      rootDir: target, remote: "https://example.test/governed.git", ref: "refs/heads/remote-adoption", deps: remoteDeps,
+    });
+    assert.equal(plan.schema, "pipeline.project-onboarding-remote-adoption-plan.v1");
+    assert.equal(plan.status, "ready");
+    assert.deepEqual(names(target), [".agents", ".codex"], "planning must not seed or initialize the target");
+    assert.equal(plan.authority.status, "deferred-until-exact-branch-checkout");
+    assert.equal(plan.applyAction.mutation, true);
+    assert.equal(plan.applyAction.requiresConfirmation, true);
+    assert.equal(plan.applyAction.requiresHostBoundary, true);
+    const applied = applyProjectRemoteAdoptionV4({
+      rootDir: target, remote: "https://example.test/governed.git", ref: "refs/heads/remote-adoption",
+      planSha256: plan.planSha256, activate: true, deps: remoteDeps,
+    });
+    assert.equal(applied.status, "migration-required", JSON.stringify(applied));
+    assert.equal(readFileSync(join(target, ".git", "refs", "heads", "remote-adoption"), "utf8"), `${fixture.oid}\n`);
+    assert.match(readFileSync(join(target, ".git", "config"), "utf8"), /remote = origin/u);
+    assert.match(readFileSync(join(target, ".git", "config"), "utf8"), /merge = refs\/heads\/remote-adoption/u);
+    const afterCodex = lstatSync(join(target, ".codex"));
+    assert.equal(String(afterCodex.dev), String(beforeCodex.dev));
+    assert.equal(String(afterCodex.ino), String(beforeCodex.ino));
+    assert.equal(readFileSync(join(target, ".codex", "control.toml"), "utf8"), "reserved = true\n");
+    const afterAgents = lstatSync(join(target, ".agents"));
+    assert.equal(String(afterAgents.dev), String(beforeAgents.dev));
+    assert.equal(String(afterAgents.ino), String(beforeAgents.ino));
+    assert.equal(readFileSync(join(target, ".agents", "control.toml"), "utf8"), "reserved = true\n");
+    assert.equal(existsSync(join(target, "project", "state.json")), false);
+    assert.equal(existsSync(join(target, ".claude", "pipeline.json")), false);
+  } finally { dispose(target); }
+});
+
+test("remote adoption rejects a remote .agents and preserves the target control mount", () => {
+  const target = root(); const fixture = remoteAdoptionGitFixture({ includesAgents: true });
+  try {
+    mkdirSync(join(target, ".agents"));
+    writeFileSync(join(target, ".agents", "control.toml"), "reserved = true\n");
+    const before = lstatSync(join(target, ".agents"));
+    const remoteDeps = { ...fakeDeps, spawnSync: fixture.spawn };
+    const plan = planProjectRemoteAdoptionV4({
+      rootDir: target, remote: "https://example.test/governed.git", ref: "refs/heads/remote-adoption", deps: remoteDeps,
+    });
+    const applied = applyProjectRemoteAdoptionV4({
+      rootDir: target, remote: "https://example.test/governed.git", ref: "refs/heads/remote-adoption",
+      planSha256: plan.planSha256, activate: true, deps: remoteDeps,
+    });
+    assert.equal(applied.status, "remote-adoption-rolled-back", JSON.stringify(applied));
+    assert.deepEqual(names(target), [".agents"]);
+    const after = lstatSync(join(target, ".agents"));
+    assert.equal(String(after.dev), String(before.dev));
+    assert.equal(String(after.ino), String(before.ino));
+    assert.equal(readFileSync(join(target, ".agents", "control.toml"), "utf8"), "reserved = true\n");
+  } finally { dispose(target); }
+});
+
+test("remote adoption rejects a remote .codex and rolls back only its owned Git transaction", () => {
+  const target = root(); const fixture = remoteAdoptionGitFixture({ includesCodex: true });
+  try {
+    mkdirSync(join(target, ".codex"));
+    writeFileSync(join(target, ".codex", "control.toml"), "reserved = true\n");
+    const remoteDeps = { ...fakeDeps, spawnSync: fixture.spawn };
+    const plan = planProjectRemoteAdoptionV4({
+      rootDir: target, remote: "https://example.test/governed.git", ref: "refs/heads/remote-adoption", deps: remoteDeps,
+    });
+    const applied = applyProjectRemoteAdoptionV4({
+      rootDir: target, remote: "https://example.test/governed.git", ref: "refs/heads/remote-adoption",
+      planSha256: plan.planSha256, activate: true, deps: remoteDeps,
+    });
+    assert.equal(applied.status, "remote-adoption-rolled-back", JSON.stringify(applied));
+    assert.deepEqual(names(target), [".codex"]);
+    assert.equal(readFileSync(join(target, ".codex", "control.toml"), "utf8"), "reserved = true\n");
+  } finally { dispose(target); }
+});
+
+test("remote adoption rolls back the checked-out branch when its owned upstream bind fails", () => {
+  const target = root(); const fixture = remoteAdoptionGitFixture({ failUpstreamBind: true });
+  try {
+    mkdirSync(join(target, ".codex"));
+    writeFileSync(join(target, ".codex", "control.toml"), "reserved = true\n");
+    const remoteDeps = { ...fakeDeps, spawnSync: fixture.spawn };
+    const plan = planProjectRemoteAdoptionV4({
+      rootDir: target, remote: "https://example.test/governed.git", ref: "refs/heads/remote-adoption", deps: remoteDeps,
+    });
+    const applied = applyProjectRemoteAdoptionV4({
+      rootDir: target, remote: "https://example.test/governed.git", ref: "refs/heads/remote-adoption",
+      planSha256: plan.planSha256, activate: true, deps: remoteDeps,
+    });
+    assert.equal(applied.status, "remote-adoption-rolled-back", JSON.stringify(applied));
+    assert.deepEqual(names(target), [".codex"]);
+    assert.equal(existsSync(join(target, "pipeline.user.yaml")), false);
+  } finally { dispose(target); }
+});
+
+test("remote adoption refuses a normal initialized Git repository before remote observation", () => {
+  const target = root(); const fixture = remoteAdoptionGitFixture();
+  try {
+    mkdirSync(join(target, ".git", "objects"), { recursive: true });
+    mkdirSync(join(target, ".git", "refs"), { recursive: true });
+    writeFileSync(join(target, ".git", "HEAD"), "ref: refs/heads/main\n");
+    writeFileSync(join(target, ".git", "config"), "");
+    const planned = planProjectRemoteAdoptionV4({
+      rootDir: target, remote: "https://example.test/governed.git", ref: "refs/heads/remote-adoption",
+      deps: { ...fakeDeps, spawnSync: fixture.spawn },
+    });
+    assert.equal(planned.status, "target-not-fresh");
+    assert.equal(planned.diagnostics[0]?.code, "git_control_not_host_reserved");
+    assert.equal(fixture.calls.some(({ args }) => args[0] === "ls-remote"), false);
+  } finally { dispose(target); }
+});
+
+test("partial authority planner requires an explicit V3 selection and hashes preserved user projections", () => {
+  const path = root();
+  try {
+    mkdirSync(join(path, ".claude"));
+    writeFileSync(join(path, ".claude", "pipeline.json"), '{"project":"legacy"}\n');
+    mkdirSync(join(path, ".agents"));
+    writeFileSync(join(path, ".agents", "AGENTS.md"), "user-owned\n");
+    const missing = planProjectPartialAuthorityAdoption({ rootDir: path, deps: fakeDeps });
+    assert.equal(missing.status, "selection-required");
+    const planned = planProjectPartialAuthorityAdoption({ rootDir: path, profile: "epic", source: "canonical-fresh-v3", deps: fakeDeps });
+    assert.equal(planned.status, "ready");
+    assert.match(planned.planSha256, /^[a-f0-9]{64}$/u);
+    assert.deepEqual(planned.artifacts.map((entry) => entry.path), [".agents", ".claude"]);
+    assert.equal(planned.mutation, false);
+  } finally { dispose(path); }
+});
+
+test("partial authority apply creates only absent owned targets and preserves user projections", () => {
+  const path = root();
+  try {
+    mkdirSync(join(path, ".claude"));
+    writeFileSync(join(path, ".claude", "pipeline.json"), '{"project":"legacy"}\n');
+    mkdirSync(join(path, ".agents"));
+    writeFileSync(join(path, ".agents", "AGENTS.md"), "user-owned\n");
+    mkdirSync(join(path, ".codex"));
+    writeFileSync(join(path, ".codex", "hooks.json"), "user-owned\n");
+    const plan = planProjectPartialAuthorityAdoption({ rootDir: path, profile: "feature", source: "canonical-fresh-v3", deps: fakeDeps });
+    const applied = applyProjectPartialAuthorityAdoption({ rootDir: path, profile: "feature", source: "canonical-fresh-v3", planSha256: plan.planSha256, activate: true, deps: fakeDeps });
+    assert.equal(applied.status, "applied", JSON.stringify(applied));
+    assert.equal(existsSync(join(path, "pipeline.user.yaml")), true);
+    assert.equal(existsSync(join(path, ".claude", "pipeline.yaml")), true);
+    assert.equal(existsSync(join(path, "project", "pipeline.yaml")), true);
+    assert.equal(readFileSync(join(path, ".claude", "pipeline.json"), "utf8"), '{"project":"legacy"}\n');
+    assert.equal(readFileSync(join(path, ".agents", "AGENTS.md"), "utf8"), "user-owned\n");
+    assert.equal(readFileSync(join(path, ".codex", "hooks.json"), "utf8"), "user-owned\n");
+  } finally { dispose(path); }
+});
+
+test("reinstall quarantines only current V3 authority and leaves legacy calibration intact", () => {
+  const path = root();
+  try {
+    assert.equal(spawnSync("git", ["init", "--initial-branch=main"], { cwd: path }).status, 0);
+    const realDeps = { ...fakeDeps, spawnSync };
+    const portable = planProjectOnboardingV3({ rootDir: path, deps: realDeps });
+    assert.equal(applyProjectOnboardingV3(portable, { rootDir: path, activate: true, deps: realDeps }).status, "applied");
+    const runtime = planProjectOnboardingLifecycleV4({ rootDir: path, deps: realDeps, operation: "runtime" });
+    const runtimeDigest = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
+    assert.equal(applyProjectOnboardingLifecycleV4({ rootDir: path, deps: realDeps, operation: "runtime", planSha256: runtimeDigest, activate: true }).status, "restart-required");
+    const legacy = readFileSync(join(path, ".claude", "pipeline.json"), "utf8");
+    const plan = planProjectOnboardingReinstall({ rootDir: path, deps: realDeps });
+    assert.equal(plan.status, "ready", JSON.stringify(plan));
+    const applied = applyProjectOnboardingReinstall({ rootDir: path, planSha256: plan.planSha256, activate: true, deps: realDeps });
+    assert.equal(applied.status, "applied", JSON.stringify(applied));
+    assert.equal(existsSync(join(path, "pipeline.user.yaml")), false);
+    assert.equal(existsSync(join(path, ".claude", "pipeline.yaml")), false);
+    assert.equal(readFileSync(join(path, ".claude", "pipeline.json"), "utf8"), legacy);
+    assert.equal(existsSync(join(path, ".git", "agent-pipeline", "reinstall-quarantine", plan.planSha256, "receipt.json")), true);
+  } finally { dispose(path); }
+});
+
+test("resume hint is a post-seed, non-authoritative restart aid that fails open", () => {
+  const path = root();
+  const basis = { featureId: "kickoff-demo", planSha256: "a".repeat(64), specSha256: "b".repeat(64) };
+  const context = {
+    intent: "Build a two-level browser puzzle.",
+    scope: ["Static browser game", "Two short puzzles"],
+    constraints: ["No server or account", "Plugin installation is deferred"],
+    questions: ["Should fog obscure part of level two?"],
+  };
+  try {
+    assert.throws(() => captureResumeHint({ rootDir: path, context }), /RH-PROJECT-UNINITIALIZED/);
+    mkdirSync(join(path, "project"));
+    writeFileSync(join(path, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+    const hint = captureResumeHint({ rootDir: path, context, basis, createdAt: "2026-08-01T12:00:00.000Z" });
+    assert.equal(hint.nonAuthoritative, true);
+    assert.equal(inspectResumeHint({ rootDir: path, basis, now: Date.parse("2026-08-02T12:00:00.000Z") }).status, "available");
+    assert.equal(inspectResumeHint({ rootDir: path, basis: { ...basis, planSha256: "c".repeat(64) }, now: Date.parse("2026-08-02T12:00:00.000Z") }).status, "challenged-stale");
+    writeFileSync(join(path, "project", "resume-hint.json"), "not json\n");
+    assert.equal(inspectResumeHint({ rootDir: path, basis }).status, "ignored-invalid");
+    assert.equal(discardResumeHint({ rootDir: path }).status, "discarded");
+    assert.equal(discardResumeHint({ rootDir: path }).status, "absent");
+    assert.throws(() => captureResumeHint({ rootDir: path, context: { ...context, intent: "User: paste every command" } }), /RH-SCHEMA/);
+    assert.throws(() => captureResumeHint({ rootDir: path, context: { ...context, constraints: ["Use token sk-example"] } }), /RH-SCHEMA/);
+    assert.throws(() => captureResumeHint({ rootDir: path, context: { ...context, scope: ["Open /home/operator/private"] } }), /RH-SCHEMA/);
+    assert.throws(() => captureResumeHint({ rootDir: path, context: { ...context, scope: ["Review(/home/operator/private)"] } }), /RH-SCHEMA/);
+    const awsLikeLongTermKeyId = ["AKIA", "IOSFODNN7EXAMPLE"].join("");
+    const awsLikeTemporaryKeyId = ["ASIA", "IOSFODNN7EXAMPLE"].join("");
+    assert.throws(() => captureResumeHint({ rootDir: path, context: { ...context, constraints: [awsLikeLongTermKeyId] } }), /RH-SCHEMA/);
+    assert.throws(() => captureResumeHint({ rootDir: path, context: { ...context, constraints: [awsLikeTemporaryKeyId] } }), /RH-SCHEMA/);
+    assert.throws(() => captureResumeHint({ rootDir: path, context: { ...context, constraints: ["xASIAAAAAAAAAAAAAAAAA"] } }), /RH-SCHEMA/);
+    assert.throws(() => captureResumeHint({ rootDir: path, context: { ...context, questions: ["Use Ab9Qx2Lm8Vw4Ze7Rt1Yu?"] } }), /RH-SCHEMA/);
+    const helper = fileURLToPath(new URL("../scripts/resume-hint.mjs", import.meta.url));
+    const cardPath = join(path, "resume-card.json");
+    writeFileSync(cardPath, JSON.stringify(context));
+    const captured = spawnSync(process.execPath, [helper, "capture", "--root", path, "--card-file", cardPath], { encoding: "utf8" });
+    assert.equal(captured.status, 0, captured.stderr);
+    writeFileSync(cardPath, JSON.stringify({ ...context, constraints: ["Bearer sk-secret"] }));
+    const rejected = spawnSync(process.execPath, [helper, "capture", "--root", path, "--card-file", cardPath], { encoding: "utf8" });
+    assert.equal(rejected.status, 2);
+    assert.match(rejected.stderr, /RH-SCHEMA/);
+    assert.equal(rejected.stderr.includes("sk-secret"), false);
+  } finally { dispose(path); }
+});
+
+test("observation governance applies only to the Pipeline source checkout, never a fresh consumer", () => {
+  const consumer = root();
+  try {
+    assert.deepEqual(inspectObservationGovernanceBootstrap({ rootDir: consumer }), {
+      schema: "pipeline.observation-governance-bootstrap.v1", status: "not-applicable", sourceCheckout: false, checker: null,
+    });
+    const source = fileURLToPath(new URL("../../..", import.meta.url));
+    const observed = inspectObservationGovernanceBootstrap({ rootDir: source });
+    assert.equal(observed.status, "required");
+    assert.equal(observed.sourceCheckout, true);
+    const helper = fileURLToPath(new URL("../scripts/observation-governance-bootstrap.mjs", import.meta.url));
+    const invoked = spawnSync(process.execPath, [helper, "--root", consumer], { encoding: "utf8" });
+    assert.equal(invoked.status, 0, invoked.stderr);
+    assert.equal(JSON.parse(invoked.stdout).status, "not-applicable");
+  } finally { dispose(consumer); }
 });
 
 console.log(`\nproject-onboarding-v3: ${passed} passed, ${failures.length} failed`);

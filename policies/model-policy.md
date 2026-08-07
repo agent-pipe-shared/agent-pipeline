@@ -6,6 +6,12 @@
 
 This policy operationalizes the role-model matrix, the Ultracode/workflow rules, cache discipline, and the requirements around acceptEdits preconditions and cost telemetry from the project's own decision register (where one exists). On conflict, that decision register wins. The policy is deliberately **model-agnostic**: rules speak of role tiers (Design/Implement/Mechanic/Deep/Review/Advisor) — the Implement/Mechanic/Deep/Review dispatch tiers live in `pipeline.user.yaml` → `models.*`, the Design (orchestrator) and Advisor tiers are routed per session profile via `worktypes.*` — not product names; concrete model names appear only as the shipped default preset (Section 1).
 
+> **V3 supersession:** `pipeline.user.v3` routing and ADR-0047 supersede the
+> historical `worktypes`, `design-first|advisor|speed`, continuously active
+> Advisor and startup/Compact probe passages retained below. Current profiles
+> are `epic|feature|mini`; MP-26 below is the current Advisor rule. Bootstrap
+> performs only model-free capability preflight, and consultation is on demand.
+
 Sibling documents of this phase: `docs/operating-model.md` (roles, rituals, session lifecycle), `policies/tooling-policy.md` (version requirements, tooling radar), `harness/session-bootstrap.md` (session-start protocol), `docs/adr/` (formalization as ADRs).
 
 All rules carry IDs (**MP-xx**) and follow the pattern **Rule (must/must-not) → Why → How to check**.
@@ -214,22 +220,30 @@ Terminology: Ultracode is not an API effort level but a runtime setting — it s
 ### MP-26 — Advisor rules (optional second-opinion pattern)
 
 - **Must:**
-  (a) The advisor is used only when `worktypes.<profile>.advisor` is set to a model (not `off`) (or via a dated project exception) — default is `off` (see preset, Section 1).
-  (b) Advisor = Design-tier model class as second opinion, injected at judgment gates. If the advisor is chosen as project-wide standard operation (Design-tier orchestrator + advisor continuously active instead of only at specific points), that stays a REAL, deliberately made choice per project — never a silent auto-default.
-  (c) every telemetry line records advisor call count/cost share, as far as the provider's usage display exposes that.
-  (d) Goldfish/Critic briefings in advisor sessions carry an explicit "Do not consult the advisor" prohibition line where needed, until the project's own measurement data confirms the benefit.
-  (d2) the subagent model matrix stays UNTOUCHED: Goldfish/Critic always run on the tier model explicitly named in the dispatch (MP-02/MP-07) — advisor inheritance concerns only the availability of the advisor TOOL within a subagent, never its own model.
-  (d3) advisor hygiene NEVER presents a blind global advisor-off (that can silently kill parallel advisor sessions of other projects on the same machine). Order: (1) ask about parallel advisor sessions of other projects on this machine; (2) prefer a project-local off switch if the runtime offers one; (3) use a global advisor-off switch ONLY if no parallel session is affected; (4) if the ACTUAL advisor state diverges from the chosen profile's intended state, that's a mandatory question to the PO, never a silent correction.
-  (d4) after every context-compaction step (`/compact` or similar) in an advisor-active session, advisor availability MUST be actively checked and logged in the session record — compaction × advisor interaction is a known blind spot this check closes.
-  (e) the orchestrator SHOULD actively request advisor consultation at judgment gates (dispositions, readiness triage, incident decisions) instead of relying solely on model-driven timing.
-  (f) advisor effort is not separately configurable (it runs at the fixed Design-tier effort).
-  (g) **Advisor-outage workaround (hardened):** if an advisor call in an advisor-active session reports an error/`unavailable`, this order applies:
-  1. IMMEDIATE notification to the PO on the FIRST failure — never silently continue without the advisor.
-  2. **MANDATORY PRIMARY PATH, not an optional suggestion:** the orchestrator IMMEDIATELY dispatches a read-only advisor-consult subagent as a substitute (Design-tier model class, dispatch metadata `role=consult-advisor` — the bound fallback agent in this plugin is named `consult-advisor`, `plugins/pipeline-core/agents/consult-advisor.md`), EXACTLY one question per consult, no repo writes; the answer feeds the orchestrator's own judgment, never applied automatically.
-  3. In addition, NOT as an alternative, the orchestrator offers the PO a switch-block to an alternative advisor model as an OPTIONAL offer — the decision stays with the PO, never a unilateral orchestrator move.
-  **Explicit ban:** (i) silently omitting advisor consultation and (ii) a unilateral switch of the MAIN model in reaction to the advisor outage are NOT acceptable substitutes for step 2 — both were actually observed and are exactly the gap this hardening closes.
-- **Why:** advisor cost scales with context length (uncached full-conversation reads); without these guardrails the advisor pattern would undercut the cost discipline the tier matrix is meant to establish. The hygiene order (d3) prevents a blind global advisor-off from damaging neighboring sessions.
-- **How to check:** dispatch metadata and briefings show the prohibition line in advisor sessions where applicable; the telemetry line records advisor calls ("peculiarities"); the advisor-configuration bootstrap step checks the hygiene order including the mandatory question on divergence; session notes carry the post-compaction advisor check (d4); an advisor outage triggers the (g) notification within the same turn AND the consult-advisor dispatch within the same or the next turn — silently continuing without the advisor, or a unilateral model switch instead of the dispatch, is a bootstrap/process defect, not a judgment call.
+  (a) Bootstrap, restart, resume, re-entry and Compact perform only the
+  model-free Advisor capability preflight from ADR-0047. They launch no Advisor
+  child and consume no consultation budget.
+  (b) Consultation is on demand for exactly one concrete question, one
+  allowlisted reason and bounded evidence. A current
+  `pipeline.advisory-demand.v2` must bind question/evidence digests, candidate
+  and route policies before any model effect.
+  (c) Session lifecycle events, a configured route and consent alone are not
+  consultation triggers.
+  (d) The same `reuseKeySha256` is not consulted twice. Material question,
+  reason, evidence, candidate or route-policy drift requires a new demand.
+  (e) Goldfish/Critic remain on their explicitly dispatched tier model; an
+  Advisor never changes their model or supplies an implementation decision.
+  (f) Every actual call retains same-runner consent, isolation and sanitized
+  evidence rules and is recorded in telemetry where provider usage permits.
+  (g) An unavailable actual consultation is reported once; the Elephant
+  retains the judgment duty and does not automatically switch the main model,
+  create an unbound fallback or repeat an unchanged demand.
+- **Why:** configuration and consent establish a route, not a reason to spend
+  model time. The split eliminates startup/Compact latency while preserving a
+  bounded second opinion when a concrete decision benefits from it.
+- **How to check:** bootstrap evidence reports zero model effects and one
+  bounded capability state; consultation records show reason/digests/reuse,
+  and unchanged demand never produces another adapter attempt.
 
 ---
 
@@ -525,22 +539,32 @@ Begriffsklärung: Ultracode ist kein API-Effort-Level, sondern ein Runtime-Setti
 ### MP-26 — Advisor-Regeln (optionales Second-Opinion-Muster)
 
 - **Gebot:**
-  (a) Der Advisor wird nur genutzt, wenn `worktypes.<profile>.advisor` auf ein Modell gesetzt ist (nicht `off`) (oder per datierter Projekt-Ausnahme) — Default ist `off` (s. Preset, Abschnitt 1).
-  (b) Advisor = Design-Tier-Modellklasse als Second Opinion, injiziert an Urteils-Gates. Wird der Advisor als projektweiter Standard-Betrieb gewählt (Design-Tier-Orchestrator + Advisor durchgehend aktiv statt nur punktuell), bleibt das eine ECHTE, bewusst getroffene Wahl je Projekt — niemals ein stiller Auto-Default.
-  (c) Jede Telemetrie-Zeile erfasst Advisor-Aufrufzahl/-Kostenanteil, soweit die Nutzungsanzeige des Providers das ausweist.
-  (d) Goldfish-/Critic-Briefings in Advisor-Sessions tragen bei Bedarf eine explizite Verbotszeile „Do not consult the advisor", bis eigene Messdaten den Nutzen bestätigen.
-  (d2) Die Subagent-Modell-Matrix bleibt UNANGETASTET: Goldfish/Critic laufen immer auf dem im Dispatch explizit genannten Tier-Modell (MP-02/MP-07) — Advisor-Vererbung betrifft ausschließlich die Verfügbarkeit des Advisor-TOOLS innerhalb eines Subagenten, nie dessen eigenes Modell.
-  (d3) Advisor-Hygiene präsentiert NIE blind ein globales Advisor-Aus (das kann parallele Advisor-Sessions anderer Projekte auf derselben Maschine stumm beenden). Reihenfolge: (1) nach parallelen Advisor-Sessions anderer Projekte auf dieser Maschine fragen; (2) einen projekt-lokalen Off-Schalter bevorzugen, falls die Runtime einen anbietet; (3) einen globalen Advisor-Aus-Schalter NUR nutzen, wenn keine parallele Session betroffen ist; (4) weicht der TATSÄCHLICHE Advisor-Zustand vom beabsichtigten Zustand des gewählten Profils ab, ist das eine Pflichtfrage an den PO, keine stille Korrektur.
-  (d4) Nach jedem Kontext-Kompaktierungsschritt (`/compact` o. Ä.) in einer Advisor-aktiven Session MUSS die Advisor-Verfügbarkeit aktiv geprüft und im Session-Protokoll notiert werden — Kompaktierung × Advisor-Wechselwirkung ist ein bekannter blinder Fleck, den diese Prüfpflicht schließt.
-  (e) Der Orchestrator SOLLTE Advisor-Konsultation an Urteils-Gates aktiv anfordern (Dispositionen, Readiness-Triage, Inzident-Entscheide) statt sich allein auf modellgesteuertes Timing zu verlassen.
-  (f) Advisor-Effort ist nicht separat konfigurierbar (er läuft auf dem festen Design-Tier-Effort).
-  (g) **Advisor-Ausfall-Workaround (gehärtet):** Meldet ein Advisor-Aufruf in einer Advisor-aktiven Session einen Fehler/`unavailable`, gilt in dieser Reihenfolge:
-  1. SOFORT-Meldung an den PO beim ERSTEN Fehlschlag — nie stilles Weiterlaufen ohne Advisor.
-  2. **PFLICHT-PRIMÄRPFAD, kein optionaler Vorschlag:** der Orchestrator dispatcht UNMITTELBAR einen read-only Advisor-Consult-Subagenten als Ersatz (Design-Tier-Modellklasse, Dispatch-Metadaten `role=consult-advisor` — der gebundene Fallback-Agent heißt in diesem Plugin `consult-advisor`, `plugins/pipeline-core/agents/consult-advisor.md`), GENAU eine Frage je Consult, keine Repo-Schreibzugriffe; die Antwort fließt in das Orchestrator-Urteil ein, wird nie automatisch angewandt.
-  3. Zusätzlich, NICHT alternativ, bietet der Orchestrator dem PO einen Umschalt-Block auf ein alternatives Advisor-Modell als OPTIONALES ANGEBOT an — Entscheidung liegt beim PO, kein Orchestrator-Alleingang.
-  **Verbot (explizit):** (i) stilles Weglassen der Advisor-Konsultation und (ii) ein einseitiger Wechsel des HAUPTMODELLS als Reaktion auf den Advisor-Ausfall sind KEINE zulässigen Ersatzhandlungen für Schritt 2 — beide wurden real beobachtet und sind genau die Lücke, die diese Härtung schließt.
-- **Warum:** Advisor-Kosten skalieren mit der Kontextlänge (ungecachte Full-Conversation-Reads); ohne diese Leitplanken würde das Advisor-Muster die Kostendisziplin unterlaufen, die die Tier-Matrix herstellen soll. Die Hygiene-Reihenfolge (d3) verhindert, dass ein blindes globales Advisor-Aus Nachbarsessions beschädigt.
-- **Prüfweise:** Dispatch-Metadaten und Briefings zeigen die Verbotszeile in Advisor-Sessions, wo zutreffend; Telemetrie-Zeile weist Advisor-Aufrufe aus („Besonderheiten"); der Bootstrap-Schritt zur Advisor-Konfiguration prüft die Hygiene-Reihenfolge inkl. der Pflichtfrage bei Divergenz; Session-Notizen tragen den Post-Kompaktierungs-Advisor-Check (d4); ein Advisor-Ausfall löst binnen desselben Turns die (g)-Meldung UND binnen desselben oder des nächsten Turns den Consult-Advisor-Dispatch aus — stilles Weiterlaufen ohne Advisor, oder ein einseitiger Modellwechsel statt des Dispatches, ist ein Bootstrap-/Prozessfehler, kein Judgment Call.
+  (a) Bootstrap, Restart, Resume, Re-entry und Compact führen ausschließlich
+  den modellfreien Advisor-Capability-Preflight aus ADR-0047 aus. Sie starten
+  kein Advisor-Kind und verbrauchen kein Consultation-Budget.
+  (b) Consultation läuft on demand für genau eine konkrete Frage, einen
+  erlaubten Grund und begrenzte Evidenz. Vor jedem Modelleffekt bindet ein
+  aktueller `pipeline.advisory-demand.v2` Frage-/Evidenz-Digests, Kandidat und
+  Route-Policies.
+  (c) Session-Lifecycle-Ereignisse, konfigurierte Route und Consent allein sind
+  keine Consultation-Trigger.
+  (d) Derselbe `reuseKeySha256` wird nicht zweimal konsultiert. Materieller
+  Drift bei Frage, Grund, Evidenz, Kandidat oder Route-Policy verlangt einen
+  neuen Demand.
+  (e) Goldfish/Critic bleiben auf dem explizit dispatchten Tier-Modell; ein
+  Advisor ändert weder ihr Modell noch liefert er eine Implementierungsentscheidung.
+  (f) Jeder echte Aufruf behält Same-Runner-Consent, Isolation und sanitierte
+  Evidenzregeln und erscheint in der Telemetrie, soweit der Provider dies zeigt.
+  (g) Eine nicht verfügbare echte Consultation wird einmal gemeldet; der
+  Elephant behält die Urteilspflicht und wechselt weder automatisch das
+  Hauptmodell noch erzeugt er einen ungebundenen Fallback oder wiederholt einen
+  unveränderten Demand.
+- **Warum:** Konfiguration und Consent schaffen eine Route, keinen Grund für
+  Modellausgaben. Die Trennung entfernt Start-/Compact-Latenz und bewahrt die
+  begrenzte zweite Meinung für konkrete Entscheidungen.
+- **Prüfweise:** Bootstrap-Evidenz meldet null Modelleffekte und einen
+  begrenzten Capability-Zustand; Consultation-Records zeigen Grund, Digests und
+  Reuse, und unveränderter Demand erzeugt keinen weiteren Adapterversuch.
 
 ---
 

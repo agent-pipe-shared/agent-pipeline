@@ -62,7 +62,11 @@ const VERSIONLESS_MANIFEST = `${JSON.stringify({
 }, null, 2)}\n`;
 const HOST_PLUGIN_VERSION = "1.2.3-test.1";
 
-function codexHostSpawn(path, version = HOST_PLUGIN_VERSION) {
+function codexHostSpawn(path, version = HOST_PLUGIN_VERSION, marketplaceSource = undefined) {
+  const marketplace = marketplaceSource ?? {
+    sourceType: "git",
+    source: "https://example.test/public-core.git",
+  };
   const spawnSync = () => ({
     status: 0,
     signal: null,
@@ -75,7 +79,7 @@ function codexHostSpawn(path, version = HOST_PLUGIN_VERSION) {
         installed: true,
         enabled: true,
         source: { source: "local", path },
-        marketplaceSource: { sourceType: "git", source: "https://example.test/public-core.git" },
+        marketplaceSource: marketplace,
         installPolicy: "AVAILABLE",
         authPolicy: "ON_INSTALL",
       }],
@@ -190,6 +194,26 @@ test("accepts one physical source root as the installed development root", (t) =
   const result = observePublicCoreIdentity(repo.input({ installedPluginRoot: repo.sourcePluginRoot }));
   assert.equal(result.status, "ready", JSON.stringify(result));
   assert.match(result.plugin.contentSha256, /^[0-9a-f]{64}$/u);
+});
+
+test("local Codex marketplace symlink resolves to the physical Git source before attestation", (t) => {
+  const repo = fixture();
+  t.after(repo.cleanup);
+  if (!symlinkCapable) return;
+  const marketplaceRoot = join(repo.base, "marketplace");
+  const logicalPluginRoot = join(marketplaceRoot, "plugins", "pipeline-core");
+  mkdirSync(dirname(logicalPluginRoot), { recursive: true });
+  symlinkSync(repo.sourcePluginRoot, logicalPluginRoot);
+
+  const result = observeCodexPublicCoreIdentity(
+    repo.input(),
+    codexHostSpawn(logicalPluginRoot, HOST_PLUGIN_VERSION, {
+      sourceType: "local",
+      source: marketplaceRoot,
+    }),
+  );
+  assert.equal(result.status, "ready", JSON.stringify(result));
+  assert.equal(result.candidate.commit, git(repo.sourceRoot, ["rev-parse", "HEAD"]));
 });
 
 test("accepts a versionless Codex manifest only with a typed host plugin-list version", (t) => {

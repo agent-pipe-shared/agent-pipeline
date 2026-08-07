@@ -37,6 +37,7 @@ export const PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES = Object.freeze([
 ]);
 
 const INTENTS = new Set(["onboarding", "bootstrap", "session", "dispatch"]);
+const RUNNERS = new Set(["claude", "codex"]);
 const NON_READY_STATUSES = new Set(PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES);
 const RESULT_KEYS = [
   "appServer",
@@ -91,11 +92,26 @@ function safeLifecycleStatus(value) {
 export function requireProjectOnboardingReady({
   rootDir,
   intent,
+  runner,
   inspect = inspectProjectOnboardingV3,
 } = {}) {
   if (!INTENTS.has(intent)) {
     fail("PORG-INTENT", "Project onboarding readiness requires an exact lifecycle intent.", { intent: null });
   }
+
+  // Session/runner identity is threaded explicitly (ADR-0051): every caller
+  // resolves its own runner at its own boundary (CLI flag, spawn argv, etc.)
+  // and passes it in. This shared gate never infers or defaults a runner
+  // itself -- no ambient-environment read here, by design. Reading an
+  // ambient session marker is legitimate only at a CLI entry boundary that
+  // then carries the value forward explicitly (see
+  // pipeline-start-preflight.mjs); doing it inside a shared admission gate
+  // let a stray inherited marker silently reassign which runner's exemptions
+  // applied (backlog: ready-gate-env-var-runner-authority).
+  if (typeof runner !== "string" || !RUNNERS.has(runner)) {
+    fail("PORG-RUNNER", "Project onboarding readiness requires an explicit, valid runner.", { intent });
+  }
+  const resolvedRunner = runner;
 
   let physicalRoot;
   try {
@@ -111,7 +127,7 @@ export function requireProjectOnboardingReady({
 
   let observed;
   try {
-    observed = inspect({ rootDir, intent });
+    observed = inspect({ rootDir, intent, runner: resolvedRunner });
   } catch {
     fail(
       "PORG-OBSERVATION-UNAVAILABLE",
@@ -147,7 +163,7 @@ export function requireProjectOnboardingReady({
     );
   }
 
-  if (observed.runner !== "codex"
+  if (observed.runner !== resolvedRunner
     || !plainObject(observed.repository)
     || !plainObject(observed.runtime)
     || !plainObject(observed.continuity)

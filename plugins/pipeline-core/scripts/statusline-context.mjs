@@ -65,7 +65,7 @@
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 // ---- small numeric helper (pure) -----------------------------------------------------------
 function toFiniteNumber(v) {
@@ -252,6 +252,6 @@ export function run() {
 
 // Only auto-run when executed directly (`node statusline-context.mjs`), never on import
 // (the test file imports the functions above without triggering the real CLI/exit).
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectInvocation(import.meta.url)) {
   run();
 }

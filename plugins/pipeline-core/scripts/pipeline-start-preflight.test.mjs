@@ -5,26 +5,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  freshnessHostActionForPreflight, installedPipelineIdentity, installedPipelineVersion, observePipelineStartPreflight as observeActual,
-  pipelineStartPreflightExitCode, SCHEMA,
+  installedPipelineIdentity, installedPipelineVersion, observePipelineStartPreflight,
+  normalBootstrapPayloadReceipt, pipelineStartPreflightExitCode, SCHEMA,
 } from "./pipeline-start-preflight.mjs";
 
 const manifest = JSON.stringify({ version: "0.4.5+test" });
-const source = (status = "ready", selectedPluginVersion = "0.4.5+test") => ({
-  schema: "pipeline.codex-ruleset-source-observation.v1",
-  status,
-  observation: status === "ready" ? {
-    schema: "pipeline.ruleset-source.v1",
-    runner: "codex",
-    selectedPlugin: { id: "pipeline-core@agent-pipeline", version: selectedPluginVersion },
-    source: { class: "marketplace-public" },
-    loadedIdentity: { status: "available", algorithm: "git-sha1", value: "a".repeat(40) },
-    installedIdentity: { status: "available", algorithm: "git-sha1", value: "a".repeat(40) },
-  } : null,
-});
-function observePipelineStartPreflight(options) {
-  return observeActual({ observeRulesetSource: () => source(), ...options });
-}
 const pluginList = (
   version = "0.4.5+test",
   sourceType = "git",
@@ -50,6 +35,31 @@ const pluginList = (
   available: [],
 });
 
+const claudeManifest = JSON.stringify({ version: "0.5.2+claude.test" });
+const claudePluginList = (
+  version = "0.5.2+claude.test",
+  id = "pipeline-core@agent-pipeline-local",
+) => () => JSON.stringify([{
+  id,
+  version,
+  scope: "local",
+  enabled: true,
+  installPath: "/cache/claude/plugins/cache/agent-pipeline-local/pipeline-core",
+  installedAt: "2026-08-05T21:06:31.445Z",
+  lastUpdated: "2026-08-05T21:06:31.445Z",
+  projectPath: "/projects/current",
+}]);
+const claudeKnownMarketplaces = (
+  marketplaceName = "agent-pipeline-local",
+  path = "/repo",
+) => () => JSON.stringify({
+  [marketplaceName]: {
+    source: { source: "directory", path },
+    installLocation: path,
+    lastUpdated: "2026-08-05T21:05:40.967Z",
+  },
+});
+
 test("preflight reports exact identity and no-handoff without secret fields", () => {
   const cwd = "/projects/current";
   const result = observePipelineStartPreflight({
@@ -59,8 +69,8 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
     cwd,
   });
   assert.deepEqual(Object.keys(result).sort(), [
-    "executionBoundary", "freshnessHostBinding", "handoff", "installedSource", "installedVersion",
-    "nextAction", "pluginRoot", "rulesetSource", "schema", "status", "version",
+    "bootstrapPayload", "executionBoundary", "handoff", "installedSource", "installedVersion",
+    "nextAction", "pluginRoot", "schema", "status", "version",
   ]);
   assert.equal(result.schema, SCHEMA);
   assert.equal(result.status, "ready");
@@ -68,9 +78,14 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
   assert.equal(result.installedVersion, "0.4.5+test");
   assert.equal(result.installedSource, "remote");
   assert.equal(result.executionBoundary, "default");
-  assert.equal(result.freshnessHostBinding, null);
   assert.equal(result.handoff, "none");
-  assert.deepEqual(result.rulesetSource, { status: "ready", observation: source().observation });
+  assert.equal(result.bootstrapPayload.schema, "pipeline.bootstrap-payload-receipt.v1");
+  assert.equal(result.bootstrapPayload.mode, "normal");
+  assert.deepEqual(result.bootstrapPayload.retainedChecks, [
+    "lifecycle", "authority", "calibration", "handover", "verify", "continuation",
+  ]);
+  assert.equal(result.bootstrapPayload.originalMeasurement.withinBudget, true);
+  assert.match(result.bootstrapPayload.originalMeasurement.digestSha256, /^[a-f0-9]{64}$/u);
   assert.deepEqual(result.nextAction, {
     kind: "command",
     executable: "node",
@@ -81,6 +96,8 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
       cwd,
       "--intent",
       "bootstrap",
+      "--runner",
+      "codex",
     ],
     mutation: false,
     requiresConfirmation: false,
@@ -89,6 +106,36 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
       schema: "pipeline.project-onboarding.v4",
     },
   });
+});
+
+test("preflight declares the Claude runner when CLAUDECODE marks the session", () => {
+  const cwd = "/projects/current";
+  const result = observePipelineStartPreflight({
+    env: { CLAUDECODE: "1" },
+    pluginList: pluginList(),
+    read: () => manifest,
+    cwd,
+  });
+  assert.deepEqual(result.nextAction.argv.slice(-2), ["--runner", "claude"]);
+});
+
+test("preflight keeps the Codex runner default for any non-Claude-Code session", () => {
+  for (const env of [{}, { CLAUDECODE: "0" }, { CLAUDECODE: "true" }]) {
+    const result = observePipelineStartPreflight({
+      env,
+      pluginList: pluginList(),
+      read: () => manifest,
+      cwd: "/projects/current",
+    });
+    assert.deepEqual(result.nextAction.argv.slice(-2), ["--runner", "codex"], JSON.stringify(env));
+  }
+});
+
+test("normal bootstrap receipt retains exact envelope measurement and over-budget state", () => {
+  const receipt = normalBootstrapPayloadReceipt({ schema: "test", payload: "x".repeat(15_001) });
+  assert.equal(receipt.overBudget, true);
+  assert.equal(receipt.truncated, false);
+  assert.equal(receipt.originalMeasurement.withinBudget, false);
 });
 
 test("preflight selects one host-authorized capability boundary for WSL", () => {
@@ -105,42 +152,7 @@ test("preflight selects one host-authorized capability boundary for WSL", () => 
     assert.equal(result.executionBoundary, "host-authorized-wsl");
     assert.equal(result.nextAction.executionBoundary, "host-authorized-wsl");
     assert.equal(result.nextAction.argv[3], "/projects/wsl");
-    const freshness = freshnessHostActionForPreflight(result);
-    assert.deepEqual(freshness, {
-      executionBoundary: "host-authorized-wsl",
-      boundaryId: "pipeline-start-host-authorized-wsl",
-      preflightSha256: freshness.preflightSha256,
-    });
-    assert.match(freshness.preflightSha256, /^[0-9a-f]{64}$/u);
-    assert.deepEqual(result.freshnessHostBinding, freshness);
-    assert.equal(JSON.stringify(freshness).includes("/projects/wsl"), false);
-    assert.equal(JSON.stringify(freshness).includes(result.pluginRoot), false);
   }
-});
-
-test("a sandbox preflight routes WSL without observing host control identity", () => {
-  let observations = 0;
-  const result = observeActual({
-    env: { WSL_DISTRO_NAME: "Ubuntu" },
-    pluginList: pluginList(),
-    read: () => manifest,
-    observeRulesetSource: () => source(),
-    observeHostControl() { observations += 1; return { status: "ready" }; },
-  });
-  assert.equal(result.status, "ready");
-  assert.equal(result.executionBoundary, "host-authorized-wsl");
-  assert.equal(observations, 0);
-  assert.equal(JSON.stringify(result).includes("daemonIdentity"), false);
-});
-
-test("default-boundary preflight exposes no freshness host action", () => {
-  const result = observePipelineStartPreflight({
-    env: {},
-    pluginList: pluginList(),
-    read: () => manifest,
-  });
-  assert.equal(freshnessHostActionForPreflight(result), null);
-  assert.equal(freshnessHostActionForPreflight({ ...result, status: "plugin-refresh-required" }), null);
 });
 
 test("preflight distinguishes complete and malformed handoff by presence only", () => {
@@ -248,52 +260,6 @@ test("unavailable registry remains non-blocking when the loaded identity is cohe
   }
 });
 
-test("preflight binds the normalized Codex observation and fails closed on its disagreement", () => {
-  const ready = observeActual({
-    env: {},
-    pluginList: pluginList(),
-    read: () => manifest,
-    observeRulesetSource: () => source(),
-  });
-  assert.equal(ready.status, "ready");
-  assert.equal(ready.rulesetSource.observation.source.class, "marketplace-public");
-  assert.equal(JSON.stringify(ready).includes("/cache/agent-pipeline"), false);
-
-  for (const status of ["loaded-installed-mismatch", "self-application-unattested", "codex-plugin-list-unavailable"]) {
-    const rejected = observeActual({
-      env: {},
-      pluginList: pluginList(),
-      read: () => manifest,
-      observeRulesetSource: () => source(status),
-    });
-    assert.equal(rejected.status, "plugin-refresh-required");
-    assert.deepEqual(rejected.rulesetSource, { status, observation: null });
-    assert.equal(rejected.nextAction, null);
-  }
-});
-
-test("a ready source observation with a mismatched selected plugin version requires refresh", () => {
-  const result = observeActual({
-    env: {},
-    pluginList: pluginList(),
-    read: () => manifest,
-    observeRulesetSource: () => source("ready", "0.4.5+other"),
-  });
-  assert.equal(result.status, "plugin-refresh-required");
-  assert.equal(result.nextAction, null);
-});
-
-test("a ready source observation with an exact selected plugin version remains ready", () => {
-  const result = observeActual({
-    env: {},
-    pluginList: pluginList(),
-    read: () => manifest,
-    observeRulesetSource: () => source("ready", "0.4.5+test"),
-  });
-  assert.equal(result.status, "ready");
-  assert.notEqual(result.nextAction, null);
-});
-
 test("installed version accepts only one exact enabled Agent-Pipeline entry", () => {
   assert.equal(installedPipelineVersion(pluginList()), "0.4.5+test");
   for (const invalid of [
@@ -331,4 +297,126 @@ test("missing or malformed manifest fails identity closed", () => {
     assert.equal(result.version, null);
     assert.equal(pipelineStartPreflightExitCode(result), 2);
   }
+});
+
+test("a Claude session reads the Claude source manifest, never the Codex one", () => {
+  const result = observePipelineStartPreflight({
+    env: { CLAUDECODE: "1" },
+    pluginList: () => JSON.stringify([]),
+    read: (path) => {
+      if (String(path).endsWith(".claude-plugin/plugin.json")) return claudeManifest;
+      throw new Error(`unexpected manifest path for the Claude runner: ${path}`);
+    },
+    cwd: "/projects/current",
+  });
+  assert.equal(result.version, "0.5.2+claude.test");
+});
+
+test("a non-Claude-Code session still reads the Codex source manifest, never the Claude one", () => {
+  const result = observePipelineStartPreflight({
+    env: {},
+    pluginList: pluginList(),
+    read: (path) => {
+      if (String(path).endsWith(".codex-plugin/plugin.json")) return manifest;
+      throw new Error(`unexpected manifest path for the Codex runner: ${path}`);
+    },
+    cwd: "/projects/current",
+  });
+  assert.equal(result.version, "0.4.5+test");
+});
+
+test("a Claude bare-array registry resolves an attested local-development installation", () => {
+  const result = observePipelineStartPreflight({
+    env: { CLAUDECODE: "1" },
+    pluginList: claudePluginList(),
+    knownMarketplaces: claudeKnownMarketplaces(),
+    read: () => claudeManifest,
+    cwd: "/projects/current",
+  });
+  assert.equal(result.status, "ready");
+  assert.equal(result.installedVersion, "0.5.2+claude.test");
+  assert.equal(result.installedSource, "local-development");
+  assert.deepEqual(
+    installedPipelineIdentity(claudePluginList(), "claude", claudeKnownMarketplaces()),
+    { version: "0.5.2+claude.test", source: "local-development" },
+  );
+});
+
+test("a Claude registry with two eligible entries fails closed as ambiguous", () => {
+  const both = () => JSON.stringify([
+    { id: "pipeline-core@agent-pipeline-local", version: "0.5.2+claude.a", scope: "local", enabled: true },
+    { id: "pipeline-core@agent-pipeline", version: "0.5.1+claude.b", scope: "local", enabled: true },
+  ]);
+  assert.deepEqual(
+    installedPipelineIdentity(both, "claude", claudeKnownMarketplaces()),
+    { version: null, source: "unknown", ambiguous: true },
+  );
+  const result = observePipelineStartPreflight({
+    env: { CLAUDECODE: "1" },
+    pluginList: both,
+    knownMarketplaces: claudeKnownMarketplaces(),
+    read: () => claudeManifest,
+  });
+  assert.equal(result.status, "plugin-refresh-required");
+  assert.equal(result.installedVersion, null);
+  assert.equal(result.installedSource, "unknown");
+});
+
+test("a malformed, non-array, or empty Claude registry yields no identity without crashing", () => {
+  for (const invalid of [
+    () => { throw new Error("unavailable"); },
+    () => "{",
+    () => JSON.stringify({}),
+    () => JSON.stringify([]),
+  ]) {
+    assert.equal(installedPipelineIdentity(invalid, "claude", claudeKnownMarketplaces()), null);
+    const result = observePipelineStartPreflight({
+      env: { CLAUDECODE: "1" },
+      pluginList: invalid,
+      knownMarketplaces: claudeKnownMarketplaces(),
+      read: () => claudeManifest,
+    });
+    assert.equal(result.status, "ready");
+    assert.equal(result.installedVersion, null);
+    assert.equal(result.installedSource, "unknown");
+  }
+});
+
+test("a Claude version mismatch between loaded and installed identity requires refresh", () => {
+  const result = observePipelineStartPreflight({
+    env: { CLAUDECODE: "1" },
+    pluginList: claudePluginList("0.5.2+claude.other"),
+    knownMarketplaces: claudeKnownMarketplaces(),
+    read: () => claudeManifest,
+  });
+  assert.equal(result.status, "plugin-refresh-required");
+  assert.equal(result.version, "0.5.2+claude.test");
+  assert.equal(result.installedVersion, "0.5.2+claude.other");
+  assert.equal(pipelineStartPreflightExitCode(result), 0);
+});
+
+test("the Claude local-development id is accepted only from an attested directory-source marketplace", () => {
+  for (const knownMarketplaces of [
+    claudeKnownMarketplaces("agent-pipeline-local", "relative/path"),
+    () => JSON.stringify({ "agent-pipeline-local": { source: { source: "github", path: "/repo" } } }),
+    () => JSON.stringify({}),
+    () => JSON.stringify({ "agent-pipeline-local": { source: { source: "directory", path: "/repo/./x/.." } } }),
+    () => { throw new Error("registry unavailable"); },
+    () => "{",
+  ]) {
+    assert.equal(
+      installedPipelineIdentity(claudePluginList(), "claude", knownMarketplaces),
+      null,
+    );
+  }
+});
+
+test("a non-local Claude installation id reports unknown source without touching the host marketplace registry", () => {
+  const officialList = claudePluginList("0.5.2+claude.test", "pipeline-core@agent-pipeline");
+  assert.deepEqual(
+    installedPipelineIdentity(officialList, "claude", () => {
+      throw new Error("must not read the host marketplace registry for a non-local id");
+    }),
+    { version: "0.5.2+claude.test", source: "unknown" },
+  );
 });

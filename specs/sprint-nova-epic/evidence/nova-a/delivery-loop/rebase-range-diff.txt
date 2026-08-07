@@ -1,0 +1,62 @@
+Nova v0.4.7 adoption replay map
+old range: 9d1b3dc108eb77629ace5b82002120f5539abd8d..480f2f7091990da06924e33c280b47dcc7921fa8
+new range: 89cb12b99e3fd86ac44878d0c23b278f00538921..94a4904a13518bed4b060ad89a17f3ba2bb36cb3
+command: git range-diff --no-patch --abbrev=40 <old-range> <new-range>
+
+ 1:  5aae0b5280bc0f8e2706781b344b981b9ce42ef3 !  1:  120dbcbd7d22dab7f2e170ec485d0916fac3fbc8 fix(nova): deliver v0.4.6 recovery candidate
+ 2:  8701961679fe281741eba8fd33901a9af3b9f084 !  2:  9b9779cabbd84a674a165b4d6fa9e0de2de6d43c fix(nova): bind runtime fixture executable
+ 3:  ddd0d6ab89ba7579d28d4b4273feb7896b35f10c =  3:  2491ff416cdf367244a117989ad7a678c9232a11 test(nova): make host control fixture hermetic
+ 4:  5d5b68dd0a7155276bbe1fbe8b15a41d7c068d43 =  4:  1c606decdc4f2becfcab6e5822826a35908ffe48 docs(nova): record B4R candidate evidence
+ 5:  ece3ae95cd7b358cd727ac5cc015938bbbf64305 !  5:  b8d663053dafcc453daa13e36f8e3b675b8419d1 docs(nova): clarify epic close readiness
+ 6:  63d350853ff9075b96db254f34c32f287002399b !  6:  f7dc5f5048de98218f18c046084ada4d85440043 docs(nova): retain B4R gate receipts
+ 7:  16cb9c17a91eff451d6cae778ba69b5ef71f3aa6 =  7:  a9bd168cf261481857439c7de9bbdd23620624f9 feat(nova): add Antigravity alpha runner boundary
+ 8:  2fa66cc2d3b0c5d0d863a305b91ceb6bb63614b9 =  8:  78e8d72a9e4cc0ec28ffaa66e03154fb3cf5abce fix(codex): surface blocked goal resume requirement
+ 9:  8d1ff804a42cd749bd7e6f2e4025dcf6e0e02d6c =  9:  c89eaf4ea9aa5c25fe9e6d475c3b3bf81525188c fix(continuity): retain blocked goal readbacks
+10:  340ccd93135468fcc96f3401426a7ff721c81d5c = 10:  6b0b28017c2109121c9bdd110d94d719e918b955 docs(codex): distinguish goal resume from replacement
+11:  f9018db4383c9b0cb56d54ead774f94d0a91e8f1 = 11:  a4cb57bccba77f1c13c1678a058507dee128b4b8 docs(nova): bind Codex blocked goal acceptance
+12:  5d04be734a2b44164d48e791ae6a03376abffbe9 ! 12:  e89910185cb82929c46ec318ce4ece23946a593c fix(nova): retain long-lived native goals safely
+13:  033575c532f39ad622a7b8578ca8eca005d0b8f6 ! 13:  a6e800117bf9cf34d8a27dcb17ab87cfab34b365 fix(nova): close recritic authority gaps
+14:  bb6c20cf0a4d639b6972412e83b875907f2d7deb = 14:  98609584c423209224669cb1749065809af5d001 test(nova): use trusted supervisor state fixtures
+15:  a4a456b12018fb1b3668a6674d0d699de59ce125 = 15:  135f42e6ed567192a7efd474619aa2f54a97a731 docs(nova): correct supervisor trust boundary record
+16:  fe3fddf22b41f656178805c9dcc477adcb43b538 = 16:  1d10746f85f079c77612fbbf1254f0146f0d69f5 docs(nova): rebind corrected result artifact
+17:  6dfba1eccc6eb47e3ee951dd61c2c4a0e2fe2260 = 17:  07df8c1577bc0c1c8f203d51ac3a13e64567e225 docs(nova): amend supervisor trust boundary record
+18:  ea78887c8fdc3382358391a96f7f55fbab569542 = 18:  5d61b94e928263e576b78c405df1c71f60436e5b feat(nova): add macOS acceptance contract
+19:  7f8f7c2d6f11b4858fb3c0b06667a4727587744d ! 19:  748a3abd294fd07d72d6768b2e8442b8b643ddaf fix(nova): canonicalize B5 evidence bindings
+20:  9b62f75707958909e355d2fa850004e0bb6ffda6 = 20:  2346e5f7a06ede0a3a2f794645b50c795fde10fb docs(nova): record runner and macOS boundaries
+21:  76da17e054bcf8de20b8f45b99fa3eb644df1509 = 21:  4f8a7ebae9dc3c7313bcf585ab5616f4efc81eca docs(nova): reconcile the 17-issue intake
+22:  da2efb6ce281459042355bbab320ee95cbea62c1 = 22:  4554c512a3c63a04a55e75ef8f965f3f81b18f97 docs(nova): correct the independent branch base
+23:  8f765eeec163d12b4142eabc60ddcef384780354 <  -:  ---------------------------------------- fix(backlog): repair managed onboarding ledger admission
+ -:  ---------------------------------------- > 23:  1401e4698d26bad8f332c25156b411c18fa67913 fix(backlog): repair managed onboarding ledger admission
+24:  f9caeb59981508401e9f57cb6df8b6340375e88c = 24:  3071217c05e99977aed6642193db5834c26bbe1a docs(nova): freeze B5 candidate evidence
+25:  dc3036754ddef259c4b2189c8e12782ef295c31a = 25:  a4814c45f1604f63150eb50e5d0e2693f0b9c029 feat(nova): validate B5 candidate freeze evidence
+26:  f365a09ced53b82ea01afc40e75a555e71248a71 = 26:  9f1960dac81425c8146e27e03e9eb8a33cf45833 docs(nova): register B5 freeze verification
+27:  d604c604bd394831dd0c309a8962a2f69d08ea2a = 27:  3896d5e265a00f33209d0468c0a4d5d2b17ca304 docs(nova): rebind B5 freeze evidence
+28:  a1ae8e5f75e403a6e7a896b771390d2c9057024e = 28:  30ac95cb9fc5013bc6954823aa326050415a77df docs(nova): define dual-provider and B2 pilot boundaries
+29:  2475c578aabdee74cfc62534f871388ea6b85638 ! 29:  e3b0e9d3962a90ec59ffec595aa06a137cb3b762 feat(nova): add dual-forge transport contracts
+30:  cf051d5b1b0153f321cf80529f39bf1108aaf7e1 = 30:  dcc734549a0d1f7c32527a35da33eb7606bb4eb9 chore(nova): bind forge candidate artifacts
+31:  812abfb7676d2725ffd0807f601214c954d903a9 = 31:  b4da2d5a7f7d5a378a3761a7931c056d4d23e526 docs(nova): authorize contract evidence bindings
+32:  f846d2a804d2a06ddda40edc6e915f851e51f7b0 = 32:  9a868485d597abd5ab213c7765d117be61eee80c feat(nova): add bounded gitlab ci broker contract
+33:  d70ffc3723c776a35e5f2fe423f2f24534d8094c = 33:  c8ffded04e1b98527bdd48008098b8c61e83fdda fix(nova): harden gitlab broker reconciliation
+34:  f55783aee4e6407bd12a6646c7c7f0dbf4ca9b3b = 34:  52a0cb94c3a06e711497333487ff3ce9057f5903 fix(nova): order gitlab broker observations
+35:  2ea86fd0ac9a4e50d2a941a10c5142cfa420b4c6 = 35:  350f50740ae3bad2704faeb5889d8f82681e7ac5 fix(nova): validate persisted broker ordering
+36:  3b51ecc796f430cb504b2ccf44d08a8026d4c1b1 = 36:  8ea32ad9f8eabadc558ed4d82cd27f8280bf90ea feat(nova): bind broker cancellation intents
+37:  85bbcb28c9683c534560241c38130894cf643cea = 37:  165861f9e571414bdc6d591588f33635f5a6b9eb fix(nova): admit broker candidates through git
+38:  2f06b1c7926efec79cb594b930de609bf14e6297 = 38:  512f7025ade56f15b3dd4d0f25183bf8e8898887 fix(nova): retain broker cancellation intent
+39:  02075aa819c3766e8adcc3794accb8fcb424a483 = 39:  8ec138afd1cc4ea11c29bac8f6bbc14adee1e4ad fix(nova): bind broker base and lineage
+40:  2508ec0aacd00a0047247fe53e463518a03f8ce3 = 40:  73139aee56ce402bbca10e818633b643f5239d34 fix(nova): seal broker expiry and retries
+41:  e2214196acd6ed048be6f1fda0322caa99e5fbce = 41:  54194f99863f8cc28c60ce2693dafadbff7a5692 fix(nova): close broker cancellation and schema gaps
+42:  c18ffd323268b2955a15b10de28edc2826b56f63 = 42:  59f3f058da7f7ddfdf57d86b79ce187f8e31e655 fix(nova): seal broker cancellation lineage
+43:  08257d6e52b8cffb5c649379d83dab2f1d437015 = 43:  b0ab0cf5fab2c72c277c578dc38a04b8b7b20425 fix(nova): bind reconciliation timing
+44:  5dd062e43c1c5ee5d163a441148d15cf528537ac = 44:  fec7ea3caeaa23dfccebe0dd6d39c46f92e85f02 fix(nova): seal fixed broker admission
+45:  69668451e160db790d94597f3f624eda40bfb61f = 45:  09d8c4b7deb48f71965cfde007ff01176b1a12da fix(nova): bind broker timing clock
+46:  01ae0e9921f54117ccfa16f79672e940cae6c3bf = 46:  9420622c8473c6fda5a0d8883a37647bd73fe7c7 fix(nova): seal broker retry and clock lineage
+47:  b1b2df3852371b855cf53024533d8d8a07e801c8 = 47:  26cd4b422e56e9b6ce52065f456a8c2fe141556b fix(nova): preserve retry clock lineage
+48:  c4995099a07ccce30b410c766a3940ce3e776990 = 48:  d395e10325f088cea5c13050435509c98f0ceb17 fix(nova): reject stale broker records
+49:  d54f7071ba50d19c5f6b361e1e01fc199c9690d4 = 49:  66c9af6b19c9aebbc6a736320337f7567d5a7dbb fix(nova): require confirmation before branch apply
+50:  28e797f7ca6231cffcf702d5ce6ad79d953bc2ad <  -:  ---------------------------------------- fix(cleanup): recover retained Nova session binding
+51:  08ba06d82297b783ef16e86b83f39872a80cc8a3 = 50:  4580d69c15a22718bd9560b73eef5d00e3f990ef feat(nova): add pre-rebase execution contracts
+52:  cacb7553a1cfdf92066873f949f7262c666e42a4 = 51:  9f800b3a66bca2a78e6b12f74b9ce4664ec5e9b9 fix(nova): close execution contract review gaps
+53:  59ef38b8f613c873b0fd053f7e8428c7e154ab95 = 52:  64ef60b04dd3be3505367f859dcf9fb063ec58db fix(nova): require complete execution state chains
+54:  7f47613908e4be862865aaa92c8b888d066585c4 ! 53:  b89dd8c4e2ac84ec7444f5eb3c2cdc7a420aa37a fix(governance): classify Nova threat model
+55:  e31dc16a582ca2f5599922d9952807aadc0177f3 ! 54:  94a4904a13518bed4b060ad89a17f3ba2bb36cb3 docs(nova): adopt v0.4.7 delivery-loop design
+56:  480f2f7091990da06924e33c280b47dcc7921fa8 <  -:  ---------------------------------------- fix(governance): retain neutral guard audit

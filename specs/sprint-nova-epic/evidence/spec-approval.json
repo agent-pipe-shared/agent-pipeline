@@ -1,0 +1,40 @@
+{
+  "schema": "pipeline.nova-spec-approval.v1",
+  "recordedAt": "2026-07-24T20:39:37Z",
+  "approvedBy": "Product Owner",
+  "decision": "Spec approved",
+  "featureId": "sprint-nova-epic",
+  "gateCommit": {
+    "commit": "86ecde4d294d74504bd56063ab6cc0587071b8db",
+    "tree": "ee9dad2423206b79770a837129d04afc861601e0"
+  },
+  "bindings": {
+    "specSha256": "47a952040fd3a50ba2b02c04d4b4c7c0d3b7a32d58e4a736858d19fda1eae8b9",
+    "acceptanceSha256": "69779547a926df01768e7c518158e030ee777cb51ee82a66d009631d431d9f2c",
+    "backlogSpecBindingsSha256": "fe21dd49b652212612101f76a5db01b5c665597f77d9dc8d8b102c6951961408",
+    "advisorDispositionSha256": "c3c4bf07fb9838441100f687c6ab3a71677643909ce9cd55b0127cdbe9341711",
+    "specReadinessBaselineSha256": "48e9fa998c66d99e01cdaa44fc251b154047487e1e32350c6d452e3f11409821",
+    "lifecycleBeforeApprovalSha256": "3edf82920922821d2971ebe60a3327d56873765092f3b3343eb231cb392c4986"
+  },
+  "acceptedTechnicalAmendment": {
+    "previousAcceptanceSha256": "f15c417360fd8757ce42a410f3735f61b7cd17f9ff165c59fb65257e9103c855",
+    "acceptedAcceptanceSha256": "69779547a926df01768e7c518158e030ee777cb51ee82a66d009631d431d9f2c",
+    "changesPrdScope": false
+  },
+  "authorizes": [
+    "nova-a-implementation-dispatch"
+  ],
+  "doesNotAuthorize": [
+    "nova-b-implementation",
+    "new-mutable-state-store",
+    "remote-execution",
+    "credential-use",
+    "antigravity-live-implementation",
+    "external-mutation",
+    "backlog-transition-apply",
+    "github-issue-mutation",
+    "merge",
+    "push",
+    "release"
+  ]
+}

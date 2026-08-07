@@ -10,7 +10,6 @@ import { spawn } from "node:child_process";
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { StringDecoder } from "node:string_decoder";
-import { pathToFileURL } from "node:url";
 
 import {
   HELPER_PATH, LAUNCHER_PATH, READBACK_SCHEMA, authenticateLaunchTicket,
@@ -21,6 +20,7 @@ import {
   loadRuntimeProjectionV3OwnedKeys,
   parseRuntimeProjectionV3TomlRoute,
 } from "../lib/runtime-projection-v3.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 export const READBACK_STATUS_SCHEMA = "pipeline.codex-project-runtime-readback-status.v1";
 const READBACK_STATUS_CODES = new Set([
@@ -33,6 +33,7 @@ const READBACK_STATUS_CODES = new Set([
 const MAX_TRANSPORT_BYTES = 4 * 1024 * 1024;
 const HOST_TIMEOUT_MS = 30_000;
 const REMOTE_CONTROL_STATUSES = new Set(["disabled", "connecting", "connected", "errored"]);
+const CONFIG_WARNING_KEYS = new Set(["details", "path", "range", "summary"]);
 
 export class RuntimeReadbackError extends Error {
   constructor(code, message, options = undefined) {
@@ -51,6 +52,27 @@ function plainObject(value) {
 function exactKeys(value, keys) {
   return plainObject(value)
     && JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...keys].sort());
+}
+function validTextPosition(value) {
+  return exactKeys(value, ["column", "line"])
+    && Number.isSafeInteger(value.column) && value.column >= 0
+    && Number.isSafeInteger(value.line) && value.line >= 0;
+}
+function validTextRange(value) {
+  return exactKeys(value, ["end", "start"])
+    && validTextPosition(value.start)
+    && validTextPosition(value.end);
+}
+function validConfigWarning(params) {
+  if (!plainObject(params)
+    || typeof params.summary !== "string"
+    || Object.keys(params).some((key) => !CONFIG_WARNING_KEYS.has(key))
+    || (Object.hasOwn(params, "details") && !(params.details === null || typeof params.details === "string"))
+    || (Object.hasOwn(params, "path") && !(params.path === null || typeof params.path === "string"))
+    || (Object.hasOwn(params, "range") && !(params.range === null || validTextRange(params.range)))) {
+    return false;
+  }
+  return true;
 }
 function physicalFile(path, label) {
   const info = lstatSync(path);
@@ -236,6 +258,15 @@ export function readNativeConfig({ executable, cwd, includeLayers = true, spawnC
       }
       remoteControlStatusObserved = true;
     };
+    const observeConfigWarning = (value) => {
+      if (!initialized || response !== null
+        || !exactKeys(value, ["emittedAtMs", "method", "params"])
+        || value.method !== "configWarning"
+        || !Number.isSafeInteger(value.emittedAtMs) || value.emittedAtMs < 0
+        || !validConfigWarning(value.params)) {
+        stop(typed("protocol-invalid", "Codex config/read config warning notification was invalid or out of sequence"));
+      }
+    };
     const onMessage = (value) => {
       if (failure) return;
       if (!plainObject(value)) {
@@ -247,7 +278,8 @@ export function readNativeConfig({ executable, cwd, includeLayers = true, spawnC
           stop(typed("protocol-invalid", "Codex config/read emitted an unexpected server request"));
           return;
         }
-        observeRemoteControlStatus(value);
+        if (value.method === "configWarning") observeConfigWarning(value);
+        else observeRemoteControlStatus(value);
         return;
       }
       if (value.id === 1) {
@@ -342,7 +374,7 @@ export async function produceRuntimeReadback({
   const { target: configTarget } = validateConfigPostimage(root, barrier.value);
   let executablePath;
   try {
-    executablePath = runtimeOptions.codexExecutablePath ?? resolveRuntimeExecutable();
+    executablePath = runtimeOptions.codexExecutablePath ?? resolveRuntimeExecutable().physicalPath;
   } catch (error) {
     throw typed("executable-unavailable", "Codex executable is unavailable", error);
   }
@@ -427,6 +459,6 @@ export async function main(argv = process.argv.slice(2), {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectInvocation(import.meta.url)) {
   main().then((code) => { process.exitCode = code; });
 }

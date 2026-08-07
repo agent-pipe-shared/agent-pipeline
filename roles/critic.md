@@ -198,6 +198,14 @@ Per `harness/session-bootstrap.md` §6.3: no staleness check (the dispatch fixes
 
 > "Bootstrap check passed: ruleset {{SHA_FROM_DISPATCH}} loaded · Project {{PROJECT}} · Calibration {{CALIBRATION_FILE_OR_NA}} · State n/a (Critic sees no history) · Role Critic"
 
+The Critic role is closed before bootstrap. `agent: critic`, the
+`critic-review` skill, or dispatch metadata `Bootstrap role: critic` requires
+the compact `pipeline-core:pipeline-start critic` path even when an adapter
+omits the optional argument. The Elephant default may apply only when no role
+carrier exists. A Critic validates the preflight identity but never executes
+its onboarding action or reads State, handover, or history; conflicting role
+carriers stop before those reads. `CRITIC-BOOTSTRAP-ROLE-CLOSED`.
+
 ## 10. References
 
 - `docs/operating-model.md` — §2.4 (this role, normative), §4.2 (risk classes + trigger matrix), §4.3 (escalation ladder stage 2), §3.4 (spec-readiness check — the sibling review BEFORE implementation).

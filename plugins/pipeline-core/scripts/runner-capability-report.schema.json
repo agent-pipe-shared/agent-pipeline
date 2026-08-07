@@ -1,0 +1,670 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.runner-capability-report.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "reportId",
+    "identity",
+    "environment",
+    "capacity",
+    "cells",
+    "assurance",
+    "bindings",
+    "recordSha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pipeline.runner-capability-report.v1"
+    },
+    "reportId": {
+      "$ref": "#/$defs/id"
+    },
+    "identity": {
+      "$ref": "#/$defs/identity"
+    },
+    "environment": {
+      "$ref": "#/$defs/environment"
+    },
+    "capacity": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/capacityValue"
+      }
+    },
+    "cells": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/cell"
+      },
+      "allOf": [
+        {
+          "contains": {
+            "type": "object",
+            "required": [
+              "capabilityId",
+              "mode",
+              "status"
+            ],
+            "properties": {
+              "capabilityId": {
+                "const": "synthetic-contract"
+              },
+              "mode": {
+                "const": "synthetic"
+              },
+              "status": {
+                "const": "certified"
+              }
+            }
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "required": [
+              "capabilityId",
+              "mode"
+            ],
+            "properties": {
+              "capabilityId": {
+                "const": "claude-native-review"
+              },
+              "mode": {
+                "enum": [
+                  "native",
+                  "unavailable"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "required": [
+              "capabilityId",
+              "mode"
+            ],
+            "properties": {
+              "capabilityId": {
+                "const": "codex-native-readonly"
+              },
+              "mode": {
+                "enum": [
+                  "native",
+                  "unavailable"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "contains": {
+            "type": "object",
+            "required": [
+              "capabilityId",
+              "mode",
+              "status"
+            ],
+            "properties": {
+              "capabilityId": {
+                "const": "unsupported-live-worker"
+              },
+              "mode": {
+                "const": "unsupported"
+              },
+              "status": {
+                "const": "unsupported"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "assurance": {
+      "$ref": "#/$defs/assurance"
+    },
+    "bindings": {
+      "$ref": "#/$defs/bindings"
+    },
+    "recordSha256": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "gitOid": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]{0,127}$"
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "path",
+        "fileSha256",
+        "recordSha256"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/id"
+        },
+        "path": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/path"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fileSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "recordSha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adapterId",
+        "adapterVersion",
+        "implementationSha256",
+        "requestedRunner",
+        "requestedModel",
+        "observedRunner",
+        "observedModel"
+      ],
+      "properties": {
+        "adapterId": {
+          "$ref": "#/$defs/id"
+        },
+        "adapterVersion": {
+          "$ref": "#/$defs/id"
+        },
+        "implementationSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "requestedRunner": {
+          "$ref": "#/$defs/id"
+        },
+        "requestedModel": {
+          "$ref": "#/$defs/id"
+        },
+        "observedRunner": {
+          "$ref": "#/$defs/id"
+        },
+        "observedModel": {
+          "$ref": "#/$defs/id"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "observedRunner": {
+                "const": "not-observed"
+              }
+            },
+            "required": [
+              "observedRunner"
+            ]
+          },
+          "then": {
+            "properties": {
+              "observedModel": {
+                "const": "not-observed"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "observedModel": {
+                "not": {
+                  "const": "not-observed"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "platformClass",
+        "architectureClass",
+        "hostClass",
+        "fingerprintSha256"
+      ],
+      "properties": {
+        "platformClass": {
+          "$ref": "#/$defs/id"
+        },
+        "architectureClass": {
+          "$ref": "#/$defs/id"
+        },
+        "hostClass": {
+          "$ref": "#/$defs/id"
+        },
+        "fingerprintSha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "capacityValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unit",
+        "value",
+        "source",
+        "status"
+      ],
+      "properties": {
+        "unit": {
+          "enum": [
+            "concurrent-tasks",
+            "logical-subagents",
+            "worker-processes",
+            "workspaces",
+            "cpu-millicores",
+            "memory-bytes",
+            "external-jobs"
+          ]
+        },
+        "value": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "source": {
+          "enum": [
+            "advertised",
+            "certified",
+            "observed",
+            "reserved",
+            "effective"
+          ]
+        },
+        "status": {
+          "enum": [
+            "known",
+            "unknown",
+            "unavailable"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "known"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "cell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capabilityId",
+        "mode",
+        "status",
+        "evidence"
+      ],
+      "properties": {
+        "capabilityId": {
+          "$ref": "#/$defs/id"
+        },
+        "mode": {
+          "enum": [
+            "native",
+            "functional-equivalent",
+            "synthetic",
+            "unsupported",
+            "unavailable"
+          ]
+        },
+        "status": {
+          "enum": [
+            "certified",
+            "observed",
+            "unsupported",
+            "unavailable"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "unsupported"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": "unsupported"
+              },
+              "evidence": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "unavailable"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "const": "unavailable"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "enum": [
+                  "native",
+                  "functional-equivalent",
+                  "synthetic"
+                ]
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "certified",
+                  "observed"
+                ]
+              },
+              "evidence": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "certified"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence": {
+                "not": {
+                  "contains": {
+                    "type": "object",
+                    "required": [
+                      "kind"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "const": "runner-self-report"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "assuranceValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "evidenceSha256"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "observed",
+            "not-observed",
+            "unavailable"
+          ]
+        },
+        "evidenceSha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "observed"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidenceSha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "not-observed"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidenceSha256": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "assurance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspace",
+        "process",
+        "filesystem",
+        "network",
+        "os"
+      ],
+      "properties": {
+        "workspace": {
+          "$ref": "#/$defs/assuranceValue"
+        },
+        "process": {
+          "$ref": "#/$defs/assuranceValue"
+        },
+        "filesystem": {
+          "$ref": "#/$defs/assuranceValue"
+        },
+        "network": {
+          "$ref": "#/$defs/assuranceValue"
+        },
+        "os": {
+          "$ref": "#/$defs/assuranceValue"
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit",
+        "tree"
+      ],
+      "properties": {
+        "commit": {
+          "$ref": "#/$defs/gitOid"
+        },
+        "tree": {
+          "$ref": "#/$defs/gitOid"
+        }
+      }
+    },
+    "authorityDigest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "sha256"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/id"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "suiteVersion",
+        "candidate",
+        "authorityDigests",
+        "rawEvidenceSha256"
+      ],
+      "properties": {
+        "suiteVersion": {
+          "$ref": "#/$defs/id"
+        },
+        "candidate": {
+          "$ref": "#/$defs/candidate"
+        },
+        "authorityDigests": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/authorityDigest"
+          }
+        },
+        "rawEvidenceSha256": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/sha256"
+          }
+        }
+      }
+    }
+  }
+}

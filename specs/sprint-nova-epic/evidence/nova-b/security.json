@@ -1,0 +1,104 @@
+{
+  "schema": "pipeline.security-evidence.v1",
+  "project": "agent-pipeline",
+  "command": "node harness/scripts/security-scan.mjs",
+  "commit": "f365a09ced53b82ea01afc40e75a555e71248a71",
+  "candidate": {
+    "status": "clean",
+    "commit": "f365a09ced53b82ea01afc40e75a555e71248a71",
+    "tree": "d43e621484ec81b83ea59faef94ea7eae4d81db1",
+    "inputSha256": "45817848e75f4c9fb11d8e978f348c904e112d73877f85c57484e2b3310b80d0",
+    "repositorySha256": "b6137fe69f388c729e9c782159a75c7f1dbf9e3749281fda9f840031e72dfa85",
+    "inventory": {
+      "entries": 944,
+      "symlinkPolicy": "reject",
+      "submodulePolicy": "reject"
+    },
+    "reason": null,
+    "snapshot": {
+      "method": "git-detached-worktree.v1",
+      "verifiedBeforeAfter": true
+    }
+  },
+  "finishedAt": "2026-07-27T12:40:26.491Z",
+  "thresholds": {
+    "block_on": [
+      "critical",
+      "high"
+    ]
+  },
+  "policy": {
+    "schema": "pipeline.security-policy-binding.v1",
+    "configurationSha256": "fe9d1c31aca7bf7abeead315d3c4320062d589fd25234de5819532f9d2553728",
+    "inputs": {
+      "manifestSha256": null,
+      "declaredLicensesSha256": null,
+      "licenseAllowlistSha256": null,
+      "semgrepRulesPath": "governance/examples/policies/semgrep"
+    },
+    "sha256": "cd15b5f9c03aad2451d90a8853797b28763e6d0490d3ac05cc25f6c5b556e16a"
+  },
+  "execution": {
+    "childProcessPreflight": {
+      "status": "PASS",
+      "classification": "success"
+    },
+    "snapshotCleanup": {
+      "status": "removed"
+    }
+  },
+  "scanners": [
+    {
+      "tool": "gitleaks",
+      "adapter": "pipeline.security-adapter.v1",
+      "executableSha256": "8b95a336428cac9a470dc72744b4475fd50ab9221c7be6b7b776edd4d053540a",
+      "status": "PASS",
+      "classification": "success",
+      "findingCount": 0,
+      "coverage": {
+        "subject": "candidate-tree",
+        "exclusions": []
+      }
+    },
+    {
+      "tool": "osv-scanner",
+      "adapter": "pipeline.security-adapter.v1",
+      "executableSha256": "5b67ba474cd164104f04c4de4d575131a827cdff32155bb8930f55700ea2ba12",
+      "status": "SKIPPED",
+      "classification": "success",
+      "findingCount": 0,
+      "coverage": {
+        "subject": "candidate-tree",
+        "exclusions": []
+      },
+      "reason": "no package sources in project (osv-scanner: \"No package sources found\", exit 128)"
+    },
+    {
+      "tool": "semgrep",
+      "adapter": "pipeline.security-adapter.v1",
+      "executableSha256": "0fadb15a6e8932eb6b0af915a7e8fd072c8146804299e0c89d8f275c09acd782",
+      "status": "PASS",
+      "classification": "success",
+      "findingCount": 0,
+      "coverage": {
+        "subject": "candidate-tree",
+        "exclusions": []
+      }
+    },
+    {
+      "tool": "license-check",
+      "adapter": "pipeline.security-adapter.v1",
+      "executableSha256": null,
+      "status": "PASS",
+      "classification": "success",
+      "findingCount": 0,
+      "coverage": {
+        "subject": "candidate-tree",
+        "exclusions": []
+      }
+    }
+  ],
+  "findings": [],
+  "exitCode": 0,
+  "payloadSha256": "dd5285a424800e7afd9f9050f1d07ac416741006061421177c555d2fc385d2c6"
+}

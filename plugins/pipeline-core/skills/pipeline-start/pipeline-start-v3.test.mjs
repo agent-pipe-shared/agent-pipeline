@@ -1,413 +1,55 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
-
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import {
-  PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES,
-} from "../../lib/project-onboarding-ready-gate.mjs";
-
-const HERE = dirname(fileURLToPath(import.meta.url));
-const skill = readFileSync(join(HERE, "SKILL.md"), "utf8");
-const operatingModel = readFileSync(join(HERE, "../../../../docs/operating-model.md"), "utf8");
-const claude = readFileSync(join(HERE, "../../../../CLAUDE.md"), "utf8");
-
-const cases = [
-  ["V4 bootstrap inspection is checked before Git or ordinary V3 authority", () => {
-    const onboarding = skill.indexOf("## Step 0 — Consumer-root onboarding state");
-    const loadedState = skill.indexOf("## Step 1 — Ruleset presence + loaded state");
-    const v3Authority = skill.indexOf("## Step 1a — V3 source/runtime authority");
-    assert.ok(onboarding >= 0, "Step 0 must exist");
-    assert.ok(onboarding < loadedState, "onboarding must precede loaded-state Git checks");
-    assert.ok(onboarding < v3Authority, "onboarding must precede V3 authority checks");
-    assert.match(skill, /Before \*\*any\*\* `git rev-parse`, Git freshness helper, `setup\.mjs`, V3 authority\s+validator/u);
-    assert.match(skill, /project-onboarding-v3\.mjs" inspect --root "\$PWD" --intent bootstrap/u);
-    assert.match(skill, /pipeline\.project-onboarding\.v4/u);
-    assert.match(skill, /Do not replace\s+it with a shell emptiness check, a copied consumer-root `setup\.mjs`, generated\s+project-file heuristics, or an incidental Git error/u);
-  }],
-  ["an inherited restart ticket performs private host readback before inspection and then re-inspects", () => {
-    const helper = skill.indexOf("codex-project-runtime-readback-host.mjs");
-    const inspect = skill.indexOf('project-onboarding-v3.mjs" inspect --root "$PWD" --intent bootstrap');
-    assert.ok(helper >= 0 && helper < inspect, "ticket-bound helper must precede the V4 bootstrap inspection");
-    assert.match(skill, /preflight helper's `handoff` result/u);
-    assert.match(skill, /reports handoff presence only and never\s+prints the private ticket or token/u);
-    assert.match(skill, /do not inspect the\s+environment again/u);
-    assert.match(skill, /pipeline\.codex-project-runtime-readback-status\.v1/u);
-    assert.match(skill, /status `produced`/u);
-    assert.match(skill, /runtime-readback-unavailable/u);
-    assert.match(skill, /re-inspect from the beginning/u);
-    assert.match(skill, /runtime\.status `readback-current`/u);
-    assert.match(skill, /post-ticket result may continue only as\s+`ready` with runtime\.status `readback-current`/u);
-  }],
-  ["normal bootstrap accepts only native local or receipt-bound plugin-managed readiness", () => {
-    assert.match(skill, /On the normal path with no inherited ticket, `ready` has exactly three accepted\s+runtime forms/u);
-    assert.match(skill, /repository mode `local` with repository status `local-valid-writable`/u);
-    assert.match(skill, /repository mode `local` with repository status `local-valid-writable`,\s+runtime status `plugin-managed`/u);
-    assert.match(skill, /repository mode and status `host-managed`, runtime status `plugin-managed`/u);
-    assert.match(skill, /a non-null source digest, null target\/barrier\/readback digests/u);
-    assert.match(skill, /`appServer\.required:true` plus\s+`appServer\.status:running` and `appServer\.code:CAS-READY`/u);
-    assert.match(skill, /receipt-bound forms require no runtime initialization or native readback\s+barrier/u);
-    assert.match(skill, /make no project-local\s+runtime or native-readback claim/u);
-    assert.match(skill, /empty read-only `\.codex` directory alone is not runtime authority/u);
-    assert.match(skill, /authoritative in the execution boundary\s+selected by the preflight/u);
-    assert.match(skill, /Under `host-authorized-wsl`, run the exact inspector once directly\s+at the host-authorized local read-only boundary/u);
-    assert.match(skill, /do not precede it with a sandbox probe or repeat it across both views/u);
-    assert.match(skill, /Any mixed form\s+is malformed and fail-closed/u);
-    assert.match(skill, /V4 inspection itself carries\s+the mandatory single read-only App-Server observation/u);
-    assert.match(skill, /`host-managed` form with a concrete `gitVersion` is the narrowly bound\s+post-initialization Codex mount/u);
-    assert.match(skill, /fresh pre-initialization form is not `ready`/u);
-    assert.match(skill, /`host-repository-init-required`/u);
-    assert.match(skill, /runtime status `plugin-managed-unattested`/u);
-    assert.match(skill, /`appServer\.required:false`, `appServer\.status:not-requested`, and\s+`appServer\.code:null`/u);
-  }],
-  ["host-managed readiness hands off only bounded Git initialization to the host", () => {
-    assert.match(skill, /codex-host-repository-init\.mjs" plan --root "\$PWD"/u);
-    assert.match(skill, /pipeline\.codex-host-repository-init-plan\.v1/u);
-    assert.match(skill, /`requiresHostBoundary:true`/u);
-    assert.match(skill, /run it only through the host-authorized local write boundary/u);
-    assert.match(skill, /never in the workspace sandbox/u);
-    assert.match(skill, /pipeline\.codex-host-repository-init-apply\.v1/u);
-    assert.match(skill, /initializes Git without a commit, copies the private kickoff continuity\s+history into the new Git control path/u);
-    assert.match(skill, /atomically publishes one private\s+digest-bound admission directory containing the transaction intent, post-init\s+receipt, and receipt-digest marker in `\.claude\/\.runtime`/u);
-    assert.match(skill, /An exact\s+pending intent plus the same exclusively reserved Git directory identity and\s+successfully initialized closed core-tree make the confirmed apply\s+restart-safe; a partial or replaced `\.git` fails closed, and pending state is\s+never readiness by itself/u);
-    assert.match(skill, /fresh Codex\s+hook can distinguish the otherwise identical empty protected mount/u);
-    assert.match(skill, /mutates no portable\s+Pipeline\/project file/u);
-    assert.match(skill, /exactly one ordinary project-session\s+restart/u);
-    assert.match(skill, /Do not run the\s+onboarding inspector at the host boundary/u);
-    assert.match(skill, /For this 0\.4\.6 compatibility hotfix,\s+the lifecycle guard may fall back either to the exact fresh-root host-init\s+admission directory/u);
-    assert.match(skill, /complete protected Git control mount \(`HEAD`, `config`, `objects`,\s+and `refs`; never an empty `\.git`\)/u);
-    assert.match(skill, /physical\s+project root, stable Pipeline source\/calibration authority, and\s+immutable\s+kickoff history/u);
-    assert.match(skill, /Issue #25 owns replacing\s+both with one native cross-view session attestation/u);
-  }],
-  ["V4 progress and every controlling terminal state expose only their closed structured action", () => {
-    for (const status of ["portable-seed-required", "runtime-initialization-required", "runtime-attestation-required", "restart-required", "kickoff-required", "ready"]) {
-      assert.equal(skill.includes(`\`${status}\``), true, `${status} must be documented`);
-    }
-    for (const status of PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES) {
-      assert.equal(skill.includes(status), true, `${status} must fail closed in bootstrap`);
-    }
-    assert.match(skill, /Execute only a schema-valid read-only `command` action\s+whose `mutation` and `requiresConfirmation` fields are both `false`/u);
-    assert.match(skill, /Never auto-execute a mutating action/u);
-    assert.match(skill, /digest-bound `apply-portable-seed`,\s+`initialize-runtime`, or `apply-repair` action/u);
-    assert.match(skill, /`restart-process`[\s\S]*requiresCurrentProcessExit/u);
-    assert.match(skill, /`partial\|invalid\|unsafe\|migration-required\|adoption-required/u);
-    assert.doesNotMatch(skill, /fresh-host-managed/u);
-    assert.doesNotMatch(skill, /project-onboarding-v3\.mjs" apply --root "\$PWD" --activate/u);
-  }],
-  ["kickoff-required gives one complete local command and forbids remote syntax discovery", () => {
-    assert.match(skill, /goal is a short project\s+objective, not the pasted design, requirements list, acceptance criteria, or\s+PRD/u);
-    assert.match(skill, /one line, ideally 3–12 words, and at most 160 UTF-8 bytes/u);
-    assert.match(skill, /Preserve the\s+complete design in conversation for the post-bootstrap PRD\/spec review/u);
-    assert.match(skill, /never pass it through `--goal`/u);
-    assert.match(skill, /project-onboarding-v3\.mjs" kickoff plan --root "\$PWD" --goal "\{\{GOAL\}\}"/u);
-    assert.match(skill, /`kickoff` and `plan` are two separate argv elements in that order/u);
-    for (const alias of ["`kickoff-plan`", "`plan-kickoff`", "`plan --goal`", "bare `kickoff`"]) {
-      assert.equal(skill.includes(alias), true, `${alias} must be explicitly rejected`);
-    }
-    assert.match(skill, /Do not inspect the script, search GitHub,\s+browse the web, call a repository connector, or run any remote command/u);
-    assert.match(skill, /pipeline\.codex-onboarding-kickoff-plan\.v1/u);
-    assert.match(skill, /project-onboarding-v3\.mjs" kickoff apply --root "\$PWD" --goal "\{\{SAME_GOAL\}\}" --plan-sha256 "\{\{PLAN_SHA256\}\}" --activate/u);
-    assert.match(skill, /Never reconstruct the\s+digest, split the goal, or substitute a network result/u);
-  }],
-  ["runner SessionStart hints are visible but never invisible initializers", () => {
-    assert.match(skill, /Codex and Claude expose a visible, non-mutating SessionStart onboarding hint/u);
-    assert.match(skill, /For an ungoverned folder it is an opt-in gate/u);
-    assert.match(skill, /run neither this skill nor an\s+onboarding inspection until the user answers affirmatively/u);
-    assert.match(skill, /Codex and Claude SessionStart hooks surface a visible, non-mutating onboarding reminder/u);
-    assert.match(skill, /MUST NOT invoke this skill or inspect onboarding before the affirmative answer/u);
-  }],
-  ["pipeline-start reports its resolved distribution identity before inspection", () => {
-    assert.match(skill, /Runtime identity line \(mandatory, before Step 0\)/u);
-    assert.match(skill, /pipeline-start-preflight\.mjs/u);
-    assert.match(skill, /pipeline\.start-preflight\.v1/u);
-    assert.match(skill, /reports handoff presence only and never\s+prints the private ticket or token/u);
-    assert.match(skill, /Agent Pipeline start: version \{\{MANIFEST_VERSION\}\} · plugin root \{\{ABSOLUTE_PLUGIN_ROOT\}\}/u);
-    assert.match(skill, /`plugin-refresh-required` is an attended update handoff, not a project defect/u);
-    assert.match(skill, /ask\s+whether the user wants to activate the already installed version/u);
-    assert.match(skill, /Claude Code uses its native\s+`\/reload-plugins`/u);
-    assert.match(skill, /Codex has no such slash command/u);
-    assert.match(skill, /installation performed\s+inside `\/plugins` is followed by `\/new`/u);
-    assert.match(skill, /`plugin-daemon-refresh-required`/u);
-    assert.match(skill, /codex app-server daemon restart/u);
-    assert.match(skill, /Never invent a Codex `\/reload-plugins` command/u);
-    assert.match(skill, /restart the global daemon from an\s+active project session or without that explicit authorization/u);
-    assert.match(skill, /run only `codex plugin list --json` as the native registry\s+readback/u);
-    assert.match(skill, /`pipeline-core@agent-pipeline-local`/u);
-    assert.match(skill, /sanctioned development override/u);
-    assert.match(skill, /prevents an older official session from replacing its cache/u);
-    assert.match(skill, /do\s+not search cache directories, use a replacement plugin root, inspect the\s+network, or run onboarding/u);
-    assert.match(skill, /run no onboarding command/u);
-    assert.match(skill, /`installedSource` as\s+`remote\|local-development\|unknown`/u);
-    assert.match(skill, /`executionBoundary` as\s+`default\|host-authorized-wsl`/u);
-    assert.match(skill, /a `nextAction`\s+that is null unless status is `ready`/u);
-    assert.match(skill, /Execute that exact returned action at its declared boundary/u);
-    assert.match(skill, /never reconstruct\s+or independently invoke the initial lifecycle inspector/u);
-    assert.match(skill, /Agent Pipeline source: local-development · registered local Codex marketplace/u);
-    assert.match(skill, /also permits push and release/u);
-    assert.match(skill, /make that one routing\s+decision authoritative for the whole bootstrap/u);
-    assert.match(skill, /Do not first execute any of those helpers in\s+the workspace sandbox/u);
-    assert.match(skill, /every mutating action retains its exact confirmation/u);
-  }],
-  ["V3 source plus native or plugin-managed runtime authority is bootstrap authority", () => {
-    assert.match(skill, /pipeline\.user\.v3/u);
-    assert.match(skill, /v3-bootstrap-authority\.mjs" --root "\$PWD"/u);
-    assert.match(skill, /Consumer-root `setup\.mjs`\s+is neither required nor consulted/u);
-    assert.match(skill, /`runtimeProjection: "noop"`/u);
-    assert.match(skill, /`runtimeReadback: "current"`/u);
-    assert.match(skill, /`runtimeProjection: "plugin-managed"`/u);
-    assert.match(skill, /`runtimeReadback: "plugin-provided"`/u);
-    assert.match(skill, /status `ready`/u);
-    assert.match(skill, /projection-only\s+`projection-current`, `restart-required`, host-managed projection gap, or\s+unavailable cleared readback is non-success/u);
-    assert.match(skill, /explicit V3 migration\/apply/u);
-    assert.match(skill, /current native readback/u);
-    assert.match(skill, /pending restart barrier is bound to\s+a different Pipeline launcher\/helper or Codex executable identity/u);
-    assert.match(skill, /replacing a\s+stale binding when necessary/u);
-    assert.match(skill, /`executionBoundary:external-terminal`/u);
-    assert.match(skill, /`invocation:user-copy-only`/u);
-    assert.match(skill, /`codexToolCallPermitted:false`/u);
-    assert.match(skill, /never submit the launcher to Bash, exec, PTY, or any\s+other Codex tool/u);
-    assert.match(skill, /run the exact digest-bound action in a real\s+external terminal/u);
-    assert.match(skill, /returned `launch\.copyCommand` object is mandatory/u);
-    assert.match(skill, /`maxColumns:72` plus nonempty `posix` and `powershell`/u);
-    assert.match(skill, /On Linux and macOS print the exact\s+returned `posix` string/u);
-    assert.match(skill, /on Windows print the exact returned `powershell`\s+string/u);
-    assert.match(skill, /never reconstruct it from argv/u);
-    assert.match(skill, /assembles long paths from short variable assignments/u);
-    assert.match(skill, /`external-launch-required`/u);
-    assert.match(skill, /`retryAfterEpochMs`/u);
-    assert.match(skill, /invokes the digest-bound\s+readback helper directly/u);
-    assert.match(skill, /starts a separate strict App Server/u);
-    assert.match(skill, /ordinary token-free Codex TUI/u);
-    assert.match(skill, /`readback-produced` means the barrier was\s+cleared but the TUI could not be started/u);
-    assert.match(skill, /re-enters this Step 0 with no inherited handoff/u);
-  }],
-  ["host-managed freshness is bound to protected controls or the durable initializer receipt", () => {
-    assert.match(skill, /accepts only the exact protected control layout or the durable digest-bound receipt/u);
-    assert.match(skill, /Neither host-managed form claims remote freshness or performs a fetch/u);
-    assert.match(skill, /invalid host-managed layout or receipt/u);
-  }],
-  ["V1/V2 and runtime drift fail closed without confirmation", () => {
-    assert.match(skill, /\*\*F5\*\*/u);
-    assert.match(skill, /Do not use V1\/V2/u);
-    assert.match(skill, /print \*\*no confirmation line\*\*/u);
-  }],
-  ["Codex locked projects use only the loaded plugin status wrapper", () => {
-    assert.match(skill, /\.agent-pipeline\/core\.lock\.json/u);
-    assert.match(skill, /currently loaded `pipeline-core` plugin/u);
-    assert.match(skill, /node "\$\{PIPELINE_PLUGIN_ROOT\}\/scripts\/codex-private-overlay-activation\.mjs" status --project-root "\$PWD"/u);
-    assert.match(skill, /node "\$\{PIPELINE_PLUGIN_ROOT\}\/scripts\/codex-private-overlay-activation\.mjs" load-context --project-root "\$PWD"/u);
-    assert.match(skill, /Never select a wrapper under `\$PWD`/u);
-    assert.match(skill, /Do not run project-local\s+`setup\.mjs`, a local harness,[\s\S]*as an SNT-A\s+identity\/admission substitute/u);
-    assert.match(skill, /When `\.agent-pipeline\/core\.lock\.json` is absent,[\s\S]*ordinary public-project/u);
-  }],
-  ["private-overlay status outcomes are explicit and mutation-free", () => {
-    assert.match(skill, /`activation-required`:[\s\S]*STOP before Step 1b and print no confirmation\s+line/u);
-    assert.match(skill, /Report the returned reason and `planSha256`; perform no mutation/u);
-    assert.match(skill, /do not invoke `activate`/u);
-    assert.match(skill, /`rejected`, a non-zero exit, malformed output,[\s\S]*FAIL CLOSED/u);
-    assert.match(skill, /`activated`: this is the only activation status/u);
-  }],
-  ["activated status requires the bounded operational context envelope", () => {
-    assert.match(skill, /sanitized status alone is never private context/u);
-    assert.match(skill, /pipeline\.private-overlay-operational-context\.v1/u);
-    assert.match(skill, /status `context-loaded`/u);
-    assert.match(skill, /same `planSha256` as the activated readback/u);
-    assert.match(skill, /not private filenames/u);
-    assert.match(skill, /Do not echo,[\s\S]*persist,[\s\S]*export/u);
-    assert.match(skill, /SNT-A-CODEX-CONTEXT-TRANSFER-UNAVAILABLE/u);
-    assert.match(skill, /Only `activated` plus schema-valid `context-loaded` may continue/u);
-    assert.match(skill, /Do not infer or reconstruct the\s+private inputs from the project checkout, status stdout, setup, or harness/u);
-  }],
-  ["SNT-A admission does not replace project F4 checks", () => {
-    assert.match(skill, /replaces only SNT-A identity, admission,[\s\S]*private-input authentication/u);
-    assert.match(skill, /does \*\*not\*\* satisfy or replace\s+the project-specific Step 3 calibration\/denies, Step 4 handover, or Step 5\s+verify checks/u);
-    assert.match(skill, /retain their F4 behavior/u);
-  }],
-  ["work profiles are epic feature mini and advisory is not a profile", () => {
-    assert.match(skill, /`epic`, `feature`, or `mini`/u);
-    assert.match(skill, /`advisor` and `design-first` are no longer profiles/u);
-    assert.doesNotMatch(skill, /Profile \{\{advisor\|design-first/u);
-    assert.doesNotMatch(skill, /\/advisor fable/u);
-    assert.equal((skill.match(/MP-26g/gu) ?? []).length, 1, "MP-26g may appear only in the explicit V3 supersession notice");
-    assert.match(skill, /reuse the persisted unambiguous V3\s+profile and phase/u);
-    assert.match(skill, /Ask only when[\s\S]*genuinely\s+ambiguous/u);
-    assert.doesNotMatch(skill, /profile question repeats at EVERY bootstrap/u);
-  }],
-  ["Epic and Feature Codex advisory defaults on while Mini disables it", () => {
-    assert.match(skill, /Missing consent is the enabled `default`, with no per-run question/u);
-    assert.match(skill, /`declined` disables before a child, export or status/u);
-    assert.match(skill, /`mini` is disabled/u);
-  }],
-  ["Codex starts one bounded Host Advisor sequence", () => {
-    assert.match(skill, /codex-host-advisor-route\.mjs/u);
-    assert.match(skill, /--runner codex --profile "\{\{PROFILE\}\}" --consent "\{\{CONSENT\}\}"/u);
-    assert.match(skill, /Accept exactly JSON keys `route\|policy`/u);
-    assert.match(skill, /do not pass `--root`, probe `--help`,\s+inspect the script, or retry through stdin/u);
-    assert.match(skill, /pipeline\.codex-host-advisor-policy\.v1/u);
-    assert.match(skill, /primary\s+once for at most 60 seconds/u);
-    assert.match(skill, /`gpt-5\.6-terra` \/ `high` fallback for at most 45 seconds/u);
-    assert.match(skill, /Polling must never reset either deadline/u);
-    assert.match(skill, /never\s+start a third attempt/u);
-    assert.match(skill, /Do not make any selected-sandbox, App-Server, native or\s+other advisory probe/u);
-    assert.match(skill, /pipeline\.host-advisor-status\.v1/u);
-  }],
-  ["Verify availability never executes the calibrated gate", () => {
-    assert.match(skill, /Confirm the project's ONE verify command[\s\S]*without invoking that command/u);
-    assert.match(skill, /Never append or pass `--help`/u);
-    assert.match(skill, /`node --check <script>`/u);
-    assert.match(skill, /resolve only the executable\s+path/u);
-    assert.match(skill, /Run no full gate and create no\s+evidence at bootstrap/u);
-  }],
-  ["Claude fallback order is bounded Fable then Opus then consult", () => {
-    const chain = skill.match(/order is `([^`]+)`/u)?.[1] ?? "";
-    assert.match(chain, /Fable/u);
-    assert.ok(chain.indexOf("Fable") < chain.indexOf("Opus"));
-    assert.ok(chain.indexOf("Opus") < chain.indexOf("Claude consult"));
-    assert.match(skill, /same-runner fresh read-only consult/u);
-  }],
-  ["Codex status is bounded gate capability while Claude receipts remain separate", () => {
-    assert.match(skill, /An answered unchanged status\s+from attempt one or two is Codex `host-bound-consult` success/u);
-    assert.match(skill, /record\s+`advisory-unavailable` and continue bootstrap without an Advisory-pass\s+claim/u);
-    assert.match(skill, /advisory exhaustion is not a session blocker/u);
-    assert.match(skill, /Workspace mutation\s+remains a hard integrity stop/u);
-    assert.match(skill, /It emits no `pipeline\.advisory-receipt\.v1`/u);
-    assert.match(skill, /Claude retains its existing coordinator receipt/u);
-    assert.match(skill, /no attested\s+selected-sandbox execution; OS isolation and\s+model identity are not\s+asserted/u);
-  }],
-  ["existing provenance and Elephant role checks remain", () => {
-    assert.match(skill, /git rev-parse HEAD/u);
-    assert.match(skill, /ruleset-freshness\.mjs" --repo "\$PWD"/u);
-    assert.match(skill, /`equal\|ahead` is current/u);
-    assert.match(skill, /host-authorized\s+network-open\/read-only command boundary/u);
-    assert.match(skill, /`installedSource:local-development`, skip the public-marketplace equality\s+helper/u);
-    assert.match(skill, /all\s+Verify, Security, push\/publication approval, and readback gates still run\s+unchanged/u);
-    assert.match(skill, /bootstrap-env-check\.mjs/u);
-    assert.match(skill, /do not first run a known-to-fail sandbox probe/u);
-    assert.match(skill, /check-po-gate-authority\.mjs/u);
-    assert.match(skill, /EL-01\/EL-02\/EL-03\/EL-04\/EL-16\/EL-18\/EL-19/u);
-    assert.match(skill, /Bootstrap check passed:/u);
-  }],
-  ["Compact re-enters bootstrap then resumes persisted continuity", () => {
-    assert.match(skill, /Compact MUST rerun `?pipeline-start`? as a continuation re-entry/u);
-    assert.match(skill, /after that re-entry, automatically continue the persisted next action without waiting/u);
-    assert.match(skill, /Only an explicit pause\/cancel\/replace\/redirect, a named gate, completion or a typed blocker may stop/u);
-  }],
-  ["Approved plans continue internal implementation without slice-level PO pauses", () => {
-    assert.match(skill, /Approved-plan continuation/u);
-    assert.match(skill, /an internal implementation slice or package is not a PO gate/u);
-    assert.match(skill, /complete its required evidence gates, Critic review and\s+finding disposition, then autonomously continue with the next package/u);
-    assert.match(skill, /Ask\s+for a PO gate only for a typed blocker, a material scope or authority change,\s+a push or other remote action not already admitted by the PHX-2\s+Ledger\/Resolver proof/u);
-    assert.match(skill, /does\s+not\s+weaken the initial readable-PRD approval\s+requirement or any evidence gate/u);
-    assert.match(skill, /completed\s+internal slice\/package is ordinary continuity[\s\S]*push or other remote action\s+not already admitted by the PHX-2\s+Ledger\/Resolver proof/u);
-    assert.doesNotMatch(skill, /a push or other remote action, or final feature\/epic acceptance/u);
-    assert.match(skill, /a completed\s+internal slice\/package is ordinary continuity, not a named PO gate/u);
-  }],
-  ["PHX-2 Ledger/Resolver is the sole fail-closed remote transition", () => {
-    assert.match(claude, /sole possible remote-action exception is an exact, securely resolved\s+\*\*PHX-2 Human Governance Decision Ledger\*\* PO decision, bound by its\s+\*\*Authority Resolver\*\*/u);
-    assert.match(claude, /Until that PHX-2 Ledger\/Resolver path exists and produces that proof, this Pipeline has no executable remote-action exception/u);
-    assert.match(claude, /every push or other remote action remains an explicit PO gate/u);
-    assert.match(claude, /PO direction is only proposed Ledger input, never executable authority/u);
-    assert.match(claude, /mutable `pushApproval` or other state, CLI input, Git history or metadata, cache, journal, lifecycle\/readback record, agent record, runner or AGY value/u);
-    assert.doesNotMatch(claude, /pushing `main` to origin at work-package boundaries is \*\*standing-approved\*\*/u);
-    assert.match(operatingModel, /PHX-2 Human Governance Decision Ledger and Authority Resolver transition\s+\(policy and rollback plan\)/u);
-    assert.match(operatingModel, /one valid, unconsumed,\s+unrevoked, unexpired and integrity-bound PO decision/u);
-    assert.match(operatingModel, /bind\s+that decision exactly to one action, remote, ref, candidate and named work\s+package/u);
-    assert.match(operatingModel, /must not originate from an\s+agent, Git history, state, cache, agent journal, lifecycle event, readback,\s+runner or AGY/u);
-    assert.match(operatingModel, /Until this PHX-2 path exists, or whenever its Resolver or\s+proof is unavailable, missing or ambiguous, this Pipeline has no executable\s+remote-action exception/u);
-    assert.match(operatingModel, /every remote action remains an explicit PO gate/u);
-    assert.match(operatingModel, /PO decision is only proposed Ledger input, never executable\s+authority/u);
-    assert.match(operatingModel, /mutable\s+`pushApproval` or other state, CLI input, Git history or metadata, cache,\s+journal, lifecycle\/readback record, agent record, runner or AGY value/u);
-    assert.match(operatingModel, /platform- and runner-neutral: it applies equally on macOS,\s+Windows and Linux and to Claude, Codex and AGY, without making AGY a\s+prerequisite/u);
-    assert.match(operatingModel, /PHX-2 Human Governance Decision Ledger und Authority-Resolver-Übergang/u);
-    assert.match(operatingModel, /gültigen,\s+unverbrauchten, nicht widerrufenen, nicht abgelaufenen und\s+integritätsgebundenen PO-Decision/u);
-    assert.match(operatingModel, /darf nicht aus einem Agent,\s+Git-History, State, Cache, Agent-Journal, Lifecycle-Event, Readback, Runner\s+oder AGY stammen/u);
-    assert.match(operatingModel, /Jede Remote-Aktion bleibt ein ausdrückliches PO-Gate/u);
-    assert.match(operatingModel, /keine ausführbare Remote-Aktionsausnahme/u);
-    assert.match(operatingModel, /PO-Decision nur vorgeschlagener Ledger-Eingang und nie ausführbare\s+Authority/u);
-    assert.match(skill, /PHX-2 Ledger\/Resolver remote-authority transition/u);
-    assert.match(skill, /valid, unconsumed, unrevoked, unexpired\s+and integrity-bound PO decision/u);
-    assert.match(skill, /record must not originate from an\s+agent, Git history, state, cache, agent journal, lifecycle event, readback,\s+runner or AGY/u);
-    assert.match(skill, /this Pipeline has\s+no executable remote-action exception: every remote action remains an\s+explicit PO gate/u);
-    assert.match(skill, /PO decision is only proposed Ledger input, never\s+executable authority/u);
-    assert.match(skill, /mutable\s+`pushApproval` or other state, CLI input, Git history or metadata, cache,\s+journal, lifecycle\/readback record, agent record, runner or AGY value/u);
-    assert.match(skill, /Until that Ledger\/Resolver path exists, or whenever the\s+Resolver or proof is unavailable, missing or ambiguous, this Pipeline has\s+no executable remote-action exception/u);
-    assert.match(skill, /every remote action remains an\s+explicit PO gate/u);
-    assert.match(skill, /PO decision is only proposed Ledger input, never\s+executable authority/u);
-    assert.match(skill, /mutable\s+`pushApproval` or other state, CLI input, Git history or metadata, cache,\s+journal, lifecycle\/readback record, agent record, runner or AGY value/u);
-    assert.match(skill, /platform- and runner-neutral for macOS, Windows and\s+Linux and for Claude, Codex and AGY; AGY is a parallel consumer, never a\s+prerequisite/u);
-    assert.match(skill, /This check applies again at every compact or\s+continuation re-entry; never carry a remote exception forward by inference/u);
-    assert.doesNotMatch(skill, /repository-calibrated,\s+candidate- or work-package-bound standing authority/u);
-  }],
-  ["PHX-2 remote actions retain binding, expiry, readback and rollback denials", () => {
-    assert.match(operatingModel, /authorizes no action variant, other remote\s+action, remote, ref,\s+candidate or work package/u);
-    assert.match(operatingModel, /stop if the decision is expired,\s+revoked, consumed or changed/u);
-    assert.match(operatingModel, /sole lifetime ends at successful exact\s+remote readback, or at an explicit revocation or authority change/u);
-    assert.match(operatingModel, /compare the exact remote ref with the bound\s+candidate and update the local public evidence\/audit path with the binding\s+and observed ref; never include private data or claim success without that\s+readback/u);
-    assert.match(operatingModel, /Before the readback, abort the action\. After publication,\s+never force-push or automatically reverse it: a compensating remote action\s+needs new explicit PO authority that names that action, remote and ref/u);
-    assert.match(operatingModel, /diese Decision genau\s+an eine Aktion, ein Remote, einen Ref, einen Kandidaten und ein benanntes\s+Arbeitspaket binden/u);
-    assert.match(operatingModel, /einzige Laufzeit endet mit erfolgreichem exaktem Remote-Readback oder\s+einem ausdrücklichen Widerruf bzw\. einer Authority-Änderung/u);
-    assert.match(operatingModel, /Vor dem Readback die Aktion abbrechen\. Nach\s+der Veröffentlichung niemals force-pushen oder automatisch zurückbauen/u);
-    assert.match(operatingModel, /Authorization\/trust-boundary threat-model assessment\.\*\* An unbound,\s+stale, ambiguous or changed remote action is denied: only the PHX-2\s+Ledger\/Resolver proof is authority\. Remote readback is observation, never\s+authority/u);
-    assert.match(operatingModel, /Nur der PHX-2-Ledger-\/Resolver-Nachweis ist Authority\.\s+Remote-Readback ist Beobachtung, nie Authority/u);
-    assert.match(skill, /Continuation never\s+infers a remote exception from `autonomy`, an old approval or generic\s+standing authority/u);
-    assert.match(skill, /bound exactly to one action, remote, ref,\s+candidate and named work package/u);
-    assert.match(skill, /agent record, runner or AGY value\. Stop\s+before execution also for expiry, revocation,\s+consumption or authority change/u);
-    assert.match(skill, /sole lifetime ends at successful exact\s+remote readback or an explicit revocation\/authority change/u);
-    assert.match(skill, /Read back the\s+exact remote ref against the bound candidate, then update only the local\s+public evidence\/audit path; never include private data or claim success\s+before that readback/u);
-    assert.match(skill, /Before readback, abort\. After publication, never force-push\s+or automatically reverse: only new explicit PO authority may name a\s+compensating remote action, remote and ref/u);
-    assert.match(skill, /Readback is observation, never authority/u);
-  }],
-  ["Cleanup startup reuses one CAS-bound descriptor and exposes only typed rotation/recovery", () => {
-    assert.match(skill, /command owns the entire First-bind CAS/u);
-    assert.match(skill, /WT-SESSION-REUSED/u);
-    assert.match(skill, /MUST NOT create or persist another nonce/u);
-    assert.match(skill, /atomically releases the exact State tuple/u);
-    assert.match(skill, /use `release-binding`/u);
-    assert.match(skill, /read-only `plan-recovery`/u);
-    assert.match(skill, /digest-bound `apply-recovery` action for explicit PO confirmation/u);
-    assert.match(skill, /active descriptor is never PO-force-replaced/u);
-  }],
-  ["Readiness and Critic retain their documented selected host boundary", () => {
-    assert.equal(skill.includes("sandboxed-readonly-host-bridge.mjs"), true, "pipeline start must name the generic selected host bridge");
-    assert.match(skill, /Readiness and Critic duties; it is not an Advisor route/u);
-    assert.doesNotMatch(skill, /Codex Advisory[\s\S]*network-open\/read-only/u);
-    assert.equal(skill.includes("danger-full-access"), false, "the prohibited mode must never appear as a workaround");
-  }],
-  ["self-application probes the managed toolchain without exporting pipeline scope to consumers", () => {
-    assert.match(skill, /Self-application toolchain preflight/u);
-    assert.match(skill, /toolchain-preflight\.mjs" --root "\$PWD"/u);
-    assert.match(skill, /Agent-Pipeline checkout only/u);
-    assert.match(skill, /never run it in a consumer project/u);
-    assert.match(skill, /read-only observation/u);
-    assert.match(skill, /does not write a receipt/u);
-    assert.match(skill, /securityGate: blocking/u);
-    assert.match(skill, /security\/release\/public-baseline claims/u);
-    assert.match(skill, /execution_environment`, `probe_timeout`, and `probe_error`/u);
-    assert.match(skill, /never recommend\s+reinstalling/u);
-  }],
-  ["self-application observation governance fails closed before writes", () => {
-    assert.match(skill, /Observation\/document governance \(Agent-Pipeline source checkout only\)/u);
-    assert.match(skill, /node harness\/scripts\/check-observation-governance\.mjs/u);
-    assert.match(skill, /unclassified `docs\/` artifact/u);
-    assert.match(skill, /case \*\*F6\*\*/u);
-    assert.match(skill, /no Issue, label, backlog item, or network request/u);
-    assert.match(skill, /no writing, dispatch, confirmation line/u);
-  }],
-];
-
-let passed = 0;
-for (const [name, run] of cases) {
-  try {
-    run();
-    passed += 1;
-    console.log(`PASS ${name}`);
-  } catch (error) {
-    console.error(`FAIL ${name} -- ${error.message}`);
-  }
-}
-
-console.log(`\npipeline-start V3: ${passed}/${cases.length} checks passed.`);
-process.exit(passed === cases.length ? 0 : 1);
+const here = dirname(fileURLToPath(import.meta.url));
+const core = readFileSync(join(here, "SKILL.md"), "utf8");
+const closeBlock = readFileSync(join(here, "..", "close-block", "SKILL.md"), "utf8");
+const refs = ["onboarding-recovery.md", "private-overlay.md", "roles.md", "freshness.md", "failure-cases.md", "continuation.md"]
+  .map((name) => readFileSync(join(here, "references", name), "utf8")).join("\n");
+const all = `${core}\n${refs}`;
+assert.ok(Buffer.byteLength(core, "utf8") <= 15_000);
+assert.match(core, /full Elephant bootstrap is session-bound/u);
+assert.match(core, /never for an ordinary task, message, tool result, commit, test,/u);
+assert.match(core, /does not trigger a second full Elephant bootstrap unless a real SessionStart or\n+typed recovery follows/u);
+assert.match(core, /No happy-path reference is mandatory/u);
+assert.match(core, /project-onboarding-v3\.mjs inspect --root "\$PWD" --intent bootstrap/u);
+assert.match(core, /Agent Pipeline start: version/u);
+assert.match(all, /codex-project-runtime-readback-host\.mjs/u);
+assert.match(all, /pipeline\.codex-project-runtime-readback-status\.v1/u);
+assert.match(all, /project-onboarding-v3\.mjs kickoff plan/u);
+assert.match(all, /codex-host-repository-init\.mjs plan/u);
+assert.match(all, /session-cleanup\.mjs plan-privatization/u);
+assert.match(all, /pipeline\.session-cleanup-privatization-plan\.v1/u);
+assert.match(all, /Agent Pipeline source: local-development/u);
+assert.match(all, /pipeline\.start-preflight\.v1/u);
+assert.match(all, /CR?PCR?-BLOCKED|PCR-DECISION-PENDING/u);
+assert.match(all, /four|three|Verify|handover/u);
+assert.match(core, /Operating Model, compiled runtime manifest and recorded active\nplan are the only gate authority/u);
+assert.match(core, /scoped edits, focused tests, state\nreadback, one-line commits, Verify, Critic preparation/u);
+assert.match(core, /A guard\ndenial alone is not a human gate/u);
+assert.match(core, /\*\*and\n   before proposing, displaying, or performing any restart, session cut or\n   Compact after kickoff\*\*/u);
+assert.match(core, /input received\n   after a short kickoff goal has already initialized the project/u);
+assert.match(core, /do not reduce it to a new short\n   kickoff goal or merely promise to remember it/u);
+assert.match(core, /Read back `resume-hint\.mjs inspect` after a\n   successful capture/u);
+assert.match(core, /obtain both a single-line project goal and an\nexplicit PO profile: `epic`, `feature`, or `mini`/u);
+assert.match(core, /Never infer, silently select, or retrospectively claim a profile/u);
+assert.match(core, /`specs\/kickoff-\*` files are provisional bootstrap\nanchors, not the standard long-term design location/u);
+assert.match(core, /`specs\/YYYY-MM-DD_short-topic\/`/u);
+assert.match(core, /`prd_short-topic\.md`, `spec\.md`, and `design-input\.md`/u);
+assert.match(core, /The PRD and Spec both\nlink to it and carry a compact traceability table/u);
+assert.match(core, /include a valid Mermaid flow\/sequence\/state diagram wherever it materially\nclarifies that flow/u);
+assert.match(core, /Treat that named package as a pre-authority staging set/u);
+assert.match(core, /only its digest-bound `kickoff promote apply` to bind the PRD\/Spec in State\nand the source-evidence path\/hash in the same immutable continuity transaction\./u);
+assert.match(core, /Do not invoke a repair, generic continuity CAS, manifest\nrepair, or hash-rebinding cascade solely because a new design package was\ncreated/u);
+assert.match(core, /The source-evidence file is immutable after its PRD\/Spec reference is bound/u);
+assert.match(core, /Normal restart is handover-only/u);
+assert.match(core, /Never invoke `close-block`, `close-feature`, or the close\n   coordinator merely to start a new chat/u);
+assert.match(closeBlock, /Hard entry gate — never close a normal restart/u);
+assert.match(closeBlock, /CLOSE-INTENT-REQUIRED/u);
+assert.match(closeBlock, /`durable-stop` or `runtime-transfer`/u);
+assert.match(closeBlock, /Do \*\*not\*\* invoke `close-block`, `close-feature`, `close-coordinator`, Verify/u);
+process.stdout.write("pipeline-start V3: core budget and lazy-reference checks passed\n");

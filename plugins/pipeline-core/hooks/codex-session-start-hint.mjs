@@ -4,11 +4,14 @@
 /** Surface a concise, non-mutating Agent-Pipeline entry hint in every Codex session. */
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const GOVERNANCE_MARKERS = [
   ".agent-pipeline/core.lock.json",
   "pipeline.user.yaml",
+  "project/pipeline.json",
+  "project/pipeline.yaml",
   ".claude/pipeline.json",
   ".claude/pipeline.yaml",
 ];
@@ -27,8 +30,13 @@ export function sessionStartDecision(projectDir = process.cwd(), exists = exists
     return {
       governed,
       message,
-      context:
-        `${message} This governed-repository bootstrap is mandatory; do not substitute a project-local script or stale cache path.`,
+      context: [
+        message,
+        "This governed-repository bootstrap is mandatory; do not substitute a project-local script or stale cache path.",
+        "After a ready bootstrap, the Operating Model and compiled manifest are the gate authority: continue ordinary implementation, focused tests, commits, Verify, Critic preparation and state readback autonomously.",
+        "Do not invent a human checkpoint for routine work. Request the PO only for a configured decision gate, required final acceptance, an irreversible/external consequence, or a typed hard block with no safe returned recovery action.",
+        "A guard denial is not by itself a human gate: first execute its exact typed read-only or lifecycle recovery action when one is supplied.",
+      ].join(" "),
     };
   }
   const message =
@@ -62,5 +70,4 @@ export function main({ projectDir, exists } = {}) {
   })}\n`);
 }
 
-const invokedDirectly = process.argv[1] && resolve(fileURLToPath(import.meta.url)) === resolve(process.argv[1]);
-if (invokedDirectly) main();
+if (isDirectInvocation(import.meta.url)) main();

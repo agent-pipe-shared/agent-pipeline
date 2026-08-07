@@ -8,7 +8,6 @@
  * the source and every runtime projection, while this common reader also
  * requires the current private native Codex readback before returning ready.
  */
-import { pathToFileURL } from "node:url";
 import { lstatSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -25,8 +24,24 @@ import {
   hasCodexRuntimeControlMount,
   observeCodexHostRepositoryInitAdmission,
 } from "../lib/codex-host-layout.mjs";
+import {
+  LEGACY_CALIBRATION,
+  NEUTRAL_CALIBRATION,
+  resolveProjectAuthorityPaths,
+} from "../lib/project-authority.mjs";
+import { parseYaml } from "../lib/yaml-lite.mjs";
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const SCHEMA = "pipeline.v3-bootstrap-authority.v1";
+/**
+ * The restart barrier and its native readback are Codex-specific: the barrier
+ * binds a `codexExecutableSha256` and proves a fresh Codex process reloaded the
+ * projected runtime. A runner listed here has no comparable contract in this
+ * codebase, so requiring that artifact would be a permanently unsatisfiable
+ * gate rather than evidence. Such a runner reports the honest
+ * `runtimeReadback: "not-applicable"` and never claims `"current"`.
+ */
+const RUNNERS_WITHOUT_NATIVE_READBACK = new Set(["claude"]);
 
 function diagnostic(path, code, message, repair) {
   return { path, code, message, repair };
@@ -38,8 +53,14 @@ function rejected(root, diagnostics, extra = {}) {
 
 function hasHostManagedCalibration(root, deps = {}) {
   try {
+    const authority = resolveProjectAuthorityPaths({ rootDir: root });
+    const relativePath = authority.status === "ready"
+      ? authority.calibration
+      : (lstatSync(join(root, NEUTRAL_CALIBRATION), { throwIfNoEntry: false })
+        ? NEUTRAL_CALIBRATION
+        : LEGACY_CALIBRATION);
     const calibration = JSON.parse((deps.readFileSync ?? readFileSync)(
-      join(root, ".claude", "pipeline.json"),
+      join(root, relativePath),
       "utf8",
     ));
     return calibration?.repositoryMode === "host-managed";
@@ -88,7 +109,23 @@ function repositoryCapability(root, deps) {
   return hasHostManagedCalibration(root, deps) ? "host-managed" : "local";
 }
 
-function projectionCurrent(root, inspection, runtimeProjection, extra = {}, deps = {}) {
+function projectionCurrent(root, inspection, runtimeProjection, extra = {}, deps = {}, runner = "codex") {
+  if (RUNNERS_WITHOUT_NATIVE_READBACK.has(runner)) {
+    // The private Codex runtime authority is never read for this runner: no
+    // restart barrier has to exist on disk, and none is fabricated.
+    return {
+      schema: SCHEMA,
+      status: "ready",
+      root,
+      source: inspection.source,
+      sourceKind: "v3",
+      sourceSha256: inspection.sourceSha256,
+      runtimeProjection,
+      runtimeReadback: "not-applicable",
+      diagnostics: [],
+      ...extra,
+    };
+  }
   const repositoryMode = repositoryCapability(root, deps);
   let barrier;
   try {
@@ -183,6 +220,13 @@ function parseArgs(args) {
       if (!root || root.startsWith("--")) return { error: "--root requires a project directory" };
       parsed.root = root;
       index += 1;
+    } else if (arg === "--runner") {
+      const runner = args[index + 1];
+      if (runner !== "claude" && runner !== "codex") {
+        return { error: '--runner requires "claude" or "codex"' };
+      }
+      parsed.runner = runner;
+      index += 1;
     } else if (arg === "--help" || arg === "-h") parsed.help = true;
     else return { error: `unknown argument: ${arg}` };
   }
@@ -190,7 +234,38 @@ function parseArgs(args) {
   return parsed;
 }
 
-export function validateV3BootstrapAuthority({ rootDir = process.cwd(), deps = {} } = {}) {
+/**
+ * Derives the CLI's runner from the project's own V3 source when `--runner`
+ * is not given on the command line. This replicates (does not import) the
+ * canonical `selectedRunner(root, fs)` derivation in
+ * `../lib/project-onboarding-v3.mjs:934` -- that lib already imports
+ * `validateV3BootstrapAuthority` FROM this file, so importing back from it
+ * would be circular. Returns `null` on any missing/unreadable/ambiguous
+ * source; a `null` result deliberately keeps the caller on the Codex
+ * fail-closed path (`RUNNERS_WITHOUT_NATIVE_READBACK.has(null)` is false).
+ */
+function deriveCliRunner(root, deps = {}) {
+  try {
+    const raw = (deps.readFileSync ?? readFileSync)(join(root, "pipeline.user.yaml"), "utf8");
+    const declared = parseYaml(raw)?.runners;
+    const selected = declared?.default;
+    return (selected === "claude" || selected === "codex")
+      && Array.isArray(declared?.enabled)
+      && declared.enabled.includes(selected)
+      ? selected
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * `runner` is the runner the caller already derived from the project's own V3
+ * source. It defaults to `"codex"`, so every existing caller keeps today's
+ * exact native-readback requirement; a `null`/unknown value also stays on that
+ * fail-closed Codex path.
+ */
+export function validateV3BootstrapAuthority({ rootDir = process.cwd(), deps = {}, runner = "codex" } = {}) {
   const inspection = inspectRunnerProfileMigrationV3({ rootDir, deps });
   if (inspection.status !== "ready") {
     return rejected(inspection.root, [diagnostic(
@@ -294,7 +369,7 @@ export function validateV3BootstrapAuthority({ rootDir = process.cwd(), deps = {
     });
   }
 
-  return projectionCurrent(plan.root, inspection, "noop", {}, deps);
+  return projectionCurrent(plan.root, inspection, "noop", {}, deps, runner);
 }
 
 export function main(args = process.argv.slice(2), {
@@ -303,16 +378,17 @@ export function main(args = process.argv.slice(2), {
 } = {}) {
   const options = parseArgs(args);
   if (options.help) {
-    write("Usage: node plugins/pipeline-core/scripts/v3-bootstrap-authority.mjs --root <project-dir>\n");
+    write("Usage: node plugins/pipeline-core/scripts/v3-bootstrap-authority.mjs --root <project-dir> [--runner claude|codex]\n");
     return 0;
   }
   if (options.error) {
     write(`${options.error}\n`);
     return 2;
   }
-  const result = validateV3BootstrapAuthority({ rootDir: options.root, deps });
+  const runner = options.runner ?? deriveCliRunner(options.root, deps);
+  const result = validateV3BootstrapAuthority({ rootDir: options.root, deps, runner });
   write(`${JSON.stringify(result, null, 2)}\n`);
   return result.status === "ready" ? 0 : 1;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) process.exit(main());
+if (isDirectInvocation(import.meta.url)) process.exit(main());

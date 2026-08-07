@@ -12,8 +12,15 @@ an authority lock, or a projection plan.
 - Supply one real consumer project root containing `pipeline.user.yaml`.
 - Keep the project writable only for the final, explicit activation. `inspect`
   and `plan` are read-only.
-- Resolve any separately required route/advisory decision before activation.
-  A migration preview is not an approval, push, or release authorization.
+- Critic export is always limited to the configured allowlist: the bounded
+  candidate packet, listed providers, and listed assurance classes. The fresh
+  default records repository-scoped Advisor-export consent as `approved`, so a
+  matching consultation does not ask again for every export. A different data
+  class, provider, or packet boundary is not covered and remains blocked until
+  it is explicitly configured. Do not perform a consultation merely to
+  activate or bootstrap; Advisor capability preflight is model-free and
+  consultation is on demand. A migration preview is not an approval, push, or
+  release authorization.
 
 ## Fresh Codex lifecycle V4
 
@@ -243,7 +250,7 @@ repository.
 ## Neutral project authority migration
 
 Legacy project gates and lifecycle state may still live in
-`.claude/pipeline.yaml` and `.claude/pipeline-state.json`. Move that portable
+the manifest and lifecycle State at the legacy tier. Move that portable
 authority to the runner-neutral `project/` layer only through its separate,
 preview-first cutover:
 
@@ -257,7 +264,23 @@ node plugins/pipeline-core/scripts/project-authority-migration.mjs apply --root 
 sanitized pre-write preview to standard error before it can activate. The
 legacy files are retained for the compatibility reader; the neutral files are
 the only migration writes. A changed legacy source, changed neutral
-destination, mixed authority layer, or pending journal rejects activation.
+destination, or pending journal rejects activation.
+
+An ordinary `git fetch` never changes a checkout. Do not follow it with
+`git checkout --force` or `git switch --force`: those commands can overlay the
+untracked kickoff authority with a remote legacy authority. If an older host
+already left exactly that mixed state, `plan` returns the explicit
+`adopt-legacy-after-remote-checkout` recovery. Its activated apply preserves
+the existing neutral preimages under the repository's private Git common-dir,
+then copies the exact legacy authority into the neutral layer and verifies the
+result. It is a PO-confirmed recovery, not a precedence rule or a normal
+fetch-side effect.
+
+If migration is blocked solely by a previously completed, no-longer-live
+session-cleanup binding, use `session-cleanup.mjs release-binding --repo
+<root>`. This exact closure-receipt CAS is intentionally available before
+general onboarding readiness: it releases only the already persisted tuple and
+cannot create a session, delete a worktree, or bypass a missing closure proof.
 
 If an interrupted cutover leaves a journal, do not delete it or hand-copy its
 files. First inspect the recorded recovery, then explicitly activate it:
@@ -269,3 +292,24 @@ node plugins/pipeline-core/scripts/project-authority-migration.mjs recover --roo
 
 Recovery restores recorded preimages only after its own digest-bound preview;
 it never resumes an unreviewed write.
+
+## Externally archived temporary-worktree recovery
+
+Do not remove a Pipeline-owned worktree by hand during an active cleanup
+session. If an emergency archival was already performed outside the checkout,
+first retain the archive and then inspect the normal recovery plan:
+
+```sh
+node plugins/pipeline-core/scripts/session-cleanup.mjs plan-recovery --repo /absolute/consumer/root
+node plugins/pipeline-core/scripts/session-cleanup.mjs apply-recovery --repo /absolute/consumer/root --plan-sha256 <digest-from-plan> --activate
+```
+
+Every externally archived descriptor must prove a missing, non-sole-copy
+`disposable-control` worktree under `branch/detached`; its descriptor digest
+and manifest digest must still match and its recorded owner must not be live.
+Activation records `WT-EXTERNALLY-ARCHIVED` in the completed closure receipt
+and retires only that exact descriptor/manifest. A stale capability-only
+descriptor without a cleanup manifest may be included in the same plan only
+when it separately proves normally retirable; it never inherits the archive
+exception. The recovery never accepts a scratch file, generated output,
+implementation worktree, present path, or path-prefix guess.

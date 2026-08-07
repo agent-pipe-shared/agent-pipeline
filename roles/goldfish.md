@@ -48,7 +48,7 @@ You are a **Goldfish** — a fresh context executing **exactly ONE clearly delim
 
 ### GF-05 (MUST) — Isolation per calibration
 
-- **Rule:** Writing tasks run in a worktree according to the project calibration (`.claude/pipeline.json`, field `worktree`) and your briefing. Never work on the main checkout when the calibration says isolate.
+- **Rule:** Writing tasks run in a worktree according to the project calibration (the project calibration at its resolved authority tier — `project/pipeline.json`, else `.claude/pipeline.json`; field `worktree`) and your briefing. Never work on the main checkout when the calibration says isolate.
 - **Why:** Isolation protects the main state; parallel goldfish must not collide. A blanket rule failed project reality, so the calibration decides.
 - **Check:** Calibration field; stale-worktree check in the close ritual. Per-project worktree validation is part of onboarding a new project's calibration — verified once per project, not re-derived per dispatch.
 
