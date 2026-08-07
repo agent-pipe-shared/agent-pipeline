@@ -256,6 +256,52 @@ shape rather than an open unknown: either the GS-4 row is not needed in the same
 release, or the chain needs a carrier that does not exist yet. That is input the
 mechanism work needs, and it is a measurement, not a preference.
 
+## 8d. Resolution for the one code conflict, derived before the merge runs
+
+`git diff origin/main -- plugins/pipeline-core/hooks/guard-gate-strength.mjs`
+resolves the union question completely, and the answer is smaller than §3
+feared:
+
+**Every hunk except one is this branch being OLDER, not this branch owning a
+change.** The branch side lacks the ADR-0059 HGO routing block, the
+`toolName`/`toolInput` capture that block needs, the mode-aware denial guidance,
+and the two imports — all of which `main` adds. **The only branch-side addition is
+the `GS-8` entry** in `GATE_STRENGTH_PATHS`.
+
+**Resolution: take `main`'s file wholesale, then re-insert exactly one hunk** —
+the `GS-8` `Object.freeze({...})` block after `GS-7`. Nothing else from the branch
+side survives, and nothing else needs to.
+
+**One consequence that is a decision, not a mechanical merge, and is therefore
+stated rather than performed silently.** Under the branch's code no gate-strength
+rule had any in-session override. Under `main`'s code every rule except `GS-6`
+routes through HGO. Inserting `GS-8` into that table therefore **gives GS-8 an
+in-session override route it did not have before** — a human-authorized,
+audited, single-use, byte-exact capability, and in this repository's committed
+`signature` mode an external Ed25519 proof that no agent session can produce.
+
+Taken as the resolution, for a stated reason: GS-8 having no override was not a
+decision about GS-8, it was the absence of ADR-0059. Keeping GS-8 alone outside
+the family would make it the one rule in the table with a different shape and no
+reason recorded for it, which is how undocumented special cases start. The route
+is human-gated at the same strength as GS-1..GS-5/GS-7, which protect the push
+gate itself.
+
+**A related precision that changes a pending PO decision (R1's P5).** P5 asks
+whether `plugins/pipeline-core/lib/public-core-origin-allowlist.mjs` belongs in
+`NEVER_LIFTABLE_KERNEL_PATHS`. Read against the merged code, adding it there would
+be **inert for GS-8**: that list is consulted only on the `GS-6`/GMW branch
+(`guard-gate-strength.mjs`, the `matched === LIVE_PLUGIN_RULE` block), and a
+path-table rule never reaches it. It would bite only in a layout where the file
+sits inside the currently-enforcing plugin root — a self-hosted install — and
+there `GS-6` matches first anyway, before the path table is consulted at all.
+
+So P5 is not the question it looks like. "Add it to the kernel list" does not
+harden GS-8 in a source checkout; it changes behaviour only for the self-hosted
+case, and only via GS-6. Whoever answers P5 should be answering *which layout are
+we defending*, not *is this file important*. That reframing is the useful output
+here and it is recorded, not decided.
+
 ## 9. Honest limits of this plan
 
 The classification in §4 and §5 was computed against the **flat local copy**,
