@@ -28,7 +28,7 @@ Three consequences that shape every decision in this document:
    `plugins/pipeline-core/lib/po-approval-proof.mjs:33`) and HGO's existing
    attended authorization. Where a requirement cannot be met without a new human
    step, this document says so as a finding instead of designing the step in
-   (see §11, open question O-3).
+   (see §14, open question O-3).
 2. **The value of the ledger record here is reconstructability and tamper-evidence
    against agent behaviour and accidental loss** — not defence against a human
    forging their own approval. An argument of the form *"a human could tamper with
@@ -94,9 +94,10 @@ H-AC-12 needs; a file-level implementation inventory and test approach.
   it requires a kernel change plus a spec §6.1 amendment. Increment 1 answers all
   four PO questions portably at class level and leaves attribution exactly where
   it already lives. See §5.4.
-- **D-2 — synchronous dual-evaluation inside the guard hot path.** §8.5 explains
+- **D-2 — synchronous dual-evaluation inside the guard hot path.** §8.5.2 explains
   why the intersection check is placed at the arming/consumption boundary and in
-  reconcile, not on every hook read, and what that costs.
+  reconcile, not on every hook read, what that costs, and which criterion the
+  remaining residual does **not** satisfy.
 - **D-3 — lazy `expired` dispositions.** Emitted by an explicit reconcile step,
   not by a timer or by the guard read path (§7.5).
 
@@ -174,9 +175,19 @@ Additional facts this design depends on, all read from source:
   — a **different preimage** from the ledger's fingerprint (§3.1). The two values
   are not interchangeable; see A-6 in §10.
 - The CLI (`plugins/pipeline-core/scripts/guard-maintenance-window.mjs:54`)
-  exposes `prepare | install | status | close`, and `prepare` already accepts
-  `--plan <path>` and `--spec <path>`, while `install` currently accepts only
-  `--request` and `--proof` (`:115-128`).
+  exposes `prepare | install | status | close`. `parseArgs` (`:56-73`) shares one
+  option set across all four commands, so `--plan`/`--spec` already *parse* on
+  `install`; the install branch simply never reads them and requires only
+  `--request` and `--proof`, with `--authority` optional (`:115-130`). Only
+  `prepare` consumes them today, digesting them through `readPublicRepositoryFile`
+  (`:107-108`). §7.4 therefore needs no new option — only a consumer for two
+  options that already parse.
+- The same CLI pins `GMW_POLICY_REVISION = "guard-maintenance-window-v1"`
+  (`scripts/guard-maintenance-window.mjs:49`) and passes it into the signed intent
+  as `policyRevision` (`scripts/guard-maintenance-window.mjs:109`,
+  `po-approval-proof.mjs:22-25`). It is a public constant, covered by the PO's
+  signature, and carries no key material — §5.5 makes it the only signed input of
+  `policyDigest`.
 
 ### 3.3 HGO — already audit-chained, already named in H-AC-12
 
@@ -193,6 +204,40 @@ Additional facts this design depends on, all read from source:
   precisely what makes it acceptable.
 - HGO is covered by H-AC-12's "Git-guard override consumption"
   (`specs/sprint-phoenix-epic/acceptance.md:187-193`). GMW is not (§9).
+
+**HGO's capability field inventory, read from source.** The first version of this
+document asserted an HGO field set instead of verifying it, and named a
+`plan + spec` artifact source that HGO does not have. The verified inventory:
+
+- `CAPABILITY_KEYS` (`human-guard-override.mjs:1066-1089`) is exactly `schema,
+  status, root, requestSha256, planSha256, selectionSha256, reasonSha256, plugin,
+  repository, toolName, toolInputSha256, commandClass, denials, policy, preview,
+  eligiblePaths, mode, authorSourceRoot, authorizedAt, expiresAt, consumedAt, mac`.
+  **`specSha256` does not occur anywhere in the module**, and `planSha256`
+  (`:1295-1313`) is the digest of an in-memory plan payload object, not of a
+  repository file. There is no plan/spec artifact pair to copy.
+- The capability *does* carry a candidate: `repository` is `repositoryObservation`
+  (`:424-434`) = `{fingerprintSha256, head, tree, statusSha256, state}`, so
+  `scope.candidate = {commit: repository.head, tree: repository.tree}` is
+  derivable and exact.
+- `eligiblePaths` holds **repo-relative** strings (`safePath` `:436-455`, pushed as
+  `path.relative` at `:798`/`:815`/`:851`). It is **empty** for the
+  `closed-shell-exact` (`:838-844`) and `global-plugin-install` (`:785-792`)
+  classes, and for the dominant `writer-owned-project-policy-emergency` class its
+  entries are usually the dot-prefixed protected paths of `protectedPath`
+  (`:457-478`). §7.5 and finding F-3 (§14) take the consequences.
+- `policy` is `policyIdentity(root, pluginRoot, denials)` (`:369-396`) =
+  `{guards:[{guard, implementationSha256}], project:[{path, status, sha256}]}` —
+  shipped guard code plus repository-relative policy files with real byte digests,
+  and no key material anywhere. §5.5 uses it as HGO's `policyDigest` preimage;
+  §7.5 uses its `project` entries as the artifact fallback.
+- Consumption re-observes the repository and refuses on any drift of capability,
+  plugin identity, policy identity or repository observation (`:1588-1611`,
+  `HGO-DRIFT`) — including a changed worktree `statusSha256`. HGO's candidate
+  binding is therefore already enforced at consume time, which is what makes the
+  HGO half of §8.5.1's candidate rule non-vacuous.
+- `recordHumanGuardDenial` rejects an empty denial set (`:1156`), so every HGO
+  decision has at least one denying guard identity behind it.
 
 ### 3.4 The restricted machine-local zone — also already exists
 
@@ -223,8 +268,8 @@ All field names are from the validated payload (§3.1) unless prefixed `envelope
 | **what** was approved | `scope.action` | `GUARD.MAINTENANCE.LIFT` | `GUARD.OVERRIDE.CONSUME.SIGNATURE` or `GUARD.OVERRIDE.CONSUME.CHAT` | H-AC-11 "exact scope", H-AC-04 "action" | deterministic, derived from the mechanism, not from operator input |
 | | `scope.packageId` | `guard-maintenance-window` | `human-guard-override` | H-AC-04 "package" | deterministic |
 | | `ruleDigest` | `canonicalSha256({scopeRuleIds, openingTreeSha256})` | `canonicalSha256({eligiblePaths, commandClass})` | H-AC-04 "rule", H-AC-11 "rule digests" | re-derivable against the closed public catalogue (`LIFTABLE_RULE_IDS` + `TP-` prefix, `:104-110`) |
-| | `scope.candidate` | intent `candidate{commit,tree}` verbatim | capability's candidate | H-AC-04 "candidate" | signed for GMW; locally observed for HGO |
-| | `scope.artifacts` | plan + spec `{path, sha256}`, digests re-checked against the signed intent | plan + spec of the override | H-AC-04 "artifact" | digest-verified at intake |
+| | `scope.candidate` | intent `candidate{commit,tree}` verbatim (`guard-maintenance-window.mjs:364-371`) | `{commit: repository.head, tree: repository.tree}` from the capability's `repositoryObservation` (`human-guard-override.mjs:424-434`) | H-AC-04 "candidate" | signed for GMW; locally observed for HGO |
+| | `scope.artifacts` | plan + spec `{path, sha256}`, digests re-checked against the signed intent | the layered, source-established set of §7.5 — representable `eligiblePaths`, else the present `policy.project` entries; **never** a plan/spec pair, which HGO does not have | H-AC-04 "artifact" | digest-verified at intake |
 | | `scope.environment` | `local-checkout` | `local-checkout` | H-AC-04 "environment" | deterministic |
 | | `validity.singleUse` | `false` (a window is time-boxed, not single-use) | `true` | H-AC-04 "single-use" | structural |
 | **when** | `validity.notBeforeEpochMs` / `expiresAtEpochMs` | `installedAtMs` / `min(signed expiresAtMs, installedAtMs + MAX_WINDOW_TTL_MS)` — the **same formula** the enforcement path uses (`:542-545`) | authorization time / capability expiry | H-AC-04 "validity", H-AC-11 "time" | — |
@@ -235,7 +280,7 @@ All field names are from the validated payload (§3.1) unless prefixed `envelope
 | **by whom** | `authorityClass` | `product-owner` | `product-owner` (or the configured reviewer class) | H-AC-11 "actor/authority class" | class only — **no name, no key digest, no pseudonym** (H-AC-05) |
 | | `identityAssurance` | **`locally-attributed`** — see below | `locally-attributed` | H-AC-05 | — |
 | | `envelope.correlation.requestId` | the approval intent digest `intent.sha256` | request digest | H-AC-11 "request" | per-decision unique, non-identifying |
-| | `policyDigest` | `canonicalSha256` of the effective proof-policy inputs that decided the lift was admissible | same for HGO's mode | H-AC-11 "policy digest" | re-derivable locally |
+| | `policyDigest` | the closed preimage of §5.5 — signed `policyRevision` + `kind`, the public liftable-rule catalogue and TTL ceiling. **The trust anchor is not an input, at any depth** | `canonicalSha256(capability.policy)`, i.e. the guard/policy identity HGO already computes and MACs (`human-governance-decision.mjs` untouched; source `human-guard-override.mjs:369-396`) | H-AC-11 "policy digest" | re-derivable from public inputs alone |
 
 **Why `identityAssurance` is `locally-attributed` even for a cryptographically
 verified GMW proof.** The trust anchor against which the signature is verified is
@@ -274,11 +319,20 @@ portable record:
 
 1. `record.root` — an absolute filesystem path (`guard-maintenance-window.mjs:459`).
    H-AC-13 rejects private paths outright.
-2. `record.proof` and the trust anchor's `keyReference`/`publicKeySha256`. A
+2. `record.proof` and the trust anchor's `keyReference`/`publicKeySha256`
+   (`critical-human-proof-policy.mjs:185-194`: the anchor is exactly those two
+   keys) — **and every value derived from either of them, at any depth**. A
    public-key digest is a **stable pseudonym** for one natural person across every
-   record it appears in; H-AC-05 permits only the non-identifying class, and
+   record it appears in, and a digest *of* that digest is the same pseudonym one
+   hash deeper: identical in every record forever, and confirmable by anyone
+   holding the local policy. H-AC-05 permits only the non-identifying class, and
    H-AC-13 names joinable pseudonyms. The proof stays in the machine-local window
-   record, which already holds it.
+   record, which already holds it. Because portable records are append-only
+   (H-AC-06), a derivative admitted here could never be corrected or erased, so
+   §5.5 closes the one field whose natural preimage was the anchor, and the
+   verification of that field is **constructive** (recompute from the declared
+   preimage) rather than a blocklist of forbidden values — a blocklist cannot
+   catch a derivative.
 3. `subject.reason` — free-form rationale, named by H-AC-13.
 4. `subject.nonce` and GMW's `repoFingerprintSha256` — machine-local correlators
    with no reviewer value; the ledger has its own fingerprint (§3.1, A-6).
@@ -309,7 +363,7 @@ therefore forbids, as a testable rule:
 mechanical join can attribute a specific lift to a specific person. That is not a
 gap in this design; it is what the bound criteria decided, and it is what makes
 the machine-local record genuinely erasable while the portable record is
-append-only forever (H-AC-06). It is carried to the PO as open question O-1 (§13)
+append-only forever (H-AC-06). It is carried to the PO as open question O-1 (§14)
 rather than quietly softened.
 
 ### 5.3 What happens to GMW's free-text `subject.reason`
@@ -352,6 +406,80 @@ rather than quietly softened.
   `pipeline.human-role-exception-decision.v1` is already implemented and already
   absent from that list, so the family has been extended once before — which is an
   argument for doing it through the rebind, not around it.
+
+### 5.5 `policyDigest`: the closed preimage, and why it is not the trust anchor
+
+`policyDigest` was the one digest in this design left as prose ("the effective
+proof-policy inputs"). That is not admissible: the only proof policy in the GMW
+path is the trust anchor, whose entire content is `{keyReference,
+publicKeySha256}` (`critical-human-proof-policy.mjs:185-194`, read at
+`guard-maintenance-window.mjs:508-511`), so the field's *natural* preimage is
+exactly the stable pseudonym §5.1 excludes.
+
+**Dropping the field is not available.** `policyDigest` is a required key of the
+closed payload and must match the `SHA256` pattern
+(`human-governance-decision.mjs:23,26`); omitting it fails `HGL-SHAPE`, and
+relaxing that validator is a kernel change (increment 2, D-1). A typed state is
+not admitted for payload fields either — the typed states of
+`governance-event.mjs:24` apply to the envelope, not to this payload. The field
+must therefore be given a preimage that is safe, or the whole intake is
+unimplementable. It can be given one.
+
+**GMW.**
+
+Line references in the block below are to `lib/guard-maintenance-window.mjs`
+except where the CLI is named.
+
+```text
+policyDigest = canonicalSha256({
+  schema:          "pipeline.guard-authority-intake-policy.v1",
+  policyRevision:  intent.value.policyRevision,   // SIGNED; "guard-maintenance-window-v1",
+                                                  // scripts/guard-maintenance-window.mjs:49
+  approvalKind:    intent.value.kind,             // SIGNED; "guard-lift"
+  proofRequirement:"detached-ed25519-over-intent-digest",   // constant of this path
+  liftableRuleIds: LIFTABLE_RULE_IDS,             // ["GS-6"], exported at :104
+  liftableRulePrefix: "TP-",                      // pinned copy; see below
+  maxWindowTtlMs:  MAX_WINDOW_TTL_MS,             // exported at :175
+})
+```
+
+`LIFTABLE_RULE_IDS` (`:104`) and `MAX_WINDOW_TTL_MS` (`:175`) are exported and are
+imported directly. `LIFTABLE_TP_PREFIX` (`:105`) is **module-private**, so the
+intake carries its own pinned copy of the literal rather than asking another
+session's module to widen its export surface; §12's catalogue-pinning test asserts
+the copy still agrees with GMW's behaviour through the exported `isLiftableRuleId`
+(`:108-110`), which is the observable form of the same catalogue.
+
+**HGO.** `policyDigest = canonicalSha256(capability.policy)`, i.e. the exact
+`policyIdentity` object HGO already computes, MACs into the capability, and
+re-checks at consume time (`human-guard-override.mjs:369-396`, `:1593`). Its
+inputs are shipped guard code digests and repository-relative policy files with
+byte digests — public repository material, no key material. This is not a new
+construction: HGO's own denial audit entry already carries `policySha256:
+sha(policy)` over that same object (`:1233`), so the portable field reuses a
+digest the mechanism had already decided was safe to record.
+
+**Four properties, stated so they can be tested rather than believed:**
+
+1. **Closed.** The preimage is a fixed, enumerated object. Nothing else can enter
+   it, so no future input can smuggle the anchor in sideways.
+2. **Not a derivative of the trust anchor's key digest — explicitly.** Neither
+   `keyReference` nor `publicKeySha256`, nor any value computed from either,
+   appears in the preimage at any depth. Stated here because the reviewer must be
+   able to check the claim rather than infer it from an absence.
+3. **Not person-bound.** Every input is either a signed public constant, a
+   published catalogue value, or a digest of repository/plugin code. Two different
+   people signing on the same policy revision produce the *same* `policyDigest` —
+   which is exactly the property that distinguishes a policy digest from a
+   pseudonym.
+4. **Constructively verified.** The privacy test (§12, test 16) recomputes
+   `policyDigest` from the declared preimage and asserts equality, so any extra or
+   substituted input fails the test. AC-2's enumeration of forbidden values stays,
+   but it is the weaker of the two checks and is no longer the only one.
+
+The signature's real value is unchanged and is still recorded — as
+`scope.action`, as the reason code's provenance (§5.3), and as the machine-local
+proof the window record keeps. What is *not* recorded is who holds the key.
 
 ## 6. GMW retention: chosen approach and the rejected one
 
@@ -451,7 +579,8 @@ correlation            { featureId: <intent featureId>, packageId: <scope.packag
                          traceId:  {state:"omitted-by-policy"} }
 candidate              scope.candidate
 artifacts              scope.artifacts
-policy                 { policyDigest, configurationDigest: <openingTreeSha256>,
+policy                 { policyDigest: <the closed preimage of §5.5>,
+                         configurationDigest: <openingTreeSha256>,
                          capturePolicyDigest, redactionPolicyDigest }
 classification         "repository-public-safe"
 storageProfile         "repository-public-safe"
@@ -468,29 +597,58 @@ as a fabricated hash.
 
 ### 7.3 Deterministic identifiers (idempotency without a registry)
 
-Let `i32` be the first 32 hex characters of `intent.sha256`.
+Let `i32` be the first 32 hex characters of `intent.sha256`, and let `g` be the
+**grant generation**: the number of `granted` decisions already linked to
+`requestDecisionId` in the human stream.
 
 ```text
 requestDecisionId = "gmw-request-<i32>"
-grantDecisionId   = "gmw-grant-<i32>-<installedAtMs>"
-revokeDecisionId  = "gmw-revoke-<i32>-<installedAtMs>"
-expireDecisionId  = "gmw-expired-<i32>-<installedAtMs>"
+grantDecisionId   = "gmw-grant-<i32>-<g>"
+revokeDecisionId  = "gmw-revoke-<i32>-<g>"
+expireDecisionId  = "gmw-expired-<i32>-<g>"
 ```
 
 All match the `ID` pattern (`human-governance-decision.mjs:4`) and stay under 128
-characters. Consequences that were designed for, not stumbled into:
+characters. The generation replaces the earlier `installedAtMs` suffix, which was
+wrong under concurrency: two racing installs read different clocks, so they would
+have produced two *different* grant ids for one request and left two live grants
+that the boundary check of §8.5 could not disambiguate.
 
-- Re-running `install` with the identical signed request (explicitly supported by
-  GMW, `:451-455`) must not conflict: **before appending, the intake resolves the
-  stream; if a live, non-disposed grant for `requestDecisionId` already exists, it
-  appends nothing.** Without this the second install would produce the same
-  `idempotencyKey` with a different `occurredAtEpochMs`, and the store would fail
-  it as `GES-IDEMPOTENCY-CONFLICT` — turning a supported operation into a hard
-  error.
-- `requested` is appended once and skipped on every later install of the same
-  request. It is required, not optional: a `granted` decision without a non-null
-  `links.requestDecisionId` fails `HGL-LIFECYCLE`
-  (`human-governance-decision.mjs:37-39`).
+**The skip and the generation are re-asserted under the store's own lock.** The
+store wraps scan-plus-append in `withExclusiveStreamLock` and exposes
+`assertAppend` for exactly this purpose — "a caller may bind a domain-specific
+append precondition to this same stream lock … a separately queried grant must not
+be consumed twice in a race" (`governance-event-store.mjs:638`, `:645-651`). The
+intake therefore:
+
+1. reads the stream unlocked, computes `g`, and skips entirely if a live,
+   non-disposed grant for `requestDecisionId` already exists (the common,
+   supported re-install case, GMW `:451-455`);
+2. passes an `assertAppend` that re-checks both facts **inside** the lock — still
+   no live grant, and the generation is still `g` — and throws
+   `GAL-GRANT-RACE` otherwise.
+
+A losing racer therefore fails **closed** and retryable: no window arms, and the
+operator re-runs the identical `{request, proof}` — no re-signing, no new ceremony
+(§1). On the retry the live grant is visible and nothing is appended.
+
+**Idempotency conflicts are handled, not assumed away.** The store compares
+idempotency keys *before* `assertAppend` runs and fails a same-key/different-intent
+replay with `GES-IDEMPOTENCY-CONFLICT` (`:640-644`); a byte-identical intent
+returns `idempotent-replay` instead (`:643`). Because `occurredAtEpochMs` comes
+from the local clock, two appends of the same decision are never byte-identical,
+so the conflict path is the one that fires. The intake treats it as a **signal,
+not an error**, and only after verification: it re-reads the committed event under
+that key and continues only if the event's payload validates as the same decision
+class with the same `decisionId` and a byte-identical `scope`, `ruleDigest`,
+`policyDigest` and `validity`. Anything else fails closed. This is strictly
+stronger than the previous unlocked check-then-append, which §12's concurrency
+test now pins.
+
+`requested` is appended once and skipped on every later install of the same
+request. It is required, not optional: a `granted` decision without a non-null
+`links.requestDecisionId` fails `HGL-LIFECYCLE`
+(`human-governance-decision.mjs:37-39`).
 
 ### 7.4 GMW event sequence
 
@@ -516,10 +674,49 @@ paths are unsigned and therefore agent-supplied, but a digest match proves the
 bytes are the ones the PO signed over, so no trust is placed in the path itself.
 If the paths are absent or the digests disagree, the intake **fails closed and the
 window does not arm** — the operator re-runs `install` with the correct paths
-using the same signature (§8.1). This requires `install` to accept `--plan`/`--spec`,
-which `prepare` already does (`scripts/guard-maintenance-window.mjs:54`).
+using the same signature (§8.1). This requires `install` to *consume*
+`--plan`/`--spec`; both already parse there, because `parseArgs` shares one option
+set across all commands (`scripts/guard-maintenance-window.mjs:56-73`), and only
+the install branch's failure to read them (`:115-130`) has to change. `prepare`'s
+own defaults (`:50-52`) are deliberately **not** reused as an install-time
+fallback: a default that silently supplies a different artifact than the one the
+PO signed over would defeat the digest check it is supposed to pass.
 
 ### 7.5 HGO event sequence
+
+**Where each HGO scope field comes from** (§3.3's inventory, not assumption):
+`scope.candidate` from `capability.repository.head`/`.tree`; `scope.packageId`
+`human-guard-override`; `scope.action` from the consumption mode;
+`ruleDigest = canonicalSha256({eligiblePaths, commandClass})`;
+`policyDigest = canonicalSha256(capability.policy)` (§5.5);
+`validity.notBeforeEpochMs` / `expiresAtEpochMs` from `capability.authorizedAt` /
+`capability.expiresAt`; `correlation.requestId` from `capability.requestSha256`.
+
+**`scope.artifacts`, and the case where it cannot be built.** The payload requires
+at least one `{path, sha256}` entry whose path matches an artifact pattern that
+begins `[A-Za-z0-9]` (`human-governance-decision.mjs:30-31`; the envelope repeats
+it at `governance-event.mjs:23`). HGO's own data satisfies that only sometimes, so
+the intake uses a layered, deterministic source and states the residue:
+
+1. every `capability.eligiblePaths` entry that matches the artifact path pattern
+   **and** resolves to a regular file inside the worktree, paired with the sha256
+   of its bytes read at the moment the event is built (denial time for `denied`,
+   authorization time for `granted`; the `consumed` disposition inherits the
+   grant's `scope` unchanged, `human-governance-decision.mjs:60`);
+2. otherwise every `capability.policy.project` entry with `status: "present"` whose
+   path matches the pattern, with the digest `policyIdentity` already computed
+   (`human-guard-override.mjs:386-394`). These are honestly *bound* to the
+   decision, not decorative: a change to any of them drifts the capability and
+   HGO refuses to consume it (`:1593`, `HGO-DRIFT`);
+3. otherwise **the decision is not representable in the portable payload at all**,
+   and increment 1 appends nothing for it. See finding F-3 (§14) and §8.1.
+
+Case 3 is not hypothetical: `eligiblePaths` is empty for the `closed-shell-exact`
+and `global-plugin-install` classes, and the dominant
+`writer-owned-project-policy-emergency` class targets dot-prefixed paths such as
+the `.claude/` configuration files (`:457-478`), which the leading-`[A-Za-z0-9]`
+rule rejects. This is a limitation of the payload contract, not of HGO, and the
+amendment that removes it is specified in §9 and left to the rebind.
 
 | HGO transition | Portable event | Reason code | Link |
 | --- | --- | --- | --- |
@@ -561,6 +758,19 @@ Grounds:
 - **It costs the human nothing.** Re-installing the identical `{request, proof}`
   is explicitly supported by GMW (`:451-455`); the operator retries the same
   command with the same signature. No re-signing, no new ceremony (§1).
+
+**One bounded exception, named rather than hidden: the HGO decisions that the
+payload cannot represent at all (§7.5 case 3).** "Fail closed" there would not
+mean "record it and proceed", it would mean *disabling HGO's dominant emergency
+lane* for as long as the artifact contract stays as it is. The field constraint of
+§1 reads as a ceiling on additions, and it retires nothing that already exists;
+turning off a working human lane to satisfy a bookkeeping rule would retire
+something. Increment 1 therefore leaves those consumptions exactly as they are
+today — machine-local audit chain only, no portable event, no new capability, no
+change to HGO's behaviour — and the gap is carried as finding F-3 with its
+amendment in §9, not silently absorbed. Every HGO decision that *is* representable
+fails closed as stated above. This exception is scoped to representability alone: a
+representable decision whose append merely *fails* still blocks the consumption.
 
 **Narrowing SHALL fail open.** `close` deletes the window record first and appends
 `revoked` afterwards; if the append fails, the window is still gone. Refusing to
@@ -617,19 +827,97 @@ reading of H-AC-12's dual-evaluation requirement
 migration, fail on disagreement, and carry the shared compatibility owner and
 expiry").
 
-**Where the dual evaluation runs (D-2).** At the arming boundary (`install`), at
-the consumption boundary (HGO `consume`), in `status`, and in reconcile — **not**
-inside the synchronous guard hook read path. The hook path (`windowCoversRule`,
-`:559-566`) is synchronous and must not take the ledger's stream lock or perform
-async repository I/O on every tool call; doing so would make guard evaluation
-depend on a lockable resource, which is a denial-of-enforcement risk far worse
-than the residual it closes. The residual: between two arming boundaries, the hook
-trusts the machine-local record alone — which is the pre-existing behaviour, so
-nothing regresses. This interpretation is carried to the rebind review as open
-question O-2 (§13) rather than being settled here.
+#### 8.5.1 Which candidate the check passes — the resolver's actual comparison
 
-The migration compatibility owner and expiry required by the same sentence are
-recorded in the amendment of §9.
+The resolver compares the supplied candidate to the grant's, field by field:
+`if (decision.scope.repositoryFingerprint !== repositoryFingerprint ||
+decision.scope.candidate.commit !== candidate.commit ||
+decision.scope.candidate.tree !== candidate.tree) return … "scope-mismatch"`
+(`human-governance-ledger.mjs:55`). "A live grant exists" is therefore not a
+well-defined question until the caller says which candidate it passes. This design
+previously left that open. It is settled here, **differently for the two
+producers, because the two mechanisms bind candidates differently**:
+
+- **GMW → the grant's own candidate**, `decision.scope.candidate`. GMW's
+  enforcement is deliberately candidate-independent: validity is derived purely
+  from the signed time bound (`guard-maintenance-window.mjs:542-545`, no candidate
+  term). A maintenance window exists precisely so that guarded paths can be
+  edited, so `HEAD` moving during the window is the **normal** case, not an
+  anomaly. Passing the *current* candidate would therefore report a false
+  ledger/window disagreement on almost every real window: `status` would lose its
+  stated value as the detector of a lost close-append, and a reconcile keyed on
+  disagreement could append a spurious `revoked` that H-AC-06 makes permanent.
+  That reading is rejected.
+- **HGO → the currently observed candidate.** HGO's capability *is* candidate-
+  bound and its consume path already re-observes the repository and refuses on any
+  drift (`human-guard-override.mjs:1588-1611`, `HGO-DRIFT`), down to the worktree
+  `statusSha256`. Passing the current candidate is therefore non-vacuous there and
+  agrees with the mechanism's own rule: whenever HGO would consume, the two
+  candidates are equal by construction; when they differ, denying is correct.
+
+**The honest cost of the GMW choice, stated rather than implied.** Passing the
+grant's own candidate makes the resolver's candidate comparison **vacuous for
+GMW**: the boundary check is a *liveness, repository-binding and disposition*
+check, and it is named that way in this document from here on. The candidate
+binding H-AC-04 requires is still established and still enforced — but once, at
+grant creation, against the PO-signed intent candidate
+(`guard-maintenance-window.mjs:364-371`, re-derived and proof-checked at
+`:401-419`), and thereafter by `HGL-SCOPE`/`HGL-CROSS-REPOSITORY` at append
+(`human-governance-ledger.mjs:156`) and by the repository-fingerprint comparison
+that the same line 55 performs on every read. What the boundary does **not** do is
+re-bind the lift to the current tree; claiming otherwise would be the overclaim
+this document exists to avoid.
+
+This is not a novel reading: the kernel's own one-shot disposition path resolves
+liveness the same way, passing `candidate: grant.scope.candidate` into the
+resolver under the stream lock (`human-governance-ledger.mjs:215-221`).
+
+Two consequences are binding on the implementation: **reconcile SHALL NOT derive
+any disposition from a candidate difference** (only from expiry, from a missing
+window record after a recorded grant, or from an explicit close), and §12's
+stale-candidate test pins both halves of the rule.
+
+#### 8.5.2 Where the dual evaluation runs (D-2), and the criterion it does not meet
+
+At the arming boundary (`install`), at the consumption boundary (HGO `consume`),
+in `status`, and in reconcile — **not** inside the synchronous guard hook read
+path. The hook path (`windowCoversRule`, `guard-maintenance-window.mjs:559-566`)
+is synchronous and must not take the ledger's stream lock or perform async
+repository I/O on every tool call; doing so would make guard evaluation depend on
+a lockable resource, which is a denial-of-enforcement risk far worse than the
+residual it closes.
+
+**H-AC-02 is the criterion actually at stake, and the residual does not satisfy
+it.** H-AC-02 (`acceptance.md:143-144`) reads: "IF mutable state claims human
+authority without a matching valid ledger decision, THEN THE SYSTEM SHALL reject
+the authority claim." It carries no migration qualifier and no expiry. The
+machine-local window record is mutable state claiming human authority; between two
+boundaries the hook honours it with no ledger decision consulted. Anchoring this
+residual to H-AC-12's "during migration" clause — as this document did — answered
+a weaker question than the one being asked, and the accompanying "nothing
+regresses" is true but sets the bar at the pre-ledger status quo that this
+document exists to replace. Recorded plainly: **as designed, increment 1 does not
+satisfy H-AC-02 at the guard hook.** It satisfies it at every boundary that grants
+or consumes.
+
+**The closure path, since a defect with no route out is only half-reported.** The
+hook can perform the intersection without any of the three costs above, because on
+that side the check is **narrowing-only**: it can turn a `covered: true` into
+`covered: false` and can never produce a lift by itself, since the proof-verified
+window record remains a necessary condition. That asymmetry is what makes the
+ledger read cheap in guarantees — no lock is needed (readers take none; each event
+file is published by atomic rename, `governance-event-store.mjs:657-659`), no
+integrity assumption is needed (an agent that forges or deletes ledger files can
+only *deny* itself the lift), and no human step is added. The remaining real cost
+is per-call read I/O over the human stream, which is why this is scheduled as
+increment 2 alongside D-1 rather than asserted as free, and why the hooks that
+call `windowCoversRule` appear in §9's amendment rather than in §11's increment-1
+inventory. Until it lands, O-2 (§14) carries a **known non-conformance with an
+owner and a date**, not an interpretation to ratify.
+
+The migration compatibility owner and expiry that H-AC-12's own sentence requires
+are recorded in the amendment of §9; they bound the H-AC-12 clause, and they do
+not bound H-AC-02, which has no expiry to give.
 
 ### 8.6 Self-reference audit
 
@@ -662,18 +950,59 @@ becomes effective."
 the ordinary reviewed rebind path — proposed here, reviewed, then applied by the
 rebind, **not** edited in-session. This document does not touch the file.
 
-Two further amendments belong in the same rebind so the artifacts stay consistent
-(bundling them avoids two rebinds):
+**Further amendments belong in the same rebind** so the artifacts stay consistent
+(bundling them avoids repeated rebinds). AC-9 makes the §9 amendment a completion
+gate for this path, so an under-specified list here would write an incomplete
+inventory into a bound artifact and lock it in. The list below is therefore
+derived row-by-row from §11 rather than summarized:
 
-- `spec.md` §7.4 (`:405-428`) gains inventory rows for the new intake module, its
-  test, and the two CLI wrappers (§11).
+- `spec.md` §7.4 (`:405-427`) gains **five** rows: the intake module
+  `plugins/pipeline-core/lib/guard-authority-ledger-intake.mjs`, its unit test
+  `…/lib/guard-authority-ledger-intake.test.mjs`, the integration test
+  `plugins/pipeline-core/scripts/guard-authority-ledger-intake.test.mjs`, and the
+  two producer CLIs `plugins/pipeline-core/scripts/guard-maintenance-window.mjs`
+  and `plugins/pipeline-core/scripts/guard-human-override.mjs`.
+- Two rows already in `spec.md` §7.4 are **extended, not duplicated**:
+  `scripts/governance-authority.mjs` (`:421`) and
+  `scripts/governance-authority.test.mjs` (`:422`) gain the lazy `expired` and
+  repair `revoked` reconcile dispositions of §7.5/§8.2. This is inventory
+  catch-up, not a new surface: `spec.md:310` already declares
+  `governance-authority resolve|reconcile` as a service operation.
+- No row is needed for `docs/human-governance-ledger.md`: `spec.md:418` already
+  carries it as a **create**, which is also why §11 lists it as a create (§14,
+  F-4).
 - The migration compatibility owner and expiry H-AC-12 requires: owner
   `pipeline` (PHX-2 package), expiry at the end of the Phoenix epic, after which
-  the intersection check becomes unconditional rather than migration-scoped.
+  the intersection check becomes unconditional rather than migration-scoped. Note
+  that this bounds the H-AC-12 clause only; H-AC-02 (§8.5.2) is unconditional and
+  is not discharged by any expiry.
+- **For the H-AC-02 residual (increment 2).** The guard hooks that consult
+  `windowCoversRule` gain the synchronous, lock-free, narrowing-only intersection
+  read of §8.5.2, and `spec.md` §7.4 gains their rows at that point. Specified
+  here so the residual has a named closure; not part of increment 1's inventory.
+- **For the un-representable HGO decisions (increment 2, finding F-3).** The
+  portable payload cannot express an override whose only bound paths are
+  dot-prefixed or absent, because `scope.artifacts` requires at least one entry
+  whose path starts `[A-Za-z0-9]` (`human-governance-decision.mjs:30-31`, mirrored
+  at `governance-event.mjs:23`). Two candidate amendments, both kernel-level and
+  therefore explicitly **not applied here**: admit a leading `.` in the artifact
+  path pattern (dot-prefixed repository-relative paths are public and carry no
+  privacy problem), or admit a typed `not-applicable` artifact entry in the
+  payload as the envelope already does (`governance-event.mjs:130-136`). The
+  first is narrower and is the recommendation; both touch a shipped validator and
+  its published schema, so both belong to the reviewed rebind.
 - Only if increment 2 (D-1) is accepted: `spec.md` §6.1's closed schema family
   gains the restricted attribution schema.
 
-## 10. Unverified assumptions about the finalized GMW
+## 10. Assumptions and pinned dependencies
+
+Both producers get a safety net here. The first version of this document listed
+ten GMW assumptions and none for HGO, which made every HGO dependency read as
+established fact — and one of them was wrong (§3.3, §7.5). An unverified GMW
+dependency fails loudly against a row below; an unverified HGO dependency used to
+fail only at implementation time. §10.2 closes that asymmetry.
+
+### 10.1 Unverified assumptions about the finalized GMW
 
 The finalized GMW is being produced elsewhere and was **not** available. Each
 assumption below is about its final shape; each names what breaks if it is false,
@@ -691,57 +1020,129 @@ and how the breakage is detected rather than silently absorbed.
 | A-8 | `LIFTABLE_RULE_IDS` + `TP-` prefix remains the closed liftable set | `ruleDigest` stops being resolvable against a published catalogue | catalogue-pinning test in the conformance suite |
 | A-9 | The CLI keeps the `prepare/install/status/close` command surface | §7.1's placement of the intake moves | CLI test failure |
 | A-10 | ADR-0058 and the GMW threat model/design documents land with the finalized module | this design cites no line from them (they are **absent from this checkout**, §14) and does not depend on them | §14 |
+| A-11 | GMW enforcement stays candidate-independent — validity from the signed time bound alone, no candidate term (`:542-545`) | §8.5.1's choice inverts: if the final GMW binds a candidate at enforcement, the boundary must pass the *current* candidate and the vacuity disclosure is wrong in the other direction | §12's stale-candidate test fails the moment a candidate term enters the validity computation |
+| A-12 | `install` remains re-runnable with an identical `{request, proof}` (`:451-455`) | §7.3's fail-closed retry after a lost race stops being free for the human, and §8.1's "costs the human nothing" no longer holds | integration test 8 (re-install appends nothing, does not error) |
+
+### 10.2 HGO dependencies — verified in this checkout, pinned against drift
+
+These are **not** unverified: every row was read from source for this document
+(§3.3). They are listed so that a later change to HGO breaks a named row and a
+test, rather than breaking the intake silently.
+
+| # | Pinned dependency (**verified**, `human-guard-override.mjs`) | If it changes | Detection |
+| --- | --- | --- | --- |
+| H-1 | `CAPABILITY_KEYS` keeps `repository`, `eligiblePaths`, `policy`, `commandClass`, `requestSha256`, `authorizedAt`, `expiresAt` (`:1066-1089`) | the HGO builders lose their field sources and fail closed | shape assertion in the unit tests; `exactKeys` at `:1100` already fails a drifted capability |
+| H-2 | `repository` stays `repositoryObservation` with `head`/`tree` (`:424-434`) | `scope.candidate` has no source; no HGO event can be built | unit test pins the mapping; `HGL-SCOPE` at validation |
+| H-3 | `eligiblePaths` stays repo-relative (`:436-455`, `:815`) | an absolute path could reach a portable field | privacy test 16 and the artifact path pattern both reject it |
+| H-4 | `policy` stays `policyIdentity`'s `{guards, project}` shape with no key material (`:369-396`) | `policyDigest`'s HGO preimage stops being closed or stops being safe | §12's constructive `policyDigest` test |
+| H-5 | consume keeps refusing on repository/policy/plugin drift (`:1588-1611`) | §8.5.1's HGO half becomes vacuous too, and the current-candidate choice loses its justification | integration test on drift-rejection ordering |
+| H-6 | the audit chain keeps `denied`/`authorized`/`expired`/`rejected`/`consumed` (`:1226-1235`, `:1511-1520`, `:1598-1605`, `:1623-1631`) | §7.5's event mapping loses its trigger points | CLI integration tests |
+| H-7 | a denial set is never empty (`:1156`) | the HGO path could produce a decision with no denying guard identity behind it | unit test on the builder's precondition |
 
 ## 11. Implementation inventory (file level)
 
 | File | Change | Rationale |
 | --- | --- | --- |
 | `plugins/pipeline-core/lib/guard-authority-ledger-intake.mjs` | **create** — pure builders: `buildWindowRequestDecision`, `buildWindowGrantDecision`, `buildWindowRevocationDecision`, `buildWindowExpiryDecision`, `buildOverrideDecisions`, plus `buildAppendIntent` (§7.2) and the deterministic id helpers (§7.3). No I/O, no clock, no randomness — every time value is a parameter | keeps the whole contract unit-testable and independent of the unfinished GMW's function signatures (§7.1) |
-| `plugins/pipeline-core/lib/guard-authority-ledger-intake.test.mjs` | **create** — §12 | H-AC-15 dimensions for this path |
+| `plugins/pipeline-core/lib/guard-authority-ledger-intake.test.mjs` | **create** — §12's unit tests U-1..U-10 | the H-AC-15 dimensions §12's map assigns to the pure builders; it does **not** discharge H-AC-15 for this path on its own |
+| `plugins/pipeline-core/scripts/guard-authority-ledger-intake.test.mjs` | **create** — §12's integration tests I-1..I-14, against a temporary repository and the real store | the remaining H-AC-15 dimensions (concurrency, interruption, tampering, cross-repository, retry) exist only across the CLI/store boundary; §12's map states which test covers which dimension |
 | `plugins/pipeline-core/scripts/guard-maintenance-window.mjs` | modify `install` (append-then-arm, fail closed; accept `--plan`/`--spec`, digest-verified), `close` (unlink-then-append, fail open), `status` (report ledger/window disagreement) | the only place that can `await` without changing library signatures |
 | `plugins/pipeline-core/scripts/guard-human-override.mjs` | modify the authorize/consume/deny paths to append the events of §7.5, consumption fail-closed via `appendConsumedHumanGovernanceDecision` | H-AC-12 already names Git-guard override consumption |
 | `plugins/pipeline-core/scripts/governance-authority.mjs` | add a `reconcile` path that appends lazy `expired` and repair `revoked` dispositions (§7.5, §8.2) | the criteria require distinct disposition events; nothing else runs at expiry |
 | `plugins/pipeline-core/lib/guard-maintenance-window.mjs` | **no change** | deliberate: another session owns this file (§7.1, A-3) |
 | `plugins/pipeline-core/lib/human-guard-override.mjs` | **no change** | its audit chain stays as the machine-local record (§5.4) |
 | `plugins/pipeline-core/lib/human-governance-ledger.mjs`, `human-governance-decision.mjs`, `governance-event*.mjs` | **no change in increment 1** | design to what exists; increment 2's kernel change is D-1 |
-| `docs/human-governance-ledger.md` | add the two producers to the operator/taxonomy guide (reason codes, what is portable, what is not) | H-AC-14 |
+| `docs/human-governance-ledger.md` | **create** — the file does not exist in this checkout (untracked, and absent from disk); `spec.md:418` still carries it as a create. This path contributes the two producers' section: reason codes, what is portable, what is not | H-AC-14; the row is a creation, not an edit, so the work is not understated (§14, F-4) |
 | `specs/sprint-phoenix-epic/acceptance.md`, `spec.md` | **amendments specified in §9, applied by the rebind, not here** | bound artifacts |
 
 ## 12. Verification approach
 
-Unit (pure builders; no repository, no clock):
+**Unit** (pure builders; no repository, no clock):
 
-1. Every builder output passes `validateHumanGovernanceDecision` — and a mutated
-   copy with one extra key fails `HGL-SHAPE`.
-2. `granted` without `links.requestDecisionId` fails `HGL-LIFECYCLE`; each
-   disposition requires exactly its own link.
-3. `reasonCode` values are pinned; a free-text reason injected anywhere in the
-   input never appears in, and is not hashed into, any output field.
-4. Identifier determinism: identical input → identical ids; a changed
-   `installedAtMs` changes only the grant/disposition ids, never `requestDecisionId`.
-5. `identityAssurance` is `locally-attributed` and `timeAssurance` is
-   `locally-observed` for **every** builder, including the proof-verified GMW path.
-6. `validity` matches `min(signed, installedAtMs + MAX_WINDOW_TTL_MS)` exactly.
+- **U-1** Every builder output passes `validateHumanGovernanceDecision` — and a
+  mutated copy with one extra key fails `HGL-SHAPE`.
+- **U-2** `granted` without `links.requestDecisionId` fails `HGL-LIFECYCLE`; each
+  disposition requires exactly its own link.
+- **U-3** `reasonCode` values are pinned; a free-text reason injected anywhere in
+  the input never appears in, and is not hashed into, any output field.
+- **U-4** Identifier determinism: identical input → identical ids; a changed grant
+  generation `g` changes only the grant/disposition ids, never
+  `requestDecisionId`; and a changed `installedAtMs` changes **no** id at all —
+  the regression guard against the clock-suffixed scheme §7.3 replaced.
+- **U-5** `identityAssurance` is `locally-attributed` and `timeAssurance` is
+  `locally-observed` for **every** builder, including the proof-verified GMW path.
+- **U-6** `validity` matches `min(signed, installedAtMs + MAX_WINDOW_TTL_MS)`
+  exactly, and the catalogue pin of §5.5 agrees with `isLiftableRuleId`.
+- **U-7** `policyDigest` is verified **constructively**: recomputed from §5.5's
+  declared preimage and asserted equal. Additionally, a builder handed a trust
+  anchor as an extra input produces a byte-identical output, and neither
+  `keyReference`, `publicKeySha256`, nor any digest of either appears anywhere in
+  the preimage or the output.
+- **U-8** No builder can emit `corrected` or `superseded`: this path never
+  produces a correction, and the test pins that as a property rather than leaving
+  the H-AC-15 correction dimension unaddressed.
+- **U-9** The HGO denial builder produces `requested` + `denied` with
+  `GUARD.OVERRIDE.DENIED` and `links.requestDecisionId`.
+- **U-10** HGO artifact layering (§7.5): a capability with representable
+  `eligiblePaths` uses them; one without falls back to the present
+  `policy.project` entries; one with neither yields the explicit
+  *not-representable* outcome and **no decision object** — never a fabricated path
+  and never an empty `artifacts` array.
 
-Integration (temporary repository, real store):
+**Integration** (temporary repository, real store, both CLIs):
 
-7. install → `requested` + `granted` present and readable back; window armed.
-8. Re-install of the identical request appends nothing and does not error.
-9. install with a failing store append → **no window record exists** (fail closed).
-10. close → window gone and `revoked` appended; close with a failing append →
-    **window still gone** (fail open), and `status` reports the disagreement.
-11. Reinstall after close → new grant id, same `requestDecisionId`, ledger reads
-    granted → revoked → granted.
-12. Artifact digest mismatch or missing `--plan`/`--spec` → fail closed.
-13. Cross-repository: a decision from another repository is rejected
-    (`HGL-CROSS-REPOSITORY`).
-14. HGO double consumption → second attempt fails (`HGL-CONSUME-NOT-LIVE`).
-15. Tamper: mutate one event file → stream verification fails and install refuses.
-16. Privacy: property test over generated inputs asserting that no output contains
-    an absolute path, the `reason` text, its digest, the nonce, the proof, or the
-    trust anchor's key digest.
-17. Increment 2 only: erasing the restricted record leaves no dangling reference,
-    and no portable field appears in the restricted record.
+- **I-1** install → `requested` + `granted` present and readable back; window armed.
+- **I-2** Re-install of the identical request appends nothing and does not error.
+- **I-3** install with a failing store append → **no window record exists** (fail
+  closed), and a retry after the store recovers arms the window.
+- **I-4** close → window gone and `revoked` appended; close with a failing append →
+  **window still gone** (fail open), and `status` reports the disagreement.
+- **I-5** Reinstall after close → grant generation `g+1`, same
+  `requestDecisionId`, ledger reads granted → revoked → granted.
+- **I-6** Artifact digest mismatch or missing `--plan`/`--spec` → fail closed.
+- **I-7** Cross-repository: a decision from another repository is rejected
+  (`HGL-CROSS-REPOSITORY`).
+- **I-8** HGO lifecycle through the CLI: denial recorded, authorization recorded,
+  consumption recorded; a second consumption fails (`HGL-CONSUME-NOT-LIVE`).
+- **I-9** Tamper: mutate one event file → stream verification fails and install
+  refuses.
+- **I-10** Privacy property test over generated inputs: no output contains an
+  absolute path, the `reason` text, its digest, the nonce, the proof, the trust
+  anchor's key digest, **or any value derived from the anchor** — the last being
+  enforced constructively by U-7, since a property test can only enumerate.
+- **I-11** Stale candidate (§8.5.1): a window whose `HEAD` moved after install
+  still resolves as a live grant at the arming boundary and in `status`; reconcile
+  appends **no** disposition from a candidate difference; and the HGO half denies
+  when the observed candidate differs from the capability's.
+- **I-12** Concurrency: two concurrent installs of the same signed request leave
+  exactly one `requested` and one `granted` in the stream; the losing racer arms
+  no window and fails with a retryable code; its retry then appends nothing.
+- **I-13** Expiry: a window that expires unused gets exactly one `expired`
+  disposition from reconcile, and a second reconcile appends nothing.
+- **I-14** Reconstruction (AC-8): a fixture-based test renders one window's full
+  history from the portable stream alone and answers *what / when / why / by-whom-
+  as-class*.
+- **Increment 2 only** — erasing the restricted record leaves no dangling
+  reference, and no portable field appears in the restricted record.
+
+**H-AC-15 coverage map** (`acceptance.md:206-209`), so the claim and the tests can
+be compared directly instead of taken on trust:
+
+| Dimension | Covered by |
+| --- | --- |
+| grant | U-1, U-2, I-1 |
+| denial | U-9, I-8 |
+| consumption | I-8 |
+| expiry | U-6, I-13 |
+| revocation | I-4 |
+| correction | U-8 (negative: this path never emits one) |
+| retry | I-2, I-3 |
+| concurrency | I-12 |
+| interruption | I-3, I-4 (crash-matrix rows 3 and 5) |
+| tampering | I-9 |
+| stale candidate | I-11 |
+| cross-repository binding | I-7 |
+| redaction | U-3, U-7, I-10 |
 
 Gate: `node harness/scripts/check-doc-contracts.mjs` for this document;
 `node --test` over the new and touched test files for the implementation.
@@ -752,8 +1153,9 @@ Gate: `node harness/scripts/check-doc-contracts.mjs` for this document;
   one `granted` before the window record exists; verified by asserting the ledger
   contents *and* the absence of `window.json` when the append fails.
 - **AC-2** No portable record produced by this path contains an absolute path,
-  free-form text, a digest of free-form text, the nonce, the proof, or a
-  key digest (test 16).
+  free-form text, a digest of free-form text, the nonce, the proof, a key digest,
+  **or any value derived from the trust anchor** (I-10 enumerates; U-7 proves the
+  derivative case constructively, because an enumeration cannot).
 - **AC-3** Every portable record produced by this path validates as
   `pipeline.human-governance-decision.v1` and is accepted by
   `appendHumanGovernanceDecision`.
@@ -764,12 +1166,26 @@ Gate: `node harness/scripts/check-doc-contracts.mjs` for this document;
   true` at an arming or consumption boundary.
 - **AC-6** Re-installing an identical signed request neither errors nor appends.
 - **AC-7** HGO consumption fails closed when the `consumed` event cannot be
-  appended.
+  appended — for every decision the payload can represent. For the decisions it
+  cannot (§7.5 case 3, §8.1), increment 1 changes HGO's behaviour in no way at
+  all, and a test asserts exactly that: no portable event, no refusal, no new
+  capability.
 - **AC-8** A reviewer can answer *what/when/why* and *by-whom-as-class* for any
   lift from the portable stream alone, demonstrated by a fixture-based
   reconstruction test that renders one window's full history.
-- **AC-9** The amendment of §9 is present in the rebound `acceptance.md` before
-  this path is declared complete.
+- **AC-9** The amendments of §9 — H-AC-12's enumeration in `acceptance.md`, and
+  every `spec.md` §7.4 row §9 enumerates — are present in the rebound artifacts
+  before this path is declared complete. The §9 list and the §11 inventory are
+  compared row by row as part of that check; a mismatch fails the gate.
+- **AC-10** `policyDigest` equals `canonicalSha256` of §5.5's declared preimage,
+  recomputed independently in the test, and the trust anchor is absent from that
+  preimage at every depth (U-7).
+- **AC-11** The boundary check passes GMW's *grant-recorded* candidate and HGO's
+  *currently observed* candidate (§8.5.1); a window survives a moved `HEAD`; and no
+  reconcile disposition is ever derived from a candidate difference (I-11).
+- **AC-12** No HGO decision is ever recorded with a fabricated or substituted
+  artifact: the artifact set comes from §7.5's layers or the decision is not
+  recorded at all (U-10).
 
 ## 14. Open items and findings for the PO
 
@@ -779,10 +1195,18 @@ Gate: `node harness/scripts/check-doc-contracts.mjs` for this document;
   follows from H-AC-11 as written; confirm that this accountability ceiling is
   intended before implementation, because it cannot be softened later without
   reopening H-AC-11.
-- **O-2 (interpretation to ratify).** H-AC-12's "every direct reader SHALL
-  dual-evaluate" is implemented at the arming/consumption boundaries and in
-  reconcile, not inside the synchronous guard hook (§8.5, D-2). Ratify or
-  redirect.
+- **O-2 (known non-conformance, not an interpretation).** The dual evaluation runs
+  at the arming/consumption boundaries, in `status` and in reconcile, not inside
+  the synchronous guard hook (§8.5.2, D-2). Against H-AC-12's migration clause
+  that is defensible with an owner and an expiry. Against **H-AC-02**
+  (`acceptance.md:143-144`), which is unconditional and has no expiry, it is not:
+  between two boundaries the hook honours mutable state claiming human authority
+  with no ledger decision consulted. Recorded as a non-conformance with owner
+  `pipeline` (PHX-2) and closure in increment 2 via the narrowing-only hook read
+  of §8.5.2 — not as a question about how to read a criterion. The PO decision
+  actually needed is whether increment 1 may ship with that gap open, given that
+  the gap is identical to today's behaviour and that closing it costs per-call
+  read I/O in the guard path.
 - **O-3 (no ceremony added).** Nothing here adds a human step. The one producer-
   side ask is a `reasonCode` field inside GMW's *existing* signed subject
   (§5.3) — same signature, one more field. If that is not wanted, the fallback is
@@ -800,5 +1224,31 @@ Gate: `node harness/scripts/check-doc-contracts.mjs` for this document;
   absent from `spec.md` §6.1's "closed" v1 schema family (`:278-301`). Not caused
   by this work; relevant because increment 2 would touch the same list, and the
   rebind is the moment to reconcile it.
+- **Finding F-3 (contract limitation, verified).** The portable payload cannot
+  represent an HGO override whose bound paths are all dot-prefixed or absent:
+  `scope.artifacts` requires at least one entry and every entry's path must start
+  `[A-Za-z0-9]` (`human-governance-decision.mjs:30-31`, mirrored at
+  `governance-event.mjs:23`). HGO's dominant class targets exactly the
+  dot-prefixed configuration paths of `protectedPath`
+  (`human-guard-override.mjs:457-478`), and two other classes carry no path at all
+  (`:785-792`, `:838-844`). Increment 1 therefore records the representable subset
+  and leaves the rest exactly as it is today (§7.5 case 3, §8.1); the kernel
+  amendment that removes the limitation is specified in §9 and applied by the
+  rebind. This is a limitation of the payload contract, not of HGO, and it was
+  found by verifying HGO's field inventory rather than assuming it.
+- **Finding F-4 (inventory correction, verified).** `docs/human-governance-ledger.md`
+  **does not exist in this checkout** — untracked and absent from disk, while
+  `spec.md:418` still carries it as a create. The earlier inventory row described
+  an edit to it, which both understated the work and failed the existence check
+  this document applies to other people's citations in F-1. §11 now lists it as a
+  create.
 - **Backlog claims:** all six checked claims survived verification (§3.2 table);
   none had to be designed around.
+- **Corrections carried into this revision.** Seven review findings were resolved
+  against source: the boundary check's candidate argument (§8.5.1), `policyDigest`'s
+  closed preimage (§5.5), HGO's real artifact sources (§3.3, §7.5), the H-AC-02
+  anchoring of the hook residual (§8.5.2, O-2), the H-AC-15 coverage claim versus
+  the actual tests (§12), the §9 amendment versus the §11 inventory, and F-4 above.
+  Two of them changed the design rather than only its wording: identifiers are now
+  generation-suffixed and re-asserted under the store's lock (§7.3), and the HGO
+  half is explicitly scoped to the decisions the payload can represent (§8.1).

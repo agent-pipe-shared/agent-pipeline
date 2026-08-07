@@ -126,6 +126,7 @@ mapping above.
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Design (2026-08-07):** `specs/sprint-phoenix-epic/design/gmw-hgo-evidence-intake-into-the-human-ledger.md`
+- **Review (2026-08-07):** Critic verdict `fail` on the first revision; findings F1..F7 in `specs/sprint-phoenix-epic/evidence/phx-ledger-intake-design-critic-review-f68a17d.md`, each resolved or explicitly bounded in the design (rework `PHX-LEDGER-INTAKE-rework-1`).
 - **Decision:**
 - **Rationale:**
 - **Assignment (if accepted):**
