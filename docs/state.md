@@ -39,6 +39,31 @@ stopping, so it is not re-derived later:
   must not be reverted.
 - Unresolved before any merge: several differing files are TP-protected test
   suites, so the sync itself would hit the very guard ADR-0059 addresses.
+- **PO confirmed (2026-08-07) that the candidate also supplies the TP-11 and
+  GS-7 lifts this branch was missing; verified at source and true.** In the
+  candidate's `hooks/guard-gate-strength.mjs`, GS-1..GS-5/GS-7 now route through
+  the same audited `lib/human-guard-override.mjs` family as every sibling guard
+  (ADR-0059 Decision 3): consume an armed capability first, else offer the route
+  matching the repository's *committed* `gates.push_approval`. GS-6 is explicitly
+  excluded and keeps its narrower GMW lift. This closes the dead end recorded
+  earlier: TP-11 was GMW-liftable as a `TP-*` rule, but its target sat behind
+  GS-4, which was liftable in no mode at all — so the chain never completed.
+  With GS-4/GS-7 now HGO-liftable by external Ed25519 proof, it does. No new
+  human ceremony is introduced: the in-session `activate` path stays refused in
+  `signature` mode, and arming a chat-mode capability still requires the
+  committed mode to already be `chat`.
+- **BLOCKER for any wholesale file take, found while verifying the above:**
+  the candidate's `GATE_STRENGTH_PATHS` has **no GS-8 entry at all** — `rg -n
+  "GS-8|public-core-origin-allowlist"` over the entire candidate tree returns
+  nothing. GS-8 (`plugins/pipeline-core/lib/public-core-origin-allowlist.mjs`)
+  is this branch's own Part A work; the sibling tree simply never had it. Taking
+  the candidate's `guard-gate-strength.mjs` as a file would therefore silently
+  delete the protection on the two-URL origin allowlist that the bootstrap
+  readiness gate trusts — reopening precisely the hole Part A exists to close,
+  with no test failing to say so, because the candidate's
+  `guard-gate-strength.test.mjs` has no GS-8 case either. **The merge must be a
+  union per file, never a replace**, and this is the concrete instance proving
+  it rather than a general caution.
 
 **Next-session pointer (restart handover, 2026-08-07 evening):** both
 post-merge redesign packages have landed code this session:
