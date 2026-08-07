@@ -530,12 +530,43 @@ TP-2 for the still-open Decision 4 test-coverage gap in
 `guard-testpath.test.mjs`. Not yet run as of this note — the PO's own
 external step.
 
-**Full project Verify running (2026-08-07):** with the tree now fully clean
-and committed, `node harness/scripts/verify.mjs` launched in the background
-against commit `5ab8ce0` (before the sign-intent doc-commit lands) /
-`2365a8c` (the actual candidate) — result pending as of this note. This is
-the first full Verify run this session against the complete, fully-committed
-ADR-0059 + guard-lifecycle-ready diff.
+**Full project Verify — two real runs (2026-08-07):**
+
+- **Run 1: candidate drift, self-inflicted.** The Elephant committed a
+  `docs/state.md` update while a background `verify.mjs` was still running —
+  `VERIFY-CANDIDATE-DRIFT: Verify requires one clean, unchanged Git candidate
+  from start through evidence write.` Not a defect; a process mistake.
+  Corrected going forward: no further commits while a Verify run is in
+  flight.
+- **Run 2: genuinely clean candidate (`03c303f`), two real findings.**
+  `binding: "exact"`, 253/255 suites `exitCode: 0`. Two real gaps, neither a
+  defect in the ADR-0059/LCR-INTENT diffs themselves:
+  1. `guard-testpath-override-tests` (exit 1, 13/18 passed) — a SEPARATE test
+     file from `guard-testpath.test.mjs` (its own file specifically because
+     `guard-testpath.test.mjs` is TP-2-protected), never named in
+     NOVA-HGOSIG-3's briefing (an Elephant scoping gap, not a Goldfish
+     error), still pinning the OLD pre-Decision-3 denial wording
+     ("no in-session override is admitted ... offers no route"). The
+     underlying security properties are confirmed still intact by direct
+     inspection — only the literal expected text and the "signature mode now
+     legitimately offers a signed-path route" fact need updating.
+  2. `security-scan` (exit 2) — 2 gitleaks findings, both
+     `backlog/transitions.ndjson` (rule `sentry-access-token`, lines 42-43),
+     a KNOWN, already-once-fixed false-positive class (content-addressed
+     ledger hashes matching a credential-shaped regex; see the CLOSED
+     `backlog/items/2026-07-25-security-scan-cross-branch-gitleaks-findings.md`).
+     Confirmed pre-existing (lines dated 2026-07-30, untouched by this
+     session) and unrelated to ADR-0059. `.gitleaksignore` already has two
+     entries for exactly this path/rule/line pair but they no longer match —
+     the tool's own fingerprint (SHA256 over path+rule+line+column+secret)
+     apparently shifted, likely a `gitleaks` rule-regex version change; needs
+     two freshly-computed entries via the adapter's own exported
+     `gitleaksContentAuthorityLine()` helper, not a hand-typed guess.
+
+Two parallel, non-overlapping dispatches launched: `NOVA-HGOSIG-4`
+(goldfish-deep) for the test-wording fix, `NOVA-GITLEAKS-FP-1`
+(goldfish-implementor) for the `.gitleaksignore` fingerprints. Both running
+as of this note.
 
 **Mandatory next steps (restated, unchanged):** once full Verify confirms
 exit 0, dispatch the mandatory T1 Critic round on the complete ADR-0059
