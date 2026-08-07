@@ -5,7 +5,7 @@
 
 **Last updated:** 2026-08-07
 **Project status:** ACTIVE
-**Current block:** 0.5.2 released; Nova A closeout and Nova B disposition next
+**Current block:** 0.5.2 released, backlog triaged; Nova A closeout decision pending PO, Nova B blocked on it
 **Repair baseline:** `5d2b83dcc765d50801f4491e1bd9bed32090112b`
 **Release version:** `0.5.2` released
 **Release state:** version `0.5.2` · tag `v0.5.2` · commit `6e2c9b2868d164ff3b631ab068fa5df20939e07d` · tree `23171c38a317d8cdf50baa013f54f5447e17f754` · status `published`
@@ -16,7 +16,29 @@ the supplied authoritative release identity; it is not a claimed release time.
 The historical candidate-qualification sections below are retained as
 session history and no longer describes the current publication disposition.
 
-## 2026-08-07 Nova IV — 0.5.2 main-release signing, process friction recorded (current)
+## 2026-08-07 Nova V — backlog triage for 2026-08-05 through 2026-08-07 (current)
+
+Continues from Nova IV. Filled in the Triage section for the 9 items from
+the last two days that still had it blank (4 investigated fresh against
+current repo state; 5 are this session's own 0.5.2-round findings, triaged
+directly). None closed outright — all confirmed still-real, several narrowed
+or given a concrete assignment. Full detail lives in each item's own Triage
+section, not repeated here (`git log --oneline -- backlog/items` for the
+list; commits `6748e37`, `1e03c4d`).
+
+Wrote `docs/push-release-flow.md` — the first concrete remediation for
+`backlog/items/2026-08-07-push-release-flow-unusable-for-third-party-adopters.md`:
+one document naming every push/release authorization layer, agent-executable
+vs. PO-only, with commands verified against the actual CLI parsing rather
+than reconstructed from memory. Pointed to from CLAUDE.md's bootstrap-read
+"Push policy" bullet so a future session reads it once instead of
+rediscovering the flow live. This closes only the documentation half of that
+finding — the PO's underlying verdict about the layer count itself is
+unchanged and still needs a deliberate decision (see the item's own Triage).
+
+Verify: 254/254 clean at `1e03c4d91a0e4530bc54e73461edf37dfc3f98e3`.
+
+## 2026-08-07 Nova IV — 0.5.2 main-release signing, process friction recorded
 
 Continues from Nova III. This block strips the release `+build` cachebuster
 from both plugin manifests (PO-edited directly, GS-6 has no in-session
