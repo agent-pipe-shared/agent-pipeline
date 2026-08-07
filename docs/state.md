@@ -5,7 +5,7 @@
 
 **Last updated:** 2026-08-07
 **Project status:** ACTIVE
-**Current block:** 0.5.2 released, backlog triaged; Nova A completion in progress (paused on genuine ADR-gated/evidence-gated blockers); new parallel thread — Guard Maintenance Window (ADR-0058) in build, dispatched NOVA-GMW-1 to an isolated worktree
+**Current block:** 0.5.2 released, backlog triaged; Nova A completion paused on genuine ADR-gated/evidence-gated blockers; human-authorization unification is now the priority thread — GMW (ADR-0058) implemented (4 commits, Verify 254/254), Critic review dispatched; HGO signed-admission extension (ADR-0059) designed, queued behind the Critic verdict
 **Repair baseline:** `5d2b83dcc765d50801f4491e1bd9bed32090112b`
 **Release version:** `0.5.2` released
 **Release state:** version `0.5.2` · tag `v0.5.2` · commit `6e2c9b2868d164ff3b631ab068fa5df20939e07d` · tree `23171c38a317d8cdf50baa013f54f5447e17f754` · status `published`
@@ -16,7 +16,7 @@ the supplied authoritative release identity; it is not a claimed release time.
 The historical candidate-qualification sections below are retained as
 session history and no longer describes the current publication disposition.
 
-## 2026-08-07 Nova GMW — Guard Maintenance Window: signed, time-boxed PO lift for GS-6/TP-* (current)
+## 2026-08-07 Nova GMW — Guard Maintenance Window: signed, time-boxed PO lift for GS-6/TP-*
 
 All session, GS-6 has refused every Edit/Write into `plugins/pipeline-core/**`
 inside this self-hosted session, unconditionally, by design — including
@@ -63,11 +63,63 @@ and the danger of an unscoped "lift everything" default.
   something this session performs unilaterally via an ordinary git command,
   precisely because that would be the exact same-session bypass the
   threat model records as an open residual risk (ADR-0058 Follow-up).
-- **Not yet done:** end-to-end testing with a real PO-signed proof (needs
-  the PO's own external signing device/key — cannot happen inside any
-  agent session by construction); the bootstrap warning; the merge/install
-  step; a Critic review of the whole feature before it's considered done
-  (self-application rule, CLAUDE.md).
+- **Implementation landed, 2026-08-07 (update):** three dispatch attempts
+  were needed, each blocked by a different infrastructure issue rather than
+  a design problem — attempt 1's `isolation: worktree` snapshotted a stale
+  upstream-tracking ref (filed:
+  `backlog/items/2026-08-07-agent-tool-isolation-worktree-snapshots-stale-upstream-ref.md`);
+  attempt 2's manually created worktree had correct content but no write
+  authorization (confirmed directly: even a genuine `EnterWorktree` switch
+  of the session's own cwd did not move the write boundary — it is bound to
+  the session's original physical root, not `cwd`); attempt 3 combined
+  `isolation: worktree` (correct write authority) with a same-repo local
+  `git merge` as the dispatched agent's own first action (no fetch/push
+  needed — a linked worktree shares the parent's object database) and
+  succeeded, after being resumed once mid-run when its final report was
+  truncated before it could commit. Final candidate: four commits on branch
+  `worktree-agent-ab84ec0efe49bd94a` — `a58e836` (core lib + CLI), `b974dda`
+  (GS-6 wiring), `db88788` (TP-* wiring), `0b83a2e` (lib tests). Verify run
+  by the Elephant directly against that worktree HEAD: 254/254, exit 0,
+  sealed at `specs/sprint-nova-epic/evidence/nova-gmw/verify-0b83a2e.json`
+  (commit `12ed391`). A Critic review (guardrail-tier, `claude-opus-5` per
+  MP-07) is dispatched against the four enumerated commits.
+- **Not yet done:** the Critic verdict; the bootstrap SessionStart warning
+  (design already written, appended to the same design-note commit
+  `4398dde`); end-to-end testing with a real PO-signed proof (needs the
+  PO's own external signing device/key — cannot happen inside any agent
+  session by construction); the deliberate, human-attended merge of the
+  worktree branch into this checkout's own live-enforcing branch (per the
+  Delivery-path note above — not something this session performs
+  unilaterally).
+
+## 2026-08-07 Nova HGO-Sig — signed admission path for Human Guard Override, everything GMW doesn't cover (current)
+
+PO instruction, same exchange, after confirming GMW's split (chat, verbatim):
+"sehr gut! ja genau das brauchen wir zeitnah als 0.5.2 fix/erweiterung bevor
+wir mit dem Rest weiter machen. Ein für alle Mal endlich eine Lösung, die das
+Arbeiten an und mit der Pipeline human-authorisiert wieder 'normal' macht" —
+with the framing "diese Pipeline soll den Agenten im Zaum halten und nicht
+den Human permanent aufhalten... [statt] Skripte... ins Terminal kopieren
+[ein] generelles sauberes Lift-Verfahren für alle Guards". Investigated
+`lib/human-guard-override.mjs` in full: it already classifies almost every
+in-project guard denial and already has a complete request/plan/authorize/
+consume/audit pipeline — its one gap is that `authorizeHumanGuardOverride()`
+(the existing activation step) is an ordinary in-session command, admitted
+only in the weaker `chat` mode and refused outright in this repo's actual
+`signature` mode. **Decision recorded:** [ADR-0059](adr/0059-signed-human-guard-override.md),
+commit `f3f60dd` — a new `authorizeHumanGuardOverrideBySignature()` reusing
+the identical `po-approval-proof.mjs` primitive as GMW and push approval
+(one anchor, three consumers now), the consuming side (`consumeHumanGuardOverride`)
+untouched, calling guards switched from a mode-gate to an always-attempt-
+consume-first pattern. Explicitly does NOT extend HGO's authority across a
+repository boundary (worktrees, other repos, this session's own memory
+directory) — HGO's physical-identity model is scoped to one repository by
+design; that class of gap gets its own separate, narrower fix (worktree
+recognition in `GUARD-CROSS-REPO-MUTATION`, tracked as follow-up in the ADR,
+not yet designed in detail). Explicit PO requirement folded into Decision 4:
+every denial in the family must report its own mode-appropriate next-step
+command, never a bare refusal. **Not yet dispatched** — queued behind GMW's
+Critic verdict, deliberately not run in parallel with it (task #11).
 
 ## 2026-08-07 Nova VII — first Nova A completion wave: 6 issues evidenced
 
