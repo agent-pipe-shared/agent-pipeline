@@ -1,0 +1,9 @@
+{
+  "featureId": "sprint-nova-epic",
+  "documents": {
+    "prd": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
+    "spec": "specs/sprint-nova-epic/spec.md",
+    "acceptance": "specs/sprint-nova-epic/acceptance.md",
+    "result": "specs/sprint-nova-epic/result.md"
+  }
+}
