@@ -114,8 +114,13 @@ is not a phrasing nuance — for a real marketplace-installed (non-git) copy, e.
 end-user install actually ships to, this integrity check does not run at all (see §A.5 case
 2); readiness falls through unmodified to the pre-existing version-only decision that
 predates Part A. This is a distinct, tracked, disclosed gap, not closed by this design — see
-`backlog/items/2026-08-07-self-application-integrity-check-absent.md`, which records it as the
-residual of *how* Critic finding F2 (`WP2-WP3-partA-rework-1`) was resolved.
+`backlog/items/2026-08-07-marketplace-install-topology-unattested.md`, which records it as the
+residual of *how* Critic finding F2 (`WP2-WP3-partA-rework-1`) was resolved, and names the PO
+as its decision owner. **Citation corrected per Critic finding F1 (MAJOR, delta re-review
+`412d33d`):** this sentence previously cited
+`backlog/items/2026-08-07-self-application-integrity-check-absent.md` — a link that resolves,
+but whose target tracks the *original* 0.5.2 merge-loss gap Part A closes, not this residual.
+Until the item cited above existed, the limitation disclosed here had no tracking item at all.
 
 **Disclosed limitation 2 (content scope), not closed by this design (stated plainly, matching
 this document's own diligence standard elsewhere):** a clone whose remote origin is genuinely
@@ -406,7 +411,10 @@ make silently.
      version passes as `"ready"`, exactly as it did before Part A shipped). This is the
      topology every ordinary end-user install ships to; see §A.1's corrected guarantee, §A.7's
      matching exclusion entry, and the tracked, disclosed gap in
-     `backlog/items/2026-08-07-self-application-integrity-check-absent.md`.
+     `backlog/items/2026-08-07-marketplace-install-topology-unattested.md` (citation repointed
+     per Critic finding F1, delta re-review `412d33d`: the item cited here before,
+     `…-self-application-integrity-check-absent.md`, tracks the original merge-loss gap, not
+     this residual).
    - **Missing `git` binary, or an unhandled exception inside the observer, when a `.git`
      checkout IS present at the self-application layout:** both `observeCodexPublicCoreIdentity`
      and `observePublicCoreIdentity` already fail closed *internally* — every code path
@@ -519,8 +527,13 @@ cost of the alternative, so that the decision is taken on true rather than refut
   (`pluginRootHasSelfApplicationGit()`, `pipeline-start-preflight.mjs`) and is skipped
   entirely, not attempted, for the real installed (non-git) topology — see §A.1's corrected
   guarantee and §A.5 case 2. Closing that gap for the real installed topology is tracked
-  separately in `backlog/items/2026-08-07-self-application-integrity-check-absent.md`, not
-  this design.
+  separately in `backlog/items/2026-08-07-marketplace-install-topology-unattested.md` (`Owner:
+  PO`, concrete next step recorded, three candidate directions disclosed and none
+  pre-selected), not this design. **Citation repointed per Critic finding F1 (MAJOR, delta
+  re-review `412d33d`):** the item cited here before,
+  `…-self-application-integrity-check-absent.md`, tracks the original 0.5.2 merge-loss gap this
+  design closes; it never tracked this residual, so the link resolved while the claim it
+  carried did not hold.
 - Reviving `codex-host-plugin-list.mjs`'s retired API surface
   (`observeCodexRulesetSource`, `PUBLIC_SELF_APPLICATION_ORIGINS`) — explicitly forbidden by
   the PO decision; superseded per §A.3.
