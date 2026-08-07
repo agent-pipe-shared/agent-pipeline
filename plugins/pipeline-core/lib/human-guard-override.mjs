@@ -20,6 +20,11 @@ import { spawnSync } from "node:child_process";
 
 import { parseGuardCommand } from "../hooks/guard-command-grammar.mjs";
 import {
+  readCriticalHumanProofPolicy,
+  readPushApprovalMode,
+} from "./critical-human-proof-policy.mjs";
+import { createPoApprovalIntent, verifyPoApprovalProof } from "./po-approval-proof.mjs";
+import {
   LEGACY_STATE,
   NEUTRAL_STATE,
   resolveProjectAuthorityPaths,
@@ -38,6 +43,25 @@ const AUDIT_SCHEMA = "pipeline.human-guard-override-audit.v1";
 const AUDIT_HEAD_SCHEMA = "pipeline.human-guard-override-audit-head.v1";
 const MAX_REASON_BYTES = 500;
 const DEFAULT_TTL_MS = 5 * 60_000;
+
+// ---------------------------------------------------------------------------------
+// Signed admission path (ADR-0059). A genuine, verified Ed25519 proof arms the
+// identical v2 capability the chat-mode `activate: true` path already produces --
+// there is no in-session "activate" step here, by the same principle ADR-0058
+// (Guard Maintenance Window) already established: presence of a valid, correctly
+// bound signature IS the authorization. The "reason" ceremony
+// (`prepareHumanGuardOverrideAuthorization`) is reused byte-for-byte unchanged, with
+// a FIXED, documented reason text standing in for a human-typed one -- the proof is
+// what authorizes, the reason is only an audit label, and keeping it fixed makes the
+// resulting `selectionSha256` (what actually gets bound into the signed intent)
+// derivable by the PO from `requestSha256`/`planSha256` alone, without guessing this
+// module's internals.
+// ---------------------------------------------------------------------------------
+export const HGO_SIGNATURE_REASON = "authorized via a detached PO Ed25519 signature (ADR-0059)";
+const HGO_SIGNATURE_INTENT_KIND = "guard-override";
+const HGO_SIGNATURE_INTENT_FEATURE_ID = "human-guard-override";
+const HGO_SIGNATURE_INTENT_POLICY_REVISION = "human-guard-override-signature-v1";
+const HGO_SIGNATURE_INTENT_DECISION = "authorize";
 
 export class HumanGuardOverrideError extends Error {
   constructor(code, message) {
@@ -68,6 +92,19 @@ function sha(value) {
     ? value
     : canonical(value)).digest("hex");
 }
+
+// `createPoApprovalIntent` requires a `planSha256`/`specSha256` pair (feature-plan
+// authority, per lib/critical-action-approval-request.mjs and GMW's own CLI defaults).
+// HGO's signed path is a general, project-wide mechanism, not scoped to one sprint's
+// plan/spec documents the way GMW deliberately is -- so these are fixed, public,
+// content-independent sentinel digests (of their own descriptive labels) rather than
+// a hash of a specific file. They add no security value of their own: the real,
+// unique binding is `subjectSha256` (== the request/plan/reason `selectionSha256`
+// already computed by the byte-for-byte-unchanged `prepareHumanGuardOverrideAuthorization`)
+// together with the live repository `candidate` below. Fixed values keep the intent
+// fully reproducible offline by an external signer, with no repository file I/O.
+const HGO_SIGNATURE_INTENT_PLAN_SHA256 = sha("pipeline.human-guard-override-signature-plan.v1");
+const HGO_SIGNATURE_INTENT_SPEC_SHA256 = sha("pipeline.human-guard-override-signature-spec.v1");
 
 function exactKeys(value, keys) {
   if (!object(value)) return false;
@@ -1426,6 +1463,23 @@ export function authorizeHumanGuardOverride({
   authorSourceRoot = null,
 } = {}) {
   if (activate !== true) fail("HGO-ACTIVATION", "override authorization requires explicit activation");
+  // ADR-0059 Decision 1, defense in depth: this in-session `activate` path is an
+  // ordinary command a ready agent session can run itself -- harmless while
+  // `gates.push_approval` is "chat" (an attribution record, not proof, same as
+  // chat-mode push approval), disqualifying while it is "signature". The calling
+  // guards already stop offering this route in that mode (Decision 3), but this
+  // function must refuse it outright too, never relying on the caller alone to keep
+  // it out of reach. `readPushApprovalMode` itself already fails closed to
+  // "signature" for anything absent, unreadable, unrecognised or uncommitted.
+  let approvalMode = "signature";
+  try { approvalMode = readPushApprovalMode(rootDir, { spawn })?.mode ?? "signature"; }
+  catch { approvalMode = "signature"; }
+  if (approvalMode !== "chat") {
+    fail(
+      "HGO-SIGNATURE-MODE-REQUIRED",
+      `the in-session activation path is refused while gates.push_approval is "${approvalMode}"; use authorizeHumanGuardOverrideBySignature() (CLI: authorize-by-signature) instead`,
+    );
+  }
   const reasonBytes = Buffer.from(String(reason ?? ""), "utf8");
   if (reasonBytes.length < 1 || reasonBytes.length > MAX_REASON_BYTES || sha(reasonBytes) !== reasonSha256) {
     fail("HGO-REASON", "override reason digest is invalid");
@@ -1515,6 +1569,171 @@ export function authorizeHumanGuardOverride({
       planSha256,
       reasonSha256,
       selectionSha256,
+      mode: capability.mode,
+      authorSourceRoot: capability.authorSourceRoot,
+    });
+  } catch (error) {
+    try {
+      const observed = safePrivateFile(path);
+      if (observed.dev === owned.dev && observed.ino === owned.ino) unlinkSync(path);
+    } catch {}
+    throw error;
+  }
+  return { schema: CAPABILITY_SCHEMA, status: "armed", planSha256, requestSha256, mutated: true };
+}
+
+/**
+ * ADR-0059 Decision 1: the signed admission path, alongside the existing chat-mode
+ * one. Mirrors `authorizeHumanGuardOverride()`'s exact capability-building/audit/
+ * persistence shape (prepare -> plan -> build capabilityCore -> mac -> persist), but
+ * gates arming on a verified Ed25519 proof instead of `activate === true`. There is
+ * no `activate` parameter here at all: a genuine verified proof IS the authorization.
+ *
+ * `prepareHumanGuardOverrideAuthorization()` and `planHumanGuardOverride()` are
+ * reused completely unchanged (Decision 2) -- the only difference from the chat path
+ * is what gates the write: a rebuilt `po-approval-proof.mjs` intent bound to the
+ * exact `(requestSha256, planSha256)` pair via `prepared.selectionSha256`, verified
+ * against a trust anchor that defaults to this repository's own committed
+ * `project/critical-human-proof.json` (the same one push approval and GMW already
+ * use) when `trustPolicy` is not supplied -- exactly like GMW's CLI defaults
+ * `--authority`.
+ *
+ * External signing recipe (no repository file I/O needed by the signer): run `plan`
+ * to obtain `planSha256` and `repository.{head,tree}`, run `prepare-authorization`
+ * with the fixed `HGO_SIGNATURE_REASON` text to obtain `selectionSha256`, then sign
+ * `createPoApprovalIntent({ kind: "guard-override", featureId: "human-guard-override",
+ * planSha256: HGO_SIGNATURE_INTENT_PLAN_SHA256, specSha256: HGO_SIGNATURE_INTENT_SPEC_SHA256,
+ * candidate: { commit: repository.head, tree: repository.tree }, policyRevision:
+ * "human-guard-override-signature-v1", subjectSha256: selectionSha256, decision:
+ * "authorize" }).sha256` with the PO's own Ed25519 key.
+ *
+ * Deliberate scope narrowing (reported deviation, not required by ADR-0059's own
+ * scope): the `global-plugin-install` denial class carries no commit/tree in its
+ * repository observation (see `localPluginInstallSourceObservation`), so it has no
+ * `candidate` to bind a po-approval-proof intent to. It keeps its existing
+ * chat-mode-only route; extending signed admission to it is a separate, narrower
+ * follow-up.
+ */
+export function authorizeHumanGuardOverrideBySignature({
+  rootDir,
+  pluginRoot,
+  requestSha256,
+  planSha256,
+  proof,
+  trustPolicy = null,
+  nowMs = Date.now(),
+  spawn = spawnSync,
+  scriptPath,
+  authorSourceRoot = null,
+} = {}) {
+  const prepared = prepareHumanGuardOverrideAuthorization({
+    rootDir,
+    pluginRoot,
+    requestSha256,
+    planSha256,
+    reason: HGO_SIGNATURE_REASON,
+    nowMs,
+    spawn,
+    scriptPath,
+    authorSourceRoot,
+  });
+  const planned = planHumanGuardOverride({
+    rootDir,
+    pluginRoot,
+    requestSha256,
+    nowMs,
+    spawn,
+    scriptPath,
+    authorSourceRoot,
+  });
+  if (planned.mode === "global-plugin-install") {
+    fail("HGO-SIGNATURE-UNSUPPORTED-MODE", "signed authorization does not cover the local-plugin-install class; use the chat-mode path");
+  }
+  let intent;
+  try {
+    intent = createPoApprovalIntent({
+      kind: HGO_SIGNATURE_INTENT_KIND,
+      featureId: HGO_SIGNATURE_INTENT_FEATURE_ID,
+      planSha256: HGO_SIGNATURE_INTENT_PLAN_SHA256,
+      specSha256: HGO_SIGNATURE_INTENT_SPEC_SHA256,
+      candidate: { commit: planned.repository.head, tree: planned.repository.tree },
+      policyRevision: HGO_SIGNATURE_INTENT_POLICY_REVISION,
+      subjectSha256: prepared.selectionSha256,
+      decision: HGO_SIGNATURE_INTENT_DECISION,
+    });
+  } catch { fail("HGO-SIGNATURE-INTENT-INVALID", "signed authorization intent could not be built from the current repository observation"); }
+  const resolvedTrustPolicy = trustPolicy ?? (() => {
+    const policy = readCriticalHumanProofPolicy(rootDir);
+    if (!policy.ok || policy.trustAnchor === null) {
+      fail("HGO-TRUST-ANCHOR-MISSING", "project/critical-human-proof.json carries no trustAnchor");
+    }
+    return policy.trustAnchor;
+  })();
+  const verified = verifyPoApprovalProof({ intent, trustPolicy: resolvedTrustPolicy, proof });
+  if (!verified.verified) fail("HGO-PROOF-INVALID", verified.code ?? "PO-APPROVAL-PROOF-INVALID");
+
+  // global-plugin-install is already excluded above, so this is always the ordinary
+  // physical-repository topology -- exactly what authorizeHumanGuardOverride() also
+  // uses for every mode other than global-plugin-install.
+  const repo = topology(rootDir, spawn);
+  const paths = storage(repo.common);
+  const capabilityCore = {
+    schema: CAPABILITY_SCHEMA,
+    status: "armed",
+    root: repo.root,
+    requestSha256,
+    planSha256,
+    selectionSha256: prepared.selectionSha256,
+    reasonSha256: prepared.reasonSha256,
+    plugin: planned.plugin,
+    repository: planned.repository,
+    toolName: planned.toolName,
+    toolInputSha256: planned.toolInputSha256,
+    commandClass: planned.commandClass,
+    denials: planned.denials,
+    policy: planned.policy,
+    preview: planned.preview,
+    eligiblePaths: planned.eligiblePaths,
+    mode: planned.mode,
+    authorSourceRoot: planned.authorSourceRoot,
+    authorizedAt: new Date(nowMs).toISOString(),
+    expiresAt: planned.expiresAt,
+    consumedAt: null,
+  };
+  const capability = {
+    ...capabilityCore,
+    mac: capabilityMac(key(paths), capabilityCore),
+  };
+  const path = capabilityPath(paths, planSha256);
+  if (existsSync(path)) {
+    const prior = validatedCapability(paths, path);
+    if (canonical(prior) === canonical(capability)) {
+      if (!hasAuthorizedAuditEntry(paths, prior)) {
+        appendAudit(paths, {
+          type: "authorized",
+          at: capability.authorizedAt,
+          requestSha256,
+          planSha256,
+          reasonSha256: capability.reasonSha256,
+          selectionSha256: capability.selectionSha256,
+          mode: capability.mode,
+          authorSourceRoot: capability.authorSourceRoot,
+        });
+      }
+      return { schema: CAPABILITY_SCHEMA, status: "armed", planSha256, requestSha256, mutated: false };
+    }
+    fail("HGO-REPLAY", "override plan is already used or conflicts");
+  }
+  writeExclusive(path, Buffer.from(`${JSON.stringify(capability)}\n`, "utf8"));
+  const owned = safePrivateFile(path);
+  try {
+    appendAudit(paths, {
+      type: "authorized",
+      at: capability.authorizedAt,
+      requestSha256,
+      planSha256,
+      reasonSha256: capability.reasonSha256,
+      selectionSha256: capability.selectionSha256,
       mode: capability.mode,
       authorSourceRoot: capability.authorSourceRoot,
     });

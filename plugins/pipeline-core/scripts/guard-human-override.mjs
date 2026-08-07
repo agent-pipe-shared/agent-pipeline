@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 
+import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
   authorizeHumanGuardOverride,
+  authorizeHumanGuardOverrideBySignature,
   HumanGuardOverrideError,
   planHumanGuardOverride,
   prepareHumanGuardOverrideAuthorization,
@@ -22,8 +24,25 @@ function usage() {
     "  guard-human-override.mjs plan --repo <absolute-root> --request-sha256 <64hex> [--author-source-root <absolute-root>]",
     "  guard-human-override.mjs prepare-authorization --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> --reason <text> [--author-source-root <absolute-root>]",
     "  guard-human-override.mjs authorize --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> --selection-sha256 <64hex> --reason <text> --reason-sha256 <64hex> [--author-source-root <absolute-root>] --activate",
+    "  guard-human-override.mjs authorize-by-signature --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> --proof <external-public-json> [--authority <external-public-json>] [--author-source-root <absolute-root>]",
     "  guard-human-override.mjs verify-audit --repo <absolute-root>",
   ].join("\n");
+}
+
+/**
+ * ADR-0059 Decision 1: `path` must be supplied OUTSIDE the repository -- genuinely
+ * external, human-produced material -- mirroring guard-maintenance-window.mjs's own
+ * `externalJson()` discipline for `--proof`/`--authority`. This CLI contains no
+ * signer and accepts no private-key material; a proof is either genuine (produced by
+ * an external signing step) or it fails verification, never fabricated here.
+ */
+function externalJson(repoRoot, path) {
+  const root = resolve(repoRoot);
+  const source = resolve(path);
+  if (source === root || source.startsWith(`${root}/`)) {
+    throw new Error("--proof and --authority must be supplied outside the repository");
+  }
+  return JSON.parse(readFileSync(source, "utf8"));
 }
 
 function flags(argv) {
@@ -106,6 +125,29 @@ export function main(argv = process.argv.slice(2), io = {}) {
         reason: parsed.reason,
         reasonSha256: parsed["reason-sha256"],
         activate: true,
+        scriptPath: SCRIPT,
+        authorSourceRoot: parsed["author-source-root"] ?? null,
+      }))}\n`);
+      return 0;
+    }
+    if (command === "authorize-by-signature") {
+      const parsed = flags(rest);
+      if (!exactFlagSet(parsed, ["repo", "request-sha256", "plan-sha256", "proof"], ["author-source-root", "authority"])
+        || typeof parsed.repo !== "string"
+        || !SHA256.test(parsed["request-sha256"] ?? "")
+        || !SHA256.test(parsed["plan-sha256"] ?? "")
+        || typeof parsed.proof !== "string") throw new Error(usage());
+      if (Object.hasOwn(parsed, "author-source-root") && typeof parsed["author-source-root"] !== "string") throw new Error(usage());
+      if (Object.hasOwn(parsed, "authority") && typeof parsed.authority !== "string") throw new Error(usage());
+      const proof = externalJson(parsed.repo, parsed.proof);
+      const trustPolicy = Object.hasOwn(parsed, "authority") ? externalJson(parsed.repo, parsed.authority) : null;
+      write(`${JSON.stringify(authorizeHumanGuardOverrideBySignature({
+        rootDir: parsed.repo,
+        pluginRoot: PLUGIN_ROOT,
+        requestSha256: parsed["request-sha256"],
+        planSha256: parsed["plan-sha256"],
+        proof,
+        trustPolicy,
         scriptPath: SCRIPT,
         authorSourceRoot: parsed["author-source-root"] ?? null,
       }))}\n`);
