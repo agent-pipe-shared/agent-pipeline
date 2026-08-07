@@ -583,6 +583,25 @@ post-merge redesign packages have landed code this session:
   3 proposed, which an earlier PO decision overrode — that earlier override was
   taken before the threat model was stated, and the rework must reconcile the
   two rather than silently preferring one.
+  **Boundary of this correction, verified rather than assumed — what it does
+  NOT invalidate.** The Elephant checked what already-bound Phoenix content the
+  correction could reach, because over-applying it would be as damaging as
+  ignoring it. `specs/sprint-phoenix-epic/spec.md:423-426` binds
+  `authority-revision-proof.mjs`, `phoenix-authority-approval.mjs` and
+  `phoenix-authority-revision.mjs` — an external-key, human-terminal signing
+  boundary for a continuity authority revision. That mechanism **stays, in
+  full.** It is not a second ceremony added on top of the accepted ceiling; per
+  this file's own earlier record (`:1658-1662`) the PO already confirmed on
+  2026-08-06 that "signing outside the agent session is intended and stays: the
+  prompt is what keeps the credential out of the session's reach, and an agent
+  able to satisfy it would hold the signing authority it exists to be denied."
+  That is precisely the *agent*-adversary model the 2026-08-07 correction
+  states, so the two agree rather than conflict — and "das Signieren ausserhalb
+  ist schon heftig genug" names this existing burden as the ceiling, not as
+  something to remove. The correction bites only on **new** human ceremony:
+  an additional held key, a per-release signing step, any further ritual laid
+  on top. No bound acceptance criterion, ADR, or shipped module is retired by
+  it, and the ledger-intake design must not propose retiring one.
 - **GMW (Guard Maintenance Window, ADR-0058) merged in from the local-development
   marketplace snapshot** (commit `cca5ad8`): the PO pointed at
   `/home/skar667/agent-pipeline-local-marketplace` as the currently-wired snapshot
