@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "05c79127f3bec2c95e6c1fb076ccff7cc3fd8bc2783eee2bf86bb458570aa7b4"
+    "transitionHead": "b4533ea4bccebf0acd4bd855da0776114fa630129114b5ff869965c054ba4eb4"
   },
   "counts": {
-    "open": 28,
+    "open": 29,
     "in_progress": 21,
     "closed": 19
   },
@@ -557,6 +557,14 @@
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.technical-lock-for-pipeline-consent-before-onboarding-complete",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "PO handover from a separate session (agent-pipeline-share_phoenix), submitted through the PO's own channel, 2026-08-07."
     },
     {
       "id": "pipeline.unified-human-authorization-ux",
