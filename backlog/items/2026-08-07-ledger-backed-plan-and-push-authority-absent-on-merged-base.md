@@ -112,6 +112,25 @@ non-local-filesystem (NFS) caveat to the atomicity claim. Diff snapshot:
 `8a54751`, prior finding IDs F1–F5, per `critic-review.md`'s Phase-2.6
 mechanism) is dispatched — not implementation yet.
 
+**Delta re-review 1 (2026-08-07): FAIL.** Full findings:
+`specs/sprint-phoenix-epic/evidence/wp5-phx2-design-critic-delta-review-1-8a54751.md`.
+F1–F5 are all genuinely resolved, but the F1 fix itself introduces a new
+MAJOR defect (F-A): both integration points now call `discoverRepository(...)`
+unguarded, and `guard-push.mjs` has no try/catch around either call site —
+per the hook's own documented exit semantics, an uncaught throw exits 1,
+which *allows* the push and silently discards every other already-accumulated
+push-gate failure, the exact opposite of §4's "fail closed" commitment. Plus
+3 MINOR findings (F-B: the write-side recovery path prescribes a hand-edit
+ADR-0029 forbids outright; F-C: the write-side failure taxonomy omits
+`EEXIST`, the mechanism's own core replay signal; F-D: the F1 justification's
+"every real call site" claim overclaims — two of seven cited sites actually
+go through a different primitive, `resolvePoGateRepositoryTopology`, not
+`discoverRepository`). Remedy is narrow (wrap both derivation calls, add a
+fail-closed taxonomy entry, correct 3 claims) — does not touch the approach.
+A second, narrowly-scoped rework (F-A/F-B/F-C/F-D only) is dispatched next,
+followed by a second bounded delta re-review — Critic round 3 of 4 allowed
+for this package.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:** accepted (direction only — main's model is the baseline;

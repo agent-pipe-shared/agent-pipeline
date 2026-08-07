@@ -136,9 +136,19 @@ freehand). Status:
    until a follow-up design (extending coverage would need a `chat`-mode
    consumption key and single-use semantics that don't exist even locally
    today); F4/F5 reframed the security-property and filesystem-atomicity
-   claims accurately. A bounded delta Critic re-review (base `ad49c48`,
-   head `8a54751`, prior finding IDs F1–F5) is dispatched, per
-   `critic-review.md`'s Phase-2.6 mechanism — not implementation yet.
+   claims accurately. **Delta re-review 1: FAIL** — F1–F5 all genuinely
+   resolved, but the F1 fix itself introduces a new MAJOR (both integration
+   points now call `discoverRepository(...)` with no try/catch in
+   `guard-push.mjs`; per the hook's documented exit semantics an uncaught
+   throw exits 1, which *allows* the push and discards every other
+   accumulated gate failure — the opposite of §4's fail-closed commitment),
+   plus 3 MINOR (a write-side recovery step ADR-0029 forbids; a missing
+   `EEXIST` taxonomy entry; an overclaimed "every call site" justification).
+   Full findings:
+   `specs/sprint-phoenix-epic/evidence/wp5-phx2-design-critic-delta-review-1-8a54751.md`.
+   A second, narrowly-scoped rework (F-A/F-B/F-C/F-D only) is dispatched next,
+   then a second delta re-review — Critic round 3 of the 4 allowed for this
+   package.
 
 **Infra finding, 2026-08-07:** the `isolation: "worktree"` dispatch option
 pinned two of three agents' worktrees to `6e2c9b2` (origin/main's pre-merge
