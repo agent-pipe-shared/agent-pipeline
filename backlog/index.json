@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "ab2594131b20b555ab8170cfd0e04bfc331fcd25920573a297343cfdf7de1fca"
+    "transitionHead": "643ca4dabd823e69403f316223fafa929f58cda31c73705be25f06d47c917d97"
   },
   "counts": {
-    "open": 26,
+    "open": 31,
     "in_progress": 21,
     "closed": 19
   },
@@ -188,6 +188,14 @@
       "tracking": "Sentinel recovery baseline; no completion claim."
     },
     {
+      "id": "pipeline.governance-product-verify-suites-deregistered",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "merge report section 4 finding 3 and section 7.3 (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361"
+    },
+    {
       "id": "pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions",
       "status": "open",
       "type": "defect",
@@ -210,6 +218,14 @@
       "owner": "pipeline",
       "created": "2026-08-06",
       "source": "Product Owner requirement raised at the Phoenix plan-approval gate"
+    },
+    {
+      "id": "pipeline.ledger-backed-plan-and-push-authority-absent-on-merged-base",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "merge report section 4 findings 1/2/4/5/6/11 (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361"
     },
     {
       "id": "pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root",
@@ -362,6 +378,14 @@
       "closureEvidence": "backlog/evidence/2026-07-24-completed-companion-deliveries.md"
     },
     {
+      "id": "pipeline.project-authority-dual-state-repair-and-failclosed-gate",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "merge report section 4 finding 8 and the two narrowed findings on po-gate-authority.mjs (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361"
+    },
+    {
       "id": "pipeline.project-scoped-github-issue-operations",
       "status": "in_progress",
       "type": "workflow-improvement",
@@ -444,6 +468,14 @@
       "source": "Manual re-run of the empty-directory onboarding smoke test in scratch/onboarding-smoke-test while re-verifying backlog/items/2026-08-06-onboarding-lifecycle-plan-hardcodes-the-codex-runner.md (see backlog/evidence/2026-08-06-onboarding-runner-identity-reverification.md), 2026-08-06."
     },
     {
+      "id": "pipeline.ruleset-freshness-wsl-subsystem-absent",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "merge report section 4 finding 10 (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361"
+    },
+    {
       "id": "pipeline.runtime-projection-v2-eager-manifest-load",
       "status": "open",
       "type": "defect",
@@ -462,6 +494,14 @@
       "closureRepository": "self",
       "closureCommit": "83111227cb59eff7d186c49aadc6963f78232b77",
       "closureEvidence": "backlog/items/2026-07-25-security-scan-cross-branch-gitleaks-findings.md"
+    },
+    {
+      "id": "pipeline.self-application-integrity-check-absent",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "merge report section 4 findings 7 and 9 (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361"
     },
     {
       "id": "pipeline.sentinel-go-live-completion",
