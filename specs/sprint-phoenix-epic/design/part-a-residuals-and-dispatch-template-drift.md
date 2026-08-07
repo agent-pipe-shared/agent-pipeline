@@ -270,41 +270,90 @@ enforcing copy, while the source-checkout copy stays refused because GS-9 is not
 is likewise not in the kernel list. Whether the kernel list should grow is one ADR-0058 decision
 about both modules at once, not an R1 change (P5 below).
 
-**Residual 4 — a path-table rule fires only in a repository the guard recognises as governed.**
-Matching `GATE_STRENGTH_PATHS` is necessary but not sufficient. After `gateStrengthRuleFor()`
-returns a rule, `guard-gate-strength.mjs:179-188` runs a second test before refusing anything: an
-`existsSync` over five governance markers — `pipeline.user.yaml`, `project/pipeline.yaml`,
+**Residual 4 — a rule fires only in a repository the guard recognises as governed, and the two lanes
+do not mean the same thing by that.** Matching `GATE_STRENGTH_PATHS` is necessary but not
+sufficient: each lane runs its own marker test first, from its own list, and the lists are
+different. They are therefore stated separately below.
+
+*(Corrected 2026-08-07, review finding F-1. The earlier form of this block asserted that the shell
+lane "carries the identical precondition, same marker list". It does not, and the divergence runs in
+both directions — see the table.)*
+
+**Write lane** — `guard-gate-strength.mjs`, wired on `Edit|Write|NotebookEdit`
+(`plugins/pipeline-core/hooks/hooks.json:34-42`). After `gateStrengthRuleFor()` returns a rule,
+`:179-188` runs a second test before refusing anything: an `existsSync` over an inline literal of
+exactly **five** governance markers — `pipeline.user.yaml`, `project/pipeline.yaml`,
 `.claude/pipeline.yaml`, `project/guard-config.json`, `.claude/guard-config.json` (`:185-186`) —
 resolved against `CLAUDE_PROJECT_DIR || process.cwd()` (`:163`), with `process.exit(0)` when none of
-them is present (`:187`). The shell lane carries the identical precondition, same marker list, and
-stands down even earlier (`guard-lifecycle-ready.mjs:893-900`). GS-9 therefore protects the module
-**in a governed checkout**, not in every checkout of this source — and GS-6 is the one rule in the
-family that carries no such precondition, because it is decided at `:168-177`, *before* the
-`if (matched === null)` block that holds the marker test. Wherever this document contrasts GS-9's
-path matching with GS-6's live-root matching, that is the dimension on which GS-6 is the
-unconditional one.
+them is present (`:187`).
 
-Mitigating facts, stated rather than hidden. All five markers are ordinary **tracked** files in this
-repository (`git ls-files` over `pipeline.user.yaml`, `project/` and `.claude/`, §III.4), so every
-clone of it is governed and GS-9 would fire here. The path table also cannot reach outside the
-project root at all — `gateStrengthRuleFor()` returns `null` for a `..`-relative path (`:148`) — so
-this is a scope statement, not a cross-repository hole. And R1 inherits the precondition rather than
-creating it: it is the guard family's deliberate "only defend a repository the Pipeline actually
-governs" (`:183-184`), identical for GS-1..GS-5, GS-7 and GS-8 today. What it costs is a claim, not a
-mechanism: a copy of this source tree in a repository carrying none of the five markers — a vendored
-copy, or a checkout with those tracked files removed — is agent-writable at that path, and no GS rule
-says otherwise. No follow-up is proposed for this residual: narrowing the stand-down would change
-every path rule in the family at once, which is a guard-family decision like P5, not an R1 change.
+**Shell lane** — `gateStrengthShellRefusal()` in `guard-lifecycle-ready.mjs`, reached only for
+`Bash`/`PowerShell` (`:904-907`; wiring at `hooks.json:16-24`). It stands down earlier still, before
+any needle is compared: `GOVERNANCE_MARKERS.some(...)` at `:896`, returning `verdict(0)` at `:900`
+when nothing matches (`:893-900`). That constant is **not** the write lane's five. It is six literal
+entries plus `loadRuntimeProjectionV3OwnedKeys().targets.map((target) => target.path)`, deduped
+(`:36-44`), and the loader reads
+`plugins/pipeline-core/config/runtime-projection-v3-owned-keys.json`
+(`lib/runtime-projection-v3.mjs:29-30` and `:129-131`, 7 targets). Enumerated from source that is
+**eleven** markers: `.agent-pipeline/core.lock.json`, `pipeline.user.yaml`, `project/pipeline.json`,
+`project/pipeline.yaml`, `.claude/pipeline.json`, `.claude/pipeline.yaml`, `.claude/settings.json`,
+`.codex/config.toml`, `.codex/agents/implementor.toml`, `.codex/agents/critic.toml`,
+`.codex/agents/consult-advisor.toml`. Neither spelling of the guard config appears in it.
+
+**The two lists overlap in three entries and diverge in both directions.** Only
+`pipeline.user.yaml`, `project/pipeline.yaml` and `.claude/pipeline.yaml` are in both:
+
+| A checkout carrying only … | Write lane | Shell lane |
+| --- | --- | --- |
+| a guard config, either authority tier (2 write-lane-only markers) | governed → the `Edit` is refused | **un**governed → `verdict(0)`; the needle is never compared |
+| `.claude/settings.json`, any `.codex/**` file, `.agent-pipeline/core.lock.json` or either `pipeline.json` (8 shell-lane-only markers) | **stands down** → the `Edit` is admitted | governed → a write-classified command naming the file is refused |
+
+The second row is not a corner case: `.claude/settings.json` is present in this repository and in
+essentially any Claude Code project, so the shell lane is governed in many checkouts where the write
+lane is not. This is the same lane-asymmetry class the family already carries a T1 Critic finding
+for — GS-7 exists because a legacy-tier guard config was refused by the shell lane while the write
+lane admitted it, "the wrong way round" (`guard-gate-strength.mjs:77-82`) — and this document does
+not propose closing it.
+
+GS-9 therefore protects the module **in a checkout the relevant lane recognises as governed**, not
+in every checkout of this source. GS-6 is the one rule in the family that no marker test gates — for
+two different reasons on the two lanes, and only the first is a strength: on the write lane it is
+decided at `:168-177`, *before* the `if (matched === null)` block that holds the five-marker test,
+so it refuses in any checkout at all; on the shell lane it is not a needle in the first place, and
+deliberately so (`guard-lifecycle-ready.mjs:197-205`), so that lane never reaches a marker question
+about it. Wherever this document contrasts GS-9's path matching with GS-6's live-root matching, the
+write lane is the dimension on which GS-6 is the unconditional one.
+
+Mitigating facts, stated rather than hidden. In *this* repository both conditions hold: all five
+write-lane markers and ten of the eleven shell-lane markers are ordinary **tracked** files
+(`git ls-files` over `pipeline.user.yaml`, `project/`, `.claude/` and `.codex/`, §III.4; only
+`.agent-pipeline/core.lock.json` is absent), so every clone of it is governed on both lanes and GS-9
+would fire here. The path table also cannot reach outside the project root at all —
+`gateStrengthRuleFor()` returns `null` for a `..`-relative path (`:148`) — so this is a scope
+statement, not a cross-repository hole. And R1 inherits both preconditions rather than creating
+them: the write lane's is the guard family's deliberate "only defend a repository the Pipeline
+actually governs" (`:183-184`), identical for GS-1..GS-5, GS-7 and GS-8 today. What it costs is a
+claim, not a mechanism, and the claim has to be made per lane: a copy of this source tree in a
+repository carrying none of the five write-lane markers — a vendored copy, or a checkout with those
+tracked files removed — is agent-writable at that path **through the write lane**. It does not
+follow that no rule touches it: if that same copy carries any of the eleven shell-lane markers, and
+a vendored copy inside a Claude Code project normally carries `.claude/settings.json`, the shell
+lane still refuses every write-classified command naming the file — so the module is `Edit`-able and
+at the same time not stageable by its own path. The mirror case, a checkout carrying only a guard
+config, is the reverse. No follow-up is proposed for this residual: reconciling the two lists would
+change every path rule in the family and the whole shell lane at once, which is a guard-family
+decision like P5, not an R1 change.
 
 **The corrected guarantee.** GS-9 makes the gate's composition unwritable by an agent session; it
 does not make the gate's verdict trustworthy against an agent that can edit
 `public-core-observation.mjs`. The bar it raises is real but bounded: from "silently widen the gate's
 semantics inside the evaluation" to "delete a visible call site in a reviewed file (residual 1), or
 edit a visibly unrelated observer module (residual 2), or work inside a human-signed GS-6 window
-(residual 3), or work from a checkout the guard does not recognise as governed (residual 4)". That
-is still the protection level the originating Critic review judged sufficient when it kept this
-finding minor — every one of these files stays under the ordinary Verify/Critic/PO
-gate — but it has to be claimed at that level and not above it.
+(residual 3), or work from a checkout the *write lane* does not recognise as governed (residual 4,
+where the shell lane's own condition is a different list)". That is still the protection level the
+originating Critic review judged sufficient when it kept this finding minor — every one of these
+files stays under the ordinary Verify/Critic/PO gate — but it has to be claimed at that level and
+not above it.
 
 **Proposed follow-up for residuals 2 and 3 — specified, deliberately not applied.** None of this is
 an R1 work item: the PO decides whether any of it is taken, and this document may not apply a guard
@@ -413,13 +462,16 @@ command is the statusline script). An edit landing GS-9 in the source checkout t
 nothing the currently-enforcing guard reads; the rule first binds after the plugin refresh that
 installs it. From that point on `gateStrengthRuleFor()` matches by repo-relative path — unlike
 GS-6's live-root-only `insideLivePlugin()` — so the new module's *source-tree* copy is refused to
-agent sessions too, **in a checkout the guard recognises as governed**: the path-table branch refuses
-only after the five-marker `existsSync` test at `:179-188` passes and stands down silently otherwise
-(residual 4 of §I.1.3). That condition holds in this repository, whose markers are tracked files, so
-here the PO-hand-edit escape hatch (`guard-gate-strength.mjs:211-223`) is indeed the only remaining
-route; in a marker-less copy of the same source there is nothing to escape from. On this dimension
-the comparison runs the other way: GS-6 is decided at `:168-177`, before the branch carrying the
-marker test, so it is GS-9 that is conditional and GS-6 that is not. One session may land the module
+agent sessions too, **in a checkout the write lane recognises as governed**: the path-table branch
+refuses only after the five-marker `existsSync` test at `:179-188` passes and stands down silently
+otherwise (residual 4 of §I.1.3, which also records that the shell lane's precondition is a
+different and longer list). That condition holds in this repository, whose write-lane markers are
+tracked files, so here the PO-hand-edit escape hatch (`guard-gate-strength.mjs:211-223`) is indeed
+the only remaining route for an `Edit`; in a copy carrying none of those five there is nothing for
+the write lane to escape from — which does not make the file freely handled there, because the shell
+lane may still be governed on its own list (residual 4). On this dimension the comparison runs the
+other way: GS-6 is decided at `:168-177`, before the branch carrying the write lane's marker test,
+so it is GS-9 that is conditional and GS-6 that is not. One session may land the module
 and the rule together, in either order. For the *enforcing* copy the matched rule is GS-6 rather
 than GS-9, with the window-lift consequence that follows from it — residual 3 of §I.1.3.
 
@@ -429,9 +481,13 @@ substrings of any non-read-only command (`:207-209`), deliberately over-refusing
 after the refresh, any write-classified shell command whose text contains
 `self-application-attestation-gate.mjs` — including a `git commit -m` message that merely names the
 file — is refused with `GUARD-GATE-STRENGTH-SHELL`. Read-only diagnostics stay exempt (`:196`), and
-so is every command in an ungoverned checkout: this lane runs the same five-marker test before it
-reaches the needles and returns `verdict(0)` when none is present (`:893-900`; residual 4 of §I.1.3).
-This is why the module name must be long and distinctive rather than generic: a name like
+so is every command in a checkout **this lane** does not recognise as governed — which is not the
+same set of checkouts as the write lane's. Before any needle is compared it tests its own
+`GOVERNANCE_MARKERS` (`:36-44`: six literal entries plus the runtime-projection targets, eleven
+after dedupe) and returns `verdict(0)` when none is present (`:893-900`, the test at `:896`; the
+full comparison is residual 4 of §I.1.3). A checkout carrying only a guard config is governed for
+the write lane and not for this one; a checkout carrying only `.claude/settings.json` is the
+reverse. This is why the module name must be long and distinctive rather than generic: a name like
 `preflight-gate.mjs` would be a plausible substring of unrelated commands.
 
 *Both consequences bind at the same moment.* The shell lane imports `GATE_STRENGTH_PATHS` from the
@@ -493,7 +549,11 @@ today under GS-8.
 - **AC-R1-6** The implementation's report states that GS-9 binds only after the next plugin refresh;
   that the module's basename becomes a shell needle at the same moment; and which command shapes
   that refuses beyond commit messages (§I.1.6), including that no file-scoped `git add`/`git commit
-  --` for that path remains available to an agent session.
+  --` for that path remains available to an agent session **in a checkout the shell lane recognises
+  as governed** — i.e. one carrying at least one of its eleven `GOVERNANCE_MARKERS`, which this
+  repository does (residual 4 of §I.1.3). Stating that unavailability without the lane condition is
+  the same defect AC-R1-9 forbids for the write lane, and stating it with the *write* lane's
+  five-marker condition is simply wrong: the shell lane does not read that list.
 - **AC-R1-7** `harness/scripts/verify.mjs` carries the registration line of §I.1.5 and the verify run
   reports a `self-application-attestation-gate-tests` step. This lands through its own briefed
   test-change task (TP-3), not through the implementation dispatch.
@@ -503,9 +563,14 @@ today under GS-8.
   explicitly.
 - **AC-R1-9** The residual block of §I.1.3 is reproduced or cited in the implementation's report,
   including that GS-9 does not protect `public-core-observation.mjs` or `ruleset-source.mjs`, and
-  including that the refusal fires only in a checkout carrying one of the five governance markers
-  (residual 4). No report or comment may restate the withdrawn claim that every semantic lever sits
-  behind GS-9, and none may state the source-tree refusal unconditionally.
+  including the two lanes' preconditions **stated separately**: the **write-lane** refusal
+  (`Edit`/`Write`/`NotebookEdit` on the module's path) fires only in a checkout carrying one of the
+  five write-lane governance markers, while the **shell-lane** refusal of AC-R1-6 fires only in a
+  checkout carrying one of the eleven `GOVERNANCE_MARKERS` — a different list that diverges in both
+  directions (residual 4). A report that presents one condition as covering both lanes fails this
+  criterion; so does one that omits either. No report or comment may restate the withdrawn claim
+  that every semantic lever sits behind GS-9, and none may state either lane's source-tree refusal
+  unconditionally.
 
 ### I.2 R2 — no integrity check runs for the marketplace-install topology
 
@@ -1648,14 +1713,21 @@ is a re-verification of §I.1's citations, not a transcript of the earlier sessi
   `gateStrengthShellRefusal` `:194-214` with the read-only exemption `:196` and the
   `basename(rule.path)` needles `:206-209`; the `node --check` shape `:307-312`; `sha256sum`
   `:313-322`; the read-only tool list `:337`; the read-only `git` subcommands `:346-366`; and the
-  lane's own five-marker stand-down `:893-900`, which returns `verdict(0)` before any needle is
-  compared — residual 4's second code reference.
+  lane's own marker stand-down `:893-900`, which returns `verdict(0)` before any needle is
+  compared — residual 4's second code reference. *(Corrected 2026-08-07, finding F-1: this entry
+  originally called it a "five-marker" stand-down. The read of `:893-900` was real, but the list it
+  tests is `GOVERNANCE_MARKERS` at `:36-44`, not the write lane's five — the block at `:36-44` was
+  not read in that session, which is how the error survived it.)*
 - Read `plugins/pipeline-core/hooks/hooks.json:32-45` → the `${CLAUDE_PLUGIN_ROOT}` wiring `:39`;
   read `.claude/settings.json` in full → a statusline command and no hook wiring, as §I.1.6 claims.
 - Read `plugins/pipeline-core/hooks/guard-gate-strength.test.mjs:240-291` → GST17 `:245-278`,
   GST18 `:280-288`; `rg -n "function governed" -A 12` on the same file → the fixture at `:28-38`,
-  which writes four of the five governance markers, so the suite's roots are governed by
-  construction and GST17 does not exercise the ungoverned path at all.
+  which writes **three** of the five write-lane governance markers (`:32`, `:33`, `:34`). *(Count
+  corrected 2026-08-07, finding F-3, from "four of the five": the fixture's fourth write, `:35`, is
+  GS-2's protected path and its fifth, `:36`, is `README.md` — neither is a marker.)* The conclusion
+  is unchanged and holds for **both** lanes, because `pipeline.user.yaml` (`:32`) is in the write
+  lane's list and in the shell lane's: the suite's roots are governed by construction and GST17 does
+  not exercise the ungoverned path at all.
 - Read `plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs:88-97`, `:470-546` and
   `:560-634` → the `observe` seam `:96`, the injection points `:480`/`:503`/`:516`/`:529`/`:542`,
   the `.git`-presence section header `:548`, the fixture builder `:571-591`, and the three cases at
@@ -1668,3 +1740,53 @@ is a re-verification of §I.1's citations, not a transcript of the earlier sessi
   links, never about whether the `file:line` citations above are correct.
 - **Not run:** `node harness/scripts/verify.mjs` is unreachable in this checkout. No substitute was
   run in its place, and no claim is made about the project verify gate for this document's state.
+
+**Added by the 2026-08-07 lane-condition rework** (`Dispatch: PHX-R1-REWORK-3`), which restated
+residual 4 of §I.1.3 and the two §I.1.6 consequences as the two separate lane conditions they are,
+qualified AC-R1-6/AC-R1-9 accordingly, and corrected the two count errors marked above. Every claim
+below was established in *this* session by reading the source; nothing was carried over on trust:
+
+- Read `plugins/pipeline-core/hooks/guard-gate-strength.mjs:60-119` and `:140-189` → the GS-4/GS-7
+  pair `:67-87` and the T1 Critic finding note `:77-82` (the shell lane refusing what the write lane
+  admitted, "the wrong way round"); `gateStrengthRuleFor` `:143-151`; the GS-6-first block
+  `:168-177`; the write lane's inline five-marker literal `:185-186` and its `process.exit(0)`
+  `:187`.
+- Read `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs:30-49`, `:185-216` and `:860-930` →
+  `GOVERNANCE_MARKERS` `:36-44`, with the `loadRuntimeProjectionV3OwnedKeys()` spread at `:43` and
+  the dedupe filter at `:44`; `WRITE_TOOLS` `:71` and `SHELL_TOOLS` `:74`; the over-refusal
+  rationale `:188-192` and the note that GS-6 is deliberately **not** a needle `:197-205`;
+  `basename(rule.path)` `:206`; the marker stand-down `:893-900`, its test at `:896` and its
+  `verdict(0)` at `:900`; the shell-only gate-strength call `:904-907`. A `grep -n` for
+  `GOVERNANCE_MARKERS`/`loadRuntimeProjectionV3OwnedKeys` over the file → the import `:23`, the
+  definition `:36`/`:43` and exactly one use, `:896`, so this lane has no second marker test
+  anywhere.
+- Read `plugins/pipeline-core/lib/runtime-projection-v3.mjs:20-33` and `:129-131` → `OWNED_KEYS_PATH`
+  resolves to `plugins/pipeline-core/config/runtime-projection-v3-owned-keys.json`; read that config
+  in full → seven `targets`, `.claude/settings.json` the first of them.
+- **Machine-enumerated rather than counted by hand.** A throwaway script parsed the *exact source
+  text* of both literals — the write lane's array on `guard-gate-strength.mjs:185`, and the
+  `GOVERNANCE_MARKERS` expression `guard-lifecycle-ready.mjs:36-44` evaluated with the real loader
+  injected — and diffed them: write lane 5, shell lane 11, intersection 3 (`pipeline.user.yaml`,
+  `project/pipeline.yaml`, `.claude/pipeline.yaml`), write-lane-only 2 (both guard-config tiers),
+  shell-lane-only 8. The same script classified the gate-strength fixture's five `writeFileSync`
+  calls, which is where the corrected "three of the five" above comes from. Artefacts:
+  `.git/phx-r1-rework-3-markers.mjs` and its JSON output `.git/phx-r1-rework-3-markers.json`, written
+  outside the working tree deliberately — this document may not add code to the repository.
+- Read `plugins/pipeline-core/hooks/hooks.json:1-50` → the `Edit|Write|NotebookEdit` matcher wiring
+  `guard-gate-strength.mjs` `:34-42`, and the `Bash|PowerShell` matcher wiring
+  `guard-lifecycle-ready.mjs` `:16-24`.
+- Read `plugins/pipeline-core/hooks/guard-gate-strength.test.mjs:20-49` and `:243-292` → the
+  `governed()` fixture's five writes `:32-36` and GST17/GST18 unchanged from the block above.
+- `git ls-files` over `.claude`, `.codex`, `.agent-pipeline` and `pipeline.user.yaml`, and again over
+  the two `project/` manifests → ten of the eleven shell-lane markers are tracked files here;
+  `.agent-pipeline/core.lock.json` is neither tracked nor present in the working tree. With the
+  write-lane check in the block above, this is residual 4's "governed on both lanes in this
+  repository".
+- `node harness/scripts/check-doc-contracts.mjs` → exit 0 on this document's final state, run
+  through a wrapper that recorded the command and the exit code itself
+  (`.git/phx-r1-rework-3-doc-contracts.log`). Stated with the same limit as the block above, because
+  it applies with full force here: that gate validates Markdown links and anchors only, so its green
+  run is **no** evidence that this session's `file:line` citations are correct. The reads listed
+  above are that evidence.
+- **Not run:** `node harness/scripts/verify.mjs` is unreachable in this checkout. It was not run and
+  nothing was run in its place; no claim is made about the project verify gate for this state.
