@@ -268,7 +268,52 @@ post-merge redesign packages have landed code this session:
   against final HEAD `412d33d`: `pipeline-start-preflight.test.mjs` 32/32,
   `check-doc-contracts.mjs` clean (476 files/776 links/13 anchors). Evidence:
   `specs/sprint-phoenix-epic/evidence/wp2wp3-parta-rework-2-verify-412d33d.json`.
-  **Next:** a bounded delta Critic re-review scoped to F-A/F-C/F-D — dispatched.
+  **Next:** a bounded delta Critic re-review scoped to F-A/F-C/F-D —
+  **dispatched and landed: FAIL, 3 major + 1 minor.** Full report:
+  `specs/sprint-phoenix-epic/evidence/wp2wp3-parta-rework-2-delta-critic-review-412d33d.md`.
+  F-C/F-D genuinely resolved; F-B's backlogged disposition independently
+  judged defensible (QG-06 satisfied on substance). **F-A NOT resolved** —
+  the §A.5/§A.7 half is genuinely fixed, but the remedy introduced two new
+  defects inside F-A's own remit. **F1 (major):** the new "this gap is
+  tracked in `backlog/items/2026-08-07-self-application-integrity-check-absent.md`"
+  citation (asserted 3x) is hollow — that item records the *original* merge-loss
+  gap Part A closes, not the residual of how F2 was resolved, and contains zero
+  occurrences of `F2`/`non-git`/`flat-copy`/`pluginRootHasSelfApplicationGit`
+  (Elephant independently confirmed via `rg`). F-A's own defect class recurring
+  one level over: a dangling *section* reference replaced by a dangling
+  *content* reference — one that resolves, so `check-doc-contracts.mjs` cannot
+  detect it. The disclosed limitation therefore has no owner and no tracking
+  item anywhere. **F2 (major):** §A.6 was not touched and still asserts the
+  refuted "a real marketplace-git install preserves a `.git` directory"
+  premise, plus 4 further "every session, every project" blast-radius anchors
+  — a NEW intra-document contradiction created by this diff, and not cosmetic:
+  §A.6 carries a still-open PO question whose framing ("every-session-eligible
+  bootstrap block on a broad blast radius") is now false. **F3 (major) — the
+  Elephant's own dispatch-construction error, not a Goldfish fault:** the
+  design document's own binding rule (`:45-48`, added by the immediately
+  preceding revision) states "any further dispatch that authors or reworks
+  this design is a design-phase step and is dispatched on the Design-tier
+  model"; `WP2-WP3-partA-rework-2` was briefed by the Elephant on
+  `claude-sonnet-5` with no rationale and no disclosure paragraph, breaching
+  MP-22/MP-23 and the document's own fresh commitment — and F1/F2 are both
+  defects in the text that below-tier dispatch authored, a measured linkage.
+  **F4 (minor):** the header's "DESIGN ONLY — no `.mjs` file was changed"
+  claim and `:368`'s "None of these three files is touched" are now false
+  (commit `ac8bd06` touched `pipeline-start-preflight.mjs`, comment-only).
+  **Second dispatch-construction defect flagged in a row:** the stated base
+  `7aa84f0` did not bound the enumerated SHA set (silently admitted `cedd58a`
+  and `2c1add0`) — the Elephant must compute the base as
+  `<first-enumerated-SHA>^`, not reuse the prior candidate. **Round count:
+  this was Critic round 3 of the 4 allowed for this package** (initial
+  implementation review FAIL → rework-1 → delta 1 PASS → rework-2 → delta 2
+  FAIL). One round remains before a PO course gate is required.
+  **Next:** `WP2-WP3-partA-rework-3`, dispatched on the **Design-tier model
+  (claude-opus-5)** per the document's own rule and F3 — fixes F1 (create a
+  real backlog item for the residual, with a PO owner, mirroring F-B's own
+  pattern; correct all 3 citations), F2 (rescope §A.6 and the 4 stale
+  anchors, and re-frame the still-open PO question on the true post-F2 blast
+  radius), F3 (add the disclosure paragraph for this dispatch and for
+  rework-2), F4 (correct the two design-only status claims).
 - **GMW (Guard Maintenance Window, ADR-0058) merged in from the local-development
   marketplace snapshot** (commit `cca5ad8`): the PO pointed at
   `/home/skar667/agent-pipeline-local-marketplace` as the currently-wired snapshot
