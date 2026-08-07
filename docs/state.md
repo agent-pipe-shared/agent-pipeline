@@ -265,6 +265,43 @@ the gate prints `(operating-model §7)` into its operator-visible fix string.
 Note (c) is a one-line change but sits in a `harness/scripts/` file, so it
 follows the ordinary briefed-task path rather than an in-session edit.
 
+**R3 IS CRITIC-CLEAN. Round 3/4: PASS, no findings (`faf6909`).** All three design
+residuals — R1, R2, R3 — have now passed independent review. Full report in the
+session transcript; the load-bearing points:
+
+- The Critic re-derived the delta's measurements from source and found **no
+  recurrence of the failure pattern that had appeared in both prior rounds** (a fix
+  introducing a new inaccuracy, or a corrected figure leaving a stale dependent).
+- **The strongest evidence is F-B's repair.** Rather than restating a coverage
+  claim, the rework narrowed the old one to what it had actually checked, re-ran the
+  measurement on the *post-edit* document with a heading-derived range, and reported
+  a **larger** residue than the previous round had — including **five coordinates
+  that silently resolved to the wrong file and were reported as `ok`**. Nobody asked
+  it to find those. A false green is worse than a red, and it went looking.
+- Trajectory `consistent`; no briefing violations; authorship, model tier and
+  evidence artifacts all verified against source.
+
+**One item the Critic surfaced deliberately rather than flagging, and it is now in
+flight:** §III.1 still said the scope boundary is "deliberately left to the PO".
+Out of Part II's scope, disclosed rather than fixed by the rework, and the single
+statement a reader could land on and take a false picture from. A bounded dispatch
+is reconciling it, with instructions to sweep the whole document for the same claim
+— because both prior rounds found this exact contradiction surviving somewhere
+nobody had looked.
+
+**Not closed by this PASS, stated so it is not mistaken for completion:** B3 covers
+39 files / 233 citations. The document carries written replacement text for **2**
+files and line-level coordinates for **5**; the other **34 files / 196 citations**
+exist only as class-level counts. The rework reported that rather than inventing a
+table — the sweep itself is plausibly its own dispatch. **R3's design is clean; R3's
+implementation has not started.**
+
+**A checker defect found along the way, worth its own item:** the coordinate checker
+resolves a bare basename by suffix match, so a `path:line` citation written as
+`critic-review.md:5` silently resolves to `harness/checklists/critic-review.md`
+instead of `templates/prompts/critic-review.md`. Two such coordinates failed loudly;
+**five returned the wrong file's text under `ok`**. Recorded in §II.8, not folded in.
+
 **One of the four verify failures is repaired, and it was the Elephant's own
 defect (`b2a5c14`).** `backlog-state-check`'s frontmatter half: **44 failures → 0.**
 
