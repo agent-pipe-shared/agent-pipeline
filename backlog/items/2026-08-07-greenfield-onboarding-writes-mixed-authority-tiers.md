@@ -92,28 +92,40 @@ anything.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** Stays OPEN, but the reported cause is refuted and the item needs
-  re-grounding before anyone works it.
-- **Rationale:** Commit `674b1c0` added a check that seeds a blank root and then
-  asserts directly on the result: `project/pipeline.json` exists,
-  `.claude/pipeline.json` does **not**, and `readProjectAuthority` resolves
-  `source: "neutral"` with `calibration: "project/pipeline.json"`. It passes. The
-  `.claude/*` keys in `freshBaselines` are logical names that the write path maps
-  onto the neutral tier, which is why reading the seed function alone suggests the
-  opposite of what the seed does — a trap worth naming, since it is what made this
-  look like a tier-selection defect in the first place. A separate check pins that
-  a project already carrying the legacy tier keeps resolving there unchanged.
-  So a fresh project's *calibration* was already neutral-tier before this block,
-  and is now pinned. The independent Critic round reached the same place from the
-  other direction: no commit touches `lib/project-authority.mjs` or the
-  tier-selection write path, because there was nothing there to fix.
-  What the reporting session actually saw in `.claude/` is therefore still
-  unidentified. `.claude/settings.json` is seeded and legitimately belongs to the
-  runner rather than to the Pipeline's authority tiers, which makes it the first
-  candidate — but that is a hypothesis, not an observation, and this item must not
-  be closed on it.
-- **Assignment (if accepted):** Re-ground first: enumerate every path a fresh
-  greenfield onboarding leaves under `.claude/`, decide per path whether it is
-  runner-owned or authority-owned, and rewrite the item's description against that
-  list. Only then is there a defect to fix, or an item to close.
+- **Decision:** Stays OPEN. The report is substantiated in part and the correction
+  is deliberately NOT made inside the 0.5.4 hardening block — it returns here.
+- **Rationale:** The two artifacts behave differently and an earlier triage on this
+  item wrongly generalised from one to the other. Measured on a real fresh
+  onboarding plus runtime initialisation:
+  - `project/pipeline.json` is written and `.claude/pipeline.json` is **not**. A
+    check seeds a blank root and asserts exactly that, plus that
+    `readProjectAuthority` resolves `source: "neutral"`.
+  - `.claude/pipeline.yaml` **is** written on day one, alongside
+    `project/pipeline.yaml`. Both tiers carry a manifest in a repository with no
+    history — which is what this item reports.
+
+  A second trap is worth naming because it produced the wrong generalisation: the
+  `.claude/*` keys in `freshBaselines` are logical names that the calibration write
+  path maps onto the neutral tier, so reading that function alone suggests the
+  opposite of what it does for `pipeline.json` — while `pipeline.yaml` really does
+  land in both.
+
+  Commit `7a99a18` made the two manifests byte-identical and added a check
+  asserting that `.claude/pipeline.yaml` exists and matches. That closes a real
+  divergence which had already caused one authority-binding defect, and it is the
+  right fix for *that* problem — but it also makes the legacy-tier write a guarded
+  invariant. A later change that stops writing it on day one now has a green check
+  standing in its way. That consequence was not decided; it fell out.
+- **Assignment (if accepted):** Two steps, in order. First enumerate every path a
+  fresh greenfield onboarding leaves under `.claude/`, and decide per path whether
+  it is runner-owned (legitimate) or authority-owned (the defect). Then decide
+  whether day-one legacy-tier manifests should exist at all, and if not, retire the
+  invariant added in `7a99a18` deliberately rather than by deleting a check that
+  currently protects something real.
 - **Date:** 2026-08-08
+
+> **Note for dispatchers.** Do not hand this file to a Critic as a spec reference
+> while this section states a conclusion about a commit under review: a verdict
+> inside an admissible reference is contamination, and it reached one Critic that
+> way on 2026-08-08. Reference the sections above the Triage, or the item at a
+> pre-triage revision.

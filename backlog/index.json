@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "9319b799d89ad4041820c152d760745e7d1a5bf708f15b4f9a256b5e0d27e0e1"
+    "transitionHead": "f4c258033b61ddfdbf04498fa787e030cded0cc45a25b2a535e21678a4b1e6df"
   },
   "counts": {
-    "open": 50,
+    "open": 51,
     "in_progress": 21,
     "closed": 22
   },
@@ -761,6 +761,14 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Greenfield onboarding handover from a parallel Claude session, 2026-08-08, findings 9, 11 and 12 of 12. Grouped because each is small and self-contained; none needs a design round of its own."
+    },
+    {
+      "id": "pipeline.two-manifest-literals-bypass-the-single-seed-owner",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Self-reported by the implementing dispatch of commit 7a99a18 and independently confirmed as finding F7 of the second Critic round on the 2026-08-08 hardening block."
     },
     {
       "id": "pipeline.unified-human-authorization-ux",
