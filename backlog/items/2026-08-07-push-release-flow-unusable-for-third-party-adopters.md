@@ -174,13 +174,60 @@ commitment to any of them:
      name one cannot be matched against it without guessing — but nothing
      tells the operator this in advance, and the denial does not say it
      either. It is discoverable only by being refused.
+   **7d. PO order, 2026-08-07 evening, issued during the v0.5.3 release and
+   now normative as [ADR-0061](../../docs/adr/0061-uniform-human-approval-ceremony.md).**
+   The requirement is fixed at three human acts — *"einmal befehl kopieren,
+   approve schreiben, pin eingeben"* — identical for every gate kind, whether a
+   design phase closes, a guard is lifted temporarily, something is pushed, or
+   something is released. With it, the threat model the rest rests on: *"diese
+   pipeline schützt vor AGENTEN die sachen missbrauchen, sie bemuttert nicht den
+   HUMAN"* — the human is assumed to know what they are doing, releases once
+   after checking, and asks otherwise. Any step that re-confirms a decision the
+   human has already made prevents no agent behaviour and is therefore
+   removable, which is the disposal test ADR-0061 Decision 0 states and which
+   `OVERRIDE GG-03`-after-a-verified-`push`-signature is the first candidate
+   for. The ADR records the requirement; the mechanism is deliberately left to a
+   dispatched design round, and this item stays its tracker. Related items
+   carrying adjacent halves:
+   `2026-08-02-unified-human-authorization-ux.md` (one shape across all intents)
+   and `2026-08-07-human-approval-ux-directory-clarity-and-single-command.md`
+   (what the command must show, and how many commands there may be).
+
 8. **Layer 4 confirmed again, and it is outside this repository's control.**
    The Claude Code auto-mode classifier refused the fully authorized push —
    after the Pipeline's own gate had passed — and the only resolutions were
    the human running the command or granting a standing Bash permission rule.
    Candidate #2 above (pre-clear it at the settings level as a documented
    setup step) is the only lever this project has, and this session is a
-   second measured instance of the same block.
+   second measured instance of the same block. **Third instance, v0.5.3
+   release:** it fired again on the `main` push and, worse, it fired *after*
+   `guard-git.mjs` had already consumed the one-time `GG-03` override token —
+   so a classifier denial silently burns a PO-authorized token and the next
+   attempt needs a fresh one. Whatever shape #2 takes has to account for the
+   ordering: the Pipeline's own consumption happens first, the harness verdict
+   second.
+
+9. **A sixth layer nobody had recorded: the GitHub repository ruleset.**
+   Found on the v0.5.3 `main` push, after the signature, `approve-push` and
+   `GG-03` had all cleared: ruleset `protect-main` carried
+   `required_linear_history`, and the candidate contained one merge commit
+   (`8bc5ceb`, the Guard-Maintenance-Window worktree merge). The push was
+   rejected by the remote with `GH013`. This is structural rather than
+   accidental: the Pipeline's own `isolation: worktree` dispatch flow *produces*
+   merge commits, so a linear-history rule on `main` means no candidate this
+   Pipeline builds can ever be published — and the two escapes, rebase and
+   squash, are respectively forbidden by this repo's hard rules (never rewrite
+   history, never force-push) and destructive of the per-commit granularity the
+   signature binding and Critic reviews depend on. **PO decision, same session:**
+   drop `required_linear_history` permanently; `deletion` and `non_fast_forward`
+   stay. Executed via `gh api ... --method PUT` on ruleset `18801905`, after
+   which the already-signed fast-forward went through unchanged. Recorded here
+   because the finding is the composition again — a sixth independently-owned
+   layer, this one outside the repository entirely, discovered the same way as
+   the other five: by being refused. Note the residual cost it leaves behind:
+   merge commits on `main` are known to break the Codex Critic isolation
+   fixture (`2026-08-07-codex-critic-isolation-fixture-rejects-merge-commit-head.md`),
+   which the ruleset never fixed — it only blocked the release afterwards.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 

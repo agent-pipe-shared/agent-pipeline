@@ -122,6 +122,37 @@ the identical, already-Pipeline-authorized command in their own terminal.
 This compounding is tracked as its own finding:
 `backlog/items/2026-08-07-push-release-flow-unusable-for-third-party-adopters.md`.
 
+### Layer 6 — the GitHub repository ruleset (outside this repo, discovered by rejection)
+
+Everything above can pass and the remote can still refuse. `main` is covered by
+the repository ruleset `protect-main` (`gh api
+repos/<owner>/<repo>/rules/branches/main` lists what actually applies to a ref).
+It currently enforces `deletion` and `non_fast_forward` — both deliberate, both
+aligned with this repo's own hard rules.
+
+It also carried `required_linear_history` until the v0.5.3 release, where that
+rule rejected the push with `GH013` because the candidate contained the
+Guard-Maintenance-Window worktree merge (`8bc5ceb`). That is a structural
+conflict, not a one-off: the Pipeline's own `isolation: worktree` dispatch flow
+produces merge commits, and the two ways to linearize a candidate are both
+closed here — rebase/force-push is forbidden outright, and squashing destroys the
+per-commit granularity that candidate binding, signatures and Critic reviews all
+depend on. The PO's decision was to drop the rule permanently:
+
+```
+gh api repos/<owner>/<repo>/rulesets/<id> --method PUT --input <ruleset.json>
+```
+
+with `rules` reduced to `deletion` and `non_fast_forward`. Merge commits on
+`main` still carry a known internal cost — they break the Codex Critic isolation
+fixture (`backlog/items/2026-08-07-codex-critic-isolation-fixture-rejects-merge-commit-head.md`)
+— but that is a Pipeline-side problem to fix on its own terms, not something a
+branch rule was ever going to solve.
+
+**Check this layer before starting a release**, not after the push: one
+read-only `gh api …/rules/branches/main` call costs nothing and is the only way
+to see it.
+
 ## Release addendum — tag + GitHub release
 
 `approve-push`'s destination regex only ever matches `refs/heads/*`, so a
@@ -149,9 +180,28 @@ because it structurally isn't one.
 | 4 | `pipeline-state.mjs approve-push` | Agent |
 | 5a | `git push` (non-main, proof valid) | Agent, subject to the harness classifier |
 | 5b | `git push` to `main`/protected (GG-03) | Agent, after PO's literal `OVERRIDE GG-03`, subject to the harness classifier |
-| 6 | `gh release create` (tag + release) | Agent |
+| 6 | GitHub repository ruleset on the target ref | Repo admin (PO); agent can read it, not change it without an explicit decision |
+| 7 | `gh release create` (tag + release) | Agent |
 
 Layers 3 and the harness classifier's block are the two points in this flow
 that are not resolvable by the agent under any configuration — everything
 else above them is either config (layer 1) or, per the open finding this
 document is a partial remediation for, a candidate for narrowing.
+
+**Two ordering facts, both learned by being burned:**
+
+- A harness-classifier denial arrives *after* `guard-git.mjs` has already
+  consumed the one-time `GG-03` token. The token is spent, the push did not
+  happen, and the retry needs a fresh token. Do not assume a blocked command
+  left the ledger untouched — read `project/guard-override.log.jsonl`.
+- `approve-push` writes into the tracked `project/pipeline-state.json`, so the
+  tree is dirty from that moment on. **Commit nothing between `approve-push` and
+  the push**: every commit moves `HEAD` past the `forCommit` the signature
+  names and voids the approval. Verify has to run *before* the approval, and the
+  state record is committed *after* the push. This is finding 7c of
+  `backlog/items/2026-08-07-push-release-flow-unusable-for-third-party-adopters.md`,
+  not a workaround anyone should be happy with.
+
+Whatever replaces this flow is bound by
+[ADR-0061](adr/0061-uniform-human-approval-ceremony.md): three human acts, the
+same three for every gate.
