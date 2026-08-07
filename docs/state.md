@@ -265,6 +265,61 @@ the gate prints `(operating-model §7)` into its operator-visible fix string.
 Note (c) is a one-line change but sits in a `harness/scripts/` file, so it
 follows the ordinary briefed-task path rather than an in-session edit.
 
+**TOP RULE, SHARPENED BY THE PO (APS, 2026-08-07) — this supersedes how the
+earlier one-approval entries below are to be read.** Verbatim: *"wichtig ist nur,
+dass es niemals tätigkeiten des PO ausserhalb der session braucht und alles mit
+einer freigabe klappt. Wir schützen vor dem agenten der wilde sachen macht aber
+nicht vor dem Human! oberste Regel. Gibt der Frei per signatur oder chat je nach
+config, dann ist das ausreichend für alles!"*
+
+Three things follow, and they are requirements, not preferences:
+
+1. **No PO activity outside the session may ever be required.** The escape hatch
+   "the PO edits this file directly, outside an agent session" is no longer an
+   acceptable answer for anything. It appears verbatim in the shipped denial text
+   of `guard-gate-strength.mjs` — for GS-6 as the *only* route, and for
+   GS-1..GS-5/GS-7 as an alternative. Under this rule that text is a defect to
+   fix, not documentation.
+2. **One release covers everything downstream of it.** Not one per protected path,
+   not one per tool call, not one per act.
+3. **The adversary is the agent, never the human.** This is not new and not a
+   weakening: it is exactly the threat model already recorded in §0.5 of
+   `specs/sprint-phoenix-epic/design/part-a-residuals-and-dispatch-template-drift.md`
+   ("The adversary is the agent … A human attacker with local write access is out
+   of scope"). The rule extends that settled model from the guards to the approval
+   mechanism itself, which is consistent rather than a new concession.
+
+**The reading this session applied, stated explicitly so it can be corrected in
+one sentence if wrong.** Taken literally, "no PO activity outside the session"
+would abolish `signature` mode, since a detached Ed25519 proof is by construction
+produced outside the session with a key held outside the repository. But the same
+sentence names signature as an acceptable release ("per signatur oder chat je nach
+config"). The coherent reading is therefore: **the configured release act — one
+signature, or one chat approval — is itself the boundary. What is forbidden is
+anything *additional* beyond it:** a second signing act per protected path, a
+per-release ceremony, or a hand-edit the agent cannot perform. If that reading is
+wrong, it is wrong in one direction only and one sentence fixes it.
+
+**What this reclassifies, immediately.** This session measured from source that
+HGO binds one authorization to one byte-exact tool input, and that GMW's window
+covers only `GS-6` and `TP-*`. That measurement stands — but the conclusion drawn
+from it below ("R1 goes from three human touches to two, not one") must now be
+read as **a defect report against the top rule, not as an acceptable outcome**.
+Two touches violates the rule exactly as three did. The mechanism work that closes
+it belongs to the Nova session by the PO's own assignment; what changes here is
+that the gap is no longer something Phoenix may design around.
+
+**Concrete violations to hand over, each citable rather than described:**
+- `guard-gate-strength.mjs` denial text: out-of-session PO edit named as the only
+  route for GS-6 and as an alternative for GS-1..GS-5/GS-7.
+- `human-guard-override.mjs`: capability bound to one `toolInputSha256`, flipped
+  to `consumed` on first use — structurally one act per authorization.
+- `guard-maintenance-window.mjs:104-109`: `LIFTABLE_RULE_IDS = ["GS-6"]` plus
+  `TP-*`, so no gate-strength rule other than GS-6 can be covered by a window.
+- Phoenix's own AC-R1-8, which currently specifies a PO hand-edit for the
+  protected-test-path row. It is not reworked here (the mechanism is Nova's), but
+  it is recorded as depending on a mechanism that must exist, not on a human act.
+
 **R1 IMPLEMENTATION LANDED (`986b540`, `b0ca256`) — the first Phoenix code of this
 session.** Elephant-verified independently of the report: both commits carry
 `Dispatch: PHX-R1-IMPL (goldfish)`, three files, +158/−83, working tree clean apart
