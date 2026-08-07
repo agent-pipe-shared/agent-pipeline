@@ -42,6 +42,7 @@
 | pipeline.lifecycle-guard-does-not-know-the-human-signing-commands | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root | open | defect | pipeline | 2026-08-06 | — |
 | pipeline.local-worker-supervisor-cli-suite-flakes-under-full-verify | closed | defect | pipeline | 2026-08-06 | — |
+| pipeline.long-dispatches-truncate-before-emitting-their-report | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.maintenance-window-selectivity-is-untested-at-both-levels | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.maintenance-window-signature-voided-by-unrelated-write | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.managed-onboarding-success-contract | open | workflow-improvement | pipeline | 2026-07-25 | — |
@@ -98,6 +99,6 @@
 
 ## Counts
 
-- open: 47
+- open: 48
 - in_progress: 21
 - closed: 22

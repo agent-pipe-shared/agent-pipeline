@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "03f5760c2f8d770f78638c59ef9a4a398af6c7a27d09acc3d5fcceca8d8dae1c"
+    "transitionHead": "dd2dc6b4ab0406c2ed5312c581ebc01d0962e25a012e7e6ac261d46db19d5e06"
   },
   "counts": {
-    "open": 47,
+    "open": 48,
     "in_progress": 21,
     "closed": 22
   },
@@ -330,6 +330,14 @@
       "closureRepository": "self",
       "closureCommit": "577c515404e2bd4c94f890c9cd7009ac93b66d1d",
       "closureEvidence": "backlog/evidence/2026-08-07-nova-gwm-backlog-fixes.md"
+    },
+    {
+      "id": "pipeline.long-dispatches-truncate-before-emitting-their-report",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Three occurrences in one unattended block, 2026-08-07/08: two Goldfish dispatches and one Critic dispatch ended mid-sentence with the work done and no report."
     },
     {
       "id": "pipeline.maintenance-window-selectivity-is-untested-at-both-levels",

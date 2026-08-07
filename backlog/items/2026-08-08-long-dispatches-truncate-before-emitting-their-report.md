@@ -1,0 +1,107 @@
+---
+schema: pipeline.backlog-item.v1
+id: pipeline.long-dispatches-truncate-before-emitting-their-report
+type: defect
+owner: pipeline
+status: open
+created: 2026-08-08
+due: 2026-08-22
+source: "Three occurrences in one unattended block, 2026-08-07/08: two Goldfish dispatches and one Critic dispatch ended mid-sentence with the work done and no report."
+---
+
+# A long dispatch can finish its work and lose its report
+
+## What happened, three times in one block
+
+Two Goldfish dispatches and one Critic dispatch ended with a final message that
+was a fragment of working narration — *"Now let me run the probe to see whether
+the claude flow completes."*, *"Now the full verify sweep — the long suite in the
+background, the shorter ones in sequence."*, *"Let me review the remaining four
+diffs and map them against the backlog items."* — rather than the contractual
+report their briefing required.
+
+In every case the substantive work existed. Two had written complete source
+changes; one had reviewed most of an enumerated commit set. What was lost was
+the only artifact the dispatch contract actually delivers: the report.
+
+All three shared one shape. The dispatch was long, and the truncation fell
+during or just before a **verification sweep** — the phase where an agent runs
+several suites in sequence and holds their results in working context in order
+to quote real counts.
+
+## Why this is a defect and not merely bad luck
+
+The Goldfish and Critic contracts are report-based by design. The implementing
+session is discarded; the report plus the commit is the entire deliverable. An
+agent that finishes its work and loses its report has, from the dispatcher's
+side, produced an unverified diff — which the operating model treats as no
+delivery at all (P4).
+
+The consequence is worse for the Critic than for a Goldfish. A Goldfish's work
+sits in the tree and can be inspected. A Critic's work is *only* the judgement;
+a truncated Critic run has consumed a full review budget and produced nothing
+that can be acted on, and there is no way to tell from the outside whether it
+had found something.
+
+## What already helps, and what it does not cover
+
+`templates/prompts/goldfish-task.md` field 6 carries a **report-early duty**: for
+packages expected to need more than roughly twenty-five tool uses, keep a running
+report skeleton in `dispatch-record.json`, updated at each milestone, so the
+final report condenses a persisted log rather than being composed from scratch.
+That duty is why two of the three cases were cheap to recover.
+
+It does not cover the case that actually occurred. The running log preserves the
+*findings*; it does not cause the *report* to be emitted. Nothing in the contract
+makes the report itself durable, and the Critic template carries no equivalent
+duty at all.
+
+## What worked as recovery, and should be written down as practice
+
+Resuming the agent with a message naming only what remained. The transcript is
+intact, so the agent still holds its own findings; a short procedural instruction
+— finish, emit the report in the mandatory format, scope the verdict to what you
+actually examined, and say what you did not reach — produced a complete report on
+the next turn in each case. For one Goldfish it was cheaper still for the
+dispatcher to re-run the suites itself, since it re-runs them anyway.
+
+Recovery must stay procedural. A resume message to a Critic that characterises
+the review object, or hints at what was expected, is the same contamination the
+dispatch template exists to prevent — and a resumed Critic is *more* susceptible
+to it, not less, because it arrives with the hunt already framed.
+
+## Direction, not a design
+
+Not designed here. The questions:
+
+1. **Should the report be persisted rather than emitted?** If the contractual
+   report were written to a known artifact path as the agent's last act before
+   returning, a truncated final would cost the prose and not the deliverable.
+   This is the report-early duty carried one step further, to the report itself.
+2. **Does the Critic template need the report-early duty at all?** It currently
+   has none, and it is the role where truncation costs the most.
+3. **Should a verification sweep be structured to survive it?** The pattern in
+   all three cases was several suites run in sequence near the end. Requiring
+   each result to be appended to the dispatch record as it lands — rather than
+   accumulated for one final summary — would make the loss recoverable without a
+   resume.
+4. **Is truncation detectable by the dispatcher?** A final message that fails to
+   match the mandatory report shape is mechanically recognisable. Whether the
+   dispatcher should be required to check it, rather than noticing by reading,
+   is a separate question worth asking.
+
+Question 1 is the one that most directly protects the contract; question 2 is the
+cheapest and closes the worst case.
+
+## Triggering situation
+
+An unattended hardening block, 2026-08-07/08, with four to five concurrent
+dispatches against the local `0.5.4` candidate. Reproduced three times without
+being sought.
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:**
+- **Rationale:**
+- **Assignment (if accepted):**
+- **Date:**
