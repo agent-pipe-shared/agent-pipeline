@@ -136,7 +136,29 @@ the only instance that reaches an operator through tool output; and the German
 half carries a `### H5 Close-Koordinator` heading (`:649`) with no English
 counterpart, an EN/DE structural divergence outside R3.
 
-**Ledger rework 2 landed (`55d04d8`, +414/−137); Critic round 3/4 dispatched.
+**Ledger Critic round 3/4: FAIL — one major, narrowly bounded; rework 3
+dispatched (`PHX-LEDGER-INTAKE-rework-3`).** Everything else in the delta was
+examined and cleared, including the F-A impossibility proof, which the Critic
+explicitly judged sound rather than a letter-satisfying dodge, and ~45 source
+citations re-derived without a miss. **The single finding F-1:** §7.3 admits
+adopting a concurrently committed grant only if `scope`, `ruleDigest`,
+`policyDigest` and `validity` are byte-identical — but §4 defines
+`validity.notBeforeEpochMs` as `installedAtMs`, a per-process clock read that
+`guard-maintenance-window.mjs:456` assigns from `nowMs` and `:446-447`
+explicitly excludes from the signed subject. Two concurrent installs therefore
+always differ there, the precondition always fails, and both losing racers take
+the fail-closed path — while §12's I-12(a) asserts the opposite ("both racers
+adopt … and neither errors"). **How it arose, which is the instructive part:**
+the previous revision's I-12 was consistent with the same rule; rework 2 changed
+the *test*, not the rule, while closing an earlier finding. The rework-3
+briefing therefore carries an explicit prohibition against the tempting fix —
+relaxing the precondition until the test goes green would silently admit a grant
+whose `validity` differs from the one the intake computed, arming a window
+against ledger bounds never verified. That is a real H-AC-04 defect and worse
+than the contradiction. **Round 4 is the last autonomous round for this
+package**; a FAIL there is a PO course gate, not a fifth iteration.
+
+**Ledger rework 2 landed (`55d04d8`, +414/−137); Critic round 3 was run on it.
 The blocker could not be resolved as designed, and that is the result.** F-A
 asked for a portable identifier scheme that does not reproduce a value existing
 byte-identically in the machine-local record. The rework proved no such scheme
