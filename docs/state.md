@@ -265,6 +265,58 @@ the gate prints `(operating-model §7)` into its operator-visible fix string.
 Note (c) is a one-line change but sits in a `harness/scripts/` file, so it
 follows the ordinary briefed-task path rather than an in-session edit.
 
+**THE 0.5.3 MERGE IS DONE (`35d9e11`), plus the ledger reconciliation (`6a5331d`).**
+`origin/main` `2740041`, tag `v0.5.3`, merged into `sprint_phoenix`. The plan
+written before any file was touched predicted the outcome exactly: seven
+conflicts, of which **one** was code.
+
+- **The code conflict was the silent-regression case, as predicted.**
+  `guard-gate-strength.mjs`: `main` carries the ADR-0059 override routing this
+  branch never had; this branch carries GS-8 and GS-9, which `main` never had.
+  Either side taken wholesale drops protection **with no test failing**. Resolved
+  as a union and verified after the fact — `node --check` clean, GS-1..GS-9 plus
+  the GS-6 live-plugin rule all present, and the `toolName`/`toolInput` capture
+  the override block depends on in place. **`guard-gate-strength.test.mjs`: 30/30
+  pass**, including GST17, which iterates the whole path table through both lanes,
+  and GST21–GST30, which are `main`'s own ADR-0059 cases.
+- **The backlog trio took `main`'s side for a reason worth keeping.**
+  `backlog/transitions.ndjson` is a hash-chained ledger and both branches appended
+  from sequence 119 with different `previousHash` chains. A union would have
+  produced duplicate sequence numbers and a broken chain. This branch's 24 items
+  were re-added afterwards through the sanctioned reconciler (31 transitions), not
+  by hand.
+- **`docs/state.md` keeps both halves**, this branch's live handover above,
+  `main`'s Nova record below, under the convention the previous snapshot merge
+  established. Resolving that half away would have registered as a *deletion* of
+  Nova's handover when this branch merges back.
+- **`project/pipeline-state.json` took this branch's side**, verified by reading
+  both: ours carries the active Phoenix feature, continuity revision 3, this
+  branch's plan approval and its push approval record.
+- **ADR-0058, ADR-0059 and the GMW threat model arrived with the code**, which is
+  what the plan's §7 required rather than accepting as an inherited gap.
+  `check-doc-contracts`: valid, 531 files, 826 links.
+
+**§7 item 1 stands and is now worse, stated plainly: GS-8 has no test on either
+side, and GS-9 has none either.** Two of the nine gate-strength rules are
+protected by a table entry that GST17 exercises structurally and by no behavioural
+case of their own.
+
+**A defect found by doing, not by analysis, and it lands squarely on the standing
+top rule.** Resolving `project/pipeline-state.json` is a *precondition for the
+session to function at all*. While that file held conflict markers, the continuity
+observation failed, the lifecycle guard fell closed, and **every recovery command
+was itself refused — including `git merge --abort`** — while the typed recovery
+the guard names returned `nextAction: null`. An ordinary merge of two Pipeline
+branches therefore deadlocks the agent session and requires a human at the
+keyboard. That is not a designed approval; it is an unplanned external act caused
+by a fail-closed guard with no exit. The PO cleared it with one command. Filed as
+its own item.
+
+**Elephant error worth recording:** I started the merge having *measured*
+`project/pipeline-state.json` as one of the seven conflicts and dismissed it as
+"bookkeeping both sides append to". That the same file is the lifecycle guard's
+own authority was in my notes. Two facts, both mine, never joined.
+
 **TOP RULE, SHARPENED BY THE PO (APS, 2026-08-07) — this supersedes how the
 earlier one-approval entries below are to be read.** Verbatim: *"wichtig ist nur,
 dass es niemals tätigkeiten des PO ausserhalb der session braucht und alles mit
