@@ -620,7 +620,36 @@ the repository and explicitly needs its own dedicated, extra-careful
 independent Critic pass before anyone relies on it** — flagged as a
 mandatory next step in the dispatch briefing itself, not to be folded
 silently into the general ADR-0059 Critic round as "just another fix."
-Running as of this note.
+
+**Course correction, PO instruction (chat, 2026-08-07), while
+`NOVA-HGOSIG-GS7-1` was still running: the signed-only, chat-forbidden
+design above is WRONG and was rejected before it was committed.** Verbatim
+PO framing: *"alle Sachen die den Agenten blockieren müssen mit human
+Signatur oder chat je nach config Liftbar sein... wenn ein User bewusst von
+der sicheren Signaturmethode auf Chat umstellt, dann ist das völlig okay...
+es macht keinen Sinn, dass du die Sachen immer wieder uninterpretierst, wenn
+ich Vorgaben mache."* Grounded in a standing principle already present in
+[ADR-0056](adr/0056-push-approval-mode.md) Decision 4 (`chat` is "a real and
+deliberate weakening, chosen for ergonomics", not a hole to fence off
+per-file) — the Elephant had invented a stricter, absolute exception the PO
+never asked for and that contradicts this repo's own already-recorded
+design. Independently verified the self-service-escalation concern that
+motivated the rejected design is not actually reachable: the existing,
+already-committed `HGO-SIGNATURE-MODE-REQUIRED` check in
+`authorizeHumanGuardOverride()` is unconditional and path-independent — no
+chat-armed capability can exist for ANY file unless the repository is
+already, genuinely, committedly in `chat` mode, so the loop cannot
+bootstrap itself from `signature`. **Corrected:** GS-1..GS-5/GS-7 get
+exactly the same lift shape as `guard-testpath.mjs` (Decision 3) with **no
+special-casing** — `human-guard-override.mjs` needs no change at all for
+this task. ADR-0059 corrected twice more (commits `6e8d6bd` — the Follow-up
+paragraph rewritten to the corrected design; `405d7e0` — a new explicit
+"Standing principle" paragraph added after Decision 3, quoting the PO's own
+words verbatim, precisely so this does not need rediscovering per guard
+again). The in-flight `NOVA-HGOSIG-GS7-1` dispatch was redirected via
+`SendMessage` before it had committed anything (confirmed via `git
+status`/`git log` immediately before redirecting) — running with the
+corrected design as of this note.
 
 **Mandatory next steps (restated, unchanged):** once full Verify confirms
 exit 0, dispatch the mandatory T1 Critic round on the complete ADR-0059
