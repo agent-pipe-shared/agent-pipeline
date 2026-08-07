@@ -320,6 +320,15 @@ window. The GS-4 row in `project/guard-config.json` **cannot** join it — GS-4 
 outside GMW's scope set, and its HGO route is one exact edit. **R1 therefore goes
 from three human touches to two, not to one, with what exists today.**
 
+**OWNERSHIP, set by the PO the same day (APS, 2026-08-07):** *"diese
+implementierung belassen wir dem nova elephant bitte! das ist nicht dein problem
+erstmal also das thema single freigabe!"* The one-approval **mechanism** is the
+Nova session's work. This session does **not** rework R1 to fit it, does not
+design a carrier, and does not treat the two-instead-of-one result as a Phoenix
+defect to fix. What is recorded above stays recorded as *input* for that session —
+a measurement it does not have to repeat — and nothing more. Phoenix continues on
+its own packages.
+
 That is not a reason to weaken anything. It is the concrete input the mechanism
 work needs: reaching one release means either the GS-4 row is not required in the
 same release, or a carrier is needed that does not exist yet. Stated as a
