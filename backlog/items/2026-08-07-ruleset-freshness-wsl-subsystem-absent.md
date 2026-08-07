@@ -157,3 +157,7 @@ trigger, both threat-model pointers resolve cleanly, citations verbatim. The
 `2026-08-07-self-application-integrity-check-absent.md` for detail). A
 scoped rework 3 is dispatched next — round 4 of 4, the last delta re-review
 allowed before a PO course gate.
+
+**Rework 3 (2026-08-07): landed, commit `0d8ed74`, Part-A-only — Part B
+untouched.** Findings 1-3 were all Part-A scoped; see the companion item for
+detail. A bounded delta re-review is dispatched next — round 4 of 4.

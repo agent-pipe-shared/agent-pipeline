@@ -170,3 +170,18 @@ Finding D (§B.8 open item) fully resolved. All three narrow/textual, no new
 blocker/major. A scoped rework 3 is dispatched next, this time on the
 Design-tier model per MP-22/23 to close Finding-3's recurrence structurally
 — round 4 of 4, the last delta re-review allowed before a PO course gate.
+
+**Rework 3 (2026-08-07): landed, commit `0d8ed74`, Design-tier model
+(claude-opus-5/xhigh, MP-22/23 rationale — the first dispatch touching this
+document to run on-tier).** (1) Corrects the GS-6 timing claim: the
+enforcing guard is the installed plugin-cache copy (`hooks.json:39`), not
+the source tree; this checkout wires no source-tree hooks; a source edit
+only takes effect on the next plugin refresh. Replaces the false
+same-session lockout with the real consequence (agent-writable window until
+refresh) and withdraws the sequencing advice built on the false premise.
+(2) §A.6 is now the single source of the 5-file count; §A.5 defers to it.
+(3) Names the third below-tier dispatch (`WP2-WP3-design-rework-2`) and
+records this rework's own Design-tier authorship, closing the recurrence
+structurally rather than by another disclosure layer. A bounded delta
+re-review is dispatched next — round 4 of 4, the last one allowed before a
+PO course gate.

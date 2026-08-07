@@ -190,6 +190,23 @@ freehand). Status:
    disclosure — **round 4 of 4, the last delta re-review allowed for this
    package; a further FAIL needs a PO course gate, not a fifth autonomous
    iteration** (mirrors WP5/PHX-2's round 4 outcome).
+
+   **Rework 3 (2026-08-07): landed, commit `0d8ed74`, on the Design-tier
+   model (claude-opus-5/xhigh, MP-22/23 rationale).** Finding 1: corrects
+   the GS-6 timing claim — the enforcing guard is the *installed* copy
+   (`hooks.json:39` wires `${CLAUDE_PLUGIN_ROOT}/hooks/guard-gate-strength.mjs`;
+   this checkout wires no source-tree hooks), so a source-tree edit changes
+   nothing until the next plugin refresh; replaces the false same-session
+   lockout with the real consequence (an agent-writable window until
+   refresh) and withdraws the sequencing advice built on the false premise.
+   Finding 2: §A.6 is now the single source of the 5-file count; §A.5
+   enumerates only its own 3 files and defers the total. Finding 3: names
+   the third below-tier dispatch (`WP2-WP3-design-rework-2`) and records
+   that this rework itself runs Design-tier, closing the recurrence
+   structurally. Part B and all prior F/A-D material untouched (diff
+   confined to §A.3's disclosure block, the GS-6 exception paragraph, and
+   §A.5/§A.6). A bounded delta re-review is dispatched next — **round 4 of
+   4, the last one allowed before a PO course gate.**
 4. **`governance-product-verify-suites-deregistered`** — blocked on 1–3's
    outcome, not started.
 5. **`ledger-backed-plan-and-push-authority-absent-on-merged-base`** —
