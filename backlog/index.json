@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "b4533ea4bccebf0acd4bd855da0776114fa630129114b5ff869965c054ba4eb4"
+    "transitionHead": "fcb8ac156fde84d9806dfc67f1ee5133385eda49a17d02ccc28ac259ad771bfb"
   },
   "counts": {
-    "open": 29,
+    "open": 30,
     "in_progress": 21,
     "closed": 19
   },
@@ -315,6 +315,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "ADR-0051 Follow-up section names this as one of two gaps to track as a dated backlog item; created per backlog/items/2026-08-05-adr-0051-follow-up-gaps-untracked.md's proposal, executed 2026-08-06 night autonomous backlog reconciliation."
+    },
+    {
+      "id": "pipeline.onboarding-restart-flow-is-codex-only-not-runner-aware",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "PO handover from a separate session (rune_test1_claude), submitted through the PO's own channel, 2026-08-07."
     },
     {
       "id": "pipeline.parallel-goldfish-dispatches-race-on-shared-checkout",
