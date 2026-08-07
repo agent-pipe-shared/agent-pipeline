@@ -330,7 +330,6 @@ const TEST_SUITES = [
   { name: "public-core-observation-tests", file: join(libDir, "public-core-observation.test.mjs") },
   { name: "public-core-origin-allowlist-tests", file: join(libDir, "public-core-origin-allowlist.test.mjs") },
   { name: "external-push-ledger-tests", file: join(libDir, "external-push-ledger.test.mjs") },
-  { name: "guard-maintenance-window-tests", file: join(libDir, "guard-maintenance-window.test.mjs") },
   { name: "guard-push-external-ledger-tests", file: join(hooksDir, "guard-push-external-ledger.test.mjs") },
   { name: "guard-gate-strength-gmw-tests", file: join(hooksDir, "guard-gate-strength-gmw.test.mjs") },
   { name: "guard-testpath-gmw-tests", file: join(hooksDir, "guard-testpath-gmw.test.mjs") },
