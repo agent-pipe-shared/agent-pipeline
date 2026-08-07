@@ -1598,8 +1598,10 @@ review's authority. All measurements are pinned to `84876f1` — the reviewed tr
   C1–C9 have a rule id as their nearest preceding reference, and only one of them is an
   operating-model citation:** `critic-review.md:15` `§4.2` ← `MP-07` (F1 itself);
   `harness/session-bootstrap.md:91` and `:487` `§6.5` ← `MP-28`, both self-references to that file's
-  own `### 6.5 Speed bootstrap` (`:361`, German `:741`); and `docs/state.md:1801` `§7` ← `AC-07`, a
-  reference to another project's acceptance-criteria path, not to this repository's operating model.
+  own `### 6.5 Speed bootstrap` (`:361`, German `:741`); and `docs/state.md:1801` `§7` ← `AC-07`,
+  which reads "`PX0-AC-02` through `PX0-AC-07` describe the very §7 path that is currently blocked"
+  — a reference into the acceptance-criteria document those ids belong to, not into
+  `docs/operating-model.md`.
   **So the mandated re-check turns up no further instance beyond F1**, and no count moves because of
   it.
 - **A second, adjacent miss mechanism — measured, scale reported, deliberately not folded in.** The
