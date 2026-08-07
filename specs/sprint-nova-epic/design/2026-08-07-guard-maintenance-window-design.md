@@ -165,6 +165,45 @@ through to the existing logic exactly as it is today (including the
 - Any change to `lib/po-approval-proof.mjs` or `lib/human-guard-override.mjs`
   themselves — read-only references for this dispatch.
 
+## Follow-up (separate dispatch, after NOVA-GMW-1 lands and is Critic-reviewed): bootstrap warning
+
+Not part of NOVA-GMW-1 — depends on its `currentGuardMaintenanceWindow`/
+`status` output being correct and reviewed first. Recorded here now so the
+next dispatch has a ready contract.
+
+New file `plugins/pipeline-core/hooks/guard-maintenance-window-check.mjs`,
+wired into `plugins/pipeline-core/hooks/hooks.json`'s existing SessionStart
+`startup|resume|clear` matcher (same group as `staleness-check.mjs` and
+`setup-check.mjs` — read `setup-check.mjs` first for the exact output
+contract and fail-open discipline to mirror):
+
+- Calls `currentGuardMaintenanceWindow({ rootDir })` directly (import the lib
+  function; do not shell out to the CLI from a hook).
+- `status: "absent"` → silent, exit 0 (the normal case — nothing to report).
+- `status: "active"` → non-silent: `{ systemMessage, hookSpecificOutput: { hookEventName: "SessionStart", additionalContext } }`
+  on stdout, exit 0 (NEVER exit non-zero — this hook must never block
+  startup, matching every other hook in this matcher group). Message states
+  scope, reason, and remaining time plainly, e.g. "Guard maintenance window
+  active: GS-6, expires in 41 min, reason: <reason>."
+- `status: "expired"` (a record exists but is past its effective expiry) →
+  one informational line, not a repeated nag: e.g. "A guard maintenance
+  window expired at <iso> and is now inert (GS-6 refuses again). No action
+  needed; run `guard-maintenance-window.mjs close` to clear the record if
+  you want it gone." Do not treat this as equivalent severity to `active`.
+- If the just-closed/expired window's scope included `GS-6`: additionally
+  compare the CURRENT live-plugin tree hash (same computation
+  `prepareGuardMaintenanceWindowRequest` used) against the window's recorded
+  `openingTreeSha256`. A mismatch is stated as fact, not a verdict: "The
+  plugin root changed during this window (opening tree <hash>, current tree
+  <hash>) — confirm this matches an intended, reviewed change." No mismatch
+  → say nothing extra.
+- Any read/parse error anywhere in this chain → silent, exit 0 (fail-open,
+  identical discipline to every sibling hook in this file).
+- Test fixtures: an absent window, an active window, an expired-but-present
+  window, and an expired GS-6 window with a tree-hash mismatch — four cases,
+  each asserting the exact stdout shape (or lack of it) and exit code 0 in
+  every case including a simulated internal error.
+
 ## Test expectations (in addition to the DoD checks in the briefing)
 
 - A request naming a non-liftable rule id (e.g. `GS-2`, or an unknown id) is
