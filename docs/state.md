@@ -16,7 +16,65 @@ the supplied authoritative release identity; it is not a claimed release time.
 The historical candidate-qualification sections below are retained as
 session history and no longer describes the current publication disposition.
 
-## 2026-08-06 Nova III (night) — push executed, autonomous AFK prep (current)
+## 2026-08-07 Nova IV — 0.5.2 main-release signing, process friction recorded (current)
+
+Continues from Nova III. This block strips the release `+build` cachebuster
+from both plugin manifests (PO-edited directly, GS-6 has no in-session
+override), gets a fresh Verify+Security run clean on the stripped candidate
+`6e2c9b2868d164ff3b631ab068fa5df20939e07d`, gets a T1-equivalent Critic PASS
+on the 12-commit block since `5ba7ee0` (three minor findings, none blocking —
+see the Critic's own report, not reproduced here per this file's own
+citation discipline), and gets a fresh `push`-kind PO signature scoped to
+`(6e2c9b2, origin, refs/heads/main)`, consumed via `pipeline-state.mjs
+approve-push`. The actual `git push origin 6e2c9b2:refs/heads/main` is
+GG-03-gated (double-confirmation override, PO gave `OVERRIDE GG-03`) and then
+additionally blocked for the agent by the Claude Code harness classifier —
+same pattern as the original branch push in Nova III — so it runs in the
+PO's own terminal, not recorded as complete here until confirmed.
+
+**PO process feedback, recorded because Claude's own persistent memory
+system was tried and found blocked in this governed session** — writes to
+`~/.claude/projects/<hash>/memory/*.md` hit `guard-lifecycle-ready.mjs`'s
+cross-repository-mutation check exactly as already described in
+`backlog/items/2026-07-29-guard-lifecycle-ready-blocks-claude-memory-writes.md`
+(re-confirmed here, not a new finding). Recorded here instead, since this
+file is the sanctioned fallback when the cross-session memory path is
+unavailable:
+
+1. Guessing instead of verifying, twice, in this same session: (a) claiming
+   `po-approval-gate.mjs prepare-critical` was human-only when it is agent-
+   eligible by design intent but still guard-blocked by
+   `GUARD-CROSS-REPO-MUTATION` in practice — the PO ran it needlessly before
+   the guess was tested and corrected; (b) picking the wrong one of two
+   candidate external PO-key directories from filesystem timestamps rather
+   than checking the public-key hash against the committed trust anchor,
+   caught only via a live `CRITICAL-PROOF-TRUST-ANCHOR-MISMATCH`. Lesson:
+   for the push/publication/deploy critical-action flow specifically, verify
+   against the guard's actual code path or a live test, state it as a test
+   when it is one, never assert from inference.
+2. Two independent, sequentially-discovered authorization layers gate a
+   risky git action (push to `main`, or a working-tree discard): the
+   Pipeline's own guard union (readable, predictable, explainable in
+   advance — e.g. GG-03 with its documented GIT-04 override) and a separate
+   Claude Code harness "auto mode classifier" that is opaque to the agent,
+   undiscoverable except by attempting the exact command. The PO's words:
+   "das macht auch keinen Sinn das so doppelt zu moppen ... irgendwie haben
+   wir jetzt 2 Freigaben für das selbe." This is a structural property of
+   running a governed agent session, not a Pipeline defect to fix — but a
+   future session should say so plainly and immediately rather than treat
+   the second block as a surprise.
+3. PO's own proposed (unfiled) improvement: record the external PO-signing
+   directory path in project config so the agent does not have to guess
+   which of several candidate directories is the trust-anchored one, and
+   give the cross-repo-mutation guard a narrow, config-driven exception for
+   that exact path limited to `prepare`/`verify`-class artifact creation and
+   reading — never the signing/approval mutation itself, which stays
+   human-only exactly as today. Related, already-filed:
+   `backlog/items/2026-08-07-gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions.md`
+   (same shape of gap: a guard drawn at the boundary of a whole directory/
+   root rather than at the boundary of what actually needs protecting).
+
+## 2026-08-06 Nova III (night) — push executed, autonomous AFK prep
 
 Continues `feat/sprint-nova-codex-v046` from `5ba7ee0`. The PO reviewed and
 signed a push approval for `5ba7ee0` (remote `origin`, destination
