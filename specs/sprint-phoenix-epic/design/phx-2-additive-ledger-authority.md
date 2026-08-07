@@ -23,7 +23,8 @@ pre-merge (see backlog item
 findings 1, 2, 4, 5, 6, 11). The PO decision recorded there is binding and is not
 re-litigated here: main's `gates.push_approval` stays the baseline; PHX-2 becomes an
 additive layer "consumed alongside the signature/chat gate, not a competing enforcement
-path."
+path." (§1 states exactly which of the two modes this specific design actually engages for —
+read §1 before assuming both are covered.)
 
 This document designs the smallest such additive layer. It reuses main's existing
 `authorizeRecordedPush` / `criticalProof` machinery for everything about verifying *that a
@@ -70,16 +71,42 @@ concrete residual gaps follow from that:
    human and the agent have access to the same command in the same session; genuinely
    proving human presence needs an out-of-band channel (a second device, a physically
    separate credential), which is explicitly outside "smallest additive mechanism" and is
-   not proposed here.
+   not proposed here. The gap this design leaves in `chat` mode is stronger than "no added
+   strength," though — see the coverage-boundary paragraph immediately below.
+
+**Coverage boundary: this design engages ONLY for `signature`-mode-configured projects.**
+The read-side integration point (§2) is nested inside the branch of `guard-push.mjs` that
+executes only when `pushGate.approval === "required"` and no `push` waiver applies
+(`!pushWaiver.waived`). `gates.push_approval: chat` sets exactly that waiver
+(`criticalProofWaiverFor`, `plugins/pipeline-core/lib/critical-human-proof-policy.mjs:270-280`
+resolves `waived: true` whenever `configured.mode === "chat"`) — as does an explicit
+ADR-0055 waiver for `push` recorded in the critical-human-proof policy. Whenever `pushWaiver
+.waived` is true, that entire branch is skipped and this design's new check is never
+consulted at all, in either direction: not on the read side (nothing calls
+`checkExternalPushLedgerConsumption`) and not on the write side (`approve-push`'s
+`verified.proof !== null` guard, §2, is also false for a waived approval, since `chat` mode
+produces no `criticalProof` object to bind a `proofSha256` to in the first place). Concretely:
+**`chat`-mode-configured projects get zero benefit from this design — not weaker
+defense-in-depth, none at all — until a follow-up design extends coverage.** Extending
+coverage to `chat` mode is not a natural, small extension of the mechanism in §3: the external
+ledger is keyed on `proofSha256`, and a `chat`-mode approval has none, so there is nothing to
+bind a consumption record to. A `chat`-mode-specific keying scheme (e.g. binding on
+`forCommit`/`remote`/`destination` instead) would also need to invent single-use semantics
+`chat` mode does not have even locally today — `criticalProofConsumption` is never appended
+for a waived approval (`pipeline-state.mjs:5208-5210`), so nothing today stops the same `chat`
+approval from being reused, meaning "single-use consumption" is not yet a concept that applies
+to a `chat`-mode approval at all. Building that concept is materially more than "smallest
+additive mechanism" calls for and is left to a follow-up design, not attempted here.
 
 **Stated plainly, as required:** the marginal guarantee this design adds is a *second,
 independently stored, independently checked, single-use consumption record that is immune to
 Git-level state manipulation* — defense-in-depth against a bug or reset in the existing local
-enforcement chain. It does **not** add a new proof of human identity or presence beyond what
-`signature` mode's private key already provides, and it does **not** turn `chat` mode into
-anything cryptographically stronger than an attribution record. A fully adversarial agent
-session with unrestricted filesystem access (including outside the repository) is not
-defended against by this design either — see §6.
+enforcement chain, and available **only to `signature`-mode-configured projects** per the
+coverage boundary above. It does **not** add a new proof of human identity or presence beyond
+what `signature` mode's private key already provides, and it does **not** apply to `chat` mode
+in any form, weakened or otherwise. A fully adversarial agent session with unrestricted
+filesystem access (including outside the repository) is not defended against by this design
+either — see §6.
 
 ## 2. Exact integration point
 
@@ -101,17 +128,21 @@ at line 1660-1668, and pushes a failure if `!attested.authorized`.
 
 The new check is added as an **additional, AND-ed condition inside the same `if
 (pushGate.approval === "required" && !pushWaiver.waived)` branch**, evaluated only after
-`attested.authorized` is true (there is nothing to consume-check if the base signature/chat
-proof did not already verify):
+`attested.authorized` is true (there is nothing to consume-check if the base signature proof
+did not already verify). Per §1's coverage boundary, this is also exactly why this design
+engages only in `signature` mode: `!pushWaiver.waived` is this branch's own precondition, and
+`chat` mode is precisely the condition that makes it false, so the branch — and this design's
+check inside it — never runs at all for a `chat`-mode-approved push:
 
 ```js
 if (!attested.authorized) {
   failures.push(/* existing message, unchanged */);
 } else if (externalPushLedgerGate(manifest) !== "off") {   // new: opt-in, see §5
+  const repository = discoverRepository(projectDir);  // worktree-invariant roots, see below
   const ledgerCheck = checkExternalPushLedgerConsumption({
     repositoryFingerprint: derivePoGateRepositoryFingerprint({
-      gitCommonDir: /* existing git-common-dir resolution already used elsewhere in this file */,
-      primaryRoot: projectDir,
+      gitCommonDir: repository.commonDir,
+      primaryRoot: repository.primaryRoot,
     }),
     proofSha256: state.pushApproval.lastApproved.criticalProof.proofSha256,
     candidate: { commit: sourceCommit, tree: sourceTree },
@@ -126,13 +157,33 @@ if (!attested.authorized) {
 }
 ```
 
-What it needs from the caller: exactly the fields `authorizeRecordedPush` already computed
-for its own check — `sourceCommit`, `sourceTree` (already resolved earlier in the same file
-via `resolveSourceTree()`, line 1657), and `state.pushApproval.lastApproved.criticalProof.
-proofSha256` (already present on `state`, no new field is added to `pipeline-state.json`).
-The new check therefore consumes exactly the same `criticalProof`/`subjectSha256` binding
-main already produces — it does not re-derive or re-verify the signature, only checks that
-its `proofSha256` has an external, independent consumption record.
+`discoverRepository` (`plugins/pipeline-core/lib/worktree-lifecycle.mjs:231`) is imported, not
+newly written — a net-new import for `guard-push.mjs` (which does not currently import it),
+already available in `pipeline-state.mjs` alongside its existing `inspectSessionClosure`
+import from the same module. Its `primaryRoot`/`commonDir` pair is the physical primary
+checkout, resolved the same way regardless of which worktree the guard happens to be running
+from. This is not a stylistic choice: it is the same pair every real call site of
+`derivePoGateRepositoryFingerprint` in this codebase sources its fingerprint from —
+`document-adapter.mjs:99`, `document-binding.mjs:120`, `governance-event-store.mjs:87`,
+`document-identifiers.mjs:106`, `session-power.mjs:312`, `po-gate-profile-publisher.mjs:197`
+and `po-gate-authority.mjs:484` all derive it from a `discoverRepository()` result's
+`.commonDir`/`.primaryRoot`, never from a worktree-local toplevel. Using `projectDir`
+(`fallbackProjectDir()`'s `git rev-parse --show-toplevel` from whichever worktree the push
+runs in — `plugins/pipeline-core/hooks/guard-push.mjs:748-754`) or the CLI's own working
+directory (`dir` in `pipeline-state.mjs`) instead would make the fingerprint itself vary
+between worktrees of the same repository: a proof consumed against worktree A's fingerprint
+would not match a check made from worktree B, which directly undermines §1 point 1's
+worktree-invariance claim — the exact threat this design exists to close would remain open
+because the new check's own key would be worktree-dependent.
+
+What it needs from the caller beyond the repository roots above: exactly the fields
+`authorizeRecordedPush` already computed for its own check — `sourceCommit`, `sourceTree`
+(already resolved earlier in the same file via `resolveSourceTree()`, line 1657), and
+`state.pushApproval.lastApproved.criticalProof.proofSha256` (already present on `state`, no
+new field is added to `pipeline-state.json`). The new check therefore consumes exactly the
+same `criticalProof`/`subjectSha256` binding main already produces — it does not re-derive or
+re-verify the signature, only checks that its `proofSha256` has an external, independent
+consumption record.
 
 ### Write side: `plugins/pipeline-core/scripts/pipeline-state.mjs`, `case "approve-push"`
 
@@ -142,8 +193,12 @@ local write succeeded, add one call:
 
 ```js
 if (verified.proof !== null && externalPushLedgerGate(dir) !== "off") {
+  const repository = discoverRepository(dir);  // same worktree-invariant roots as the read side
   const appended = appendExternalPushLedgerConsumption({
-    repositoryFingerprint: derivePoGateRepositoryFingerprint({ gitCommonDir, primaryRoot: dir }),
+    repositoryFingerprint: derivePoGateRepositoryFingerprint({
+      gitCommonDir: repository.commonDir,
+      primaryRoot: repository.primaryRoot,
+    }),
     proofSha256: verified.proof.proofSha256,
     consumedAt: approvedAt,
   });
@@ -151,10 +206,14 @@ if (verified.proof !== null && externalPushLedgerGate(dir) !== "off") {
 }
 ```
 
-`verified.proof !== null` mirrors the existing conditional at line 5208 exactly (a `chat`-mode
-waiver still has no `criticalProof` object to bind a `proofSha256` to, so there is nothing to
-externally consume in that branch — same limitation as §1 point 2, stated once, not
-duplicated per-branch).
+`gitCommonDir`/`primaryRoot: dir` (the CLI's raw working directory) are replaced with the same
+`discoverRepository(dir)` call the read side now uses, for the identical reason: `dir` is
+whatever directory `pipeline-state.mjs` was invoked from, which is worktree-local exactly like
+`guard-push.mjs`'s `projectDir`, and a fingerprint keyed on it would not match across
+worktrees. `verified.proof !== null` mirrors the existing conditional at line 5208 exactly (a
+`chat`-mode waiver still has no `criticalProof` object to bind a `proofSha256` to, so there is
+nothing to externally consume in that branch — see §1's coverage-boundary paragraph for why
+this is a disclosed scope limit, not an oversight).
 
 ## 3. What is reused vs. what is new
 
@@ -170,7 +229,13 @@ duplicated per-branch).
 - `derivePoGateRepositoryFingerprint` (`plugins/pipeline-core/lib/po-gate-authority.mjs:212`)
   — the existing repository-fingerprint primitive is reused as-is rather than inventing a
   second fingerprint scheme (PHX-2 pre-merge invented its own `repositoryFingerprint` concept
-  inside the governance-event ledger; that duplication is exactly what this design avoids).
+  inside the governance-event ledger; that duplication is exactly what this design avoids), fed
+  by `discoverRepository(...)`'s `primaryRoot`/`commonDir`, matching every other call site (see
+  §2).
+- `discoverRepository` (`plugins/pipeline-core/lib/worktree-lifecycle.mjs:231`) — the existing
+  worktree-invariant repository-discovery primitive, reused to compute the fingerprint's inputs
+  at both call sites (§2); a net-new import in `guard-push.mjs`, already imported (for
+  `inspectSessionClosure`) in `pipeline-state.mjs`.
 - The `pipeline-state.mjs approve-push` CLI subcommand as the **sole** write path — no new
   CLI, no new subcommand. One more atomic file write is added to the existing command.
 - The GS-1 gate-strength protection already covering the whole `pipeline.user.yaml` file
@@ -194,12 +259,31 @@ duplicated per-branch).
   - `appendExternalPushLedgerConsumption({ repositoryFingerprint, proofSha256, consumedAt,
     rootDir = homedir() })` — writes `{ schema: "pipeline.external-push-ledger.v1",
     repositoryFingerprint, proofSha256, consumedAt }` to
-    `join(rootDir, ".pipeline", "push-ledger", repositoryFingerprint, `${proofSha256}.json`)`
-    using `writeFileSync(path, json, { flag: "wx", mode: 0o600 })`. The `wx` flag is the
-    entire single-use mechanism: it throws `EEXIST` if the file already exists, so a second
-    write for the same `proofSha256` fails atomically at the filesystem layer — no lock file,
-    no hash chain, no append-only stream, no recovery journal is needed, because each proof
-    gets exactly one file and that file is never appended to or rewritten.
+    `join(rootDir, ".pipeline", "push-ledger", repositoryFingerprint, `${proofSha256}.json`)`.
+    Because §5 establishes that on first use in any given repository the target directory
+    (`.pipeline/push-ledger/<repositoryFingerprint>/`) does not exist yet, the write is two
+    steps, not one: first `mkdirSync(dirname(path), { recursive: true, mode: 0o700 })`, then
+    `writeFileSync(path, json, { flag: "wx", mode: 0o600 })`. Without the `mkdirSync` step the
+    very first `approve-push` in any repository would throw `ENOENT` (the parent directory is
+    missing), not the `EEXIST` the single-use design below assumes — `mkdirSync` with
+    `recursive: true` is idempotent against an already-existing directory, so this is safe to
+    call unconditionally on every write, not only the first. The `wx` flag on the file write
+    itself remains the single-use mechanism: it throws `EEXIST` if the file already exists, so
+    a second write for the same `proofSha256` fails atomically at the filesystem layer — no
+    lock file, no hash chain, no append-only stream, no recovery journal is needed, because
+    each proof gets exactly one file and that file is never appended to or rewritten — with one
+    disclosed, narrow caveat: this atomicity guarantee assumes `rootDir` resolves onto a local
+    filesystem. On a non-local filesystem (most concretely a network-mounted, e.g. NFS, home
+    directory), `O_EXCL`/`wx` exclusive-create atomicity has historically been weaker than on a
+    local filesystem (client-side caching and lock-manager races), so two racing writes for the
+    same `proofSha256` could in principle both appear to succeed. In that specific case this
+    defense-in-depth layer degrades silently toward the pre-existing local
+    `criticalProofConsumption` guard (the ADR-0056 baseline) rather than failing loudly — the
+    push stays gated by everything ADR-0056 already checks, just not additionally by this
+    layer. This is a known, accepted, narrow limitation of relying on filesystem-level
+    exclusivity instead of an explicit lock/journal (§6 already rules the latter out as
+    unneeded machinery for a non-secret, non-append, single-file-per-proof marker), not a
+    blocking concern for this design.
   - `checkExternalPushLedgerConsumption({ repositoryFingerprint, proofSha256, candidate })`
     — reads that same path; returns `{ ok: true }` only if the file exists, parses as strict
     JSON, has exactly the four schema keys above, and its `repositoryFingerprint` /
@@ -213,18 +297,34 @@ duplicated per-branch).
   pattern already established for `gates.push_approval`, except its own absent-value default
   is the opposite direction; see §5 for why).
 - No encryption, no external key custody, no lock file, no cross-platform advisory-lock
-  code, no recovery/replay journal, no `heads.json`-style projection. The ledger entry
-  contains no secret: `proofSha256` is already committed to `project/pipeline-state.json` in
-  plaintext today, and `repositoryFingerprint` is already used unencrypted elsewhere in this
-  codebase (`plugins/pipeline-core/lib/po-gate-authority.mjs`). There is nothing here that
-  needs the restricted/encrypted-record machinery PHX-1 built for genuinely sensitive
-  payloads.
+  code, no recovery/replay journal, no `heads.json`-style projection. This is **not** because
+  the entry is secret and secrecy alone would justify skipping integrity machinery — it would
+  not: a single-use consumption marker's actually-required property is tamper-resistance, and
+  this design does not provide that. Both path components (`repositoryFingerprint`,
+  `proofSha256`) are derivable from already-plaintext-visible data — `proofSha256` is already
+  committed to `project/pipeline-state.json` in plaintext today, and `repositoryFingerprint` is
+  reproducible by anyone who can run `discoverRepository()` against the same checkout (§2) —
+  so any process running with the same filesystem privilege as the agent or the operator can
+  trivially delete or forge `.pipeline/push-ledger/<repositoryFingerprint>/<proofSha256>.json`:
+  deletion undoes the recorded single-use consumption, and writing a plausible-looking
+  replacement (same four schema keys) fabricates a consumption record `approve-push` never
+  actually wrote. This is an accepted, disclosed limitation, not an oversight: §1's closing
+  paragraph and §6 both already state that this design does not defend against a fully
+  adversarial agent session with unrestricted filesystem write access, and ordinary
+  same-privilege filesystem access is exactly that class of access. PHX-1's
+  restricted/encrypted-record machinery exists for genuinely sensitive payloads (secrets) — a
+  distinct property from the tamper-resistance this marker lacks and does not claim to have.
 
 ## 4. Failure mode
 
 The gate must fail closed once enabled, consistent with this repo's established convention
 (ADR-0056 §2: "a gate whose configuration cannot be read sits at its strongest setting,
-never its weakest").
+never its weakest"). This applies on both sides: the read-side taxonomy below
+(`checkExternalPushLedgerConsumption`, consulted by `guard-push.mjs`), and the write-side
+failure mode that follows it (`appendExternalPushLedgerConsumption`, consulted by
+`approve-push`).
+
+**Read side (`checkExternalPushLedgerConsumption`):**
 
 - **Present and valid** (file exists, parses, exact schema keys, `repositoryFingerprint` and
   `proofSha256` both match) → `{ ok: true }`, push proceeds (subject to every other check in
@@ -245,6 +345,34 @@ never its weakest").
   strings `"required"` or `"off"`) → resolves to `"required"` (fails closed), mirroring
   ADR-0056 decision 2's "unrecognised resolves to `signature`" precedent exactly. Only a
   clean, exact `"off"` disables the check.
+
+**Write side (`appendExternalPushLedgerConsumption`, inside `approve-push`):** the
+`mkdirSync`+`writeFileSync` pair (§3) can still fail for a reason other than "directory
+missing" — permission denied on `.pipeline/push-ledger/` (or an ancestor), a read-only or full
+filesystem, or (per the local-filesystem caveat in §3) a lock-manager error on a non-local
+mount. This failure is structurally different from every read-side case above: by the time it
+can happen, the local write (`writeState(dir, next, base)`, line 5213) has **already
+succeeded**, so `pushApproval.lastApproved` and `criticalProofConsumption` for this
+`proofSha256` are already persisted. A naive retry of `approve-push` with the same `--proof`
+artifact therefore hits the pre-existing `CRITICAL-PROOF-REPLAY` guard (line 5196-5199) and is
+refused — recovery is not "just run the command again."
+
+The fail-safe answer this design commits to: **the write-side failure is fatal to the whole
+`approve-push` command** — `console.error` + `return 2`, exactly as §2's write-side snippet
+already shows, and the existing `console.log("Push approved by ...")` success line must not be
+reached. Treating it as a non-fatal warning would let `approve-push` report success while a
+`gates.push_external_ledger: required` project's next push is, correctly, still refused by the
+read side for `PUSH-EXTERNAL-LEDGER-MISSING` — a confusing, misleading "succeeded, but didn't"
+outcome this design avoids by failing loudly at the point of the actual failure instead. The
+accepted operational cost of that choice: because the local write cannot be un-done from inside
+`approve-push` itself, recovering from this specific failure needs one of (a) an operator
+manually removing the just-added `criticalProofConsumption` entry for that `proofSha256` from
+local state (an explicit, auditable manual edit, not a silent one) before retrying
+`approve-push` with the same proof, once the underlying filesystem condition is fixed, or (b)
+a fresh human-signed proof for a new signing ceremony. This is a genuine, disclosed rough edge
+of the local write and the external-ledger write not being one atomic transaction; per (a) in
+§3, the one concretely identified cause (`ENOENT` on first use in a repository) is eliminated
+by the `mkdirSync` step, so in practice this recovery path is expected to be rare, not routine.
 
 ## 5. Migration/rollout note
 
@@ -311,3 +439,10 @@ Rollout is therefore explicit opt-in, not default-on:
 - **Proving genuine human presence for `chat` mode** — explicitly not claimed (§1). No purely
   local mechanism can provide this; an out-of-band channel would be a materially different
   (and materially larger) design than "smallest additive mechanism" calls for.
+- **Any coverage of `chat`-mode-approved pushes at all** — not built, and this is a distinct,
+  stronger exclusion than the point above: this design's check is not merely weaker for `chat`
+  mode, it is never consulted for it (§1's coverage boundary, §2). Giving it *any* coverage
+  would require a `chat`-mode-specific consumption key (nothing today plays the role
+  `proofSha256` plays for `signature` mode) and inventing single-use semantics `chat` mode does
+  not have locally today either — out of scope for "smallest additive mechanism"; left to a
+  follow-up design.
