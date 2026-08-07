@@ -3,14 +3,22 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "852019717532328ca41077e49ddf26ce69f51c0115d1c145a9fb72fbd6df74c1"
+    "transitionHead": "e54e5713398bbaf843e5fd770a0bc8c18713e8604c3def8001ba6d60eeb4d371"
   },
   "counts": {
-    "open": 29,
+    "open": 31,
     "in_progress": 21,
     "closed": 22
   },
   "items": [
+    {
+      "id": "pipeline.absent-runner-flag-silently-defaults-to-codex",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "NOVA-RESTART-RUNNER-1 stop condition in the 2026-08-07 Nova session; the reverted change is recorded inline at the freshIntent default in plugins/pipeline-core/lib/project-onboarding-v3.mjs in commit 5efb0f1, carrying forward the question deferred by the closed item 2026-08-06-onboarding-lifecycle-plan-hardcodes-the-codex-runner.md."
+    },
     {
       "id": "pipeline.adr-0047-numbering-collision",
       "status": "open",
@@ -238,6 +246,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "Live onboarding test (rune_test1_claude line of work) hitting a self-inflicted guard rejection at the plan-runtime step, 2026-08-07 (Nova GMW session); root cause independently re-verified by reading the cited source directly, not taken from the report alone."
+    },
+    {
+      "id": "pipeline.human-authorization-prompts-ignore-the-configured-language-profile",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "PO request in the 2026-08-07 Nova session for a deliberate confirmation before PIN entry, explicitly qualified as language-profile dependent; partially delivered by NOVA-PO-CONFIRM-1 in commits 5efb0f1 and 584a598."
     },
     {
       "id": "pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root",
