@@ -737,6 +737,109 @@ from the same session. Only after a Critic PASS on ADR-0059 does backlog
 item #4 (`gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions`) get
 dispatched.
 
+### The wave landed, and reviewing it found more than the reports did
+
+All four parallel dispatches returned. Three delivered; none delivered
+cleanly, and two of the problems were only visible from outside the
+dispatch that caused them. Reviewing every diff rather than accepting the
+self-reports is what surfaced them — the same practice that has now caught
+a real defect five times this session.
+
+**`NOVA-PO-CONFIRM-1` — the pre-signature confirmation gate.** Landed:
+`requireExplicitConfirmation()` prints the approval kind, the exact
+candidate commit (plus action subject digest and expiry for `-critical`),
+or the intent digest for `sign-intent`, states that OpenSSL is about to
+sign and that this cannot be undone, and requires the literal token
+`approve`. Anything else, empty answer included, cancels before OpenSSL is
+invoked and before any artifact exists. `approve-all` inherits it once per
+signed proof; `setup` signs nothing and is exempt. The dispatch stopped at
+its budget with the work staged, and correctly refused to widen scope into
+`threat-model-approval-request.test.mjs`, which called `approve` without
+the new dependency and so had turned Verify red. Completed in `584a598`:
+both call sites inject the confirmation, and `docs/po-human-approval.md`
+now documents both the gate and the previously undocumented `sign-intent`
+subcommand — a human following that document to sign a maintenance window
+would otherwise have met an undocumented prompt. **Open, and named rather
+than quietly delivered: the prompt is English-only and does not follow
+`runtime.humanFacingLanguage`, which the PO's request explicitly asked
+for ("je nach Sprachprofil").**
+
+**`NOVA-RESTART-RUNNER-1` — the Codex-only restart.** Landed in `5efb0f1`:
+`restartAction()` now takes the runner identity `v4Inspection()` already
+holds, and a non-Codex runner gets a typed `external-operator` action
+carrying guidance instead of the Codex launcher. There is no Claude-native
+launcher to point at — `native-plugin-readback.mjs` is an install readback
+verifier, checked and rejected as a target — so this stops the wrong
+launcher being offered rather than providing a right one. The briefing's
+second root cause (`runner = "codex"` defaults derived from `CLAUDECODE`)
+was implemented, found to break the deliberately named regression test
+"omitting `--runner` keeps the historical Codex App-Server requirement"
+plus ~15 others, and reverted; a prior closed backlog item had already
+declined exactly this change for exactly this reason. That remains a real
+open decision, not a fixed defect.
+
+**The shared-index race is no longer theoretical.** `5efb0f1` also carries
+`NOVA-PO-CONFIRM-1`'s two production files. The dispatch staged only its
+own paths, but the shared non-worktree checkout's index already held the
+other dispatch's staged files and `git commit -F` took the whole index. It
+detected and disclosed this itself and declined to un-commit while the
+other session was live — the right call. Consequence recorded rather than
+rewritten: `5efb0f1`'s `Dispatch:` trailer does not cover its whole diff,
+so that trailer is not complete provenance. Live instance of
+`backlog/items/2026-08-07-parallel-goldfish-dispatches-race-on-shared-checkout.md`.
+Working rule adopted for the rest of this session: commit with an explicit
+pathspec (`git commit -F <msg> -- <paths>`), never from the index.
+
+**`NOVA-LCR-HGO-1` — the shell-grammar lift, and the hole in it.** Landed
+in `bae3c1a`: the three grammar denial codes now route through the generic
+`closed-shell-exact` HGO class, consume-first then mode-appropriate offer,
+with the denial reason string hoisted to module scope so the HGO-bound
+reason and the printed text cannot drift. 35/35 green. But reading the
+diff showed the admitted `verdict(0)` returns at `:1045`/`:1056`
+short-circuit the rest of `evaluateLifecycleReadyGuard()` — so a consumed
+grammar capability also bypasses the `LAUNCH_SCRIPT` refusal and, worse,
+the `GUARD-LIFECYCLE-NOT-READY` readiness check, which ADR-0059 Decision 5
+deliberately holds outside HGO's authority. **Appending ` && true` to any
+command is therefore enough to turn an unliftable readiness denial into a
+liftable grammar denial.** The human is shown a request describing a
+grammar denial and signs that; what they actually grant is broader. The
+cross-repository checks are unaffected — they run upstream at `:1023`
+and `:1033`. Dispatched as `NOVA-LCR-HGO-2` rather than left for the
+Critic, with the consume-once-then-refused-downstream question named as
+genuine design latitude for the dispatch to answer.
+
+**`NOVA-HGOSIG-GS7-1` — GS-7 is liftable, untested.** The dispatch was cut
+off mid-sentence by its budget and never reported. Its working-tree diff
+was reviewed, syntax-checked and its imports verified by hand, then
+committed as `503fe0d`: GS-1..GS-5 and GS-7 route through the same
+consume-first HGO shape `guard-testpath.mjs` uses, GS-6 is fenced out and
+keeps its ADR-0058 maintenance window, and the file header's old "there is
+deliberately no in-session override" claim was rewritten for the lifted
+rules while staying verbatim for GS-6. **It carries no test coverage at
+all, and the commit message says so in its body rather than burying it:**
+the guard's own suite is `guard-gate-strength.test.mjs`, which TP-6
+protects. Review evidence, not execution evidence — treat it accordingly
+until the tests land.
+
+**One signature unblocks all three stranded test files.** TP-2
+(`guard-testpath.test.mjs`, the Decision 4 gap), TP-6
+(`guard-gate-strength.test.mjs`, the GS-7 gap) and TP-7
+(`guard-testpath-override.test.mjs`, the post-Decision-3 wording) are the
+same class of blocker, and `guard-maintenance-window.mjs prepare` takes
+`--scope` as a list, so one window covers all three. A 2h window was
+prepared successfully against candidate `503fe0d`, proving the mechanism
+and the multi-rule scope work; `prepare` writes nothing to the tree, so
+nothing stale was left behind. It must be re-prepared once the wave stops
+moving, because the request binds the candidate commit and opening tree.
+This supersedes the earlier TP-2-only request — do not sign that one.
+
+**Also cleaned up:** `NOVA-LCR-HGO-1` wrote its dispatch record to
+`plugins/pipeline-core/dispatch-record.json`, inside the tree copied into
+every consumer's plugin install. Relocated to the feature's evidence
+directory in `a00cbae`, together with records for the two dispatches whose
+reports never wrote one. Each record states both what the dispatch claimed
+and what reviewing its diff found afterwards.
+
 ## 2026-08-07 Nova VII — first Nova A completion wave: 6 issues evidenced
 
 Continues from Nova VI. PO instruction: "leg mal los und fange an — du
