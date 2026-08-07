@@ -47,6 +47,25 @@ design-phase authorship of this document going forward: any further dispatch tha
 reworks this design is a design-phase step and is dispatched on the Design-tier model, with
 its model recorded in the dispatch metadata either way.
 
+**The commitment above was breached once, immediately — disclosed per Critic finding F3
+(MAJOR, delta re-review `412d33d`), in the same running convention this document keeps for the
+three below-tier dispatches named above:** the very next dispatch to rework this document,
+`WP2-WP3-partA-rework-2` (commit `ac8bd06` — rescoped §A.1's guarantee, added disclosed
+limitation 1, split §A.5 case 2 into two sub-cases, added §A.7's exclusion entry: design-contract
+authorship, not a typo pass), ran on `claude-sonnet-5`, below the Design tier, with no rationale
+recorded at the time (its dispatch record `.git/dispatch-record-WP2-WP3-partA-rework-2.json`
+records `"model": "claude-sonnet-5"` and carries no rationale field). **This was a
+dispatch-construction error by the Elephant, not a Goldfish fault:** the briefing itself
+specified that model, and the Goldfish followed it. The commitment above is not weakened by the
+breach and is not rewritten here — it stands as written; it was broken once, and the break is
+named plainly instead of being left to be inferred from a dispatch record.
+
+**Compliance restored from this revision:** the dispatch that produced *this* correction
+(`WP2-WP3-partA-rework-3`) is routed on the Design-tier model `claude-opus-5` (effort `xhigh`,
+per its dispatch metadata), citing MP-22/MP-23 as its stated model justification — the second
+dispatch touching this document to run on-tier, and the reason the disclosure convention above
+now covers a fourth below-tier dispatch rather than quietly ending at three.
+
 This design covers two related, independently shippable repairs. Part A changes the
 bootstrap readiness gate's `status` semantics (blast radius, **rescoped per Critic finding F2,
 MAJOR, delta re-review `412d33d`**: the changed code path is reached by every session and every
