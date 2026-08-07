@@ -1133,6 +1133,21 @@ const HGO_GRAMMAR_REASON = {
   "GUARD-REDIRECT-UNAPPROVED": "GUARD-REDIRECT-UNAPPROVED: The command contains an unapproved shell redirection.",
 };
 
+// NOVA-LCR-HGO-2: since a consumed grammar capability now falls through to the
+// LAUNCH_SCRIPT/readiness tail (evaluateAfterGrammarAdmission()) instead of returning
+// verdict(0) immediately, an "admitted all the way through" fixture must make that tail
+// admit too. hgoGitFixture() below is a bare git repo with no onboarding scaffolding, so
+// the exact V4 ready receipt is supplied directly via dependency injection rather than
+// engineering a full onboarding-ready checkout.
+const HGO_READY_RECEIPT = Object.freeze({
+  schema: "pipeline.project-onboarding-ready-gate.v1",
+  status: "ready",
+  intent: "session",
+});
+function hgoReadyDeps() {
+  return { requireProjectOnboardingReadyFn: () => ({ ...HGO_READY_RECEIPT }) };
+}
+
 /** `pipeline.user.yaml`, committed, decides the mode -- same "committed value wins" fixture shape as the sibling suites. */
 function hgoGitFixture(mode) {
   const base = mkdtempSync(join(tmpdir(), "guard-lifecycle-hgo-"));
@@ -1225,7 +1240,7 @@ test("NOVA-LCR-HGO-1: a chat-armed capability admits the exact denied grammar co
       const toolInput = { command };
       const denials = [{ guard: "guard-lifecycle-ready.mjs", reason: HGO_GRAMMAR_REASON[code] }];
       hgoArmByChat(chatRoot, toolInput, denials);
-      const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: chatRoot });
+      const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: chatRoot, ...hgoReadyDeps() });
       assert.equal(result.exitCode, 0, `chat-armed did not admit ${command}: ${result.stderr}`);
       assert.match(result.stderr, /\[pipeline-human-override\] guard-lifecycle-ready/u, command);
       assert.match(result.stderr, /capability consumed/u, command);
@@ -1246,7 +1261,7 @@ test("NOVA-LCR-HGO-1: a signature-armed capability admits the denied grammar com
       const sigRoot = hgoGitFixture(mode);
       roots.push(sigRoot);
       hgoArmBySignature(sigRoot, toolInput, denials);
-      const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: sigRoot });
+      const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: sigRoot, ...hgoReadyDeps() });
       assert.equal(result.exitCode, 0, `signature-armed did not admit under mode=${mode}: ${result.stderr}`);
       assert.match(result.stderr, /capability consumed/u, mode);
     }
@@ -1313,4 +1328,87 @@ test("NOVA-LCR-HGO-1: GUARD-CROSS-REPO-MUTATION and GUARD-LIFECYCLE-NOT-READY st
     assert.doesNotMatch(notReady.stderr, /Human override available/u);
     assert.doesNotMatch(notReady.stderr, /guard-human-override\.mjs/u);
   } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// ---------------------------------------------------------------------------------
+// NOVA-LCR-HGO-2 (ADR-0059 Decision 5): a consumed grammar capability clears ONLY the
+// shell-grammar objection -- every other check in evaluateLifecycleReadyGuard() still
+// applies to the lifted command, in particular the LAUNCH_SCRIPT external-restart
+// refusal and the GUARD-LIFECYCLE-NOT-READY onboarding-readiness gate, neither of which
+// HGO is authorized to clear. Before this fix the guard returned verdict(0) the instant
+// grammarOverrideRoute() reported a consumed capability (:1045/:1056), so
+// `<otherwise-unliftable command> && true` turned an unliftable readiness denial into a
+// liftable grammar one.
+//
+// Fixtures below deliberately combine an ABSOLUTE path with a RELATIVE one in the same
+// command, carried inside a `--flag=value` token so HGO's own eligibility()
+// (lib/human-guard-override.mjs, read-only to this dispatch) never has to resolve it as
+// a bare path argument -- that classification is orthogonal to the control-flow fix
+// under test here, and a `--flag=<path>` token is skipped by eligibility()'s absolute-
+// path/protected-path checks (they only run for tokens not starting with "-").
+
+test("NOVA-LCR-HGO-2: a consumed grammar capability admits the composed command only once the readiness tail also admits it", () => {
+  const chatRoot = hgoGitFixture("chat");
+  try {
+    const absMarker = join(chatRoot, "abs-marker.txt");
+    const command = `rg -n lifecycle --marker=${absMarker} relative-notes.txt | tee output.txt`;
+    const toolInput = { command };
+    const denials = [{ guard: "guard-lifecycle-ready.mjs", reason: HGO_GRAMMAR_REASON["GUARD-OPERATOR-UNAPPROVED"] }];
+    hgoArmByChat(chatRoot, toolInput, denials);
+    const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: chatRoot, ...hgoReadyDeps() });
+    assert.equal(result.exitCode, 0, `armed + ready did not admit: ${result.stderr}`);
+    assert.match(
+      result.stderr,
+      /\[pipeline-human-override\] guard-lifecycle-ready GUARD-OPERATOR-UNAPPROVED: exact one-time capability consumed/u,
+    );
+  } finally { rmSync(chatRoot, { recursive: true, force: true }); }
+});
+
+test("NOVA-LCR-HGO-2: an armed matching capability does not bypass GUARD-LIFECYCLE-NOT-READY", () => {
+  const chatRoot = hgoGitFixture("chat");
+  try {
+    const absMarker = join(chatRoot, "abs-marker-b.txt");
+    const command = `rg -n readiness --marker=${absMarker} relative-notes-b.txt | tee output-b.txt`;
+    const toolInput = { command };
+    const denials = [{ guard: "guard-lifecycle-ready.mjs", reason: HGO_GRAMMAR_REASON["GUARD-OPERATOR-UNAPPROVED"] }];
+    hgoArmByChat(chatRoot, toolInput, denials);
+    const result = evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: chatRoot,
+      requireProjectOnboardingReadyFn() { deny("partial"); },
+    });
+    assert.equal(result.exitCode, 2, `armed + not-ready wrongly admitted: ${result.stderr}`);
+    assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
+    // Design decision (NOVA-LCR-HGO-2): a capability consumed here and then refused
+    // downstream stays spent (consumeHumanGuardOverride() already marked it "consumed"
+    // on disk, irreversibly, before this denial was even constructed) -- but its
+    // consumption must not vanish silently, so the audit line still surfaces here,
+    // alongside the readiness refusal that actually decided the outcome.
+    assert.match(
+      result.stderr,
+      /\[pipeline-human-override\] guard-lifecycle-ready GUARD-OPERATOR-UNAPPROVED: exact one-time capability consumed/u,
+    );
+    // Single-use: the spent capability is gone even though it was refused downstream --
+    // it was never "returned" for being refused.
+    const second = evaluateLifecycleReadyGuard(bash(command), { projectDir: chatRoot, ...hgoReadyDeps() });
+    assert.equal(second.exitCode, 2, "a downstream-refused capability was still reusable");
+    assert.doesNotMatch(second.stderr, /capability consumed/u);
+  } finally { rmSync(chatRoot, { recursive: true, force: true }); }
+});
+
+test("NOVA-LCR-HGO-2: an armed matching capability for a command naming LAUNCH_SCRIPT still requires externalRestartOnly()", () => {
+  const chatRoot = hgoGitFixture("chat");
+  try {
+    const command = `rg -n lifecycle --note=${ONBOARDING_LAUNCH_SCRIPT} relative-notes.txt | tee output.txt`;
+    const toolInput = { command };
+    const denials = [{ guard: "guard-lifecycle-ready.mjs", reason: HGO_GRAMMAR_REASON["GUARD-OPERATOR-UNAPPROVED"] }];
+    hgoArmByChat(chatRoot, toolInput, denials);
+    const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: chatRoot, ...hgoReadyDeps() });
+    assert.equal(result.exitCode, 2, `armed LAUNCH_SCRIPT command was wrongly admitted: ${result.stderr}`);
+    assert.match(result.stderr, /EXTERNAL ACTION REQUIRED/u);
+    assert.match(result.stderr, /restart-process is external-terminal\/user-copy-only/u);
+    assert.match(
+      result.stderr,
+      /\[pipeline-human-override\] guard-lifecycle-ready GUARD-OPERATOR-UNAPPROVED: exact one-time capability consumed/u,
+    );
+  } finally { rmSync(chatRoot, { recursive: true, force: true }); }
 });

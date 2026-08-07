@@ -966,6 +966,85 @@ export function isSanctionedLifecycleCommand(command, root, options = {}) {
     && args.length === 1;
 }
 
+/**
+ * ADR-0059 Decision 5 / NOVA-LCR-HGO-2: everything below -- the LAUNCH_SCRIPT
+ * external-restart refusal and the onboarding-readiness gate (denial code
+ * GUARD-LIFECYCLE-NOT-READY) -- stays outside HGO's authority no matter how the
+ * shell-grammar objection above was resolved. This function is the exact tail of
+ * evaluateLifecycleReadyGuard() that used to be unreachable once a grammar capability
+ * was consumed (verdict(0) returned immediately at the grammar check itself); it is now
+ * called unconditionally so a lifted command is admitted only if these checks also
+ * admit it. Its own logic is otherwise unchanged.
+ */
+function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
+  if (toolName === "Bash" && input.tool_input.command.includes(LAUNCH_SCRIPT)) {
+    return externalRestartOnly();
+  }
+
+  let receipt;
+  try {
+    receipt = (dependencies.requireProjectOnboardingReadyFn ?? requireProjectOnboardingReady)({
+      rootDir: root,
+      intent: "session",
+      runner: dependencies.runner,
+    });
+  } catch (error) {
+    // Codex 0.145 may execute PreToolUse against the physical host Git
+    // directory while the successful bootstrap command sees protected virtual
+    // control mounts. Accept only the explicit host-init admission written by
+    // the confirmed lifecycle action and bound to this root, stable authority,
+    // and immutable kickoff history, and only when the native observation
+    // failed with the two exact repository-control statuses produced by that
+    // cross-view mismatch. App Server, runtime, continuity, malformed
+    // observations, and unknown exceptions must never inherit this admission.
+    // The prepared sprint:NONE follow-up owns replacing this narrow hotfix
+    // fallback with one native cross-view session attestation.
+    const crossViewRepositoryFailure = error instanceof ProjectOnboardingReadyError
+      && error.code === "PORG-NOT-READY"
+      && error.intent === "session"
+      && HOST_INIT_CROSS_VIEW_STATUSES.has(error.lifecycleStatus);
+    if (crossViewRepositoryFailure) {
+      try {
+        const admission = (dependencies.readCodexHostRepositoryInitAdmissionFn
+          ?? readCodexHostRepositoryInitAdmission)(root);
+        if (admission?.gitVersion) return verdict(0);
+      } catch {}
+      try {
+        const existingControlMount = (dependencies.hasCodexExistingGitControlMountFn
+          ?? hasCodexExistingGitControlMount)(root);
+        if (existingControlMount === true) return verdict(0);
+      } catch {}
+    }
+    const restartRequired = error instanceof ProjectOnboardingReadyError
+      && error.code === "PORG-NOT-READY"
+      && error.intent === "session"
+      && error.lifecycleStatus === "restart-required";
+    if (restartRequired && (isRestartResumeHintInputWrite(input, root)
+      || (toolName === "Bash" && isRestartResumeHintCapture(input.tool_input.command, root)))) {
+      return verdict(0);
+    }
+    const exactPoAuthorityRebindRecovery = error instanceof ProjectOnboardingReadyError
+      && error.code === "PORG-NOT-READY"
+      && error.intent === "session"
+      && error.lifecycleStatus === "partial"
+      && toolName === "Bash"
+      && isExactPoAuthorityRebindPlannerRecovery(input.tool_input.command, root, dependencies);
+    if (exactPoAuthorityRebindRecovery) return verdict(0);
+    return toolName === "Bash"
+      && isSanctionedLifecycleCommand(input.tool_input.command, root)
+      ? verdict(0)
+      : blocked(
+        "GUARD-LIFECYCLE-NOT-READY",
+        error instanceof ProjectOnboardingReadyError
+          && error.code === "PORG-NOT-READY"
+          && error.intent === "session"
+          ? error.lifecycleStatus
+          : null,
+      );
+  }
+  return exactReadyReceipt(receipt) ? verdict(0) : blocked();
+}
+
 export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
   const toolName = String(input?.tool_name ?? "");
   // PowerShell is wired into the same PreToolUse matcher as Bash and was nevertheless
@@ -1038,91 +1117,44 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
   if (toolName === "Bash" && isNarrowRepositoryRecoveryCommand(input.tool_input.command, root)) {
     return verdict(0);
   }
+  // A consumed grammar capability clears ONLY the shell-grammar objection captured in
+  // `grammarLift` below -- the LAUNCH_SCRIPT and readiness checks in
+  // evaluateAfterGrammarAdmission() stay outside HGO's authority (ADR-0059 Decision 5) and
+  // are always evaluated next, whether or not a capability was just consumed here; a lifted
+  // command is admitted only if that tail also admits it. consumeHumanGuardOverride()
+  // (lib/human-guard-override.mjs, read-only to this dispatch) already marks the capability
+  // irreversibly "consumed" on disk, with its own audit entry, the moment it matched, before
+  // grammarOverrideRoute() even returns here -- there is no "un-consume" available to this
+  // file. A capability spent on a command later refused downstream stays spent; its
+  // consumption is surfaced in the denial below rather than left to vanish silently.
+  let grammarLift = null;
   if (toolName === "Bash") {
     const parsed = parseGuardCommand(input.tool_input.command, root);
     if (parsed.parseStatus !== "accepted") {
       const route = grammarOverrideRoute("GUARD-PARSE-UNSUPPORTED", root, toolName, input.tool_input, dependencies);
-      if (route.admitted) return route.admitted;
-      return blocked(
-        "GUARD-PARSE-UNSUPPORTED",
-        null,
-        retryActionsForDeniedCommand(input.tool_input.command, root),
-        route.overrideGuidance,
-      );
-    }
-    if (parsed.operators.length > 0 || parsed.redirects.length > 0) {
+      if (!route.admitted) {
+        return blocked(
+          "GUARD-PARSE-UNSUPPORTED",
+          null,
+          retryActionsForDeniedCommand(input.tool_input.command, root),
+          route.overrideGuidance,
+        );
+      }
+      grammarLift = route.admitted;
+    } else if (parsed.operators.length > 0 || parsed.redirects.length > 0) {
       const code = parsed.redirects.length > 0 ? "GUARD-REDIRECT-UNAPPROVED" : "GUARD-OPERATOR-UNAPPROVED";
       const route = grammarOverrideRoute(code, root, toolName, input.tool_input, dependencies);
-      if (route.admitted) return route.admitted;
-      return blocked(code, null, [], route.overrideGuidance);
+      if (!route.admitted) {
+        return blocked(code, null, [], route.overrideGuidance);
+      }
+      grammarLift = route.admitted;
     }
   }
-  if (toolName === "Bash" && input.tool_input.command.includes(LAUNCH_SCRIPT)) {
-    return externalRestartOnly();
-  }
-
-  let receipt;
-  try {
-    receipt = (dependencies.requireProjectOnboardingReadyFn ?? requireProjectOnboardingReady)({
-      rootDir: root,
-      intent: "session",
-      runner: dependencies.runner,
-    });
-  } catch (error) {
-    // Codex 0.145 may execute PreToolUse against the physical host Git
-    // directory while the successful bootstrap command sees protected virtual
-    // control mounts. Accept only the explicit host-init admission written by
-    // the confirmed lifecycle action and bound to this root, stable authority,
-    // and immutable kickoff history, and only when the native observation
-    // failed with the two exact repository-control statuses produced by that
-    // cross-view mismatch. App Server, runtime, continuity, malformed
-    // observations, and unknown exceptions must never inherit this admission.
-    // The prepared sprint:NONE follow-up owns replacing this narrow hotfix
-    // fallback with one native cross-view session attestation.
-    const crossViewRepositoryFailure = error instanceof ProjectOnboardingReadyError
-      && error.code === "PORG-NOT-READY"
-      && error.intent === "session"
-      && HOST_INIT_CROSS_VIEW_STATUSES.has(error.lifecycleStatus);
-    if (crossViewRepositoryFailure) {
-      try {
-        const admission = (dependencies.readCodexHostRepositoryInitAdmissionFn
-          ?? readCodexHostRepositoryInitAdmission)(root);
-        if (admission?.gitVersion) return verdict(0);
-      } catch {}
-      try {
-        const existingControlMount = (dependencies.hasCodexExistingGitControlMountFn
-          ?? hasCodexExistingGitControlMount)(root);
-        if (existingControlMount === true) return verdict(0);
-      } catch {}
-    }
-    const restartRequired = error instanceof ProjectOnboardingReadyError
-      && error.code === "PORG-NOT-READY"
-      && error.intent === "session"
-      && error.lifecycleStatus === "restart-required";
-    if (restartRequired && (isRestartResumeHintInputWrite(input, root)
-      || (toolName === "Bash" && isRestartResumeHintCapture(input.tool_input.command, root)))) {
-      return verdict(0);
-    }
-    const exactPoAuthorityRebindRecovery = error instanceof ProjectOnboardingReadyError
-      && error.code === "PORG-NOT-READY"
-      && error.intent === "session"
-      && error.lifecycleStatus === "partial"
-      && toolName === "Bash"
-      && isExactPoAuthorityRebindPlannerRecovery(input.tool_input.command, root, dependencies);
-    if (exactPoAuthorityRebindRecovery) return verdict(0);
-    return toolName === "Bash"
-      && isSanctionedLifecycleCommand(input.tool_input.command, root)
-      ? verdict(0)
-      : blocked(
-        "GUARD-LIFECYCLE-NOT-READY",
-        error instanceof ProjectOnboardingReadyError
-          && error.code === "PORG-NOT-READY"
-          && error.intent === "session"
-          ? error.lifecycleStatus
-          : null,
-      );
-  }
-  return exactReadyReceipt(receipt) ? verdict(0) : blocked();
+  const tail = evaluateAfterGrammarAdmission(input, root, toolName, dependencies);
+  if (grammarLift === null) return tail;
+  return tail.exitCode === 0
+    ? grammarLift
+    : verdict(tail.exitCode, `${grammarLift.stderr}${tail.stderr}`);
 }
 
 export function main(rawInput = undefined, dependencies = {}) {
