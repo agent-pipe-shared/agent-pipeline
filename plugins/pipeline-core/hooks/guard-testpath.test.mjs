@@ -9,6 +9,12 @@
  * Coverage contract (AC-G4-1): >= 1 BLOCK case + >= 1 ALLOW case for a configured
  * protected path; no-config no-op case; broken-config WARN case; Write tool coverage
  * alongside Edit; explicit rule-id-in-message case (mirrors guard-git.mjs's OV-AC7).
+ * ADR-0059 Decision 4: a denial in CHAT mode names its own next step (`authorize ...
+ * --activate`) and never signature's (`authorize-by-signature`) (TP10/TP11, absolute and
+ * relative file_path). Signature mode's equivalent property is already pinned in depth by
+ * guard-testpath-override.test.mjs (OT02/OT03/OT13/OT15/OT17) and is not repeated here. The
+ * override ROUTES themselves (arming, consuming, eligibility, committed-vs-working-tree) are
+ * that sibling suite's job too, not duplicated here.
  *
  * Run:   node plugins/pipeline-core/hooks/guard-testpath.test.mjs
  * Exit:  0 = all cases pass · 1 = at least one case failed (failure list on stdout).
@@ -44,12 +50,15 @@ const EMPTY_DIR = mkdtempSync(join(tmpdir(), "guard-testpath-empty-"));
 
 let pass = 0;
 const failures = [];
-function check(id, toolName, filePath, expectExit, { projectDir = EMPTY_DIR, stderrIncludes, stderrEmpty, extraInput } = {}) {
+function check(id, toolName, filePath, expectExit, { projectDir = EMPTY_DIR, stderrIncludes, stderrExcludes, stderrEmpty, extraInput } = {}) {
   const { code, stderr } = runGuard(toolName, filePath, projectDir, extraInput);
   const problems = [];
   if (code !== expectExit) problems.push(`exit ${code} (expected ${expectExit})`);
   for (const needle of [].concat(stderrIncludes ?? [])) {
     if (!stderr.includes(needle)) problems.push(`stderr missing "${needle}"`);
+  }
+  for (const needle of [].concat(stderrExcludes ?? [])) {
+    if (stderr.includes(needle)) problems.push(`stderr unexpectedly contains "${needle}"`);
   }
   if (stderrEmpty && stderr.trim() !== "") problems.push(`stderr not empty: ${stderr.trim().slice(0, 120)}`);
   if (problems.length === 0) {
@@ -197,8 +206,93 @@ check("TP09 real armed GMW window scoped to TP-1 lifts the matching Edit", "Edit
   })());
 closeGuardMaintenanceWindow({ rootDir: GMW_DIR });
 
+// ---- ADR-0059 Decision 4: every denial names the mode-appropriate next step -----------
+// None of TP01-TP09 above ever reads gates.push_approval or the override-guidance section
+// of a denial: their fixture paths all live under plugins/pipeline-core, where HGO
+// eligibility classifies every write as "pipeline-author-repair" (needs an explicit
+// --author-source-root) and so never reaches "planned" -- guard-testpath-override.test.mjs's
+// own OT14 pins exactly that boundary, which is why no guidance text ever appears for those
+// cases either way. guard-testpath-override.test.mjs (as of 058190f) covers the SIGNATURE
+// side of Decision 4 in depth: OT02/OT03/OT13/OT15/OT17 all pin that a denial in signature
+// mode names the resolved mode, refuses the in-session `--activate` continuation, and offers
+// `authorize-by-signature` instead. It does not carry the equivalent pin for CHAT mode --
+// OT04/OT05 only assert that SOME route is offered and that it says "attribution, not
+// proof", never that the printed continuation is specifically chat's `--activate` step and
+// specifically NOT signature's `authorize-by-signature`. TP10/TP11 below close exactly that
+// gap, from a fixture outside plugins/pipeline-core so a route is actually offered.
+function gitCommitAll(dir) {
+  execFileSync("git", ["init", "-q"], { cwd: dir });
+  execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: dir });
+  execFileSync("git", ["config", "user.name", "Test"], { cwd: dir });
+  execFileSync("git", ["add", "-A"], { cwd: dir });
+  execFileSync("git", ["commit", "-q", "-m", "mode-fixture"], { cwd: dir });
+}
+const MODE_PATTERN = "src/domain/important\\.test\\.mjs$";
+
+const MODE_CHAT_DIR = mkdtempSync(join(tmpdir(), "guard-testpath-mode-chat-"));
+mkdirSync(join(MODE_CHAT_DIR, ".claude"), { recursive: true });
+writeFileSync(
+  join(MODE_CHAT_DIR, ".claude", "guard-config.json"),
+  JSON.stringify({ protectedTestPaths: [{ id: "TP-MODE", pattern: MODE_PATTERN, reason: "example protected project test" }] }),
+);
+// `chat` must be COMMITTED, not just written: an uncommitted copy reads as unverified and
+// falls back to the strongest mode (signature) regardless of its content.
+writeFileSync(join(MODE_CHAT_DIR, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "chat"\n');
+gitCommitAll(MODE_CHAT_DIR);
+// A real, resolvable ABSOLUTE path built from the fixture root -- mirrors the actual harness
+// contract (Claude Code always sends an absolute file_path). TP01-TP09 above only ever use a
+// synthetic "D:/repo/..." placeholder, never a path that actually resolves under the project.
+const MODE_CHAT_ABS_FILE = join(MODE_CHAT_DIR, "src/domain/important.test.mjs");
+
+check(
+  "TP10 block  chat mode names its own next step (authorize --activate), not signature's",
+  "Edit",
+  MODE_CHAT_ABS_FILE,
+  BLOCK,
+  {
+    projectDir: MODE_CHAT_DIR,
+    stderrIncludes: [
+      'Clearance: gates.push_approval is "chat"',
+      "attribution, not proof",
+      "--request-sha256", // a next-step command is actually named, not merely implied
+      "--activate",
+    ],
+    stderrExcludes: ["authorize-by-signature"],
+    extraInput: { old_string: "a", new_string: "b" },
+  },
+);
+
+// A genuinely RELATIVE file_path this time (no absolute prefix at all, same fixture dir) --
+// fixtures must mirror the real contract with absolute paths ALONGSIDE relative ones, and
+// TP01-TP09 above never exercise a plain relative file_path (only the "D:/repo/..."
+// placeholder style). Signature mode's own equivalent of this differentiator (mode resolved,
+// `--activate` refused, `authorize-by-signature` offered) is NOT repeated here: since
+// f650164/058190f it is already pinned in depth by guard-testpath-override.test.mjs's OT02,
+// OT03, OT13, OT15 and OT17 -- a second copy of the same property would be padding, not
+// coverage. This case instead confirms the CHAT differentiator TP10 established still holds
+// when the guard is handed a relative rather than an absolute path.
+const MODE_CHAT_REL_FILE = "src/domain/important.test.mjs";
+
+check(
+  "TP11 block  chat mode's own next step still names authorize --activate given a relative path",
+  "Edit",
+  MODE_CHAT_REL_FILE,
+  BLOCK,
+  {
+    projectDir: MODE_CHAT_DIR,
+    stderrIncludes: [
+      'Clearance: gates.push_approval is "chat"',
+      "attribution, not proof",
+      "--request-sha256",
+      "--activate",
+    ],
+    stderrExcludes: ["authorize-by-signature"],
+    extraInput: { old_string: "a", new_string: "b" },
+  },
+);
+
 // ---- Summary -----------------------------------------------------------------------------
-for (const dir of [EMPTY_DIR, CFG_DIR, BROKEN_DIR, CFG_ID_DIR, GMW_DIR]) {
+for (const dir of [EMPTY_DIR, CFG_DIR, BROKEN_DIR, CFG_ID_DIR, GMW_DIR, MODE_CHAT_DIR]) {
   try {
     rmSync(dir, { recursive: true, force: true });
   } catch {
