@@ -140,3 +140,10 @@ Full findings:
 that doesn't exist in the document — the exact "documented risk, no owner"
 shape F6 originally flagged, recurring one level down. F2/F3/F6/F8 remain
 genuinely resolved otherwise. A scoped rework is dispatched next.
+
+**Rework 2 (2026-08-07): landed, commit `d99e59f`.** (D) §B.8 now has an
+actual open-item bullet (not just a §B.6 pointer to nothing) with owner
+"implementation dispatch" and explicit trigger "once §B.3's action-family
+shape is finalized," covering both §B.6 threat-model doc-update entries. A
+bounded delta re-review is dispatched next — round 3 of 4 (initial + delta 1
++ this delta 2).

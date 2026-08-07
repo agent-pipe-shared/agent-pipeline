@@ -159,6 +159,15 @@ freehand). Status:
    `specs/sprint-phoenix-epic/evidence/wp2wp3-design-critic-delta-review-1-8c526dd.md`.
    A scoped rework (Finding A-D) is dispatched next — round 3 of 4, within
    cap.
+
+   **Rework 2: landed, commit `d99e59f`.** Discloses the rework dispatch's
+   own below-Design-tier authorship (Finding A); corrects §A.6's scope claim
+   to a category breakdown instead of a bare number now proven fragile
+   (Finding B); discloses the `GATE_STRENGTH_PATHS` addition as a deliberate,
+   narrow exception to GS-6's stated source-checkout-writable policy, with
+   its sequencing/maintenance consequences (Finding C); replaces §B.8's
+   dangling pointer with a real owned, triggered open-item bullet (Finding
+   D). A bounded delta re-review is dispatched next — round 3 of 4.
 4. **`governance-product-verify-suites-deregistered`** — blocked on 1–3's
    outcome, not started.
 5. **`ledger-backed-plan-and-push-authority-absent-on-merged-base`** —

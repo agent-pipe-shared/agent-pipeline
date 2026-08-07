@@ -137,3 +137,17 @@ product source rather than config, reversing GS-6's own documented choice,
 and blocks in-session creation/maintenance of the module it protects,
 undisclosed. F1/F4/F5 remain genuinely resolved. A scoped rework is
 dispatched next.
+
+**Rework 2 (2026-08-07): landed, commit `d99e59f`.** (B) §A.6's scope claim
+corrected — dropped the bare (already-wrong-once) number in favor of a
+category breakdown (1 new `nextAction` shape, 2 companion doc files, 1 new
+constant module, 1 new guardrail entry = 5 files), so it can't silently go
+stale the same way again. (C) Added an explicit disclosure to §A.3 item 3:
+verified all 6 existing `GATE_STRENGTH_PATHS` entries are config files, none
+protects product source; the new entry is the first to do so, deliberately
+and narrowly excepted from GS-6's stated policy (the module is a fixed,
+review-gated allowlist, not ordinary product source); states the sequencing
+consequence (can't create the module in the same session the rule lands,
+since the guard has no in-session override) and the maintenance consequence
+(later edits need a PO hand-edit). A bounded delta re-review is dispatched
+next — round 3 of 4 (initial + delta 1 + this delta 2).
