@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e737cd988fc1225705bdd4a355dc6b6f5222e9dd6193851faad6ff261ab6b340"
+    "transitionHead": "2e07c84e97257ac1a114f5de9ae7c797a30c0ab8a27ca68b82c5461263137459"
   },
   "counts": {
-    "open": 35,
+    "open": 37,
     "in_progress": 21,
     "closed": 22
   },
@@ -47,6 +47,14 @@
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.agent-definitions-pin-the-review-tier-model",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "Critic round 1 of the 0.5.3 candidate, 2026-08-07 — the Critic reported its own route violation from direct same-dispatch evidence; the cause was found in the shipped agent definitions afterwards."
     },
     {
       "id": "pipeline.agent-tool-isolation-worktree-snapshots-stale-upstream-ref",
@@ -306,6 +314,14 @@
       "owner": "pipeline",
       "created": "2026-07-25",
       "source": "close-block self-retro, 0.4.4 managed-workspace onboarding hotfix"
+    },
+    {
+      "id": "pipeline.mp22-orchestrator-self-implementation-has-no-enforcement",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "Critic rounds 1 and 2 of the 0.5.3 candidate, 2026-08-07 — both independently found the same class of violation, round 2 with the sharper spec-ref."
     },
     {
       "id": "pipeline.multi-cli-efficiency-pilots",
