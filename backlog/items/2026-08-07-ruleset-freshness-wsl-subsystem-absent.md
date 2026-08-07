@@ -107,3 +107,20 @@ host-action-family's exact schema (§B.3/§B.8) as real remaining design
 surface for a fast-follow sub-design, not resolved here given its security
 sensitivity. A first (not delta) Critic review is dispatched next, before
 implementation.
+
+**Critic review (2026-08-07): FAIL.** Full findings:
+`specs/sprint-phoenix-epic/evidence/wp2wp3-design-critic-review-a75a45d.md`.
+Part-B-specific findings: (F2, MAJOR) the proposed "closed" host-action
+family covers only 4 of the 8 git invocations that actually flow through the
+`options.spawn` seam §B.2(b) selects — either the uncovered ones silently
+degrade the freshness comparison (contradicting §B.7's "strict improvement"
+claim) or an unrecognised-command passthrough reopens exactly the
+direct-execution fallback the threat model forbids; (F3, MAJOR) §B.4's claim
+that the mis-scoped `executionBoundary` is "currently inert" is false — it is
+live-consumed by the mandatory bootstrap skill, and a separate, already-closed
+backlog item (`2026-08-05-pipeline-state-rebind-codex-default-runner.md`)
+already recorded this exact defect, which a narrower-than-claimed grep
+("repo-wide" was actually `plugins/`-scoped) missed; plus 2 MINOR (a missed
+threat-model doc-update row; a mis-cited `session-bootstrap.md` line). A
+rework dispatch addressing these plus the companion item's Part-A findings is
+next, then a bounded re-review before implementation.

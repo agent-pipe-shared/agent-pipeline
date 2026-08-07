@@ -100,3 +100,20 @@ same self-referential observation — is that acceptable, or is a genuinely
 independent second identity source wanted?) and one rollout question (§A.6:
 soft-advisory vs. hard-block on day one). A first (not delta) Critic review is
 dispatched next, before implementation.
+
+**Critic review (2026-08-07): FAIL.** Full findings:
+`specs/sprint-phoenix-epic/evidence/wp2wp3-design-critic-review-a75a45d.md`.
+Part-A-specific findings: (F1, BLOCKER) the "soft/advisory" framing in §A.6
+is wrong — the chosen `"plugin-refresh-required"` status branch sets
+`nextAction: null`, and the mandatory bootstrap skill requires executing
+`nextAction` and forbids printing its confirmation line on non-ready state,
+so this is not a soft failure in practice; (F4, MAJOR) §A.1's stated
+guarantee ("byte-identical to a clean checkout") overstates what the
+mechanism delivers — it performs no remote read, only checks for
+*uncommitted* local drift, so a clone with arbitrary *committed* changes
+passes; (F5, MAJOR) the new 2-URL allowlist constant is left as an
+unprotected gate-strength surface — `guard-gate-strength.mjs`'s
+`GATE_STRENGTH_PATHS` doesn't cover it, and §A.7 explicitly scopes out the
+fix that would. A rework dispatch addressing these plus the companion
+item's Part-B findings is next, then a bounded re-review before
+implementation.

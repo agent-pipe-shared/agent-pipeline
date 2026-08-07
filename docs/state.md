@@ -113,8 +113,23 @@ freehand). Status:
    `normalizeRulesetSource`'s loaded-vs-installed pairing is tautological in
    this self-referential calling pattern; §A.6: soft-advisory vs. hard-block
    day-one failure mode) plus one deferred sub-design (§B.8: the new
-   closed host-action family's exact schema). Next: a first (not delta)
-   Critic review, mirroring WP5's sequence, before implementation.
+   closed host-action family's exact schema). **Critic review: FAIL** — 1
+   BLOCKER + 4 MAJOR + 3 MINOR, notably heavier than WP5's first pass: the
+   chosen "soft" `plugin-refresh-required` branch actually nulls the
+   bootstrap's own `nextAction`, breaking the mandatory bootstrap steps
+   (blocker); Part B's "closed action family" covers only 4 of the 8 git
+   invocations flowing through its chosen integration seam (major); the
+   design's own "`executionBoundary` is currently inert" claim is false — a
+   separate, already-closed backlog item recorded its live consumption
+   (major); Part A's stated guarantee ("byte-identical to a clean checkout")
+   is stronger than the mechanism delivers, which only checks for
+   *uncommitted* drift (major); the new allowlist constant is left as an
+   unprotected gate-strength surface, with the fix that would protect it
+   explicitly scoped out of the same document (major). Full findings:
+   `specs/sprint-phoenix-epic/evidence/wp2wp3-design-critic-review-a75a45d.md`.
+   None require abandoning either approach. A rework dispatch addressing all
+   8 findings is next, then a bounded re-review before implementation — same
+   sequence as WP5.
 4. **`governance-product-verify-suites-deregistered`** — blocked on 1–3's
    outcome, not started.
 5. **`ledger-backed-plan-and-push-authority-absent-on-merged-base`** —
