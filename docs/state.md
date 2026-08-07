@@ -244,6 +244,31 @@ post-merge redesign packages have landed code this session:
   **WP2-WP3 Part A is now Critic-clean (PASS, no blocker) — technically ready
   for the PO's self-application gate, but F-A is a live open question about
   what the design contract should actually say, not yet decided or fixed.**
+  **`WP2-WP3-partA-rework-2` (goldfish-deep) dispatched and landed** (PO
+  direction: "fixe doch die majors und dann mach weiter" — fix the major
+  finding and keep going without pausing for confirmation at each step), 4
+  commits `ac8bd06`/`4e1ac8a`/`627d053`/`412d33d`. **F-A (fixed, `ac8bd06`):**
+  design doc §A.1 rescoped so the stated guarantee only claims what a real
+  git-checkout topology can prove, with a new disclosed-limitation paragraph;
+  §A.5 case 2 split into the non-git-flat-copy case (attestation skipped,
+  not attempted) versus the missing-git-binary exception; §A.7 gained the
+  matching exclusion entry so the code comment's citation is now accurate.
+  **F-D (fixed, `4e1ac8a`):** `pluginRootHasSelfApplicationGit`'s JSDoc no
+  longer claims layout-equivalence to `resolveSourceLayout()` it doesn't
+  have. **F-C (fixed, `627d053`):** `buildSelfApplicationGitFixture`'s
+  `mkdtempSync` root is canonicalized via `realpathSync`, portable across
+  hosts where `os.tmpdir()` isn't already its own realpath. **F-B (recorded,
+  not code-fixed, `412d33d`):** new backlog item
+  `backlog/items/2026-08-07-attestation-git-presence-gate-not-gs8-protected.md`
+  — two candidate directions disclosed (a narrow GS-9 constant-extraction, or
+  accepting the residual under the ordinary Verify/Critic/PO gate), decision
+  explicitly left to the PO, no guard change made. The F2 gating LOGIC itself
+  was deliberately untouched throughout (documentation/comment/fixture-
+  portability only). Both verify commands re-run by the Elephant directly
+  against final HEAD `412d33d`: `pipeline-start-preflight.test.mjs` 32/32,
+  `check-doc-contracts.mjs` clean (476 files/776 links/13 anchors). Evidence:
+  `specs/sprint-phoenix-epic/evidence/wp2wp3-parta-rework-2-verify-412d33d.json`.
+  **Next:** a bounded delta Critic re-review scoped to F-A/F-C/F-D — dispatched.
 - **GMW (Guard Maintenance Window, ADR-0058) merged in from the local-development
   marketplace snapshot** (commit `cca5ad8`): the PO pointed at
   `/home/skar667/agent-pipeline-local-marketplace` as the currently-wired snapshot
