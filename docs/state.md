@@ -265,6 +265,41 @@ the gate prints `(operating-model §7)` into its operator-visible fix string.
 Note (c) is a one-line change but sits in a `harness/scripts/` file, so it
 follows the ordinary briefed-task path rather than an in-session edit.
 
+**One of the four verify failures is repaired, and it was the Elephant's own
+defect (`b2a5c14`).** `backlog-state-check`'s frontmatter half: **44 failures → 0.**
+
+`plugins/pipeline-core/lib/backlog-state.mjs:121` rejects any **unquoted**
+frontmatter value containing a comma, apostrophe, or bracket. Every `source:` line
+this session wrote is multi-sentence prose full of commas — so every item filed
+today failed, including all of the Elephant's. The parser's own quoted form (a JSON
+string, `:111-119`) is the fix; fourteen items were converted with a **mechanical
+round-trip proof** that re-reads each pre-conversion value from `git show HEAD:` and
+compares it to `JSON.parse` of the new one. All 98 values identical. A silent reword
+is exactly the failure mode that proof exists to catch, and it would have been
+invisible otherwise.
+
+**The ledger half fell 54 → 39 without `backlog/transitions.ndjson` being touched.**
+16 events reported `id does not name a current backlog item` *only because those
+items failed to parse*; once they parse, the events resolve. One new line appeared
+for the mirror reason — an item is now visible to the checker and genuinely has no
+ledger entry. Net −15, nothing in the ledger changed. Worth remembering: **a
+parse failure in one artifact was manufacturing failures in an unrelated one.**
+
+**Two observations from that repair that are worth more than the repair.**
+
+1. **A diagnostics defect, not a validation defect.** The value rule is defensible
+   YAML safety. What is not: a rejected value is *dropped from the metadata map*, so
+   one authoring slip produces three unrelated-looking errors —
+   `must be plain text or JSON strings`, `missing required field source`, and
+   `source must be non-empty` — and the two loudest of them point away from the
+   cause. That is why this took a checker read to diagnose rather than a glance.
+2. **The item taxonomy has no slot for "a PO-stated obligation".** Two independent
+   authors, in different sessions, reached for `requirement` and `improvement`;
+   neither is canonical (`workflow-improvement | tooling-radar | defect | idea`).
+   The dispatch made the closest defensible assignment and declined to file a
+   taxonomy item as out of scope. **A taxonomy that two writers independently
+   mis-hit is a taxonomy worth revisiting**, and that is a PO call.
+
 **THE VERIFY GATE RAN END TO END FOR THE FIRST TIME IN THIS SESSION — AND IT IS
 RED (2026-08-08).** This is the session's most consequential result, and it is a
 result, not a failure.
