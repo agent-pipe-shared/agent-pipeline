@@ -251,10 +251,25 @@ an active, correctly-scoped, unexpired window that claims to cover them.
 | protected-test-path row in `project/guard-config.json` | GS-4 | **no** — GS-4 is not in GMW's scope set, and its HGO route is one exact edit |
 
 So R1 goes from three human touches to **two**, not to one, under the mechanisms
-that exist today. Whether it can reach one is a design question with a concrete
-shape rather than an open unknown: either the GS-4 row is not needed in the same
-release, or the chain needs a carrier that does not exist yet. That is input the
-mechanism work needs, and it is a measurement, not a preference.
+that exist today.
+
+**Reclassified the same day by PO ruling: two is a defect, not a result.** The
+top rule is that no PO activity outside the session may ever be required and that
+one release covers everything downstream of it — the adversary being the agent,
+never the human. Two touches violates that exactly as three did. The measurement
+above stands unchanged; what changes is that it is a defect report rather than an
+acceptable outcome, and that this plan may not design around it. Tracked in
+`backlog/items/2026-08-07-approval-mechanisms-require-out-of-session-po-acts.md`,
+owned by the Nova session by the PO's own assignment.
+
+One consequence for **this** merge, and it is the reason the reclassification is
+recorded here rather than only in the handover: `guard-gate-strength.mjs` is the
+file the merge has to union by hand, and its denial text is one of the artifacts
+that names an out-of-session PO edit as the sanctioned route. Resolving the
+conflict does not fix that text — deleting it before a replacement route exists
+would leave an agent with a refusal and no route at all — but the union must not
+*extend* it either. Take `main`'s text as-is, add GS-8 and GS-9, and leave the
+rewrite to the mechanism work.
 
 ## 8d. Resolution for the one code conflict, derived before the merge runs
 
