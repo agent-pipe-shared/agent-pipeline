@@ -70,9 +70,12 @@ assert.throws(() => runHumanApproval(["setup", "--repo-root", nominalRepo, "--di
 const hardLinkedDirectory = mkdtempSync(join(tmpdir(), "po-human-hard-linked-")); linkSync(join(nominalRepo, "poisoned-private.pem"), join(hardLinkedDirectory, "po-private.pem"));
 assert.throws(() => runHumanApproval(["setup", "--repo-root", nominalRepo, "--directory", hardLinkedDirectory]), /unlinked regular files/u);
 writeFileSync(join(external, "po-private.pem"), "encrypted-private-key-placeholder");
-assert.equal(runHumanApproval(["approve", "--repo-root", nominalRepo, "--directory", external], { spawn: (_executable, args) => { writeFileSync(args[args.indexOf("-out") + 1], "detached-signature"); return { status: 0 }; } }).code, "PO-HUMAN-PROOF-READY");
+// `readConfirmation` is injected here because signing is gated on an explicit typed
+// human confirmation (NOVA-PO-CONFIRM-1); these checks cover the request/proof shape,
+// not the gate, which has its own coverage in scripts/po-human-approval.test.mjs.
+assert.equal(runHumanApproval(["approve", "--repo-root", nominalRepo, "--directory", external], { readConfirmation: () => "approve", spawn: (_executable, args) => { writeFileSync(args[args.indexOf("-out") + 1], "detached-signature"); return { status: 0 }; } }).code, "PO-HUMAN-PROOF-READY");
 assert.equal(JSON.parse(readFileSync(join(external, "proof.json"), "utf8")).intentSha256, request.approvalIntent.sha256);
 writeFileSync(join(external, "request-cyb-5.json"), JSON.stringify({ ok: true, value: request }));
-assert.equal(runHumanApproval(["approve-all", "--repo-root", nominalRepo, "--directory", external], { spawn: (_executable, args) => { writeFileSync(args[args.indexOf("-out") + 1], "detached-signature"); return { status: 0 }; } }).code, "PO-HUMAN-APPROVE-ALL-READY");
+assert.equal(runHumanApproval(["approve-all", "--repo-root", nominalRepo, "--directory", external], { readConfirmation: () => "approve", spawn: (_executable, args) => { writeFileSync(args[args.indexOf("-out") + 1], "detached-signature"); return { status: 0 }; } }).code, "PO-HUMAN-APPROVE-ALL-READY");
 assert.equal(JSON.parse(readFileSync(join(external, "proof-cyb-5.json"), "utf8")).intentSha256, request.approvalIntent.sha256);
 console.log("36 threat-model approval request checks passed");
