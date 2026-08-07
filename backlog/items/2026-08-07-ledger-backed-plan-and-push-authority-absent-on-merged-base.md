@@ -168,6 +168,24 @@ minors) is dispatched next — **this is Critic round 4 of the 4 allowed for
 this package; if it also fails, this needs a PO course gate, not a fifth
 autonomous iteration.**
 
+**Third rework (2026-08-07): landed, commit `6f191ee`.** Corrects the
+write-side `discoverRepository(dir)` catch's ordering claim to match §2's
+own unchanged placement instruction (the catch fires AFTER the local state
+write has already succeeded, not before) and extends the recovery paragraph
+so this sub-case shares the same "fresh signing ceremony" recovery framing
+already given for the filesystem-condition sub-case (Finding 1); re-notates
+the §4 read-side entry to the actual `failures.push` free-text message shape
+instead of a return code the called function never produces on that path
+(Finding 2); corrects the timeout paragraph — the `5000`ms convention is
+`guard-push.mjs`'s own, not `pipeline-state.mjs`'s (which has no uniform
+timeout convention across its 7 git spawns) — while still recommending
+`5000`ms at both new call sites for cross-file consistency (Finding 3);
+Finding 4 (a commit-metadata provenance mismatch, not document content)
+required no document change. F1-F5 and F-B/F-C/F-D remain intact. A bounded
+delta Critic re-review (base `099a31b`, head `6f191ee`, prior finding IDs
+1-4) is dispatched next — **Critic round 4 of 4, the last one allowed under
+this package's cap.**
+
 **Delta re-review 1 (2026-08-07): FAIL.** Full findings:
 `specs/sprint-phoenix-epic/evidence/wp5-phx2-design-critic-delta-review-1-8a54751.md`.
 F1–F5 are all genuinely resolved, but the F1 fix itself introduces a new

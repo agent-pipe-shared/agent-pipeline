@@ -203,6 +203,18 @@ freehand). Status:
    the 4 allowed for this package; a further FAIL needs a PO course gate,
    not a fifth autonomous iteration.**
 
+   **Third rework: landed, commit `6f191ee`.** Corrects the write-side
+   ordering claim to match the document's own unchanged placement
+   instruction (catch fires after the local write succeeds, not before),
+   extending the recovery paragraph to cover it with the same
+   signing-ceremony framing already given for the filesystem-condition
+   sub-case; re-notates the read-side entry to the real `failures.push`
+   free-text shape; corrects the `pipeline-state.mjs` timeout-convention
+   overclaim; the fourth (commit-metadata provenance) finding needed no
+   document change. F1-F5/F-B/F-C/F-D remain intact. A bounded delta Critic
+   re-review (base `099a31b`, head `6f191ee`) is dispatched next — **Critic
+   round 4 of 4, the last one allowed for this package.**
+
 **Infra finding, 2026-08-07:** the `isolation: "worktree"` dispatch option
 pinned two of three agents' worktrees to `6e2c9b2` (origin/main's pre-merge
 tip) instead of `sprint_phoenix`'s actual HEAD — one agent (WP2+WP3)
