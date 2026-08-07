@@ -7,19 +7,21 @@ the candidate is ready and on what evidence. Everything here is read from
 `docs/state.md`'s 2026-08-07 sections, ADR-0056/0058/0059, the gate evidence
 files, and direct invocation — nothing is asserted from memory.
 
-`VERSION` reads `0.5.3`. Codex's `.codex-plugin/plugin.json` reads `0.5.3`;
-Claude's `.claude-plugin/plugin.json` reads
-`0.5.3+claude.20260807181921.f667dec`. `codex-pretool-guard.test.mjs` compares
-BASE versions, splitting at `+`, so the two agree — and that check is what
+All three version carriers now read a bare `0.5.3`: `VERSION`, Codex's
+`.codex-plugin/plugin.json`, and Claude's `.claude-plugin/plugin.json`.
+`codex-pretool-guard.test.mjs` compares BASE versions, splitting at `+`, so it
+accepted both the cachebustered and the stripped form — and that check is what
 caught the Codex manifest being left behind on a first bump attempt.
 
-**The cachebuster is deliberately retained on this candidate**, against the
-usual release practice of stripping it, because of a cost that only bites
-after the fact: a cachebuster-free version cannot be re-materialized locally
-under the same number, so a fix found in review would force `0.5.4` rather
-than a corrected `0.5.3`. Keeping it preserves the ability to replace this
-exact build while it is still under review. Strip it when cutting the actual
-release tag, not before.
+**The cachebuster was carried through review and stripped for the tag**, which
+is the practice this repository adopted rather than an exception to it. The cost
+it buys against only bites after the fact: a cachebuster-free version cannot be
+re-materialized locally under the same number, so a defect found in review would
+have forced `0.5.4` instead of a corrected `0.5.3`. That mattered — the second
+Critic round found four majors and the candidate was rebuilt three times under
+`0.5.3`. Stripping happens at the tag because a released version must be
+reproducible, and a build-metadata suffix naming a commit that is not the tagged
+commit is not.
 
 **Why 0.5.3 and not 0.6.0, although this candidate adds a capability.** In this
 repository the minor position tracks sprints, not feature counts: a `0.X` bump
@@ -72,7 +74,69 @@ accepted from dispatch self-reports:** `guard-lifecycle-ready.test.mjs` 38/38,
 `project-onboarding-v3.test.mjs` 91/91, `check-backlog-state.mjs` valid,
 `check-doc-contracts.mjs` 447 files / 719 links valid.
 
-## Not ready: three things, stated plainly
+## The three blockers are closed — and closing them found four more
+
+All three items below were the reason this candidate was called repair-ready
+rather than release-ready. Each is now closed, and the closing is what turned
+up the defects in the section after this one. That sequence is the point: the
+blockers were not paperwork.
+
+**1. Verify now reaches exit 0**, 255/255 registered suites and 255 terminal
+receipts, binding `exact`. `guard-testpath-override-tests` passes 19/19. The
+five failing cases were corrected under a signed TP-2/TP-6/TP-7 maintenance
+window, and OT13 — which passed for an incidental reason while claiming to pin
+a removed invariant — was rebuilt to assert `{status: "replan", code:
+"HGO-DRIFT"}` by name, with a byte-identical twin fixture proving it tracks
+drift rather than never admitting anything.
+
+**2. `503fe0d` now has coverage.** `guard-gate-strength.test.mjs` runs 30/30,
+including GST27 (a real, validly-armed, exactly-matching capability still does
+not lift GS-6) and GST28 (a static pin that the consume call sits inside the
+exclusion). Its evidence is execution now, not review.
+
+**3. Two independent Critic rounds have run.** The first was dispatched on the
+wrong tier — the shipped agent definition pins the review tier, so MP-07's
+mandatory escalation for a guardrail diff silently did not happen, and only the
+Critic's own report-header duty caught it. The re-run on the mandated tier
+returned four majors the first round did not have, two of them inside the
+security mechanism under review. The tier difference was not academic.
+
+## What the second Critic round found, and what was done
+
+Recorded here because a release note that lists only what was built, and not
+what was nearly shipped broken, is the wrong shape for a decision aid.
+
+**A caller could supply the trust anchor.** `--authority` let the signing CLI
+verify against a key the caller had just generated, while ADR-0059 Decision 1
+claims the subcommand "cannot succeed without a genuine signature it is
+structurally incapable of producing". The red run armed a real capability from
+a self-signed proof. The flag is removed, not constrained: a flag whose only
+admissible value is the default carries no capability while keeping a
+caller-supplied-anchor path alive.
+
+**The outside-the-repository check was inert on Windows.** A hard-coded POSIX
+separator meant only exact equality with the root was ever caught, so an
+in-repository path passed as external. Composed with the above: an
+agent-writable JSON file in the repo as trust anchor. Now compared through
+platform-flavoured `relative()`, which also folds case on win32.
+
+**The signature route dead-ended at its last step.** Every guard printed
+`authorize-by-signature` as the decisive next command for `signature` mode —
+this repository's committed mode — and the admission list matched only
+`authorize` by strict equality, so the same guard refused what it had just
+told the operator to run.
+
+**A denial could fall silent.** Route planning has three outcomes; three guards
+rendered one and swallowed the rest behind a bare `catch` that declared the
+silence intentional. A denial that *could not* be routed printed identically to
+one that was never eligible — the single outcome ADR-0059 Decision 4 does not
+admit.
+
+Two lesser findings closed alongside: the Codex adapter's Decision-4
+continuation had no test at all while the other three guards had one, and a
+docstring still claimed a guarantee that `503fe0d` had ended.
+
+## Historical: the three blockers as they stood before the window
 
 **1. Verify does not reach exit 0.** One suite fails:
 `guard-testpath-override-tests`, five cases. All five share one cause — the
@@ -94,7 +158,11 @@ The prepared dispatch is ready but has no green candidate to review yet.
 
 Items 1 and 2 are unblocked by one PO signature; item 3 follows them.
 
-## What the PO must do, in order
+*(All three were subsequently closed — see the section above. The steps below
+are kept as the executed record of how, because the flow they describe is
+itself the subject of an open backlog finding.)*
+
+## What the PO did, in order
 
 **Step 1 — sign the maintenance window. This is the only command that is
 yours.** `--repo-root` must be ABSOLUTE (`po-human-approval.mjs:87` requires
@@ -143,11 +211,36 @@ For a directory-sourced local marketplace, `/reload-plugins` suffices for guard
 scripts (re-read per invocation); a change to `hooks.json` wiring needs a new
 session. This candidate does not change `hooks.json`.
 
-**Readback before trusting it:** `claude plugin list --json` shows
-`0.5.3+claude.20260807181921.f667dec` at `scope: "user"`, and
-`pipeline-start-preflight.mjs` returns `status: "ready"` with
+**Readback before trusting it:** `pipeline-start-preflight.mjs` must return
+`status: "ready"` with `version` equal to `installedVersion` and
 `installedSource: "local-development"`. A `plugin-refresh-required` there means
-manifest and registry disagree.
+manifest and registry disagree. Done and confirmed for this candidate at
+`0.5.3+claude.20260807221336.14e7b97` — note that the *installed* build carried
+the cachebuster, which the tagged release does not; the reinstall was for
+enforcement, the strip is for reproducibility, and they are different jobs.
+
+## Release state: prepared to the push gate
+
+Everything the agent can do is done. What remains is the gate itself.
+
+- Candidate: `refs/heads/feat/sprint-nova-codex-v046`, pushed to `origin` and
+  read back with `ls-remote`.
+- Verify: exit 0, binding `exact`, 255/255. `security-scan`: exit 0.
+- Version: bare `0.5.3` across `VERSION` and both plugin manifests.
+- Both Critic rounds closed; every major finding fixed and re-verified.
+
+The remaining path, per [`push-release-flow.md`](push-release-flow.md):
+
+1. **Merge or push to `main`** — needs a fresh `push`-kind signature bound to
+   the `main` destination, plus the `GG-03` double-confirmation override. Note
+   that branch and `main` proofs cannot be prepared in parallel: both land on
+   `proof-critical-push.json`, so a second request overwrites the first.
+2. **`gh release create v0.5.3 --target <sha>`** — agent-executable, and not a
+   push at all: it calls the GitHub API directly, so no push guard intercepts
+   it. `git push origin <tag>` would be refused no matter how it is signed,
+   because `approve-push`'s destination regex only matches `refs/heads/*`.
+
+Neither step is started. Both are the PO's call.
 
 ## Known weaknesses, stated rather than smoothed
 
