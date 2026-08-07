@@ -1,0 +1,7 @@
+{
+  "taskId": "NOVA-A38-EVIDENCE-1",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "03c89ae0fc747598347bef449692abe66ed05c7b",
+  "dispatcher": "Elephant",
+  "outcome": "completed"
+}

@@ -1,0 +1,99 @@
+{
+  "schema": "pipeline.invocation-reliability-report.v1",
+  "reportId": "nova-a3-03c89ae",
+  "identity": {
+    "adapterId": "invocation-reliability",
+    "adapterVersion": "nova-a3-v1",
+    "implementationSha256": "e8434c07475cb2585d9def27ea3dddd6df15eb1274c2b3a856ec38b70074b3b8",
+    "preflightImplementationSha256": "474f04d8e70c6fe194826e163d1659491b010496ced28486a35c75d00bc5df05"
+  },
+  "verify": {
+    "command": "node --test plugins/pipeline-core/lib/invocation-reliability.test.mjs plugins/pipeline-core/scripts/invocation-preflight.test.mjs",
+    "exitCode": 0,
+    "suites": [
+      {
+        "path": "plugins/pipeline-core/lib/invocation-reliability.test.mjs",
+        "fileSha256": "36e0626ea1ae85a0a3c3383d986dde978e9f7486977380938afb855a00564ac2",
+        "passed": 10,
+        "total": 10
+      },
+      {
+        "path": "plugins/pipeline-core/scripts/invocation-preflight.test.mjs",
+        "fileSha256": "b4d7d2b1e7d2d2dab16cd0ac504c665d27f87193160a91907e95699cb2a3a399",
+        "passed": 11,
+        "total": 11
+      }
+    ]
+  },
+  "criteria": [
+    {
+      "criterionId": "NVA-A38-1",
+      "text": "Each logical invocation has correlated, distinct attempts.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/lib/invocation-reliability.test.mjs", "name": "A3R03 chain links exact request and prior attempt digests with unique correlated indexes" },
+        { "kind": "test", "path": "plugins/pipeline-core/scripts/invocation-preflight.test.mjs", "name": "A3P02 concurrent duplicate callers join the atomically retained resolution" }
+      ]
+    },
+    {
+      "criterionId": "NVA-A38-2",
+      "text": "Deterministic request/chain defects fail before launch where the host contract permits.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/lib/invocation-reliability.test.mjs", "name": "A3R06 attempt schema is exact, closed and runtime-parallel for bounds/enums/conditionals" },
+        { "kind": "test", "path": "plugins/pipeline-core/scripts/invocation-preflight.test.mjs", "name": "A3P04 invalid requests are digest-suppressed and no no-child/fallback/self-report record authorizes a launch" },
+        { "kind": "test", "path": "plugins/pipeline-core/scripts/invocation-preflight.test.mjs", "name": "A3P09 unchanged terminal/transient selected-sandbox dispositions remain prelaunch suppressed" }
+      ]
+    },
+    {
+      "criterionId": "NVA-A38-3",
+      "text": "Byte-equivalent invalid requests cannot loop.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/scripts/invocation-preflight.test.mjs", "name": "A3P04 invalid requests are digest-suppressed and no no-child/fallback/self-report record authorizes a launch" },
+        { "kind": "test", "path": "plugins/pipeline-core/scripts/invocation-preflight.test.mjs", "name": "A3P05 byte-equivalent invalid requests are one suppressed outcome while a corrected request is independently admitted" }
+      ]
+    },
+    {
+      "criterionId": "NVA-A38-4",
+      "text": "One confirmed resolution is atomically reused within the session only while all fingerprint predicates match.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/scripts/invocation-preflight.test.mjs", "name": "A3P03 boot/profile/policy/binary/duty/subject drift gets a fresh resolution key" },
+        { "kind": "test", "path": "plugins/pipeline-core/scripts/invocation-preflight.test.mjs", "name": "A3P08 shared session memory atomically joins one resolution and fingerprint drift invalidates reuse" },
+        { "kind": "test", "path": "plugins/pipeline-core/scripts/invocation-preflight.test.mjs", "name": "A3P11 convenience calls are stateless while explicit shared memory still joins one reservation" }
+      ]
+    },
+    {
+      "criterionId": "NVA-A38-5",
+      "text": "Failure classes, recurrence metrics and remediation candidates remain privacy-safe and observational.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/lib/invocation-reliability.test.mjs", "name": "A3R08 recurrence aggregation emits only class, owning layer, bounded counters, coarse bucket and digest" },
+        { "kind": "test", "path": "plugins/pipeline-core/lib/invocation-reliability.test.mjs", "name": "A3R09 remediation is deduplicated and accepted only with all four systemic-repair evidence gates" }
+      ]
+    },
+    {
+      "criterionId": "NVA-A38-6",
+      "text": "Accepted systemic repairs require a reproducer, owning-layer fix, regression fixture and post-fix non-recurrence.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/lib/invocation-reliability.test.mjs", "name": "A3R09 remediation is deduplicated and accepted only with all four systemic-repair evidence gates" }
+      ],
+      "note": "Demonstrates the code-level enforcement contract only (createInvocationRemediationCandidate/deduplicateInvocationRemediationCandidates reject status \"accepted\" unless reproducerSha256, owningLayerFixSha256, regressionFixtureSha256 and postFixNonRecurrenceSha256 are all present; BOUND:remediation-acceptance rejects a forged accepted record missing evidence). A repository search (git log --all --grep, and both focused test files) found no specific prior systemic repair being tracked through this contract: the A3R09 fixture uses synthetic placeholder digests (A/B/C), not a real reproducer/fix/fixture/non-recurrence chain for an actual incident. No such instance is claimed here."
+    }
+  ],
+  "bindings": {
+    "suiteVersion": "nova-a3-v1",
+    "candidate": {
+      "commit": "03c89ae0fc747598347bef449692abe66ed05c7b",
+      "tree": "99e3bd0cca49eb33f25e737bc4ddd6e4055e146b"
+    },
+    "rawEvidenceSha256": [
+      "e8434c07475cb2585d9def27ea3dddd6df15eb1274c2b3a856ec38b70074b3b8",
+      "474f04d8e70c6fe194826e163d1659491b010496ced28486a35c75d00bc5df05",
+      "36e0626ea1ae85a0a3c3383d986dde978e9f7486977380938afb855a00564ac2",
+      "b4d7d2b1e7d2d2dab16cd0ac504c665d27f87193160a91907e95699cb2a3a399"
+    ]
+  }
+}

@@ -3,14 +3,30 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "7636ea87561403fddde0fdbec4075fcca9c4cf93f408d33f8f1e05be10146c7f"
+    "transitionHead": "716912c4a7f46b25167cc81b58b5d5069636711eed6158ab18b86270bcb1c09e"
   },
   "counts": {
-    "open": 28,
-    "in_progress": 23,
-    "closed": 20
+    "open": 38,
+    "in_progress": 21,
+    "closed": 22
   },
   "items": [
+    {
+      "id": "pipeline.absent-runner-flag-silently-defaults-to-codex",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "NOVA-RESTART-RUNNER-1 stop condition in the 2026-08-07 Nova session; the reverted change is recorded inline at the freshIntent default in plugins/pipeline-core/lib/project-onboarding-v3.mjs in commit 5efb0f1, carrying forward the question deferred by the closed item 2026-08-06-onboarding-lifecycle-plan-hardcodes-the-codex-runner.md."
+    },
+    {
+      "id": "pipeline.adr-0047-numbering-collision",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "specs/sprint-nova-epic/plans/nova-b-readiness-2026-08-06.md (lines 55-69), promoted from a plan-only note to a backlog item per the 0.5.2 Critic round's F2 finding, 2026-08-07."
+    },
     {
       "id": "pipeline.adr-0051-follow-up-gaps-untracked",
       "status": "closed",
@@ -33,12 +49,20 @@
       "tracking": "Sentinel recovery baseline; no completion claim."
     },
     {
-      "id": "pipeline.authority-signing-terminal-contract",
+      "id": "pipeline.agent-definitions-pin-the-review-tier-model",
       "status": "open",
-      "type": "workflow-improvement",
+      "type": "defect",
       "owner": "pipeline",
-      "created": "2026-08-06",
-      "source": "Phoenix §7 authority revision; approve step failed twice inside an agent session"
+      "created": "2026-08-07",
+      "source": "Critic round 1 of the 0.5.3 candidate, 2026-08-07 — the Critic reported its own route violation from direct same-dispatch evidence; the cause was found in the shipped agent definitions afterwards."
+    },
+    {
+      "id": "pipeline.agent-tool-isolation-worktree-snapshots-stale-upstream-ref",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "NOVA-GMW-1 first dispatch attempt, 2026-08-07 -- Agent tool isolation:worktree."
     },
     {
       "id": "pipeline.backlog-delivery-status-reconciliation",
@@ -48,6 +72,18 @@
       "created": "2026-07-25",
       "source": "Approved Nova A1 issue #57 bootstrap authority and reviewed canonical backlog intake.",
       "tracking": "Nova A / issue #57"
+    },
+    {
+      "id": "pipeline.backlog-ledger-closure-reason-misleading",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "0.5.2 release Critic round, 2026-08-07, finding F3.",
+      "closedAt": "2026-08-07",
+      "closureRepository": "self",
+      "closureCommit": "19c5bf0f2e2eb0835c1980edaacdae26316934f0",
+      "closureEvidence": "backlog/evidence/2026-08-07-nova-gwm-backlog-fixes.md"
     },
     {
       "id": "pipeline.canonical-worktree-lifecycle",
@@ -93,6 +129,14 @@
       "owner": "pipeline",
       "created": "2026-07-20",
       "source": "close retro; bounded privacy correction review"
+    },
+    {
+      "id": "pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "Discovered running harness/scripts/verify.mjs against the NOVA-GMW-1 merge commit 8bc5ceb (first real merge commit into this repository's live main-branch history), 2026-08-07."
     },
     {
       "id": "pipeline.codex-plugin-validator-host-parity",
@@ -145,6 +189,14 @@
       "source": "Public V3 Foundation stabilization close authorship check: delivered Goldfish work packages lacked required public Dispatch trailers"
     },
     {
+      "id": "pipeline.dispatched-agents-return-truncated-mid-step",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "PO, 2026-08-07: 'die goldfische generell und criticer liefern seit einiger zeit immer abgeschnittenes das könnte an der WSL umgebung liegen'. Four instances measured in one session the same day."
+    },
+    {
       "id": "pipeline.documentation-information-architecture",
       "status": "open",
       "type": "workflow-improvement",
@@ -188,14 +240,6 @@
       "tracking": "Sentinel recovery baseline; no completion claim."
     },
     {
-      "id": "pipeline.governance-product-verify-suites-deregistered",
-      "status": "open",
-      "type": "defect",
-      "owner": "pipeline",
-      "created": "2026-08-07",
-      "source": "merge report section 4 finding 3 and section 7.3 (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361"
-    },
-    {
       "id": "pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions",
       "status": "open",
       "type": "defect",
@@ -212,20 +256,36 @@
       "source": "Sprint Cyborg epic, self-application finding #2 (Elephant self-observation while implementing CYB-2E; PO decision Option B recorded in docs/state.md, session 2026-07-29)"
     },
     {
-      "id": "pipeline.human-legible-approval-record",
-      "status": "open",
-      "type": "workflow-improvement",
-      "owner": "pipeline",
-      "created": "2026-08-06",
-      "source": "Product Owner requirement raised at the Phoenix plan-approval gate"
-    },
-    {
-      "id": "pipeline.ledger-backed-plan-and-push-authority-absent-on-merged-base",
+      "id": "pipeline.guard-lifecycle-ready-rejects-plan-runtime-intent-argv",
       "status": "open",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "merge report section 4 findings 1/2/4/5/6/11 (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361"
+      "source": "Live onboarding test (rune_test1_claude line of work) hitting a self-inflicted guard rejection at the plan-runtime step, 2026-08-07 (Nova GMW session); root cause independently re-verified by reading the cited source directly, not taken from the report alone."
+    },
+    {
+      "id": "pipeline.handover-file-has-no-rotation-obligation",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "PO, 2026-08-07: 'state wird aber auch hoffentlich nicht unendlich lang sondern irgendwann wieder leer :) wenn etwas dauerhaft als regel geschrieben wird, dann muss es in adrs'."
+    },
+    {
+      "id": "pipeline.human-approval-ux-directory-clarity-and-single-command",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "PO decision and observation during the first live guard-maintenance-window signing on 2026-08-07: the wrong key directory was used twice before the trust mismatch surfaced, and the PO was handed two commands where only the first is theirs."
+    },
+    {
+      "id": "pipeline.human-authorization-prompts-ignore-the-configured-language-profile",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "PO request in the 2026-08-07 Nova session for a deliberate confirmation before PIN entry, explicitly qualified as language-profile dependent; partially delivered by NOVA-PO-CONFIRM-1 in commits 5efb0f1 and 584a598."
     },
     {
       "id": "pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root",
@@ -237,11 +297,23 @@
     },
     {
       "id": "pipeline.local-worker-supervisor-cli-suite-flakes-under-full-verify",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-06",
-      "source": "Sprint Nova session, 2026-08-06: Full Verify on candidate 9f5bfc9 failed with local-worker-supervisor-cli-tests=1, the same suite passed 9/9 standalone immediately afterwards, and an unchanged re-run of Full Verify on the same candidate and clean tree went green."
+      "source": "Sprint Nova session, 2026-08-06: Full Verify on candidate 9f5bfc9 failed with local-worker-supervisor-cli-tests=1, the same suite passed 9/9 standalone immediately afterwards, and an unchanged re-run of Full Verify on the same candidate and clean tree went green.",
+      "closedAt": "2026-08-07",
+      "closureRepository": "self",
+      "closureCommit": "577c515404e2bd4c94f890c9cd7009ac93b66d1d",
+      "closureEvidence": "backlog/evidence/2026-08-07-nova-gwm-backlog-fixes.md"
+    },
+    {
+      "id": "pipeline.maintenance-window-selectivity-is-untested-at-both-levels",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "Observation from a parallel Phoenix session on the marketplace snapshot that each guard hook carries only one maintenance-window test, sharpened and empirically checked against the live TP-2/TP-6/TP-7 window during the 2026-08-07 Nova session."
     },
     {
       "id": "pipeline.managed-onboarding-success-contract",
@@ -250,6 +322,14 @@
       "owner": "pipeline",
       "created": "2026-07-25",
       "source": "close-block self-retro, 0.4.4 managed-workspace onboarding hotfix"
+    },
+    {
+      "id": "pipeline.mp22-orchestrator-self-implementation-has-no-enforcement",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "Critic rounds 1 and 2 of the 0.5.3 candidate, 2026-08-07 — both independently found the same class of violation, round 2 with the sharper spec-ref."
     },
     {
       "id": "pipeline.multi-cli-efficiency-pilots",
@@ -325,6 +405,22 @@
       "source": "ADR-0051 Follow-up section names this as one of two gaps to track as a dated backlog item; created per backlog/items/2026-08-05-adr-0051-follow-up-gaps-untracked.md's proposal, executed 2026-08-06 night autonomous backlog reconciliation."
     },
     {
+      "id": "pipeline.onboarding-restart-flow-is-codex-only-not-runner-aware",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "PO handover from a separate session (rune_test1_claude), submitted through the PO's own channel, 2026-08-07."
+    },
+    {
+      "id": "pipeline.parallel-goldfish-dispatches-race-on-shared-checkout",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "Observed live during a 2026-08-07 wave of five parallel Nova A evidence-sealing Goldfish dispatches, each briefed 'Worktree: no' on the reasoning that their file scopes were disjoint."
+    },
+    {
       "id": "pipeline.pipeline-state-rebind-codex-default-runner",
       "status": "closed",
       "type": "defect",
@@ -378,18 +474,6 @@
       "closureEvidence": "backlog/evidence/2026-07-24-completed-companion-deliveries.md"
     },
     {
-      "id": "pipeline.project-authority-dual-state-repair-and-failclosed-gate",
-      "status": "closed",
-      "type": "defect",
-      "owner": "pipeline",
-      "created": "2026-08-07",
-      "source": "merge report section 4 finding 8 and the two narrowed findings on po-gate-authority.mjs (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361",
-      "closedAt": "2026-08-07",
-      "closureRepository": "self",
-      "closureCommit": "1f070c91743b7340c59ea5836286cd632bb0eba8",
-      "closureEvidence": "backlog/evidence/2026-08-07-project-authority-failclosed-closure.md"
-    },
-    {
       "id": "pipeline.project-scoped-github-issue-operations",
       "status": "in_progress",
       "type": "workflow-improvement",
@@ -411,12 +495,12 @@
       "closureEvidence": "backlog/evidence/2026-07-24-po-sentinel-closure-disposition.md"
     },
     {
-      "id": "pipeline.readonly-command-guard-classification",
+      "id": "pipeline.push-release-flow-unusable-for-third-party-adopters",
       "status": "open",
-      "type": "workflow-improvement",
+      "type": "defect",
       "owner": "pipeline",
-      "created": "2026-07-26",
-      "source": "Phoenix close self-retro; specs/sprint-phoenix-epic/RECOVERY.md R-02"
+      "created": "2026-08-07",
+      "source": "PO, live during the 0.5.2 main-release session, 2026-08-07 — verbatim: 'Eine Entwickler Agent-Pipeline die nicht pushen und releasen kann ist unbrauchbar, außerdem viel zu unhandlich mit so vielen Freigaben.'"
     },
     {
       "id": "pipeline.ready-gate-env-var-runner-authority",
@@ -456,6 +540,18 @@
       "tracking": "Sentinel recovery baseline; no completion claim."
     },
     {
+      "id": "pipeline.release-preflight-cli-base-commit-not-peeled",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "NVA-A54 Critic review, 2026-08-07 (finding 2), reviewing commits 6e2c9b2..d5be0e6.",
+      "closedAt": "2026-08-07",
+      "closureRepository": "self",
+      "closureCommit": "5e20b854afc1f499d1376c43558565389e375c59",
+      "closureEvidence": "backlog/evidence/2026-08-07-nova-gwm-backlog-fixes.md"
+    },
+    {
       "id": "pipeline.release-preflight-has-a-builder-but-no-cli",
       "status": "in_progress",
       "type": "defect",
@@ -470,14 +566,6 @@
       "owner": "pipeline",
       "created": "2026-08-06",
       "source": "Manual re-run of the empty-directory onboarding smoke test in scratch/onboarding-smoke-test while re-verifying backlog/items/2026-08-06-onboarding-lifecycle-plan-hardcodes-the-codex-runner.md (see backlog/evidence/2026-08-06-onboarding-runner-identity-reverification.md), 2026-08-06."
-    },
-    {
-      "id": "pipeline.ruleset-freshness-wsl-subsystem-absent",
-      "status": "in_progress",
-      "type": "defect",
-      "owner": "pipeline",
-      "created": "2026-08-07",
-      "source": "merge report section 4 finding 10 (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361"
     },
     {
       "id": "pipeline.runtime-projection-v2-eager-manifest-load",
@@ -498,14 +586,6 @@
       "closureRepository": "self",
       "closureCommit": "83111227cb59eff7d186c49aadc6963f78232b77",
       "closureEvidence": "backlog/items/2026-07-25-security-scan-cross-branch-gitleaks-findings.md"
-    },
-    {
-      "id": "pipeline.self-application-integrity-check-absent",
-      "status": "in_progress",
-      "type": "defect",
-      "owner": "pipeline",
-      "created": "2026-08-07",
-      "source": "merge report section 4 findings 7 and 9 (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361"
     },
     {
       "id": "pipeline.sentinel-go-live-completion",
@@ -529,6 +609,14 @@
       "tracking": "Sentinel recovery baseline; no completion claim."
     },
     {
+      "id": "pipeline.session-scratchpad-is-unwritable-under-the-cross-repo-guard",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "PO, 2026-08-07, on watching the guard refuse a scratchpad write: 'eigentlich solltest du auf tmp zugriff haben'. The Critic-contract half of the finding was observed independently the same day."
+    },
+    {
       "id": "pipeline.setup-mjs-marketplace-name-collision-defeats-local-dev-installs",
       "status": "closed",
       "type": "defect",
@@ -539,14 +627,6 @@
       "closureRepository": "self",
       "closureCommit": "d3db4a07dee565c1eeee2eb1e1e77ffcd2ca4e0a",
       "closureEvidence": "backlog/evidence/2026-08-06-second-reconciliation-pass.md"
-    },
-    {
-      "id": "pipeline.signed-authority-binding-durability",
-      "status": "open",
-      "type": "defect",
-      "owner": "pipeline",
-      "created": "2026-08-06",
-      "source": "Phoenix §7 authority revision; observed directly during the revision sequence"
     },
     {
       "id": "pipeline.source-available-commercial-licensing",
@@ -585,6 +665,14 @@
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.technical-lock-for-pipeline-consent-before-onboarding-complete",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "PO handover from a separate session (agent-pipeline-share_phoenix), submitted through the PO's own channel, 2026-08-07."
     },
     {
       "id": "pipeline.unified-human-authorization-ux",

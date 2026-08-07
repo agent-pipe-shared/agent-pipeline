@@ -13,7 +13,7 @@
  */
 import { createHash, createPublicKey } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 
 import { approvalRequestFromExternalJson, observeCleanCandidate, run as runApprovalRequest } from "./po-approval-request.mjs";
@@ -21,7 +21,7 @@ import { readPublicRepositoryFile, verifyThreatModelApprovalRequest } from "../l
 import { CRITICAL_ACTION_KINDS, createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
-const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication> --subject-sha256 <sha256> --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication>";
+const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication> --subject-sha256 <sha256> --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | sign-intent --repo-root <repo> --directory <external-dir> --intent-sha256 <sha256>";
 const own = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 const SHA = /^[a-f0-9]{64}$/u;
 const text = (value) => typeof value === "string" && value.trim() !== "";
@@ -80,19 +80,59 @@ export function parseHumanArgs(argv) {
     const key = tokens[index]; const value = tokens[index + 1];
     if (!key?.startsWith("--") || typeof value !== "string" || value.startsWith("--")) return { error: USAGE };
     const normalized = key.slice(2).replace(/-([a-z])/gu, (_, letter) => letter.toUpperCase());
-    if (!new Set(["directory", "repoRoot", "keyReference", "featureId", "plan", "spec", "model", "kind", "subjectSha256", "expiresAt"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
+    if (!new Set(["directory", "repoRoot", "keyReference", "featureId", "plan", "spec", "model", "kind", "subjectSha256", "expiresAt", "intentSha256"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
     supplied.add(normalized); values[normalized] = value; index += 1;
   }
-  if (!new Set(["setup", "prepare", "prepare-all", "approve", "approve-all", "verify", "verify-all", "prepare-critical", "approve-critical", "verify-critical"]).has(command) || !text(values.directory) || !isAbsolute(values.directory)
+  if (!new Set(["setup", "prepare", "prepare-all", "approve", "approve-all", "verify", "verify-all", "prepare-critical", "approve-critical", "verify-critical", "sign-intent"]).has(command) || !text(values.directory) || !isAbsolute(values.directory)
     || !text(values.repoRoot) || !isAbsolute(values.repoRoot)) return { error: USAGE };
   if (command.endsWith("-all") && (values.featureId || values.plan || values.spec || values.model)) return { error: USAGE };
   if (command.endsWith("-critical") && !CRITICAL_ACTION_KINDS.includes(values.kind)) return { error: USAGE };
+  if (command === "sign-intent" && !SHA.test(values.intentSha256 ?? "")) return { error: USAGE };
   return values;
 }
 
 function command(executable, args, dependencies) {
   const result = (dependencies.spawn ?? spawnSync)(executable, args, { stdio: "inherit", shell: false });
   if (result?.status !== 0) fail(`${executable} failed; the human terminal must complete the local prompt`);
+}
+
+const CONFIRMATION_TOKEN = "approve";
+
+/**
+ * Reads one line of plain-text confirmation from the real controlling
+ * terminal. Synchronous by design: this file already blocks on `spawnSync`
+ * for the OpenSSL passphrase prompt, and a human confirmation gate that must
+ * complete before that prompt has to block the same way, not hand control to
+ * an async callback the rest of this CLI does not have.
+ */
+function defaultReadConfirmation(prompt) {
+  process.stdout.write(prompt);
+  const buffer = Buffer.alloc(1); const bytes = [];
+  for (;;) {
+    let read;
+    try { read = readSync(0, buffer, 0, 1, null); }
+    catch (error) { if (error?.code === "EAGAIN") continue; if (error?.code === "EOF") break; throw error; }
+    if (read === 0 || buffer[0] === 10) break;
+    bytes.push(buffer[0]);
+  }
+  return Buffer.from(bytes).toString("utf8").replace(/\r$/u, "").trim();
+}
+
+/**
+ * The deliberate, plain-language gate the PO requires before any passphrase
+ * prompt: a human must read what is being authorized and its consequence,
+ * then type the exact confirmation token. Anything else cancels, and the
+ * caller must never reach the OpenSSL sign step or write any artifact.
+ */
+function requireExplicitConfirmation(summaryLines, dependencies) {
+  const prompt = [
+    "PO APPROVAL CONFIRMATION -- read before you enter your passphrase:",
+    ...summaryLines.map((line) => `  ${line}`),
+    "This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.",
+    `Type exactly "${CONFIRMATION_TOKEN}" to continue; anything else cancels: `,
+  ].join("\n");
+  const read = dependencies.readConfirmation ?? defaultReadConfirmation;
+  if (read(prompt) !== CONFIRMATION_TOKEN) fail("approval cancelled: explicit confirmation was not given");
 }
 
 export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}) {
@@ -171,12 +211,42 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
     write(paths.request, `${JSON.stringify(result, null, 2)}\n`, { mode: 0o600 });
     return { ok: true, code: "PO-HUMAN-REQUEST-READY", candidate: result.value.candidate, intentSha256: result.value.approvalIntent.sha256 };
   }
+  if (args.command === "sign-intent") {
+    if (!exists(paths.privateKey) || !exists(paths.publicKey) || !exists(paths.authority)) fail("run setup before sign-intent");
+    const intentSha256 = args.intentSha256;
+    requireExplicitConfirmation([
+      `intent sha256: ${intentSha256}`,
+      "this arms a one-time, audited guard-lift/guard-override authorization (HGO/GMW) for whatever action was already recorded against this exact digest; this command has no more specific description of that action available to it.",
+    ], dependencies);
+    const manual = {
+      intent: artifactPath(directory, "intent-manual.txt"),
+      signature: artifactPath(directory, "signature-manual.bin"),
+      proof: artifactPath(directory, "proof-manual.json"),
+    };
+    write(manual.intent, intentSha256, { mode: 0o600 });
+    try { command("openssl", ["pkeyutl", "-sign", "-rawin", "-inkey", paths.privateKey, "-in", manual.intent, "-out", manual.signature], dependencies); }
+    finally { rmSync(manual.intent, { force: true }); }
+    try {
+      const authority = json(paths.authority); const publicKey = read(paths.publicKey, "utf8");
+      if (!own(authority, ["keyReference", "publicKeySha256"]) || !text(authority.keyReference) || authority.publicKeySha256 !== publicKeyPolicy(publicKey, authority.keyReference).publicKeySha256) fail("external trust policy does not match the local public key");
+      const proof = { schema: "pipeline.po-approval-proof.v1", intentSha256, keyReference: authority.keyReference, publicKey, signatureBase64: Buffer.from(read(manual.signature)).toString("base64") };
+      write(manual.proof, `${JSON.stringify(proof, null, 2)}\n`, { mode: 0o600 });
+    } finally { rmSync(manual.signature, { force: true }); }
+    return { ok: true, code: "PO-HUMAN-SIGN-INTENT-READY", intentSha256 };
+  }
   if (!exists(paths.request) || !exists(paths.publicKey) || !exists(paths.authority)) fail("run setup and prepare before approving");
   const request = approvalRequestFromExternalJson(json(paths.request));
   const intentSha256 = request?.approvalIntent?.sha256;
   if (!SHA.test(intentSha256 ?? "")) fail("request has no valid approval intent");
   if (args.command === "approve" || args.command === "approve-critical") {
     if (!exists(paths.privateKey)) fail("private key is unavailable");
+    const kind = critical ? request?.action?.kind : request?.approvalIntent?.value?.kind;
+    const summary = [`kind: ${kind}`, `candidate commit: ${request?.candidate?.commit}`];
+    if (critical) {
+      summary.push(`action subject sha256: ${request?.action?.subjectSha256}`);
+      summary.push(`action expires at: ${request?.action?.expiresAt}`);
+    }
+    requireExplicitConfirmation(summary, dependencies);
     write(paths.intent, intentSha256, { mode: 0o600 });
     try { command("openssl", ["pkeyutl", "-sign", "-rawin", "-inkey", paths.privateKey, "-in", paths.intent, "-out", paths.signature], dependencies); }
     finally { rmSync(paths.intent, { force: true }); }

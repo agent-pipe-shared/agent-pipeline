@@ -120,6 +120,7 @@
           "docs/github-actions-token-permissions.md",
           "docs/gitlab-ci-pilot-threat-model.md",
           "docs/governance-events.md",
+          "docs/guard-maintenance-window-threat-model.md",
           "docs/human-guard-override-threat-model.md",
           "docs/local-supervisor-state-threat-model.md",
           "docs/marketplace-supply-chain-threat-model.md",
@@ -128,6 +129,7 @@
           "docs/phoenix-governance-threat-model.md",
           "docs/po-approval-proof-contract.md",
           "docs/po-human-approval.md",
+          "docs/push-release-flow.md",
           "docs/release-0.4-readiness.md",
           "docs/release-0.4.2-readiness.md",
           "docs/release-0.4.3-readiness.md",
@@ -136,6 +138,7 @@
           "docs/release-0.4.6-readiness.md",
           "docs/release-0.5.0-readiness.md",
           "docs/release-0.5.2-readiness.md",
+          "docs/release-0.5.3-readiness.md",
           "docs/runner-platform-conformance.md",
           "docs/security-incident-response.md",
           "docs/security-support-policy.md",
@@ -207,6 +210,9 @@
           "docs/adr/0055-critical-human-proof-waiver.md",
           "docs/adr/0056-push-approval-mode.md",
           "docs/adr/0057-runner-platform-support-is-an-implementation-obligation.md",
+          "docs/adr/0058-guard-maintenance-window.md",
+          "docs/adr/0059-signed-human-guard-override.md",
+          "docs/adr/0060-handover-placement-and-rotation.md",
           "docs/adr/README.md"
         ]
       },

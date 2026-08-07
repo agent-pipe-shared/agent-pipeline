@@ -1,0 +1,169 @@
+{
+  "schema": "pipeline.execution-plane-scheduling-report.v1",
+  "reportId": "nova-a4-57ee7e9",
+  "identity": {
+    "modules": [
+      {
+        "moduleId": "scheduling-lifecycle",
+        "implementationPath": "plugins/pipeline-core/lib/scheduling-lifecycle.mjs",
+        "implementationSha256": "436409ab1e55ea932e47e5df16f94e87b2b389f1971fe6fe55c09aa9edbbb847",
+        "testPath": "plugins/pipeline-core/lib/scheduling-lifecycle.test.mjs",
+        "testSha256": "21cf78493b1210701343b2f796c96d728ab7959c05e0abcf283d217441387516"
+      },
+      {
+        "moduleId": "parallel-dispatch-planner",
+        "implementationPath": "plugins/pipeline-core/lib/parallel-dispatch-planner.mjs",
+        "implementationSha256": "2820233fded07e2006e308b772fc597d2a69a04024be1ff07a8987c924ea1341",
+        "testPath": "plugins/pipeline-core/lib/parallel-dispatch-planner.test.mjs",
+        "testSha256": "a5f769430fcd6913354b4ccd555324bf244e7a9f0e463ae3188108cca8c65b14"
+      },
+      {
+        "moduleId": "execution-plane-contract",
+        "implementationPath": "plugins/pipeline-core/lib/execution-plane-contract.mjs",
+        "implementationSha256": "c58271cccc992355be77c99e9ca3f1ef32cfb7135ab0c999c6977b37d91d172f",
+        "testPath": "plugins/pipeline-core/lib/execution-plane-contract.test.mjs",
+        "testSha256": "b1aba612145c83f7d885afa7b7aedf6506cb398cdc706f1d34fc49a74143b33b"
+      }
+    ]
+  },
+  "verify": {
+    "commands": [
+      "node --test plugins/pipeline-core/lib/scheduling-lifecycle.test.mjs",
+      "node --test plugins/pipeline-core/lib/parallel-dispatch-planner.test.mjs",
+      "node --test plugins/pipeline-core/lib/execution-plane-contract.test.mjs"
+    ],
+    "exitCode": 0,
+    "suites": [
+      {
+        "path": "plugins/pipeline-core/lib/scheduling-lifecycle.test.mjs",
+        "fileSha256": "21cf78493b1210701343b2f796c96d728ab7959c05e0abcf283d217441387516",
+        "passed": 9,
+        "total": 9
+      },
+      {
+        "path": "plugins/pipeline-core/lib/parallel-dispatch-planner.test.mjs",
+        "fileSha256": "a5f769430fcd6913354b4ccd555324bf244e7a9f0e463ae3188108cca8c65b14",
+        "passed": 10,
+        "total": 10
+      },
+      {
+        "path": "plugins/pipeline-core/lib/execution-plane-contract.test.mjs",
+        "fileSha256": "b1aba612145c83f7d885afa7b7aedf6506cb398cdc706f1d34fc49a74143b33b",
+        "passed": 10,
+        "total": 10
+      }
+    ],
+    "note": "The issue-acceptance-matrix row for #14 historically cites 'Execution-plane contract and workflow-boundary suites (31/31)'. This re-verification is scoped by the briefing to exactly one file, execution-plane-contract.test.mjs, which currently passes 10/10 on this exact HEAD. No adjacent 'workflow-boundary' suite file was in scope for this dispatch, so the historical 31/31 combined figure is neither reproduced nor contradicted here -- it is simply out of this evidence's scope. This discrepancy should be reconciled by whoever next touches the #14 row."
+  },
+  "criteria": [
+    {
+      "criterionId": "NVA-A12-1",
+      "text": "Same canonical input produces the same maximum-cardinality safe wave and receipt.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/lib/parallel-dispatch-planner.test.mjs", "name": "PDP01 selects the largest safe ready set across design, implementation, test, and review packages" },
+        { "kind": "test", "path": "plugins/pipeline-core/lib/parallel-dispatch-planner.test.mjs", "name": "PDP03 finds a maximum safe wave instead of using a greedy first-ready selection" },
+        { "kind": "test", "path": "plugins/pipeline-core/lib/scheduling-lifecycle.test.mjs", "name": "SLC03 binds the exact maximum-cardinality frozen receipt and preserves every blocked reason" }
+      ],
+      "note": "Demonstrated as a synthetic in-process contract only (ADR-0044); no candidate-bound integration against authoritative paths/resources is exercised here, per the matrix's own 'Remaining gap' cell for #12."
+    },
+    {
+      "criterionId": "NVA-A12-2",
+      "text": "Cycles, unknown dependencies/write sets, overlapping authority and stale receipts fail closed.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/lib/parallel-dispatch-planner.test.mjs", "name": "PDP10 fails closed for unknown dependencies, cycles, and malformed package contracts" },
+        { "kind": "test", "path": "plugins/pipeline-core/lib/parallel-dispatch-planner.test.mjs", "name": "PDP02 serializes overlapping write paths with a stable reason and lexicographic tie-break" },
+        { "kind": "test", "path": "plugins/pipeline-core/lib/scheduling-lifecycle.test.mjs", "name": "SLC04 rejects unknown dependency/write/resource sets, overlapping authority and mixed candidates before planner admission" },
+        { "kind": "test", "path": "plugins/pipeline-core/lib/scheduling-lifecycle.test.mjs", "name": "SLC06 rejects handwritten/stale receipts, package-set drift and non-canonical package input" }
+      ]
+    },
+    {
+      "criterionId": "NVA-A12-3",
+      "text": "Every unselected ready package has an explicit dependency, path, resource or capacity reason.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/lib/parallel-dispatch-planner.test.mjs", "name": "PDP05 uses a capacity reason only after every conflict-free slot is filled" },
+        { "kind": "test", "path": "plugins/pipeline-core/lib/parallel-dispatch-planner.test.mjs", "name": "PDP06 permits every slot to be reserved and explains the resulting serialization" },
+        { "kind": "test", "path": "plugins/pipeline-core/lib/parallel-dispatch-planner.test.mjs", "name": "PDP07 reports unused capacity when conflicts, rather than arbitrary serialization, prevent another dispatch" },
+        { "kind": "test", "path": "plugins/pipeline-core/lib/parallel-dispatch-planner.test.mjs", "name": "PDP09 validates a caller-held receipt and rejects an omitted ready-package explanation" }
+      ]
+    },
+    {
+      "criterionId": "NVA-A12-4",
+      "text": "Completion, failure, cancellation and invalidation yield a deterministic next-wave plan with separate package evidence.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/lib/scheduling-lifecycle.test.mjs", "name": "SLC07 imports only independently selected verified outcomes and binds revision/previous digest" },
+        { "kind": "test", "path": "plugins/pipeline-core/lib/scheduling-lifecycle.test.mjs", "name": "SLC08 propagates failure, cancellation and invalidation transitively to the original terminal root" },
+        { "kind": "test", "path": "plugins/pipeline-core/lib/scheduling-lifecycle.test.mjs", "name": "SLC09 rejects replayed terminal evidence and duplicate/out-of-order terminal observations" },
+        { "kind": "test", "path": "plugins/pipeline-core/lib/scheduling-lifecycle.test.mjs", "name": "SLC05 scopes attempt identity to each dispatch while retaining global dispatch uniqueness" }
+      ]
+    },
+    {
+      "criterionId": "NVA-A14-1",
+      "text": "Request, admission, state, heartbeat, cancellation, timeout, result and evidence envelopes are closed and versioned.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/lib/execution-plane-contract.test.mjs", "name": "EPC01 publishes exact Draft 2020-12 roots and closes every nested subject/request shape" },
+        { "kind": "test", "path": "plugins/pipeline-core/lib/execution-plane-contract.test.mjs", "name": "EPC03 keeps request Schema and runtime admission parallel and excludes raw provider/private fields" },
+        { "kind": "test", "path": "plugins/pipeline-core/lib/execution-plane-contract.test.mjs", "name": "EPC07 keeps the closed full TimedObservation state envelope parallel with runtime admission" }
+      ]
+    },
+    {
+      "criterionId": "NVA-A14-2",
+      "text": "Locality, workspace, network, mounts, resource limits, sidecars and write capability are explicit.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/lib/execution-plane-contract.test.mjs", "name": "EPC04 binds paths, resource units, locality, network and timing without a capability false success" }
+      ]
+    },
+    {
+      "criterionId": "NVA-A14-3",
+      "text": "Advertised capacity and observed admission remain separate.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/lib/execution-plane-contract.test.mjs", "name": "EPC02 keeps execution-subject Schema and runtime admission parallel over the closed corpus" },
+        { "kind": "test", "path": "plugins/pipeline-core/lib/execution-plane-contract.test.mjs", "name": "EPC08 normalizes success as unverified and reserves verified for matching verifier evidence" }
+      ]
+    },
+    {
+      "criterionId": "NVA-A14-4",
+      "text": "Synthetic adapters cover success, failure, timeout, cancellation, retry, duplicate delivery and lost heartbeat.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/lib/execution-plane-contract.test.mjs", "name": "EPC10 covers duplicate, out-of-order, stale candidate, failure, timeout, cancellation, lost heartbeat and completed-undelivered without false success" }
+      ],
+      "note": "Coverage is against the synthetic in-process adapter fixture (ADR-0044) only, not a production executor; the matrix's #14 'Remaining gap' cell already says production executor adapter coverage remains separately approved."
+    },
+    {
+      "criterionId": "NVA-A14-5",
+      "text": "The frozen control/execution exchange remains unchanged.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/lib/execution-plane-contract.test.mjs", "name": "EPC06 builds a frozen canonical request and detects post-construction digest drift" },
+        { "kind": "test", "path": "plugins/pipeline-core/lib/execution-plane-contract.test.mjs", "name": "EPC09 rejects unbound and forged chains, admitting successors only with a complete genesis history" },
+        { "kind": "test", "path": "plugins/pipeline-core/lib/execution-plane-contract.test.mjs", "name": "EPC05 rejects stale, replayed, candidate-drifted and frozen-binding-drifted admission contexts" }
+      ]
+    }
+  ],
+  "openGaps": {
+    "sharedGap": "Both #12 and #14 remain gated on candidate-bound integration with authoritative write paths/resources and a separately ADR-approved production executor. This report re-confirms only that the synthetic/contract-level suites pass on current HEAD (per ADR-0044's in-process fixture boundary); it does not and cannot demonstrate real authoritative-path integration or production-executor adapter coverage. No implementation movement on this gap was found since 2026-08-01, consistent with a prior same-day research pass.",
+    "outOfScope": "Building real authoritative-path integration or a production executor is explicitly out of scope for this dispatch (nova-a.md: 'no production executor without ADR approval' / matrix row for #14: 'production executor remains separately approved')."
+  },
+  "bindings": {
+    "suiteVersion": "nova-a4-v1",
+    "candidate": {
+      "commit": "57ee7e94cd2472f66d6561a232edff89512f9d14",
+      "tree": "3dfa21ea2bdee08d5ff840f5429120e1fe848d15"
+    },
+    "rawEvidenceSha256": [
+      "436409ab1e55ea932e47e5df16f94e87b2b389f1971fe6fe55c09aa9edbbb847",
+      "21cf78493b1210701343b2f796c96d728ab7959c05e0abcf283d217441387516",
+      "2820233fded07e2006e308b772fc597d2a69a04024be1ff07a8987c924ea1341",
+      "a5f769430fcd6913354b4ccd555324bf244e7a9f0e463ae3188108cca8c65b14",
+      "c58271cccc992355be77c99e9ca3f1ef32cfb7135ab0c999c6977b37d91d172f",
+      "b1aba612145c83f7d885afa7b7aedf6506cb398cdc706f1d34fc49a74143b33b"
+    ]
+  }
+}

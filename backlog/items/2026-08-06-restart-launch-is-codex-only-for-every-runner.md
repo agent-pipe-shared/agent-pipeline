@@ -6,6 +6,8 @@ owner: pipeline
 status: open
 created: 2026-08-06
 source: "Manual re-run of the empty-directory onboarding smoke test in scratch/onboarding-smoke-test while re-verifying backlog/items/2026-08-06-onboarding-lifecycle-plan-hardcodes-the-codex-runner.md (see backlog/evidence/2026-08-06-onboarding-runner-identity-reverification.md), 2026-08-06."
+due: 2026-09-05
+expires: 2026-09-05
 ---
 
 # The `restart-required` step names Codex regardless of the active runner
@@ -66,7 +68,33 @@ confirming the actual runtime behavior, not just the naming.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accept-open.
+- **Rationale:** the item's own two open questions (is
+  `codex-onboarding-launch.mjs` actually runner-generic in effect, and does
+  a live Claude session ever reach this `nextAction`) are unanswered and
+  should be answered before any fix is designed — this is exactly the class
+  of issue the item's own "Attempt 1" caution warns against fixing on
+  naming alone. Not investigated further this session; no new evidence
+  changes the item's own assessment.
+- **Assignment (if accepted):** pair with
+  `backlog/items/2026-08-07-onboarding-ready-path-unconditional-restart-barrier-read.md`
+  (filed the same sprint, adjacent runner-neutrality gap in the same
+  ready/restart machinery) — investigate both together, they may share a
+  root cause or a fix.
+- **Date:** 2026-08-07
+
+## Update, 2026-08-07 (second live session)
+
+A second onboarding test (`rune_test1_claude` line of work, same day) reached
+this same territory in a genuinely live session using `--runner claude`
+throughout, and the returned restart `nextAction` still named
+`codex-onboarding-launch.mjs` — partial evidence toward this item's own open
+question "does a live Claude Code session ever actually reach this
+`nextAction` in practice?" (above). This is still a static reading of the
+returned JSON, not an executed restart (the process-exiting launch itself was
+not run, same caution as the original finding) — the other open question,
+whether `codex-onboarding-launch.mjs` is actually runner-generic in effect,
+remains unanswered. Full detail, including the precise unrelated guard-grammar
+trap hit on the way there, is in the sibling item
+`backlog/items/2026-08-07-onboarding-restart-flow-is-codex-only-not-runner-aware.md`
+("Additional evidence, 2026-08-07" section).

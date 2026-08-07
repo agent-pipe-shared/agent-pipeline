@@ -1,0 +1,42 @@
+{
+  "schema": "pipeline.dispatch-record.v1",
+  "taskId": "NOVA-LCR-HGO-2",
+  "model": "claude-opus-5",
+  "rulesetSha": "2914a55713d714d95323231edaddccec5e1d6c2e5a4fbfaaaaa9d913a5fb1efc",
+  "dispatcher": "goldfish",
+  "outcome": "success",
+  "evidenceLog": [
+    {
+      "milestone": "context-read",
+      "note": "Read ADR-0059 (Decisions 3/4/5), guard-lifecycle-ready.mjs (grammarOverrideRoute, blocked, evaluateLifecycleReadyGuard tail :1019-:1125), human-guard-override.mjs's consumeHumanGuardOverride() (confirmed it marks a capability 'consumed' on disk, irreversibly, with its own audit entry, as a side effect BEFORE returning to the caller -- no un-consume primitive exists), and guard-testpath.mjs."
+    },
+    {
+      "milestone": "premise-verified",
+      "note": "Confirmed file:line evidence: grammarOverrideRoute() admit paths returned immediately at :1045/:1056 (pre-fix), bypassing the LAUNCH_SCRIPT check (:1060-1062) and the readiness gate (:1064-1123). crossRepositoryMutationBlocked() at :1023/:1033 is upstream of the Bash grammar block (:1041+), confirmed unaffected by the fix."
+    },
+    {
+      "milestone": "guard-testpath-checked",
+      "note": "guard-testpath.mjs consumes and process.exit(0)s immediately (line 263) with nothing else in its own control flow following that admission -- no analogous downstream gate for a consumed capability to bypass. Does NOT carry the same leak."
+    },
+    {
+      "milestone": "design-decision",
+      "note": "Design latitude question (consume-vs-refuse) resolved as SPENT, not not-consumed-at-all. Reasoning: consumeHumanGuardOverride() (lib/human-guard-override.mjs, no-go/read-only) irreversibly marks the capability 'consumed' on disk with its own audit entry the instant it matches, before grammarOverrideRoute() even returns -- there is no un-consume primitive, and adding one would require touching the no-go file. The alternative (defer the consume call until after speculatively evaluating the LAUNCH_SCRIPT/readiness tail) would require duplicating or restructuring the large, multi-branch readiness try/catch block (:1064-1123) to run twice, which is out of the briefed scope ('control-flow scoping inside one function', not a rewrite) and risks behavior drift in that complex fallback logic. Implemented instead: evaluateAfterGrammarAdmission() is now called unconditionally after a grammar admit; on downstream denial, the consumed-capability audit line is prepended to that denial's stderr so it 'does not vanish silently' (verified via new tests)."
+    },
+    {
+      "milestone": "implementation-done",
+      "note": "guard-lifecycle-ready.mjs: extracted the LAUNCH_SCRIPT + readiness tail (formerly :1060-1125) verbatim into evaluateAfterGrammarAdmission(input, root, toolName, dependencies); the grammar-check block now captures an admitted lift into `grammarLift` instead of returning it immediately; the tail is always evaluated next; final result is `tail` when no lift occurred, `grammarLift` verbatim when the tail also admits (exitCode 0), or verdict(tail.exitCode, grammarLift.stderr + tail.stderr) when the tail denies."
+    },
+    {
+      "milestone": "verify-guard-suite",
+      "note": "node --test plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs -> 38/38 pass (35 pre-existing + 3 new NOVA-LCR-HGO-2 tests), exit 0. Two pre-existing NOVA-LCR-HGO-1 admit tests required a genuinely forced fixture adjustment (documented below and in the completion report): they never engineered their bare-git fixture to satisfy real onboarding readiness, since previously the grammar admit short-circuited before readiness was ever consulted. Adjustment: inject requireProjectOnboardingReadyFn returning the exact V4 ready receipt for the post-arm admission call only; the denial-path assertions in those same tests, and the two other pre-existing HGO tests, were left byte-identical."
+    },
+    {
+      "milestone": "verify-hgo-lib-suite",
+      "note": "node --test plugins/pipeline-core/lib/human-guard-override.test.mjs -> 23/23 pass, exit 0, proving that file is untouched."
+    },
+    {
+      "milestone": "scope-check",
+      "note": "git status --porcelain shows exactly the two in-scope files modified: plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs and plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs. No other files touched."
+    }
+  ]
+}

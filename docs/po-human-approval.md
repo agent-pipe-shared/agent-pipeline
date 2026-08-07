@@ -38,6 +38,59 @@ state. A changed Git candidate causes the agent to refresh the request before
 it asks again. Every helper command resolves symlinks before using the external
 directory and rejects a directory that reaches the repository.
 
+## Before any signature: one explicit confirmation
+
+Every signing command — `approve`, `approve-critical`, `sign-intent`, and each
+signature `approve-all` performs on your behalf — first prints a plain-language
+summary of what is about to be authorized and waits for you to type the exact
+word `approve`. Anything else, including an empty line, cancels: OpenSSL is
+never invoked and no proof artifact is written. The summary names the approval
+kind and the exact candidate commit (plus the action subject digest and expiry
+for a critical action), or the intent digest for `sign-intent`.
+
+The confirmation is deliberately placed *before* the passphrase prompt, so the
+question "should this be authorized, with this consequence?" is answered while
+you can still read the terms, rather than being implied by having typed a
+passphrase. `setup` creates key material and signs nothing, so it does not ask.
+
+## Which commands are yours
+
+Every command in this document that reads the private key is yours and only
+yours: `setup`, `approve`, `approve-all`, `approve-critical`, `sign-intent`.
+Everything else — `prepare*`, `verify*`, and the guard-side consumers such as
+`guard-maintenance-window.mjs install` and `guard-human-override.mjs` — reads
+only public artifacts and is executed by the agent. If an agent asks you to run
+one of those, it is doing extra work on your behalf that it should have done
+itself.
+
+`--repo-root` must be an ABSOLUTE path for `po-human-approval.mjs`; the usage
+string does not currently say so and a relative path is rejected with the bare
+usage text.
+
+If more than one external directory exists on the machine, confirm you are
+using the one whose key this repository pins: `trust-policy.json`'s
+`publicKeySha256` must equal `trustAnchor.publicKeySha256` in
+`project/critical-human-proof.json`. The `keyReference` field does not
+discriminate — separate keys may both be called `local-po-key`, and signing
+with the wrong one fails only afterwards, with `PO-APPROVAL-TRUST-MISMATCH`.
+
+## Signing a bare intent digest
+
+Guard lifts (`guard-lift`, `guard-override` — the Guard Maintenance Window and
+the Human Guard Override) present an already-computed intent digest rather than
+a request file. The human signs it directly:
+
+```sh
+node "$REPO/plugins/pipeline-core/scripts/po-human-approval.mjs" sign-intent \
+  --repo-root "$REPO" --directory "$PO_DIR" --intent-sha256 "$INTENT_SHA256"
+```
+
+The proof lands at `$PO_DIR/proof-manual.json`, which the requesting guard
+command then consumes. Because this command signs a digest and not a request,
+it cannot describe the specific action any more precisely than the digest and
+its consequence class; check the digest against the one the agent showed you
+before confirming.
+
 ## Control-plane integration
 
 Agents, runners, and desktop applications use this public-only command before
@@ -110,4 +163,7 @@ Widerspruch gilt der englische Text. Der Agent erzeugt und aktualisiert die
 öffentlichen Requests und prüft die Proofs selbst. Der Mensch sieht weder
 interne Rezepte noch muss er Dateien erzeugen: Nach dem einmaligen `setup`
 führt er pro Freigabe nur `approve-all` in seinem eigenen Terminal aus. Der
-Agent darf weder die lokale Passphrase noch den privaten Schlüssel sehen.
+Agent darf weder die lokale Passphrase noch den privaten Schlüssel sehen. Vor
+jeder Signatur zeigt das Werkzeug in Klartext an, was genau freigegeben wird,
+und verlangt die Eingabe des Wortes `approve`; alles andere bricht ab, bevor
+OpenSSL überhaupt startet.

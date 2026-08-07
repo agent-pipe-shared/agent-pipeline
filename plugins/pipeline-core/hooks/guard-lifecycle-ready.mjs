@@ -26,12 +26,26 @@ import {
   readCodexHostRepositoryInitAdmission,
 } from "../lib/codex-host-layout.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { readPushApprovalMode } from "../lib/critical-human-proof-policy.mjs";
+import {
+  consumeHumanGuardOverride,
+  humanGuardRouteUnavailableReason,
+  recordHumanGuardDenial,
+} from "../lib/human-guard-override.mjs";
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
 import { GATE_STRENGTH_PATHS } from "./guard-gate-strength.mjs";
 import {
   isBoundedReadOnlyPipeline,
   parseGuardCommand,
 } from "./guard-command-grammar.mjs";
+
+// ADR-0059 Decision 3/4: the same generic, exact-command-bound Human-Guard-Override
+// (HGO) route the other guards in this family already use for their own denials
+// (guard-testpath.mjs, codex-pretool-guard.mjs). Reused here unmodified -- only the
+// three closed-shell-grammar denial codes below are wired to it; GUARD-CROSS-REPO-MUTATION
+// and GUARD-LIFECYCLE-NOT-READY stay outside HGO's authority (ADR-0059 Decision 5,
+// this file's own header comments on crossRepositoryMutationBlocked()).
+const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 const GOVERNANCE_MARKERS = [
   ".agent-pipeline/core.lock.json",
@@ -94,17 +108,21 @@ function exactReadyReceipt(value) {
     && value.intent === "session";
 }
 
-function blocked(code = "GUARD-LIFECYCLE-NOT-READY", lifecycleStatus = null, retryActions = []) {
-  const grammarGuidance = {
-    "GUARD-PARSE-UNSUPPORTED": "The command is outside the closed Pipeline shell grammar.",
-    "GUARD-OPERATOR-UNAPPROVED": "The command contains an unapproved shell operator.",
-    "GUARD-REDIRECT-UNAPPROVED": "The command contains an unapproved shell redirection.",
-  };
+// Hoisted to module scope so grammarOverrideRoute() can build the identical, exact
+// denial reason text blocked() itself prints -- the two must never drift apart, since
+// the HGO request/capability is bound to this exact reason string.
+const GRAMMAR_DENIAL_GUIDANCE = {
+  "GUARD-PARSE-UNSUPPORTED": "The command is outside the closed Pipeline shell grammar.",
+  "GUARD-OPERATOR-UNAPPROVED": "The command contains an unapproved shell operator.",
+  "GUARD-REDIRECT-UNAPPROVED": "The command contains an unapproved shell redirection.",
+};
+
+function blocked(code = "GUARD-LIFECYCLE-NOT-READY", lifecycleStatus = null, retryActions = [], overrideGuidance = "") {
   const typedLifecycleStatus = code === "GUARD-LIFECYCLE-NOT-READY"
     && CONTROLLING_NON_READY_STATUSES.has(lifecycleStatus)
     ? lifecycleStatus
     : null;
-  const grammarReason = grammarGuidance[code];
+  const grammarReason = GRAMMAR_DENIAL_GUIDANCE[code];
   if (grammarReason) {
     const retryEnvelope = {
       schema: "pipeline.guard-retry-actions.v1",
@@ -118,7 +136,8 @@ function blocked(code = "GUARD-LIFECYCLE-NOT-READY", lifecycleStatus = null, ret
         + "Do not construct a new composed command with &&, ;, pipelines, redirects, or line continuation.\n"
         + "If typed retryActions are present, run only those exact read-only actions as separate tool calls.\n"
         + "Only bounded rg-to-rg and rg-to-head diagnostic pipelines are admitted as exceptions.\n"
-        + `${JSON.stringify(retryEnvelope)}\n`,
+        + `${JSON.stringify(retryEnvelope)}\n`
+        + overrideGuidance,
     );
   }
   const guidance = typedLifecycleStatus === null
@@ -137,6 +156,92 @@ function blocked(code = "GUARD-LIFECYCLE-NOT-READY", lifecycleStatus = null, ret
       + `${guidance[0]}\n`
       + `${guidance[1]}\n`,
   );
+}
+
+/**
+ * ADR-0059 Decision 3: wire the three closed-shell-grammar denial codes into the
+ * EXISTING, already-working generic HGO Bash class (`eligibility()`'s
+ * `commandClass: "closed-shell-exact"`) -- no new classification logic, this file is a
+ * CONSUMER of that machinery. Always attempt to consume a matching capability first
+ * (harmless: it only ever succeeds against a genuinely armed, matching one, regardless
+ * of mode); when nothing is consumed, attempt to record the denial and offer the
+ * mode-appropriate next step (Decision 4). Offering the route is a convenience, never a
+ * gate: an unusable store leaves the refusal itself standing unchanged -- same pattern as
+ * guard-testpath.mjs's `overrideGuidance` block, adapted to this file's own message
+ * shape. GUARD-CROSS-REPO-MUTATION and GUARD-LIFECYCLE-NOT-READY never call this
+ * (ADR-0059 Decision 5; out of scope for this dispatch).
+ *
+ * What it does NOT leave unchanged any more is the silence. Both no-route outcomes --
+ * planning threw, and planning returned a status other than `planned` -- print a bounded
+ * typed reason via humanGuardRouteUnavailableReason(), because Decision 4's claim is that
+ * every denial reports its next step, and "no next step, and no word about why" is the one
+ * outcome that makes it untrue.
+ *
+ * The exact denial reason text is `${code}: ${GRAMMAR_DENIAL_GUIDANCE[code]}` -- the
+ * SAME string blocked() itself prints for that code -- because the HGO request/capability
+ * is bound to this exact reason string; a request planned for one code's reason will not
+ * match a differently-worded denial for the same command.
+ */
+function grammarOverrideRoute(code, root, toolName, toolInput, dependencies = {}) {
+  const denials = [{ guard: "guard-lifecycle-ready.mjs", reason: `${code}: ${GRAMMAR_DENIAL_GUIDANCE[code]}` }];
+  const consumeFn = dependencies.consumeHumanGuardOverrideFn ?? consumeHumanGuardOverride;
+  let consumed = { status: "absent" };
+  try {
+    consumed = consumeFn({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName, toolInput, denials });
+  } catch {
+    consumed = { status: "absent" }; // an unusable capability is not an authorization
+  }
+  if (consumed.status === "consumed") {
+    return {
+      admitted: verdict(
+        0,
+        `[pipeline-human-override] guard-lifecycle-ready ${code}: exact one-time capability consumed; plan=${consumed.planSha256}.\n`,
+      ),
+    };
+  }
+  let overrideGuidance = "";
+  if (consumed.status === "absent" || consumed.status === "replan") {
+    let approvalMode = "signature";
+    const readModeFn = dependencies.readPushApprovalModeFn ?? readPushApprovalMode;
+    try { approvalMode = readModeFn(root)?.mode ?? "signature"; } catch { approvalMode = "signature"; }
+    try {
+      const recordFn = dependencies.recordHumanGuardDenialFn ?? recordHumanGuardDenial;
+      const planned = recordFn({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName, toolInput, denials });
+      if (planned.status === "planned") {
+        const script = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+        // ADR-0059 Decision 4: name the exact next command for the CURRENTLY CONFIGURED
+        // mode -- mirrors guard-testpath.mjs's own continuation exactly in shape.
+        const continuation = approvalMode === "chat"
+          ? [
+            `Then (the human confirms in-session; this is attribution, not proof):`,
+            `${process.execPath} ${JSON.stringify(script)} prepare-authorization --repo ${JSON.stringify(root)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256-from-plan> --reason "<human-reason>"`,
+            `${process.execPath} ${JSON.stringify(script)} authorize --repo ${JSON.stringify(root)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256> --selection-sha256 <selection-sha256> --reason "<human-reason>" --reason-sha256 <reason-sha256> --activate`,
+          ].join("\n")
+          : [
+            `Then, outside this session (presence of a valid, correctly-bound Ed25519 ` +
+              `signature IS the authorization -- there is no in-session activate step for this mode):`,
+            `${process.execPath} ${JSON.stringify(script)} prepare-authorization --repo ${JSON.stringify(root)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256-from-plan> --reason "<fixed HGO_SIGNATURE_REASON text>"`,
+            `${process.execPath} ${JSON.stringify(script)} authorize-by-signature --repo ${JSON.stringify(root)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256> --proof <external-proof.json>`,
+          ].join("\n");
+        overrideGuidance = [
+          "",
+          "Human override available for this exact command (one use; audited; the human confirms):",
+          `${process.execPath} ${JSON.stringify(script)} plan --repo ${JSON.stringify(root)} --request-sha256 ${planned.requestSha256}`,
+          continuation,
+          "",
+        ].join("\n");
+      } else {
+        // ADR-0059 Decision 4: a denial that could not be routed must SAY so. Silence here
+        // made this path indistinguishable from a denial that was never eligible for a
+        // route at all -- see humanGuardRouteUnavailableReason()'s own header for what may
+        // and may not appear in the rendered reason.
+        overrideGuidance = ["", humanGuardRouteUnavailableReason("command", { planned }), ""].join("\n");
+      }
+    } catch (error) {
+      overrideGuidance = ["", humanGuardRouteUnavailableReason("command", { error }), ""].join("\n");
+    }
+  }
+  return { admitted: null, overrideGuidance };
 }
 
 function externalRestartOnly() {
@@ -578,7 +683,7 @@ export function isForbiddenCrossRepositoryMutation(command, root, dependencies =
 }
 
 /**
- * Strip an optional trailing `--runner <claude|codex>` before the shape checks.
+ * Strip an optional `--runner <claude|codex>` pair before the shape checks.
  *
  * ADR-0051 requires the invoking runner to be threaded explicitly, and the onboarding
  * CLI now honours it — but this allowlist predated that and accepted only the
@@ -587,12 +692,19 @@ export function isForbiddenCrossRepositoryMutation(command, root, dependencies =
  * runner, i.e. it pushed every caller onto the exact path ADR-0051 exists to prevent,
  * and the refusal it printed named a command it would itself deny.
  *
- * Narrow by construction: only the two registered runner values, only as the final
- * pair, and the remaining shape is still matched exactly as before.
+ * `lifecycleArgv(argv, runner, intent)` always appends `--runner <runner>` first and,
+ * whenever `intent !== "onboarding"`, `--intent <intent>` afterward — so `--runner` is
+ * not always the trailing pair; it can also sit second-to-last, with `--intent`
+ * trailing. Scan the array for the first `--runner <claude|codex>` pair found
+ * anywhere and remove it, so both shapes normalize correctly before the shape
+ * checks run. Narrow by construction: only the two registered runner values,
+ * only an exact `--runner <value>` pair, first match only.
  */
 function withoutRunnerFlag(args) {
-  if (args.length >= 2 && args[args.length - 2] === "--runner" && ["claude", "codex"].includes(args[args.length - 1])) {
-    return args.slice(0, -2);
+  for (let i = 0; i < args.length - 1; i += 1) {
+    if (args[i] === "--runner" && ["claude", "codex"].includes(args[i + 1])) {
+      return [...args.slice(0, i), ...args.slice(i + 2)];
+    }
   }
   return args;
 }
@@ -607,7 +719,10 @@ function sanctionedOnboardingArgs(rawArgs, root) {
   if (args[0] === "continuity" && args[1] === "inspect"
     && exactRoot(args, root, 2) && args.length === 4) return true;
   if (["plan", "plan-runtime", "plan-reinstall", "plan-repair", "plan-readback", "plan-source-recovery", "plan-manifest-repair"].includes(args[0])
-    && exactRoot(args, root, 1) && args.length === 3) return true;
+    && exactRoot(args, root, 1)
+    && (args.length === 3
+      || (args.length === 5 && args[3] === "--intent"
+        && ["onboarding", "bootstrap", "session", "dispatch"].includes(args[4])))) return true;
   if (["plan-source-recovery", "plan-manifest-repair"].includes(args[0])
     && exactRoot(args, root, 1) && args.length === 3) return true;
   if (args[0] === "apply-manifest-repair"
@@ -788,6 +903,29 @@ function sanctionedProjectAuthorityMigrationArgs(args, root) {
     && args[5] === "--activate" && args.length === 6;
 }
 
+/**
+ * `--proof` carries a filesystem path, not a digest, so HEX cannot bound it -- and an
+ * unbounded word is exactly what the rest of this function refuses to admit. The bound
+ * is therefore structural, and deliberately narrower than "any string": an absolute
+ * `.json` path, no control characters, no `.`/`..` segment, a bounded byte length, and
+ * -- mirroring the CLI's own `externalJson()` discipline (ADR-0059 Decision 1) -- a
+ * location OUTSIDE the repository root, so this gate never admits a command the CLI
+ * would refuse anyway. Host `isAbsolute`/`resolve`/`pathInside` are used deliberately:
+ * a Windows path is absolute on the Windows host and is not a path at all on POSIX,
+ * which is the correct answer on each.
+ *
+ * The residual is a single external path word, and it stays a data argument: the closed
+ * shell grammar has already tokenized it, so it can never re-enter the shell, and the
+ * only thing the CLI does with it is JSON.parse a file whose contents must still carry a
+ * valid signature under the project's committed trust anchor.
+ */
+function externalProofPathArgument(value, root) {
+  if (typeof value !== "string" || value === "" || Buffer.byteLength(value, "utf8") > 500) return false;
+  if (/[\u0000-\u001f\u007f]/u.test(value) || !/\.json$/iu.test(value)) return false;
+  if (value.split(/[\\/]/u).some((segment) => segment === "." || segment === "..")) return false;
+  return isAbsolute(value) && !pathInside(root, resolve(value));
+}
+
 function sanctionedHumanOverrideArgs(args, root) {
   const exactAuthorRoot = (index) => args[index] === "--author-source-root"
     && args[index + 1] === join(root, "plugins", "pipeline-core");
@@ -806,6 +944,27 @@ function sanctionedHumanOverrideArgs(args, root) {
   }
   if (args[0] === "verify-audit") {
     return args[1] === "--repo" && args[2] === root && args.length === 3;
+  }
+  // ADR-0059 Decision 4: `signature` mode's own decisive final step -- and, until this
+  // branch existed, the one command in the family that every guard PRINTED as the next
+  // step while the base check below refused it, because `args[0] === "authorize"` is a
+  // strict equality that `authorize-by-signature` does not satisfy. `signature` is this
+  // repository's committed mode, so the offered route dead-ended at its last step in
+  // exactly the session state (GUARD-LIFECYCLE-NOT-READY) where an override matters.
+  //
+  // Same exactness discipline as its siblings: pinned flag order, pinned `--repo`, HEX on
+  // every digest, an exact total `args.length`, and the optional `--author-source-root`
+  // tail handled identically. The shape is derived from the CLI's own argument parsing
+  // (scripts/guard-human-override.mjs's `authorize-by-signature` branch), not from the
+  // guidance strings: there is no `--activate` here (a verified signature IS the
+  // authorization) and no `--authority` at all (the committed trust anchor is the only
+  // trust source, ADR-0059 Decision 1).
+  if (args[0] === "authorize-by-signature") {
+    const base = args[1] === "--repo" && args[2] === root
+      && args[3] === "--request-sha256" && HEX.test(args[4] ?? "")
+      && args[5] === "--plan-sha256" && HEX.test(args[6] ?? "")
+      && args[7] === "--proof" && externalProofPathArgument(args[8], root);
+    return base && (args.length === 9 || (exactAuthorRoot(9) && args.length === 11));
   }
   const base = args[0] === "authorize"
     && args[1] === "--repo" && args[2] === root
@@ -864,6 +1023,85 @@ export function isSanctionedLifecycleCommand(command, root, options = {}) {
   return script === APP_SERVER_SCRIPT
     && ["--recover", "--doctor"].includes(args[0])
     && args.length === 1;
+}
+
+/**
+ * ADR-0059 Decision 5 / NOVA-LCR-HGO-2: everything below -- the LAUNCH_SCRIPT
+ * external-restart refusal and the onboarding-readiness gate (denial code
+ * GUARD-LIFECYCLE-NOT-READY) -- stays outside HGO's authority no matter how the
+ * shell-grammar objection above was resolved. This function is the exact tail of
+ * evaluateLifecycleReadyGuard() that used to be unreachable once a grammar capability
+ * was consumed (verdict(0) returned immediately at the grammar check itself); it is now
+ * called unconditionally so a lifted command is admitted only if these checks also
+ * admit it. Its own logic is otherwise unchanged.
+ */
+function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
+  if (toolName === "Bash" && input.tool_input.command.includes(LAUNCH_SCRIPT)) {
+    return externalRestartOnly();
+  }
+
+  let receipt;
+  try {
+    receipt = (dependencies.requireProjectOnboardingReadyFn ?? requireProjectOnboardingReady)({
+      rootDir: root,
+      intent: "session",
+      runner: dependencies.runner,
+    });
+  } catch (error) {
+    // Codex 0.145 may execute PreToolUse against the physical host Git
+    // directory while the successful bootstrap command sees protected virtual
+    // control mounts. Accept only the explicit host-init admission written by
+    // the confirmed lifecycle action and bound to this root, stable authority,
+    // and immutable kickoff history, and only when the native observation
+    // failed with the two exact repository-control statuses produced by that
+    // cross-view mismatch. App Server, runtime, continuity, malformed
+    // observations, and unknown exceptions must never inherit this admission.
+    // The prepared sprint:NONE follow-up owns replacing this narrow hotfix
+    // fallback with one native cross-view session attestation.
+    const crossViewRepositoryFailure = error instanceof ProjectOnboardingReadyError
+      && error.code === "PORG-NOT-READY"
+      && error.intent === "session"
+      && HOST_INIT_CROSS_VIEW_STATUSES.has(error.lifecycleStatus);
+    if (crossViewRepositoryFailure) {
+      try {
+        const admission = (dependencies.readCodexHostRepositoryInitAdmissionFn
+          ?? readCodexHostRepositoryInitAdmission)(root);
+        if (admission?.gitVersion) return verdict(0);
+      } catch {}
+      try {
+        const existingControlMount = (dependencies.hasCodexExistingGitControlMountFn
+          ?? hasCodexExistingGitControlMount)(root);
+        if (existingControlMount === true) return verdict(0);
+      } catch {}
+    }
+    const restartRequired = error instanceof ProjectOnboardingReadyError
+      && error.code === "PORG-NOT-READY"
+      && error.intent === "session"
+      && error.lifecycleStatus === "restart-required";
+    if (restartRequired && (isRestartResumeHintInputWrite(input, root)
+      || (toolName === "Bash" && isRestartResumeHintCapture(input.tool_input.command, root)))) {
+      return verdict(0);
+    }
+    const exactPoAuthorityRebindRecovery = error instanceof ProjectOnboardingReadyError
+      && error.code === "PORG-NOT-READY"
+      && error.intent === "session"
+      && error.lifecycleStatus === "partial"
+      && toolName === "Bash"
+      && isExactPoAuthorityRebindPlannerRecovery(input.tool_input.command, root, dependencies);
+    if (exactPoAuthorityRebindRecovery) return verdict(0);
+    return toolName === "Bash"
+      && isSanctionedLifecycleCommand(input.tool_input.command, root)
+      ? verdict(0)
+      : blocked(
+        "GUARD-LIFECYCLE-NOT-READY",
+        error instanceof ProjectOnboardingReadyError
+          && error.code === "PORG-NOT-READY"
+          && error.intent === "session"
+          ? error.lifecycleStatus
+          : null,
+      );
+  }
+  return exactReadyReceipt(receipt) ? verdict(0) : blocked();
 }
 
 export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
@@ -938,87 +1176,44 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
   if (toolName === "Bash" && isNarrowRepositoryRecoveryCommand(input.tool_input.command, root)) {
     return verdict(0);
   }
+  // A consumed grammar capability clears ONLY the shell-grammar objection captured in
+  // `grammarLift` below -- the LAUNCH_SCRIPT and readiness checks in
+  // evaluateAfterGrammarAdmission() stay outside HGO's authority (ADR-0059 Decision 5) and
+  // are always evaluated next, whether or not a capability was just consumed here; a lifted
+  // command is admitted only if that tail also admits it. consumeHumanGuardOverride()
+  // (lib/human-guard-override.mjs, read-only to this dispatch) already marks the capability
+  // irreversibly "consumed" on disk, with its own audit entry, the moment it matched, before
+  // grammarOverrideRoute() even returns here -- there is no "un-consume" available to this
+  // file. A capability spent on a command later refused downstream stays spent; its
+  // consumption is surfaced in the denial below rather than left to vanish silently.
+  let grammarLift = null;
   if (toolName === "Bash") {
     const parsed = parseGuardCommand(input.tool_input.command, root);
     if (parsed.parseStatus !== "accepted") {
-      return blocked(
-        "GUARD-PARSE-UNSUPPORTED",
-        null,
-        retryActionsForDeniedCommand(input.tool_input.command, root),
-      );
-    }
-    if (parsed.operators.length > 0 || parsed.redirects.length > 0) {
-      return blocked(parsed.redirects.length > 0
-        ? "GUARD-REDIRECT-UNAPPROVED"
-        : "GUARD-OPERATOR-UNAPPROVED", null, []);
+      const route = grammarOverrideRoute("GUARD-PARSE-UNSUPPORTED", root, toolName, input.tool_input, dependencies);
+      if (!route.admitted) {
+        return blocked(
+          "GUARD-PARSE-UNSUPPORTED",
+          null,
+          retryActionsForDeniedCommand(input.tool_input.command, root),
+          route.overrideGuidance,
+        );
+      }
+      grammarLift = route.admitted;
+    } else if (parsed.operators.length > 0 || parsed.redirects.length > 0) {
+      const code = parsed.redirects.length > 0 ? "GUARD-REDIRECT-UNAPPROVED" : "GUARD-OPERATOR-UNAPPROVED";
+      const route = grammarOverrideRoute(code, root, toolName, input.tool_input, dependencies);
+      if (!route.admitted) {
+        return blocked(code, null, [], route.overrideGuidance);
+      }
+      grammarLift = route.admitted;
     }
   }
-  if (toolName === "Bash" && input.tool_input.command.includes(LAUNCH_SCRIPT)) {
-    return externalRestartOnly();
-  }
-
-  let receipt;
-  try {
-    receipt = (dependencies.requireProjectOnboardingReadyFn ?? requireProjectOnboardingReady)({
-      rootDir: root,
-      intent: "session",
-      runner: dependencies.runner,
-    });
-  } catch (error) {
-    // Codex 0.145 may execute PreToolUse against the physical host Git
-    // directory while the successful bootstrap command sees protected virtual
-    // control mounts. Accept only the explicit host-init admission written by
-    // the confirmed lifecycle action and bound to this root, stable authority,
-    // and immutable kickoff history, and only when the native observation
-    // failed with the two exact repository-control statuses produced by that
-    // cross-view mismatch. App Server, runtime, continuity, malformed
-    // observations, and unknown exceptions must never inherit this admission.
-    // The prepared sprint:NONE follow-up owns replacing this narrow hotfix
-    // fallback with one native cross-view session attestation.
-    const crossViewRepositoryFailure = error instanceof ProjectOnboardingReadyError
-      && error.code === "PORG-NOT-READY"
-      && error.intent === "session"
-      && HOST_INIT_CROSS_VIEW_STATUSES.has(error.lifecycleStatus);
-    if (crossViewRepositoryFailure) {
-      try {
-        const admission = (dependencies.readCodexHostRepositoryInitAdmissionFn
-          ?? readCodexHostRepositoryInitAdmission)(root);
-        if (admission?.gitVersion) return verdict(0);
-      } catch {}
-      try {
-        const existingControlMount = (dependencies.hasCodexExistingGitControlMountFn
-          ?? hasCodexExistingGitControlMount)(root);
-        if (existingControlMount === true) return verdict(0);
-      } catch {}
-    }
-    const restartRequired = error instanceof ProjectOnboardingReadyError
-      && error.code === "PORG-NOT-READY"
-      && error.intent === "session"
-      && error.lifecycleStatus === "restart-required";
-    if (restartRequired && (isRestartResumeHintInputWrite(input, root)
-      || (toolName === "Bash" && isRestartResumeHintCapture(input.tool_input.command, root)))) {
-      return verdict(0);
-    }
-    const exactPoAuthorityRebindRecovery = error instanceof ProjectOnboardingReadyError
-      && error.code === "PORG-NOT-READY"
-      && error.intent === "session"
-      && error.lifecycleStatus === "partial"
-      && toolName === "Bash"
-      && isExactPoAuthorityRebindPlannerRecovery(input.tool_input.command, root, dependencies);
-    if (exactPoAuthorityRebindRecovery) return verdict(0);
-    return toolName === "Bash"
-      && isSanctionedLifecycleCommand(input.tool_input.command, root)
-      ? verdict(0)
-      : blocked(
-        "GUARD-LIFECYCLE-NOT-READY",
-        error instanceof ProjectOnboardingReadyError
-          && error.code === "PORG-NOT-READY"
-          && error.intent === "session"
-          ? error.lifecycleStatus
-          : null,
-      );
-  }
-  return exactReadyReceipt(receipt) ? verdict(0) : blocked();
+  const tail = evaluateAfterGrammarAdmission(input, root, toolName, dependencies);
+  if (grammarLift === null) return tail;
+  return tail.exitCode === 0
+    ? grammarLift
+    : verdict(tail.exitCode, `${grammarLift.stderr}${tail.stderr}`);
 }
 
 export function main(rawInput = undefined, dependencies = {}) {

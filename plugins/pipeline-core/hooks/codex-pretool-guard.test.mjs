@@ -178,9 +178,9 @@ check("attended Human override admits only the exact next tool call and is then 
   git("config", "user.name", "Fixture");
   git("config", "user.email", "fixture@example.invalid");
   writeFileSync(join(root, "README.md"), "fixture\n");
-  git("add", "README.md");
+  writeFileSync(join(root, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "chat"\n');
+  git("add", "README.md", "pipeline.user.yaml");
   git("commit", "-q", "-m", "fixture");
-  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
   const input = { tool_name: "Write", tool_input: { file_path: "notes.md", content: "attended\n" } };
   const first = decision(run(input, root));
   assert.equal(first.permissionDecision, "deny");
@@ -218,6 +218,59 @@ check("attended Human override admits only the exact next tool call and is then 
   assert.equal(replay.permissionDecision, "deny");
 });
 
+check("ADR-0059 Decision 4: the continuation names the configured mode's own final step, in both modes", () => {
+  // The adapter prints the `authorize-by-signature` continuation in exactly one branch, and
+  // until now no fixture in this suite ever reached it -- both HGO fixtures pinned
+  // push_approval to "chat", so the signature branch had zero coverage while three of the
+  // four guards in this family already carried the equivalent pin. Decision 4 makes it a
+  // DoD item: the printed next-step command must match the LIVE configuration, so both
+  // modes are exercised here and each assertion is bound to the mode the fixture actually
+  // committed, not to the loop variable that produced it.
+  for (const mode of ["chat", "signature"]) {
+    const root = fixture();
+    const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
+    git("init", "-q", "-b", "main");
+    git("config", "user.name", "Fixture");
+    git("config", "user.email", "fixture@example.invalid");
+    writeFileSync(join(root, "README.md"), "fixture\n");
+    writeFileSync(join(root, "pipeline.user.yaml"), `schema: "pipeline.user.v3"\ngates:\n  push_approval: "${mode}"\n`);
+    git("add", "README.md", "pipeline.user.yaml");
+    git("commit", "-q", "-m", "fixture");
+    // Read back what the repository carries. readPushApprovalMode() honours the COMMITTED
+    // bytes and nothing else, so this -- not the loop variable -- is the live configuration
+    // the printed command has to agree with.
+    const committed = readFileSync(join(root, "pipeline.user.yaml"), "utf8")
+      .match(/push_approval:\s*"([a-z]+)"/u)?.[1];
+    assert.equal(committed, mode, "fixture did not commit the mode it claims");
+
+    const denied = decision(run({
+      tool_name: "Write",
+      tool_input: { file_path: "notes.md", content: "decision-4\n" },
+    }, root));
+    assert.equal(denied.permissionDecision, "deny", `mode=${committed}`);
+    const reason = denied.permissionDecisionReason;
+    // The mode-common first step is always the read-only planner.
+    assert.match(reason, /Human override available for this exact action/u, `mode=${committed}`);
+    assert.match(reason, /\bplan --repo\b/u, `mode=${committed}`);
+    assert.match(reason, /prepare-authorization --repo/u, `mode=${committed}`);
+    assert.match(reason, new RegExp(`gates\\.push_approval is "${committed}"`, "u"), `mode=${committed}`);
+    if (committed === "chat") {
+      assert.match(reason, /\bauthorize --repo\b[^\n]*--selection-sha256[^\n]*--activate/u,
+        "chat mode must offer the in-session activate step");
+      assert.doesNotMatch(reason, /authorize-by-signature/u,
+        "chat mode must not offer the signature-only final step");
+    } else {
+      assert.match(reason, /\bauthorize-by-signature --repo\b[^\n]*--proof <external-proof\.json>/u,
+        "signature mode must offer its own decisive final step");
+      assert.doesNotMatch(reason, /--activate/u,
+        "signature mode must not offer the in-session activate step");
+      assert.doesNotMatch(reason, /--selection-sha256/u,
+        "signature mode has no in-session selection to confirm");
+    }
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 check("Pipeline Author Repair selects one exact source root and consumes one patch", () => {
   const root = fixture();
   const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
@@ -225,7 +278,7 @@ check("Pipeline Author Repair selects one exact source root and consumes one pat
   git("config", "user.name", "Fixture");
   git("config", "user.email", "fixture@example.invalid");
   writeFileSync(join(root, "README.md"), "fixture\n");
-  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  writeFileSync(join(root, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "chat"\n');
   const sourceRoot = join(root, "plugins", "pipeline-core");
   mkdirSync(join(sourceRoot, ".codex-plugin"), { recursive: true });
   mkdirSync(join(sourceRoot, "lib"), { recursive: true });

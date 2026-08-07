@@ -1,0 +1,8 @@
+{
+  "taskId": "NOVA-A8-EVIDENCE-1",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "57ee7e94cd2472f66d6561a232edff89512f9d14",
+  "dispatcher": "Elephant",
+  "outcome": "completed",
+  "note": "Recovered by the Elephant: the dispatch's own dispatch-record.json write collided with a concurrent NOVA-A56-EVIDENCE-1 write to the same shared path and was lost; this file restores the record under a distinct name."
+}

@@ -172,12 +172,30 @@ const KEY_REFERENCE = /^[A-Za-z0-9._:@/-]{1,200}$/u;
 /**
  * The committed identity of the key whose signature authorizes a critical action.
  *
- * WHY IT LIVES HERE and nowhere else: this file is gate-strength protected (GS-2), so an
- * agent can reach neither the Edit/Write lane nor the shell lane to install a key of its
- * own. Every other candidate location was writable by the thing being gated. The anchor
- * is public data — a key reference and the digest of a public key — so committing it
- * costs nothing and is what lets a verifier that holds no external directory (the push
- * guard) decide whether a recorded proof is the operator's or a forgery.
+ * WHY IT LIVES HERE and nowhere else: `project/critical-human-proof.json` is gate-strength
+ * protected (GS-2), and every other candidate location was plainly writable by the thing
+ * being gated.
+ *
+ * What GS-2 buys is NOT "unreachable", and this comment used to say it was — that an agent
+ * "can reach neither the Edit/Write lane nor the shell lane to install a key of its own".
+ * That has been false for the write lane since 503fe0d, which gave GS-1..GS-5/GS-7 the same
+ * human-override lift every sibling guard already had (ADR-0059): a chat- or signature-armed
+ * capability, bound to one exact edit, now admits one audited write to this file. The shell
+ * lane keeps its blanket refusal with deliberately no in-session override at all
+ * (GUARD-GATE-STRENGTH-SHELL), and even that is literal-filename matching, so a name
+ * assembled at runtime is not caught — the same limitation guard-testpath.mjs already
+ * records for GS-1.
+ *
+ * So the property to rely on is narrower and still sufficient: an agent cannot install a
+ * key of its own UNILATERALLY. Every write lane into this file now passes through a human
+ * authorization bound to that exact edit and recorded in the override audit ledger, and a
+ * chat-mode capability additionally requires the repository's committed gates.push_approval
+ * to already be "chat" — itself a GS-1-protected file. Anyone reasoning about this anchor
+ * should treat it as human-gated and audited, not as unwritable.
+ *
+ * The anchor is public data — a key reference and the digest of a public key — so
+ * committing it costs nothing and is what lets a verifier that holds no external directory
+ * (the push guard) decide whether a recorded proof is the operator's or a forgery.
  *
  * Optional on purpose. A project that never authorizes a raw push does not need one, and
  * its absence is not an error — it simply means that route is unavailable.

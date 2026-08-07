@@ -1,0 +1,62 @@
+{
+  "schema": "pipeline.claims-evidence.v1",
+  "candidate": {
+    "commit": "916805f558cd3a40cfd6fd3299a8616d60c2936b",
+    "tree": "9578b5a5da128b61ba8688c5ca5679b2e030c710",
+    "branch": "feat/sprint-nova-codex-v046",
+    "version": "0.5.3"
+  },
+  "gates": [
+    {
+      "name": "verify",
+      "command": "node harness/scripts/verify.mjs",
+      "exitCode": 0,
+      "registeredSuiteCount": 255,
+      "terminalReceiptCount": 255,
+      "candidateBinding": "exact",
+      "artifact": "evidence/verify-latest.json"
+    },
+    {
+      "name": "security-scan",
+      "command": "node harness/scripts/security-scan.mjs",
+      "exitCode": 0,
+      "artifact": "evidence/security-latest.json"
+    }
+  ],
+  "targetedSuites": [
+    { "command": "node --test plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs", "exitCode": 0, "result": "38 passed, 0 failed" },
+    { "command": "node --test plugins/pipeline-core/hooks/guard-gate-strength.test.mjs", "exitCode": 0, "result": "29 passed, 0 failed" },
+    { "command": "node --test plugins/pipeline-core/hooks/guard-testpath.test.mjs", "exitCode": 0, "result": "11 passed, 0 failed" },
+    { "command": "node --test plugins/pipeline-core/hooks/guard-testpath-override.test.mjs", "exitCode": 0, "result": "18 passed, 0 failed" },
+    { "command": "node --test plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs", "exitCode": 0, "result": "21 passed, 0 failed" },
+    { "command": "node --test plugins/pipeline-core/lib/human-guard-override.test.mjs", "exitCode": 0, "result": "23 passed, 0 failed" },
+    { "command": "node --test plugins/pipeline-core/scripts/po-human-approval.test.mjs", "exitCode": 0, "result": "5 passed, 0 failed" },
+    { "command": "node plugins/pipeline-core/lib/threat-model-approval-request.test.mjs", "exitCode": 0, "result": "36 checks passed" },
+    { "command": "node --test plugins/pipeline-core/lib/project-onboarding-v3.test.mjs", "exitCode": 0, "result": "91 passed, 0 failed" },
+    { "command": "node harness/scripts/check-doc-contracts.mjs", "exitCode": 0, "result": "450 files, 726 links, 10 anchors valid" },
+    { "command": "node harness/scripts/check-observation-governance.mjs", "exitCode": 0, "result": "125 documents classified" },
+    { "command": "node plugins/pipeline-core/scripts/check-backlog-state.mjs", "exitCode": 0, "result": "state, ledger, closure evidence and projections valid" }
+  ],
+  "liveMechanismExercise": {
+    "description": "The signed guard-lift path was executed end to end against this repository, not only unit-tested.",
+    "steps": [
+      { "command": "guard-maintenance-window.mjs prepare --scope TP-2,TP-6,TP-7 --ttl-seconds 10800", "result": "request produced, nothing written to the working tree" },
+      { "command": "po-human-approval.mjs sign-intent", "result": "PO-HUMAN-SIGN-INTENT-READY after an explicit typed confirmation naming the digest" },
+      { "command": "guard-maintenance-window.mjs install --proof <wrong-key-directory>/proof-manual.json", "result": "PO-APPROVAL-TRUST-MISMATCH, exit 2 — refused a proof signed by a key this repository does not pin" },
+      { "command": "guard-maintenance-window.mjs install --proof <correct-directory>/proof-manual.json", "result": "status active, scope TP-2/TP-6/TP-7" },
+      { "command": "probe: guard-testpath.mjs via stdin, four paths, window open", "result": "TP-1 and TP-3 REFUSED exit 2; TP-2 and TP-6 ALLOWED with window-lifted audit line" },
+      { "command": "guard-maintenance-window.mjs close", "result": "status closed" },
+      { "command": "probe: same four paths, window closed", "result": "all four REFUSED exit 2" }
+    ]
+  },
+  "knownGapsDisclosed": [
+    "The pre-signature confirmation prompt in po-human-approval.mjs is English-only and does not follow runtime.humanFacingLanguage.",
+    "sign-intent's confirmation summary names only the intent digest and a generic consequence class; it cannot describe the specific action.",
+    "An absent --runner still resolves silently to codex in project-onboarding-v3.mjs; the correction was implemented and reverted twice.",
+    "Commit 5efb0f1's Dispatch trailer names one dispatch while its diff carries production changes from two, caused by a shared-checkout index race.",
+    "Maintenance-window scope selectivity is not asserted by any test at either library or hook level, though it was verified empirically against a live window.",
+    "GUARD-CROSS-REPO-MUTATION blocks writes to the session's harness-assigned scratchpad directory and has no lift by design.",
+    "One grammar denial against a path outside the repository root was observed without the new override-route block. DIAGNOSED 2026-08-07: grammarOverrideRoute() only sets overrideGuidance when recordHumanGuardDenial returns status 'planned', and wraps that call in a bare catch whose comment reads 'no route offered; the plain grammar refusal stands unchanged'. Either a throw or any non-'planned' status therefore prints a denial with no next step and no statement that a route was attempted -- silently making ADR-0059 Decision 4 untrue for that path. The swallowed reason is the defect, not the missing route. Owner: pipeline. Expiry: 2026-08-21. Tracked for fix in the same wave as the round-2 findings."
+  ],
+  "excludedFromReview": "Documentation-only, backlog and evidence-relocation commits in the same range are not part of the enumerated review object."
+}

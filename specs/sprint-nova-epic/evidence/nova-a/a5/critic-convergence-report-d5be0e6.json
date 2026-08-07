@@ -1,0 +1,49 @@
+{
+  "schema": "pipeline.critic-convergence-report.v1",
+  "reportId": "nova-a5-d5be0e6",
+  "dispatch": {
+    "preflight": {
+      "command": "node plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs --root . --base 6e2c9b2868d164ff3b631ab068fa5df20939e07d --candidate d5be0e690bfe292ae885f799c484ed977fa9c99d --spec specs/sprint-nova-epic/spec.md --evidence evidence/verify-latest.json --evidence evidence/security-latest.json",
+      "status": "packet-ready",
+      "exitCode": 0
+    },
+    "review": {
+      "base": { "commit": "6e2c9b2868d164ff3b631ab068fa5df20939e07d", "tree": "23171c38a317d8cdf50baa013f54f5447e17f754" },
+      "candidate": { "commit": "d5be0e690bfe292ae885f799c484ed977fa9c99d", "tree": "6df501dbf7a39edf756058b130caf0569f33b794" },
+      "reviewedCommitCount": 21,
+      "requestedRoute": "claude-sonnet-5 at max",
+      "verdict": "pass",
+      "findings": [
+        {
+          "id": "F1",
+          "severity": "minor",
+          "gap": "Commit 7140776d4f18bcff379f120025d79aa5984acff3 is missing the mandatory AI-Assisted: true trailer.",
+          "disposition": "accepted, unfixable without a forbidden history rewrite; recorded here and in docs/state.md as a known, permanent gap on that one commit"
+        },
+        {
+          "id": "F2",
+          "severity": "minor",
+          "gap": "release-preflight-cli.mjs:149 resolves base.commit via a plain rev-parse without a ^{commit} peel, so a tag --base seals a tag OID instead of the commit OID; surfaced in evidence/nova-a/a6/release-preflight-record-57ee7e9.json.",
+          "disposition": "filed as backlog/items/2026-08-07-release-preflight-cli-base-commit-not-peeled.md; GS-6 blocks in-session fix, minor severity, not blocking"
+        }
+      ]
+    }
+  },
+  "criteria": [
+    { "criterionId": "NVA-A54-1", "text": "Read-only dispatch admission binds candidate paths/evidence and derives required governance before a Critic slot is consumed.", "status": "demonstrated", "evidence": [{ "kind": "command", "detail": "critic-dispatch-preflight.mjs run with real base/candidate/spec/evidence paths, returned packet-ready with full guardrail/governance/evidence binding (see dispatch.preflight above)" }] },
+    { "criterionId": "NVA-A54-3", "text": "Coverage and verdict contracts.", "status": "demonstrated", "evidence": [{ "kind": "review-output", "detail": "the dispatched Critic returned the full mandatory report format: Findings, Deliberately not flagged (15 items across 15 hunt categories), Trajectory check, Briefing violations, Verdict" }] },
+    { "criterionId": "NVA-A54-4", "text": "Finding lineage.", "status": "partially-demonstrated", "note": "two findings produced with concrete file:line evidence and spec-ref citations (lineage exists for this round); no correction/re-review round was exercised since both findings are minor and non-blocking, so delta-lineage across rounds (NVA-A54-11) is not demonstrated by this dispatch alone." },
+    { "criterionId": "NVA-A54-9", "text": "Reconciliation fixtures for the named backlog items.", "status": "demonstrated", "evidence": [{ "kind": "artifact", "path": "backlog/items/2026-08-07-release-preflight-cli-base-commit-not-peeled.md" }] },
+    { "criterionId": "NVA-A54-12", "text": "Dispatch preflight binds base/candidate commit+tree, Spec, guardrails; rejects stale/candidate-unbound evidence.", "status": "demonstrated", "evidence": [{ "kind": "command", "detail": "critic-dispatch-preflight.mjs rejected the dispatch with CDP-EVIDENCE-REQUIRED and CDP-EVIDENCE-BINDING before Verify evidence existed for the exact candidate commit; only succeeded once evidence/verify-latest.json and evidence/security-latest.json were freshly bound to d5be0e69" }] }
+  ],
+  "openGaps": {
+    "candidateBinding": "This review covers this Nova A evidence-sealing wave (base 6e2c9b2..candidate d5be0e69), not a frozen final Nova A candidate -- no such candidate exists yet. Full NVA-A54 closure (all 12 criteria, a real correction/delta round exercising NVA-A54-5/6/11) remains open pending the eventual Slice A7 candidate freeze.",
+    "notEligibleForR2": "This review's findings count (2) is non-zero, so per publication-executor.mjs's requireSuccessfulGate this evidence record does NOT satisfy the strict zero-findings Critic-evidence gate required for a #98/R2 v2 publication-authorization prepare step; a future, separate zero-findings Critic pass would be needed for that specific purpose."
+  },
+  "bindings": {
+    "candidate": {
+      "commit": "d5be0e690bfe292ae885f799c484ed977fa9c99d",
+      "tree": "6df501dbf7a39edf756058b130caf0569f33b794"
+    }
+  }
+}

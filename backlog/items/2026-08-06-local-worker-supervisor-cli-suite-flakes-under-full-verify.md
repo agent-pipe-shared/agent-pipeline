@@ -1,12 +1,16 @@
 ---
-schema: pipeline.backlog-item.v1
-id: pipeline.local-worker-supervisor-cli-suite-flakes-under-full-verify
-type: defect
-owner: pipeline
-status: open
-created: 2026-08-06
+schema: "pipeline.backlog-item.v1"
+id: "pipeline.local-worker-supervisor-cli-suite-flakes-under-full-verify"
+type: "defect"
+owner: "pipeline"
+status: "closed"
+created: "2026-08-06"
 source: "Sprint Nova session, 2026-08-06: Full Verify on candidate 9f5bfc9 failed with local-worker-supervisor-cli-tests=1, the same suite passed 9/9 standalone immediately afterwards, and an unchanged re-run of Full Verify on the same candidate and clean tree went green."
-due: 2026-09-06
+due: "2026-09-06"
+closed_at: "2026-08-07"
+closure_repository: "self"
+closure_commit: "577c515404e2bd4c94f890c9cd7009ac93b66d1d"
+closure_evidence: "backlog/evidence/2026-08-07-nova-gwm-backlog-fixes.md"
 ---
 
 # `local-worker-supervisor-cli-tests` is not deterministic under Full Verify
@@ -73,7 +77,10 @@ anything being wrong with the candidate.
   `JSON.parse(readFileSync(...))` with no try/catch, so it crashes instead of
   polling again.
   **Fix (small, test-only, no production risk):** wrap the read/parse in
-  `waitForRecord` (`local-worker-supervisor.test.mjs:296-298`) in try/catch,
+  `waitForRecord` (`plugins/pipeline-core/scripts/local-worker-supervisor.test.mjs:297`
+  — corrected path, 2026-08-07: a first dispatch attempt cited
+  `plugins/pipeline-core/lib/local-worker-supervisor.test.mjs`, which carries
+  no such function; independently confirmed against current HEAD) in try/catch,
   treating a parse failure the same as "not written yet, keep polling" —
   mirroring the `readBoundedJson` pattern already used everywhere in
   production. Drafted and verified to match the actual code during this

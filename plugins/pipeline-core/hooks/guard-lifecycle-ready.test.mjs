@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import {
   mkdirSync,
   mkdtempSync,
@@ -32,6 +34,19 @@ import {
   isBoundedReadOnlyPipeline,
   parseGuardCommand,
 } from "./guard-command-grammar.mjs";
+// NOVA-LCR-HGO-1 (ADR-0059 Decision 3/4): the same generic HGO Bash class the guard now
+// consumes for its three closed-shell-grammar denials. Arming driven through the library
+// directly, mirroring guard-testpath-override.test.mjs's `arm()` (chat) and
+// lib/human-guard-override.test.mjs's `prepareSignedArming()` (signature) helpers.
+import {
+  authorizeHumanGuardOverride,
+  authorizeHumanGuardOverrideBySignature,
+  HGO_SIGNATURE_REASON,
+  planHumanGuardOverride,
+  prepareHumanGuardOverrideAuthorization,
+  recordHumanGuardDenial,
+} from "../lib/human-guard-override.mjs";
+import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
 
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
 const ONBOARDING_LAUNCH_SCRIPT = fileURLToPath(new URL("../scripts/codex-onboarding-launch.mjs", import.meta.url));
@@ -742,6 +757,112 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+/**
+ * ADR-0059 Decision 4, `signature` mode's decisive final step (NOVA-HGOSIG-TRUST-1 D1).
+ *
+ * The guard prints `authorize-by-signature ...` as the next command whenever
+ * gates.push_approval is `signature` (this repository's committed value) -- see the
+ * continuation assertion at "signature mode offers authorize-by-signature" further down --
+ * and `sanctionedHumanOverrideArgs()` then had to admit it. It did not: its base check
+ * matched `args[0] === "authorize"` by strict equality, so the offered route dead-ended at
+ * its last step. Positive and negative shapes are asserted in ONE test on purpose: the
+ * mutations alone pass against the unfixed code (which refuses everything), so only the
+ * admission assertion proves the branch exists, and only the mutations prove it did not
+ * arrive as a blanket allowance.
+ */
+test("signature mode's authorize-by-signature is admitted in exactly its printed shape and refused when mutated", () => {
+  const path = root();
+  const external = mkdtempSync(join(tmpdir(), "guard-lifecycle-ready-proof-"));
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const request = "f".repeat(64);
+    const plan = "a".repeat(64);
+    const proof = join(external, "proof.json");
+    const authorRoot = join(path, "plugins", "pipeline-core");
+    const signature = `node '${HUMAN_OVERRIDE_SCRIPT}' authorize-by-signature --repo '${path}' --request-sha256 ${request} --plan-sha256 ${plan} --proof '${proof}'`;
+    const signatureAuthor = `${signature} --author-source-root '${authorRoot}'`;
+    for (const command of [signature, signatureAuthor]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+      assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
+      }), { exitCode: 0, stderr: "" }, command);
+    }
+    for (const command of [
+      // wrong flag order
+      `node '${HUMAN_OVERRIDE_SCRIPT}' authorize-by-signature --repo '${path}' --plan-sha256 ${plan} --request-sha256 ${request} --proof '${proof}'`,
+      // non-hex and short digests
+      `node '${HUMAN_OVERRIDE_SCRIPT}' authorize-by-signature --repo '${path}' --request-sha256 ${"g".repeat(64)} --plan-sha256 ${plan} --proof '${proof}'`,
+      `node '${HUMAN_OVERRIDE_SCRIPT}' authorize-by-signature --repo '${path}' --request-sha256 ${request} --plan-sha256 ${"a".repeat(63)} --proof '${proof}'`,
+      // extra trailing word
+      `${signature} --bypass`,
+      `${signature} --activate`,
+      `${signatureAuthor} --activate`,
+      // wrong --repo
+      `node '${HUMAN_OVERRIDE_SCRIPT}' authorize-by-signature --repo /tmp/other --request-sha256 ${request} --plan-sha256 ${plan} --proof '${proof}'`,
+      // wrong --author-source-root
+      `${signature} --author-source-root /tmp/other`,
+      // the trust anchor is not caller-supplied: --authority is no shape at all
+      `${signature} --authority '${join(external, "authority.json")}'`,
+      // --proof is bounded structurally: in-repository, relative, traversing,
+      // non-JSON and empty paths are all refused
+      `node '${HUMAN_OVERRIDE_SCRIPT}' authorize-by-signature --repo '${path}' --request-sha256 ${request} --plan-sha256 ${plan} --proof '${join(path, "proof.json")}'`,
+      `node '${HUMAN_OVERRIDE_SCRIPT}' authorize-by-signature --repo '${path}' --request-sha256 ${request} --plan-sha256 ${plan} --proof proof.json`,
+      `node '${HUMAN_OVERRIDE_SCRIPT}' authorize-by-signature --repo '${path}' --request-sha256 ${request} --plan-sha256 ${plan} --proof '${external}/../proof.json'`,
+      `node '${HUMAN_OVERRIDE_SCRIPT}' authorize-by-signature --repo '${path}' --request-sha256 ${request} --plan-sha256 ${plan} --proof '${join(external, "proof.txt")}'`,
+      `node '${HUMAN_OVERRIDE_SCRIPT}' authorize-by-signature --repo '${path}' --request-sha256 ${request} --plan-sha256 ${plan} --proof ''`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
+      }).exitCode, 2, command);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(external, { recursive: true, force: true });
+  }
+});
+
+test("plan-runtime family accepts the runner-plus-intent argv lifecycleArgv actually emits for non-default intents", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const command of [
+      "plan", "plan-runtime", "plan-reinstall", "plan-repair", "plan-readback",
+      "plan-source-recovery", "plan-manifest-repair",
+    ]) {
+      // Regression pin: this is the exact 7-token argv shape lifecycleArgv(argv, runner, intent)
+      // emits at project-onboarding-v3.mjs:1300-1303 whenever intent !== "onboarding" — --runner
+      // is appended first, --intent afterward, so --runner sits second-to-last, not trailing.
+      for (const intent of ["onboarding", "bootstrap", "session", "dispatch"]) {
+        for (const runner of ["claude", "codex"]) {
+          const withIntent = `node '${ONBOARDING_SCRIPT}' ${command} --root '${path}' --runner ${runner} --intent ${intent}`;
+          assert.equal(isSanctionedLifecycleCommand(withIntent, path), true, withIntent);
+        }
+      }
+      // No-regression pin: the pre-existing default-intent shape (trailing --runner, no
+      // --intent) must keep working exactly as before the generalization.
+      assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' ${command} --root '${path}' --runner claude`, path), true);
+      assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' ${command} --root '${path}' --runner codex`, path), true);
+      assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' ${command} --root '${path}'`, path), true);
+    }
+    for (const command of [
+      // invalid intent value
+      `node '${ONBOARDING_SCRIPT}' plan-runtime --root '${path}' --runner claude --intent unknown`,
+      // invalid runner value
+      `node '${ONBOARDING_SCRIPT}' plan-runtime --root '${path}' --runner windows --intent session`,
+      // malformed / wrong-length argv
+      `node '${ONBOARDING_SCRIPT}' plan-runtime --root '${path}' --intent session --extra flag`,
+      `node '${ONBOARDING_SCRIPT}' plan-runtime --root '${path}' --runner claude --intent session --extra flag`,
+      `node '${ONBOARDING_SCRIPT}' plan-runtime --root '${path}' --runner claude --intent`,
+      `node '${ONBOARDING_SCRIPT}' plan-runtime --root '${path}' --runner claude --goal session`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 test("partial PO authority rebind admits only the exact read-only planner", () => {
   const path = root();
   try {
@@ -1050,4 +1171,460 @@ test("main() fails closed on an absent or invalid --runner without ever inspecti
       assert.equal(calls, 0, JSON.stringify(argv));
     }
   } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// ---------------------------------------------------------------------------------
+// NOVA-LCR-HGO-1 (ADR-0059 Decision 3/4): the three closed-shell-grammar denials now
+// always attempt the SAME generic, exact-command-bound Human-Guard-Override (HGO) route
+// the sibling guards already use. These fixtures need a real Git repository (topology()
+// requires one), unlike this file's other tests -- mirrors
+// guard-testpath-override.test.mjs's `fixture()`/`arm()` and
+// lib/human-guard-override.test.mjs's `fixtureSignature()`/`prepareSignedArming()`.
+
+const HGO_PLUGIN_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const HGO_OVERRIDE_SCRIPT = join(HGO_PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+const hgoSigPair = generateKeyPairSync("ed25519");
+const HGO_SIG_KEY_REFERENCE = "guard-lifecycle-ready-hgo-test-key";
+const hgoSigPublicKey = hgoSigPair.publicKey.export({ type: "spki", format: "pem" });
+const hgoSigPublicKeySha256 = createHash("sha256").update(hgoSigPublicKey).digest("hex");
+// The two fixed, content-independent sentinel digests authorizeHumanGuardOverrideBySignature()
+// itself names by exact source string -- reproduced independently, never imported, exactly
+// as lib/human-guard-override.test.mjs's own copy does.
+const HGO_SIGNATURE_INTENT_PLAN_SHA256 = createHash("sha256").update("pipeline.human-guard-override-signature-plan.v1").digest("hex");
+const HGO_SIGNATURE_INTENT_SPEC_SHA256 = createHash("sha256").update("pipeline.human-guard-override-signature-spec.v1").digest("hex");
+
+/** The exact denial reason text grammarOverrideRoute() builds for each grammar code. */
+const HGO_GRAMMAR_REASON = {
+  "GUARD-PARSE-UNSUPPORTED": "GUARD-PARSE-UNSUPPORTED: The command is outside the closed Pipeline shell grammar.",
+  "GUARD-OPERATOR-UNAPPROVED": "GUARD-OPERATOR-UNAPPROVED: The command contains an unapproved shell operator.",
+  "GUARD-REDIRECT-UNAPPROVED": "GUARD-REDIRECT-UNAPPROVED: The command contains an unapproved shell redirection.",
+};
+
+// NOVA-LCR-HGO-2: since a consumed grammar capability now falls through to the
+// LAUNCH_SCRIPT/readiness tail (evaluateAfterGrammarAdmission()) instead of returning
+// verdict(0) immediately, an "admitted all the way through" fixture must make that tail
+// admit too. hgoGitFixture() below is a bare git repo with no onboarding scaffolding, so
+// the exact V4 ready receipt is supplied directly via dependency injection rather than
+// engineering a full onboarding-ready checkout.
+const HGO_READY_RECEIPT = Object.freeze({
+  schema: "pipeline.project-onboarding-ready-gate.v1",
+  status: "ready",
+  intent: "session",
+});
+function hgoReadyDeps() {
+  return { requireProjectOnboardingReadyFn: () => ({ ...HGO_READY_RECEIPT }) };
+}
+
+/** `pipeline.user.yaml`, committed, decides the mode -- same "committed value wins" fixture shape as the sibling suites. */
+function hgoGitFixture(mode) {
+  const base = mkdtempSync(join(tmpdir(), "guard-lifecycle-hgo-"));
+  spawnSync("git", ["init", "-q", "-b", "main", base], { encoding: "utf8" });
+  spawnSync("git", ["-C", base, "config", "user.email", "fixture@example.invalid"], { encoding: "utf8" });
+  spawnSync("git", ["-C", base, "config", "user.name", "fixture"], { encoding: "utf8" });
+  writeFileSync(join(base, "pipeline.user.yaml"), `schema: "pipeline.user.v3"\ngates:\n  push_approval: "${mode}"\n`);
+  mkdirSync(join(base, "project"), { recursive: true });
+  writeFileSync(join(base, "project", "critical-human-proof.json"), JSON.stringify({
+    schema: "pipeline.critical-human-proof-policy.v1",
+    requiredKinds: ["push"],
+    trustAnchor: { keyReference: HGO_SIG_KEY_REFERENCE, publicKeySha256: hgoSigPublicKeySha256 },
+  }));
+  spawnSync("git", ["-C", base, "add", "pipeline.user.yaml", "project/critical-human-proof.json"], { encoding: "utf8" });
+  spawnSync("git", ["-C", base, "commit", "-qm", "fixture"], { encoding: "utf8" });
+  return base;
+}
+
+/** Arms a real one-time capability via the chat-mode in-session path (denial -> plan -> prepare-authorization -> authorize --activate). */
+function hgoArmByChat(root, toolInput, denials) {
+  const shared = { rootDir: root, pluginRoot: HGO_PLUGIN_ROOT, scriptPath: HGO_OVERRIDE_SCRIPT };
+  const recorded = recordHumanGuardDenial({ ...shared, toolName: "Bash", toolInput, denials });
+  assert.equal(recorded.status, "planned", `denial not plannable: ${JSON.stringify(recorded)}`);
+  const planned = planHumanGuardOverride({ ...shared, requestSha256: recorded.requestSha256 });
+  const reason = "NOVA-LCR-HGO-1 fixture arming";
+  const prepared = prepareHumanGuardOverrideAuthorization({
+    ...shared, requestSha256: recorded.requestSha256, planSha256: planned.planSha256, reason,
+  });
+  const armed = authorizeHumanGuardOverride({
+    ...shared,
+    requestSha256: recorded.requestSha256,
+    planSha256: planned.planSha256,
+    selectionSha256: prepared.selectionSha256,
+    reason,
+    reasonSha256: prepared.reasonSha256,
+    activate: true,
+  });
+  assert.equal(armed.status, "armed", `chat arm failed: ${JSON.stringify(armed)}`);
+}
+
+/** Arms a real one-time capability via a genuine detached Ed25519 proof (ADR-0059 Decision 1). */
+function hgoArmBySignature(root, toolInput, denials) {
+  const shared = { rootDir: root, pluginRoot: HGO_PLUGIN_ROOT, scriptPath: HGO_OVERRIDE_SCRIPT };
+  const recorded = recordHumanGuardDenial({ ...shared, toolName: "Bash", toolInput, denials });
+  assert.equal(recorded.status, "planned", `denial not plannable: ${JSON.stringify(recorded)}`);
+  const planned = planHumanGuardOverride({ ...shared, requestSha256: recorded.requestSha256 });
+  const prepared = prepareHumanGuardOverrideAuthorization({
+    ...shared, requestSha256: recorded.requestSha256, planSha256: planned.planSha256, reason: HGO_SIGNATURE_REASON,
+  });
+  const intent = createPoApprovalIntent({
+    kind: "guard-override",
+    featureId: "human-guard-override",
+    planSha256: HGO_SIGNATURE_INTENT_PLAN_SHA256,
+    specSha256: HGO_SIGNATURE_INTENT_SPEC_SHA256,
+    candidate: { commit: planned.repository.head, tree: planned.repository.tree },
+    policyRevision: "human-guard-override-signature-v1",
+    subjectSha256: prepared.selectionSha256,
+    decision: "authorize",
+  });
+  const proof = {
+    schema: PO_APPROVAL_PROOF_SCHEMA,
+    intentSha256: intent.sha256,
+    keyReference: HGO_SIG_KEY_REFERENCE,
+    publicKey: hgoSigPublicKey,
+    signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), hgoSigPair.privateKey).toString("base64"),
+  };
+  const armed = authorizeHumanGuardOverrideBySignature({
+    rootDir: root,
+    pluginRoot: HGO_PLUGIN_ROOT,
+    requestSha256: recorded.requestSha256,
+    planSha256: planned.planSha256,
+    proof,
+    scriptPath: HGO_OVERRIDE_SCRIPT,
+  });
+  assert.equal(armed.status, "armed", `signature arm failed: ${JSON.stringify(armed)}`);
+}
+
+test("NOVA-LCR-HGO-1: a chat-armed capability admits the exact denied grammar command, for all three codes", () => {
+  const roots = [];
+  try {
+    const cases = [
+      ["rg -n lifecycle . && touch output.txt", "GUARD-PARSE-UNSUPPORTED"],
+      ["rg -n lifecycle . | tee output.txt", "GUARD-OPERATOR-UNAPPROVED"],
+      ["rg -n lifecycle . > output.txt | head -n 20", "GUARD-REDIRECT-UNAPPROVED"],
+    ];
+    for (const [command, code] of cases) {
+      const chatRoot = hgoGitFixture("chat");
+      roots.push(chatRoot);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), { projectDir: chatRoot }).exitCode, 2, `precondition: ${command}`);
+      const toolInput = { command };
+      const denials = [{ guard: "guard-lifecycle-ready.mjs", reason: HGO_GRAMMAR_REASON[code] }];
+      hgoArmByChat(chatRoot, toolInput, denials);
+      const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: chatRoot, ...hgoReadyDeps() });
+      assert.equal(result.exitCode, 0, `chat-armed did not admit ${command}: ${result.stderr}`);
+      assert.match(result.stderr, /\[pipeline-human-override\] guard-lifecycle-ready/u, command);
+      assert.match(result.stderr, /capability consumed/u, command);
+      // single-use: the same command is refused again
+      const second = evaluateLifecycleReadyGuard(bash(command), { projectDir: chatRoot });
+      assert.equal(second.exitCode, 2, `capability was reusable for ${command}`);
+    }
+  } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
+});
+
+test("NOVA-LCR-HGO-1: a signature-armed capability admits the denied grammar command, regardless of the committed mode", () => {
+  const roots = [];
+  try {
+    const command = "rg -n lifecycle . && touch output.txt";
+    const toolInput = { command };
+    const denials = [{ guard: "guard-lifecycle-ready.mjs", reason: HGO_GRAMMAR_REASON["GUARD-PARSE-UNSUPPORTED"] }];
+    for (const mode of ["signature", "chat"]) {
+      const sigRoot = hgoGitFixture(mode);
+      roots.push(sigRoot);
+      hgoArmBySignature(sigRoot, toolInput, denials);
+      const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: sigRoot, ...hgoReadyDeps() });
+      assert.equal(result.exitCode, 0, `signature-armed did not admit under mode=${mode}: ${result.stderr}`);
+      assert.match(result.stderr, /capability consumed/u, mode);
+    }
+  } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
+});
+
+test("NOVA-LCR-HGO-1: with nothing armed, the grammar denial names the mode-appropriate next command (ADR-0059 Decision 4)", () => {
+  const roots = [];
+  try {
+    const command = "rg -n lifecycle . && touch output.txt";
+
+    const chatRoot = hgoGitFixture("chat");
+    roots.push(chatRoot);
+    const chatResult = evaluateLifecycleReadyGuard(bash(command), { projectDir: chatRoot });
+    assert.equal(chatResult.exitCode, 2);
+    assert.match(chatResult.stderr, /Human override available for this exact command/u);
+    assert.match(chatResult.stderr, /guard-human-override\.mjs/u);
+    assert.match(chatResult.stderr, /\bplan --repo\b/u);
+    assert.match(chatResult.stderr, /prepare-authorization --repo/u);
+    assert.match(chatResult.stderr, /\bauthorize --repo\b[^\n]*--activate/u);
+    assert.doesNotMatch(chatResult.stderr, /authorize-by-signature/u);
+    assert.doesNotMatch(chatResult.stderr, /capability consumed/u);
+
+    const sigRoot = hgoGitFixture("signature");
+    roots.push(sigRoot);
+    const sigResult = evaluateLifecycleReadyGuard(bash(command), { projectDir: sigRoot });
+    assert.equal(sigResult.exitCode, 2);
+    assert.match(sigResult.stderr, /Human override available for this exact command/u);
+    assert.match(sigResult.stderr, /\bplan --repo\b/u);
+    assert.match(sigResult.stderr, /prepare-authorization --repo/u);
+    assert.match(sigResult.stderr, /authorize-by-signature --repo/u);
+    assert.doesNotMatch(sigResult.stderr, /--activate/u, "signature mode must not offer the in-session activate step");
+  } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
+});
+
+test("NOVA-LCR-HGO-1: an unusable override store leaves the plain grammar refusal exactly as it was", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n"); // no git repo at all
+    const result = evaluateLifecycleReadyGuard(bash("rg -n lifecycle . && touch output.txt"), { projectDir: path });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /GUARD-PARSE-UNSUPPORTED/u);
+    assert.doesNotMatch(result.stderr, /Human override available/u);
+    assert.doesNotMatch(result.stderr, /guard-human-override\.mjs/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("NOVA-LCR-HGO-1: GUARD-CROSS-REPO-MUTATION and GUARD-LIFECYCLE-NOT-READY stay outside HGO (regression, ADR-0059 Decision 5)", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const crossRepo = evaluateLifecycleReadyGuard(edit("../outside.mjs"), { projectDir: path });
+    assert.equal(crossRepo.exitCode, 2);
+    assert.match(crossRepo.stderr, /GUARD-CROSS-REPO-MUTATION/u);
+    assert.doesNotMatch(crossRepo.stderr, /Human override available/u);
+    assert.doesNotMatch(crossRepo.stderr, /guard-human-override\.mjs/u);
+
+    const notReady = evaluateLifecycleReadyGuard(edit(), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("partial"); },
+    });
+    assert.equal(notReady.exitCode, 2);
+    assert.match(notReady.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
+    assert.doesNotMatch(notReady.stderr, /Human override available/u);
+    assert.doesNotMatch(notReady.stderr, /guard-human-override\.mjs/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// ---------------------------------------------------------------------------------
+// NOVA-LCR-HGO-2 (ADR-0059 Decision 5): a consumed grammar capability clears ONLY the
+// shell-grammar objection -- every other check in evaluateLifecycleReadyGuard() still
+// applies to the lifted command, in particular the LAUNCH_SCRIPT external-restart
+// refusal and the GUARD-LIFECYCLE-NOT-READY onboarding-readiness gate, neither of which
+// HGO is authorized to clear. Before this fix the guard returned verdict(0) the instant
+// grammarOverrideRoute() reported a consumed capability (:1045/:1056), so
+// `<otherwise-unliftable command> && true` turned an unliftable readiness denial into a
+// liftable grammar one.
+//
+// Fixtures below deliberately combine an ABSOLUTE path with a RELATIVE one in the same
+// command, carried inside a `--flag=value` token so HGO's own eligibility()
+// (lib/human-guard-override.mjs, read-only to this dispatch) never has to resolve it as
+// a bare path argument -- that classification is orthogonal to the control-flow fix
+// under test here, and a `--flag=<path>` token is skipped by eligibility()'s absolute-
+// path/protected-path checks (they only run for tokens not starting with "-").
+
+test("NOVA-LCR-HGO-2: a consumed grammar capability admits the composed command only once the readiness tail also admits it", () => {
+  const chatRoot = hgoGitFixture("chat");
+  try {
+    const absMarker = join(chatRoot, "abs-marker.txt");
+    const command = `rg -n lifecycle --marker=${absMarker} relative-notes.txt | tee output.txt`;
+    const toolInput = { command };
+    const denials = [{ guard: "guard-lifecycle-ready.mjs", reason: HGO_GRAMMAR_REASON["GUARD-OPERATOR-UNAPPROVED"] }];
+    hgoArmByChat(chatRoot, toolInput, denials);
+    const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: chatRoot, ...hgoReadyDeps() });
+    assert.equal(result.exitCode, 0, `armed + ready did not admit: ${result.stderr}`);
+    assert.match(
+      result.stderr,
+      /\[pipeline-human-override\] guard-lifecycle-ready GUARD-OPERATOR-UNAPPROVED: exact one-time capability consumed/u,
+    );
+  } finally { rmSync(chatRoot, { recursive: true, force: true }); }
+});
+
+test("NOVA-LCR-HGO-2: an armed matching capability does not bypass GUARD-LIFECYCLE-NOT-READY", () => {
+  const chatRoot = hgoGitFixture("chat");
+  try {
+    const absMarker = join(chatRoot, "abs-marker-b.txt");
+    const command = `rg -n readiness --marker=${absMarker} relative-notes-b.txt | tee output-b.txt`;
+    const toolInput = { command };
+    const denials = [{ guard: "guard-lifecycle-ready.mjs", reason: HGO_GRAMMAR_REASON["GUARD-OPERATOR-UNAPPROVED"] }];
+    hgoArmByChat(chatRoot, toolInput, denials);
+    const result = evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: chatRoot,
+      requireProjectOnboardingReadyFn() { deny("partial"); },
+    });
+    assert.equal(result.exitCode, 2, `armed + not-ready wrongly admitted: ${result.stderr}`);
+    assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
+    // Design decision (NOVA-LCR-HGO-2): a capability consumed here and then refused
+    // downstream stays spent (consumeHumanGuardOverride() already marked it "consumed"
+    // on disk, irreversibly, before this denial was even constructed) -- but its
+    // consumption must not vanish silently, so the audit line still surfaces here,
+    // alongside the readiness refusal that actually decided the outcome.
+    assert.match(
+      result.stderr,
+      /\[pipeline-human-override\] guard-lifecycle-ready GUARD-OPERATOR-UNAPPROVED: exact one-time capability consumed/u,
+    );
+    // Single-use: the spent capability is gone even though it was refused downstream --
+    // it was never "returned" for being refused.
+    const second = evaluateLifecycleReadyGuard(bash(command), { projectDir: chatRoot, ...hgoReadyDeps() });
+    assert.equal(second.exitCode, 2, "a downstream-refused capability was still reusable");
+    assert.doesNotMatch(second.stderr, /capability consumed/u);
+  } finally { rmSync(chatRoot, { recursive: true, force: true }); }
+});
+
+// ---------------------------------------------------------------------------------
+// NOVA-HGOSIG-ROUTE-1 (ADR-0059 Decision 4): a denial that cannot offer a route must say
+// that it could not, and why. grammarOverrideRoute() used to set overrideGuidance only when
+// recordHumanGuardDenial() answered `planned`, and wrapped the call in a bare
+// `catch { /* no route offered */ }` -- so two paths printed a denial with no next step AND
+// no word that a route had even been attempted, indistinguishable from a denial that was
+// never eligible for one. That silence is the single outcome Decision 4's "every denial
+// reports its next step" does not allow, and it was observed in the field, not theorised
+// (a grammar denial against a path outside the repository root).
+//
+// The two outcomes are reported distinguishably, because they mean different things: a
+// non-`planned` status is the route machinery ANSWERING ("not this way"), a throw is the
+// route machinery being unable to answer at all.
+//
+// What the reason may disclose is bounded by construction, not by care --
+// humanGuardRouteUnavailableReason() in lib/human-guard-override.mjs renders a typed status
+// and a typed code and nothing else. The tests below assert that bound positively (against
+// injected hostile outcomes) rather than by listing forbidden strings.
+
+const ROUTE_REASON_HEADLINE = "No human override route is offered for this exact command;";
+
+/** The added block only: the headline through the end of the denial. */
+function routeReasonBlock(stderr) {
+  const index = stderr.indexOf(ROUTE_REASON_HEADLINE);
+  assert.notEqual(index, -1, `no route-unavailable reason was printed:\n${stderr}`);
+  return stderr.slice(index).trim();
+}
+
+/**
+ * The disclosure bound. Stated positively: the whole added block is exactly two lines and
+ * contains no path separator at all, so it cannot spell an absolute host path on either
+ * platform, and cannot carry a stack frame (every frame carries one).
+ */
+function assertReasonDisclosesNothing(stderr, projectDir) {
+  const block = routeReasonBlock(stderr);
+  assert.equal(block.split("\n").length, 2, `the reason must be exactly two lines:\n${block}`);
+  assert.doesNotMatch(block, /[\\/]/u, `the reason leaked a path separator:\n${block}`);
+  assert.ok(!block.includes(projectDir), `the reason leaked the repository root:\n${block}`);
+  assert.doesNotMatch(
+    block,
+    /\bat\s+\S+\s+\(|node:internal|\.mjs:\d+|Error:/u,
+    `the reason leaked a stack frame or an exception message:\n${block}`,
+  );
+}
+
+test("NOVA-HGOSIG-ROUTE-1: a grammar denial whose route planning throws prints a typed reason, not silence", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n"); // governed, but no git repository at all
+    const result = evaluateLifecycleReadyGuard(bash("rg -n lifecycle . && touch output.txt"), { projectDir: path });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /GUARD-PARSE-UNSUPPORTED/u);
+    // Names the observed failure, and says the planner FAILED rather than answered.
+    assert.match(result.stderr, /Reason: planning the route failed with code=HGO-GIT\./u);
+    assert.doesNotMatch(result.stderr, /the override planner returned status=/u);
+    // ... and still offers no route, because there is none to offer.
+    assert.doesNotMatch(result.stderr, /Human override available/u);
+    assert.doesNotMatch(result.stderr, /guard-human-override\.mjs/u);
+    assert.doesNotMatch(result.stderr, /--request-sha256/u);
+    assertReasonDisclosesNothing(result.stderr, path);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("NOVA-HGOSIG-ROUTE-1: a grammar denial whose route planning returns a non-planned status reports that status", () => {
+  const roots = [];
+  try {
+    const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-outside-"));
+    roots.push(outside);
+
+    // (a) The case actually observed: an absolute path outside the repository root, which
+    // HGO classifies as a project-boundary crossing and never plans.
+    const crossRoot = hgoGitFixture("signature");
+    roots.push(crossRoot);
+    const cross = evaluateLifecycleReadyGuard(
+      bash(`rg -n lifecycle ${join(outside, "notes.txt")} | tee output.txt`),
+      { projectDir: crossRoot },
+    );
+    assert.equal(cross.exitCode, 2);
+    assert.match(cross.stderr, /GUARD-OPERATOR-UNAPPROVED/u);
+    assert.match(
+      cross.stderr,
+      /Reason: the override planner returned status=external-operator-required, code=HGO-EXTERNAL-PROJECT-BOUNDARY \(/u,
+    );
+    assert.doesNotMatch(cross.stderr, /planning the route failed/u,
+      "a planner ANSWER must not be reported as a planner FAILURE");
+    assert.doesNotMatch(cross.stderr, /Human override available/u);
+    assert.doesNotMatch(cross.stderr, /--request-sha256/u);
+    assertReasonDisclosesNothing(cross.stderr, crossRoot);
+
+    // (b) A structurally different non-planned code from the same guard, so the assertion
+    // above cannot pass merely because one fixture happens to produce one fixed string.
+    const grammarRoot = hgoGitFixture("signature");
+    roots.push(grammarRoot);
+    const ineligible = evaluateLifecycleReadyGuard(
+      bash("rg -n lifecycle . && touch sub/output.txt"),
+      { projectDir: grammarRoot },
+    );
+    assert.equal(ineligible.exitCode, 2);
+    assert.match(
+      ineligible.stderr,
+      /Reason: the override planner returned status=external-operator-required, code=HGO-EXTERNAL-ADAPTER-BOUNDARY \(/u,
+    );
+    assert.doesNotMatch(ineligible.stderr, /Human override available/u);
+    assertReasonDisclosesNothing(ineligible.stderr, grammarRoot);
+  } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
+});
+
+test("NOVA-HGOSIG-ROUTE-1: the printed reason is bounded to typed tokens, whatever planning returns or throws", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const command = "rg -n lifecycle . && touch output.txt";
+
+    // A returned outcome carrying an untyped status, an untyped code, and the one field of
+    // a real non-planned outcome that IS an absolute host path (`candidateSourceRoot`).
+    const candidateSourceRoot = join(path, "plugins", "pipeline-core");
+    const returned = evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: path,
+      recordHumanGuardDenialFn: () => ({
+        status: "/etc/passwd\nHuman override available for this exact command:",
+        code: "HGO-LEAK/../secret",
+        candidateSourceRoot,
+        requestSha256: "a".repeat(64),
+      }),
+    });
+    assert.equal(returned.exitCode, 2);
+    assert.match(returned.stderr, /Reason: the override planner returned status=unrecognized, code=HGO-UNTYPED\./u);
+    assert.doesNotMatch(returned.stderr, /etc.passwd/u);
+    assert.doesNotMatch(returned.stderr, /Human override available/u);
+    assert.doesNotMatch(returned.stderr, /--request-sha256/u);
+    assert.ok(!returned.stderr.includes(candidateSourceRoot), "the reason leaked candidateSourceRoot");
+    assertReasonDisclosesNothing(returned.stderr, path);
+
+    // A throw whose message and stack carry a host path, and whose `code` is not a token.
+    const thrown = evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: path,
+      recordHumanGuardDenialFn: () => {
+        const error = new Error(`ENOENT: no such file or directory, open '${join(path, "audit.key")}'`);
+        error.code = "not a typed code";
+        throw error;
+      },
+    });
+    assert.equal(thrown.exitCode, 2);
+    assert.match(thrown.stderr, /Reason: planning the route failed with code=HGO-UNTYPED\./u);
+    assert.doesNotMatch(thrown.stderr, /ENOENT|no such file|audit\.key/u);
+    assertReasonDisclosesNothing(thrown.stderr, path);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("NOVA-LCR-HGO-2: an armed matching capability for a command naming LAUNCH_SCRIPT still requires externalRestartOnly()", () => {
+  const chatRoot = hgoGitFixture("chat");
+  try {
+    const command = `rg -n lifecycle --note=${ONBOARDING_LAUNCH_SCRIPT} relative-notes.txt | tee output.txt`;
+    const toolInput = { command };
+    const denials = [{ guard: "guard-lifecycle-ready.mjs", reason: HGO_GRAMMAR_REASON["GUARD-OPERATOR-UNAPPROVED"] }];
+    hgoArmByChat(chatRoot, toolInput, denials);
+    const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: chatRoot, ...hgoReadyDeps() });
+    assert.equal(result.exitCode, 2, `armed LAUNCH_SCRIPT command was wrongly admitted: ${result.stderr}`);
+    assert.match(result.stderr, /EXTERNAL ACTION REQUIRED/u);
+    assert.match(result.stderr, /restart-process is external-terminal\/user-copy-only/u);
+    assert.match(
+      result.stderr,
+      /\[pipeline-human-override\] guard-lifecycle-ready GUARD-OPERATOR-UNAPPROVED: exact one-time capability consumed/u,
+    );
+  } finally { rmSync(chatRoot, { recursive: true, force: true }); }
 });

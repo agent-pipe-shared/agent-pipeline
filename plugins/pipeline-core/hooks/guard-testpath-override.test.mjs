@@ -34,13 +34,15 @@
  */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { criticalProofWaiverFor } from "../lib/critical-human-proof-policy.mjs";
 import {
+  HumanGuardOverrideError,
   authorizeHumanGuardOverride,
+  consumeHumanGuardOverride,
   planHumanGuardOverride,
   prepareHumanGuardOverrideAuthorization,
   recordHumanGuardDenial,
@@ -137,21 +139,31 @@ try {
     assert.match(stderr, /Rule ID: TP-3/u);
   });
 
-  check("OT02 signature mode admits no in-session override and offers no route", () => {
-    // The blocker, stated as a test. In signature mode the capability is never consulted.
+  check("OT02 signature mode refuses in-session activation and offers the signed route (ADR-0059 Decision 3/4)", () => {
+    // Since ADR-0059 Decision 3, signature mode is no longer a hard wall: the guard always
+    // attempts to consume first (harmless here -- nothing is armed), then offers the
+    // mode-appropriate next step. What signature mode still refuses is the in-session
+    // `activate` continuation; what it now offers instead is the signed route.
     const { blocked, stderr } = ask(fixture({ mode: "signature" }), PROTECTED);
     assert.equal(blocked, true);
-    assert.match(stderr, /no in-session override is admitted/u);
-    assert.doesNotMatch(stderr, /--request-sha256/u, "a route must not be offered in signature mode");
+    assert.match(stderr, /gates\.push_approval is "signature"/u);
+    assert.match(stderr, /in-session activation step is refused/u);
+    assert.match(stderr, /A signed override is admitted instead/u);
+    assert.match(stderr, /--request-sha256\s+[a-f0-9]{64}\b/u, "signature mode must offer the signed route");
+    assert.match(stderr, /authorize-by-signature\b/u);
+    assert.doesNotMatch(stderr, /--activate\b/u, "signature mode must not offer the in-session activate step");
     assert.match(stderr, /outside\s+this session/u);
   });
 
-  check("OT03 an absent, unreadable or unrecognised setting falls back to signature", () => {
+  check("OT03 an absent, unreadable or unrecognised setting falls back to signature and offers the signed route", () => {
     for (const mode of [null, "whatever", ""]) {
       const { blocked, stderr } = ask(fixture({ mode }), PROTECTED);
       assert.equal(blocked, true, `mode=${String(mode)}`);
-      assert.match(stderr, /no in-session override is admitted/u, `mode=${String(mode)}`);
-      assert.doesNotMatch(stderr, /--request-sha256/u, `mode=${String(mode)} offered a route`);
+      assert.match(stderr, /gates\.push_approval is "signature"/u, `mode=${String(mode)}`);
+      assert.match(stderr, /in-session activation step is refused/u, `mode=${String(mode)}`);
+      assert.match(stderr, /--request-sha256\s+[a-f0-9]{64}\b/u, `mode=${String(mode)} offered no route`);
+      assert.match(stderr, /authorize-by-signature\b/u, `mode=${String(mode)}`);
+      assert.doesNotMatch(stderr, /--activate\b/u, `mode=${String(mode)} must not offer the in-session activate step`);
     }
   });
 
@@ -234,17 +246,62 @@ try {
     assert.doesNotMatch(stderr, /capability consumed/u);
   });
 
-  check("OT13 signature mode ignores an armed capability entirely", () => {
-    // The mode gate must sit in front of the capability, not beside it. Arming happens in
-    // a chat-mode fixture, then the setting is flipped to signature under the same store.
+  check("OT13 an in-session write drifts the repository an armed capability is bound to, which fails closed with HGO-DRIFT", () => {
+    // This case was called "signature mode ignores an armed capability entirely" and its
+    // comment said the mode gate must sit in front of the capability. That gate no longer
+    // exists: f650164 removed it for ADR-0059 Decision 3, and the guard now attempts to
+    // consume in EVERY mode -- harmlessly, because a capability can only have been armed by
+    // a clearance matching the committed mode (Decision 1 refuses the in-session activation
+    // path outright while that mode is not chat; OT19 below pins it, one step earlier and in
+    // the library rather than here). The case nevertheless stayed green, for a reason it did
+    // not name: the fixture's own uncommitted writeFileSync perturbs `git status`, which
+    // repositoryObservation() digests into `statusSha256`, so consumption answers `replan` on
+    // repository DRIFT. That is a real and worthwhile property -- it is just not the one the
+    // title claimed, and a bare `blocked === true` would have gone green for any refusal at
+    // all, including a loosened drift comparison plus some later check tripping instead.
+    // So the code is asserted BY NAME.
     const root = fixture({ mode: "chat" });
     arm(root, { file_path: PROTECTED }, TP3_DENIAL);
     writeFileSync(join(root, "pipeline.user.yaml"),
       'schema: "pipeline.user.v3"\ngates:\n  push_approval: "signature"\n');
+    assert.deepEqual(
+      consumeHumanGuardOverride({
+        rootDir: root,
+        pluginRoot: PLUGIN_ROOT,
+        toolName: "Edit",
+        toolInput: { file_path: PROTECTED },
+        denials: [{ guard: "guard-testpath.mjs", reason: TP3_DENIAL }],
+      }),
+      { status: "replan", code: "HGO-DRIFT" },
+      "an armed capability survived a change to the repository state it was bound to",
+    );
     const { blocked, stderr } = ask(root, PROTECTED);
-    assert.equal(blocked, true, "signature mode consumed a capability it must not consult");
-    assert.match(stderr, /no in-session override is admitted/u);
+    assert.equal(blocked, true, "a drifted capability admitted the edit");
     assert.doesNotMatch(stderr, /capability consumed/u);
+    // The resolved mode flips to signature as a CONSEQUENCE of that same write -- the
+    // working-tree copy no longer matches the committed blob, so readPushApprovalMode falls
+    // back to the strongest mode (OT15/OT17's property). It is not what blocks the edit.
+    // Kept because it is Decision 4's next-step property on this path: the refusal names the
+    // signed route rather than an in-session one it would now refuse to honour.
+    assert.match(stderr, /gates\.push_approval is "signature"/u);
+    assert.match(stderr, /in-session activation step is refused/u);
+    assert.match(stderr, /authorize-by-signature\b/u);
+
+    // The differential half (OT14/OT16's idiom): a twin fixture in which the SAME file is
+    // rewritten BYTE-IDENTICALLY. Same write call, same path, same armed capability -- only
+    // the bytes are unchanged, so `git status` stays clean, statusSha256 is unmoved, nothing
+    // drifts and the capability is consumed. Without it, the half above would equally be
+    // satisfied by a fixture that never admits anything, and the drift claim would be
+    // untestable rather than tested.
+    const twin = fixture({ mode: "chat" });
+    const settings = join(twin, "pipeline.user.yaml");
+    const identicalBytes = readFileSync(settings);
+    arm(twin, { file_path: PROTECTED }, TP3_DENIAL);
+    writeFileSync(settings, identicalBytes);
+    const admitted = ask(twin, PROTECTED);
+    assert.equal(admitted.blocked, false,
+      `a byte-identical rewrite was treated as drift, so the case above pins nothing:\n${admitted.stderr}`);
+    assert.match(admitted.stderr, /capability consumed/u);
   });
 
   check("OT14 a protected test path under plugins/pipeline-core gets no plain route", () => {
@@ -286,17 +343,22 @@ try {
 
   // ---- C1: an in-session write to the setting must not weaken this gate ------------
 
-  check("OT15 an uncommitted chat setting does not admit the override", () => {
+  check("OT15 an uncommitted chat setting does not admit the chat-mode continuation", () => {
     // The T2 Critic's blocker, as a test. The shell lane refuses the literal filename but
     // not a name assembled at runtime, so the write itself is assumed to succeed -- the
-    // fixture simply performs it. What must hold is that the write buys nothing.
+    // fixture simply performs it. What must hold is that the write buys nothing: the
+    // resolved mode stays signature, so the route offered (if any) is the signed one, not
+    // the chat-mode activate continuation the uncommitted write asked for.
     const root = fixture({ mode: "signature" });
     writeFileSync(join(root, "pipeline.user.yaml"),
       'schema: "pipeline.user.v3"\ngates:\n  push_approval: "chat"\n');
     const { blocked, stderr } = ask(root, PROTECTED);
     assert.equal(blocked, true, "an uncommitted flip to chat opened the gate");
-    assert.match(stderr, /no in-session override is admitted/u);
-    assert.doesNotMatch(stderr, /--request-sha256/u, "an uncommitted flip offered a route");
+    assert.match(stderr, /gates\.push_approval is "signature"/u, "an uncommitted flip to chat must not change the resolved mode");
+    assert.match(stderr, /in-session activation step is refused/u);
+    assert.match(stderr, /--request-sha256\s+[a-f0-9]{64}\b/u, "the committed (signature) mode still offers its own route");
+    assert.match(stderr, /authorize-by-signature\b/u);
+    assert.doesNotMatch(stderr, /--activate\b/u, "an uncommitted flip to chat must not offer the in-session activate step");
   });
 
   check("OT16 the same setting, committed, is honoured", () => {
@@ -311,7 +373,9 @@ try {
     // The asymmetry, from the only starting point where it can be observed: HEAD says
     // chat, so the gate is open, and ANY in-session modification closes it again. Writing
     // the identical bytes back is deliberately not included -- that is not a modification,
-    // and asserting it would pin the wrong property.
+    // and asserting it would pin the wrong property. The resolved mode still falls back to
+    // signature, which (since ADR-0059 Decision 3/4) offers its own signed route rather than
+    // no route at all -- what must not survive the modification is the chat continuation.
     for (const written of ["signature", "nonsense", ""]) {
       const root = fixture({ mode: "chat" });
       assert.match(ask(root, PROTECTED).stderr, /--request-sha256/u, "precondition: open");
@@ -319,7 +383,10 @@ try {
         `schema: "pipeline.user.v3"\ngates:\n  push_approval: "${written}"\n`);
       const { blocked, stderr } = ask(root, PROTECTED);
       assert.equal(blocked, true, `written=${written}`);
-      assert.match(stderr, /no in-session override is admitted/u, `written=${written}`);
+      assert.match(stderr, /gates\.push_approval is "signature"/u, `written=${written}`);
+      assert.match(stderr, /in-session activation step is refused/u, `written=${written}`);
+      assert.match(stderr, /--request-sha256\s+[a-f0-9]{64}\b/u, `written=${written} must still offer the signed route`);
+      assert.doesNotMatch(stderr, /--activate\b/u, `written=${written} must not offer the in-session activate step`);
     }
   });
 
@@ -334,6 +401,79 @@ try {
       'schema: "pipeline.user.v3"\ngates:\n  push_approval: "chat"\n');
     assert.equal(criticalProofWaiverFor(root, "push").waived, false,
       "an uncommitted flip to chat stood the push proof down");
+  });
+
+  // ---- the invariant the old OT13 title gestured at, at the layer where it survives ----
+
+  check("OT19 the in-session activation path itself refuses every committed mode but chat", () => {
+    // "An override its subject can arm is not an override" -- this suite's own opening
+    // claim. Decision 3 moved WHERE that is enforced: the guards stopped gating on the mode
+    // and now always attempt to consume, so nothing in this suite pinned the enforcement any
+    // more. It still exists, one step earlier and in the library:
+    // authorizeHumanGuardOverride() reads the COMMITTED gates.push_approval itself and fails
+    // with HGO-SIGNATURE-MODE-REQUIRED unless it is exactly "chat" (ADR-0059 Decision 1,
+    // defense in depth; human-guard-override.mjs, immediately after the `activate` check).
+    // Delete that check today and every case in this file stays green while an agent can arm
+    // its own capability in signature mode -- which is the whole hole, restored.
+    //
+    // The three steps BEFORE it must stay reachable in every mode, because Decision 4 has
+    // every denial report a next step and the SIGNED route needs the same
+    // record -> plan -> prepare chain; so they are asserted, not assumed. The chat-mode twin
+    // is OT10's arm(), which walks this identical chain through to `armed`, and is not
+    // duplicated here.
+    for (const mode of ["signature", null, "nonsense"]) {
+      const label = `mode=${String(mode)}`;
+      const root = fixture({ mode });
+      const shared = { rootDir: root, pluginRoot: PLUGIN_ROOT, scriptPath: OVERRIDE_SCRIPT };
+      const denials = [{ guard: "guard-testpath.mjs", reason: TP3_DENIAL }];
+      const toolInput = { file_path: PROTECTED };
+
+      const recorded = recordHumanGuardDenial({ ...shared, toolName: "Edit", toolInput, denials });
+      assert.equal(recorded.status, "planned", `${label}: the denial must stay routable in every mode`);
+      const planned = planHumanGuardOverride({ ...shared, requestSha256: recorded.requestSha256 });
+      assert.equal(planned.status, "planned", `${label}: planning must stay mode-independent`);
+      const reason = "briefed test-change task";
+      const prepared = prepareHumanGuardOverrideAuthorization({
+        ...shared, requestSha256: recorded.requestSha256, planSha256: planned.planSha256, reason,
+      });
+      assert.equal(prepared.status, "prepared", `${label}: preparing must stay mode-independent`);
+
+      assert.throws(
+        () => authorizeHumanGuardOverride({
+          ...shared,
+          requestSha256: recorded.requestSha256,
+          planSha256: planned.planSha256,
+          selectionSha256: prepared.selectionSha256,
+          reason,
+          reasonSha256: prepared.reasonSha256,
+          activate: true,
+        }),
+        (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-SIGNATURE-MODE-REQUIRED",
+        `${label}: a complete, otherwise-valid in-session activation was accepted`,
+      );
+
+      // Unconditional and path-independent: the identical refusal answers a request, plan,
+      // selection and reason digest that match nothing at all. So the check precedes every
+      // lookup rather than being one branch reachable only for particular inputs -- there is
+      // no shape of argument that walks around it.
+      assert.throws(
+        () => authorizeHumanGuardOverride({
+          ...shared,
+          requestSha256: "a".repeat(64),
+          planSha256: "b".repeat(64),
+          selectionSha256: "c".repeat(64),
+          reason: "unrelated",
+          reasonSha256: "d".repeat(64),
+          activate: true,
+        }),
+        (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-SIGNATURE-MODE-REQUIRED",
+        `${label}: the mode check does not precede the request/reason lookups`,
+      );
+
+      const { blocked, stderr } = ask(root, PROTECTED);
+      assert.equal(blocked, true, `${label}: the guard admitted the edit after a refused arming`);
+      assert.doesNotMatch(stderr, /capability consumed/u, `${label}: something was armed anyway`);
+    }
   });
 
   console.log(`\nguard-testpath-override: ${passed} passed, ${failed} failed`);

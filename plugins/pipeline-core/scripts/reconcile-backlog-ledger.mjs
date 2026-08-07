@@ -65,6 +65,11 @@ const REASON =
   "Record in the ledger the status this backlog item file already asserts. " +
   "The item file is the pre-existing record; this entry claims no implementation, " +
   "no review, and no closure of its own.";
+const CLOSED_REASON =
+  "Record in the ledger the closure this backlog item file's own frontmatter " +
+  "already documents (closed_at, closure_repository, closure_commit, closure_evidence). " +
+  "This entry attests the sync to that pre-existing closure record, not a new " +
+  "implementation or review of its own.";
 
 function readItems(root) {
   const items = [];
@@ -180,7 +185,7 @@ export function planBacklogReconciliation(root = DEFAULT_ROOT, { at = null, comm
         to: ORDER[step],
         at: date,
         actor: ACTOR,
-        reason: REASON,
+        reason: ORDER[step] === "closed" ? CLOSED_REASON : REASON,
         // A closing entry's evidence commit is the item's OWN recorded closure
         // commit — the checker binds the two, and a reconciliation must not
         // substitute the reconciling HEAD for the commit that did the work.

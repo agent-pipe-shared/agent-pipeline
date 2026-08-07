@@ -1,0 +1,134 @@
+{
+  "schema": "pipeline.selected-sandbox-acceptance-report.v1",
+  "reportId": "nova-a29-57ee7e9",
+  "identity": {
+    "adapterId": "selected-sandbox-disposition",
+    "adapterVersion": "nova-a2-v1",
+    "implementationSha256": "2758a45b3de610b23e075ebf0a5ba3dce82aefeeb4f8513c5ddd795a234971b6"
+  },
+  "verify": {
+    "commands": [
+      {
+        "command": "node --test plugins/pipeline-core/lib/selected-sandbox-disposition.test.mjs",
+        "exitCode": 0,
+        "path": "plugins/pipeline-core/lib/selected-sandbox-disposition.test.mjs",
+        "fileSha256": "9dca1e2e0ae17a24415a29f71c6f980dcdc7fe464179dc7c10d49266255d8b9e",
+        "passed": 11,
+        "total": 11,
+        "note": "Matrix historically cited 13/13 for the resolver/reducer suite; the current disposition-reducer file itself is 11/11. The 13/13 count matches a sibling suite (codex-sandbox-select.test.mjs) re-run separately below."
+      },
+      {
+        "command": "node --test plugins/pipeline-core/scripts/codex-sandbox-select.test.mjs",
+        "exitCode": 0,
+        "path": "plugins/pipeline-core/scripts/codex-sandbox-select.test.mjs",
+        "fileSha256": "7d726436aafbfd1e46adb9ad2b8fbd19271c984562db6c6a9b6a0c3d362ba835",
+        "passed": 13,
+        "total": 13,
+        "note": "Locates the matrix's cited '13/13' resolver/selection-storage suite."
+      },
+      {
+        "command": "node --test plugins/pipeline-core/scripts/critic-packet-preflight.test.mjs",
+        "exitCode": 0,
+        "path": "plugins/pipeline-core/scripts/critic-packet-preflight.test.mjs",
+        "fileSha256": "4e0288af5cbff5be8bc4b8a5d551c0466a770122362da339c1153e5e71110961",
+        "passed": 6,
+        "total": 6,
+        "note": "Locates the matrix's cited host-capable '6/6' packet-preflight suite; ran clean in this session (no spawnSync EPERM observed)."
+      }
+    ],
+    "unresolvedHistoricalCitation": {
+      "cited": "2/2",
+      "status": "not-locatable",
+      "note": "Searched plugins/pipeline-core/lib and /scripts for every selected-sandbox/packet-preflight/sandbox-preflight related *.test.mjs and re-ran the plausible candidates (codex-sandbox-select 13/13, critic-packet-preflight 6/6, sandboxed-readonly-host-bridge 10/10, live-runner-certification 4/4, codex-sandbox-compatibility 9/9, codex-isolated-critic-contract 22/22, harness/scripts/codex-sandbox-preflight.test.mjs 17/17). None reproduce a 2/2 count. Honestly reported as not locatable rather than guessed."
+    }
+  },
+  "criteria": [
+    {
+      "criterionId": "NVA-A29-1",
+      "text": "CAS health cannot satisfy selected-sandbox availability.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/lib/selected-sandbox-disposition.test.mjs", "name": "A2S05 CAS health, fallback and a self-asserted runner cannot become attested" }
+      ]
+    },
+    {
+      "criterionId": "NVA-A29-2",
+      "text": "A terminal selection failure is attempted at most once per valid capability fingerprint.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/lib/selected-sandbox-disposition.test.mjs", "name": "A2S07 terminal suppression blocks unchanged inputs; only explicit force-reprobe authority creates a new attempt" }
+      ]
+    },
+    {
+      "criterionId": "NVA-A29-3",
+      "text": "Relevant runner/host/environment/profile/policy/probe drift invalidates the disposition.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/lib/selected-sandbox-disposition.test.mjs", "name": "A2S08 fingerprint/session drift invalidates attestation before any new probe" },
+        { "kind": "test", "path": "plugins/pipeline-core/lib/selected-sandbox-disposition.test.mjs", "name": "A2S09 identical fingerprint drift cannot bypass terminal suppression" }
+      ],
+      "note": "Fingerprint binds runnerSha256, hostBootSha256, platformClass, architectureClass, sandboxSha256, profileSha256, policySha256, duty and contractVersion (FINGERPRINT closed shape, selected-sandbox-disposition.mjs lines 10/46-50); any change invalidates via the fingerprint-drift transition."
+    },
+    {
+      "criterionId": "NVA-A29-4",
+      "text": "Functional-equivalent review is never reported as native selected-sandbox execution.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/lib/selected-sandbox-disposition.test.mjs", "name": "A2S04 available-attested requires the parent 256-bit challenge and exact child/attempt/nonce/duty/transport/subject/result bindings" },
+        { "kind": "test", "path": "plugins/pipeline-core/lib/selected-sandbox-disposition.test.mjs", "name": "A2S05 CAS health, fallback and a self-asserted runner cannot become attested" }
+      ],
+      "note": "available-attested requires an exact, receipt-bound childReceipt (validReceipt + AUTHORITY:attestation cross-checks); no functional-equivalent, self-asserted or fallback-transport record can satisfy the closed binding, so a merely-equivalent review can never be reported as native selected-sandbox execution."
+    },
+    {
+      "criterionId": "NVA-A29-5",
+      "text": "State/diagnostics contain no private machine or account coordinates.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/lib/selected-sandbox-disposition.test.mjs", "name": "A2S02 root/nested closed shapes and privacy-safe identity are enforced" }
+      ],
+      "note": "safeReceiptPath (selected-sandbox-disposition.mjs lines 17-20) rejects absolute paths, backslashes, doubled slashes, dot-segments and any Users/home/private/var path component; exact() closes every record shape against additional fields such as homePath."
+    },
+    {
+      "criterionId": "NVA-A29-6",
+      "text": "At least one opt-in selected-child execution produces a fresh nonce-bound positive receipt; no-child, wrong child/attempt/profile/fingerprint, replay, host-only observation, CAS health or fallback fixtures cannot produce available-attested.",
+      "status": "partially-demonstrated-unreachable-live-leg",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/lib/selected-sandbox-disposition.test.mjs", "name": "A2S04 available-attested requires the parent 256-bit challenge and exact child/attempt/nonce/duty/transport/subject/result bindings" },
+        { "kind": "test", "path": "plugins/pipeline-core/lib/selected-sandbox-disposition.test.mjs", "name": "A2S05 CAS health, fallback and a self-asserted runner cannot become attested" },
+        { "kind": "test", "path": "plugins/pipeline-core/lib/selected-sandbox-disposition.test.mjs", "name": "A2S10 semantic record chains bind the exact prior digest and fail closed on replay/digest drift" }
+      ],
+      "note": "The negative half of NVA-A29-6 (no-child/wrong-child/wrong-attempt/wrong-fingerprint/replay/host-only/CAS-health/fallback all fail to reach available-attested) is fully demonstrated by the reducer's own contract tests above. The positive half -- a fresh, real opt-in selected-child execution producing a genuine childReceipt -- is UNREACHABLE from this session: a repository-wide search (grep for reduceSelectedSandboxDisposition/createSelectedSandboxDisposition across plugins/pipeline-core) found the reducer consumed only by its own test file and by plugins/pipeline-core/scripts/invocation-preflight.mjs, which only calls validateSelectedSandboxDisposition on an already-existing disposition record -- it does not spawn a child process or emit a probe-start/probe-success event pair anywhere. There is currently no wired production launcher in this repository that would attempt a real selected-sandbox child execution through this contract; writing one is new production code, which is out of scope for this evidence-sealing task (briefing NOVA-A29-EVIDENCE-1 field 4). This is a stronger and more specific finding than a session sandbox permission denial: git and codex CLI (codex-cli 0.147.0) both execute successfully in this session (`git --version` and `codex --version` verified via spawnSync/exec, exit 0, no EPERM), so the blocker is the absence of integration wiring, not (in this session) a host permission denial. The matrix's prior 'workspace EPERM' framing describes an different, already-superseded observation (result.md, the critic-packet-preflight git-temp-repo fixture); it does not apply to this contract, which has no live-launch call site to even attempt."
+    },
+    {
+      "criterionId": "NVA-A29-7",
+      "text": "The selected-sandbox policy SHALL select a closed semantic compatibility class, not a fixed Codex CLI version or released-binary hash.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/lib/selected-sandbox-disposition.test.mjs", "name": "A2S11 the published 2020-12 schema closes every selected-sandbox nested record" }
+      ],
+      "note": "fingerprint.contractVersion and fingerprint.platformClass/architectureClass are closed SAFE_ID semantic labels (e.g. 'nova-a2-v1', 'linux', 'x64'), never a raw CLI version string or release-binary hash; the schema closes the shape so no additional version-pin field can be smuggled in. Corroborating read-only context (not owned by this scope): plugins/pipeline-core/lib/codex-sandbox-compatibility.test.mjs 'committed registry is closed, semantic-version-agnostic and has exactly one fallback', and the sealed #7 evidence's own statement that its compatibility is 'semantic and receipt-bound, never a static runner-version pin' (runner-capability-report-f7d33a5.json context)."
+    }
+  ],
+  "environment": {
+    "gitInvocable": true,
+    "codexInvocable": true,
+    "codexObservedVersion": "0.147.0",
+    "note": "Recorded to distinguish the NVA-A29-6 gap (missing production wiring) from a session sandbox-permission denial; neither was hit for these two probes in this session."
+  },
+  "bindings": {
+    "suiteVersion": "nova-a2-v1",
+    "candidate": {
+      "commit": "57ee7e94cd2472f66d6561a232edff89512f9d14",
+      "tree": "3dfa21ea2bdee08d5ff840f5429120e1fe848d15"
+    },
+    "authorityDigests": [
+      { "kind": "selected-sandbox-disposition-implementation", "sha256": "2758a45b3de610b23e075ebf0a5ba3dce82aefeeb4f8513c5ddd795a234971b6" },
+      { "kind": "invocation-preflight-implementation", "sha256": "474f04d8e70c6fe194826e163d1659491b010496ced28486a35c75d00bc5df05" }
+    ],
+    "rawEvidenceSha256": [
+      "9dca1e2e0ae17a24415a29f71c6f980dcdc7fe464179dc7c10d49266255d8b9e",
+      "7d726436aafbfd1e46adb9ad2b8fbd19271c984562db6c6a9b6a0c3d362ba835",
+      "4e0288af5cbff5be8bc4b8a5d551c0466a770122362da339c1153e5e71110961"
+    ]
+  }
+}

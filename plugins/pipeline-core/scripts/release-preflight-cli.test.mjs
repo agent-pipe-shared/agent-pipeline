@@ -133,6 +133,21 @@ try {
     }
   });
 
+  check("RPC10 a tag ref as --base peels base.commit to the commit it points to, not the tag's own OID", () => {
+    const context = fixture();
+    const git = (...args) => {
+      const r = spawnSync("git", args, { cwd: context.base, encoding: "utf8" });
+      assert.equal(r.status, 0, `git ${args.join(" ")}: ${r.stderr}`);
+      return r.stdout.trim();
+    };
+    git("tag", "-a", "v-fixture", context.baseCommit, "-m", "annotated tag for RPC10");
+    const tagOid = git("rev-parse", "v-fixture");
+    assert.notEqual(tagOid, context.baseCommit, "test setup invalid: tag OID must differ from the commit it points to");
+    const { record } = build(context, { baseCommit: "v-fixture" });
+    assert.equal(record.base.commit, context.baseCommit, "base.commit must be the peeled commit OID, not the tag OID");
+    assert.notEqual(record.base.commit, tagOid);
+  });
+
   check("RPC09 every final gate stays pending and separated by kind", () => {
     const { record } = build(fixture());
     assert.deepEqual(record.gates.inventory.map((gate) => gate.id), ["verify", "security", "critic", "remote", "human"]);

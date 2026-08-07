@@ -6,6 +6,8 @@ owner: pipeline
 status: open
 created: 2026-08-07
 source: "0.5.2 release session, 2026-08-07: PO asked why a release cannot run end-to-end through the Pipeline with only the final signature as the human step, for the version-surface strip specifically."
+due: 2026-09-06
+expires: 2026-09-06
 ---
 
 # GS-6 blocks the version field in `plugin.json` exactly as hard as it blocks guard code
@@ -79,6 +81,21 @@ denials — only for `guard-testpath.mjs`/Codex-adapter denials).
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-Not yet triaged. Filed same-session as the workaround (PO edits the two
-files directly per the guard's own stated escape hatch) so the 0.5.2 release
-is not blocked on this being resolved first.
+- **Decision:** accept-open.
+- **Rationale:** the item's own proposal already draws the correct
+  distinction (guard-reading code stays override-free; inert metadata gets a
+  routed human-approval path instead of a bare refusal) and names a concrete
+  first case (`plugin.json` version field). This is guardrail-class work —
+  touches `guard-gate-strength.mjs`/`guard-lifecycle-ready.mjs` and
+  `human-guard-override.mjs`'s wiring — so it needs design-tier effort and a
+  T1 Critic round on the result, not a same-session mechanical patch, and
+  cannot itself be applied from inside a GS-6-governed session (the same
+  constraint that produced this finding).
+- **Assignment (if accepted):** `goldfish-deep` with a T1 Critic round,
+  matching the discipline already used for adjacent guard-scope items
+  (`2026-08-06-local-plugin-install-attestation-does-not-bind-external-marketplace-root.md`).
+  Should be scoped together with
+  `2026-08-07-push-release-flow-unusable-for-third-party-adopters.md`'s
+  candidate #3, since both describe the same shape of gap (guard drawn at a
+  directory boundary, not at what needs protecting) on overlapping code.
+- **Date:** 2026-08-07

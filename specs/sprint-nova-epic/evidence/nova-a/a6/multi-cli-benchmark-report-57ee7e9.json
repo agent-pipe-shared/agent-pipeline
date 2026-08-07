@@ -1,0 +1,81 @@
+{
+  "schema": "pipeline.multi-cli-benchmark-report.v1",
+  "reportId": "nova-a6-57ee7e9",
+  "identity": {
+    "adapterId": "multi-cli-benchmark",
+    "adapterVersion": "nova-a6-v1",
+    "implementationSha256": "933b2ab5150b2e339320cec4137b95bf8edc5e35a3cc28f844378409646bb403",
+    "testImplementationSha256": "4563ac89a719c98c5a877658d9f0e2785d4c80c40ebc047ca8de9349e0d020ac"
+  },
+  "verify": {
+    "command": "node --test plugins/pipeline-core/lib/multi-cli-benchmark.test.mjs",
+    "exitCode": 0,
+    "suites": [
+      {
+        "path": "plugins/pipeline-core/lib/multi-cli-benchmark.test.mjs",
+        "fileSha256": "4563ac89a719c98c5a877658d9f0e2785d4c80c40ebc047ca8de9349e0d020ac",
+        "passed": 6,
+        "total": 6
+      }
+    ]
+  },
+  "criteria": [
+    {
+      "criterionId": "NVA-A8-1",
+      "text": "Mini, Feature, review, migration and failure-recovery fixtures are versioned and reproducible.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/lib/multi-cli-benchmark.test.mjs", "name": "MCB01 ships a fully closed benchmark schema and exact versioned fixture corpus" }
+      ],
+      "note": "MCB01 asserts BENCHMARK_FIXTURES pins all five task classes (mini, feature, review, migration, failure-recovery) to a fixed path and a fixed fileSha256 each, re-reads the on-disk fixture bytes, verifies the hash matches, and verifies the parsed content equals a fixed shape ({class, fixture:'synthetic', version:1}). The runtime validator (validFixtures/validFixture in multi-cli-benchmark.mjs) also rejects any evaluateMultiCliBenchmark call whose fixtures array does not byte-match this exact frozen corpus. This demonstrates the fixtures are versioned (hash-pinned) and reproducible (deterministic content, re-verified against current HEAD)."
+    },
+    {
+      "criterionId": "NVA-A8-2",
+      "text": "Serial and runner-native results use unchanged scoring that Nova B can extend with local-pool/external results.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/lib/multi-cli-benchmark.test.mjs", "name": "MCB02 recommends only paired same-host monotonic observations within every resource bound" },
+        { "kind": "test", "path": "plugins/pipeline-core/lib/multi-cli-benchmark.test.mjs", "name": "MCB03 does not recommend unknown usage and rejects host, resource, clock, fixture, route, or class drift" }
+      ],
+      "note": "evaluateMultiCliBenchmark's scoring path (evaluateMultiCliBenchmark lines 49-66 in multi-cli-benchmark.mjs) is not hardcoded to route ids named 'serial'/'native': `routes = [input.baseline, input.candidateRoute]` accepts any two distinct ID-shaped routeIds sharing the envelope's hostClass, and `validSubjects` rejects any third named subject/route regardless of label (MCB03's subject-push assertion, MCB-BINDING). This is the same closed two-route scoring contract used by the fixture-suite's serial/native pair; nothing in the scoring logic special-cases those two names, so it is structurally unchanged and open to a Nova B caller supplying different route labels (e.g. local-pool/external) through the same schema. No test exercises literal 'local-pool'/'external' labels; that specific pairing is inferred from the generic contract, not separately observed."
+    },
+    {
+      "criterionId": "NVA-A8-3",
+      "text": "Results separate orchestration, workspace, verification, review, retry and cleanup overhead.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/lib/multi-cli-benchmark.test.mjs", "name": "MCB05 rejects zero concurrency, impossible stage totals, and a zero baseline before percent division" }
+      ],
+      "note": "validMeasures (multi-cli-benchmark.mjs line 37) requires measures.stages to be an exact object with precisely the six keys orchestrationMs, workspaceMs, verificationMs, reviewMs, retryMs, cleanupMs, each a safe non-negative integer, and enforces their sum never exceeds wallMs. MCB05's 'impossible stage totals' assertion (retryMs set to exceed the wall-clock budget) exercises this and confirms the six-way stage decomposition is enforced, not merely typed, before an observation is accepted into scoring."
+    },
+    {
+      "criterionId": "NVA-A8-4",
+      "text": "No concurrency recommendation is made without observed task-level benefit and a resource envelope.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/lib/multi-cli-benchmark.test.mjs", "name": "MCB02 recommends only paired same-host monotonic observations within every resource bound" },
+        { "kind": "test", "path": "plugins/pipeline-core/lib/multi-cli-benchmark.test.mjs", "name": "MCB03 does not recommend unknown usage and rejects host, resource, clock, fixture, route, or class drift" },
+        { "kind": "test", "path": "plugins/pipeline-core/lib/multi-cli-benchmark.test.mjs", "name": "MCB06 canonically hashes finite non-integral percent scores" }
+      ],
+      "note": "The status above reflects the code-level enforcement contract only, not an empirical task-level result — see the explicit gap called out below. The `recommend` gate (multi-cli-benchmark.mjs line 65) only returns 'candidate-route-for-observed-envelope' when at least 3 of 5 task classes show >=10% improvement AND every class stays within a <=5% regression bound, a <=1.1x p95 bound, zero usage-unknown, equal correctness, and resourceWithinEnvelope -- i.e. the function structurally cannot recommend without observed per-class benefit and envelope data being present in its input. MCB02/MCB03 confirm this gating logic fires and withholds ('no-recommendation') when usage is unknown or inputs drift. However, every observation these tests feed the function is a synthetic fixture object (fabricated wallMs/resourceUse/usage values in multi-cli-benchmark.test.mjs, not measurements from an actual serial-vs-native multi-CLI task execution). No test in this suite, and no other artifact found in this repository search, runs a real task through both a serial and a runner-native invocation path and captures genuine wall-clock/resource numbers. This is exactly the matrix's stated gap ('observed task-level benefit/resource envelope'): the enforcement contract is demonstrated, the empirical task-level benefit and resource envelope this criterion's text also requires is not. Reported honestly as not-yet-demonstrable from this fixture suite, per the briefing's instruction not to paper over it."
+    },
+    {
+      "criterionId": "NVA-A8-5",
+      "text": "`pipeline.multi-cli-efficiency-pilots` remains an input until its separately PO-gated pilot and evidence criteria are satisfied; benchmark framework delivery alone cannot close it.",
+      "status": "not-demonstrated",
+      "evidence": [],
+      "note": "This criterion is a process/governance gate, not a code property: it requires a separately PO-gated pilot with its own evidence criteria (per the plan and the matrix's existing 'Remaining gap' text), which by the criterion's own wording cannot be satisfied by delivering the benchmark framework or its focused suite. A repository search for `pipeline.multi-cli-efficiency-pilots` and for a PO-gated pilot record found none. Not demonstrated here, and not attempted: doing so would require new pilot/evidence delivery beyond evidence-sealing, which is out of this dispatch's scope per its briefing."
+    }
+  ],
+  "bindings": {
+    "suiteVersion": "nova-a6-v1",
+    "candidate": {
+      "commit": "57ee7e94cd2472f66d6561a232edff89512f9d14",
+      "tree": "3dfa21ea2bdee08d5ff840f5429120e1fe848d15"
+    },
+    "rawEvidenceSha256": [
+      "933b2ab5150b2e339320cec4137b95bf8edc5e35a3cc28f844378409646bb403",
+      "4563ac89a719c98c5a877658d9f0e2785d4c80c40ebc047ca8de9349e0d020ac"
+    ]
+  }
+}

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import {
   copyFileSync,
   existsSync,
@@ -23,14 +23,18 @@ import test from "node:test";
 
 import {
   authorizeHumanGuardOverride,
+  authorizeHumanGuardOverrideBySignature,
   consumeHumanGuardOverride,
+  HGO_SIGNATURE_REASON,
   HumanGuardOverrideError,
   humanGuardOverrideInternals,
+  humanGuardRouteUnavailableReason,
   planHumanGuardOverride,
   prepareHumanGuardOverrideAuthorization,
   recordHumanGuardDenial,
   verifyHumanGuardOverrideAudit,
 } from "./human-guard-override.mjs";
+import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "./po-approval-proof.mjs";
 
 const PLUGIN_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -46,7 +50,14 @@ function fixture() {
   git(root, "config", "user.name", "Fixture");
   git(root, "config", "user.email", "fixture@example.invalid");
   writeFileSync(join(root, "README.md"), "fixture\n");
-  git(root, "add", "README.md");
+  // ADR-0059 Decision 1 (defense in depth): authorizeHumanGuardOverride() now refuses
+  // outright unless the COMMITTED gates.push_approval is "chat" -- this suite exercises
+  // that in-session `activate: true` path throughout, so the fixture commits chat mode
+  // by default. Individual signature-path tests below override this back to "signature"
+  // via their own committed pipeline.user.yaml, exactly like guard-testpath-override's
+  // OT15/OT17 fixtures already do for the guard layer.
+  writeFileSync(join(root, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "chat"\n');
+  git(root, "add", "README.md", "pipeline.user.yaml");
   git(root, "commit", "-q", "-m", "fixture");
   return root;
 }
@@ -56,6 +67,230 @@ function reasonDigest(reason) {
 }
 
 const denial = [{ guard: "guard-lifecycle-ready.mjs", reason: "GUARD-LIFECYCLE-NOT-READY" }];
+
+// ---------------------------------------------------------------------------------
+// ADR-0059 Decision 1: authorizeHumanGuardOverrideBySignature() tests.
+//
+// This repository's own `gates.push_approval: "chat"` fixture() above exists so the
+// pre-existing chat-mode suite keeps exercising `authorizeHumanGuardOverride()`'s
+// `activate: true` path (ADR-0059 Decision 1's defense-in-depth check requires it).
+// The signed path needs the OPPOSITE committed setting -- "signature" -- so this
+// fixture variant mirrors fixture() exactly except for that one line, following the
+// same OT15/OT17 "committed value wins" pattern guard-testpath-override.test.mjs's
+// fixture already establishes for the guard layer.
+function fixtureSignature({ trustAnchor = true } = {}) {
+  const root = mkdtempSync(join(tmpdir(), "human-guard-override-sig-"));
+  git(root, "init", "-q", "-b", "main");
+  git(root, "config", "user.name", "Fixture");
+  git(root, "config", "user.email", "fixture@example.invalid");
+  writeFileSync(join(root, "README.md"), "fixture\n");
+  writeFileSync(join(root, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "signature"\n');
+  const added = ["README.md", "pipeline.user.yaml"];
+  if (trustAnchor) {
+    mkdirSync(join(root, "project"), { recursive: true });
+    writeFileSync(join(root, "project", "critical-human-proof.json"), JSON.stringify({
+      schema: "pipeline.critical-human-proof-policy.v1",
+      requiredKinds: ["push"],
+      trustAnchor: { keyReference: SIG_KEY_REFERENCE, publicKeySha256: sigPublicKeySha256 },
+    }));
+    added.push("project/critical-human-proof.json");
+  }
+  git(root, "add", ...added);
+  git(root, "commit", "-q", "-m", "fixture");
+  return root;
+}
+
+// One shared Ed25519 test keypair for the whole suite (never a real PO key -- exactly
+// guard-maintenance-window.test.mjs's own `generateKeyPairSync` pattern, the closest
+// precedent for a po-approval-proof.mjs test signer).
+const sigPair = generateKeyPairSync("ed25519");
+const sigPublicKey = sigPair.publicKey.export({ type: "spki", format: "pem" });
+const sigPublicKeySha256 = createHash("sha256").update(sigPublicKey).digest("hex");
+const SIG_KEY_REFERENCE = "hgo-test-key";
+
+// The two fixed, content-independent sentinel digests authorizeHumanGuardOverrideBySignature()'s
+// own doc comment names by their exact source string -- reproduced independently here,
+// never imported, exactly as the doc comment says an external signer must derive them
+// (no repository file I/O, no access to this module's unexported constants).
+const HGO_SIGNATURE_INTENT_PLAN_SHA256 = createHash("sha256").update("pipeline.human-guard-override-signature-plan.v1").digest("hex");
+const HGO_SIGNATURE_INTENT_SPEC_SHA256 = createHash("sha256").update("pipeline.human-guard-override-signature-spec.v1").digest("hex");
+
+/** Runs denial -> plan -> prepare-authorization (fixed reason) -> builds a matching, genuinely signed proof. Does not call authorizeHumanGuardOverrideBySignature() itself. */
+function prepareSignedArming(root, {
+  toolName, toolInput, denials, nowMs = 1000, keyPair = sigPair, keyReference = SIG_KEY_REFERENCE,
+} = {}) {
+  const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+  const shared = { rootDir: root, pluginRoot: PLUGIN_ROOT, scriptPath };
+  const recorded = recordHumanGuardDenial({ ...shared, toolName, toolInput, denials, nowMs });
+  assert.equal(recorded.status, "planned", `denial not plannable: ${JSON.stringify(recorded)}`);
+  const plan = planHumanGuardOverride({ ...shared, requestSha256: recorded.requestSha256, nowMs: nowMs + 500 });
+  const prepared = prepareHumanGuardOverrideAuthorization({
+    ...shared, requestSha256: recorded.requestSha256, planSha256: plan.planSha256, reason: HGO_SIGNATURE_REASON, nowMs: nowMs + 1000,
+  });
+  const intent = createPoApprovalIntent({
+    kind: "guard-override",
+    featureId: "human-guard-override",
+    planSha256: HGO_SIGNATURE_INTENT_PLAN_SHA256,
+    specSha256: HGO_SIGNATURE_INTENT_SPEC_SHA256,
+    candidate: { commit: plan.repository.head, tree: plan.repository.tree },
+    policyRevision: "human-guard-override-signature-v1",
+    subjectSha256: prepared.selectionSha256,
+    decision: "authorize",
+  });
+  const proof = {
+    schema: PO_APPROVAL_PROOF_SCHEMA,
+    intentSha256: intent.sha256,
+    keyReference,
+    publicKey: keyPair.publicKey.export({ type: "spki", format: "pem" }),
+    signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), keyPair.privateKey).toString("base64"),
+  };
+  return { shared, scriptPath, recorded, plan, prepared, intent, proof };
+}
+
+test("ADR-0059 Decision 1: a valid, correctly-bound signed proof arms the identical v2 capability, consumable exactly like the chat path", () => {
+  const root = fixtureSignature();
+  try {
+    const toolInput = { file_path: "notes.md", content: "signed recovery\n" };
+    const { scriptPath, recorded, plan, proof } = prepareSignedArming(root, { toolName: "Write", toolInput, denials: denial });
+    const armed = authorizeHumanGuardOverrideBySignature({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: recorded.requestSha256,
+      planSha256: plan.planSha256,
+      proof,
+      nowMs: 3000,
+      scriptPath,
+    });
+    assert.equal(armed.status, "armed");
+    assert.equal(armed.mutated, true);
+    assert.equal(armed.planSha256, plan.planSha256);
+    const consumed = consumeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 4000,
+    });
+    assert.equal(consumed.status, "consumed");
+    const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const audit = join(common, "agent-pipeline", "human-guard-overrides", "audit.jsonl");
+    const auditEvents = readFileSync(audit, "utf8").trim().split("\n").map((line) => JSON.parse(line).event);
+    assert.deepEqual(auditEvents.map(({ type }) => type), ["denied", "authorized", "consumed"]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("ADR-0059 Decision 1: re-authorizing with an identical proof is an idempotent no-op (mutated: false), a genuinely different re-arming is HGO-REPLAY", () => {
+  const root = fixtureSignature();
+  try {
+    const toolInput = { file_path: "notes.md", content: "signed idempotent\n" };
+    const { scriptPath, recorded, plan, proof } = prepareSignedArming(root, { toolName: "Write", toolInput, denials: denial });
+    const first = authorizeHumanGuardOverrideBySignature({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256, proof, nowMs: 3000, scriptPath,
+    });
+    assert.equal(first.mutated, true);
+    const second = authorizeHumanGuardOverrideBySignature({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256, proof, nowMs: 3000, scriptPath,
+    });
+    assert.deepEqual(second, { schema: "pipeline.human-guard-override-capability.v2", status: "armed", planSha256: plan.planSha256, requestSha256: recorded.requestSha256, mutated: false });
+    assert.throws(
+      () => authorizeHumanGuardOverrideBySignature({
+        rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256, proof, nowMs: 3999, scriptPath,
+      }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-REPLAY",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("ADR-0059 Decision 1: an invalid, wrong-key or mismatched proof is refused with HGO-PROOF-INVALID", () => {
+  const root = fixtureSignature();
+  try {
+    const toolInput = { file_path: "notes.md", content: "signed rejection\n" };
+    const { scriptPath, recorded, plan, proof } = prepareSignedArming(root, { toolName: "Write", toolInput, denials: denial });
+    // A tampered signature: same intent digest and key, but the bytes signed no longer verify.
+    const tampered = { ...proof, signatureBase64: `${proof.signatureBase64.slice(0, -4)}AAAA` };
+    assert.throws(
+      () => authorizeHumanGuardOverrideBySignature({
+        rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256, proof: tampered, nowMs: 3000, scriptPath,
+      }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-PROOF-INVALID",
+    );
+    // A genuine signature from an unrelated key never matches the committed trust anchor.
+    const wrongKeyPair = generateKeyPairSync("ed25519");
+    const { proof: wrongKeyProof } = prepareSignedArming(root, {
+      toolName: "Write", toolInput, denials: denial, keyPair: wrongKeyPair,
+    });
+    assert.throws(
+      () => authorizeHumanGuardOverrideBySignature({
+        rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256, proof: wrongKeyProof, nowMs: 3000, scriptPath,
+      }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-PROOF-INVALID",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("ADR-0059 Decision 1: the global-plugin-install denial class is refused for the signed path with HGO-SIGNATURE-UNSUPPORTED-MODE", () => {
+  const root = fixtureSignature();
+  try {
+    mkdirSync(join(root, "harness", "scripts"), { recursive: true });
+    mkdirSync(join(root, "plugins", "pipeline-core", ".codex-plugin"), { recursive: true });
+    mkdirSync(join(root, ".claude-plugin"), { recursive: true });
+    writeFileSync(join(root, "harness", "scripts", "verify.mjs"), "// verify\n");
+    writeFileSync(join(root, "plugins", "pipeline-core", ".codex-plugin", "plugin.json"), JSON.stringify({
+      name: "pipeline-core",
+      version: "0.0.0-test",
+    }));
+    writeFileSync(join(root, ".claude-plugin", "marketplace.json"), JSON.stringify({
+      name: "agent-pipeline",
+      plugins: [{ name: "pipeline-core", source: "./plugins/pipeline-core" }],
+    }));
+    const toolInput = { command: "codex plugin add pipeline-core@agent-pipeline-local" };
+    const noGit = () => ({ status: null, error: { code: "EPERM" }, stdout: "" });
+    const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+    const request = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash", toolInput, denials: denial, nowMs: 1_000, spawn: noGit,
+    });
+    assert.equal(request.status, "planned");
+    // Unlike the record above, plan/authorize run with the real default spawn -- the PO's
+    // own step, from an ordinary terminal, never through the host-Git-unavailable adapter
+    // (same precedent as the sibling chat-path local-plugin-install tests above).
+    const plan = planHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 2_000, scriptPath,
+    });
+    assert.equal(plan.mode, "global-plugin-install");
+    assert.throws(
+      () => authorizeHumanGuardOverrideBySignature({
+        rootDir: root,
+        pluginRoot: PLUGIN_ROOT,
+        requestSha256: request.requestSha256,
+        planSha256: plan.planSha256,
+        proof: { schema: PO_APPROVAL_PROOF_SCHEMA, intentSha256: "a".repeat(64), keyReference: "x", publicKey: "y", signatureBase64: "z" },
+        nowMs: 3_000,
+        scriptPath,
+      }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-SIGNATURE-UNSUPPORTED-MODE",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("ADR-0059 Decision 1: an absent trustAnchor (no trustPolicy given, no committed anchor) is refused with HGO-TRUST-ANCHOR-MISSING", () => {
+  const root = fixtureSignature({ trustAnchor: false });
+  try {
+    const toolInput = { file_path: "notes.md", content: "no trust anchor\n" };
+    const { scriptPath, recorded, plan, proof } = prepareSignedArming(root, { toolName: "Write", toolInput, denials: denial });
+    assert.throws(
+      () => authorizeHumanGuardOverrideBySignature({
+        rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256, proof, nowMs: 3000, scriptPath,
+      }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-TRUST-ANCHOR-MISSING",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 test("one exact attended capability is audited, consumed once and cannot be replayed", () => {
   const root = fixture();
@@ -197,6 +432,12 @@ test("a host-Git-unavailable hook can consume only the exact audited local plugi
       spawn: noGit,
       scriptPath,
     });
+    // Unlike every other call in this fixture, `authorize` deliberately uses the REAL
+    // default spawn (real git): it is the PO's own step, run from an ordinary terminal
+    // with normal Git access, never through the host-Git-unavailable Codex adapter this
+    // test otherwise simulates -- and it is also where ADR-0059 Decision 1's defense-in-
+    // depth mode check now lives, which needs to read the fixture's own committed
+    // `pipeline.user.yaml` via real Git.
     authorizeHumanGuardOverride({
       rootDir: root,
       pluginRoot: PLUGIN_ROOT,
@@ -207,7 +448,6 @@ test("a host-Git-unavailable hook can consume only the exact audited local plugi
       reasonSha256: reasonDigest(reason),
       activate: true,
       nowMs: 3_000,
-      spawn: noGit,
       scriptPath,
     });
     assert.equal(consumeHumanGuardOverride({
@@ -265,10 +505,12 @@ test("local plugin installation capability rejects a changed candidate source", 
       rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
       reason, nowMs: 2_500, spawn: noGit, scriptPath,
     });
+    // See the sibling fixture above: `authorize` uses the real default spawn (the PO's
+    // own step, plus ADR-0059 Decision 1's defense-in-depth mode check).
     authorizeHumanGuardOverride({
       rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
       selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
-      nowMs: 3_000, spawn: noGit, scriptPath,
+      nowMs: 3_000, scriptPath,
     });
     writeFileSync(join(root, "plugins", "pipeline-core", "candidate.mjs"), "export const candidate = 2;\n");
     assert.deepEqual(consumeHumanGuardOverride({
@@ -968,6 +1210,91 @@ test("F1 (dispatch CRITIC-REMEDY-09): the local-plugin-install attestation succe
   const observation = humanGuardOverrideInternals.localPluginInstallSourceObservation({ root: repoRoot });
   assert.match(observation.statusSha256, /^[a-f0-9]{64}$/u);
   assert.match(observation.fingerprintSha256, /^[a-f0-9]{64}$/u);
+});
+
+// ---------------------------------------------------------------------------------
+// NOVA-HGOSIG-ROUTE-1 (ADR-0059 Decision 4): recordHumanGuardDenial() has three outcomes,
+// and consuming guards used to render only one of them. `planned` printed a route; every
+// other typed status and every throw printed NOTHING -- so a denial that could not be routed
+// was byte-identical to a denial that was never eligible for one. Decision 4's claim is that
+// every denial reports its next step; silence is the one outcome that makes it untrue.
+//
+// The renderer lives here, next to the statuses it describes, so the four consuming guards
+// cannot drift apart on what a route-less denial says. Its disclosure bound is asserted
+// against hostile inputs rather than trusted: only a typed status token and a typed code
+// token ever reach the output.
+//
+// This block once also carried two CONSUMER checks that spawn a real guard binary, parked
+// here only because guard-testpath.test.mjs (TP-2) and guard-gate-strength.test.mjs (TP-6)
+// were locked. Under the signed maintenance window over TP-2/TP-6/TP-7 they moved to the
+// suites that own the guards they exercise (guard-testpath.test.mjs TP12/TP13 and
+// guard-gate-strength.test.mjs GST30), rewritten in those suites' own idioms. What stays
+// here is exactly what belongs here: the renderer's own contract, asserted against the
+// function directly rather than through a guard's stderr.
+// ---------------------------------------------------------------------------------
+
+test("a route-less denial reports the status the planner actually returned, with its typed code", () => {
+  assert.equal(
+    humanGuardRouteUnavailableReason("command", {
+      planned: { status: "external-operator-required", code: "HGO-EXTERNAL-PROJECT-BOUNDARY" },
+    }),
+    "No human override route is offered for this exact command; the guard attempted to plan one.\n"
+      + "Reason: the override planner returned status=external-operator-required, "
+      + "code=HGO-EXTERNAL-PROJECT-BOUNDARY (the exact action must be carried out by an "
+      + "attended operator outside this session).",
+  );
+  // author-repair-required carries no `code` at all, so none is invented for it.
+  const authorRepair = humanGuardRouteUnavailableReason("edit", {
+    planned: { status: "author-repair-required", requestSha256: "a".repeat(64), candidateSourceRoot: "/tmp/x/plugins/pipeline-core" },
+  });
+  assert.match(authorRepair, /status=author-repair-required \(the target is Pipeline plugin source/u);
+  assert.doesNotMatch(authorRepair, /code=/u);
+  assert.doesNotMatch(authorRepair, /[\\/]/u, "candidateSourceRoot must never reach the rendered reason");
+  assert.match(
+    humanGuardRouteUnavailableReason("edit", { planned: { status: "narrower-recovery-required", code: "HGO-NORMAL-RETRY-ACTIONS" } }),
+    /status=narrower-recovery-required, code=HGO-NORMAL-RETRY-ACTIONS \(a narrower typed recovery/u,
+  );
+});
+
+test("a failed route plan is reported as a failure, distinguishably from a planner answer", () => {
+  const thrown = humanGuardRouteUnavailableReason("command", {
+    error: new HumanGuardOverrideError("HGO-GIT", "repository identity is unavailable (operation=rev-parse, outcome=EPERM)"),
+  });
+  assert.equal(
+    thrown,
+    "No human override route is offered for this exact command; the guard attempted to plan one.\n"
+      + "Reason: planning the route failed with code=HGO-GIT.",
+  );
+  assert.doesNotMatch(thrown, /returned status=/u);
+  assert.doesNotMatch(thrown, /operation=|outcome=|EPERM/u, "the error message must not reach the reason");
+});
+
+test("the rendered reason is bounded to typed tokens against any outcome shape", () => {
+  const hostile = [
+    { planned: { status: "/etc/passwd", code: "HGO-X/../y" } },
+    { planned: { status: "x".repeat(200), code: "A".repeat(200) } },
+    { planned: { status: "ok\nHuman override available:", code: "HGO-OK\nplan --repo /root" } },
+    { planned: { status: 7, code: { toString: () => "HGO-OBJ" } } },
+    { planned: null },
+    { planned: {} },
+    {},
+    { error: null },
+    { error: new Error("ENOENT: open '/home/someone/.ssh/id_ed25519'") },
+    { error: Object.assign(new Error("boom"), { code: 42 }) },
+    { error: Object.assign(new Error("boom"), { code: "code with spaces" }) },
+  ];
+  for (const outcome of hostile) {
+    const rendered = humanGuardRouteUnavailableReason("command", outcome);
+    assert.equal(rendered.split("\n").length, 2, `not two lines for ${JSON.stringify(Object.keys(outcome))}: ${rendered}`);
+    assert.doesNotMatch(rendered, /[\\/]/u, `path separator leaked: ${rendered}`);
+    assert.doesNotMatch(rendered, /ENOENT|id_ed25519|passwd|boom|Human override available/u, `payload leaked: ${rendered}`);
+    assert.ok(rendered.length < 400, `unbounded output: ${rendered.length}`);
+  }
+  // The subject noun is bounded too -- a guard cannot smuggle text in through it.
+  assert.match(
+    humanGuardRouteUnavailableReason("/etc/passwd\ninjected", { planned: { status: "external-operator-required" } }),
+    /^No human override route is offered for this exact action;/u,
+  );
 });
 
 test("repository identity failures name the sanitized Git operation", () => {

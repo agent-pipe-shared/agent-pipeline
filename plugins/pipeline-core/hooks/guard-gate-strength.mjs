@@ -23,9 +23,23 @@
  *   <live plugin root>/**          the installed guard code that is enforcing right now (GS-6)
  *
  * SHAPE. Deliberately the same as `guard-testpath`: refuse, name the rule, and point at
- * the one sanctioned escape — the PO edits the file directly, outside an agent session.
- * There is no in-session override, because an in-session override for "may I weaken my
- * own gate" is the same hole with an extra step.
+ * the sanctioned escape. GS-1..GS-5/GS-7 (the write-lane paths above) route through the
+ * same audited `lib/human-guard-override.mjs` family every sibling guard already uses
+ * (ADR-0059 Decision 3): always attempt to consume a genuinely armed capability first,
+ * and on failure offer whichever route matches the repository's own COMMITTED
+ * `gates.push_approval` -- chat or signed. Admitting a CHAT-armed capability here is not
+ * a new hole: `authorizeHumanGuardOverride()`'s own unconditional, path-independent
+ * `HGO-SIGNATURE-MODE-REQUIRED` check (ADR-0059 Decision 1) already refuses to arm ANY
+ * chat-mode capability, for ANY file, unless the repository's COMMITTED mode is already
+ * "chat" -- reachable only through a real, prior, deliberate human commit (ADR-0056
+ * Decision 4's accepted "chosen for ergonomics" downgrade), never something a ready
+ * agent session can bootstrap from "signature" by itself. A SIGNED capability is always
+ * admissible regardless of the committed mode, exactly like everywhere else in HGO. The
+ * PO editing the file directly, outside an agent session, remains available too. GS-6
+ * (the live plugin root below) is the one exception: it keeps its own separate, narrower
+ * Guard Maintenance Window lift (ADR-0058) rather than HGO, because a time-boxed window
+ * is the right shape for "the PO is actively developing guard code" and the wrong shape
+ * for a one-shot config edit (ADR-0058 Decision 2).
  *
  * SCOPE, and it is narrower than it looks. This hook is wired for write TOOLS only
  * (`Edit|Write|NotebookEdit`, asserted by GST07), so it never sees a shell command.
@@ -47,6 +61,14 @@ import { fileURLToPath } from "node:url";
 
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
 import { isNeverLiftableKernelPath, windowCoversRule } from "../lib/guard-maintenance-window.mjs";
+import { readPushApprovalMode } from "../lib/critical-human-proof-policy.mjs";
+import {
+  consumeHumanGuardOverride,
+  humanGuardRouteUnavailableReason,
+  recordHumanGuardDenial,
+} from "../lib/human-guard-override.mjs";
+
+const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 export const GATE_STRENGTH_PATHS = Object.freeze([
   Object.freeze({
@@ -157,9 +179,13 @@ export function gateStrengthRuleFor(filePath, projectDir) {
 
 if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mjs")) {
   let filePath = "";
+  let toolName = "";
+  let toolInput = {};
   try {
     const input = JSON.parse(readFileSync(0, "utf8"));
-    filePath = writeTargetPath(input?.tool_input, String(input?.tool_name ?? ""));
+    toolName = String(input?.tool_name ?? "");
+    toolInput = input?.tool_input ?? {};
+    filePath = writeTargetPath(toolInput, toolName);
   } catch {
     process.exit(0); // fail-open: malformed input is not this guard's business
   }
@@ -213,17 +239,84 @@ if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mj
     } catch { /* an unusable window is not a lift; the refusal below still stands */ }
   }
 
+  // ADR-0059 Decision 3, and the corrected follow-up decision on this guard specifically
+  // (2026-08-07): GS-1..GS-5/GS-7 get the SAME lift shape every other HGO-routed guard
+  // already has -- always attempt to consume first (harmless: it only ever succeeds
+  // against a genuinely armed, matching capability), and on failure offer the
+  // MODE-APPROPRIATE next step, mirroring guard-testpath.mjs's own denial-message shape.
+  // Never GS-6: that rule keeps its own separate GMW mechanism above, untouched.
+  let overrideGuidance = "";
+  if (matched !== LIVE_PLUGIN_RULE) {
+    let approvalMode = "signature";
+    try { approvalMode = readPushApprovalMode(projectDir)?.mode ?? "signature"; } catch { approvalMode = "signature"; }
+
+    const denials = [{ guard: "guard-gate-strength.mjs", reason: `${matched.id}: ${matched.reason}` }];
+    let consumed = { status: "absent" };
+    try {
+      consumed = consumeHumanGuardOverride({ rootDir: projectDir, pluginRoot: PLUGIN_ROOT, toolName, toolInput, denials });
+    } catch {
+      consumed = { status: "absent" }; // an unusable capability is not an authorization
+    }
+    if (consumed.status === "consumed") {
+      process.stderr.write(
+        `[pipeline-human-override] guard-gate-strength ${matched.id}: exact one-time capability consumed; plan=${consumed.planSha256}.\n`,
+      );
+      process.exit(0);
+    }
+
+    if (consumed.status === "absent" || consumed.status === "replan") {
+      try {
+        const planned = recordHumanGuardDenial({ rootDir: projectDir, pluginRoot: PLUGIN_ROOT, toolName, toolInput, denials });
+        if (planned.status === "planned") {
+          const script = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+          const continuation = approvalMode === "chat"
+            ? [
+              `Then (the human confirms in-session; this is attribution, not proof):`,
+              `${process.execPath} ${JSON.stringify(script)} prepare-authorization --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256-from-plan> --reason "<human-reason>"`,
+              `${process.execPath} ${JSON.stringify(script)} authorize --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256> --selection-sha256 <selection-sha256> --reason "<human-reason>" --reason-sha256 <reason-sha256> --activate`,
+            ].join("\n")
+            : [
+              `Then, outside this session (presence of a valid, correctly-bound Ed25519 ` +
+                `signature IS the authorization -- there is no in-session activate step for this mode):`,
+              `${process.execPath} ${JSON.stringify(script)} prepare-authorization --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256-from-plan> --reason "<fixed HGO_SIGNATURE_REASON text>"`,
+              `${process.execPath} ${JSON.stringify(script)} authorize-by-signature --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256> --proof <external-proof.json>`,
+            ].join("\n");
+          overrideGuidance = [
+            "",
+            "Human override available for this exact edit (one use; audited; the human confirms):",
+            `${process.execPath} ${JSON.stringify(script)} plan --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256}`,
+            continuation,
+          ].join("\n");
+        } else {
+          // ADR-0059 Decision 4: a denial with no route says so, with a bounded typed
+          // reason, rather than looking identical to a rule that has no override at all
+          // (which for this guard is a real, adjacent case -- GS-6, one branch below).
+          overrideGuidance = ["", humanGuardRouteUnavailableReason("edit", { planned })].join("\n");
+        }
+      } catch (error) {
+        overrideGuidance = ["", humanGuardRouteUnavailableReason("edit", { error })].join("\n");
+      }
+    }
+  }
+
   process.stderr.write([
     `BLOCKED (guard-gate-strength, plugin pipeline-core): ${matched.reason}`,
     `Rule ID: ${matched.id}`,
     `File: ${filePath}`,
     "Why: an agent that can weaken the gate that authorizes its own actions has no gate. " +
-      "This file decides a gate's strength, so it is not agent-writable — there is deliberately " +
-      "no in-session override, because an in-session override for this is the same hole with an " +
-      "extra step. Escape hatch: the PO edits this file directly, outside an agent session" +
+      "This file decides a gate's strength, so it is not agent-writable" +
       (matched.id === "GS-6"
-        ? "; guard code itself is changed in a source checkout, reviewed, and then installed."
-        : "."),
+        ? " -- there is deliberately no in-session override at all for this rule, because an " +
+          "in-session override for 'may I disarm the gate that is enforcing right now' is the " +
+          "same hole with an extra step. Escape hatch: the PO edits this file directly, outside " +
+          "an agent session; guard code itself is changed in a source checkout, reviewed, and " +
+          "then installed."
+        : " in-session by default -- a human-authorized override (chat- or signature-mode, " +
+          "matching whatever gates.push_approval is actually committed) can admit one exact, " +
+          "audited edit, exactly like every other guard this override family already covers " +
+          "(ADR-0059). Escape hatch: the PO edits this file directly, outside an agent session, " +
+          "or authorizes the override below."),
+    overrideGuidance,
   ].join("\n") + "\n");
   process.exit(2);
 }

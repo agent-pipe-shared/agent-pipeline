@@ -2,12 +2,23 @@
 
 ## Entry gate
 
-- The prior PRD/Spec approval is revoked; revised 17-Issue authority and a new
-  readiness/PO gate are required before implementation resumes.
+- **Cleared 2026-08-02, recorded here 2026-08-07.** This section previously
+  read "the prior PRD/Spec approval is revoked; revised 17-Issue authority and
+  a new readiness/PO gate are required before implementation resumes" — that
+  text was never updated after the gate was actually satisfied and went stale.
+  Verified directly against `project/pipeline-state.json`:
+  `planApproval.approvedBy: "Human"`, `approvedAt: "2026-08-02T20:26:09.754Z"`,
+  and `poGateAuthority.planSha256`/`specSha256` match the current
+  `prd_sprint-nova-epic.md`/`spec.md` bytes exactly (independently confirmed by
+  hashing both files). Commits `06a2cf9`/`afa8cee` ("submit renewed epic
+  plan"/"approve renewed epic plan", 2026-08-02) are the renewal transaction
+  `activeFeature.phase` names as `implementation`. Implementation may resume.
 - Branch remains `feat/sprint-nova-codex-v046` and has adopted released
   `v0.4.7` commit `89cb12b99e3fd86ac44878d0c23b278f00538921`, tree
   `b6537dcaa7bee526d9a393e2603b28648f4b0438`, through the reviewed R0 rebase
-  record. A new Execution approval still requires the revised authority bytes.
+  record (`specs/sprint-nova-epic/design/rebase-readiness-0.4.7.md`, "Completed
+  local adoption — 2026-08-01" section) — this is the readiness half of the
+  former gate, and it is also complete.
 - Issue `#98` is a P0 blocker and composes `#54`, `#56`, the released
   publication authority/executor and the one configured Verify command.
 - The package has exact Nova write paths/resources and does not share a

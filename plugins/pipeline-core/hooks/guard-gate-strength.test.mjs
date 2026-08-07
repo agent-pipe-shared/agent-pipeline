@@ -12,17 +12,29 @@
  * — which classifies what an override may touch and gates nothing.
  */
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { GATE_STRENGTH_PATHS, gateStrengthRuleFor, insideLivePlugin } from "./guard-gate-strength.mjs";
+import { GATE_STRENGTH_PATHS, LIVE_PLUGIN_RULE, gateStrengthRuleFor, insideLivePlugin, livePluginRoots } from "./guard-gate-strength.mjs";
+import { installGuardMaintenanceWindow, prepareGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
+import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
+import {
+  HGO_SIGNATURE_REASON,
+  authorizeHumanGuardOverride,
+  authorizeHumanGuardOverrideBySignature,
+  planHumanGuardOverride,
+  prepareHumanGuardOverrideAuthorization,
+  recordHumanGuardDenial,
+} from "../lib/human-guard-override.mjs";
 
 const HOOKS = dirname(fileURLToPath(import.meta.url));
 const GUARD = join(HOOKS, "guard-gate-strength.mjs");
 const PLUGIN_ROOT = join(HOOKS, "..");
+const OVERRIDE_SCRIPT = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
 const roots = [];
 
 function governed() {
@@ -302,6 +314,320 @@ try {
     });
     assert.notEqual(result.status, 0, "the legacy-tier guard config was writable");
     assert.match(result.stderr ?? "", /Rule ID: GS-7/u);
+  });
+
+  check("GST20 a real armed GS-6 window lifts an ordinary plugin file but a kernel path stays refused", () => {
+    const root = mkdtempSync(join(tmpdir(), "gate-strength-gmw-"));
+    roots.push(root);
+    execFileSync("git", ["init", "-q"], { cwd: root });
+    execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: root });
+    execFileSync("git", ["config", "user.name", "Test"], { cwd: root });
+    mkdirSync(join(root, "project"), { recursive: true });
+    writeFileSync(join(root, "plan.md"), "plan\n");
+    writeFileSync(join(root, "spec.md"), "spec\n");
+    const pair = generateKeyPairSync("ed25519");
+    const publicKey = pair.publicKey.export({ type: "spki", format: "pem" });
+    const publicKeySha256 = createHash("sha256").update(publicKey).digest("hex");
+    writeFileSync(join(root, "project", "critical-human-proof.json"), JSON.stringify({
+      schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push"],
+      trustAnchor: { keyReference: "gst-e2e", publicKeySha256 },
+    }));
+    execFileSync("git", ["add", "-A"], { cwd: root });
+    execFileSync("git", ["commit", "-q", "-m", "gmw-fixture"], { cwd: root });
+    const livePluginRoot = livePluginRoots()[0];
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "GST20",
+      featureId: "gst20", planSha256: createHash("sha256").update("plan\n").digest("hex"),
+      specSha256: createHash("sha256").update("spec\n").digest("hex"), policyRevision: "gst20-v1", livePluginRoot,
+    });
+    const proof = {
+      schema: PO_APPROVAL_PROOF_SCHEMA, intentSha256: intent.sha256, keyReference: "gst-e2e", publicKey,
+      signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), pair.privateKey).toString("base64"),
+    };
+    installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy: { keyReference: "gst-e2e", publicKeySha256 }, proof, livePluginRoot });
+
+    const ordinary = ask(root, join(PLUGIN_ROOT, "hooks", "guard-git.mjs"));
+    assert.equal(ordinary.blocked, false, "ordinary plugin file should be lifted under the active window");
+    assert.match(ordinary.stderr, /guard-maintenance-window.*GS-6 lifted/u);
+
+    const kernel = ask(root, join(PLUGIN_ROOT, "hooks", "guard-gate-strength.mjs"));
+    assert.equal(kernel.blocked, true, "kernel path must stay refused under the SAME active window");
+    assert.doesNotMatch(kernel.stderr, /lifted/u);
+    const kernel2 = ask(root, join(PLUGIN_ROOT, "hooks", "hooks.json"));
+    assert.equal(kernel2.blocked, true);
+  });
+
+  // ---- ADR-0059 Decision 3 / its follow-up on this guard specifically: the
+  // always-attempt-consume-first lift for GS-1..GS-5/GS-7, and the GS-6 exclusion
+  // that stays completely unchanged. Fixture helpers mirror
+  // guard-testpath-override.test.mjs's own `arm()` shape (denial -> plan ->
+  // prepare-authorization -> authorize) rather than reinventing it, plus a second
+  // arming path for the genuine detached-signature route this guard also offers.
+  function governedGit({ mode = "chat", trustAnchor = null } = {}) {
+    const base = mkdtempSync(join(tmpdir(), "gate-strength-hgo-"));
+    roots.push(base);
+    mkdirSync(join(base, "project"), { recursive: true });
+    writeFileSync(join(base, "pipeline.user.yaml"), `schema: "pipeline.user.v3"\ngates:\n  push_approval: "${mode}"\n`);
+    writeFileSync(join(base, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+    writeFileSync(join(base, "project", "guard-config.json"), '{"protectedTestPaths":[]}\n');
+    const policy = trustAnchor
+      ? { schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push"], trustAnchor }
+      : { schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push"] };
+    writeFileSync(join(base, "project", "critical-human-proof.json"), JSON.stringify(policy));
+    writeFileSync(join(base, "README.md"), "# fixture\n");
+    execFileSync("git", ["init", "-q"], { cwd: base });
+    execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: base });
+    execFileSync("git", ["config", "user.name", "Test"], { cwd: base });
+    execFileSync("git", ["add", "-A"], { cwd: base });
+    execFileSync("git", ["commit", "-q", "-m", "fixture"], { cwd: base });
+    return base;
+  }
+
+  function keyPair() {
+    const pair = generateKeyPairSync("ed25519");
+    const publicKeyPem = pair.publicKey.export({ type: "spki", format: "pem" });
+    return {
+      privateKey: pair.privateKey,
+      publicKeyPem,
+      publicKeySha256: createHash("sha256").update(publicKeyPem).digest("hex"),
+    };
+  }
+
+  function denialFor(rule) {
+    return `${rule.id}: ${rule.reason}`;
+  }
+
+  /** Exactly the chain a human clears in `chat` mode: denial -> plan -> prepare -> authorize --activate. */
+  function armByChat(root, toolInput, denialReason, { toolName = "Edit" } = {}) {
+    const denials = [{ guard: "guard-gate-strength.mjs", reason: denialReason }];
+    const shared = { rootDir: root, pluginRoot: PLUGIN_ROOT, scriptPath: OVERRIDE_SCRIPT };
+    const recorded = recordHumanGuardDenial({ ...shared, toolName, toolInput, denials });
+    assert.equal(recorded.status, "planned", `denial not plannable: ${JSON.stringify(recorded)}`);
+    const { requestSha256 } = recorded;
+    const planned = planHumanGuardOverride({ ...shared, requestSha256 });
+    const reason = "briefed test-change task";
+    const prepared = prepareHumanGuardOverrideAuthorization({
+      ...shared, requestSha256, planSha256: planned.planSha256, reason,
+    });
+    const armed = authorizeHumanGuardOverride({
+      ...shared,
+      requestSha256,
+      planSha256: planned.planSha256,
+      selectionSha256: prepared.selectionSha256,
+      reason,
+      reasonSha256: prepared.reasonSha256,
+      activate: true,
+    });
+    assert.equal(armed.status, "armed", `chat arming failed: ${JSON.stringify(armed)}`);
+    return { planSha256: planned.planSha256, requestSha256 };
+  }
+
+  /**
+   * The genuine detached-signature chain (ADR-0059 Decision 1): denial -> plan ->
+   * prepare (fixed HGO_SIGNATURE_REASON text) -> sign the rebuilt PO-approval intent
+   * -> authorize-by-signature. No in-session `activate` step exists for this path;
+   * presence of a verified signature IS the authorization.
+   */
+  function armBySignature(root, toolInput, denialReason, { toolName = "Edit", pair, keyReference } = {}) {
+    const denials = [{ guard: "guard-gate-strength.mjs", reason: denialReason }];
+    const shared = { rootDir: root, pluginRoot: PLUGIN_ROOT, scriptPath: OVERRIDE_SCRIPT };
+    const recorded = recordHumanGuardDenial({ ...shared, toolName, toolInput, denials });
+    assert.equal(recorded.status, "planned", `denial not plannable: ${JSON.stringify(recorded)}`);
+    const { requestSha256 } = recorded;
+    const planned = planHumanGuardOverride({ ...shared, requestSha256 });
+    const prepared = prepareHumanGuardOverrideAuthorization({
+      ...shared, requestSha256, planSha256: planned.planSha256, reason: HGO_SIGNATURE_REASON,
+    });
+    const intent = createPoApprovalIntent({
+      kind: "guard-override",
+      featureId: "human-guard-override",
+      planSha256: createHash("sha256").update("pipeline.human-guard-override-signature-plan.v1").digest("hex"),
+      specSha256: createHash("sha256").update("pipeline.human-guard-override-signature-spec.v1").digest("hex"),
+      candidate: { commit: planned.repository.head, tree: planned.repository.tree },
+      policyRevision: "human-guard-override-signature-v1",
+      subjectSha256: prepared.selectionSha256,
+      decision: "authorize",
+    });
+    const proof = {
+      schema: PO_APPROVAL_PROOF_SCHEMA,
+      intentSha256: intent.sha256,
+      keyReference,
+      publicKey: pair.publicKeyPem,
+      signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), pair.privateKey).toString("base64"),
+    };
+    const armed = authorizeHumanGuardOverrideBySignature({
+      ...shared, requestSha256, planSha256: planned.planSha256, proof,
+    });
+    assert.equal(armed.status, "armed", `signature arming failed: ${JSON.stringify(armed)}`);
+    return { planSha256: planned.planSha256, requestSha256 };
+  }
+
+  /** A GS-6 target that lives INSIDE the fixture itself, via a declared plugin root. */
+  function declaredLivePluginFixture({ mode = "chat" } = {}) {
+    const base = governedGit({ mode });
+    const declaredRoot = join(base, "declared-plugin");
+    mkdirSync(join(declaredRoot, "hooks"), { recursive: true });
+    mkdirSync(join(declaredRoot, ".claude-plugin"), { recursive: true });
+    writeFileSync(join(declaredRoot, ".claude-plugin", "plugin.json"), JSON.stringify({ name: "pipeline-core", version: "0.0.0-fixture" }));
+    writeFileSync(join(declaredRoot, "hooks", "some-guard.mjs"), "// fixture\n");
+    return { base, declaredRoot, targetFile: join(declaredRoot, "hooks", "some-guard.mjs") };
+  }
+
+  check("GST21 a chat-armed capability admits the exact bound edit to a GS-1..GS-5/GS-7 path", () => {
+    const rule = GATE_STRENGTH_PATHS.find((entry) => entry.id === "GS-4");
+    const root = governedGit({ mode: "chat" });
+    assert.equal(ask(root, rule.path).blocked, true, "precondition: refused while unarmed");
+    armByChat(root, { file_path: rule.path }, denialFor(rule));
+    const { blocked, stderr } = ask(root, rule.path);
+    assert.equal(blocked, false, `armed capability did not admit the edit:\n${stderr}`);
+    assert.match(stderr, /\[pipeline-human-override\] guard-gate-strength GS-4: exact one-time capability consumed/u);
+  });
+
+  check("GST22 a signature-armed capability admits it regardless of the committed mode", () => {
+    const rule = GATE_STRENGTH_PATHS.find((entry) => entry.id === "GS-3");
+    const pair = keyPair();
+    const trustAnchor = { keyReference: "gst-hgo-signature", publicKeySha256: pair.publicKeySha256 };
+    // Armed and consumed once with the committed mode at "signature" (this repository's
+    // actual default), once at "chat" -- proving admission does not depend on either.
+    for (const mode of ["signature", "chat"]) {
+      const root = governedGit({ mode, trustAnchor });
+      const absolutePath = join(root, rule.path);
+      assert.equal(ask(root, absolutePath).blocked, true, `precondition (mode=${mode}): refused while unarmed`);
+      armBySignature(root, { file_path: absolutePath }, denialFor(rule), { pair, keyReference: "gst-hgo-signature" });
+      const { blocked, stderr } = ask(root, absolutePath);
+      assert.equal(blocked, false, `mode=${mode}: signature-armed capability was not admitted:\n${stderr}`);
+      assert.match(stderr, /\[pipeline-human-override\] guard-gate-strength GS-3: exact one-time capability consumed/u, `mode=${mode}`);
+    }
+  });
+
+  check("GST23 with nothing armed, the refusal names the mode-appropriate next command", () => {
+    const rule = GATE_STRENGTH_PATHS.find((entry) => entry.id === "GS-4");
+
+    const chatStderr = ask(governedGit({ mode: "chat" }), rule.path).stderr;
+    assert.match(chatStderr, /plan --repo/u);
+    assert.match(chatStderr, /prepare-authorization --repo/u);
+    assert.match(chatStderr, /--selection-sha256/u);
+    assert.match(chatStderr, /--activate/u);
+    assert.doesNotMatch(chatStderr, /authorize-by-signature/u);
+
+    const sigStderr = ask(governedGit({ mode: "signature" }), rule.path).stderr;
+    assert.match(sigStderr, /plan --repo/u);
+    assert.match(sigStderr, /prepare-authorization --repo/u);
+    assert.match(sigStderr, /authorize-by-signature --repo/u);
+    assert.match(sigStderr, /--proof/u);
+    assert.doesNotMatch(sigStderr, /--activate/u);
+    assert.doesNotMatch(sigStderr, /--selection-sha256/u);
+  });
+
+  check("GST24 an unusable override store leaves the refusal exactly as it was", () => {
+    const rule = GATE_STRENGTH_PATHS.find((entry) => entry.id === "GS-4");
+    const root = governed(); // no git: the override store has no repository to bind to
+    const { blocked, stderr } = ask(root, rule.path);
+    assert.equal(blocked, true, "a broken override store must not become an authorization");
+    assert.match(stderr, new RegExp(`Rule ID: ${rule.id}\\b`, "u"));
+    assert.doesNotMatch(stderr, /--request-sha256/u);
+    assert.doesNotMatch(stderr, /capability consumed/u);
+    assert.doesNotMatch(stderr, /Human override available/u);
+  });
+
+  check("GST25 a capability bound to a different edit does not admit this one", () => {
+    const ruleA = GATE_STRENGTH_PATHS.find((entry) => entry.id === "GS-4");
+    const ruleB = GATE_STRENGTH_PATHS.find((entry) => entry.id === "GS-3");
+    const root = governedGit({ mode: "chat" });
+    armByChat(root, { file_path: ruleA.path }, denialFor(ruleA));
+    const { blocked, stderr } = ask(root, ruleB.path);
+    assert.equal(blocked, true, "a capability bound elsewhere admitted this edit");
+    assert.match(stderr, new RegExp(`Rule ID: ${ruleB.id}\\b`, "u"));
+    assert.doesNotMatch(stderr, /capability consumed/u);
+  });
+
+  check("GST26 the capability is single-use: the same edit is refused again", () => {
+    const rule = GATE_STRENGTH_PATHS.find((entry) => entry.id === "GS-4");
+    const root = governedGit({ mode: "chat" });
+    armByChat(root, { file_path: rule.path }, denialFor(rule));
+    assert.equal(ask(root, rule.path).blocked, false, "precondition: first use is admitted");
+    const { blocked, stderr } = ask(root, rule.path);
+    assert.equal(blocked, true, "a consumed capability was accepted a second time");
+    assert.doesNotMatch(stderr, /capability consumed/u);
+  });
+
+  check("GST27 GS-6 is never lifted by this path, even with a real, valid, exactly-matching armed capability", () => {
+    // The exclusion most worth pinning (ADR-0059's follow-up decision): GS-1..GS-5/GS-7
+    // get the always-attempt-consume-first lift, GS-6 never does, and no special-casing
+    // is needed to prove it -- the code path that would consume never runs for GS-6 at
+    // all. Proven the hard way: a genuinely armed capability, built to match EXACTLY
+    // what the guard would need to consume for this edit if it ever tried to, still
+    // does not admit it.
+    const { base, declaredRoot, targetFile } = declaredLivePluginFixture({ mode: "chat" });
+    const before = ask(base, targetFile, { CLAUDE_PLUGIN_ROOT: declaredRoot });
+    assert.equal(before.blocked, true);
+    assert.match(before.stderr, /Rule ID: GS-6\b/u, "precondition: the declared root is not classified GS-6");
+
+    armByChat(base, { file_path: targetFile }, denialFor(LIVE_PLUGIN_RULE));
+
+    const { blocked, stderr } = ask(base, targetFile, { CLAUDE_PLUGIN_ROOT: declaredRoot });
+    assert.equal(blocked, true, "GS-6 was lifted by an armed HGO capability");
+    assert.match(stderr, /Rule ID: GS-6\b/u);
+    assert.doesNotMatch(stderr, /capability consumed/u);
+    assert.doesNotMatch(stderr, /lifted/u);
+    assert.match(stderr, /no in-session override/u);
+  });
+
+  check("GST28 the HGO consume call is reached only when the matched rule is not GS-6", () => {
+    // A static companion to GST27: the consume call site itself must be lexically
+    // inside the `matched !== LIVE_PLUGIN_RULE` block, not merely behaved-as-if by
+    // this fixture's particular inputs.
+    const source = readFileSync(GUARD, "utf8");
+    const guardIndex = source.indexOf("if (matched !== LIVE_PLUGIN_RULE) {");
+    const consumeIndex = source.indexOf("consumeHumanGuardOverride({");
+    assert.ok(guardIndex > 0 && consumeIndex > 0, "expected both the GS-6 exclusion guard and the consume call");
+    assert.ok(guardIndex < consumeIndex, "the consume call is not gated behind the GS-6 exclusion");
+  });
+
+  check("GST29 the refusal text differs: GS-6 states there is no in-session override, the lifted rules do not", () => {
+    const base = mkdtempSync(join(tmpdir(), "gate-strength-text-"));
+    roots.push(base);
+    writeFileSync(join(base, "README.md"), "# unrelated, ungoverned\n");
+    const gs6 = ask(base, join(PLUGIN_ROOT, "hooks", "guard-git.mjs"));
+    assert.equal(gs6.blocked, true);
+    assert.match(gs6.stderr, /no in-session override/u);
+
+    const rule = GATE_STRENGTH_PATHS.find((entry) => entry.id === "GS-4");
+    const lifted = ask(governed(), rule.path);
+    assert.equal(lifted.blocked, true);
+    assert.doesNotMatch(lifted.stderr, /no in-session override/u);
+  });
+
+  check("GST30 an unusable override store still says a route was attempted, and what the attempt hit", () => {
+    // Moved here from lib/human-guard-override.test.mjs, which hosted it only because this
+    // suite is TP-6 protected and no maintenance window was open when NOVA-HGOSIG-ROUTE-1
+    // landed it. It spawns this guard end to end, so it belongs beside the guard it
+    // describes; the library suite keeps the renderer's own direct unit cases.
+    //
+    // GST24 above pins the half that must NOT change -- an unusable store is not an
+    // authorization, so the refusal stands, no route is printed and nothing is consumed;
+    // those assertions are not repeated here. This is the other half (ADR-0059 Decision 4):
+    // the denial now says a route was ATTEMPTED and names the typed code the attempt hit,
+    // instead of being byte-identical to a rule that has no override at all -- which for
+    // this guard is a real, adjacent case (GS-6, pinned by GST29). `governed()` has no Git
+    // control path, so the planner throws rather than answering a typed status, exercising
+    // humanGuardRouteUnavailableReason()'s `error` branch.
+    const rule = GATE_STRENGTH_PATHS.find((entry) => entry.id === "GS-4");
+    const root = governed();
+    const { blocked, stderr } = ask(root, rule.path);
+    assert.equal(blocked, true, "a broken override store must not become an authorization");
+    assert.match(stderr, /Rule ID: GS-4\b/u);
+    assert.match(
+      stderr,
+      /No human override route is offered for this exact edit; the guard attempted to plan one\.\nReason: planning the route failed with code=HGO-GIT\./u,
+      `the route-less denial said nothing about why:\n${stderr}`,
+    );
+    // The reason discloses nothing beyond the typed code: exactly two lines, no path
+    // separator, and never the repository root.
+    const block = stderr.slice(stderr.indexOf("No human override route is offered")).trim();
+    assert.equal(block.split("\n").length, 2, block);
+    assert.doesNotMatch(block, /[\\/]/u, `the reason leaked a path separator:\n${block}`);
+    assert.ok(!block.includes(root), "the reason leaked the repository root");
   });
 
   console.log(`\nguard-gate-strength: ${passed} passed, ${failed} failed`);

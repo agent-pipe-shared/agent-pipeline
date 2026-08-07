@@ -232,6 +232,25 @@ try {
     );
   });
 
+  check("RBL12 a closing entry's reason names the closure sync, not the generic disclaimer", () => {
+    const { base, head } = fixture({
+      items: [ITEM("nu", "closed", {
+        closed_at: "2026-07-02", closure_repository: "self",
+        closure_commit: "PLACEHOLDER", closure_evidence: "backlog/evidence/nu.md",
+      })],
+      evidenceFiles: ["nu.md"],
+    });
+    const path = join(base, "backlog", "items", "2026-07-01-nu.md");
+    writeFileSync(path, readFileSync(path, "utf8").replace("PLACEHOLDER", head));
+    const plan = planBacklogReconciliation(base, { at: "2026-08-06" });
+    assert.equal(plan.ok, true, plan.findings.join("; "));
+    const nonClosing = plan.planned.filter((event) => event.to !== "closed");
+    const closing = plan.planned.filter((event) => event.to === "closed");
+    assert.ok(nonClosing.length > 0 && closing.length > 0);
+    for (const event of nonClosing) assert.match(event.reason, /claims no implementation, no review, and no closure/u);
+    for (const event of closing) assert.match(event.reason, /attests the sync to that pre-existing closure record/u);
+  });
+
   check("RBL10 the transaction journal does not survive a successful apply", () => {
     const { base } = fixture({
       items: [ITEM("kappa", "open")],

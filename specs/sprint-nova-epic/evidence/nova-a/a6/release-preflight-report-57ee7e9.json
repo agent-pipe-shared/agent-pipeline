@@ -1,0 +1,144 @@
+{
+  "schema": "pipeline.release-preflight-exercise-report.v1",
+  "reportId": "nova-a6-57ee7e9",
+  "identity": {
+    "builderId": "release-preflight",
+    "builderSha256": "c4792d023653f4727ad1d3c3ffa2a585630d89d12bb73172739c5f9d92e06705",
+    "cliId": "release-preflight-cli",
+    "cliSha256": "acc780022ebf0d3e38af7907fded3e48cedba7216035069a5d6c1ed19358811b"
+  },
+  "verify": {
+    "command": "node --test plugins/pipeline-core/scripts/release-preflight.test.mjs",
+    "exitCode": 0,
+    "suites": [
+      {
+        "path": "plugins/pipeline-core/scripts/release-preflight.test.mjs",
+        "fileSha256": "aea06078a58fa4d8d3193847615efcc3752e6d9df27fa23f14b664d416b83c35",
+        "passed": 18,
+        "total": 18
+      }
+    ]
+  },
+  "verifyCli": {
+    "command": "node --test plugins/pipeline-core/scripts/release-preflight-cli.test.mjs",
+    "exitCode": 0,
+    "suites": [
+      {
+        "path": "plugins/pipeline-core/scripts/release-preflight-cli.test.mjs",
+        "fileSha256": "a17352b19e76d50985f469cc4eaea5c3f6ecd47e04f916c44d2be11ebfed8fc7",
+        "passed": 9,
+        "total": 9
+      }
+    ]
+  },
+  "realInvocation": {
+    "command": "node plugins/pipeline-core/scripts/release-preflight-cli.mjs --preflight-id nova-a56-evidence-1 --base v0.5.2 --consent specs/sprint-nova-epic/evidence/nova-a/a6/consent-input-57ee7e9.json --lifecycle specs/sprint-nova-epic/evidence/nova-a/a6/lifecycle-input-57ee7e9.json --retention-policy 7fcfbd163addeac8bcc025c0a56692f2f695086b65ce40435f5bdb5d8bc68105 --out specs/sprint-nova-epic/evidence/nova-a/a6/release-preflight-record-57ee7e9.json",
+    "exitCode": 0,
+    "candidate": {
+      "commit": "57ee7e94cd2472f66d6561a232edff89512f9d14",
+      "tree": "3dfa21ea2bdee08d5ff840f5429120e1fe848d15"
+    },
+    "base": {
+      "commit": "5a23a2453c4740addf33f7b83a62e7084e9259b0",
+      "tree": "23171c38a317d8cdf50baa013f54f5447e17f754",
+      "ref": "v0.5.2"
+    },
+    "consentInputStatus": "declined",
+    "consentInputNote": "No real PO consent record exists for this dispatch. A synthetic input with status \"declined\" was supplied so the tool never self-supplies \"approved\" on the PO's behalf (RPC02); this reproduces the honest default, not a fabricated positive claim.",
+    "gg03Path": null,
+    "gg03Note": "Omitted: no real GG-03 fast-forward binding artifact exists in the repository for this candidate. Recorded as gates.gg03.required=false (not required), never as satisfied, matching RPC06.",
+    "outputStatus": "blocked",
+    "outputReasons": ["repository-not-clean", "consent-not-approved"],
+    "outputRecordSha256": "30229871c821406fe4c43d104dc485a8a622b2589815c5f9e1a72b1862257614",
+    "versionSurfacesAgree": true,
+    "fullRecordPath": "specs/sprint-nova-epic/evidence/nova-a/a6/release-preflight-record-57ee7e9.json",
+    "note": "repository-not-clean is genuine: the working tree carries this dispatch's own new evidence-input files (untracked, uncommitted at run time), which the tool correctly observed and reported rather than ignoring."
+  },
+  "criteria": [
+    {
+      "criterionId": "NVA-A56-1",
+      "text": "A clean prepared 0.4.x-style candidate receives a deterministic ready report without running final gates.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/scripts/release-preflight.test.mjs", "name": "A56-1 prepared 0.4.x candidate is only eligible to begin final gates" },
+        { "kind": "test", "path": "plugins/pipeline-core/scripts/release-preflight-cli.test.mjs", "name": "RPC01 a clean candidate with agreeing surfaces and approved consent is ready" }
+      ],
+      "note": "The real invocation against current HEAD is not itself a clean-ready case (repository-not-clean, consent-not-approved) — that is expected given this dispatch's honest inputs, not a defect; the ready path is proven at the unit level for a synthetic clean fixture, per RPC01."
+    },
+    {
+      "criterionId": "NVA-A56-2",
+      "text": "Version, documentation, retention and candidate drift fail before Full Verify.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/scripts/release-preflight.test.mjs", "name": "A56-2 version drift blocks before any final-gate claim" },
+        { "kind": "test", "path": "plugins/pipeline-core/scripts/release-preflight.test.mjs", "name": "A56-2 candidate and repository drift are deterministic blockers" },
+        { "kind": "test", "path": "plugins/pipeline-core/scripts/release-preflight-cli.test.mjs", "name": "RPC03 an uncommitted working tree blocks" },
+        { "kind": "test", "path": "plugins/pipeline-core/scripts/release-preflight-cli.test.mjs", "name": "RPC04 version surfaces that disagree block" },
+        { "kind": "real-run", "path": "specs/sprint-nova-epic/evidence/nova-a/a6/release-preflight-record-57ee7e9.json", "note": "repository-not-clean fired for real against the actual working tree at invocation time" }
+      ]
+    },
+    {
+      "criterionId": "NVA-A56-3",
+      "text": "Local deterministic blockers remain distinct from remote/human gates.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/scripts/release-preflight.test.mjs", "name": "A56-3 remote and human gates remain external pending inventory entries" },
+        { "kind": "test", "path": "plugins/pipeline-core/scripts/release-preflight.test.mjs", "name": "A56-3 rejects reordered, completed, duplicated, or extra final-gate inventory" },
+        { "kind": "real-run", "path": "specs/sprint-nova-epic/evidence/nova-a/a6/release-preflight-record-57ee7e9.json", "note": "the real record's gates.inventory keeps verify/security/critic as kind:local-final and remote/human as kind:external, all status:pending, distinct from the local reasons array that actually blocked" }
+      ]
+    },
+    {
+      "criterionId": "NVA-A56-4",
+      "text": "Valid GG-03 binding reaches evidence validation instead of an ambiguous command-form rejection.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/scripts/release-preflight.test.mjs", "name": "A56-4 valid GG-03 binding reaches normal evidence-ready evaluation" },
+        { "kind": "test", "path": "plugins/pipeline-core/scripts/release-preflight.test.mjs", "name": "A56-4 missing GG-03 binding rejects the closed contract" },
+        { "kind": "test", "path": "plugins/pipeline-core/scripts/release-preflight.test.mjs", "name": "A56-4 mismatched GG-03 candidate is a local blocker" },
+        { "kind": "test", "path": "plugins/pipeline-core/scripts/release-preflight.test.mjs", "name": "A56-4 ambiguous GG-03 command-shaped extras are rejected" },
+        { "kind": "test", "path": "plugins/pipeline-core/scripts/release-preflight-cli.test.mjs", "name": "RPC05 a GG-03 binding naming another candidate blocks" },
+        { "kind": "test", "path": "plugins/pipeline-core/scripts/release-preflight-cli.test.mjs", "name": "RPC06 an omitted GG-03 is recorded as not required, never as satisfied" }
+      ],
+      "note": "Demonstrated at the unit/contract level and for the not-required path in the real run (--gg03 omitted, gates.gg03.required=false). A real *positive* GG-03 binding run against this candidate could not be produced: no GG-03 fast-forward evidence artifact exists in this repository for HEAD, and fabricating one would recreate exactly the self-attestation problem the CLI is designed to refuse. Reported honestly as not-verifiable for the positive real-binding case only."
+    },
+    {
+      "criterionId": "NVA-A56-5",
+      "text": "Cyborg requirements can be registered after reconciliation without importing unpublished Cyborg bytes.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/scripts/release-preflight.test.mjs", "name": "A56-5 later Cyborg extension registration admits opaque accepted requirement digests" },
+        { "kind": "test", "path": "plugins/pipeline-core/scripts/release-preflight.test.mjs", "name": "A56-5 rejects unordered or unpublished extension payload fields" },
+        { "kind": "test", "path": "plugins/pipeline-core/scripts/release-preflight.test.mjs", "name": "A56-5 rejects an oversized registered extension set" }
+      ],
+      "note": "Contract-level only; the real run used extensions.status=\"none\" (the CLI derives no extension registry). No real-run evidence for the registered path."
+    },
+    {
+      "criterionId": "NVA-A56-6",
+      "text": "Missing lifecycle manifest, durable PRD/Spec/acceptance/Result destination, archive digest/provenance, public/private classification or bounded consent-status readback blocks readiness without exposing raw consent, credential or environment material.",
+      "status": "demonstrated",
+      "evidence": [
+        { "kind": "test", "path": "plugins/pipeline-core/scripts/release-preflight.test.mjs", "name": "A56-6 missing lifecycle manifest, retention archive provenance, classification, and bounded consent readback reject input" },
+        { "kind": "test", "path": "plugins/pipeline-core/scripts/release-preflight.test.mjs", "name": "A56-6 rejects path traversal, duplicate documentation destinations, unordered retention, and reversed consent bounds" },
+        { "kind": "test", "path": "plugins/pipeline-core/scripts/release-preflight.test.mjs", "name": "declined but bounded consent is represented as a blocker without its raw text" },
+        { "kind": "test", "path": "plugins/pipeline-core/scripts/release-preflight-cli.test.mjs", "name": "RPC07 documentation digests are read from the tree, not supplied" },
+        { "kind": "test", "path": "plugins/pipeline-core/scripts/release-preflight-cli.test.mjs", "name": "RPC08 an absolute or escaping input path is refused" },
+        { "kind": "real-run", "path": "specs/sprint-nova-epic/evidence/nova-a/a6/release-preflight-record-57ee7e9.json", "note": "the real record's consent block carries only status/typed digests/timestamps for the declined consent, no raw consent text, credential or environment material" }
+      ]
+    },
+    {
+      "criterionId": "NVA-A56-7",
+      "text": "Before candidate authorization, preflight binds the intended remote fingerprint/ref and exact preimage and reports usable credentials, ref write capability, relevant workflow-update capability, repository/ref policy and fixed executor availability as sanitized typed cells.",
+      "status": "not-verifiable",
+      "evidence": [],
+      "note": "Out of this dispatch's scope and, on inspection, not represented by release-preflight.mjs / release-preflight-cli.mjs at all: their schema (base/candidate/version/repository/documentation/lifecycle/retention/consent/gates/extensions) has no remote fingerprint, ref, preimage, credential, ref-write-capability, workflow-update-capability or executor-availability fields. That sanitized-typed-cell machinery (fingerprint/preimage/permissions/workflow-update `cell(...)`) lives in plugins/pipeline-core/scripts/publication-executor.mjs (observed read-only, outside this briefing's four-file scope). Reported honestly as not-verifiable within this dispatch rather than claimed against the wrong producer."
+    },
+    {
+      "criterionId": "NVA-A56-8",
+      "text": "Missing endpoint access, insufficient permission, policy rejection, stale preimage, ambiguous transport and unavailable executor are distinct non-ready results; successful read access cannot imply write capability.",
+      "status": "not-verifiable",
+      "evidence": [],
+      "note": "Same finding as NVA-A56-7: this criterion describes publication-executor.mjs's remote-capability negotiation (permissions/workflowUpdate typed cells with values like unavailable/insufficient/not-required, ambiguous-transport handling), not release-preflight.mjs or its CLI. Not producible or evidenced from the files in this dispatch's scope."
+    }
+  ],
+  "matrixContext": "The #56 issue-acceptance-matrix row's own 'Remaining gap' already names this: 'require GG-03 binding and typed permission/credential cells before authorization' — the typed permission/credential cells (NVA-A56-7/8) are recorded there as still open, consistent with this finding."
+}
