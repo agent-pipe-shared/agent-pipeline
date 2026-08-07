@@ -565,8 +565,16 @@ external step.
 
 Two parallel, non-overlapping dispatches launched: `NOVA-HGOSIG-4`
 (goldfish-deep) for the test-wording fix, `NOVA-GITLEAKS-FP-1`
-(goldfish-implementor) for the `.gitleaksignore` fingerprints. Both running
-as of this note.
+(goldfish-implementor) for the `.gitleaksignore` fingerprints.
+
+**`NOVA-GITLEAKS-FP-1` landed:** commit `dfe7619` — two freshly-computed
+`content-v1:` fingerprints appended via the adapter's own exported
+`gitleaksContentAuthorityLine()` helper (never hand-computed), the two stale
+existing entries left untouched per this repo's own precedent. Independently
+re-verified: `node harness/scripts/security-scan.mjs` → `gitleaks: OK (0
+findings)`, `Verdict: CLEAN`, exit 0. This suite is now genuinely clean.
+`NOVA-HGOSIG-4` (the `guard-testpath-override.test.mjs` wording fix) still
+running as of this note.
 
 **Mandatory next steps (restated, unchanged):** once full Verify confirms
 exit 0, dispatch the mandatory T1 Critic round on the complete ADR-0059
