@@ -5,6 +5,41 @@
 
 **Last updated:** 2026-08-07
 
+**HOLD — plugin snapshot sync deferred by PO instruction (2026-08-07 evening).**
+A newer local plugin candidate is installed and reloaded:
+`0.5.3+claude.20260807181921.f667dec` at
+`<local-marketplace>/plugins/pipeline-core` (this branch's own tree is still
+`0.5.2`). The build commit `f667dec` does **not** exist in this repository and
+the install is a flat copy with no `.git`, so the only provenance is the
+version string — the same non-git topology Part A's residual R2 concerns.
+The PO asked to extend the earlier snapshot sync (`cca5ad8`) against this newer
+candidate, then immediately instructed to **wait**; no file of that tree has
+been touched and no merge was started. What the sizing pass established before
+stopping, so it is not re-derived later:
+- `lib/guard-maintenance-window.mjs` is **byte-identical** in both trees — GMW
+  itself did not change. The new work is a different mechanism.
+- The candidate carries **ADR-0059**, absent from this branch entirely (`rg -c
+  "ADR-0059"` over `plugins/` and `docs/` returns nothing here). It spans
+  `guard-testpath`, `guard-gate-strength`, `guard-lifecycle-ready`,
+  `codex-pretool-guard`, `lib/human-guard-override.mjs` and
+  `scripts/guard-human-override.mjs`, each with its test file.
+- **What it changes is directly relevant to this branch's open blocker.** In
+  `signature` mode an HGO is no longer refused outright: Decision 3 drops the
+  `overrideAdmitted` pre-gate so consumption is always attempted, and Decision 1
+  keeps the in-session `activate: true` path refused while admitting
+  `authorizeHumanGuardOverrideBySignature()` — an external Ed25519 proof. The
+  refusal message now prints the exact `authorize-by-signature` continuation
+  (Decision 4). So the TP-3 workaround this branch has been living with
+  (sibling test files, or a direct PO edit outside the session) has a sanctioned
+  alternative in the candidate.
+- Two files exist only in the candidate: `scripts/guard-human-override.test.mjs`
+  and `scripts/po-human-approval.test.mjs`. Roughly 30 further files differ and
+  need the same per-file take/keep judgement `cca5ad8` used; a large share of
+  the "only in this branch" entries are Phoenix's own governance/ledger work and
+  must not be reverted.
+- Unresolved before any merge: several differing files are TP-protected test
+  suites, so the sync itself would hit the very guard ADR-0059 addresses.
+
 **Next-session pointer (restart handover, 2026-08-07 evening):** both
 post-merge redesign packages have landed code this session:
 - **WP5/PHX-2** (external push-authority ledger): design Critic-clean
@@ -620,7 +655,11 @@ post-merge redesign packages have landed code this session:
   `phoenix-authority-revision.mjs` — an external-key, human-terminal signing
   boundary for a continuity authority revision. That mechanism **stays, in
   full.** It is not a second ceremony added on top of the accepted ceiling; per
-  this file's own earlier record (`:1658-1662`) the PO already confirmed on
+  this file's own earlier record — the Product Owner runbook's step 5, findable
+  by the phrase "The Product Owner has confirmed that signing outside the agent
+  session", cited by content rather than by line number because line numbers in
+  this file drift with every prepended entry (this citation was already stale
+  once) — the PO confirmed on
   2026-08-06 that "signing outside the agent session is intended and stays: the
   prompt is what keeps the credential out of the session's reach, and an agent
   able to satisfy it would hold the signing authority it exists to be denied."
