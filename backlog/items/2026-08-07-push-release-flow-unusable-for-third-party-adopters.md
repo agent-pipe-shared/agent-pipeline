@@ -118,6 +118,57 @@ commitment to any of them:
    already carries a verified per-commit, per-destination Ed25519 signature
    for `kind: push`?) — not proposing removal here, proposing the question
    be asked deliberately rather than left as accreted layers.
+7. **PO requirement, 2026-08-07 evening, stated after walking the branch-push
+   flow end to end:** *"das es zu umständlich ist und korrigiert werden muss.
+   die eine signatur muss für alles reichen und auch da will man nicht 2
+   befehle sondern nur den einen."* Two distinct requirements, both narrower
+   and more testable than the earlier restatements, so they are recorded
+   separately:
+
+   **7a. One signature covers the work, not one action.** The same session
+   signed twice within an hour — once for a guard maintenance window, once for
+   a branch push — each binding its own candidate commit, each invalidated by
+   the next commit. The second signature was needed *because* the first
+   signature's own follow-up work produced commits. That is a loop: sign,
+   fix, invalidate, sign again. A design has to answer what a signature
+   legitimately covers. Candidate-bound is not obviously wrong — it is what
+   makes the proof meaningful — but a session that lands ten commits under one
+   approved intent should not need ten signatures, and today the binding is
+   the only thing preventing that.
+
+   **7b. One command, not two.** `prepare-critical` followed by
+   `approve-critical` is not two decisions; it is one decision split across
+   two invocations, and the split has already produced a live failure. In this
+   very session `prepare-critical` failed on an invalid `--expires-at` (the
+   validator demands an exact `toISOString()` round-trip, so a timestamp
+   without milliseconds is rejected — and the error names no field), and
+   `approve-critical` then signed the **stale** request still on disk without
+   noticing. The confirmation text looked entirely normal; only the commit
+   hash inside it revealed the wrong subject. Two commands with no coupling
+   means a failed first step plus a successful second step yields a
+   confidently signed wrong thing. Merging them is not only ergonomics — it
+   removes that failure mode by construction.
+
+   Two smaller findings from the same walkthrough, worth fixing whatever
+   shape 7a/7b take:
+
+   - **`prepare-critical`'s validation error is unattributed.** It says only
+     `critical approval request is invalid`. Diagnosing it required reading
+     the validator's source. Naming the offending field costs nothing.
+   - **The push must be written with an explicit destination ref.**
+     `git push origin <branch>` is refused; `git push origin
+     HEAD:refs/heads/<branch>` is admitted. The guard's reasoning is sound and
+     should stay — an attestation names a ref, and a command that does not
+     name one cannot be matched against it without guessing — but nothing
+     tells the operator this in advance, and the denial does not say it
+     either. It is discoverable only by being refused.
+8. **Layer 4 confirmed again, and it is outside this repository's control.**
+   The Claude Code auto-mode classifier refused the fully authorized push —
+   after the Pipeline's own gate had passed — and the only resolutions were
+   the human running the command or granting a standing Bash permission rule.
+   Candidate #2 above (pre-clear it at the settings level as a documented
+   setup step) is the only lever this project has, and this session is a
+   second measured instance of the same block.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
