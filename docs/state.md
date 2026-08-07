@@ -383,17 +383,36 @@ against this ADR, both `plugins/pipeline-core:goldfish-deep` / `xhigh`.
   (still gates on `overrideAdmitted = approvalMode === "chat"` before
   attempting consumption, the exact pattern Decision 3 replaces).
 - `NOVA-HGOSIG-2` (continuation, dispatched immediately after, same
-  ruleset SHA `7138c1ea2ff339433d8cf3bb39a868918da4609e`): closes the gaps
-  above — signature-path tests (valid proof, invalid proof, unsupported
-  `global-plugin-install` class, missing trust anchor, replay), the
-  `authorize-by-signature` CLI subcommand, `guard-testpath.mjs`'s Decision 3
-  rewrite (always-attempt-consume-first, mode-appropriate denial guidance),
-  a judgment call on whether `codex-pretool-guard.mjs` (already
-  Decision-3-shaped, unclear on Decision 4) needs a text change, and the full
-  project Verify. **Running in the background; not yet returned as of this
-  note.**
+  ruleset SHA `7138c1ea2ff339433d8cf3bb39a868918da4609e`): closed most of the
+  gaps above — signature-path tests (valid proof, invalid proof, unsupported
+  `global-plugin-install` class, missing trust anchor, replay: 5 new tests,
+  23/23 total in `human-guard-override.test.mjs`, independently re-run), the
+  `authorize-by-signature` CLI subcommand plus its own new test file (5/5,
+  independently re-run), and a Decision 4 guidance extension in
+  `codex-pretool-guard.mjs`'s `planned.status === "planned"` branch (mode-
+  appropriate next-step text). Again stopped mid-task without committing (own
+  final message again read as an in-progress checkpoint, not a completion
+  report — treated accordingly). Independently verified, not taken from the
+  self-report: this pass introduced a CONFIRMED REGRESSION — two pre-existing
+  tests in `codex-pretool-guard.test.mjs` ("attended Human override...",
+  "Pipeline Author Repair...") started failing with
+  `HGO-SIGNATURE-MODE-REQUIRED`, because their fixtures write
+  `pipeline.user.yaml` with no `gates.push_approval` declared (one of them
+  even writes it AFTER the initial commit, so it was never even committed),
+  and now trip the new defense-in-depth mode check NOVA-HGOSIG-1 added. The
+  check itself is correct; the fixtures were simply never updated. Also
+  confirmed: `guard-testpath.mjs` — Decision 3's actual target — is STILL
+  completely untouched by both prior dispatches.
+- `NOVA-HGOSIG-3` (narrower final pass, dispatched immediately after, ruleset
+  SHA `7ae451c582cf7ee5b196cea50482521abf198d08`): scope reduced to exactly
+  three files (the two regressed fixtures + `guard-testpath.mjs` and its
+  test) with the five already-done/tested files from NOVA-HGOSIG-1/2 marked
+  explicitly frozen/read-only in the briefing, plus an explicit note asking
+  it to commit each piece as it goes green rather than repeating the
+  batch-to-the-end pattern that left both prior dispatches uncommitted.
+  **Running in the background; not yet returned as of this note.**
 
-**Mandatory next steps once NOVA-HGOSIG-2 returns** (unchanged from the
+**Mandatory next steps once NOVA-HGOSIG-3 returns** (unchanged from the
 standing rule established for NOVA-HGOSIG-1, still in force): independent
 Elephant diff review — read the actual diff, do not take the dispatched
 Goldfish's self-report alone — then a mandatory T1 Critic round on the full
