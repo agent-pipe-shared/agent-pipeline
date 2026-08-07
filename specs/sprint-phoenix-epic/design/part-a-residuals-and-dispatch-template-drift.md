@@ -1882,7 +1882,10 @@ document** are taken on the state this rework leaves behind and say so where it 
   leaves one known residual disclosed rather than fixed: §III.1's bullet on the twelve
   `harness/review-protocol.md` citations still says the scope call is "deliberately left to the PO".
   It is inside Part III, which this rework may not edit, and it is now stale in exactly the way F-A
-  describes.
+  describes. **Closed 2026-08-08** (`Dispatch: PHX-R3-PARTIII (goldfish)`): that bullet now states
+  the decision as taken — B3, which admits `harness/review-protocol.md` as class C5 — while keeping
+  Part III's point that this document writes no replacement text for those twelve lines. Nothing
+  else in Part III was touched, and the decision was not re-opened.
 - **One further figure the tree had outgrown, found by this rework's own gate run and corrected:**
   §II.3.1 stated "today that is 13 out of 776 links". The gate now reports 826 links (and 535
   Markdown files); only the anchor-check count, the figure the argument actually rests on, is
@@ -1924,8 +1927,11 @@ document** are taken on the state this rework leaves behind and say so where it 
 - **The shell-lane residual for the live plugin root (finding SL-1, §I.2.3c).** Reported, escalated
   to §I.2.10 item 5, and deliberately not designed, fixed or worked around here — it is guard code
   and a T1 subject of its own.
-- **The twelve `harness/review-protocol.md` citations** of §II.7 — disclosed; the scope call moved
-  into §II.6 as part of R3's boundary decision, which this document deliberately leaves to the PO.
+- **The twelve `harness/review-protocol.md` citations** of §II.7 — disclosed, not repaired here. The
+  scope call has been taken: the PO chose **B3** (APS 2026-08-07, §II.6), which admits the file with
+  class C5, so these twelve are in R3's scope but not in this document's — no replacement text is
+  written for them (§II.5 tier 3 counts them rather than enumerating them), and fixing them is a
+  later dispatch's work.
 - **R2-min-B (§I.2.6)** — promoted to the preferred option if U3 holds, but still not designed; it
   needs OBS-1 and its own small pass for the Claude-host record.
 
