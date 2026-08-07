@@ -149,6 +149,25 @@ EL-16) depends on it. A second bounded delta Critic re-review (base `8a54751`,
 head `099a31b`, prior finding IDs F-A/F-B/F-C/F-D) is dispatched next —
 Critic round 3 of the 4 allowed for this package (initial + delta 1 + delta 2).
 
+**Delta re-review 2 (2026-08-07): FAIL.** Full findings:
+`specs/sprint-phoenix-epic/evidence/wp5-phx2-design-critic-delta-review-2-099a31b.md`.
+F-B/F-C/F-D genuinely resolved (F-D's full 9-site call inventory
+independently re-derived and matched exactly); F-A's read side genuinely
+fail-closed. But the F-A write-side fix introduces a new MAJOR: it asserts
+three times that the `discoverRepository(dir)` catch fires BEFORE the local
+state write, contradicting §2's own unchanged placement instruction ("only
+if that local write succeeded" — i.e. AFTER), leaving that case's recovery
+paragraph built on a false "state untouched" premise with no actual recovery
+path. Plus 3 MINOR (a read-side taxonomy entry citing a return code the
+called function can't produce; a false "established `5000`ms" claim for
+`pipeline-state.mjs`, which has no uniform timeout convention; a dispatch-
+record/commit-trailer provenance mismatch — explicitly NOT a lifecycle
+violation, since design-spec diffs are permitted direct Elephant output
+either way). A third, narrowly-scoped rework (fix the ordering claim + 3
+minors) is dispatched next — **this is Critic round 4 of the 4 allowed for
+this package; if it also fails, this needs a PO course gate, not a fifth
+autonomous iteration.**
+
 **Delta re-review 1 (2026-08-07): FAIL.** Full findings:
 `specs/sprint-phoenix-epic/evidence/wp5-phx2-design-critic-delta-review-1-8a54751.md`.
 F1–F5 are all genuinely resolved, but the F1 fix itself introduces a new

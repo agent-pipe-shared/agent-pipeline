@@ -127,8 +127,21 @@ freehand). Status:
    unprotected gate-strength surface, with the fix that would protect it
    explicitly scoped out of the same document (major). Full findings:
    `specs/sprint-phoenix-epic/evidence/wp2wp3-design-critic-review-a75a45d.md`.
-   None require abandoning either approach. A rework dispatch addressing all
-   8 findings is next, then a bounded re-review before implementation — same
+   None require abandoning either approach. **Rework: landed, commit
+   `8c526dd`.** F1 corrects the false "soft/advisory" claim and widens Part
+   A's scope to a companion `nextAction`/`SKILL.md`/`onboarding-recovery.md`
+   fix (named, not implemented — still design-only) so the branch genuinely
+   has something safe to do, with an honest fallback framing if that
+   companion fix doesn't ship alongside it; F2 accounts for all 8 git
+   invocations behind the seam (2 network-delegated, 6 local-passthrough,
+   both typed); F3 corrects the false "inert"/"zero behavioral change"
+   claims; F4 rewrites Part A's guarantee to what a local-only check can
+   actually prove (allowlisted origin + no uncommitted drift, not
+   byte-identity); F5 adds `GATE_STRENGTH_PATHS` protection for the new
+   allowlist constant, in Part A's own scope; F6-F8 fix a missing doc-update
+   entry, a below-tier model-authorship disclosure, and a miscited line. A
+   bounded delta Critic re-review (base `a75a45d`, head `8c526dd`, prior
+   finding IDs F1-F8) is dispatched next, before implementation — same
    sequence as WP5.
 4. **`governance-product-verify-suites-deregistered`** — blocked on 1–3's
    outcome, not started.
@@ -178,6 +191,17 @@ freehand). Status:
    (EL-01/EL-16) depends on it. A second bounded delta Critic re-review
    (base `8a54751`, head `099a31b`) is dispatched next — Critic round 3 of
    the 4 allowed for this package.
+
+   **Delta re-review 2: FAIL.** F-B/F-C/F-D genuinely resolved, F-A's read
+   side genuinely fail-closed — but the F-A write-side fix introduces a new
+   MAJOR (asserts the `discoverRepository(dir)` catch fires before the local
+   state write, contradicting the document's own unchanged placement
+   instruction, leaving that case's recovery paragraph built on a false
+   premise), plus 3 MINOR. Full findings:
+   `specs/sprint-phoenix-epic/evidence/wp5-phx2-design-critic-delta-review-2-099a31b.md`.
+   A third, narrowly-scoped rework is dispatched next — **Critic round 4 of
+   the 4 allowed for this package; a further FAIL needs a PO course gate,
+   not a fifth autonomous iteration.**
 
 **Infra finding, 2026-08-07:** the `isolation: "worktree"` dispatch option
 pinned two of three agents' worktrees to `6e2c9b2` (origin/main's pre-merge
