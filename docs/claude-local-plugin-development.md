@@ -21,7 +21,9 @@ this repository once suffered from directly.
 | Normal operation, consumer repositories, and post-release validation | `pipeline-core@agent-pipeline` | The official Git marketplace, or this checkout's own root registered directly (its manifest now correctly self-names `agent-pipeline` — see "Reaching the released selector from this checkout" below) |
 
 Exactly one selector should be enabled locally while testing, installed
-`--scope local` from the marketplace named `agent-pipeline-local`. Do not
+`--scope user` from the marketplace named `agent-pipeline-local` (measured
+2026-08-07, corrected here: an earlier version of this document said
+`--scope local`; see "Scope model" below for why that was wrong). Do not
 repoint the `agent-pipeline` marketplace name to a local-development source
 and do not use a local candidate through the released selector.
 
@@ -178,7 +180,7 @@ The copy does not follow the checkout. After changing plugin code:
 
 ```text
 cp -a <absolute-checkout-root>/plugins/pipeline-core <local-marketplace-root>/plugins/
-claude plugin update pipeline-core@agent-pipeline-local --scope local
+claude plugin update pipeline-core@agent-pipeline-local --scope user
 ```
 
 Then reload or restart per "The cachebuster mechanism" below. Guard *scripts*
@@ -243,7 +245,7 @@ The registry separately records the actual installed commit in its
 
 ```text
 claude plugin marketplace add <local-marketplace-root> --scope user
-claude plugin install pipeline-core@agent-pipeline-local --scope local
+claude plugin install pipeline-core@agent-pipeline-local --scope user
 ```
 
 Restart the Claude Code session; a plugin change takes effect only after a
@@ -252,22 +254,27 @@ live-test sessions.
 
 ## Update an existing local build
 
-`claude plugin install <id> --scope local` is a **no-op** against an
+`claude plugin install <id> --scope user` is a **no-op** against an
 already-installed plugin, even when the manifest version has changed. It
-reports `Plugin "<id>" is already installed (scope: local)` and does not
+reports `Plugin "<id>" is already installed (scope: user)` and does not
 re-materialize. Updating an existing local install requires `claude plugin
-update` instead, with a `--scope` flag matching the install scope:
+update` instead:
 
 ```text
-claude plugin update pipeline-core@agent-pipeline-local --scope local
+claude plugin update pipeline-core@agent-pipeline-local --scope user
 ```
 
-`claude plugin update <id>` defaults to `--scope user` and fails against a
-`local`-scope install with `Failed to update plugin "<id>": Plugin
-"pipeline-core" is not installed at scope user`. On success it reports
-`Plugin "pipeline-core" updated from <old> to <new> for scope local
-(<checkout>). Restart to apply changes.` Restart the session to apply the
-change.
+`claude plugin update <id>` defaults to `--scope user` — the same scope this
+document now installs at, so the flag above is for explicitness (matching this
+document's style elsewhere), not because omitting it would target the wrong
+scope. This is a deliberate improvement over the prior `--scope local`
+guidance, which forced every `update`/`uninstall` call to carry an explicit,
+easy-to-forget `--scope local` (the default `user` scope would otherwise
+target a different, nonexistent registration and fail). Exact success/failure
+readback text for `--scope user` has not yet been captured verbatim in this
+document; confirm by readback (`claude plugin list --json`) the next time an
+update actually runs, and correct this note if the observed text differs.
+Restart the session to apply the change.
 
 ## Readback contract
 
@@ -278,7 +285,7 @@ Verified on a correct local-development installation:
   path), not a GitHub source.
 - `claude plugin list --json` returns a bare array; the single enabled entry
   has `id: "pipeline-core@agent-pipeline-local"`, the expected candidate
-  `version`, `scope: "local"`, and an `installPath` under the cache
+  `version`, `scope: "user"`, and an `installPath` under the cache
   directory named for that version.
 - `CLAUDECODE=1 node <plugin-root>/scripts/pipeline-start-preflight.mjs`
   returns `"status": "ready"` with `version` equal to `installedVersion` and
@@ -299,9 +306,16 @@ directly — instead of through the separate local marketplace root above —
 resolves under the released selector:
 
 ```text
-claude plugin marketplace add <absolute-checkout-root> --scope user
-claude plugin install pipeline-core@agent-pipeline --scope local
+claude plugin marketplace add <absolute-checkout-root> --scope project
+claude plugin install pipeline-core@agent-pipeline --scope project
 ```
+
+`--scope project` here, not `--scope user`, because the released selector
+`pipeline-core@agent-pipeline` follows [ADR-0001](adr/0001-distribution-plugin-marketplace.md)
+D1 ("project-scope is the only canonical install path") regardless of
+whether the checkout being registered happens to be this repository itself —
+this section exercises that same released-identity install path, just
+sourced from local content instead of the real Git marketplace.
 
 The readback should show `pipeline-core@agent-pipeline` at the version
 carried by this checkout's `plugins/pipeline-core/.claude-plugin/plugin.json`.
@@ -313,12 +327,40 @@ different purposes and should not be combined.
 
 ## Scope model
 
-A local-scope install is per-repository: it is recorded in
-`~/.claude/plugins/installed_plugins.json` with a `projectPath` field naming
-the single checkout it applies to, and it does not affect any other checkout
-on the host. A marketplace declaration, by contrast, lives at `--scope user`
-in `~/.claude/settings.json` and is host-wide: every repository on the host
-can see the marketplace, but only repositories with their own install and
+`claude plugin install`/`update`/`uninstall` accept three install scopes
+(confirmed via `--help`, 2026-08-07): `user`, `project`, and `local`.
+
+- **`user`** — host-wide, recorded in `~/.claude/plugins/installed_plugins.json`
+  with no `projectPath` binding. Any repository on the host that has the
+  owning marketplace registered sees the install. **This is what local
+  development and pre-release testing use** (corrected here 2026-08-07; an
+  earlier version of this document said `local`). Root cause, PO-reported:
+  a `local`-scope install is per-repository (see below), so testing local
+  candidates against several repositories in parallel — the normal case for
+  this kind of work — meant a separate install action per repository, and a
+  repository that already carried its own install at a different scope could
+  end up with two different registrations/versions simultaneously active,
+  producing errors. `user` scope needs exactly one install, ever, and it is
+  immediately available in any repository on the host.
+- **`project`** — declared in a repository's own committed `.claude/settings.json`,
+  so every contributor who opens that repository gets the binding
+  automatically. **This is what normal Pipeline usage (a consumer project
+  adopting Agent-Pipeline) uses**, not `user` or `local` —
+  [ADR-0001](adr/0001-distribution-plugin-marketplace.md) D1 already
+  establishes project-scope as "the only canonical install path" for the
+  released `pipeline-core@agent-pipeline` identity, for exactly this
+  self-describing, per-project-pinnable reason.
+- **`local`** — per-repository, recorded in
+  `~/.claude/plugins/installed_plugins.json` with a `projectPath` field
+  naming the single checkout it applies to; it does not affect any other
+  checkout on the host, and is not committed/shared with other contributors
+  (unlike `project`). Not used by either flow in this document, per the
+  root-cause note above.
+
+A marketplace *declaration* (`claude plugin marketplace add`), as distinct
+from a plugin *install*, lives at `--scope user` in `~/.claude/settings.json`
+in both flows above and is always host-wide: every repository on the host can
+see the marketplace, but only repositories with their own install and
 enablement actually load the plugin. The local marketplace root is what lets a
 single `agent-pipeline-local` registration serve any checkout on the host:
 switching which checkout is the development source means re-copying that
@@ -328,17 +370,17 @@ not removing and re-adding the marketplace declaration.
 ## Exit / retire local test mode
 
 ```text
-claude plugin uninstall pipeline-core@agent-pipeline-local --scope local
+claude plugin uninstall pipeline-core@agent-pipeline-local --scope user
 claude plugin marketplace remove agent-pipeline-local
 ```
 
-`claude plugin uninstall` defaults to `--scope user`, exactly like `claude
-plugin update` — the same scope-mismatch trap documented above applies here
-too, so a `local`-scope install requires the explicit `--scope local` (or
-`-s local`). This document records the documented interface of `uninstall`
-(measured from its `--help` output) rather than an observed success output:
-unlike the sequences elsewhere in this document, this command has not been
-confirmed by readback. The subsequent `marketplace remove` (unqualified,
+`claude plugin uninstall` defaults to `--scope user`, the same scope this
+document installs at — so the flag above is for explicitness, not to avoid a
+scope-mismatch trap (that trap applied under the prior `--scope local`
+guidance; it does not apply here). This document records the documented
+interface of `uninstall` (measured from its `--help` output) rather than an
+observed success output: unlike the sequences elsewhere in this document, this
+command has not been confirmed by readback. The subsequent `marketplace remove` (unqualified,
 removing from every scope) drops the local marketplace root's registration,
 so the local selector `pipeline-core@agent-pipeline-local` can no longer
 resolve. Restart the session after these changes.
