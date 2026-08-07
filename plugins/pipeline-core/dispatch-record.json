@@ -1,7 +1,0 @@
-{
-  "taskId": "NOVA-LCR-HGO-1",
-  "model": "claude-sonnet-5",
-  "rulesetSha": "d8a432280bdebd97c5789f04eb88ef826809536e",
-  "dispatcher": "elephant",
-  "outcome": "done-verified-partial-tool-budget-exceeded"
-}
