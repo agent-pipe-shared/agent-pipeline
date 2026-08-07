@@ -22,6 +22,11 @@ changed threat model carries more in-task latitude than authoring it did, not le
 for this package:** any dispatch that authors or reworks a design in it runs on the Design tier
 (MP-22/MP-23), and its briefing says so explicitly.
 
+The 2026-08-07 R3 re-scope (`Dispatch: PHX-R3-RESCOPE (goldfish)`), which re-derived the whole of
+Part II against the operating model's measured structure, ran on the same tier (`claude-opus-5`,
+effort `xhigh`) under that standing rule. It changed no file but this one: it re-scopes R3, it does
+not perform it.
+
 ## 0. Scope, sources, and what is deliberately not re-opened
 
 ### 0.1 The three residuals
@@ -53,6 +58,10 @@ Each item's `Triage` block records a binding 2026-08-07 PO decision. Taken as gi
   Decision (b) is answered YES: its own design pass first — this document. Choosing between
   candidate directions 1 and 2 is explicitly *not* pre-decided and is done in §I.2.4.
 - **R3:** implement; proposal items 1+2 are mechanical, item 3 is design work — done in §II.2.
+  *(Corrected 2026-08-07: the "mechanical" half of that framing does not survive the re-derivation.
+  **What** to change is mechanical; **which files** to change is a scope decision the PO still owes,
+  because the defect is 344 citations over 57 files rather than the eight in the two templates —
+  §II.1.3, §II.6.)*
 
 ### 0.3 Relationship to the Part-A design document, and what this supersedes
 
@@ -805,32 +814,117 @@ with the pin. They are recorded here as answered rather than deleted.
 
 ## Part II — R3: dispatch templates cite restructured operating-model sections
 
-### II.1 Problem, re-derived against the current files
+### II.1 Problem, re-derived from the operating model's actual structure
 
-`docs/operating-model.md`'s current English structure, read directly: §1 `:16`, §2 `:38`, §3 `:57`,
-§4 `:87`, §5 `:164`, §6 `:227`, §7 `:244`, §8 `:280`, §9 `:288`, §10 `:302` (everything from `:325`
-is the German reference translation and is not a citation target). Only §3 and §5 carry `###`
-children: `### Profiles` `:63`, `### Duties` `:78`, `### Gate discipline and autonomous happy path`
-`:185`. **No `§N.M` subsection numbering exists anywhere in the document.** Every numbered
-subsection citation in either template is therefore stale by construction.
+**Status: re-derived 2026-08-07 (`Dispatch: PHX-R3-RESCOPE`). Supersedes the first revision's
+inventory**, which measured only the two dispatch templates and therefore reported a defect of 8
+citations in 2 files where the repository has 344 in 57. Nothing below is inherited from that count;
+the structure was re-read and the inventory re-derived by an attribution-aware scan over every
+tracked file (§II.8). The first revision's two substantive findings (the "light" profile and the
+"trigger matrix") survive verbatim and are kept at the end of this section.
 
-Complete verified inventory — wider than the backlog item recorded, which listed four of the eight:
+#### II.1.1 The measured structure of `docs/operating-model.md`
 
-| Location | Cited | Status |
-| --- | --- | --- |
-| `templates/prompts/critic-review.md:5` | OM §2.4 (Critic contract + report format) | **stale** — content is at `:45` (roles table, Critic row) + §6 `:233-236` |
-| `templates/prompts/critic-review.md:6` | OM §4.2 (trigger matrix; "canonical German trigger wording — authoritative") | **stale, twice** — see §II.3 |
-| `templates/prompts/critic-review.md:15` | `review-protocol.md §2.1` | **path incomplete** — the file is `harness/review-protocol.md`; §2.1 `:33` is correct |
-| `templates/prompts/critic-review.md:142` | OM §2.3 field 6 | **stale** |
-| `templates/prompts/goldfish-task.md:5` | OM §2.3 (canonical briefing field list) | **stale** — see §II.2 |
-| `templates/prompts/goldfish-task.md:7` | OM §2.3 | **stale** |
-| `templates/prompts/goldfish-task.md:15` | OM §3.2 step 4 (briefing-format check) | **stale, not recorded in the backlog item** — §3 has no numbered steps; §4's numbered step 4 is the human plan gate, not a briefing-format check |
-| `templates/prompts/goldfish-task.md:129` | OM §3.3 (light profile) | **stale, not recorded in the backlog item** — and §3's `### Profiles` `:63-72` is a *different* concept (`mini`/`feature`/`epic`), not the dispatch `light`/`standard` profile |
-| `templates/prompts/goldfish-task.md:8` | `harness/session-bootstrap.md` §6.2 | **correct** (`:298`) |
-| `templates/prompts/critic-review.md:7` | `harness/session-bootstrap.md` §6.3 | **correct** (`:308`) |
-| `templates/prompts/goldfish-task.md:160` | `roles/goldfish.md` §6 | **correct** (`:86`, "Completion report (GF-09)") |
+Read directly, English part only (`:1-322`; the German reference-translation marker is at `:323`,
+the file is 671 lines and everything below the marker is the German reader copy):
 
-Two findings the backlog item does not contain:
+- **10 `##` sections, all numbered 1–10:** §1 `:16` *What the model protects* · §2 `:38` *Roles and
+  boundaries* · §3 `:57` *V3 routing: profiles, duties and phases* · §4 `:87` *The lifecycle* ·
+  §5 `:164` *Rigor, risk and gates* · §6 `:227` *Evidence, review and recovery* · §7 `:244`
+  *Project calibration and extensions* · §8 `:280` *Operating shapes* · §9 `:288` *Authority
+  precedence* · §10 `:302` *Glossary*.
+- **3 `###` children, none of them numbered:** `### Profiles` `:63` and `### Duties` `:78` (under
+  §3), `### Gate discipline and autonomous happy path` `:185` (under §5). §1, §2, §4, §6, §7, §8,
+  §9 and §10 have no children at all.
+
+Two consequences follow from the structure alone, and they are the reason the inventory has to be
+counted twice rather than once:
+
+1. **There is no `§N.M` anywhere in the document.** Every `§N.M` citation of the operating model, in
+   any file, is dead by construction — it cannot be repaired by picking a better minor number.
+2. **The `##` numbering is not stable across the restructuring, and the shift is not a constant
+   offset.** Reconstructed from the surviving citation topics (`CLAUDE.md:27`, `roles/elephant.md:273`
+   and `templates/CLAUDE.project.md:4` each preserve an old topic label next to its old number), the
+   old numbering was roughly §3 SDLC · §4 review system · §5 session lifecycle · §6 handover ·
+   §7 feedback loop · §8 project calibration. Today §3 is V3 routing, §4 is the lifecycle, §5 is
+   rigor/risk/gates, §6 is evidence/review/recovery, §7 is project calibration, §8 is operating
+   shapes — and handover, the feedback loop/retro and session lifecycle no longer have a section of
+   their own at all (handover and retro are now lifecycle step 8, `:160-162`). So a `§N` citation
+   written before the restructuring still *resolves*, and now points at different content. That is a
+   second, distinct defect, and it is invisible to any check that only asks "does the target exist?"
+
+#### II.1.2 Two defect kinds — they need different fixes
+
+| Kind | Definition | How it is detected | How it is repaired |
+| --- | --- | --- | --- |
+| **A — target does not exist** | a `§N.M` (no numbered subsection exists), or a `§N` outside 1–10 | mechanically: the token's shape against the measured structure | must be re-pointed at a section, a `###` title or a different file; there is nothing to renumber to |
+| **B — target exists, description is wrong** | a `§N` that resolves to an existing `##` section whose heading does not match the topic the citing line states (`review system (§4)` → §4 is *The lifecycle*) | only by reading the citing sentence against the heading | re-point at the section that now carries the topic |
+
+Kind A is what the backlog item and the first revision of this section describe. **Kind B is
+undetectable by any mechanism currently in the repository, is roughly a third of the defect by
+volume, and is the more dangerous of the two** — a dead `§2.4` announces itself to a reader, whereas
+`review system (§4)` sends an agent to a section that reads plausibly and is about something else.
+
+#### II.1.3 Measured inventory (attribution-aware, whole repository)
+
+Method (§II.8): every tracked file was scanned for `§N`/`§N.M` tokens; each token was attributed to
+the **nearest preceding document reference on its line**, so a line citing two documents does not
+inflate the operating-model count; tokens below a file's own German-reference marker are counted
+separately as the German mirror of the same defect. One verified false positive was dropped by hand
+(`roles/critic.md:190` `§3` is a self-reference to that file's own §3).
+
+**Totals: 344 operating-model section citations across 57 tracked files** — 230 of kind A, 114 that
+resolve. Of the 114, the 68 that sit in live artifacts (i.e. outside `specs/`/`backlog/`) were
+topic-checked one by one against the measured headings: **51 are confirmed kind B**, 5 are correct,
+11 state no topic at all (a bare number in a reference list — not adjudicable from the citing text),
+1 is a meta-note *about* this defect (`docs/state.md:700`).
+
+| Class | Files | A | B (resolves) | Notes |
+| --- | --- | --- | --- | --- |
+| **C1 the two dispatch templates** — R3's scope today | 2 | 8 | 0 | `critic-review.md` 4, `goldfish-task.md` 4 |
+| **C2 other prompt templates** | 3 | 6 | 3 | `elephant-kickoff.md`, `kickoff-new-project.md`, `session-bootstrap-check.md` |
+| **C3 role contracts** | 3 | 39 | 9 | `elephant.md` 23+9, `critic.md` 10, `goldfish.md` 6 |
+| **C4 root canon** | 2 | 4+1 de | 8 | **`CLAUDE.md` 3 + 8**, `README.md` 1+1 de |
+| **C5 harness** | 8 | 41+6 de | 14+4 de | `review-protocol.md` 12, `definition-of-done.md` 12, `session-bootstrap.md` 20 |
+| **C6 guardrails + policies** | 5 | 20+5 de | 4+2 de | `global.md` 7, `model-policy.md` 14 |
+| **C7 project-facing templates** | 9 | 17 | 17 | `spec.md` 8, `CLAUDE.project.md` 9, `pipeline.json.example` 5 |
+| **C8 shipped plugin artifacts** | 7 | 16 | 8 | `close-block/SKILL.md` 11, `critic-review/SKILL.md` 4, 4 agent files, `guard-git.mjs` 5 |
+| **C9 docs (ADR / state / deploy)** | 10 | 22+15 de | 5+4 de | dated records, see §II.6 |
+| **C10 archival (specs / backlog)** | 8 | 30 | 36 | includes this document's own 43 quotations of the defect |
+
+Named instances, each confirmed by reading the file (not by trusting a search hit):
+
+**Kind A —**
+- `templates/prompts/critic-review.md:5` OM §2.4 · `:6` §4.2 · `:142` §2.3 · **`:215` `OM §3.3`**
+  — the fourth was missed by the first revision *and* by the backlog item because both searched for
+  the string `operating-model`, and this line uses the `OM §` shorthand. See AC-R3-1.
+- `templates/prompts/goldfish-task.md:5` §2.3 · `:7` §2.3 · `:15` §3.2 step 4 · `:129` §3.3.
+- `roles/goldfish.md:7` §2.3 · `:103` §3.3 · `:126` §2.3, §3.2, §4.1, §4.3 — six dead citations in
+  the file §II.2 makes the canonical carrier the templates are to cite.
+- `roles/critic.md:10` §2.4, §4.2 · `:72` §3.3, §4.2 · `:138` §3.3 · `:190` §4.2 · `:211` §2.4,
+  §4.2, §4.3, §3.4.
+- `harness/review-protocol.md:5` §4.3 · `:22` §4.3 · `:35` §4.2 · `:53` §3.3, §4.2 · `:58` §4.2 ·
+  `:140` §2.4 (inside a heading) · `:161` §2.4 · `:188` §3.4 · `:206` §4.3 · `:213` §4.2.
+- `CLAUDE.md:20` §2.3 · `:22` §5.1 · `:44` §5.2.
+
+**Kind B —**
+- `CLAUDE.md:27` — `SDLC (§3), review system (§4), session lifecycle (§5), handover (§6), feedback
+  loop (§7), project calibration (§8)`: six labelled citations, six wrong topics, in the file every
+  session in this repository loads. Only `roles (§2)` is right.
+- `roles/elephant.md:273` — the same six-way shift in the Elephant contract's reference list;
+  `:247` cites §5 for "lifecycle self-management" (§5 is rigor/risk/gates, the lifecycle is §4).
+- `harness/session-bootstrap.md:171`, `:175`, `:397` cite §8 for the calibration field sketch
+  (calibration is §7; §8 is *Operating shapes*); `:398` cites §6 for the handover.
+- `harness/review-protocol.md:5` — "Operationalizes `docs/operating-model.md` §4 (review system)":
+  §4 is *The lifecycle*.
+- `templates/retro.md:4`, `:22`, `:37` cite §7 for the feedback loop (§7 is project calibration).
+- `plugins/pipeline-core/skills/close-block/SKILL.md:94` §8 for calibration, `:123`/`:142` §7 for
+  the CLAUDE.md length gate and the self-retro; `plugins/pipeline-core/hooks/guard-git.mjs:7`/`:134`
+  §8 for calibration.
+- `harness/scripts/check-claude-md-lines.mjs:59` puts `(operating-model §7)` into the **user-facing
+  fix string the gate prints** — the only instance that reaches an operator through a tool's output.
+
+Two findings from the first revision, re-verified and unchanged:
 
 - **The word "light" as a dispatch profile has no counterpart in `operating-model.md` at all.** Its
   single occurrence, `:96`, is "for work above the light path" inside lifecycle step 3. So
@@ -842,6 +936,11 @@ Two findings the backlog item does not contain:
   the canonical trigger wording quoted at `:53-55`. The backlog item's proposal to repoint this at
   OM §5 is therefore imprecise: §5 (`:164-183`) carries rigor/risk/gates in general, but the actual
   table the templates mean lives in `harness/review-protocol.md`.
+
+One correctness note carried from the first revision: `templates/prompts/critic-review.md:15` cites
+`review-protocol.md §2.1` with an **incomplete path** (the file is `harness/review-protocol.md`;
+§2.1 `:33` is correct). It is not an operating-model citation and is not counted above; it is listed
+in §II.4 because the same edit pass touches that line.
 
 ### II.2 Decision — where the six-field briefing list canonically lives
 
@@ -882,92 +981,294 @@ Rejected, with tradeoffs:
 - **(c) with a new file under `docs/`.** Adds a fourth carrier to a defect whose cause is having
   three. Rejected for that reason alone.
 
-**Consequence to carry into implementation:** the template's field name "Forbidden"
+**Consequence 1 to carry into implementation:** the template's field name "Forbidden"
 (`goldfish-task.md:6`) and GF-01's "Prohibitions" must be reconciled — one of the two, used
 everywhere. Recommendation: keep GF-01's "Prohibitions" as canonical and note "(Forbidden)" once in
 the template, because the operating model's §4 step 5 also says "prohibitions".
 
+**Consequence 2, measured by the 2026-08-07 re-derivation and not visible to the first revision:**
+`roles/goldfish.md` — the file this decision promotes to canonical carrier — **carries six dead
+operating-model citations of its own** (`:7` §2.3, `:103` §3.3, `:126` §2.3/§3.2/§4.1/§4.3;
+§II.1.3). Promoting it while leaving those in place makes the newly-declared source of truth a
+carrier of the exact defect R3 exists to remove, and the §II.5 inventory's "at most one sentence" in
+that file does not cover them. The decision itself is unaffected — `roles/` is still the right home
+and GF-01 is still the complete, normative list — but **the scope options in §II.6 that exclude
+`roles/goldfish.md` are inconsistent with this decision**, and that is one of the two facts the
+boundary call has to weigh.
+
 ### II.3 Decision — should section numbers be cited at all
 
-**No — cite machine-checkable anchor links, with the heading title in the link text.**
+**Status: re-examined 2026-08-07 against the repository's own anchor data. The answer to the
+question stays "no". The *justification* the first revision gave for it — "anchor links are
+machine-checked, therefore this defect class becomes non-recurring" — is refuted by measurement and
+is withdrawn.** The first revision reasoned from the checker's source; this one reasoned from the
+links that already exist.
+
+#### II.3.1 What the checker does, and what it does not do
 
 `harness/scripts/check-doc-contracts.mjs` validates Markdown links and their fragments: it collects
-heading anchors (`:163-187`), resolves every relative link target (`:414-438`), and reports "anchor
-not found" when a fragment does not resolve (`:451-454`). It does **not** validate prose `§N.M`
-references — nothing does. So a citation written as a Markdown link with the destination
-`docs/operating-model.md#4-the-lifecycle` (spelled relative to the citing file — from
-`templates/prompts/` that is two levels up) is checked by the existing verify gate on every run,
-while `§4.2` is checked by nobody. The extractor is line-based and contains no HTML-comment
-handling, so links inside the templates' `<!-- ... -->` header blocks are validated exactly like
-body links — which is precisely where the stale citations sit.
+heading anchors (`collectAnchors`, `:160-188`), resolves every relative link target (`:414-433`),
+and reports "anchor not found" when a fragment does not resolve (`:445-455`). It does **not**
+validate prose `§N.M` references, and it does not validate backticked path citations — nothing in
+the repository does. Two properties the implementation must respect, both measured rather than
+assumed: the extractor does not exempt inline-code spans, so even an *example* link written inside
+backticks is resolved and must be correct; and destinations are resolved relative to the citing
+file, so the same citation needs a different `../` depth in `templates/prompts/` than in `roles/`.
+The extractor is line-based with no HTML-comment handling, so links inside the templates'
+`<!-- ... -->` header blocks are validated exactly like body links.
 
-Two properties of the checker the implementation must respect, both measured in this session rather
-than assumed (§III.4): the extractor does **not** exempt inline-code spans, so even an *example*
-link written inside backticks is resolved and must be correct; and destinations are resolved
-relative to the citing file, so the same citation needs a different `../` depth in
-`templates/prompts/` than in `roles/`.
+**On the current tree the gate reports `490 Markdown file(s), 776 link(s), 13 anchor check(s)` and
+exits 0.** Thirteen. The anchor check is not a broad safety net; it is whatever fragments happen to
+have been written as links, and today that is 13 out of 776 links and 0 out of 344 section
+citations.
 
-The residual is honest and small: an anchor slug contains the section number
-(`#4-the-lifecycle`), so a renumbering still breaks the link — but it breaks it **red**, in the
-verify gate, instead of silently. Turning a silent-drift class into a failing-check class is the
-whole point. Where a link is impossible (the trigger-wording reference to a table row), cite the
-heading *title* plus the file, never a number.
+#### II.3.2 The measured refutation: the anchor form has already drifted, green
 
-**Falsifiability requirement for the implementation:** after the edit, deliberately break one
-fragment, confirm `node harness/scripts/check-doc-contracts.mjs` exits non-zero, restore it, confirm
-exit 0. A check that has not been observed failing is not evidence.
+Five of those 13 fragment links point at `docs/operating-model.md`, all from `backlog/README.md`
+(`:16`, `:35`, `:54`, `:68`, `:77`). **Four of the five name a heading that no longer exists**, and
+the gate is green anyway:
 
-### II.4 Exact corrected references
+- `#7-feedback-loop` (`backlog/README.md:16`, `:54`, `:68`) resolves only through a hand-planted
+  `<a id="7-feedback-loop"></a>` at `docs/operating-model.md:563` — which sits above the **German**
+  `## 6. Evidenz, Review und Recovery` (`:565`), i.e. above neither a feedback-loop section nor an
+  English one.
+- `#8-projekt-kalibrierungsschicht` (`:77`) resolves through the same trick at
+  `docs/operating-model.md:583`, above the German `## 7. Projektkalibrierung und Erweiterungen`.
+- Only `#6-evidence-review-and-recovery` (`:35`) is genuinely correct.
+
+Those two `<a id>` tags are the only ones in the whole repository outside the checker's own tests.
+They are a compatibility alias for exactly the drift R3 is about, and their effect is that a stale
+citation stays green forever. **The mechanism the first revision proposed as the fix is already
+deployed on this document, has already drifted, and did not go red.** A design cannot recommend a
+control whose one existing deployment demonstrates the opposite of the claim made for it.
+
+Three further measured properties of the anchor namespace, all from `collectAnchors` run over
+`docs/operating-model.md`:
+
+1. **31 anchors for 20 headings.** English and German slugs share one flat namespace, so
+   `#4-the-lifecycle` and `#4-der-lifecycle` are both valid and nothing marks one as the normative
+   half. A citation can silently resolve into the German reference translation that CLAUDE.md's
+   bilingual skip convention forbids agents to read.
+2. **Collision suffixes are silent.** The document contains `duties` and `duties-1`, `profile` and
+   `profiles`, `agent-pipeline-operating-model-v3` and `-1`. A link to `#duties` resolves to
+   whichever came first; a later edit that adds a heading can move which one that is, without any
+   check firing.
+3. **A slug carries whatever is in the heading, including a stale citation.**
+   `harness/review-protocol.md:140` is `### 2.4 Findings format (transfer format 3, OM §2.4)`, so
+   its slug is `#24-findings-format-transfer-format-3-om-24`. Citing that slug — which the first
+   revision's §II.4 did — pins the stale reference into the link, and correcting the heading breaks
+   every link that pinned it.
+
+#### II.3.3 Revised remedy
+
+1. **Do not cite section numbers of `docs/operating-model.md` — cite the file plus the stable
+   heading title** ("`docs/operating-model.md`, *Evidence, review and recovery*"). This half of the
+   first revision's answer is confirmed and strengthened: numbers are dead (kind A) or misleading
+   (kind B), and the title is what survives a renumbering and what a reader can actually find.
+2. **A Markdown link may be added for convenience** — destination spelled relative to the citing
+   file, English slug only, each slug confirmed against `collectAnchors` by running the gate rather
+   than by assuming GitHub's convention. It is a convenience, **not the control**: per §II.3.2 it
+   proves only that some string exists somewhere in the file, including in the German half and
+   including via an alias.
+3. **The class only becomes non-recurring with a checker that validates the citation itself.** Two
+   candidate shapes, both code, both outside R3's stated scope, both needing their own briefed task
+   and Critic pass, neither designed here: **(i)** a lint that fails on any `§N`/`§N.M` reference to
+   `docs/operating-model.md` in non-archival paths — this is the one that mechanically closes the
+   class, and it is cheap because the target set is exactly the inventory of §II.1.3; **(ii)**
+   anchor hygiene in `check-doc-contracts.mjs` — reject alias `<a id>` anchors and cross-language
+   slug resolution in bilingual documents, so a fragment link means what §II.3.1 claimed it means.
+   Both are recorded as follow-up items in §II.6, not folded into R3 by this document.
+4. **Falsifiability requirement for the implementation, corrected.** Deliberately break one fragment,
+   confirm `node harness/scripts/check-doc-contracts.mjs` exits non-zero, restore it, confirm exit 0.
+   State plainly what that proves: **that fragment checking runs at all** — not that any citation is
+   correct, and not that the inventory is complete. `check-doc-contracts.mjs` exiting 0 is not
+   evidence about `§N.M` prose or backticked path citations, because it never looks at them.
+
+### II.4 Exact corrected references (the two dispatch templates)
+
+Revised 2026-08-07: citations are given as **file + stable heading title**, per §II.3.3; where an
+anchor slug is named it is the optional link half, and the implementation must confirm it against
+`collectAnchors` (`check-doc-contracts.mjs:160-188`) by running the gate, never by assuming
+GitHub's convention. This table covers scope option **B1** only; options B2/B3 (§II.6) add the
+corresponding tables for the further files, which this document does not pre-write because the
+boundary is undecided.
 
 | Location | Replace with |
 | --- | --- |
-| `critic-review.md:5` | Critic contract: `docs/operating-model.md` — roles table, Critic row (`#2-roles-and-boundaries`) **and** `#6-evidence-review-and-recovery`; report format: `harness/review-protocol.md` `#24-findings-format-transfer-format-3-om-24` |
-| `critic-review.md:6` | trigger decision table: `harness/review-protocol.md` `#21-trigger-decision-table`; drop "canonical German trigger wording" — the canonical wording quoted at `harness/review-protocol.md:53-55` is English (ADR-0011 makes this Public Core English-canonical), and the `docs/operating-model.md §3.3/§4.2` word-identity claim in that same line is itself stale (§II.6) |
-| `critic-review.md:15` | `harness/review-protocol.md` `#23-isolation-levels` for T-row semantics; keep the §2.1 reference but with the full path |
+| `critic-review.md:5` | Critic contract: `docs/operating-model.md` — *Roles and boundaries* (the roles table's Critic row, `:45`) **and** *Evidence, review and recovery* (`:233-236`); report format: `harness/review-protocol.md` §2.4 *Findings format*. Do **not** pin the current slug of that heading: it contains the stale `OM §2.4` (§II.3.2 item 3), so either the heading is corrected in the same package or the citation stays title-only |
+| `critic-review.md:6` | trigger decision table: `harness/review-protocol.md` §2.1 *Trigger decision table* (`:33`); drop "canonical German trigger wording" — the canonical wording quoted at `harness/review-protocol.md:53-55` is English (ADR-0011 makes this Public Core English-canonical), and the `docs/operating-model.md §3.3/§4.2` word-identity claim in that same line is itself stale (§II.7) |
+| `critic-review.md:15` | keep the §2.1 reference — it is correct — but with the full path `harness/review-protocol.md`; add §2.3 *Isolation levels* (`:74`) for T-row semantics. This is a path repair, not an operating-model citation |
 | `critic-review.md:142` | "Dispatch metadata (`roles/goldfish.md` GF-01 field 6, critic variant)" — per §II.2 |
-| `goldfish-task.md:5` and `:7` | "Source of truth: `roles/goldfish.md` GF-01 — the canonical six-field briefing list" (link to `../../roles/goldfish.md#2-input-contract`) |
-| `goldfish-task.md:15` | the briefing-format duty is `roles/goldfish.md` GF-01/GF-02 (`:21-31`) plus `docs/operating-model.md` `#4-the-lifecycle` step 5 (`:144-146`); there is no "§3.2 step 4" |
-| `goldfish-task.md:129` | drop the `§3.3` citation. The light/standard *dispatch* profile is defined by the template and `roles/goldfish.md` §6 (`:86`); the nearest operating-model concept is `#3-v3-routing-profiles-duties-and-phases` → Duties (`:78-85`), which is about `implement`/`mechanic`/`deep`, not the report shape. Cite Duties for the routing half and `roles/goldfish.md` §6 for the report half — do not invent a section for the rest |
+| **`critic-review.md:215`** | `OM §3.3` → `docs/operating-model.md`, *Rigor, risk and gates* (rigor 0, `:170`) — the stage-0 fast-path *criteria* the line relies on (≤ 2 files, ≤ ~25 diff lines, no architecture/schema/API/test/guardrail/security surface, trivially revertable) are enumerated in `roles/elephant.md` EL-01's exception bullet (`:35`), not in any numbered operating-model subsection — and that bullet cites `§3.3` itself, so it is part of the same defect. **Not in the first revision's table and not in the backlog item**; found only by searching for `§` rather than for the string `operating-model` |
+| `goldfish-task.md:5` and `:7` | "Source of truth: `roles/goldfish.md` GF-01 — the canonical six-field briefing list" (optional link `../../roles/goldfish.md#2-input-contract`; that slug was confirmed to exist) |
+| `goldfish-task.md:15` | the briefing-format duty is `roles/goldfish.md` GF-01/GF-02 (`:21-31`) plus `docs/operating-model.md` *The lifecycle* step 5 (`:144-146`); there is no "§3.2 step 4" |
+| `goldfish-task.md:129` | drop the `§3.3` citation. The light/standard *dispatch* profile is defined by the template and `roles/goldfish.md` §6 (`:86`); the nearest operating-model concept is *V3 routing* → `### Duties` (`:78-85`), which is about `implement`/`mechanic`/`deep`, not the report shape. Cite Duties for the routing half and `roles/goldfish.md` §6 for the report half — do not invent a section for the rest |
 
-Anchor slugs above follow GitHub's convention (lowercase, spaces → `-`, punctuation dropped); the
-implementation must confirm each one against `collectAnchors` (`check-doc-contracts.mjs:163-187`)
-by running the check, not by assuming the slug.
+`goldfish-task.md:8` (`harness/session-bootstrap.md` §6.2 → `:298`), `critic-review.md:7` (§6.3 →
+`:308`) and `goldfish-task.md:160` (`roles/goldfish.md` §6 → `:86`) were re-checked and are correct;
+they are not to be touched.
 
 ### II.5 Inventory, tests, acceptance criteria (R3)
 
+The inventory below is written for scope option **B1** (§II.6), because that is the option the
+backlog item's literal wording names. **It is not a green light: §II.6 is an open PO decision, and
+B2/B3 extend this table file by file from §II.1.3.** The acceptance criteria are written so that
+they hold under whichever option is chosen.
+
 | File | Change |
 | --- | --- |
-| `templates/prompts/critic-review.md` | four citation lines per §II.4 (`:5`, `:6`, `:15`, `:142`) |
+| `templates/prompts/critic-review.md` | **five** citation lines per §II.4 (`:5`, `:6`, `:15`, `:142`, `:215`) — the first revision said four |
 | `templates/prompts/goldfish-task.md` | four citation lines per §II.4 (`:5`, `:7`, `:15`, `:129`); reconcile "Forbidden"/"Prohibitions" per §II.2 |
-| `roles/goldfish.md` | **at most one sentence** in §2 marking GF-01's list as the canonical carrier the templates cite. No renumbering, no restructuring. |
+| `roles/goldfish.md` | **at most one sentence** in §2 marking GF-01's list as the canonical carrier the templates cite. No renumbering, no restructuring. **Under B1 this file keeps its own six dead citations** (§II.2 consequence 2) — a disclosed inconsistency of B1, not an oversight. |
 
-Verification is the existing gate: `node harness/scripts/check-doc-contracts.mjs` exits 0 with every
-new anchor resolving, plus the deliberate-break falsification of §II.3. There is no unit test for
-prose citations and this design does not invent one.
+Verification is the existing gate: `node harness/scripts/check-doc-contracts.mjs` exits 0, plus the
+deliberate-break falsification of §II.3.3 item 4. There is no unit test for prose citations and this
+design does not invent one — which is precisely why §II.3.3 item 3 records the lint as a follow-up
+rather than pretending the gate covers this.
 
-- **AC-R3-1** No `§N.M` reference to `docs/operating-model.md` remains in either template
-  (`rg -n "operating-model" templates/prompts/` shows only links or heading-title citations).
-- **AC-R3-2** Every citation added is either a link whose fragment resolves under
-  `check-doc-contracts.mjs`, or a file + heading-title reference with no number.
+- **AC-R3-1** No `§N`/`§N.M` reference to `docs/operating-model.md` remains in any file the chosen
+  scope admits. **The check must search for the section sign, not for the string `operating-model`:**
+  `rg -n "§" <scope paths>` and `rg -n "OM §" <scope paths>`. Searching for `operating-model` is what
+  made both the backlog item and the first revision of this section miss
+  `templates/prompts/critic-review.md:215`, and it is not an acceptable verification of this AC.
+- **AC-R3-2** Every citation added is a file + heading-title reference with no number; an optional
+  Markdown link may accompany it, with an English slug confirmed by running the gate. A link alone
+  does not satisfy this AC (§II.3.2).
 - **AC-R3-3** `node harness/scripts/check-doc-contracts.mjs` exits 0, and has been observed exiting
-  non-zero for a deliberately broken fragment in the same files.
+  non-zero for a deliberately broken fragment in the same files. The implementation report states
+  what that proves and what it does not (§II.3.3 item 4).
 - **AC-R3-4** Both templates still contain all six field names and the "never freehand" contract
   intact — this is a citation repair, not a rewrite of dispatch semantics.
-- **AC-R3-5** The `roles/goldfish.md` edit is one sentence and changes no rule id.
+- **AC-R3-5** The `roles/goldfish.md` edit is one sentence and changes no rule id (B1); under B2/B3
+  the six citations of `:7`/`:103`/`:126` are additionally repaired, still with no rule-id change.
+- **AC-R3-6** For every file the chosen scope admits that carries a German reference half
+  (`README.md`, `harness/session-bootstrap.md`, `policies/model-policy.md`, `docs/adr/*`), the German
+  mirror of each corrected citation is corrected in the same commit, or the file is explicitly
+  excluded. A half-corrected bilingual file is a new defect, not a partial fix.
+- **AC-R3-7** No file outside the chosen scope is touched, and the implementation report enumerates
+  the citations it deliberately left in place with their counts, so the residual stays measurable.
 
-### II.6 Adjacent drift, disclosed and not fixed here
+### II.6 The implementation boundary — an open PO decision
 
-`harness/review-protocol.md` — the file the corrected citations point *to* — carries the same defect
-class in four places: `:35` ("normative definitions: OM §4.2"), `:53` ("word-identical in
-`docs/operating-model.md` §3.3/§4.2"), `:58` ("OM §4.2") and the §2.4 heading itself at `:140`
-("transfer format 3, OM §2.4"). None of those sections exists.
+The first revision drew no boundary: it fixed two templates and disclosed "four" further citations
+in `harness/review-protocol.md` as an open scope call. The measurement changes both halves of that.
+The `harness/review-protocol.md` figure is **twelve, not four** (`:5` ×2, `:22`, `:35`, `:53` ×2,
+`:58`, `:140`, `:161`, `:188`, `:206`, `:213`), and the same defect class runs through 57 files.
+**This design does not choose the boundary.** The choice is the PO's, for the reason the backlog
+item already records: `templates/prompts/*.md` and `roles/*.md` are normative dispatch artifacts
+under CLAUDE.md's "Dispatch from the template, never freehand" rule, and the volume decides whether
+R3 stays a mechanical task or becomes a package. The three defensible options, with what each buys
+and costs:
 
-This is outside R3's stated scope (the backlog item names the two templates), and this design does
-**not** silently widen that scope. It is recorded here because repointing the templates at a file
-whose own cross-references are broken fixes one hop of a two-hop chain. Recommendation: fold these
-four lines into R3's implementation package as a bounded, enumerated addition — they are the same
-defect, the same fix shape, and the list is complete above. The scope call is the PO's/Elephant's,
-not this document's.
+| Option | Scope | Size | What it buys | What it leaves |
+| --- | --- | --- | --- | --- |
+| **B1 literal** | the two dispatch templates (+ the one sentence in `roles/goldfish.md`) | 3 files, 9 citations | exactly what the backlog item asks for; smallest review surface; matches the Triage's "mechanical" framing | the templates then cite `roles/goldfish.md` (6 dead) and `harness/review-protocol.md` (12 dead) — **it repairs the first hop of a chain whose next two hops are broken**, and leaves `CLAUDE.md` (3 dead + 6 wrong-topic), the highest-traffic carrier in the repo, untouched |
+| **B2 citation-chain closure** | B1 + `roles/goldfish.md` (all 6) + `roles/critic.md` (10) + `harness/review-protocol.md` (12) + `CLAUDE.md` (11) | 6 files, ~47 citations | closes every hop an agent traverses when it follows a dispatch template, and makes §II.2's decision coherent (the canonical carrier stops carrying the defect) | everything else: `roles/elephant.md` (32), `harness/session-bootstrap.md` (20), `templates/**`, the shipped plugin. Still a real reduction, still a stated residual |
+| **B3 all live agent-facing artifacts** | classes C1–C8 of §II.1.3, both language halves | 39 files, ~232 citations | removes the class from every artifact an agent or a new project actually reads | touches the **shipped plugin** (`plugins/pipeline-core/**`, 7 files — a distribution change with plugin-refresh implications), one `.mjs` (`harness/scripts/check-claude-md-lines.mjs`, incl. an operator-visible fix string), and all nine project-facing templates, which changes what every new project inherits. This is a package with its own Critic pass, not a task |
+
+**Excluded under every option, with reasons — this part is not a decision, it is a boundary:**
+
+- **`docs/adr/**` (C9, 46 citations over 10 files, incl. `docs/state.md` and `docs/deploy/README.md`).**
+  ADRs are dated records of what was decided against the document as it then stood; rewriting an
+  ADR's `**Basis:**` line rewrites the record. `docs/adr/0003-role-implementation-subagents.md:21`
+  already models the correct handling — it says "Historical trigger wording from 2026-07-03 (matched
+  the then-current `operating-model.md` §4.2/§3.3)". Recommendation: leave them, and if anything, add
+  that same "then-current" framing where it is missing. Not R3's work.
+- **`specs/**` and `backlog/**` (C10, 66 citations over 8 files).** Archival. Includes this document,
+  whose 43 hits are quotations *of* the defect.
+- **The German reference halves as a separate scope.** They are not separately scoped: a bilingual
+  file is fixed in both halves or not at all (AC-R3-6).
+- **Any change to `docs/operating-model.md` itself.** R3 repairs citations; it does not restructure
+  the target. In particular the two alias anchors at `:563`/`:583` are **reported, not removed** —
+  removing them turns `backlog/README.md`'s three stale links red, which is a correct outcome but a
+  different task with a different blast radius.
+
+**Two follow-up items this re-derivation raises, neither folded into R3 here** (§II.3.3 item 3):
+
+1. **A citation lint** that fails on `§N`/`§N.M` references to `docs/operating-model.md` outside
+   archival paths — the only mechanism that would make this class non-recurring. Cheap, because the
+   target set is exactly §II.1.3.
+2. **Anchor hygiene in `check-doc-contracts.mjs`** — alias `<a id>` anchors and cross-language slug
+   resolution in bilingual documents let a fragment link stay green while pointing at the wrong (or
+   German) content. That is a gate-honesty defect in the checker, on the same footing as the
+   guardrail the repo applies to its other gates, and it is guard/harness code with its own review
+   path.
+
+### II.7 Adjacent drift, disclosed and not fixed here
+
+**Corrected 2026-08-07: the first revision reported four citations in `harness/review-protocol.md`.
+There are twelve, across ten lines.** The undercount came from searching that file for the string
+`operating-model`; six of the twelve use the `OM §` shorthand and one sits inside a heading.
+Complete list, each read in the file:
+
+`:5` §4 *and* §4.3 ("Operationalizes `docs/operating-model.md` §4 (review system) and §4.3") ·
+`:22` §4.3 · `:35` §4.2 ("normative definitions: OM §4.2") · `:53` §3.3 *and* §4.2 ("word-identical
+in `docs/operating-model.md` §3.3/§4.2") · `:58` §4.2 · `:140` §2.4 — **inside the heading**
+`### 2.4 Findings format (transfer format 3, OM §2.4)` · `:161` §2.4 · `:188` §3.4 · `:206` §4.3 ·
+`:213` §4.2. Eleven are kind A; `:5`'s `§4` is kind B (§4 is *The lifecycle*, not the review
+system).
+
+Three things follow that the first revision could not see:
+
+1. **The heading at `:140` is load-bearing twice over.** It carries a stale citation *and* its slug
+   (`#24-findings-format-transfer-format-3-om-24`) is what the first revision's §II.4 proposed the
+   templates link to. Correcting the heading and pinning its slug are mutually exclusive; §II.4 now
+   cites it by title.
+2. **This is no longer a two-hop chain but a three-hop one.** `templates/prompts/*` → both
+   `harness/review-protocol.md` (12) and `roles/goldfish.md` (6, §II.2 consequence 2) →
+   `docs/operating-model.md`. B1 repairs hop one only.
+3. The scope call is therefore not a small addendum to R3 but part of the boundary decision itself,
+   and it has moved into §II.6 where it belongs. This section no longer makes a recommendation of
+   its own; §II.6 option B2 is where these twelve lines are decided.
+
+Two further adjacent observations, recorded and deliberately not acted on:
+
+- **`docs/operating-model.md`'s German half carries a `### H5 Close-Koordinator` heading (`:649`)
+  with no English counterpart** — observed from the heading scan alone (the German prose was not
+  read, per the bilingual skip convention). An EN/DE structural divergence in the normative document,
+  outside R3 entirely, mentioned so the next reader of §II.1.1 does not mistake it for a measurement
+  error.
+- **`docs/state.md:700` already records this defect** ("`:22` \"operating-model §5.1\", `:44`
+  \"§5.2/P5\"; §5 has no numbered children"). It is a note *about* the defect, not an instance of it,
+  and it is counted as such in §II.1.3.
+
+### II.8 Verification log for the 2026-08-07 re-derivation (Part II only)
+
+Method and commands actually run. Part I's log stays in §III.4 and is untouched.
+
+- **Read in full:** `docs/operating-model.md:1-322` — the English part only; the German reader copy
+  below the marker at `:323` was deliberately **not** read (CLAUDE.md bilingual skip convention), and
+  every statement about it in §II.3.2/§II.7 comes from the heading scan and from two `<a id>` lines
+  read in place. Also read in full: both dispatch templates' header blocks, `roles/goldfish.md`,
+  R3's backlog item, and `harness/scripts/check-doc-contracts.mjs` (`:1-85`, `:150-199`, `:355-460`).
+- `rg -n "^#{1,4} " docs/operating-model.md` and `rg -n "DE-REFERENCE-BELOW" docs/operating-model.md`
+  → the 10 `##` / 3 `###` / 0 numbered-`###` structure of §II.1.1 and the marker line `:323`.
+- **The inventory of §II.1.3** comes from an attribution-aware scan over `git ls-files`: every
+  `§N`/`§N.M` token is attributed to the **nearest preceding document reference on its line**, so a
+  line citing two documents does not inflate the operating-model count; rows below a file's own
+  German marker are counted separately; one verified false positive was dropped by hand
+  (`roles/critic.md:190`). The scan tooling was written under `.git/` and is deliberately **not** a
+  repository artifact — this dispatch adds no file to the tree.
+- `rg -n "\]\([^)]*\.md#" .` → the 13 fragment-bearing links, five of them from `backlog/README.md`
+  to `docs/operating-model.md`; `rg -n "<a id=" docs/operating-model.md` → the two alias anchors,
+  both then read in place at `:563` and `:583`.
+- A probe importing `collectAnchors` from `harness/scripts/check-doc-contracts.mjs` → 31 anchors for
+  20 headings; `#7-feedback-loop`, `#8-projekt-kalibrierungsschicht` and `#4-der-lifecycle` all
+  resolve. This is the measurement §II.3.2 rests on.
+- `rg -n "^#{1,4} " harness/review-protocol.md roles/goldfish.md`, `rg -n "^#{2,4} 6"
+  harness/session-bootstrap.md`, `rg -n "^#{1,4} |^### EL-0" roles/elephant.md` → the replacement
+  targets named in §II.4 (`review-protocol` §2.1 `:33`, §2.3 `:74`, §2.4 `:140`; `goldfish.md` §2
+  `:19`, GF-01 `:21`, §6 `:86`; `session-bootstrap` §6.2 `:298`, §6.3 `:308`; the stage-0 criteria
+  in `elephant.md` EL-01's exception `:35`).
+- `node harness/scripts/check-doc-contracts.mjs` → exit 0 both before and after this revision:
+  `490 Markdown file(s), 776 link(s), 13 anchor check(s)`.
+- **Every `file:line` quoted in Part II was confirmed by reading the file**, not by trusting a search
+  hit: `rg` output in this environment can render the matched needle itself as a placeholder, which
+  is how the `<a id=` hits first appeared and why they were re-read before being relied on.
+- **Not run, and disclosed rather than substituted:** the project's configured verify gate. It is
+  unreachable in this checkout for a reason outside a dispatch's control, so the doc-contract checker
+  was run on its own. A single checker is **not** the gate, and §II.5's AC-R3-3 is written against the
+  gate, not against this session's substitute.
 
 ---
 
@@ -993,7 +1294,8 @@ not this document's.
 - **The shell-lane residual for the live plugin root (finding SL-1, §I.2.3c).** Reported, escalated
   to §I.2.10 item 5, and deliberately not designed, fixed or worked around here — it is guard code
   and a T1 subject of its own.
-- **The four `harness/review-protocol.md` citations** of §II.6 — disclosed, scope call left open.
+- **The twelve `harness/review-protocol.md` citations** of §II.7 — disclosed; the scope call moved
+  into §II.6 as part of R3's boundary decision, which this document deliberately leaves to the PO.
 - **R2-min-B (§I.2.6)** — promoted to the preferred option if U3 holds, but still not designed; it
   needs OBS-1 and its own small pass for the Claude-host record.
 
