@@ -95,8 +95,10 @@ freehand). Status:
    confirmed not needed (main already has an equivalent). See
    `backlog/evidence/2026-08-07-project-authority-failclosed-closure.md`.
 2. **`self-application-integrity-check-absent`** and
-3. **`ruleset-freshness-wsl-subsystem-absent`** — investigation in progress.
-   Already found, independent of the dispatched agent: `ruleset-freshness-host.mjs`
+3. **`ruleset-freshness-wsl-subsystem-absent`** — the first dispatch hit the
+   worktree-staleness bug (below) and self-detected/stopped cleanly without
+   guessing; being redispatched without `isolation: "worktree"`. Already
+   found, independent of the dispatched agent: `ruleset-freshness-host.mjs`
    (Phoenix-only, merged in cleanly) has a **currently broken import** —
    verified directly (`node -e "import(...)"` throws) — depending on 9 named
    exports across `ruleset-freshness.mjs`/`codex-host-plugin-list.mjs` that
@@ -104,9 +106,15 @@ freehand). Status:
 4. **`governance-product-verify-suites-deregistered`** — blocked on 1–3's
    outcome, not started.
 5. **`ledger-backed-plan-and-push-authority-absent-on-merged-base`** — design
-   phase (not implementation) dispatched: a spec addendum for the additive
-   ledger layer on top of ADR-0056, explicitly NOT reviving Phoenix's full
-   pre-merge `pipeline-state.mjs`/`plan-spec-state-v2.mjs` subsystems.
+   phase (not implementation) done: commit `ad49c48`,
+   `specs/sprint-phoenix-epic/design/phx-2-additive-ledger-authority.md`. A
+   scoped additive mechanism (one new ~100-line lib module, two call sites,
+   opt-in gate key) — explicitly NOT reviving Phoenix's full pre-merge
+   `pipeline-state.mjs`/`plan-spec-state-v2.mjs` subsystems, explicitly not
+   claiming to close the `chat`-mode human-presence gap. Per CLAUDE.md's
+   self-application rule (checkpoint deliverables get an independent Critic
+   review before the PO's gate), a Critic review of this design is
+   dispatched and pending before any implementation work starts on it.
 
 **Infra finding, 2026-08-07:** the `isolation: "worktree"` dispatch option
 pinned two of three agents' worktrees to `6e2c9b2` (origin/main's pre-merge
