@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.dispatch-templates-cite-restructured-operating-model-sections
 type: defect
 owner: pipeline
-status: open
+status: in_progress
 created: 2026-08-07
 source: Critic round-4 briefing-violations note, delta re-review of WP2-WP3-partA-rework-3 (specs/sprint-phoenix-epic/evidence/wp2wp3-parta-rework-3-delta-critic-review-138e2e3.md); widened by the Elephant on verification. Recorded, not fixed, because the correct target is a real decision rather than a renumbering.
 ---
@@ -125,4 +125,8 @@ in-session edit.
   pass, not as an in-session edit. To be folded into the Phoenix design for
   the implementation phase together with the two sibling items recorded the
   same day.
+- **Design (2026-08-07):** designed as residual R3 in
+  `specs/sprint-phoenix-epic/design/part-a-residuals-and-dispatch-template-drift.md` Part II
+  (proposal item 3 decided there; the citation inventory found four stale references beyond
+  the four recorded here).
 - **Date:** 2026-08-07

@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.marketplace-install-topology-unattested
 type: defect
 owner: pipeline
-status: open
+status: in_progress
 created: 2026-08-07
 source: Critic finding F1, delta re-review of the F-A/F-C/F-D/F-B rework (specs/sprint-phoenix-epic/evidence/wp2wp3-parta-rework-2-delta-critic-review-412d33d.md); the residual of *how* Critic finding F2 (WP2-WP3-partA-rework-1) was resolved. Recorded via the WP2-WP3-partA-rework-3 dispatch.
 ---
@@ -133,4 +133,8 @@ design-first treatment (MP-22/23) when accepting the companion item
   pre-decided here. To be folded into the Phoenix design for the
   implementation phase together with the two sibling items recorded the same
   day.
+- **Design (2026-08-07):** designed as residual R2 in
+  `specs/sprint-phoenix-epic/design/part-a-residuals-and-dispatch-template-drift.md` §I.2
+  (candidate direction 1 recommended, direction 2 rejected with tradeoffs; open PO
+  questions in §I.2.10).
 - **Date:** 2026-08-07

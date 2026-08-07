@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.attestation-git-presence-gate-not-gs8-protected
 type: defect
 owner: pipeline
-status: open
+status: in_progress
 created: 2026-08-07
 source: Critic finding F-B, delta re-review of the F2 implementation fix (specs/sprint-phoenix-epic/evidence/wp2wp3-parta-rework-1-delta-critic-review-7aa84f0.md); recorded via the WP2-WP3-partA-rework-2 dispatch (which also fixed F-A/F-C/F-D from the same review).
 ---
@@ -99,4 +99,6 @@ already received for its own gate-strength question (§A.3 item 3).
   of a script gating live bootstrap readiness (MP-22/23 design-first). To be
   folded into the Phoenix design for the implementation phase together with
   the two sibling items recorded the same day.
+- **Design (2026-08-07):** designed as residual R1 in
+  `specs/sprint-phoenix-epic/design/part-a-residuals-and-dispatch-template-drift.md` §I.1.
 - **Date:** 2026-08-07
