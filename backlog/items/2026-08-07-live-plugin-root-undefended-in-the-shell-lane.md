@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-07
-source: Finding SL-1 of the PHX-R2-THREATMODEL-rework dispatch (2026-08-07), re-verified independently by the Elephant at source. Security class. NOT executed by either party — confirming it empirically would mean disarming the guard that is enforcing at the time.
+source: "Finding SL-1 of the PHX-R2-THREATMODEL-rework dispatch (2026-08-07), re-verified independently by the Elephant at source. Security class. NOT executed by either party — confirming it empirically would mean disarming the guard that is enforcing at the time."
 ---
 
 # The live plugin root is defended in the write lane only; the shell lane has no control that reaches it

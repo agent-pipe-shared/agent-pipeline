@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-07
-source: PO ruling (APS, 2026-08-07) establishing the top rule that no PO activity outside the session may ever be required and that one release must cover everything. Measured from source on origin/main by the Phoenix session the same day; the mechanism work is assigned to the Nova session.
+source: "PO ruling (APS, 2026-08-07) establishing the top rule that no PO activity outside the session may ever be required and that one release must cover everything. Measured from source on origin/main by the Phoenix session the same day; the mechanism work is assigned to the Nova session."
 ---
 
 # The shipped approval mechanisms require out-of-session PO acts and cannot carry one release across a chain

@@ -1,11 +1,11 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.no-check-validates-prose-section-citations
-type: improvement
+type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-08-07
-source: Measured by the PHX-R3-RESCOPE dispatch (344 stale citations across 57 files). PO decision (APS, 2026-08-07): accepted for implementation, as the follow-up that makes the defect class non-recurring.
+source: "Measured by the PHX-R3-RESCOPE dispatch (344 stale citations across 57 files). PO decision (APS, 2026-08-07): accepted for implementation, as the follow-up that makes the defect class non-recurring."
 ---
 
 # Nothing in the repository validates prose `§N` / `§N.M` citations

@@ -1,11 +1,11 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger
-type: requirement
+type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-08-07
-source: PO requirement (APS, 2026-08-07) — the finalized GMW and HGO modules in the next plugin version must write their evidence cleanly into the audit ledger Phoenix delivers; the information to log is "what was approved, when, why, by whom". Recorded with the concrete gaps the Elephant found on verification against the bound Phoenix acceptance criteria.
+source: "PO requirement (APS, 2026-08-07) — the finalized GMW and HGO modules in the next plugin version must write their evidence cleanly into the audit ledger Phoenix delivers; the information to log is \"what was approved, when, why, by whom\". Recorded with the concrete gaps the Elephant found on verification against the bound Phoenix acceptance criteria."
 ---
 
 # GMW and HGO approval evidence must land in Phoenix's Human Governance Decision Ledger
