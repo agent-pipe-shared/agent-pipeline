@@ -136,6 +136,35 @@ the only instance that reaches an operator through tool output; and the German
 half carries a `### H5 Close-Koordinator` heading (`:649`) with no English
 counterpart, an EN/DE structural divergence outside R3.
 
+**R1 Critic round 2/4: FAIL — one major, two minor; rework 2 dispatched
+(`PHX-R1-REWORK-2`).** The F1 correction itself held up: the Critic re-derived
+the `:157` lever, the GS-6-before-path-table evaluation order and the complete
+shell-needle enumeration from source without a miss. **F-A, the major:** §I.1.3
+is GS-9's QG-05 blind-spot statement and asserts "Three residuals, not one" — but
+a path-table rule fires **only** in a repository carrying one of five
+governance-marker files (`guard-gate-strength.mjs:179-188`), so §I.1.6's claim
+that the source-tree copy is refused is unconditional where the code is
+conditional. The contrast it draws with GS-6 is inverted on the dimension that
+matters: GS-6 is evaluated *before* the path table and carries no marker
+precondition. **The author had measured this and left it in the `.git/` dispatch
+record's `openQuestions` — a location no downstream reader sees**, so the
+disclosure never reached the artifact. That matters because AC-R1-9 propagates
+this block into the implementation's own report. Minors: the document's
+verification-posture claim is now false for ~40 added citations with no §III.4
+entry, and the relocated explanatory comment carries two "`status` below"
+references to code that stays behind — the mirror of the defect the previous
+round fixed.
+**Process finding worth carrying beyond this package:** the Critic dispatch
+admits the dispatch record as "mechanical DoD result and command/exit code
+artifact only; the implementor's narrative rationale is NOT your input". That
+carve-out is **unenforceable as written** — the JSON interleaves mechanical
+fields with `findingResolutions[].detail`, `openQuestions`, `deviationsFromSpec`
+and `modelRationale` in one object, and cannot be read in halves. The Critic
+disclosed reading the whole file, re-derived both affected findings from source
+before reporting them, and recommended emitting the mechanical record as a
+separate artifact or dropping the carve-out. Applies to every future Critic
+dispatch, not just this one.
+
 **Ledger Critic round 3/4: FAIL — one major, narrowly bounded; rework 3
 dispatched (`PHX-LEDGER-INTAKE-rework-3`).** Everything else in the delta was
 examined and cleared, including the F-A impossibility proof, which the Critic
