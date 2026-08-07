@@ -92,7 +92,28 @@ anything.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Stays OPEN, but the reported cause is refuted and the item needs
+  re-grounding before anyone works it.
+- **Rationale:** Commit `674b1c0` added a check that seeds a blank root and then
+  asserts directly on the result: `project/pipeline.json` exists,
+  `.claude/pipeline.json` does **not**, and `readProjectAuthority` resolves
+  `source: "neutral"` with `calibration: "project/pipeline.json"`. It passes. The
+  `.claude/*` keys in `freshBaselines` are logical names that the write path maps
+  onto the neutral tier, which is why reading the seed function alone suggests the
+  opposite of what the seed does — a trap worth naming, since it is what made this
+  look like a tier-selection defect in the first place. A separate check pins that
+  a project already carrying the legacy tier keeps resolving there unchanged.
+  So a fresh project's *calibration* was already neutral-tier before this block,
+  and is now pinned. The independent Critic round reached the same place from the
+  other direction: no commit touches `lib/project-authority.mjs` or the
+  tier-selection write path, because there was nothing there to fix.
+  What the reporting session actually saw in `.claude/` is therefore still
+  unidentified. `.claude/settings.json` is seeded and legitimately belongs to the
+  runner rather than to the Pipeline's authority tiers, which makes it the first
+  candidate — but that is a hypothesis, not an observation, and this item must not
+  be closed on it.
+- **Assignment (if accepted):** Re-ground first: enumerate every path a fresh
+  greenfield onboarding leaves under `.claude/`, decide per path whether it is
+  runner-owned or authority-owned, and rewrite the item's description against that
+  list. Only then is there a defect to fix, or an item to close.
+- **Date:** 2026-08-08
