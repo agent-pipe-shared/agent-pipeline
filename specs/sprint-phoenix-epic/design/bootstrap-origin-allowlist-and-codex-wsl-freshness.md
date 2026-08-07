@@ -85,7 +85,11 @@ an allowlisted origin. Checked directly against Part A's actual mechanism
 canonical remote copy; the "clean checkout" framing overclaimed what a purely local check can
 deliver.
 
-Concretely, the guarantee Part A actually restores is narrower: **the origin URL is one of
+Concretely, the guarantee Part A actually restores is narrower, and — **corrected per Critic
+finding F-A (MAJOR, delta re-review `7aa84f0` of the F2 implementation fix)** — scoped to only
+the topology where a real git checkout sits at the self-application layout (a `.git` entry two
+directories above `pluginRoot`, gated by `pluginRootHasSelfApplicationGit()` in
+`pipeline-start-preflight.mjs`): **the origin URL is one of
 the two reviewed Public-Core origins** — `https://github.com/agent-pipe-shared/agent-pipeline.git`
 or `git@github-public:agent-pipe-shared/agent-pipeline.git` — or, for local development, the
 verified self-application layout — **AND the plugin subtree carries no *uncommitted* local
@@ -96,10 +100,20 @@ from the loaded manifest vs. `installedVersion` read from the host's plugin list
 came from, whether the working tree is dirty, or whether the manifest was hand-edited without
 touching the version string. A forked or locally altered marketplace clone with a matching
 version string currently passes readiness undetected; Part A closes exactly that gap, no
-more.
+more — and only inside a self-application/dev checkout, per the scoping above.
 
-**Disclosed limitation, not closed by this design (stated plainly, matching this document's
-own diligence standard elsewhere):** a clone whose remote origin is genuinely one of the two
+**Disclosed limitation 1 (topology scope), added per Critic finding F-A:** the scoping above
+is not a phrasing nuance — for a real marketplace-installed (non-git) copy, e.g.
+`~/.claude/plugins/cache/<marketplace>/pipeline-core/<version>`, the topology every ordinary
+end-user install actually ships to, this integrity check does not run at all (see §A.5 case
+2); readiness falls through unmodified to the pre-existing version-only decision that
+predates Part A. This is a distinct, tracked, disclosed gap, not closed by this design — see
+`backlog/items/2026-08-07-self-application-integrity-check-absent.md`, which records it as the
+residual of *how* Critic finding F2 (`WP2-WP3-partA-rework-1`) was resolved.
+
+**Disclosed limitation 2 (content scope), not closed by this design (stated plainly, matching
+this document's own diligence standard elsewhere):** a clone whose remote origin is genuinely
+one of the two
 allowlisted URLs, but which is checked out at an arbitrary *committed* local commit/history
 (e.g. a locally amended, rebased, or cherry-picked history, or a detached-HEAD checkout of an
 arbitrary committed tree, on a clone that still reports one of the two allowlisted origin
@@ -364,13 +378,28 @@ make silently.
    Part A's implementation dispatch must carry in addition to the origin/content attestation
    itself — see §A.6 for the rollout framing and the PO's actual choice, including the
    alternative (day-one hard block) this design does not recommend but discloses.
-2. **The check cannot run at all** (missing `git` binary, non-git flat-copy install, an
-   unhandled exception inside the observer): both `observeCodexPublicCoreIdentity` and
-   `observePublicCoreIdentity` already fail closed *internally* — every code path returns
-   `{status: "rejected", reasonCodes: [...]}` inside a top-level `try`/`catch`
-   (`public-core-observation.mjs:323-357`, `:368-377`); neither function is documented or
-   observed to throw for an expected failure. A "rejected" observation is therefore just
-   case 1 again, not a separate branch.
+2. **The check cannot run at all — two distinct sub-cases (corrected per Critic finding F-A,
+   MAJOR, delta re-review `7aa84f0`, which found the original text below conflated them):**
+   - **Non-git flat-copy install** (no `.git` entry two directories above `pluginRoot` — the
+     real marketplace-installed-plugin-cache topology, e.g.
+     `~/.claude/plugins/cache/<marketplace>/pipeline-core/<version>`): gated by
+     `pluginRootHasSelfApplicationGit()` in `pipeline-start-preflight.mjs`, the F2 fix's own
+     attestation-gating decision. The observer (`observeCodexPublicCoreIdentity`/
+     `observePublicCoreIdentity`) is **never even invoked** in this case — attestation is
+     skipped entirely, not attempted, not failed — and `status` falls through unmodified to
+     the pre-existing version/installedIdentity/installedVersion-only decision that predates
+     Part A (case 1's `"plugin-refresh-required"` branch does **not** apply here; a matching
+     version passes as `"ready"`, exactly as it did before Part A shipped). This is the
+     topology every ordinary end-user install ships to; see §A.1's corrected guarantee, §A.7's
+     matching exclusion entry, and the tracked, disclosed gap in
+     `backlog/items/2026-08-07-self-application-integrity-check-absent.md`.
+   - **Missing `git` binary, or an unhandled exception inside the observer, when a `.git`
+     checkout IS present at the self-application layout:** both `observeCodexPublicCoreIdentity`
+     and `observePublicCoreIdentity` already fail closed *internally* — every code path
+     returns `{status: "rejected", reasonCodes: [...]}` inside a top-level `try`/`catch`
+     (`public-core-observation.mjs:323-357`, `:368-377`); neither function is documented or
+     observed to throw for an expected failure. A "rejected" observation here is therefore
+     just case 1 again, not a separate branch.
 3. **Explicit non-goal for this design:** the check must not, on first ship, newly produce a
    *hard* block (`"plugin-identity-unavailable"`, exit `2`) — see the migration note (§A.6)
    for why.
@@ -437,6 +466,15 @@ broad blast radius" alternative this correction discloses rather than glosses ov
 
 ### A.7 Explicitly out of scope (Part A)
 
+- **A real integrity check for the installed non-git (marketplace flat-copy) case — added per
+  Critic finding F-A (MAJOR, delta re-review `7aa84f0`), which found the code's own citation of
+  this exclusion pointed at a bullet that did not yet exist.** The origin/content attestation
+  is gated on `.git` presence at the self-application layout
+  (`pluginRootHasSelfApplicationGit()`, `pipeline-start-preflight.mjs`) and is skipped
+  entirely, not attempted, for the real installed (non-git) topology — see §A.1's corrected
+  guarantee and §A.5 case 2. Closing that gap for the real installed topology is tracked
+  separately in `backlog/items/2026-08-07-self-application-integrity-check-absent.md`, not
+  this design.
 - Reviving `codex-host-plugin-list.mjs`'s retired API surface
   (`observeCodexRulesetSource`, `PUBLIC_SELF_APPLICATION_ORIGINS`) — explicitly forbidden by
   the PO decision; superseded per §A.3.

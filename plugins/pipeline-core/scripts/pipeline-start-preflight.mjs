@@ -249,8 +249,9 @@ export function observePipelineStartPreflight({
   // not failed -- and `status` below falls through to exactly the
   // version/installedIdentity/installedVersion decision that predates this
   // feature. A real integrity check for the installed non-git case is
-  // explicitly out of scope; see the design doc's Part A and this dispatch's
-  // briefing.
+  // explicitly out of scope; see the design doc's Part A §A.7 (the
+  // non-git-flat-copy exclusion entry added there for this exact case) and
+  // §A.5 case 2.
   const resolvedObserve = observe
     ?? (runner === "codex" ? observeCodexPublicCoreIdentity : observePublicCoreIdentity);
   let attestationFailed = false;
