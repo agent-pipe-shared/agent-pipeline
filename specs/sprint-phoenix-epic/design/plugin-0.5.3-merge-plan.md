@@ -129,6 +129,52 @@ Full `verify` (all suites registered per `harness/scripts/verify.mjs`),
 Critic review of the merge diff — architecture/guardrail class, so the
 higher-capability review model at max, per CLAUDE.md's self-application rule.
 
+## 8a. MEASURED against the real source — §4/§5 are superseded (2026-08-07)
+
+The 0.5.3 work turned out to have real git history after all: it sits on
+`origin/feat/sprint-nova-codex-v046`, whose head `378cb64` carries exactly the
+installed version `0.5.3+claude.20260807221336.14e7b97`, and whose build commit
+`14e7b97` is in that branch's own history. That removes the provenance objection
+this plan was built around — there is a real ancestor, real SHAs, and a real
+three-way merge. `git merge-base sprint_phoenix origin/feat/sprint-nova-codex-v046`
+is `6e2c9b2`, the same base as `origin/main`.
+
+**The estimate in §4 was far too pessimistic, and the reason is instructive.**
+It was computed against the flat copy, which is a snapshot taken at a different
+moment; files where *this* branch was simply newer showed up as differences and
+were counted as conflicts. Against the real branch:
+
+- The nova side changes **29** plugin files, not the whole tree.
+- Intersected with the 110 this branch owns, the candidate conflict set is
+  **5** files, not 16: `hooks/guard-gate-strength.mjs`, `hooks/guard-testpath.mjs`,
+  `lib/guard-maintenance-window.mjs` (+ its test), `scripts/guard-maintenance-window.mjs`.
+- `git merge-tree --write-tree` resolves nearly all of it. **Real conflicts: 7
+  files, and exactly ONE of them is in the plugin tree —
+  `plugins/pipeline-core/hooks/guard-gate-strength.mjs`.** `guard-testpath.mjs`
+  and `harness/scripts/verify.mjs` both auto-merge cleanly.
+
+The remaining six conflicts are bookkeeping rather than code: `backlog/STATUS.md`,
+`backlog/index.json`, `backlog/transitions.ndjson`, `docs/state.md`,
+`governance/observation-doc-governance.json`, `project/pipeline-state.json` —
+all files both sides append to independently.
+
+**§3's warning is confirmed, not weakened.** The single code conflict is the GS-8
+file, which is precisely the silent-regression case: the nova side has no GS-8
+entry and no GS-8 test, so resolving that one conflict by taking either side
+wholesale loses something. It is the only file in the merge that requires a
+genuine union, and it is the file the plan predicted.
+
+**What this changes for execution:** the merge is materially smaller and better
+understood than §4 suggested. What it does *not* change is the sequencing
+recorded in `docs/state.md` — the merge still lands before R3's B3 sweep — or the
+open items in §7, in particular that ADR-0058, ADR-0059 and the GMW threat model
+must arrive with the code rather than be inherited as gaps.
+
+**Still a PO decision:** the standing instruction was to wait for the push to
+`main`. `origin/main` is unchanged as of this measurement. Merging from a feature
+branch that has not landed on `main` means merging content that may still change
+before it does. That trade is the PO's to make, not this plan's.
+
 ## 9. Honest limits of this plan
 
 The classification in §4 and §5 was computed against the **flat local copy**,
