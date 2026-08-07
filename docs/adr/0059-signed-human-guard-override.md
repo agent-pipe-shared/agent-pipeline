@@ -109,10 +109,42 @@ boundary is a different problem with a different, narrower fix (worktree
 recognition in `GUARD-CROSS-REPO-MUTATION` specifically — tracked as
 follow-up, not part of this ADR) rather than something HGO should absorb.
 GS-1/GS-2/GS-3/GS-4/GS-5/GS-7 (the files that decide a gate's own strength)
-remain outside BOTH GMW and this mechanism for the same reason ADR-0058
-already gives: their existing `writer-owned-project-policy-emergency`
-HGO class is the correct, narrower, exact-action route for those, and it is
-what this ADR makes usable in `signature` mode — not a new, broader one.
+remain outside GMW for the same reason ADR-0058 already gives.
+
+**Correction, 2026-08-07 (found while acting on this Decision):** the
+paragraph above originally claimed these paths' "existing
+`writer-owned-project-policy-emergency` HGO class is the correct, narrower,
+exact-action route for those, and it is what this ADR makes usable in
+`signature` mode" — implying `guard-gate-strength.mjs` (the guard that
+actually enforces GS-1..GS-5/GS-7) already consulted HGO and only needed the
+signed path added. That was false: `guard-gate-strength.mjs` never called
+`consumeHumanGuardOverride()` or any HGO function at all for these six
+paths — by design, per its own header comment ("There is no in-session
+override, because an in-session override for 'may I weaken my own gate' is
+the same hole with an extra step"), added after the T1 Critic's F5 finding
+that these files had NO gate whatsoever. `protectedPath()` in
+`human-guard-override.mjs` does classify them, but only for OTHER guards'
+generic writer-owned-policy edits elsewhere in the project — it was never
+wired to `guard-gate-strength.mjs` itself. So these six paths had zero lift
+mechanism, signed or otherwise, until the follow-up below.
+
+**Follow-up decision (2026-08-07, PO instruction — a live session was
+blocked on GS-7 with no route at all):** extend `guard-gate-strength.mjs`
+with a SIGNED-ONLY lift for GS-1..GS-5/GS-7 (never GS-6, which keeps its own
+GMW mechanism unchanged), mirroring Decision 3's always-attempt-consume
+pattern — but with an additional, absolute constraint the other guards do
+not need: `authorizeHumanGuardOverride()` (the chat-mode path) must refuse
+to arm a capability for any of these six exact paths UNCONDITIONALLY,
+regardless of the configured `gates.push_approval` mode — not merely
+"refused unless chat mode" like every other HGO consumer. Only
+`authorizeHumanGuardOverrideBySignature()` may ever arm one. This is
+stricter than Decision 2's "consuming side doesn't care how a capability was
+armed" for the ordinary guard family: for gate-strength paths specifically,
+an in-session chat-mode capability must never be *creatable* in the first
+place, not merely inadmissible at consume time — because these are the
+files that decide what "chat mode" even means, so any acceptance of a
+chat-armed capability here is circular by construction. Tracked and
+implemented as a direct follow-up dispatch on this same ADR, not a new one.
 
 ## Consequences
 
