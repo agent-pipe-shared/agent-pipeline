@@ -23,7 +23,34 @@ authored this session and both are in the Critic cycle:
   digest over the trust anchor the design explicitly excluded one section
   earlier. **F4** anchors the hook-path residual to H-AC-12's migration clause
   while H-AC-02 states the same requirement unconditionally and is cited
-  nowhere. Rework dispatched (`PHX-LEDGER-INTAKE-rework-1`, Design-tier).
+  nowhere.
+  **Rework landed (`3088b57`, +548/−97); Critic round 2/4 dispatched as a
+  bounded delta on that commit.** Three outcomes worth reading before the next
+  round, because each is a design decision rather than a findings fix:
+  - **F1 is decided per producer, and the cost is stated instead of hidden.**
+    GMW passes the grant's own candidate (its enforcement is time-based, so a
+    moved `HEAD` is the normal case, `guard-maintenance-window.mjs:542-545`);
+    HGO passes the observed candidate (its capability is candidate-bound and
+    drift-rejected). The consequence — the candidate comparison is therefore
+    **vacuous for GMW** — is written into the document, with the kernel's own
+    liveness check cited as the in-repo precedent for doing the same.
+  - **`policyDigest` could not be dropped**, although the rework briefing
+    offered that as an out: it is a required `SHA256` key of the closed payload
+    (`human-governance-decision.mjs:23,26`). A closed preimage was defined
+    instead, with an explicit statement that it is not a trust-anchor derivative
+    at any depth, and constructive rather than blocklist verification — a
+    blocklist cannot catch a derivative, which was F2's whole point.
+  - **New finding F-3, not present in round 1:** HGO's most common override
+    target path is structurally unrepresentable in the portable payload
+    (`human-governance-decision.mjs:30-31` rejects dot-prefixed paths). Failing
+    closed there would disable HGO's dominant emergency lane, which the standing
+    constraint forbids ("retires nothing that already exists"), so increment 1
+    covers the representable subset and leaves those consumptions as they are
+    today. Disclosed in §14, and one of the two kernel amendments now specified
+    in §9 rather than applied.
+  Two deviations were declared: §7.3's identifiers became generation-suffixed so
+  the concurrency test F5 demanded would not have to assert broken behaviour,
+  and §8.1 gained one bounded exception for the F-3 case.
   Trajectory verdict was `consistent` and the Critic re-verified ~40 of the
   document's citations itself — this is a fail on a strong document, and the
   Critic said so.
