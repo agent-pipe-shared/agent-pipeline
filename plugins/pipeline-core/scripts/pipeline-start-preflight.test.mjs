@@ -2,7 +2,12 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
+import { pathToFileURL } from "node:url";
 
 import {
   installedPipelineIdentity, installedPipelineVersion, observePipelineStartPreflight,
@@ -538,4 +543,129 @@ test("plugin-identity-unavailable keeps nextAction null even under a failing att
   });
   assert.equal(result.status, "plugin-identity-unavailable");
   assert.equal(result.nextAction, null);
+});
+
+// ---- .git-presence gate (Critic findings F2/F4, WP2-WP3-partA-rework-1) ----
+
+function fixtureScriptUrl(pluginRoot) {
+  return pathToFileURL(join(pluginRoot, "scripts", "pipeline-start-preflight.mjs")).href;
+}
+
+/**
+ * A real, minimal, valid `.codex-plugin/plugin.json`-bearing git checkout
+ * laid out exactly like self-application (`<gitRoot>/plugins/pipeline-core`),
+ * with its origin set to an allowlisted Public-Core URL and a clean working
+ * tree -- everything `observeGit`/`resolveSourceLayout`/`parseManifest`
+ * require for a genuine "ready" attestation. Built with real `git` calls
+ * (mkdtempSync fixture, not further stubbing) so the real default-selection
+ * line in `observePipelineStartPreflight` actually executes end to end.
+ */
+function buildSelfApplicationGitFixture() {
+  const gitRoot = mkdtempSync(join(tmpdir(), "pipeline-start-preflight-git-fixture-"));
+  const pluginRoot = join(gitRoot, "plugins", "pipeline-core");
+  mkdirSync(join(pluginRoot, ".codex-plugin"), { recursive: true });
+  writeFileSync(join(pluginRoot, ".codex-plugin", "plugin.json"), JSON.stringify({
+    name: "pipeline-core",
+    description: "fixture",
+    hooks: "./hooks/codex-hooks.json",
+    author: "fixture",
+    license: "SUL-1.0",
+    interface: "fixture",
+    version: "0.0.1+fixture",
+  }));
+  const git = (args) => execFileSync("git", args, { cwd: gitRoot, stdio: ["ignore", "pipe", "pipe"] });
+  git(["init", "--quiet", "--initial-branch=main"]);
+  git(["config", "user.email", "fixture@example.invalid"]);
+  git(["config", "user.name", "fixture"]);
+  git(["remote", "add", "origin", "https://github.com/agent-pipe-shared/agent-pipeline.git"]);
+  git(["add", "-A"]);
+  git(["commit", "--quiet", "-m", "fixture"]);
+  return { gitRoot, pluginRoot, scriptUrl: fixtureScriptUrl(pluginRoot) };
+}
+
+test("F2: attestation still runs, unmodified, when the loaded plugin root sits inside a real git checkout", () => {
+  const calls = [];
+  const result = preflight({
+    env: {},
+    pluginList: pluginList(),
+    read: () => manifest,
+    observe(input) { calls.push(input); return readyObservation(); },
+  });
+  assert.equal(calls.length, 1,
+    "this test's own real checkout has a real .git two levels above plugins/pipeline-core -- attestation must still be attempted");
+  assert.equal(result.status, "ready");
+});
+
+test("F2: attestation is skipped entirely (not attempted, not failed) for a real installed-plugin-cache-style layout with no .git at all", () => {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), "pipeline-start-preflight-no-git-"));
+  const pluginRoot = join(fixtureRoot, "cache", "agent-pipeline-local", "pipeline-core", "0.5.2");
+  mkdirSync(pluginRoot, { recursive: true });
+  let called = false;
+  const result = observePipelineStartPreflight({
+    env: {},
+    pluginList: pluginList(),
+    read: () => manifest,
+    scriptUrl: fixtureScriptUrl(pluginRoot),
+    observe: () => { called = true; return readyObservation(); },
+  });
+  assert.equal(called, false, "the observer must never be invoked when no .git exists");
+  assert.equal(result.status, "ready",
+    "falls through to the pre-existing version/installedVersion-only decision, not plugin-refresh-required");
+  rmSync(fixtureRoot, { recursive: true, force: true });
+});
+
+test("F4(c): the .git-presence gate skips real attestation for a no-.git fixture without injecting any observe stub", () => {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), "pipeline-start-preflight-f4c-"));
+  const pluginRoot = join(fixtureRoot, "cache", "agent-pipeline-local", "pipeline-core", "0.5.2");
+  mkdirSync(pluginRoot, { recursive: true });
+  const result = observePipelineStartPreflight({
+    env: {},
+    pluginList: pluginList(),
+    read: () => manifest,
+    scriptUrl: fixtureScriptUrl(pluginRoot),
+  });
+  assert.equal(result.status, "ready");
+  assert.equal(result.pluginRoot, pluginRoot);
+  rmSync(fixtureRoot, { recursive: true, force: true });
+});
+
+test("F4(a): runner claude reaches the real observePublicCoreIdentity default path, without any observe stub", () => {
+  const fixture = buildSelfApplicationGitFixture();
+  try {
+    const result = observePipelineStartPreflight({
+      env: { CLAUDECODE: "1" },
+      pluginList: () => JSON.stringify({ installed: [] }),
+      read: () => JSON.stringify({ version: "0.0.1+fixture" }),
+      scriptUrl: fixture.scriptUrl,
+    });
+    assert.equal(result.status, "ready",
+      "the real observePublicCoreIdentity path succeeds against this valid, allowlisted, clean self-application fixture");
+  } finally {
+    rmSync(fixture.gitRoot, { recursive: true, force: true });
+  }
+});
+
+test("F4(b): runner codex reaches the real observeCodexPublicCoreIdentity default path, without any observe stub", () => {
+  const fixture = buildSelfApplicationGitFixture();
+  try {
+    const result = observePipelineStartPreflight({
+      env: {},
+      pluginList: () => JSON.stringify({ installed: [] }),
+      read: () => JSON.stringify({ version: "0.0.1+fixture" }),
+      scriptUrl: fixture.scriptUrl,
+    });
+    // The identical fixture that lets runner "claude" succeed (F4(a) above)
+    // fails closed here: observeCodexPublicCoreIdentity performs an
+    // additional, Codex-only host-plugin-list attestation this test
+    // environment cannot genuinely satisfy for a synthetic tmp path (no real
+    // Codex host selects it, or a real host selects something else and
+    // SNT-A2-CODEX-HOST-MISMATCH fires) -- this divergence from F4(a)'s
+    // outcome, on the identical fixture, is the proof that the codex-only
+    // default branch (not observePublicCoreIdentity) was genuinely reached.
+    assert.equal(result.status, "plugin-refresh-required");
+    assert.equal(result.nextAction.kind, "advisory");
+    assert.equal(pipelineStartPreflightExitCode(result), 0);
+  } finally {
+    rmSync(fixture.gitRoot, { recursive: true, force: true });
+  }
 });

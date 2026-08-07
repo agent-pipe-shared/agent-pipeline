@@ -3,7 +3,7 @@
 
 /** Report loaded distribution identity and restart-handoff presence without secrets. */
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -172,6 +172,23 @@ export function installedPipelineVersion(pluginList = () => readInstalledPluginL
   return installedPipelineIdentity(pluginList, runner)?.version ?? null;
 }
 
+/**
+ * Whether `pluginRoot` sits inside the self-application/local-development git
+ * checkout layout the origin/content attestation is built for (design
+ * bootstrap-origin-allowlist-and-codex-wsl-freshness.md §A -- PO-confirmed F2
+ * fix direction, 2026-08-07): a `.git` entry at the repository root two
+ * directories above `pluginRoot` (`<clone>/plugins/pipeline-core` ->
+ * `<clone>`), the exact layout `resolveSourceLayout()` in
+ * `public-core-observation.mjs` requires. A real marketplace-installed plugin
+ * copy (e.g. `~/.claude/plugins/cache/<marketplace>/pipeline-core/<version>`)
+ * has no `.git` at all, at this path or any other -- this is a cheap,
+ * read-only filesystem check, never a `git` subprocess, and never throws for
+ * a missing/unreadable path (`existsSync` fails closed to `false`).
+ */
+export function pluginRootHasSelfApplicationGit(pluginRoot) {
+  return existsSync(resolve(pluginRoot, "..", "..", ".git"));
+}
+
 export function observePipelineStartPreflight({
   env = process.env,
   pluginList,
@@ -221,10 +238,23 @@ export function observePipelineStartPreflight({
   // hard-fails to "plugin-identity-unavailable" in that case regardless of
   // this result. A negative result never invents a new hard-fail status; it
   // only widens the existing "plugin-refresh-required" branch.
+  //
+  // Gated on `.git` presence at the self-application layout's repository root
+  // (Critic finding F2, WP2-WP3-partA-rework-1, PO-confirmed fix direction):
+  // the observer's `resolveSourceLayout`/`observeGit` require a real git
+  // checkout and reject unconditionally otherwise. A real marketplace-
+  // installed plugin copy has no `.git` at all, so calling the observer there
+  // made `attestationFailed` permanently true for every real install. When no
+  // `.git` is present the attestation is skipped entirely -- not attempted,
+  // not failed -- and `status` below falls through to exactly the
+  // version/installedIdentity/installedVersion decision that predates this
+  // feature. A real integrity check for the installed non-git case is
+  // explicitly out of scope; see the design doc's Part A and this dispatch's
+  // briefing.
   const resolvedObserve = observe
     ?? (runner === "codex" ? observeCodexPublicCoreIdentity : observePublicCoreIdentity);
   let attestationFailed = false;
-  if (version) {
+  if (version && pluginRootHasSelfApplicationGit(pluginRoot)) {
     const observation = resolvedObserve({ sourcePluginRoot: pluginRoot, installedPluginRoot: pluginRoot }, {});
     const originAllowlisted = observation?.status === "ready"
       && PUBLIC_SELF_APPLICATION_ORIGINS.has(observation.candidate?.repository);
