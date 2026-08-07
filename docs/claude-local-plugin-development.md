@@ -249,9 +249,27 @@ may well carry a new capability — 0.5.3 shipped ADR-0059's signed
 human-guard-override admission path, which 0.5.2 did not have. Do not infer
 "bug fixes only" from a patch number here, and do not reach for a minor bump
 just because something new landed; that decision belongs to the sprint
-boundary. A released version carries no `+claude.<...>` build metadata at all
-— the cachebuster exists for local development builds, and is stripped when a
-version is cut for release (`d2bc254` did this for 0.5.2).
+boundary.
+
+**A released version carries no `+claude.<...>` build metadata**, and the
+reasons matter more than the precedent — `d2bc254` stripped it for 0.5.2 with
+no recorded justification, so here it is. The cachebuster exists to force
+propagation when the semver itself does NOT change; a release changes it, so
+the mechanism has nothing left to do. Semver ignores build metadata in
+precedence comparisons, so `0.5.3+claude.x` and `0.5.3` are the same version to
+every consumer that compares them — the suffix carries no information anyone
+can act on. It embeds a timestamp, which would make a release irreproducible:
+the same commit built twice would yield two version strings. And it is named
+`+claude.<...>` while the number now also sits on the Codex manifest, so on a
+runner-neutral release it would be actively misleading. Traceability does not
+depend on it: the registry records the real installed commit in `gitCommitSha`.
+
+The cost, stated because it is easy to walk into: once a cachebuster-free
+version is installed, **you cannot push a corrected build of that same version
+locally.** The registry sees an unchanged version string and does not
+re-materialize. If a fix is needed after cutting, either re-add a cachebuster
+for the test round or move to the next patch number. Practical consequence:
+install a released version locally AFTER its review has cleared, not before.
 
 The Claude manifest is not the only one carrying the number. Codex has its own
 `plugins/pipeline-core/.codex-plugin/plugin.json`, and
