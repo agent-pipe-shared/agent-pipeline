@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "91dc1318343228088a843a0ea2e528ea14e65c7205a5dc4d5eb343f45b4b9ffa"
+    "transitionHead": "2d3f2c613ccf023a671452cec1a358f110e39f291c3282cb5fb55d99ddcc8eb4"
   },
   "counts": {
-    "open": 21,
+    "open": 22,
     "in_progress": 21,
     "closed": 19
   },
@@ -178,6 +178,14 @@
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-07",
+      "source": "0.5.2 release session, 2026-08-07: PO asked why a release cannot run end-to-end through the Pipeline with only the final signature as the human step, for the version-surface strip specifically."
     },
     {
       "id": "pipeline.guard-lifecycle-ready-blocks-claude-memory-writes",

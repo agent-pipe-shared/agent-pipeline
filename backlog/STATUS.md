@@ -24,6 +24,7 @@
 | pipeline.elephant-direct-implementation-under-afk-authorization | in_progress | workflow-improvement | pipeline | 2026-07-23 | — |
 | pipeline.evidence-bound-review-retry-economics | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.execution-model-switchback | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
+| pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.guard-lifecycle-ready-blocks-claude-memory-writes | open | defect | pipeline | 2026-07-29 | — |
 | pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root | open | defect | pipeline | 2026-08-06 | — |
 | pipeline.local-worker-supervisor-cli-suite-flakes-under-full-verify | open | defect | pipeline | 2026-08-06 | — |
@@ -69,6 +70,6 @@
 
 ## Counts
 
-- open: 21
+- open: 22
 - in_progress: 21
 - closed: 19
