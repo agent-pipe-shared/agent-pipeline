@@ -98,7 +98,21 @@ commitment to any of them:
    `2026-08-07-gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions.md`'s
    sibling finding) would let the agent do the one half of the ceremony its
    own design intent already says it may.
-4. A frank cost/benefit PO review of whether five stacked layers is the
+5. **PO restatement, 2026-08-07, later the same day and sharper than the
+   original:** an agent pipeline that cannot release *after the human has
+   approved* is not worth having — so releasing must become possible, "auch
+   mit Signatur oder Config je nach chat". That names the mechanism, not just
+   the goal: the same admission shape ADR-0059 established for guard denials
+   — signature always, chat whenever that is what the repository has genuinely
+   committed to — should extend to the release path, rather than the release
+   path keeping its own separate, human-only ceremony. Note what this does and
+   does not ask for: the human still decides, and still signs in `signature`
+   mode. What changes is that their decision, once made, is something the
+   agent can *act on* end to end, instead of handing back a list of terminal
+   commands. The PO deferred this deliberately on 2026-08-07 rather than
+   improvising it during a release ("das nehmen wir uns noch mal vor"), and
+   took only the branch push that session.
+6. A frank cost/benefit PO review of whether five stacked layers is the
    intended security posture for every push, or whether some are redundant
    given the others (e.g., does GG-03 add real protection once a candidate
    already carries a verified per-commit, per-destination Ed25519 signature
