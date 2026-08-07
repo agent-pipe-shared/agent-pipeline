@@ -3,23 +3,65 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-06
+**Last updated:** 2026-08-07
 
-> **MERGE SPLICE NOTICE (2026-08-07, sprint_phoenix <- origin/main 0.5.2 merge, unresolved by design).**
-> `docs/state.md` diverged so far past its common ancestor that git could not
-> auto-merge it — nearly the entire file is one conflict hunk. Per PO
-> instruction this file needs reconciliation, not a blind overwrite, so both
-> full histories are preserved verbatim below rather than either being
-> discarded. **This is a lossless mechanical splice, not an edited
-> reconciliation** — the two "Project status" blurbs below still disagree,
-> and a human/PO editorial pass is required before this file can serve as a
-> single coherent handover again. See
-> `specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md` for the
-> full merge report this splice is part of.
+## Current status
+
+**Project status:** MERGE LANDED (local only) — origin/main 0.5.2 is integrated
+into `sprint_phoenix`; redesign/reintegration round pending PO decision
+**Current block:** post-merge reconciliation. Local merge commit `75b8361`
+(two parents: `998a609` sprint_phoenix + `6e2c9b2` origin/main 0.5.2) is
+**not pushed**; fully reversible (`git reset --hard 998a609` on
+`sprint_phoenix` before any push)
+**Branch:** `sprint_phoenix`, merge-base `9d1b3dc108eb77629ace5b82002120f5539abd8d`
+**Pipeline:** origin/main 0.5.2's `plugins/pipeline-core` now governs this
+checkout (taken verbatim in the merge; see conflict-resolution policy below)
+**DoD:** no aggregate Verify evidence exists for the merge candidate (main's
+new `verify-journal.mjs` orchestration needs a session-cleanup binding this
+checkout cannot establish — genuine infra gap, not a merge defect). Substitute
+evidence gathered directly: security-scan CLEAN, all direct checker scripts
+PASS, 329/341 individual `.test.mjs` files pass (full triage in the merge
+report). Full detail, resolution policy per file, and the priority-ordered
+open-items list (gitignored `evidence/` work artifact, not a tracked
+doc-contract target): `specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md`
+
+**Open items awaiting a PO decision (see the report's §11 for full detail):**
+1. `project/pipeline-state.json` reconciliation — Phoenix's plan-approval/
+   continuity authority is not currently live (main's `sprint-nova-epic`
+   state is); needs an explicit fresh approval cycle, not a silent overwrite.
+2. Push Policy: adopt main's `signature`/`chat` `gates.push_approval` model
+   (ADR-0056) as-is, or carry the PHX-2 Human Governance Decision Ledger
+   design forward as new work against the merged base.
+3. The 11 flagged code-conflict losses (governance-ledger ecosystem,
+   `pipeline-state.mjs`, ledger-backed plan approval, `project-authority.mjs`
+   dual-state repair) — decide what, if anything, gets redesigned.
+
+**Resolved during this session's post-merge follow-up (2026-08-07):**
+- ADR-0047 numbering collision (`0047-governance-event-kernel.md`) indexed in
+  `docs/adr/README.md` via the same `0047-N` convention main already uses for
+  its own internal collision — no file rename needed.
+- Backlog ledger drift (4 of Phoenix's own 2026-08-06 items) reconciled via
+  `reconcile-backlog-ledger.mjs --activate`; `RBL01` now passes.
+- `docs/state.md` itself — this editorial pass. Both full pre-merge histories
+  are retained verbatim below as dated historical record; this section is now
+  the single current-state source, resolving the two disagreeing "Project
+  status" blurbs that existed only in the two histories' own final entries.
+- Verify session-cleanup-binding gap (item 7) investigated, not fixed:
+  confirmed this checkout has no real session descriptor or
+  `PIPELINE_SESSION_OWNER_NONCE` to bind — establishing one artificially
+  would fabricate evidence rather than supply it. Left as a genuine
+  infrastructure gap for whoever stands up the runner-side binding.
+
+**Still open, not urgent:** `.gitleaksignore` legacy-format entries are inert
+under main's new adapter (0 live findings today; matters only if one of the
+historically-exempted paths trips a rule again).
 
 ---
 
 ## Phoenix branch history (sprint_phoenix, pre-merge, HEAD side)
+
+> Historical record, frozen at the merge-base checkout above — superseded by
+> "Current status" at the top of this file, not a second live status.
 
 **Project status:** PAUSED — resumes with the rebase onto the 0.5.2 release
 **Current block:** Implementation against the approved §7 inventory. Phase `implementation`, lifecycle `implementing`, continuity revision `3`, authority PRD `303586c8…` + Spec `f7e32bb7…`. 18 of the 35 criterion gaps are closed; 10 are classified as needing real implementation; 6 are classified as needing only a test against an existing mechanism; 1 remains unclassified (R-AC-10). All 35 are now read; none is left unread
@@ -896,6 +938,9 @@ Run these in order in this checkout; each step reads back before the next.
 ---
 
 ## Pipeline general/Nova-Cyborg-release history (origin/main 0.5.2, pre-merge, theirs side)
+
+> Historical record, frozen at the merge-base checkout above — superseded by
+> "Current status" at the top of this file, not a second live status.
 
 **Project status:** ACTIVE
 **Current block:** 0.5.2 patch-candidate recovery on the released `v0.5.1` baseline
