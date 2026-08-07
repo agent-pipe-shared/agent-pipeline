@@ -5,16 +5,78 @@
 
 **Last updated:** 2026-08-07
 **Project status:** ACTIVE
-**Current block:** 0.5.2 released, backlog triaged; Nova A completion paused on genuine ADR-gated/evidence-gated blockers; human-authorization unification is now the priority thread — GMW (ADR-0058) fully landed and merged into `feat/sprint-nova-codex-v046` (three correction rounds, Critic PASS, 255/255 post-merge Verify), then verified genuinely live after a local-marketplace refresh + restart (Nova GWM section); HGO signed-admission extension (ADR-0059) designed, queued behind the Critic verdict
+**Current block:** 0.5.3 released to `main` (GMW/ADR-0058 + HGO-Sig/ADR-0059 + onboarding repairs, two Critic rounds, 255/255 Verify); the priority thread is now the human-authorization ceremony itself — the PO issued a binding order on it during the release, recorded as [ADR-0061](adr/0061-uniform-human-approval-ceremony.md); Nova A completion still paused on genuine ADR-gated/evidence-gated blockers
 **Repair baseline:** `5d2b83dcc765d50801f4491e1bd9bed32090112b`
-**Release version:** `0.5.2` released
-**Release state:** version `0.5.2` · tag `v0.5.2` · commit `6e2c9b2868d164ff3b631ab068fa5df20939e07d` · tree `23171c38a317d8cdf50baa013f54f5447e17f754` · status `published`
+**Release version:** `0.5.3` released
+**Release state:** version `0.5.3` · tag `v0.5.3` · commit `2740041d59458f949b597905816af12048502469` · tree `e72cca9b69e105ec6aac9833c4ac0bccb385d25b` · status `published`
 
 The machine-readable public projection is [`release-state.json`](release-state.json).
 Its `observedAt` is the UTC time when this public projection was produced from
 the supplied authoritative release identity; it is not a claimed release time.
 The historical candidate-qualification sections below are retained as
 session history and no longer describes the current publication disposition.
+
+## 2026-08-07 Nova REL-053 — 0.5.3 published, and the PO order that came out of publishing it (current)
+
+**Released.** `main` = `2740041d59458f949b597905816af12048502469`, tag `v0.5.3`
+on the same commit, GitHub release created. `docs/release-state.json`
+regenerated through `createPublicReleaseState` (never hand-computed). The
+candidate was the one Verify had already passed at 255/255 with binding `exact`
+and a clean security scan; the signature bound exactly that commit and tree.
+
+**What publishing it cost, measured.** The PO's own account of the ceremony is
+now normative in [ADR-0061](adr/0061-uniform-human-approval-ceremony.md) and the
+measurements sit in requirement 7d and finding 9 of
+`backlog/items/2026-08-07-push-release-flow-unusable-for-third-party-adopters.md`.
+Three facts from this run are worth carrying forward because none of them is
+discoverable from the code:
+
+1. **A harness-classifier denial burns the `GG-03` token.** `guard-git.mjs`
+   consumed the one-time token, *then* the Claude Code classifier refused the
+   command. The push had not happened, the token was spent, and the retry
+   reported the token as already consumed. Third measured instance of the
+   classifier blocking an already-Pipeline-authorized push; the new part is the
+   ordering. Always read `project/guard-override.log.jsonl` before concluding a
+   blocked command left nothing behind.
+2. **A sixth authorization layer exists and nothing had recorded it:** the
+   GitHub repository ruleset. `protect-main` enforced `required_linear_history`,
+   and the candidate carries the GMW worktree merge `8bc5ceb`, so the remote
+   rejected the fully-signed push with `GH013`. Structural, not accidental — the
+   Pipeline's own `isolation: worktree` flow produces merge commits, and both
+   escapes (rebase/force-push, squash) are closed here by hard rule and by
+   candidate-binding respectively. **PO decision:** drop
+   `required_linear_history` permanently, keep `deletion` and
+   `non_fast_forward`. Executed on ruleset `18801905`; the signed push then went
+   through unchanged. Residual cost: merge commits on `main` still break the
+   Codex Critic isolation fixture
+   (`backlog/items/2026-08-07-codex-critic-isolation-fixture-rejects-merge-commit-head.md`)
+   — the ruleset never fixed that, it only blocked the release afterwards.
+   `docs/push-release-flow.md` now carries this as Layer 6, with the instruction
+   to read `gh api …/rules/branches/main` *before* starting a release.
+3. **Nothing may be committed between `approve-push` and the push.**
+   `approve-push` dirties the tracked `project/pipeline-state.json`; any commit
+   moves `HEAD` past the `forCommit` the signature names and voids it. So Verify
+   runs before the approval and the state record is committed after the push —
+   which is finding 7c, still open.
+
+**The PO order (verbatim, and now ADR-0061).** *"einmal befehl kopieren, approve
+schreiben, pin eingeben ... egal ob design phase schließt, etwas übergangsweise
+aufgehoben wird, ob man pushed oder released"*, with the threat model it rests
+on: *"diese pipeline schützt vor AGENTEN die sachen missbrauchen, sie bemuttert
+nicht den HUMAN"*. Three human acts, identical for every gate kind. The gate,
+the signature and `signature` vs. `chat` mode are explicitly **not** relaxed —
+what changes is the number of human *actions*, never the strength of the human
+*decision*. The disposal test that follows: for every step a gate imposes, name
+the agent behaviour it prevents; a step that cannot name one is removable, and
+`OVERRIDE GG-03` after a verified per-commit `push` signature is the first
+candidate. The mechanism is deliberately undesigned — it is a guardrail-class,
+Critic-mandatory change and belongs to a dispatched round, tracked as
+requirement 7 of the push/release item.
+
+**Not pushed:** the feature branch `feat/sprint-nova-codex-v046` still points at
+`378cb64` on the remote. Everything in it is on `main`, and pushing the branch
+would need its own signature under the current one-approval-per-action design —
+which is the loop the order above is about. Left deliberately.
 
 ## 2026-08-07 Nova GMW — Guard Maintenance Window: signed, time-boxed PO lift for GS-6/TP-*
 
