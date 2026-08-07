@@ -520,12 +520,14 @@ function validatePoGateProfileSnapshot({ repoRoot, gitCommonDir, primaryRoot, re
 
 function activeFeatureState(repoRoot) {
   const authority = resolveProjectAuthorityPaths({ rootDir: repoRoot });
-  const statePath = authority.status === "ready"
-    ? authority.state
-    : NEUTRAL_STATE;
+  // Any non-"ready" status (mixed, missing, unsafe, migration-required, invalid, ...)
+  // is an ambiguous or unsafe authority resolution. Fail closed here rather than
+  // silently falling back to a default state path -- the caller turns this into
+  // PO-GATE-STATE-AUTHORITY-UNAVAILABLE.
+  if (authority.status !== "ready") return { status: "unavailable" };
   const raw = readPhysicalFile(
     repoRoot,
-    statePath ?? (authority.source === "legacy" ? LEGACY_STATE : NEUTRAL_STATE),
+    authority.state ?? (authority.source === "legacy" ? LEGACY_STATE : NEUTRAL_STATE),
   );
   const state = JSON.parse(decodeUtf8(raw));
   if (!Object.prototype.hasOwnProperty.call(state, "activeFeature")) return { status: "absent" };
@@ -633,6 +635,9 @@ export function validatePoGateAuthority({
   }
   if (active.status === "invalid") {
     return fail("PO-GATE-ACTIVE-FEATURE-INVALID", "The active feature and planPath are missing or unsafe.", PRD_REPAIR);
+  }
+  if (active.status === "unavailable") {
+    return fail("PO-GATE-STATE-AUTHORITY-UNAVAILABLE", "The authoritative State projection is unavailable or mixed.", PRD_REPAIR);
   }
   if (active.status === "absent") {
     if (expectedPlanSha256 !== undefined || expectedSpecSha256 !== undefined) {

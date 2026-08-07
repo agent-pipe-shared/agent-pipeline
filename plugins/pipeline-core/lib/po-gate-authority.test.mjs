@@ -33,6 +33,7 @@ import {
   selectPrimaryWorktree,
   serializePoGateProfileReceipt,
   validatePoGateAuthority,
+  validatePoGateAuthorityForRepository,
   validatePoGateLanguageProjection,
   validatePoGateProfileReceipt,
   validatePoGateProfileForRepository,
@@ -377,6 +378,45 @@ check("pipeline-start can validate the shared profile when no feature is active"
     assert.equal(result.value.humanFacing, "de");
     assert.equal(Object.prototype.hasOwnProperty.call(result.value, "planPath"), false);
     assert.equal(validate({ expectedPlanSha256: "0".repeat(64) }).code, "PO-GATE-PLAN-DIGEST-STALE");
+  });
+});
+
+check("a mixed project authority (neutral manifest present without neutral State while legacy State remains) fails the state authority closed instead of silently reading the legacy State", () => {
+  withFixture({ linkedLanguage: "de" }, ({ current, validate }) => {
+    // Adds a neutral manifest at `current` without a neutral State file, while the
+    // legacy `.claude/pipeline-state.json` populated by `populateRoot` still exists --
+    // this is exactly `project-authority.mjs`'s "mixed" status (reason: "neutral
+    // authority has no neutral State while legacy lifecycle State remains").
+    write(join(current, "project", "pipeline.yaml"), runtime("de"));
+    const result = validate();
+    assert.equal(result.ok, false, JSON.stringify(result));
+    assert.equal(result.code, "PO-GATE-STATE-AUTHORITY-UNAVAILABLE");
+  });
+});
+
+check("a missing project authority (no legacy or neutral manifest at the current checkout) fails the state authority closed", () => {
+  withFixture({ linkedLanguage: "de" }, ({ current, validate }) => {
+    // Removing the legacy authority tree at `current` with no neutral tree ever
+    // created there reproduces `project-authority.mjs`'s "missing" status.
+    rmSync(join(current, ".claude"), { recursive: true, force: true });
+    const result = validate();
+    assert.equal(result.ok, false, JSON.stringify(result));
+    assert.equal(result.code, "PO-GATE-STATE-AUTHORITY-UNAVAILABLE");
+  });
+});
+
+check("validatePoGateAuthorityForRepository propagates the fail-closed state authority code for a mixed project authority", () => {
+  withFixture({ linkedLanguage: "de" }, ({ current, primary, common }) => {
+    write(join(current, "project", "pipeline.yaml"), runtime("de"));
+    const topology = {
+      repoRoot: current,
+      gitCommonDir: common,
+      primaryRoot: primary,
+      registeredWorktreeRoots: [primary, current],
+    };
+    const result = validatePoGateAuthorityForRepository({ repoRoot: current }, { topology });
+    assert.equal(result.ok, false, JSON.stringify(result));
+    assert.equal(result.code, "PO-GATE-STATE-AUTHORITY-UNAVAILABLE");
   });
 });
 
