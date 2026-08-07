@@ -67,11 +67,89 @@ relaxed, an existing preflight key-list assertion to admit `statusScope`.
    The report-early duty in the briefing template is what makes this cheap;
    without a persisted running log the work would have been re-done.
 
-**Not repaired, deliberately.** The PO language defect and the seeded-project
-contract (authority tier, always-green verify command, absent gates chapter)
-were dispatched in this block; their disposition is recorded by their own commits
-or, where a dispatch stopped, by the stop report in its backlog item. Everything
-still open keeps its backlog item and its ledger entry.
+**The reported defect that mattered most is closed, and it took four commits to
+get there.** The PO's complaint was that implementation began without anyone
+being asked. A freshly onboarded project seeded no `gates` chapter at all, so
+`gateConfig()` returned `null`, `guard-devplan` exited 0, and the first
+implementation file was written unasked — while `pipeline.user.yaml`
+simultaneously declared `dev_plan: blocking`. The Pipeline claimed a gate it did
+not have. Each of these was a precondition for the next:
+
+1. `b649567` — promotion binds a `prd_*.md` as the plan, so a promoted feature can
+   satisfy the PO gate at all.
+2. `e2c990f` — a fresh kickoff binds its profile receipt to the manifest the gate
+   actually reads, so a new project holds valid PO authority without a repair step.
+3. `7a99a18` — the two authority tiers stop disagreeing, which is what had made
+   (2) fail invisibly.
+4. `78d5958` — only now the seeded gate becomes `blocking`, and the satisfying
+   path is **measured** in a real temporary root before the seed is touched:
+   onboarding → runtime → kickoff → promotion → `submit-plan` (0) → `approve-plan`
+   (0) → `set-phase --phase implementation` (0), after which the same non-exempt
+   write the gate refused with exit 2 is admitted with exit 0. Measured
+   identically for `epic`, `feature` and `mini`, and for a project that never
+   promotes a design package. The plan's own path stays writable, so the plan
+   under review can still be revised.
+
+The intermediate state deserves recording because it was the right call: while
+(2) and (3) were still open, the seed was deliberately left at `warn` with the
+reason written into the code — a gate that blocks with no path through it is
+worse than one that is off.
+
+**Three independent Critic rounds, and the second one earned its keep.** Round 1
+passed. Round 2 returned FAIL with one blocker: the rewritten Resume-Hint
+sanitizer admitted a credential value whenever further prose followed it in the
+same clause — `password: <value> for the staging box` — which the rule it replaced
+had refused. The enumerated corpus could not see it, because every entry was a
+bare `label: value`. It was found by running the *old* predicate against the new
+one, which is the measurement the implementing dispatch had not made. Closed in
+`81a3a75`, whose differential now reports `oldRejectedNowAdmitted = 0` end to end
+and carries a drift guard asserting its own rule copies still appear verbatim in
+the module, so it cannot green-light a rule that has moved underneath it.
+
+Round 2's other findings: `1979a87` closes the guard refusing the exact repair
+command the PO gate prints; two findings were already answered by commits outside
+that round's enumeration; the rest are filed with owners and dates.
+
+**Facts worth carrying forward that no code records.**
+
+1. **A maintenance-window signature dies on an unrelated write.** The request binds
+   the live plugin tree at preparation time, so any concurrent write between
+   `prepare` and `install` voids a signature the human has already given. Filed;
+   it violates ADR-0061 directly. Working practice until fixed: let the tree fall
+   quiet, then prepare, then sign, then install, and start no dispatch in between.
+2. **`MAX_WINDOW_TTL_MS` is four hours and is enforced twice** — at signing and at
+   install. A longer request is silently clamped. Unattended work must front-load
+   everything that writes plugin sources.
+3. **Long dispatches truncate before emitting their report — seven times in this
+   block.** The work survives; the report does not. Recovery is to resume the agent
+   with a purely procedural message naming only what remains. For a Critic that
+   message must stay procedural: a resumed Critic arrives with its hunt already
+   framed and is *more* susceptible to contamination, not less. The report-early
+   duty is what made every recovery cheap; `78d5958`'s measurements survived a
+   truncation entirely because they were in the dispatch record before the prose.
+4. **A verdict written into a backlog item's Triage contaminates that item as a
+   spec reference.** It reached a Critic that way in this block. The Critic caught
+   it, stopped reading, re-read the item at a pre-triage revision and derived its
+   finding independently — but the failure was the dispatcher's. The affected item
+   now carries a dispatcher note.
+5. **A content-fingerprint suppression binds line and column, so it goes stale
+   loudly.** When a fixture moved from line 116 to 131 the suppression stopped
+   matching and the scan went red again. That is the correct failure direction, and
+   the reason to replace such entries rather than accumulate them.
+
+**Candidate state at the close of this block:** Verify 255/255 with binding
+`exact`, security scan clean. `VERSION` is `0.5.4`; the Claude manifest carries the
+review cachebuster and the Codex manifest stays bare, per the versioning
+convention. The installed local build is still `0.5.3+claude.20260807221336`, so
+the copy step is required before any of this is testable in anger.
+
+**Still open, deliberately.** Every remaining item keeps its backlog entry and its
+ledger transition. The two that most want a human decision: whether a day-one
+`.claude/pipeline.yaml` should exist at all (the byte-identical fix closed a real
+divergence and, in the same motion, made that write a guarded invariant — a
+consequence that fell out rather than being decided), and whether the guard
+reclassification that moved a denial from non-liftable to signature-liftable is
+the boundary the PO wants.
 
 ## 2026-08-07 Nova REL-053 — 0.5.3 published, and the PO order that came out of publishing it
 
