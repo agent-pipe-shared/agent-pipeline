@@ -3,16 +3,14 @@
 
 /** Report loaded distribution identity and restart-handoff presence without secrets. */
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { measureBootstrapPayload } from "../lib/bootstrap-payload-budget.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { observeCodexPublicCoreIdentity, observePublicCoreIdentity } from "../lib/public-core-observation.mjs";
-import { PUBLIC_SELF_APPLICATION_ORIGINS } from "../lib/public-core-origin-allowlist.mjs";
-import { normalizeRulesetSource, RULESET_SOURCE_SCHEMA } from "../lib/ruleset-source.mjs";
+import { evaluateSelfApplicationAttestation } from "../lib/self-application-attestation-gate.mjs";
 
 export const SCHEMA = "pipeline.start-preflight.v1";
 const PLUGIN_ID = "pipeline-core@agent-pipeline";
@@ -172,39 +170,6 @@ export function installedPipelineVersion(pluginList = () => readInstalledPluginL
   return installedPipelineIdentity(pluginList, runner)?.version ?? null;
 }
 
-/**
- * Whether `pluginRoot` sits inside the self-application/local-development git
- * checkout layout the origin/content attestation is built for (design
- * bootstrap-origin-allowlist-and-codex-wsl-freshness.md §A -- PO-confirmed F2
- * fix direction, 2026-08-07): a `.git` entry at the repository root two
- * directories above `pluginRoot` (`<clone>/plugins/pipeline-core` ->
- * `<clone>`).
- *
- * **Corrected per Critic finding F-D (MINOR, delta re-review `7aa84f0`):**
- * this is a cheap presence check, not a re-implementation of the layout
- * `resolveSourceLayout()` in `public-core-observation.mjs` requires --
- * the two do not verify the same thing. `resolveSourceLayout()` checks three
- * different, unrelated conditions and never inspects `.git` at all: that
- * `pluginRoot`'s basename is exactly `"pipeline-core"`, its parent's basename
- * is exactly `"plugins"`, and each of `pluginRoot`/its parent/its
- * grandparent is a real, canonical (`realpathSync`-stable), non-symlink
- * directory. A missing repository at that layout only surfaces later,
- * indirectly, when `observeGit()`'s `git` subprocess calls against that
- * directory fail (`SNT-A2-GIT-UNAVAILABLE`) -- `resolveSourceLayout()` itself
- * has no dedicated `.git`-presence check for this function to mirror. This
- * function, conversely, never checks the `pipeline-core`/`plugins` basename
- * naming `resolveSourceLayout()` requires; it only tests for a `.git` entry
- * two directories up from whatever path it is given. A real
- * marketplace-installed plugin copy (e.g.
- * `~/.claude/plugins/cache/<marketplace>/pipeline-core/<version>`) has no
- * `.git` at all, at this path or any other -- this is a cheap, read-only
- * filesystem check, never a `git` subprocess, and never throws for a
- * missing/unreadable path (`existsSync` fails closed to `false`).
- */
-export function pluginRootHasSelfApplicationGit(pluginRoot) {
-  return existsSync(resolve(pluginRoot, "..", "..", ".git"));
-}
-
 export function observePipelineStartPreflight({
   env = process.env,
   pluginList,
@@ -245,52 +210,7 @@ export function observePipelineStartPreflight({
   const wsl = [env.WSL_DISTRO_NAME, env.WSL_INTEROP]
     .some((value) => typeof value === "string" && value.trim() !== "");
   const executionBoundary = wsl ? "host-authorized-wsl" : "default";
-  // Origin/content attestation of the loaded plugin itself (design:
-  // bootstrap-origin-allowlist-and-codex-wsl-freshness.md §A.2-§A.5). Mirrors
-  // the calling pattern already established in private-overlay-activation.mjs:
-  // `observe` defaults per-runner, self-referentially, to the same reused
-  // Public-Core observers already proven safe on the private-overlay path.
-  // Skipped when the manifest itself is unreadable -- `status` below already
-  // hard-fails to "plugin-identity-unavailable" in that case regardless of
-  // this result. A negative result never invents a new hard-fail status; it
-  // only widens the existing "plugin-refresh-required" branch.
-  //
-  // Gated on `.git` presence at the self-application layout's repository root
-  // (Critic finding F2, WP2-WP3-partA-rework-1, PO-confirmed fix direction):
-  // the observer's `resolveSourceLayout`/`observeGit` require a real git
-  // checkout and reject unconditionally otherwise. A real marketplace-
-  // installed plugin copy has no `.git` at all, so calling the observer there
-  // made `attestationFailed` permanently true for every real install. When no
-  // `.git` is present the attestation is skipped entirely -- not attempted,
-  // not failed -- and `status` below falls through to exactly the
-  // version/installedIdentity/installedVersion decision that predates this
-  // feature. A real integrity check for the installed non-git case is
-  // explicitly out of scope; see the design doc's Part A §A.7 (the
-  // non-git-flat-copy exclusion entry added there for this exact case) and
-  // §A.5 case 2.
-  const resolvedObserve = observe
-    ?? (runner === "codex" ? observeCodexPublicCoreIdentity : observePublicCoreIdentity);
-  let attestationFailed = false;
-  if (version && pluginRootHasSelfApplicationGit(pluginRoot)) {
-    const observation = resolvedObserve({ sourcePluginRoot: pluginRoot, installedPluginRoot: pluginRoot }, {});
-    const originAllowlisted = observation?.status === "ready"
-      && PUBLIC_SELF_APPLICATION_ORIGINS.has(observation.candidate?.repository);
-    // sourcePluginRoot === installedPluginRoot by construction here, so
-    // loadedIdentity/installedIdentity are necessarily equal -- normalizeRulesetSource
-    // is exercised for its schema-closure value and as a genuine production
-    // caller, not as an independent content-hash match (design §A.4, PO-resolved).
-    const normalized = observation?.status === "ready"
-      ? normalizeRulesetSource({
-          schema: RULESET_SOURCE_SCHEMA,
-          runner,
-          selectedPlugin: { id: observation.plugin.name, version: observation.plugin.version },
-          source: { class: "self-application" },
-          loadedIdentity: { status: "available", algorithm: "content-sha256", value: observation.plugin.contentSha256 },
-          installedIdentity: { status: "available", algorithm: "content-sha256", value: observation.plugin.contentSha256 },
-        })
-      : null;
-    attestationFailed = !originAllowlisted || normalized?.status !== "ready";
-  }
+  const attestationFailed = evaluateSelfApplicationAttestation({ pluginRoot, runner, version, observe }).failed;
   const status = !version
     ? "plugin-identity-unavailable"
     : installedIdentity?.ambiguous === true || installedVersion !== null && installedVersion !== version || attestationFailed
