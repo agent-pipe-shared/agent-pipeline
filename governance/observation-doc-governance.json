@@ -201,6 +201,7 @@
           "docs/adr/0057-runner-platform-support-is-an-implementation-obligation.md",
           "docs/adr/0058-guard-maintenance-window.md",
           "docs/adr/0059-signed-human-guard-override.md",
+          "docs/adr/0060-handover-placement-and-rotation.md",
           "docs/adr/README.md"
         ]
       },
