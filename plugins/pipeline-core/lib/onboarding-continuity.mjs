@@ -3488,7 +3488,20 @@ function promotionInput({ profile, featureId, planPath, prdPath, specPath, desig
   return { profile, featureId, planPath, prdPath, specPath, designInputPath };
 }
 
-function promotionArtifacts(root, input) {
+// checkMarkers distinguishes the two concerns this function used to conflate:
+// plan-time ADMISSION (may this PRD be planned for promotion at all) versus
+// apply-time IDENTITY (what are this package's current bytes). Admission
+// belongs only to genuine plan-building (planOnboardingKickoffPromotion,
+// checkMarkers left at its true default) -- never to reconstructing an
+// existing plan from current bytes for apply-time digest comparison
+// (reconstructOnboardingKickoffPromotionPlan, checkMarkers: false), because
+// re-admitting against *current* bytes there can fire before the plan-digest
+// comparison that should be the first refusal a drifted Spec gets. Apply
+// still enforces admission unconditionally, once, in its own later call to
+// this function (checkMarkers left at its true default) -- after the digest
+// comparison, so a caller cannot use reconstruction's skipped admission to
+// slip a marker-less PRD past this function altogether.
+function promotionArtifacts(root, input, { checkMarkers = true } = {}) {
   const prd = observeOptionalProjectFile(root, input.prdPath, "promotion PRD");
   const spec = observeOptionalProjectFile(root, input.specPath, "promotion specification");
   const designInput = observeOptionalProjectFile(root, input.designInputPath, "promotion design input");
@@ -3506,31 +3519,32 @@ function promotionArtifacts(root, input) {
   // the very binding this function just recorded -- into a one-line refusal
   // now, while the PRD is still freely editable. The grammars are imported
   // from po-gate-authority.mjs, never re-declared, so the two checks cannot
-  // drift apart. This function is the one path shared by plan-building and
-  // apply's own fresh re-read of the bytes, so both refuse alike.
-  const prdText = prd.raw.toString("utf8");
-  const languageMarkers = [...prdText.matchAll(PRD_LANGUAGE_MARKER)].map((match) => match[1]);
-  if (languageMarkers.length !== 1) {
-    fail(
-      "KICKOFF-PROMOTION-PRD-LANGUAGE-MARKER-INVALID",
-      "The promoted PRD must carry the PO-gate language marker exactly once, as <!-- po-language: de --> or"
-        + " <!-- po-language: en --> on its own line; the PO plan gate will otherwise refuse it.",
-    );
-  }
-  const specMarkers = [...prdText.matchAll(TECHNICAL_SPEC_MARKER)].map((match) => match[1]);
-  if (specMarkers.length !== 1) {
-    fail(
-      "KICKOFF-PROMOTION-PRD-SPEC-MARKER-MISSING",
-      "The promoted PRD must carry the technical Spec marker exactly once, as"
-        + ` <!-- technical-spec-sha256: ${spec.sha256} --> on its own line; the PO plan gate will otherwise refuse it.`,
-    );
-  }
-  if (specMarkers[0] !== spec.sha256) {
-    fail(
-      "KICKOFF-PROMOTION-PRD-SPEC-MARKER-MISMATCH",
-      "The promoted PRD technical Spec marker does not match the neighboring spec.md; it must read exactly"
-        + ` <!-- technical-spec-sha256: ${spec.sha256} -->; the PO plan gate will otherwise refuse it.`,
-    );
+  // drift apart.
+  if (checkMarkers) {
+    const prdText = prd.raw.toString("utf8");
+    const languageMarkers = [...prdText.matchAll(PRD_LANGUAGE_MARKER)].map((match) => match[1]);
+    if (languageMarkers.length !== 1) {
+      fail(
+        "KICKOFF-PROMOTION-PRD-LANGUAGE-MARKER-INVALID",
+        "The promoted PRD must carry the PO-gate language marker exactly once, as <!-- po-language: de --> or"
+          + " <!-- po-language: en --> on its own line; the PO plan gate will otherwise refuse it.",
+      );
+    }
+    const specMarkers = [...prdText.matchAll(TECHNICAL_SPEC_MARKER)].map((match) => match[1]);
+    if (specMarkers.length !== 1) {
+      fail(
+        "KICKOFF-PROMOTION-PRD-SPEC-MARKER-MISSING",
+        "The promoted PRD must carry the technical Spec marker exactly once, as"
+          + ` <!-- technical-spec-sha256: ${spec.sha256} --> on its own line; the PO plan gate will otherwise refuse it.`,
+      );
+    }
+    if (specMarkers[0] !== spec.sha256) {
+      fail(
+        "KICKOFF-PROMOTION-PRD-SPEC-MARKER-MISMATCH",
+        "The promoted PRD technical Spec marker does not match the neighboring spec.md; it must read exactly"
+          + ` <!-- technical-spec-sha256: ${spec.sha256} -->; the PO plan gate will otherwise refuse it.`,
+      );
+    }
   }
   return {
     prd: { path: input.prdPath, sha256: prd.sha256 },
@@ -3680,7 +3694,10 @@ function buildKickoffPromotionPlan({
   if (kickoff === null && allowAppliedReplay) {
     const entries = observed.history?.transactions;
     const entry = entries?.at(-1);
-    const authority = promotionArtifacts(observed.root, input);
+    // Reconstructing what an already-applied promotion's plan looked like is
+    // never a new admission decision -- the PRD was admitted once, at its own
+    // plan time, and that decision is not re-litigated by replaying history.
+    const authority = promotionArtifacts(observed.root, input, { checkMarkers: false });
     if (entries?.length !== 2 || entry?.kind !== "kickoff-promotion"
       || entry.profile !== input.profile || entry.featureId !== input.featureId
       || entry.planPath !== input.planPath || entry.specPath !== input.specPath
@@ -3727,7 +3744,15 @@ function buildKickoffPromotionPlan({
   if (kickoff === null) {
     fail("KICKOFF-PROMOTION-NOT-SEED", "promotion requires the exact unapproved kickoff seed");
   }
-  const authority = promotionArtifacts(observed.root, input);
+  // This branch is shared by genuine plan-building (allowAppliedReplay false,
+  // the plan-time admission decision Piece 1 exists to make) and by
+  // reconstructing an apply-time comparison plan for a promotion that has not
+  // happened yet (allowAppliedReplay true). Only the former is an admission
+  // decision; the latter must compare against current bytes without
+  // re-deciding admissibility, so a drifted Spec is reported as a stale plan
+  // (KICKOFF-PROMOTION-PLAN-DIGEST, compared next in applyOnboardingKickoffPromotion)
+  // rather than as a PRD defect that invites editing an already-bound PRD.
+  const authority = promotionArtifacts(observed.root, input, { checkMarkers: !allowAppliedReplay });
   const beforeStateSha256 = observed.stateObservation.sha256;
   const beforeHistorySha256 = observed.historyObservation.sha256;
   const next = structuredClone(kickoff.state);

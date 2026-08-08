@@ -3327,8 +3327,15 @@ test("kickoff promotion fails closed for authority drift, a real active feature,
     const barrier = initializeRestartRequiredRoot(path); clearRuntimeBarrier(path, barrier);
     completeKickoff(path, "Promotion failures");
     mkdirSync(join(path, "specs"), { recursive: true });
-    writeFileSync(join(path, "specs", "prd_real.md"), "# PRD\n");
     writeFileSync(join(path, "specs", "spec.md"), "# Spec\n");
+    const realSpecSha256 = sha256(readFileSync(join(path, "specs", "spec.md")));
+    writeFileSync(join(path, "specs", "prd_real.md"), [
+      "<!-- po-language: en -->",
+      `<!-- technical-spec-sha256: ${realSpecSha256} -->`,
+      "",
+      "# PRD",
+      "",
+    ].join("\n"));
     writeFileSync(join(path, "specs", "design-input.md"), "# Design input\n");
     const args = { rootDir: path, profile: "feature", featureId: "real-work", planPath: "specs/prd_real.md", prdPath: "specs/prd_real.md", specPath: "specs/spec.md", designInputPath: "specs/design-input.md", runner: "codex", deps: fakeDeps };
     const plan = planProjectOnboardingKickoffPromotionV4(args);
