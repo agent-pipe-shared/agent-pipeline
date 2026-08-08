@@ -1164,7 +1164,15 @@ function managedRepairInput(root, overrides = {}) {
   // without-override direction too. A future ordinary item inconsistency can
   // therefore break this case without any append being at fault; a synthetic
   // fixture would be immune, at the cost of the realism the live binding
-  // buys. Recorded in docs/state.md rather than decided silently here.
+  // buys.
+  //
+  // That is a deferred decision with an owner and an expiry, not an open TODO
+  // (QG-06): owner PO, expiry 2026-09-08. At expiry the live-ledger binding is
+  // either confirmed as the deliberate choice or replaced by a synthetic
+  // fixture -- there is no third option and no silent extension. Until then
+  // the residual failure mode is a loud red rather than a silent return to
+  // vacuity: any finding present in BOTH directions breaks the
+  // `!reachableWithoutOverride` conjunct of the check below.
   function renumberPrePublicCoreHistory(events) {
     const rebuilt = [];
     let previousHash = null;
