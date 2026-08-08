@@ -1501,6 +1501,15 @@ export async function run(argv = process.argv.slice(2), deps = {}) {
   const rootDir = deps.rootDir ?? ROOT_DIR;
   const userYamlPath = join(rootDir, "pipeline.user.yaml");
   const opts = parseArgv(argv);
+  // CLI edge: setup.mjs is invoked directly by a session with no --runner flag
+  // of its own. The one signal this process can observe is which runner is
+  // executing it (CLAUDECODE is set by every Claude Code session, main and
+  // subagent); reused rather than re-derived, the same convention already
+  // resolved by pipeline-start-preflight.mjs and by the project-onboarding-v3
+  // CLI. This is correct only at this entry point -- a library helper below
+  // must never guess the same thing about a project it does not observe.
+  const env = deps.env ?? process.env;
+  const runner = env.CLAUDECODE === "1" ? "claude" : "codex";
   if (opts.help) {
     console.log(
       `Usage: node setup.mjs [--defaults] [--configure-advisor-export] [--publish-po-profile] [--migrate-agents-adapter] [--help]
@@ -1566,7 +1575,7 @@ Legacy v0/v1/v2 sources are never compiled. Review and activate their one-way V3
   const hasV3Source = existingUserYamlRaw !== null && existingUserYamlParsed?.schema === "pipeline.user.v3";
   const needsV1Migration = existingUserYamlRaw !== null && existingUserYamlParsed?.schema !== "pipeline.user.v1";
   if (!hasV3Source) {
-    const lifecycle = (deps.inspectProjectOnboardingV3 ?? inspectProjectOnboardingV3)({ rootDir, intent: "onboarding" });
+    const lifecycle = (deps.inspectProjectOnboardingV3 ?? inspectProjectOnboardingV3)({ rootDir, intent: "onboarding", runner });
     if (lifecycle.nextAction?.kind === "command") console.error("setup.mjs: governed onboarding requires its next typed recovery action; rerun pipeline-start to obtain it.");
     else console.error("setup.mjs: governed onboarding has no automatic repair available in this environment.");
     console.error(v3MigrationRequiredMessage(existingUserYamlParsed?.schema));
@@ -1575,7 +1584,7 @@ Legacy v0/v1/v2 sources are never compiled. Review and activate their one-way V3
   if (existingUserYamlParsed?.runners?.default === "codex") {
     const bootstrapAuthority = (deps.validateV3BootstrapAuthority ?? validateV3BootstrapAuthority)({ rootDir });
     if (bootstrapAuthority?.status !== "ready") {
-      const lifecycle = (deps.inspectProjectOnboardingV3 ?? inspectProjectOnboardingV3)({ rootDir, intent: "onboarding" });
+      const lifecycle = (deps.inspectProjectOnboardingV3 ?? inspectProjectOnboardingV3)({ rootDir, intent: "onboarding", runner });
       if (lifecycle.nextAction?.kind === "command") console.error("setup.mjs: governed onboarding requires its next typed recovery action; rerun pipeline-start to obtain it.");
       else console.error("setup.mjs: governed onboarding has no automatic repair available in this environment.");
       console.error("setup.mjs: a projection-only V3 result is not operational readiness; current native Codex runtime readback is required.");

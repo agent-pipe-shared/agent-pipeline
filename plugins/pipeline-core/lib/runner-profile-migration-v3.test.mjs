@@ -1336,7 +1336,7 @@ record("the shipped v1 seed converts directly to V3 without a persistent V2 inte
 function freshlyOnboardedRoot() {
   const root = mkdtempSync(join(tmpdir(), "runner-profile-v3-fresh-"));
   try {
-    const portable = planProjectOnboardingV3({ rootDir: root });
+    const portable = planProjectOnboardingV3({ rootDir: root, runner: "claude" });
     assert.equal(portable.status, "ready", "fresh onboarding must plan");
     assert.equal(applyProjectOnboardingV3(portable, { rootDir: root, activate: true }).status, "applied");
     const runtime = planProjectOnboardingLifecycleV4({ rootDir: root, operation: "runtime", runner: "claude" });
