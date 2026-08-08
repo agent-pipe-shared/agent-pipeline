@@ -20,6 +20,69 @@ H-AC-11 amended for GMW; the window singleton (O-5) and the inert kernel-list
 entry (P5) recorded as decisions with reasons; `requirement` added to the item
 taxonomy; and the stage-0 definition site decided as option (b).
 
+**IMPLEMENTATION IN FLIGHT — R3's B3 SWEEP IS DONE (2026-08-08).** All 39 files,
+both language halves, four commits: `ddd1830` (C1–C3), `56f5293` (C6+C7),
+`9dae9fb` (C8 + `harness/scripts/check-claude-md-lines.mjs`), `74346bf` (C4+C5).
+Verified by the Elephant rather than accepted from the reports: `rg -n "OM §"`
+and a search for `operating-model.md … §N` over every scope class return nothing;
+`check-doc-contracts.mjs` exits 0 (539 files, 830 links).
+
+Also landed: **R4** H-AC-11 amended for GMW (`39374ab`), **R5** the O-5
+window-singleton decision (`b98acaa`), **R6** P5 closed (`d3fd216`), **R7** the
+`requirement` type (`633524b`), and the seven red suites filed (`2edf88d`).
+
+**The P5 closure rests on verified control flow, not on a design claim.** The
+dispatch was told to confirm it in the hook source and did:
+`isNeverLiftableKernelPath` is called exactly once, inside the
+`matched === LIVE_PLUGIN_RULE` block, which is mutually exclusive with the
+path-table branch that GS-8 takes. An entry there would have been inert.
+
+**Two residual-shaped findings from the sweep, both worth keeping.**
+
+1. **The inventory's drafted replacement was wrong once, and the sweep said so.**
+   For `roles/elephant.md:273`'s reference list the draft grouped §3 and §4 both
+   under *The lifecycle*; the sweep mapped §4 to *Evidence, review and recovery*
+   instead, matching how the three other identically-shaped lists were treated.
+   Disclosed rather than silently applied — which is the behaviour that makes a
+   drafted work list safe to hand to an implementer.
+2. **`roles/elephant.md:47`'s `(80%-gate, §8)` was not "not adjudicable" after
+   all** — it is a self-reference to that file's own §8, which defines the term at
+   `:254`. The inventory had it in the unresolvable bucket; reading the file
+   settled it.
+
+**MY OWN REPEATED SCOPING ERROR, recorded because it cost three dispatch rounds.**
+The stage-0 consolidation (option b) needed every reference to the criteria
+repointed to `roles/elephant.md` EL-01. I scoped it **three times by directory
+and three times too narrowly**: first the two harness documents, then `roles/` +
+`harness/`, and only then the repository. Each pass found carriers the previous
+one could not see, because each search was bounded where I had last *found* the
+problem rather than where the property *holds*. A mechanic dispatch stopped
+correctly at a limit I had mis-specified — I had imported EL-01's "≤ 2 files"
+into a Goldfish briefing, where it has never applied; that bound constrains what
+the Elephant may write itself, not how large a dispatch may be.
+**The rule: measure repository-wide first, then cut.** The B3 inventory did
+exactly that and found 238 citations against the design's 233; the stage-0 work
+did not, because it looked small.
+
+Landed so far: `1474319` (two harness documents, executed by the Elephant under
+EL-01's stage-0 fast path — two files, five lines, gate run as evidence) and
+`263d57a` (`roles/critic.md:138`, `harness/checklists/session-close.md:35`,
+`harness/checklists/critic-review.md:23`). **AC-P11's second clause is not yet
+satisfied**: a repository-wide dispatch is in flight for the remaining carriers,
+which include `roles/elephant.md:117` — the definition site itself still pointing
+elsewhere for "true stage-0 fast-path" — plus `templates/prd.md:14`,
+`templates/prompts/critic-review.md:218` and three lines in
+`templates/prompts/kickoff-new-project.md`.
+
+**In flight at the context cut:** `PHX-STAGE0-SWEEP` (the repository-wide
+repoint) and `PHX-REGCHECK` (the suite-registration completeness checker, its
+suite, and the *unapplied* `verify.mjs` registration patch as an evidence
+artifact). Neither needs a human act.
+
+**The next hard gate is one act:** a signed maintenance window over TP-3, so the
+102 green registrations and the new check land together. Everything else in the
+phase that needs no signature is done or in flight.
+
 **PHASE APPROVED AND IN IMPLEMENTATION (2026-08-08).** The PO authority decision
 was applied (candidate `spec`, continuity revision 4), the plan was submitted
 (`Elephant`, profile `epic`) and **approved by the PO in-session at
