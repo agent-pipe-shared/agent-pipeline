@@ -238,6 +238,19 @@ edit to that file.
 `27456fa` after the review pointed out they were bound to a superseded revision
 whose output format no longer exists.
 
+The window's contents are staged in
+`specs/sprint-phoenix-epic/design/acp3-preplanning-patch.md`: roughly twelve
+lines in `verify.mjs`, a shared `duplicateSuiteIds` export so the rule has one
+definition, and the capture procedure. The prior window carried 105 lines; this
+one is small.
+
+> **A trap worth knowing: `.gitignore:25` is a bare `evidence/`, which matches
+> every nested directory of that name, including
+> `specs/sprint-phoenix-epic/evidence/`.** The review artifacts tracked there
+> were force-added at some point. A new design document written into that
+> directory is silently untracked — it looks written and would never be
+> committed. That is why the staged patch above lives under `design/`.
+
 **F2 — partial: AC-P2 demonstrated, AC-P3 named but not yet reported before planning.**
 The PO signed a one-use TP-3 window for exactly the duplicate-suite-id edit
 (ADR-0059, request `91ecdd34…`, plan `65f19034…`, intent `f822476b…`).
