@@ -9,12 +9,19 @@
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
 
-The PO is restarting the session to pick up a new plugin build and is rebooting
-WSL. This section is the complete handover; everything below it is history.
+The PO restarted the session to pick up a new plugin build and rebooted WSL.
+This section is the complete handover; everything below it is history.
 
-**HEAD: `358c709` on `sprint_phoenix`. Nothing pushed. Working tree clean apart
-from `.claude/settings.json`, which is permanently dirty in this checkout and is
-never committed.**
+**Resumed 2026-08-08 on plugin `0.5.4+claude.20260808104333.c4be063`
+(local-development, registered local marketplace). Bootstrap ready: V3 authority
+`pipeline.user.yaml` ready, continuity valid at revision 5, `CS-STATUS-ACTIVE`,
+activeFeature `sprint-phoenix-epic` in implementation, observation governance
+passed. Update channel `alpha` unreachable — availability `unknown`,
+non-blocking.**
+
+**HEAD: `e7f6e96` on `sprint_phoenix`. Nothing pushed. Working tree clean apart
+from `.claude/settings.json` and `project/resume-hint.json`, which are
+permanently dirty in this checkout and are never committed.**
 
 ### Nothing needed lives in `/tmp`
 
@@ -47,41 +54,50 @@ The second break is the one that matters: it reproduces the vacuous state the
 Critic found, and the test now fails on it. BS26 was audited for the same
 vacuity and is sound — confirmed by the third break, not by reading.
 
-### One thing deliberately left open, recorded rather than papered over
+### The open item is now closed by measurement (`e7f6e96`)
 
-The **without-override direction of the append-stability probe** was never
-cleanly measured. The single run that failed it used a synthetic event that
-moved an item without updating the paired `items` array, so
-`validateTransitionLedger` reported an unrelated items-level finding
-(`items: pipeline.managed-onboarding-success-contract status does not match its
-final ledger transition`, `evidence/measure-baseline-output.txt:15`) which
-perturbed the set comparison. I checked that attribution against the captured
-raw findings and it holds — but a corrected probe has not been run, so the
-code comment's claim of append-stability is reasoned, not measured.
+The **append-stability probe has been run properly**, in memory against the real
+ledger, in both directions. Growth events are produced by
+`planBacklogTransition`, so each one carries its updated `items` entry and is
+ledger-valid by construction — that is exactly what the earlier, discarded run
+got wrong.
 
-This also surfaced something real and worth keeping: the planner's
-"exactly its authorized set of currently failing events" comparison is sensitive
-to **any** validation finding, including items-level ones unrelated to
-reachability. BS25's discrimination can therefore be broken in future by an
-ordinary item inconsistency, not only by an append. A synthetic fixture would be
-immune to both; the live-ledger binding is what buys the realism. Worth an
-explicit decision later, not a silent one.
+| run | first 38 identical | WITH override | WITHOUT override |
+|---|---|---|---|
+| baseline (220 events, 1 renumbered) | yes | refusal fires | refusal does **not** fire |
+| +1 / +2 / +3 consistent appends | yes | refusal fires | refusal does **not** fire |
+| negative control: same append, `items` entry left stale | yes | refusal fires | **refusal fires too — discrimination collapses** |
+
+The finding set stays at exactly the authorized 38 under consistent growth. The
+negative control reproduces the accidental failure deliberately: the stale item
+adds a 39th finding (`status does not match its final ledger transition`) and
+the set comparison then mismatches in both directions.
+
+So the stability is real but **conditional**, and the condition is items/ledger
+consistency, not the number of appends. The previously *reasoned* attribution
+now stands as measured, and the comment in `backlog-state.test.mjs` states the
+conditional instead of the flat claim. The trade-off it implies — a synthetic
+fixture would be immune to an ordinary item inconsistency, at the cost of the
+realism the live binding buys — is recorded there and here rather than decided
+silently.
+
+Probe script: `scratch/phx-append-stability-probe.mjs` (gitignored, on disk).
 
 ### Immediate next steps, in order
 
-1. Run the corrected append-stability probe (synthetic event with a matching
-   `items` entry) and either confirm or correct the comment in
-   `backlog-state.test.mjs:1150-1155`.
-2. Full verify from a **fresh** detached worktree at HEAD — the tree cannot be
-   made clean in place, so verify only runs there:
-   `git worktree add --detach .git/phx-verify-wt HEAD`, run with
+1. **Delta re-Critic — decided: yes, run it.** F1 was a *vacuous test*, which is
+   precisely the failure mode self-review misses; closing it on the Elephant's
+   own break-proofs is weaker evidence than the finding deserves. Round 2 of at
+   most 4. Base `3345efe` (head of the reviewed object), head = final commit,
+   changed paths bound exactly.
+2. Full verify from a **fresh** detached worktree at the final commit — the tree
+   cannot be made clean in place, so verify only runs there:
+   `git worktree add --detach .git/phx-verify-wt <commit>`, run with
    `--root <worktree>`, then `git worktree remove --force`.
    The push gate (`guard-push.mjs:49`) needs `evidence/verify-latest.json` with
    `exitCode === 0` and `commit` equal to the pushed commit, so this must be
    redone at the final commit, not reused from `3345efe`.
-3. Decide whether F1's closure warrants a delta re-Critic (up to 4 rounds are
-   allowed; 1 has been used).
-4. Push gate — the fourth and last PO authorization. **Only to `sprint_phoenix`.**
+3. Push gate — the fourth and last PO authorization. **Only to `sprint_phoenix`.**
 
 ### One Critic "not verifiable" item is now closed
 
