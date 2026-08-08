@@ -13,6 +13,7 @@ import {
   EVIDENCE_AMENDMENT_SCHEMA,
   ITEM_SCHEMA,
   PRE_PUBLIC_CORE_REACHABILITY_KIND,
+  PRE_PUBLIC_CORE_REACHABILITY_TARGETS,
   PROJECT_CLOSURE_READBACK_SCHEMA,
   TRANSITION_SCHEMA,
   TRANSITION_V2_SCHEMA,
@@ -1137,95 +1138,123 @@ function managedRepairInput(root, overrides = {}) {
 
 {
   // A dedicated planner-level test for the PHX-LEDGER-REACH sibling repair,
-  // replayed against this repository's own real canonical ledger and items
-  // (mirroring BS12's style), so the 38-entry authorized registry is
-  // exercised for real rather than against a hand-rolled fixture registry.
+  // replayed against this repository's own 38 authorized historical events
+  // (physical sequences 1..38), so the authorized registry is exercised for
+  // real rather than against a hand-rolled fixture registry.
   //
-  // The raw ledger, filtered to drop the 38 amendments, is not contiguous:
-  // any ordinary event appended after the (now-removed) amendment block
-  // keeps its original sequence number and previousHash, so
-  // validateTransitionLedger reports sequence-order and hash-chain findings
-  // unconditionally, on top of whatever `commitExists` reports. That makes
-  // the asserted refusal fire regardless of the override, which is exactly
-  // the failure mode this rebuild closes (PHX-BS25-FIX). Renumbering only
-  // rewrites the tail that no longer matches physical order -- the first 38
-  // events (the amendment targets, whose entryHash is pinned by
-  // PRE_PUBLIC_CORE_REACHABILITY_TARGETS) always come out byte-identical --
-  // so the rebuild survives ordinary growth of the live ledger.
+  // Those 38 events are immutable history, pinned entry-hash by entry-hash in
+  // the module's own PRE_PUBLIC_CORE_REACHABILITY_TARGETS. Everything else
+  // this check needs is DERIVED from them (see prePublicCoreFixture) instead
+  // of read out of the live backlog. That derivation is the PHX-BS25 repair.
   //
-  // Measured, not reasoned (2026-08-08, both directions): appending
-  // consistent ordinary events -- ones whose paired `items` entry is updated
-  // too -- leaves validateTransitionLedger's finding set at exactly the
-  // authorized 38 and both directions of the discrimination below intact.
-  // The stability is conditional on that consistency: the planner compares
-  // against the *whole* finding set, so an items-level inconsistency
-  // unrelated to reachability (an item whose status no longer matches its
-  // final transition) adds a 39th finding and makes the refusal fire in the
-  // without-override direction too. A future ordinary item inconsistency can
-  // therefore break this case without any append being at fault; a synthetic
-  // fixture would be immune, at the cost of the realism the live binding
-  // buys.
+  // What it repairs, measured 2026-08-08/09: the previous construction filtered
+  // and renumbered the WHOLE live ledger and handed the planner the WHOLE live
+  // item set. The planner refuses unless the current finding set is EXACTLY the
+  // 38 authorized reachability failures, so any ordinary growth of the backlog
+  // -- one added item, one added event, one status not yet reprojected -- added
+  // a 39th finding, the refusal then fired in BOTH directions, and the
+  // discrimination this check exists to pin collapsed into a tautology. BS25
+  // went red on an unrelated backlog append and green again on an unrelated
+  // backlog fix, with no line of production code changing either time.
   //
-  // That is a deferred decision with an owner and an expiry, not an open TODO
-  // (QG-06): owner PO, expiry 2026-09-08. At expiry the live-ledger binding is
-  // either confirmed as the deliberate choice or replaced by a synthetic
-  // fixture -- there is no third option and no silent extension. Until then
-  // the residual failure mode is a loud red rather than a silent return to
-  // vacuity: any finding present in BOTH directions breaks the
-  // `!reachableWithoutOverride` conjunct of the check below.
-  function renumberPrePublicCoreHistory(events) {
-    const rebuilt = [];
-    let previousHash = null;
-    for (const [index, original] of events.entries()) {
-      const sequence = index + 1;
-      if (original.sequence === sequence && original.previousHash === previousHash) {
-        rebuilt.push(original);
-        previousHash = original.entryHash;
-        continue;
-      }
-      const updated = { ...original, sequence, previousHash, entryHash: "" };
-      updated.entryHash = transitionHash(updated);
-      rebuilt.push(updated);
-      previousHash = updated.entryHash;
-    }
-    return rebuilt;
-  }
-
+  // `withLiveDrift` below is the permanent regression pin for that: the same
+  // verdict, recomputed from live state plus one extra item and one extra
+  // ledger event, must be identical. Nothing is written to disk for it.
+  //
+  // What still binds reality, deliberately: the 38 events are read from the
+  // live ledger and must match the module's pins (`boundToPins`), and the
+  // fixture's finding set must be exactly the 38 authorized reachability
+  // failures (`findings`). Tampering with pre-public-core history is still a
+  // loud red here; only ordinary growth is now invisible to it.
   const canonical = loadBacklogState(process.cwd(), { checkCommit: false });
-  const historical = renumberPrePublicCoreHistory(
-    canonical.events.filter((entry) => entry?.evidence?.kind !== PRE_PUBLIC_CORE_REACHABILITY_KIND));
   const expectedSequences = Array.from({ length: 38 }, (_, index) => index + 1);
-  function realCommitExists(oid) {
-    return spawnSync("git", ["cat-file", "-e", `${oid}^{commit}`], { cwd: process.cwd(), stdio: "ignore" }).status === 0;
+  const expectedFindings = expectedSequences.map((sequence) => `ledger event ${sequence}: evidence.commit is not a reachable local Git commit`);
+  const TARGET_FINDING = "pre-public-core reachability repair requires exactly its authorized set of currently failing events";
+  // The fixture is a pure function of the pinned prefix: the 38 authorized
+  // events, plus the item set their own terminal states imply. Nothing that
+  // the live backlog gained after event 38 -- and no live item file -- can
+  // reach the planner, which is the PHX-BS25 repair.
+  function prePublicCoreFixture(source) {
+    const events = source.events.slice(0, expectedSequences.length);
+    const terminalById = new Map();
+    for (const entry of events) terminalById.set(entry.id, entry);
+    const items = [...terminalById].map(([id, terminal]) => {
+      const metadata = { id, status: terminal.to, owner: "pipeline", closure_repository: "self" };
+      if (terminal.to === "closed") {
+        metadata.closure_commit = terminal.evidence.commit;
+        metadata.closure_evidence = terminal.evidence.reference;
+      }
+      return { metadata };
+    });
+    return { events, items };
   }
-  const overriddenCommitExists = (oid) => (oid === "933e1a8d17d6c7bed040d13f8fccca2511fff9dc" ? true : realCommitExists(oid));
-  const dummyReferences = expectedSequences.map((sequence) => ({
-    sequence,
-    reference: historical[sequence - 1].evidence.reference,
-    referenceBlobOid: "a".repeat(40),
-    referenceSha256: "a".repeat(64),
-  }));
-  const input = { at: "2026-08-08", actor: "hotfix-phx-ledger-reach-repair", commit: "a".repeat(40), references: dummyReferences };
-  const TARGET_ERROR = "exactly its authorized set of currently failing events";
-  // The first 38 targets must survive renumbering byte-for-byte: they are
-  // never physically displaced (the amendments always sit after them), so
-  // renumberPrePublicCoreHistory should never have touched them.
-  const first38Untouched = expectedSequences.every((sequence) => historical[sequence - 1] === canonical.events[sequence - 1]);
-  const reachableOverrideRejected = planPrePublicCoreReachabilityRepair(canonical.items, historical, input, { commitExists: overriddenCommitExists });
-  const reachableWithoutOverride = planPrePublicCoreReachabilityRepair(canonical.items, historical, input, { commitExists: realCommitExists });
+  function verdictFor(source) {
+    const { events, items } = prePublicCoreFixture(source);
+    // Reachability is stated, not probed: whether a 2026-07-20-orphaned
+    // commit happens to be resolvable in this clone is not what BS25 is
+    // about, and made the verdict depend on the local object database.
+    const nothingReachable = () => false;
+    const alreadyReachable = (oid) => oid === events[0]?.evidence?.commit;
+    const references = expectedSequences.map((sequence) => ({
+      sequence,
+      reference: events[sequence - 1].evidence.reference,
+      referenceBlobOid: "a".repeat(40),
+      referenceSha256: "a".repeat(64),
+    }));
+    const input = { at: "2026-08-08", actor: "hotfix-phx-ledger-reach-repair", commit: "a".repeat(40), references };
+    const rejected = planPrePublicCoreReachabilityRepair(items, events, input, { commitExists: alreadyReachable });
+    const accepted = planPrePublicCoreReachabilityRepair(items, events, input, { commitExists: nothingReachable });
+    return {
+      boundToPins: Object.keys(PRE_PUBLIC_CORE_REACHABILITY_TARGETS).length === expectedSequences.length
+        && expectedSequences.every((sequence) => events[sequence - 1]?.id === PRE_PUBLIC_CORE_REACHABILITY_TARGETS[sequence].id
+          && events[sequence - 1]?.entryHash === PRE_PUBLIC_CORE_REACHABILITY_TARGETS[sequence].entryHash),
+      findings: validateTransitionLedger(events, items, { commitExists: nothingReachable }),
+      refusedWithOverride: !rejected.ok && rejected.errors.some((error) => error.includes(TARGET_FINDING)),
+      quietWithoutOverride: !accepted.errors.some((error) => error.includes(TARGET_FINDING)),
+      onlyWithOverride: rejected.errors.filter((error) => !accepted.errors.includes(error)),
+    };
+  }
+  // The repro (PHX-BS25): the live backlog gains one item and one ordinary
+  // ledger event -- exactly the growth that happened on 2026-08-08/09 -- and
+  // BS25's verdict must not move. Nothing is written to disk and no tracked
+  // backlog file is touched; the variation is injected into the loaded state.
+  const noiseId = "pipeline.phx-bs25-live-state-noise";
+  const noiseEvent = event({
+    sequence: canonical.events.length + 1,
+    id: noiseId,
+    previousHash: canonical.events.at(-1).entryHash,
+    reason: "Simulated ordinary growth of the live ledger.",
+  });
+  const noiseItem = { metadata: { id: noiseId, status: "in_progress", owner: "pipeline", type: "improvement" } };
+  const baseline = verdictFor(canonical);
+  const withLiveDrift = verdictFor({ items: [...canonical.items, noiseItem], events: [...canonical.events, noiseEvent] });
   check("BS25 a pre-public-core reachability amendment for an event whose commit IS already reachable is refused",
-    first38Untouched
+    baseline.boundToPins
+      && baseline.findings.join("\n") === expectedFindings.join("\n")
       // Discrimination, pinned in both directions: the refusal fires once
       // the target commit is reported reachable (override) and must NOT
       // fire on the identical input when it is not (no override) -- proving
       // the refusal tracks reachability rather than incidental ledger noise.
-      && !reachableOverrideRejected.ok
-      && reachableOverrideRejected.errors.some((error) => error.includes(TARGET_ERROR))
-      && !reachableWithoutOverride.errors.some((error) => error.includes(TARGET_ERROR)),
-    [`WITH override: ${reachableOverrideRejected.errors.join("; ")}`,
-      `WITHOUT override: ${reachableWithoutOverride.errors.join("; ")}`].join(" | "));
+      && baseline.refusedWithOverride
+      && baseline.quietWithoutOverride
+      && baseline.onlyWithOverride.join("\n") === TARGET_FINDING
+      // ... and the whole verdict is a function of the pinned history alone,
+      // not of whatever the live backlog happens to contain right now.
+      && JSON.stringify(withLiveDrift) === JSON.stringify(baseline),
+    [`BASELINE: ${JSON.stringify(baseline)}`, `WITH LIVE DRIFT: ${JSON.stringify(withLiveDrift)}`].join(" | "));
 
-  const duplicateRejected = planPrePublicCoreReachabilityRepair(canonical.items, canonical.events, input);
+  const duplicateInput = {
+    at: "2026-08-08",
+    actor: "hotfix-phx-ledger-reach-repair",
+    commit: "a".repeat(40),
+    references: expectedSequences.map((sequence) => ({
+      sequence,
+      reference: canonical.events[sequence - 1].evidence.reference,
+      referenceBlobOid: "a".repeat(40),
+      referenceSha256: "a".repeat(64),
+    })),
+  };
+  const duplicateRejected = planPrePublicCoreReachabilityRepair(canonical.items, canonical.events, duplicateInput);
   check("BS26 a second pre-public-core reachability repair run is refused rather than appending duplicates",
     !duplicateRejected.ok && duplicateRejected.errors.some((error) => error.includes("already appended")),
     duplicateRejected.errors.join("; "));
