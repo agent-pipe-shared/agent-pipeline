@@ -1023,6 +1023,61 @@ a dispatch the authority to clear a control whose purpose is to check that
 dispatch's own class of work. "Show your evidence" is not a substitute for
 separation of duties — it is what makes the absence of separation look rigorous.
 
+### RESTORED (`6d6fa5c`) — and it dissolved decision 4 rather than answering it
+
+Gate at `6d6fa5c`: exit 0, 368 steps, `binding: "exact"`, clean at tree `7d5836e`,
+23:51:54Z → 23:55:12Z. And the thing that could not be imported at all now imports —
+I checked that myself, separately from the dispatch's own evidence: `IMPORT OK`.
+
+**This supersedes decision 4 in the block below. It no longer needs the PO.**
+
+**My premise was wrong, and the dispatch established that instead of executing it.**
+I briefed this as a restoration of nineteen *deleted definitions*. The merge deleted
+nothing of the sort: it replaced `ruleset-freshness.mjs` wholesale with a different
+design. Four identifiers genuinely collide, two of them exported and bound at HEAD as
+deprecated aliases of the **new** contract. Overwriting either side would have been
+the obvious move and would have silently reverted the 0.5.2 service. The dispatch
+left the merged bindings untouched and landed the restored logic additively under
+distinct names.
+
+**The collision I put to the PO does not exist.** `observeCodexRulesetSource` is not
+load-bearing: `hostControlBinding`, `executeRulesetFreshnessHostAction` and
+`inspectHostRulesetFreshness` all take the observation as a parameter — only `main()`
+called it. So "restore the family" and "do not revive that helper" were never in
+conflict. What is actually true is narrower and already written down: the helper was
+the sole producer of `pipeline.codex-ruleset-source-observation.v1`, no producer
+survives anywhere, and the design record **already names the successor and marks it
+unbuilt** (`bootstrap-origin-allowlist-and-codex-wsl-freshness.md:233-236`, `:580-582`).
+Two decisions that I reported as colliding are compatible; there is an unbuilt piece
+between them.
+
+`main()` now takes the observation by injection with no default, so absent a producer
+it fails closed — `invalid-input`, exit 2 — instead of guessing. The host CLI stays
+non-functional until the named successor is built. That is a roadmap item with a
+written owner, not a decision anyone is waiting on tonight.
+
+**Provenance, because this is exactly where the night's earlier restoration would have
+gone wrong:** 13 code blocks and 7 constants proved byte-identical against the
+pre-merge blob by the runner. One symbol adapted — `PUBLIC_MARKETPLACE_URL` is
+re-exported from the module that already carries the identical value rather than
+duplicated as a literal. **Nothing invented.** A reconstructed helper is what makes
+digest assertions pass by construction, and that trap was named in the briefing and
+avoided in the work.
+
+**The detail I want kept.** The dispatch's own first probe went red. It did not adjust
+production code until its check agreed — it investigated, and found a *pre-merge*
+defect: `validRemoteObservation` collapses every non-ready reason to
+`remote-unavailable` unless it is `timeout`, so one reason is not producible through
+`inspectCliRulesetFreshness` and two code paths are unreachable through it. It
+preserved that defect and reported it rather than repairing it under cover of an
+unrelated commit. That is the exact inversion of the failure mode I recorded three
+times tonight, and it is worth more than the restoration.
+
+Three further helpers were deliberately not restored — no surviving caller, so they
+would have been dead exports — and `freshnessHostBinding` was not re-added to the
+preflight result because a green registered suite pins that exact key set. Both are
+the right call and both were declared.
+
 ### The blind spots are closed (`19e3793`), gate green — and I have just built a third instance of tonight's own pattern
 
 Gate at `19e3793`: exit 0, 368 steps, `binding: "exact"`, clean at tree `4f718a7`,
