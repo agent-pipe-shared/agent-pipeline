@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { existsSync, linkSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -896,6 +897,45 @@ record("slim valid V3 runtime initialization is explicit, read-only at plan, and
       humanRoles: { po: { displayLabel: "PO" } },
     });
     assert.match(readFileSync(join(root, ".claude/pipeline.yaml"), "utf8"), /language:\n  human_facing: de\n/u);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+record("overlayCalibration separates a private overlay's own calibration from an ordinary consumer project's, by intent", () => {
+  const root = fixture(yaml(v3Intent()));
+  try {
+    rmSync(join(root, ".claude"), { recursive: true, force: true });
+    rmSync(join(root, ".codex"), { recursive: true, force: true });
+
+    // Default (omitted) is `true`: unchanged behaviour for the sole remaining
+    // unconditional caller of this literal, private-overlay-activation.mjs.
+    const overlayPlan = planRunnerProfileMigrationV3({ rootDir: root, initializeMissingRuntimeForSlimV3: true });
+    assert.equal(overlayPlan.status, "ready");
+    assert.equal(applyRunnerProfileMigrationV3(overlayPlan, { rootDir: root, activate: true }).status, "applied");
+    const overlayCalibrationBytes = readFileSync(join(root, ".claude/pipeline.json"), "utf8");
+    const overlayCalibration = JSON.parse(overlayCalibrationBytes);
+    assert.equal(overlayCalibration.project, "agent-pipeline-private-overlay");
+    assert.equal(overlayCalibration.verify, "git diff --check HEAD");
+
+    // Only `.claude/pipeline.json` is reset: every other runtime target stays
+    // present, so the next plan re-seeds exactly the one target under test.
+    rmSync(join(root, ".claude/pipeline.json"));
+    const consumerPlan = planRunnerProfileMigrationV3({
+      rootDir: root,
+      initializeMissingRuntimeForSlimV3: true,
+      overlayCalibration: false,
+    });
+    assert.equal(consumerPlan.status, "ready");
+    assert.equal(applyRunnerProfileMigrationV3(consumerPlan, { rootDir: root, activate: true }).status, "applied");
+    const consumerCalibrationBytes = readFileSync(join(root, ".claude/pipeline.json"), "utf8");
+    const consumerCalibration = JSON.parse(consumerCalibrationBytes);
+    // Pin, both ways: neither the overlay's project identity nor its
+    // always-green verify command reaches an ordinary consumer project.
+    assert.equal(consumerCalibrationBytes.includes("agent-pipeline-private-overlay"), false);
+    assert.notEqual(consumerCalibration.project, "agent-pipeline-private-overlay");
+    assert.notEqual(consumerCalibration.verify, "git diff --check HEAD");
+    assert.match(consumerCalibration.verify, /not configured/u);
+    const verifyRun = spawnSync(consumerCalibration.verify, { cwd: root, shell: true, encoding: "utf8" });
+    assert.notEqual(verifyRun.status, 0, "a freshly seeded, unconfigured verify contract must not report success");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 

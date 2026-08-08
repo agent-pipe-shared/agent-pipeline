@@ -737,6 +737,20 @@ export function freshManifestBytes(profile = null) {
     + freshGateChapter(profile)
     + "modelRouting:\n  legacy:\n    model: legacy\n    effort: low\n";
 }
+// The honest consumer-project calibration for `.claude/pipeline.json`, byte-
+// identical to what freshBaselines() below seeds for a non-host-managed fresh
+// project. This is exported so runner-profile-migration-v3.mjs's slim V3
+// runtime initialization can seed the SAME honest placeholder for an ORDINARY
+// consumer project's runtime targets -- as opposed to
+// SLIM_V3_RUNTIME_SEEDS[".claude/pipeline.json"] there, which is the private
+// overlay's own calibration and is correct only for a private overlay
+// activating itself. Without this, a consumer project whose portable-seed step
+// ran before its runtime-initialization step (the ordinary greenfield order)
+// would have its `.claude/pipeline.json` seeded from the overlay literal the
+// moment runtime initialization finds it still absent.
+export function freshCalibrationBytes() {
+  return `${JSON.stringify({ project: "new-project", verify: UNCONFIGURED_VERIFY, handover: "docs/state.md", autonomy: "gated", branchModel: "feature-branch", repositoryMode: "local-only", worktree: "optional", stakes: "standard", constraints: ["Configure project-specific policy before delivery."] }, null, 2)}\n`;
+}
 function freshBaselines(intent, { hostManaged = false, profile = null } = {}) {
   const baselines = {
     ".claude/settings.json": { status: "present", bytes: "{}\n" },
@@ -3723,7 +3737,12 @@ function planLifecycle(rootDir, fs, operation, intent = "onboarding", runner) {
         ? "projection-drift"
         : "runtime-attestation-required";
     if (observed.status !== expected) return observed;
-    const plan = planRunnerProfileMigrationV3({ rootDir, deps: fs, initializeMissingRuntimeForSlimV3: operation === "runtime" });
+    // This is an ORDINARY consumer project's runtime initialization, never a
+    // private overlay activating itself (that is a separate, dedicated call
+    // path in private-overlay-activation.mjs). overlayCalibration: false keeps
+    // a freshly seeded `.claude/pipeline.json` the honest consumer placeholder
+    // instead of the overlay's own calibration literal.
+    const plan = planRunnerProfileMigrationV3({ rootDir, deps: fs, initializeMissingRuntimeForSlimV3: operation === "runtime", overlayCalibration: false });
     if (operation === "readback" ? plan.status !== "noop" : plan.status !== "ready") return observed;
     // A runner without a native runtime readback publishes no barrier, so its
     // initialization lands on the next real step instead of `restart-required`.
@@ -3792,7 +3811,9 @@ function applyLifecycle(rootDir, fs, operation, planSha256, activate, intent = "
       return runtimeTargetReadOnlyResult(beforeApply);
     }
   }
-  const plan = planRunnerProfileMigrationV3({ rootDir, deps: fs, initializeMissingRuntimeForSlimV3: operation === "runtime" });
+  // Same caller as planLifecycle() above: an ordinary consumer project's
+  // runtime apply, not a private overlay activation. See its comment.
+  const plan = planRunnerProfileMigrationV3({ rootDir, deps: fs, initializeMissingRuntimeForSlimV3: operation === "runtime", overlayCalibration: false });
   const expectedPlanStatus = operation === "readback" ? "noop" : "ready";
   if (plan.status !== expectedPlanStatus || lifecyclePlanDigest(plan) !== planSha256) return v4Inspection(rootDir, fs, intent, runner);
   const runtimeTargets = plan.targets.filter((target) => target.kind === "runtime" && target.path.startsWith(".codex/")).map((target) => ({

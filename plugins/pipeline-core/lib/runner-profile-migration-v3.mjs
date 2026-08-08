@@ -38,7 +38,7 @@ import {
 } from "./codex-host-layout.mjs";
 // One seed for both manifest tiers.  This is an intentional import cycle
 // (project-onboarding-v3.mjs imports this module); every use is lazy.
-import { freshManifestBytes } from "./project-onboarding-v3.mjs";
+import { freshCalibrationBytes, freshManifestBytes } from "./project-onboarding-v3.mjs";
 import { applyRunnerProfileMigrationV2, planRunnerProfileMigrationV2 } from "./runner-profile-migration-v2.mjs";
 import { validatePipelineUserV2 } from "./runner-profiles-v2.mjs";
 import { loadRunnerProfilesV3Registry, validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
@@ -112,6 +112,11 @@ const SLIM_V3_RUNTIME_SEEDS = Object.freeze({
   // F4 bootstrap contract on every machine.  The V3 renderer owns only
   // humanRoles.po.displayLabel and preserves these calibration keys on later
   // refreshes.
+  // This literal is correct ONLY for a private overlay activating itself --
+  // see the `overlayCalibration` parameter below. An ordinary consumer
+  // project's slim runtime initialization must never receive this; it gets
+  // freshCalibrationBytes() (project-onboarding-v3.mjs) instead, resolved by
+  // slimRuntimeSeed() the same way the manifest seed is resolved just below.
   ".claude/pipeline.json": `${JSON.stringify({
     project: "agent-pipeline-private-overlay",
     verify: "git diff --check HEAD",
@@ -143,10 +148,20 @@ const SLIM_V3_RUNTIME_SEEDS = Object.freeze({
 // Fresh runtime initialization holds no PO profile -- the migration API takes
 // none, and the kickoff binds the profile only at promotion, after this call
 // site -- so the profile-neutral default is the correct seed here.
-function slimRuntimeSeed(relative) {
-  return relative === ".claude/pipeline.yaml"
-    ? freshManifestBytes()
-    : SLIM_V3_RUNTIME_SEEDS[relative];
+//
+// `overlayCalibration` separates the two SLIM_V3_RUNTIME_SEEDS callers by
+// INTENT, not by which operation happens to be running: a private overlay
+// activating itself (private-overlay-activation.mjs, the sole unconditional
+// `initializeMissingRuntimeForSlimV3: true` caller left after this fix) is the
+// only caller that may bind `.claude/pipeline.json` to the overlay's own
+// calibration. Defaulting it to `true` preserves that caller's behaviour
+// unchanged; every other slim V3 caller (an ordinary consumer project's
+// runtime initialization -- project-onboarding-v3.mjs) passes `false`
+// explicitly and gets the honest, unconfigured consumer placeholder instead.
+function slimRuntimeSeed(relative, { overlayCalibration = true } = {}) {
+  if (relative === ".claude/pipeline.yaml") return freshManifestBytes();
+  if (relative === ".claude/pipeline.json" && !overlayCalibration) return freshCalibrationBytes();
+  return SLIM_V3_RUNTIME_SEEDS[relative];
 }
 
 class IntentionalMigrationInterruption extends Error {
@@ -262,7 +277,7 @@ function hasDurableHostInitAdmission(root, deps) {
     return false;
   }
 }
-function runtimeBaselines(root, deps, sourceKind, { initializeMissingRuntimeForSlimV3 = false } = {}) {
+function runtimeBaselines(root, deps, sourceKind, { initializeMissingRuntimeForSlimV3 = false, overlayCalibration = true } = {}) {
   const legacy = ["v0", "v1", "v2"].includes(sourceKind);
   const initializeSlimV3 = ["v3", "v3-refresh"].includes(sourceKind)
     && initializeMissingRuntimeForSlimV3 === true;
@@ -283,7 +298,7 @@ function runtimeBaselines(root, deps, sourceKind, { initializeMissingRuntimeForS
     if (!deps.existsSync(target)) {
       const seed = legacy
         ? LEGACY_V3_RUNTIME_SEEDS[relative]
-        : initializeSlimV3 ? slimRuntimeSeed(relative)
+        : initializeSlimV3 ? slimRuntimeSeed(relative, { overlayCalibration })
           // A reserved Codex mount supplies `.codex` at runtime.  Missing
           // Claude compatibility projections are renderer baselines only in
           // this mode; they must not make a freshly project-seeded root
@@ -528,6 +543,13 @@ export function planRunnerProfileMigrationV3({
   deps: overrides = {},
   initializeMissingRuntimeForSlimV3 = false,
   authorityLockBytes = undefined,
+  // Defaults `true` for backward compatibility with every caller left
+  // unchanged by this parameter's introduction (private-overlay-activation.mjs
+  // and the CLI/tests that pre-date it) -- all of them ARE a private overlay
+  // activating itself. A caller seeding an ordinary consumer project's runtime
+  // (project-onboarding-v3.mjs) MUST pass `false` explicitly; see
+  // slimRuntimeSeed() in this module for what each value seeds.
+  overlayCalibration = true,
 } = {}) {
   const deps = dependencies(overrides);
   let root;
@@ -541,7 +563,7 @@ export function planRunnerProfileMigrationV3({
   if (!validation.ok) return result("invalid-intent", validation.errors, { root, sourceKind: classified.kind, targets: [], changes: [] });
   let projection; let seeded; let hostManagedCodex;
   try {
-    const runtime = runtimeBaselines(root, deps, classified.kind, { initializeMissingRuntimeForSlimV3 });
+    const runtime = runtimeBaselines(root, deps, classified.kind, { initializeMissingRuntimeForSlimV3, overlayCalibration });
     seeded = runtime.seeded;
     hostManagedCodex = runtime.hostManagedCodex;
     projection = planRuntimeProjectionV3(classified.intent, { source: SOURCE_FILE, baselines: runtime.baselines });

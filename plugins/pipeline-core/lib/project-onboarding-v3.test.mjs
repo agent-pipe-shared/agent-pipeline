@@ -4751,5 +4751,29 @@ test("a freshly seeded project is honest about its authority tier, its verify co
   } finally { dispose(path); dispose(legacyPath); }
 });
 
+test("an ordinary consumer project's runtime initialization never seeds the private overlay's own calibration", () => {
+  const path = root();
+  try {
+    // Full greenfield order: portable seed, then runtime initialization --
+    // the exact sequence the defect this pins was found in.
+    initializeRestartRequiredRoot(path);
+    const legacyCalibrationPath = join(path, ".claude", "pipeline.json");
+    assert.equal(existsSync(legacyCalibrationPath), true, "runtime initialization must seed the legacy compatibility calibration");
+    const bytes = readFileSync(legacyCalibrationPath, "utf8");
+    // Pin, both ways: neither the private overlay's project identity nor its
+    // always-green verify command may reach an ordinary consumer project.
+    assert.equal(bytes.includes("agent-pipeline-private-overlay"), false, "a consumer project must never carry the private overlay's project identity");
+    const calibration = JSON.parse(bytes);
+    assert.notEqual(calibration.project, "agent-pipeline-private-overlay");
+    assert.notEqual(calibration.verify, "git diff --check HEAD");
+    const verifyRun = spawnSync(calibration.verify, { cwd: path, shell: true, encoding: "utf8" });
+    assert.notEqual(verifyRun.status, 0, "an unconfigured verify contract must not report success on an arbitrary tree");
+    assert.match(String(verifyRun.stderr), /not configured/);
+    // Both tiers of one fresh project must agree the verify gate is unconfigured.
+    const neutralCalibration = JSON.parse(readFileSync(join(path, "project", "pipeline.json"), "utf8"));
+    assert.equal(calibration.verify, neutralCalibration.verify);
+  } finally { dispose(path); }
+});
+
 console.log(`\nproject-onboarding-v3: ${passed} passed, ${failures.length} failed`);
 if (failures.length) { console.error(failures.join("\n")); process.exitCode = 1; }
