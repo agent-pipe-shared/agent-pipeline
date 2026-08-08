@@ -54,6 +54,11 @@
       "id": "TP-11",
       "pattern": "plugins/pipeline-core/lib/public-core-origin-allowlist\\.test\\.mjs$",
       "reason": "this suite pins the two-URL self-application origin allowlist's own exact assertions (exact-2, exact-URLs); GS-8 protects the constant module but not the test that pins it (Critic finding F6, WP2-WP3 Part A implementation review, E5/QG-04) — no ad-hoc edits outside a briefed test-change task."
+    },
+    {
+      "id": "TP-12",
+      "pattern": "plugins/pipeline-core/lib/self-application-attestation-gate\\.test\\.mjs$",
+      "reason": "this suite pins the GS-9-protected self-application attestation gate's own assertions, including its export set; GS-9 protects the module but nothing protected the test that pins it (AC-R1-8, E5/QG-04) — no ad-hoc edits outside a briefed test-change task."
     }
   ]
 }
