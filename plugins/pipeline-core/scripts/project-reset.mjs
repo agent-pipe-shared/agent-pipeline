@@ -20,16 +20,24 @@
  * was filed for.
  *
  * THREE CLOSED SETS. `remove`: paths a reset would delete -- always a file,
- * or a directory the Pipeline creates wholesale (`.git/agent-pipeline/` is
- * the only such case; the individual seeded file is named, never a
- * container the Pipeline merely writes into, e.g. `docs/` or `specs/`).
+ * or a directory the Pipeline creates wholesale. Two cases of the latter:
+ * `.git/agent-pipeline/` (private state), and (R3) an UNPROMOTED provisional
+ * kickoff anchor under `specs/` -- `specs/kickoff-<16 hex>/`, matched by
+ * shape via KICKOFF_ANCHOR_DIRNAME_RE below, never a startsWith string test.
+ * Everywhere else the individual seeded file is named, never a container the
+ * Pipeline merely writes into: `docs/` itself, or an adopter's own or a
+ * promoted feature's design package under `specs/`.
  * `keep`: paths inside the Pipeline's own footprint the reset deliberately
  * leaves -- a compatibility copy at the authority tier that is NOT currently
- * selected (retained by design, see project-authority.mjs), and private
- * state that resolves outside this project root (a linked worktree's Git
- * common directory, shared with other worktrees). `neverTouched`: fixed
- * categories the reset does not enter at all -- this repository's own git
- * history, the adopter's own files, and any design package under `specs/`.
+ * selected (retained by design, see project-authority.mjs), private state
+ * that resolves outside this project root (a linked worktree's Git common
+ * directory, shared with other worktrees), and (R3) a PROMOTED kickoff
+ * anchor -- one already carrying the supersession marker naming its
+ * successor -- kept as a provenance record rather than removed as litter
+ * (see the AC-4 decision at the anchor-scanning code below).
+ * `neverTouched`: fixed categories the reset does not enter at all -- this
+ * repository's own git history, the adopter's own files, and any design
+ * package under `specs/` that is not itself a provisional kickoff anchor.
  *
  * A THIRD REMOVAL KIND (R2B/R2C). `remove` also derives every runtime-
  * projection target from the unfiltered `loadRuntimeProjectionV3OwnedKeys().
@@ -81,6 +89,7 @@ import {
   lstatSync,
   mkdirSync,
   openSync,
+  readdirSync,
   readFileSync,
   realpathSync,
   renameSync,
@@ -142,9 +151,46 @@ const NEVER_TOUCHED = Object.freeze([
   }),
   Object.freeze({
     category: "design-package",
-    description: "any design package under specs/, including a PRD and specification a kickoff or promotion seeded there",
+    description: "any design package under specs/ that is not itself a provisional kickoff anchor: an adopter's own work, or a promoted feature's PRD, specification, and design input. A provisional kickoff anchor (specs/kickoff-<16 hex>/) is not a design package -- it is Pipeline-seeded scaffolding for an attempted kickoff, and this reset classifies it separately (kind kickoffAnchor/kickoffAnchorPromoted in remove/keep, not this entry)",
   }),
 ]);
+
+// R3 (backlog/items/2026-08-08-there-is-no-sanctioned-way-to-start-over.md,
+// direction 3): a provisional kickoff anchor is Pipeline-seeded scaffolding,
+// not a design package, so its removal belongs in `remove`/`keep` above --
+// never folded into the "design-package" neverTouched entry that used to
+// claim specs/ untouched wholesale (see the entry's description above).
+//
+// SHAPE, NOT A STRING TEST. `KICKOFF_ANCHOR_DIRNAME_RE` is the SAME check
+// onboarding-continuity.mjs uses to recognise a kickoff feature id
+// (:3434 recognisedKickoff, :4354 publishKickoffSupersession, :460 history
+// validation) -- the id is `kickoff-${goalSha256.slice(0, 16)}`
+// (:3241 planOnboardingKickoff) and its directory is `specs/${featureId}`
+// (:2876 initialAuthorityPaths). A startsWith("specs/kickoff-") test would
+// also match an adopter's own specs/kickoff-notes-from-the-workshop/; the
+// exact 16-lowercase-hex shape does not, because it is drawn from a sha256
+// digest.
+//
+// DUPLICATED, NOT IMPORTED, AND SAID SO. None of the three call sites above
+// exports this regex, and importing onboarding-continuity.mjs here would
+// pull kickoff's full read/write/lock side-effect surface into a read-only
+// plan step -- exactly what this dispatch's stop conditions warned against
+// doing silently. Precedent for the duplication already exists in this
+// repository: onboarding-continuity.test.mjs:1134 duplicates the sibling
+// `SUPERSEDED.md` constant (see KICKOFF_SUPERSESSION_MARKER_BASENAME below)
+// as a test-local constant for the same reason. Agreement is pinned by
+// project-reset.test.mjs, which drives specs/ through the REAL
+// planOnboardingKickoff/applyOnboardingKickoff and
+// planOnboardingKickoffPromotion/applyOnboardingKickoffPromotion producers
+// and asserts this regex classifies exactly what they create.
+const KICKOFF_ANCHOR_DIRNAME_RE = /^kickoff-[a-f0-9]{16}$/u;
+
+// The basename a promotion transaction already writes, after it commits, to
+// retire an anchor by naming its successor
+// (onboarding-continuity.mjs:144 KICKOFF_SUPERSESSION_BASENAME, written by
+// publishKickoffSupersession:4353). Not exported either; duplicated for the
+// same reason and pinned the same way as the regex above.
+const KICKOFF_SUPERSESSION_MARKER_BASENAME = "SUPERSEDED.md";
 
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -323,6 +369,47 @@ export function planProjectReset({ rootDir } = {}) {
         existed: existsSync(privateDir),
         reason: "private Pipeline state resolves outside this project root (a linked worktree's Git common directory); a project-scoped reset does not remove state shared with other worktrees",
       });
+    }
+  }
+
+  // PROVISIONAL KICKOFF ANCHORS (R3). An anchor the Pipeline seeded for an
+  // attempted kickoff is removed like `.git/agent-pipeline`: the whole
+  // directory, matched by SHAPE (see KICKOFF_ANCHOR_DIRNAME_RE above), never
+  // a startsWith string test (AC-1).
+  //
+  // AC-4 DECISION, STATED HERE. A PROMOTED anchor -- one already carrying
+  // the supersession marker a promotion writes, naming its successor -- is
+  // `keep`, not `remove`. It is a provenance record, not litter from a
+  // FAILED attempt: the promotion transaction itself declined to remove it
+  // when it retired the anchor (see the docstring at
+  // onboarding-continuity.mjs:4331 -- "Removal was the other route and this
+  // transaction cannot offer it honestly"), and this Pipeline's pattern
+  // elsewhere is append-only provenance (HISTORY entries, the discarded-
+  // feature record) over silent deletion of a record naming what replaced
+  // it. An UNPROMOTED anchor carries no such record -- removing it erases
+  // nothing but the litter itself, which is the whole point of this item.
+  const specsDir = join(root, "specs");
+  if (existsSync(specsDir)) {
+    let specsEntries = [];
+    try { specsEntries = readdirSync(specsDir, { withFileTypes: true }); } catch { specsEntries = []; }
+    const anchorDirs = specsEntries
+      .filter((entry) => entry.isDirectory() && KICKOFF_ANCHOR_DIRNAME_RE.test(entry.name))
+      .map((entry) => entry.name)
+      .sort();
+    for (const name of anchorDirs) {
+      const anchorPath = `specs/${name}`;
+      const promoted = existsSync(join(specsDir, name, KICKOFF_SUPERSESSION_MARKER_BASENAME));
+      if (promoted) {
+        keep.push({
+          path: anchorPath,
+          kind: "kickoffAnchorPromoted",
+          type: "directory",
+          existed: true,
+          reason: "a promoted kickoff anchor carries the supersession marker naming its successor; it is a provenance record, not litter from a failed attempt, so a reset preserves it",
+        });
+      } else {
+        remove.push({ path: anchorPath, kind: "kickoffAnchor", type: "directory", existed: true });
+      }
     }
   }
 

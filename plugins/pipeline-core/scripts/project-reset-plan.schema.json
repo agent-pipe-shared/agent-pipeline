@@ -18,7 +18,7 @@
         "required": ["path", "kind", "type", "existed"],
         "properties": {
           "path": { "type": "string" },
-          "kind": { "type": "string", "enum": ["manifest", "state", "calibration", "guardConfig", "guardAudit", "handover", "privateState", "runtimeOwnedKeys", "runtimeSeededFile"] },
+          "kind": { "type": "string", "enum": ["manifest", "state", "calibration", "guardConfig", "guardAudit", "handover", "privateState", "runtimeOwnedKeys", "runtimeSeededFile", "kickoffAnchor"] },
           "type": { "type": "string", "enum": ["file", "directory", "keys"] },
           "existed": { "type": "boolean" },
           "ownedKeys": { "type": "array", "items": { "type": "string" } }
@@ -33,7 +33,7 @@
         "required": ["path", "kind", "type", "existed", "reason"],
         "properties": {
           "path": { "type": "string" },
-          "kind": { "type": "string", "enum": ["manifest", "state", "calibration", "guardConfig", "guardAudit", "privateState", "runtimePreserveOnly"] },
+          "kind": { "type": "string", "enum": ["manifest", "state", "calibration", "guardConfig", "guardAudit", "privateState", "runtimePreserveOnly", "kickoffAnchorPromoted"] },
           "type": { "type": "string", "enum": ["file", "directory"] },
           "existed": { "type": "boolean" },
           "reason": { "type": "string" }

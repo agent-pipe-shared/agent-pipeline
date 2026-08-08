@@ -27,7 +27,12 @@ import {
   planProjectReset,
 } from "./project-reset.mjs";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
-import { applyOnboardingKickoff, planOnboardingKickoff } from "../lib/onboarding-continuity.mjs";
+import {
+  applyOnboardingKickoff,
+  applyOnboardingKickoffPromotion,
+  planOnboardingKickoff,
+  planOnboardingKickoffPromotion,
+} from "../lib/onboarding-continuity.mjs";
 
 const SCHEMA = JSON.parse(readFileSync(new URL("./project-reset-plan.schema.json", import.meta.url), "utf8"));
 
@@ -67,6 +72,45 @@ function kickoffFixture(name, options = {}) {
   const root = freshProject(name, options);
   const plan = planOnboardingKickoff({ rootDir: root, goal: "Fixture goal for the reset planner" });
   applyOnboardingKickoff({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  return root;
+}
+
+/**
+ * A kickoff whose anchor has been PROMOTED -- carries the real supersession
+ * marker a promotion transaction writes (onboarding-continuity.mjs:4353),
+ * naming a real successor package. Request shape mirrors the minimal
+ * `promotionSeed` fixture in onboarding-continuity.test.mjs:952 (profile
+ * "feature", no `runner` -- unneeded for a fresh, non-legacy-continuity
+ * promotion).
+ */
+function promotedKickoffFixture(name, options = {}) {
+  const root = freshProject(name, options);
+  const kickoff = planOnboardingKickoff({ rootDir: root, goal: `Promote ${name}` });
+  applyOnboardingKickoff({ plan: kickoff, expectedPlanSha256: kickoff.planSha256, activate: true });
+  const directory = join(root, "specs", "promoted");
+  mkdirSync(directory, { recursive: true });
+  const specBytes = `# ${name} specification\n`;
+  writeFileSync(join(directory, "spec.md"), specBytes);
+  writeFileSync(join(directory, "prd_promoted.md"), [
+    "<!-- po-language: en -->",
+    `<!-- technical-spec-sha256: ${createHash("sha256").update(specBytes).digest("hex")} -->`,
+    `# ${name} PRD`,
+    "",
+  ].join("\n"));
+  writeFileSync(join(directory, "design-input.md"), `# ${name} design input\n`);
+  const promotion = planOnboardingKickoffPromotion({
+    rootDir: root,
+    profile: "feature",
+    featureId: `feature-${name}`,
+    planPath: "specs/promoted/prd_promoted.md",
+    prdPath: "specs/promoted/prd_promoted.md",
+    specPath: "specs/promoted/spec.md",
+    designInputPath: "specs/promoted/design-input.md",
+  });
+  const applied = applyOnboardingKickoffPromotion({
+    plan: promotion, expectedPlanSha256: promotion.planSha256, activate: true,
+  });
+  assert.equal(applied.status, "applied");
   return root;
 }
 
@@ -160,17 +204,26 @@ test("AC-2: a configured calibration.handover is removed; the default docs/state
   });
 });
 
-test("AC-3: remove never contains a directory the Pipeline merely writes into, only the seeded file", () => {
+test("AC-3: remove never contains a directory the Pipeline merely writes into, only the seeded file or a Pipeline-created anchor", () => {
+  // R3: `kickoffFixture` seeds a genuine, UNPROMOTED kickoff anchor, so
+  // `specs/kickoff-<hash>` is now legitimately a `remove` entry -- the exact
+  // behaviour change this dispatch's AC-3 requires. `specs` (the directory
+  // itself, wholesale) must still never appear.
   withFixture(kickoffFixture("docs-specs-guard"), (root) => {
     const plan = planProjectReset({ rootDir: root });
     const paths = plan.remove.map((entry) => entry.path);
     assert.equal(paths.includes("docs"), false);
     assert.equal(paths.includes("docs/"), false);
     assert.equal(paths.includes("specs"), false);
-    assert.equal(plan.remove.some((entry) => entry.path.startsWith("specs/")), false);
+    assert.equal(paths.includes("specs/"), false);
     assert.equal(plan.remove.some((entry) => entry.path === "docs/state.md"), true);
     for (const entry of plan.remove) {
-      if (entry.type === "directory") assert.equal(entry.path, ".git/agent-pipeline", "the only directory remove entry is the Pipeline's own wholesale private state");
+      if (entry.type === "directory") {
+        assert.ok(
+          entry.path === ".git/agent-pipeline" || entry.kind === "kickoffAnchor",
+          "the only directory remove entries are the Pipeline's own wholesale private state and a provisional kickoff anchor",
+        );
+      }
     }
   });
 });
@@ -181,6 +234,135 @@ test("AC-1: neverTouched names git history, adopter files, and specs/ as a desig
     assert.deepEqual(plan.neverTouched.map((entry) => entry.category), ["git-history", "adopter-files", "design-package"]);
     const designPackage = plan.neverTouched.find((entry) => entry.category === "design-package");
     assert.match(designPackage.description, /specs\//);
+  });
+});
+
+test("R3 AC-3: the design-package neverTouched entry states plainly that a provisional kickoff anchor is not a design package", () => {
+  withFixture(kickoffFixture("anchor-vs-design-package"), (root) => {
+    const plan = planProjectReset({ rootDir: root });
+    const designPackage = plan.neverTouched.find((entry) => entry.category === "design-package");
+    assert.match(designPackage.description, /provisional kickoff anchor/);
+    assert.match(designPackage.description, /not a design package/);
+    // Behaviour matches the claim: the fixture's own (unpromoted) kickoff
+    // anchor is classified elsewhere -- a remove entry, never something the
+    // "design-package" category describes as untouched.
+    const anchorEntry = plan.remove.find((entry) => entry.kind === "kickoffAnchor");
+    assert.ok(anchorEntry, "expected the fixture's own kickoff anchor to be a remove entry, not folded into design-package");
+  });
+});
+
+test("R3 AC-1: a provisional kickoff anchor is a shape-derived directory remove entry, never a startsWith string test", () => {
+  withFixture(kickoffFixture("anchor-shape"), (root) => {
+    const plan = planProjectReset({ rootDir: root });
+    const anchorEntries = plan.remove.filter((entry) => entry.kind === "kickoffAnchor");
+    assert.equal(anchorEntries.length, 1);
+    assert.equal(anchorEntries[0].type, "directory");
+    assert.match(anchorEntries[0].path, /^specs\/kickoff-[a-f0-9]{16}$/u);
+    assert.equal(anchorEntries[0].existed, true);
+  });
+  // A directory whose name merely starts with "kickoff-" but does not match
+  // the exact 16-lowercase-hex shape must never be classified as an anchor --
+  // proves the check is shape-derived, not startsWith("specs/kickoff-").
+  withFixture(freshProject("anchor-lookalike", { tier: "neutral" }), (root) => {
+    mkdirSync(join(root, "specs", "kickoff-notes-from-the-workshop"), { recursive: true });
+    writeFileSync(join(root, "specs", "kickoff-notes-from-the-workshop", "notes.md"), "# notes\n");
+    const plan = planProjectReset({ rootDir: root });
+    assert.equal(plan.remove.some((entry) => entry.kind === "kickoffAnchor"), false);
+    assert.equal(plan.remove.some((entry) => entry.path.startsWith("specs/kickoff-")), false);
+    assert.equal(plan.keep.some((entry) => entry.path.startsWith("specs/kickoff-")), false);
+  });
+});
+
+test("R3 AC-2: an adopter's design package, and a plausible non-anchor specs/kickoff-* directory, are never touched", () => {
+  // Legacy tier: as R2D's own comment above notes, only the neutral tier
+  // (without a legacy compat copy) produces a `keys`-type remove entry that
+  // `apply` refuses outright -- irrelevant to what this test exercises.
+  withFixture(kickoffFixture("adopter-design-package", { tier: "legacy" }), (root) => {
+    const realTopicDir = join(root, "specs", "2026-08-08_real-topic");
+    mkdirSync(realTopicDir, { recursive: true });
+    writeFileSync(join(realTopicDir, "prd.md"), "# Real topic PRD\n");
+    writeFileSync(join(realTopicDir, "spec.md"), "# Real topic spec\n");
+    const ideasDir = join(root, "specs", "kickoff-ideas");
+    mkdirSync(ideasDir, { recursive: true });
+    writeFileSync(join(ideasDir, "notes.md"), "# workshop ideas, not a Pipeline anchor\n");
+    const plan = planProjectReset({ rootDir: root });
+    assert.equal(plan.status, "ready");
+    const anchorEntry = plan.remove.find((entry) => entry.kind === "kickoffAnchor");
+    assert.ok(anchorEntry, "expected the fixture's own real anchor to still be classified for removal");
+    for (const prefix of ["specs/2026-08-08_real-topic", "specs/kickoff-ideas"]) {
+      assert.equal(
+        plan.remove.some((entry) => entry.path === prefix || entry.path.startsWith(`${prefix}/`)),
+        false,
+        `${prefix} must never be a remove entry`,
+      );
+      assert.equal(
+        plan.keep.some((entry) => entry.path === prefix || entry.path.startsWith(`${prefix}/`)),
+        false,
+        `${prefix} must never be enumerated in keep either -- it is categorically covered by the design-package neverTouched entry, never listed by path`,
+      );
+    }
+    const before = inventory(root);
+    const result = applyProjectReset({ rootDir: root, expectedPlanSha256: plan.planSha256 });
+    assert.equal(result.status, "applied");
+    const after = inventory(root);
+    for (const prefix of ["specs/2026-08-08_real-topic", "specs/kickoff-ideas"]) {
+      assert.deepEqual(linesFor(after, prefix), linesFor(before, prefix), `expected ${prefix} untouched`);
+    }
+    // The fixture's own (unpromoted) anchor IS gone -- proving the two paths
+    // above survived on their own merits, not because apply skipped all of
+    // specs/.
+    assert.equal(existsSync(join(root, anchorEntry.path)), false);
+  });
+});
+
+test("R3 AC-4: a promoted kickoff anchor -- one already carrying the supersession marker -- is kept, not removed", () => {
+  withFixture(promotedKickoffFixture("promoted-anchor"), (root) => {
+    const plan = planProjectReset({ rootDir: root });
+    assert.equal(plan.status, "ready");
+    const promotedEntry = plan.keep.find((entry) => entry.kind === "kickoffAnchorPromoted");
+    assert.ok(promotedEntry, "expected the promoted anchor to be a keep entry");
+    assert.match(promotedEntry.path, /^specs\/kickoff-[a-f0-9]{16}$/u);
+    assert.equal(promotedEntry.type, "directory");
+    assert.equal(promotedEntry.existed, true);
+    assert.equal(typeof promotedEntry.reason, "string");
+    assert.equal(plan.remove.some((entry) => entry.kind === "kickoffAnchor"), false);
+    assert.equal(plan.remove.some((entry) => entry.path === promotedEntry.path), false);
+    const before = inventory(root);
+    const result = applyProjectReset({ rootDir: root, expectedPlanSha256: plan.planSha256 });
+    assert.equal(result.status, "applied");
+    const after = inventory(root);
+    assert.deepEqual(
+      linesFor(after, promotedEntry.path),
+      linesFor(before, promotedEntry.path),
+      "the promoted anchor must survive apply byte for byte",
+    );
+  });
+});
+
+test("R3 AC-5: several attempted kickoffs leave several anchors -- all are planned and removed", () => {
+  // Legacy tier, for the same reason as the AC-2 test above.
+  withFixture(freshProject("several-anchors", { tier: "legacy" }), (root) => {
+    const names = ["first attempt", "second attempt", "third attempt"].map(
+      (label) => `kickoff-${createHash("sha256").update(label).digest("hex").slice(0, 16)}`,
+    );
+    for (const name of names) {
+      const dir = join(root, "specs", name);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, `prd_${name}.md`), `# ${name} PRD\n`);
+      writeFileSync(join(dir, "spec.md"), `# ${name} spec\n`);
+    }
+    const plan = planProjectReset({ rootDir: root });
+    assert.equal(plan.status, "ready");
+    const anchorEntries = plan.remove.filter((entry) => entry.kind === "kickoffAnchor");
+    assert.equal(anchorEntries.length, 3);
+    assert.deepEqual(anchorEntries.map((entry) => entry.path).sort(), names.map((name) => `specs/${name}`).sort());
+    for (const entry of anchorEntries) {
+      assert.equal(entry.type, "directory");
+      assert.equal(entry.existed, true);
+    }
+    const result = applyProjectReset({ rootDir: root, expectedPlanSha256: plan.planSha256 });
+    assert.equal(result.status, "applied");
+    for (const name of names) assert.equal(existsSync(join(root, "specs", name)), false);
   });
 });
 
@@ -497,22 +679,34 @@ test("R2D AC-3: keep and neverTouched entries are byte-identical after a success
   // set, so neither survives to the runtime loop as a `keys` entry (see the
   // "AC-4: the collision paths are claimed..." test above) -- an apply that
   // hit a keys refusal would never reach the move phase this test exercises.
+  //
+  // R3: `kickoffFixture` also seeds a genuine, UNPROMOTED anchor under
+  // specs/, which IS now removed by design -- so "specs" as a whole is no
+  // longer an untouched prefix; an adopter's own subdirectory under specs/
+  // (not seeded by the Pipeline) is what must survive, and it is asserted
+  // here alongside the anchor's actual removal.
   withFixture(kickoffFixture("apply-keep-untouched", { tier: "neutral" }), (root) => {
     mkdirSync(join(root, ".claude"), { recursive: true });
     writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.project.v1\n");
     writeFileSync(join(root, ".claude", "pipeline.json"), "{}\n");
     mkdirSync(join(root, "src"), { recursive: true });
     writeFileSync(join(root, "src", "adopter.txt"), "adopter content\n");
+    const adopterSpecsDir = join(root, "specs", "2026-08-08_real-topic");
+    mkdirSync(adopterSpecsDir, { recursive: true });
+    writeFileSync(join(adopterSpecsDir, "prd.md"), "# Real topic PRD\n");
     const plan = planProjectReset({ rootDir: root });
     assert.equal(plan.status, "ready");
     assert.equal(plan.remove.some((entry) => entry.type === "keys"), false, "both collision paths must be claimed as keep, not keys");
+    const anchorEntry = plan.remove.find((entry) => entry.kind === "kickoffAnchor");
+    assert.ok(anchorEntry, "expected the fixture's own unpromoted anchor to be a remove entry");
     const before = inventory(root);
     const result = applyProjectReset({ rootDir: root, expectedPlanSha256: plan.planSha256 });
     assert.equal(result.status, "applied");
     const after = inventory(root);
-    for (const prefix of ["specs", "src", ".claude/pipeline.yaml", ".claude/pipeline.json"]) {
+    for (const prefix of ["specs/2026-08-08_real-topic", "src", ".claude/pipeline.yaml", ".claude/pipeline.json"]) {
       assert.deepEqual(linesFor(after, prefix), linesFor(before, prefix), `expected ${prefix} untouched`);
     }
+    assert.equal(existsSync(join(root, anchorEntry.path)), false, "the unpromoted anchor must be gone after apply");
   });
 });
 
