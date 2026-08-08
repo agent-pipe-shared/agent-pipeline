@@ -117,9 +117,30 @@ worth more with that check than without it, because the class regenerates.
 - `2026-08-07-push-release-flow-unusable-for-third-party-adopters.md`
 - `docs/adr/0056-push-approval-mode.md`
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted. For the third class specifically — the scripts a
+  shipped skill names but a consumer cannot have — the PO decided **ship them**,
+  not scope the instruction, for all three: `usage-ledger.mjs`,
+  `model-prices.json` and `security-scan.mjs` move under
+  `plugins/pipeline-core/`, and every shipped skill's command and
+  `allowed-tools:` entry follows.
+- **Rationale (the PO's, recorded because it decides more than this item):** two
+  reasons, and the second is the load-bearing one. First, moving them into the
+  plugin does not merely make the shipped instruction true — it also puts them
+  under the plugin's own change protection, which `harness/` does not have.
+  Second, and deliberately: **a security baseline is something every agent repo
+  should get.** Shipping `security-scan.mjs` is therefore not scope creep into a
+  consumer's business, it is the intended product — a floor the consumer extends,
+  not a ceiling this repository keeps to itself. That reframes the "or scope the
+  instruction" option above as the wrong answer rather than the cheaper one.
+- **Consequence to design for, not discovered later:** `security-scan.mjs` pulls
+  the adapter chain (`gitleaks`, `osv-scanner`, `semgrep`, `license-check`) and
+  those adapters shell out to external tools a consumer may not have installed.
+  A shipped baseline must degrade to a named, typed "adapter unavailable" rather
+  than to a failed gate — otherwise shipping it converts a missing script into a
+  blocked consumer, which is the same defect wearing the opposite sign.
+- **Assignment (if accepted):** GF-057 successor block; sequenced after the reset
+  packages (R2/R3), because those own the deadlock class and this one owns a
+  consumer-completeness class.
+- **Date:** 2026-08-08
