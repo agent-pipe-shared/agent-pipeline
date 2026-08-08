@@ -329,6 +329,7 @@ import {
   validatePortablePipelineState,
 } from "../lib/project-authority.mjs";
 import { observeGitSource } from "../lib/source-observation.mjs";
+import { createAuthorityRevisionIntent } from "../lib/authority-revision-proof.mjs";
 import { discoverRepository, inspectSessionClosure } from "../lib/worktree-lifecycle.mjs";
 import {
   PUBLICATION_AUTHORITY_REFERENCE_SCHEMA,
@@ -3108,6 +3109,428 @@ function runResultCaseMigrationCommand(sub, rest, deps) {
   } finally { releaseContinuityLock(lock); }
 }
 
+// ---- PHX-0B: continuity-authority PRD/Spec revision writer (Phoenix §7) ----
+/**
+ * `continuity-authority-revision-plan` / `-apply` / `-recover`.
+ *
+ * A scoped human design-revision decision replaces the active feature's PRD/Spec
+ * authority bytes recorded at `continuity.authority.{prd,spec}` -- the same pair every
+ * other continuity writer treats as immutable once initialized. `-plan` derives ONE
+ * closed read-only request via `createAuthorityRevisionIntent` (../lib/authority-
+ * revision-proof.mjs) and writes no State. `-apply` re-derives the identical request
+ * fresh from CURRENT reality (closing the TOCTOU gap a planner leaves open), consumes
+ * the caller-injected `authorityRevisionApproval` proof result rather than verifying a
+ * signature itself, and commits the postimage as a transaction: a private, HMAC-
+ * authenticated recovery journal (mirroring `feature-package-apply`'s git-common-dir
+ * journal) is published BEFORE the State bytes are touched and retained -- never
+ * deleted -- on every failure path; only a confirmed post-write readback retires it.
+ * `-recover` never re-derives the plan and never re-reads a git candidate -- it replays
+ * only the exact frozen postimage bytes the journal already carries, or confirms the
+ * exact retained preimage, after a fresh byte-identical reread of the CURRENT State
+ * file (never a temporary file).
+ *
+ * The plan's own stdout document IS the `--request-file` `-apply` consumes: it embeds
+ * the fixed `postimage.updatedAt` the plan used, so apply never calls the clock again
+ * for the postimage it writes -- only for the (separately, freshly re-checked) expiry.
+ */
+const AUTHORITY_REVISION_SUBCOMMANDS = new Set([
+  "continuity-authority-revision-plan",
+  "continuity-authority-revision-apply",
+  "continuity-authority-revision-recover",
+]);
+const AUTHORITY_REVISION_REQUEST_INPUT_SCHEMA = "pipeline.continuity-authority-revision-request.v1";
+const AUTHORITY_REVISION_PLAN_SCHEMA = "pipeline.continuity-authority-revision-plan.v1";
+const AUTHORITY_REVISION_APPLY_SCHEMA = "pipeline.continuity-authority-revision-apply.v1";
+const AUTHORITY_REVISION_RECOVER_SCHEMA = "pipeline.continuity-authority-revision-recover.v1";
+const AUTHORITY_REVISION_RECEIPT_SCHEMA = "pipeline.continuity-authority-revision-receipt.v1";
+const AUTHORITY_REVISION_JOURNAL_SCHEMA = "pipeline.continuity-authority-revision-journal.v1";
+// Must match phoenix-authority-approval.mjs's `approval` object schema and key order
+// EXACTLY: `deps.authorityRevisionApproval` performs a strict JSON.stringify comparison.
+const AUTHORITY_REVISION_APPROVAL_SCHEMA = "pipeline.continuity-authority-revision-approval.v1";
+const AUTHORITY_REVISION_PRD_PATH_RE = /^specs\/[A-Za-z0-9._:-]+\/prd_[A-Za-z0-9._:-]+\.md$/u;
+
+function readAuthorityRevisionFile(dir, relativePath) {
+  const path = safeRequestFile(dir, relativePath);
+  if (path === null) return { ok: false, code: "AR-REQUEST-FILE" };
+  let raw;
+  try { raw = readFileSync(path); } catch { return { ok: false, code: "AR-REQUEST-FILE" }; }
+  let value;
+  try { value = JSON.parse(raw.toString("utf8")); } catch { return { ok: false, code: "AR-REQUEST-JSON" }; }
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return { ok: false, code: "AR-REQUEST-JSON" };
+  return { ok: true, raw, value };
+}
+
+/**
+ * Re-derivable from either a `--proposal-file` (plan) or the intent embedded in a
+ * previously-planned `--request-file` (apply): both are the same closed shape
+ * `createAuthorityRevisionIntent` accepts, and every check below re-reads reality
+ * fresh -- nothing here trusts a cached observation.
+ */
+function buildAuthorityRevisionPlan(dir, existing, proposal, updatedAt, deps = {}) {
+  if (existing.status !== "ok") return { ok: false, code: "AR-STATE-UNAVAILABLE" };
+  if (!canonicalIso(updatedAt)) return { ok: false, code: "AR-UPDATED-AT" };
+  const state = existing.state;
+  if (!state?.activeFeature || !state?.continuity || state.schema !== SCHEMA_ID || state.gateEstimate !== undefined) {
+    return { ok: false, code: "AR-NO-ACTIVE-FEATURE" };
+  }
+  let intent;
+  try { intent = createAuthorityRevisionIntent(proposal); } catch { return { ok: false, code: "AR-INTENT-INVALID" }; }
+  const value = intent.value;
+  const stateFile = physicalRebindFile(dir, stateRelativePath(dir));
+  if (stateFile === null || stateFile.sha256 !== sha256Bytes(existing.raw)) return { ok: false, code: "AR-STATE-IDENTITY" };
+  const continuity = state.continuity;
+  if (!validateContinuityState(continuity, state.activeFeature.id).ok || continuity.featureId !== state.activeFeature.id) {
+    return { ok: false, code: "AR-CONTINUITY-INVALID" };
+  }
+  if (continuity.queueHead?.dispatch !== null || continuity.blocker !== null || continuity.decisionTxn !== null
+    || continuity.closeTransition != null || continuity.recovery !== null || continuity.acknowledgedFinal !== null) {
+    return { ok: false, code: "AR-CONTINUITY-BUSY" };
+  }
+  if (state.activeFeature.id !== value.featureId) return { ok: false, code: "AR-FEATURE-MISMATCH" };
+  if (state.activeFeature.phase !== "design" || value.decision.scope.phase !== "design"
+    || value.decision.scope.featureId !== state.activeFeature.id) return { ok: false, code: "AR-DECISION-SCOPE" };
+  if (continuity.revision !== value.expectedRevision || continuity.revision >= Number.MAX_SAFE_INTEGER) {
+    return { ok: false, code: "AR-REVISION-STALE" };
+  }
+  if (sha256Bytes(existing.raw) !== value.preStateSha256) return { ok: false, code: "AR-PRESTATE-STALE" };
+  const nowIso = (deps.now ?? (() => new Date().toISOString()))();
+  if (!(Date.parse(value.expiresAt) > Date.parse(nowIso))) return { ok: false, code: "AR-EXPIRED" };
+  const observedCandidate = (deps.gitCandidate ?? defaultGitCandidate)(dir);
+  if (!observedCandidate.ok || observedCandidate.commit !== value.candidate.commit || observedCandidate.tree !== value.candidate.tree) {
+    return { ok: false, code: "AR-CANDIDATE-STALE" };
+  }
+  if (continuity.authority.prd.path !== value.oldAuthority.prd.path || continuity.authority.prd.sha256 !== value.oldAuthority.prd.sha256
+    || continuity.authority.spec.path !== value.oldAuthority.spec.path || continuity.authority.spec.sha256 !== value.oldAuthority.spec.sha256) {
+    return { ok: false, code: "AR-OLD-AUTHORITY-STALE" };
+  }
+  if (!AUTHORITY_REVISION_PRD_PATH_RE.test(value.nextAuthority.prd.path)) return { ok: false, code: "AR-NEXT-PRD-PATH" };
+  if (value.nextAuthority.spec.path !== `${dirname(value.nextAuthority.prd.path).split(sep).join("/")}/spec.md`) {
+    return { ok: false, code: "AR-NEXT-SPEC-PATH" };
+  }
+  if (value.nextAuthority.prd.path === value.oldAuthority.prd.path && value.nextAuthority.prd.sha256 === value.oldAuthority.prd.sha256
+    && value.nextAuthority.spec.path === value.oldAuthority.spec.path && value.nextAuthority.spec.sha256 === value.oldAuthority.spec.sha256) {
+    return { ok: false, code: "AR-NO-CHANGE" };
+  }
+  const newPrd = physicalRebindFile(dir, value.nextAuthority.prd.path);
+  const newSpec = physicalRebindFile(dir, value.nextAuthority.spec.path);
+  if (newPrd === null || newSpec === null || newPrd.sha256 !== value.nextAuthority.prd.sha256 || newSpec.sha256 !== value.nextAuthority.spec.sha256) {
+    return { ok: false, code: "AR-NEXT-AUTHORITY-STALE" };
+  }
+  let newPrdText;
+  try { newPrdText = new TextDecoder("utf-8", { fatal: true }).decode(newPrd.bytes); } catch { return { ok: false, code: "AR-NEXT-PRD-TEXT" }; }
+  const marker = rebindMarker(newPrdText);
+  if (marker === null || marker.digest !== newSpec.sha256) return { ok: false, code: "AR-NEXT-PRD-MARKER" };
+
+  const nextState = structuredClone(state);
+  nextState.continuity.revision += 1;
+  nextState.continuity.authority = {
+    ...nextState.continuity.authority,
+    prd: { path: value.nextAuthority.prd.path, sha256: value.nextAuthority.prd.sha256 },
+    spec: { path: value.nextAuthority.spec.path, sha256: value.nextAuthority.spec.sha256 },
+  };
+  nextState.continuity.resume = { ...nextState.continuity.resume, sourceRevision: nextState.continuity.revision };
+  nextState.updatedAt = updatedAt;
+  if (!validateContinuityState(nextState.continuity, state.activeFeature.id).ok) return { ok: false, code: "AR-POSTIMAGE-INVALID" };
+  const nextStateBytes = Buffer.from(`${JSON.stringify(nextState, null, 2)}\n`, "utf8");
+
+  // PX0-AC-05: a public-safe correlated receipt -- stable operation/reason classes,
+  // public path+digest references, decision/candidate/evidence references, a typed
+  // outcome. Deliberately excludes `dir`/`root`/any absolute path, any raw command,
+  // any prompt text, and any user/account or machine identifier.
+  const receipt = {
+    schema: AUTHORITY_REVISION_RECEIPT_SCHEMA,
+    operation: "continuity-authority-revision",
+    reasonClass: "design-authority-revision",
+    featureId: state.activeFeature.id,
+    oldAuthority: { prd: value.oldAuthority.prd, spec: value.oldAuthority.spec },
+    nextAuthority: { prd: value.nextAuthority.prd, spec: value.nextAuthority.spec },
+    decision: value.decision,
+    candidate: value.candidate,
+    evidence: value.evidence,
+  };
+  const payload = {
+    schema: AUTHORITY_REVISION_PLAN_SCHEMA,
+    intent: value,
+    intentSha256: intent.sha256,
+    preimage: { revision: continuity.revision, stateSha256: sha256Bytes(existing.raw), authority: { prd: continuity.authority.prd, spec: continuity.authority.spec } },
+    postimage: {
+      revision: nextState.continuity.revision,
+      stateSha256: sha256Bytes(nextStateBytes),
+      authority: { prd: nextState.continuity.authority.prd, spec: nextState.continuity.authority.spec },
+      updatedAt,
+    },
+    receipt,
+  };
+  return { ok: true, payload, planSha256: sha256CanonicalJson(payload), intentSha256: intent.sha256, nextState, nextStateBytes, receipt };
+}
+
+function authorityRevisionPrivatePaths(dir, deps = {}) {
+  const common = (deps.gitCommonDir ?? defaultGitCommonDir)(dir);
+  if (!common?.ok || typeof common.path !== "string") return null;
+  try {
+    const root = realpathSync(common.path);
+    if (root !== resolve(common.path) || !lstatSync(root).isDirectory() || lstatSync(root).isSymbolicLink()) return null;
+    const namespace = join(root, "agent-pipeline");
+    const base = join(namespace, "continuity-authority-revision");
+    return { root, namespace, base, key: join(base, "key"), journal: join(base, "journal") };
+  } catch { return null; }
+}
+
+function loadAuthorityRevisionJournal(dir, deps = {}) {
+  const paths = authorityRevisionPrivatePaths(dir, deps);
+  if (paths === null || !observeBootstrapPrivateDirectory(paths)) return { ok: false, code: "AR-JOURNAL-GIT-COMMON-DIR" };
+  const key = readPrivateBootstrap(paths.key);
+  const raw = readPrivateBootstrap(paths.journal);
+  if (raw === null) return { ok: true, journal: null, paths, key };
+  if (key === null || key.byteLength !== 32) return { ok: false, code: "AR-JOURNAL" };
+  try {
+    const value = JSON.parse(raw.toString("utf8"));
+    const keys = ["schema", "intentSha256", "planSha256", "preStateSha256", "postStateSha256", "postStateBase64", "receipt", "mac"];
+    if (!exactObjectKeys(value, keys)
+      || value.schema !== AUTHORITY_REVISION_JOURNAL_SCHEMA
+      || !SHA256_RE.test(value.intentSha256)
+      || !SHA256_RE.test(value.planSha256)
+      || !SHA256_RE.test(value.preStateSha256)
+      || !SHA256_RE.test(value.postStateSha256)
+      || typeof value.postStateBase64 !== "string"
+      || value.receipt === null || typeof value.receipt !== "object" || Array.isArray(value.receipt)
+      || !SHA256_RE.test(value.mac)) return { ok: false, code: "AR-JOURNAL" };
+    const { mac, ...core } = value;
+    if (bootstrapJournalMac(key, core) !== mac) return { ok: false, code: "AR-JOURNAL" };
+    return { ok: true, journal: value, paths, key };
+  } catch { return { ok: false, code: "AR-JOURNAL" }; }
+}
+
+/** Publishes the journal BEFORE any State byte is touched. `wx`-only: never overwrites a pending one. */
+function publishAuthorityRevisionJournal(dir, record, deps = {}) {
+  const paths = authorityRevisionPrivatePaths(dir, deps);
+  if (!ensureBootstrapPrivateDirectory(paths)) return false;
+  let key = readPrivateBootstrap(paths.key);
+  if (key === null) { key = randomBytes(32); if (!writePrivateBootstrap(paths.key, key)) return false; }
+  if (key.byteLength !== 32) return false;
+  const core = {
+    schema: AUTHORITY_REVISION_JOURNAL_SCHEMA,
+    intentSha256: record.intentSha256,
+    planSha256: record.planSha256,
+    preStateSha256: record.preStateSha256,
+    postStateSha256: record.postStateSha256,
+    postStateBase64: record.postStateBytes.toString("base64"),
+    receipt: record.receipt,
+  };
+  const bytes = Buffer.from(`${JSON.stringify({ ...core, mac: bootstrapJournalMac(key, core) })}\n`, "utf8");
+  return writePrivateBootstrap(paths.journal, bytes, false);
+}
+
+/** Retires the journal. Only ever called after a confirmed, matching postimage readback. */
+function retireAuthorityRevisionJournal(paths) {
+  try { return ensureBootstrapPrivateDirectory(paths) && (unlinkSync(paths.journal), syncDirectory(paths.base).ok); } catch { return false; }
+}
+
+function parseAuthorityRevisionApplyFlags(rest) {
+  const parsed = parseExactFlags(rest, new Set(["request-file", "request-sha256", "lock-token"]));
+  if (!parsed.ok || !SHA256_RE.test(parsed.value["request-sha256"])) return null;
+  return { requestFile: parsed.value["request-file"], requestSha256: parsed.value["request-sha256"], lockToken: parsed.value["lock-token"] };
+}
+
+function runAuthorityRevisionPlanCommand(dir, rest, deps) {
+  const parsed = parseExactFlags(rest, new Set(["proposal-file"]));
+  if (!parsed.ok) { console.error("Error: continuity-authority-revision-plan requires exactly --proposal-file <repo-relative-json>."); return 2; }
+  const read = readAuthorityRevisionFile(dir, parsed.value["proposal-file"]);
+  if (!read.ok) { console.error(`Error: continuity-authority-revision-plan refused (${read.code}); zero mutation.`); return 2; }
+  const updatedAt = deps.now();
+  const built = buildAuthorityRevisionPlan(dir, readStateRaw(dir), read.value, updatedAt, deps);
+  if (!built.ok) { console.error(`Error: continuity-authority-revision-plan refused (${built.code}); zero mutation.`); return 2; }
+  console.log(JSON.stringify({ ...built.payload, planSha256: built.planSha256 }, null, 2));
+  return 0;
+}
+
+function authorityRevisionRequestDocValid(requestDoc) {
+  return requestDoc?.schema === AUTHORITY_REVISION_PLAN_SCHEMA
+    && requestDoc.intent && typeof requestDoc.intent === "object" && !Array.isArray(requestDoc.intent)
+    && typeof requestDoc.intentSha256 === "string" && SHA256_RE.test(requestDoc.intentSha256)
+    && typeof requestDoc.planSha256 === "string" && SHA256_RE.test(requestDoc.planSha256)
+    && requestDoc.postimage && typeof requestDoc.postimage.updatedAt === "string"
+    && requestDoc.receipt && typeof requestDoc.receipt === "object" && !Array.isArray(requestDoc.receipt);
+}
+
+function runAuthorityRevisionApplyCommand(dir, rest, deps) {
+  const parsed = parseAuthorityRevisionApplyFlags(rest);
+  if (parsed === null) {
+    console.error("Error: continuity-authority-revision-apply requires exactly --request-file <repo-relative-json> --request-sha256 <sha256> --lock-token <token>.");
+    return 2;
+  }
+  const readRaw = readAuthorityRevisionFile(dir, parsed.requestFile);
+  if (!readRaw.ok) { console.error(`Error: continuity-authority-revision-apply refused (${readRaw.code}); zero mutation.`); return 2; }
+  if (sha256Bytes(readRaw.raw) !== parsed.requestSha256) { console.error("Error: continuity-authority-revision-apply refused (AR-REQUEST-DIGEST-MISMATCH); zero mutation."); return 2; }
+  const requestDoc = readRaw.value;
+  if (!authorityRevisionRequestDocValid(requestDoc)) { console.error("Error: continuity-authority-revision-apply refused (AR-REQUEST-SHAPE); zero mutation."); return 2; }
+  const intentValue = requestDoc.intent;
+
+  if (typeof deps.authorityRevisionApproval !== "function") {
+    console.error("Error: continuity-authority-revision-apply refused (AR-APPROVAL-UNAVAILABLE); zero mutation.");
+    return 2;
+  }
+  const approvalCheck = deps.authorityRevisionApproval({
+    repoRoot: dir,
+    schema: AUTHORITY_REVISION_APPROVAL_SCHEMA,
+    featureId: intentValue.featureId,
+    phase: intentValue.decision?.scope?.phase,
+    oldAuthority: intentValue.oldAuthority,
+    nextAuthority: intentValue.nextAuthority,
+    decision: intentValue.decision,
+    candidate: intentValue.candidate,
+    evidence: intentValue.evidence,
+    expiresAt: intentValue.expiresAt,
+  });
+  if (!approvalCheck?.ok) { console.error("Error: continuity-authority-revision-apply refused (AR-PROOF-REJECTED); zero mutation."); return 2; }
+
+  const lock = acquireContinuityLock(dir, parsed.lockToken, deps);
+  if (!lock.ok) { console.error(`Error: continuity-authority-revision-apply refused (${lock.code}); zero mutation.`); return 2; }
+  try {
+    const current = readStateRaw(dir);
+    if (current.status !== "ok") { console.error("Error: continuity-authority-revision-apply refused (AR-STATE-UNAVAILABLE); zero mutation."); return 2; }
+
+    // PX0-AC-07: the exact same completed request, replayed -- verified zero-write.
+    if (sha256Bytes(current.raw) === requestDoc.postimage.stateSha256) {
+      if (current.state?.activeFeature?.id !== intentValue.featureId
+        || current.state?.continuity?.revision !== requestDoc.postimage.revision
+        || !sameJson(current.state?.continuity?.authority?.prd, requestDoc.postimage.authority?.prd)
+        || !sameJson(current.state?.continuity?.authority?.spec, requestDoc.postimage.authority?.spec)) {
+        console.error("Error: continuity-authority-revision-apply refused (AR-REPLAY-POSTIMAGE-INVALID); zero mutation.");
+        return 2;
+      }
+      console.log(JSON.stringify({ schema: AUTHORITY_REVISION_APPLY_SCHEMA, status: "replayed", mutated: false, featureId: intentValue.featureId, revision: current.state.continuity.revision, receipt: requestDoc.receipt }, null, 2));
+      return 0;
+    }
+
+    const pending = loadAuthorityRevisionJournal(dir, deps);
+    if (!pending.ok) { console.error(`Error: continuity-authority-revision-apply refused (${pending.code}); run continuity-authority-revision-recover.`); return 2; }
+    if (pending.journal !== null) {
+      console.error(pending.journal.intentSha256 === requestDoc.intentSha256
+        ? "Error: continuity-authority-revision-apply refused (AR-JOURNAL-PENDING); a recovery journal is already retained for this exact revision; run continuity-authority-revision-recover before retrying. Zero new mutation; recovery journal retained."
+        : "Error: continuity-authority-revision-apply refused (AR-JOURNAL-CONFLICT); a different revision is already pending; run continuity-authority-revision-recover before retrying. Zero new mutation; recovery journal retained.");
+      return 2;
+    }
+
+    // Fresh -- closes the TOCTOU window a planner leaves open: re-derive against
+    // CURRENT reality using the SAME `updatedAt` the plan fixed, never a fresh clock.
+    const proposal = { ...intentValue, schema: AUTHORITY_REVISION_REQUEST_INPUT_SCHEMA };
+    const rebuilt = buildAuthorityRevisionPlan(dir, current, proposal, requestDoc.postimage.updatedAt, deps);
+    if (!rebuilt.ok || rebuilt.planSha256 !== requestDoc.planSha256 || rebuilt.intentSha256 !== requestDoc.intentSha256) {
+      console.error(`Error: continuity-authority-revision-apply refused (${rebuilt.ok ? "AR-REQUEST-STALE" : rebuilt.code}); zero mutation.`);
+      return 2;
+    }
+
+    const published = publishAuthorityRevisionJournal(dir, {
+      intentSha256: rebuilt.intentSha256, planSha256: rebuilt.planSha256,
+      preStateSha256: sha256Bytes(current.raw), postStateSha256: sha256Bytes(rebuilt.nextStateBytes),
+      postStateBytes: rebuilt.nextStateBytes, receipt: rebuilt.receipt,
+    }, deps);
+    if (!published) { console.error("Error: continuity-authority-revision-apply refused (AR-JOURNAL-PREPARE-FAILED); zero mutation."); return 2; }
+    if (deps.afterAuthorityRevisionJournal?.() === false) {
+      console.error("Error: continuity-authority-revision-apply interrupted after journal preparation; recovery journal retained.");
+      return 2;
+    }
+
+    const written = atomicWriteContinuityState(dir, rebuilt.nextState, lock, deps);
+    if (!written.ok) { console.error(`Error: continuity-authority-revision-apply refused (${written.code}); recovery journal retained.`); return 2; }
+    if (deps.afterAuthorityRevisionWrite?.() === false) {
+      console.error("Error: continuity-authority-revision-apply interrupted after State write; recovery journal retained.");
+      return 2;
+    }
+
+    const persisted = readStateRaw(dir);
+    if (persisted.status !== "ok" || sha256Bytes(persisted.raw) !== sha256Bytes(rebuilt.nextStateBytes) || !sameJson(persisted.state, rebuilt.nextState)) {
+      console.error("Error: continuity-authority-revision-apply refused (AR-POSTIMAGE-READBACK); recovery journal retained.");
+      return 2;
+    }
+    const paths = authorityRevisionPrivatePaths(dir, deps);
+    if (!retireAuthorityRevisionJournal(paths)) {
+      console.error("Error: continuity-authority-revision-apply committed but journal retirement is unresolved; recovery journal retained.");
+      return 2;
+    }
+    console.log(JSON.stringify({ schema: AUTHORITY_REVISION_APPLY_SCHEMA, status: "applied", mutated: true, featureId: intentValue.featureId, revision: persisted.state.continuity.revision, receipt: rebuilt.receipt }, null, 2));
+    return 0;
+  } finally { releaseContinuityLock(lock); }
+}
+
+/**
+ * Never re-derives the plan and never re-reads a git candidate -- "must not select a
+ * new candidate". Never infers success from the presence/absence of a `.tmp.*` file --
+ * "must not infer success from a temporary file" -- it re-reads the CURRENT State file
+ * itself and compares its exact bytes to the two values the journal already froze.
+ */
+function runAuthorityRevisionRecoverCommand(dir, rest, deps) {
+  const parsed = parseExactFlags(rest, new Set(["lock-token"]));
+  if (!parsed.ok) { console.error("Error: continuity-authority-revision-recover requires exactly --lock-token <token>."); return 2; }
+  const lockToken = parsed.value["lock-token"];
+  const loaded = loadAuthorityRevisionJournal(dir, deps);
+  if (!loaded.ok) { console.error(`Error: continuity-authority-revision-recover refused (${loaded.code}); manual repository inspection is required.`); return 2; }
+  if (loaded.journal === null) {
+    console.log(JSON.stringify({ schema: AUTHORITY_REVISION_RECOVER_SCHEMA, status: "clean", retained: false }, null, 2));
+    return 0;
+  }
+  const journal = loaded.journal;
+  const observedBefore = readStateRaw(dir);
+  if (observedBefore.status !== "ok") { console.error("Error: continuity-authority-revision-recover refused (AR-STATE-UNAVAILABLE); recovery journal retained."); return 2; }
+  const observedSha256 = sha256Bytes(observedBefore.raw);
+
+  if (observedSha256 === journal.postStateSha256) {
+    // Durable stage already reached; only the journal retirement is outstanding.
+    const paths = authorityRevisionPrivatePaths(dir, deps);
+    if (!retireAuthorityRevisionJournal(paths)) {
+      console.error("Error: continuity-authority-revision-recover refused (AR-JOURNAL-RETIREMENT-UNRESOLVED); recovery journal retained.");
+      return 2;
+    }
+    console.log(JSON.stringify({ schema: AUTHORITY_REVISION_RECOVER_SCHEMA, status: "recovered-postimage", retained: false, mutated: false, receipt: journal.receipt }, null, 2));
+    return 0;
+  }
+
+  if (observedSha256 !== journal.preStateSha256) {
+    console.log(JSON.stringify({ schema: AUTHORITY_REVISION_RECOVER_SCHEMA, status: "diverged", retained: true }, null, 2));
+    return 2;
+  }
+
+  // Preimage confirmed byte-identical to the frozen journal's own preimage -- the ONLY
+  // fresh binding check recovery performs -- then replays the frozen postimage bytes
+  // exactly as journaled. No plan re-derivation, no new candidate.
+  const lock = acquireContinuityLock(dir, lockToken, deps);
+  if (!lock.ok) { console.error(`Error: continuity-authority-revision-recover refused (${lock.code}); recovery journal retained.`); return 2; }
+  try {
+    const recheck = readStateRaw(dir);
+    if (recheck.status !== "ok" || sha256Bytes(recheck.raw) !== journal.preStateSha256) {
+      console.error("Error: continuity-authority-revision-recover refused (AR-RECOVERY-PREIMAGE-DRIFT); recovery journal retained.");
+      return 2;
+    }
+    let postState;
+    try { postState = JSON.parse(Buffer.from(journal.postStateBase64, "base64").toString("utf8")); }
+    catch { console.error("Error: continuity-authority-revision-recover refused (AR-JOURNAL); recovery journal retained."); return 2; }
+    const written = atomicWriteContinuityState(dir, postState, lock, deps);
+    if (!written.ok) { console.error(`Error: continuity-authority-revision-recover refused (${written.code}); recovery journal retained.`); return 2; }
+    const persisted = readStateRaw(dir);
+    if (persisted.status !== "ok" || sha256Bytes(persisted.raw) !== journal.postStateSha256) {
+      console.error("Error: continuity-authority-revision-recover refused (AR-POSTIMAGE-READBACK); recovery journal retained.");
+      return 2;
+    }
+    const paths = authorityRevisionPrivatePaths(dir, deps);
+    if (!retireAuthorityRevisionJournal(paths)) {
+      console.error("Error: continuity-authority-revision-recover committed but journal retirement is unresolved; recovery journal retained.");
+      return 2;
+    }
+    console.log(JSON.stringify({ schema: AUTHORITY_REVISION_RECOVER_SCHEMA, status: "recovered-postimage", retained: false, mutated: true, receipt: journal.receipt }, null, 2));
+    return 0;
+  } finally { releaseContinuityLock(lock); }
+}
+
+function runAuthorityRevisionCommand(sub, rest, deps) {
+  const dir = deps.dir;
+  const now = deps.now ?? (() => new Date().toISOString());
+  const boundDeps = { ...deps, now };
+  if (sub === "continuity-authority-revision-plan") return runAuthorityRevisionPlanCommand(dir, rest, boundDeps);
+  if (sub === "continuity-authority-revision-recover") return runAuthorityRevisionRecoverCommand(dir, rest, boundDeps);
+  return runAuthorityRevisionApplyCommand(dir, rest, boundDeps);
+}
+
 // ---- Elephant-owned first Result-authority bootstrap (AC-047-143--148) ----
 
 function resultBootstrapPath(dir, prdPath) {
@@ -5135,6 +5558,9 @@ export function run(argv = process.argv.slice(2), deps = {}) {
   }
   if (sub === "continuity-result-case-migration-plan" || sub === "continuity-result-case-migration-apply") {
     return runResultCaseMigrationCommand(sub, rest, { ...deps, dir, now });
+  }
+  if (AUTHORITY_REVISION_SUBCOMMANDS.has(sub)) {
+    return runAuthorityRevisionCommand(sub, rest, { ...deps, dir, now, gitCandidate });
   }
   if (CONTINUITY_SUBCOMMANDS.has(sub)) return runContinuityCommand(sub, flags, { ...deps, dir, now });
   if (PUBLICATION_SUBCOMMANDS.has(sub)) return runPublicationCommand(sub, flags, { ...deps, dir, now });
