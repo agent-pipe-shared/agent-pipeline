@@ -119,6 +119,30 @@ class is now empty and the two frozen projections (`backlog/index.json`,
 `backlog/STATUS.md`) caught up. `check-backlog-state.mjs` still exits 2 on the 38
 pre-export events — unchanged, diagnosed, and owned by its own item.
 
+**R3.2's test suite landed** (`6f7bb86`, `5cfdee3`). Six cases, all green,
+including the export-set assertion AC-R1-1's second half requires; its
+registration is staged as Batch 14, so it shares the one TP-3 window instead of
+costing a second. Verified: `verify.mjs` still at `0ffe37c`, the checker's
+unregistered count moved 103 → 104, delta exactly one. AC-R1-7 and AC-R1-8 stay
+blocked on the protected-path edits by design.
+
+**A sequencing trap I nearly walked into, recorded because the rule generalizes.**
+I had the TP-3 window request prepared before checking what else needed TP-3.
+R3.2's registration would have arrived after the window closed and cost a fifth
+human command. **Count everything a gate protects before opening it, not after.**
+Same shape as the scoping error above: measure the property first, act second.
+
+**R2 failure 3 repaired** (`8d38135`, `315334d`): the 13 commit-bound gitleaks
+suppressions were residue — each already had a content-v1 counterpart — and the
+scan against the committed candidate is clean, measured rather than assumed.
+**In the course of verifying that, I found my own item was wrong**: it claimed
+every other assertion in that suite passed. The suite has always had two
+failures, now 127/128. The second is a contract disagreement — the assertion
+wants the scanner invoked with a relative source, the adapter passes an absolute
+one and normalizes afterwards — unconditional, unchanged since the run the item
+reports, and independent of this repair. No live matching defect; which side
+should move is left open in the item.
+
 **The next hard gate: four authorizations, and none of them is a hand edit.**
 One signed maintenance window over TP-3 (the 104 registration lines plus the two
 in-window demonstrations), two HGO overrides for the GS-class configuration rows,
