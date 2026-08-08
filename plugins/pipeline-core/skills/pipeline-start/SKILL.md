@@ -176,6 +176,9 @@ repair, or hash-rebinding cascade solely because a new design package was
 created. After promotion, a material change to a bound PRD/Spec follows the
 ordinary reviewed planning/rebind path; it is not a document cleanup.
 
+`prd_short-topic.md` must carry `<!-- po-language: (de|en) -->` and
+`<!-- technical-spec-sha256: <sha256-of-spec.md> -->`.
+
 `design-input.md` is source evidence, not an unbounded conversation dump. It
 records a faithful, sanitised structured extraction of the material input
 (context, goals/non-goals, requested behaviour, constraints, risks, open
