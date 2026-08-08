@@ -64,4 +64,15 @@ assert.match(closeBlock, /Hard entry gate — never close a normal restart/u);
 assert.match(closeBlock, /CLOSE-INTENT-REQUIRED/u);
 assert.match(closeBlock, /`durable-stop` or `runtime-transfer`/u);
 assert.match(closeBlock, /Do \*\*not\*\* invoke `close-block`, `close-feature`, `close-coordinator`, Verify/u);
+
+// SETUP-3: bootstrap questions (language, profile) come before any artifact
+// is written, and are shaped problem/options/cost/recommendation -- never a
+// bare setting name.
+assert.match(core, /Bootstrap questions are answered before any artifact is written/u);
+assert.match(core, /never\ninferred from the greeting, the repository's contents, or the runner's\nlocale/u);
+assert.match(core, /problem, options, cost, recommendation — never a bare setting name/u);
+assert.match(core, /Recommendation: match the language you would already write the PRD/u);
+assert.match(core, /Bind the answer into `<!-- po-language: \(de\|en\) -->` before drafting/u);
+assert.match(core, /Recommendation: `feature` unless the work is visibly cross-package or\ntrivially small\./u);
+assert.ok(!core.includes("Set gates.push_approval?"), "a question must not be posed as a bare setting name");
 process.stdout.write("pipeline-start V3: core budget and lazy-reference checks passed\n");

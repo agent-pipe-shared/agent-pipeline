@@ -150,11 +150,27 @@ deployment, publication, destructive work, or scope change.
 
 ### Kickoff intake, durable design package, and document quality
 
+Bootstrap questions are answered before any artifact is written. The
+project's operator-facing language is decided by what the PO answers, never
+inferred from the greeting, the repository's contents, or the runner's
+locale — rewriting an already-authored PRD, Spec, or handover in another
+language afterwards is the expensive path. Ask it together with the goal and
+profile below, before the first artifact is drafted, in plain language —
+problem, options, cost, recommendation — never a bare setting name: *"Which
+language should the PRD, Spec, and this project's working documents use —
+English or German? English is the more portable choice outside a
+German-speaking team; German reads naturally if that is how the team already
+works, at the cost of a still-English document scaffold underneath either
+way. Recommendation: match the language you would already write the PRD
+in."* Bind the answer into `<!-- po-language: (de|en) -->` before drafting.
+
 Before the first `kickoff plan`, obtain both a single-line project goal and an
 explicit PO profile: `epic`, `feature`, or `mini`. Ask for them together when
 the project is pristine; if the user supplied only a goal, ask for the profile
 before continuing. Explain the choices briefly (`epic` = cross-package
 initiative, `feature` = bounded deliverable, `mini` = small, contained change).
+Recommendation: `feature` unless the work is visibly cross-package or
+trivially small.
 Never infer, silently select, or retrospectively claim a profile from the
 amount of text, an assistant's preferred route, or a model preflight. The
 profile is a PO input, not a second confirmation for an already authorized
@@ -224,7 +240,10 @@ The happy path loads no reference file. Load only the exact condition:
 - `references/roles.md` for Goldfish/Critic role-specific prohibitions;
 - `references/freshness.md` for freshness/update/calibration/handover detail;
 - `references/failure-cases.md` for typed failure and recovery cases;
-- `references/continuation.md` for `PCR-BLOCKED` or `PCR-DECISION-PENDING`.
+- `references/continuation.md` for `PCR-BLOCKED` or `PCR-DECISION-PENDING`;
+- `references/push-approval.md` for the point a session constructs,
+  explains, or discusses the push-approval gate (`gates.push_approval`),
+  before a human clears it.
 
 No happy-path reference is mandatory. Lazy loading never widens authority and
 must preserve lifecycle, V3 authority, calibration, handover, Verify and
