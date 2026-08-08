@@ -109,17 +109,70 @@ pushes to, that is a reasonable trade and the Pipeline should not pretend
 otherwise.
 
 **No dead end.** There must be no reachable state from which `chat` cannot be
-reached. Open question named rather than hidden: a repository that has signed
-approvals and whose key has been *lost* has no signature path. Whether that is
-recoverable, and by what, is not decided here.
+reached. The lost-key case is addressed in §5a, which turns out to be the same
+question as the team case.
+
+## 5a. Which human — and the single trust anchor that answers it wrongly
+
+The PO stated the intended property: the system must assure that **a** human
+audited, deliberately **not which** one. A newly created key that did not exist
+before must work for a new approval.
+
+**That is not what is implemented.** `project/critical-human-proof.json` pins
+exactly one trust anchor:
+
+```json
+"trustAnchor": { "keyReference": "local-po-key", "publicKeySha256": "…" }
+```
+
+One key, one fingerprint, committed, validated as a single object by
+`critical-human-proof-policy.mjs` (`exactKeys(anchor, ["keyReference",
+"publicKeySha256"])`). Three consequences follow:
+
+1. A new key does not work — it fails the anchor check.
+2. A lost key is a genuine dead end for the signature path.
+3. The team case is not merely unhandled but structurally excluded: one anchor
+   admits one holder.
+
+**The anchor buys nothing against the actual threat.** What the signature defends
+against is an agent approving its own work. An agent cannot produce one, because
+the key lives outside the checkout and the passphrase is typed at a human's
+terminal — and that remains true *whichever* key it is. A freshly created key
+defends exactly as well. The anchor costs the team case and recoverability, and
+returns nothing the threat model asks for.
+
+**What is given up, stated plainly.** The claim weakens from "the PO approved" to
+"a human approved". Someone with shell access on the machine could create a key
+and approve — but someone with shell access can already do worse. For a solo user
+this changes nothing; for a team it is precisely the intended behaviour.
+
+**The distinction that matters: not restricted, but always recorded.** Any
+well-formed key may sign. The approval record must capture *which* public key did,
+so the question "who approved this" remains answerable after the fact even though
+it is not enforced beforehand. Unrestricted is not the same as unrecorded, and
+conflating the two would be the real loss.
+
+**Direction for implementation** (not built here):
+
+- Replace the single `trustAnchor` with an optional anchor *set*. Absent or empty
+  means "any well-formed key", which is the PO's intended default. A populated set
+  means membership is enforced, for projects that want the stronger claim.
+- Every approval record carries the signing key's `publicKeySha256` and a
+  human-supplied `keyReference`, whether or not a set is configured.
+- The schema change is a version bump, not an edit in place: existing repositories
+  carry `pipeline.critical-human-proof-policy.v1` with a single anchor, and their
+  behaviour must not change silently under a new reader.
+
+With this, the lost-key case resolves without a special mechanism: create a new
+key, sign with it, and the record says which key it was.
 
 ## 6. Out of scope, deliberately
 
-- **The team case.** One participant signs on their machine, another does not.
-  Under this design the effective repository value is committed and shared, so both
-  are governed by the same mode — but nothing yet reconciles a participant whose
-  machine plane says `chat` with a repository that says `signature`, beyond the
-  fail-closed rule. The PO named this explicitly as a later problem.
+- **The team case, in its remaining half.** §5a removes the structural blocker —
+  multiple humans with different keys become possible. What is still unhandled is
+  the *mode* mismatch: a participant whose machine plane says `chat` working in a
+  repository whose committed value says `signature`. The fail-closed rule makes
+  that safe rather than resolved. The PO named this explicitly as a later problem.
 - Where the machine plane physically lives. An environment variable
   (`PIPELINE_PO_APPROVAL_DIRECTORY` today) is losable and undiscoverable; a file
   under the user's configuration directory is better but needs its own guard
