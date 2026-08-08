@@ -40,6 +40,7 @@ the gate", never "not run".
 | `plugins/pipeline-core/lib/machine-plane.test.mjs` | SETUP-2b | The machine-scoped configuration store: three-valued reader, exact key set, the enforced zero-overlap rule against the repository plane, atomic validating writer. 22 tests. |
 | `harness/scripts/check-consumer-safe-paths.test.mjs` | CB-1b | The gate that fails when a shipped artifact under `plugins/pipeline-core/` names a path only this repository has. 9 tests; the gate itself sweeps 755 tracked files against 46 reasoned allowlist entries and reports unused ones. |
 | `plugins/pipeline-core/scripts/verify-evidence-producer.test.mjs` | CB-2 | The `pipeline.verify-evidence.v0` producer that had a schema and consumers but no producer, including a test that feeds its output through the real, unmodified `publication-gate-evidence.mjs`. 6 tests. |
+| `plugins/pipeline-core/hooks/guard-lifecycle-recovery-contract.test.mjs` | C1/C3 | The missing test level itself: that a recovery action the onboarding inspection prescribes is one the lifecycle guard admits. Drives the real dependency-injected inspection into the real guard and enumerates the real producing table. 2 tests — small, and it found a live defect on its first run (five of six offered rebind codes were refused). |
 
 Note that `plugins/pipeline-core/scripts/po-human-approval.test.mjs` was found
 during SETUP-2b to be unregistered as well — a pre-existing gap, not created by
