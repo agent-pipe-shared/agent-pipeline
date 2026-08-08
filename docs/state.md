@@ -201,6 +201,39 @@ rather than only repairing the two carriers.
 
 ### Round-1 repairs: four of five findings closed, one cannot be (2026-08-08)
 
+### PUSH DEFERRED BY PO DECISION; THE TP LIFT CANNOT GO THROUGH CHAT (2026-08-08)
+
+**PO, AFK:** skip the push until further notice, and work around the protected
+path on other Phoenix topics.
+
+**Asked and answered: no, the TP-3 lift cannot be cleared in chat.**
+`pipeline.user.yaml` is itself gate-strength protected *because* it carries
+`gates.push_approval` — `guard-gate-strength.mjs:76-77` says so, and its header
+names the exact attack it exists to stop: an agent writing
+`gates.push_approval: "chat"` into that file and then pushing on its own
+authority. So switching to chat mode is itself an edit needing a signed
+override. Circular by construction, and correctly so.
+
+**Worked around it instead.** `162c30c` (dispatch `PHX-DEPLOY-CITE`) repaired
+the two carriers the B3 census never reached, and `8bea96a` narrowed a claim
+this session's own backlog item had overstated: `roles/elephant.md:105`'s
+citation of `docs/deploy/README.md §7.1` resolves — that heading exists — so it
+is fragile, not broken, and does not belong to the defect.
+
+**The census question is answered, and the answer is structural.** The B3
+method was prescribed as `rg -n "§" <file>` per file of a given list and
+explicitly forbade searching the repository for `operating-model`
+(`phx-r3-b3-inventory-c6-c8.md:15-16`). A file absent from the class list could
+not surface, however many citations it carried, and the list was authored from a
+design document rather than derived from the tree. **The sweep was measured; the
+scope was asserted.** The phase's own lesson — measure repository-wide first,
+then cut — had been applied to counting citations *inside* the scope and never
+to establishing it.
+
+**Evidence binding note:** `evidence/verify-latest.json` binds `d85494c`. Three
+commits have landed since, so the gate must be re-run before any push; the
+subject hash in the gate packet is likewise stale for the current head.
+
 ### CORRECTION — F2 was NOT closed, and I recorded that it was (round 2, 2026-08-08)
 
 The delta re-review found it and is right. **AC-P3 is unsatisfied at the level
