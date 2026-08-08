@@ -184,6 +184,26 @@ architecture prose or an implementation briefing.
   query. That restricted record SHALL have no portable counterpart or join
   handle and SHALL NOT be persisted in, bundled from, or inferred by a
   repository record.
+
+  **Amendment for GMW (PO, 2026-08-08).** The second clause above cannot be
+  satisfied by any identifier scheme for the Guard Maintenance Window (GMW)
+  producer specifically: the portable record's required `scope.candidate`,
+  `scope.artifacts[].sha256`, `validity.expiresAtEpochMs`, and `ruleDigest` are
+  byte-identical to, or recomputable from, values GMW's own machine-local
+  record already carries, and that record additionally holds `subject.reason`
+  in clear text plus `proof.publicKey`/`proof.keyReference` — an
+  attribution-and-rationale record in this criterion's own sense. This is a
+  proved result, not an unfinished implementation (impossibility proof:
+  `design/gmw-hgo-evidence-intake-into-the-human-ledger.md` §5.2, rules
+  R-1/R-2/R-3), and it does not extend to HGO, where the same join reaches
+  only digests and no attribution (same §5.2, R-3). Increment 1 does **not**
+  satisfy H-AC-11's no-join-handle clause for the GMW half; that would hold
+  only if a later, separately reviewed amendment scopes the clause to the
+  restricted machine-local profile it actually describes, or GMW's own
+  machine-local storage changes so no attributing value remains there.
+  Tracked as O-4 in
+  `design/gmw-hgo-evidence-intake-into-the-human-ledger.md` §14, owner
+  `pipeline` (PHX-2).
 - **H-AC-12:** WHEN an existing guard, plan, release, deployment, or override
   path grants or consumes human authority, including `guard-devplan`,
   `guard-push`, `pipeline-state`, release planning, deploy approval/consumption,
