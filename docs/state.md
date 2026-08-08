@@ -63,6 +63,7 @@ from the report.**
 | `37c063b` `bdcc998` | `close-feature`'s commands and its `allowed-tools:` frontmatter, and the push preparation recipe, name paths a consumer has | pipeline-start-v3 green |
 | `028e545` `fdebd42` `b13c107` `6792990` `76ea1dc` | A check over all 753 tracked plugin files that fails when a shipped artifact names a source-only path, with 46 reasoned allowlist entries and unused-entry reporting; and the nine guard runtime messages that told an operator to run a command only this repository has, seven of them on the push path | consumer-safe-paths 9/0, guard-push 150/0, guard-git 219/0, guard-devplan 38/0, stop-suggest 250/0 |
 | `b844ea3` `77f57b9` | The `pipeline.verify-evidence.v0` producer that had a schema and consumers and none; and a repository's root commit as an ordinary Critic base, proven by a fixture with exactly one commit rather than by inventing a parent | verify-evidence-producer 6/0, critic-preflight 6/0, publication-gate-evidence 14/0 |
+| `aacad51` `9a307fa` `7f6f522` | `sha256sum` admitted with more than one path; the inspection stops prescribing a rebind the planner rejected inside that same inspection; and the guard now admits every rebind action the inspection actually offers, reading the admitted set from the producing table rather than naming one code | guard-lifecycle-ready 68/0, project-onboarding-v3 109/0, recovery-contract 2/0, consumer-safe-paths 755 files / 46 entries |
 
 **Four findings came from reading the code, not from a red suite — and that is the
 pattern of this block.** The suites were green every time.
@@ -90,12 +91,32 @@ pattern of this block.** The suites were green every time.
    GF-056, was walked around with a shell write; this one was reported and stopped.
    The discipline improved, the mechanism did not.
 
+5. **The C1 fix was itself incomplete, and only a new *level* of test found it.**
+   The guard admitted one diagnostic code; the producing table hands the operator
+   the same read-only planner argv under six. So five reachable states printed a
+   recovery command and then blocked it — the same defect, still open after the
+   fix aimed at it, because the fix looked at the one code the existing test
+   named. What found it was `guard-lifecycle-recovery-contract.test.mjs`
+   (`7f6f522`): it drives the real dependency-injected inspection, enumerates the
+   real producing table, and feeds the real output into the real guard. It failed
+   on its first run. Every test in this repository asserted one side or the other;
+   none asserted that the two agree, which is precisely why all four findings
+   above survived a green Verify. The guard now derives its admitted set from the
+   table, so a reason added there is offered and admitted together.
+
 **The generalisation this block earned, and the standing check for the rest of it:**
 the assurances hold and the signposts point wrong. `SPEC_REPAIR` naming a
 destructive route, `observePoAuthorityRebind` offering a rebind that refuses,
 and A1's own shadowed diagnosis are three instances of one shape. The question at
 every remaining fix is therefore not only "does it refuse correctly" but "where
 does the refusal send the reader, and is that route open in *this* state".
+
+C2, in progress, is the fourth instance and the first found by asking that
+question deliberately: a command that only *names* a gate-strength path is
+refused with a message that explains how to change the file. Measured — the
+Critic preflight the review skill makes mandatory, invoked with the guardrail
+paths that skill says to pass, is refused, while `cat`, `rg`, `git show` and
+`sha256sum` on the same file are admitted (`scratch/c2-repro.mjs`).
 
 **Eleven backlog items filed, every claim verified at a line first** (`518dd03`,
 `dadf8e2`, `6a16fcf`, `b4eb34e`). The consumer blockers the PO's consolidated
@@ -138,9 +159,9 @@ ignore rule would have swallowed, so the handover survives the block that
 produced it. Each listed suite has been run individually by the Elephant: "not
 registered" means "not run by the gate", never "not run".
 
-Still to build: C2 (a required preflight input path the shell classifier refuses
-to let a command name), the reset and discard paths, the kickoff re-entry, the
-repair map, SETUP-3/4 and SCRATCH-2, plus the two product decisions above.
+Still to build: C2 (in flight), the reset and discard paths, the kickoff
+re-entry, the repair map, SETUP-3/4 and SCRATCH-2, plus the two product
+decisions above.
 
 ## 2026-08-08 Nova GF-054 — the greenfield handover, hardened into the 0.5.4 local candidate
 
