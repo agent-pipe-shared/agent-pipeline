@@ -143,25 +143,15 @@ import {
 } from "../lib/project-authority.mjs";
 import { derivePlanLifecycle } from "../lib/plan-spec-state-v2.mjs";
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
+import { DEFAULT_EXEMPT_PREFIXES } from "../lib/guard-devplan-policy.mjs";
 
-// `scratch/` is exempt because the Pipeline's own shipped instructions send every agent
-// there and describe it as the one place needing no exception: skills/pipeline-start/
-// SKILL.md "Scratch space" calls it "the only location the containment guard permits
-// without an exception", and the Goldfish briefing template says the same. Both were
-// speaking about the CONTAINMENT guard (guard-lifecycle-ready), which does permit it --
-// while this gate blocked it in the draft phase, which is the phase every fresh project
-// starts in. So a consumer following the shipped instruction was refused by a different
-// guard than the one the instruction had cleared, and the refusal named a plan approval
-// that has nothing to do with writing a throwaway probe script.
-//
-// It is also the safest of the five entries here rather than the riskiest: `docs/`,
-// `specs/`, `.claude/` and `backlog/` are all tracked directories whose contents ship,
-// whereas `scratch/` holds throwaways by definition. Implementation smuggled there is
-// not implementation until it moves into a real source path, and that move is exactly
-// what this gate still catches.
-//
-// backlog: 2026-08-08-shipped-guidance-sends-agents-to-a-directory-a-gate-refuses.md
-const DEFAULT_EXEMPT_PREFIXES = ["docs/", "specs/", ".claude/", "backlog/", "scratch/"];
+// The exempt prefixes, and the full reasoning for each, live in
+// `lib/guard-devplan-policy.mjs` so the shipped obligations reference can be
+// GENERATED from the same constant this gate enforces. It has to be a separate
+// module rather than an export here: this file is a hook SCRIPT that runs its
+// whole decision at import time and calls process.exit(), so a reader that
+// merely wants to know the policy cannot import it -- the importing process
+// dies. One owner, two readers, no hand-copied second list.
 
 // The plugin root this guard is itself running from -- same self-location resolution
 // guard-lifecycle-ready.mjs / guard-human-override.mjs already use (`resolve(dirname(

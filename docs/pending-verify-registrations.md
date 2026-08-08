@@ -75,6 +75,8 @@ the gate", never "not run".
 
 | `plugins/pipeline-core/scripts/repair-map.test.mjs` | REPAIRMAP-1 | The repair map: for each refusal class the guard union can produce, whether it is liftable, by whom, and the exact command — every answer asked of the real planner at runtime rather than stored. 7 tests, two of them contract tests that re-drive each row against a fresh independent live call. Evidence: `evidence/repairmap-1-suite.txt`. |
 
+| `harness/scripts/generate-agent-obligations.test.mjs` | OBLIG-1 | The contract that keeps `templates/prompts/agent-obligations.md` honest: the committed document must equal a fresh generation from the guards' own sources, and a protected path added at the source must change it. 8 tests, including a drift test that would fail a generator ignoring its inputs. |
+
 Note that `plugins/pipeline-core/scripts/po-human-approval.test.mjs` was found
 during SETUP-2b to be unregistered as well — a pre-existing gap, not created by
 this block. It covers the human authority chain. Worth adding in the same pass.

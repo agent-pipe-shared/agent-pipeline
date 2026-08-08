@@ -12,6 +12,13 @@ Language: English (agent-facing prompt, ADR-0011); single-language scaffolding
 — no German kept in this file.
 
 USAGE (Elephant)
+0. INCLUDE `templates/prompts/agent-obligations.md` verbatim at the top of the
+   dispatch (or point the Critic at that exact path). It is GENERATED from the
+   guards themselves and carries the closed shell grammar, the protected test
+   paths, and the fact that no in-session override exists for them. A Critic
+   that does not know the grammar spends its budget being refused instead of
+   reading code. Do not retype the rules here — a hand-copied second list
+   drifts from the guard that owns it.
 1. Model per MP-07 / §4.2 matrix, TIERED (review-protocol.md §2.1 T0/T3/T4):
    mechanical/deterministic diffs (lockfiles, generated artifacts, pure
    formatting, zero semantic delta) auto-pass — no critic dispatch. Class-mittel

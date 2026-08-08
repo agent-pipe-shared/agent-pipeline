@@ -11,6 +11,15 @@ two-failed-attempts rule.
 Language: English (agent-facing prompt, ADR-0011).
 
 USAGE (Elephant)
+0. INCLUDE `templates/prompts/agent-obligations.md` verbatim at the top of the
+   briefing (or, if the agent can read the repo, point it at that exact path).
+   It is GENERATED from the guards themselves — the closed shell grammar, the
+   protected test paths and the fact that no in-session override exists for
+   them, the draft-phase write prefixes. Measured 2026-08-08: none of those
+   rules appeared in any agent contract, template or role file, so agents
+   learned them by being refused, and each refusal cost a retry out of the
+   budget that is also the stop condition. Do not retype the rules here — the
+   copy drifts, which is the defect the generated file exists to remove.
 1. Fill ALL six fields. An incomplete briefing is not dispatchable — the
    briefing-format check (operating-model §3.2 step 4) fails.
 2. This text plus the files listed in field 2 are the Goldfish's ENTIRE input.
