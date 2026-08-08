@@ -4,11 +4,19 @@
  * REBIND-RUNNER-04: the `po-authority-rebind-apply` recovery transaction must
  * observe its in-transaction V4 lifecycle readback with the invoking
  * session's own runner (ADR-0051 class), never the historical "codex"
- * default -- while `po-authority-decision-apply` (a different subcommand
- * sharing the same `runPoAuthorityRebindApply` helper) stays byte-for-byte
- * unaffected. New file (not an edit of the guarded `harness/scripts/
+ * default. New file (not an edit of the guarded `harness/scripts/
  * pipeline-state.test.mjs` / TP-5 suite) exercising the same public `run`
  * export and the same pre-existing `deps.v4Inspection` injection seam.
+ *
+ * AUTHAPPLY-1 (2026-08-08): `po-authority-decision-apply` (a different
+ * subcommand sharing the same `runPoAuthorityRebindApply` helper) used to
+ * leave its `runner` option undefined, falling through two layers down to
+ * `inspectProjectOnboardingV3`'s own "codex" default -- reachable and
+ * consequential, since that readback gates the postimage check the apply
+ * must pass. It now resolves via the same `resolvePoRebindRunner` the
+ * rebind path already used, so the "unaffected" framing below no longer
+ * holds; see backlog/items/2026-08-08-the-authority-decision-apply-path-
+ * still-defaults-to-codex.md.
  */
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
@@ -127,20 +135,36 @@ test("rebind-apply: invalid explicit --runner fails closed without mutation", ()
   assert.equal(readFileSync(statePath(f.dir), "utf8"), before);
 });
 
-test("decision-apply: V4 request carries no runner (unaffected by the rebind-apply flag)", () => {
-  const f = fixture("decision-unaffected");
+function planAndSelectDecision(f) {
   const planned = invoke(["po-authority-decision-plan"], f.deps);
   assert.equal(planned.status, 0, planned.err);
   const plan = JSON.parse(planned.out);
   const selectionAction = plan.selectionActions.find((action) => action.selectedCandidate === "spec");
   const selected = invoke(selectionAction.argv.slice(1), f.deps);
   assert.equal(selected.status, 0, selected.err);
-  const selection = JSON.parse(selected.out);
+  return JSON.parse(selected.out);
+}
+
+test("decision-apply: no CLI --runner flag exists; the request resolves via CLAUDECODE (claude)", () => {
+  const f = fixture("decision-env-claude");
+  const selection = planAndSelectDecision(f);
   const observed = [];
   const applied = invoke(selection.applyAction.argv.slice(1), {
     ...f.deps, env: { CLAUDECODE: "1" },
     v4Inspection: ({ runner }) => { observed.push(runner); return { status: "ready" }; },
   });
   assert.equal(applied.status, 0, applied.err);
-  assert.deepEqual(observed, [undefined, undefined, undefined]);
+  assert.deepEqual(observed, ["claude", "claude", "claude"]);
+});
+
+test("decision-apply: no CLI --runner flag exists; absent CLAUDECODE resolves explicitly to codex", () => {
+  const f = fixture("decision-env-codex");
+  const selection = planAndSelectDecision(f);
+  const observed = [];
+  const applied = invoke(selection.applyAction.argv.slice(1), {
+    ...f.deps, env: {},
+    v4Inspection: ({ runner }) => { observed.push(runner); return { status: "ready" }; },
+  });
+  assert.equal(applied.status, 0, applied.err);
+  assert.deepEqual(observed, ["codex", "codex", "codex"]);
 });

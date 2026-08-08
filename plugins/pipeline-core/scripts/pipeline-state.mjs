@@ -4420,10 +4420,23 @@ function runPoAuthorityDecisionCommand(sub, rest, deps) {
       console.error("Error: PO authority decision recovered its interrupted transaction; regenerate and confirm a new plan.");
       return 2;
     }
+    // The decision-apply caller has no CLI-level --runner flag of its own
+    // (parsePoDecisionApply never returns a `runner` field), so this mirrors
+    // the rebind path's own absent-flag case exactly: resolvePoRebindRunner
+    // falls through to the CLAUDECODE env marker, never to a literal default
+    // here. This closes the residue tracked in backlog/items/2026-08-08-the-
+    // authority-decision-apply-path-still-defaults-to-codex.md -- the in-
+    // transaction V4 readback (bootstrap/session/dispatch) is runner-
+    // dependent (sourceEnablesRunner admission, requiresNativeRuntimeReadback,
+    // RUNNERS_WITHOUT_APP_SERVER) and gates the postimage readback that must
+    // be `ready` for the apply to succeed, so an implicit Codex identity here
+    // was reachable and consequential for a Claude-rooted project.
+    const runner = resolvePoRebindRunner(apply.runner, deps.env ?? process.env);
     return runPoAuthorityRebindApply(apply, deps, lock, io, stateIo, {
       buildPlan: buildPoAuthorityDecisionPlan,
       resultSchema: "pipeline.po-authority-decision-apply.v1",
       resultCode: "PO-DECISION-APPLIED",
+      runner,
     });
   } finally {
     releaseContinuityLock(lock);
@@ -4434,9 +4447,12 @@ function runPoAuthorityRebindApply(apply, deps, lock, io, stateIo, {
   buildPlan = buildPoAuthorityRebindPlan,
   resultSchema = "pipeline.po-authority-rebind-apply.v1",
   resultCode = "PO-REBIND-APPLIED",
-  // Left undefined for the po-authority-decision-apply caller, which passes
-  // no runner: inspectV4 below then falls through to inspectProjectOnboardingV3's
-  // own "codex" default, preserving that path's prior behavior unchanged.
+  // Both callers (po-authority-rebind-apply and po-authority-decision-apply)
+  // now resolve this explicitly via resolvePoRebindRunner before reaching
+  // here; there is no longer a caller that leaves this undefined so a
+  // default two layers down (inspectProjectOnboardingV3's own "codex"
+  // default) silently applies. See backlog/items/2026-08-08-the-authority-
+  // decision-apply-path-still-defaults-to-codex.md.
   runner,
 } = {}) {
   const existing = readStateRaw(deps.dir);
