@@ -163,6 +163,26 @@ function emit(code, lines) {
   process.exit(code);
 }
 
+/**
+ * Reduces an escaped exception to a typed, sanitized diagnostic for the terminal
+ * fault boundary around the blocking evaluation (PUSHBOUND-1, issue #100 AC3).
+ * Deliberately never the raw `.message` or `.stack` -- those can carry a local
+ * absolute path, a credential-bearing remote URL, or other operator-supplied text
+ * that reached this evaluation (SEC-01; PG17i already redacts for the identical
+ * reason at the one other place raw operand text would otherwise be echoed). Only a
+ * constructor-style `.name` and a well-formed Node error CODE (already a short
+ * uppercase identifier, e.g. ENOENT/ERR_INVALID_ARG_TYPE -- never free text) survive.
+ */
+function sanitizedFaultDiagnostic(error) {
+  const name = error && typeof error === "object" && typeof error.name === "string" && error.name
+    ? error.name
+    : "non-Error exception";
+  const code = error && typeof error === "object" && typeof error.code === "string" && /^[A-Z][A-Z0-9_]*$/.test(error.code)
+    ? error.code
+    : null;
+  return code ? `${name} (${code})` : name;
+}
+
 /** Mirrors validate-manifest's message-first rendering for semantic policy findings. */
 function manifestFindingText(finding) {
   if (typeof finding?.message === "string") return finding.message;
@@ -1571,126 +1591,172 @@ function checkSecurityEvidenceBinding() {
 
 const failures = [];
 
-// (a) verify evidence -- always checked once the push gate is active.
-failures.push(...checkEvidenceFreshness("evidence/verify-latest.json"));
-
-// (b) security evidence -- only when a security gate is configured and not "off".
-const securityGate = gateConfig(manifest, "security");
-if (securityGate && securityGate.mode !== "off") {
-  failures.push(...checkSecurityEvidenceBinding());
-
-  // (b.2) v2 policy-complete verdict -- additive, same trigger as (b), never replacing
-  // its severity-based authority (CYB-2F; see this file's header "V2 POLICY-COMPLETE
-  // VERDICT" paragraph and `checkSecurityCompleteness`'s own header comment in
-  // ../lib/security-completeness-gate.mjs, CYB-2I-0). Reuses the single
-  // `resolveSourceTree()` computation `checkSecurityEvidenceBinding()` above may already
-  // have triggered (Finding 5) -- never a second independent `git rev-parse`.
-  failures.push(
-    ...checkSecurityCompleteness({ projectDir: evidenceProjectDir, commit: sourceCommit, tree: resolveSourceTree() }),
-  );
-}
-
-// (b.1) self-application-only anonymous public range and dedicated authenticated
-// SSH-account evidence. The close ritual repeats this preflight immediately before
-// the actual network operation, then fetches the pushed ref from a fresh repository.
-failures.push(...checkAnonymousPublicPush(pushBinding, sourceCommit));
-
-// (c) approval.
-if (pushGate.approval === "standing-approved") {
-  // auto-pass, no state needed at all.
-} else {
-  // "required", or the field absent entirely -- treated as the safer default (a push
-  // gate that is active at all, with no explicit standing-approval, should not
-  // silently skip the approval check).
-  const stateRelPath = projectStateRelPath(projectDir);
-  const statePath = join(projectDir, stateRelPath);
-  let stateRaw;
-  let stateExists = true;
-  try {
-    stateRaw = readFileSync(statePath, "utf8");
-  } catch {
-    stateExists = false;
+// ---- terminal fault boundary (PUSHBOUND-1 / issue #100 AC3) --------------------------
+// Everything below builds `failures` for THIS authority-bearing evaluation. An
+// exception escaping any of it must never fall through to Node's own default
+// uncaught-exception exit (code 1 -- a WARNING in this hook family's semantics,
+// exactly the outcome a configured BLOCKING gate must never produce on an
+// unanticipated fault). The catch below maps any escape through the SAME mode
+// dispatch the normal all-checks-collected path further down already uses
+// (`pushGate.mode === "warn"` stays non-blocking -- AC4 -- everything else fails
+// closed), so a fault can never be MORE permissive than a genuine finding would
+// have been.
+try {
+  // TEST-ONLY FAULT INJECTION (PUSHBOUND-1): guard-push.test.mjs invokes this file
+  // as its own subprocess, so the only way to prove the catch below maps an
+  // ARBITRARY escaped exception -- not merely one of the already-guarded bad shapes
+  // the PG11* fixtures pin -- to the correct exit code is to make this exact
+  // evaluation genuinely throw. Equivalent in spirit to the `deps.crashAt`
+  // fault-injection seam already used the same way in
+  // ../lib/onboarding-continuity.mjs, adapted for a hook that runs as its own
+  // process rather than an imported function. Inert unless BOTH the exact env var
+  // name AND the exact sentinel value are set; it can only route into the SAME
+  // fail-closed/non-blocking dispatch a real fault would, never into an allow, so it
+  // cannot be used to bypass the gate even if somehow set outside a test.
+  if (process.env.PIPELINE_GUARD_PUSH_TEST_FAULT === "PUSHBOUND-1-inject") {
+    throw new Error("PUSHBOUND-1 injected test fault");
   }
-  if (!stateExists) {
-    failures.push(`Push approval missing: ${stateRelPath} does not exist (never recorded via approve-push).`);
+
+  // (a) verify evidence -- always checked once the push gate is active.
+  failures.push(...checkEvidenceFreshness("evidence/verify-latest.json"));
+
+  // (b) security evidence -- only when a security gate is configured and not "off".
+  const securityGate = gateConfig(manifest, "security");
+  if (securityGate && securityGate.mode !== "off") {
+    failures.push(...checkSecurityEvidenceBinding());
+
+    // (b.2) v2 policy-complete verdict -- additive, same trigger as (b), never replacing
+    // its severity-based authority (CYB-2F; see this file's header "V2 POLICY-COMPLETE
+    // VERDICT" paragraph and `checkSecurityCompleteness`'s own header comment in
+    // ../lib/security-completeness-gate.mjs, CYB-2I-0). Reuses the single
+    // `resolveSourceTree()` computation `checkSecurityEvidenceBinding()` above may already
+    // have triggered (Finding 5) -- never a second independent `git rev-parse`.
+    failures.push(
+      ...checkSecurityCompleteness({ projectDir: evidenceProjectDir, commit: sourceCommit, tree: resolveSourceTree() }),
+    );
+  }
+
+  // (b.1) self-application-only anonymous public range and dedicated authenticated
+  // SSH-account evidence. The close ritual repeats this preflight immediately before
+  // the actual network operation, then fetches the pushed ref from a fresh repository.
+  failures.push(...checkAnonymousPublicPush(pushBinding, sourceCommit));
+
+  // (c) approval.
+  if (pushGate.approval === "standing-approved") {
+    // auto-pass, no state needed at all.
   } else {
-    let state;
+    // "required", or the field absent entirely -- treated as the safer default (a push
+    // gate that is active at all, with no explicit standing-approval, should not
+    // silently skip the approval check).
+    const stateRelPath = projectStateRelPath(projectDir);
+    const statePath = join(projectDir, stateRelPath);
+    let stateRaw;
+    let stateExists = true;
     try {
-      state = JSON.parse(stateRaw);
-    } catch (e) {
-      failures.push(
-        `Push approval state is malformed: ${stateRelPath} contains invalid JSON (${e.message}). ` +
-        `Rewrite only via harness/scripts/pipeline-state.mjs; publication remains blocked.`,
-      );
+      stateRaw = readFileSync(statePath, "utf8");
+    } catch {
+      stateExists = false;
     }
-    const approval = state?.pushApproval?.lastApproved;
-    const forCommit = approval?.forCommit;
-    if (!forCommit || forCommit !== sourceCommit) {
-      failures.push(
-        `Push approval missing or stale: state.pushApproval.lastApproved.forCommit=${JSON.stringify(
-          forCommit ?? null,
-        )}, expected pushed source commit=${JSON.stringify(sourceCommit)}. Record: node harness/scripts/pipeline-state.mjs approve-push --by <name> --remote <remote> --destination <full-ref>. NOTE: with gates.push.approval "required" this state record is NECESSARY BUT NOT SUFFICIENT -- the critical-proof check below is independent and also applies. A pushApproval in mutable state is never executable authority on its own.`,
-      );
-    }
-    // ADR-0055: the project may stand the private-key proof down for `push` with an
-    // explicit, reasoned waiver. The human gate itself still applies — the approval
-    // above must still be recorded and bound to THIS commit — but a waived project
-    // does not additionally need the detached proof, and therefore does not need the
-    // publication executor to carry the push. An unreadable policy answers "required".
-    // Governed session root, not the pushed repository. The waiver decides whether the
-    // detached proof is demanded at all, so reading it from the target would let the target
-    // stand its own gate down -- a `.v2` push waiver or a committed `push_approval: chat` in
-    // a nested repository would do it. Same root cause as the anchor (T6 F1); the fix
-    // belongs in both places or in neither.
-    const pushWaiver = criticalProofWaiverFor(fallbackProjectDir(), "push");
-    if (pushGate.approval === "required" && !pushWaiver.waived) {
-      // ADR-0056 §6. This branch used to refuse EVERY agent-issued push and point at the
-      // fixed publication executor. That was safe and unusable: publication is a release
-      // path, and an ordinary feature branch needs to be pushable without one, so
-      // `signature` mode meant "no session can ever push" rather than "a session can push
-      // what the human signed".
-      //
-      // The permission is granted by verification, never by the record's word. See
-      // ../lib/critical-action-authorization.mjs for why believing
-      // `pushApproval.lastApproved` would have silently demoted `signature` to `chat`.
-      // A policy failure keeps its own code so the operator sees which half is broken.
-      const sourceTree = resolveSourceTree();
-      const attested = sourceTree === null
-        ? { authorized: false, code: "PUSH-PROOF-CANDIDATE-UNRESOLVED" }
-        : authorizeRecordedPush({
-          projectDir,
-          anchorDir: fallbackProjectDir(), // governed session root -- see attestedMainPublication
-          state,
-          candidate: { commit: sourceCommit, tree: sourceTree },
-          remote: pushBinding.remote,
-          destination: pushBinding.destination,
-          now: new Date().toISOString(),
-        });
-      if (!attested.authorized) {
+    if (!stateExists) {
+      failures.push(`Push approval missing: ${stateRelPath} does not exist (never recorded via approve-push).`);
+    } else {
+      let state;
+      try {
+        state = JSON.parse(stateRaw);
+      } catch (e) {
         failures.push(
-          pushWaiver.code === null
-            // Operand text is deliberately NOT interpolated here. `remote` is any positional
-          // the command supplied, so it can be a credential-bearing URL, and this message
-          // travels into the session transcript and from there into persisted artifacts
-          // (SEC-01). The file already redacts elsewhere for exactly this reason (PG17i);
-          // that fixture cannot reach this line, so PG12s15 covers it. The operator does
-          // not need the values echoed back -- they are in the command they just ran.
-          ? `Push approval is not externally attested for this exact action (${attested.code}). `
-              + "Record one for this commit, remote and destination ref: node harness/scripts/pipeline-state.mjs "
-              + "approve-push --by <name> --remote <remote> --destination <full-ref> "
-              + "--proof-request <path> --proof-authority <path> --proof <path>."
-            : `Push approval critical proof is unavailable: project/critical-human-proof.json is ${pushWaiver.code}.`,
+          `Push approval state is malformed: ${stateRelPath} contains invalid JSON (${e.message}). ` +
+          `Rewrite only via harness/scripts/pipeline-state.mjs; publication remains blocked.`,
         );
       }
-    } else if (pushGate.approval === "required" && approval?.criticalProofWaiver?.kind !== "push") {
-      // Waived by policy, but the recorded approval does not say so: it was recorded
-      // under a different policy than the one in force now. Re-approve deliberately.
-      failures.push(
-        "Push approval predates the current critical-proof waiver; re-record it with " +
-        "node harness/scripts/pipeline-state.mjs approve-push so the record states what backed it.",
-      );
+      const approval = state?.pushApproval?.lastApproved;
+      const forCommit = approval?.forCommit;
+      if (!forCommit || forCommit !== sourceCommit) {
+        failures.push(
+          `Push approval missing or stale: state.pushApproval.lastApproved.forCommit=${JSON.stringify(
+            forCommit ?? null,
+          )}, expected pushed source commit=${JSON.stringify(sourceCommit)}. Record: node harness/scripts/pipeline-state.mjs approve-push --by <name> --remote <remote> --destination <full-ref>. NOTE: with gates.push.approval "required" this state record is NECESSARY BUT NOT SUFFICIENT -- the critical-proof check below is independent and also applies. A pushApproval in mutable state is never executable authority on its own.`,
+        );
+      }
+      // ADR-0055: the project may stand the private-key proof down for `push` with an
+      // explicit, reasoned waiver. The human gate itself still applies — the approval
+      // above must still be recorded and bound to THIS commit — but a waived project
+      // does not additionally need the detached proof, and therefore does not need the
+      // publication executor to carry the push. An unreadable policy answers "required".
+      // Governed session root, not the pushed repository. The waiver decides whether the
+      // detached proof is demanded at all, so reading it from the target would let the target
+      // stand its own gate down -- a `.v2` push waiver or a committed `push_approval: chat` in
+      // a nested repository would do it. Same root cause as the anchor (T6 F1); the fix
+      // belongs in both places or in neither.
+      const pushWaiver = criticalProofWaiverFor(fallbackProjectDir(), "push");
+      if (pushGate.approval === "required" && !pushWaiver.waived) {
+        // ADR-0056 §6. This branch used to refuse EVERY agent-issued push and point at the
+        // fixed publication executor. That was safe and unusable: publication is a release
+        // path, and an ordinary feature branch needs to be pushable without one, so
+        // `signature` mode meant "no session can ever push" rather than "a session can push
+        // what the human signed".
+        //
+        // The permission is granted by verification, never by the record's word. See
+        // ../lib/critical-action-authorization.mjs for why believing
+        // `pushApproval.lastApproved` would have silently demoted `signature` to `chat`.
+        // A policy failure keeps its own code so the operator sees which half is broken.
+        const sourceTree = resolveSourceTree();
+        const attested = sourceTree === null
+          ? { authorized: false, code: "PUSH-PROOF-CANDIDATE-UNRESOLVED" }
+          : authorizeRecordedPush({
+            projectDir,
+            anchorDir: fallbackProjectDir(), // governed session root -- see attestedMainPublication
+            state,
+            candidate: { commit: sourceCommit, tree: sourceTree },
+            remote: pushBinding.remote,
+            destination: pushBinding.destination,
+            now: new Date().toISOString(),
+          });
+        if (!attested.authorized) {
+          failures.push(
+            pushWaiver.code === null
+              // Operand text is deliberately NOT interpolated here. `remote` is any positional
+            // the command supplied, so it can be a credential-bearing URL, and this message
+            // travels into the session transcript and from there into persisted artifacts
+            // (SEC-01). The file already redacts elsewhere for exactly this reason (PG17i);
+            // that fixture cannot reach this line, so PG12s15 covers it. The operator does
+            // not need the values echoed back -- they are in the command they just ran.
+            ? `Push approval is not externally attested for this exact action (${attested.code}). `
+                + "Record one for this commit, remote and destination ref: node harness/scripts/pipeline-state.mjs "
+                + "approve-push --by <name> --remote <remote> --destination <full-ref> "
+                + "--proof-request <path> --proof-authority <path> --proof <path>."
+              : `Push approval critical proof is unavailable: project/critical-human-proof.json is ${pushWaiver.code}.`,
+          );
+        }
+      } else if (pushGate.approval === "required" && approval?.criticalProofWaiver?.kind !== "push") {
+        // Waived by policy, but the recorded approval does not say so: it was recorded
+        // under a different policy than the one in force now. Re-approve deliberately.
+        failures.push(
+          "Push approval predates the current critical-proof waiver; re-record it with " +
+          "node harness/scripts/pipeline-state.mjs approve-push so the record states what backed it.",
+        );
+      }
     }
   }
+} catch (faultError) {
+  // The evaluation above faulted before producing a `failures` verdict at all. Map
+  // it through the SAME mode dispatch the normal collected-findings path below uses
+  // -- "warn" keeps its documented non-blocking semantics unchanged (AC4); anything
+  // else (mode "blocking", or any future unrecognized non-"off" value -- the same
+  // "errs safe" rule the pre-existing dispatch already applies) fails CLOSED. The
+  // diagnostic never swallows the fault silently, and never carries the raw message
+  // or stack (SEC-01) -- see `sanitizedFaultDiagnostic` above for why.
+  const detail = sanitizedFaultDiagnostic(faultError);
+  if (pushGate.mode === "warn") {
+    emit(1, [
+      `[guard-push] WARN: the Push-Gate evaluation faulted unexpectedly (${detail}).`,
+      `Mode "warn" keeps this non-blocking; please investigate and re-run once fixed.`,
+    ]);
+  }
+  emit(2, [
+    `BLOCKED (guard-push, plugin pipeline-core): the Push-Gate evaluation faulted unexpectedly (${detail}).`,
+    `This authority-bearing gate fails closed on an unanticipated fault -- the push is blocked until the underlying issue is fixed.`,
+  ]);
 }
 
 if (failures.length === 0) process.exit(0); // all-green -- allow

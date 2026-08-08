@@ -374,6 +374,43 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   });
 }
 
+// ---- PG11e required + state has no pushApproval key at all -- pins equality with PG11c --
+// PUSHBOUND-1 (backlog: missing fixture named separately from PG11c). state?.pushApproval
+// ?.lastApproved walks the SAME optional chain whether pushApproval is absent entirely or
+// present-but-empty, so this MUST produce byte-identical stderr to PG11c -- pinned directly
+// here rather than assumed.
+{
+  const { dir, head } = freshRepo("required-no-pushapproval-key");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeState(dir, { schema: "pipeline.state.v0" });
+  const withoutKey = runGuard(PUSH_CMD, dir, { projectDir: dir });
+
+  const { dir: dirC, head: headC } = freshRepo("required-missing-last-approved-compare");
+  writeManifest(dirC, manifestPush({ approval: "required" }));
+  writeEvidence(dirC, "evidence/verify-latest.json", { exitCode: 0, commit: headC });
+  writeState(dirC, { schema: "pipeline.state.v0", pushApproval: {} });
+  const withEmptyObject = runGuard(PUSH_CMD, dirC, { projectDir: dirC });
+
+  const problems = [];
+  if (withoutKey.code !== BLOCK) problems.push(`exit ${withoutKey.code} (expected ${BLOCK})`);
+  if (withoutKey.code !== withEmptyObject.code) {
+    problems.push(`exit code diverges from PG11c: ${withoutKey.code} vs ${withEmptyObject.code}`);
+  }
+  if (withoutKey.stderr !== withEmptyObject.stderr) {
+    problems.push(
+      `stderr diverges from PG11c -- no-key: ${withoutKey.stderr.trim().slice(0, 300)} | empty-object: ${withEmptyObject.stderr.trim().slice(0, 300)}`,
+    );
+  }
+  if (problems.length === 0) {
+    pass++;
+    console.log("PASS  PG11e block  required approval, state has no pushApproval key at all (== PG11c)");
+  } else {
+    failures.push(`PG11e: ${problems.join("; ")}`);
+    console.log(`FAIL  PG11e -- ${problems.join("; ")}`);
+  }
+}
+
 // ---- PG-HD heredoc bodies are DATA; a command AFTER one is still a command ----------
 // A first version of this stripping shipped FAIL-OPEN: the opener was never removed so
 // the scan re-matched it, the terminator was gone the second time, and the whole
@@ -1914,6 +1951,51 @@ function deployApprovalState(forArtifact, forEnvironment) {
     BLOCK,
     { stderrIncludes: ["machine-local sessionCleanup handle"] },
   );
+}
+
+
+// ---- PG28 terminal fault boundary: an escaped exception inside the blocking evaluation
+// fails CLOSED (issue #100 AC3 / PUSHBOUND-1). Uses the guard's own test-only
+// fault-injection sentinel (PIPELINE_GUARD_PUSH_TEST_FAULT) to make the evaluation
+// genuinely throw -- this is NOT a test that a `catch` merely exists; it exercises it
+// end to end and asserts the exit code a "blocking" push gate demands even on a fault
+// it never anticipated.
+{
+  const { dir, head } = freshRepo("fault-blocking");
+  writeManifest(dir, manifestPush({ mode: "blocking", approval: "standing-approved" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG28 block  an injected fault inside the blocking evaluation fails closed", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["BLOCKED", "faulted unexpectedly", "fails closed"],
+    stderrNotIncludes: ["PUSHBOUND-1 injected test fault", "at file://", ".mjs:"],
+    env: { PIPELINE_GUARD_PUSH_TEST_FAULT: "PUSHBOUND-1-inject" },
+  });
+}
+
+// ---- PG29 the SAME injected fault under mode "warn" keeps its documented non-blocking
+// semantics unchanged (acceptance criterion 4) -- a fault must never be MORE permissive
+// than a genuine finding would have been, but it must also never become MORE blocking
+// than the gate's own configured mode.
+{
+  const { dir, head } = freshRepo("fault-warn");
+  writeManifest(dir, manifestPush({ mode: "warn", approval: "standing-approved" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG29 warn  an injected fault under mode warn stays non-blocking (AC4 unchanged)", PUSH_CMD, dir, WARN, {
+    stderrIncludes: ["WARN", "faulted unexpectedly"],
+    stderrNotIncludes: ["PUSHBOUND-1 injected test fault", "at file://", ".mjs:"],
+    env: { PIPELINE_GUARD_PUSH_TEST_FAULT: "PUSHBOUND-1-inject" },
+  });
+}
+
+// ---- PG30 the fault sentinel is inert without the exact env var + value: an ordinary
+// all-green push is unaffected -- confirms the injection seam cannot accidentally fire.
+{
+  const { dir, head } = freshRepo("fault-inert");
+  writeManifest(dir, manifestPush({ mode: "blocking", approval: "standing-approved" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG30 allow  the fault sentinel env var alone (wrong value) never fires", PUSH_CMD, dir, ALLOW, {
+    stderrEmpty: true,
+    env: { PIPELINE_GUARD_PUSH_TEST_FAULT: "not-the-sentinel" },
+  });
 }
 
 // ---- Cleanup ----------------------------------------------------------------------------
