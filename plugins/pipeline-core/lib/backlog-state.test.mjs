@@ -1151,8 +1151,20 @@ function managedRepairInput(root, overrides = {}) {
   // rewrites the tail that no longer matches physical order -- the first 38
   // events (the amendment targets, whose entryHash is pinned by
   // PRE_PUBLIC_CORE_REACHABILITY_TARGETS) always come out byte-identical --
-  // so the result is stable no matter how many events the live ledger later
-  // grows by.
+  // so the rebuild survives ordinary growth of the live ledger.
+  //
+  // Measured, not reasoned (2026-08-08, both directions): appending
+  // consistent ordinary events -- ones whose paired `items` entry is updated
+  // too -- leaves validateTransitionLedger's finding set at exactly the
+  // authorized 38 and both directions of the discrimination below intact.
+  // The stability is conditional on that consistency: the planner compares
+  // against the *whole* finding set, so an items-level inconsistency
+  // unrelated to reachability (an item whose status no longer matches its
+  // final transition) adds a 39th finding and makes the refusal fire in the
+  // without-override direction too. A future ordinary item inconsistency can
+  // therefore break this case without any append being at fault; a synthetic
+  // fixture would be immune, at the cost of the realism the live binding
+  // buys. Recorded in docs/state.md rather than decided silently here.
   function renumberPrePublicCoreHistory(events) {
     const rebuilt = [];
     let previousHash = null;
