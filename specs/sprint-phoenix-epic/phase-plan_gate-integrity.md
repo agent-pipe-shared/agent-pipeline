@@ -386,6 +386,34 @@ that way here. A claim about what a gate will *do* is verified by provoking it,
 not by reading it. The same shape as the stage-0 scoping error recorded in the
 handover: measure the property, do not infer it from the neighbourhood.
 
+### A structural cost this table did not price, measured 2026-08-08
+
+Rows 2 and 3 look like two one-off items. They are not: they are **one row
+entered twice**, and that is permanent.
+
+`project-authority-migration.mjs inspect --root .` reports `source: "neutral"`,
+with `guardConfig: "project/guard-config.json"`. So every gate in this repository
+reads the neutral tier and **nothing reads `.claude/guard-config.json`**. The
+obvious conclusion — retire the unread copy, after which only one tier exists and
+`check-authority-tier-agreement.mjs` exits 0 by its own header rule — is **not
+available**: `plan` returns `status: "noop"` with
+`compatibility: "dual-read-one-write"` and no retirement target. The two-tier
+layout is intended, and the tooling offers no sanctioned way to collapse it.
+
+**The consequence is a standing tax, not a phase cost.** Every future
+protected-test-path row must be written to both tiers or the agreement check goes
+red; the two files are separate gate-strength paths, so one override cannot cover
+both; therefore **each new protected test costs two human authorizations,
+forever**. This phase adds one such row (TP-12) and inherits a second (TP-11)
+that was only ever entered at one tier — which is exactly how the drift this
+phase repairs came to exist.
+
+That is worth stating in the PO's own terms: the approval budget's "four" is
+honest for this phase, and the mechanism behind two of those four scales with the
+number of protected tests rather than with the amount of work. Reducing it is a
+design change to the tier layout or to override scoping — the Nova mechanism's
+territory, and out of scope here beyond being measured and recorded.
+
 ## Risks and mitigation
 
 | Risk | Mitigation |
