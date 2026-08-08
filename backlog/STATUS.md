@@ -19,6 +19,7 @@
 | pipeline.authority-gate-verdict-need-not-survive-checkout | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.backlog-delivery-status-reconciliation | in_progress | workflow-improvement | pipeline | 2026-07-25 | Nova A / issue #57 |
 | pipeline.backlog-ledger-closure-reason-misleading | closed | defect | pipeline | 2026-08-07 | — |
+| pipeline.blocking-push-gate-has-no-terminal-exception-boundary | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.bounded-diagnostic-outside-repo-refused-under-wrong-reason | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.briefing-model-field-contradicts-agent-definition | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.canonical-worktree-lifecycle | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -34,6 +35,7 @@
 | pipeline.critical-human-proof-not-wired-to-push-and-prd-gates | open | defect | pipeline | 2026-08-05 | — |
 | pipeline.cross-repository-override-ledger-binding | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.dispatch-provenance | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
+| pipeline.dispatch-reported-creating-a-record-it-never-created | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.dispatched-agents-return-truncated-mid-step | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.documentation-information-architecture | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.dual-channel-publication | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -74,6 +76,7 @@
 | pipeline.onboarding-lifecycle-plan-hardcodes-the-codex-runner | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.onboarding-ready-path-unconditional-restart-barrier-read | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.onboarding-restart-flow-is-codex-only-not-runner-aware | closed | defect | pipeline | 2026-08-07 | — |
+| pipeline.orchestrator-authored-production-commits-have-no-deterministic-control | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.over-broad-ignore-rule-swallows-closure-evidence | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.parallel-goldfish-dispatches-race-on-shared-checkout | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.pipeline-state-rebind-codex-default-runner | closed | defect | pipeline | 2026-08-05 | — |
@@ -123,6 +126,6 @@
 
 ## Counts
 
-- open: 69
+- open: 72
 - in_progress: 21
 - closed: 25

@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "2547c9e3cd68100f36496afc0e1ef371ae8d7a102701f31164bc790653089e74"
+    "transitionHead": "9ee657ff4b02e41a8824885e562d9ea10bffe2026255eda404a0e23bd58a22bc"
   },
   "counts": {
-    "open": 69,
+    "open": 72,
     "in_progress": 21,
     "closed": 25
   },
@@ -134,6 +134,14 @@
       "closureEvidence": "backlog/evidence/2026-08-07-nova-gwm-backlog-fixes.md"
     },
     {
+      "id": "pipeline.blocking-push-gate-has-no-terminal-exception-boundary",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Residual of GitHub issue #100 (P0/Security, 'Fail closed when the push approval record is absent'), established by reading the current tree on 2026-08-08. The PO independently reached this state in a greenfield test the same day."
+    },
+    {
       "id": "pipeline.bounded-diagnostic-outside-repo-refused-under-wrong-reason",
       "status": "open",
       "type": "defect",
@@ -259,6 +267,14 @@
       "owner": "pipeline",
       "created": "2026-07-20",
       "source": "Public V3 Foundation stabilization close authorship check: delivered Goldfish work packages lacked required public Dispatch trailers"
+    },
+    {
+      "id": "pipeline.dispatch-reported-creating-a-record-it-never-created",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Found when a Critic delta review stopped fail-closed on a missing required reference, 2026-08-08. The reference was a dispatch record the dispatch's own report claimed to have created."
     },
     {
       "id": "pipeline.dispatched-agents-return-truncated-mid-step",
@@ -603,6 +619,14 @@
       "closureRepository": "self",
       "closureCommit": "864c7f1f84b5e0a874e360bf26e168fa92f14aaf",
       "closureEvidence": "backlog/evidence/2026-08-08-restart-barrier-runner-exemption-verification.md"
+    },
+    {
+      "id": "pipeline.orchestrator-authored-production-commits-have-no-deterministic-control",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Critic delta re-review v2, 2026-08-08 (backlog/evidence/2026-08-08-critic-delta-v2-verdict.md, Findings A and B). The pattern recurred nine minutes after the commit that acknowledged it."
     },
     {
       "id": "pipeline.over-broad-ignore-rule-swallows-closure-evidence",
