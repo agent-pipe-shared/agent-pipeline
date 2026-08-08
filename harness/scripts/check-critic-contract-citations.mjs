@@ -34,8 +34,9 @@
  *               pointer resolve to text that contains them.
  *   PHX-CITE-3  the review system is attributed to the same operating-model
  *               section that CLAUDE.md's *Where things live* maps it to
- *               (CLAUDE.md is the tie-breaker), and an "escalation ladder"
- *               attribution resolves to a section that has one.
+ *               (CLAUDE.md is the tie-breaker), and EVERY "escalation ladder"
+ *               attribution in the three contract files resolves to a target
+ *               that has a rung.
  *   PHX-CITE-4  the pointer for the normative risk-class definitions resolves
  *               to text that defines risk.
  *   PHX-CITE-5  the "search harshly, report honestly" back-reference resolves
@@ -43,6 +44,20 @@
  *   PHX-CITE-6  the Rensin attribution resolves to a target that names Rensin.
  *   PHX-CITE-7  no "transfer format <n>" ordinal is used while no enumeration
  *               defining that numbering exists anywhere in the canon.
+ *   PHX-CITE-8  every CROSS-FILE section coordinate (`path.md` §N[.N], with or
+ *               without backticks) in the three contract files resolves to a
+ *               section that exists in the cited file — and, where the
+ *               coordinate also names the section title, to a heading that
+ *               carries that title. Two of the seven founding defects were
+ *               §-numbers off by one; before this class the number was parsed
+ *               only out of a "this file" clause and discarded everywhere else.
+ *
+ * NO CLASS MAY BE SATISFIED BY ITS OWN CITING LINE. Several citations sit
+ * inside the very section they cite (PHX-CITE-5 is the canonical case), so a
+ * naive substring search finds the cited phrase in the pointer rather than in
+ * the rule. Every content test below therefore runs against the target text
+ * with the citing line removed (`withoutCitingLine`): the section must state
+ * the cited content itself, or the class goes red.
  *
  * Exit 0 = every citation resolves. Exit 2 = at least one does not.
  * `--root <dir>` resolves all paths against another checkout, which is how the
@@ -65,14 +80,21 @@ const ADR14 = "docs/adr/0014-critic-contract.md";
 const CLAUDE = "CLAUDE.md";
 const README = "README.md";
 const FLOW = "PIPELINE_FLOW.md";
+const BOOTSTRAP = "harness/session-bootstrap.md";
 
 /** Every file this check reads; the evidence runner materializes exactly these. */
-export const CITATION_SOURCE_FILES = [PROTOCOL, ROLE, SKILL, OM, ADR3, ADR14, CLAUDE, README, FLOW];
+export const CITATION_SOURCE_FILES = [PROTOCOL, ROLE, SKILL, OM, ADR3, ADR14, CLAUDE, README, FLOW, BOOTSTRAP];
 
-/** Path tokens a citation may use, mapped to the file they resolve to. */
+/**
+ * Path tokens a citation may use, mapped to the file they resolve to. The
+ * directory prefix is optional where a contract file cites a sibling by bare
+ * filename ("review-protocol.md §2.1", `roles/critic.md`) — dropping those
+ * would silently exempt one of the three files from PHX-CITE-8.
+ */
 const PATH_ALIASES = [
   [/^docs\/operating-model\.md$/, OM],
-  [/^harness\/review-protocol\.md$/, PROTOCOL],
+  [/^(?:harness\/)?review-protocol\.md$/, PROTOCOL],
+  [/^(?:harness\/)?session-bootstrap\.md$/, BOOTSTRAP],
   [/^roles\/critic\.md$/, ROLE],
   [/critic-review\/SKILL\.md$/, SKILL],
   [/^CLAUDE\.md$/, CLAUDE],
@@ -140,30 +162,80 @@ function line(text, locator) {
   return m ? m[0] : null;
 }
 
-/** All `path.md` references in a citation, each with the section it names, if any. */
+/**
+ * All `path.md` references in a citation, each with the section coordinate it
+ * names: a §-number (`…md` §2.1), a title (`…md` — *Trigger decision table*),
+ * or both (`…md` §2.1, *Trigger decision table*). The §-number used to be
+ * dropped here, which followed a cross-file citation to the file and threw its
+ * coordinate away — the exact defect shape (§ off by one) this check was
+ * written for.
+ */
 function pathRefs(citation) {
   const refs = [];
-  const re = /`([^`]+\.md)`(?:\s*(?:—|,)\s*\*([^*]+)\*)?/g;
+  const re = /`([^`]+\.md)`(?:\s*§(\d+(?:\.\d+)*))?(?:\s*(?:—|,)\s*\*([^*]+)\*)?/g;
   for (const m of citation.matchAll(re)) {
     const alias = PATH_ALIASES.find(([pattern]) => pattern.test(m[1]));
-    if (alias) refs.push({ raw: m[1], file: alias[1], sectionName: m[2] ?? null });
+    if (alias) refs.push({ raw: m[1], file: alias[1], sectionNum: m[2] ?? null, sectionName: m[3] ?? null });
   }
   return refs;
 }
 
 function adrRefs(citation) {
-  return ADR_ALIASES.filter(([pattern]) => pattern.test(citation)).map(([, file]) => ({ raw: file, file, sectionName: null }));
+  return ADR_ALIASES.filter(([pattern]) => pattern.test(citation)).map(([, file]) => ({ raw: file, file, sectionNum: null, sectionName: null }));
+}
+
+/** §-numbers a citation applies to the file it sits in ("§4 below", "this file's §2.1"). */
+function selfSectionNums(citation) {
+  const nums = [];
+  for (const re of [/this file'?s?\s*§(\d+(?:\.\d+)*)/g, /§(\d+(?:\.\d+)*)\s*(?:below|above|of this file)/g]) {
+    for (const m of citation.matchAll(re)) nums.push(m[1]);
+  }
+  return [...new Set(nums)];
 }
 
 /** Resolve a reference to its text, or null when the named section does not exist. */
 function resolveRef(root, ref) {
   const doc = readDoc(root, ref.file);
+  if (ref.sectionNum) {
+    const text = numberedSection(doc, ref.sectionNum);
+    if (text === null) return null;
+    // A coordinate that names both number and title must agree with the heading.
+    if (ref.sectionName && !text.split("\n")[0].includes(ref.sectionName)) return null;
+    return text;
+  }
   if (!ref.sectionName) return doc;
   return section(doc, new RegExp(`(^|\\s)${ref.sectionName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`));
 }
 
 function describe(ref) {
-  return ref.sectionName ? `${ref.file} — *${ref.sectionName}*` : ref.file;
+  const coordinate = [ref.sectionNum ? `§${ref.sectionNum}` : null, ref.sectionName ? `*${ref.sectionName}*` : null]
+    .filter(Boolean)
+    .join(", ");
+  return coordinate ? `${ref.file} — ${coordinate}` : ref.file;
+}
+
+/**
+ * The target text a citation is judged against, with the citing line itself
+ * removed. A pointer that sits inside its own target ("… (§2.5 above)" inside
+ * §2.5) otherwise proves itself: the searched phrase is present because the
+ * pointer names it, even after the section stops stating the rule.
+ */
+function withoutCitingLine(text, citation) {
+  if (text === null) return null;
+  const cited = citation.trim();
+  return text.split("\n").filter((l) => l.trim() !== cited).join("\n");
+}
+
+/** Every target a citing line names: path refs, ADR refs, and same-file §-refs. */
+function citedTargets(root, citingFile, citation) {
+  const targets = [...pathRefs(citation), ...adrRefs(citation)].map((ref) => ({
+    text: resolveRef(root, ref),
+    where: describe(ref),
+  }));
+  for (const num of selfSectionNums(citation)) {
+    targets.push({ text: numberedSection(readDoc(root, citingFile), num), where: `${citingFile} §${num}` });
+  }
+  return targets;
 }
 
 // ------------------------------------------------------------------- checks
@@ -201,16 +273,16 @@ function checkCanonicalWording(root, findings) {
       const refs = [...pathRefs(clause), ...adrRefs(clause)];
       if (/this file/.test(clause)) {
         const selfNum = /this file'?s? §(\d(?:\.\d)?)/.exec(clause);
-        refs.push({ raw: "this file", file: claim.file, sectionName: null, selfNum: selfNum ? selfNum[1] : null });
+        refs.push({ raw: "this file", file: claim.file, sectionNum: null, sectionName: null, selfNum: selfNum ? selfNum[1] : null });
       }
       for (const ref of refs) {
-        let text = ref.selfNum ? numberedSection(readDoc(root, ref.file), ref.selfNum) : resolveRef(root, ref);
+        const text = ref.selfNum ? numberedSection(readDoc(root, ref.file), ref.selfNum) : resolveRef(root, ref);
         const where = ref.selfNum ? `${ref.file} §${ref.selfNum}` : describe(ref);
         if (text === null) {
           findings.push(`PHX-CITE-1 TARGET-MISSING: ${claim.file} cites ${where}, which does not exist.`);
           continue;
         }
-        const carries = normalize(text).includes(canonical);
+        const carries = normalize(withoutCitingLine(text, citation)).includes(canonical);
         if (denies && carries) {
           findings.push(`PHX-CITE-1 FALSE-DENIAL: ${claim.file} says ${where} does not carry the canonical trigger wording, but it does.`);
         } else if (!denies && !carries) {
@@ -242,7 +314,7 @@ function checkRungAnchor(root, findings) {
         const ref = pathRefs(citation)[0];
         return ref ? { text: resolveRef(root, ref), where: describe(ref) } : { text: null, where: "(no target named)" };
       })();
-  if (target.text === null || !/rung/i.test(target.text)) {
+  if (target.text === null || !/rung/i.test(withoutCitingLine(target.text, citation))) {
     findings.push(`PHX-CITE-2 ANCHOR-ABSENT: ${PROTOCOL} anchors "rung 1" in ${target.where}, which contains no rung.`);
   }
 }
@@ -292,11 +364,34 @@ function checkOperationalizationMap(root, findings) {
       findings.push(`PHX-CITE-3 MAPPING-MISMATCH: ${PROTOCOL} assigns the review system to *${attributed[1]}*; ${CLAUDE} maps it to *${claudeMap[1]}*.`);
     }
   }
-  const ladder = /\*([^*]+)\* \(escalation ladder/.exec(citation);
-  if (ladder) {
-    const text = section(readDoc(root, OM), new RegExp(`(^|\\s)${ladder[1].replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`));
-    if (text === null || !/rung|ladder/i.test(text)) {
-      findings.push(`PHX-CITE-3 ANCHOR-ABSENT: ${PROTOCOL} assigns the escalation ladder to ${OM} — *${ladder[1]}*, which contains no ladder.`);
+}
+
+/**
+ * PHX-CITE-3b: EVERY "escalation ladder" attribution in the three contract
+ * files — not just the protocol's status line — resolves to a target that
+ * carries a rung. `roles/critic.md` attributed the ladder to an
+ * operating-model section that has neither the word "ladder" nor a rung in its
+ * normative English part; the check read that file for one other class and
+ * passed over this one, so the class only covered the file it happened to
+ * parse.
+ */
+function checkLadderAttributions(root, findings) {
+  for (const rel of [PROTOCOL, ROLE, SKILL]) {
+    const doc = readDoc(root, rel);
+    for (const raw of doc.split("\n")) {
+      if (/^#{1,6}\s/.test(raw)) continue; // a heading names the ladder, it does not cite it
+      for (const clause of raw.split(/;\s+/)) {
+        if (!/escalation ladder/i.test(clause)) continue;
+        const targets = citedTargets(root, rel, clause);
+        if (targets.length === 0) {
+          findings.push(`PHX-CITE-3 LADDER-UNANCHORED: ${rel} refers to the escalation ladder without naming where it is defined: "${clause.trim()}"`);
+          continue;
+        }
+        const anchored = targets.some((t) => t.text !== null && /\brungs?\b/i.test(withoutCitingLine(t.text, raw)));
+        if (!anchored) {
+          findings.push(`PHX-CITE-3 LADDER-ABSENT: ${rel} attributes the escalation ladder to ${targets.map((t) => t.where).join(", ")}; no cited target contains a rung.`);
+        }
+      }
     }
   }
 }
@@ -318,7 +413,7 @@ function checkRiskClassDefinitions(root, findings) {
     : selfNum
       ? [{ text: numberedSection(doc, selfNum[1]), where: `${PROTOCOL} §${selfNum[1]}` }]
       : [{ text: null, where: "(no target named)" }];
-  const defines = targets.some((t) => t.text !== null && /\*\*Risk\*\*\s*(answers|is|means)/.test(t.text));
+  const defines = targets.some((t) => t.text !== null && /\*\*Risk\*\*\s*(answers|is|means)/.test(withoutCitingLine(t.text, citation)));
   if (!defines) {
     findings.push(`PHX-CITE-4 DEFINITION-ABSENT: ${PROTOCOL} points at ${targets.map((t) => t.where).join(", ")} for the normative risk-class definitions; no cited target defines risk.`);
   }
@@ -332,14 +427,17 @@ function checkTwoPhaseBackReference(root, findings) {
     findings.push(`PHX-CITE-5 CITATION-NOT-FOUND: ${PROTOCOL} no longer contains the prompt-framing rule.`);
     return;
   }
-  const selfNum = /§(\d(?:\.\d)?)/.exec(citation);
-  if (!selfNum) {
+  const targets = citedTargets(root, PROTOCOL, citation);
+  if (targets.length === 0) {
     findings.push(`PHX-CITE-5 REFERENCE-MISSING: ${PROTOCOL} states the two-phase pattern without naming where it is defined.`);
     return;
   }
-  const text = numberedSection(doc, selfNum[1]);
-  if (text === null || !/search harshly, report honestly/i.test(text)) {
-    findings.push(`PHX-CITE-5 PATTERN-ABSENT: ${PROTOCOL} cites §${selfNum[1]} for "search harshly, report honestly"; that section does not state it.`);
+  // The pointer sits INSIDE the section it cites, so the phrase is present in
+  // the target as long as the pointer is — the citing line is removed before
+  // the search, otherwise this class could not fail at all.
+  const states = targets.some((t) => t.text !== null && /search harshly, report honestly/i.test(withoutCitingLine(t.text, citation)));
+  if (!states) {
+    findings.push(`PHX-CITE-5 PATTERN-ABSENT: ${PROTOCOL} cites ${targets.map((t) => t.where).join(", ")} for "search harshly, report honestly"; no cited target states it independently of the citing line.`);
   }
 }
 
@@ -361,7 +459,7 @@ function checkRensinAttribution(root, findings) {
     findings.push(`PHX-CITE-6 REFERENCE-MISSING: ${PROTOCOL} attributes the rule to Rensin without naming where that attribution is anchored.`);
     return;
   }
-  const anchored = targets.some((t) => t.text !== null && /Rensin/.test(t.text));
+  const anchored = targets.some((t) => t.text !== null && /Rensin/.test(withoutCitingLine(t.text, citation)));
   if (!anchored) {
     findings.push(`PHX-CITE-6 ATTRIBUTION-ABSENT: ${PROTOCOL} anchors the Rensin attribution in ${targets.map((t) => t.where).join(", ")}; no cited target names Rensin.`);
   }
@@ -379,16 +477,56 @@ function checkTransferFormatOrdinal(root, findings) {
   }
 }
 
+/**
+ * PHX-CITE-8: every cross-file section coordinate resolves to a section that
+ * exists — and, where the coordinate also names the title, to a heading that
+ * carries it. The number is the part a reader navigates by, and it is the part
+ * that silently rots when the target file is renumbered.
+ */
+const COORDINATE_RE = /`?((?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+\.md)`?\s*§(\d+(?:\.\d+)*)(?:\s*,\s*\*([^*]+)\*)?/g;
+
+function checkSectionCoordinates(root, findings) {
+  for (const rel of [PROTOCOL, ROLE, SKILL]) {
+    const doc = readDoc(root, rel);
+    for (const m of doc.matchAll(COORDINATE_RE)) {
+      const alias = PATH_ALIASES.find(([pattern]) => pattern.test(m[1]));
+      const file = alias ? alias[1] : m[1];
+      let targetDoc;
+      try {
+        targetDoc = readDoc(root, file);
+      } catch {
+        // A replay root materializes CITATION_SOURCE_FILES only; an unreadable
+        // non-canon target is a defect in the real checkout, absence elsewhere.
+        if (root === DEFAULT_ROOT) {
+          findings.push(`PHX-CITE-8 FILE-MISSING: ${rel} cites ${file} §${m[2]}; that file cannot be read.`);
+        }
+        continue;
+      }
+      const text = numberedSection(targetDoc, m[2]);
+      if (text === null) {
+        findings.push(`PHX-CITE-8 SECTION-MISSING: ${rel} cites ${file} §${m[2]}, which does not exist in that file.`);
+        continue;
+      }
+      const heading = text.split("\n")[0].trim();
+      if (m[3] && !heading.includes(m[3])) {
+        findings.push(`PHX-CITE-8 TITLE-MISMATCH: ${rel} cites ${file} §${m[2]} as *${m[3]}*; that section is "${heading}".`);
+      }
+    }
+  }
+}
+
 export function checkCriticContractCitations({ root = DEFAULT_ROOT } = {}) {
   const findings = [];
   checkCanonicalWording(root, findings);
   checkRungAnchor(root, findings);
   checkLadderPointer(root, findings);
   checkOperationalizationMap(root, findings);
+  checkLadderAttributions(root, findings);
   checkRiskClassDefinitions(root, findings);
   checkTwoPhaseBackReference(root, findings);
   checkRensinAttribution(root, findings);
   checkTransferFormatOrdinal(root, findings);
+  checkSectionCoordinates(root, findings);
   return { ok: findings.length === 0, findings, root };
 }
 
@@ -397,7 +535,7 @@ if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import
   const root = rootIndex === -1 ? DEFAULT_ROOT : resolve(process.argv[rootIndex + 1] ?? DEFAULT_ROOT);
   const result = checkCriticContractCitations({ root });
   if (result.ok) {
-    console.log("Critic contract citations: every cited target contains its cited content (7 citation classes checked).");
+    console.log("Critic contract citations: every cited target contains its cited content (8 citation classes checked).");
     process.exit(0);
   }
   for (const finding of result.findings) console.error(finding);

@@ -208,7 +208,7 @@ carriers stop before those reads. `CRITIC-BOOTSTRAP-ROLE-CLOSED`.
 
 ## 10. References
 
-- `docs/operating-model.md` — *Roles and boundaries* (this role, normative); `harness/review-protocol.md` §2.1 (risk classes + trigger matrix); `docs/operating-model.md` — *Evidence, review and recovery* (escalation ladder stage 2); *The lifecycle* (spec-readiness check — the sibling review BEFORE implementation).
+- `docs/operating-model.md` — *Roles and boundaries* (this role, normative); `harness/review-protocol.md` §2.1 (risk classes + trigger matrix); `harness/review-protocol.md` §4 (escalation ladder — rung 2 is this role, and the ladder lives in the protocol, not in the operating model); `docs/operating-model.md` — *The lifecycle* (spec-readiness check — the sibling review BEFORE implementation).
 - ADR-0014 (Critic contract), ADR-0003 (isolation stages), ADR-0011 (language).
 - `policies/model-policy.md` — MP-03/MP-07 (staffing); `policies/tooling-policy.md` — W2 (subagent), W7 (`--bare`/headless).
 - `harness/session-bootstrap.md` — §6.3 (Critic variant).
