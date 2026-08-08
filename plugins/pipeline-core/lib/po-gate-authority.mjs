@@ -77,6 +77,37 @@ const PROFILE_REPAIR = "Run node setup.mjs --publish-po-profile from the canonic
   + " In a consumer project, run the pipeline-core script po-gate-profile-repair.mjs (plan, then apply --activate)"
   + " against that project's own primary checkout; add --human-facing <de|en> to set or correct the operator-facing language.";
 const PRD_REPAIR = "Repair activeFeature.planPath and the active feature directory; do not create child PRDs.";
+// PO-GATE-PRD-SPEC-MISMATCH is a document-binding defect: the PRD's technical
+// Spec marker and the neighboring spec.md bytes disagree, or that spec.md is not
+// readable as a physical regular file. activeFeature.planPath is correct in this
+// state, so PRD_REPAIR's route repairs nothing here -- worse, it invites an edit
+// to authority state in order to fix a document. Name the two documents, the
+// exact marker grammar this module parses, and -- for the approved-plan case,
+// where editing the PRD by hand would break the recorded approval -- the
+// sanctioned rebind route pipeline-state.mjs itself provides, in the flag form
+// its own usage line accepts. No absolute path appears in either sentence.
+const SPEC_REPAIR = "The active PRD must bind the neighboring spec.md of the same feature directory:"
+  + " that spec.md must exist as a physical regular file, and the PRD must carry its digest exactly once,"
+  + " as <!-- technical-spec-sha256: <sha256-of-spec.md> --> on its own line."
+  + " Bring those two documents back into agreement; do not change activeFeature.planPath, which is not what is wrong here."
+  + " If the plan is already approved and the Spec changed during implementation, use the sanctioned rebind rather than editing the marker by hand:"
+  + " run the pipeline-core script pipeline-state.mjs po-authority-rebind-plan, then pipeline-state.mjs po-authority-rebind-apply"
+  + " --plan-sha256 <sha256> --updated-at <ISO-8601> --activate with the digest and timestamp that plan reports.";
+// A PRD whose bytes are not decodable UTF-8 never reaches any marker check. The
+// defect is the encoding of one file; no path, directory or PRD count is
+// involved, and no script in this repository re-encodes a document for the PO.
+const ENCODING_REPAIR = "The active PRD is not canonical UTF-8 text; this is a file-encoding defect, not a plan-path defect."
+  + " Re-save the PRD at its current location as UTF-8 text, then retry; do not change activeFeature.planPath.";
+// The digest-staleness failures say the caller's snapshot is older than the
+// documents it binds -- the path it names is still the right one. The remedy is
+// to re-read the authority and re-submit with the digests it reports. Deliberately
+// no script is named: the operation to repeat is whichever one the operator was
+// running, and this repository's own checker does not exist in a consumer project.
+const SNAPSHOT_REPAIR = "The authority snapshot is older than the documents it binds:"
+  + " the active PRD or its Spec changed, or the active feature was cleared, after those digests were taken."
+  + " Re-read the current PO gate authority and re-submit the operation with the digests it reports,"
+  + " or restore the documents to the state the snapshot was taken from; if the active feature was cleared, re-establish it first."
+  + " Do not change activeFeature.planPath.";
 // A PRD language marker that disagrees with the configured language is not a
 // plan-path defect, and PRD_REPAIR's route repairs nothing about it. The PO in
 // this state has two legitimate resolutions: change the configured language to
@@ -625,7 +656,7 @@ function prdAuthority(repoRoot, active, expectedLanguage) {
   try {
     text = decodeUtf8(planBytes);
   } catch {
-    return fail("PO-GATE-PRD-LANGUAGE-MISMATCH", "The active PRD is not canonical UTF-8 text.", PRD_REPAIR);
+    return fail("PO-GATE-PRD-LANGUAGE-MISMATCH", "The active PRD is not canonical UTF-8 text.", ENCODING_REPAIR);
   }
   const markers = [...text.matchAll(PRD_LANGUAGE_MARKER)].map((match) => match[1]);
   if (markers.length !== 1 || markers[0] !== expectedLanguage) {
@@ -641,12 +672,12 @@ function prdAuthority(repoRoot, active, expectedLanguage) {
   try {
     specBytes = readPhysicalFile(repoRoot, specPath);
   } catch {
-    return fail("PO-GATE-PRD-SPEC-MISMATCH", "The active PRD must bind the neighboring physical spec.md bytes exactly once.", PRD_REPAIR);
+    return fail("PO-GATE-PRD-SPEC-MISMATCH", "The active PRD must bind the neighboring physical spec.md bytes exactly once.", SPEC_REPAIR);
   }
   const specSha256 = sha256(specBytes);
   const specMarkers = [...text.matchAll(TECHNICAL_SPEC_MARKER)].map((match) => match[1]);
   if (specMarkers.length !== 1 || specMarkers[0] !== specSha256) {
-    return fail("PO-GATE-PRD-SPEC-MISMATCH", "The active PRD technical Spec marker must exactly match the neighboring spec.md bytes.", PRD_REPAIR);
+    return fail("PO-GATE-PRD-SPEC-MISMATCH", "The active PRD technical Spec marker must exactly match the neighboring spec.md bytes.", SPEC_REPAIR);
   }
   return {
     ok: true,
@@ -683,17 +714,17 @@ export function validatePoGateAuthority({
   }
   if (active.status === "absent") {
     if (expectedPlanSha256 !== undefined || expectedSpecSha256 !== undefined) {
-      return fail("PO-GATE-PLAN-DIGEST-STALE", "The active PRD authority no longer exists.", PRD_REPAIR);
+      return fail("PO-GATE-PLAN-DIGEST-STALE", "The active PRD authority no longer exists.", SNAPSHOT_REPAIR);
     }
     return { ok: true, code: "PO-GATE-AUTHORITY-VALID", value: profileEvidence };
   }
   const prd = prdAuthority(current, active, profileEvidence.humanFacing);
   if (!prd.ok) return prd;
   if (expectedPlanSha256 !== undefined && (!SHA256.test(expectedPlanSha256) || expectedPlanSha256 !== prd.planSha256)) {
-    return fail("PO-GATE-PLAN-DIGEST-STALE", "The active PRD changed after the authority snapshot was taken.", PRD_REPAIR);
+    return fail("PO-GATE-PLAN-DIGEST-STALE", "The active PRD changed after the authority snapshot was taken.", SNAPSHOT_REPAIR);
   }
   if (expectedSpecSha256 !== undefined && (!SHA256.test(expectedSpecSha256) || expectedSpecSha256 !== prd.specSha256)) {
-    return fail("PO-GATE-PRD-SPEC-MISMATCH", "The active Spec changed after the authority snapshot was taken.", PRD_REPAIR);
+    return fail("PO-GATE-PRD-SPEC-MISMATCH", "The active Spec changed after the authority snapshot was taken.", SNAPSHOT_REPAIR);
   }
 
   const evidence = {

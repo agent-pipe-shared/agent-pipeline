@@ -1192,4 +1192,151 @@ check("missing, duplicate and malformed language markers still fail before appro
   }
 });
 
+// REPAIRSTR-1: one repair string used to be attached to three unlike causes. A
+// refusal that names the wrong remedy is load-bearing now that the seeded
+// dev-plan gate blocks rather than warns -- an operator who follows plan-path
+// guidance for a Spec-marker drift edits authority state to fix a document.
+// Each remaining class below is signposted to the remedy that resolves it, and
+// every genuine plan-path defect keeps PRD_REPAIR verbatim.
+
+const PLAN_PATH_REPAIR = "Repair activeFeature.planPath and the active feature directory; do not create child PRDs.";
+
+function captureStderr(fn) {
+  const original = console.error;
+  const lines = [];
+  console.error = (...args) => lines.push(args.map(String).join(" "));
+  try {
+    fn();
+  } finally {
+    console.error = original;
+  }
+  return lines.join("\n");
+}
+
+check("a Spec-binding mismatch is signposted to spec.md and its marker, not to plan-path repair", () => {
+  // Missing neighboring spec.md, and a marker that no longer matches its bytes.
+  const cases = [
+    ({ primary }) => unlinkSync(join(primary, "specs", "feature", "spec.md")),
+    ({ primary }) => write(join(primary, "specs", "feature", "spec.md"), spec("# Technical Spec\ndrifted\n")),
+  ];
+  for (const mutate of cases) {
+    withFixture({}, (value) => {
+      mutate(value);
+      const result = value.validate();
+      assert.equal(result.ok, false, JSON.stringify(result));
+      assert.equal(result.code, "PO-GATE-PRD-SPEC-MISMATCH", JSON.stringify(result));
+      assert.match(result.repair, /spec\.md/u, JSON.stringify(result));
+      assert.match(result.repair, /<!-- technical-spec-sha256: <sha256-of-spec\.md> -->/u, JSON.stringify(result));
+      // The unrelated remedy is gone, and the wrong edit it invited is named as
+      // the thing NOT to do.
+      assert.equal(result.repair.includes(PLAN_PATH_REPAIR), false, JSON.stringify(result));
+      assert.match(result.repair, /do not change activeFeature\.planPath/u, JSON.stringify(result));
+    });
+  }
+});
+
+check("the Spec guidance names a rebind route pipeline-state actually provides", () => {
+  const guidance = withFixture({}, ({ primary, validate }) => {
+    write(join(primary, "specs", "feature", "spec.md"), spec("# Technical Spec\ndrifted\n"));
+    return validate().repair;
+  });
+  withFixture({}, ({ primary }) => {
+    // The writer's own command list is the contract for the subcommand names ...
+    const allowed = captureStderr(() => {
+      assert.equal(runPipelineState(["po-authority-rebind-plan-typo"], { dir: primary, now: () => NOW }), 2);
+    });
+    for (const subcommand of ["po-authority-rebind-plan", "po-authority-rebind-apply"]) {
+      assert.ok(allowed.includes(subcommand), `${subcommand} is not an allowed command: ${allowed}`);
+      assert.ok(guidance.includes(`pipeline-state.mjs ${subcommand}`), `${subcommand} is not in the guidance: ${guidance}`);
+    }
+    // ... and its own usage line is the contract for the flag forms.
+    const usage = captureStderr(() => {
+      assert.equal(runPipelineState(["po-authority-rebind-apply"], { dir: primary, now: () => NOW }), 2);
+    });
+    for (const token of ["--plan-sha256 <sha256>", "--updated-at <ISO-8601>", "--activate"]) {
+      assert.ok(usage.includes(token), `${token} is not in the writer usage: ${usage}`);
+      assert.ok(guidance.includes(token), `${token} is not in the guidance: ${guidance}`);
+    }
+  });
+});
+
+check("a non-UTF-8 PRD is signposted to the file's encoding, not to plan-path repair", () => {
+  withFixture({}, ({ primary, validate }) => {
+    write(join(primary, "specs", "feature", "prd_feature.md"), Buffer.from([0xff, 0xfe]));
+    const result = validate();
+    assert.equal(result.ok, false, JSON.stringify(result));
+    assert.equal(result.code, "PO-GATE-PRD-LANGUAGE-MISMATCH", JSON.stringify(result));
+    assert.match(result.repair, /UTF-8/u, JSON.stringify(result));
+    assert.equal(result.repair.includes(PLAN_PATH_REPAIR), false, JSON.stringify(result));
+    assert.match(result.repair, /do not change activeFeature\.planPath/u, JSON.stringify(result));
+    // Not the marker route either: nothing about the language is known yet.
+    assert.equal(/--human-facing/u.test(result.repair), false, JSON.stringify(result));
+  });
+});
+
+check("digest staleness is signposted to re-reading and re-submitting, not to plan-path repair", () => {
+  withFixture({}, ({ validate }) => {
+    const stalePlan = validate({ expectedPlanSha256: "0".repeat(64) });
+    const staleSpec = validate({ expectedSpecSha256: "0".repeat(64) });
+    assert.equal(stalePlan.code, "PO-GATE-PLAN-DIGEST-STALE", JSON.stringify(stalePlan));
+    assert.equal(staleSpec.code, "PO-GATE-PRD-SPEC-MISMATCH", JSON.stringify(staleSpec));
+    for (const result of [stalePlan, staleSpec]) {
+      assert.match(result.repair, /Re-read the current PO gate authority and re-submit/u, JSON.stringify(result));
+      assert.equal(result.repair.includes(PLAN_PATH_REPAIR), false, JSON.stringify(result));
+      assert.match(result.repair, /Do not change activeFeature\.planPath/u, JSON.stringify(result));
+    }
+  });
+  // The same remedy covers a snapshot whose active feature no longer exists.
+  withFixture({}, ({ primary, validate }) => {
+    write(join(primary, ".claude", "pipeline-state.json"), `${JSON.stringify({ schema: "pipeline.state.v0" }, null, 2)}\n`);
+    const result = validate({ expectedPlanSha256: "0".repeat(64) });
+    assert.equal(result.code, "PO-GATE-PLAN-DIGEST-STALE", JSON.stringify(result));
+    assert.match(result.repair, /re-establish it first/u, JSON.stringify(result));
+    assert.equal(result.repair.includes(PLAN_PATH_REPAIR), false, JSON.stringify(result));
+  });
+});
+
+check("every genuine plan-path defect still returns the plan-path repair verbatim", () => {
+  // Unreadable feature directory, unsafe active feature state, zero PRDs, and a
+  // planPath that does not name the sole PRD.
+  const cases = [
+    [({ primary }) => rmSync(join(primary, "specs", "feature"), { recursive: true, force: true }), "PO-GATE-FEATURE-PATH-INVALID"],
+    [({ primary }) => write(join(primary, ".claude", "pipeline-state.json"), state("specs/feature/not-a-prd.md")), "PO-GATE-ACTIVE-FEATURE-INVALID"],
+    [({ primary }) => unlinkSync(join(primary, "specs", "feature", "prd_feature.md")), "PO-GATE-PRD-CARDINALITY"],
+    [({ primary }) => write(join(primary, "specs", "feature", "prd_second.md"), prd("de")), "PO-GATE-PRD-CARDINALITY"],
+  ];
+  for (const [mutate, code] of cases) {
+    withFixture({}, (value) => {
+      mutate(value);
+      const result = value.validate();
+      assert.equal(result.ok, false, JSON.stringify(result));
+      assert.equal(result.code, code, JSON.stringify(result));
+      assert.equal(result.repair, PLAN_PATH_REPAIR, JSON.stringify(result));
+    });
+  }
+});
+
+check("the re-signposted failures still expose no machine-local absolute path", () => {
+  const mutations = [
+    ({ primary }) => write(join(primary, "specs", "feature", "spec.md"), spec("# Technical Spec\ndrifted\n")),
+    ({ primary }) => unlinkSync(join(primary, "specs", "feature", "spec.md")),
+    ({ primary }) => write(join(primary, "specs", "feature", "prd_feature.md"), Buffer.from([0xff, 0xfe])),
+  ];
+  for (const mutate of mutations) {
+    withFixture({}, (value) => {
+      mutate(value);
+      const output = JSON.stringify(value.validate());
+      for (const secretPath of [value.base, value.primary, value.current]) {
+        assert.equal(output.includes(secretPath), false, output);
+      }
+    });
+  }
+  withFixture({}, (value) => {
+    const output = JSON.stringify(value.validate({ expectedPlanSha256: "0".repeat(64) }));
+    for (const secretPath of [value.base, value.primary, value.current]) {
+      assert.equal(output.includes(secretPath), false, output);
+    }
+  });
+});
+
 process.stdout.write(`po-gate-authority: ${passed} checks passed\n`);
