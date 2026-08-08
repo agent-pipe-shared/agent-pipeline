@@ -111,6 +111,28 @@ names the wrong condition costs more than a silent one, because it is confidentl
 misleading. Whatever else changes, this refusal must distinguish "the marker is
 missing" from "the marker disagrees with the spec", and say which one it means.
 
+## The refusal text names two routes, and the observed state is a third
+
+`SPEC_REPAIR` (`plugins/pipeline-core/lib/po-gate-authority.mjs:89`) is not
+silent — it is carefully written, and it is wrong for exactly this state. It
+offers:
+
+- *"Bring those two documents back into agreement"* — which is what the Claude
+  session did, and which breaks the promotion's byte binding and costs the
+  session its readiness;
+- *"If the plan is already approved and the Spec changed during implementation,
+  use the sanctioned rebind"* — which is what the Codex session tried, and which
+  refuses with `PO-REBIND-STATE` because no approval exists.
+
+The text models two lifecycle states: not-yet-bound (edit freely) and
+approved-and-drifted (rebind). The observed state is a third — **promoted and
+byte-bound, not yet approved** — where the first instruction is destructive and
+the second is inapplicable. Both agents followed the advice in front of them and
+both failed, in the two different ways the two sentences invite.
+
+Whatever else changes, this message must recognise the promoted-unapproved state
+and must not tell that state's reader to edit the bound documents.
+
 ## Why it is not enough to fix the instruction
 
 Adding the two markers to `SKILL.md` closes the observed run and leaves the trap
