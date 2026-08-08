@@ -31,6 +31,45 @@ helper scripts and dispatch records under `.git/`, evidence under `evidence/`
 `git worktree list` shows the primary tree only, so the bootstrap topology is
 clean. `/tmp` can be wiped.
 
+### The three outstanding protected-path acts are ONE signature, not three
+
+Corrected 2026-08-08 after reading the guard rather than the handover.
+`isLiftableRuleId` (`lib/guard-maintenance-window.mjs:108`) admits `GS-6` **plus
+any id beginning `TP-`**, and a window's scope is a list. So TP-3 and TP-5 belong
+in a single window, `--scope TP-3,TP-5`, and the three acts previously carried as
+separate PO items — the AC-P3 residual patch, landing the 37 `PHX-0A-READ` cases,
+and registering them in the gate — are three edits inside one lift.
+
+`MAX_WINDOW_TTL_MS` is **four hours** (`:175`), so this ceremony has none of the
+5-minute pressure the HGO signing path has. The division of labour:
+
+| step | who |
+| --- | --- |
+| `prepare --scope TP-3,TP-5 --ttl-seconds … --reason …` — emits one intent digest | Elephant |
+| sign that digest with the external key, proof JSON written **outside** the repo | **PO** |
+| `install --request … --proof …` | Elephant |
+| the edits, their tests, the focused Verify | Elephant |
+| `close` | Elephant |
+
+The PO's whole part is the second row. `scratch/phx-hgo-sign.sh` already performs
+it; only its pinned `INTENT_SHA256` changes. Note `install` refuses a proof or
+authority file that lives inside the repository (`scripts/guard-maintenance-window.mjs:83`).
+
+**Sequencing decision:** `prepare` is deliberately NOT run until the transactional
+half is finished, because the window's clock starts at prepare and a window opened
+early is a window spent waiting. The scope is by rule id, not by path, so waiting
+costs nothing and covers whatever the write half adds.
+
+### PHX-0A-WRITE dispatched while the window waits
+
+The read half's boundary was mis-drawn as "the epic cannot proceed". Only the
+*tests* of the transactional half hit TP-5; its implementation lives in
+`plugins/pipeline-core/scripts/pipeline-state.mjs`, which is unprotected. So
+`feature-package-apply`/`recover` is being built now against P-AC-08, with its
+cases staged in `evidence/phx-0a-write-cases.mjs` exactly as the read half staged
+its own — and the one window then lands both halves' cases plus the AC-P3
+residual plus the registration together.
+
 ### F1 is closed, and closed on evidence I produced myself
 
 The Critic's single FAIL finding is repaired in `358c709`. BS25 rebuilds its
