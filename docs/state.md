@@ -230,6 +230,79 @@ worked, now standing practice for every dispatch here:
 because of the second rule. `PHX-ADJ`, without it, produced nothing from 50 tool
 uses.
 
+### The window is spent, and the Critic returned FAIL — three major findings
+
+**What landed inside the signed window** (`TP-3,TP-5`, opened 2026-08-08):
+
+| commit | what |
+| --- | --- |
+| `0f3b4c9` | the 102 staged cases into the canonical suite — **415/415** |
+| `fd9c2b1` | AC-P3's residual `verify.mjs` patch |
+| `c1e5856` | `duplicateSuiteIds` consolidated into its designed home |
+
+`c1e5856` is worth naming: the AC-P3 patch specified a new export in a **third**
+file, outside the merging dispatch's scope. That dispatch defined the logic
+locally and disclosed it rather than silently widening scope — correct — but the
+consolidation itself needs TP-3, so leaving it would have cost the PO a **second
+signature**. Caught and done inside the same window.
+
+**The registered-step count did not move: 364 → 364.** That is right and worth
+understanding: the 102 cases landed *inside* an already-registered suite, so no
+new suite file appeared. They run in the gate; the metric counts something else
+than a reader assumes.
+
+### The Critic's verdict, finding by finding
+
+**FAIL.** Three major, one minor.
+
+**F1 — an absolute path leaks from the recovery branch, and the evidence record
+claimed it was fixed.** `feature-package-recover`'s `retained` branch emits a
+bare `root` field carrying the resolved absolute `--root`. The apply receipt and
+the `clean` branch were sanitized; this one was missed — and it is exactly the
+failure path, so it is the output most likely to be pasted into a bug report.
+
+Two things make this worse than a stray field:
+
+1. **The dispatch record asserts it was removed from both branches.** A specific,
+   checkable, false claim in admissible evidence.
+2. **My own check could not have caught it.** I ran `rg -e "/home/" -e "/tmp/"`
+   over the source and reported zero hits. The leaked value never appears in the
+   source — it is computed at runtime from `resolve(flags.root)`. A literal-string
+   grep cannot see a computed field. The check looked rigorous and covered the
+   wrong class; that is the part worth keeping.
+
+The Critic also found *why* the sibling command is clean: `continuity-authority-revision`'s
+cases `AR05b`/`AR05c` assert the absence explicitly, while the feature-package
+cases exercise the same branch and assert nothing about it. Repair in flight
+(`PHX-F1F4`) fixes the field **and** adds the missing assertion, proven red
+before green.
+
+**F2 — P-AC-08's gate clause was unsatisfied. It is satisfied now.** The Critic
+reviewed the three writer commits, all of which predate the window, so the cases
+still lived under `evidence/`. `0f3b4c9` landed them in the protected suite while
+the review was running. Verified independently, not assumed. Recorded rather than
+quietly dropped, because a finding that a later commit closes is not a finding
+that was wrong.
+
+**F3 — this one is about me, and it is fair.** I performed the commit act for
+`c62a3c4` myself after that dispatch stopped mid-sanitization, instead of
+resuming it as I had for `PHX-0A-WRITE`. EL-13a's sanctioned response to a
+truncated dispatch is a resume-nudge or a fresh re-dispatch — not orchestrator
+self-completion of the remaining step. I chose speed.
+
+The sharper half of the finding is not the act but its **invisibility**:
+`c62a3c4`'s trailer reads `Dispatch: PHX-0B (goldfish)`, textually identical to
+commits whose dispatch genuinely ran its own commit. My disclosure lives in
+`evidence/phx-0a0b-review-record.md` — a document not bound to git, which is not
+where an authorship check looks. The trailer convention has no way to say "the
+diff is the dispatch's, the commit act was not." That gap is filed.
+
+Not repairable by diff: amending would rewrite history, which the guard union
+forbids outright. The commit stands, disclosed.
+
+**F4 (minor) — the `Allowed:` help string never gained the five new subcommands.**
+Cosmetic; all five route ahead of that branch. Fixed in the same repair.
+
 ### F1 is closed, and closed on evidence I produced myself
 
 The Critic's single FAIL finding is repaired in `358c709`. BS25 rebuilds its
