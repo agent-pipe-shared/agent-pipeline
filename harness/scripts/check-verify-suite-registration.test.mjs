@@ -457,15 +457,29 @@ check("duplicateSuiteIds: a duplicate spanning two of verify.mjs's registration 
 // AC-P3/R1.4 demanded this be demonstrated, not asserted. The checkout's
 // harness/scripts/verify.mjs is TP-3-protected and is NEVER touched: the fixture copies
 // it into a temp root, injects the duplicate into THAT copy's TEST_SUITES, and spawns it.
-// runVerifyJournal is stubbed to throw a recognisable marker, so "did any suite run?" is
-// answered by the child's own output instead of by this file's opinion.
+// "Did any suite run?" is answered by the child's own evidence artifact (its `steps` list and
+// its `verifyRun` field), never by this file's opinion and never by the journal stub below --
+// that stub's body is unreachable here; see JOURNAL_STUB_TRIPWIRE.
 const VERIFY_REL_PATH = "harness/scripts/verify.mjs";
 const REPO_ROOT = resolve(here, "..", "..");
 const DUPLICATE_FIXTURE_ID = "phx-duplicate-registration-fixture-tests";
-const JOURNAL_REACHED_MARKER = "PHX-FIXTURE-JOURNAL-REACHED";
-/** Every module the copied verify.mjs imports, transitively — minus the journal, stubbed below.
- *  Enumerated by hand and therefore stale-able: assertStaleFixture below names it as staleness
- *  rather than letting a missing module read as an unexplained failure. */
+/** The copied verify.mjs STATICALLY imports runVerifyJournal from this path, so the file must
+ *  EXIST or the child dies at module load (ERR_MODULE_NOT_FOUND) before writing any evidence.
+ *  Its BODY, by contrast, never runs in this fixture: verify.mjs evaluates `gitCommonDirectory()`
+ *  while assembling runVerifyJournal's arguments (verify.mjs ~605), and that throws in a non-Git
+ *  temp root, so the else branch fails before the call. The tripwire string is therefore INERT
+ *  today -- no assertion depends on it and it is evidence of nothing. It is kept only so that,
+ *  if that argument assembly ever becomes lazy, the stub names itself in stderr instead of the
+ *  fixture failing anonymously. Both halves were demonstrated by machine (PHX-F2, 2026-08-08):
+ *  point this constant at a name that is never written and the child dies with
+ *  ERR_MODULE_NOT_FOUND before any evidence exists; instrument the else branch and the
+ *  diagnostic reads VERIFY-GIT-COMMON-DIR-UNAVAILABLE, never the tripwire. */
+const JOURNAL_STUB_REL_PATH = "plugins/pipeline-core/scripts/verify-journal.mjs";
+const JOURNAL_STUB_TRIPWIRE = "PHX-FIXTURE-JOURNAL-STUB-CALLED";
+/** Every module the copied verify.mjs imports, transitively — minus the journal, stubbed above.
+ *  Enumerated by hand and therefore stale-able: assertReachedRegistration below surfaces the
+ *  child's own stderr (which carries the ERR_MODULE_NOT_FOUND) rather than letting a missing
+ *  module read as an unexplained failure. */
 const FIXTURE_MODULES = Object.freeze([
   "harness/scripts/check-verify-suite-registration.mjs",
   "plugins/pipeline-core/lib/project-authority.mjs",
@@ -498,10 +512,7 @@ function buildVerifyFixtureRoot({ injectDuplicate }) {
     copyFileSync(join(REPO_ROOT, ...relPath.split("/")), target);
   }
   for (const relPath of FIXTURE_REGISTERED_TARGETS) writeFile(root, relPath);
-  writeFile(
-    root, "plugins/pipeline-core/scripts/verify-journal.mjs",
-    `export function runVerifyJournal() { throw new Error(${JSON.stringify(JOURNAL_REACHED_MARKER)}); }\n`,
-  );
+  writeFile(root, JOURNAL_STUB_REL_PATH, `export function runVerifyJournal() { throw new Error(${JSON.stringify(JOURNAL_STUB_TRIPWIRE)}); }\n`);
 
   const source = readFileSync(join(REPO_ROOT, ...VERIFY_REL_PATH.split("/")), "utf8");
   const anchor = "const TEST_SUITES = [\n";
@@ -556,16 +567,17 @@ check("verify.mjs reports a duplicate registration as a failing step naming the 
   assert.notEqual(run.evidence.exitCode, 0);
   // WHAT THE IMPLEMENTATION ACTUALLY DOES, pinned rather than wished for: the duplicate
   // check is the `if`, runVerifyJournal is its `else` (verify.mjs ~597-602), so on a
-  // duplicate NO suite runs and the step list is exactly one entry long. The journal's
-  // marker is absent because the journal was never entered — the defect is reported
-  // instead of thrown, but it is still reported INSTEAD OF running the corpus.
-  // acp3-preplanning-patch.md's acceptance item 2 ("Suites still run … the step list is
-  // longer than one entry") is NOT what this code does; the discrepancy is filed, not
-  // asserted away here. Changing this line to match the document would be a lie about
-  // the gate. (verify.mjs is TP-3-protected; only its owner can close the gap.)
+  // duplicate NO suite runs and the step list is exactly one entry long — the defect is
+  // reported instead of thrown, but it is still reported INSTEAD OF running the corpus.
+  // acp3-preplanning-patch.md's acceptance item 2 now states exactly that ("Zero suites
+  // run, and the step list is exactly one entry", amended 2026-08-08 on PO decision, which
+  // names this case). Document and gate agree; nothing is filed against this line any more.
   assert.equal(run.evidence.verifyRun, null);
+  // The exact inverse of the negative control below, and failable for the same reason:
+  // entering the else branch in this fixture always emits VERIFY-JOURNAL-FAILED.
   assert.equal(run.stderr.includes("VERIFY-JOURNAL-FAILED"), false, "the journal branch must not be entered at all");
-  assert.equal(run.stderr.includes(JOURNAL_REACHED_MARKER), false, "no suite may have been planned or started");
+  // No assertion on JOURNAL_STUB_TRIPWIRE here: the stub's body cannot run in this fixture
+  // at all, so such an assertion could not fail and would read as coverage it does not give.
 });
 
 check("verify.mjs without a duplicate enters the journal branch — the duplicate step is discrimination, not a constant", () => {
@@ -574,9 +586,11 @@ check("verify.mjs without a duplicate enters the journal branch — the duplicat
   // branch that fires unconditionally — without it, an `if (true)` would pass too.
   // Note what the else branch does here: `gitCommonDirectory()` is evaluated while
   // assembling runVerifyJournal's arguments and throws in a non-Git temp root, so the
-  // marker above is not always the diagnostic. Either way the VERIFY-JOURNAL-FAILED
-  // line and the `verify-journal` step can only be produced from inside that else
-  // branch, which is precisely the discrimination being pinned.
+  // journal stub is never called and the diagnostic reads VERIFY-GIT-COMMON-DIR-UNAVAILABLE
+  // (observed under instrumentation, PHX-F2). The assertion below deliberately
+  // does not pin that text: whatever the diagnostic is, the VERIFY-JOURNAL-FAILED line
+  // and the `verify-journal` step can only be produced from inside that else branch,
+  // which is precisely the discrimination being pinned.
   const run = runVerifyFixture({ injectDuplicate: false });
   assert.notEqual(run.status, 0, `the fixture journal cannot succeed, so a non-zero exit is expected; got ${run.status}`);
   assertReachedRegistration(run);
