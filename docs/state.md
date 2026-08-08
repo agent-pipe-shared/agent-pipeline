@@ -12,13 +12,26 @@ R3 3 PASS, PHX-LEDGER-INTAKE 4/4 PASS with one minor. The 0.5.3 merge landed as
 
 **Seven PO decisions were taken on 2026-08-08 and are recorded in artifacts, not
 only here:**
-`specs/sprint-phoenix-epic/prd_phoenix-gate-integrity-phase.md` (`6122ae1`,
+`specs/sprint-phoenix-epic/phase-plan_gate-integrity.md` (`6122ae1`,
 updated `75b2d1a`, `35bee8e`). Ledger-intake design accepted; suite-registration
 completeness becomes a verify step; owners assigned for the four verify
 failures with the 13 gitleaks fingerprints **approved** as deadlock repairs;
 H-AC-11 amended for GMW; the window singleton (O-5) and the inert kernel-list
 entry (P5) recorded as decisions with reasons; `requirement` added to the item
 taxonomy; and the stage-0 definition site decided as option (b).
+
+**A self-inflicted gate break, recorded because the repair is a rule worth
+knowing.** The phase document was first created as
+`specs/sprint-phoenix-epic/prd_phoenix-gate-integrity-phase.md`. The PO gate
+admits **exactly one `prd_*.md` per active feature directory**
+(`PO-GATE-PRD-CARDINALITY`, `po-gate-authority.mjs:608`; its repair text says
+"do not create child PRDs"), so a second PRD file silently contests the
+authority slot and `submit-plan` refuses. Renamed to `phase-plan_gate-integrity.md`
+and the bound `prd_phoenix-epic.md` gained a *Phases beneath this PRD* section
+pointing at it — so the lifecycle approval, which binds the epic PRD's digest,
+genuinely covers the phase instead of re-affirming an unchanged document.
+**The generalizable form:** a phase is not a feature, and only a feature owns a
+PRD file. The gate says so; nothing in the templates did.
 
 **The ledger-intake minor is closed without a fifth round** (`546407b`, PO
 release). §7.3/§4 grounded the `validity.expiresAtEpochMs` byte-identity on

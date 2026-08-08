@@ -209,6 +209,27 @@ evidence; and the Product Owner separately accepts the integrated Epic.
 No external write, push, merge, release, or final acceptance is implied by
 approval of this PRD.
 
+## Phases beneath this PRD
+
+Phoenix is delivered in phases. This PRD is the feature's single bound authority;
+each phase carries its own plan document beneath it, in PRD form but deliberately
+not named `prd_*.md`, because the PO gate admits exactly one PRD per active
+feature directory and a second one would silently contest the authority slot.
+A phase plan is approved through the ordinary `submit-plan` / `approve-plan`
+transition against this PRD.
+
+| Phase | Plan | Status |
+| --- | --- | --- |
+| Design | the four packages under [design/](design) | Closed 2026-08-08 — R1, R2, R3 and PHX-LEDGER-INTAKE all Critic-clean under the four-round cap |
+| Gate integrity and residual closure | [phase-plan_gate-integrity.md](phase-plan_gate-integrity.md) | Awaiting PO approval |
+
+The current phase plan closes what the design phase measured but did not repair:
+verify-gate coverage becomes self-enforcing, the four current gate failures get
+owners, R1's and R3's residuals are executed, and the ledger-intake design is
+implemented. It carries the seven Product Owner decisions of 2026-08-08 and
+states the phase's human-approval cost as a measured number rather than an
+estimate.
+
 ## Decision points
 
 1. **Approve this unified Phoenix product scope and delivery shape?**
