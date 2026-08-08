@@ -100,6 +100,30 @@ criteria, and they share one absent implementation. Briefing written and held at
 PHX-0A-WRITE: both edit `plugins/pipeline-core/scripts/pipeline-state.mjs`, and
 Spec §4.6 admits parallel work only where file ownership does not overlap.
 
+### A third briefing defect of mine, and this one has a cheap permanent fix
+
+`PHX-ADJ` burned 50 tool uses and produced nothing but the dispatch record it
+wrote first. Its last line names the cause: it was fighting the closed shell
+grammar — one simple command per call, no `&&`/`;`/redirects, only `rg | rg` and
+`rg | head` — which my briefing never mentioned. Every composed command it built
+was refused, and each refusal cost a tool use.
+
+Two specifics that cost *me* calls in this same session and belong in every
+briefing from now on:
+
+1. **A `|` inside an `rg` pattern is parsed as a pipe operator and refused.**
+   `rg -n "alpha|beta" path` is rejected; `rg -n -e alpha -e beta path` is not.
+2. **There is no `Grep` tool here** — only `rg` through Bash, under those rules,
+   or `Read`. A dispatch that assumes `Grep` spends its budget discovering this.
+
+This is the third briefing defect in one phase, after omitting that verify needs
+a clean tree and mis-sizing a budget at 45 uses for 36 files. The pattern is the
+same each time: I brief the *task* precisely and the *environment* not at all.
+The re-dispatch (`PHX-ADJ2`) carries the grammar as its first section, before the
+goal, and one further hardening — write the output file after the FIRST settled
+item, not at the end, so a budget stop still leaves a deliverable on disk rather
+than in a dead context.
+
 ### F1 is closed, and closed on evidence I produced myself
 
 The Critic's single FAIL finding is repaired in `358c709`. BS25 rebuilds its
