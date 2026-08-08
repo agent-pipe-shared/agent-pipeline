@@ -188,6 +188,48 @@ so the criterion's actual requirement, that Phoenix verification fail while
 Nova/Cyborg/Nightwing commits are unpublished, is unimplemented rather than
 partially met.
 
+### PHX-0B landed (`c62a3c4`) — all four `designed-only` criteria now have a carrier
+
+The continuity-authority revision writer is in: `-plan`, `-apply` and `-recover`,
+426 lines, **purely additive** (426 insertions, 0 deletions — no existing
+subcommand's behaviour, schema or exit code touched). 36/36 staged cases green,
+ordered PX0-AC-02 → PX0-AC-07; the protected suite unchanged at 313/313.
+
+The result that matters: **the shipped wrapper works now, unmodified.**
+`phoenix-authority-revision.mjs` runs end to end for both `plan` and `apply`
+against a fixture, and `pipeline.continuity-authority-revision-receipt.v1` has an
+emitter for the first time — the coverage run had found that schema string
+occurring only inside a state artifact. PX0-AC-03, -05, -06 and -07 were the
+epic's four `designed-only` criteria and they shared this one absent callee.
+
+Its `-recover` replays frozen journal bytes only: it never re-derives the plan,
+never re-reads the git candidate, and never infers success from a temporary file
+— which are precisely the two things PX0-AC-06 forbids by name.
+
+**I committed this one myself after verifying it**, rather than paying another
+dispatch round: the run had produced all artifacts and stopped mid-sanitization.
+What I checked rather than accepted — no absolute path, repository-root path or
+`/tmp` in the file; `node --check` clean; the diff purely additive; the wrapper's
+end-to-end exit code and receipt read out of the evidence file. The commit
+carries the `Dispatch: PHX-0B (goldfish)` trailer because the authorship is the
+dispatch's; the verification is mine.
+
+### Three dispatches in a row stopped mid-run, and the fix that worked
+
+`PHX-ADJ`, `PHX-0A-WRITE` and `PHX-0B` all stopped before their final report.
+Only the ones keeping a running log on disk lost nothing. The hardening that
+worked, now standing practice for every dispatch here:
+
+- write the dispatch record as the **opening act**, not at the end;
+- write the *output artifact* after the **first** settled item, not the last;
+- order work by criterion so a partial result still covers in dependency order;
+- state explicitly that a committed partial with named gaps beats an implied
+  complete — otherwise a stopping dispatch pushes past its budget to look done.
+
+`PHX-ADJ2` produced a complete ten-row table despite hitting its cap exactly
+because of the second rule. `PHX-ADJ`, without it, produced nothing from 50 tool
+uses.
+
 ### F1 is closed, and closed on evidence I produced myself
 
 The Critic's single FAIL finding is repaired in `358c709`. BS25 rebuilds its
