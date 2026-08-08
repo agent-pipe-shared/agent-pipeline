@@ -9,23 +9,37 @@ source: "Filed under phase-plan item R1.2 (gate integrity and residual closure) 
 due: 2026-09-07
 ---
 
-# Seven unregistered suites fail standalone — file them, do not register them
+# Six unregistered suites fail standalone — file them, do not register them
+(filed as seven; one has since been deleted rather than repaired)
 
 ## Description
 
 Of the 109 test files registered nowhere in `harness/scripts/verify.mjs`, **102
 pass and 7 fail** when run standalone. The 102 are being registered in reviewable
-batches (phase plan R1.1). These 7 are not, and this item is why.
+batches (phase plan R1.1). These 7 were not, and this item is why. **Six remain**
+— see "One left the set by deletion" below.
 
 **Registering a red suite turns the gate red on arrival**, and a gate that is red
 for inherited reasons cannot distinguish a genuine regression from a pre-existing
 one. That is the same failure this repository just spent a session recovering
-from in a different form. The seven get owners and repairs first; registration
+from in a different form. They get owners and repairs first; registration
 follows a repair, never precedes it.
 
-## The seven, grouped by what is actually wrong
+## One left the set by deletion (2026-08-08)
 
-### Group 1 — stale against a module surface that does not exist (3)
+`plugins/pipeline-core/lib/codex-host-plugin-list.test.mjs` **was deleted, not
+repaired and registered**: every case in it exercised `observeCodexRulesetSource`,
+a function retired by PO decision and superseded (design
+`specs/sprint-phoenix-epic/design/bootstrap-origin-allowlist-and-codex-wsl-freshness.md`
+§A.3, "Explicitly not revived"), so the suite followed the export out of the tree
+rather than becoming a repair task. Its exclusion entry in
+`harness/scripts/check-verify-suite-registration.mjs` was removed in the same
+commit. **Six** entries remain; this item's `id` and filename keep the original
+count because they are referenced by the append-only backlog ledger.
+
+## The six remaining, grouped by what is actually wrong
+
+### Group 1 — stale against a module surface that does not exist (2 remaining of 3)
 
 These import names their target module does not export. They are **stale, not
 broken**: they were written against an API this tree does not have. Nothing is
@@ -35,7 +49,10 @@ failing *at runtime*; the file cannot even load.
 | --- | --- |
 | `harness/lib/plan-spec-state-v2.test.mjs` | `bindPlanSpecApprovalWithHumanDecision` from `./plan-spec-state-v2.mjs` |
 | `harness/scripts/recovery-bridge-approval.test.mjs` | `RECOVERY_BRIDGE_DECISION_SCHEMA` from `./pipeline-state.mjs` |
-| `plugins/pipeline-core/lib/codex-host-plugin-list.test.mjs` | `observeCodexRulesetSource` from `./codex-host-plugin-list.mjs` |
+
+(The third member of this group, `codex-host-plugin-list.test.mjs`, was resolved
+by deletion — see above. Its archaeology answer: the export was removed
+deliberately, so the suite followed it.)
 
 **The question to answer before touching them is which side is stale.** Either
 the export was removed and the suite should follow it, or the export was never
@@ -71,7 +88,7 @@ was invisible for as long as nobody ran the command by hand.
 
 ## An interaction with work in flight, recorded so it is not mistaken for a regression
 
-Two of the seven touch files the R3 citation sweep is editing in the same phase:
+Two of the six touch files the R3 citation sweep is editing in the same phase:
 
 - `codex-isolated-critic-protected-preimage.test.mjs` asserts against
   `harness/review-protocol.md`, in which the sweep repairs **12 citations,
@@ -87,19 +104,20 @@ string it changes, the sweep updates it in the same commit and says so.
 
 ## Affected artifact
 
-The seven files above; `harness/scripts/verify.mjs` only in the negative sense
+The six files above; `harness/scripts/verify.mjs` only in the negative sense
 that none of them may be registered there until repaired. Measurement and
 per-file evidence:
 `specs/sprint-phoenix-epic/evidence/unregistered-suite-classification.md`.
 
 ## Proposal
 
-**Owner: PO**, for assignment. Four repairs, not seven, because the groups differ.
+**Owner: PO**, for assignment. Three repairs left, not six, because the groups
+differ (Group 1's third member is closed by deletion).
 
 1. **Group 3 first.** It is a statement about the verify entry point and it is
    currently false. Establish whether the property was removed deliberately or
    lost; the answer decides whether the suite or the entry point is repaired.
-2. **Group 1 needs an archaeology pass, not an edit.** For each of the three,
+2. **Group 1 needs an archaeology pass, not an edit.** For each of the two left,
    determine from history whether the export was removed or never landed. Record
    the answer in this item before anyone changes a line.
 3. **Group 2 needs reading.** Three independent assertion failures with no shared

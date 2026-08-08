@@ -128,18 +128,24 @@ export const REQUIRED_EXCLUSION_FIELDS = Object.freeze(["reason", "owner", "expi
 
 /**
  * Declared exclusions -- files that legitimately carry no registration
- * entry today. Seeded 2026-08-08 from the red 7 in
+ * entry today. Seeded 2026-08-08 from the 7 then-red suites in
  * specs/sprint-phoenix-epic/evidence/unregistered-suite-classification.md
  * (R1.2: filed, not fixed -- each is a debt with an owner, not a permanent
  * state). Do not add this checker's own two files here; see header.
  *
- * All seven are owned by one filed backlog item --
+ * Six remain: plugins/pipeline-core/lib/codex-host-plugin-list.test.mjs left the
+ * set on 2026-08-08 by deletion, not by repair -- its whole subject was
+ * `observeCodexRulesetSource`, retired by PO decision and superseded (see
+ * specs/sprint-phoenix-epic/design/bootstrap-origin-allowlist-and-codex-wsl-freshness.md
+ * A.3), so the suite followed the export out of the tree.
+ *
+ * All six are owned by one filed backlog item --
  * backlog/items/2026-08-08-seven-unregistered-suites-are-red-and-must-not-be-registered.md
  * (`id: pipeline.seven-unregistered-suites-are-red`, owner: PO for
  * assignment) -- and every `expires` below is that item's own `due: 2026-09-07`.
  * They are deliberately identical: the exclusions do not get to outlive the
  * item that justifies them, and a single date means closing the item closes
- * the list rather than leaving six orphans behind.
+ * the list rather than leaving five orphans behind.
  */
 export const EXCLUSIONS = Object.freeze({
   "harness/lib/plan-spec-state-v2.test.mjs": Object.freeze({
@@ -149,11 +155,6 @@ export const EXCLUSIONS = Object.freeze({
   }),
   "harness/scripts/recovery-bridge-approval.test.mjs": Object.freeze({
     reason: "red (R1.2): SyntaxError, pipeline-state.mjs has no export RECOVERY_BRIDGE_DECISION_SCHEMA",
-    owner: "PO",
-    expires: "2026-09-07",
-  }),
-  "plugins/pipeline-core/lib/codex-host-plugin-list.test.mjs": Object.freeze({
-    reason: "red (R1.2): SyntaxError, codex-host-plugin-list.mjs has no export observeCodexRulesetSource",
     owner: "PO",
     expires: "2026-09-07",
   }),
