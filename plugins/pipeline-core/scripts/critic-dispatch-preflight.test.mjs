@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
@@ -84,4 +84,63 @@ test("accepts canonical Verify evidence whose candidate field is only a run-stat
   const fx = fixture();
   const result = preflightCriticDispatch(input(fx, { evidencePaths: ["evidence/verify-canonical.json"] }));
   assert.equal(result.evidence[0].candidate.commit, fx.candidate);
+});
+
+/**
+ * A repository whose entire history is one commit -- the normal state of a
+ * project that just adopted the Pipeline and produced its first feature
+ * (AC-1/AC-2, 2026-08-08-verify-evidence-has-a-schema-consumers-and-no-producer.md).
+ * `base` here is the git empty-tree OID: the only well-defined predecessor of
+ * a root commit. No parent commit is fabricated anywhere in this fixture.
+ */
+function singleCommitFixture() {
+  const root = mkdtempSync(join(tmpdir(), "critic-dispatch-preflight-root-"));
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  mkdirSync(join(root, "governance", "guidelines"), { recursive: true });
+  mkdirSync(join(root, "governance", "policies"), { recursive: true });
+  mkdirSync(join(root, "specs"), { recursive: true });
+  mkdirSync(join(root, "evidence"), { recursive: true });
+  git(root, ["init", "-q"]);
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), "governance:\n  guidelines_path: governance/guidelines\n  policies_path: governance/policies\n");
+  writeFileSync(join(root, "governance", "guidelines", "review.md"), "Review changed code.\n");
+  writeFileSync(join(root, "governance", "policies", "checklist.md"), "- verify\n");
+  writeFileSync(join(root, "specs", "spec.md"), "# Spec\n");
+  const candidate = commit(root, "root commit");
+  const tree = git(root, ["rev-parse", "HEAD^{tree}"]);
+  writeFileSync(join(root, "evidence", "verify.json"), `${JSON.stringify({ candidate: { commit: candidate, tree } })}\n`);
+  const base = execFileSync("git", ["-C", root, "hash-object", "-t", "tree", "--stdin"], { input: "", encoding: "utf8" }).trim();
+  return { root, base, candidate, tree };
+}
+
+test("a repository with exactly one commit resolves the root commit as an ordinary base, not a refusal", () => {
+  const fx = singleCommitFixture();
+  try {
+    const result = preflightCriticDispatch({
+      root: fx.root,
+      base: fx.base,
+      candidate: fx.candidate,
+      specPath: "specs/spec.md",
+      guardrailPaths: [],
+      evidencePaths: ["evidence/verify.json"],
+    });
+    assert.equal(result.status, "packet-ready");
+    assert.equal(result.base.commit, null, "a root commit's base has no commit -- only the empty tree");
+    assert.equal(result.base.tree, fx.base);
+    assert.equal(result.candidate.commit, fx.candidate);
+    assert.equal(result.candidate.tree, fx.tree);
+    // AC-4: no history was invented anywhere -- the fixture's own log proves it.
+    const log = git(fx.root, ["log", "--oneline"]).split("\n").filter(Boolean);
+    assert.equal(log.length, 1);
+  } finally {
+    rmSync(fx.root, { recursive: true, force: true });
+  }
+});
+
+test("a base ref that fails commit-peeling and is not the empty tree is still refused (unchanged behavior)", () => {
+  const fx = fixture();
+  const bogus = "0".repeat(40);
+  assert.throws(
+    () => preflightCriticDispatch(input(fx, { base: bogus })),
+    (error) => error instanceof CriticDispatchPreflightError && error.code === "CDP-GIT",
+  );
 });

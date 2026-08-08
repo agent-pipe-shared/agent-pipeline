@@ -58,7 +58,7 @@ function uniquePaths(values, label) {
   return paths;
 }
 
-function git(root, args) {
+function gitOrNull(root, args) {
   const result = spawnSync("git", ["-C", root, ...args], {
     encoding: "utf8",
     env: { LANG: "C", LC_ALL: "C", PATH: process.env.PATH ?? "" },
@@ -66,8 +66,44 @@ function git(root, args) {
     timeout: 10_000,
     maxBuffer: 16 * 1024 * 1024,
   });
-  if (result.error || result.status !== 0) fail("CDP-GIT", `Git observation failed for ${args[0]}.`);
+  if (result.error || result.status !== 0) return null;
   return String(result.stdout).trim();
+}
+
+function git(root, args) {
+  const value = gitOrNull(root, args);
+  if (value === null) fail("CDP-GIT", `Git observation failed for ${args[0]}.`);
+  return value;
+}
+
+/**
+ * A root commit has no parent, so the base a caller offers it is the empty
+ * tree -- and `^{commit}` peeling of the empty tree fails, because the empty
+ * tree is not a commit. Diffing a commit against the empty tree is ordinary,
+ * well-defined git; only the commit-peel of that one sentinel value is not.
+ * Every other base ref still resolves exactly as before: this is one more
+ * chance given only to a base that already failed commit-peeling, not a
+ * relaxation of what counts as a valid base.
+ */
+function emptyTreeOid(root) {
+  const result = spawnSync("git", ["-C", root, "hash-object", "-t", "tree", "--stdin"], {
+    input: "",
+    encoding: "utf8",
+    env: { LANG: "C", LC_ALL: "C", PATH: process.env.PATH ?? "" },
+    shell: false,
+    timeout: 10_000,
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  if (result.error || result.status !== 0) fail("CDP-GIT", "Git observation failed for hash-object.");
+  return String(result.stdout).trim();
+}
+
+function resolveBase(root, base) {
+  const baseCommit = gitOrNull(root, ["rev-parse", "--verify", `${base}^{commit}`]);
+  if (baseCommit !== null) return { commit: baseCommit, tree: git(root, ["rev-parse", `${baseCommit}^{tree}`]) };
+  const baseTree = gitOrNull(root, ["rev-parse", "--verify", `${base}^{tree}`]);
+  if (baseTree !== null && baseTree === emptyTreeOid(root)) return { commit: null, tree: baseTree };
+  fail("CDP-GIT", "Git observation failed for rev-parse.");
 }
 
 function candidateInventory(root, candidate) {
@@ -141,11 +177,11 @@ export function preflightCriticDispatch({ root, base, candidate, specPath, guard
     fail("CDP-INPUT", "root, base, and candidate are required.");
   }
   const realRoot = realpathSync(root);
-  const baseCommit = git(realRoot, ["rev-parse", "--verify", `${base}^{commit}`]);
+  const { commit: baseCommit, tree: baseTree } = resolveBase(realRoot, base);
   const candidateCommit = git(realRoot, ["rev-parse", "--verify", `${candidate}^{commit}`]);
-  const baseTree = git(realRoot, ["rev-parse", `${baseCommit}^{tree}`]);
   const candidateTree = git(realRoot, ["rev-parse", `${candidateCommit}^{tree}`]);
-  if (![baseCommit, candidateCommit, baseTree, candidateTree].every((value) => OID.test(value))) fail("CDP-REF", "Git returned an invalid candidate binding.");
+  if (![baseTree, candidateCommit, candidateTree].every((value) => OID.test(value))) fail("CDP-REF", "Git returned an invalid candidate binding.");
+  if (baseCommit !== null && !OID.test(baseCommit)) fail("CDP-REF", "Git returned an invalid candidate binding.");
   if (baseCommit === candidateCommit) fail("CDP-RANGE", "Critic base and candidate must be different commits.");
 
   const spec = normalizePath(specPath, "spec path");
@@ -162,7 +198,7 @@ export function preflightCriticDispatch({ root, base, candidate, specPath, guard
   let manifest;
   try { manifest = parseYaml(candidateText(realRoot, candidateCommit, ".claude/pipeline.yaml")); }
   catch { fail("CDP-MANIFEST", "Candidate manifest cannot be parsed."); }
-  const changedPaths = git(realRoot, ["diff", "--name-only", "-z", baseCommit, candidateCommit, "--"])
+  const changedPaths = git(realRoot, ["diff", "--name-only", "-z", baseCommit ?? baseTree, candidateCommit, "--"])
     .split("\0").filter(Boolean).map((path) => normalizePath(path, "changed path")).sort(compare);
   const governance = deriveCriticPacketGovernance({
     schema: CRITIC_PACKET_GOVERNANCE_INPUT_SCHEMA,
