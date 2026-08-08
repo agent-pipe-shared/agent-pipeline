@@ -5,7 +5,7 @@
 > `docs/adr/0034-deploy-precedence-central-vs-project.md`). Sibling to
 > `docs/design/README.md` and the main `README.md`.
 >
-> The deep canon lives in `docs/operating-model.md` §3.5 — this document does NOT
+> The deep canon lives in `docs/operating-model.md` — *The lifecycle* — this document does NOT
 > duplicate it, it links to it and makes the activation plus two concrete worked
 > runs concrete and copy-pasteable.
 
@@ -20,7 +20,7 @@ in its manifest (`.claude/pipeline.yaml`) — the fully commented example form l
 new gates, no new prompts, no mandatory files (the pipeline's standing anti-bloat
 guarantee). This phase is optional down to the last byte.
 
-**The flow, in prose** (the full graph lives in `docs/operating-model.md` §3.1/§3.5):
+**The flow, in prose** (the full graph lives in `docs/operating-model.md` — *The lifecycle*):
 
 ```
 Merge → deploy:test → test gate (health/smoke evidence) → promote:prod (human gate)
