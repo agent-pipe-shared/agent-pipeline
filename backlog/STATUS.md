@@ -48,6 +48,7 @@
 | pipeline.guard-lifecycle-ready-rejects-plan-runtime-intent-argv | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.guard-reclassification-changed-what-a-signature-can-lift | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.guard-refuses-documented-bounded-diagnostic | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.guard-string-match-makes-a-file-uncommittable | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.handover-file-has-no-rotation-obligation | open | workflow-improvement | pipeline | 2026-08-07 | — |
 | pipeline.harness-classifier-blocks-authorized-onboarding-action | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.human-approval-ux-directory-clarity-and-single-command | open | defect | pipeline | 2026-08-07 | — |
@@ -94,6 +95,7 @@
 | pipeline.restart-launch-is-codex-only-for-every-runner | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.runner-neutrality-before-third-runner | open | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.runtime-projection-v2-eager-manifest-load | open | defect | pipeline | 2026-07-27 | — |
+| pipeline.scratch-cleanup-mechanism-not-wired-to-any-event | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.security-scan-cross-branch-gitleaks-findings | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.seeded-verify-contract-is-always-green | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.sentinel-go-live-completion | closed | workflow-improvement | pipeline | 2026-07-20 | — |
@@ -119,6 +121,6 @@
 
 ## Counts
 
-- open: 65
+- open: 67
 - in_progress: 21
 - closed: 25

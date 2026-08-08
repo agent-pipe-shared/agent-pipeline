@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "bc44f75df9b464e48c6411b5b6aa1f550be9b217a6b9740215b901541b4ea32a"
+    "transitionHead": "75f0d2878a0678755c5a35d52074cfb7465369631016b5232a9c1fa307eb6daf"
   },
   "counts": {
-    "open": 65,
+    "open": 67,
     "in_progress": 21,
     "closed": 25
   },
@@ -378,6 +378,14 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Structured handover from the greenfield happy-path test of the local 0.5.4 build, 2026-08-08 (defect D-3). Independently hit in the Pipeline's own repository in the same session."
+    },
+    {
+      "id": "pipeline.guard-string-match-makes-a-file-uncommittable",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "SCRATCH-1 dispatch, 2026-08-08: it edited templates/pipeline.yaml.example, its tests went green, and it could not commit the file. It reported the block and attempted no workaround, which is correct behaviour."
     },
     {
       "id": "pipeline.handover-file-has-no-rotation-obligation",
@@ -794,6 +802,14 @@
       "owner": "pipeline",
       "created": "2026-07-27",
       "source": "discovered as a sibling of Critic finding F4 (CLAUDE-RUNNER-01 delta review round 2) during briefing-i's fix of `plugins/pipeline-core/lib/runtime-projection-v3.mjs` (commit `894261d`)"
+    },
+    {
+      "id": "pipeline.scratch-cleanup-mechanism-not-wired-to-any-event",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "SCRATCH-1 dispatch, 2026-08-08, reported as its own open item. The PO had asked the question directly the same night: 'hoffe nur es gibt einen Event der die Sachen auch wieder aufräumt'."
     },
     {
       "id": "pipeline.security-scan-cross-branch-gitleaks-findings",
