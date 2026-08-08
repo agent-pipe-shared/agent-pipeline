@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "4fc181e31a7c97d2cf474486b1c375aac0322444375cbdff5cb48a582951ce1e"
+    "transitionHead": "6869ffdb6f4b7bb70b535874540873b701551a04a21daadff3f97aecc8d0b741"
   },
   "counts": {
-    "open": 54,
+    "open": 55,
     "in_progress": 21,
     "closed": 22
   },
@@ -334,6 +334,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "PO request in the 2026-08-07 Nova session for a deliberate confirmation before PIN entry, explicitly qualified as language-profile dependent; partially delivered by NOVA-PO-CONFIRM-1 in commits 5efb0f1 and 584a598."
+    },
+    {
+      "id": "pipeline.kickoff-apply-action-drops-runner",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Happy-path test of the local 0.5.4 build in a fresh directory, 2026-08-08. Observed by the PO; located in the source afterwards."
     },
     {
       "id": "pipeline.lifecycle-guard-does-not-know-the-human-signing-commands",
