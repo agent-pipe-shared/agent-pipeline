@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "c4d67563b894896d12a224c97a54a32408c4d1d444fffe5e16a3f44be5bf07e2"
+    "transitionHead": "3a86320f6245a7f6619837635205273b000b18ff54aecfb2f9e5c371879053f1"
   },
   "counts": {
-    "open": 69,
+    "open": 70,
     "in_progress": 26,
     "closed": 23
   },
@@ -668,6 +668,14 @@
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.prepared-maintenance-window-dies-at-the-next-commit",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Found on 2026-08-08 while planning a TP-3/TP-5 window for Phoenix. The Elephant was about to hand the PO a prepare command with two implementation dispatches still in flight; reading install() first showed that every commit those dispatches made would have voided the signature before it could be used. Caught by reading, not by a refusal -- the ceremony gives no warning at prepare time."
     },
     {
       "id": "pipeline.private-overlay-activation-bridge",
