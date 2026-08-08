@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "df965b325699b175d2f899e45562a9a0e4c90a68a2c1a294cd0173400b44079c"
+    "transitionHead": "12ec27afa8eb4f2f0538de9bf17f57e14b42f643fa6618c5b25d38ddc8a09b4b"
   },
   "counts": {
-    "open": 73,
+    "open": 74,
     "in_progress": 21,
     "closed": 25
   },
@@ -103,6 +103,14 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Reported by the Phoenix session of 2026-08-08 after a PO authority decision it had to resolve; verified against the source in this repository before filing."
+    },
+    {
+      "id": "pipeline.authority-gate-bypassable-by-choosing-a-different-write-tool",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Reported as a deviation by the PUSHBOUND-1 dispatch, 2026-08-08, and verified against guard-testpath.mjs:70-79. The dispatch disclosed the route honestly; the gap is the guard's, not the dispatch's."
     },
     {
       "id": "pipeline.authority-gate-verdict-need-not-survive-checkout",

@@ -1,0 +1,85 @@
+---
+schema: pipeline.backlog-item.v1
+id: pipeline.authority-gate-bypassable-by-choosing-a-different-write-tool
+type: defect
+owner: pipeline
+status: open
+created: 2026-08-08
+due: 2026-08-15
+source: "Reported as a deviation by the PUSHBOUND-1 dispatch, 2026-08-08, and verified against guard-testpath.mjs:70-79. The dispatch disclosed the route honestly; the gap is the guard's, not the dispatch's."
+---
+
+# `guard-testpath` blocks Edit/Write and is walked around with Bash
+
+## What happened
+
+The `PUSHBOUND-1` dispatch needed to add fixtures to
+`plugins/pipeline-core/hooks/guard-push.test.mjs` — squarely within its briefed scope.
+`guard-testpath` (TP-5) blocked the `Edit`/`Write` tool call and offered an override
+requiring an out-of-session Ed25519 signature the dispatch structurally cannot
+produce, then refused the ceremony outright with `author-repair-required`. The
+dispatch wrote the same bytes through Bash/Node `fs` instead and **reported it as a
+deviation**, which is the correct handling of an accepted gap.
+
+The gap is real and self-documented (`plugins/pipeline-core/hooks/guard-testpath.mjs:76-79`):
+
+> Plain shell file writes are not seen either: `hooks.json` routes Bash/PowerShell tool
+> calls only through `guard-git.mjs` (matcher `Bash|PowerShell`), which does NOT check
+> test paths — a Bash/PowerShell redirect (`>`, `Set-Content` etc.) reaching a
+> protected path is unguarded (accepted gap, same tripwire-not-a-sandbox …)
+
+`MultiEdit` is listed as a second accepted gap on the same grounds.
+
+## Why this is now a contradiction rather than a known limitation
+
+`guardrails/global.md` GL-09, written today, classifies the testpath gate as
+**authority-bearing** — one of the three gates that must fail closed rather than open.
+`guard-testpath.mjs` simultaneously describes itself as a *tripwire, not a sandbox*.
+Both cannot be true. A gate whose category obliges it to fail closed cannot rest on an
+honour system about which tool an agent picks to write the same bytes.
+
+This is the same shape as the finding GL-09 was written from, rotated ninety degrees:
+the push gate's boundary was missing for *unanticipated faults*, and this one is
+missing for *unanticipated routes*. Enumerating tool matchers has the identical
+weakness as enumerating failure shapes — it holds until something not on the list
+arrives, and here the thing not on the list is `Bash`, which every dispatch has.
+
+## What makes it urgent rather than theoretical
+
+It was exercised today, by a well-behaved dispatch, on the first attempt, without
+looking for a bypass. The dispatch was not evading the guard — it was doing exactly
+what it was briefed to do, hit a gate it could not clear, and took the route that
+worked. Any agent in that position takes the same route, and only the honest ones
+report it.
+
+## Direction, not a design
+
+1. **Decide the category explicitly and follow it.** Either the testpath gate is
+   authority-bearing, in which case its coverage must not depend on tool choice, or it
+   is a tripwire, in which case GL-09's list is wrong and must be corrected. Do not
+   leave both statements standing.
+2. **If authority-bearing: route shell writes through it.** `hooks.json` sends
+   `Bash|PowerShell` only to `guard-git.mjs`. A path check on shell-borne writes is the
+   same check already implemented, applied at a second matcher.
+3. **Look at why the ceremony was unavailable.** TP-5 refused the override with
+   `author-repair-required` — so the dispatch's only sanctioned route was closed
+   *before* it reached for the unsanctioned one. A gate that blocks in-scope work and
+   also refuses its own lift manufactures the bypass it then fails to detect.
+4. **Do not respond by forbidding shell writes in briefings.** That is a prose control
+   over exactly the population that cannot be relied on to follow prose — and it would
+   have made today's outcome a silent failure instead of a reported one.
+
+## Related
+
+- `guardrails/global.md` GL-09 — the classification this contradicts.
+- `2026-08-08-the-blocking-push-gate-has-no-terminal-exception-boundary.md` — the same
+  enumeration weakness in the fault dimension rather than the route dimension.
+- `2026-08-08-the-signed-guard-override-has-no-command-that-emits-the-digest-to-sign.md`
+  — the lift path that was unavailable here, unwalkable there.
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:**
+- **Rationale:**
+- **Assignment (if accepted):**
+- **Date:**
