@@ -303,6 +303,100 @@ forbids outright. The commit stands, disclosed.
 **F4 (minor) — the `Allowed:` help string never gained the five new subcommands.**
 Cosmetic; all five route ahead of that branch. Fixed in the same repair.
 
+### The gate ran at `ae7fed1`: 365 of 366 green, and the one red is ours
+
+Run `verify-1786220889042-90b8ff8d90cc8c0a`, detached worktree under `.git/`,
+`candidate.binding: "exact"`. **The four failures carried since this morning are
+all gone** — `product-capability-inventory-tests`, `authority-tier-agreement-check`,
+`security-scan-tests`, `backlog-state-check` all report 0.
+
+One red step: `scoped-verify-registration-tests`, one case of 35 (`SVR28`).
+
+**Cause, and it is not the AC-P3 patch's placement.** That patch sits correctly
+inside the branch where scoped registration already passed. The regression is
+`c1e5856`, the consolidation: it gave `harness/scripts/verify.mjs` a new static
+import (`:54`, `./check-verify-suite-registration.mjs`). `SVR28`'s fixture copies
+`verify.mjs` into a temp root and enumerates its imports **by hand**; the new one
+is not in that list, so the fixture's copy fails to load, writes no evidence, and
+the case correctly reports failure.
+
+This is the fixture-blindness class the goldfish template names: a hand-maintained
+module list goes stale silently the next time an import is added. The repair
+belongs in the fixture — `SVR28` guards a fail-closed short-circuit (its fixture
+makes `runVerifyJournal` throw with "journal must not run after scoped-registration
+failure") and is not to be touched. The file is **not** guard-protected, so this
+costs no second signature.
+
+### Second Critic round: FAIL, and its sharpest finding is about my own artifact
+
+**F1 (blocker)** is the same `SVR28` regression, derived independently and pinned
+harder than mine: a repository-wide search establishes there was no prior
+transitive path, so the dependency is new precisely at `c1e5856`.
+
+Its real point goes further. **None of the three window dispatches ran the full
+gate** — each disclosed that correctly — and my own
+`evidence/phx-0a0b-findings-registry.md` carries a "Machine results after
+correction" table that simply omits it. Every dispatch honest individually; the
+aggregate still reads as a closed round. That framing is my artifact, not theirs,
+and it is the "fluent report with skipped verification" pattern one level up from
+where the check looks for it.
+
+**F2 (major).** AC-P3's patch is logically right, but the design document's own
+acceptance checklist — inject a duplicate live, exit non-zero naming it, other
+suites still run — was never executed, and `duplicateSuiteIds` has **no test at
+all**. The mechanism built to find duplicate registrations automatically has zero
+regression coverage of itself, and the open item carries neither owner nor expiry
+(QG-06/QG-07).
+
+The right repair is a fixture test rather than the one-off live demonstration the
+design imagined: a fixture injecting a duplicate into its own copy of `verify.mjs`
+closes it permanently **and** needs no maintenance window, where the live
+injection would need TP-3 again.
+
+**F3 (minor).** `evidence/dispatch-record-phx-f1f4.json` never reached a terminal
+state. Deliberately left as it is: finalising another agent's record myself would
+make the evidence assert something the dispatch never wrote.
+
+### A model-policy violation of mine, in both Critic rounds
+
+The Critic reported: requested route `claude-opus-5 @ max`, **effective identity
+`claude-sonnet-5`**. MP-07 makes the higher-capability review model at max
+mandatory for architecture/security diffs, and both of today's rounds ran below
+it.
+
+I named the route in the briefing and assumed the subagent would take it, without
+setting the model at dispatch. A route stated in prose is not a route selected.
+The findings were good — the blocker is real and I had reached it in parallel —
+but "produced good findings" is not "met the mandatory tier", and the gate asks
+for the second. Every future Critic dispatch here sets the model explicitly at
+the call, not in the text.
+
+### `SVR28` is repaired (`aabfe7e`), and the dispatch found a second copier
+
+35/0. The repair is one `copyFileSync` in the fixture's module list, and it was
+**proved** rather than asserted: fixed run exit 0 → remove the copy again → exit 1
+with `FAIL SVR28` → restore → exit 0, with the file confirmed byte-identical
+afterwards. The canonical suite stays at 418/418.
+
+More useful than the fix: it searched for other test files that copy and spawn
+the real `verify.mjs` and found exactly one,
+`windows-assurance-verify-registration.test.mjs`. That fixture is **also red** —
+but for a *different* reason: it is missing `project-authority.mjs` and
+`worktree-lifecycle.mjs` from an ADR-0054-era change, with today's import gap
+merely stacked on top. It is already declared debt, owner PO, due 2026-09-07, in
+`check-verify-suite-registration.mjs`'s `EXCLUSIONS` under `"WAVR19 fails"`.
+
+The dispatch **declined to partially patch it**, on the ground that adding only
+today's missing module would not turn it green and would disguise a larger gap as
+handled. That is the right call and the opposite of the reflex. It becomes a PO
+question: fold "bring WAVR19's fixture to full parity with verify's import graph"
+into the existing item, or leave it as its own debt.
+
+The general lesson is now twice-evidenced in one day: **a fixture that enumerates
+a module graph by hand is a latent failure with no owner.** Two such fixtures
+exist, both went red from ordinary import additions, and neither failure was
+visible until a full gate ran.
+
 ### F1 is closed, and closed on evidence I produced myself
 
 The Critic's single FAIL finding is repaired in `358c709`. BS25 rebuilds its
