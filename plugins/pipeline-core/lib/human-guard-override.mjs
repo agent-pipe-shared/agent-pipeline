@@ -527,6 +527,66 @@ function pipelineSourcePath(path) {
   return normalized === "plugins/pipeline-core" || normalized.startsWith("plugins/pipeline-core/");
 }
 
+// ---------------------------------------------------------------------------------
+// ADR-0059 Decision 6: a target outside `root` is a distinct, honestly-scoped eligible
+// class ("cross-repository-target"), never a broadening of the in-root symlink-safety
+// contract safePath() enforces. safePath() returns null for FOUR different reasons -- a
+// malformed candidate, a candidate that resolves to root itself, a candidate that
+// genuinely ESCAPES root, or an IN-ROOT candidate that fails its own symlink-safety walk
+// (an attack, not a cross-repository target: this repository's own "pipeline author
+// repair binds..." test depends on exactly that fourth case staying refused, via a
+// symlink planted INSIDE the repo). crossBoundaryTarget() therefore re-derives ONLY the
+// "genuinely escapes root" test safePath() itself uses -- never the symlink walk, which
+// has no meaning for a location outside root -- so a null from this function can only
+// mean "not an escape" or "a sensitive target", never "treat the existing refusal as
+// avoidable".
+//
+// What this function says yes to, and what it deliberately never checks, is the class's
+// own honesty (carried into decisionPreview()'s scopeAttestation below rather than left
+// implicit): a well-formed, non-empty, non-null-byte path that genuinely escapes `root`
+// and does not match the SAME sensitive-pattern refusal every in-root path is already
+// held to (hardBoundaryPath()'s secrets/credentials/tokens/private-key regex -- its exact
+// `.git`/`.codex`/`.agent-pipeline` match is inert here by construction, since those
+// anchor on the ENTIRE normalized string, which an absolute out-of-root path is never
+// equal to or prefixed by). It is never asked whether the target exists, is a git
+// repository, or is safe from a symlink swap between authorization and consumption --
+// HGO's physical-identity model (topology(), physicalRoot()) never extends there.
+function crossBoundaryTarget(root, candidate) {
+  if (typeof candidate !== "string" || candidate.trim() === "" || candidate.includes("\0")) return null;
+  const absolute = resolve(root, candidate);
+  const rel = relative(root, absolute).split("\\").join("/");
+  const escapes = rel === ".." || rel.startsWith("../") || isAbsolute(rel);
+  if (!escapes) return null;
+  if (hardBoundaryPath(absolute.split("\\").join("/"))) return null;
+  return absolute;
+}
+
+/**
+ * Try the existing in-root, symlink-safety-checked safePath() first; only when that
+ * fails AND the candidate is a genuine, non-sensitive escape from `root` does this
+ * classify into the new eligible class. Every other safePath() failure (malformed
+ * candidate, root itself, or an in-root symlink/hardlink attack) is reported back as
+ * "refused" unchanged -- callers keep denying it exactly as before this ADR.
+ */
+function classifyPath(root, candidate) {
+  const path = safePath(root, candidate);
+  if (path) return { kind: "in-root", path };
+  const target = crossBoundaryTarget(root, candidate);
+  return target === null ? { kind: "refused" } : { kind: "cross-boundary", target };
+}
+
+/** Builds the eligible() result for a genuine out-of-root escape, one target added to
+ * whatever in-root paths were already accumulated by the same command's earlier tokens. */
+function crossBoundaryEligible(paths, target) {
+  return {
+    eligible: true,
+    mode: "standard",
+    sourceRoot: null,
+    paths: [...new Set([...paths, target])].sort(),
+    commandClass: "cross-repository-target",
+  };
+}
+
 function authorSourceRoot(repoRoot, candidate) {
   if (typeof candidate !== "string" || !isAbsolute(candidate)) return null;
   let physical;
@@ -659,13 +719,26 @@ function decisionPreview({ toolName, toolInput, paths, commandClass, denials }) 
         rollbackRecovery: "read back every listed path and repository status; repair with a reviewed inverse patch when needed",
         residualRisk: "the exact edit may violate project invariants or invalidate evidence that covered the prior bytes",
       }
-      : {
-        repository: "the exact command may change the bound repository preimage",
-        external: "external effects are unknown for this exact command and must be treated as possible",
-        rollbackRecovery: "use command-specific readback or reconciliation; never repeat an ambiguous effect",
-        residualRisk: "the exact command may have effects not inferable by the guard adapter",
-      };
-  return {
+      // ADR-0059 Decision 6: an out-of-root cross-repository target. Stated explicitly
+      // rather than folded into the generic fallback below, because this class's honesty
+      // requirement (Decision 6: "the identity model bounds what the override can prove,
+      // not what a human may decide") is exactly that it must NOT read like an in-root
+      // action -- HGO's physical-identity model (topology(), physicalRoot()) proves this
+      // repository's own root/HEAD/tree/status, never the out-of-root target's.
+      : commandClass === "cross-repository-target"
+        ? {
+          repository: "this repository's own working tree, index, refs and configuration are unaffected by the ATTESTATION itself; HGO's physical-identity model never inspects, and cannot attest, the identity, existence, or git status of a location outside this repository's own root",
+          external: "the exact command or write reaches a target outside this repository's physical root; what it changes there is bounded only by the reviewed command/target below, never independently verified by this override",
+          rollbackRecovery: "read back the out-of-root target directly, in its own context; this repository's own HEAD/tree/status readback proves nothing about it",
+          residualRisk: "no symlink-safety walk runs on an out-of-root target the way safePath() runs for an in-root one, and no time-of-check/time-of-use guarantee holds between authorization and consumption for it; the capability still only ever admits the byte-identical command/write it was signed for, never a different one",
+        }
+        : {
+          repository: "the exact command may change the bound repository preimage",
+          external: "external effects are unknown for this exact command and must be treated as possible",
+          rollbackRecovery: "use command-specific readback or reconciliation; never repeat an ambiguous effect",
+          residualRisk: "the exact command may have effects not inferable by the guard adapter",
+        };
+  const preview = {
     action: actionPreview(toolName, toolInput, paths, commandClass),
     guardRationale: denialRationale(denials),
     alternatives: [
@@ -690,6 +763,27 @@ function decisionPreview({ toolName, toolInput, paths, commandClass, denials }) 
     postcondition: "retry the byte-identical original tool action, then run its ordinary effect readback; override admission is not operation success",
     poAuthority: "final-for-this-exact-project-policy-decision",
   };
+  // ADR-0059 Decision 6, DoD item 3: state explicitly, in the persisted record a human
+  // inspects before signing (this object is embedded verbatim in the request, plan, and
+  // capability, and printed by `guard-human-override.mjs plan`/`prepare-authorization`),
+  // what this exact class of override can and cannot bind -- never left as an implied
+  // equivalence with an in-root capability.
+  if (commandClass === "cross-repository-target") {
+    preview.scopeAttestation = {
+      schema: "pipeline.human-guard-override-scope-attestation.v1",
+      proves: [
+        "this repository's own physical root, HEAD, tree and working-tree status at authorization time -- identical to every other HGO class",
+        "a human (chat mode: in-session attribution; signature mode: a genuine detached Ed25519 proof) reviewed and authorized this exact command or write, once",
+        "the capability is bound to this exact command/tool-input digest and cannot be replayed for a different one, nor consumed twice",
+      ],
+      doesNotProve: [
+        "the identity, existence, or git status of the out-of-root target",
+        "that the out-of-root target is unchanged between authorization and consumption -- no symlink-safety walk runs there, unlike safePath()'s in-root walk",
+        "that the out-of-root target is itself a git repository, or remains the one the human inspected",
+      ],
+    };
+  }
+  return preview;
 }
 
 function localAction(executable, argv, expected) {
@@ -829,8 +923,10 @@ function eligibility(root, toolName, toolInput, { selectedAuthorSourceRoot = nul
     };
   }
   if (new Set(["Edit", "Write"]).has(toolName)) {
-    const path = safePath(root, toolInput?.file_path);
-    if (!path) return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", paths };
+    const classified = classifyPath(root, toolInput?.file_path);
+    if (classified.kind === "refused") return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", paths };
+    if (classified.kind === "cross-boundary") return crossBoundaryEligible(paths, classified.target);
+    const path = classified.path;
     if (hardBoundaryPath(path.relative)) return { eligible: false, code: "HGO-NONOVERRIDABLE-PATH", paths: [path.relative] };
     paths.push(path.relative);
     if (protectedPath(path.relative)) return {
@@ -846,8 +942,10 @@ function eligibility(root, toolName, toolInput, { selectedAuthorSourceRoot = nul
       return { eligible: false, code: "HGO-NONOVERRIDABLE-GRAMMAR", paths };
     }
     for (const candidate of parsed) {
-      const path = safePath(root, candidate);
-      if (!path) return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", paths: [...paths, candidate] };
+      const classified = classifyPath(root, candidate);
+      if (classified.kind === "refused") return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", paths: [...paths, candidate] };
+      if (classified.kind === "cross-boundary") return crossBoundaryEligible(paths, classified.target);
+      const path = classified.path;
       if (hardBoundaryPath(path.relative)) return { eligible: false, code: "HGO-NONOVERRIDABLE-PATH", paths: [...paths, path.relative] };
       paths.push(path.relative);
     }
@@ -882,8 +980,10 @@ function eligibility(root, toolName, toolInput, { selectedAuthorSourceRoot = nul
     }
     for (const redirect of parsed.redirects) {
       if (redirect.target === "/dev/null" || redirect.target?.toLowerCase() === "nul") continue;
-      const path = safePath(root, redirect.target);
-      if (!path) return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", paths: [redirect.target] };
+      const classified = classifyPath(root, redirect.target);
+      if (classified.kind === "refused") return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", paths: [redirect.target] };
+      if (classified.kind === "cross-boundary") return crossBoundaryEligible(paths, classified.target);
+      const path = classified.path;
       if (hardBoundaryPath(path.relative)) return { eligible: false, code: "HGO-NONOVERRIDABLE-PATH", paths: [path.relative] };
       paths.push(path.relative);
       if (protectedPath(path.relative)) writerOwnedProjectPolicy = true;
@@ -894,18 +994,20 @@ function eligibility(root, toolName, toolInput, { selectedAuthorSourceRoot = nul
         if (token === "-C" || token === "--git-dir" || token === "--work-tree") {
           const candidate = segment.argv[index + 1];
           if (typeof candidate === "string") {
-            const path = safePath(root, candidate);
-            if (!path) return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", paths: [candidate] };
-            paths.push(path.relative);
+            const classified = classifyPath(root, candidate);
+            if (classified.kind === "refused") return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", paths: [candidate] };
+            if (classified.kind === "cross-boundary") return crossBoundaryEligible(paths, classified.target);
+            paths.push(classified.path.relative);
           }
           index += 1;
           continue;
         }
         const assignedPath = token.match(/^--(?:git-dir|work-tree)=(.+)$/u)?.[1];
         if (assignedPath !== undefined) {
-          const path = safePath(root, assignedPath);
-          if (!path) return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", paths: [assignedPath] };
-          paths.push(path.relative);
+          const classified = classifyPath(root, assignedPath);
+          if (classified.kind === "refused") return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", paths: [assignedPath] };
+          if (classified.kind === "cross-boundary") return crossBoundaryEligible(paths, classified.target);
+          paths.push(classified.path.relative);
           continue;
         }
         const normalizedToken = token.replace(/\\/gu, "/");
@@ -918,8 +1020,10 @@ function eligibility(root, toolName, toolInput, { selectedAuthorSourceRoot = nul
           continue;
         }
         if (isAbsolute(token) || token === ".." || token.startsWith("../") || token.includes("/../")) {
-          const path = safePath(root, token);
-          if (!path) return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", paths: [token] };
+          const classified = classifyPath(root, token);
+          if (classified.kind === "refused") return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", paths: [token] };
+          if (classified.kind === "cross-boundary") return crossBoundaryEligible(paths, classified.target);
+          const path = classified.path;
           if (hardBoundaryPath(path.relative)) return { eligible: false, code: "HGO-NONOVERRIDABLE-PATH", paths: [path.relative] };
           paths.push(path.relative);
           if (protectedPath(path.relative)) writerOwnedProjectPolicy = true;
@@ -940,8 +1044,10 @@ function eligibility(root, toolName, toolInput, { selectedAuthorSourceRoot = nul
     const segment = parsed.segments[0];
     const normalizedExecutable = segment.executable.toLowerCase().replace(/\.exe$/u, "");
     if (normalizedExecutable === "node" && segment.argv.length === 2 && segment.argv[0] === "--check") {
-      const path = safePath(root, segment.argv[1]);
-      if (!path) return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", paths: [segment.argv[1]] };
+      const classified = classifyPath(root, segment.argv[1]);
+      if (classified.kind === "refused") return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", paths: [segment.argv[1]] };
+      if (classified.kind === "cross-boundary") return crossBoundaryEligible(paths, classified.target);
+      const path = classified.path;
       if (hardBoundaryPath(path.relative)) return { eligible: false, code: "HGO-NONOVERRIDABLE-PATH", paths: [path.relative] };
       paths.push(path.relative);
       if (protectedPath(path.relative)) writerOwnedProjectPolicy = true;

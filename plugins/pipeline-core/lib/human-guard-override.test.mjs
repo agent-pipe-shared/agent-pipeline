@@ -692,7 +692,13 @@ test("security and authority boundaries return typed recovery without an ambient
       ["planned", "Write", { file_path: ".claude/pipeline-state.json", content: "{}" }],
       ["planned", "Write", { file_path: ".claude/pipeline.yaml", content: "runtime: drift\n" }],
       ["author-repair-required", "Write", { file_path: "plugins/pipeline-core/lib/human-guard-override.mjs", content: "tamper\n" }],
-      ["external-operator-required", "Write", { file_path: "../outside.txt", content: "x" }],
+      // ADR-0059 Decision 6 (2026-08-08): a genuine out-of-root escape is now the honestly-
+      // scoped "cross-repository-target" eligible class, reversing the former blanket
+      // HGO-NONOVERRIDABLE-CROSS-BOUNDARY refusal for exactly this row. The symlink- and
+      // hardlink-attack rows immediately below stay "external-operator-required" -- they
+      // fail safePath()'s IN-ROOT walk, never the escape test, so they are structurally
+      // untouched by this change (see the eligibility() internals test further down).
+      ["planned", "Write", { file_path: "../outside.txt", content: "x" }],
       ["external-operator-required", "Write", { file_path: "linked/escape.txt", content: "x" }],
       ["external-operator-required", "Write", { file_path: "hardlinked.txt", content: "x" }],
       ["narrower-recovery-required", "Bash", { command: "git push origin HEAD:refs/heads/main" }],
@@ -702,13 +708,17 @@ test("security and authority boundaries return typed recovery without an ambient
       ["planned", "Bash", { command: "python3 -c 'open(\"owned\", \"w\").write(\"x\")'" }],
       ["planned", "Bash", { command: "perl -e 'open my $fh, \">\", \"owned\"'" }],
       ["planned", "Bash", { command: "node safe.mjs" }],
-      ["external-operator-required", "Bash", { command: "node --check ../../outside.mjs" }],
+      // ADR-0059 Decision 6: also now a genuine out-of-root escape, same reasoning as the
+      // Write row above (the token-scanning loop classifies it before this command's own
+      // dedicated `node --check` handling would even run).
+      ["planned", "Bash", { command: "node --check ../../outside.mjs" }],
       ["planned", "Bash", { command: "node --check .claude/pipeline-state.json" }],
       ["external-operator-required", "Bash", { command: "node safe.mjs --tok" + "en=fixture-not-a-secret" }],
       ["planned", "Bash", { command: "touch safe && touch second" }],
       ["planned", "apply_patch", { command: "*** Begin Patch\n*** Update File: .claude/pipeline-state.json\n@@\n-{}\n+{\"x\":1}\n*** End Patch" }],
       ["author-repair-required", "apply_patch", { command: "*** Begin Patch\n*** Update File: plugins/pipeline-core/hooks/codex-pretool-guard.mjs\n@@\n-old\n+tampered\n*** End Patch" }],
-      ["external-operator-required", "apply_patch", { command: "*** Begin Patch\n*** Update File: notes.md\n*** Move to: ../outside.md\n@@\n-old\n+new\n*** End Patch" }],
+      // ADR-0059 Decision 6: same reasoning, apply_patch's own "Move to" target.
+      ["planned", "apply_patch", { command: "*** Begin Patch\n*** Update File: notes.md\n*** Move to: ../outside.md\n@@\n-old\n+new\n*** End Patch" }],
     ]) {
       const observed = recordHumanGuardDenial({
         rootDir: root,
