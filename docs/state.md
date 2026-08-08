@@ -201,6 +201,24 @@ rather than only repairing the two carriers.
 
 ### Round-1 repairs: four of five findings closed, one cannot be (2026-08-08)
 
+**F2 — CLOSED, both halves (`8dcb1cc` pushed; AC-P3 demonstrated after it).**
+The PO signed a one-use TP-3 window for exactly the duplicate-suite-id edit
+(ADR-0059, request `91ecdd34…`, plan `65f19034…`, intent `f822476b…`).
+`evidence/phx-acp3-demonstration.txt`: baseline exit 0 → the same suite id
+registered twice → exit 2 with `DUPLICATE-NAME "verify-suite-registration-tests"
+is registered 2 times (TEST_SUITES, TEST_SUITES)` → restore → exit 0, with
+`verify.mjs` sha256 `5a01089e…` identical before and after and
+`git status --porcelain` empty. The criterion's "rather than throwing before
+planning" clause holds: the checker plans, then reports, and names the duplicate.
+
+**One friction worth keeping, because it cost a round.** The first
+`authorize-by-signature` failed with `PO-APPROVAL-TRUST-MISMATCH` even though the
+key and `keyReference` were correct. Cause: the signing helper read the public
+key through `$(cat …)`, and command substitution strips the trailing newline,
+while the trust anchor hashes the file's exact bytes. One missing byte. The
+helper now reads the key in Node; the error names the trust relationship rather
+than the encoding, so this is worth recognising rather than re-deriving.
+
 **F2, AC-P2 half — DEMONSTRATED.** `evidence/phx-acp2-demonstration.txt`, written
 by `evidence/phx-acp2-demonstration-run.mjs`, not by hand: baseline exit 0 → an
 unregistered `*.test.mjs` under a registered root → exit 2 naming the file →
