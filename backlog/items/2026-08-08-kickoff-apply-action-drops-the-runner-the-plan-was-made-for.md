@@ -9,9 +9,61 @@ due: 2026-08-15
 source: "Happy-path test of the local 0.5.4 build in a fresh directory, 2026-08-08. Observed by the PO; located in the source afterwards."
 ---
 
-# The kickoff apply action drops the runner its own plan was made for
+# The runner does not survive the onboarding call chain
 
-## What happened
+*Scope note: filed for the kickoff apply argv alone. A structured handover from the
+same greenfield run then established a second, more serious mechanism and one
+amplifier, so this item now covers the class. File name and id are unchanged
+because the transition ledger references them.*
+
+## Three mechanisms, not one bug
+
+| # | Mechanism | Severity |
+|---|---|---|
+| A | The promotion entry points accept no runner at all and inspect as Codex | blocker, no workaround |
+| B | The kickoff apply action's argv omits `--runner` | workaround exists |
+| C | A failed attestation sits in the CLI's exit-0 list | amplifier for B |
+
+## A — the promotion entry points never take a runner
+
+`planProjectOnboardingKickoffPromotionV4` and
+`applyProjectOnboardingKickoffPromotionV4`
+(`plugins/pipeline-core/lib/project-onboarding-v3.mjs:3949` and `:3961`) have no
+`runner` parameter at all, and call `v4Inspection(rootDir, fs, "onboarding")` with
+no runner argument (`:3953`, `:3966`, `:3975`), so the inspection defaults to
+`codex`. The CLI branches at `plugins/pipeline-core/scripts/project-onboarding-v3.mjs:133`
+and `:137` do not forward `options.runner` either: the parser accepts the flag and
+the branch discards it.
+
+**Consequence: promotion is unreachable for every non-Codex runner.** A Claude
+project is observed as Codex, reports `runtime-attestation-required`, and the
+promotion aborts before reading anything. The provisional `specs/kickoff-*`
+anchors then stay in place permanently and the real design package is never bound.
+No flag reaches the parameter, so there is no workaround.
+
+The contrast is the strongest evidence that this is an oversight rather than a
+design. The kickoff entry points sixty lines above (`:3900`, `:3918`) do take
+`runner`, and the comment introducing them (`:3894`) describes this exact failure
+class in advance:
+
+> a runner without a native runtime readback would be told it owes a Codex
+> attestation and could never reach a kickoff at all
+
+The guard was written for the kickoff pair and never applied to the promotion pair.
+
+## C — the failure is reported as success
+
+`plugins/pipeline-core/scripts/project-onboarding-v3.mjs:169` returns exit `0` for
+a status list that includes `runtime-attestation-required`. So mechanism B yields a
+mutating step that writes nothing, reports a non-ready status inside its JSON, and
+exits `0`. A human reading the JSON sees the problem; a scripting caller sees
+success.
+
+This is what turns an inconvenient bug into a silent one, and it is worth fixing on
+its own terms: `runtime-attestation-required` after an *apply* is a failed
+transaction, whatever produced it.
+
+## B — what was originally observed
 
 A Claude-onboarded project ran `kickoff plan --runner claude`. The plan came back
 valid. The agent executed the `applyAction` the plan returned, verbatim and
@@ -94,6 +146,16 @@ without the runner its plan was made under.
    runner than the plan, not merely that an attestation is missing. This one is
    worth doing even after 1–4, because a future mismatch from any other source
    still surfaces here.
+6. **Take the exit code out of the success list.** `runtime-attestation-required`
+   after an apply is a failed transaction. Whether the whole status list at
+   `scripts/project-onboarding-v3.mjs:169` should be split per operation, rather
+   than shared between plan-shaped and apply-shaped commands, is the question
+   behind it — a status that is a legitimate resting point for `inspect` is not
+   one for `apply`.
+7. **Give A its own fix ahead of the rest.** Mechanism A blocks promotion outright
+   and needs only the parameter that its sibling functions already have. It should
+   not wait on the constructor and the enumerating test, which are the durable
+   part but the slower one.
 
 ## Triggering situation
 
