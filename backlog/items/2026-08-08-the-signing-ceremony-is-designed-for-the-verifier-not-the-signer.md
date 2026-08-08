@@ -73,6 +73,51 @@ Nova must not go fix a condition this code does not have.
   whichever `prepare` actually enforces the binding, and that has to be
   established first.
 
+## Three more, from one attempt to actually sign something (2026-08-08, same day)
+
+The PO tried to sign a guard-maintenance-window intent so a session could edit a
+protected path. It failed. Every step below was measured, and together they are
+the strongest argument that this is one item and not five tickets — three
+independent defects surfaced in a single ceremony, and every one of them is the
+same asymmetry.
+
+**6. The refusal claims a key mismatch where a FIELD is missing, and prints
+neither value.** `sign-intent` failed with *"external trust policy does not match
+the local public key"*. Measured against the PO's own key directory:
+
+```
+trust-policy.publicKeySha256 : f28988b2…73db14
+sha256(po-public.pem)        : f28988b2…73db14
+```
+
+Identical. The key is correct. What the record lacks is `humanName`: it carries
+the pre-`humanName` shape `{keyReference, publicKeySha256}`, and
+`po-human-approval.mjs:269`–`:270` requires the named shape, then reports the
+failure as an identity mismatch. The comparison it just performed has both
+digests in hand and prints neither — the same shape as finding 4, in a second
+place.
+
+**7. The same file already knows better, ten lines away.** `setup`
+(`:347`–`:353`) splits exactly these two questions apart and says so in its own
+comment: *"Two different questions, two different messages (FIXTURE-2): is this
+the right key … and separately, does this record simply predate `--human-name`"*.
+The signing path never received that split. The fix for finding 6 is therefore
+not new code; it is the code beside it.
+
+**8. `setup` names a repair it does not perform — worse than naming none.** Its
+message says to *"run setup again with `--human-name`"*. Re-running it takes the
+branch at `:341` (all three files present), fails at `:352`, and **never rewrites
+the record**. The only route out is for the human to move the file aside so the
+`:333` branch (keys present, authority absent) regenerates it from the same
+public key. That route is correct, safe and undocumented; the documented one is a
+loop. This is the sharpest instance in this item of a refusal pointing at a
+closed door.
+
+**And a fourth, on the way in:** `--repo-root .` is rejected with the bare usage
+dump (`:163`), while `--directory` two lines above (`:160`–`:161`) explains
+exactly what is wrong and lists the three ways to supply it. Same parser, same
+function, two quality levels.
+
 ## Measured and confirmed here
 
 - **(4) reproduces exactly.** `lib/po-approval-proof.mjs:35` returns
