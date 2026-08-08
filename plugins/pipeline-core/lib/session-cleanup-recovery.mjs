@@ -9,8 +9,10 @@ import {
   mkdirSync,
   openSync,
   readFileSync,
+  readdirSync,
   realpathSync,
   renameSync,
+  rmSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -1320,6 +1322,273 @@ export function applySessionCleanupRecovery({
     stateSha256: result.stateSha256,
     revision: result.revision,
   };
+}
+
+// ---------------------------------------------------------------------------
+// In-repository scratch descriptor binding (backlog item
+// 2026-08-07-session-scratchpad-is-unwritable-under-the-cross-repo-guard.md,
+// Candidate 2). A scratch directory is the SAME lifecycle problem the
+// composite recovery machinery above solves for worktrees -- "does this
+// claimed resource still belong to a live session, and can it be reclaimed
+// safely when it does not" -- with a simpler target: one plain directory
+// under the project's own `scratch/` (already gitignored, already inside the
+// guard's project-root containment boundary, so no guard exception is
+// needed). This is deliberately NOT routed through worktree-lifecycle.mjs's
+// typed registerTemporaryIntent/finalizeTemporaryResource/cleanupSession
+// resource system: that system's allowedRootFor() hard-binds every
+// "scratch-file"/"scratch-directory" resource to the OS temp root
+// (tmpdir()), which is exactly the host-temp placement this backlog item
+// exists to move away from, and widening that binding touches
+// worktree-lifecycle.mjs, outside this change's file scope. Instead this
+// reuses THIS file's own already-proven primitives -- securePrivateDirectory/
+// safePrivateFile/writeAtomicPrivate for crash-safe private state, and the
+// same pid+processIdentity liveness check acquireCompositeLock already uses
+// for stale-lock detection -- rather than inventing an unrelated second
+// cleanup mechanism.
+export const SCRATCH_DESCRIPTOR_SCHEMA = "pipeline.scratch-descriptor.v1";
+
+const SAFE_SCRATCH_SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{2,79}$/u;
+const SAFE_SCRATCH_DIR_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/u;
+
+function scratchDescriptorDirectory(root, deps) {
+  const spawn = deps.spawn ?? spawnSync;
+  const result = spawn("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], {
+    cwd: root,
+    encoding: "utf8",
+    shell: false,
+    timeout: 5000,
+  });
+  if (result?.status !== 0 || result?.error) {
+    fail("WT-SCRATCH-DESCRIPTOR", "Git common directory is unavailable");
+  }
+  const raw = String(result.stdout ?? "").trim();
+  const common = realpathSync(isAbsolute(raw) ? raw : resolve(root, raw));
+  const info = lstatSync(common);
+  if (!info.isDirectory() || info.isSymbolicLink()) {
+    fail("WT-SCRATCH-DESCRIPTOR", "Git common directory is unsafe");
+  }
+  const directory = join(common, "agent-pipeline", "scratch-descriptors");
+  const security = {
+    platform: deps.platform ?? process.platform,
+    assessWindowsPrivatePathFn: deps.assessWindowsPrivatePathFn ?? assessWindowsPrivatePath,
+    hardenWindowsPrivateDirectoryFn: deps.hardenWindowsPrivateDirectoryFn ?? hardenWindowsPrivateDirectory,
+  };
+  securePrivateDirectory(directory, security);
+  return { directory, security };
+}
+
+function physicalScratchRoot(root) {
+  const scratchRoot = resolve(root, "scratch");
+  mkdirSync(scratchRoot, { recursive: true });
+  const info = lstatSync(scratchRoot);
+  if (!info.isDirectory() || info.isSymbolicLink()) {
+    fail("WT-SCRATCH-ROOT", "scratch/ is not a plain directory");
+  }
+  const physical = realpathSync(scratchRoot);
+  if (physical !== scratchRoot) {
+    fail("WT-SCRATCH-ROOT", "scratch/ resolves through a symlink");
+  }
+  return physical;
+}
+
+function scratchDescriptorPath(descriptorDirectory, sessionId) {
+  return join(descriptorDirectory, `${sessionId}.json`);
+}
+
+function validateScratchDescriptor(value, sessionId) {
+  const keys = Object.keys(value ?? {}).sort();
+  const expected = ["boundAt", "pid", "processIdentity", "schema", "scratchRelativePath", "sessionId"].sort();
+  if (!isObject(value)
+    || keys.length !== expected.length
+    || !keys.every((key, index) => key === expected[index])
+    || value.schema !== SCRATCH_DESCRIPTOR_SCHEMA
+    || value.sessionId !== sessionId
+    || !SAFE_SCRATCH_SESSION_ID.test(value.sessionId)
+    || typeof value.scratchRelativePath !== "string"
+    || !value.scratchRelativePath.startsWith("scratch/")
+    || !SAFE_SCRATCH_DIR_NAME.test(value.scratchRelativePath.slice("scratch/".length))
+    || !Number.isSafeInteger(value.pid) || value.pid < 1
+    || !(value.processIdentity === null || /^[a-f0-9-]{36}:[0-9]+$/iu.test(value.processIdentity))
+    || typeof value.boundAt !== "string" || value.boundAt === "") {
+    fail("WT-SCRATCH-DESCRIPTOR", "scratch descriptor is invalid");
+  }
+  return value;
+}
+
+function removeClaimedScratchDirectory(scratchRoot, descriptor) {
+  const dirName = descriptor.scratchRelativePath.slice("scratch/".length);
+  const claimed = join(scratchRoot, dirName);
+  if (!existsSync(claimed)) return;
+  const info = lstatSync(claimed);
+  if (info.isSymbolicLink() || !info.isDirectory()) {
+    fail("WT-SCRATCH-DESCRIPTOR", "claimed scratch path is not a plain directory");
+  }
+  if (dirname(claimed) !== scratchRoot) {
+    fail("WT-SCRATCH-DESCRIPTOR", "claimed scratch path is not a direct child of scratch/");
+  }
+  rmSync(claimed, { recursive: true, force: false });
+}
+
+/**
+ * Bind this session's own scratch subdirectory. Idempotent: a session that
+ * calls this twice (e.g. a resumed bootstrap) gets back its own already-bound
+ * directory rather than a second one. The directory name carries a
+ * cryptographically random suffix so two sessions started at once cannot
+ * collide without coordinating with each other; `mkdirSync` without
+ * `recursive` makes the filesystem itself the collision judge -- on EEXIST
+ * this draws a fresh suffix and retries rather than ever adopting a
+ * directory it did not create.
+ */
+export function bindScratchDescriptor({ rootDir, sessionId, deps = {} } = {}) {
+  if (typeof sessionId !== "string" || !SAFE_SCRATCH_SESSION_ID.test(sessionId)) {
+    fail("WT-SCRATCH-DESCRIPTOR", "session ID is unsafe");
+  }
+  const root = realpathSync(resolve(rootDir));
+  const scratchRoot = physicalScratchRoot(root);
+  const { directory: descriptorDirectory, security } = scratchDescriptorDirectory(root, deps);
+  const descriptorPath = scratchDescriptorPath(descriptorDirectory, sessionId);
+  if (existsSync(descriptorPath)) {
+    safePrivateFile(descriptorPath, security);
+    const existing = validateScratchDescriptor(JSON.parse(readFileSync(descriptorPath, "utf8")), sessionId);
+    const existingAbsolute = join(scratchRoot, existing.scratchRelativePath.slice("scratch/".length));
+    if (existsSync(existingAbsolute)
+      && lstatSync(existingAbsolute).isDirectory()
+      && !lstatSync(existingAbsolute).isSymbolicLink()) {
+      return { status: "reused", scratchRelativePath: existing.scratchRelativePath, descriptorPath };
+    }
+    fail("WT-SCRATCH-DESCRIPTOR", "bound scratch directory is missing or unsafe");
+  }
+  const now = (deps.now ?? (() => new Date()))();
+  const pid = (deps.pidFn ?? (() => process.pid))();
+  const processIdentity = (deps.processIdentityFn ?? defaultProcessIdentity)(pid);
+  const randomHex = deps.randomHexFn ?? (() => randomBytes(4).toString("hex"));
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const dirName = `${sessionId}-${randomHex()}`;
+    if (!SAFE_SCRATCH_DIR_NAME.test(dirName)) continue;
+    const candidate = join(scratchRoot, dirName);
+    try {
+      mkdirSync(candidate);
+    } catch (error) {
+      if (error?.code === "EEXIST") continue;
+      throw error;
+    }
+    const descriptor = validateScratchDescriptor({
+      schema: SCRATCH_DESCRIPTOR_SCHEMA,
+      sessionId,
+      scratchRelativePath: `scratch/${dirName}`,
+      boundAt: now.toISOString(),
+      pid,
+      processIdentity,
+    }, sessionId);
+    writeAtomicPrivate(descriptorPath, Buffer.from(`${JSON.stringify(descriptor)}\n`, "utf8"), security);
+    return { status: "bound", scratchRelativePath: descriptor.scratchRelativePath, descriptorPath };
+  }
+  fail("WT-SCRATCH-DESCRIPTOR", "scratch directory name could not be allocated");
+}
+
+/**
+ * Release this session's own scratch directory at session close. Deletes
+ * ONLY the exact path this session's own descriptor claims -- never a glob,
+ * never the whole `scratch/` root.
+ */
+export function releaseScratchDescriptor({ rootDir, sessionId, deps = {} } = {}) {
+  if (typeof sessionId !== "string" || !SAFE_SCRATCH_SESSION_ID.test(sessionId)) {
+    fail("WT-SCRATCH-DESCRIPTOR", "session ID is unsafe");
+  }
+  const root = realpathSync(resolve(rootDir));
+  const scratchRoot = physicalScratchRoot(root);
+  const { directory: descriptorDirectory, security } = scratchDescriptorDirectory(root, deps);
+  const descriptorPath = scratchDescriptorPath(descriptorDirectory, sessionId);
+  if (!existsSync(descriptorPath)) return { status: "not-bound" };
+  safePrivateFile(descriptorPath, security);
+  const descriptor = validateScratchDescriptor(JSON.parse(readFileSync(descriptorPath, "utf8")), sessionId);
+  removeClaimedScratchDirectory(scratchRoot, descriptor);
+  unlinkSync(descriptorPath);
+  return { status: "released", scratchRelativePath: descriptor.scratchRelativePath };
+}
+
+/**
+ * Read-only inspection of every bound scratch descriptor plus a liveness
+ * verdict for each, reusing the exact same pid+processIdentity check
+ * acquireCompositeLock already uses to distinguish a live owner from a
+ * crashed one (PID reuse defeats a bare `process.kill(pid, 0)` check; the
+ * recorded boot_id+start-ticks identity does not).
+ */
+export function planOrphanScratchRetirement({ rootDir, deps = {} } = {}) {
+  const root = realpathSync(resolve(rootDir));
+  const { directory: descriptorDirectory, security } = scratchDescriptorDirectory(root, deps);
+  const names = existsSync(descriptorDirectory)
+    ? readdirSync(descriptorDirectory).filter((name) => name.endsWith(".json"))
+    : [];
+  const entries = [];
+  for (const name of names) {
+    const sessionId = name.slice(0, -".json".length);
+    if (!SAFE_SCRATCH_SESSION_ID.test(sessionId)) continue;
+    const descriptorPath = join(descriptorDirectory, name);
+    let descriptor;
+    try {
+      safePrivateFile(descriptorPath, security);
+      descriptor = validateScratchDescriptor(JSON.parse(readFileSync(descriptorPath, "utf8")), sessionId);
+    } catch {
+      entries.push({ sessionId, descriptorPath, status: "invalid" });
+      continue;
+    }
+    const processIdentity = (deps.processIdentityFn ?? defaultProcessIdentity)(descriptor.pid);
+    const reusedPid = descriptor.processIdentity !== null
+      && processIdentity !== null
+      && processIdentity !== descriptor.processIdentity;
+    const alive = reusedPid ? false : (deps.isProcessAliveFn ?? defaultProcessAlive)(descriptor.pid);
+    entries.push({
+      sessionId,
+      descriptorPath,
+      scratchRelativePath: descriptor.scratchRelativePath,
+      status: alive === false ? "orphan" : "active",
+    });
+  }
+  return entries;
+}
+
+/**
+ * Retire every verified-orphaned scratch descriptor found by
+ * planOrphanScratchRetirement -- called on a LATER bootstrap, never inline in
+ * the crashed session itself, and never a wholesale clear of `scratch/`.
+ * Immediately before deleting, each descriptor is re-read and re-validated
+ * unchanged (defends against a race with a concurrent legitimate rebind of
+ * the same session ID); a descriptor that no longer matches is retained
+ * rather than forced.
+ */
+export function retireOrphanScratchDescriptors({ rootDir, deps = {} } = {}) {
+  const root = realpathSync(resolve(rootDir));
+  const scratchRoot = physicalScratchRoot(root);
+  const { security } = scratchDescriptorDirectory(root, deps);
+  const plan = planOrphanScratchRetirement({ rootDir, deps });
+  let retired = 0;
+  const retained = [];
+  for (const entry of plan) {
+    if (entry.status !== "orphan") {
+      retained.push(entry);
+      continue;
+    }
+    let descriptor;
+    try {
+      safePrivateFile(entry.descriptorPath, security);
+      descriptor = validateScratchDescriptor(
+        JSON.parse(readFileSync(entry.descriptorPath, "utf8")),
+        entry.sessionId,
+      );
+    } catch {
+      retained.push({ ...entry, status: "invalid" });
+      continue;
+    }
+    if (descriptor.scratchRelativePath !== entry.scratchRelativePath) {
+      retained.push({ ...entry, status: "changed" });
+      continue;
+    }
+    removeClaimedScratchDirectory(scratchRoot, descriptor);
+    try { unlinkSync(entry.descriptorPath); } catch (error) { if (error?.code !== "ENOENT") throw error; }
+    retired += 1;
+  }
+  return { retiredCount: retired, retained };
 }
 
 export const sessionCleanupRecoveryInternals = {

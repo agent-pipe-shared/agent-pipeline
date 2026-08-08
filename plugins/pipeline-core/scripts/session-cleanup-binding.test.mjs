@@ -26,6 +26,10 @@ import {
 } from "../lib/onboarding-continuity.mjs";
 import {
   applySessionCleanupRecovery,
+  bindScratchDescriptor,
+  planOrphanScratchRetirement,
+  releaseScratchDescriptor,
+  retireOrphanScratchDescriptors,
   SessionCleanupRecoveryError,
   sessionCleanupRecoveryInternals,
 } from "../lib/session-cleanup-recovery.mjs";
@@ -1913,6 +1917,158 @@ test("composite recovery private journal uses native-Windows DACL assurance fail
       (error) => error instanceof SessionCleanupRecoveryError
         && error.code === "WT-SESSION-RECOVERY-JOURNAL",
     );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("bindScratchDescriptor creates one collision-safe scratch directory and is idempotent on reuse", () => {
+  const root = fixture("scratch-bind");
+  try {
+    const first = bindScratchDescriptor({ rootDir: root, sessionId: "scratch-session-a" });
+    assert.equal(first.status, "bound");
+    assert.match(first.scratchRelativePath, /^scratch\/scratch-session-a-[0-9a-f]{8}$/u);
+    assert.equal(existsSync(join(root, first.scratchRelativePath)), true);
+    assert.equal(existsSync(first.descriptorPath), true);
+
+    const again = bindScratchDescriptor({ rootDir: root, sessionId: "scratch-session-a" });
+    assert.equal(again.status, "reused");
+    assert.equal(again.scratchRelativePath, first.scratchRelativePath);
+
+    const other = bindScratchDescriptor({ rootDir: root, sessionId: "scratch-session-b" });
+    assert.notEqual(other.scratchRelativePath, first.scratchRelativePath);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("bindScratchDescriptor draws a fresh suffix on an atomic mkdir collision instead of adopting the existing directory", () => {
+  const root = fixture("scratch-bind-collision");
+  try {
+    let calls = 0;
+    const bound = bindScratchDescriptor({
+      rootDir: root,
+      sessionId: "scratch-collide",
+      deps: {
+        randomHexFn() {
+          calls += 1;
+          return calls === 1 ? "aaaaaaaa" : "bbbbbbbb";
+        },
+      },
+    });
+    // Force the exact same first suffix to already exist as a foreign directory
+    // (not created by this call) before a second, independent bind attempts it.
+    const root2 = fixture("scratch-bind-collision-2");
+    try {
+      mkdirSync(join(root2, "scratch"), { recursive: true });
+      mkdirSync(join(root2, "scratch", "scratch-collide-aaaaaaaa"));
+      let secondCalls = 0;
+      const second = bindScratchDescriptor({
+        rootDir: root2,
+        sessionId: "scratch-collide",
+        deps: {
+          randomHexFn() {
+            secondCalls += 1;
+            return secondCalls === 1 ? "aaaaaaaa" : "cccccccc";
+          },
+        },
+      });
+      assert.equal(second.status, "bound");
+      assert.equal(second.scratchRelativePath, "scratch/scratch-collide-cccccccc");
+      assert.equal(secondCalls, 2);
+    } finally {
+      rmSync(root2, { recursive: true, force: true });
+    }
+    assert.equal(bound.scratchRelativePath, "scratch/scratch-collide-aaaaaaaa");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("releaseScratchDescriptor deletes only the exact claimed directory, never a sibling", () => {
+  const root = fixture("scratch-release");
+  try {
+    const mine = bindScratchDescriptor({ rootDir: root, sessionId: "scratch-owner" });
+    const sibling = join(root, "scratch", "untracked-sibling");
+    mkdirSync(sibling, { recursive: true });
+    writeFileSync(join(sibling, "note.txt"), "not mine\n");
+
+    const released = releaseScratchDescriptor({ rootDir: root, sessionId: "scratch-owner" });
+    assert.equal(released.status, "released");
+    assert.equal(existsSync(join(root, mine.scratchRelativePath)), false);
+    assert.equal(existsSync(mine.descriptorPath), false);
+    assert.equal(existsSync(sibling), true);
+
+    const again = releaseScratchDescriptor({ rootDir: root, sessionId: "scratch-owner" });
+    assert.equal(again.status, "not-bound");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("orphan scratch retirement reclaims only a verified-dead session and leaves a live one untouched", () => {
+  const root = fixture("scratch-orphan");
+  try {
+    const LIVE_PID = 424242;
+    const DEAD_PID = 434343;
+    const live = bindScratchDescriptor({
+      rootDir: root,
+      sessionId: "scratch-live",
+      deps: { pidFn() { return LIVE_PID; } },
+    });
+    const crashed = bindScratchDescriptor({
+      rootDir: root,
+      sessionId: "scratch-crashed",
+      deps: { pidFn() { return DEAD_PID; } },
+    });
+    const isProcessAliveFn = (pid) => pid === LIVE_PID;
+
+    const plan = planOrphanScratchRetirement({ rootDir: root, deps: { isProcessAliveFn } });
+    const bySession = Object.fromEntries(plan.map((entry) => [entry.sessionId, entry.status]));
+    assert.equal(bySession["scratch-live"], "active");
+    assert.equal(bySession["scratch-crashed"], "orphan");
+
+    const retired = retireOrphanScratchDescriptors({ rootDir: root, deps: { isProcessAliveFn } });
+    assert.equal(retired.retiredCount, 1);
+    assert.equal(existsSync(join(root, crashed.scratchRelativePath)), false);
+    assert.equal(existsSync(crashed.descriptorPath), false);
+    assert.equal(existsSync(join(root, live.scratchRelativePath)), true);
+    assert.equal(existsSync(live.descriptorPath), true);
+
+    const rerun = retireOrphanScratchDescriptors({ rootDir: root, deps: { isProcessAliveFn } });
+    assert.equal(rerun.retiredCount, 0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("orphan scratch retirement detects PID reuse via processIdentity and never adopts a live process's new identity", () => {
+  const root = fixture("scratch-pid-reuse");
+  try {
+    const bound = bindScratchDescriptor({
+      rootDir: root,
+      sessionId: "scratch-reused",
+      deps: { processIdentityFn() { return "11111111-1111-1111-1111-111111111111:100"; } },
+    });
+    const plan = planOrphanScratchRetirement({
+      rootDir: root,
+      deps: {
+        // Same PID is alive again, but under a DIFFERENT boot/start identity --
+        // the original owning process is gone even though the PID now resolves.
+        processIdentityFn() { return "22222222-2222-2222-2222-222222222222:200"; },
+        isProcessAliveFn() { return true; },
+      },
+    });
+    assert.equal(plan.find((entry) => entry.sessionId === "scratch-reused").status, "orphan");
+    const retired = retireOrphanScratchDescriptors({
+      rootDir: root,
+      deps: {
+        processIdentityFn() { return "22222222-2222-2222-2222-222222222222:200"; },
+        isProcessAliveFn() { return true; },
+      },
+    });
+    assert.equal(retired.retiredCount, 1);
+    assert.equal(existsSync(join(root, bound.scratchRelativePath)), false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
