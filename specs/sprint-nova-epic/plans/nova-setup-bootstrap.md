@@ -234,13 +234,52 @@ key, sign with it, and the record says which key it was.
   the *mode* mismatch: a participant whose machine plane says `chat` working in a
   repository whose committed value says `signature`. The fail-closed rule makes
   that safe rather than resolved. The PO named this explicitly as a later problem.
-- Where the machine plane physically lives. An environment variable
-  (`PIPELINE_PO_APPROVAL_DIRECTORY` today) is losable and undiscoverable; a file
-  under the user's configuration directory is better but needs its own guard
-  treatment, since the guard currently admits exactly one derived directory outside
-  the project root.
 - Everything Nightwing will do properly: the full field taxonomy, migration of
   existing projects, and any UI beyond plain prose in the bootstrap.
+
+## 6a. Where the machine plane lives — decided 2026-08-08 (PO)
+
+Previously parked in §6. The PO decided: **a file at a fixed, derived path under
+the user's home directory, written by the agent through a new narrow guard
+carve-out.** The environment variable is not the carrier; it survives only as a
+fallback for the key directory it already resolves today (`1abd38b`).
+
+**What the guard admits today, exactly.** `guard-lifecycle-ready.mjs` grants
+exactly one write surface outside the project root: the Claude session memory
+directory (`claudeSessionMemoryDirectory`, `:443`; admitted at `:1362`). Its
+doctrine is stated in the code and is the constraint the second carve-out must
+respect (`:429`–`:434`):
+
+- never a **prefix** — `~/.claude/**` was refused because that tree also holds
+  `settings.json`, `agents/` and `plugins/`, and the local marketplace sits beside
+  it;
+- never a path taken from tool input, an environment variable, or repository
+  config — only a value the agent's own tool calls cannot set;
+- fails closed whenever the derivation is unusable;
+- one `realpathSync` walk over the full candidate, so a symlinked ancestor cannot
+  misdirect the boundary.
+
+**The carve-out that follows from it.** Exactly one file — not a directory, not a
+prefix — at `<homedir>/.agent-pipeline/machine.json`, derived from the process's
+own home directory and from nothing else. It sits beside the memory carve-out in
+the `WRITE_TOOLS` branch (`:1354`–`:1377`) and falls through to the readiness gate
+like any other admitted write.
+
+**The shell lane is deliberately NOT widened.** `isForbiddenCrossRepositoryMutation`
+keeps refusing a shell write to that path. The file's writer is the plugin's own
+CLI, which reaches it through Node rather than through a shell mutation the guard
+parses. Two lanes with different reach is the shape that produced
+`2026-08-08-an-authority-gate-is-bypassable-by-choosing-a-different-write-tool.md`,
+so the asymmetry is recorded here as a decision rather than left to be discovered:
+the write lane is the one being opened, and opening the shell lane as well would
+admit `echo … > ~/.agent-pipeline/machine.json`, which no legitimate caller needs.
+
+**Why this passes the test §5a sets.** That test asks what a restriction stops an
+*agent* from doing. Read in the other direction it asks what a carve-out *lets* an
+agent do: write one named configuration file on the operator's machine. It carries
+no key material and no path that resolves to key material — it records the key
+*directory*, which the human created and which the guard never needed to admit,
+since `po-human-approval.mjs` is run by the human in their own terminal (§3.3, §7).
 
 ## 7. What implementation must not do
 
