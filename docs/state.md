@@ -16,7 +16,7 @@ the supplied authoritative release identity; it is not a claimed release time.
 The historical candidate-qualification sections below are retained as
 session history and no longer describes the current publication disposition.
 
-## 2026-08-08 Nova GF-054 — the greenfield handover, hardened into the 0.5.4 local candidate (current)
+## 2026-08-08 Nova GF-054 — the greenfield handover, hardened into the 0.5.4 local candidate
 
 A parallel session onboarded an empty repository with the Claude runner and
 handed over twelve defects with code locations. All twelve are filed in
@@ -174,6 +174,76 @@ divergence and, in the same motion, made that write a guarded invariant — a
 consequence that fell out rather than being decided), and whether the guard
 reclassification that moved a denial from non-liftable to signature-liftable is
 the boundary the PO wants.
+
+## 2026-08-08 Nova GF-056 — runner neutrality for the Claude path, and the layout contract that is missing (current, in progress)
+
+The PO set the goal for this block themselves: a next local `0.5.4` candidate
+carrying the open fixes, *"zB runner neutralität für claude und für die freigabe
+schicht"*, and — added while the block ran — **the candidate must be handed over
+with a fresh cachebuster before they install and test it, and nothing goes to
+`main` until they have.** That ordering is a PO instruction, not a courtesy: the
+gap being fixed is one they hit three times in live onboarding.
+
+**The approval layer's runner was resolved by silent fallthrough, and it mattered**
+(`e5a6a9b`). `po-authority-decision-apply` left `runner` undefined so a `"codex"`
+default two layers down applied. The dispatch was briefed to *measure before
+fixing*, and the measurement came back positive rather than benign: the default
+reaches `sourceEnablesRunner` admission, `requiresNativeRuntimeReadback`, App-Server
+applicability and restart routing inside `v4Inspection`, and all three in-transaction
+V4 readbacks must report `ready` or the whole apply rolls back. A Claude session
+could therefore have its own authority decision rolled back on a runner identity
+nobody supplied. Fixed by reusing `resolvePoRebindRunner` — the resolution the
+sibling rebind path already had — rather than inventing a second mechanism.
+
+**The absent-runner contract is decided: fail closed.** The question had been
+reached and deferred twice. The deciding argument is not that fail-closed is safest
+in the abstract but that `94b8a72` already answered it that way one surface over,
+so any other answer leaves two neighbouring surfaces of one module disagreeing. The
+environment-derived candidate is rejected outright rather than deferred a third time:
+`CLAUDECODE` answers "which runner executes this process" while the parameter asks
+"which runner is this project for", and those diverge in every test run — which is
+what broke sixteen tests when it was tried. Implementation is sequenced after the
+seed work, since both change the same module.
+
+**Two restart items closed against `864c7f1`, and a dispatch wasted proving it**
+(`19f72f1`, `7700248`). The Claude onboarding hang — barrier published, clearable
+only by a Codex-issued ticket, guard refusing that launcher to a tool call, every
+project write refused until `ready` — was already fixed on this branch. The
+orchestrator briefed a dispatch against the stale items without reading the code,
+although the closing commit had already been named to the PO by name. The dispatch
+stopped correctly on the contradiction rather than inventing work. Verified
+independently at `project-onboarding-v3.mjs:3809` and `:1572` before closing,
+because "already fixed" is the same class of claim as "pre-existing failure" and
+two of those were wrong earlier the same night. Evidence:
+`backlog/evidence/2026-08-08-restart-barrier-runner-exemption-verification.md`.
+
+**The PO opened two capabilities the guard had closed.** Claude's own memory writes
+are admitted — but derived from `transcript_path` in the hook payload, whose parent
+directory is the session's project directory as the CLI reports it, **never** as a
+`~/.claude/**` prefix, since that tree also holds `settings.json`, `agents/` and
+`plugins/`. The 2026-07-29 item had held this open for want of exactly that signal;
+it is present in the payload the guard already parses and used nowhere in the
+plugin. Separately, the session scratch space moves **into** the repository, which
+needs no guard exception at all and is why it is the better answer than a temp-root
+carve-out. The PO's boundary on both: the encrypted PO signing key stays outside the
+checkout, is only ever invoked after they create it once in their own terminal, and
+enters no allowlist — which is already the implemented contract
+(`po-human-approval.mjs` passes OpenSSL the key's *path*, never its bytes).
+
+**The missing layout contract.** The PO named it: agents invent a directory
+structure each session because nothing governs where a kind of file belongs. Five
+instances from this one night are on record, including agent material falling back
+into `.git/` for want of a named alternative, and an unanchored `evidence/` ignore
+rule that silently swallows the closure evidence the backlog gate demands while the
+gate still passes. Both filed; the layout item argues for an ADR on the ground that
+the `scratch/` convention already existed in two files and reached no agent — what
+was missing is standing to be checked, not a place to write it down.
+
+**Truncation reached fourteen, then fifteen**, twice at the commit step, costing
+whole diffs' durability. This item already recorded "commit as soon as the suites
+are green" as the earned practice; the briefings did not carry it, because the
+practice lives in a backlog item nobody reads while dispatching. It must move into
+`templates/prompts/goldfish-task.md`.
 
 ## 2026-08-08 Nova GF-055 — the PO's six decisions on the open questions, implemented (in progress)
 
