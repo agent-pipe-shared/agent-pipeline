@@ -71,11 +71,26 @@ This repository's store holds exactly one record, dated 2026-07-30, with
 `plugin.root` is a Codex plugin cache path at version `0.4.7-partial-auth`,
 while the plugin enforcing today is a different root and version.
 
-**What is proven:** the guidance is empty, the paths are eligible, the family is
-healthy, and a single unvalidatable capability file is sufficient to produce
-exactly this symptom. **What is not proven:** that `validatedCapability` is in
-fact throwing on that file. Establishing that is a two-line diagnostic and should
-be the first step, not an assumption.
+**Confirmed by measurement, same day — the hypothesis above is no longer a
+hypothesis.** A read-only probe called `consumeHumanGuardOverride` with a
+deliberately non-matching tool input (a file path that does not exist, so no
+stored capability can match it) and a synthetic denial. A healthy store must
+answer `absent` for that. It answered:
+
+```
+{"status":"invalid","code":"HGO-CAPABILITY"}
+```
+
+Nothing was written and nothing was consumed. That return is produced only by the
+whole-loop `return` at `human-guard-override.mjs:1857-1858`, so
+`validatedCapability` does throw on the one stored record, and it does so before
+any matching is attempted.
+
+**Which widens the consequence past this item's title.** The status does not
+depend on the tool, the path, or the guard: it is the store's answer to *every*
+call. So **every HGO-routed guard denial in this checkout is silent**, not only
+the two gate-strength rules that exposed it. Any guard in that family will refuse,
+promise a route, and print nothing.
 
 ## Consequence, and why it is worth more than its size
 
@@ -113,10 +128,12 @@ filing, not a repair.
 
 **Owner: PO**, for assignment to Nova. Ordered by what unblocks the most.
 
-1. **Confirm the mechanism first.** Read the one stored capability through
-   `validatedCapability` and record whether it throws. If it does not, this
-   item's hypothesis is wrong and the empty guidance has another cause — which
-   matters more than the fix.
+1. **The mechanism is established; what remains is why that record fails
+   validation.** The probe above proves `validatedCapability` throws on it. Which
+   check rejects it — the MAC against an audit key rotated since, the foreign
+   plugin identity, a schema field added after 2026-07-30 — decides whether this
+   is a migration defect or a key-lifecycle one, and only the first is a
+   one-repository problem.
 2. **A denial must never be silent.** Whatever `consumeHumanGuardOverride`
    returns, the guard should emit either a route or a typed reason why there is
    none. The present `if` enumerates two statuses and drops the rest; an `else`
