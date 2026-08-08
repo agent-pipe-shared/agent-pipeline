@@ -76,7 +76,41 @@ the second time the question has been reached and deferred. Do not adopt option
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accept — **candidate 1, fail closed.** An absent `runner` is a
+  caller error. The helpers raise a typed error rather than assuming an identity,
+  and the regression test named above is deliberately inverted: omitting
+  `--runner` becomes an error case, not a preserved historical behaviour.
+- **Rationale:** three arguments, in the order they decide it.
+
+  1. **The contract already exists in this module and says fail closed.** Commit
+     `94b8a72` closed the sibling gap on the apply surface by making `runner` a
+     required argument of `planBoundApplyAction()`, raising
+     `APPLY-ACTION-RUNNER-REQUIRED` when it is absent. Choosing candidate 2 or 3
+     here would leave two neighbouring surfaces of one module disagreeing about
+     what an absent runner means. That is worse than either answer taken alone.
+  2. **Candidate 3 mistakes one question for another.** Deriving the runner from
+     `env.CLAUDECODE` answers "which runner is executing this process", but the
+     parameter answers "which runner is this project for". Those coincide in a
+     live session and diverge in every test run — which is exactly why the
+     reverted attempt broke sixteen tests: the suite runs under Claude Code
+     while exercising Codex-shaped projects. The breakage was not evidence about
+     the tests' assumptions; it was evidence that the two questions are
+     different. This is the reason to reject candidate 3 outright rather than
+     defer it a third time.
+  3. **Only candidate 1 makes the observed harm structurally impossible.**
+     Candidate 2 keeps the trap and adds a diagnostic, which helps a reader of
+     logs and not the consumer whose project was already created wrong. The
+     observed failure — a Claude consumer silently receiving a Codex project —
+     stops being reachable only when the assumption cannot be made at all.
+
+  Cost, stated rather than discounted: every caller must be audited, and the
+  regression test inverts rather than adjusts. That cost is the reason this
+  question was deferred twice; it is not a reason to defer it a third time.
+- **Assignment (if accepted):** a `goldfish-deep` dispatch, sequenced AFTER the
+  runner-aware restart work lands — both change
+  `plugins/pipeline-core/lib/project-onboarding-v3.mjs` and must not run
+  concurrently in one checkout. The dispatch audits every caller, threads an
+  explicit runner from each, inverts the named regression test, and adds an
+  enumerating check that fails when any helper in the module reintroduces a
+  literal runner default.
+- **Date:** 2026-08-08
