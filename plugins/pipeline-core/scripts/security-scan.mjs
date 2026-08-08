@@ -66,7 +66,7 @@
  * `path.basename(rootDir)` if that file is absent/malformed -- this script is meant to run
  * unmodified across every pipeline-bound project, not just this repo.
  *
- * CLI: `node harness/scripts/security-scan.mjs [--root <dir>] [--timeout-ms N]`.
+ * CLI: `node plugins/pipeline-core/scripts/security-scan.mjs [--root <dir>] [--timeout-ms N]`.
  */
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmdirSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -75,9 +75,9 @@ import { basename, join, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { loadManifestSafe, gateConfig } from "../../plugins/pipeline-core/lib/manifest.mjs";
-import { resolveProjectAuthorityPaths } from "../../plugins/pipeline-core/lib/project-authority.mjs";
-import { assessTrustedExecutablePath, resolveTrustedSystemExecutable } from "./security-readiness/tool-identity.mjs";
+import { loadManifestSafe, gateConfig } from "../lib/manifest.mjs";
+import { resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
+import { assessTrustedExecutablePath, resolveTrustedSystemExecutable } from "./tool-identity.mjs";
 
 import * as gitleaksAdapter from "./security-adapters/gitleaks.mjs";
 import * as osvScannerAdapter from "./security-adapters/osv-scanner.mjs";
@@ -93,9 +93,9 @@ import {
   validateSecurityEvidenceV2,
   SECURITY_EVIDENCE_V2_SCHEMA,
   FINDING_SEVERITIES,
-} from "../../plugins/pipeline-core/lib/security-evidence-evaluator.mjs";
-import { buildCapabilityPlan } from "../../plugins/pipeline-core/lib/security-capability-plan-builder.mjs";
-import { resolveApplicableControls } from "../../plugins/pipeline-core/lib/security-policy-resolver.mjs";
+} from "../lib/security-evidence-evaluator.mjs";
+import { buildCapabilityPlan } from "../lib/security-capability-plan-builder.mjs";
+import { resolveApplicableControls } from "../lib/security-policy-resolver.mjs";
 
 const DEFAULT_TIMEOUT_MS = 60000;
 const PREFLIGHT_TIMEOUT_MS = 5000;
@@ -875,7 +875,7 @@ export async function runSecurityScan({
   const evidenceCore = {
     schema: "pipeline.security-evidence.v1",
     project,
-    command: "node harness/scripts/security-scan.mjs",
+    command: "node plugins/pipeline-core/scripts/security-scan.mjs",
     commit: resolveCommit(rootDir),
     candidate,
     finishedAt: new Date().toISOString(),

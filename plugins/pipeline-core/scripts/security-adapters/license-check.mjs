@@ -9,7 +9,7 @@
  * its binary-backed siblings for uniform runner treatment.
  *
  * INPUT FILES (both resolved to absolute paths by the runner and handed in via `config`,
- * per the briefing's "path from config" clause -- see harness/scripts/security-scan.mjs
+ * per the briefing's "path from config" clause -- see plugins/pipeline-core/scripts/security-scan.mjs
  * header for exactly how these two paths are derived from the manifest):
  *   - `config.allowlistPath` -- `<governance.policies_path>/license-allowlist.json`,
  *     shape `{ "allow": ["MIT", "Apache-2.0", ...], "deny": ["GPL-3.0", ...] }`.
@@ -18,7 +18,7 @@
  *     override (mirroring `semgrep.rules_dir`) was considered and dropped: the manifest
  *     schema's `security.scanners.<key>` value shape is `additionalProperties: false` with
  *     only `enabled`/`rules_dir` declared, so an undeclared `declared_path` key there would
- *     invalidate the WHOLE manifest -- see harness/scripts/security-scan.mjs header for the
+ *     invalidate the WHOLE manifest -- see plugins/pipeline-core/scripts/security-scan.mjs header for the
  *     full rationale. Flagged as an open item, not implemented.
  *     SHAPE DEFINED HERE (no external standard governs this file -- it is this pipeline's
  *     own declaration format, not a third-party tool's output):

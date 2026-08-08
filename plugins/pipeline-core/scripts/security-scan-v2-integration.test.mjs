@@ -3,7 +3,7 @@
 /**
  * security-scan-v2-integration.test.mjs -- CYB-2E integration suite for the additive,
  * EXIT-NEUTRAL `pipeline.security-evidence.v2` emission wired into security-scan.mjs
- * (Option B / D9). Run: `node --test harness/scripts/security-scan-v2-integration.test.mjs`.
+ * (Option B / D9). Run: `node --test plugins/pipeline-core/scripts/security-scan-v2-integration.test.mjs`.
  *
  * This suite is SEPARATE from security-scan.test.mjs (which must stay byte-identical to its
  * pre-CYB-2E baseline). It covers, per the CYB-2E DoD:
@@ -30,11 +30,11 @@ import {
   validateSecurityEvidenceV2,
   evaluateCapability,
   FINDING_SEVERITIES,
-} from "../../plugins/pipeline-core/lib/security-evidence-evaluator.mjs";
+} from "../lib/security-evidence-evaluator.mjs";
 
 // The real repo control catalog, seeded into every Git fixture so `sourceCapabilityPlan`
 // exercises the actual catalog + baseline-assurance sourcing this task committed to.
-const REPO_CATALOG = readFileSync(new URL("../../governance/security-controls/catalog.json", import.meta.url), "utf8");
+const REPO_CATALOG = readFileSync(new URL("../../../governance/security-controls/catalog.json", import.meta.url), "utf8");
 
 // ---------------------------------------------------------------------------------------------
 // Fixture plumbing (minimal replication of security-scan.test.mjs's helpers).

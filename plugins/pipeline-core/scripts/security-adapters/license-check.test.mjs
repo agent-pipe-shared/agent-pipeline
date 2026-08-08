@@ -5,7 +5,7 @@
  * descriptor (CYB-2D). Pure shape/value assertions on the new, additive, frozen data descriptor
  * only -- does not exercise run()/isInstalled() (that stays covered by security-scan.test.mjs).
  *
- * Run:  node --test harness/scripts/security-adapters/license-check.test.mjs
+ * Run:  node --test plugins/pipeline-core/scripts/security-adapters/license-check.test.mjs
  * Exit: 0 = all cases pass, non-zero = at least one case failed.
  */
 import assert from "node:assert/strict";

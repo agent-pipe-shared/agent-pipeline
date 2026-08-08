@@ -13,7 +13,7 @@
  *      covered by security-scan.test.mjs's fixture-binary suite; this file adds only the
  *      scope-guarantee cases that are gitleaks-adapter-local.
  *
- * Run:  node --test harness/scripts/security-adapters/gitleaks.test.mjs
+ * Run:  node --test plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs
  * Exit: 0 = all cases pass, non-zero = at least one case failed.
  */
 import assert from "node:assert/strict";
@@ -23,7 +23,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { name, CAPABILITY_CONTRACT_V2, gitleaksContentAuthorityLine, run } from "./gitleaks.mjs";
-import { resolveTrustedSystemExecutable } from "../security-readiness/tool-identity.mjs";
+import { resolveTrustedSystemExecutable } from "../tool-identity.mjs";
 
 test("CAPABILITY_CONTRACT_V2 exists and is frozen", () => {
   assert.ok(CAPABILITY_CONTRACT_V2, "CAPABILITY_CONTRACT_V2 export is missing");

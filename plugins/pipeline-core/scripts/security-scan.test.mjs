@@ -16,7 +16,7 @@
  * Same plain-assertion style + "N/N cases passed." convention as
  * plugins/pipeline-core/hooks/guard-git.test.mjs / scripts/critic-bare.test.mjs.
  *
- * Run:   node harness/scripts/security-scan.test.mjs
+ * Run:   node plugins/pipeline-core/scripts/security-scan.test.mjs
  * Exit:  0 = all cases pass, 1 = at least one case failed (failure list on stdout).
  */
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
@@ -33,7 +33,7 @@ import * as licenseCheckAdapter from "./security-adapters/license-check.mjs";
 import { runSecurityScan } from "./security-scan.mjs";
 
 const SCRIPT = fileURLToPath(new URL("./security-scan.mjs", import.meta.url));
-const REPO_ROOT = join(dirname(SCRIPT), "..", "..");
+const REPO_ROOT = join(dirname(SCRIPT), "..", "..", "..");
 const NOVA_A1_CONTENT_AUTHORITIES = Object.freeze([
   "content-v1:0326c0edc10afd521b56b4823c2d7d78e9cf1e610faa7a59e8d0e0499f50fb7b:specs/sprint-nova-epic/evidence/backlog/2026-07-24-unreachable-evidence-disposition.md:generic-api-key:1:532",
   "content-v1:051427313d0ea2513b6c50b6007f9e92ddfe4d40736dbd94981fff51a81e77ed:specs/sprint-nova-epic/evidence/backlog/event-40-amendment-intent.json:generic-api-key:1:813",
@@ -1009,7 +1009,7 @@ governance:
     repositorySha256: null, inventory: null, reason: "git-identity-unavailable",
     snapshot: { method: null, verifiedBeforeAfter: false },
   });
-  assertEqual("runner: evidence.command", evidence.command, "node harness/scripts/security-scan.mjs");
+  assertEqual("runner: evidence.command", evidence.command, "node plugins/pipeline-core/scripts/security-scan.mjs");
   assertTrue("runner: evidence.commit is a non-empty string", typeof evidence.commit === "string" && evidence.commit.length > 0, evidence.commit);
   assertTrue("runner: evidence.project is a non-empty string", typeof evidence.project === "string" && evidence.project.length > 0, evidence.project);
   assertTrue(

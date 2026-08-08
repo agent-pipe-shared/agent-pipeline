@@ -6,7 +6,7 @@
  * descriptor only -- does not exercise run()/isInstalled() (that stays covered by
  * security-scan.test.mjs).
  *
- * Run:  node --test harness/scripts/security-adapters/semgrep.test.mjs
+ * Run:  node --test plugins/pipeline-core/scripts/security-adapters/semgrep.test.mjs
  * Exit: 0 = all cases pass, non-zero = at least one case failed.
  */
 import assert from "node:assert/strict";
