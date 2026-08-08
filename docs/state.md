@@ -613,6 +613,79 @@ dispatched.
    not this package's to register.
 5. **Push** — deferred to 2026-08-09 by PO decision; gate green at `5d0fc6a`.
 
+### A signed window is ACTIVE, and what it cost to learn how to time one
+
+**Installed 2026-08-08 ~21:26 local, scope `TP-3,TP-6`, TTL 4 h (the maximum),
+expiry ≈ 01:25.** Candidate `9b36144`, tree matched, `status: active`.
+
+The thing worth keeping from this ceremony is the timing rule, which the earlier
+backlog item named but did not spell out operationally:
+
+- `install` compares live `HEAD` and `HEAD^{tree}` against the signed candidate
+  (`lib/guard-maintenance-window.mjs:495-503`). **Any commit between `prepare`
+  and `install` kills the digest** — including a background dispatch's commit,
+  which is exactly what nearly happened here: `PHX-F2` committed between my
+  reading of `HEAD` and the `prepare` call, so the candidate moved under me.
+- `currentGuardMaintenanceWindow` — the function every guard calls on every
+  check — does **not** re-check the candidate (`:485-530`). It re-verifies the
+  proof, the repo fingerprint, the scope and the expiry, and nothing else.
+
+So the window is fragile for exactly the seconds between prepare and install, and
+completely commit-insensitive for the four hours after. The practical rule: never
+prepare in advance, never prepare while a dispatch is mid-flight if it can be
+helped, and install the moment the proof exists.
+
+The PO asked whether to set a window up before going to sleep. Yes, and this is
+why: without it Part A's new suite lands as an **eighth** unregistered suite —
+the exact problem we already have seven times over.
+
+### F-2 is repaired (`9b36144`), including a claim of mine it falsified
+
+The fixture now describes only what it proves. `assertStaleFixture` (which never
+existed) is corrected to `assertReachedRegistration`; the journal stub is
+described as what it actually is — an import-resolution requirement whose
+tripwire is inert, and labelled inert in place; the assertion that could not fail
+is gone; and the comment quoting the pre-amendment acceptance item 2 is replaced
+by the amended wording. 37 cases before and after — one assertion removed, no
+case lost. Break/restore in both directions, machine-captured.
+
+One correction to my own briefing, reported by the dispatch: I told it a
+synthetic fixture string `/home/fixture/secret` sat near line 15 of that file and
+should be left alone. It is not in that file at all — it is in
+`agent-decision-journal.test.mjs`, which I had read in the same batch. Carried
+forward here so it is not repeated as fact in the next briefing.
+
+### PHX-0 Part A is dispatched (`PHX-0A1`), with both of its questions decided
+
+- **§A.4 — the PO decided: one observation**, the design's own recommendation.
+  No second host round-trip. The consequence is recorded honestly rather than
+  glossed: the loaded-vs-installed comparison is tautological in this
+  self-referential calling pattern, so `normalizeRulesetSource` runs there as a
+  schema-closure pass and as a genuine production caller, not as a second
+  independent identity source.
+- **§A.6 — I took this one, and it is mine, not the PO's.** The design flags a
+  secondary question: ship the §A.5 companion fix as a hard prerequisite (its
+  recommendation), or ship the attestation alone and accept an undocumented
+  bootstrap block for self-application and dev-checkout sessions until a later
+  follow-up. I chose the recommendation without asking, because the PO was going
+  to sleep and the alternative is described by the design itself as reproducing a
+  BLOCKER-class defect on a developer-facing population. If the PO disagrees, the
+  cost of reversing is dropping three of the five files — cheaper than the
+  reverse direction would have been.
+
+Scope: the new origin-allowlist module, the attestation in
+`pipeline-start-preflight.mjs`, the advisory `nextAction`, two companion doc
+files, one `GATE_STRENGTH_PATHS` entry plus its coverage, a new suite for
+`PX0-AC-09/10/11/16/17`, its registration in `verify.mjs`, and the deletion of
+`codex-host-plugin-list.test.mjs` with its exclusion entry. The deletion carries
+a condition: the dispatch must map each behavioural property of the deleted suite
+onto a case in the new one and report the mapping, or name the gap. Deleting
+coverage silently is the failure mode that condition exists to prevent.
+
+Also in flight: `PHX-BFAM`, the sub-design for Part B's closed host-action
+family. §B.8 names that family as real remaining design surface deliberately left
+unresolved, so Part B has no implementable contract until it lands.
+
 ### F1 is closed, and closed on evidence I produced myself
 
 The Critic's single FAIL finding is repaired in `358c709`. BS25 rebuilds its
