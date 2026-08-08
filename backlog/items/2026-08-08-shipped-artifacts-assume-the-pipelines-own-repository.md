@@ -55,6 +55,33 @@ This is the same class as the `setup.mjs` contradiction already recorded in
 shipped artifact instructing a consumer to run something only the source
 checkout has. That item found one instance; this is the systematic version.
 
+## A third class the sweep found: instructions that no path change can fix
+
+Correcting the paths surfaced occurrences where there is nothing to correct to.
+`close-feature/SKILL.md:5` and `:31`, and `close-block/SKILL.md:150`–`:153`,
+instruct a consumer to run `harness/scripts/usage-ledger.mjs` and read
+`harness/scripts/model-prices.json`. Neither has any equivalent under
+`plugins/pipeline-core/`, so the consumer-correct path does not exist.
+
+This is a **content** defect, not a path defect, and it needs its own decision
+rather than a rewrite:
+
+- **Ship them.** `usage-ledger.mjs` reads the runner's own transcripts to produce
+  the telemetry row the close ritual requires; a consumer running that ritual
+  needs it as much as this repository does. This is the answer that makes the
+  shipped instruction true.
+- **Or scope the instruction.** If the telemetry step is genuinely
+  self-application only — this repository's own cost ledger — then the skill must
+  say so, the way `close-block:118` already marks its governance precheck as
+  "Agent-Pipeline checkout only", and a consumer must not be told to run it at
+  all.
+
+What is not acceptable is the current state, where a shipped skill names a script
+the reader cannot have and nothing marks it as inapplicable. The check added
+under Direction 4 allowlists these occurrences with that reason recorded, so they
+are inventoried rather than forgotten — but an allowlist entry is a note that a
+decision is owed, not the decision.
+
 ## Why these two belong in one item
 
 They share a single cause: **artifacts that ship to consumers were written from
