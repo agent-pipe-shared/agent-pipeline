@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.human-legible-approval-record
-type: workflow-improvement
+type: requirement
 owner: pipeline
 status: open
 source: Product Owner requirement raised at the Phoenix plan-approval gate

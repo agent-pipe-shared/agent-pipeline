@@ -3,11 +3,13 @@
 
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 import {
+  BACKLOG_TYPES,
   EVIDENCE_AMENDMENT_SCHEMA,
   ITEM_SCHEMA,
   PROJECT_CLOSURE_READBACK_SCHEMA,
@@ -401,6 +403,26 @@ function managedRepairInput(root, overrides = {}) {
   check("BS02 only canonical statuses are accepted and closure data cannot leak onto open work",
     validateBacklogItem(invalid).some((error) => error.includes("status must be open"))
       && validateBacklogItem(closureLeak).some((error) => error.includes("only closed items")));
+}
+{
+  const requirement = item({ type: "requirement" });
+  const unknown = item({ type: "roadmap-note" });
+  check("BS02a the canonical taxonomy accepts requirement and rejects an unknown type",
+    validateBacklogItem(requirement).length === 0
+      && validateBacklogItem(unknown).some((error) => error.includes("type is not in the canonical item taxonomy")),
+    `${validateBacklogItem(requirement).join("; ")} / ${validateBacklogItem(unknown).join("; ")}`);
+}
+{
+  const here = dirname(fileURLToPath(import.meta.url));
+  const repoRoot = resolve(here, "..", "..", "..");
+  const schema = JSON.parse(readFileSync(join(repoRoot, "backlog/schemas/item.schema.json"), "utf8"));
+  const schemaTypeEnum = schema.properties.type.enum;
+  check("BS02b the item schema's type enum agrees with the validator's canonical taxonomy",
+    Array.isArray(schemaTypeEnum)
+      && schemaTypeEnum.length === BACKLOG_TYPES.length
+      && schemaTypeEnum.every((value) => BACKLOG_TYPES.includes(value))
+      && BACKLOG_TYPES.every((value) => schemaTypeEnum.includes(value)),
+    `schema=${JSON.stringify(schemaTypeEnum)} validator=${JSON.stringify(BACKLOG_TYPES)}`);
 }
 {
   const first = event();

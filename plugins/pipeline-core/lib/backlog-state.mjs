@@ -18,7 +18,7 @@ export const INDEX_SCHEMA = "pipeline.backlog-index.v1";
 export const SENTINEL_RECOVERY_CATALOG_SCHEMA = "pipeline.sentinel-backlog-recovery.v1";
 export const PROJECT_CLOSURE_READBACK_SCHEMA = "pipeline.project-closure-readback.v1";
 export const BACKLOG_STATUSES = Object.freeze(["open", "in_progress", "closed"]);
-export const BACKLOG_TYPES = Object.freeze(["workflow-improvement", "tooling-radar", "defect", "idea"]);
+export const BACKLOG_TYPES = Object.freeze(["workflow-improvement", "tooling-radar", "defect", "idea", "requirement"]);
 const FORWARD_TRANSITIONS = Object.freeze({ open: "in_progress", in_progress: "closed" });
 
 const ITEM_REQUIRED = Object.freeze(["schema", "id", "type", "owner", "status", "created", "source"]);

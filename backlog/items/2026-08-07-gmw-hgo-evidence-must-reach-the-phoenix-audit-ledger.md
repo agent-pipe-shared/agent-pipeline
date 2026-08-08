@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger
-type: workflow-improvement
+type: requirement
 owner: pipeline
 status: open
 created: 2026-08-07

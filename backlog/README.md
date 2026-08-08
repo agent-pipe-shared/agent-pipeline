@@ -25,8 +25,9 @@ Every item carries exactly one type in the frontmatter field `type`:
 | `tooling-radar` | Result of a radar run or an ADR follow-up from the tooling-radar contract | monthly radar run ([`policies/tooling-policy.md` §4](../policies/tooling-policy.md)) |
 | `defect` | Gap, contradiction, or drift in an existing pipeline artifact (docs contradict the ruleset, guardrail has a hole) | Critic finding, drift check, self-observation |
 | `idea` | Immature proposal without a worked-out case — prioritization and elaboration still pending | spontaneous observation, discussion with the PO |
+| `requirement` | An obligation stated by the Product Owner that the repository must satisfy — not a defect an agent found and not an improvement an agent proposes | PO ruling, PO-stated obligation raised in or outside a session |
 
-`workflow-improvement` and `tooling-radar` are the only types operating-model.md and tooling-policy.md already name explicitly ([`docs/operating-model.md` §7](../docs/operating-model.md), [`policies/tooling-policy.md` §4 R1](../policies/tooling-policy.md)); `defect` and `idea` extend the taxonomy with the two cases "something is broken" and "not yet a mature position" — neither was anchored anywhere before.
+`workflow-improvement` and `tooling-radar` are the only types operating-model.md and tooling-policy.md already name explicitly ([`docs/operating-model.md` §7](../docs/operating-model.md), [`policies/tooling-policy.md` §4 R1](../policies/tooling-policy.md)); `defect` and `idea` extend the taxonomy with the two cases "something is broken" and "not yet a mature position" — neither was anchored anywhere before. `requirement` closes a further gap (PO decision, 2026-08-08): two authors, in different sessions, independently reached for `requirement` and `improvement` to name a PO-stated obligation, and neither was canonical. Use `requirement` only when the obligation itself comes from the PO — a bug an agent finds stays `defect`, and an improvement an agent proposes stays `workflow-improvement`, even when a PO observation triggered the discovery.
 
 ## Storage & format
 
