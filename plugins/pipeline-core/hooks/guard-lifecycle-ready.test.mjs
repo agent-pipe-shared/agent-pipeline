@@ -23,7 +23,9 @@ import {
   ProjectOnboardingReadyError,
 } from "../lib/project-onboarding-ready-gate.mjs";
 import {
+  claudeSessionMemoryDirectory,
   evaluateLifecycleReadyGuard,
+  isClaudeSessionMemoryWritePath,
   isForbiddenCrossRepositoryMutation,
   isNarrowRepositoryRecoveryCommand,
   isProjectWritePath,
@@ -78,6 +80,33 @@ function edit(filePath = "src/implementation.mjs") {
 
 function write(filePath = "src/implementation.mjs") {
   return { tool_name: "Write", tool_input: { file_path: filePath } };
+}
+
+// MEMPATH-1: real Edit/Write PreToolUse payloads carry `file_path` alongside sibling
+// top-level fields the tool itself never sees or sets, `transcript_path` among them. `edit`/
+// `write` above stay unmodified (every pre-existing test relies on their exact shape); these
+// two add only the one field this feature reads, mirroring the real harness contract rather
+// than a synthetic shortcut.
+function editWithTranscript(filePath, transcriptPath) {
+  return { tool_name: "Edit", tool_input: { file_path: filePath }, transcript_path: transcriptPath };
+}
+
+function writeWithTranscript(filePath, transcriptPath) {
+  return { tool_name: "Write", tool_input: { file_path: filePath }, transcript_path: transcriptPath };
+}
+
+/**
+ * A real Claude Code session directory: an absolute transcript file (a UUID `.jsonl`
+ * sibling of the memory directory, exactly what `dirname(transcript_path)` yields) plus its
+ * already-materialized `memory/` directory -- matching this session's own observed on-disk
+ * shape (confirmed live, this dispatch, Linux/WSL2) rather than a guessed layout.
+ */
+function claudeMemorySessionFixture() {
+  const sessionDir = mkdtempSync(join(tmpdir(), "guard-lifecycle-claude-session-"));
+  const transcriptPath = join(sessionDir, "9f86d081-884c-4d30-8c19-ffcaa4c07bd1.jsonl");
+  const memoryDir = join(sessionDir, "memory");
+  mkdirSync(memoryDir, { recursive: true });
+  return { sessionDir, transcriptPath, memoryDir };
 }
 
 function bash(command = "printf implementation") {
@@ -2129,4 +2158,167 @@ test("NOVA-LCR-HGO-2: an armed matching capability for a command naming LAUNCH_S
       /\[pipeline-human-override\] guard-lifecycle-ready GUARD-OPERATOR-UNAPPROVED: exact one-time capability consumed/u,
     );
   } finally { rmSync(chatRoot, { recursive: true, force: true }); }
+});
+
+// MEMPATH-1 (PO decision, 2026-08-08 -- backlog/items/2026-07-29-guard-lifecycle-ready-
+// blocks-claude-memory-writes.md). Claude Code's own PreToolUse payload carries
+// `transcript_path`; `dirname(transcript_path)/memory/` is admitted, and NOTHING else --
+// never a `~/.claude/**` prefix, never a path the agent's own tool call or environment
+// supplies. The readiness gate below it (evaluateAfterGrammarAdmission) is unaffected: an
+// admitted memory write still needs an exact session-ready receipt like any other write.
+
+test("MEMPATH-1: a governed session admits its own derived Claude memory directory, and only that directory", () => {
+  const path = root();
+  const { sessionDir, transcriptPath, memoryDir } = claudeMemorySessionFixture();
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const memoryFile = join(memoryDir, "learned-preferences.md");
+    for (const build of [editWithTranscript, writeWithTranscript]) {
+      assert.deepEqual(evaluateLifecycleReadyGuard(build(memoryFile, transcriptPath), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { return readiness; },
+      }), { exitCode: 0, stderr: "" }, build.name);
+    }
+    assert.equal(isClaudeSessionMemoryWritePath(memoryFile, { transcript_path: transcriptPath }), true);
+    assert.equal(claudeSessionMemoryDirectory({ transcript_path: transcriptPath }), realpathSync(memoryDir));
+    // A relative file_path is never how Edit/Write actually calls this tool -- the CLI
+    // always supplies an absolute path -- and the derivation refuses to guess through one.
+    assert.equal(isClaudeSessionMemoryWritePath("learned-preferences.md", { transcript_path: transcriptPath }), false);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(sessionDir, { recursive: true, force: true });
+  }
+});
+
+test("MEMPATH-1: the derived memory admission still requires session readiness, not a substitute for it", () => {
+  const path = root();
+  const { sessionDir, transcriptPath, memoryDir } = claudeMemorySessionFixture();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const memoryFile = join(memoryDir, "learned-preferences.md");
+    const result = evaluateLifecycleReadyGuard(editWithTranscript(memoryFile, transcriptPath), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("partial"); },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(sessionDir, { recursive: true, force: true });
+  }
+});
+
+test("MEMPATH-1: a symlink planted inside the derived memory directory cannot redirect a write outside it", () => {
+  const path = root();
+  const { sessionDir, transcriptPath, memoryDir } = claudeMemorySessionFixture();
+  const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-memory-escape-"));
+  let readinessCalls = 0;
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    symlinkSync(outside, join(memoryDir, "escape"));
+    const escapedTarget = join(memoryDir, "escape", "evil.md");
+    assert.equal(isClaudeSessionMemoryWritePath(escapedTarget, { transcript_path: transcriptPath }), false);
+    const result = evaluateLifecycleReadyGuard(editWithTranscript(escapedTarget, transcriptPath), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { readinessCalls += 1; return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" }; },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /only inside its own physical project root/u);
+    assert.equal(readinessCalls, 0);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(sessionDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("MEMPATH-1: an absent, empty, relative, or not-yet-materialized transcript_path fails closed rather than guessing", () => {
+  const notCreated = mkdtempSync(join(tmpdir(), "guard-lifecycle-claude-session-uncreated-"));
+  const arbitraryAbsoluteTarget = join(tmpdir(), "guard-lifecycle-mempath-unrelated-notes.md");
+  try {
+    const cases = [
+      { label: "absent field", input: {} },
+      { label: "empty string", input: { transcript_path: "" } },
+      { label: "relative path", input: { transcript_path: "relative/session/abc.jsonl" } },
+      { label: "session directory exists but memory/ was never created", input: { transcript_path: join(notCreated, "abc.jsonl") } },
+      { label: "session directory itself does not exist", input: { transcript_path: join(notCreated, "does-not-exist", "abc.jsonl") } },
+      { label: "null byte", input: { transcript_path: `${join(notCreated, "abc")}\0.jsonl` } },
+    ];
+    for (const { label, input } of cases) {
+      assert.equal(claudeSessionMemoryDirectory(input), null, label);
+      assert.equal(isClaudeSessionMemoryWritePath(arbitraryAbsoluteTarget, input), false, label);
+    }
+  } finally { rmSync(notCreated, { recursive: true, force: true }); }
+});
+
+test("MEMPATH-1: a not-yet-materialized memory directory is refused end to end by the guard, not just by the helper", () => {
+  const path = root();
+  const notCreated = mkdtempSync(join(tmpdir(), "guard-lifecycle-claude-session-uncreated-"));
+  const transcriptPath = join(notCreated, "abc.jsonl");
+  let readinessCalls = 0;
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const target = join(notCreated, "memory", "learned-preferences.md");
+    const result = evaluateLifecycleReadyGuard(editWithTranscript(target, transcriptPath), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { readinessCalls += 1; return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" }; },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /only inside its own physical project root/u);
+    assert.equal(readinessCalls, 0);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(notCreated, { recursive: true, force: true });
+  }
+});
+
+test("MEMPATH-1: every other standard-Claude-path shape stays refused -- settings, agents, plugins, marketplace, another repository, and a merely-similarly-named directory", () => {
+  const path = root();
+  // A synthetic home layout standing in for `~/.claude/**` and the marketplace beside it --
+  // never the real `$HOME`, and this session's OWN derived memory directory sits inside it
+  // too, exactly as it does on a real machine, so the containment check is exercised against
+  // realistic siblings rather than an isolated fixture.
+  const home = mkdtempSync(join(tmpdir(), "guard-lifecycle-synthetic-home-"));
+  const sessionDir = join(home, ".claude", "projects", "-synthetic-project");
+  mkdirSync(join(sessionDir, "memory"), { recursive: true });
+  const transcriptPath = join(sessionDir, "9f86d081-884c-4d30-8c19-ffcaa4c07bd1.jsonl");
+  mkdirSync(join(home, ".claude", "agents"), { recursive: true });
+  mkdirSync(join(home, ".claude", "plugins"), { recursive: true });
+  mkdirSync(join(home, "agent-pipeline-local-marketplace", "plugins", "pipeline-core"), { recursive: true });
+  writeFileSync(join(home, ".claude", "settings.json"), "{}\n");
+  const otherRepo = mkdtempSync(join(tmpdir(), "guard-lifecycle-other-repo-"));
+  // A second, differently-hashed project directory whose OWN memory dir merely shares the
+  // leaf name "memory" with the derived one -- the exact "contains the segment but is not
+  // the derived directory" case the DoD names.
+  const otherProjectMemory = join(home, ".claude", "projects", "-synthetic-other-project", "memory");
+  mkdirSync(otherProjectMemory, { recursive: true });
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const targets = [
+      ["settings.json", join(home, ".claude", "settings.json")],
+      ["agents/", join(home, ".claude", "agents", "malicious.toml")],
+      ["plugins/", join(home, ".claude", "plugins", "malicious.json")],
+      ["local marketplace directory", join(home, "agent-pipeline-local-marketplace", "plugins", "pipeline-core", "marketplace.json")],
+      ["another repository", join(otherRepo, "src", "file.mjs")],
+      ["sibling dir merely named similarly", join(sessionDir, "memory-lookalike", "note.md")],
+      ["a different project's own memory directory", join(otherProjectMemory, "note.md")],
+    ];
+    for (const [label, target] of targets) {
+      assert.equal(isClaudeSessionMemoryWritePath(target, { transcript_path: transcriptPath }), false, label);
+      let readinessCalls = 0;
+      const result = evaluateLifecycleReadyGuard(editWithTranscript(target, transcriptPath), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { readinessCalls += 1; return readiness; },
+      });
+      assert.equal(result.exitCode, 2, label);
+      assert.match(result.stderr, /only inside its own physical project root/u, label);
+      assert.equal(readinessCalls, 0, label);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+    rmSync(otherRepo, { recursive: true, force: true });
+  }
 });

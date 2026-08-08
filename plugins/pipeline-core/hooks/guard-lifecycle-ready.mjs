@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 /** Codex implementation-write guard for already Pipeline-governed roots. */
-import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import {
   basename,
   dirname,
@@ -391,8 +391,14 @@ function pathInside(root, target) {
   return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
 }
 
-/** Reject lexical escapes and escapes through an existing symlink ancestor. */
-export function isProjectWritePath(filePath, root, dependencies = {}) {
+/**
+ * Reject lexical escapes and escapes through an existing symlink ancestor. Shared by
+ * isProjectWritePath() (root = this project's own physical root, already realpathed by its
+ * caller) and isClaudeSessionMemoryWritePath() (root = this session's own derived memory
+ * directory, MEMPATH-1) -- the identical walk, bound to whichever already-real boundary the
+ * caller owns.
+ */
+function isPathWithinRealpathedRoot(filePath, root, dependencies) {
   if (typeof filePath !== "string" || filePath.trim() === "" || filePath.includes("\0")) return false;
   const exists = dependencies.existsSyncFn ?? existsSync;
   const realpath = dependencies.realpathSyncFn ?? realpathSync;
@@ -405,6 +411,63 @@ export function isProjectWritePath(filePath, root, dependencies = {}) {
   } catch {
     return false;
   }
+}
+
+export function isProjectWritePath(filePath, root, dependencies = {}) {
+  return isPathWithinRealpathedRoot(filePath, root, dependencies);
+}
+
+/**
+ * MEMPATH-1 (PO decision, 2026-08-08 -- backlog/items/2026-07-29-guard-lifecycle-ready-
+ * blocks-claude-memory-writes.md, "PO decision, 2026-08-08 -- Option A"). Claude Code's own
+ * PreToolUse hook payload carries `transcript_path`: this session's transcript file, as the
+ * CLI itself reports it, never reconstructed or guessed from a sampled naming/hashing
+ * scheme. `dirname(transcript_path)` is this session's project directory exactly as the CLI
+ * lays it out; `<that>/memory/` is this project's memory directory -- the ONE narrow
+ * carve-out this function exists to identify.
+ *
+ * Never a `~/.claude/**` prefix: that tree also holds `settings.json`, `agents/`, `plugins/`
+ * and the local marketplace sits beside it, so admitting a prefix would admit all of those
+ * too -- exactly the escape ADR-0059 Decision 5 and the cross-repository guard exist to
+ * close. Never a path taken from tool input, an environment variable, or repository config
+ * -- only from this CLI-supplied hook field, which is a fixed per-session value the agent's
+ * own tool calls cannot set (unlike `tool_input`, which the calling tool call constructs).
+ *
+ * Fails closed whenever the derivation is unusable: `transcript_path` absent, empty,
+ * relative, or naming a session directory whose own `memory/` does not yet exist on disk (an
+ * empty session before Claude Code has created it, rather than guessing a lazy-create
+ * contract this repository has not observed). realpathSync() on the full candidate resolves
+ * every symlinked ancestor in one step, so a symlinked `~/.claude` or `projects/<hash>`
+ * cannot misdirect the boundary this function hands back.
+ */
+export function claudeSessionMemoryDirectory(input, dependencies = {}) {
+  const transcriptPath = input?.transcript_path;
+  if (typeof transcriptPath !== "string" || transcriptPath.trim() === ""
+    || transcriptPath.includes("\0") || !isAbsolute(transcriptPath)) return null;
+  const realpath = dependencies.realpathSyncFn ?? realpathSync;
+  const statFn = dependencies.statSyncFn ?? statSync;
+  const candidate = join(dirname(transcriptPath), "memory");
+  try {
+    const real = realpath(candidate);
+    return statFn(real).isDirectory() ? real : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Admit a write only strictly inside the derived memory directory above, through the same
+ * realpath walk isProjectWritePath() uses -- a symlink planted inside the memory directory
+ * cannot redirect a write outside it, and a path that merely contains the segment `memory`
+ * without landing inside the exact derived directory is refused by the same lexical
+ * containment check.
+ */
+export function isClaudeSessionMemoryWritePath(filePath, input, dependencies = {}) {
+  if (typeof filePath !== "string" || filePath.trim() === "" || filePath.includes("\0")
+    || !isAbsolute(filePath)) return false;
+  const memoryDir = claudeSessionMemoryDirectory(input, dependencies);
+  if (memoryDir === null) return false;
+  return isPathWithinRealpathedRoot(filePath, memoryDir, dependencies);
 }
 
 function isRestartResumeHintInputWrite(input, root) {
@@ -1285,17 +1348,26 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
   const crossRepoReason = `${CROSS_REPO_DENIAL_CODE}: ${CROSS_REPO_DENIAL_GUIDANCE}`;
   if (WRITE_TOOLS.includes(toolName)) {
     const target = writeTargetPath(input.tool_input, toolName);
-    if (!isProjectWritePath(target, root, dependencies)) {
+    // MEMPATH-1: the CLI's own derived memory directory is admitted outright, never through
+    // the human-override route -- it is not a lifted cross-repository exception, it is not a
+    // cross-repository mutation in the first place. Falls through to the readiness gate
+    // below exactly like any other admitted write; only the cross-repository objection and
+    // the writer-owned-State check (meaningless for a target this far outside root) are
+    // skipped.
+    const memoryWrite = isClaudeSessionMemoryWritePath(target, input, dependencies);
+    if (!memoryWrite && !isProjectWritePath(target, root, dependencies)) {
       const route = humanOverrideRoute(
         CROSS_REPO_DENIAL_CODE, crossRepoReason, "write", root, toolName, input.tool_input, dependencies,
       );
       if (!route.admitted) return crossRepositoryMutationBlocked(route.overrideGuidance);
       lifts.push(route.admitted);
     }
-    const requested = resolve(root, target);
-    if (requested === join(root, ".claude", "pipeline-state.json")
-      || requested === join(root, "project", "pipeline-state.json")) {
-      return withLifts(lifts, protectedStateWriterOnly());
+    if (!memoryWrite) {
+      const requested = resolve(root, target);
+      if (requested === join(root, ".claude", "pipeline-state.json")
+        || requested === join(root, "project", "pipeline-state.json")) {
+        return withLifts(lifts, protectedStateWriterOnly());
+      }
     }
   }
   if (toolName === "Bash"
