@@ -147,11 +147,6 @@ export const ALLOWLIST = Object.freeze([
   },
   {
     file: "plugins/pipeline-core/hooks/guard-devplan.mjs",
-    match: "harness/scripts/pipeline-state.mjs, never by hand).",
-    reason: "Class A: a real guard-denial message an operator reads, naming a path a consumer does not have. Not fixed by this dispatch (scope narrowed mid-task) -- deferred to a separate remediation dispatch.",
-  },
-  {
-    file: "plugins/pipeline-core/hooks/guard-devplan.mjs",
     match: "this hook is a READER, never a writer.",
     reason: "Class B: source comment (`* ...`), not an operator-facing message.",
   },
@@ -161,17 +156,8 @@ export const ALLOWLIST = Object.freeze([
     reason: "Class B: source comment (`// ...`), not an operator-facing message.",
   },
   {
-    file: "plugins/pipeline-core/hooks/guard-git.mjs",
-    match: "typed phrase (record one: node harness/scripts/pipeline-state.mjs approve-push",
-    reason: "Class A: a real guard-denial message an operator reads, naming a path a consumer does not have. Not fixed by this dispatch -- deferred to a separate remediation dispatch.",
-  },
-  {
     filePattern: /^plugins\/pipeline-core\/hooks\/guard-lifecycle-ready\.mjs$/u,
     reason: "Class B: both occurrences are source comments (`// ...` / `* ...`) citing this repository's own Nova-sprint planning documents, not operator-facing messages.",
-  },
-  {
-    filePattern: /^plugins\/pipeline-core\/hooks\/guard-push\.mjs$/u,
-    reason: "Class A: every occurrence in this file is a real guard-denial or guidance message an operator reads on the push path (the path CB-1a made reachable for a consumer), naming harness/scripts/pipeline-state.mjs, which a consumer does not have. Not fixed by this dispatch (scope narrowed mid-task) -- deferred to a separate remediation dispatch; this whole-file entry is the handoff marker for it.",
   },
   {
     filePattern: /^plugins\/pipeline-core\/hooks\/guard-testpath\.mjs$/u,

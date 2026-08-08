@@ -149,9 +149,9 @@ const DEFAULT_EXEMPT_PREFIXES = ["docs/", "specs/", ".claude/", "backlog/"];
 // The plugin root this guard is itself running from -- same self-location resolution
 // guard-lifecycle-ready.mjs / guard-human-override.mjs already use (`resolve(dirname(
 // fileURLToPath(import.meta.url)), "..")`), reused rather than a second mechanism, so a
-// path this hook prints resolves inside a consumer's installed plugin, never this
-// repository's own harness/ layout (backlog: 2026-08-08-shipped-artifacts-assume-the-
-// pipelines-own-repository.md).
+// path this hook prints resolves inside a consumer's installed plugin, never a path
+// that exists only in this repository's own source checkout (backlog: 2026-08-08-
+// shipped-artifacts-assume-the-pipelines-own-repository.md).
 const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 /**
