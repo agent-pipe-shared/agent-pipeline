@@ -5,6 +5,45 @@
 
 **Last updated:** 2026-08-08
 
+**AUTHORIZATIONS 2 AND 3 ARE SPENT; BOTH TIERS NOW CARRY TP-12 (`ce75672`).**
+`.claude/guard-config.json` gained TP-11 and TP-12, `project/guard-config.json`
+gained TP-12. `check-authority-tier-agreement.mjs` reports agreement across the
+3 artifacts held at more than one tier — **AC-P6 satisfied**. TP-12 was then
+provoked rather than asserted: an Edit to
+`plugins/pipeline-core/lib/self-application-attestation-gate.test.mjs` is now
+refused by `guard-testpath`. **AC-R1-8 satisfied.**
+
+**The 5-minute plan TTL cost two expired requests before it worked** — the first
+before the PO signed, the second *while* they were signing. Each expiry forces a
+full replan, and a replan produces a new `selectionSha256` and therefore a new
+intent digest, so the signature already produced becomes worthless. The PO
+decided to lengthen it to 30 minutes; **that change belongs to Nova and ships in
+its next version.** A duplicate one-line change was drafted here and deliberately
+reverted rather than committed, to avoid the same constant moving in two branches.
+
+**Boundary confirmed with the PO (2026-08-08): this session never installs.**
+The marketplace copy at `~/agent-pipeline-local-marketplace` carries
+`0.5.4+claude.20260808021712.48d14a9` while this checkout's manifest says
+`0.5.3` — the enforcing plugin is built from a *different* checkout. A `cp -a`
+refresh from here would have overwritten Nova's build. Plugin refresh is Nova's,
+full stop; work here stays in this branch.
+
+**A shell-lane over-refusal worth knowing before it surprises someone.**
+`gateStrengthShellRefusal` matches the *basename* as a substring against any
+non-read-only command, so `git add .claude/guard-config.json` is refused even
+after a signed override has admitted the edit itself. The code documents the
+over-refusal as intended ("over-refusal costs a `-F` flag"). Staging went through
+`git add --pathspec-from-file`, and the commit message through `-F`, so neither
+command names the file. That is working around a *name* filter, not around the
+gate: the gate is GS-4/GS-7 on the write, and it was passed with a PO signature.
+
+**The two-signature cost is structural but bounded, and the bound was checked.**
+Every protected-test row costs two authorizations *in this repository* because it
+carries both authority tiers as separate gate-strength paths (GS-7 and GS-4) with
+no sanctioned collapse. Per ADR-0054 the legacy tier exists only for projects that
+never migrated, so a freshly onboarded project holds `project/` alone and pays
+one. The cost is Pipeline-internal, not adopter-facing (PO, 2026-08-08).
+
 **DESIGN PHASE CLOSED; A PHASE PRD IS ON THE TABLE (2026-08-08).** All four
 design packages are Critic-clean under the round cap — R1 4/4 PASS, R2 1 PASS,
 R3 3 PASS, PHX-LEDGER-INTAKE 4/4 PASS with one minor. The 0.5.3 merge landed as
