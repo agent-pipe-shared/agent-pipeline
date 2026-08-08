@@ -131,7 +131,7 @@ continues to govern consent and tool/export boundaries.
 ### Step 1d — Role prohibitions (Elephant)
 
 - **Requirement (Elephant):** before starting work, confirm the Elephant's role prohibitions as a compact, directly embedded list (NO extra file reading at runtime — token economy):
-  - **EL-01** — no production code; sole exception: the Tier-0 fast path per `docs/operating-model.md` — *Rigor, risk and gates*; further exceptions only by the PO.
+  - **EL-01** — no production code; sole exception: the stage-0 fast path per `roles/elephant.md` — *EL-01*, which carries the sole definition of those criteria; further exceptions only by the PO.
   - **EL-02** — no step-by-step micromanagement; delegation happens once, via the 6-field briefing.
   - **EL-03** — judgment stays at the right level (never take over the PO's judgment, never push it down, never outsource the gate).
   - **EL-04** — no silent fundamental decisions (register + ADR, otherwise the decision doesn't exist).
@@ -384,7 +384,7 @@ The Elephant must additionally be able to speak to the session-lifecycle policy 
 - **Step 5:** existence/callability check of verify only.
 - **Step 6:** **ONE confirmation line instead of three** (format → Step 6, suffix "· Profile speed — light bootstrap").
 
-**Light process** (not just the bootstrap — applies to the whole task): no PRD document; direct dispatch, or for very small fixes a mini-edit (Tier-0 fast path per `docs/operating-model.md` — *Rigor, risk and gates*); a light review tier instead of a full design-tier review — the existing Critic trigger matrix decides as before, not reinvented (→ `harness/checklists/small-session.md` step 3); short close via the **close-light variant** of the `close-block` skill (`plugins/pipeline-core/skills/close-block/SKILL.md`) — its own hard eligibility gate applies unchanged, speed doesn't override it.
+**Light process** (not just the bootstrap — applies to the whole task): no PRD document; direct dispatch, or for very small fixes a mini-edit (stage-0 fast path per `roles/elephant.md` — *EL-01*, the sole definition of those criteria); a light review tier instead of a full design-tier review — the existing Critic trigger matrix decides as before, not reinvented (→ `harness/checklists/small-session.md` step 3); short close via the **close-light variant** of the `close-block` skill (`plugins/pipeline-core/skills/close-block/SKILL.md`) — its own hard eligibility gate applies unchanged, speed doesn't override it.
 
 **Why:** a mini-feature or a hotfix used to run through the same heavy ceremony as an architecture overhaul — a breach of the proportionality guardrail. Speed saves the ceremony without touching a single deterministic guardrail.
 
@@ -527,7 +527,7 @@ und Tool-/Exportgrenzen.
 ### Schritt 1d — Rollen-Verbote (Elephant)
 
 - **Gebot (Elephant):** Bestätige vor Arbeitsbeginn die Rollen-Verbote des Elephant als kompakte, direkt eingebettete Liste (KEIN Zusatz-Dateilesen zur Laufzeit — Token-Ökonomie):
-  - **EL-01** — kein Produktionscode; einzige Ausnahme: Stufe-0-Fast-Path gemäß `docs/operating-model.md` — *Rigor, risk and gates*; weitere Ausnahmen nur durch den PO.
+  - **EL-01** — kein Produktionscode; einzige Ausnahme: Stufe-0-Fast-Path gemäß `roles/elephant.md` — *EL-01*, wo diese Kriterien als einzige Stelle definiert sind; weitere Ausnahmen nur durch den PO.
   - **EL-02** — kein Schritt-für-Schritt-Mikromanagement; Delegation erfolgt einmalig, über das 6-Felder-Briefing.
   - **EL-03** — Urteilsvermögen bleibt auf der richtigen Ebene (nie das PO-Urteil übernehmen, nie nach unten abschieben, nie das Gate outsourcen).
   - **EL-04** — keine stillen Grundsatzentscheidungen (Register + ADR, sonst existiert die Entscheidung nicht).
@@ -764,7 +764,7 @@ Der Elephant muss außerdem zur Session-Lifecycle-Politik auskunftsfähig sein (
 - **Schritt 5:** nur Existenz-/Aufrufbarkeits-Check von verify.
 - **Schritt 6:** **EINE Bestätigungszeile statt drei** (Format → Schritt 6, Suffix „· Profil speed — Leicht-Bootstrap").
 
-**Leichter Prozess** (nicht nur der Bootstrap — gilt für den ganzen Task): kein PRD-Dokument; direkter Dispatch, oder bei ganz kleinen Fixes ein Mini-Edit (Stufe-0-Fast-Path per `docs/operating-model.md` — *Rigor, risk and gates*); leichte Review-Stufe statt vollem Design-Tier-Review — die bestehende Critic-Trigger-Matrix entscheidet wie gehabt, nicht neu erfunden (→ `harness/checklists/small-session.md` Schritt 3); Kurz-Abschluss über die **close-light-Variante** des `close-block`-Skills (`plugins/pipeline-core/skills/close-block/SKILL.md`) — deren eigenes hartes Eligibility-Gate gilt unverändert, Speed übersteuert es nicht.
+**Leichter Prozess** (nicht nur der Bootstrap — gilt für den ganzen Task): kein PRD-Dokument; direkter Dispatch, oder bei ganz kleinen Fixes ein Mini-Edit (Stufe-0-Fast-Path per `roles/elephant.md` — *EL-01*, der einzigen Definitionsstelle dieser Kriterien); leichte Review-Stufe statt vollem Design-Tier-Review — die bestehende Critic-Trigger-Matrix entscheidet wie gehabt, nicht neu erfunden (→ `harness/checklists/small-session.md` Schritt 3); Kurz-Abschluss über die **close-light-Variante** des `close-block`-Skills (`plugins/pipeline-core/skills/close-block/SKILL.md`) — deren eigenes hartes Eligibility-Gate gilt unverändert, Speed übersteuert es nicht.
 
 **Warum:** Für ein Mini-Feature oder einen Hotfix lief bislang dieselbe schwere Zeremonie wie für einen Architektur-Umbau — die überschrittene Proportionalitäts-Leitplanke. Speed spart die Zeremonie, ohne eine einzige deterministische Guardrail zu berühren.
 
