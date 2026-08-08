@@ -365,39 +365,46 @@ const CONTINUITY_REQUEST_MAX_BYTES = 32_768;
 // the same digest at push time rooted at the PUSHED repository. A path
 // outside the project satisfies neither check, which would silently swap the
 // M-4 property ("the human's signature is bound to a file that lives inside
-// the pushed project's own tree") for one where it does not. So both legs of
-// resolution below stay inside `dir`, through the SAME `boundRepositoryArtifact`
-// call, and M-4 is preserved exactly rather than traded for reachability.
+// the pushed project's own tree") for one where it does not.
 //
-// Resolution order (`resolvePushThreatModelArtifact` below):
-//   1. `PIPELINE_PUSH_THREAT_MODEL_PATH` in the environment, if set and
-//      non-empty -- an explicit project decision naming a path relative to
-//      `dir`. This is how a project keeps binding a document of its own,
-//      INCLUDING this repository continuing to bind
-//      `specs/sprint-nova-epic/implementation/critical-action-authorization-threat-model.md`
-//      by setting this variable to that exact path (evidence/cb-1a-measurement.md
-//      AC-4) -- not by editing the GS-1-protected `pipeline.user.yaml`.
-//   2. Otherwise, the conventional project-owned path
-//      `PUSH_THREAT_MODEL_DEFAULT_PATH` below, inside `dir` -- following the
-//      same `project/<name>.<ext>` convention this repository already uses
-//      for its other project-owned Pipeline artifacts (`project/pipeline-state.json`,
-//      `project/critical-human-proof.json`, `project/guard-config.json`),
-//      rather than inventing a new one.
-// A project that configures a path that does not resolve gets a clear
-// refusal (the same bound-artifact codes), never a silent fallback to (2).
+// There is exactly ONE path, `PUSH_THREAT_MODEL_DEFAULT_PATH` below, for
+// every project including this one -- deliberately NOT configurable, and not
+// merely because nobody asked for it yet. `guard-lifecycle-ready.mjs`'s
+// doctrine comment above `claudeSessionMemoryDirectory` states the rule this
+// follows: a security-relevant path is taken "never from tool input, an
+// environment variable, or repository config -- only from a value the
+// agent's own tool calls cannot set." An earlier version of this resolution
+// read `PIPELINE_PUSH_THREAT_MODEL_PATH` from `process.env`; that made the
+// bound artifact agent-choosable (any single command can be prefixed
+// `env NAME=value`), which the original hardcoded constant this replaces was
+// NOT. No configuration is better than agent-settable configuration here. If
+// per-project paths are ever genuinely needed, they must come from COMMITTED
+// project configuration read the way `readPushApprovalMode` reads
+// `gates.push_approval` -- including its requirement that the working copy
+// match the committed bytes at HEAD -- and that is a separate decision, not
+// this one; do not re-add an environment-variable or ad hoc config read as
+// an "obvious improvement" without that same tamper-evidence property.
 //
-// Path (2) starts absent in a fresh project. Rather than leaving a consumer
-// stuck reading a path they must create by hand, `approve-push` names the
-// exact `materialize-push-threat-model` subcommand (below) when the DEFAULT
-// path specifically is what is missing. That subcommand copies the plugin's
+// The path is `project/<name>.<ext>`, the same convention this repository
+// already uses for its other project-owned Pipeline artifacts
+// (`project/pipeline-state.json`, `project/critical-human-proof.json`,
+// `project/guard-config.json`), rather than inventing a new one.
+//
+// The path starts absent in a fresh project -- including THIS repository,
+// which materialized its own copy once (see the file itself: its bytes are
+// an exact copy of `specs/sprint-nova-epic/implementation/critical-action-authorization-threat-model.md`,
+// never a summary or rewrite, so this repository keeps binding the same
+// CONTENT even though the bound PATH changed). Rather than leaving a
+// consumer stuck reading a path they must create by hand, `approve-push`
+// names the exact `materialize-push-threat-model` subcommand (below) when
+// the artifact does not exist yet. That subcommand copies the plugin's
 // shipped TEMPLATE (`DEFAULT_PUSH_THREAT_MODEL_DOC`, resolved relative to
 // THIS FILE's own location via `PLUGIN_ROOT` -- a source document, never
-// itself the bound artifact) into the project at that same conventional path,
-// and refuses to overwrite one that already exists: overwriting would change
-// the bytes under an artifact path that may already back a recorded proof,
-// invalidating it (M-2 item 4 again -- the push guard re-hashes current bytes
-// against the recorded digest and refuses on any mismatch).
-const PUSH_THREAT_MODEL_ENV = "PIPELINE_PUSH_THREAT_MODEL_PATH";
+// itself the bound artifact) into the project at the conventional path, and
+// refuses to overwrite one that already exists: overwriting would change the
+// bytes under an artifact path that may already back a recorded proof,
+// invalidating it (M-2 item 4 again -- the push guard re-hashes current
+// bytes against the recorded digest and refuses on any mismatch).
 const PUSH_THREAT_MODEL_DEFAULT_PATH = "project/push-threat-model.md";
 const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_PUSH_THREAT_MODEL_DOC = join(PLUGIN_ROOT, "docs", "default-push-threat-model.md");
@@ -2629,33 +2636,14 @@ function boundRepositoryArtifact(dir, relativePath) {
 
 /**
  * Resolves the artifact `approve-push` binds into the signed subject. See the
- * resolution-order comment on `PUSH_THREAT_MODEL_ENV` above the constant
- * definitions for the two-step order and why it exists. Both legs go through
- * `boundRepositoryArtifact` unchanged -- the artifact stays a PROJECT
- * artifact either way, so its containment/shape rules and the M-4 property
- * they exist to guarantee are identical for a configured path and for the
- * conventional default. A configured value that fails to resolve is
- * returned as-is (its own bound-artifact refusal code) -- never silently
- * replaced by the default (AC-7, evidence/cb-1a-measurement.md).
+ * comment above `PUSH_THREAT_MODEL_DEFAULT_PATH` for why this is the single
+ * fixed path, for every project, and never configurable. Goes through
+ * `boundRepositoryArtifact` unchanged, so the artifact's containment/shape
+ * rules and the M-4 property they exist to guarantee are exactly the rules
+ * every other bound artifact already has.
  */
 function resolvePushThreatModelArtifact(dir) {
-  const configured = process.env[PUSH_THREAT_MODEL_ENV];
-  const relativePath = typeof configured === "string" && configured.trim() !== "" ? configured : PUSH_THREAT_MODEL_DEFAULT_PATH;
-  return boundRepositoryArtifact(dir, relativePath);
-}
-
-/**
- * Is `PIPELINE_PUSH_THREAT_MODEL_PATH` unset (so `resolvePushThreatModelArtifact`
- * used the conventional default path rather than a project's own configured
- * one)? Used only to decide which refusal message `approve-push` prints when
- * the artifact does not resolve -- naming `materialize-push-threat-model` is
- * correct advice for a missing DEFAULT artifact, and wrong (silently
- * suggesting a fix that ignores the project's own choice) for a missing
- * CONFIGURED one.
- */
-function usingDefaultPushThreatModelPath() {
-  const configured = process.env[PUSH_THREAT_MODEL_ENV];
-  return !(typeof configured === "string" && configured.trim() !== "");
+  return boundRepositoryArtifact(dir, PUSH_THREAT_MODEL_DEFAULT_PATH);
 }
 
 function externalPublicJson(dir, value) {
@@ -5280,20 +5268,16 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       const threatModel = resolvePushThreatModelArtifact(dir);
       if (!threatModel.ok) {
         // AC-3b: a refusal that only names the code leaves a consumer exactly as
-        // stuck as they were before this could be configured at all -- point at the
-        // exact command that creates the artifact, but ONLY when the DEFAULT path is
-        // what is missing. A project that configured its own path and got it wrong
-        // is told the code, not steered at a command that would write somewhere else.
-        if (threatModel.code === "CRITICAL-PROOF-BOUND-ARTIFACT-UNAVAILABLE" && usingDefaultPushThreatModelPath()) {
-          console.error(
-            `Error: approve-push refused (${threatModel.code}); no push threat-model artifact exists yet at ` +
+        // stuck as they were before this could be materialized at all -- there is
+        // exactly one path now, so there is exactly one refusal that means "it does
+        // not exist yet", and it names the exact command that creates it. Any other
+        // code (an unsafe file already sitting at that path, for instance) gets the
+        // plain code: `materialize-push-threat-model` would only refuse again there.
+        console.error(threatModel.code === "CRITICAL-PROOF-BOUND-ARTIFACT-UNAVAILABLE"
+          ? `Error: approve-push refused (${threatModel.code}); no push threat-model artifact exists yet at ` +
             `${PUSH_THREAT_MODEL_DEFAULT_PATH}. Run the "materialize-push-threat-model" subcommand of this ` +
-            "script (same --dir as this command) to create it from the plugin's shipped template, review it, " +
-            "then retry approve-push.",
-          );
-        } else {
-          console.error(`Error: approve-push refused (${threatModel.code}).`);
-        }
+            "script (same --dir as this command) to create it, review it, then retry approve-push."
+          : `Error: approve-push refused (${threatModel.code}).`);
         return 2;
       }
       const threatModelBinding = { path: threatModel.path, sha256: threatModel.sha256 };
