@@ -298,6 +298,28 @@ versioning convention. Verify is re-run on this tip *after* the stamp rather tha
 reported from the commit before it — the evidence artifact is gitignored, so the
 stamp commit is genuinely the last one and the receipt still binds to it exactly.
 
+**The candidate is verified on its own tip and handed over.** Verify 255/255 with
+binding `exact` at `0008d78b99a57a0634ee1fa2d1f9e7e741d12c8c` / tree
+`3ef06fa8a74ca806d907fecc12cfbd14259641db`, tree clean at start and finish; the
+security receipt binds to the same commit and tree, gitleaks/semgrep/license-check
+`PASS`, osv-scanner `SKIPPED` with a named reason per SEC-06. The PO has copied the
+build to the local marketplace; only the session restart remains. Commits after this
+tip touch `backlog/` and `docs/state.md` only — no plugin content — so the installed
+build and the verified tip are the same bytes.
+
+**The block was blocked for an hour by a full filesystem, and the diagnosis is worth
+keeping.** Every write failed with `ENOSPC`, including the harness's own tool-output
+files, so no command could run at all — while `df -h /` reported 2% used. `/tmp` is a
+`tmpfs` with a separate inode table (`nr_inodes=1048576`) and it was at 100% with
+34350 entries, essentially all test-fixture directories. Three of the four ordinary
+capacity checks are reassuring and only `df -i /tmp` is true. The PO supplied the
+observation that makes it serious: `tmpfs` lives in RAM, a restart empties it, and a
+reboot is therefore the only cleanup this leak has ever had — which is why it stays
+invisible until a machine runs two days without one, and why it is worst for exactly
+the population that never reboots. Two wrong producer attributions were made and
+corrected along the way, both from sampling one prefix; the suites are the producer.
+Filed as `2026-08-08-temp-directories-leak-until-the-filesystem-refuses-every-write.md`.
+
 **What is deliberately NOT in this candidate, by PO decision.** `SETUP-2` through
 `SETUP-4` (the machine plane, the bootstrap questions, the `signature`-explaining
 remedy and the downgrade path to `chat`) and the scratch-cleanup wiring are both

@@ -46,29 +46,39 @@ one, and the population it hides from is exactly the one that cannot afford it:
 anything that does not reboot — CI, a build server, a long-lived session, a container
 — hits a hard write-stop with no warning and a misleading `df`.
 
-## Which producer — the first guess was measurably wrong
+## Which producer — and how sampling one prefix produced a wrong answer twice
 
 An age-filtered cleanup (`-mmin +2880`, older than 48 hours) reclaimed only **2833
 inodes**, so the mass was created *inside* the last two days.
 
-The obvious suspect was this repository's own Verify. It is not the main source: the
-two full 255-suite runs on 2026-08-08 account for roughly 700 directories between them
-(measured with `-newermt 2026-08-07`), about 350 per run — call it 12000 inodes for a
-full pass. That is two orders of magnitude short of the ~33000 present. The bulk falls
-in a window on 2026-08-06, just inside the 48-hour boundary, which is exactly why the
-age filter missed it.
+The first analysis then counted `actions-permissions-*` alone, found ~700 of them from
+2026-08-08, compared that against ~33000 total entries, and concluded that this
+repository's Verify was **not** the main producer. That conclusion was wrong, and the
+error is worth keeping on the record because it is cheap to repeat: `actions-permissions`
+merely sorts first alphabetically, and `ls | head -40` shows nothing else.
 
-So the producer is **not yet identified**, and this item deliberately does not name
-one. Recorded as an open question rather than closed with the convenient answer.
+Listing `/tmp` excluding that one prefix shows the rest are this repository's own test
+fixtures, across many prefixes — `critic-dispatch-preflight-`, `pr-contributor-gates-`
+(with `-trusted` and `-realscan` variants), `pr-gate-real-scan-bin-`, `license-gate-*`,
+`license-contract-`, `license-approved-surfaces-`, `sbom-*` (a dozen variants),
+`po-human-*`, and more beyond the truncated listing.
+
+**So the test suites are the producer**, and a single full Verify pass leaks on the
+order of thousands of directories rather than the ~350 the one-prefix sample suggested.
+Two passes in one afternoon, on top of two days of prior runs, exhausted the table.
+
+What remains genuinely open is the *complete* prefix list and which suite owns each —
+the listing above is itself a sample, of a 1MB output that was truncated.
 
 ## Direction, not a design
 
-1. **Enumerate the prefixes and find the actual producer first.** The diagnosis above
-   rests on a 40-entry sample of 34350, and the obvious suspect is measurably not the
-   main source. Group `/tmp` entries by prefix *and* by creation window before
-   deciding what to fix, so the fix covers the real set rather than the one that
-   sorted first alphabetically or the one that happened to be running when the wall
-   was hit.
+1. **Enumerate the prefixes completely before fixing any of them.** Both wrong answers
+   in this investigation came from sampling: `ls | head -40` showed one prefix, and the
+   full listing was truncated at 1MB. Group `/tmp` entries by prefix with counts —
+   `find /tmp -maxdepth 1 -type d -printf '%f\n' | sed 's/-[A-Za-z0-9]*$//' | sort |
+   uniq -c | sort -rn` or equivalent — and map each prefix to its owning suite. The fix
+   is per-suite, so an incomplete prefix list silently leaves leaks in place while
+   looking finished.
 2. **Remove the directory in the same scope that created it.** Node's test runner has
    `after`/`t.after` hooks for exactly this, and a fixture already knows its own path
    — nothing needs discovering at cleanup time. A shared fixture helper that owns
