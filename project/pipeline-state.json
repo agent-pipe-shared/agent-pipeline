@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
-  "planApproved": true,
-  "updatedAt": "2026-08-07T09:12:38.000Z",
+  "planApproved": false,
+  "updatedAt": "2026-08-08T06:03:50.917Z",
   "closedFeatures": [
     {
       "id": "sprint-sentinel-epic",
@@ -134,12 +134,12 @@
   "activeFeature": {
     "id": "sprint-phoenix-epic",
     "planPath": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
-    "phase": "implementation"
+    "phase": "design"
   },
   "continuity": {
     "schema": "pipeline.continuity.v0",
     "featureId": "sprint-phoenix-epic",
-    "revision": 3,
+    "revision": 5,
     "runtime": {
       "humanFacingLanguage": "en",
       "activeDuty": "Elephant",
@@ -148,7 +148,7 @@
     "authority": {
       "prd": {
         "path": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
-        "sha256": "303586c891173ba4c5741df9869d4b7b3508f3029d1a6914093d1e6683ba292b"
+        "sha256": "8b820ea5907c24061eeab1a8f2255939401f5a2002792c5f16d39836712b3177"
       },
       "spec": {
         "path": "specs/sprint-phoenix-epic/spec.md",
@@ -168,7 +168,7 @@
     "acknowledgedFinal": null,
     "resume": {
       "mode": "immediate",
-      "sourceRevision": 3,
+      "sourceRevision": 5,
       "reasonCode": "active-turn"
     },
     "recovery": null,
@@ -220,21 +220,21 @@
     "schema": "pipeline.plan-submission.v1",
     "featureId": "sprint-phoenix-epic",
     "planPath": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
-    "planSha256": "303586c891173ba4c5741df9869d4b7b3508f3029d1a6914093d1e6683ba292b",
+    "planSha256": "8b820ea5907c24061eeab1a8f2255939401f5a2002792c5f16d39836712b3177",
     "specPath": "specs/sprint-phoenix-epic/spec.md",
     "specSha256": "f7e32bb764d408ec21d6578d72b4729d8d5931bcf840ebac2198a2d652233d4f",
     "profile": "epic",
-    "profileSha256": "72a1601a9a904136f5fef9bf6146cfb5da3c03da175309353576f09a97861b05",
-    "submittedBy": "Elephant (merged Spec submission)",
-    "submittedAt": "2026-08-06T05:48:27.051Z"
+    "profileSha256": "26494e6fbe5634bf4b7bbd698f5348b74f766bb3bcb715d926f5def107d50ba0",
+    "submittedBy": "Elephant",
+    "submittedAt": "2026-08-08T06:03:50.917Z"
   },
   "planInvalidation": {
     "schema": "pipeline.plan-invalidation.v1",
     "featureId": "sprint-phoenix-epic",
-    "invalidatedSubmissionSha256": "692f168dceb9821baac7e201c3f53d1157009c6779b90c4ac9c6375890d324ae",
-    "invalidatedApprovalSha256": null,
-    "invalidatedBy": "Elephant (authority split repair)",
-    "invalidatedAt": "2026-08-06T05:42:12.168Z",
+    "invalidatedSubmissionSha256": "a737d5b0a8f568a29f530edc546c79569b6f8c54b73783ad2bb95b34fd876a01",
+    "invalidatedApprovalSha256": "b73ecd3f7e4812ac1cfe1336bbc15df8e088ec650b3e038853a76442ed2b7e52",
+    "invalidatedBy": "PO",
+    "invalidatedAt": "2026-08-08T05:56:29.729Z",
     "reason": "reopen-design"
   },
   "planApproval": {
