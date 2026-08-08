@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 import {
   checkVerifySuiteRegistration,
+  duplicateSuiteIds,
   EXCLUSIONS,
   parseExclusionDay,
   REQUIRED_EXCLUSION_FIELDS,
@@ -372,6 +373,216 @@ check("QG-06: the real EXCLUSIONS table is self-clearing -- every entry expires 
   assert.deepEqual(before.malformedExclusions, []);
   const after = checkVerifySuiteRegistration({ exclusions: EXCLUSIONS, now: dayAfterLast });
   assert.deepEqual(after.expiredExclusions.sort(), Object.keys(EXCLUSIONS).sort());
+});
+
+// -- duplicateSuiteIds: the RUNTIME counterpart of Class 3. ------------------
+// Class 3 (DUPLICATE-NAME, above) reads verify.mjs's SOURCE TEXT. duplicateSuiteIds
+// is a different mechanism on a different input: verify.mjs calls it on the already
+// assembled runtime array (`[...TEST_SUITES, ...scopedTests, ...windowsAssuranceTests,
+// ...phaseSteps]`) it is about to hand to runVerifyJournal, so a duplicate surfaces as
+// a reported step instead of planVerifyResume() throwing before any suite runs
+// (AC-P3/R1.4, specs/sprint-phoenix-epic/design/acp3-preplanning-patch.md). The two are
+// tested separately on purpose; a green Class-3 case says nothing about this one.
+function suiteEntry(name, file = `${name}.test.mjs`) { return { name, file }; }
+
+check("duplicateSuiteIds: an empty registration array reports no duplicates", () => {
+  assert.deepEqual(duplicateSuiteIds([]), []);
+});
+
+check("duplicateSuiteIds: a registration array with no repeated name reports no duplicates", () => {
+  assert.deepEqual(duplicateSuiteIds([suiteEntry("alpha-tests"), suiteEntry("beta-tests"), suiteEntry("gamma-tests")]), []);
+});
+
+check("duplicateSuiteIds: one id registered twice is reported once, with count 2", () => {
+  assert.deepEqual(
+    duplicateSuiteIds([suiteEntry("alpha-tests"), suiteEntry("dup-tests"), suiteEntry("dup-tests")]),
+    [{ id: "dup-tests", count: 2 }],
+  );
+});
+
+check("duplicateSuiteIds: one id registered three times reports a count of 3, not two findings", () => {
+  assert.deepEqual(
+    duplicateSuiteIds([suiteEntry("dup-tests"), suiteEntry("alpha-tests"), suiteEntry("dup-tests"), suiteEntry("dup-tests")]),
+    [{ id: "dup-tests", count: 3 }],
+  );
+});
+
+check("duplicateSuiteIds: two distinct duplicated ids are both reported, sorted by id", () => {
+  assert.deepEqual(
+    duplicateSuiteIds([
+      suiteEntry("zeta-tests"), suiteEntry("alpha-tests"), suiteEntry("solo-tests"),
+      suiteEntry("zeta-tests"), suiteEntry("alpha-tests"), suiteEntry("zeta-tests"),
+    ]),
+    [{ id: "alpha-tests", count: 2 }, { id: "zeta-tests", count: 3 }],
+  );
+});
+
+check("duplicateSuiteIds: entries sharing a name but naming different files are still duplicates", () => {
+  // `name` is the field verify-journal.mjs threads through unchanged as the suite `id`
+  // (`return { id: suite.name, ... }`) and is exactly what verify-resume.mjs:114 keys on.
+  // Two different files under one name is the defect, not an accident of the file path.
+  assert.deepEqual(
+    duplicateSuiteIds([
+      { name: "dup-tests", file: "/fixture/harness/scripts/first.test.mjs" },
+      { name: "dup-tests", file: "/fixture/plugins/pipeline-core/lib/second.test.mjs" },
+    ]),
+    [{ id: "dup-tests", count: 2 }],
+  );
+});
+
+check("duplicateSuiteIds: returns exactly the { id, count } shape the verify.mjs call site consumes", () => {
+  // harness/scripts/verify.mjs ~596-601 reads `.length`, then per entry `duplicate.id`
+  // (JSON.stringify'd into the VERIFY-REGISTRATION-DUPLICATE line) and `duplicate.count`.
+  // Pinned here so a later "richer" return value cannot silently break that line.
+  const result = duplicateSuiteIds([suiteEntry("dup-tests"), suiteEntry("dup-tests")]);
+  assert.equal(result.length, 1);
+  assert.deepEqual(Object.keys(result[0]).sort(), ["count", "id"]);
+  assert.equal(typeof result[0].id, "string");
+  assert.equal(typeof result[0].count, "number");
+});
+
+check("duplicateSuiteIds: a duplicate spanning two of verify.mjs's registration arrays is found", () => {
+  // The exact assembly verify.mjs performs at ~591, phase steps included.
+  const testSuites = [suiteEntry("alpha-tests"), suiteEntry("shared-tests")];
+  const scopedTests = [suiteEntry("beta-tests")];
+  const windowsAssuranceTests = [suiteEntry("shared-tests")];
+  const phaseSteps = [{ name: "validate-manifest", file: "validate-manifest.mjs", dependsOn: [] }];
+  assert.deepEqual(
+    duplicateSuiteIds([...testSuites, ...scopedTests, ...windowsAssuranceTests, ...phaseSteps]),
+    [{ id: "shared-tests", count: 2 }],
+  );
+});
+
+// -- End-to-end fixture: verify.mjs's own duplicate path, run for real. ------
+// AC-P3/R1.4 demanded this be demonstrated, not asserted. The checkout's
+// harness/scripts/verify.mjs is TP-3-protected and is NEVER touched: the fixture copies
+// it into a temp root, injects the duplicate into THAT copy's TEST_SUITES, and spawns it.
+// runVerifyJournal is stubbed to throw a recognisable marker, so "did any suite run?" is
+// answered by the child's own output instead of by this file's opinion.
+const VERIFY_REL_PATH = "harness/scripts/verify.mjs";
+const REPO_ROOT = resolve(here, "..", "..");
+const DUPLICATE_FIXTURE_ID = "phx-duplicate-registration-fixture-tests";
+const JOURNAL_REACHED_MARKER = "PHX-FIXTURE-JOURNAL-REACHED";
+/** Every module the copied verify.mjs imports, transitively — minus the journal, stubbed below.
+ *  Enumerated by hand and therefore stale-able: assertStaleFixture below names it as staleness
+ *  rather than letting a missing module read as an unexplained failure. */
+const FIXTURE_MODULES = Object.freeze([
+  "harness/scripts/check-verify-suite-registration.mjs",
+  "plugins/pipeline-core/lib/project-authority.mjs",
+  "plugins/pipeline-core/lib/scoped-verify-registration.mjs",
+  "plugins/pipeline-core/lib/verify-resume.mjs",
+  "plugins/pipeline-core/lib/windows-assurance-verify-registration.mjs",
+  "plugins/pipeline-core/lib/worktree-lifecycle.mjs", // via project-authority.mjs
+  "plugins/pipeline-core/lib/windows-private-state.mjs", // via worktree-lifecycle.mjs
+]);
+/** Authority files the two registration validators hash before verify plans anything. */
+const FIXTURE_AUTHORITY = Object.freeze([
+  "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
+  "specs/2026-07-19-sprint-sentinel-epic/windows-trusted-tool-resolution-ac-matrix.md",
+]);
+/** Registration targets those validators lstat; absent, verify stops before the duplicate check. */
+const FIXTURE_REGISTERED_TARGETS = Object.freeze([
+  "plugins/pipeline-core/lib/scoped-verify-registration.test.mjs",
+  "plugins/pipeline-core/lib/workflow-preflight.test.mjs",
+  "plugins/pipeline-core/lib/interaction-continuity.test.mjs",
+  "plugins/pipeline-core/lib/trusted-tool-resolution.test.mjs",
+  "plugins/pipeline-core/lib/advisory-receipt-assurance.test.mjs",
+  "plugins/pipeline-core/scripts/toolchain-preflight.test.mjs",
+]);
+
+function buildVerifyFixtureRoot({ injectDuplicate }) {
+  const root = buildRoot();
+  for (const relPath of [...FIXTURE_MODULES, ...FIXTURE_AUTHORITY]) {
+    const target = join(root, ...relPath.split("/"));
+    mkdirSync(dirname(target), { recursive: true });
+    copyFileSync(join(REPO_ROOT, ...relPath.split("/")), target);
+  }
+  for (const relPath of FIXTURE_REGISTERED_TARGETS) writeFile(root, relPath);
+  writeFile(
+    root, "plugins/pipeline-core/scripts/verify-journal.mjs",
+    `export function runVerifyJournal() { throw new Error(${JSON.stringify(JOURNAL_REACHED_MARKER)}); }\n`,
+  );
+
+  const source = readFileSync(join(REPO_ROOT, ...VERIFY_REL_PATH.split("/")), "utf8");
+  const anchor = "const TEST_SUITES = [\n";
+  assert.ok(source.includes(anchor), `fixture is stale: ${VERIFY_REL_PATH} no longer declares TEST_SUITES in the parsed form`);
+  // One registration line, written twice — the shape a clean auto-merge produced on
+  // 2026-08-08. The target need not exist: this path never reaches the journal.
+  const line = `  { name: "${DUPLICATE_FIXTURE_ID}", file: join(scriptDir, "check-verify-suite-registration.mjs") },\n`;
+  writeFile(root, VERIFY_REL_PATH, source.replace(anchor, anchor + (injectDuplicate ? line + line : "")));
+  return root;
+}
+
+function runVerifyFixture({ injectDuplicate }) {
+  const root = buildVerifyFixtureRoot({ injectDuplicate });
+  try {
+    const spawned = spawnSync(process.execPath, [join(root, ...VERIFY_REL_PATH.split("/"))], { cwd: root, encoding: "utf8" });
+    const evidencePath = join(root, "evidence", "verify-latest.json");
+    return {
+      status: spawned.status,
+      stderr: spawned.stderr ?? "",
+      evidence: existsSync(evidencePath) ? JSON.parse(readFileSync(evidencePath, "utf8")) : null,
+    };
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+/** Turns "a module went missing" and "the temp root is inside a repo" into named causes. */
+function assertReachedRegistration(run) {
+  assert.ok(run.evidence, `verify wrote no evidence at all; stderr: ${run.stderr}`);
+  assert.notEqual(
+    run.evidence.candidate.start.status, "dirty",
+    "the fixture root looks like a dirty Git worktree, so verify stopped at candidate-preflight",
+  );
+  for (const blocked of ["windows-assurance-verify-registration", "scoped-verify-registration", "verify-running"]) {
+    assert.equal(
+      run.evidence.steps.some((step) => step.name === blocked), false,
+      `verify never reached the duplicate check (stopped at ${blocked}); the fixture list is stale. stderr: ${run.stderr}`,
+    );
+  }
+}
+
+check("verify.mjs reports a duplicate registration as a failing step naming the id (AC-P3/R1.4)", () => {
+  const run = runVerifyFixture({ injectDuplicate: true });
+  assert.notEqual(run.status, 0, `expected a non-zero exit, got ${run.status}; stderr: ${run.stderr}`);
+  assertReachedRegistration(run);
+  assert.match(
+    run.stderr,
+    new RegExp(`VERIFY-REGISTRATION-DUPLICATE: suite id "${DUPLICATE_FIXTURE_ID}" is registered 2 times`),
+    `stderr must name the duplicated id, got: ${run.stderr}`,
+  );
+  assert.deepEqual(run.evidence.steps, [{ name: "verify-suite-registration-duplicates", exitCode: 1 }]);
+  assert.notEqual(run.evidence.exitCode, 0);
+  // WHAT THE IMPLEMENTATION ACTUALLY DOES, pinned rather than wished for: the duplicate
+  // check is the `if`, runVerifyJournal is its `else` (verify.mjs ~597-602), so on a
+  // duplicate NO suite runs and the step list is exactly one entry long. The journal's
+  // marker is absent because the journal was never entered — the defect is reported
+  // instead of thrown, but it is still reported INSTEAD OF running the corpus.
+  // acp3-preplanning-patch.md's acceptance item 2 ("Suites still run … the step list is
+  // longer than one entry") is NOT what this code does; the discrepancy is filed, not
+  // asserted away here. Changing this line to match the document would be a lie about
+  // the gate. (verify.mjs is TP-3-protected; only its owner can close the gap.)
+  assert.equal(run.evidence.verifyRun, null);
+  assert.equal(run.stderr.includes("VERIFY-JOURNAL-FAILED"), false, "the journal branch must not be entered at all");
+  assert.equal(run.stderr.includes(JOURNAL_REACHED_MARKER), false, "no suite may have been planned or started");
+});
+
+check("verify.mjs without a duplicate enters the journal branch — the duplicate step is discrimination, not a constant", () => {
+  // The negative control for the case above: the same fixture with the duplicate line
+  // omitted. It is what makes the case above evidence of DETECTION rather than of a
+  // branch that fires unconditionally — without it, an `if (true)` would pass too.
+  // Note what the else branch does here: `gitCommonDirectory()` is evaluated while
+  // assembling runVerifyJournal's arguments and throws in a non-Git temp root, so the
+  // marker above is not always the diagnostic. Either way the VERIFY-JOURNAL-FAILED
+  // line and the `verify-journal` step can only be produced from inside that else
+  // branch, which is precisely the discrimination being pinned.
+  const run = runVerifyFixture({ injectDuplicate: false });
+  assert.notEqual(run.status, 0, `the fixture journal cannot succeed, so a non-zero exit is expected; got ${run.status}`);
+  assertReachedRegistration(run);
+  assert.equal(run.stderr.includes("VERIFY-REGISTRATION-DUPLICATE"), false, `no duplicate was registered, got: ${run.stderr}`);
+  assert.match(run.stderr, /VERIFY-JOURNAL-FAILED: /, `expected the journal branch to be entered, got: ${run.stderr}`);
+  assert.deepEqual(run.evidence.steps, [{ name: "verify-journal", exitCode: 1 }]);
 });
 
 process.stdout.write(`1..${passed}\n# pass ${passed}\n`);
