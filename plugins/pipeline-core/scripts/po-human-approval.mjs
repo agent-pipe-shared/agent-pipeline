@@ -56,6 +56,14 @@ function publicKeyPolicy(publicKey, keyReference) {
   createPublicKey(publicKey);
   return { keyReference, publicKeySha256: createHash("sha256").update(publicKey).digest("hex") };
 }
+// SETUP-1: the human types their name ONCE, at key creation, rather than on every
+// approval -- approvals happen every push/deploy while a key is created rarely, so
+// re-prompting for a name that never changes would be repeated friction for no benefit.
+// It becomes a field of the key's OWN local authority record (never the proof itself,
+// whose exact 5-key shape is a contract shared by every verifier -- see signIntentIntoProof).
+function localAuthority(publicKey, keyReference, humanName) {
+  return { ...publicKeyPolicy(publicKey, keyReference), humanName };
+}
 function externalDirectory(repository, directory, { create = false, source = "--directory" } = {}) {
   // `source` names where this directory came from (--directory or the environment-variable
   // fallback) so a failure message can say which one was used. It is a fixed label, never the
@@ -104,7 +112,7 @@ export function parseHumanArgs(argv) {
     const key = tokens[index]; const value = tokens[index + 1];
     if (!key?.startsWith("--") || typeof value !== "string" || value.startsWith("--")) return { error: USAGE };
     const normalized = key.slice(2).replace(/-([a-z])/gu, (_, letter) => letter.toUpperCase());
-    if (!new Set(["directory", "repoRoot", "keyReference", "featureId", "plan", "spec", "model", "kind", "subjectSha256", "expiresAt", "intentSha256"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
+    if (!new Set(["directory", "repoRoot", "keyReference", "humanName", "featureId", "plan", "spec", "model", "kind", "subjectSha256", "expiresAt", "intentSha256"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
     supplied.add(normalized); values[normalized] = value; index += 1;
   }
   if (!new Set(["setup", "prepare", "prepare-all", "approve", "approve-all", "verify", "verify-all", "prepare-critical", "approve-critical", "verify-critical", "authorize-critical", "sign-intent"]).has(command)) return { error: USAGE };
@@ -122,6 +130,11 @@ export function parseHumanArgs(argv) {
     return { error: `${USAGE}\napproval directory is required and must be an absolute path: pass --directory <path>, or set $${PO_APPROVAL_DIRECTORY_ENV} to an absolute path as a fallback (an explicit --directory always overrides it).` };
   }
   if (!text(values.repoRoot) || !isAbsolute(values.repoRoot)) return { error: USAGE };
+  // SETUP-1: the human names themselves once, at key creation. No default -- a name that
+  // silently defaulted would satisfy the shape of "recorded" while recording nothing.
+  if (command === "setup" && !text(values.humanName)) {
+    return { error: `${USAGE}\nsetup requires --human-name "<the human this key's approvals will be attributed to>".` };
+  }
   if (command.endsWith("-all") && (values.featureId || values.plan || values.spec || values.model)) return { error: USAGE };
   if (command.endsWith("-critical") && !CRITICAL_ACTION_KINDS.includes(values.kind)) return { error: USAGE };
   if (command === "sign-intent" && !SHA.test(values.intentSha256 ?? "")) return { error: USAGE };
@@ -223,9 +236,19 @@ function signIntentIntoProof({ intentSha256, keys, artifacts, io, dependencies }
   finally { rmSync(artifacts.intent, { force: true }); }
   try {
     const authority = json(keys.authority); const publicKey = io.read(keys.publicKey, "utf8");
-    if (!own(authority, ["keyReference", "publicKeySha256"]) || !text(authority.keyReference) || authority.publicKeySha256 !== publicKeyPolicy(publicKey, authority.keyReference).publicKeySha256) fail("external trust policy does not match the local public key");
+    if (!own(authority, ["keyReference", "publicKeySha256", "humanName"]) || !text(authority.keyReference) || !text(authority.humanName)
+      || authority.publicKeySha256 !== publicKeyPolicy(publicKey, authority.keyReference).publicKeySha256) fail("external trust policy does not match the local public key");
     const proof = { schema: "pipeline.po-approval-proof.v1", intentSha256, keyReference: authority.keyReference, publicKey, signatureBase64: Buffer.from(io.read(artifacts.signature)).toString("base64") };
     io.write(artifacts.proof, `${JSON.stringify(proof, null, 2)}\n`, { mode: 0o600 });
+    // SETUP-1: recorded on EVERY approval, independent of whether the project's trust
+    // policy restricts which key may sign -- "not restricted" must never become "not
+    // recorded". This is public data, same as `proof`, and shares its artifact lifecycle.
+    const signer = {
+      schema: "pipeline.po-approval-signer.v1", intentSha256,
+      keyReference: authority.keyReference, publicKeySha256: authority.publicKeySha256, humanName: authority.humanName,
+    };
+    io.write(artifacts.signer, `${JSON.stringify(signer, null, 2)}\n`, { mode: 0o600 });
+    return { proof, signer };
   } finally { rmSync(artifacts.signature, { force: true }); }
 }
 
@@ -268,24 +291,30 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
     proof: artifactPath(directory, `proof${suffix}.json`),
     signature: artifactPath(directory, `signature${suffix}.bin`),
     intent: artifactPath(directory, `intent${suffix}.txt`),
+    // SETUP-1: a companion record of WHO signed -- kept separate from `proof` itself,
+    // whose exact shape (PO_APPROVAL_PROOF_SCHEMA) is a contract shared by every verifier
+    // (threat-model, HGO, GMW, critical-action); adding a field there would make every
+    // proof this command produces unverifiable everywhere else.
+    signer: artifactPath(directory, `signer${suffix}.json`),
   };
   const write = dependencies.writeFile ?? writeFileSync; const read = dependencies.readFile ?? readFileSync; const exists = dependencies.exists ?? existsSync;
   if (args.command === "setup") {
     const present = { privateKey: exists(paths.privateKey), publicKey: exists(paths.publicKey), authority: exists(paths.authority) };
     if (present.privateKey && present.publicKey && !present.authority) {
-      const authority = publicKeyPolicy(read(paths.publicKey, "utf8"), args.keyReference);
+      const authority = localAuthority(read(paths.publicKey, "utf8"), args.keyReference, args.humanName);
       write(paths.authority, `${JSON.stringify(authority, null, 2)}\n`, { mode: 0o600 });
       return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority, recovered: true };
     }
     if (present.privateKey && present.publicKey && present.authority) {
       const authority = json(paths.authority); const publicKey = read(paths.publicKey, "utf8");
-      if (!own(authority, ["keyReference", "publicKeySha256"]) || authority.publicKeySha256 !== publicKeyPolicy(publicKey, authority.keyReference).publicKeySha256) fail("existing trust policy does not match the local public key");
+      if (!own(authority, ["keyReference", "publicKeySha256", "humanName"]) || !text(authority.humanName)
+        || authority.publicKeySha256 !== publicKeyPolicy(publicKey, authority.keyReference).publicKeySha256) fail("existing trust policy does not match the local public key");
       return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority, recovered: false };
     }
     if (present.privateKey || present.publicKey || present.authority) fail("partial PO authority exists; refusing to overwrite it");
     command("openssl", ["genpkey", "-algorithm", "ED25519", "-aes-256-cbc", "-out", paths.privateKey], dependencies);
     command("openssl", ["pkey", "-in", paths.privateKey, "-pubout", "-out", paths.publicKey], dependencies);
-    const authority = publicKeyPolicy(read(paths.publicKey, "utf8"), args.keyReference); write(paths.authority, `${JSON.stringify(authority, null, 2)}\n`, { mode: 0o600 }); chmodSync(paths.privateKey, 0o600);
+    const authority = localAuthority(read(paths.publicKey, "utf8"), args.keyReference, args.humanName); write(paths.authority, `${JSON.stringify(authority, null, 2)}\n`, { mode: 0o600 }); chmodSync(paths.privateKey, 0o600);
     return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority };
   }
   if (args.command === "authorize-critical") {
@@ -308,8 +337,8 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
       `approval intent sha256: ${intentSha256}`,
       "this approval does NOT cover: any other commit or tree than the candidate above, any other subject digest, any action attempted after the expiry above, and any action of a different kind -- each of those needs its own approval.",
     ], dependencies);
-    signIntentIntoProof({ intentSha256, keys: paths, artifacts: { intent: paths.intent, signature: paths.signature, proof: paths.proof }, io: { write, read }, dependencies });
-    return { ok: true, code: "PO-HUMAN-CRITICAL-AUTHORIZATION-READY", candidate: request.candidate, action: request.action, intentSha256 };
+    const signed = signIntentIntoProof({ intentSha256, keys: paths, artifacts: { intent: paths.intent, signature: paths.signature, proof: paths.proof, signer: paths.signer }, io: { write, read }, dependencies });
+    return { ok: true, code: "PO-HUMAN-CRITICAL-AUTHORIZATION-READY", candidate: request.candidate, action: request.action, intentSha256, signer: signed.signer };
   }
   if (args.command === "prepare" || args.command === "prepare-critical") {
     if (critical) {
@@ -347,9 +376,10 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
       intent: artifactPath(directory, "intent-manual.txt"),
       signature: artifactPath(directory, "signature-manual.bin"),
       proof: artifactPath(directory, "proof-manual.json"),
+      signer: artifactPath(directory, "signer-manual.json"),
     };
-    signIntentIntoProof({ intentSha256, keys: paths, artifacts: manual, io: { write, read }, dependencies });
-    return { ok: true, code: "PO-HUMAN-SIGN-INTENT-READY", intentSha256 };
+    const signed = signIntentIntoProof({ intentSha256, keys: paths, artifacts: manual, io: { write, read }, dependencies });
+    return { ok: true, code: "PO-HUMAN-SIGN-INTENT-READY", intentSha256, signer: signed.signer };
   }
   if (!exists(paths.request) || !exists(paths.publicKey) || !exists(paths.authority)) fail("run setup and prepare before approving");
   const request = approvalRequestFromExternalJson(json(paths.request));
@@ -364,15 +394,22 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
       summary.push(`action expires at: ${request?.action?.expiresAt}`);
     }
     requireExplicitConfirmation(summary, dependencies);
-    signIntentIntoProof({ intentSha256, keys: paths, artifacts: { intent: paths.intent, signature: paths.signature, proof: paths.proof }, io: { write, read }, dependencies });
-    return { ok: true, code: "PO-HUMAN-PROOF-READY", intentSha256 };
+    const signed = signIntentIntoProof({ intentSha256, keys: paths, artifacts: { intent: paths.intent, signature: paths.signature, proof: paths.proof, signer: paths.signer }, io: { write, read }, dependencies });
+    return { ok: true, code: "PO-HUMAN-PROOF-READY", intentSha256, signer: signed.signer };
   }
   if (!exists(paths.proof)) fail("run approve before verify");
   const candidate = (dependencies.observeCandidate ?? observeCleanCandidate)(repository);
   if (request?.candidate?.commit !== candidate.commit || request?.candidate?.tree !== candidate.tree) fail("proof request is not bound to the current clean candidate");
+  // The shared trustPolicy contract (verifyPoApprovalProof et al.) checks an EXACT
+  // {keyReference, publicKeySha256} shape; the LOCAL authority record additionally
+  // carries `humanName` (SETUP-1). Only the two key-identity fields travel into
+  // verification -- the same split signIntentIntoProof already keeps between the local
+  // authority record and the shared proof/trustPolicy contract.
+  const localAuthorityRecord = json(paths.authority);
+  const trustPolicy = { keyReference: localAuthorityRecord.keyReference, publicKeySha256: localAuthorityRecord.publicKeySha256 };
   const verified = critical
-    ? verifyCriticalActionApprovalRequest({ request, trustPolicy: json(paths.authority), proof: json(paths.proof), expectedCandidate: candidate, expectedAction: request.action })
-    : verifyThreatModelApprovalRequest({ request, trustPolicy: json(paths.authority), proof: json(paths.proof) });
+    ? verifyCriticalActionApprovalRequest({ request, trustPolicy, proof: json(paths.proof), expectedCandidate: candidate, expectedAction: request.action })
+    : verifyThreatModelApprovalRequest({ request, trustPolicy, proof: json(paths.proof) });
   return { ok: true, value: verified };
 }
 

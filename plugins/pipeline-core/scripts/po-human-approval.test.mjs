@@ -56,8 +56,15 @@ function keyFixture(directory) {
   openssl(["genpkey", "-algorithm", "ED25519", "-out", privateKey]);
   openssl(["pkey", "-in", privateKey, "-pubout", "-out", publicKey]);
   const publicKeyPem = readFileSync(publicKey, "utf8");
+  // `authority` stays the exact 2-key {keyReference, publicKeySha256} shape every
+  // trustPolicy consumer (verifyPoApprovalProof, verifyCriticalActionApprovalRequest)
+  // checks with an EXACT key match -- SETUP-1's `humanName` is added only to the LOCAL
+  // trust-policy.json this fixture writes to disk (the shape po-human-approval.mjs's own
+  // setup/signIntentIntoProof reads and checks), never to the object tests use as a
+  // trustPolicy, mirroring the production split between the local authority record and
+  // the shared proof-verification contract.
   const authority = { keyReference: "sign-intent-test-key", publicKeySha256: createHash("sha256").update(publicKeyPem).digest("hex") };
-  writeFileSync(join(directory, "trust-policy.json"), `${JSON.stringify(authority, null, 2)}\n`);
+  writeFileSync(join(directory, "trust-policy.json"), `${JSON.stringify({ ...authority, humanName: "Test Operator" }, null, 2)}\n`);
   return { publicKeyPem, authority };
 }
 
@@ -132,7 +139,16 @@ test("sign-intent signs a digest end-to-end with a real OpenSSL round trip and t
     const confirmationPrompts = [];
     const dependencies = { readConfirmation: (prompt) => { confirmationPrompts.push(prompt); return "approve"; } };
     const result = runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256], dependencies);
-    assert.deepEqual(result, { ok: true, code: "PO-HUMAN-SIGN-INTENT-READY", intentSha256 });
+    assert.equal(result.ok, true);
+    assert.equal(result.code, "PO-HUMAN-SIGN-INTENT-READY");
+    assert.equal(result.intentSha256, intentSha256);
+    // SETUP-1: the signer is recorded on every approval -- keyReference, publicKeySha256
+    // and the human-supplied name, all present in this accepting case.
+    assert.equal(result.signer.keyReference, authority.keyReference);
+    assert.equal(result.signer.publicKeySha256, authority.publicKeySha256);
+    assert.equal(result.signer.humanName, "Test Operator");
+    const signerOnDisk = JSON.parse(readFileSync(join(dirs.directory, "signer-manual.json"), "utf8"));
+    assert.deepEqual(signerOnDisk, result.signer);
 
     assert.equal(confirmationPrompts.length, 1, "sign-intent must ask for exactly one explicit confirmation before signing");
     assert.match(confirmationPrompts[0], new RegExp(intentSha256, "u"), "the confirmation prompt must name the exact digest being authorized");
@@ -278,12 +294,18 @@ test("authorize-critical prepares and signs in ONE invocation, and the proof is 
     // was signed is read from the request THIS invocation wrote -- no second file, no
     // second digest computation, no window between the two steps.
     assert.deepEqual(writes.map((entry) => basename(entry.path)), [
-      "request-critical-push.json", "intent-critical-push.txt", "proof-critical-push.json",
+      "request-critical-push.json", "intent-critical-push.txt", "proof-critical-push.json", "signer-critical-push.json",
     ]);
     const request = JSON.parse(writes[0].data);
     assert.equal(writes[1].data, request.approvalIntent.sha256, "the bytes signed by OpenSSL must be this invocation's own intent digest");
     assert.equal(JSON.parse(writes[2].data).intentSha256, request.approvalIntent.sha256);
     assert.equal(result.intentSha256, request.approvalIntent.sha256);
+    // SETUP-1: the signer is recorded on this critical-action approval too.
+    const signerWritten = JSON.parse(writes[3].data);
+    assert.equal(signerWritten.keyReference, authority.keyReference);
+    assert.equal(signerWritten.publicKeySha256, authority.publicKeySha256);
+    assert.equal(signerWritten.humanName, "Test Operator");
+    assert.deepEqual(result.signer, signerWritten);
 
     // The request is the library's construction of the declared inputs, not a re-derivation.
     const rebuilt = createCriticalActionApprovalRequest({
@@ -629,7 +651,10 @@ test("sign-intent states the reason, scope and expiry of the request recorded be
       ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", prepared.intent.sha256],
       { readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } },
     );
-    assert.deepEqual(result, { ok: true, code: "PO-HUMAN-SIGN-INTENT-READY", intentSha256: prepared.intent.sha256 });
+    assert.equal(result.ok, true);
+    assert.equal(result.code, "PO-HUMAN-SIGN-INTENT-READY");
+    assert.equal(result.intentSha256, prepared.intent.sha256);
+    assert.equal(result.signer.humanName, "Test Operator");
     assert.equal(prompts.length, 1, "still exactly one human confirmation (ADR-0061 Decision 1)");
     const [prompt] = prompts;
     assert.ok(prompt.includes(prepared.intent.sha256), "the digest being signed must still be named");
@@ -729,7 +754,7 @@ test("the disclosure stays bounded: an oversized reason and scope cannot flood o
 
 test("an explicit --directory always wins and behaves exactly as before: the environment variable is not even read", () => {
   withEnvDirectory("/should/never/be/read", () => {
-    const parsed = parseHumanArgs(["setup", "--repo-root", "/tmp/po-podir1-repo", "--directory", "/tmp/po-podir1-flag-dir"]);
+    const parsed = parseHumanArgs(["setup", "--repo-root", "/tmp/po-podir1-repo", "--directory", "/tmp/po-podir1-flag-dir", "--human-name", "Test Operator"]);
     assert.equal(parsed.error, undefined);
     assert.equal(parsed.directory, "/tmp/po-podir1-flag-dir");
     assert.equal(parsed.directorySource, "flag");
@@ -738,7 +763,7 @@ test("an explicit --directory always wins and behaves exactly as before: the env
 
 test("PIPELINE_PO_APPROVAL_DIRECTORY resolves the directory when --directory is absent", () => {
   withEnvDirectory("/tmp/po-podir1-env-dir", () => {
-    const parsed = parseHumanArgs(["setup", "--repo-root", "/tmp/po-podir1-repo"]);
+    const parsed = parseHumanArgs(["setup", "--repo-root", "/tmp/po-podir1-repo", "--human-name", "Test Operator"]);
     assert.equal(parsed.error, undefined);
     assert.equal(parsed.directory, "/tmp/po-podir1-env-dir");
     assert.equal(parsed.directorySource, "environment");
@@ -772,11 +797,11 @@ test("an unsafe directory fed through PIPELINE_PO_APPROVAL_DIRECTORY is refused 
     const insideRepo = join(dirs.repoRoot, "not-outside-the-repo");
     mkdirSync(insideRepo, { recursive: true });
 
-    const viaFlagError = thrown(() => runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", insideRepo], {}));
+    const viaFlagError = thrown(() => runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", insideRepo, "--human-name", "Test Operator"], {}));
     assert.ok(viaFlagError, "an unsafe --directory must be refused");
     assert.match(viaFlagError.message, /approval directory \(from --directory\) must be outside the repository/u);
 
-    const viaEnvError = withEnvDirectory(insideRepo, () => thrown(() => runHumanApproval(["setup", "--repo-root", dirs.repoRoot], {})));
+    const viaEnvError = withEnvDirectory(insideRepo, () => thrown(() => runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--human-name", "Test Operator"], {})));
     assert.ok(viaEnvError, "the identical unsafe value must be refused when it arrives via the environment");
     assert.match(viaEnvError.message, new RegExp(`approval directory \\(from the ${PO_APPROVAL_DIRECTORY_ENV} environment variable\\) must be outside the repository`, "u"));
 
@@ -808,10 +833,14 @@ test("PIPELINE_PO_APPROVAL_DIRECTORY runs a full sign-intent ceremony exactly li
     const dependencies = { readConfirmation: () => "approve" };
 
     const viaFlag = runHumanApproval(["sign-intent", "--repo-root", dirsFlag.repoRoot, "--directory", dirsFlag.directory, "--intent-sha256", intentSha256Flag], dependencies);
-    assert.deepEqual(viaFlag, { ok: true, code: "PO-HUMAN-SIGN-INTENT-READY", intentSha256: intentSha256Flag });
+    assert.equal(viaFlag.ok, true);
+    assert.equal(viaFlag.code, "PO-HUMAN-SIGN-INTENT-READY");
+    assert.equal(viaFlag.intentSha256, intentSha256Flag);
 
     const viaEnv = withEnvDirectory(dirsEnv.directory, () => runHumanApproval(["sign-intent", "--repo-root", dirsEnv.repoRoot, "--intent-sha256", intentSha256Env], dependencies));
-    assert.deepEqual(viaEnv, { ok: true, code: "PO-HUMAN-SIGN-INTENT-READY", intentSha256: intentSha256Env });
+    assert.equal(viaEnv.ok, true);
+    assert.equal(viaEnv.code, "PO-HUMAN-SIGN-INTENT-READY");
+    assert.equal(viaEnv.intentSha256, intentSha256Env);
 
     const proofFlag = JSON.parse(readFileSync(join(dirsFlag.directory, "proof-manual.json"), "utf8"));
     const proofEnv = JSON.parse(readFileSync(join(dirsEnv.directory, "proof-manual.json"), "utf8"));
