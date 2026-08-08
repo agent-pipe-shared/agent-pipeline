@@ -609,21 +609,23 @@ export function isReadOnlyDiagnosticCommand(command, root) {
       && isProjectWritePath(args[1], root);
   }
   if (executable === "sha256sum") {
-    const path = args.length === 1
-      ? args[0]
-      : args.length === 2 && args[0] === "--"
-        ? args[1]
-        : null;
-    return typeof path === "string"
-      && !path.startsWith("-")
-      && isProjectWritePath(path, root);
+    // backlog: 2026-08-08-the-guard-refuses-the-recovery-the-inspection-prescribes.md
+    // (C3). Several path arguments are admitted, each subject to the identical
+    // containment check a single path already applies -- `.every()` refuses
+    // the whole command if even one entry escapes, so a mixed list cannot be
+    // admitted because most of it is fine (AC-3).
+    const paths = args[0] === "--" ? args.slice(1) : args;
+    return paths.length > 0
+      && paths.every((path) => typeof path === "string"
+        && !path.startsWith("-")
+        && isProjectWritePath(path, root));
   }
   if (executable === "shasum") {
-    return args.length === 3
-      && ["-a", "--algorithm"].includes(args[0])
-      && args[1] === "256"
-      && !args[2].startsWith("-")
-      && isProjectWritePath(args[2], root);
+    if (args.length < 3 || !["-a", "--algorithm"].includes(args[0]) || args[1] !== "256") return false;
+    const paths = args.slice(2);
+    return paths.every((path) => typeof path === "string"
+      && !path.startsWith("-")
+      && isProjectWritePath(path, root));
   }
   if (["certutil", "certutil.exe"].includes(executable)) {
     return args.length === 3

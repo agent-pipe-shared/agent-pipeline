@@ -529,8 +529,13 @@ test("non-ready governed roots retain a narrow simple-command read-only diagnost
       "node.exe --check harness/scripts/verify.mjs",
       "sha256sum specs/hotfix.md",
       "sha256sum -- specs/hotfix.md",
+      // C3 (AC-1): several read-only path arguments, each subject to the
+      // identical containment check the single-path form already applies.
+      "sha256sum specs/hotfix.md pipeline.user.yaml",
+      "sha256sum -- specs/hotfix.md pipeline.user.yaml harness/scripts/verify.mjs",
       "shasum -a 256 specs/hotfix.md",
       "shasum --algorithm 256 specs/hotfix.md",
+      "shasum -a 256 specs/hotfix.md pipeline.user.yaml",
       "certutil -hashfile specs/hotfix.md SHA256",
       "certutil.exe -hashfile specs/hotfix.md sha256",
       "git status --short --branch",
@@ -558,10 +563,15 @@ test("non-ready governed roots retain a narrow simple-command read-only diagnost
       "node -e 'process.exit(0)'",
       "sha256sum ../../outside.md",
       "sha256sum linked-outside/outside.md",
-      "sha256sum specs/hotfix.md pipeline.user.yaml",
       "sha256sum -c specs/hotfix.md",
       "shasum -a 1 specs/hotfix.md",
-      "shasum -a 256 specs/hotfix.md pipeline.user.yaml",
+      // C3 (AC-3): a flag-looking argument, a path escaping the project root,
+      // and a mixed list where only one entry escapes are each still refused
+      // -- a widened form must not admit a list because most of it is fine.
+      "sha256sum specs/hotfix.md --check",
+      "sha256sum specs/hotfix.md ../../outside.md",
+      "sha256sum -- specs/hotfix.md ../../outside.md",
+      "shasum -a 256 specs/hotfix.md ../../outside.md",
       "certutil -urlcache specs/hotfix.md SHA256",
       "certutil -hashfile ../../outside.md SHA256",
       "certutil -hashfile specs/hotfix.md SHA1",
