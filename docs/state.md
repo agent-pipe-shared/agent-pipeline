@@ -227,10 +227,18 @@ three, **#31 two of sixteen**.
 
 **Two findings that are not implementation debt.**
 
-1. **A schema contradicts its criterion.**
-   `governance/schemas/agent-decision-event.schema.json:13` enumerates six
-   states; A-AC-11 requires seven, and `"assumed"` appears nowhere in the tree.
-   That is a decision for the PO, not a gap to fill quietly.
+1. **A schema does not contradict its criterion by one state — it models a
+   different thing.** A-AC-11 requires seven *epistemic* states: `assumed`,
+   `inferred`, `observed`, `verified`, `contradicted`, `unavailable`, `unknown`.
+   `governance/schemas/agent-decision-event.schema.json:13` enumerates
+   `declared`, `verified`, `contradicted`, `expired`, `invalidated`,
+   `superseded` — a *claim lifecycle*. Only two values overlap. Five required
+   states are absent and four unnamed ones are present.
+   **Impact:** the journal can record that a claim was declared and later
+   verified or contradicted, but cannot express *why* something was believed —
+   assumed, inferred, or observed. That distinction is the reason an assumption
+   journal is worth auditing at all, so #31 is not five values short; it answers
+   a different question.
 2. **A wrapper calls commands that do not exist.**
    `plugins/pipeline-core/scripts/phoenix-authority-revision.mjs:19-20` names
    `continuity-authority-revision-plan|apply` — neither exists, so that wrapper
@@ -277,11 +285,19 @@ family would die at budget as `PHX-COVERAGE` nearly did:
 
 **Two things the dispatch surfaced that change later briefings.**
 
-1. **P-AC-08's stale-digest reconciliation duty is moot today.** The inherited
-   Phoenix `draft` manifest validates clean — 13 artifacts, zero findings. The
-   criterion's reconciliation half describes a repair with nothing to repair.
-   Confirm before briefing that work rather than building a transaction for a
-   condition that does not exist.
+1. **P-AC-08's reconciliation duty is not "moot" — it was already performed by
+   the exact route the criterion forbids. Correcting my own earlier wording.**
+   The manifest validates clean (13 artifacts, zero findings) because `ece6041`
+   recomputed and rebound the two stale digests **by hand**, in a two-line edit
+   to `lifecycle.json` with no preview, no PO-bound apply, no readback and no
+   receipt. P-AC-08 says in terms: "It SHALL NOT permit manual digest
+   replacement to stand in for that transaction."
+   So building the transaction now leaves it with nothing to reconcile, and the
+   audit trail the clause exists to produce will never exist for that repair.
+   The capability half of P-AC-08 is still buildable and still required; its
+   reconciliation half has lost its subject. **This is a PO call, not a
+   dispatch:** accept the hand repair as a recorded deviation, or re-stage a
+   reconciliation the writer can legitimately perform.
 2. **`validateFeatureTopology()` is deliberately unused** by `inspect`, so its
    stray-nested-manifest check is not surfaced. Named by the dispatch rather
    than silently added, and worth a decision when the write half is briefed.
