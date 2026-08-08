@@ -194,6 +194,55 @@ Deliberately nothing more. Richer instrumentation would cost the budget the PO
 asked to protect, and the two fields above are what the six-row table above was
 missing when it was assembled by hand from runtime notifications.
 
+## PO direction, 2026-08-08 — make the budget a handover, not a cliff
+
+The PO proposes a durable fix rather than a larger number:
+
+> when the budget is exceeded, deliberately allow a timely close and handover —
+> then the Elephant can decide whether to dispatch again for the rest, or adjust
+> the briefing
+
+That is the right shape, and it inverts today's rule. TB-09 currently makes
+reaching the cap a *stop condition*, which is honest but leaves the dispatcher with
+a stopped run and no structured statement of what remains. A budgeted **closing
+allowance** — a small reserve beyond the cap, spendable only on committing what is
+green, writing the record, and emitting the report — converts an exhausted run into
+a usable handover. The work already done stops being lost, and the decision about
+the remainder returns to the role that should make it.
+
+Two design points a proposal must settle rather than assume:
+
+1. **The allowance is spendable on closing only.** A reserve that can be spent on
+   "just one more fix" is simply a larger budget, and the cap stops meaning
+   anything. The permitted acts are: commit what is already green, write the
+   dispatch record, emit the report.
+2. **The handover must be structured, not prose.** "I ran out" is what happens
+   today. What the Elephant needs is: what is committed, what is green, what
+   remains, and what the next briefing would have to say differently — the last of
+   which is the part that prevents a second dispatch failing the same way.
+
+### The PO's own observation on dispatch leadership, recorded because it generalizes
+
+From a parallel line of work, verbatim in substance: two of three dispatches ran
+out without a final report, both at the tool budget. The first lacked a convention
+the dispatcher had not passed on (the evidence wrappers); the second was given it
+and came through at 76 of 80. **The error was the dispatcher's in both cases, not
+the dispatch's, and both reported honestly that they were at the limit rather than
+concealing it.**
+
+That is the same pattern as this block's own record: every stop this session was
+correct, and the briefings were what needed fixing. A dispatch that reports being
+at its limit is behaving well; the cost is the dispatcher's to prevent.
+
+### One correction to the causal claim, from this block's measurements
+
+The budget is **a** cause, not the only one. Of the truncations measured here,
+several occurred *before* the cap was reached — 39, 50 and 54 tool uses against
+caps of 45 to 70 — and at least one fell in a pure reading phase with no edits
+made. A closing allowance therefore recovers the budget-exhaustion class and does
+nothing for the rest, which still needs the record-first change already adopted
+above. Both are worth having; neither is sufficient alone.
+
 ## Triggering situation
 
 An unattended hardening block, 2026-08-07/08, with four to five concurrent
