@@ -9,15 +9,15 @@ source: "Filed under phase-plan item R1.2 (gate integrity and residual closure) 
 due: 2026-09-07
 ---
 
-# Six unregistered suites fail standalone — file them, do not register them
-(filed as seven; one has since been deleted rather than repaired)
+# Five unregistered suites fail standalone — file them, do not register them
+(filed as seven; one has since been deleted rather than repaired, one repaired and registered)
 
 ## Description
 
 Of the 109 test files registered nowhere in `harness/scripts/verify.mjs`, **102
 pass and 7 fail** when run standalone. The 102 are being registered in reviewable
-batches (phase plan R1.1). These 7 were not, and this item is why. **Six remain**
-— see "One left the set by deletion" below.
+batches (phase plan R1.1). These 7 were not, and this item is why. **Five remain**
+— see "Two left the set" below.
 
 **Registering a red suite turns the gate red on arrival**, and a gate that is red
 for inherited reasons cannot distinguish a genuine regression from a pre-existing
@@ -25,7 +25,7 @@ one. That is the same failure this repository just spent a session recovering
 from in a different form. They get owners and repairs first; registration
 follows a repair, never precedes it.
 
-## One left the set by deletion (2026-08-08)
+## Two left the set (2026-08-08, 2026-08-09)
 
 `plugins/pipeline-core/lib/codex-host-plugin-list.test.mjs` **was deleted, not
 repaired and registered**: every case in it exercised `observeCodexRulesetSource`,
@@ -34,10 +34,18 @@ a function retired by PO decision and superseded (design
 §A.3, "Explicitly not revived"), so the suite followed the export out of the tree
 rather than becoming a repair task. Its exclusion entry in
 `harness/scripts/check-verify-suite-registration.mjs` was removed in the same
-commit. **Six** entries remain; this item's `id` and filename keep the original
-count because they are referenced by the append-only backlog ledger.
+commit.
 
-## The six remaining, grouped by what is actually wrong
+`plugins/pipeline-core/lib/windows-assurance-verify-registration.test.mjs` **left
+by repair, the route this item asks for** (2026-08-09): WAVR19 was repaired in
+`afa00fd` (24/24 standalone), and registration followed the repair in a separate
+commit — `TEST_SUITES` entry `windows-assurance-verify-registration-tests`,
+exclusion entry removed, product surface added. See "Group 3" below.
+
+**Five** entries remain; this item's `id` and filename keep the original count
+because they are referenced by the append-only backlog ledger.
+
+## The five remaining, grouped by what is actually wrong
 
 ### Group 1 — stale against a module surface that does not exist (2 remaining of 3)
 
@@ -72,10 +80,10 @@ These need reading, not fixing. Each asserts something about current behaviour
 and disagrees with it; whether the assertion or the behaviour is wrong is the
 whole question.
 
-### Group 3 — the one that pins the gate it is outside of (1)
+### Group 3 — the one that pins the gate it is outside of (0 remaining of 1, CLOSED 2026-08-09)
 
-`plugins/pipeline-core/lib/windows-assurance-verify-registration.test.mjs` passes
-23 of its 24 checks. The single failure is **`WAVR19 Verify fails before ordinary
+`plugins/pipeline-core/lib/windows-assurance-verify-registration.test.mjs` passed
+23 of its 24 checks when this item was filed. The single failure was **`WAVR19 Verify fails before ordinary
 suites with a named Windows-assurance registration step`**.
 
 **Read what that means before triaging it.** The suite exists to pin a property of
@@ -86,9 +94,15 @@ outside the gate, reporting that the gate does not do what it says: that is the
 same class as the duplicated registration line that stopped all 260 suites and
 was invisible for as long as nobody ran the command by hand.
 
+**Resolved.** The cause was in the suite's own fixture, not in the entry point:
+its hand-enumerated module list had gone stale against `verify.mjs`'s import
+graph, so the child died at import and the silence read as a failing property
+(`afa00fd`). The suite is now green and registered, which is exactly the order
+proposal item 4 below prescribes.
+
 ## An interaction with work in flight, recorded so it is not mistaken for a regression
 
-Two of the six touch files the R3 citation sweep is editing in the same phase:
+Two of the five touch files the R3 citation sweep is editing in the same phase:
 
 - `codex-isolated-critic-protected-preimage.test.mjs` asserts against
   `harness/review-protocol.md`, in which the sweep repairs **12 citations,
@@ -104,19 +118,19 @@ string it changes, the sweep updates it in the same commit and says so.
 
 ## Affected artifact
 
-The six files above; `harness/scripts/verify.mjs` only in the negative sense
+The five files above; `harness/scripts/verify.mjs` only in the negative sense
 that none of them may be registered there until repaired. Measurement and
 per-file evidence:
 `specs/sprint-phoenix-epic/evidence/unregistered-suite-classification.md`.
 
 ## Proposal
 
-**Owner: PO**, for assignment. Three repairs left, not six, because the groups
-differ (Group 1's third member is closed by deletion).
+**Owner: PO**, for assignment. Two repairs left, not five, because the groups
+differ (Group 1's third member is closed by deletion, Group 3 by repair).
 
-1. **Group 3 first.** It is a statement about the verify entry point and it is
-   currently false. Establish whether the property was removed deliberately or
-   lost; the answer decides whether the suite or the entry point is repaired.
+1. ~~**Group 3 first.** It is a statement about the verify entry point and it is
+   currently false.~~ **Done 2026-08-09** — the suite was stale, not the entry
+   point; repaired in `afa00fd` and registered thereafter.
 2. **Group 1 needs an archaeology pass, not an edit.** For each of the two left,
    determine from history whether the export was removed or never landed. Record
    the answer in this item before anyone changes a line.

@@ -2669,6 +2669,12 @@
       "member": "verify-topology-preflight-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:windows-assurance-verify-registration-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "windows-assurance-verify-registration-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:windows-private-state-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -3208,6 +3214,7 @@
         "verify-phase:harness/scripts/verify.mjs:verify-suite-registration-check",
         "verify-phase:harness/scripts/verify.mjs:verify-suite-registration-tests",
         "verify-phase:harness/scripts/verify.mjs:verify-topology-preflight-tests",
+        "verify-phase:harness/scripts/verify.mjs:windows-assurance-verify-registration-tests",
         "verify-phase:harness/scripts/verify.mjs:windows-private-state-tests",
         "verify-phase:harness/scripts/verify.mjs:workflow-runner-boundary-tests",
         "verify-phase:harness/scripts/verify.mjs:workflow-writer-preflight-tests",

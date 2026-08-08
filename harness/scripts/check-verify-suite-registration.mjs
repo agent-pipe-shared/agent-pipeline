@@ -133,13 +133,18 @@ export const REQUIRED_EXCLUSION_FIELDS = Object.freeze(["reason", "owner", "expi
  * (R1.2: filed, not fixed -- each is a debt with an owner, not a permanent
  * state). Do not add this checker's own two files here; see header.
  *
- * Six remain: plugins/pipeline-core/lib/codex-host-plugin-list.test.mjs left the
- * set on 2026-08-08 by deletion, not by repair -- its whole subject was
- * `observeCodexRulesetSource`, retired by PO decision and superseded (see
+ * Five remain, and the two departures left by different routes.
+ * plugins/pipeline-core/lib/codex-host-plugin-list.test.mjs left on 2026-08-08 by
+ * deletion, not by repair -- its whole subject was `observeCodexRulesetSource`,
+ * retired by PO decision and superseded (see
  * specs/sprint-phoenix-epic/design/bootstrap-origin-allowlist-and-codex-wsl-freshness.md
  * A.3), so the suite followed the export out of the tree.
+ * plugins/pipeline-core/lib/windows-assurance-verify-registration.test.mjs left on
+ * 2026-08-09 by repair (PHX-RED6, commit afa00fd, WAVR19 green) and is now a
+ * registered entry of verify.mjs's TEST_SUITES -- the outcome this list exists to
+ * reach.
  *
- * All six are owned by one filed backlog item --
+ * All five are owned by one filed backlog item --
  * backlog/items/2026-08-08-seven-unregistered-suites-are-red-and-must-not-be-registered.md
  * (`id: pipeline.seven-unregistered-suites-are-red`, owner: PO for
  * assignment) -- and every `expires` below is that item's own `due: 2026-09-07`.
@@ -170,11 +175,6 @@ export const EXCLUSIONS = Object.freeze({
   }),
   "plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs": Object.freeze({
     reason: "red (R1.2): AssertionError against harness/review-protocol.md",
-    owner: "PO",
-    expires: "2026-09-07",
-  }),
-  "plugins/pipeline-core/lib/windows-assurance-verify-registration.test.mjs": Object.freeze({
-    reason: "red (R1.2): WAVR19 fails; also itself an unregistered self-check of verify.mjs's own ordering",
     owner: "PO",
     expires: "2026-09-07",
   }),

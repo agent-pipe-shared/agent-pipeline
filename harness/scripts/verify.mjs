@@ -404,6 +404,7 @@ const TEST_SUITES = [
   { name: "critic-packet-governance-tests", file: join(libDir, "critic-packet-governance.test.mjs") },
   { name: "critic-dispatch-preflight-tests", file: join(pluginScriptsDir, "critic-dispatch-preflight.test.mjs") },
   { name: "windows-private-state-tests", file: join(libDir, "windows-private-state.test.mjs") },
+  { name: "windows-assurance-verify-registration-tests", file: join(libDir, "windows-assurance-verify-registration.test.mjs") },
   { name: "symlink-capability-tests", file: join(libDir, "symlink-capability.test.mjs") },
   { name: "runner-native-continuation-tests", file: join(libDir, "runner-native-continuation.test.mjs") },
   { name: "bootstrap-payload-budget-tests", file: join(libDir, "bootstrap-payload-budget.test.mjs") },

@@ -195,12 +195,11 @@ check("the checker's own two files are not declared exclusions", () => {
   assert.equal(Object.prototype.hasOwnProperty.call(EXCLUSIONS, "harness/scripts/check-verify-suite-registration.test.mjs"), false);
 });
 
-check("EXCLUSIONS is exactly the 6 surviving red suites from the classification report, each with reason, owner and expiry", () => {
+check("EXCLUSIONS is exactly the 5 surviving red suites from the classification report, each with reason, owner and expiry", () => {
   const expected = [
     "harness/lib/plan-spec-state-v2.test.mjs",
     "harness/scripts/recovery-bridge-approval.test.mjs",
     "plugins/pipeline-core/hooks/guard-git-phoenix.test.mjs",
-    "plugins/pipeline-core/lib/windows-assurance-verify-registration.test.mjs",
     "plugins/pipeline-core/scripts/afk-activation.test.mjs",
     "plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs",
   ];
