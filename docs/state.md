@@ -61,6 +61,8 @@ from the report.**
 | `fb918b8` `cc6cbec` `0ecd75e` `19aa65a` `36a5679` `14c7807` | The promotion refuses at plan time and names the missing line; absent and mismatched markers are distinct codes; the inspection stops offering a rebind that is known to refuse; the skill names both markers | onboarding-continuity 115/0, po-gate-authority 54/0, project-onboarding-v3 109/0 |
 | `36331b8` `05822c5` `0acee40` `7e1d4b2` `2a4e8d6` `783e62f` | The push threat model resolves at one fixed in-project path, so a consumer can reach `approve-push` at all; `materialize-push-threat-model` creates it and refuses to overwrite | pipeline-state 1/1, critical-human-proof-gate 20/0, authorization 36/0 |
 | `37c063b` `bdcc998` | `close-feature`'s commands and its `allowed-tools:` frontmatter, and the push preparation recipe, name paths a consumer has | pipeline-start-v3 green |
+| `028e545` `fdebd42` `b13c107` `6792990` `76ea1dc` | A check over all 753 tracked plugin files that fails when a shipped artifact names a source-only path, with 46 reasoned allowlist entries and unused-entry reporting; and the nine guard runtime messages that told an operator to run a command only this repository has, seven of them on the push path | consumer-safe-paths 9/0, guard-push 150/0, guard-git 219/0, guard-devplan 38/0, stop-suggest 250/0 |
+| `b844ea3` `77f57b9` | The `pipeline.verify-evidence.v0` producer that had a schema and consumers and none; and a repository's root commit as an ordinary Critic base, proven by a fixture with exactly one commit rather than by inventing a parent | verify-evidence-producer 6/0, critic-preflight 6/0, publication-gate-evidence 14/0 |
 
 **Four findings came from reading the code, not from a red suite — and that is the
 pattern of this block.** The suites were green every time.
@@ -117,13 +119,28 @@ diff despite the commit-when-green rule now being in `templates/prompts/goldfish
 The rule is in the template and it is not holding. Smaller work packages, not a
 sterner instruction, is the response being tried.
 
+**A third class the path sweep found, and it needs a product decision rather than a
+fix.** `close-feature` and `close-block` instruct a consumer to run
+`usage-ledger.mjs` and read `model-prices.json`; `stop-suggest` names
+`security-scan.mjs`. None of the three exists under `plugins/pipeline-core/`, so
+there is no consumer-correct path to correct *to*. Either they ship with the
+plugin, or the steps that need them are marked self-application-only the way
+`close-block:118` already marks its governance precheck. The check inventories
+them with that reason recorded; an allowlist entry is a note that a decision is
+owed, not the decision.
+
 **Open, and the human steps.** The verify registration for every suite this block
 adds is batched into one edit for the PO, because TP-3's override follows the
-`signature` mode and binds to an exact command that cannot be pre-authorized;
-`evidence/pending-verify-registrations.md` collects them. Still to build: the
-guard runtime messages that name `harness/scripts/`, the verify-evidence
-producer, the root-commit case, C1–C3 with the missing test level, the reset and
-discard paths, the kickoff re-entry, the repair map, SETUP-3/4 and SCRATCH-2.
+`signature` mode and binds to an exact command that cannot be pre-authorized.
+[`docs/pending-verify-registrations.md`](pending-verify-registrations.md) carries
+them — deliberately under `docs/` rather than `evidence/`, which the over-broad
+ignore rule would have swallowed, so the handover survives the block that
+produced it. Each listed suite has been run individually by the Elephant: "not
+registered" means "not run by the gate", never "not run".
+
+Still to build: C2 (a required preflight input path the shell classifier refuses
+to let a command name), the reset and discard paths, the kickoff re-entry, the
+repair map, SETUP-3/4 and SCRATCH-2, plus the two product decisions above.
 
 ## 2026-08-08 Nova GF-054 — the greenfield handover, hardened into the 0.5.4 local candidate
 
