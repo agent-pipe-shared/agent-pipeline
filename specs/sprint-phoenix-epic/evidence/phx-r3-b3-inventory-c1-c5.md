@@ -388,7 +388,10 @@ CLAUDE.md figure is 3A + 7 resolving (6B + 1 correct, from `:27` only) = 10.
 topic-bearing (the preceding clause names "role definitions", matching
 *Roles and boundaries*) but which does not appear in §II.1.3's named
 kind-A/kind-B lists at all. Plausible explanation: `:10`'s reference is a
-Markdown link, `` [`docs/operating-model.md`](docs/operating-model.md) §2 ``
+Markdown link — the label `` `docs/operating-model.md` `` followed by a
+target of the same path, then `§2`; written out here in parts because the
+link form itself would be resolved by `check-doc-contracts.mjs` against
+this file's own directory and reported as an untracked target
 — the automated scan's document-reference pattern may not have recognized
 the link form as a "document reference on the line," which would make this
 one more instance of the same class of miss the design already documents

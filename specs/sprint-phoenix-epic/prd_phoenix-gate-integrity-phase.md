@@ -134,18 +134,77 @@ a red.
 ### R3 — Residual closure
 
 **R3.1 — R3's B3 citation sweep.** PO decision APS 2026-08-07: all 39 live
-agent-facing artifacts, 233 citations, classes C1–C8, both language halves. The
-design writes replacement text for class C1 only and line coordinates for five
-files; **34 files / 196 citations exist as class counts, not as coordinates**,
-and the design says so in its own §II.5 tier 3. The sweep therefore opens with a
-re-measurement at the current tree — already dispatched — because the previous
-inventory was pinned at `84876f1` and the 0.5.3 merge has since rewritten much
-of `plugins/pipeline-core/**`.
+agent-facing artifacts, classes C1–C8, both language halves. The design writes
+replacement text for class C1 only and line coordinates for five files; 34 files
+existed as class counts, not as coordinates, and the design says so in its own
+§II.5 tier 3.
+
+**The re-measurement is done** (2026-08-08, at `84c5c0f`, in two dispatches):
+`evidence/phx-r3-b3-inventory-c1-c5.md` and
+`evidence/phx-r3-b3-inventory-c6-c8.md` carry the complete per-line inventory
+with a drafted replacement for every citation.
+
+| | Design (§II.1.3, pinned at `84876f1`) | Measured at `84c5c0f` |
+| --- | --- | --- |
+| C1–C5 | 144 | **145** |
+| C6–C8 | 89 | **93** |
+| **Total** | **233** | **238** |
+
+Every delta runs in the "found more" direction and each is explained by a named
+line. No file carries fewer citations than the design states. The C1–C5 grand
+total converging to within one of the design's figure is coincidental — the
+per-file deltas are real and offsetting, and the inventory says so rather than
+presenting the total as confirmation.
 
 Acceptance criteria AC-R3-1..AC-R3-7 already exist in the design and bind
 unchanged. AC-R3-1's method requirement is load-bearing and is repeated here
 because two prior measurements failed it: **search for the section sign, not for
 the string `operating-model`.**
+
+**Guard protection: none, and therefore no approval cost.** The inventory
+established from `GATE_STRENGTH_PATHS` and from the resolved live-plugin root —
+not by assumption — that no file in C6, C7 or C8, and not
+`harness/scripts/check-claude-md-lines.mjs`, is refused by any GS-* path-table
+rule, by GS-6, or by a protected-test-path rule in this checkout. The repository's
+own `plugins/pipeline-core/**` is a source tree here, not the enforcing copy.
+**The B3 sweep therefore adds zero human approvals.** The GS-6 half of that
+result is session- and host-configuration dependent and must be re-confirmed by
+whoever runs the sweep in their own session; the GS-* path-table half is a
+property of the files and is not.
+
+### R3.4 — The stage-0 fast path cites a definition that does not exist
+
+Found by the C1–C5 inventory while drafting replacements, and escalated here
+because it is not a citation-hygiene defect.
+
+`roles/elephant.md:35` carries EL-01's only exception — the rule that permits an
+interactive Elephant session to write production code itself. It scopes that
+exception "**EXCLUSIVELY** to the OM §3.3 definition … do not extend it by local
+judgment". `harness/checklists/small-session.md:38-40` invokes the same
+definition and links the anchor `stage-0-smallfix-definition`.
+
+**Neither exists.** `docs/operating-model.md` does not contain the criteria, and
+`git log -S "25 diff lines" -- docs/operating-model.md` returns nothing — the
+string has never appeared in that file's history, so this is not drift from a
+restructure. The anchor `stage-0-smallfix-definition` appears nowhere in the
+target either, and `check-doc-contracts.mjs` passes because it validates
+Markdown links and anchors, not `§N` prose citations (the design's §II.3.1 says
+exactly this about the checker's reach).
+
+The criteria therefore exist only as parentheticals inside the two sentences that
+cite the missing target — **and the two parentheticals disagree**:
+`roles/elephant.md` excludes "architecture/schema/public-API/test/guardrail-hook-CI/
+dependency/security-surface" changes; `harness/checklists/small-session.md`
+excludes "architecture/schema/API/test/guardrail". An agent cannot check its own
+eligibility against the named authority, and the two available restatements do
+not bound the same set.
+
+**Why this cannot be swept mechanically.** For roughly thirty citations in this
+class, "repoint to the correct heading" has no correct heading — there is nothing
+to point at. Repointing them to the nearest plausible section would convert a
+kind-A defect (dead number) into a kind-B defect (resolves, wrong topic), which is
+the outcome R3 exists to remove. **This needs a decision before the sweep reaches
+those lines** — see decision point 4.
 
 **R3.2 — R1's remaining acceptance criteria.** AC-R1-5, AC-R1-8 (the GS-4
 protected-test-path row) and the export-set half of AC-R1-1. AC-R1-8 touches the
@@ -249,6 +308,12 @@ whether one approval is formally sufficient. This phase's honest count:
 unbounded number of suite registrations. That is the number to beat, and it is
 recorded here so the Nova mechanism has something to be measured against.
 
+**Confirmed against measurement, not estimated.** The largest work stream in this
+phase — B3's sweep over 39 files and 238 citations, including the shipped plugin
+tree and one executable — was the open risk in this table. The inventory
+established that it is refused by nothing (§R3.1), so it adds **zero**. The four
+above are the whole cost.
+
 **Two observations from the 0.5.4 candidate, relevant to that mechanism.** It
 adds `authorize-critical`, a single human-terminal command that prepares and
 signs a critical-action request in one invocation — precisely the "collapse the
@@ -316,5 +381,20 @@ than being maintained here.
 
 1. **Approve this phase** — authorizes the first implementation dispatch.
 2. **Approve R4 separately** — it amends a bound acceptance criterion.
-3. **Confirm the approval budget** (four human commands) is acceptable for this
-   phase, or defer the two GS-class edits until the Nova mechanism lands.
+3. **Confirm the approval budget** (four human commands, now measurement-backed)
+   is acceptable for this phase, or defer the two GS-class edits until the Nova
+   mechanism lands.
+4. **Where the stage-0 fast-path definition lives (§R3.4).** The sweep is blocked
+   on this for ~30 citations. Four options, with what each costs:
+
+   | | Option | Cost | Consequence |
+   | --- | --- | --- | --- |
+   | **a** | Write the definition into `docs/operating-model.md` under a real anchor, then repoint the citations to it | one edit to the target document | Contradicts §II.6's boundary ("R3 repairs citations, it does not restructure the target") — so it is a deliberate, named exception to that boundary, not a slip |
+   | **b** — *recommended* | Designate `roles/elephant.md`'s statement canonical, repoint every citation there by heading title, and reduce `small-session.md` to a reference | edits inside B3's existing scope | Puts the definition where the rule it governs lives. Resolves the two disagreeing restatements into one. No change to the operating model |
+   | **c** | Repoint to the nearest plausible operating-model heading | cheapest | Manufactures ~30 kind-B citations. Rejected on its face, listed so the decision is auditable |
+   | **d** | Delete the criteria from the citing sentences and leave EL-01's exception unbounded | trivial | Removes the only bound on when an Elephant may write production code. Not recommended under any reading |
+
+   **Recommendation: (b).** It is the only option that both closes the citation
+   and fixes the substantive defect — a rule whose scope is defined twice, in two
+   different sets of words, in files that each say the definition is somewhere
+   else.
