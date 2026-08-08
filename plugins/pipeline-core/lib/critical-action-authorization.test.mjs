@@ -39,15 +39,22 @@ function keypair() {
 /**
  * A repository whose committed policy carries the trust anchor, plus the threat-model
  * file the subject digest binds. `anchor: null` writes the pre-anchor policy shape.
+ *
+ * SETUP-1: `trustAnchors` (plural, an array) switches the fixture to the v3 SET schema
+ * instead of v1's single `trustAnchor` -- `[]` is the "any well-formed key" posture,
+ * a populated array enforces membership. `anchor` and `trustAnchors` are mutually
+ * exclusive; `trustAnchors` wins if both are given a non-undefined value.
  */
-function fixture({ anchor, threatModelBody = "# threat model\n" } = {}) {
+function fixture({ anchor, trustAnchors, threatModelBody = "# threat model\n" } = {}) {
   const root = mkdtempSync(join(tmpdir(), "push-proof-"));
   roots.push(root);
   mkdirSync(join(root, "project"), { recursive: true });
   mkdirSync(join(root, "specs", "demo"), { recursive: true });
   writeFileSync(join(root, THREAT_MODEL_PATH), threatModelBody);
-  const policy = { schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push", "deploy", "publication"] };
-  if (anchor !== null) policy.trustAnchor = anchor;
+  const policy = trustAnchors === undefined
+    ? { schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push", "deploy", "publication"] }
+    : { schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: ["push", "deploy", "publication"], waivedKinds: [], trustAnchors };
+  if (trustAnchors === undefined && anchor !== null) policy.trustAnchor = anchor;
   writeFileSync(join(root, "project", "critical-human-proof.json"), `${JSON.stringify(policy, null, 2)}\n`);
   return {
     root,
@@ -316,6 +323,68 @@ try {
       trustAnchor: { keyReference: "po-key-1", publicKeySha256: "nope" },
     }, null, 2)}\n`);
     assert.equal(call(root, stateFor(approvalRecord({ key, threatModel }))).code, "CRITICAL-PROOF-POLICY-TRUST-ANCHOR-INVALID");
+  });
+
+  // ---- SETUP-1: the v3 trust-anchor SET, exercised end-to-end through the real guard-time
+  // authorization decision (nova-setup-bootstrap.md Sec5a). Every posture below builds a REAL
+  // Ed25519 keypair and a real signature, same discipline as the rest of this file.
+
+  // PPA21 -- posture 1: no set configured (v3, empty trustAnchors) accepts a brand-new key
+  // that never appeared in any committed document.
+  check("PPA21 an empty v3 trust-anchor set authorizes a brand-new key (any-key posture)", () => {
+    const key = keypair();
+    const { root, threatModel } = fixture({ trustAnchors: [] });
+    const result = call(root, stateFor(approvalRecord({ key, threatModel })));
+    assert.equal(result.code, "PUSH-PROOF-VERIFIED");
+    assert.equal(result.authorized, true);
+    // SETUP-1: the signer is recorded in this accepting case too, though nothing gated on it.
+    assert.equal(result.keyReference, "po-key-1");
+    assert.equal(result.publicKeySha256, key.publicKeySha256);
+  });
+
+  // PPA22 -- posture 2: a populated v3 set with the signing key as a member.
+  check("PPA22 a populated v3 trust-anchor set authorizes a member key", () => {
+    const key = keypair();
+    const { root, threatModel } = fixture({ trustAnchors: [{ keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 }] });
+    const result = call(root, stateFor(approvalRecord({ key, threatModel })));
+    assert.equal(result.authorized, true);
+    assert.equal(result.keyReference, "po-key-1");
+    assert.equal(result.publicKeySha256, key.publicKeySha256);
+  });
+
+  // PPA23 -- posture 3: a populated v3 set that does NOT include the signing key (same
+  // claimed keyReference as PPA3's single-anchor case, so this exercises membership on the
+  // actual key content, not merely on the label).
+  check("PPA23 a populated v3 trust-anchor set refuses a non-member key", () => {
+    const key = keypair();
+    const other = keypair();
+    const { root, threatModel } = fixture({ trustAnchors: [{ keyReference: "po-key-1", publicKeySha256: other.publicKeySha256 }] });
+    const result = call(root, stateFor(approvalRecord({ key, threatModel })));
+    assert.equal(result.authorized, false);
+    assert.equal(result.code, "PUSH-PROOF-TRUST-MISMATCH");
+  });
+
+  // PPA24 -- posture 4: a malformed key is refused in BOTH postures (any-key and set).
+  check("PPA24 a malformed public key is refused whether or not a trust-anchor set is configured", () => {
+    const key = keypair();
+    const { root: anyRoot, threatModel: anyThreatModel } = fixture({ trustAnchors: [] });
+    const anyRecord = approvalRecord({ key, threatModel: anyThreatModel });
+    anyRecord.criticalProof.proof.publicKey = "not a real key";
+    assert.equal(call(anyRoot, stateFor(anyRecord)).authorized, false);
+
+    const { root: setRoot, threatModel: setThreatModel } = fixture({ trustAnchors: [{ keyReference: "po-key-1", publicKeySha256: key.publicKeySha256 }] });
+    const setRecord = approvalRecord({ key, threatModel: setThreatModel });
+    setRecord.criticalProof.proof.publicKey = "not a real key";
+    assert.equal(call(setRoot, stateFor(setRecord)).authorized, false);
+  });
+
+  // PPA25 -- an empty v3 set does not bypass EXPIRY or BINDING: any-key relaxes WHICH key,
+  // nothing else the signed subject already governs.
+  check("PPA25 the any-key posture still enforces the signed binding and expiry", () => {
+    const key = keypair();
+    const { root, threatModel } = fixture({ trustAnchors: [] });
+    const record = approvalRecord({ key, threatModel });
+    assert.equal(call(root, stateFor(record), { remote: "origin" }).code, "PUSH-PROOF-BINDING-MISMATCH");
   });
 
   // ---- the release route ------------------------------------------------------------
