@@ -11,6 +11,7 @@
 | pipeline.adr-0051-follow-up-gaps-untracked | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.afk-assumption-mode | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.agent-definitions-pin-the-review-tier-model | open | defect | pipeline | 2026-08-07 | — |
+| pipeline.agent-talks-itself-out-of-the-pipeline | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.agent-tool-isolation-worktree-snapshots-stale-upstream-ref | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.backlog-delivery-status-reconciliation | in_progress | workflow-improvement | pipeline | 2026-07-25 | Nova A / issue #57 |
 | pipeline.backlog-ledger-closure-reason-misleading | closed | defect | pipeline | 2026-08-07 | — |
@@ -39,6 +40,7 @@
 | pipeline.guard-lifecycle-ready-rejects-plan-runtime-intent-argv | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.guard-reclassification-changed-what-a-signature-can-lift | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.handover-file-has-no-rotation-obligation | open | workflow-improvement | pipeline | 2026-08-07 | — |
+| pipeline.harness-classifier-blocks-authorized-onboarding-action | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.human-approval-ux-directory-clarity-and-single-command | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.human-authorization-prompts-ignore-the-configured-language-profile | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.lifecycle-guard-does-not-know-the-human-signing-commands | open | defect | pipeline | 2026-08-07 | — |
@@ -103,6 +105,6 @@
 
 ## Counts
 
-- open: 52
+- open: 54
 - in_progress: 21
 - closed: 22

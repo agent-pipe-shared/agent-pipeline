@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "938740cba9dfb5daa57b581986a91bc7c2dc627aa935dbc28f4b50f15cfca6c4"
+    "transitionHead": "4fc181e31a7c97d2cf474486b1c375aac0322444375cbdff5cb48a582951ce1e"
   },
   "counts": {
-    "open": 52,
+    "open": 54,
     "in_progress": 21,
     "closed": 22
   },
@@ -63,6 +63,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "Critic round 1 of the 0.5.3 candidate, 2026-08-07 — the Critic reported its own route violation from direct same-dispatch evidence; the cause was found in the shipped agent definitions afterwards."
+    },
+    {
+      "id": "pipeline.agent-talks-itself-out-of-the-pipeline",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Happy-path test of the local 0.5.4 build in a fresh empty directory, 2026-08-08, observed by the PO."
     },
     {
       "id": "pipeline.agent-tool-isolation-worktree-snapshots-stale-upstream-ref",
@@ -302,6 +310,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "PO, 2026-08-07: 'state wird aber auch hoffentlich nicht unendlich lang sondern irgendwann wieder leer :) wenn etwas dauerhaft als regel geschrieben wird, dann muss es in adrs'."
+    },
+    {
+      "id": "pipeline.harness-classifier-blocks-authorized-onboarding-action",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Happy-path test of the local 0.5.4 build in a fresh directory, 2026-08-08. Third measured instance of this class; the first two were on the push path."
     },
     {
       "id": "pipeline.human-approval-ux-directory-clarity-and-single-command",
