@@ -194,7 +194,66 @@ on reading the content.
 **One out-of-scope observation worth acting on:** `docs/deploy/README.md:8,23`
 still carry live `docs/operating-model.md §3.5` / `§3.1/§3.5` citations. It is in
 neither B3 inventory, so AC-P4's 39-file scope never reached it — the sweep is
-complete against its inventory and the inventory was incomplete.
+complete against its inventory and the inventory was incomplete. Filed
+(`pipeline.b3-inventory-missed-agent-facing-documents-under-docs-deploy`), and
+the item asks the useful question — what did the census's search bound exclude —
+rather than only repairing the two carriers.
+
+### Round-1 repairs: four of five findings closed, one cannot be (2026-08-08)
+
+**F2, AC-P2 half — DEMONSTRATED.** `evidence/phx-acp2-demonstration.txt`, written
+by `evidence/phx-acp2-demonstration-run.mjs`, not by hand: baseline exit 0 → an
+unregistered `*.test.mjs` under a registered root → exit 2 naming the file →
+fixture removed → exit 0, with `git status --porcelain` empty before and after.
+This needed no TP-3 window because it only adds and deletes a test file; it
+never touches `verify.mjs`.
+
+**F4 — DEMONSTRATED, bound to a B3 file this time.**
+`evidence/phx-acp5-demonstration.txt`: a link to a nonexistent file appended to
+`roles/elephant.md` (B3 class C1) makes `check-doc-contracts.mjs` exit 2 naming
+`roles/elephant.md:279`, and the restore returns it to exit 0 with the file
+byte-identical. The prior break artifact was an R1-rework one and was never
+bound to the swept set.
+
+**F3 — CLOSED, both halves.** The 36 undated items now carry `due:` on the
+repo's existing `created + 30` convention (`6944507`, dispatch
+`PHX-QG06-DUE`). The checker's half went further than dating
+(`5e7edfb`, dispatch `PHX-QG06-EXCL`): each exclusion carries reason, owner and
+expiry, and the checker now refuses a missing field, an unparseable date, and a
+**passed** expiry — and neither a malformed nor an expired entry suppresses its
+`UNREGISTERED` finding any more. That last part is what makes the list
+self-clearing rather than a parking lot; verified independently at 27/27.
+
+> **A dated obligation now lives in the gate, not in a reminder.** All seven
+> exclusions expire **2026-09-07**, the `due:` of the backlog item that owns
+> them. On 2026-09-08 the verify gate goes red unless that item is closed or
+> both dates are moved together. That is QG-06 working as designed, and it is
+> deliberately not a surprise.
+
+**F5 — recorded, and the real gap filed.** The rebind at `ece6041` was correct
+and its cause was already in this file; the Critic could not use that, because
+`state.md` was under review as an artifact rather than available as a source.
+What survives is genuine: the manifest schema has **no field** that could carry
+an amendment reason, so a correct rebind and a silent one look identical to
+anyone reading the manifest. Filed as
+`pipeline.immutable-manifest-entries-can-be-rebound-with-no-amendment-record`
+rather than closed by inventing an ad-hoc field while disposing of a minor
+finding.
+
+**F1 — NOT repairable, and not repaired.** Five commits, one of them mine from
+this session. History is not rewritten here and a revert would be a second
+orchestrator-authored source commit. It stands disclosed.
+
+**Two dispatch defects of mine, both in the briefings rather than the work.**
+`PHX-QG06-DUE` was given a 45-tool-use budget for 36 files that need a read and
+an edit each; it stopped exactly at the cap and returned the cause analysis,
+because this time the briefing carried an explicit report point. Re-briefed at
+120, it finished — but swept `project/pipeline-state.json` and
+`project/resume-hint.json` into its commit, which are local operator state and
+were never named as forbidden in that briefing. Both are now named in every
+dispatch's prohibitions. The index was restored to their pre-`6944507` content
+while the working tree kept the live runtime state, so nothing was rewritten and
+the push approval for `d5daebf` survived.
 
 ### The push gate cost four failed attempts. All four causes, so the next one does not
 
