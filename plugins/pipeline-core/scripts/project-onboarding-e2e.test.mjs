@@ -101,6 +101,12 @@ function run(script, args, cwd) {
   const status = main(args, {
     write: (chunk) => { stdout += chunk; },
     writePreview: () => {},
+    // Isolated from the ambient session's own environment: the onboarding
+    // CLI resolves its runner from CLAUDECODE when --runner is omitted
+    // (project-onboarding-v3.mjs's resolveActiveRunner), and this harness
+    // must exercise the historical Codex-shaped fixtures below regardless
+    // of which runner happens to be executing this test process itself.
+    env: {},
     deps: {
       spawnSync: cliGit,
       codexExecutable: process.execPath,
@@ -152,14 +158,20 @@ function makeReady(path) {
   assert.equal(run(onboarding, actionArgs(runtime.json), path).json.status, "restart-required");
   completeRuntimeReadback(path);
   const goal = "Recover one governed project";
+  // Matches the fixture's own CLI runner (run()'s isolated env resolves
+  // "codex"): the kickoff entry points inspect as the caller's runner, so
+  // a mismatch here would observe a different project state than the CLI
+  // calls above just produced.
   const kickoff = planProjectOnboardingKickoffV4({
     rootDir: path,
     goal,
+    runner: "codex",
     deps: { spawnSync: cliGit },
   });
   const ready = applyProjectOnboardingKickoffV4({
     rootDir: path,
     goal,
+    runner: "codex",
     planSha256: kickoff.planSha256,
     activate: true,
     deps: { spawnSync: cliGit },
@@ -221,14 +233,18 @@ test("read-only host-control paths receive portable host-managed onboarding", ()
     assert.equal(applied.json.runtime.status, "plugin-managed-unattested");
     assert.equal(applied.json.nextAction.kind, "collect-input");
     const goal = "Build one small HTML game from the supplied design";
+    // Matches the fixture's own CLI runner (run()'s isolated env resolves
+    // "codex") -- see the comment on the equivalent call in makeReady().
     const kickoff = planProjectOnboardingKickoffV4({
       rootDir: path,
       goal,
+      runner: "codex",
       deps: { spawnSync: cliGit },
     });
     const kickedOff = applyProjectOnboardingKickoffV4({
       rootDir: path,
       goal,
+      runner: "codex",
       planSha256: kickoff.planSha256,
       activate: true,
       deps: { spawnSync: cliGit },
