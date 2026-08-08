@@ -3,7 +3,7 @@
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 3
 > Audience: every agent role; primary consumers are Goldfish (submission), Elephant (gate decision), and Critic (trajectory check). Operationalizes the quality-gate / Definition-of-Done decision (`docs/adr/0005-quality-gates-dod.md`).
 
-**Precedence and enforcement:** as defined in `guardrails/global.md` (header). Principle: deterministic before probabilistic — machines gate first, LLM judgment reviews after (`docs/operating-model.md` §4).
+**Precedence and enforcement:** as defined in `guardrails/global.md` (header). Principle: deterministic before probabilistic — machines gate first, LLM judgment reviews after (`docs/operating-model.md`, *What the model protects* — rule 3).
 
 Rule IDs: `QG-xx`.
 
@@ -13,7 +13,7 @@ Rule IDs: `QG-xx`.
 
 - **MUST** pass the full deterministic chain `Format → Lint → Typecheck → Tests → Build` (blocking) before any submission counts and before any LLM review starts. The concrete checkers per project come from the calibration (<PROJECT_A>: pnpm chain; <PROJECT_B>: yamllint + `check_config`; <PROJECT_C>: build/compile gate) — the chain semantics are central and non-negotiable.
 - **MUST NOT** hand a diff to the Critic while deterministic gates are red, and the Critic **MUST NOT** flag anything CI/verify already enforces (lint, formatting, type errors) — no noise, no double work.
-- `verify` + evidence are invariant on ALL rigor levels — there is no path around the deterministic gates, not even for one-line fixes (`docs/operating-model.md` §3.3).
+- `verify` + evidence are invariant on ALL rigor levels — there is no path around the deterministic gates, not even for one-line fixes (`docs/operating-model.md`, *Rigor, risk and gates*).
 - **Why:** Machines find mechanical errors guaranteed and cheaply; LLM review is probabilistic and expensive — inverting the order wastes tokens and dilutes findings.
 - **Verification:** The verify script encodes the chain (QG-02); the gate decision (SDLC step 8) records green evidence before the Critic dispatch; Critic reports contain no CI-enforceable findings.
 
@@ -63,8 +63,8 @@ Rule IDs: `QG-xx`.
 - An implementation Goldfish **MUST NOT** create, modify, delete, or weaken the tests/checks that validate its own implementation — tests are the contract, not negotiating mass.
 - If a test is genuinely wrong or the spec contradicts it: trigger the stop condition and report — the test change is a SEPARATE task (separate dispatch/commit), and the Critic reviews test diffs specifically for weakening (threshold lowering, assertion removal, skips).
 - **MUST NOT** soften gates to get green: no skipping tests, no lowering thresholds, no `|| true`.
-- **Why:** Self-validation is the core failure mode of agentic coding — an agent that can edit its own examiner always passes (`docs/operating-model.md` §2.3).
-- **Verification:** Test-path protection during implementation tasks — **delivered:** PreToolUse hook `guard-testpath.mjs` blocks Edit/Write on paths named in a project's `.claude/guard-config.json` (`protectedTestPaths`); Bash/PowerShell writes to the same paths are NOT covered by this hook — those tool calls route only through `guard-git.mjs`, which does not check test paths (see the hook's own NOT-COVERED header); scope is deliberately a blanket per-path block, not automatic task-type detection (that distinction stays an open design question, out of scope for this delivery — see the hook's own header comment). The briefing's prohibitions field (canonical field 4, `docs/operating-model.md` §2.3) and Critic test-diff review remain the primary defense for that nuance.
+- **Why:** Self-validation is the core failure mode of agentic coding — an agent that can edit its own examiner always passes (`docs/operating-model.md`, *Roles and boundaries* — Goldfish row).
+- **Verification:** Test-path protection during implementation tasks — **delivered:** PreToolUse hook `guard-testpath.mjs` blocks Edit/Write on paths named in a project's `.claude/guard-config.json` (`protectedTestPaths`); Bash/PowerShell writes to the same paths are NOT covered by this hook — those tool calls route only through `guard-git.mjs`, which does not check test paths (see the hook's own NOT-COVERED header); scope is deliberately a blanket per-path block, not automatic task-type detection (that distinction stays an open design question, out of scope for this delivery — see the hook's own header comment). The briefing's prohibitions field (canonical field 4, `docs/operating-model.md`, *The lifecycle* — step 5, Dispatch; `roles/goldfish.md` GF-01) and Critic test-diff review remain the primary defense for that nuance.
 
 ## QG-05 — Gate honesty: document what a gate does NOT check
 

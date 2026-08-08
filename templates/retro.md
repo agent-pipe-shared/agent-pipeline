@@ -1,8 +1,8 @@
 <!--
 ═══════════════════════════════════════════════════════════════════════════
 TEMPLATE: Block/session retro — Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 3 · 2026-07-03
-Source of truth: docs/operating-model.md §7 (feedback loop: mandatory question,
-maturity metrics, growth rule, three-artifact archive), §3.2 step 11,
+Source of truth: docs/operating-model.md, *The lifecycle* (step 8, Close — feedback loop: mandatory question,
+maturity metrics, growth rule, three-artifact archive),
 policies/model-policy.md MP-20 (telemetry line), tooling-policy G1 (rule → artifact).
 Language note (ADR-0011): template structure/instructions in English; FILLED
 content in the project's human-facing language (default English).
@@ -19,7 +19,7 @@ HARD RULES (checkable)
 - The mandatory question (section 1) MUST be answered: a concrete item OR a
   deliberate "nothing". Silence is not an option.
   Why: the lessons loop is the only cross-session learning mechanism; without
-  the forced answer it silts up (operating-model §7).
+  the forced answer it silts up (`docs/operating-model.md`, *The lifecycle* — step 8, Close).
   Check: close report contains the answered question; empty section = ritual failed.
 - Every lesson MUST carry an escalation decision (section 3, column "Escalation").
   Why: a lesson without a landing artifact evaporates — the growth rule requires
@@ -34,7 +34,7 @@ HARD RULES (checkable)
 
 # Retro — {{PROJECT_NAME}} · {{SESSION_OR_BLOCK_ID}} · {{YYYY-MM-DD}}
 
-## 1. Elephant Retro (written by the session Elephant itself, operating-model §7)
+## 1. Elephant Retro (written by the session Elephant itself, `docs/operating-model.md`, *The lifecycle* — step 8, Close)
 
 Guiding question (verbatim): **"What should the Pipeline do better next time?"**
 
@@ -69,8 +69,8 @@ at Pipeline level) · **Pipeline way of working** → `workflow-improvement` ite
 ## 4. Closing Checks (part of the Close ritual)
 
 - [ ] Three-artifact archive done from rigor level 1 up: spec/problem statement ·
-      acceptance criteria · result/close report (NO chat logs — §7).
-- [ ] Handover file updated (merge-close gate, §6).
+      acceptance criteria · result/close report (NO chat logs — `docs/operating-model.md`, *The lifecycle*, step 8 Close).
+- [ ] Handover file updated (merge-close gate, `docs/operating-model.md`, *The lifecycle*, step 8 Close).
 - [ ] CLAUDE.md length gate green ({{LIMIT}} lines).
 - [ ] Telemetry line(s) written (MP-20).
 - [ ] Memory mirror consistent with the repo (conflict → repo wins).

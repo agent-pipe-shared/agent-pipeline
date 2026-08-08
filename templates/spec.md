@@ -1,7 +1,7 @@
 <!--
 ═══════════════════════════════════════════════════════════════════════════
 TEMPLATE: Spec (rigor level 1 / 2) — Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 3 · 2026-07-03
-Source of truth: docs/operating-model.md §3.2–§3.4 (SDLC, readiness check),
+Source of truth: docs/operating-model.md, *The lifecycle* (SDLC, readiness check),
 ADR-0004 (rigor levels + EARS), Rensin design-doc structure
 (Problem / Technical Plan / Alternatives / Detailed Implementation),
 EARS patterns, OpenSpec delta pattern.
@@ -42,10 +42,10 @@ HARD RULES (checkable)
 | Field | Value |
 |---|---|
 | Rigor level | {{1 or 2}} (rigor triage by Elephant) |
-| Risk class | {{low or medium or high}} (operating-model §4.2; when in doubt: higher) |
+| Risk class | {{low or medium or high}} (`harness/review-protocol.md` §2.1, *Trigger decision table*; when in doubt: higher) |
 | Status | {{draft / readiness-passed / implemented / superseded}} |
 | Date | {{YYYY-MM-DD}} |
-| Readiness check | {{result + date — MANDATORY for level 2, any architecture/guardrail/core-contract change, OR risk class high; optional at Elephant judgment otherwise (recommended for multi-file waves) — operating-model §3.4}} |
+| Readiness check | {{result + date — MANDATORY for level 2, any architecture/guardrail/core-contract change, OR risk class high; optional at Elephant judgment otherwise (recommended for multi-file waves) — `docs/operating-model.md`, *The lifecycle* (step 3)}} |
 | Related | {{ISSUE_OR_BACKLOG_REF}} · {{ADR_REFS_IF_ANY}} |
 
 ---
@@ -99,7 +99,7 @@ guardrails against future hallucinations and repeat debates.}}
 
 {{Enumerate EACH file to be created/changed/deleted. This list is the contract:
 the implementing Goldfish touches exactly these files; deviations must be
-reported, never silently built in (operating-model §2.3 report format, item 5).}}
+reported, never silently built in (`docs/operating-model.md`, *The lifecycle* — step 5, Dispatch; `roles/goldfish.md` GF-01 report format, item 5).}}
 
 | # | File (repo-relative) | Change | Rationale |
 |---|---|---|---|
@@ -123,8 +123,8 @@ SYSTEM SHALL …".}}
 - All acceptance criteria above have green, machine-run checks: each AC maps to
   a test or a named step of `{{VERIFY_COMMAND}}` (single verify script).
 - Evidence artifact is mandatory: script-written verify output + command +
-  exit code (never model-written prose — operating-model §4.1, P4).
-- Critic trigger per operating-model §4.2 matrix; for level 2 the Critic is
+  exit code (never model-written prose — `docs/operating-model.md`, *Evidence, review and recovery*, P4).
+- Critic trigger per `harness/review-protocol.md` §2.1, *Trigger decision table*; for level 2 the Critic is
   mandatory. Architecture/guardrail/security diffs additionally require the
   higher-capability review tier with the selected runner's usable native
   isolation. `claude -p --bare` remains a Claude runner adapter, not a global
@@ -140,7 +140,7 @@ SYSTEM SHALL …".}}
   finding-disposition requirement. The contractual read-only equivalent never
   claims OS isolation or effective provider model identity; if even it cannot
   be provided, stop at a PO course gate (canonical trigger wording:
-  operating-model §4.2 — the German text is authoritative).
+  `harness/review-protocol.md` §2.1, *Trigger decision table* — the German text is authoritative).
 - Level 2 only: spec updated BEFORE merge on any implementation deviation.
 - Canonical DoD checklist: `harness/definition-of-done.md` §2 (copy the block,
   strike items per the rigor matrix §4 there).

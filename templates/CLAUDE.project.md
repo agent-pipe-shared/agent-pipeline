@@ -1,7 +1,7 @@
 <!--
 ═══════════════════════════════════════════════════════════════════════════
 TEMPLATE: Project CLAUDE.md skeleton — Agent-Pipeline v0.1.0-draft
-Source of truth: docs/operating-model.md §5/§6/§7/§8, ADR-0011 (language).
+Source of truth: docs/operating-model.md, ADR-0011 (language).
 Motivating anti-pattern: a real project's CLAUDE.md grew to 578 lines
 against its own "keep it lean" rule.
 Language: English (agent-facing artifact, ADR-0011).
@@ -18,7 +18,7 @@ HARD RULES FOR THE RESULTING FILE (checkable)
   Why: CLAUDE.md is loaded into EVERY session; growth taxes every session start
   (a real project's CLAUDE.md reached 578 lines / >40k tokens).
   Check: `(Get-Content CLAUDE.md | Measure-Object -Line).Lines` — length gate in
-  the close ritual (operating-model §6); merge is blocked while the gate is red.
+  the close ritual (`docs/operating-model.md`, *The lifecycle* — step 8, Close); merge is blocked while the gate is red.
 - MUST NOT contain history, current-state prose, or roadmap prose (block 6).
   Why: three hand-maintained state copies demonstrably lied.
   Check: drift check in the close ritual; the only state pointer is the
@@ -57,7 +57,7 @@ HARD RULES FOR THE RESULTING FILE (checkable)
   (schema format: JSON; canonical example:
   `templates/pipeline.json.example` in the agent-pipeline repo).
 - Permissions/denies: committed `.claude/settings.json` (+ git-guard config).
-  Denies do NOT live in pipeline.json (operating-model §8).
+  Denies do NOT live in pipeline.json (`docs/operating-model.md`, *Project calibration and extensions*).
 - Single verify gate: `{{VERIFY_COMMAND e.g. "pnpm verify"}}` — the ONE command
   behind evidence duty. If it is red, nothing is done.
 
@@ -67,7 +67,7 @@ HARD RULES FOR THE RESULTING FILE (checkable)
 - Current state, open items, and next block live ONLY in
   `{{HANDOVER_FILE default: docs/state.md}}` (single versioned handover source).
 - MUST: read it at session start (bootstrap step 4); update it before session end
-  and after every merge (merge-completion gate, operating-model §6).
+  and after every merge (merge-completion gate, `docs/operating-model.md`, *The lifecycle* — step 8, Close).
 - MUST NOT: duplicate its content anywhere — HISTORY is append-only past;
   memory is a mirror only (repo wins on contradiction).
 
@@ -95,7 +95,7 @@ a note in the handover file.
   hooks/permissions, facts and conventions to this file, procedures to skills
   (tooling-policy G1). Record the trigger in the session's Lehren entry.
   Why: the lessons loop is the only cross-session learning mechanism
-  (operating-model §7). Check: each Lehren entry names the changed rule/artifact.
+  (`docs/operating-model.md`, *The lifecycle* — step 8, Close, retro). Check: each Lehren entry names the changed rule/artifact.
 - Counterweight: growing toward the line limit forces consolidation — merge,
   move to hooks/skills, or delete. The length gate stays green; "add a rule"
   never justifies breaking it.
@@ -112,7 +112,7 @@ a note in the handover file.
 Why: this file is paid for in every session; a real project's CLAUDE.md became a
 578-line context dump against its own "keep it lean" rule.
 Check: close-ritual drift check + length gate; a Critic flags violations on any
-diff touching this file (guardrail-relevant → risk class high, operating-model §4.2).
+diff touching this file (guardrail-relevant → risk class high, `harness/review-protocol.md` §2.1, *Trigger decision table*).
 
 <!-- Block 7 — Doc map. Where knowledge lands. One line per file. -->
 ## Doc map (knowledge lands in the responsible file)
