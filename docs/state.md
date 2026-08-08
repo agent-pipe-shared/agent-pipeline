@@ -64,6 +64,10 @@ from the report.**
 | `028e545` `fdebd42` `b13c107` `6792990` `76ea1dc` | A check over all 753 tracked plugin files that fails when a shipped artifact names a source-only path, with 46 reasoned allowlist entries and unused-entry reporting; and the nine guard runtime messages that told an operator to run a command only this repository has, seven of them on the push path | consumer-safe-paths 9/0, guard-push 150/0, guard-git 219/0, guard-devplan 38/0, stop-suggest 250/0 |
 | `b844ea3` `77f57b9` | The `pipeline.verify-evidence.v0` producer that had a schema and consumers and none; and a repository's root commit as an ordinary Critic base, proven by a fixture with exactly one commit rather than by inventing a parent | verify-evidence-producer 6/0, critic-preflight 6/0, publication-gate-evidence 14/0 |
 | `aacad51` `9a307fa` `7f6f522` | `sha256sum` admitted with more than one path; the inspection stops prescribing a rebind the planner rejected inside that same inspection; and the guard now admits every rebind action the inspection actually offers, reading the admitted set from the producing table rather than naming one code | guard-lifecycle-ready 68/0, project-onboarding-v3 109/0, recovery-contract 2/0, consumer-safe-paths 755 files / 46 entries |
+| `ce1a741` `59ac842` `6dc5f89` | The read-only Critic preflight exempted from the gate-strength shell lane, with the refusal now saying the match is on the file name in the command rather than on a detected write; and `guard-devplan` stops refusing the `scratch/` directory the Pipeline's own shipped instructions send every agent to | gate-strength 32/0, guard-devplan 41/0 |
+| `2dd0623` `e1b22c0` | `discard-feature`, the missing third command between "you may not point the feature elsewhere" and "you must ceremonially close it" — and the classifier that now recognises the state it writes. R1's own check passed because it asked `set-feature` afterwards and never asked the inspection | onboarding-continuity 124/0, inspection-contract 3/0, pipeline-state 1/1 |
+| `5f1b870` `52635f0` `70ace6b` `f154755` | The typed reset: a plan that derives its delete list from the resolved authority tier and the parsed calibration instead of recalling it, the runtime-projection targets runner-neutrally, provenance classified by projection kind rather than by `ownedKeys`, and an apply that is atomic or does not begin | project-reset 36/0, project-onboarding-v3 109/0, onboarding-continuity 124/0 |
+| `25ae385` `2a815ab` | The two protected-path edits no session can make, applied by the PO through one operator script that refuses on an ambiguous anchor, verifies after writing and restores on failure — seven `TEST_SUITES` registrations and `GST33`–`GST36` | verify.mjs parses, seven suites each green, gate-strength 36/0 |
 
 **Four findings came from reading the code, not from a red suite — and that is the
 pattern of this block.** The suites were green every time.
@@ -140,28 +144,61 @@ diff despite the commit-when-green rule now being in `templates/prompts/goldfish
 The rule is in the template and it is not holding. Smaller work packages, not a
 sterner instruction, is the response being tried.
 
-**A third class the path sweep found, and it needs a product decision rather than a
-fix.** `close-feature` and `close-block` instruct a consumer to run
+**A third class the path sweep found needed a product decision, and the PO made
+it (`8e905aa`).** `close-feature` and `close-block` instruct a consumer to run
 `usage-ledger.mjs` and read `model-prices.json`; `stop-suggest` names
-`security-scan.mjs`. None of the three exists under `plugins/pipeline-core/`, so
-there is no consumer-correct path to correct *to*. Either they ship with the
-plugin, or the steps that need them are marked self-application-only the way
-`close-block:118` already marks its governance precheck. The check inventories
-them with that reason recorded; an allowlist entry is a note that a decision is
-owed, not the decision.
+`security-scan.mjs`. All three exist — under `harness/`, which only this
+repository has — so there was no consumer-correct path to correct *to*. **Decision:
+ship them**, all three, under `plugins/pipeline-core/`. Two reasons, and the
+second decides more than this item: moving them into the plugin also puts them
+under the plugin's own change protection, which `harness/` does not have; and a
+security baseline is something every agent repo should get, so shipping the scan
+is the intended product — a floor the consumer extends — rather than scope creep.
+That makes "mark it self-application-only" the wrong answer, not the cheaper one.
+Recorded with the consequence to design for: the scan pulls an adapter chain that
+shells out to tools a consumer may not have, so a shipped baseline must degrade
+to a typed *adapter-unavailable*, never to a failed gate.
 
-**Open, and the human steps.** The verify registration for every suite this block
-adds is batched into one edit for the PO, because TP-3's override follows the
-`signature` mode and binds to an exact command that cannot be pre-authorized.
-[`docs/pending-verify-registrations.md`](pending-verify-registrations.md) carries
-them — deliberately under `docs/` rather than `evidence/`, which the over-broad
-ignore rule would have swallowed, so the handover survives the block that
-produced it. Each listed suite has been run individually by the Elephant: "not
-registered" means "not run by the gate", never "not run".
+**The two protected-path edits are done (`2a815ab`), and the route is now a
+tool.** `harness/scripts/apply-pending-protected-edits.mjs` applies both: it
+refuses before writing a byte if any anchor is missing or ambiguous, skips a step
+already applied, and **restores the original bytes if the affected suite does not
+reach its expected result** — so neither file can be left half-applied. Its
+`--preview` mode runs the transformed gate-strength suite from a removed sibling,
+so the operator learns whether the paste works *before* applying. Seven
+`TEST_SUITES` entries registered and each suite run green; gate-strength 32 → 36.
 
-Still to build: C2 (in flight), the reset and discard paths, the kickoff
-re-entry, the repair map, SETUP-3/4 and SCRATCH-2, plus the two product
-decisions above.
+**The deadlock item is closed end to end.** All three legs of
+`there-is-no-sanctioned-way-to-start-over` now exist except the third:
+`discard-feature` plus the classifier that recognises what it writes (R1), and the
+typed reset as plan + apply (R2, four commits). The reset's delete list is
+*derived* — authority tier and `calibration.handover` resolved from the project in
+front of it, runtime targets from the projection manifest unfiltered so it stays
+runner-neutral, and provenance keyed on the projection kind rather than on
+`ownedKeys`, because the three seeded Codex agent files carry owned keys and are
+nonetheless entirely Pipeline-written. The apply moves everything into one
+quarantine inside the root behind a flushed journal and removes it last, so an
+interrupted run is completed by re-running the identical command; every stage is
+enumerated in a frozen constant and pinned by its own fault-injection test.
+A keys-level entry is a typed refusal rather than an approximation — a file delete
+standing in for a key removal would destroy project-owned content, which is the
+harm the item was filed for.
+
+**Still to build:** R3 (the sanctioned second kickoff that retires the previous
+anchor, the one remaining leg), the repair map, SETUP-3/4, and the script move the
+PO just decided.
+
+**A defect this block's own dispatches produced, now filed** (`85eca12`):
+`rg -c 'one simple command|closed shell grammar|GUARD-PARSE-UNSUPPORTED'
+plugins/pipeline-core/agents templates/prompts roles` returns zero hits. The
+closed shell grammar, the protected test paths, and the fact that no override
+exists for plugin source in a source checkout are enforced at runtime and stated
+in no artifact any agent reads. An agent that does not know a rule does not fail
+once — it reads a refusal written for a different reader, forms a wrong theory and
+retries, spending the budget that is also its stop condition. The direction is the
+one this block earned twice: ship the obligations block, derived from the guard's
+own sources with a contract test asserting the two agree, rather than hand-copied
+into each briefing. Every dispatch since has carried it inline as an interim.
 
 ## 2026-08-08 Nova GF-054 — the greenfield handover, hardened into the 0.5.4 local candidate
 
