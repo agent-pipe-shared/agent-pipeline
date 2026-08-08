@@ -188,6 +188,49 @@ is the only file this follow-up touches, mirroring `guard-testpath.mjs`
 exactly, chat continuation and signature continuation both offered per the
 committed mode, same as every other HGO consumer.
 
+### 6. Amendment, 2026-08-08 (PO instruction): a cross-repository mutation is signature-liftable
+
+Decision 5 above placed `GUARD-CROSS-REPO-MUTATION` outside HGO's authority
+entirely: no signed capability could reach it, and the only route offered was
+`external-operator-required`. **That is reversed.** A cross-repository mutation
+is now liftable by a signed human override, through exactly the same
+always-attempt-consume-first mechanism every other liftable class uses.
+
+**The PO's reasoning, which supersedes the reasoning in Decision 5.** Cross-repo
+writes are occasionally *necessary* — a critical repair, an installation, a
+recovery that genuinely lives outside this project root. Decision 5's answer to
+that case was a human acting outside the ceremony altogether. Under
+[ADR-0061](0061-uniform-human-approval-ceremony.md) that is precisely the shape
+that is not allowed to exist: a gate whose only escape is the human stepping
+around the mechanism is not a gate, it is a mechanism people learn to bypass. If
+the action is legitimate when a human authorizes it, then the authorization
+belongs *inside* the ceremony — one command, `approve`, PIN — where it is
+commit-bound, one-use and audited.
+
+**Why Decision 5's argument does not survive contact with ADR-0061.** It reasoned
+from HGO's *implementation* — that its physical-identity model is scoped to one
+repository — to a *policy* conclusion, that the class must therefore be
+unreachable. That is backwards. The identity model bounds what the override can
+**prove**, not what a human may **decide**. What follows from it is that the
+override record must be honest about its scope for an out-of-root target; it does
+not follow that the human loses the decision.
+
+**What does not change, and is the whole point of keeping the ceremony.** The
+lift stays per-command and one-use; it stays bound to the exact command digest;
+it stays audited in the override ledger; it remains unreachable to an agent
+acting alone; and it remains subject to the committed `signature`/`chat` mode.
+Nothing here relaxes the guard union's absolute prohibitions — no force-push, no
+history rewrite, no deletion of a protected branch or tag, no skipped hooks —
+which are enforced by the union and are not override classes at all.
+
+**Companion instruction, same date.** `LIFTABLE_RULE_IDS` is not to remain
+`["GS-6"]` plus a `TP-` prefix while `guard-gate-strength.mjs` continues to name
+"the PO edits this file directly, outside an agent session" as the route for
+everything else. That is the same defect in another place: a rule the ceremony
+cannot reach, with a hand-editing escape hatch beside it. Every rule a human may
+legitimately lift is reachable through the ceremony, or it is genuinely
+unliftable and says so with no escape hatch — never both.
+
 ## Consequences
 
 **Positive.** One primitive (`po-approval-proof.mjs`), three consumers (push,
