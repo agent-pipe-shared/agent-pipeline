@@ -86,14 +86,45 @@ entry`, the mirror case this item's own filing created).
 
 The original figure supported "one episode somewhere in the middle of the
 history". The measured figure does not: a block starting at event **1** is not an
-episode inside the history, it is the whole inherited chain. The likely
-explanation is the ledger reconciliation performed during the 0.5.3 merge — the
-`main` chain was adopted wholesale and our items re-added on top
-(`reconcile-backlog-ledger.mjs --activate`, 31 transitions, `6a5331d`) — so the
-adopted events carry `evidence.commit` values from a history this branch cannot
-reach. **That is a repair on the reconciliation, not on 38 events.** It should be
-confirmed before it is acted on; it is recorded as the leading hypothesis, not as
-a finding.
+episode inside the history, it is the whole inherited chain.
+
+**Diagnosed 2026-08-08. The first hypothesis was wrong and is withdrawn.** It
+guessed at the 0.5.3 ledger reconciliation (`reconcile-backlog-ledger.mjs
+--activate`, `6a5331d`). Measurement refutes that:
+
+- The 38 failing events reference **8 distinct commits**, all of them
+  `baseline-migration`, `license-boundary-recovery`, `po-license-disposition`,
+  `close-retro`, `sentinel-backlog-recovery`, `sentinel-scope-extension` and
+  `sentinel-windows-containment` — the Sentinel era, not the 0.5.3 merge. The
+  merge's own 30 events (`35d9e11`) resolve fine, as do all 137 later ones.
+- **The decisive check is the date.** This repository's history begins with a root
+  commit `4375585` of 2026-07-09, *"chore: initial snapshot — Agent-Pipeline
+  v0.1.0"* — a snapshot that discarded whatever came before it. If the missing
+  SHAs were a rewritten prefix of *this* lineage they would predate that snapshot.
+  They do not: the events are dated **2026-07-20**, eleven days after it, and
+  1561 commits of this history sit around them.
+
+**So they are not a lost prefix of this history — they belong to a different
+one.** This is the public-core share repository; the ledger's early
+`evidence.commit` values are the SHAs of a parallel (private) lineage, carried
+across by the export along with the file. They will never resolve here, and no
+amount of repairing the ledger will make them.
+
+**That reframes the repair from data to definition.** The question is not "how do
+we fix 38 events" but "what does `evidence.commit` mean in a repository that was
+exported rather than grown". Two shapes, neither chosen here:
+
+1. **Re-anchor** each pre-export event to the corresponding public-core commit —
+   requires that a 1:1 correspondence exists and can be established, which nobody
+   has verified.
+2. **Teach the checker the boundary** — pre-export evidence is unverifiable *by
+   construction*, not broken, and should be reported as such rather than as a
+   failure. This keeps the assertion meaningful for everything after the export,
+   which is the part where a dangling reference is a real defect.
+
+Option 2 is the honest one if no correspondence exists; option 1 is better if one
+does. **Establishing whether the correspondence exists is the next step, and it is
+a measurement, not a decision.**
 
 **A consequence nobody had connected to this suite.** `backlog/index.json` and
 `backlog/STATUS.md` are generator output, and the generator (`--write`) fails
