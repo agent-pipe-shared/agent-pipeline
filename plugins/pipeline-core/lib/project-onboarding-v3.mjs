@@ -3909,6 +3909,7 @@ export function planProjectOnboardingKickoffV4({
   return planOnboardingKickoff({
     rootDir: observed.root,
     goal,
+    runner,
     repositoryCapability: observed.repository.mode,
     onboardingScript: ONBOARDING_SCRIPT,
     spawn: fs.spawnSync,
@@ -3932,6 +3933,7 @@ export function applyProjectOnboardingKickoffV4({
   const plan = reconstructOnboardingKickoffPlan({
     rootDir: observed.root,
     goal,
+    runner,
     repositoryCapability: observed.repository.mode,
     onboardingScript: ONBOARDING_SCRIPT,
     spawn: fs.spawnSync,
@@ -3946,31 +3948,38 @@ export function applyProjectOnboardingKickoffV4({
   return v4Inspection(rootDir, fs, "onboarding", runner);
 }
 
+// The promotion entry points inspect on the caller's behalf exactly as their
+// kickoff siblings above do, and were missing the same `runner` parameter
+// those siblings' comment already warns about: promotion is unreachable for
+// every non-Codex runner without it (backlog:
+// kickoff-apply-action-drops-the-runner-the-plan-was-made-for, mechanism A;
+// ADR-0051, ADR-0057 R1). The default stays `"codex"` for the same reason.
 export function planProjectOnboardingKickoffPromotionV4({
-  rootDir = process.cwd(), profile, featureId, planPath, prdPath, specPath, designInputPath, deps: overrides = {},
+  rootDir = process.cwd(), profile, featureId, planPath, prdPath, specPath, designInputPath,
+  runner = "codex", deps: overrides = {},
 } = {}) {
   const fs = deps(overrides);
-  const observed = v4Inspection(rootDir, fs, "onboarding");
+  const observed = v4Inspection(rootDir, fs, "onboarding", runner);
   if (observed.status !== "ready" || observed.continuity.status !== "valid") return observed;
   return planOnboardingKickoffPromotion({
-    rootDir: observed.root, profile, featureId, planPath, prdPath, specPath, designInputPath,
+    rootDir: observed.root, profile, featureId, planPath, prdPath, specPath, designInputPath, runner,
     repositoryCapability: observed.repository.mode, onboardingScript: ONBOARDING_SCRIPT, spawn: fs.spawnSync,
   });
 }
 
 export function applyProjectOnboardingKickoffPromotionV4({
   rootDir = process.cwd(), profile, featureId, planPath, prdPath, specPath, designInputPath,
-  planSha256, activate = false, deps: overrides = {},
+  runner = "codex", planSha256, activate = false, deps: overrides = {},
 } = {}) {
   const fs = deps(overrides);
-  const observed = v4Inspection(rootDir, fs, "onboarding");
+  const observed = v4Inspection(rootDir, fs, "onboarding", runner);
   if (observed.status !== "ready" || observed.continuity.status !== "valid") return observed;
   const plan = reconstructOnboardingKickoffPromotionPlan({
-    rootDir: observed.root, profile, featureId, planPath, prdPath, specPath, designInputPath,
+    rootDir: observed.root, profile, featureId, planPath, prdPath, specPath, designInputPath, runner,
     repositoryCapability: observed.repository.mode, onboardingScript: ONBOARDING_SCRIPT, spawn: fs.spawnSync,
   });
   applyOnboardingKickoffPromotion({
     plan, expectedPlanSha256: planSha256, activate, deps: { ...overrides, spawn: fs.spawnSync },
   });
-  return v4Inspection(rootDir, fs, "onboarding");
+  return v4Inspection(rootDir, fs, "onboarding", runner);
 }

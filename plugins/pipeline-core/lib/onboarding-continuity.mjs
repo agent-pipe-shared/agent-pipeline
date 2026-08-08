@@ -106,7 +106,7 @@ const SESSION_CLEANUP_PRIVATIZATION_CONFIRMATION_BASENAME = "session-cleanup-pri
 const SHA256_RE = /^[a-f0-9]{64}$/u;
 const PLAN_KEYS = new Set([
   "schema", "root", "repositoryCapability", "goal", "goalSha256", "calibration",
-  "targets", "transactionSha256", "onboardingScript", "planSha256", "applyAction",
+  "targets", "transactionSha256", "onboardingScript", "runner", "planSha256", "applyAction",
 ]);
 const TARGET_KEYS = {
   state: new Set(["path", "beforeSha256", "afterSha256", "value"]),
@@ -117,7 +117,7 @@ const TARGET_KEYS = {
 };
 const PROMOTION_PLAN_KEYS = new Set([
   "schema", "root", "repositoryCapability", "profile", "feature", "authority",
-  "kickoff", "targets", "transactionSha256", "onboardingScript", "planSha256", "applyAction",
+  "kickoff", "targets", "transactionSha256", "onboardingScript", "runner", "planSha256", "applyAction",
 ]);
 const PROMOTION_TARGET_KEYS = {
   state: new Set(["path", "beforeSha256", "afterSha256", "value"]),
@@ -2980,18 +2980,29 @@ function initialContinuity({ featureId, prdPath, prdSha256, specPath, specSha256
   };
 }
 
-function applyAction(onboardingScript, root, goal, planSha256) {
+/**
+ * The one construction site for a plan-bound apply action: every such action
+ * re-invokes the onboarding-script CLI, verbatim, under whichever runner its
+ * plan was produced for. `runner` is a required argument here, not a default,
+ * so a caller that forgets to thread it through fails at construction time --
+ * a hand-written argv literal copied for a new plan/apply pair cannot silently
+ * inherit an omission the way `applyAction`/`promotionApplyAction` once did
+ * (backlog: kickoff-apply-action-drops-the-runner-the-plan-was-made-for;
+ * ADR-0051, ADR-0057 R1).
+ */
+function planBoundApplyAction(onboardingScript, commandArgv, optionArgv, runner, planSha256, schema) {
+  if (typeof runner !== "string" || runner.length === 0) {
+    fail("APPLY-ACTION-RUNNER-REQUIRED", "a plan-bound apply action cannot be constructed without the runner its plan was produced under");
+  }
   return {
     kind: "command",
     executable: "node",
     argv: [
       onboardingScript,
-      "kickoff",
-      "apply",
-      "--root",
-      root,
-      "--goal",
-      goal,
+      ...commandArgv,
+      ...optionArgv,
+      "--runner",
+      runner,
       "--plan-sha256",
       planSha256,
       "--activate",
@@ -2999,10 +3010,21 @@ function applyAction(onboardingScript, root, goal, planSha256) {
     mutation: true,
     requiresConfirmation: true,
     expected: {
-      schema: "pipeline.project-onboarding.v4",
+      schema,
       statuses: ["ready"],
     },
   };
+}
+
+function applyAction(onboardingScript, root, goal, planSha256, runner) {
+  return planBoundApplyAction(
+    onboardingScript,
+    ["kickoff", "apply"],
+    ["--root", root, "--goal", goal],
+    runner,
+    planSha256,
+    "pipeline.project-onboarding.v4",
+  );
 }
 
 function planBinding(plan) {
@@ -3016,6 +3038,11 @@ function planBinding(plan) {
     targets: plan.targets,
     transactionSha256: plan.transactionSha256,
     onboardingScript: plan.onboardingScript,
+    // Part of the binding, not just the applyAction argv: two plans that
+    // differ only in which runner they were produced for must not collide on
+    // the same digest, or an apply reconstructed under a different runner
+    // would validate against a plan it does not match (RUNNERNEUT-1).
+    runner: plan.runner,
   };
 }
 
@@ -3038,6 +3065,7 @@ function validatePlan(plan) {
     || !SHA256_RE.test(plan.transactionSha256 ?? "")
     || !SHA256_RE.test(plan.planSha256 ?? "")
     || !isAbsolute(plan.onboardingScript ?? "")
+    || typeof plan.runner !== "string" || plan.runner.length === 0
     || validateKickoffGoal(plan.goal) !== plan.goal
     || sha256(Buffer.from(plan.goal, "utf8")) !== plan.goalSha256
     || !exactKeys(plan.calibration, new Set(["path", "sha256"]))
@@ -3128,7 +3156,7 @@ function validatePlan(plan) {
     fail("KICKOFF-PLAN-INVALID", "kickoff transaction binding is invalid");
   }
   if (canonicalJson(plan.applyAction) !== canonicalJson(
-    applyAction(plan.onboardingScript, plan.root, plan.goal, plan.planSha256),
+    applyAction(plan.onboardingScript, plan.root, plan.goal, plan.planSha256, plan.runner),
   )) {
     fail("KICKOFF-PLAN-INVALID", "kickoff apply action is invalid");
   }
@@ -3149,6 +3177,7 @@ function validatePlan(plan) {
 function buildOnboardingKickoffPlan({
   rootDir,
   goal,
+  runner = "codex",
   repositoryCapability = "local",
   onboardingScript = DEFAULT_ONBOARDING_SCRIPT,
   spawn = defaultGitSpawn,
@@ -3279,12 +3308,13 @@ function buildOnboardingKickoffPlan({
     targets,
     transactionSha256,
     onboardingScript,
+    runner,
   };
   const planSha256 = canonicalSha256(binding);
   const plan = {
     ...binding,
     planSha256,
-    applyAction: applyAction(onboardingScript, observed.root, normalizedGoal, planSha256),
+    applyAction: applyAction(onboardingScript, observed.root, normalizedGoal, planSha256, runner),
   };
   validatePlan(plan);
   if (replay) {
@@ -3316,21 +3346,18 @@ export function reconstructOnboardingKickoffPlan(options = {}) {
   return buildOnboardingKickoffPlan({ ...options, allowAppliedReplay: true });
 }
 
-function promotionApplyAction(onboardingScript, root, profile, featureId, planPath, prdPath, specPath, designInputPath, planSha256) {
-  return {
-    kind: "command",
-    executable: "node",
-    argv: [
-      onboardingScript, "kickoff", "promote", "apply", "--root", root,
-      "--profile", profile, "--id", featureId, "--plan-path", planPath,
-      "--prd-path", prdPath, "--spec-path", specPath,
-      "--design-input-path", designInputPath,
-      "--plan-sha256", planSha256, "--activate",
+function promotionApplyAction(onboardingScript, root, profile, featureId, planPath, prdPath, specPath, designInputPath, planSha256, runner) {
+  return planBoundApplyAction(
+    onboardingScript,
+    ["kickoff", "promote", "apply"],
+    [
+      "--root", root, "--profile", profile, "--id", featureId, "--plan-path", planPath,
+      "--prd-path", prdPath, "--spec-path", specPath, "--design-input-path", designInputPath,
     ],
-    mutation: true,
-    requiresConfirmation: true,
-    expected: { schema: "pipeline.project-onboarding.v4", statuses: ["ready"] },
-  };
+    runner,
+    planSha256,
+    "pipeline.project-onboarding.v4",
+  );
 }
 
 function promotionBinding(plan) {
@@ -3345,6 +3372,9 @@ function promotionBinding(plan) {
     targets: plan.targets,
     transactionSha256: plan.transactionSha256,
     onboardingScript: plan.onboardingScript,
+    // See planBinding's identical comment: a promotion plan and its apply must
+    // not validate under a runner they were not produced for.
+    runner: plan.runner,
   };
 }
 
@@ -3502,6 +3532,7 @@ function validatePromotionPlan(plan) {
     || !new Set(["local", "host-managed"]).has(plan.repositoryCapability)
     || !isAbsolute(plan.onboardingScript ?? "") || !SHA256_RE.test(plan.planSha256 ?? "")
     || !SHA256_RE.test(plan.transactionSha256 ?? "")
+    || typeof plan.runner !== "string" || plan.runner.length === 0
     || !exactKeys(plan.feature, new Set(["id", "planPath"]))
     || !exactKeys(plan.authority, new Set(["prd", "spec", "designInput"]))
     || !exactKeys(plan.authority.prd, new Set(["path", "sha256"]))
@@ -3591,7 +3622,7 @@ function validatePromotionPlan(plan) {
   if (canonicalSha256(promotionBinding(plan)) !== plan.planSha256
     || canonicalJson(plan.applyAction) !== canonicalJson(promotionApplyAction(
       plan.onboardingScript, plan.root, input.profile, input.featureId, input.planPath,
-      input.prdPath, input.specPath, input.designInputPath, plan.planSha256,
+      input.prdPath, input.specPath, input.designInputPath, plan.planSha256, plan.runner,
     ))) {
     fail("KICKOFF-PROMOTION-PLAN", "promotion action binding is invalid");
   }
@@ -3600,6 +3631,7 @@ function validatePromotionPlan(plan) {
 
 function buildKickoffPromotionPlan({
   rootDir, profile, featureId, planPath, prdPath, specPath, designInputPath,
+  runner = "codex",
   repositoryCapability = "local", onboardingScript = DEFAULT_ONBOARDING_SCRIPT,
   spawn = defaultGitSpawn, allowAppliedReplay = false,
 } = {}) {
@@ -3648,9 +3680,10 @@ function buildKickoffPromotionPlan({
         ...(entry.cleanupBinding === undefined ? {} : { cleanupBinding: structuredClone(entry.cleanupBinding) }),
       },
       transactionSha256: entry.transactionSha256, onboardingScript,
+      runner,
     };
     const planSha256 = canonicalSha256(binding);
-    const plan = { ...binding, planSha256, applyAction: promotionApplyAction(onboardingScript, observed.root, input.profile, input.featureId, input.planPath, input.prdPath, input.specPath, input.designInputPath, planSha256) };
+    const plan = { ...binding, planSha256, applyAction: promotionApplyAction(onboardingScript, observed.root, input.profile, input.featureId, input.planPath, input.prdPath, input.specPath, input.designInputPath, planSha256, runner) };
     validatePromotionPlan(plan);
     return plan;
   }
@@ -3728,11 +3761,12 @@ function buildKickoffPromotionPlan({
       ...(cleanupBindingTarget === null ? {} : { cleanupBinding: cleanupBindingTarget }),
     },
     transactionSha256, onboardingScript,
+    runner,
   };
   const planSha256 = canonicalSha256(binding);
   const plan = {
     ...binding, planSha256,
-    applyAction: promotionApplyAction(onboardingScript, observed.root, input.profile, input.featureId, input.planPath, input.prdPath, input.specPath, input.designInputPath, planSha256),
+    applyAction: promotionApplyAction(onboardingScript, observed.root, input.profile, input.featureId, input.planPath, input.prdPath, input.specPath, input.designInputPath, planSha256, runner),
   };
   validatePromotionPlan(plan);
   return plan;

@@ -2583,6 +2583,7 @@ test("public kickoff plan/apply carries goal as one argv element and reconstruct
     assert.deepEqual(planned.result.applyAction.argv, [
       ONBOARDING_SCRIPT,
       "kickoff", "apply", "--root", path, "--goal", goal,
+      "--runner", "codex",
       "--plan-sha256", planned.result.planSha256, "--activate",
     ]);
     assert.match(renderProjectOnboardingAction(planned.result.applyAction), /'Ship safely; keep \$\(touch nope\) as text'/u);
@@ -2890,6 +2891,193 @@ test("the kickoff CLI applies its closed runner value set: claude is honoured, u
       assert.equal(refused.result, null);
     }
     assert.deepEqual(names(path), before);
+  } finally { dispose(path); }
+});
+
+// Mechanism A (backlog: kickoff-apply-action-drops-the-runner-the-plan-was-
+// made-for). Before this fix neither promotion entry point took a `runner`
+// at all and both inspected as the hardcoded default `codex`, so promotion
+// was unreachable for every non-Codex runner: a Claude project was told it
+// owed a Codex attestation and the promotion aborted before reading anything.
+function claudePromotedRoot(path, deps = fakeDeps) {
+  initializeClaudeOnboardedRoot(path, deps);
+  const goal = "Promote under the claude identity";
+  const planned = planProjectOnboardingKickoffV4({ rootDir: path, goal, runner: "claude", deps });
+  applyProjectOnboardingKickoffV4({
+    rootDir: path, goal, runner: "claude", planSha256: planned.planSha256, activate: true, deps,
+  });
+  mkdirSync(join(path, "specs", "claude-promoted"), { recursive: true });
+  const prdPath = "specs/claude-promoted/prd_claude_promoted.md";
+  const specPath = "specs/claude-promoted/spec.md";
+  const designInputPath = "specs/claude-promoted/design-input.md";
+  writeFileSync(join(path, specPath), "# Claude-promoted specification\n");
+  const specSha256 = sha256(readFileSync(join(path, specPath)));
+  writeFileSync(join(path, prdPath), [
+    "<!-- po-language: en -->",
+    `<!-- technical-spec-sha256: ${specSha256} -->`,
+    "",
+    "# Claude-promoted product requirements",
+    "",
+  ].join("\n"));
+  writeFileSync(join(path, designInputPath), "# Claude-promoted design input\n");
+  return {
+    rootDir: path, profile: "feature", featureId: "claude-promoted-work", planPath: prdPath,
+    prdPath, specPath, designInputPath, deps,
+  };
+}
+
+test("a claude-onboarded root completes kickoff promotion and observes the project as claude, not codex", () => {
+  const path = root();
+  try {
+    const args = claudePromotedRoot(path);
+    const plan = planProjectOnboardingKickoffPromotionV4({ ...args, runner: "claude" });
+    assert.equal(plan.schema, "pipeline.codex-onboarding-kickoff-promotion-plan.v1");
+    assert.equal(plan.runner, "claude");
+    const runnerIndex = plan.applyAction.argv.indexOf("--runner");
+    assert.notEqual(runnerIndex, -1);
+    assert.equal(plan.applyAction.argv[runnerIndex + 1], "claude");
+    const applied = applyProjectOnboardingKickoffPromotionV4({ ...args, runner: "claude", planSha256: plan.planSha256, activate: true });
+    assert.equal(applied.status, "ready");
+    assert.equal(applied.runner, "claude");
+    assert.equal(applied.continuity.status, "valid");
+
+    // The other half of the same contract: omission is never promoted to this
+    // runner. Without an explicit runner the promotion entry points still
+    // inspect as Codex, which on this claude-onboarded root is the historical
+    // Codex-only dead end that made mechanism A a blocker.
+    const substituted = planProjectOnboardingKickoffPromotionV4({ ...args, runner: undefined });
+    assert.equal(substituted.runner, "codex");
+    assert.equal(substituted.status, "runtime-attestation-required");
+  } finally { dispose(path); }
+});
+
+test("codex kickoff promotion plan and apply are unchanged whether the runner is omitted or explicit", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path); clearRuntimeBarrier(path, barrier);
+    completeKickoff(path, "Codex promotion regression pin");
+    mkdirSync(join(path, "specs", "codex-promoted"), { recursive: true });
+    const prdPath = "specs/codex-promoted/prd_codex_promoted.md";
+    const specPath = "specs/codex-promoted/spec.md";
+    const designInputPath = "specs/codex-promoted/design-input.md";
+    writeFileSync(join(path, specPath), "# Codex-promoted specification\n");
+    const specSha256 = sha256(readFileSync(join(path, specPath)));
+    writeFileSync(join(path, prdPath), [
+      "<!-- po-language: en -->",
+      `<!-- technical-spec-sha256: ${specSha256} -->`,
+      "",
+      "# Codex-promoted product requirements",
+      "",
+    ].join("\n"));
+    writeFileSync(join(path, designInputPath), "# Codex-promoted design input\n");
+    const args = {
+      rootDir: path, profile: "feature", featureId: "codex-promoted-work", planPath: prdPath,
+      prdPath, specPath, designInputPath, deps: fakeDeps,
+    };
+    const omitted = planProjectOnboardingKickoffPromotionV4(args);
+    const explicit = planProjectOnboardingKickoffPromotionV4({ ...args, runner: "codex" });
+    assert.equal(omitted.schema, "pipeline.codex-onboarding-kickoff-promotion-plan.v1");
+    assert.deepEqual(explicit, omitted);
+    const applied = applyProjectOnboardingKickoffPromotionV4({ ...args, planSha256: omitted.planSha256, activate: true });
+    assert.equal(applied.status, "ready");
+    assert.equal(applied.runner, "codex");
+  } finally { dispose(path); }
+});
+
+// Mechanism B / direction 1 (same backlog item): the runner now participates
+// in the plan digest, so a plan produced for one runner cannot validate an
+// apply reconstructed for another -- the digest mismatch is refused, not
+// silently substituted.
+test("a kickoff plan produced for one runner does not validate an apply for another", () => {
+  const path = root();
+  try {
+    // A root onboarded natively as codex (barrier cleared) reaches
+    // kickoff-required for both runners: codex through its own barrier,
+    // claude because it never needed one. That makes this a genuine digest
+    // comparison, not an earlier observation-layer refusal.
+    const barrier = initializeRestartRequiredRoot(path); clearRuntimeBarrier(path, barrier);
+    const goal = "Cross-runner kickoff digest mismatch";
+    const claudePlanned = planProjectOnboardingKickoffV4({ rootDir: path, goal, runner: "claude", deps: fakeDeps });
+    assert.equal(claudePlanned.schema, "pipeline.codex-onboarding-kickoff-plan.v1");
+    assert.throws(() => applyProjectOnboardingKickoffV4({
+      rootDir: path, goal, runner: "codex", planSha256: claudePlanned.planSha256, activate: true, deps: fakeDeps,
+    }), /kickoff plan digest/u);
+    assert.equal(inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, runner: "claude" }).status, "kickoff-required");
+    const applied = applyProjectOnboardingKickoffV4({
+      rootDir: path, goal, runner: "claude", planSha256: claudePlanned.planSha256, activate: true, deps: fakeDeps,
+    });
+    assert.equal(applied.status, "ready");
+    assert.equal(applied.runner, "claude");
+  } finally { dispose(path); }
+});
+
+test("a promotion plan produced for one runner does not validate an apply for another", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path); clearRuntimeBarrier(path, barrier);
+    completeKickoff(path, "Cross-runner promotion digest mismatch");
+    mkdirSync(join(path, "specs", "cross-runner"), { recursive: true });
+    const prdPath = "specs/cross-runner/prd_cross_runner.md";
+    const specPath = "specs/cross-runner/spec.md";
+    const designInputPath = "specs/cross-runner/design-input.md";
+    writeFileSync(join(path, specPath), "# Cross-runner specification\n");
+    const specSha256 = sha256(readFileSync(join(path, specPath)));
+    writeFileSync(join(path, prdPath), [
+      "<!-- po-language: en -->",
+      `<!-- technical-spec-sha256: ${specSha256} -->`,
+      "",
+      "# Cross-runner product requirements",
+      "",
+    ].join("\n"));
+    writeFileSync(join(path, designInputPath), "# Cross-runner design input\n");
+    const args = {
+      rootDir: path, profile: "feature", featureId: "cross-runner-work", planPath: prdPath,
+      prdPath, specPath, designInputPath, deps: fakeDeps,
+    };
+    const claudePlan = planProjectOnboardingKickoffPromotionV4({ ...args, runner: "claude" });
+    assert.equal(claudePlan.schema, "pipeline.codex-onboarding-kickoff-promotion-plan.v1");
+    assert.throws(() => applyProjectOnboardingKickoffPromotionV4({
+      ...args, runner: "codex", planSha256: claudePlan.planSha256, activate: true,
+    }), /promotion plan digest/u);
+    const applied = applyProjectOnboardingKickoffPromotionV4({
+      ...args, runner: "claude", planSha256: claudePlan.planSha256, activate: true,
+    });
+    assert.equal(applied.status, "ready");
+    assert.equal(applied.runner, "claude");
+  } finally { dispose(path); }
+});
+
+// Mechanism C (same backlog item): `runtime-attestation-required` after an
+// apply-shaped command is a failed transaction (nothing was written), and
+// must not exit 0 the way the same status legitimately does for inspect/plan.
+test("an apply-shaped runtime-attestation-required exits non-zero; the same status stays a resting point for inspect/plan", () => {
+  const path = root();
+  try {
+    initializeClaudeOnboardedRoot(path);
+    const goal = "Exit-code split regression (RUNNERNEUT-1 mechanism C)";
+    const invoke = (args) => {
+      let stdout = ""; let stderr = "";
+      const code = onboardingCli(args, {
+        deps: fakeDeps,
+        write: (chunk) => { stdout += chunk; },
+        writeError: (chunk) => { stderr += chunk; },
+      });
+      return { code, stderr, result: stdout ? JSON.parse(stdout) : null };
+    };
+    // Same precondition as the originally observed defect: the CLI carries no
+    // --runner, so the apply resolves the default codex identity on a
+    // claude-onboarded root and aborts before writing anything.
+    const applied = invoke(["kickoff", "apply", "--root", path, "--goal", goal, "--plan-sha256", "0".repeat(64), "--activate"]);
+    assert.equal(applied.result.status, "runtime-attestation-required");
+    assert.equal(applied.code, 1, "an apply that wrote nothing must not exit 0");
+
+    const inspected = invoke(["inspect", "--root", path]);
+    assert.equal(inspected.result.status, "runtime-attestation-required");
+    assert.equal(inspected.code, 0, "the same status is still a legitimate resting point for inspect");
+
+    const planned = invoke(["kickoff", "plan", "--root", path, "--goal", goal]);
+    assert.equal(planned.result.status, "runtime-attestation-required");
+    assert.equal(planned.code, 0, "and for plan");
   } finally { dispose(path); }
 });
 

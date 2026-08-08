@@ -21,13 +21,23 @@ import {
   planProjectOnboardingSourceRecoveryV4,
 } from "../lib/project-onboarding-v3.mjs";
 
+// The commands that mutate (accept --activate). Shared between the --activate
+// validity check and the exit-status decision below, so the two can never
+// silently drift apart: what may write is exactly what the exit code below
+// treats as "apply-shaped" (RUNNERNEUT-1 mechanism C).
+const APPLY_SHAPED_COMMANDS = new Set([
+  "apply-portable-seed", "initialize-runtime", "apply-repair", "apply-readback",
+  "apply-manifest-repair", "apply-partial-authority", "apply-reinstall",
+  "kickoff-apply", "kickoff-promote-apply", "adopt-remote-apply",
+]);
+
 function usage() {
   return [
     "Usage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> [--profile <epic|feature|mini> --source <selection>]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--plan-sha256 <sha256>] [--activate]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]",
-    "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> --design-input-path <path> [--plan-sha256 <sha256>] [--activate]",
+    "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> --design-input-path <path> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>",
   ].join("\n");
 }
@@ -83,7 +93,7 @@ function parse(args) {
     if (![output.profile, output.featureId, output.planPath, output.prdPath, output.specPath, output.designInputPath].every(Boolean)) return { error: "kickoff promotion requires --profile --id --plan-path --prd-path --spec-path --design-input-path" };
   } else if (output.command?.startsWith("kickoff-") && output.goal === undefined) return { error: "kickoff plan/apply requires --goal <text>" };
   else if (!output.command?.startsWith("kickoff-") && output.goal !== undefined) return { error: "--goal is only valid for kickoff plan/apply" };
-  if (output.activate && !["apply-portable-seed", "initialize-runtime", "apply-repair", "apply-readback", "apply-manifest-repair", "apply-partial-authority", "apply-reinstall", "kickoff-apply", "kickoff-promote-apply", "adopt-remote-apply"].includes(output.command)) return { error: "--activate is only valid for an apply command" };
+  if (output.activate && !APPLY_SHAPED_COMMANDS.has(output.command)) return { error: "--activate is only valid for an apply command" };
   return output;
 }
 export function main(args = process.argv.slice(2), {
@@ -132,12 +142,13 @@ export function main(args = process.argv.slice(2), {
     });
     else if (options.command === "kickoff-promote-plan") output = planProjectOnboardingKickoffPromotionV4({
       rootDir: options.root, profile: options.profile, featureId: options.featureId,
-      planPath: options.planPath, prdPath: options.prdPath, specPath: options.specPath, designInputPath: options.designInputPath, deps,
+      planPath: options.planPath, prdPath: options.prdPath, specPath: options.specPath, designInputPath: options.designInputPath,
+      runner: options.runner, deps,
     });
     else if (options.command === "kickoff-promote-apply") output = applyProjectOnboardingKickoffPromotionV4({
       rootDir: options.root, profile: options.profile, featureId: options.featureId,
       planPath: options.planPath, prdPath: options.prdPath, specPath: options.specPath, designInputPath: options.designInputPath,
-      planSha256: options.planSha256, activate: options.activate, deps,
+      runner: options.runner, planSha256: options.planSha256, activate: options.activate, deps,
     });
     else {
       const operation = options.command === "initialize-runtime"
@@ -166,6 +177,21 @@ export function main(args = process.argv.slice(2), {
   write(`${JSON.stringify(output, null, 2)}\n`);
   if (["pipeline.codex-onboarding-kickoff-plan.v1", "pipeline.codex-onboarding-kickoff-promotion-plan.v1"].includes(output.schema)) return 0;
   if (output.schema === "pipeline.project-onboarding-remote-adoption-plan.v1") return output.status === "ready" || output.status === "activation-required" ? 0 : 1;
-  return ["portable-seed-required", "runtime-initialization-required", "runtime-attestation-required", "restart-required", "kickoff-required", "host-repository-init-required", "ready", "migration-required", "adoption-required", "projection-drift"].includes(output.status) ? 0 : 1;
+  // `runtime-attestation-required` is a legitimate resting point for an
+  // inspect/plan command: it names what the caller still needs before it can
+  // proceed. It is not one for an apply-shaped command: an apply that reaches
+  // it wrote nothing (the mutating step aborted before its write), so exit 0
+  // there would report a failed transaction as success to a scripting caller
+  // (RUNNERNEUT-1 mechanism C; backlog:
+  // kickoff-apply-action-drops-the-runner-the-plan-was-made-for). Deliberate
+  // split, not a shared list: every other resting status stays shared because
+  // each of those genuinely can be the settled outcome of either shape.
+  const restingStatuses = new Set([
+    "portable-seed-required", "runtime-initialization-required", "runtime-attestation-required",
+    "restart-required", "kickoff-required", "host-repository-init-required", "ready",
+    "migration-required", "adoption-required", "projection-drift",
+  ]);
+  if (APPLY_SHAPED_COMMANDS.has(options.command)) restingStatuses.delete("runtime-attestation-required");
+  return restingStatuses.has(output.status) ? 0 : 1;
 }
 if (isDirectInvocation(import.meta.url)) process.exit(main());

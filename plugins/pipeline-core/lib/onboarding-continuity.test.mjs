@@ -16,6 +16,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { fileURLToPath } from "node:url";
 
 import {
   createPoGateProfileReceipt,
@@ -38,6 +39,7 @@ import {
   planOnboardingKickoffPromotion,
   planOnboardingKickoffPromotionCleanupRecovery,
   readOnboardingSessionCleanupBinding,
+  reconstructOnboardingKickoffPlan,
   reconstructOnboardingKickoffPromotionPlan,
   releaseOnboardingSessionCleanup,
   validateKickoffGoal,
@@ -384,12 +386,13 @@ check("kickoff plan is deterministic, closed, valid, and read-only", () => {
   assert.equal(existsSync(join(root, "nope")), false);
   assert.deepEqual(Object.keys(first).sort(), [
     "applyAction", "calibration", "goal", "goalSha256", "onboardingScript",
-    "planSha256", "repositoryCapability", "root", "schema", "targets",
+    "planSha256", "repositoryCapability", "root", "runner", "schema", "targets",
     "transactionSha256",
   ]);
+  assert.equal(first.runner, "codex");
   assert.deepEqual(first.applyAction.argv, [
     "/plugin/project-onboarding-v3.mjs", "kickoff", "apply", "--root", root,
-    "--goal", first.goal, "--plan-sha256", first.planSha256, "--activate",
+    "--goal", first.goal, "--runner", "codex", "--plan-sha256", first.planSha256, "--activate",
   ]);
   assert.equal(first.applyAction.mutation, true);
   assert.equal(first.applyAction.requiresConfirmation, true);
@@ -1422,6 +1425,93 @@ check("a legacy promotion whose planPath is the Spec stays readable and is refus
   expectKickoffError("KICKOFF-PROMOTION-PLAN-IS-SPEC", () => planOnboardingKickoffPromotion({
     ...seed.request, planPath: seed.request.specPath,
   }));
+});
+
+// RUNNERNEUT-1 direction 2: the shared construction site for a plan-bound
+// apply action (`planBoundApplyAction`) requires the runner as a formal
+// argument, not a default, so a caller that forgets to thread it through
+// fails at plan-construction time. Exercised through the public plan
+// builders -- with an explicit empty runner, bypassing the "codex" default
+// the way a caller that genuinely lost the identity would -- rather than by
+// reaching into the private helper directly.
+check("a plan-bound apply action cannot be constructed without the runner its plan was made under", () => {
+  const root = fixture("runner-required-kickoff");
+  expectKickoffError("APPLY-ACTION-RUNNER-REQUIRED", () => planOnboardingKickoff({
+    rootDir: root, goal: "Runner is required at construction", runner: "",
+  }));
+  const seed = promotionSeed("runner-required-promotion");
+  expectKickoffError("APPLY-ACTION-RUNNER-REQUIRED", () => planOnboardingKickoffPromotion({
+    ...seed.request, runner: "",
+  }));
+});
+
+// RUNNERNEUT-1 direction 3: an enumerating check over every plan-producing
+// entry point in this module, discovered from the module's own exports
+// rather than named twice. A name matched by the naming pattern below that
+// has neither a fixture in the table nor a documented exemption fails this
+// check by construction -- so a new kickoff/promotion plan builder that
+// forgets to carry the runner into its resolved apply action goes red here,
+// not in someone's fresh project.
+const KICKOFF_PLAN_BUILDER_PATTERN = /^export function ((?:plan|reconstruct)OnboardingKickoff\w*)\(/gmu;
+const KICKOFF_PLAN_BUILDER_EXEMPT = new Set([
+  // Recovers a private session-cleanup binding after a kickoff promotion by
+  // re-invoking the session-cleanup script, not the onboarding-script CLI;
+  // that script has no runner concept at all (RUNNERNEUT-1 direction 4 sweep,
+  // 2026-08-08). Matched by the naming pattern above, so it is exempted here
+  // by name with its reason on record, rather than silently excluded.
+  "planOnboardingKickoffPromotionCleanupRecovery",
+]);
+
+function assertActionCarriesRunner(action, runner) {
+  assert.equal(action.kind, "command");
+  const index = action.argv.indexOf("--runner");
+  assert.notEqual(index, -1, "resolved action argv is missing --runner");
+  assert.equal(action.argv[index + 1], runner);
+}
+
+check("every kickoff/promotion plan builder carries its runner into the resolved apply action (enumerating)", () => {
+  const modulePath = fileURLToPath(new URL("./onboarding-continuity.mjs", import.meta.url));
+  const source = readFileSync(modulePath, "utf8");
+  const discovered = [...source.matchAll(KICKOFF_PLAN_BUILDER_PATTERN)]
+    .map((match) => match[1])
+    .filter((name) => !KICKOFF_PLAN_BUILDER_EXEMPT.has(name));
+
+  const runner = "claude";
+  const fixtures = {
+    planOnboardingKickoff: () => {
+      const root = fixture("enumerate-kickoff-plan");
+      return planOnboardingKickoff({ rootDir: root, goal: "Enumerate the kickoff plan", runner });
+    },
+    reconstructOnboardingKickoffPlan: () => {
+      const root = fixture("enumerate-kickoff-reconstruct");
+      const goal = "Enumerate the kickoff reconstruction";
+      const plan = planOnboardingKickoff({ rootDir: root, goal, runner });
+      applyOnboardingKickoff({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+      return reconstructOnboardingKickoffPlan({ rootDir: root, goal, runner });
+    },
+    planOnboardingKickoffPromotion: () => {
+      const seed = promotionSeed("enumerate-promotion-plan");
+      return planOnboardingKickoffPromotion({ ...seed.request, runner });
+    },
+    reconstructOnboardingKickoffPromotionPlan: () => {
+      const seed = promotionSeed("enumerate-promotion-reconstruct");
+      const request = { ...seed.request, runner };
+      const plan = planOnboardingKickoffPromotion(request);
+      applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+      return reconstructOnboardingKickoffPromotionPlan(request);
+    },
+  };
+
+  assert.deepEqual(
+    [...discovered].sort(),
+    Object.keys(fixtures).sort(),
+    "a plan-producing entry point was added, removed, or renamed without updating this enumerating check",
+  );
+
+  for (const name of discovered) {
+    const plan = fixtures[name]();
+    assertActionCarriesRunner(plan.applyAction, runner);
+  }
 });
 
 console.log(`${passed} onboarding continuity/kickoff checks passed.`);
