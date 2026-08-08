@@ -61,6 +61,7 @@
 | pipeline.onboarding-restart-flow-is-codex-only-not-runner-aware | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.parallel-goldfish-dispatches-race-on-shared-checkout | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.pipeline-state-rebind-codex-default-runner | closed | defect | pipeline | 2026-08-05 | — |
+| pipeline.plan-path-guidance-attached-to-unlike-causes | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.po-gate-authority-path-canonicalization | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-authority-receipt-readback | open | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-worktree-authority | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -102,6 +103,6 @@
 
 ## Counts
 
-- open: 51
+- open: 52
 - in_progress: 21
 - closed: 22

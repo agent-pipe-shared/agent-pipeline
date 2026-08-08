@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "f4c258033b61ddfdbf04498fa787e030cded0cc45a25b2a535e21678a4b1e6df"
+    "transitionHead": "938740cba9dfb5daa57b581986a91bc7c2dc627aa935dbc28f4b50f15cfca6c4"
   },
   "counts": {
-    "open": 51,
+    "open": 52,
     "in_progress": 21,
     "closed": 22
   },
@@ -495,6 +495,14 @@
       "closureRepository": "self",
       "closureCommit": "7514fb95f23d6b30bd42bbed2435f2dc4d76ca61",
       "closureEvidence": "backlog/evidence/2026-08-06-second-reconciliation-pass.md"
+    },
+    {
+      "id": "pipeline.plan-path-guidance-attached-to-unlike-causes",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Established while re-signposting the PO-language mismatch (commit b094cb5); the enumeration was produced by that dispatch and the remaining sites were deliberately left alone."
     },
     {
       "id": "pipeline.po-gate-authority-path-canonicalization",
