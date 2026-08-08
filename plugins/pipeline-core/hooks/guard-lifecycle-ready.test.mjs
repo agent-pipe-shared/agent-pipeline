@@ -1611,25 +1611,181 @@ test("NOVA-LCR-HGO-1: an unusable override store leaves the plain grammar refusa
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
-test("NOVA-LCR-HGO-1: GUARD-CROSS-REPO-MUTATION and GUARD-LIFECYCLE-NOT-READY stay outside HGO (regression, ADR-0059 Decision 5)", () => {
-  const path = root();
-  try {
-    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
-    const crossRepo = evaluateLifecycleReadyGuard(edit("../outside.mjs"), { projectDir: path });
-    assert.equal(crossRepo.exitCode, 2);
-    assert.match(crossRepo.stderr, /GUARD-CROSS-REPO-MUTATION/u);
-    assert.doesNotMatch(crossRepo.stderr, /Human override available/u);
-    assert.doesNotMatch(crossRepo.stderr, /guard-human-override\.mjs/u);
+// ---------------------------------------------------------------------------------
+// NOVA-XREPO-HGO-1 (ADR-0059 Decision 6, 2026-08-08): the cross-repository half of the
+// former NOVA-LCR-HGO-1 pin is INVERTED here, deliberately. That pin asserted
+// "GUARD-CROSS-REPO-MUTATION and GUARD-LIFECYCLE-NOT-READY stay outside HGO (regression,
+// ADR-0059 Decision 5)". Decision 6 reverses Decision 5 for the cross-repository class
+// only -- "That is reversed. A cross-repository mutation is now liftable by a signed human
+// override, through exactly the same always-attempt-consume-first mechanism every other
+// liftable class uses." The pin was therefore encoding a decision that no longer holds, and
+// its cross-repo half is rewritten as a positive assertion of the new contract. This is a
+// contract correction under a superseding ADR, not a test bent to fit code: the
+// GUARD-LIFECYCLE-NOT-READY half is kept, unchanged in force, in every test below.
+//
+// Measured boundary, pinned in NOVA-XREPO-HGO-6 rather than left as prose: HGO's own
+// eligibility() classifies a target outside the physical project root as
+// HGO-NONOVERRIDABLE-CROSS-BOUNDARY, so no capability can be armed for those from this
+// guard. They get the typed "no route, and why" line, never silence, and never admission.
 
-    const notReady = evaluateLifecycleReadyGuard(edit(), {
-      projectDir: path,
+/** Cross-repository denials whose tool input HGO can classify, so a capability can actually be armed. */
+const XREPO_COMMAND = "codex plugin add pipeline-core@agent-pipeline-local";
+const XREPO_OTHER_COMMAND = "codex plugin remove pipeline-core";
+const XREPO_REASON = "GUARD-CROSS-REPO-MUTATION: A governed consumer session may write only inside its own physical project root.";
+const xrepoDenials = () => [{ guard: "guard-lifecycle-ready.mjs", reason: XREPO_REASON }];
+
+test("NOVA-XREPO-HGO-1: with nothing armed a cross-repo denial still refuses, and names the mode-appropriate next command", () => {
+  const roots = [];
+  try {
+    const sigRoot = hgoGitFixture("signature");
+    roots.push(sigRoot);
+    const sig = evaluateLifecycleReadyGuard(bash(XREPO_COMMAND), { projectDir: sigRoot, ...hgoReadyDeps() });
+    assert.equal(sig.exitCode, 2, "an unarmed agent gained admission");
+    assert.match(sig.stderr, /GUARD-CROSS-REPO-MUTATION/u);
+    assert.doesNotMatch(sig.stderr, /capability consumed/u);
+    assert.match(sig.stderr, /Human override available for this exact command/u);
+    assert.match(sig.stderr, /\bplan --repo\b/u);
+    assert.match(sig.stderr, /prepare-authorization --repo/u);
+    assert.match(sig.stderr, /authorize-by-signature --repo/u);
+    assert.doesNotMatch(sig.stderr, /--activate/u, "signature mode must not offer the in-session activate step");
+
+    const chatRoot = hgoGitFixture("chat");
+    roots.push(chatRoot);
+    const chat = evaluateLifecycleReadyGuard(bash(XREPO_COMMAND), { projectDir: chatRoot, ...hgoReadyDeps() });
+    assert.equal(chat.exitCode, 2, "an unarmed agent gained admission");
+    assert.match(chat.stderr, /GUARD-CROSS-REPO-MUTATION/u);
+    assert.match(chat.stderr, /\bauthorize --repo\b[^\n]*--activate/u);
+    assert.doesNotMatch(chat.stderr, /authorize-by-signature/u);
+  } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
+});
+
+test("NOVA-XREPO-HGO-2: a signature-armed capability admits the exact cross-repo command, and only once", () => {
+  const sigRoot = hgoGitFixture("signature");
+  try {
+    hgoArmBySignature(sigRoot, { command: XREPO_COMMAND }, xrepoDenials());
+    const first = evaluateLifecycleReadyGuard(bash(XREPO_COMMAND), { projectDir: sigRoot, ...hgoReadyDeps() });
+    assert.equal(first.exitCode, 0, `signature-armed did not admit: ${first.stderr}`);
+    assert.match(
+      first.stderr,
+      /\[pipeline-human-override\] guard-lifecycle-ready GUARD-CROSS-REPO-MUTATION: exact one-time capability consumed/u,
+    );
+    const second = evaluateLifecycleReadyGuard(bash(XREPO_COMMAND), { projectDir: sigRoot, ...hgoReadyDeps() });
+    assert.equal(second.exitCode, 2, "a consumed capability admitted a second run");
+    assert.doesNotMatch(second.stderr, /capability consumed/u);
+  } finally { rmSync(sigRoot, { recursive: true, force: true }); }
+});
+
+test("NOVA-XREPO-HGO-3: a chat-armed capability admits the exact cross-repo command in a chat-mode repository", () => {
+  const chatRoot = hgoGitFixture("chat");
+  try {
+    hgoArmByChat(chatRoot, { command: XREPO_COMMAND }, xrepoDenials());
+    const result = evaluateLifecycleReadyGuard(bash(XREPO_COMMAND), { projectDir: chatRoot, ...hgoReadyDeps() });
+    assert.equal(result.exitCode, 0, `chat-armed did not admit: ${result.stderr}`);
+    assert.match(result.stderr, /capability consumed/u);
+  } finally { rmSync(chatRoot, { recursive: true, force: true }); }
+});
+
+test("NOVA-XREPO-HGO-4: a capability armed for a different command does not admit this one", () => {
+  const sigRoot = hgoGitFixture("signature");
+  try {
+    hgoArmBySignature(sigRoot, { command: XREPO_OTHER_COMMAND }, xrepoDenials());
+    const result = evaluateLifecycleReadyGuard(bash(XREPO_COMMAND), { projectDir: sigRoot, ...hgoReadyDeps() });
+    assert.equal(result.exitCode, 2, "a capability bound to another command admitted this one");
+    assert.match(result.stderr, /GUARD-CROSS-REPO-MUTATION/u);
+    assert.doesNotMatch(result.stderr, /capability consumed/u);
+    // The armed capability is untouched: it still admits exactly the command it was bound to.
+    const bound = evaluateLifecycleReadyGuard(bash(XREPO_OTHER_COMMAND), { projectDir: sigRoot, ...hgoReadyDeps() });
+    assert.equal(bound.exitCode, 0, `the bound command was not admitted: ${bound.stderr}`);
+  } finally { rmSync(sigRoot, { recursive: true, force: true }); }
+});
+
+test("NOVA-XREPO-HGO-5: GUARD-LIFECYCLE-NOT-READY is never liftable, armed capability or not", () => {
+  const sigRoot = hgoGitFixture("signature");
+  try {
+    // No route is offered for a readiness denial at all.
+    const plain = evaluateLifecycleReadyGuard(edit("docs/notes.md"), {
+      projectDir: sigRoot,
       requireProjectOnboardingReadyFn() { deny("partial"); },
     });
-    assert.equal(notReady.exitCode, 2);
-    assert.match(notReady.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
-    assert.doesNotMatch(notReady.stderr, /Human override available/u);
-    assert.doesNotMatch(notReady.stderr, /guard-human-override\.mjs/u);
-  } finally { rmSync(path, { recursive: true, force: true }); }
+    assert.equal(plain.exitCode, 2);
+    assert.match(plain.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
+    assert.doesNotMatch(plain.stderr, /Human override available/u);
+    assert.doesNotMatch(plain.stderr, /guard-human-override\.mjs/u);
+    assert.doesNotMatch(plain.stderr, /No human override route/u);
+
+    // And a genuine, matching cross-repo capability does not buy past readiness either:
+    // it clears the cross-repository objection only, is spent doing so, and says so.
+    hgoArmBySignature(sigRoot, { command: XREPO_COMMAND }, xrepoDenials());
+    const armed = evaluateLifecycleReadyGuard(bash(XREPO_COMMAND), {
+      projectDir: sigRoot,
+      requireProjectOnboardingReadyFn() { deny("partial"); },
+    });
+    assert.equal(armed.exitCode, 2, "an armed cross-repo capability bypassed the readiness gate");
+    assert.match(armed.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
+    assert.match(armed.stderr, /capability consumed/u, "a spent capability vanished silently");
+    const second = evaluateLifecycleReadyGuard(bash(XREPO_COMMAND), { projectDir: sigRoot, ...hgoReadyDeps() });
+    assert.equal(second.exitCode, 2, "a downstream-refused capability was still reusable");
+  } finally { rmSync(sigRoot, { recursive: true, force: true }); }
+});
+
+test("NOVA-XREPO-HGO-6: an out-of-root target is refused and reports why no route exists, instead of silence", () => {
+  const sigRoot = hgoGitFixture("signature");
+  const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-hgo-outside-"));
+  try {
+    const target = join(outside, "outside.mjs");
+    const result = evaluateLifecycleReadyGuard(edit(target), { projectDir: sigRoot, ...hgoReadyDeps() });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /GUARD-CROSS-REPO-MUTATION/u);
+    assert.doesNotMatch(result.stderr, /capability consumed/u);
+    assert.doesNotMatch(result.stderr, /Human override available/u);
+    assert.match(result.stderr, /No human override route is offered for this exact write/u);
+    assert.match(result.stderr, /status=external-operator-required/u);
+    // The boundary is HGO's eligibility(), not this guard's wiring: no capability can be
+    // armed for an out-of-root target, so there is nothing for the guard to consume.
+    const recorded = recordHumanGuardDenial({
+      rootDir: sigRoot,
+      pluginRoot: HGO_PLUGIN_ROOT,
+      toolName: "Edit",
+      toolInput: { file_path: target },
+      denials: xrepoDenials(),
+    });
+    assert.equal(recorded.status, "external-operator-required");
+  } finally {
+    rmSync(sigRoot, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("NOVA-XREPO-HGO-7: the guard union's absolute prohibitions gain no admission path here", () => {
+  const sigRoot = hgoGitFixture("signature");
+  try {
+    const prohibited = [
+      "git push --force origin main",
+      "git push --force-with-lease origin main",
+      "git filter-branch --force",
+      "git commit --no-verify -m fixture",
+      "git branch -D main",
+      "git tag -d v1.0.0",
+    ];
+    for (const command of prohibited) {
+      // This guard is not the union's enforcer (plugins/pipeline-core/hooks/git-guard-union
+      // is, and is untouched by this change) -- what is asserted here is that the change
+      // introduced no override admission for these shapes: nothing is consumed, and nothing
+      // offers to arm anything.
+      const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: sigRoot, ...hgoReadyDeps() });
+      assert.doesNotMatch(result.stderr, /capability consumed/u, command);
+      assert.doesNotMatch(result.stderr, /Human override available/u, command);
+    }
+    // A raw push is not even plannable as an override: HGO refuses to classify it.
+    const recorded = recordHumanGuardDenial({
+      rootDir: sigRoot,
+      pluginRoot: HGO_PLUGIN_ROOT,
+      toolName: "Bash",
+      toolInput: { command: "git push --force origin main" },
+      denials: xrepoDenials(),
+    });
+    assert.notEqual(recorded.status, "planned");
+  } finally { rmSync(sigRoot, { recursive: true, force: true }); }
 });
 
 // ---------------------------------------------------------------------------------

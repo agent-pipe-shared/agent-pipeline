@@ -41,10 +41,26 @@ import {
 
 // ADR-0059 Decision 3/4: the same generic, exact-command-bound Human-Guard-Override
 // (HGO) route the other guards in this family already use for their own denials
-// (guard-testpath.mjs, codex-pretool-guard.mjs). Reused here unmodified -- only the
-// three closed-shell-grammar denial codes below are wired to it; GUARD-CROSS-REPO-MUTATION
-// and GUARD-LIFECYCLE-NOT-READY stay outside HGO's authority (ADR-0059 Decision 5,
-// this file's own header comments on crossRepositoryMutationBlocked()).
+// (guard-testpath.mjs, codex-pretool-guard.mjs). Reused here unmodified -- the three
+// closed-shell-grammar denial codes AND, since ADR-0059 Decision 6 (2026-08-08),
+// GUARD-CROSS-REPO-MUTATION are wired to it. GUARD-LIFECYCLE-NOT-READY stays outside
+// HGO's authority.
+//
+// Decision 6 reverses Decision 5 for the cross-repository class only: a cross-repository
+// mutation is liftable by a signed human override, through exactly this mechanism -- per
+// command, one use, bound to the exact command digest, recorded in the override ledger,
+// subject to the committed signature/chat mode, and unreachable to an agent acting alone.
+//
+// Measured boundary, stated rather than implied (evidence/hgocross-1-differential.*.json):
+// HGO's own eligibility() classifies a target OUTSIDE the physical project root as
+// HGO-NONOVERRIDABLE-CROSS-BOUNDARY, so recordHumanGuardDenial() returns
+// external-operator-required and no capability can be armed for it from this guard. Those
+// denials therefore print the typed "no route, and why" line instead of a next command --
+// the same outcome the grammar codes already produce for an out-of-root path, and the same
+// silence Decision 4 forbids. Cross-repository denials whose tool input HGO can classify
+// (plugin install/remove, marketplace metadata, the in-root shapes) get the full route
+// today. Closing the residual half is an eligibility() change in lib/human-guard-override.mjs,
+// which is out of scope for this file.
 const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 const GOVERNANCE_MARKERS = [
@@ -96,6 +112,20 @@ const CONTROLLING_NON_READY_STATUSES = new Set(
 
 function verdict(exitCode, stderr = "") {
   return { exitCode, stderr };
+}
+
+/**
+ * Carry every consumed-capability notice onto whatever verdict the remaining checks
+ * produced, admission or refusal alike (NOVA-LCR-HGO-2's rule, generalized from one lift
+ * to the list). A capability consumed here and then refused by a later check stays spent --
+ * consumeHumanGuardOverride() marked it "consumed" on disk, with its own audit entry,
+ * before this function ever runs -- so the consumption must be visible in the output rather
+ * than vanish behind the refusal that actually decided the outcome. With no lifts this is
+ * the identity function, which is what keeps every unlifted verdict byte-identical.
+ */
+function withLifts(lifts, result) {
+  if (lifts.length === 0) return result;
+  return verdict(result.exitCode, `${lifts.map((lift) => lift.stderr).join("")}${result.stderr ?? ""}`);
 }
 
 function exactReadyReceipt(value) {
@@ -168,8 +198,9 @@ function blocked(code = "GUARD-LIFECYCLE-NOT-READY", lifecycleStatus = null, ret
  * mode-appropriate next step (Decision 4). Offering the route is a convenience, never a
  * gate: an unusable store leaves the refusal itself standing unchanged -- same pattern as
  * guard-testpath.mjs's `overrideGuidance` block, adapted to this file's own message
- * shape. GUARD-CROSS-REPO-MUTATION and GUARD-LIFECYCLE-NOT-READY never call this
- * (ADR-0059 Decision 5; out of scope for this dispatch).
+ * shape. Called by the three grammar codes and, since ADR-0059 Decision 6, by
+ * GUARD-CROSS-REPO-MUTATION. GUARD-LIFECYCLE-NOT-READY never calls it: readiness is not a
+ * human-liftable class, and no capability admits a session that never proved its bootstrap.
  *
  * What it does NOT leave unchanged any more is the silence. Both no-route outcomes --
  * planning threw, and planning returned a status other than `planned` -- print a bounded
@@ -177,13 +208,17 @@ function blocked(code = "GUARD-LIFECYCLE-NOT-READY", lifecycleStatus = null, ret
  * every denial reports its next step, and "no next step, and no word about why" is the one
  * outcome that makes it untrue.
  *
- * The exact denial reason text is `${code}: ${GRAMMAR_DENIAL_GUIDANCE[code]}` -- the
- * SAME string blocked() itself prints for that code -- because the HGO request/capability
- * is bound to this exact reason string; a request planned for one code's reason will not
- * match a differently-worded denial for the same command.
+ * The caller passes the exact denial reason text -- the SAME string the denial itself
+ * prints for that code -- because the HGO request/capability is bound to this exact reason
+ * string; a request planned for one code's reason will not match a differently-worded
+ * denial for the same command.
+ *
+ * @param {string} code the typed denial code, printed in the admission audit line.
+ * @param {string} reason the exact denial reason text the refusal prints, bound into the capability.
+ * @param {string} subject short noun for humanGuardRouteUnavailableReason ("command", "write").
  */
-function grammarOverrideRoute(code, root, toolName, toolInput, dependencies = {}) {
-  const denials = [{ guard: "guard-lifecycle-ready.mjs", reason: `${code}: ${GRAMMAR_DENIAL_GUIDANCE[code]}` }];
+function humanOverrideRoute(code, reason, subject, root, toolName, toolInput, dependencies = {}) {
+  const denials = [{ guard: "guard-lifecycle-ready.mjs", reason }];
   const consumeFn = dependencies.consumeHumanGuardOverrideFn ?? consumeHumanGuardOverride;
   let consumed = { status: "absent" };
   try {
@@ -225,7 +260,7 @@ function grammarOverrideRoute(code, root, toolName, toolInput, dependencies = {}
           ].join("\n");
         overrideGuidance = [
           "",
-          "Human override available for this exact command (one use; audited; the human confirms):",
+          `Human override available for this exact ${subject} (one use; audited; the human confirms):`,
           `${process.execPath} ${JSON.stringify(script)} plan --repo ${JSON.stringify(root)} --request-sha256 ${planned.requestSha256}`,
           continuation,
           "",
@@ -235,10 +270,10 @@ function grammarOverrideRoute(code, root, toolName, toolInput, dependencies = {}
         // made this path indistinguishable from a denial that was never eligible for a
         // route at all -- see humanGuardRouteUnavailableReason()'s own header for what may
         // and may not appear in the rendered reason.
-        overrideGuidance = ["", humanGuardRouteUnavailableReason("command", { planned }), ""].join("\n");
+        overrideGuidance = ["", humanGuardRouteUnavailableReason(subject, { planned }), ""].join("\n");
       }
     } catch (error) {
-      overrideGuidance = ["", humanGuardRouteUnavailableReason("command", { error }), ""].join("\n");
+      overrideGuidance = ["", humanGuardRouteUnavailableReason(subject, { error }), ""].join("\n");
     }
   }
   return { admitted: null, overrideGuidance };
@@ -263,15 +298,22 @@ function protectedStateWriterOnly() {
   );
 }
 
-function crossRepositoryMutationBlocked() {
+// Hoisted for the same reason GRAMMAR_DENIAL_GUIDANCE is: the HGO request/capability is
+// bound to the exact denial reason string, so the text the denial prints and the text the
+// route binds must be one constant, never two copies that can drift.
+const CROSS_REPO_DENIAL_CODE = "GUARD-CROSS-REPO-MUTATION";
+const CROSS_REPO_DENIAL_GUIDANCE = "A governed consumer session may write only inside its own physical project root.";
+
+function crossRepositoryMutationBlocked(overrideGuidance = "") {
   return verdict(
     2,
     "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
-      + "GUARD-CROSS-REPO-MUTATION: "
-      + "A governed consumer session may write only inside its own physical project root.\n"
+      + `${CROSS_REPO_DENIAL_CODE}: `
+      + `${CROSS_REPO_DENIAL_GUIDANCE}\n`
       + "Pipeline source, another repository, marketplace metadata, cachebuster updates, "
       + "and plugin installation require a separate session rooted at the exact target "
-      + "plus their own explicit PO authorization.\n",
+      + "plus their own explicit PO authorization.\n"
+      + overrideGuidance,
   );
 }
 
@@ -1228,26 +1270,43 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
   // only reads. That over-refuses on exactly five filenames and fails closed; a
   // PowerShell-aware read-only classifier is the proper fix.
   if (toolName === "PowerShell") return verdict(0);
+  // ADR-0059 Decision 6: a consumed cross-repository capability clears ONLY the
+  // cross-repository objection. Every later check still runs against the lifted action --
+  // the writer-owned State refusal, the closed shell grammar, the LAUNCH_SCRIPT external
+  // restart and the readiness gate above all -- exactly as NOVA-LCR-HGO-2 established for
+  // the grammar lift. `lifts` carries the consumption notices so a capability spent on an
+  // action a later check refuses is surfaced rather than silently swallowed; it is already
+  // irreversibly consumed on disk by then, and there is no "un-consume" available here.
+  const lifts = [];
+  const crossRepoReason = `${CROSS_REPO_DENIAL_CODE}: ${CROSS_REPO_DENIAL_GUIDANCE}`;
   if (WRITE_TOOLS.includes(toolName)) {
     const target = writeTargetPath(input.tool_input, toolName);
     if (!isProjectWritePath(target, root, dependencies)) {
-      return crossRepositoryMutationBlocked();
+      const route = humanOverrideRoute(
+        CROSS_REPO_DENIAL_CODE, crossRepoReason, "write", root, toolName, input.tool_input, dependencies,
+      );
+      if (!route.admitted) return crossRepositoryMutationBlocked(route.overrideGuidance);
+      lifts.push(route.admitted);
     }
     const requested = resolve(root, target);
     if (requested === join(root, ".claude", "pipeline-state.json")
       || requested === join(root, "project", "pipeline-state.json")) {
-      return protectedStateWriterOnly();
+      return withLifts(lifts, protectedStateWriterOnly());
     }
   }
   if (toolName === "Bash"
     && isForbiddenCrossRepositoryMutation(input.tool_input.command, root, dependencies)) {
-    return crossRepositoryMutationBlocked();
+    const route = humanOverrideRoute(
+      CROSS_REPO_DENIAL_CODE, crossRepoReason, "command", root, toolName, input.tool_input, dependencies,
+    );
+    if (!route.admitted) return crossRepositoryMutationBlocked(route.overrideGuidance);
+    lifts.push(route.admitted);
   }
   if (toolName === "Bash" && isReadOnlyDiagnosticCommand(input.tool_input.command, root)) {
-    return verdict(0);
+    return withLifts(lifts, verdict(0));
   }
   if (toolName === "Bash" && isNarrowRepositoryRecoveryCommand(input.tool_input.command, root)) {
-    return verdict(0);
+    return withLifts(lifts, verdict(0));
   }
   // A consumed grammar capability clears ONLY the shell-grammar objection captured in
   // `grammarLift` below -- the LAUNCH_SCRIPT and readiness checks in
@@ -1259,34 +1318,34 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
   // grammarOverrideRoute() even returns here -- there is no "un-consume" available to this
   // file. A capability spent on a command later refused downstream stays spent; its
   // consumption is surfaced in the denial below rather than left to vanish silently.
-  let grammarLift = null;
   if (toolName === "Bash") {
     const parsed = parseGuardCommand(input.tool_input.command, root);
     if (parsed.parseStatus !== "accepted") {
-      const route = grammarOverrideRoute("GUARD-PARSE-UNSUPPORTED", root, toolName, input.tool_input, dependencies);
+      const code = "GUARD-PARSE-UNSUPPORTED";
+      const route = humanOverrideRoute(
+        code, `${code}: ${GRAMMAR_DENIAL_GUIDANCE[code]}`, "command", root, toolName, input.tool_input, dependencies,
+      );
       if (!route.admitted) {
-        return blocked(
-          "GUARD-PARSE-UNSUPPORTED",
+        return withLifts(lifts, blocked(
+          code,
           null,
           retryActionsForDeniedCommand(input.tool_input.command, root),
           route.overrideGuidance,
-        );
+        ));
       }
-      grammarLift = route.admitted;
+      lifts.push(route.admitted);
     } else if (parsed.operators.length > 0 || parsed.redirects.length > 0) {
       const code = parsed.redirects.length > 0 ? "GUARD-REDIRECT-UNAPPROVED" : "GUARD-OPERATOR-UNAPPROVED";
-      const route = grammarOverrideRoute(code, root, toolName, input.tool_input, dependencies);
+      const route = humanOverrideRoute(
+        code, `${code}: ${GRAMMAR_DENIAL_GUIDANCE[code]}`, "command", root, toolName, input.tool_input, dependencies,
+      );
       if (!route.admitted) {
-        return blocked(code, null, [], route.overrideGuidance);
+        return withLifts(lifts, blocked(code, null, [], route.overrideGuidance));
       }
-      grammarLift = route.admitted;
+      lifts.push(route.admitted);
     }
   }
-  const tail = evaluateAfterGrammarAdmission(input, root, toolName, dependencies);
-  if (grammarLift === null) return tail;
-  return tail.exitCode === 0
-    ? grammarLift
-    : verdict(tail.exitCode, `${grammarLift.stderr}${tail.stderr}`);
+  return withLifts(lifts, evaluateAfterGrammarAdmission(input, root, toolName, dependencies));
 }
 
 export function main(rawInput = undefined, dependencies = {}) {
