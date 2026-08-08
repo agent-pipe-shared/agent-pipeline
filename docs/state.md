@@ -143,6 +143,50 @@ one and normalizes afterwards — unconditional, unchanged since the run the ite
 reports, and independent of this repair. No live matching defect; which side
 should move is left open in the item.
 
+**AUTHORIZATION 1 SPENT — THE TP-3 WINDOW IS DONE AND CLOSED (2026-08-08).**
+The PO signed the intent, the window was installed over `TP-3`, all 105 staged
+registration lines landed (`6686b16`), and the window is closed again. The gate
+now plans **366 steps**, up from 260, with **0 unregistered** and 7 declared
+exclusions.
+
+**AC-P2 and AC-P3 are demonstrated, not asserted.** Break and restore, inside the
+window, both directions recorded: an unregistered suite makes the checker exit 2
+and names the file, deleting it returns exit 0; a duplicated suite name exits 2
+naming the duplicate, removing it returns 0.
+
+**AC-P1 is satisfied on its own terms** — "exits 0, or every non-zero step has a
+named owner and a filed item, and the run's registered-step count is stated".
+Run `verify-1786175905384-0184c492bcde7209` at `ece6041`: 366 registered steps,
+366 terminal receipts, exit 1, **four failures, all four already filed and
+owned** (`product-capability-inventory-tests`, `authority-tier-agreement-check`,
+`security-scan-tests`, `backlog-state-check`).
+
+**Getting there took two corrections, both of my own making, and both worth
+keeping.**
+
+1. **The first run showed eight failures, not four.** None came from the
+   registration. Three collapsed to one cause: `specs/sprint-phoenix-epic/lifecycle.json`
+   still pinned the PRD digest `303586c8…` and the pre-R4 `acceptance.md` digest,
+   so the feature package was invalid and `artifact-topology-check`,
+   `threat-model-tests` and `external-reference-adapter-tests` all failed on it.
+   The manifest never followed those two artifacts when they legitimately changed
+   earlier today. Rebound from computed bytes, 13 entries checked, 2 changed
+   (`ece6041`). The recomputed PRD digest is `8b820ea5…` — the exact value the
+   authority decision moved to, which is when the drift began.
+2. **The fourth was `backlog-ledger-reconciliation-tests`, and the gate caught
+   me.** Its RBL01 asserts the repository needs no reconciliation; it went red the
+   moment I filed an item without a ledger entry. That is the invariant working
+   on its author (`96f6e92`).
+
+**And one briefing failure of mine.** The applying dispatch could not run verify
+at all: the gate requires an exactly clean tree and `.claude/settings.json` is
+permanently dirty here. That is recorded in my own notes and I left it out of the
+briefing. The dispatch stopped and said so rather than reaching for the obvious
+workaround — stashing the PO's local file — which is the right call and the
+reason the briefing forbade it. Measured afterwards from a detached worktree
+under `.git/`, removed again. **Every future dispatch whose DoD includes a verify
+run must be told this, or told to use a worktree.**
+
 **THE GATE, AND THE BLOCKER FOUND AT IT (2026-08-08).** Attempting the two
 gate-strength edits — rather than reading the guard again — showed both denials
 ending with "or authorizes the override below" and printing nothing below. A
