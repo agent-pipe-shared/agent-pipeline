@@ -42,7 +42,18 @@ const CAPABILITY_SCHEMA = "pipeline.human-guard-override-capability.v2";
 const AUDIT_SCHEMA = "pipeline.human-guard-override-audit.v1";
 const AUDIT_HEAD_SCHEMA = "pipeline.human-guard-override-audit-head.v1";
 const MAX_REASON_BYTES = 500;
-const DEFAULT_TTL_MS = 5 * 60_000;
+// 30 minutes, not 5 (PO, 2026-08-08). The window is sized for a HUMAN, and the
+// human step in the middle of it is: read the plan, recompute or read back the
+// intent digest, switch to a second terminal, unlock a key, type a passphrase.
+// At 5 minutes that flow only fits if nobody stops to check anything -- which
+// defeats the confirmation the ceremony exists to obtain, and was measured twice
+// on 2026-08-08 (two expired requests, one of them expiring while the PO was
+// signing it). Lengthening this does not widen WHAT is authorized by one byte:
+// the request stays bound to `toolInputSha256`, the plugin identity, the policy
+// preimage and the repository observation -- head, tree AND `statusSha256` -- so
+// any edit to the working tree, including the agent's own, still invalidates it
+// immediately. The only thing that grows is how long a human may take to answer.
+const DEFAULT_TTL_MS = 30 * 60_000;
 
 // ---------------------------------------------------------------------------------
 // Signed admission path (ADR-0059). A genuine, verified Ed25519 proof arms the
