@@ -105,11 +105,21 @@ Computing `--subject-sha256` correctly matters: it is
 `kind: "push"` the exact bound `subject` shape (from
 `authorizeRecordedPush` in `critical-action-authorization.mjs`) is
 `{ sourceCommit, remote, destination, threatModel: { path, sha256 } }` where
-`threatModel` is the fixed, repo-relative
-`specs/sprint-nova-epic/implementation/critical-action-authorization-threat-model.md`
-binding. Compute it by **importing the real function** in a throwaway script
-(`scratch/`, gitignored) — never hand-roll the hash. A wrong hash fails
-closed at verification, it does not silently accept.
+`threatModel` is the fixed, project-relative `project/push-threat-model.md`
+binding (`PUSH_THREAT_MODEL_DEFAULT_PATH` in `pipeline-state.mjs`) — the same
+path in every project, including a consumer's, never a sprint-specific one.
+If that file does not exist yet in the target project, create it first with:
+
+```
+node plugins/pipeline-core/scripts/pipeline-state.mjs materialize-push-threat-model --dir <repo>
+```
+
+which copies the plugin's shipped template into place (refuses if the file
+already exists, since overwriting it would invalidate any push proof already
+bound to its current bytes — move or remove it yourself first if you mean to
+replace it). Compute the hash by **importing the real function** in a
+throwaway script (`scratch/`, gitignored) — never hand-roll the hash. A wrong
+hash fails closed at verification, it does not silently accept.
 
 ### Layer 3 (superseded as a separate step) — sign it (human-only, by design — no override exists or should exist)
 
