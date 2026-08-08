@@ -346,11 +346,20 @@ function crossRepositoryMutationBlocked(overrideGuidance = "") {
  * matching sees one opaque word. That deliberately over-refuses -- a `git commit -m`
  * message merely naming one of these files is refused too. Over-refusal costs a `-F`
  * flag; under-refusal costs the gate. Read-only diagnostics are exempt via the existing
- * classifier, so `cat`, `rg`, `sha256sum` and `git diff` on these paths keep working.
+ * classifier, so `cat`, `rg`, `sha256sum` and `git diff` on these paths keep working --
+ * except for one measured, real, prescribed shape that classifier does not cover:
+ * `node <script> --guardrail <gate-strength-path> ...`, the exact command
+ * `skills/critic-review/SKILL.md`'s mandatory dispatch-admission step instructs an
+ * operator to run (it tells them to pass "every declared guardrail", a gate-strength
+ * path among them for a governance project). That shape is closed instead by the exact,
+ * closed exemption below (GATE_STRENGTH_SHELL_READ_ONLY_SCRIPTS): not "any read-only
+ * command", but one specific, provably write-free plugin-local script, matched on exact
+ * identity rather than shape.
  */
-function gateStrengthShellRefusal(command, root) {
+function gateStrengthShellRefusal(command, root, dependencies = {}) {
   if (typeof command !== "string" || command === "") return null;
   if (isReadOnlyDiagnosticCommand(command, root)) return null;
+  if (gateStrengthShellReadOnlyScriptExemption(command, root, dependencies)) return null;
   // Scoped to the five configuration paths (GS-1..GS-5) deliberately. The live plugin
   // root (GS-6) is NOT a needle here: executing a plugin script by absolute path is the
   // normal bootstrap and recovery shape, so matching the root would refuse
@@ -368,18 +377,97 @@ function gateStrengthShellRefusal(command, root) {
     2,
     "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
       + "GUARD-GATE-STRENGTH-SHELL: "
-      + `This command names ${hit}, a file whose contents decide how strong a gate is, `
-      + "and it is not a read-only diagnostic.\n"
-      + "An agent that can weaken the gate authorizing its own actions has no gate, and the "
-      + "Edit/Write refusal (GS-1..GS-5/GS-7) is worth nothing if a shell command reaches the same "
-      + "file. There is deliberately no in-session override for this shell-lane refusal itself -- "
-      + "not even the audited one.\n"
-      + "Reading is unaffected: cat, rg, head, sha256sum and git diff/log/show on these paths "
-      + "are admitted. To actually change this file, use the Edit or Write tool instead of a shell "
-      + "command: guard-gate-strength.mjs enforces the identical rule there and offers the audited "
+      + `This command names ${hit}, a file whose contents decide how strong a gate is.\n`
+      + `The match is on the file NAME ${hit} appearing in the command, not on a detected `
+      + "write: this rule cannot tell a read from a write inside an arbitrary shell command, "
+      + "so it refuses both rather than risk letting the gate-weakening write through.\n"
+      + "Reading is unaffected: cat, rg, head, sha256sum and git diff/log/show on this path "
+      + "are admitted, and so is the one exact, closed script exemption this rule grants "
+      + "(GATE_STRENGTH_SHELL_READ_ONLY_SCRIPTS) -- if this command was one of those shapes "
+      + "and was still refused, that is this classifier under-covering, not this file "
+      + "genuinely changing.\n"
+      + "To actually CHANGE this file, use the Edit or Write tool instead of a shell command: "
+      + "guard-gate-strength.mjs enforces the identical rule there and offers the audited "
       + "human-guard-override ceremony (chat- or signature-mode, matching whatever "
-      + "gates.push_approval is actually committed) -- never a hand-edit outside a session.\n",
+      + "gates.push_approval is actually committed) -- never a hand-edit outside a session. "
+      + "There is deliberately no in-session override for this shell-lane refusal itself -- "
+      + "not even the audited one.\n",
   );
+}
+
+/**
+ * AC-2 (backlog 2026-08-08-the-gate-strength-shell-lane-refuses-the-read-only-critic-
+ * preflight.md, C2). The ONLY relief this shell lane grants beyond the ordinary read-only
+ * diagnostic classifier above: a closed, exact exemption for plugin-local scripts that are
+ * PROVABLY write-free. "Provably" is not asserted here -- GST3x in
+ * guard-gate-strength.test.mjs walks each entry's source and its transitive plugin-local
+ * relative imports for a filesystem-write API on every run (AC-3), so this list stays
+ * honest rather than becoming a second, uninspected trust boundary.
+ *
+ * Frozen literal, never agent-settable: no environment variable, config key, or other
+ * agent-chosen input selects membership. A prior dispatch in this block implemented
+ * project configuration as `process.env[...]`, turning an agent-chosen value into a
+ * security input; it was rejected and removed. Membership changes only by editing this
+ * source file, which is itself Edit/Write-tool territory under ordinary review.
+ *
+ * AC-1 measured (scratch/c2-ac1-measurement.mjs): `buildPacket()`
+ * (lib/critic-packet-governance.mjs) already auto-requires `.claude/pipeline.yaml` in the
+ * returned `guardrails` array whenever the candidate manifest declares a `governance`
+ * block, even with an EMPTY `--guardrail` list. This exemption is granted anyway: SKILL.md
+ * still instructs the operator to pass every declared guardrail explicitly (`critic-
+ * review/SKILL.md:32/:71`), and an operator who follows that instruction and names a path
+ * the preflight itself reports as required must not be punished for it.
+ */
+export const GATE_STRENGTH_SHELL_READ_ONLY_SCRIPTS = Object.freeze([
+  Object.freeze({
+    path: "scripts/critic-dispatch-preflight.mjs",
+    reason: "skills/critic-review/SKILL.md's mandatory dispatch-admission step instructs "
+      + "the operator to pass every declared guardrail path -- a gate-strength path among "
+      + "them for a governance project (SKILL.md:32/:71) -- and preflightCriticDispatch() "
+      + "has zero filesystem-write calls: it only parses and reports.",
+  }),
+]);
+
+/**
+ * Fires ONLY when: the command's first word is a trusted `node` executable (the same
+ * platform-aware direct-name-or-trusted-execPath check `isRestartResumeHintCapture()`
+ * above already uses); its second word, resolved against `root` exactly as every other
+ * path argument in this file is (`commandPath()`), is EXACTLY one of the frozen entries
+ * above joined onto this module's own resolved plugin root; and that resolved candidate
+ * also passes the realpath-safe containment walk this file already has
+ * (`isPathWithinRealpathedRoot`, exported elsewhere as `isProjectWritePath`) against that
+ * same root -- so a symlink planted to redirect the exact-match candidate elsewhere cannot
+ * slip through. Nothing else about the command is inspected or assumed: extra flags, extra
+ * words, or a write to a gate-strength path elsewhere in the SAME command line all fall
+ * through untouched (AC-5 pins the write-smuggling case) -- they still reach the ordinary
+ * substring refusal, or GUARD-CROSS-REPO-MUTATION / GS-1..GS-5/GS-7's Edit lane, exactly as
+ * before this exemption existed.
+ *
+ * The plugin root used here is THIS module's own resolved location (`PLUGIN_ROOT`, GS-6's
+ * "the copy that is CURRENTLY ENFORCING"), never the project root a command happens to
+ * name -- a vendored `plugins/pipeline-core/` inside some OTHER governed project is not
+ * trusted merely for sharing a relative path; only the installed copy actually running
+ * this check is.
+ */
+function gateStrengthShellReadOnlyScriptExemption(command, root, dependencies = {}) {
+  const words = simpleWords(command, root);
+  if (!words || words.length < 2) return false;
+  const platform = dependencies.platform ?? process.platform;
+  const directNode = platform === "win32" ? ["node", "node.exe"] : ["node"];
+  const trustedNode = dependencies.processExecPath ?? process.execPath;
+  if (![...directNode, trustedNode].includes(words[0])) return false;
+  const scriptArg = words[1];
+  if (typeof scriptArg !== "string" || scriptArg === "" || scriptArg.startsWith("-")) return false;
+  const realpath = dependencies.realpathSyncFn ?? realpathSync;
+  let pluginRoot;
+  try {
+    pluginRoot = realpath(PLUGIN_ROOT);
+  } catch {
+    return false;
+  }
+  const resolvedScript = resolve(root, scriptArg);
+  return GATE_STRENGTH_SHELL_READ_ONLY_SCRIPTS.some((entry) => resolve(pluginRoot, entry.path) === resolvedScript
+    && isPathWithinRealpathedRoot(resolvedScript, pluginRoot, dependencies));
 }
 
 function externalPoSigningOnly() {
@@ -1436,7 +1524,7 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
     return externalPoSigningOnly();
   }
   if (SHELL_TOOLS.includes(toolName)) {
-    const gateStrength = gateStrengthShellRefusal(input.tool_input.command, root);
+    const gateStrength = gateStrengthShellRefusal(input.tool_input.command, root, dependencies);
     if (gateStrength !== null) return gateStrength;
   }
   // PowerShell reaches the gate-strength check above and nothing else, deliberately.
