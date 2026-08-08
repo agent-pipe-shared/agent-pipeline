@@ -325,18 +325,52 @@ check("Pipeline Author Repair selects one exact source root and consumes one pat
   assert.equal(decision(run(input, root)).permissionDecision, "deny");
 });
 
+// The `doesNotMatch(/Human override available/)` this check carried until c609ac0 was a
+// PROXY, not the property. When fe59eb4 wrote it (2026-08-01), GUARD-CROSS-REPO-MUTATION had
+// no human-override route at all, so "no route text" and "no self-service retry loop" were
+// the same observation. c609ac0 routed that denial class through HGO (ADR-0059 Decision 6),
+// and this command was already HGO-classifiable before then -- eligibility()'s
+// exactLocalPluginInstall / "global-plugin-install" mode landed in a483675, an ancestor of
+// b108b3e. Measured, not inferred: this check is green at c609ac0^ and red at c609ac0, and
+// b108b3e (the out-of-root eligible class) is not involved.
+//
+// The property fe59eb4 actually fixed survives intact and is pinned positively below. The
+// defect it closed was an agent-executable LOOP: the cross-repository denial used to route to
+// HGO-NARROWER-WRITER-REQUIRED, whose next action is `verify-audit` followed by "retry the
+// exact original denial" -- every step runnable by the agent alone, ending back at the same
+// denial without ever changing the allowed execution boundary. What replaced it is one
+// terminal external boundary. The override route now printed alongside it is not that loop:
+// it terminates at a human authorization the agent cannot issue for itself, which is a
+// different thing from a self-service retry and is asserted as such.
 check("local plugin-cache installation returns one external boundary without an audit retry loop", () => {
   const output = decision(run({
     tool_name: "Bash",
     tool_input: { command: "codex plugin add pipeline-core@agent-pipeline-local" },
   }, join(pluginRoot, "..", "..")));
   assert.equal(output.permissionDecision, "deny");
-  assert.match(output.permissionDecisionReason, /GUARD-CROSS-REPO-MUTATION/u);
-  assert.match(output.permissionDecisionReason, /HGO-EXTERNAL-PLUGIN-CACHE-BOUNDARY/u);
-  assert.match(output.permissionDecisionReason, /separate-session-rooted-at-plugin-cache/u);
-  assert.doesNotMatch(output.permissionDecisionReason, /verify-audit/u);
-  assert.doesNotMatch(output.permissionDecisionReason, /effect-reconciliation-required/u);
-  assert.doesNotMatch(output.permissionDecisionReason, /Human override available/u);
+  const reason = output.permissionDecisionReason;
+  assert.match(reason, /GUARD-CROSS-REPO-MUTATION/u);
+  assert.match(reason, /HGO-EXTERNAL-PLUGIN-CACHE-BOUNDARY/u);
+  assert.match(reason, /separate-session-rooted-at-plugin-cache/u);
+  assert.doesNotMatch(reason, /verify-audit/u);
+  assert.doesNotMatch(reason, /effect-reconciliation-required/u);
+  // ONE external boundary, still: the denial names it exactly once, so the agent is given a
+  // single terminal destination rather than a menu of competing recoveries.
+  assert.equal((reason.match(/HGO-EXTERNAL-PLUGIN-CACHE-BOUNDARY/gu) ?? []).length, 1);
+  assert.equal((reason.match(/separate-session-rooted-at-plugin-cache/gu) ?? []).length, 1);
+  // NO audit retry loop, still: nothing instructs the agent to re-run the denied command
+  // after a step it could have taken by itself.
+  assert.doesNotMatch(reason, /retry the exact original denial/u);
+  assert.doesNotMatch(reason, /fresh emergency plan/u);
+  // The route that IS offered is human-gated, which is why it is not a loop: the decisive
+  // step is an authorization the agent cannot mint. Asserted mode-independently -- this
+  // fixture runs against the real repository root, whose committed push_approval mode is not
+  // this check's subject; both modes route through `prepare-authorization`, and neither lets
+  // the agent clear the denial by repeating it.
+  if (/Human override available/u.test(reason)) {
+    assert.match(reason, /prepare-authorization --repo/u,
+      "an override route was advertised without the human authorization step that gates it");
+  }
 });
 
 check("override persistence failure remains a sanitized fail-closed denial", () => {

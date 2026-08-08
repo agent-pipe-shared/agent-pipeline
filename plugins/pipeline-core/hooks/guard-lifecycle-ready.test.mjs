@@ -1490,10 +1490,15 @@ function hgoArmByChat(root, toolInput, denials) {
   assert.equal(armed.status, "armed", `chat arm failed: ${JSON.stringify(armed)}`);
 }
 
-/** Arms a real one-time capability via a genuine detached Ed25519 proof (ADR-0059 Decision 1). */
-function hgoArmBySignature(root, toolInput, denials) {
+/**
+ * Arms a real one-time capability via a genuine detached Ed25519 proof (ADR-0059 Decision 1).
+ * `toolName` defaults to "Bash" -- every pre-existing caller arms a command -- and is passed
+ * explicitly by NOVA-XREPO-HGO-6, which arms an out-of-root Edit (ADR-0059 Decision 6's
+ * "cross-repository-target" class is reached through a write target, not a command).
+ */
+function hgoArmBySignature(root, toolInput, denials, toolName = "Bash") {
   const shared = { rootDir: root, pluginRoot: HGO_PLUGIN_ROOT, scriptPath: HGO_OVERRIDE_SCRIPT };
-  const recorded = recordHumanGuardDenial({ ...shared, toolName: "Bash", toolInput, denials });
+  const recorded = recordHumanGuardDenial({ ...shared, toolName, toolInput, denials });
   assert.equal(recorded.status, "planned", `denial not plannable: ${JSON.stringify(recorded)}`);
   const planned = planHumanGuardOverride({ ...shared, requestSha256: recorded.requestSha256 });
   const prepared = prepareHumanGuardOverrideAuthorization({
@@ -1623,10 +1628,24 @@ test("NOVA-LCR-HGO-1: an unusable override store leaves the plain grammar refusa
 // contract correction under a superseding ADR, not a test bent to fit code: the
 // GUARD-LIFECYCLE-NOT-READY half is kept, unchanged in force, in every test below.
 //
-// Measured boundary, pinned in NOVA-XREPO-HGO-6 rather than left as prose: HGO's own
-// eligibility() classifies a target outside the physical project root as
-// HGO-NONOVERRIDABLE-CROSS-BOUNDARY, so no capability can be armed for those from this
-// guard. They get the typed "no route, and why" line, never silence, and never admission.
+// Measured boundary, pinned in NOVA-XREPO-HGO-6 rather than left as prose. This boundary
+// MOVED in b108b3e, and the pin moved with it. Until then, HGO's own eligibility() refused
+// ANY target outside the physical project root as HGO-NONOVERRIDABLE-CROSS-BOUNDARY, so no
+// capability could be armed for one; NOVA-XREPO-HGO-6 pinned exactly that, as "refused, and
+// told why no route exists". b108b3e closed that residual gap -- Decision 6's reversal is
+// pointless if the class it makes liftable cannot be classified -- by adding the
+// "cross-repository-target" eligible class. An out-of-root target is therefore now REFUSED
+// BUT ROUTABLE, on explicitly narrowed terms: the plan carries a scopeAttestation naming
+// what the override does NOT prove (the out-of-root target's identity, existence, git
+// status, or freedom from a symlink swap), because HGO's physical-identity model cannot
+// reach outside this repository's own root.
+//
+// What did NOT move, and is what NOVA-XREPO-HGO-6 now pins as the no-route half: a
+// candidate that safePath() refuses for a reason OTHER than escaping root -- above all an
+// in-root symlink escaping root, and any target matching the sensitive-path pattern -- is
+// still HGO-NONOVERRIDABLE-CROSS-BOUNDARY, still unarmable, and still gets the typed
+// "no route, and why" line rather than silence. crossBoundaryTarget() rescues a genuine
+// cross-repository target, never an attack on the in-root symlink-safety walk.
 
 /** Cross-repository denials whose tool input HGO can classify, so a capability can actually be armed. */
 const XREPO_COMMAND = "codex plugin add pipeline-core@agent-pipeline-local";
@@ -1728,20 +1747,24 @@ test("NOVA-XREPO-HGO-5: GUARD-LIFECYCLE-NOT-READY is never liftable, armed capab
   } finally { rmSync(sigRoot, { recursive: true, force: true }); }
 });
 
-test("NOVA-XREPO-HGO-6: an out-of-root target is refused and reports why no route exists, instead of silence", () => {
+test("NOVA-XREPO-HGO-6: an out-of-root target is refused but routable on narrowed terms, while a still-unroutable one reports why instead of falling silent", () => {
   const sigRoot = hgoGitFixture("signature");
   const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-hgo-outside-"));
   try {
     const target = join(outside, "outside.mjs");
-    const result = evaluateLifecycleReadyGuard(edit(target), { projectDir: sigRoot, ...hgoReadyDeps() });
-    assert.equal(result.exitCode, 2);
-    assert.match(result.stderr, /GUARD-CROSS-REPO-MUTATION/u);
-    assert.doesNotMatch(result.stderr, /capability consumed/u);
-    assert.doesNotMatch(result.stderr, /Human override available/u);
-    assert.match(result.stderr, /No human override route is offered for this exact write/u);
-    assert.match(result.stderr, /status=external-operator-required/u);
-    // The boundary is HGO's eligibility(), not this guard's wiring: no capability can be
-    // armed for an out-of-root target, so there is nothing for the guard to consume.
+
+    // (a) Liftable is not the same as allowed: unarmed, the write is still refused.
+    const unarmed = evaluateLifecycleReadyGuard(edit(target), { projectDir: sigRoot, ...hgoReadyDeps() });
+    assert.equal(unarmed.exitCode, 2, "an unarmed agent gained admission to an out-of-root target");
+    assert.match(unarmed.stderr, /GUARD-CROSS-REPO-MUTATION/u);
+    assert.doesNotMatch(unarmed.stderr, /capability consumed/u);
+    // ... and it now NAMES a route, where it previously reported that none existed.
+    assert.match(unarmed.stderr, /Human override available for this exact write/u);
+    assert.doesNotMatch(unarmed.stderr, /No human override route is offered/u);
+
+    // (b) The route is classified into its own eligible class, and the record a human reads
+    //     before signing states what this class cannot prove -- the honesty Decision 6 requires
+    //     of it, asserted against the persisted plan rather than trusted as prose.
     const recorded = recordHumanGuardDenial({
       rootDir: sigRoot,
       pluginRoot: HGO_PLUGIN_ROOT,
@@ -1749,7 +1772,57 @@ test("NOVA-XREPO-HGO-6: an out-of-root target is refused and reports why no rout
       toolInput: { file_path: target },
       denials: xrepoDenials(),
     });
-    assert.equal(recorded.status, "external-operator-required");
+    assert.equal(recorded.status, "planned", `an out-of-root target was not plannable: ${JSON.stringify(recorded)}`);
+    const planned = planHumanGuardOverride({
+      rootDir: sigRoot,
+      pluginRoot: HGO_PLUGIN_ROOT,
+      scriptPath: HGO_OVERRIDE_SCRIPT,
+      requestSha256: recorded.requestSha256,
+    });
+    assert.equal(planned.commandClass, "cross-repository-target");
+    const attestation = planned.preview.scopeAttestation;
+    assert.equal(attestation.schema, "pipeline.human-guard-override-scope-attestation.v1");
+    assert.ok(
+      attestation.doesNotProve.some((entry) => /identity, existence, or git status of the out-of-root target/u.test(entry)),
+      `the plan did not state that the out-of-root target's identity is unproven: ${JSON.stringify(attestation)}`,
+    );
+    assert.ok(
+      attestation.doesNotProve.some((entry) => /symlink-safety walk/u.test(entry)),
+      `the plan did not state that no symlink-safety walk runs out of root: ${JSON.stringify(attestation)}`,
+    );
+
+    // (c) A genuine signature-armed capability admits the exact out-of-root write, once.
+    hgoArmBySignature(sigRoot, { file_path: target }, xrepoDenials(), "Edit");
+    const armed = evaluateLifecycleReadyGuard(edit(target), { projectDir: sigRoot, ...hgoReadyDeps() });
+    assert.equal(armed.exitCode, 0, `a signature-armed out-of-root write was not admitted: ${armed.stderr}`);
+    assert.match(armed.stderr, /GUARD-CROSS-REPO-MUTATION: exact one-time capability consumed/u);
+    const replay = evaluateLifecycleReadyGuard(edit(target), { projectDir: sigRoot, ...hgoReadyDeps() });
+    assert.equal(replay.exitCode, 2, "a consumed capability admitted a second out-of-root write");
+    assert.doesNotMatch(replay.stderr, /capability consumed/u);
+
+    // (d) The no-route half, on the boundary that did NOT move: a sensitive out-of-root
+    //     target is refused by crossBoundaryTarget()'s own hardBoundaryPath() check, so no
+    //     capability can be armed for it -- and that refusal still says WHY, in typed
+    //     tokens, rather than printing a bare denial.
+    const sensitive = join(outside, "secrets.txt");
+    const noRoute = evaluateLifecycleReadyGuard(edit(sensitive), { projectDir: sigRoot, ...hgoReadyDeps() });
+    assert.equal(noRoute.exitCode, 2);
+    assert.match(noRoute.stderr, /GUARD-CROSS-REPO-MUTATION/u);
+    assert.doesNotMatch(noRoute.stderr, /capability consumed/u);
+    assert.doesNotMatch(noRoute.stderr, /Human override available/u);
+    assert.match(noRoute.stderr, /No human override route is offered for this exact write/u);
+    assert.match(
+      noRoute.stderr,
+      /Reason: the override planner returned status=external-operator-required, code=HGO-EXTERNAL-PROJECT-BOUNDARY \(/u,
+    );
+    const refused = recordHumanGuardDenial({
+      rootDir: sigRoot,
+      pluginRoot: HGO_PLUGIN_ROOT,
+      toolName: "Edit",
+      toolInput: { file_path: sensitive },
+      denials: xrepoDenials(),
+    });
+    assert.equal(refused.status, "external-operator-required");
   } finally {
     rmSync(sigRoot, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });
@@ -1867,6 +1940,18 @@ test("NOVA-LCR-HGO-2: an armed matching capability does not bypass GUARD-LIFECYC
 // non-`planned` status is the route machinery ANSWERING ("not this way"), a throw is the
 // route machinery being unable to answer at all.
 //
+// The originally observed fixture no longer reproduces, and the check was re-pointed rather
+// than relaxed. b108b3e (ADR-0059 Decision 6) made a path outside the repository root an
+// eligible "cross-repository-target", so the exact field case above now returns `planned`
+// and prints a route -- it can no longer stand in for "planning answered, but not with a
+// route". It is replaced below by a fixture that still genuinely produces a planner ANSWER,
+// and deliberately by the one Decision 6 left untouched on purpose: an IN-ROOT symlink that
+// escapes root. crossBoundaryTarget() rescues a genuine cross-repository target, never a
+// candidate safePath() refused for failing its in-root symlink-safety walk, so that case is
+// still HGO-NONOVERRIDABLE-CROSS-BOUNDARY and still yields exactly the status/code pair this
+// check has always pinned. The property under test is unchanged: a refusal that cannot offer
+// a route says so, and says why.
+//
 // What the reason may disclose is bounded by construction, not by care --
 // humanGuardRouteUnavailableReason() in lib/human-guard-override.mjs renders a typed status
 // and a typed code and nothing else. The tests below assert that bound positively (against
@@ -1922,12 +2007,17 @@ test("NOVA-HGOSIG-ROUTE-1: a grammar denial whose route planning returns a non-p
     const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-outside-"));
     roots.push(outside);
 
-    // (a) The case actually observed: an absolute path outside the repository root, which
-    // HGO classifies as a project-boundary crossing and never plans.
+    // (a) A path that reaches outside the repository root through an IN-ROOT SYMLINK. HGO
+    // classifies this as a project-boundary crossing and never plans it: safePath() refuses
+    // it on its symlink-safety walk, and crossBoundaryTarget() does not rescue it, because
+    // the candidate itself does not escape root -- only what it points at does. (The plain
+    // out-of-root path this case used before b108b3e is now a plannable
+    // "cross-repository-target"; NOVA-XREPO-HGO-6 pins that new contract.)
     const crossRoot = hgoGitFixture("signature");
     roots.push(crossRoot);
+    symlinkSync(outside, join(crossRoot, "escape"), "dir");
     const cross = evaluateLifecycleReadyGuard(
-      bash(`rg -n lifecycle ${join(outside, "notes.txt")} | tee output.txt`),
+      bash(`rg -n lifecycle ${join(crossRoot, "escape", "notes.txt")} | tee output.txt`),
       { projectDir: crossRoot },
     );
     assert.equal(cross.exitCode, 2);
@@ -1957,6 +2047,27 @@ test("NOVA-HGOSIG-ROUTE-1: a grammar denial whose route planning returns a non-p
     );
     assert.doesNotMatch(ineligible.stderr, /Human override available/u);
     assertReasonDisclosesNothing(ineligible.stderr, grammarRoot);
+
+    // (c) A different non-planned STATUS, not merely a different code under the same one --
+    // the check claims the guard reports whatever status planning returns, and (a) and (b)
+    // both happen to be `external-operator-required`. A sensitive out-of-root target is
+    // refused by crossBoundaryTarget()'s hardBoundaryPath() check and routed to a narrower
+    // typed recovery instead, so it exercises the other status class end to end.
+    const narrowerRoot = hgoGitFixture("signature");
+    roots.push(narrowerRoot);
+    const narrower = evaluateLifecycleReadyGuard(
+      bash(`rg -n lifecycle ${join(outside, "secrets.txt")} | tee output.txt`),
+      { projectDir: narrowerRoot },
+    );
+    assert.equal(narrower.exitCode, 2);
+    assert.match(
+      narrower.stderr,
+      /Reason: the override planner returned status=narrower-recovery-required, code=HGO-NARROWER-WRITER-REQUIRED \(/u,
+    );
+    assert.doesNotMatch(narrower.stderr, /planning the route failed/u,
+      "a planner ANSWER must not be reported as a planner FAILURE");
+    assert.doesNotMatch(narrower.stderr, /Human override available/u);
+    assertReasonDisclosesNothing(narrower.stderr, narrowerRoot);
   } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
 });
 
