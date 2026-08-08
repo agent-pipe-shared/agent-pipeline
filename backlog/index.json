@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "12ec27afa8eb4f2f0538de9bf17f57e14b42f643fa6618c5b25d38ddc8a09b4b"
+    "transitionHead": "0fa2fb602c1a4317f50e7cd98e5d2706c0720133fbc03fba7c07b01479310e6b"
   },
   "counts": {
-    "open": 74,
+    "open": 75,
     "in_progress": 21,
     "closed": 25
   },
@@ -973,6 +973,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "PO handover from a separate session (agent-pipeline-share_phoenix), submitted through the PO's own channel, 2026-08-07."
+    },
+    {
+      "id": "pipeline.temp-directories-leak-until-the-filesystem-refuses-every-write",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Observed live on 2026-08-08: the tmpfs inode table on the PO's machine was exhausted, blocking every process that needed to create a file. Diagnosed jointly with the PO from df/mount output during the 0.5.4 candidate run."
     },
     {
       "id": "pipeline.three-smaller-greenfield-defects",
