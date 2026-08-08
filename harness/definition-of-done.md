@@ -2,7 +2,7 @@
 
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 3
 
-**Status:** Binding harness contract. Agent-facing, therefore English (ADR-0011 — primary readers are Elephant/Goldfish/Critic sessions and the plugin skills). Operationalizes **ADR-0005** (two-part DoD), the process-toll table in `docs/operating-model.md` §3.3, and the three-valued verification-status practice inherited from an earlier project. The deterministic gate-chain semantics are specified in `guardrails/quality-gates.md`; the review flow in `harness/review-protocol.md`; session duties in `harness/checklists/`. Precedence on contradiction: the decision register > ADRs > `docs/operating-model.md` > this file.
+**Status:** Binding harness contract. Agent-facing, therefore English (ADR-0011 — primary readers are Elephant/Goldfish/Critic sessions and the plugin skills). Operationalizes **ADR-0005** (two-part DoD), the process-toll table in `docs/operating-model.md` — *Rigor, risk and gates*, and the three-valued verification-status practice inherited from an earlier project. The deterministic gate-chain semantics are specified in `guardrails/quality-gates.md`; the review flow in `harness/review-protocol.md`; session duties in `harness/checklists/`. Precedence on contradiction: the decision register > ADRs > `docs/operating-model.md` > this file.
 
 ---
 
@@ -47,7 +47,7 @@ Copy this block into the task/spec (rigor ≥ 1) or the issue/brief (rigor 0). S
 - [ ] B1 Critic ran per trigger table where mandatory (`harness/review-protocol.md` §2.1); findings report present
 - [ ] B2 Every blocker/major finding dispositioned: fixed / rejected with recorded justification / escalated to the PO
 - [ ] B3 Spec fidelity: all deviations reported, none silently built in — rigor 2 additionally: spec updated BEFORE merge
-- [ ] B4 Completion report complete (6 fields, `docs/operating-model.md` §2.3) incl. "Deliberately NOT changed" rubric
+- [ ] B4 Completion report complete (6 fields, `docs/operating-model.md` — *Roles and boundaries*) incl. "Deliberately NOT changed" rubric
 - [ ] B5 Human gate passed where triggered: {{HUMAN_GATE}}
 - [ ] B6 Everything not machine- or human-verified yet is listed honestly (feeds the 🟡 status, §3)
 
@@ -74,12 +74,12 @@ Copy this block into the task/spec (rigor ≥ 1) or the issue/brief (rigor 0). S
 | `🟡 not-human-verified` | Part A green, mandatory Critic processed — but a human verification ({{HUMAN_GATE}}: PIE run, live devices, spot check) is still pending. | Elephant, listing exactly WHAT is unverified |
 | `blocked` | A mandatory item cannot pass: verify red after the separate two-attempt retry rule, a stop condition fired, a correction need beyond 3 fresh local rework cycles, or a PO decision pending. | Goldfish (stop) or Elephant (gate), with reason + escalation rung (`harness/review-protocol.md` §4) |
 
-Per-check results inside reports are three-valued as well: **pass / fail / not verifiable** (`docs/operating-model.md` §2.3, report field 1).
+Per-check results inside reports are three-valued as well: **pass / fail / not verifiable** (`docs/operating-model.md` — *Roles and boundaries*, report field 1).
 
 **Transition rules:**
 
 - `🟡 → done` only through the named human verification; the clearance is recorded in HISTORY/commit (an earlier project's practice: "confirmed in PIE").
-- **🟡-Merge rule:** the human gate no longer blocks the merge by default — it gates the **done declaration** only. Merge may proceed while a mandatory human verification (§4 / OM §3.2 step 9) is still pending when ALL of the following hold: (a) a **rollback anchor** exists — a pre-merge tag/commit reference recorded in the handover file ("a step-back to the previous state must always be possible in an emergency," the PO); (b) the project calibration documents a **per-project rollback procedure** (field `rollback`, OM §8); (c) the 🟡 entry **persists in the handover file** until the PO verifies it, and continues to count against the WIP limit; (d) **external effect is unaffected** — a 🟡-merge means the code lives in the repo; a live deploy still requires consent per the global rule (`guardrails/global.md`). If the project calibration defines verification as non-gating (e.g. spot checks), merge proceeds the same way and the 🟡 entry persists until cleared.
+- **🟡-Merge rule:** the human gate no longer blocks the merge by default — it gates the **done declaration** only. Merge may proceed while a mandatory human verification (§4 / `docs/operating-model.md` — *The lifecycle*, step 9) is still pending when ALL of the following hold: (a) a **rollback anchor** exists — a pre-merge tag/commit reference recorded in the handover file ("a step-back to the previous state must always be possible in an emergency," the PO); (b) the project calibration documents a **per-project rollback procedure** (field `rollback`, `docs/operating-model.md` — *Project calibration and extensions*); (c) the 🟡 entry **persists in the handover file** until the PO verifies it, and continues to count against the WIP limit; (d) **external effect is unaffected** — a 🟡-merge means the code lives in the repo; a live deploy still requires consent per the global rule (`guardrails/global.md`). If the project calibration defines verification as non-gating (e.g. spot checks), merge proceeds the same way and the 🟡 entry persists until cleared.
 - `blocked → anything` only via the escalation ladder (`harness/review-protocol.md` §4) — never by silently re-running until green looks achievable.
 
 **Prohibitions:** No `done` while a 🟡 item exists for the task. No silent clearing of 🟡. No reclassifying a `fail` as `not verifiable` to dodge `blocked`.
@@ -90,9 +90,9 @@ Per-check results inside reports are three-valued as well: **pass / fail / not v
 
 ## 4. DoD per rigor level (process toll, operationalized)
 
-Invariant first: **A1–A5 (verify + evidence) are mandatory at every level — there is no path around the deterministic gates** (OM §3.3). Everything else scales with the rigor level:
+Invariant first: **A1–A5 (verify + evidence) are mandatory at every level — there is no path around the deterministic gates** (`docs/operating-model.md` — *Rigor, risk and gates*). Everything else scales with the rigor level:
 
-**Rigor-0 eligibility (canonical definition):** `docs/operating-model.md` §3.3 carries the full stage-0 fast-path definition — size limits, exclusion list, risk-flag zones, worked examples. This table does not repeat it, it only lists the resulting DoD toll per rigor column; a task that fails the OM §3.3 criteria is not rigor-0 regardless of what this table shows.
+**Rigor-0 eligibility (canonical definition):** `docs/operating-model.md` — *Rigor, risk and gates* carries the full stage-0 fast-path definition — size limits, exclusion list, risk-flag zones, worked examples. This table does not repeat it, it only lists the resulting DoD toll per rigor column; a task that fails those criteria is not rigor-0 regardless of what this table shows.
 
 | Requirement | Rigor 0 (issue-only) | Rigor 1 (delta spec) | Rigor 2 (spec-anchored) | DoD item |
 |---|---|---|---|---|
@@ -101,20 +101,20 @@ Invariant first: **A1–A5 (verify + evidence) are mandatory at every level — 
 | verify + evidence | **MANDATORY** | **MANDATORY** | **MANDATORY** | A1–A3 |
 | Test integrity + gate honesty | MANDATORY | MANDATORY | MANDATORY | A4–A5 |
 | Critic | only with risk flag → then per trigger table | per risk class | MANDATORY (review-tier model standard; escalated to a higher-capability model per canonical trigger, `harness/review-protocol.md` §2.1) | B1–B2 |
-| Human gate | only with risk flag | per criteria (OM §3.2 step 9) | default: yes | B5 |
+| Human gate | only with risk flag | per criteria (`docs/operating-model.md` — *The lifecycle*, step 9) | default: yes | B5 |
 | Worktree | per calibration (write scope) | per calibration | per calibration (default: yes) | dispatch precondition |
 | Lessons / doc sync | bundled entry allowed | per block | per block | C3 |
 | Spec maintenance after merge | — | spec may age (spec-first) | deviations reported + spec updated BEFORE merge | B3 |
 | Three-artifacts archive | — | MANDATORY | MANDATORY | C4 |
 
-**Why:** Process overhead must stay proportional to task size (OM §3.3; SDD critique: overhead ∝ 1/task size) — but size never protects against risk: the risk flag pulls Critic and human gate into rigor 0. A 3-line hook diff is still a guardrail change.
+**Why:** Process overhead must stay proportional to task size (`docs/operating-model.md` — *Rigor, risk and gates*; SDD critique: overhead ∝ 1/task size) — but size never protects against risk: the risk flag pulls Critic and human gate into rigor 0. A 3-line hook diff is still a guardrail change.
 **Check:** Triage records rigor + risk class in the task head; the gate decision names the applied column; a Critic can reconstruct the applicable column from those two values alone.
 
 ---
 
 ## 5. Project slots
 
-Slots come from the committed project calibration at its resolved authority tier — `project/pipeline.json`, else `.claude/pipeline.json` (field sketch: `docs/operating-model.md` §8). Never hardcode them — the pipeline runs on two machines with differing paths.
+Slots come from the committed project calibration at its resolved authority tier — `project/pipeline.json`, else `.claude/pipeline.json` (field sketch: `docs/operating-model.md` — *Project calibration and extensions*). Never hardcode them — the pipeline runs on two machines with differing paths.
 
 | Slot | Meaning | Calibration source |
 |---|---|---|
@@ -129,7 +129,7 @@ Slots come from the committed project calibration at its resolved authority tier
 
 ## 6. Where the DoD is applied
 
-| Moment (SDLC step, OM §3.2) | Actor | Items checked |
+| Moment (SDLC step, `docs/operating-model.md` — *The lifecycle*) | Actor | Items checked |
 |---|---|---|
 | Delivery (steps 5–6) | Goldfish reports; Elephant validates | A1–A5, B4 |
 | Critic review (step 7) | Critic | uses A/B as review basis; flags unticked mandatory items |

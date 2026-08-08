@@ -1,6 +1,6 @@
 # Checklist — Session Close / Block End
 
-> Agent-Pipeline · Compact operative reference for the Elephant; why + verification live in `docs/operating-model.md` §5–§7, `policies/model-policy.md` MP-16/MP-19/MP-20, ADR-0012. Executable form: the unified close coordinator plus the compatibility skills in `plugins/pipeline-core`.
+> Agent-Pipeline · Compact operative reference for the Elephant; why + verification live in `docs/operating-model.md`, `policies/model-policy.md` MP-16/MP-19/MP-20, ADR-0012. Executable form: the unified close coordinator plus the compatibility skills in `plugins/pipeline-core`.
 
 ## Close the block honestly
 
@@ -32,7 +32,7 @@
 - [ ] Merge-completion gate: post-merge handover update done (deterministic check)
 - [ ] CLAUDE.md length gate green: ≤ {{CLAUDE_MD_MAX_LINES}} — growing means consolidating, moving to skills/hooks, or deleting
 - [ ] Memory is mirror only — contradictions corrected in favor of the repo
-- [ ] Authorship check (sub-step 6b — before Learn + measure): session's production diffs enumerated (`git log`/diff stat over the session range); mandatory question answered — "Whose are this session's production diffs?" — every diff maps to a Goldfish/Critic dispatch or the OM §3.3 stage-0 fast path; Elephant-authored diff outside stage-0 → INCIDENT (flag to the PO, note in handover + telemetry), never a retro discussion point
+- [ ] Authorship check (sub-step 6b — before Learn + measure): session's production diffs enumerated (`git log`/diff stat over the session range); mandatory question answered — "Whose are this session's production diffs?" — every diff maps to a Goldfish/Critic dispatch or the `docs/operating-model.md` — *Rigor, risk and gates* stage-0 fast path; Elephant-authored diff outside stage-0 → INCIDENT (flag to the PO, note in handover + telemetry), never a retro discussion point
 - [ ] If `publicPushIdentity.mode: required`: final exact-commit Verify plus required privacy/security evidence is green; `ssh -T <sshHostAlias>` readback names the calibrated dedicated account; only the explicit approved feature branch was pushed; a fresh/disposable fetch-back equals the pushed OID. Any failure is recorded as unfinished/blocked — never substitute a main merge, tag, release, force-push or deletion.
 
 ## Learn + measure
@@ -40,10 +40,10 @@
 - [ ] Self-retro filed (supersedes the former the PO retro question + deferred-retro placeholder): session elephant writes the close retro itself — concrete improvement item(s) or explicit "nothing" — as a `workflow-improvement` backlog item / transfer note to the pipeline elephant (continuous-improvement process); never silently skipped. the PO's observations go via his own channel, no ritual prompt.
 - [ ] Tooling radar due? Newest `tooling-radar` backlog item vs. current calendar month — overdue → report loudly + recommend a radar dispatch (tooling-policy R2; anchored in close-block step 7)
 - [ ] `workflow-improvement` items filed in the pipeline repo's `backlog/`
-- [ ] Agent failure traced to a missing/vague rule → rule added/sharpened in the right artifact (growth rule, OM §7)
+- [ ] Agent failure traced to a missing/vague rule → rule added/sharpened in the right artifact (growth rule, `docs/operating-model.md` — *The lifecycle*)
 - [ ] Three-artifacts archive for rigor ≥ 1: spec · acceptance criteria · result report (never full chat logs)
 - [ ] `/usage`: ONE optional paste request before session end (mandatory manual paste rejected by the PO; declined/absent → "not collected" is a valid outcome; automated capture is tracked as a backlog item); telemetry line appended to `telemetry/costs.md` incl. first-pass + interventions per goldfish + limit standings when available (MP-20)
-- [ ] Rigor-0 lessons may be bundled into one collective entry (OM §3.3)
+- [ ] Rigor-0 lessons may be bundled into one collective entry (`docs/operating-model.md` — *Rigor, risk and gates*)
 
 ## Hygiene + handover to the next session
 

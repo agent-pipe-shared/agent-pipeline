@@ -1,6 +1,6 @@
 # Checklist — Critic Review
 
-> Agent-Pipeline v0.1.0-draft · Phase 3 · Compact operative reference; why + verification live in the normative spec `harness/review-protocol.md` (+ OM §4, ADR-0003/0014). Executable form: critic skill (`critic-review`) in `plugins/pipeline-core` (authored in parallel).
+> Agent-Pipeline v0.1.0-draft · Phase 3 · Compact operative reference; why + verification live in the normative spec `harness/review-protocol.md` (+ `docs/operating-model.md`, ADR-0003/0014). Executable form: critic skill (`critic-review`) in `plugins/pipeline-core` (authored in parallel).
 
 ## Before dispatch (Elephant)
 
@@ -20,7 +20,7 @@
 - [ ] Search harshly, report honestly — findings only with evidence
 - [ ] Per finding: Gap · Risk (blocker/major/minor) · Evidence `file:line` · Spec/guardrail ref
 - [ ] Trajectory section: were claimed checks actually executed per evidence (command + commit state + exit code)?
-- [ ] Authorship (standard check, EL-01/EL-16): production diffs originate from dispatched fresh-context sessions (commit/session trailers, dispatch records) or from the orchestrator itself? Orchestrator-authored diffs outside OM §3.3 stage-0 = lifecycle-violation finding, severity ≥ major
+- [ ] Authorship (standard check, EL-01/EL-16): production diffs originate from dispatched fresh-context sessions (commit/session trailers, dispatch records) or from the orchestrator itself? Orchestrator-authored diffs outside `docs/operating-model.md` — *Rigor, risk and gates* stage-0 = lifecycle-violation finding, severity ≥ major
 - [ ] Documented-instead-of-fixed risks hunted: known gaps with TODO/comment but no owner + expiry date are findings, not mitigations (AP7/QG-06)
 - [ ] Dependency reality check: every NEW import/package/action/image exists in the official registry under exactly that name, registry evidence (URL + pinned version) present (SEC-04 slopsquatting)
 - [ ] Pipeline-deliverable reviews: language assignment of new artifacts per ADR-0011 checked (agent-facing English / human-facing German / primary-reader rule)

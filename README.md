@@ -150,7 +150,7 @@ flowchart TD
     G --> C["Risk-class-dependent Critic"]
     C --> H["Human completion gate"]
     H --> M["Merge + doc sync"]
-    M -.->|"optional, if manifest declares release"| REL["Release/Promotion<br/>(optional, §3.5)"]
+    M -.->|"optional, if manifest declares release"| REL["Release/Promotion<br/>(optional)"]
 ```
 
 Order matters: deterministic gates always run *before* any LLM judgment — a
@@ -176,7 +176,7 @@ path (interview → spec → readiness) instead of adopting it as an
 already-approved design. For large topics, the Elephant also proposes a cut
 into several self-contained backlog items and waits for confirmation or
 correction — the existing per-item PRD review stays the only check point,
-nothing new is added. Details: [`docs/operating-model.md`](docs/operating-model.md) §3.2.
+nothing new is added. Details: [`docs/operating-model.md`](docs/operating-model.md) — *The lifecycle*.
 
 ## Bring your own architecture rules & guardrails
 
@@ -442,7 +442,7 @@ flowchart TD
     G --> C["Risikoklassen-abhängiger Critic"]
     C --> H["Menschliches Abschluss-Gate"]
     H --> M["Merge + Doku-Sync"]
-    M -.->|"optional, falls Manifest Release erklärt"| REL["Release/Promotion<br/>(optional, §3.5)"]
+    M -.->|"optional, falls Manifest Release erklärt"| REL["Release/Promotion<br/>(optional)"]
 ```
 
 Entscheidend ist die Reihenfolge: Die maschinellen Gates laufen immer VOR jedem
@@ -470,7 +470,7 @@ Readiness) neu her, statt ihn als fertig genehmigtes Design zu übernehmen.
 Bei großen Themen schlägt der Elephant zusätzlich einen Schnitt in mehrere
 eigenständige Backlog-Items vor und wartet auf Bestätigung oder Korrektur —
 das bestehende PRD-Review pro Item bleibt der einzige Prüfpunkt, es kommt
-nichts Neues hinzu. Details: [`docs/operating-model.md`](docs/operating-model.md) §3.2.
+nichts Neues hinzu. Details: [`docs/operating-model.md`](docs/operating-model.md) — *The lifecycle*.
 
 ## Eigene Architekturvorgaben & Guardrails
 

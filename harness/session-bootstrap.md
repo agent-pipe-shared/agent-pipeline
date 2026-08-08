@@ -131,7 +131,7 @@ continues to govern consent and tool/export boundaries.
 ### Step 1d — Role prohibitions (Elephant)
 
 - **Requirement (Elephant):** before starting work, confirm the Elephant's role prohibitions as a compact, directly embedded list (NO extra file reading at runtime — token economy):
-  - **EL-01** — no production code; sole exception: the Tier-0 fast path per `docs/operating-model.md` §3.3; further exceptions only by the PO.
+  - **EL-01** — no production code; sole exception: the Tier-0 fast path per `docs/operating-model.md` — *Rigor, risk and gates*; further exceptions only by the PO.
   - **EL-02** — no step-by-step micromanagement; delegation happens once, via the 6-field briefing.
   - **EL-03** — judgment stays at the right level (never take over the PO's judgment, never push it down, never outsource the gate).
   - **EL-04** — no silent fundamental decisions (register + ADR, otherwise the decision doesn't exist).
@@ -144,7 +144,7 @@ continues to govern consent and tool/export boundaries.
 
 This step ends in a **third mandatory confirmation line** (printed directly under the model/effort line; literally checked like line 1 — format → §6.1):
 
-> "Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (Tier-0 per OM §3.3; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'"
+> "Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (Tier-0 per operating-model.md, Rigor risk and gates; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'"
 
 ### Step 2 — Staleness check against the marketplace remote
 
@@ -168,11 +168,11 @@ This step ends in a **third mandatory confirmation line** (printed directly unde
 
 ### Step 3 — Read the project calibration file (existence check first!)
 
-- **Requirement:** first check that the calibration file **exists** at its resolved authority tier (`project/pipeline.json`, else the legacy `.claude/pipeline.json`), then read it fully. Expected minimum required fields (field sketch → `docs/operating-model.md` §8): verify command(s), autonomy level, branch model, worktree rule, stakes rating, project constraints.
+- **Requirement:** first check that the calibration file **exists** at its resolved authority tier (`project/pipeline.json`, else the legacy `.claude/pipeline.json`), then read it fully. Expected minimum required fields (field sketch → `docs/operating-model.md` — *Project calibration and extensions*): verify command(s), autonomy level, branch model, worktree rule, stakes rating, project constraints.
 - **Requirement (denies):** project **denies** don't live in the calibration file, but in the committed `.claude/settings.json` resp. the git-guard config — this step checks the denies **there** (existence of the committed permission/guard entries).
 - **Why:** the central skills are parameterized and read this file — without it, rituals run with wrong defaults, in the worst case with the wrong project's guardrails.
 - **Verification:** file exists and contains the required fields; if missing or incomplete → case **F4**.
-- **Decided:** mechanism + field sketch → `docs/operating-model.md` §8; **schema format:** JSON (`pipeline.json` at the resolved tier, shipped with the plugin).
+- **Decided:** mechanism + field sketch → `docs/operating-model.md` — *Project calibration and extensions*; **schema format:** JSON (`pipeline.json` at the resolved tier, shipped with the plugin).
 
 ### Step 4 — Read the handover/state file
 
@@ -291,14 +291,14 @@ All mandatory steps including **1b** (set and verify model/effort per model-poli
 
 Directly below that, per **1d**, a **third line**:
 
-> "Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (Tier-0 per OM §3.3; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'"
+> "Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (Tier-0 per operating-model.md, Rigor risk and gates; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'"
 
 The Elephant must additionally be able to speak to the session-lifecycle policy (Elephant retention at full context, Goldfish cadence — a mandatory part of the operating model, → `docs/operating-model.md`); the bootstrap loads no extra files for this, the policy ships with the ruleset.
 
 ### 6.2 Goldfish bootstrap (briefing instead of handover)
 
-- **The Elephant's briefing replaces reading the handover.** Prohibition: reading the handover/state file or history artifacts. Why: context economy and contract clarity — the briefing (goal · context files · DoD checks · prohibitions · stop conditions · dispatch metadata; canonical field list: `docs/operating-model.md` §2.3) is the complete assignment; whatever isn't in it doesn't belong in the Goldfish's context.
-- The briefing **must name the ruleset SHA** (mandatory field "dispatch metadata," → `docs/operating-model.md` §2.3) under which it was dispatched; the Goldfish carries it into its confirmation (no own remote check — network/time cost sits with the Elephant, once per dispatch wave instead of once per Goldfish).
+- **The Elephant's briefing replaces reading the handover.** Prohibition: reading the handover/state file or history artifacts. Why: context economy and contract clarity — the briefing (goal · context files · DoD checks · prohibitions · stop conditions · dispatch metadata; canonical field list: `docs/operating-model.md` — *Roles and boundaries*) is the complete assignment; whatever isn't in it doesn't belong in the Goldfish's context.
+- The briefing **must name the ruleset SHA** (mandatory field "dispatch metadata," → `docs/operating-model.md` — *Roles and boundaries*) under which it was dispatched; the Goldfish carries it into its confirmation (no own remote check — network/time cost sits with the Elephant, once per dispatch wave instead of once per Goldfish).
 - **Compact confirmation** (one line, field "State" carries the briefing reference):
 
   > "Bootstrap check passed: ruleset \<SHA from briefing\> loaded · Project \<name\> · Calibration \<file\> · State briefing \<task-id/date\> · Role Goldfish"
@@ -384,7 +384,7 @@ The Elephant must additionally be able to speak to the session-lifecycle policy 
 - **Step 5:** existence/callability check of verify only.
 - **Step 6:** **ONE confirmation line instead of three** (format → Step 6, suffix "· Profile speed — light bootstrap").
 
-**Light process** (not just the bootstrap — applies to the whole task): no PRD document; direct dispatch, or for very small fixes a mini-edit (Tier-0 fast path per `docs/operating-model.md` §3.3); a light review tier instead of a full design-tier review — the existing Critic trigger matrix decides as before, not reinvented (→ `harness/checklists/small-session.md` step 3); short close via the **close-light variant** of the `close-block` skill (`plugins/pipeline-core/skills/close-block/SKILL.md`) — its own hard eligibility gate applies unchanged, speed doesn't override it.
+**Light process** (not just the bootstrap — applies to the whole task): no PRD document; direct dispatch, or for very small fixes a mini-edit (Tier-0 fast path per `docs/operating-model.md` — *Rigor, risk and gates*); a light review tier instead of a full design-tier review — the existing Critic trigger matrix decides as before, not reinvented (→ `harness/checklists/small-session.md` step 3); short close via the **close-light variant** of the `close-block` skill (`plugins/pipeline-core/skills/close-block/SKILL.md`) — its own hard eligibility gate applies unchanged, speed doesn't override it.
 
 **Why:** a mini-feature or a hotfix used to run through the same heavy ceremony as an architecture overhaul — a breach of the proportionality guardrail. Speed saves the ceremony without touching a single deterministic guardrail.
 
@@ -394,8 +394,8 @@ The Elephant must additionally be able to speak to the session-lifecycle policy 
 
 - **PARTIALLY DONE:** the machine-readable source for the installed plugin SHA is verified on the main PC: `~/.claude/plugins/installed_plugins.json`, field `gitCommitSha` (details → Step 1). Naming the source in the `/pipeline-core:pipeline-start` skill has been backfilled. **Only the laptop cross-check remains OPEN** (two-machine validation, Sprint 1).
 - **DONE:** SessionStart hook wired up — `plugins/pipeline-core/hooks/staleness-check.mjs` (matcher `startup|resume|clear`, timeout 15s, fail-open, read-only) delegates to the channel-aware Pipeline-update helper and injects the bootstrap prompt plus visible `pipelineUpdateAvailability` channel/ref metadata alongside `repositoryFreshness=not-observed`; it never supplies repository write admission or performs an update.
-- **Decided:** mechanism and field sketch of the project calibration file are in `docs/operating-model.md` §8. **Schema format decided (shipped with the plugin):** JSON (`pipeline.json` at the resolved authority tier — `project/`, else the legacy `.claude/`); the `pipeline-start`/`close-block` skills read this format.
-- **Decided:** handover file canonicalized (convention `docs/state.md`), relationship to HISTORY fixed — → `docs/operating-model.md` §6 + ADR-0012. **OPEN (Phase 4):** only the handover template + the final template name per project remain.
+- **Decided:** mechanism and field sketch of the project calibration file are in `docs/operating-model.md` — *Project calibration and extensions*. **Schema format decided (shipped with the plugin):** JSON (`pipeline.json` at the resolved authority tier — `project/`, else the legacy `.claude/`); the `pipeline-start`/`close-block` skills read this format.
+- **Decided:** handover file canonicalized (convention `docs/state.md`), relationship to HISTORY fixed — → `docs/operating-model.md` — *The lifecycle* + ADR-0012. **OPEN (Phase 4):** only the handover template + the final template name per project remain.
 - **DONE:** the handover drift-check threshold (Step 4) calibrated — default "HEAD newer than handover AND ≥1 non-docs commit in the delta," per-project override via `$driftThreshold` in the project calibration.
 - **⚠ UNCERTAIN:** whether `autoUpdate` on the `extraKnownMarketplaces` entry has any effect outside managed settings — hence this protocol relies on explicit refreshes; re-evaluate the ritual in §5 if the docs situation changes.
 
@@ -527,7 +527,7 @@ und Tool-/Exportgrenzen.
 ### Schritt 1d — Rollen-Verbote (Elephant)
 
 - **Gebot (Elephant):** Bestätige vor Arbeitsbeginn die Rollen-Verbote des Elephant als kompakte, direkt eingebettete Liste (KEIN Zusatz-Dateilesen zur Laufzeit — Token-Ökonomie):
-  - **EL-01** — kein Produktionscode; einzige Ausnahme: Stufe-0-Fast-Path gemäß `docs/operating-model.md` §3.3; weitere Ausnahmen nur durch den PO.
+  - **EL-01** — kein Produktionscode; einzige Ausnahme: Stufe-0-Fast-Path gemäß `docs/operating-model.md` — *Rigor, risk and gates*; weitere Ausnahmen nur durch den PO.
   - **EL-02** — kein Schritt-für-Schritt-Mikromanagement; Delegation erfolgt einmalig, über das 6-Felder-Briefing.
   - **EL-03** — Urteilsvermögen bleibt auf der richtigen Ebene (nie das PO-Urteil übernehmen, nie nach unten abschieben, nie das Gate outsourcen).
   - **EL-04** — keine stillen Grundsatzentscheidungen (Register + ADR, sonst existiert die Entscheidung nicht).
@@ -540,7 +540,7 @@ und Tool-/Exportgrenzen.
 
 Dieser Schritt endet in einer **dritten verbindlichen Bestätigungszeile** (Deutsch, wörtlich, direkt unter der Modell/Effort-Zeile gedruckt; literal geprüft wie Zeile 1 — Format → §6.1):
 
-> „Rollen-Verbote geladen: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — Implementierung nur per Goldfish-Dispatch (Stufe-0 per OM §3.3; weitere Ausnahmen nur durch den PO); PRD-Gate: lesbar vorlegen + auf ‚freigegeben' warten"
+> „Rollen-Verbote geladen: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — Implementierung nur per Goldfish-Dispatch (Stufe-0 per operating-model.md, Rigor risk and gates; weitere Ausnahmen nur durch den PO); PRD-Gate: lesbar vorlegen + auf ‚freigegeben' warten"
 
 ### Schritt 2 — Repository-Freshness und Pipeline-Update-Verfügbarkeit
 
@@ -553,11 +553,11 @@ Dieser Schritt endet in einer **dritten verbindlichen Bestätigungszeile** (Deut
 
 ### Schritt 3 — Projekt-Kalibrierungsdatei lesen (Existenz-Check zuerst!)
 
-- **Gebot:** Prüfe zuerst, dass die Kalibrierungsdatei **existiert** (Arbeitsname einheitlich: `.claude/pipeline.json`), dann lies sie vollständig. Erwartetes Pflichtfeld-Minimum (Feldskizze → docs/operating-model.md §8): verify-Kommando(s), Autonomie-Stufe, Branch-Modell, Worktree-Regel, Stakes-Einstufung, Projekt-Constraints.
+- **Gebot:** Prüfe zuerst, dass die Kalibrierungsdatei **existiert** (Arbeitsname einheitlich: `.claude/pipeline.json`), dann lies sie vollständig. Erwartetes Pflichtfeld-Minimum (Feldskizze → `docs/operating-model.md` — *Project calibration and extensions*): verify-Kommando(s), Autonomie-Stufe, Branch-Modell, Worktree-Regel, Stakes-Einstufung, Projekt-Constraints.
 - **Gebot (Denies):** Projekt-**Denies** leben NICHT in der Kalibrierungsdatei, sondern in der committeten `.claude/settings.json` bzw. der Guard-Config des git-guard — dieser Schritt prüft die Denies **dort** (Existenz der committeten Permission-/Guard-Einträge).
 - **Warum:** Die zentralen Skills sind parametrisiert und lesen diese Datei — ohne sie laufen Rituale mit falschen Defaults, im schlimmsten Fall mit den Guardrails des falschen Projekts.
 - **Prüfweise:** Datei existiert und enthält die Pflichtfelder; fehlt sie oder ist sie unvollständig → Fall **F4**.
-- **Entschieden:** Mechanismus + Feldskizze → docs/operating-model.md §8; **Schema-Format:** JSON (`.claude/pipeline.json`, mit der Plugin-Lieferung).
+- **Entschieden:** Mechanismus + Feldskizze → `docs/operating-model.md` — *Project calibration and extensions*; **Schema-Format:** JSON (`.claude/pipeline.json`, mit der Plugin-Lieferung).
 
 ### Schritt 4 — Handover-/State-Datei lesen
 
@@ -676,14 +676,14 @@ Alle Pflicht-Schritte inklusive **1b** (Modell/Effort gemäß model-policy setze
 
 Direkt darunter, gemäß **1d**, eine **dritte Zeile**:
 
-> „Rollen-Verbote geladen: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — Implementierung nur per Goldfish-Dispatch (Stufe-0 per OM §3.3; weitere Ausnahmen nur durch den PO); PRD-Gate: lesbar vorlegen + auf ‚freigegeben' warten"
+> „Rollen-Verbote geladen: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — Implementierung nur per Goldfish-Dispatch (Stufe-0 per operating-model.md, Rigor risk and gates; weitere Ausnahmen nur durch den PO); PRD-Gate: lesbar vorlegen + auf ‚freigegeben' warten"
 
 Der Elephant muss außerdem zur Session-Lifecycle-Politik auskunftsfähig sein (Elephant-Erhalt bei vollem Kontext, Goldfish-Kadenz — Pflichtteil des Operating Model, → docs/operating-model.md); der Bootstrap lädt dafür keine Zusatzdateien, die Politik kommt mit dem Regelwerk.
 
 ### 6.2 Goldfish-Bootstrap (Briefing statt Handover)
 
-- **Das Briefing des Elephant ersetzt die Handover-Lektüre.** Verbot: Handover-/State-Datei oder Verlaufsartefakte lesen. Warum: Kontext-Ökonomie und Kontrakt-Klarheit — das Briefing (Ziel · Kontext-Dateien · DoD-Checks · Verbote · Stop-Bedingungen · Dispatch-Metadaten; kanonische Feldliste: docs/operating-model.md §2.3) ist der vollständige Auftrag; was nicht drinsteht, gehört nicht in den Goldfish-Kontext.
-- Das Briefing **muss den Regelwerk-SHA nennen** (Pflichtfeld „Dispatch-Metadaten", → docs/operating-model.md §2.3), unter dem dispatcht wurde; der Goldfish übernimmt ihn in seine Bestätigung (kein eigener Remote-Check — Netz-/Zeitkosten liegen beim Elephant, einmal pro Dispatch-Welle statt einmal pro Goldfish).
+- **Das Briefing des Elephant ersetzt die Handover-Lektüre.** Verbot: Handover-/State-Datei oder Verlaufsartefakte lesen. Warum: Kontext-Ökonomie und Kontrakt-Klarheit — das Briefing (Ziel · Kontext-Dateien · DoD-Checks · Verbote · Stop-Bedingungen · Dispatch-Metadaten; kanonische Feldliste: `docs/operating-model.md` — *Roles and boundaries*) ist der vollständige Auftrag; was nicht drinsteht, gehört nicht in den Goldfish-Kontext.
+- Das Briefing **muss den Regelwerk-SHA nennen** (Pflichtfeld „Dispatch-Metadaten", → `docs/operating-model.md` — *Roles and boundaries*), unter dem dispatcht wurde; der Goldfish übernimmt ihn in seine Bestätigung (kein eigener Remote-Check — Netz-/Zeitkosten liegen beim Elephant, einmal pro Dispatch-Welle statt einmal pro Goldfish).
 - **Kompakte Bestätigung** (eine Zeile, Feld „Stand" trägt die Briefing-Referenz):
 
   > „Bootstrap-Check bestanden: Regelwerk \<SHA aus Briefing\> geladen · Projekt \<name\> · Kalibrierung \<datei\> · Stand Briefing \<task-id/datum\> · Rolle Goldfish"
@@ -764,7 +764,7 @@ Der Elephant muss außerdem zur Session-Lifecycle-Politik auskunftsfähig sein (
 - **Schritt 5:** nur Existenz-/Aufrufbarkeits-Check von verify.
 - **Schritt 6:** **EINE Bestätigungszeile statt drei** (Format → Schritt 6, Suffix „· Profil speed — Leicht-Bootstrap").
 
-**Leichter Prozess** (nicht nur der Bootstrap — gilt für den ganzen Task): kein PRD-Dokument; direkter Dispatch, oder bei ganz kleinen Fixes ein Mini-Edit (Stufe-0-Fast-Path per `docs/operating-model.md` §3.3); leichte Review-Stufe statt vollem Design-Tier-Review — die bestehende Critic-Trigger-Matrix entscheidet wie gehabt, nicht neu erfunden (→ `harness/checklists/small-session.md` Schritt 3); Kurz-Abschluss über die **close-light-Variante** des `close-block`-Skills (`plugins/pipeline-core/skills/close-block/SKILL.md`) — deren eigenes hartes Eligibility-Gate gilt unverändert, Speed übersteuert es nicht.
+**Leichter Prozess** (nicht nur der Bootstrap — gilt für den ganzen Task): kein PRD-Dokument; direkter Dispatch, oder bei ganz kleinen Fixes ein Mini-Edit (Stufe-0-Fast-Path per `docs/operating-model.md` — *Rigor, risk and gates*); leichte Review-Stufe statt vollem Design-Tier-Review — die bestehende Critic-Trigger-Matrix entscheidet wie gehabt, nicht neu erfunden (→ `harness/checklists/small-session.md` Schritt 3); Kurz-Abschluss über die **close-light-Variante** des `close-block`-Skills (`plugins/pipeline-core/skills/close-block/SKILL.md`) — deren eigenes hartes Eligibility-Gate gilt unverändert, Speed übersteuert es nicht.
 
 **Warum:** Für ein Mini-Feature oder einen Hotfix lief bislang dieselbe schwere Zeremonie wie für einen Architektur-Umbau — die überschrittene Proportionalitäts-Leitplanke. Speed spart die Zeremonie, ohne eine einzige deterministische Guardrail zu berühren.
 
@@ -774,7 +774,7 @@ Der Elephant muss außerdem zur Session-Lifecycle-Politik auskunftsfähig sein (
 
 - **TEILERLEDIGT:** Maschinenlesbare Quelle für den installierten Plugin-SHA ist auf dem Haupt-PC verifiziert: `~/.claude/plugins/installed_plugins.json`, Feld `gitCommitSha` (Details → Schritt 1). Die Quellen-Nennung im `/pipeline-core:pipeline-start`-Skill ist nachgezogen. **OFFEN bleibt nur die Laptop-Gegenprobe** (Zwei-Rechner-Validierung, Sprint 1).
 - **ERLEDIGT:** SessionStart-Hook verdrahtet — `plugins/pipeline-core/hooks/staleness-check.mjs` (Matcher `startup|resume|clear`, Timeout 15 s, fail-open, read-only) delegiert an den channel-aware Pipeline-Update-Helper und zeigt `pipelineUpdateAvailability` mit Channel/Ref getrennt von `repositoryFreshness=not-observed`; er entscheidet keine Schreibzulassung und führt kein Update aus.
-- **Entschieden:** Mechanismus und Feldskizze der Projekt-Kalibrierungsdatei stehen in docs/operating-model.md §8 (Arbeitsname `.claude/pipeline.json`). **Schema-Format entschieden (mit der Plugin-Lieferung):** JSON (`.claude/pipeline.json`); die Skills `pipeline-start`/`close-block` lesen dieses Format.
-- **Entschieden:** Handover-Datei kanonisch (Konvention `docs/state.md`), Verhältnis zu HISTORY festgeschrieben — → docs/operating-model.md §6 + ADR-0012. **OFFEN (Phase 4):** nur noch das Handover-Template + der endgültige Template-Name je Projekt.
+- **Entschieden:** Mechanismus und Feldskizze der Projekt-Kalibrierungsdatei stehen in `docs/operating-model.md` — *Project calibration and extensions* (Arbeitsname `.claude/pipeline.json`). **Schema-Format entschieden (mit der Plugin-Lieferung):** JSON (`.claude/pipeline.json`); die Skills `pipeline-start`/`close-block` lesen dieses Format.
+- **Entschieden:** Handover-Datei kanonisch (Konvention `docs/state.md`), Verhältnis zu HISTORY festgeschrieben — → `docs/operating-model.md` — *The lifecycle* + ADR-0012. **OFFEN (Phase 4):** nur noch das Handover-Template + der endgültige Template-Name je Projekt.
 - **ERLEDIGT:** Schwellwert des Handover-Drift-Checks (Schritt 4) kalibriert — Default „HEAD neuer als Handover UND ≥1 Nicht-Doku-Commit im Delta", per-Projekt-Override via `$driftThreshold` in `.claude/pipeline.json`.
 - **⚠ UNSICHER:** Ob `autoUpdate` am `extraKnownMarketplaces`-Eintrag außerhalb managed settings wirkt — deshalb setzt dieses Protokoll auf explizite Refreshes; falls sich die Doku-Lage ändert, Ritual in §5 neu bewerten.

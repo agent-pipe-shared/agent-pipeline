@@ -2,7 +2,7 @@
 
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 3 · 2026-07-03
 
-**Status:** Binding harness contract. Agent-facing, therefore English (ADR-0011). Operationalizes `docs/operating-model.md` §4 (review system) and §4.3 (escalation ladder), **ADR-0003** (isolation levels), **ADR-0005** (gate chain), **ADR-0014** (Critic contract), and **MP-07** (`policies/model-policy.md`). Precedence on contradiction: the decision register (`docs/state.md`) > ADRs > `docs/operating-model.md` > this file.
+**Status:** Binding harness contract. Agent-facing, therefore English (ADR-0011). Operationalizes `docs/operating-model.md` — *The lifecycle* (review system) and *Evidence, review and recovery* (escalation ladder), **ADR-0003** (isolation levels), **ADR-0005** (gate chain), **ADR-0014** (Critic contract), and **MP-07** (`policies/model-policy.md`). Precedence on contradiction: the decision register (`docs/state.md`) > ADRs > `docs/operating-model.md` > this file.
 
 Governing principle: **deterministic before probabilistic.** Stage 1 is machine and blocking; Stage 2 is LLM judgment and produces findings for the Elephant's gate decision. Stage 2 never re-checks what Stage 1 enforces.
 
@@ -19,7 +19,7 @@ Governing principle: **deterministic before probabilistic.** Stage 1 is machine 
 **Check:** The artifact was written by the script itself (file/log); model-authored prose does not qualify.
 
 **Rule (self-fix loop):** A closed-classified product failure may consume **one** automatic product retry. A matching second signature, any exhausted review/correction budget, and every unknown cause stop automatic work and create a course gate with a PO decision brief; no third automatic attempt exists. Hard harness leashes: `maxTurns` in the agent frontmatter; stop-hook cap of 8 consecutive blocks.
-**Why:** A fresh context with a better briefing beats grinding on; the decision brief makes the alternative courses explicit instead of turning a repeated error into an invisible loop (OM §4.3, rung 1).
+**Why:** A fresh context with a better briefing beats grinding on; the decision brief makes the alternative courses explicit instead of turning a repeated error into an invisible loop (`docs/operating-model.md` — *Evidence, review and recovery*, rung 1).
 **Check:** The stop condition is in every briefing; the completion report names attempts and failure state.
 
 **Rule (gate honesty):** Every gate documents what it does NOT check. Gates are binary — sharp or deleted; warn-only only with an expiry date.
@@ -32,7 +32,7 @@ Governing principle: **deterministic before probabilistic.** Stage 1 is machine 
 
 ### 2.1 Trigger decision table
 
-Inputs, fixed at triage and recorded in the task head: **rigor level** (0/1/2) · **risk class** (high/medium/low — normative definitions: OM §4.2; the project's `riskZones` from the calibration inform the classification) · **diff type:** does the diff touch **architecture / guardrails / security ("A/G/S")** — architecture principles, hooks, permissions, policies (also in this repo), secrets/auth, live-effective <PROJECT_B> changes? · OR is the diff **mechanical/deterministic** (lockfiles, generated artifacts, pure formatting with zero semantic delta)?
+Inputs, fixed at triage and recorded in the task head: **rigor level** (0/1/2) · **risk class** (high/medium/low — normative definitions: §2.1 (this section); the project's `riskZones` from the calibration inform the classification) · **diff type:** does the diff touch **architecture / guardrails / security ("A/G/S")** — architecture principles, hooks, permissions, policies (also in this repo), secrets/auth, live-effective <PROJECT_B> changes? · OR is the diff **mechanical/deterministic** (lockfiles, generated artifacts, pure formatting with zero semantic delta)?
 
 Evaluate all rows; the **strictest matching row wins** — a diff that superficially looks mechanical (T0) but ALSO matches a stricter row (T1–T4) is never exempted by T0. Row T1 additionally forces the isolation level:
 
@@ -50,12 +50,12 @@ Evaluate all rows; the **strictest matching row wins** — a diff that superfici
 
 **Bundling default:** one bundled critic per delivery wave is the default; per-package critics run only when risk classes inside the wave differ from each other.
 
-Canonical trigger wording (word-identical in `docs/operating-model.md` §3.3/§4.2, ADR-0003, and ADR-0014 — on any divergence the canonical wording wins over the table above):
+Canonical trigger wording (word-identical in `docs/operating-model.md` — *Rigor, risk and gates* and this file's §2.1, ADR-0003, and ADR-0014 — on any divergence the canonical wording wins over the table above):
 
 > "Every architecture/guardrail/security diff runs with the Critic on the higher-capability tier AND with the selected runner's usable native isolation; if that isolation is technically unavailable or unusable in the current host setup, the standing PO-authorized functional equivalent is ONE fresh independently briefed, contractually read-only Critic subagent with a JSON-schema-shaped verdict and the literal assurance `functional-equivalent-read-only; OS isolation not asserted`. Rigor level 2 makes the Critic mandatory (default: the review-tier model); escalation to the higher-capability tier applies there only when, in addition, the risk class is high OR an architecture/guardrail/security diff is present."
 
 **Why staggered:** The Critic is expensive and must not decay into ceremony — a documented discipline-erosion risk; A/G/S zones are exactly where a weaker checker has correlated blind spots. Evidence for the cascade/non-blocking relaxation: the last 3 canon critics after a passed readiness check + first-pass delivery returned PASS with 0 findings; real blockers occurred only on risky live-code changes in a governed project (two blockers, one fail-open major finding). Community evidence: Meta's risk-tiered gating held quality at relaxed gates (incident rate 1/50 baseline).
-**Check:** The gate decision documents the applied row; merge requires a findings report for every mandatory trigger (OM §4.2).
+**Check:** The gate decision documents the applied row; merge requires a findings report for every mandatory trigger (§2.1).
 
 ### 2.2 Input construction — by the Critic itself
 
@@ -137,7 +137,7 @@ as a freshness reference — diff range and commit state come exclusively from
 the dispatch (§2.2), confirmed via the Critic's own `git` commands.
 **Check:** Writable tools available to a Critic = failed bootstrap → abort (wrong agent definition loaded).
 
-### 2.4 Findings format (transfer format 3, OM §2.4)
+### 2.4 Findings format (transfer format 3)
 
 Per finding — all four fields mandatory:
 
@@ -158,7 +158,7 @@ Mandatory report sections:
 **Why:** "A reviewer prompted to find gaps will usually report some, even when the work is sound" (documented failure mode, ADR-0014). ~30 % valuable findings is a good yield — a padded 100 % is noise.
 **Check:** The Elephant rejects rule-violating findings (§3); the "Deliberately not flagged" rubric makes omissions auditable, so anti-overreporting cannot silently flip into under-reporting.
 
-**Prompt framing:** Hunt-style reviews (bug/security hunts) are dispatched with unproven **negative-thesis priming** ("this code very likely contains many defects …") combined with the evidence gate — the two-phase pattern "search harshly, report honestly" (OM §2.4). The canonical prompt wording lives in `templates/prompts/critic-review.md`.
+**Prompt framing:** Hunt-style reviews (bug/security hunts) are dispatched with unproven **negative-thesis priming** ("this code very likely contains many defects …") combined with the evidence gate — the two-phase pattern "search harshly, report honestly" (§2.4 above). The canonical prompt wording lives in `templates/prompts/critic-review.md`.
 
 ---
 
@@ -185,7 +185,7 @@ map's reporting validation rather than silently choosing a replacement control.
 **Rule (disposition):** EVERY blocker/major finding receives exactly one disposition: **fix** (rework dispatch) · **reject with recorded justification** · **escalate to the PO**. Minor findings: fix now, file as backlog item, or reject.
 **Rule (rework):** Rework is a **NEW dispatch with fresh context and a refined briefing** — never continued work in the failed context. BEFORE any re-dispatch or model escalation, run the harness checklist (P1 / `policies/tooling-policy.md` G2): (1) briefing complete and consistent? (2) context clean? (3) tools/permissions right-sized? (4) hooks/gates wired and actually run?
 **Rule (cycle cap):** Max **3 fresh local rework cycles per task**. Open the PO course gate only when a further correction would exceed that budget (>3) — mandatory, no exceptions.
-**Rule (re-review):** After rework, the trigger table (§2.1) re-applies to the new diff; mandatory triggers → a NEW fresh Critic run. A Critic context is never reused — it would anchor on its own previous findings (same rationale as the readiness-check repetition rule, OM §3.4).
+**Rule (re-review):** After rework, the trigger table (§2.1) re-applies to the new diff; mandatory triggers → a NEW fresh Critic run. A Critic context is never reused — it would anchor on its own previous findings (same rationale as the readiness-check repetition rule, `docs/operating-model.md` — *The lifecycle*).
 **Rule (no dialogue):** There is never a Critic↔Goldfish dialogue; the Elephant mediates via briefings.
 **Why:** Findings without dispositions rot; unbounded rework cycles are the expensive form of grinding; a reused reviewer stops being fresh.
 **Check:** The gate decision records the applied trigger row, the disposition per finding, and the cycle count; a telemetry line exists per Critic run; merge blocks without a findings report where the trigger was mandatory.
@@ -203,14 +203,14 @@ Model escalation inside rework follows **MP-05** (criterion 3: same task class f
 | 3 | Elephant | dispositions every finding (fix / reject with justification / the PO); harness checklist BEFORE re-dispatch or model escalation (G2/P1); rework = fresh local context + refined briefing; max **3 rework cycles per task**, then a PO course gate only for a further correction (>3) |
 | 4 | the PO | MANDATORY on: blockers, > 3 rework cycles, irreversible/externally visible/costly matters, spec↔reality conflict, budget overrun (criterion: `policies/model-policy.md` MP-20) |
 
-Flow diagram: `docs/operating-model.md` §4.3 (normative; this table is its operational summary).
+Flow diagram: `docs/operating-model.md` — *Evidence, review and recovery* (normative; this table is its operational summary).
 
 ---
 
 ## 5. Time-shifted second look (irreversible gates)
 
 **Rule:** Before irreversible, externally visible, or costly decisions, put deliberate time distance between draft and final approval (another day, or at least a clearly later session segment); the decision is re-read against spec and register BEFORE the human gate releases.
-**Why:** Solo substitute for the team review — time distance replaces the second human (Rensin; OM §4.2).
+**Why:** Solo substitute for the team review — time distance replaces the second human (Rensin; §2.1 above).
 **Check:** For irreversible gates, the gate decision documents the time-shifted second look.
 
 ---
