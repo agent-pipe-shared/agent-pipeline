@@ -32,3 +32,48 @@ test("R-AC-05 refuses every enumerated private field and every untyped digest at
   const serialized=JSON.stringify(accepted);
   for(const content of Object.values(PROHIBITED))assert.equal(serialized.includes(String(content)),false);
 });
+
+// A-AC-11 adds a second, distinct axis to the journal. `state` records what
+// became of a claim; `assumptionState` records the epistemic ground it was held
+// on. A claim can legitimately be inferred AND later contradicted, so the two
+// vocabularies stay separate enums, neither constrains the other, and the
+// overlapping words (`verified`, `contradicted`) are deliberately not the same
+// value in the same slot. The key is optional because the criterion governs the
+// case WHEN an assumption state is recorded; when present it fails closed.
+import { readFileSync } from "node:fs";
+const ASSUMPTION_STATES=["assumed","inferred","observed","verified","contradicted","unavailable","unknown"];
+const LIFECYCLE_STATES=["declared","verified","contradicted","expired","invalidated","superseded"];
+test("A-AC-11 preserves each enumerated assumption state as a distinct typed value",()=>{
+  const seen=new Set();
+  for(const assumptionState of ASSUMPTION_STATES){
+    const accepted=validateAgentDecisionEvent(value({assumptionState}));
+    assert.equal(accepted.assumptionState,assumptionState,`assumption state ${assumptionState} was not preserved`);
+    seen.add(accepted.assumptionState);
+  }
+  assert.equal(seen.size,ASSUMPTION_STATES.length,"the enumerated assumption states are not distinct");
+});
+test("A-AC-11 rejects unknown assumption states and keeps the two vocabularies unmerged",()=>{
+  for(const assumptionState of ["declared","expired","invalidated","superseded","offered","Assumed","assumed ","assume","",null,0,true,undefined,[],{},["assumed"]])
+    assert.throws(()=>validateAgentDecisionEvent(value({assumptionState})),(error)=>error instanceof AgentDecisionJournalError,`assumption state admitted ${JSON.stringify(assumptionState)??String(assumptionState)}`);
+  for(const state of ["assumed","inferred","observed","unavailable","unknown"])
+    assert.throws(()=>validateAgentDecisionEvent(value({state})),(error)=>error instanceof AgentDecisionJournalError,`the lifecycle axis admitted the epistemic value ${state}`);
+  for(const field of ["assumptionstate","assumption_state","AssumptionState","epistemicState"])
+    assert.throws(()=>validateAgentDecisionEvent({...value(),[field]:"assumed"}),(error)=>error instanceof AgentDecisionJournalError,`the shape admitted the unknown property ${field}`);
+});
+test("A-AC-11 leaves the assumption state optional and independent of the claim lifecycle",()=>{
+  const unrecorded=validateAgentDecisionEvent(value());
+  assert.equal(Object.hasOwn(unrecorded,"assumptionState"),false,"absence must stay absence, not a synthesised value");
+  for(const state of LIFECYCLE_STATES)for(const assumptionState of ASSUMPTION_STATES){
+    const accepted=validateAgentDecisionEvent(value({state,assumptionState,supersedesEventId:state==="superseded"?"agent-0":null}));
+    assert.equal(accepted.state,state,`lifecycle ${state} was constrained by assumption state ${assumptionState}`);
+    assert.equal(accepted.assumptionState,assumptionState,`assumption state ${assumptionState} was constrained by lifecycle ${state}`);
+  }
+});
+test("A-AC-11 keeps the published schema closed and in step with the validator",()=>{
+  const schema=JSON.parse(readFileSync(new URL("../../../governance/schemas/agent-decision-event.schema.json",import.meta.url),"utf8"));
+  const branch=schema.oneOf.find((entry)=>entry.properties.kind.enum?.includes("assumption"));
+  assert.deepEqual(branch.properties.assumptionState.enum,ASSUMPTION_STATES);
+  assert.deepEqual(branch.properties.state.enum,LIFECYCLE_STATES);
+  assert.equal(branch.required.includes("assumptionState"),false);
+  for(const entry of schema.oneOf)assert.equal(entry.additionalProperties,false,"a journal event shape stopped being closed");
+});

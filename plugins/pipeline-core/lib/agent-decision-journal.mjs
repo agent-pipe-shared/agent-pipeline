@@ -2,16 +2,24 @@
 /** Closed PHX-4 agent assumptions/selection payload; observational only. */
 const ID=/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u, CODE=/^[A-Z][A-Z0-9._:-]{0,127}$/u, SHA=/^[a-f0-9]{64}$/u;
 const KINDS=new Set(["assumption","selection","verification-scope","fallback","escalation"]), STATES=new Set(["declared","verified","contradicted","expired","invalidated","superseded"]);
+/** A-AC-11: the epistemic ground a claim was held on, a separate axis from the claim lifecycle `state`; the two never collapse into one enum. */
+const ASSUMPTION_STATES=new Set(["assumed","inferred","observed","verified","contradicted","unavailable","unknown"]);
 const COMMAND_STATES=new Set(["offered","acknowledged","authorized","copied","attempted","execution-unobserved","observed-completed","readback-verified","failed","partial","cancelled","unknown","unavailable","readback-mismatch","recovery-proposed","recovered"]);
 const COMMAND_ASSURANCE=new Set(["not-applicable","attempted","execution-unobserved","observed-completed","readback-verified","failed","partial","cancelled","unknown","unavailable","readback-mismatch"]);
 const OMITTABLE=new Set(["raw-command","arguments","private-coordinates","unrestricted-output","prompt","transcript","credential"]);
 export class AgentDecisionJournalError extends Error { constructor(code){super("Agent decision event is invalid.");this.code=code;} }
 const rec=(v)=>v!==null&&typeof v==="object"&&!Array.isArray(v), exact=(v,k)=>rec(v)&&Object.keys(v).length===k.length&&k.every((x)=>Object.hasOwn(v,x)); const fail=(c)=>{throw new AgentDecisionJournalError(c);};
-/** Admits only bounded reason codes/digests; this record can never grant authority. */
+/**
+ * Admits only bounded reason codes/digests; this record can never grant authority.
+ * `assumptionState` is optional because A-AC-11 governs the case WHEN an
+ * assumption state is recorded; when the key is present it fails closed against
+ * ASSUMPTION_STATES, and it constrains no `state` value and is constrained by none.
+ */
 export function validateAgentDecisionEvent(value) {
   const keys=["eventId","kind","state","reasonCode","candidateDigest","relatedHumanDecisionId","supersedesEventId"];
   if(value?.kind==="command-offer") return validateCommandOfferEvent(value);
-  if(!exact(value,keys)||!ID.test(value.eventId)||!KINDS.has(value.kind)||!STATES.has(value.state)||!CODE.test(value.reasonCode)||!SHA.test(value.candidateDigest)||(value.relatedHumanDecisionId!==null&&(!ID.test(value.relatedHumanDecisionId)))||(value.supersedesEventId!==null&&!ID.test(value.supersedesEventId)))fail("ADJ-SHAPE");
+  const epistemic=rec(value)&&Object.hasOwn(value,"assumptionState");
+  if(!exact(value,epistemic?[...keys,"assumptionState"]:keys)||!ID.test(value.eventId)||!KINDS.has(value.kind)||!STATES.has(value.state)||(epistemic&&!ASSUMPTION_STATES.has(value.assumptionState))||!CODE.test(value.reasonCode)||!SHA.test(value.candidateDigest)||(value.relatedHumanDecisionId!==null&&(!ID.test(value.relatedHumanDecisionId)))||(value.supersedesEventId!==null&&!ID.test(value.supersedesEventId)))fail("ADJ-SHAPE");
   if(value.state==="superseded"&&value.supersedesEventId===null)fail("ADJ-SUPERSESSION");
   return Object.freeze({...value});
 }

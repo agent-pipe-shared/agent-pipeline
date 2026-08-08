@@ -11,6 +11,7 @@
         "eventId": { "type": "string" },
         "kind": { "enum": ["assumption", "selection", "verification-scope", "fallback", "escalation"] },
         "state": { "enum": ["declared", "verified", "contradicted", "expired", "invalidated", "superseded"] },
+        "assumptionState": { "enum": ["assumed", "inferred", "observed", "verified", "contradicted", "unavailable", "unknown"] },
         "reasonCode": { "type": "string" },
         "candidateDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
         "relatedHumanDecisionId": { "type": ["string", "null"] },
