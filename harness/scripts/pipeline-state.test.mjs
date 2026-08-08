@@ -3317,6 +3317,18 @@ function recoverCmd(dir, deps) {
   return captureBoth(() => run(["feature-package-recover", "--root", dir], deps));
 }
 
+// Pins Finding 1 (PHX-F1F4): the "retained" branch of feature-package-recover must
+// leak no absolute --root path, mirroring AR05b/AR05c's closed-property check for the
+// continuity-authority-revision receipt/plan.
+function assertRetainedReportIsClean(id, fx, recovered) {
+  const text = recovered.out || "";
+  const report = JSON.parse(text || "{}");
+  const bannedNeedles = [fx.dir, "/home/", "/tmp/", process.cwd()];
+  const clean = bannedNeedles.every((needle) => !text.includes(needle))
+    && !/"root"\s*:/.test(text) && !Object.hasOwn(report, "root") && !Object.hasOwn(report, "dir");
+  ok(`${id} the retained feature-package-recover report contains NO absolute path, repo root, /home/, /tmp/ or a root/dir key`, clean, text);
+}
+
 function runFeaturePackageWriteTests() {
 {
   // WRa -- existing-manifest transition, the successful case.
@@ -3428,6 +3440,7 @@ function runFeaturePackageWriteTests() {
   ok("WRd feature-package-recover diagnoses the retained journal as not-yet-applied", recovered.value === 2
     && report.schema === "pipeline.feature-package-recover.v1" && report.status === "retained"
     && report.diagnosis === "not-yet-applied" && report.transaction.manifest === fx.manifestRel, recovered.out);
+  assertRetainedReportIsClean("WRd2", fx, recovered);
 }
 
 {
@@ -3444,6 +3457,7 @@ function runFeaturePackageWriteTests() {
   const recovered = recoverCmd(fx.dir, fx.deps);
   const report = JSON.parse(recovered.out || "{}");
   ok("WRe recover diagnoses applied-pending-retirement", recovered.value === 2 && report.diagnosis === "applied-pending-retirement", recovered.out);
+  assertRetainedReportIsClean("WRe2", fx, recovered);
 }
 
 {
@@ -3490,6 +3504,7 @@ function runFeaturePackageWriteTests() {
   const recovered = recoverCmd(fx.dir, fx.deps);
   const report = JSON.parse(recovered.out || "{}");
   ok("WRi recover diagnoses the corrupted write as diverged", recovered.value === 2 && report.diagnosis === "diverged", recovered.out);
+  assertRetainedReportIsClean("WRi2", fx, recovered);
 }
 
 {
