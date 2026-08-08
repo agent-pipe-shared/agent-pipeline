@@ -58,8 +58,8 @@ import { lstatSync, readFileSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 
 import { criticalActionSha256, criticalActionSubjectSha256 } from "./critical-action-approval-request.mjs";
-import { readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
-import { createPoApprovalIntent, verifyPoApprovalProof } from "./po-approval-proof.mjs";
+import { readCriticalHumanProofPolicy, verifyAgainstTrustAnchors } from "./critical-human-proof-policy.mjs";
+import { createPoApprovalIntent } from "./po-approval-proof.mjs";
 
 const OID = /^[a-f0-9]{40,64}$/u;
 const SHA256 = /^[a-f0-9]{64}$/u;
@@ -125,21 +125,31 @@ function boundArtifactDigest(projectDir, relativePath) {
  * Anchoring to the session root does not forbid a cross-repository push. It requires that
  * such a push carry a signature under the GOVERNING project's key, over the target's
  * candidate — which is the property "the human cleared this" was always supposed to mean.
+ *
+ * SETUP-1: the committed identity is now a SET, not a single object, and its cardinality
+ * carries meaning (§5a). A v1/v2 document's single `trustAnchor` is wrapped as a set of
+ * one — identical behaviour to before, since membership in a one-element set is exactly
+ * the equality check this used to do directly. A v3 document's `trustAnchors` is used as
+ * written, EMPTY INCLUDED: an explicit empty v3 set is not "missing", it is the "any
+ * well-formed key" posture, and only a v3 reader can say so — a v1/v2 document with no
+ * `trustAnchor` at all still means "this route is unavailable", exactly as it always has.
  */
-function trustAnchorFor(anchorDir, prefix) {
+function trustAnchorsFor(anchorDir, prefix) {
   const policy = readCriticalHumanProofPolicy(anchorDir);
   if (!policy.ok) return { ok: false, code: policy.code };
+  if (policy.trustAnchors !== null) return { ok: true, anchors: policy.trustAnchors, policy };
   return policy.trustAnchor === null
     ? { ok: false, code: `${prefix}-TRUST-ANCHOR-MISSING` }
-    : { ok: true, anchor: policy.trustAnchor, policy };
+    : { ok: true, anchors: [policy.trustAnchor], policy };
 }
 
 /**
  * The half both routes share: a recorded proof is accepted only if the signature
- * verifies against the committed anchor over an intent rebuilt from the OBSERVED
- * subject. `subject` is the caller's route-specific object; everything else is uniform.
+ * verifies against the committed anchor SET (or against any well-formed key, in the
+ * absent-set posture) over an intent rebuilt from the OBSERVED subject. `subject` is the
+ * caller's route-specific object; everything else is uniform.
  */
-function verifySignedAction({ state, kind, prefix, candidate, subject, recorded, anchor, now }) {
+function verifySignedAction({ state, kind, prefix, candidate, subject, recorded, anchors, now }) {
   if (!object(recorded) || !object(recorded.proof) || !object(recorded.action)
     || !SHA256.test(recorded.proofSha256 ?? "") || !SHA256.test(recorded.intentSha256 ?? "")) {
     return { ok: false, code: `${prefix}-RECORD-INCOMPLETE` };
@@ -189,7 +199,7 @@ function verifySignedAction({ state, kind, prefix, candidate, subject, recorded,
   }
   if (intent.sha256 !== recorded.intentSha256) return { ok: false, code: `${prefix}-INTENT-MISMATCH` };
 
-  const verified = verifyPoApprovalProof({ intent, trustPolicy: anchor, proof: recorded.proof });
+  const verified = verifyAgainstTrustAnchors({ intent, anchors, proof: recorded.proof });
   if (!verified.verified) {
     return {
       ok: false,
@@ -205,7 +215,10 @@ function verifySignedAction({ state, kind, prefix, candidate, subject, recorded,
     || createHash("sha256").update(canonical(recorded.proof)).digest("hex") !== recorded.proofSha256) {
     return { ok: false, code: `${prefix}-DIGEST-MISMATCH` };
   }
-  return { ok: true };
+  // `signer` — the recorded `keyReference`/`publicKeySha256` (SETUP-1) — is present in
+  // every accepting case, independent of posture: `verifyAgainstTrustAnchors` derives it
+  // from the proof itself in the absent-set posture and from the matched anchor otherwise.
+  return { ok: true, signer: verified.signer };
 }
 
 function validCandidate(candidate) {
@@ -218,7 +231,7 @@ const validNow = (now) => typeof now === "string" && Number.isFinite(Date.parse(
 /**
  * @param {{projectDir: string, state: object, candidate: {commit: string, tree: string},
  *          remote: string, destination: string, now: string}} input
- * @returns {{authorized: true, code: "PUSH-PROOF-VERIFIED", keyReference: string}
+ * @returns {{authorized: true, code: "PUSH-PROOF-VERIFIED", keyReference: string, publicKeySha256: string}
  *          | {authorized: false, code: string}}
  */
 export function authorizeRecordedPush({ projectDir, anchorDir = projectDir, state, candidate, remote, destination, now } = {}) {
@@ -229,10 +242,11 @@ export function authorizeRecordedPush({ projectDir, anchorDir = projectDir, stat
     return { authorized: false, code: `${prefix}-INPUT-INVALID` };
   }
 
-  // The key identity is read first: every later check is meaningless without an anchor to
-  // verify against, and "no anchor" must never read as "no check needed". It comes from the
-  // governed session root, never from the pushed repository -- see `trustAnchorFor`.
-  const trust = trustAnchorFor(anchorDir, prefix);
+  // The key identity is read first: every later check is meaningless without an anchor set
+  // to verify against, and "no anchor set at all" (v1/v2, or no policy) must never read as
+  // "no check needed". It comes from the governed session root, never from the pushed
+  // repository -- see `trustAnchorsFor`.
+  const trust = trustAnchorsFor(anchorDir, prefix);
   if (!trust.ok) return { authorized: false, code: trust.code };
 
   const approval = state?.pushApproval?.lastApproved;
@@ -258,7 +272,7 @@ export function authorizeRecordedPush({ projectDir, anchorDir = projectDir, stat
   }
 
   const verified = verifySignedAction({
-    state, kind: "push", prefix, candidate, recorded, anchor: trust.anchor, now,
+    state, kind: "push", prefix, candidate, recorded, anchors: trust.anchors, now,
     subject: {
       sourceCommit: candidate.commit,
       remote,
@@ -276,7 +290,10 @@ export function authorizeRecordedPush({ projectDir, anchorDir = projectDir, stat
     return { authorized: false, code: `${prefix}-NOT-CONSUMED` };
   }
 
-  return { authorized: true, code: `${prefix}-VERIFIED`, keyReference: trust.anchor.keyReference };
+  return {
+    authorized: true, code: `${prefix}-VERIFIED`,
+    keyReference: verified.signer.keyReference, publicKeySha256: verified.signer.publicKeySha256,
+  };
 }
 
 /**
@@ -290,7 +307,7 @@ export function authorizeRecordedPush({ projectDir, anchorDir = projectDir, stat
  *
  * @param {{projectDir: string, state: object, candidate: {commit: string, tree: string},
  *          artifact: string, environment: string, now: string}} input
- * @returns {{authorized: true, code: "DEPLOY-PROOF-VERIFIED", keyReference: string}
+ * @returns {{authorized: true, code: "DEPLOY-PROOF-VERIFIED", keyReference: string, publicKeySha256: string}
  *          | {authorized: false, code: string}}
  */
 export function authorizeRecordedDeploy({ projectDir, anchorDir = projectDir, state, candidate, artifact, environment, now } = {}) {
@@ -301,7 +318,7 @@ export function authorizeRecordedDeploy({ projectDir, anchorDir = projectDir, st
     return { authorized: false, code: `${prefix}-INPUT-INVALID` };
   }
 
-  const trust = trustAnchorFor(anchorDir, prefix);
+  const trust = trustAnchorsFor(anchorDir, prefix);
   if (!trust.ok) return { authorized: false, code: trust.code };
 
   const approvals = Array.isArray(state?.deployApprovals) ? state.deployApprovals : [];
@@ -317,9 +334,14 @@ export function authorizeRecordedDeploy({ projectDir, anchorDir = projectDir, st
   for (const entry of matching) {
     const verified = verifySignedAction({
       state, kind: "deploy", prefix, candidate, recorded: entry.criticalProof,
-      anchor: trust.anchor, now, subject: { artifact, environment },
+      anchors: trust.anchors, now, subject: { artifact, environment },
     });
-    if (verified.ok) return { authorized: true, code: `${prefix}-VERIFIED`, keyReference: trust.anchor.keyReference };
+    if (verified.ok) {
+      return {
+        authorized: true, code: `${prefix}-VERIFIED`,
+        keyReference: verified.signer.keyReference, publicKeySha256: verified.signer.publicKeySha256,
+      };
+    }
     lastCode = verified.code;
   }
   return { authorized: false, code: lastCode };
