@@ -201,7 +201,44 @@ rather than only repairing the two carriers.
 
 ### Round-1 repairs: four of five findings closed, one cannot be (2026-08-08)
 
-**F2 — CLOSED, both halves (`8dcb1cc` pushed; AC-P3 demonstrated after it).**
+### CORRECTION — F2 was NOT closed, and I recorded that it was (round 2, 2026-08-08)
+
+The delta re-review found it and is right. **AC-P3 is unsatisfied at the level
+the criterion names, and my note below claiming both halves closed was wrong.**
+Verified myself before accepting:
+
+`planVerifyResume` throws on the first duplicate id
+(`plugins/pipeline-core/lib/verify-resume.mjs:114`), `verify.mjs:617-620`
+catches it, prints one line and pushes a single failed step. **Zero suites run** —
+so `verify-suite-registration-check`, registered inside `TEST_SUITES`, can never
+fire for the duplicate class at all. My demonstration ran the *standalone
+checker*, which is a different program from the one the criterion names. The
+substitution is exactly what AC-P3's "rather than throwing before planning"
+clause exists to forbid, and I did not notice it while writing the closure note.
+
+**What is fixed now (`27456fa`, dispatch `PHX-ACP3-NAME`).** The planner's
+registration errors name their subject, so the message `verify` actually prints
+is `VERIFY-JOURNAL-FAILED: Verify suite registration is invalid: duplicate suite
+id "…", registered again at index N` — captured in
+`evidence/phx-acp3-name.txt`, including a maximal-length id to prove the name
+survives `verify.mjs:618`'s 256-character truncation. Shape and dependency
+defects keep their own distinct messages. The planner suite is 10/10, the
+adjacent checker suite 27/27.
+
+**What is still open, and it needs a window.** AC-P3's second clause — that
+verify reports this *instead of* throwing before planning — is unchanged: a
+duplicate still aborts the run before any suite executes. Satisfying it means
+running the registration check ahead of `runVerifyJournal` inside
+`harness/scripts/verify.mjs`, which is TP-3-protected. Staged for the next
+window rather than asserted; the end-to-end demonstration needs the same window,
+because injecting a duplicate into the real registration arrays is itself an
+edit to that file.
+
+**F-B (minor) closed.** Both break-and-restore demonstrations were re-run at
+`27456fa` after the review pointed out they were bound to a superseded revision
+whose output format no longer exists.
+
+**F2 — partial: AC-P2 demonstrated, AC-P3 named but not yet reported before planning.**
 The PO signed a one-use TP-3 window for exactly the duplicate-suite-id edit
 (ADR-0059, request `91ecdd34…`, plan `65f19034…`, intent `f822476b…`).
 `evidence/phx-acp3-demonstration.txt`: baseline exit 0 → the same suite id
