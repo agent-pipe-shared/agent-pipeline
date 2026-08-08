@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "03e4e1600d910cb67d093759933944cbf7ae4eb10b12ee82f831d411f2d92ed5"
+    "transitionHead": "b173ba8b55e80a9fd1a538bcc7d0e4607499dfc2080d8fc67d09d82c7acd7123"
   },
   "counts": {
-    "open": 58,
+    "open": 59,
     "in_progress": 21,
     "closed": 22
   },
@@ -694,6 +694,14 @@
       "owner": "pipeline",
       "created": "2026-08-06",
       "source": "Manual re-run of the empty-directory onboarding smoke test in scratch/onboarding-smoke-test while re-verifying backlog/items/2026-08-06-onboarding-lifecycle-plan-hardcodes-the-codex-runner.md (see backlog/evidence/2026-08-06-onboarding-runner-identity-reverification.md), 2026-08-06."
+    },
+    {
+      "id": "pipeline.runner-neutrality-before-third-runner",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "PO question of 2026-08-08 during the greenfield hardening block: whether Antigravity/AGY support is tracked anywhere, given that it will require runner neutrality to hold far better than it does today."
     },
     {
       "id": "pipeline.runtime-projection-v2-eager-manifest-load",

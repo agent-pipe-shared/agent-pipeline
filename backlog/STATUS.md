@@ -83,6 +83,7 @@
 | pipeline.release-preflight-cli-base-commit-not-peeled | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.release-preflight-has-a-builder-but-no-cli | in_progress | defect | pipeline | 2026-08-06 | — |
 | pipeline.restart-launch-is-codex-only-for-every-runner | open | defect | pipeline | 2026-08-06 | — |
+| pipeline.runner-neutrality-before-third-runner | open | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.runtime-projection-v2-eager-manifest-load | open | defect | pipeline | 2026-07-27 | — |
 | pipeline.security-scan-cross-branch-gitleaks-findings | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.seeded-verify-contract-is-always-green | open | defect | pipeline | 2026-08-08 | — |
@@ -109,6 +110,6 @@
 
 ## Counts
 
-- open: 58
+- open: 59
 - in_progress: 21
 - closed: 22
