@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "6d357ca98cc4d4e3da780fe4597b276e14f4ab643a69353b89b28cebb5c0031e"
+    "transitionHead": "bc44f75df9b464e48c6411b5b6aa1f550be9b217a6b9740215b901541b4ea32a"
   },
   "counts": {
-    "open": 66,
+    "open": 65,
     "in_progress": 21,
-    "closed": 24
+    "closed": 25
   },
   "items": [
     {
@@ -329,11 +329,15 @@
     },
     {
       "id": "pipeline.greenfield-seeded-with-private-overlay-calibration",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Found by the CLAUDETIER-1 dispatch of 2026-08-08 while measuring what a fresh seed leaves under .claude/; the dispatch was investigating a different question and stopped on this."
+      "source": "Found by the CLAUDETIER-1 dispatch of 2026-08-08 while measuring what a fresh seed leaves under .claude/; the dispatch was investigating a different question and stopped on this.",
+      "closedAt": "2026-08-08",
+      "closureRepository": "self",
+      "closureCommit": "43ab69fa4e468a48a084bdd11deffedc4716dd20",
+      "closureEvidence": "backlog/evidence/2026-08-08-consumer-seed-calibration-closure.md"
     },
     {
       "id": "pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions",
