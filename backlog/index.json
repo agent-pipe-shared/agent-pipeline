@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "b173ba8b55e80a9fd1a538bcc7d0e4607499dfc2080d8fc67d09d82c7acd7123"
+    "transitionHead": "0711a603b1c9170beaed64c054584aefefff79b11fc289165c6ade33584d635a"
   },
   "counts": {
-    "open": 59,
+    "open": 61,
     "in_progress": 21,
     "closed": 22
   },
@@ -79,6 +79,22 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "NOVA-GMW-1 first dispatch attempt, 2026-08-07 -- Agent tool isolation:worktree."
+    },
+    {
+      "id": "pipeline.authority-decision-candidate-is-a-literal",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Reported by the Phoenix session of 2026-08-08 after a PO authority decision it had to resolve; verified against the source in this repository before filing."
+    },
+    {
+      "id": "pipeline.authority-gate-verdict-need-not-survive-checkout",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Observed by the Phoenix session of 2026-08-08, which caught it in its own work; generalised and verified against the source here."
     },
     {
       "id": "pipeline.backlog-delivery-status-reconciliation",

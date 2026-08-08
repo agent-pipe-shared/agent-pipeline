@@ -13,6 +13,8 @@
 | pipeline.agent-definitions-pin-the-review-tier-model | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.agent-talks-itself-out-of-the-pipeline | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.agent-tool-isolation-worktree-snapshots-stale-upstream-ref | open | defect | pipeline | 2026-08-07 | — |
+| pipeline.authority-decision-candidate-is-a-literal | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.authority-gate-verdict-need-not-survive-checkout | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.backlog-delivery-status-reconciliation | in_progress | workflow-improvement | pipeline | 2026-07-25 | Nova A / issue #57 |
 | pipeline.backlog-ledger-closure-reason-misleading | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.bounded-diagnostic-outside-repo-refused-under-wrong-reason | open | defect | pipeline | 2026-08-08 | — |
@@ -110,6 +112,6 @@
 
 ## Counts
 
-- open: 59
+- open: 61
 - in_progress: 21
 - closed: 22
