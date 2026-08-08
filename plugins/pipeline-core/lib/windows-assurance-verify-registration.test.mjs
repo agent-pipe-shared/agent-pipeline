@@ -132,55 +132,115 @@ assert.deepEqual(result, { ok: false, code: "WAVR-AUTHORITY-DRIFT" });
 
 check("WAVR18 detects a tampered authority matrix from the validator fixture root", authorityDriftFixture());
 
+/** Every LOCAL module the copied verify.mjs pulls in at load time, repo-relative.
+ *  verify.mjs is TP-3-protected, so the fixture — never verify.mjs — carries this list, and the
+ *  list is enumerated by hand and therefore stale-able: a module added to verify.mjs's import
+ *  graph without an entry here kills the spawned child at import, before it can write any
+ *  evidence. That must NOT read as "verify produced the wrong evidence" (precedent: commit
+ *  aabfe7e, SVR28, same defect class) — assertFixtureReachedVerify below gives it its own name.
+ *  The journal is stubbed (JOURNAL_STUB_SOURCE), so this list stops at verify.mjs's own imports
+ *  plus their local dependencies; copying the real verify-journal.mjs would drag 18 further
+ *  modules into the list for a function this fixture proves is never called. */
+const FIXTURE_MODULES = Object.freeze([
+  "harness/scripts/check-verify-suite-registration.mjs", // duplicateSuiteIds
+  "plugins/pipeline-core/lib/project-authority.mjs", // resolveAuthorityArtifactPath (ADR-0054)
+  "plugins/pipeline-core/lib/scoped-verify-registration.mjs",
+  "plugins/pipeline-core/lib/verify-resume.mjs",
+  "plugins/pipeline-core/lib/windows-assurance-verify-registration.mjs",
+  "plugins/pipeline-core/lib/worktree-lifecycle.mjs", // via project-authority.mjs
+  "plugins/pipeline-core/lib/windows-private-state.mjs", // via worktree-lifecycle.mjs
+]);
+const JOURNAL_STUB_REL_PATH = "plugins/pipeline-core/scripts/verify-journal.mjs";
+const JOURNAL_STUB_SOURCE = 'export function runVerifyJournal() { throw new Error("journal must not run after windows-assurance-registration failure"); }\n';
+/** Targets of the SCOPED registration only. The three Windows-assurance targets (SUITES) are
+ *  deliberately absent — their absence is what makes windows-assurance-verify-registration the
+ *  first failing step, i.e. exactly the property WAVR19 pins. */
+const FIXTURE_SCOPED_TARGETS = Object.freeze([
+  "plugins/pipeline-core/lib/scoped-verify-registration.test.mjs",
+  "plugins/pipeline-core/lib/workflow-preflight.test.mjs",
+  "plugins/pipeline-core/lib/interaction-continuity.test.mjs",
+]);
+
+/** A fixture defect that must never be reported as a failed property. */
+class FixtureCause extends Error {}
+
+function boundedStderr(stderr, lines = 6) {
+  return String(stderr ?? "").split("\n").filter(Boolean).slice(0, lines).join(" | ");
+}
+
+/** Separates "the fixture could not even run verify" from "verify ran and wrote wrong evidence".
+ *  Without this the two are indistinguishable: both used to return a bare false. */
+function assertFixtureReachedVerify(result, evidenceExists) {
+  if (result.error) throw new FixtureCause(`WAVR19-CHILD-NOT-SPAWNED: ${result.error.message}`);
+  if (/ERR_MODULE_NOT_FOUND|Cannot find (module|package)/.test(String(result.stderr ?? ""))) {
+    throw new FixtureCause(
+      `WAVR19-FIXTURE-MODULES-STALE: the copied verify.mjs imports a module FIXTURE_MODULES does not carry, so the child died at import. child stderr: ${boundedStderr(result.stderr)}`,
+    );
+  }
+  if (!evidenceExists) {
+    throw new FixtureCause(
+      `WAVR19-NO-EVIDENCE: the child wrote no evidence artifact at all (exit ${result.status}). child stderr: ${boundedStderr(result.stderr)}`,
+    );
+  }
+}
+
+/** Runs a fixture so a named cause reaches the operator instead of an unexplained FAIL. */
+function fixtureHolds(name, fixture) {
+  try {
+    return fixture() === true;
+  } catch (error) {
+    const cause = error instanceof FixtureCause ? error.message : `WAVR19-FIXTURE-THREW: ${error?.stack ?? error}`;
+    console.error(`CAUSE ${name}: ${cause}`);
+    return false;
+  }
+}
+
 function windowsAssuranceRegistrationFailureFixture() {
   const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
   const fixtureRoot = mkdtempSync(join(tmpdir(), "windows-assurance-verify-registration-"));
   const writer = join(fixtureRoot, "harness", "scripts", "verify.mjs");
-  const scopedRegistration = join(fixtureRoot, "plugins", "pipeline-core", "lib", "scoped-verify-registration.mjs");
-  const windowsRegistration = join(fixtureRoot, "plugins", "pipeline-core", "lib", "windows-assurance-verify-registration.mjs");
   const prd = join(fixtureRoot, "specs", "2026-07-19-sprint-sentinel-epic", "prd_sentinel-epic.md");
   const authority = join(fixtureRoot, AUTHORITY_PATH);
   const evidencePath = join(fixtureRoot, "evidence", "verify-latest.json");
 
   try {
     mkdirSync(dirname(writer), { recursive: true });
-    mkdirSync(dirname(scopedRegistration), { recursive: true });
     mkdirSync(dirname(prd), { recursive: true });
     mkdirSync(dirname(authority), { recursive: true });
     copyFileSync(join(repoRoot, "harness", "scripts", "verify.mjs"), writer);
-    copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "scoped-verify-registration.mjs"), scopedRegistration);
-    copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "windows-assurance-verify-registration.mjs"), windowsRegistration);
-    copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "verify-resume.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "verify-resume.mjs"));
-    copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "windows-private-state.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "windows-private-state.mjs"));
-    mkdirSync(join(fixtureRoot, "plugins", "pipeline-core", "scripts"), { recursive: true });
-    copyFileSync(join(repoRoot, "plugins", "pipeline-core", "scripts", "verify-journal.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "scripts", "verify-journal.mjs"));
+    for (const module of FIXTURE_MODULES) {
+      const target = join(fixtureRoot, module);
+      mkdirSync(dirname(target), { recursive: true });
+      copyFileSync(join(repoRoot, module), target);
+    }
+    const journalStub = join(fixtureRoot, JOURNAL_STUB_REL_PATH);
+    mkdirSync(dirname(journalStub), { recursive: true });
+    writeFileSync(journalStub, JOURNAL_STUB_SOURCE);
     copyFileSync(join(repoRoot, "specs", "2026-07-19-sprint-sentinel-epic", "prd_sentinel-epic.md"), prd);
     copyFileSync(join(repoRoot, AUTHORITY_PATH), authority);
-    for (const suite of [
-      "plugins/pipeline-core/lib/scoped-verify-registration.test.mjs",
-      "plugins/pipeline-core/lib/workflow-preflight.test.mjs",
-      "plugins/pipeline-core/lib/interaction-continuity.test.mjs",
-    ]) {
+    for (const suite of FIXTURE_SCOPED_TARGETS) {
       const target = join(fixtureRoot, suite);
       mkdirSync(dirname(target), { recursive: true });
       writeFileSync(target, "// fixture target\n");
     }
 
     const result = spawnSync(process.execPath, [writer], { cwd: fixtureRoot, encoding: "utf8" });
-    if (result.status === 0 || !existsSync(evidencePath)) return false;
+    assertFixtureReachedVerify(result, existsSync(evidencePath));
+    if (result.status === 0) return false;
     const evidence = JSON.parse(readFileSync(evidencePath, "utf8"));
     return evidence.exitCode !== 0
       && evidence.steps.length === 1
       && evidence.steps[0].name === "windows-assurance-verify-registration"
       && evidence.steps[0].exitCode === 1;
-  } catch {
-    return false;
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true });
   }
 }
 
-check("WAVR19 Verify fails before ordinary suites with a named Windows-assurance registration step", windowsAssuranceRegistrationFailureFixture());
+check(
+  "WAVR19 Verify fails before ordinary suites with a named Windows-assurance registration step",
+  fixtureHolds("WAVR19", windowsAssuranceRegistrationFailureFixture),
+);
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exitCode = failed === 0 ? 0 : 1;
