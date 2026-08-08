@@ -137,11 +137,35 @@ that round's enumeration; the rest are filed with owners and dates.
    matching and the scan went red again. That is the correct failure direction, and
    the reason to replace such entries rather than accumulate them.
 
-**Candidate state at the close of this block:** Verify 255/255 with binding
-`exact`, security scan clean. `VERSION` is `0.5.4`; the Claude manifest carries the
-review cachebuster and the Codex manifest stays bare, per the versioning
-convention. The installed local build is still `0.5.3+claude.20260807221336`, so
-the copy step is required before any of this is testable in anger.
+**Candidate state at the close of this block.** Verify 255/255 with binding
+`exact` on `272e9a96d0aff92a4906b83de606837054169781` — the tip itself, re-run
+after the cachebuster stamp rather than reported from the commit before it.
+Security scan clean. `VERSION` is `0.5.4`; the Claude manifest carries
+`0.5.4+claude.20260808021712.48d14a9` and the Codex manifest stays bare, per the
+versioning convention. The installed local build is still
+`0.5.3+claude.20260807221336`, which is the build the twelve greenfield defects
+were reported against, so the copy step is required before any of this is
+testable in anger.
+
+**Handover — the two human steps.** `rsync -a --delete` from
+`plugins/pipeline-core/` in this checkout onto `plugins/pipeline-core/` in the
+local marketplace, then `/reload-plugins`. The copy leaves the repository and is
+refused to an agent as a cross-repository mutation, which is correct and not
+worth routing around.
+
+**What a first run should now show, against the build the defects came from:** a
+Claude-onboarded repository no longer stops at a Codex restart barrier only a
+Codex ticket could clear; the kickoff reaches `ready` instead of
+`runtime-attestation-required`; implementation writes are refused until the plan
+is submitted, approved and the phase switched, with the refusal naming that
+sequence; a PRD marked honestly in a non-configured language is signposted to the
+route that changes the configuration; a new project's verify contract fails until
+configured; and a Resume-Hint card containing a colon is storable.
+
+**Three Critic rounds, verdicts recorded:** PASS, FAIL (one blocker, fixed and
+re-probed), FAIL (two majors, both fixed). No round was skipped and no finding was
+argued away. Two round-3 findings were already answered by commits outside that
+round's enumeration — an artefact of where the rounds were cut, not of the review.
 
 **Still open, deliberately.** Every remaining item keeps its backlog entry and its
 ledger transition. The two that most want a human decision: whether a day-one
