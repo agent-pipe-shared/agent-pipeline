@@ -24,7 +24,7 @@ export const INDEPENDENT_CHECK_COMMANDS = Object.freeze({
   test: "plugins/pipeline-core/lib/ai-assisted-hardening.test.mjs",
   guard: "plugins/pipeline-core/hooks/guard-git.test.mjs",
   policy: "harness/scripts/validate-manifest.mjs",
-  dependency: "harness/scripts/security-scan.mjs",
+  dependency: "plugins/pipeline-core/scripts/security-scan.mjs",
   workflow: "plugins/pipeline-core/lib/workflow-preflight.test.mjs",
   evidence: "plugins/pipeline-core/lib/security-evidence-evaluator.test.mjs",
 });

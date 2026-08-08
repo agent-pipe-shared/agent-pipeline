@@ -44,8 +44,8 @@
 // Design rationale for the candidate/plan split (this is the one deliberate
 // design decision worth spelling out): each `candidate.capabilities[]` entry
 // is kept STRICTLY to the real v1 per-adapter contract already shipping in
-// harness/scripts/security-adapters/gitleaks.mjs and aggregated by
-// harness/scripts/security-scan.mjs's `scannerEntry()` --
+// scripts/security-adapters/gitleaks.mjs and aggregated by
+// scripts/security-scan.mjs's `scannerEntry()` --
 // `{status, classification, findings, raw, reason?}` plus the `tool` name
 // and a short capability `id` for cross-referencing. Requiredness
 // (required vs optional capability) is an L2-plan concept that does not
@@ -208,7 +208,7 @@ export const FIXTURE_MATRIX = Object.freeze([
         Object.freeze({ id: "sast", tool: "semgrep", status: "PASS", classification: "empty_rule_pack", findings: Object.freeze([]), raw: null, reason: "rules_dir resolved but contains zero rule files" }),
       ]),
       // Additive context beyond the pure per-capability contract, modeled on
-      // the real rules_dir concept in harness/scripts/security-scan.mjs's
+      // the real rules_dir concept in plugins/pipeline-core/scripts/security-scan.mjs's
       // buildAdapterConfig(); not part of the closed per-capability shape.
       rulePackDetail: Object.freeze({ path: "governance/security-controls/semgrep-rules", ruleCount: 0, lastUpdatedAt: "2024-01-01T00:00:00.000Z" }),
     }),

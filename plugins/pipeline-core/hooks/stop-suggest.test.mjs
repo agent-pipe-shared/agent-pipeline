@@ -132,7 +132,7 @@ function stateFixture(phase, extra = {}) {
 ok("PHASE_GATE_MAP maps implementation -> dev-plan gate, no command", PHASE_GATE_MAP.implementation.gate === "dev-plan" && PHASE_GATE_MAP.implementation.command === null);
 ok(
   "PHASE_GATE_MAP maps security-scan -> security gate + scan command",
-  PHASE_GATE_MAP["security-scan"].gate === "security" && PHASE_GATE_MAP["security-scan"].command === "node harness/scripts/security-scan.mjs",
+  PHASE_GATE_MAP["security-scan"].gate === "security" && PHASE_GATE_MAP["security-scan"].command === "node plugins/pipeline-core/scripts/security-scan.mjs",
 );
 
 // ======================================================================================
@@ -206,7 +206,7 @@ ok(
 {
   const manifest = manifestFixture({ secMode: "blocking" });
   const message = resolveSuggestion(manifest, stateFixture("implementation"));
-  const expected = 'Pipeline: phase "implementation" active → next step: "security-scan" (Gate: security, mode: blocking). Check: node harness/scripts/security-scan.mjs';
+  const expected = 'Pipeline: phase "implementation" active → next step: "security-scan" (Gate: security, mode: blocking). Check: node plugins/pipeline-core/scripts/security-scan.mjs';
   ok("resolveSuggestion: implementation -> security-scan exact English message", message === expected, message);
 }
 

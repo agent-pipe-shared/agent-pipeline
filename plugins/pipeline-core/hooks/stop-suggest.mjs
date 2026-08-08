@@ -241,7 +241,7 @@ import {
 // ---- phase -> gate mapping (ONE small table; later phases are one-line additions) -------
 export const PHASE_GATE_MAP = {
   implementation: { gate: "dev-plan", command: null },
-  "security-scan": { gate: "security", command: "node harness/scripts/security-scan.mjs" },
+  "security-scan": { gate: "security", command: "node plugins/pipeline-core/scripts/security-scan.mjs" },
 };
 
 // ---- shared safe-JSON-object loader (fail-open: missing file / malformed JSON / non-object

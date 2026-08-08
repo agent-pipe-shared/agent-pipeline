@@ -178,10 +178,6 @@ export const ALLOWLIST = Object.freeze([
     reason: "Class B: every other setup.mjs mention in this file is a doc comment explaining what the hook detects, not a constructed operator-facing message (those are the separate, more specific entry above).",
   },
   {
-    filePattern: /^plugins\/pipeline-core\/hooks\/stop-suggest\.mjs$/u,
-    reason: "Class A: `PHASE_GATE_MAP[\"security-scan\"].command` is the literal string later surfaced verbatim in the Stop-hook's suggested-next-step message (pinned by stop-suggest.test.mjs), naming harness/scripts/security-scan.mjs. Not fixed by this dispatch -- deferred to a separate remediation dispatch.",
-  },
-  {
     filePattern: /^plugins\/pipeline-core\/lib\/critic-packet-governance\.mjs$/u,
     reason: "Class B: `path.startsWith(\"harness/\")` is internal path-classification logic for this repository's own Critic-packet governance (used only when Critic reviews run inside this repo), not a path assumption about a consumer's tree.",
   },
@@ -219,14 +215,6 @@ export const ALLOWLIST = Object.freeze([
     file: "plugins/pipeline-core/lib/po-gate-authority.mjs",
     match: "Run node setup.mjs --publish-po-profile",
     reason: "Class unclear: a constructed repair message that names \"the canonical primary checkout\" rather than the current repo, which may or may not make it consumer-reachable in practice. Not confidently classified within this dispatch's budget -- left for the follow-up dispatch's judgment rather than guessed.",
-  },
-  {
-    filePattern: /^plugins\/pipeline-core\/lib\/security-evidence-evaluator\.mjs$/u,
-    reason: "Class B: both occurrences are source comments citing harness/scripts/security-scan.mjs's schema shape, not operator-facing messages.",
-  },
-  {
-    filePattern: /^plugins\/pipeline-core\/lib\/security-evidence-fixture-matrix\.mjs$/u,
-    reason: "Class B: source comments citing harness/scripts/security-scan.mjs and its adapters, not operator-facing messages.",
   },
   {
     filePattern: /^plugins\/pipeline-core\/scripts\/ai-assisted-hardening-gate\.mjs$/u,

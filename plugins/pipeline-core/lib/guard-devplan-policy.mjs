@@ -10,9 +10,11 @@
  * repository has been bitten by twice in one block.
  *
  * So the value lives here, with exactly one owner: the guard imports it to
- * enforce, and `harness/scripts/generate-agent-obligations.mjs` imports it to
- * tell agents about it. A prefix added here reaches both at once, and the
- * generator's contract test goes red until the shipped document is regenerated.
+ * enforce, and the obligations generator (a source-checkout tool, so its path is
+ * deliberately not named here -- a shipped file must not point a consumer at
+ * something only this repository has) imports it to tell agents about it. A
+ * prefix added here reaches both at once, and the generator's contract test goes
+ * red until the shipped document is regenerated.
  */
 
 /**

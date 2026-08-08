@@ -3,12 +3,18 @@
 /**
  * security-scan.mjs -- security-scan phase runner, AP1-P4 "FUNDIN".
  *
- * NEW FILE, NOT WIRED into harness/scripts/verify.mjs (TP-3 -- explicit scope boundary of
- * this delivery; a later work package, "W-WIRE", adds the call site + the accompanying gate
- * hook). This script is a standalone, independently invocable phase runner exactly like
- * verify.mjs is for the guard-family test set, following the same evidence-artifact family
- * pattern (`pipeline.verify-evidence.v0` is the sibling schema this one,
- * `pipeline.security-evidence.v0`, was modeled on).
+ * SHIPPED WITH THE PLUGIN (moved here 2026-08-09, SHIP-2). It used to live in a
+ * source-checkout-only directory that a consumer project does not have, while shipped
+ * skills and the Stop hook told consumers to run it -- an instruction naming a script the
+ * reader cannot have. The PO's decision was to ship it rather than mark the step
+ * self-application-only,
+ * on the ground that a security baseline is something every agent repo should get: a floor
+ * the consumer extends, not a ceiling this repository keeps to itself.
+ *
+ * It is wired into the verify chain (registered as both a suite and a manifest-gated phase
+ * step) and is also a standalone, independently invocable phase runner, following the same
+ * evidence-artifact family pattern (`pipeline.verify-evidence.v0` is the sibling schema
+ * this one, `pipeline.security-evidence.v0`, was modeled on).
  *
  * MANDATORY DEDUP STEP (briefing step 1): grepped the whole repo for
  * security-scan/security-adapters/gitleaks/osv-scanner/semgrep/license-check precursors --

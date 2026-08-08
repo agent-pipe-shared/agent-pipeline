@@ -11,8 +11,8 @@
 //
 //   (A) the `pipeline.security-evidence.v2` schema -- a NEW, additive,
 //       closed evidence-envelope schema. It does not reuse, mutate, or
-//       silently extend `pipeline.security-evidence.v1` (harness/scripts/
-//       security-scan.mjs's schema string) -- v1 stays exactly as-is, out of
+//       silently extend `pipeline.security-evidence.v1` (the schema string in
+//       scripts/security-scan.mjs) -- v1 stays exactly as-is, out of
 //       scope, a later wave's job. See "PART A" below.
 //   (B) the pure L3 per-capability evaluator + a separate aggregate-verdict
 //       function + the F-3 run-outcome -> control-result projection. See
@@ -62,7 +62,7 @@
 // input, environment -- to be non-empty. Rather than inventing an unrelated
 // shape, this schema places each identity concept where the REAL code
 // already places its closest analogue (per this task's context file,
-// harness/scripts/security-scan.mjs):
+// plugins/pipeline-core/scripts/security-scan.mjs):
 //   - `policy`, `input`, `environment` are ENVELOPE-level, one per whole scan
 //     run -- exactly mirroring security-scan.mjs's own
 //     `policy.configurationSha256` (top-level `policy` field),
