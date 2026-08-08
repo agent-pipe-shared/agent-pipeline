@@ -85,6 +85,46 @@ and weaker thing.
 5. **Then close #100** naming the exact commit and the test evidence, per its
    seventh criterion.
 
+## The invariant this is an instance of — write it down once
+
+Input from a parallel session, adopted: the handler is the more consequential of
+the two remaining pieces, because it changes the **failure direction of the whole
+guard family**. Today an undiscovered bug in an authority gate is automatically a
+pass. With the boundary it is automatically a block. That is the difference between
+a guard that works when the code is right and one that holds when it is not.
+
+**And it is exactly why the boundary must not be rolled out everywhere.**
+`guard-git`'s fail-open is a documented design decision — the source says "fail-open:
+guard is a safety net, not a prison" — and it stays. A boundary applied to advisory
+hooks turns them into prisons: a harmless bug in a hint-emitting hook would begin
+blocking every command. The two errors are mirror images, and only one of them is
+the subject of this item.
+
+So the rule belongs in `guardrails/` once, as an invariant, rather than being
+re-decided per file:
+
+> **Advisory guards fail open. Authority-bearing gates fail closed** — including on
+> an unexpected runtime fault. A hook's category is a property it declares, not
+> something inferred from what it happens to do.
+
+Authority-bearing today: the push gate, the approval gate, the testpath gate.
+Advisory: `guard-git` among others. Writing the invariant is a separate, small
+change from this item's fix and is deliberately not folded into it.
+
+## Two tests, two different jobs
+
+Recorded because losing the distinction under budget pressure would leave the
+weaker half:
+
+- The **fixture** — state valid, no `pushApproval`, approval `required` — proves
+  *this location* is fixed.
+- The **fault-injection** test — an artificial error raised mid-hook, asserting the
+  block exit code rather than the warning one — proves *the next location does not
+  matter*.
+
+The second is the one that demonstrates the class rather than the instance. If only
+one survives, it must be that one.
+
 ## Related
 
 - GitHub issue #100 — the parent; this item is its residual, not a new defect.
