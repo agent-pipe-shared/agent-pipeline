@@ -1104,6 +1104,30 @@ The project rule wins and every commit I made tonight carries only
 session that does not actively suppress it. That is a standing hazard, not a
 past incident.
 
+**CORRECTION to the paragraph immediately above, written three hours later.** The
+"standing hazard" claim is wrong, and the correction changes this decision. I tested
+the live guard with a deliberate probe — a message file carrying both forbidden
+trailers, nothing staged — and it refused with
+`GIT-03-PROVIDER-COAUTHOR, GIT-03-CORRELATION-TRAILER, GIT-03-SESSION-URL`
+and the sentence *"There is no override for this rule."* **Recurrence is closed.**
+What remains is 22 historical commits and nothing else. The harness default does
+still emit the trailers, so the guard is doing real work on every commit rather than
+sitting idle — but it is doing it unconditionally, which is the part I got wrong.
+
+**Why the 22 exist anyway, which is the more useful finding.** The enforcing guard
+landed on 2026-08-06 in `e4d4fa3` — *"feat(guard): enforce GIT-03 instead of
+documenting it"*. 22 of the 23 offending commits were made after that commit already
+existed. They are not pre-policy debt. They were made while the rule sat in the
+repository and was not yet in force in the running session, which picked up its new
+plugin build only at the 2026-08-08 restart.
+
+**So the systemic defect is not GIT-03: a guard committed to this repository is not a
+guard in force until the runtime reloads it, and nothing tells you which of the two
+you currently have.** Every hook here has that property. The gap between "merged"
+and "enforced" was 22 commits wide on the one rule whose damage cannot be undone,
+and it was invisible from inside the session that was violating it. That is worth
+more than the trailers that revealed it, and it needs its own backlog item.
+
 **2. The Critic returned FAIL, and its second blocker answers your question.**
 The pin re-baseline you asked about: the Critic found the tamper detection over
 the Critic execution surface is currently non-enforcing for six of nine files,
