@@ -245,6 +245,68 @@ are green" as the earned practice; the briefings did not carry it, because the
 practice lives in a backlog item nobody reads while dispatching. It must move into
 `templates/prompts/goldfish-task.md`.
 
+**Issue #100's last open acceptance criterion is closed** (`2ae06d9`). The push
+gate's blocking evaluation now carries a terminal boundary: an escaped exception is
+routed through the same mode dispatch the normal collected-findings path uses, so
+`warn` stays non-blocking (AC-4, unchanged) and everything else fails closed instead
+of reaching Node's own exit 1 — which in this hook family means *warning*, precisely
+where a blocking gate was configured. The diagnostic carries only an error name and
+a well-formed Node code; the fixtures assert that neither message nor stack survives,
+because the operand text in scope there includes local paths and remote URLs. Proven
+with a genuine injected fault under both modes plus an inertness check, not with a
+test that observes a `catch` exists. The missing `pushApproval`-absent fixture landed
+with it, pinned byte-identical to its supposed equivalent rather than assumed equal.
+
+**The rule behind it is written down once, as `GL-09`** (`85530f6`): advisory guards
+fail open, authority-bearing gates fail closed including on an unexpected runtime
+fault, and a hook's category is a property it *declares* rather than one inferred
+from what it happens to do. Both halves are load-bearing and point in opposite
+directions — the same boundary applied to an advisory hook would turn a harmless bug
+in a hint-emitting hook into a block on every command, which is why `guard-git`
+keeps its documented fail-open.
+
+**The delta re-review cleared all three prior findings and returned a new major**
+(`6514f85`). Verify green and exactly bound, every commit file-scope atomic, nine of
+ten trailer-less commits reconciled to dispatch records. The tenth is the finding: a
+production change to what the approval record contains, committed by the orchestrator
+after its dispatch ended without committing — **nine minutes after the commit that
+owned exactly that pattern from the previous batch**. History is not rewritten, so
+the record is the correction, and the measurement is the point: an acknowledgement
+plus an intention held for nine minutes. Filed for a structural control, with the
+direction pointing upstream at *why* dispatches end with uncommitted diffs rather than
+at making the `Dispatch:` trailer mandatory, which would only convert an honest
+optional signal into a field that gets filled in to pass a check.
+
+**Two gaps found by walking flows rather than reading about them.** The signed
+guard-override path has no command that emits the digest the human must sign — what
+`prepare-authorization` returns is a selection hash, and the actual recipe lives in a
+library doc comment — while the signing command's describer resolves maintenance-window
+requests only, so an override selection lands in the honest "no recorded request
+resolves for this digest" branch. Every piece behaves correctly and the composition
+still ends with a human signing a number nothing can explain to them, under the
+default mode. Separately, `guard-testpath` blocked a dispatch's in-scope Edit/Write,
+*refused its own override ceremony*, and was then walked around with a shell write —
+a documented accepted gap that `GL-09` has now turned into a contradiction, since the
+same gate is classified authority-bearing. Both filed; both are the same shape as the
+push-gate finding, rotated from unanticipated faults to unanticipated routes.
+
+**Candidate state at the close of this block.** Verify 255/255 with binding `exact`
+at `c4be0638c673357bd7d2bca02ec43f03c3d3b220`, run on a quiet tree. `VERSION` stays
+`0.5.4`; the Claude manifest carries the fresh cachebuster
+`0.5.4+claude.20260808104333.c4be063` and the Codex manifest stays bare, per the
+versioning convention. Verify is re-run on this tip *after* the stamp rather than
+reported from the commit before it — the evidence artifact is gitignored, so the
+stamp commit is genuinely the last one and the receipt still binds to it exactly.
+
+**What is deliberately NOT in this candidate, by PO decision.** `SETUP-2` through
+`SETUP-4` (the machine plane, the bootstrap questions, the `signature`-explaining
+remedy and the downgrade path to `chat`) and the scratch-cleanup wiring are both
+moved to *directly after* this local candidate: the PO tests the happy path in
+parallel, and both must land in `0.5.4` in functional — explicitly not polished —
+form before external testers see it. The Critic's own scratchpad disclosure is the
+argument for the second one: before creating its working directory it found four
+foreign run directories and a pile of loose files, after roughly one day of use.
+
 ## 2026-08-08 Nova GF-055 — the PO's six decisions on the open questions, implemented (in progress)
 
 The block above ended by naming the open questions. The PO answered them, and one
