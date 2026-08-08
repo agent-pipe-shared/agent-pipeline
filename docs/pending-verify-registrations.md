@@ -25,9 +25,29 @@ so a handover artifact placed there does not survive the block that produced it.
 
 ## The human step
 
-Add one `TEST_SUITES` entry per suite below, then commit. A human editing their
-own repository's file needs no ceremony; the signed-override route is available
-if the ceremony is wanted for the record.
+Both pending edits — the registrations here and the `guard-gate-strength`
+content below — are applied by one operator script:
+
+```
+node harness/scripts/apply-pending-protected-edits.mjs --check     # dry run, writes nothing
+node harness/scripts/apply-pending-protected-edits.mjs --preview   # runs the transformed suite from a removed sibling
+node harness/scripts/apply-pending-protected-edits.mjs             # apply both steps
+```
+
+It refuses before writing a byte if any insertion anchor is missing or occurs
+more than once, it skips a step already applied, and after writing it runs the
+affected suite and **restores the original bytes if that suite does not reach
+its expected result** — so neither protected file can be left half-applied. It
+does not commit; reviewing with `git diff` and committing stays with you.
+
+The `--preview` mode has already been run here and reached
+`guard-gate-strength: 36 passed, 0 failed` without touching the protected file,
+so the paste is proven before you apply it rather than after.
+
+Doing it by hand instead is equally fine: add one `TEST_SUITES` entry per suite
+below, then commit. A human editing their own repository's file needs no
+ceremony; the signed-override route is available if the ceremony is wanted for
+the record.
 
 Until that happens, each suite has been run individually by the Elephant and its
 result recorded in the block's evidence — "not registered" here means "not run by
