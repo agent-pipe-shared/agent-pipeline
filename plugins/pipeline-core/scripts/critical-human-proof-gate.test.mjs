@@ -15,8 +15,10 @@ const planSha256 = createHash("sha256").update("plan").digest("hex");
 const specSha256 = createHash("sha256").update("spec").digest("hex");
 const now = "2026-08-02T18:40:00.000Z";
 mkdirSync(join(root, "project"), { recursive: true });
-mkdirSync(join(root, "specs", "sprint-nova-epic", "implementation"), { recursive: true });
-writeFileSync(join(root, "specs", "sprint-nova-epic", "implementation", "critical-action-authorization-threat-model.md"), "fixture threat model\n");
+// CB-1a: approve-push resolves the threat-model artifact at the fixed
+// conventional path project/push-threat-model.md -- never configurable, and
+// never the Pipeline's own specs/sprint-nova-epic/ (evidence/cb-1a-measurement.md).
+writeFileSync(join(root, "project", "push-threat-model.md"), "fixture threat model\n");
 writeFileSync(join(root, "project", "critical-human-proof.json"), JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push", "deploy", "publication"] }));
 writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({
   schema: "pipeline.state.v0", planApproved: true,
@@ -24,7 +26,7 @@ writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({
   planApproval: { poGateAuthority: { planSha256, specSha256 } },
 }, null, 2));
 const pushTarget = { remote: "origin", destination: "refs/heads/main" };
-const threatModel = { path: "specs/sprint-nova-epic/implementation/critical-action-authorization-threat-model.md", sha256: createHash("sha256").update("fixture threat model\n").digest("hex") };
+const threatModel = { path: "project/push-threat-model.md", sha256: createHash("sha256").update("fixture threat model\n").digest("hex") };
 const subjectSha256 = criticalActionSubjectSha256({ kind: "push", candidate, subject: { sourceCommit: candidate.commit, ...pushTarget, threatModel } });
 const request = createCriticalActionApprovalRequest({ candidate, featureId: "sprint-nova-epic", planBytes: Buffer.from("plan"), specBytes: Buffer.from("spec"), action: { kind: "push", subjectSha256, expiresAt: "2026-08-02T18:50:00.000Z" } });
 const keys = generateKeyPairSync("ed25519");

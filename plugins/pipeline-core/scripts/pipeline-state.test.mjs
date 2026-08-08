@@ -4,15 +4,18 @@
  * (`resolvePushThreatModelArtifact`, `materialize-push-threat-model`).
  * See evidence/cb-1a-measurement.md for the measurement this responds to.
  *
- * Deliberately narrow: `critical-human-proof-gate.test.mjs` already covers
- * the rest of `approve-push`'s behaviour end to end (a valid signed proof
- * accepted once, replay refused, policy-kind refusal, etc.) and is
- * unaffected by this change other than its own fixture's threat-model path,
- * which is out of this dispatch's edit scope.
+ * There is exactly ONE resolution path -- `project/push-threat-model.md` --
+ * deliberately not configurable (see the comment above
+ * `PUSH_THREAT_MODEL_DEFAULT_PATH` in `pipeline-state.mjs`), so there is no
+ * "configured path" scenario left to cover here.
+ *
+ * Deliberately narrow otherwise: `critical-human-proof-gate.test.mjs`
+ * already covers the rest of `approve-push`'s behaviour end to end (replay
+ * refused, policy-kind refusal, etc.).
  */
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -23,6 +26,10 @@ const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
 const planSha256 = createHash("sha256").update("plan").digest("hex");
 const specSha256 = createHash("sha256").update("spec").digest("hex");
 const now = "2026-08-08T18:40:00.000Z";
+
+function mktempProjectDir() {
+  return mkdtempSync(join(tmpdir(), "cb-1a-fixture-"));
+}
 
 function freshFixture() {
   const root = mktempProjectDir();
@@ -37,10 +44,6 @@ function freshFixture() {
   return { root, deps };
 }
 
-function mktempProjectDir() {
-  return mkdtempSync(join(tmpdir(), "cb-1a-fixture-"));
-}
-
 function capturedStderr(fn) {
   const original = console.error;
   const lines = [];
@@ -53,97 +56,42 @@ function capturedStderr(fn) {
   }
 }
 
-function withEnv(name, value, fn) {
-  const had = Object.hasOwn(process.env, name);
-  const previous = process.env[name];
-  if (value === undefined) delete process.env[name];
-  else process.env[name] = value;
-  try {
-    return fn();
-  } finally {
-    if (had) process.env[name] = previous;
-    else delete process.env[name];
-  }
+function approvePushAttempt(root, deps, pushTarget = { remote: "origin", destination: "refs/heads/main" }) {
+  return capturedStderr(() => run(["approve-push", "--by", "PO", "--remote", pushTarget.remote, "--destination", pushTarget.destination,
+    "--proof-request", join(root, "missing-request.json"), "--proof-authority", join(root, "missing-authority.json"), "--proof", join(root, "missing-proof.json")], deps));
 }
 
-// AC-6: a fixture project that is not this repository and has no sprint
-// directory reaches proof verification -- via the materializing command the
-// refusal itself names -- without ever hitting CRITICAL-PROOF-BOUND-ARTIFACT-UNAVAILABLE.
+// AC-1/AC-2/AC-6: a fixture project that is not this repository and has no
+// sprint directory, and has never had any environment variable naming a
+// path, still ends up with a resolvable artifact -- via the materializing
+// command the refusal itself names -- and then completes a REAL signed
+// approval end to end, binding the exact bytes materialize-push-threat-model
+// wrote.
 {
   const { root, deps } = freshFixture();
   assert.equal(existsSync(join(root, "specs")), false, "fixture must have no sprint directory");
+  assert.equal(process.env.PIPELINE_PUSH_THREAT_MODEL_PATH, undefined, "no environment variable governs this route (Correction 1)");
 
-  const beforeMaterialize = capturedStderr(() => run(["approve-push", "--by", "PO", "--remote", "origin", "--destination", "refs/heads/main",
-    "--proof-request", join(root, "missing-request.json"), "--proof-authority", join(root, "missing-authority.json"), "--proof", join(root, "missing-proof.json")], deps));
+  const beforeMaterialize = approvePushAttempt(root, deps);
   assert.equal(beforeMaterialize.result, 2);
   assert.ok(beforeMaterialize.lines.some((line) => line.includes("CRITICAL-PROOF-BOUND-ARTIFACT-UNAVAILABLE")),
     "before materializing, the refusal must name the missing-artifact code");
   assert.ok(beforeMaterialize.lines.some((line) => line.includes("materialize-push-threat-model")),
-    "the refusal must name the exact command that creates the artifact (AC-3b)");
+    "AC-3b: the refusal must name the exact command that creates the artifact");
 
-  const materialized = run(["materialize-push-threat-model"], deps);
-  assert.equal(materialized, 0);
+  assert.equal(run(["materialize-push-threat-model"], deps), 0);
   const materializedPath = join(root, "project", "push-threat-model.md");
   assert.ok(existsSync(materializedPath), "materialize-push-threat-model must create project/push-threat-model.md");
+  const materializedBytes = readFileSync(materializedPath);
 
-  const afterMaterialize = capturedStderr(() => run(["approve-push", "--by", "PO", "--remote", "origin", "--destination", "refs/heads/main",
-    "--proof-request", join(root, "missing-request.json"), "--proof-authority", join(root, "missing-authority.json"), "--proof", join(root, "missing-proof.json")], deps));
-  assert.equal(afterMaterialize.result, 2, "still refused -- no valid proof was supplied");
+  const afterMaterialize = approvePushAttempt(root, deps);
   assert.ok(!afterMaterialize.lines.some((line) => line.includes("CRITICAL-PROOF-BOUND-ARTIFACT-UNAVAILABLE")),
     "AC-6: after materializing, the artifact resolves -- the refusal is no longer the artifact-unavailable one");
-  assert.ok(afterMaterialize.lines.some((line) => line.includes("CRITICAL-PROOF-EXTERNAL-PATH") || line.includes("proof was not consumed")),
-    "the remaining refusal is for the (deliberately invalid) proof, not the artifact");
-}
 
-// AC-3c: materialize-push-threat-model refuses to overwrite an existing artifact.
-{
-  const { root, deps } = freshFixture();
-  assert.equal(run(["materialize-push-threat-model"], deps), 0);
-  const before = readFileSync(join(root, "project", "push-threat-model.md"), "utf8");
-  const second = capturedStderr(() => run(["materialize-push-threat-model"], deps));
-  assert.equal(second.result, 2);
-  assert.ok(second.lines.some((line) => line.includes("already exists")));
-  assert.equal(readFileSync(join(root, "project", "push-threat-model.md"), "utf8"), before, "an existing artifact must be byte-for-byte untouched");
-}
-
-// AC-7: a project that configures a path which does not resolve gets a clear
-// refusal, never a silent fallback to the conventional default.
-{
-  const { root, deps } = freshFixture();
-  assert.equal(run(["materialize-push-threat-model"], deps), 0, "the default artifact DOES exist in this fixture");
-  withEnv("PIPELINE_PUSH_THREAT_MODEL_PATH", "does/not/exist.md", () => {
-    const refused = capturedStderr(() => run(["approve-push", "--by", "PO", "--remote", "origin", "--destination", "refs/heads/main",
-      "--proof-request", join(root, "missing-request.json"), "--proof-authority", join(root, "missing-authority.json"), "--proof", join(root, "missing-proof.json")], deps));
-    assert.equal(refused.result, 2);
-    assert.ok(refused.lines.some((line) => line.includes("CRITICAL-PROOF-BOUND-ARTIFACT-UNAVAILABLE")),
-      "AC-7: the configured path's own refusal, not a silent fallback to the default that DOES exist here");
-    assert.ok(!refused.lines.some((line) => line.includes("materialize-push-threat-model")),
-      "AC-7: a configured (non-default) path's refusal must not steer the operator at the default-only remedy");
-  });
-}
-
-// AC-4: this repository keeps binding the document it binds today
-// (specs/sprint-nova-epic/implementation/critical-action-authorization-threat-model.md)
-// through the configuration route -- proved end to end with a real signed
-// approval, not asserted.
-{
-  const root = mktempProjectDir();
+  // End-to-end: a real signed approval, over the artifact exactly as materialized.
   const external = mktempProjectDir();
-  mkdirSync(join(root, "project"), { recursive: true });
-  mkdirSync(join(root, "specs", "sprint-nova-epic", "implementation"), { recursive: true });
-  const documentBytes = "fixture threat model, configured route\n";
-  const documentPath = "specs/sprint-nova-epic/implementation/critical-action-authorization-threat-model.md";
-  writeFileSync(join(root, documentPath), documentBytes);
-  writeFileSync(join(root, "project", "critical-human-proof.json"), JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push", "deploy", "publication"] }));
-  writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({
-    schema: "pipeline.state.v0", planApproved: true,
-    activeFeature: { id: "sprint-nova-epic", planPath: "specs/sprint-nova-epic/prd.md", phase: "implementation" },
-    planApproval: { poGateAuthority: { planSha256, specSha256 } },
-  }, null, 2));
-  const deps = { dir: root, now: () => now, gitHead: () => ({ ok: true, commit: candidate.commit }), gitCandidate: () => ({ ok: true, ...candidate }) };
-
   const pushTarget = { remote: "origin", destination: "refs/heads/main" };
-  const expectedThreatModel = { path: documentPath, sha256: createHash("sha256").update(documentBytes).digest("hex") };
+  const expectedThreatModel = { path: "project/push-threat-model.md", sha256: createHash("sha256").update(materializedBytes).digest("hex") };
   const subjectSha256 = criticalActionSubjectSha256({ kind: "push", candidate, subject: { sourceCommit: candidate.commit, ...pushTarget, threatModel: expectedThreatModel } });
   const request = createCriticalActionApprovalRequest({ candidate, featureId: "sprint-nova-epic", planBytes: Buffer.from("plan"), specBytes: Buffer.from("spec"), action: { kind: "push", subjectSha256, expiresAt: "2026-08-08T18:50:00.000Z" } });
   const keys = generateKeyPairSync("ed25519");
@@ -157,14 +105,38 @@ function withEnv(name, value, fn) {
   writeFileSync(authorityPath, JSON.stringify(authority));
   writeFileSync(proofPath, JSON.stringify(proof));
 
-  withEnv("PIPELINE_PUSH_THREAT_MODEL_PATH", documentPath, () => {
-    const approved = run(["approve-push", "--by", "PO", "--remote", pushTarget.remote, "--destination", pushTarget.destination,
-      "--proof-request", requestPath, "--proof-authority", authorityPath, "--proof", proofPath], deps);
-    assert.equal(approved, 0, "AC-4: the configuration route reproduces today's exact binding, end to end");
-  });
+  const approved = run(["approve-push", "--by", "PO", "--remote", pushTarget.remote, "--destination", pushTarget.destination,
+    "--proof-request", requestPath, "--proof-authority", authorityPath, "--proof", proofPath], deps);
+  assert.equal(approved, 0, "AC-1/AC-6: the materialized artifact is fully bindable end to end, no sprint directory involved");
   const state = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
-  assert.deepEqual(state.pushApproval.lastApproved.threatModel, expectedThreatModel,
-    "AC-4: the recorded threatModel is byte-for-byte the same {path, sha256} boundRepositoryArtifact always produced for this path");
+  assert.deepEqual(state.pushApproval.lastApproved.threatModel, expectedThreatModel);
+}
+
+// AC-3c: materialize-push-threat-model refuses to overwrite an existing artifact.
+{
+  const { root, deps } = freshFixture();
+  assert.equal(run(["materialize-push-threat-model"], deps), 0);
+  const before = readFileSync(join(root, "project", "push-threat-model.md"), "utf8");
+  const second = capturedStderr(() => run(["materialize-push-threat-model"], deps));
+  assert.equal(second.result, 2);
+  assert.ok(second.lines.some((line) => line.includes("already exists")));
+  assert.equal(readFileSync(join(root, "project", "push-threat-model.md"), "utf8"), before, "an existing artifact must be byte-for-byte untouched");
+}
+
+// A non-UNAVAILABLE refusal (an unsafe file already at the conventional path)
+// is reported plainly and does NOT steer the operator at
+// materialize-push-threat-model, which would only refuse again there.
+{
+  const { root, deps } = freshFixture();
+  const target = join(root, "project", "push-threat-model.md");
+  const linkTarget = join(root, "project", "push-threat-model-real.md");
+  writeFileSync(linkTarget, "not the real artifact\n");
+  symlinkSync(linkTarget, target);
+  const refused = approvePushAttempt(root, deps);
+  assert.equal(refused.result, 2);
+  assert.ok(refused.lines.some((line) => line.includes("CRITICAL-PROOF-BOUND-ARTIFACT-UNSAFE")));
+  assert.ok(!refused.lines.some((line) => line.includes("materialize-push-threat-model")),
+    "a symlink at the conventional path is not the missing-artifact case");
 }
 
 console.log("pipeline-state.test.mjs (CB-1a): all checks passed");
