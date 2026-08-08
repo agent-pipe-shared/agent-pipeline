@@ -47,6 +47,38 @@ liftable, which is right for one code and wrong for the other. The map is a
 reader and was correctly not allowed to change a guard, so this is recorded here
 rather than patched there.
 
+## Partially fixed 2026-08-09 (`53aa19a`), and the fix has a visible seam
+
+The refusal now names the rejected element, at both grammar call sites
+(`guard-lifecycle-ready.mjs:1695` and `:1706`, via `rejectedGrammarElement()`),
+and the newline-in-`-m` case carries a real typed retry action. Proven
+behaviour-neutral by `harness/scripts/guard-grammar-differential.mjs`: 30 command
+shapes, 9 admitted before and after, 0 reclassified.
+
+**What is still open, and it is the original defect in a narrower place.** The
+two call sites are not symmetric:
+
+- `:1693` — `GUARD-PARSE-UNSUPPORTED` passes
+  `retryActionsForDeniedCommand(command, root)`.
+- `:1706` — `GUARD-OPERATOR-UNAPPROVED` and `GUARD-REDIRECT-UNAPPROVED` pass a
+  literal `[]`.
+
+So an operator or redirect refusal still prints `"retryActions":[]` — a claim
+that no narrower path exists — without ever asking whether one does. Whether
+`retryActionsForDeniedCommand` would return anything useful for those shapes is
+the measurement to take first; if it would, the fix is passing it. If it would
+not, the honest fix is saying so rather than printing an empty list that reads as
+a checked answer.
+
+**A confirmation worth keeping, from chasing this.** A Critic reviewing the block
+noticed that a live refusal in that same session carried no `Rejected element:`
+line, which looked like the fix not being wired. It is wired; the *installed*
+plugin copy had not been synced from the checkout yet. That is the expected state
+between a commit and the operator's `rsync` + `/reload-plugins`, and it is worth
+recording because it means **no observation of guard behaviour from inside a
+session is evidence about the committed code until that sync has run** — a trap
+for exactly this kind of review.
+
 ## Direction
 
 1. **Name the failing element, not just the rule.** The parser already knows
