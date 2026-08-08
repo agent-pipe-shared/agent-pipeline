@@ -55,15 +55,53 @@ Two steps, deliberately separate:
 1. **Repair the carriers.** Repoint `docs/deploy/README.md`'s two citations by
    heading title, the same transformation the B3 sweep applied everywhere else.
    Small, mechanical, and needs no new decision.
-2. **Find out why the census missed it**, before trusting the next one. The
-   useful question is not "which other files are missing" but "what did the
-   inventory's search bound exclude" — a `docs/` subdirectory, a filename
-   pattern, or a scope class that was never enumerated. Answering it is what
-   turns this from one repair into a bounded guarantee.
+2. **Find out why the census missed it**, before trusting the next one.
+   **Answered 2026-08-08 — see below.** What remains of this step is deciding
+   what to do about the cause, not discovering it.
 
 Acceptance test: a repository-wide search for `docs/operating-model.md` followed
 by a section sign returns only archival documents that quote the defect
-deliberately, and the reason the previous census missed `docs/deploy/` is stated.
+deliberately.
+
+## Why the census missed it (measured 2026-08-08)
+
+The inventory's method was prescribed and, as prescribed, structurally unable to
+find this file. `phx-r3-b3-inventory-c6-c8.md:15-16` states it:
+
+> For every file in scope: `rg -n "§" <path>` and `rg -n "OM §" <path>` … **never
+> `rg` for the string `operating-model`**.
+
+So the search ran *per file of a given list*, over the section sign, and was
+explicitly forbidden from searching the repository for the cited document's
+name. A file that was not already in the class list could not surface, however
+many citations it carried. The class list itself came from a design document's
+enumeration (`design/part-a-residuals-and-dispatch-template-drift.md` §II.1.3),
+authored rather than re-derived from the tree.
+
+That is the whole cause: **the sweep was measured, the scope was asserted.** The
+lesson the phase already recorded — "measure repository-wide first, then cut" —
+was applied to counting citations *within* the scope and never to establishing
+the scope.
+
+A repository-wide search run now (`rg -ln "operating-model\.md.*§"`, excluding
+the deliberate archival carriers `docs/state.md`, `specs/**`, `backlog/**`,
+`docs/adr/**`) returns seven files. Six of them are false positives of the
+obvious form: they cite `harness/review-protocol.md §2.1` on the same line where
+they name `docs/operating-model.md` by heading title, which is the correct
+post-sweep shape. Only `docs/deploy/README.md:8,23` genuinely carries
+`docs/operating-model.md §3.5` and `§3.1/§3.5`.
+
+**One adjacent instance found by the same search, same class, different target:**
+`roles/elephant.md:105` cites `docs/deploy/README.md §7.1` — a numeric section
+citation into a document whose headings can drift exactly as the operating
+model's did. AC-P4 is scoped to citations of the operating model, so this is
+outside it; it belongs to whatever generalises the rule.
+
+**Consequence for the proposal:** step 1 stays a two-line repair. Step 2 is no
+longer an investigation but a choice — whether a census may ever be authored
+rather than derived, which is the same question
+`2026-08-07-no-check-validates-prose-section-citations.md` answers structurally
+with a lint. That item is the durable fix; this one is its evidence.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
