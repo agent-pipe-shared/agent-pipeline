@@ -1077,11 +1077,34 @@ suites that cannot see a broken production module. **Recommended first: this one
 ahead of the recovery-bridge writer, because the recovery bridge at least announces
 itself as a red suite.
 
-**This also bears on Phoenix Part B.** The sub-design
-`specs/sprint-phoenix-epic/design/codex-wsl-freshness-host-action-family.md`
-describes this family's invocations. Whether it was written against the surviving
-code or the deleted code is now a question I have to answer before that design is
-built on, and I have not answered it yet.
+**This also bears on Phoenix Part B, and I have now answered how.** Both Part B
+designs — `bootstrap-origin-allowlist-and-codex-wsl-freshness.md` and the sub-design
+`codex-wsl-freshness-host-action-family.md` — reference the lost symbols, 9 and 4
+occurrences respectively. Every one of the ten names
+`ruleset-freshness-host.mjs` imports is absent from the current tree: all eight from
+`ruleset-freshness.mjs`, plus `freshnessHostActionForPreflight`, plus
+`observeCodexRulesetSource`. Measured directly, not inferred.
+
+**Part B is designed against code this repository does not contain.** That is not a
+gap in the design's reasoning; the design is coherent, it simply describes a version
+of the tree that the 0.5.2 merge replaced. Nobody noticed because the module it
+describes is loaded by nothing the gate runs.
+
+**And the retirement decision is entangled with it.** §A.3 of the parent design
+retires `observeCodexRulesetSource` — "explicitly not revived", a PO decision I
+recorded and defended. It is also one of the ten imports the broken host file still
+makes. So "restore the family from the pre-merge commit" and "do not revive that
+symbol" cannot both be executed as written. That leaves two coherent routes and the
+choice is the PO's: restore the family but rewrite the host file to drop the retired
+import, or retire `ruleset-freshness-host.mjs` as well and accept that the WSL
+freshness capability Part B describes does not currently exist. **I recommend the
+first**, because the retirement decision was about one observation helper, not about
+the freshness capability — but I want it said out loud rather than assumed, because
+reading a narrow decision broadly is how the last three briefing defects happened.
+
+**What I am not claiming:** I have not re-read either design in full tonight, and I
+have not established whether their acceptance criteria were ever satisfiable against
+the merged base. That is the next question, not a settled fact.
 
 **5. Deferred, unchanged from last night:** the BFAM §13 threat-model sentence
 (recommend option A, accept and amend) and the RED1 GIT-04 contract contradiction
