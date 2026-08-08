@@ -69,6 +69,32 @@ assertion passes.
 commit-bound ignore entries have been cleaned up. Entries that outlive the commit
 they were pinned to are suppressions nobody is re-justifying.
 
+**Measured 2026-08-08, and the repair is smaller than the framing suggests.** The
+same suite carries a second, *passing* assertion — `Nova A1 entries are exact,
+rebase-stable content authorities` — over a frozen list of **15**
+`content-v1:<digest>:<path>:<rule>:<line>:<column>` entries
+(`harness/scripts/security-scan.test.mjs:37-52`). It passes, so `.gitleaksignore`
+already carries all 15, and the file holds 24 `content-v1:` lines in total.
+
+Mapping the 13 commit-bound lines onto that set by `(path, rule, line)`: **every
+one of the 13 has at least one content-v1 counterpart already present.** The
+migration from commit-bound to content-bound suppressions was completed; the 13
+old lines were simply never deleted. They are residue, not an unreplaced
+suppression — which is why the replacement assertion is green while the removal
+assertion is red.
+
+**One thing that still has to be measured rather than assumed.** A content
+authority is keyed by a content digest. If any of those files changed after the
+digests were computed, the content-v1 entry no longer matches and deleting the
+commit-bound line would surface a real finding rather than nothing. So the repair
+is: delete the 13, then run the security scan and read the result. A clean scan
+proves the residue reading; any finding means that file's suppression genuinely
+lapsed and needs its own judgement — never a restored commit-bound line.
+
+**Do not "fix" this by relaxing the assertion**, which remains the standing
+instruction: the assertion is what stops commit-bound suppressions from
+accumulating again after the next rebase.
+
 ### 4. `backlog-state-check`
 
 `ledger event N: evidence.commit is not a reachable local Git commit`. A contiguous
