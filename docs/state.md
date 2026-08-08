@@ -5,6 +5,131 @@
 
 **Last updated:** 2026-08-08
 
+---
+
+## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
+
+The PO is restarting the session to pick up a new plugin build and is rebooting
+WSL. This section is the complete handover; everything below it is history.
+
+**HEAD: `358c709` on `sprint_phoenix`. Nothing pushed. Working tree clean apart
+from `.claude/settings.json`, which is permanently dirty in this checkout and is
+never committed.**
+
+### Nothing needed lives in `/tmp`
+
+Checked before the reboot. All working artifacts are inside the repository:
+helper scripts and dispatch records under `.git/`, evidence under `evidence/`
+(gitignored but on disk). The detached verify worktree was removed —
+`git worktree list` shows the primary tree only, so the bootstrap topology is
+clean. `/tmp` can be wiped.
+
+### F1 is closed, and closed on evidence I produced myself
+
+The Critic's single FAIL finding is repaired in `358c709`. BS25 rebuilds its
+input through `renumberPrePublicCoreHistory`, which recomputes sequence,
+previousHash and entryHash only for events whose physical position no longer
+matches; the first 38 amendment targets come out byte-identical and the test
+asserts that identity rather than assuming it. Discrimination is now pinned in
+both directions inside the case.
+
+I did not accept the implementor's report. Break-proof run by the orchestrator,
+restoring `backlog-state.mjs` byte-for-byte after each (empty `git diff`, suite
+back to 35/35):
+
+| break | result |
+|---|---|
+| disable the `commitExists`-guarded comparison | BS25 RED, BS26 green |
+| force that comparison to always fire | BS25 RED, target error in **both** directions — the exact F1 shape, now caught |
+| disable the `already appended` guard | BS26 RED, BS25 green |
+
+The second break is the one that matters: it reproduces the vacuous state the
+Critic found, and the test now fails on it. BS26 was audited for the same
+vacuity and is sound — confirmed by the third break, not by reading.
+
+### One thing deliberately left open, recorded rather than papered over
+
+The **without-override direction of the append-stability probe** was never
+cleanly measured. The single run that failed it used a synthetic event that
+moved an item without updating the paired `items` array, so
+`validateTransitionLedger` reported an unrelated items-level finding
+(`items: pipeline.managed-onboarding-success-contract status does not match its
+final ledger transition`, `evidence/measure-baseline-output.txt:15`) which
+perturbed the set comparison. I checked that attribution against the captured
+raw findings and it holds — but a corrected probe has not been run, so the
+code comment's claim of append-stability is reasoned, not measured.
+
+This also surfaced something real and worth keeping: the planner's
+"exactly its authorized set of currently failing events" comparison is sensitive
+to **any** validation finding, including items-level ones unrelated to
+reachability. BS25's discrimination can therefore be broken in future by an
+ordinary item inconsistency, not only by an append. A synthetic fixture would be
+immune to both; the live-ledger binding is what buys the realism. Worth an
+explicit decision later, not a silent one.
+
+### Immediate next steps, in order
+
+1. Run the corrected append-stability probe (synthetic event with a matching
+   `items` entry) and either confirm or correct the comment in
+   `backlog-state.test.mjs:1150-1155`.
+2. Full verify from a **fresh** detached worktree at HEAD — the tree cannot be
+   made clean in place, so verify only runs there:
+   `git worktree add --detach .git/phx-verify-wt HEAD`, run with
+   `--root <worktree>`, then `git worktree remove --force`.
+   The push gate (`guard-push.mjs:49`) needs `evidence/verify-latest.json` with
+   `exitCode === 0` and `commit` equal to the pushed commit, so this must be
+   redone at the final commit, not reused from `3345efe`.
+3. Decide whether F1's closure warrants a delta re-Critic (up to 4 rounds are
+   allowed; 1 has been used).
+4. Push gate — the fourth and last PO authorization. **Only to `sprint_phoenix`.**
+
+### One Critic "not verifiable" item is now closed
+
+The two ADR-0059 authorizations behind `ce75672` **do** resolve against the
+override audit ledger. `guard-human-override.mjs verify-audit` reports `valid`,
+32 entries. Each override appears as a complete `denied → authorized → consumed`
+triple on an unbroken MAC chain (sequences 9–11 and 12–14); every `previousMac`
+was checked individually against its predecessor's `mac`. The two denials carry
+different `policySha256` and `previewSha256`, so they are two distinct refusals
+of two distinct tool calls. Both name `guard-gate-strength.mjs` as the refusing
+guard, which is the family protecting the two `guard-config.json` files.
+
+Note for a later reader: the ledger records `mode: "standard"`, which is the
+override's *scope class* (`human-guard-override.mjs:1147`), not the
+authorization method. It does not contradict signature mode.
+
+Full working: `evidence/phx-hgo-audit-resolution.md` (gitignored, on disk).
+
+The **second** not-verifiable item stands and is not repairable: no dispatch
+record exists for `PHX-INV-REFRESH` or `PHX-LEDGER-IGNORE`. A record written
+now would assert a contemporaneity it does not have. Carried as a gap.
+
+### Environment incident worth remembering
+
+Both this session and a parallel one died on `ENOSPC`: `/tmp` is a size-capped
+tmpfs (16G) and the machine had run for two days without a clean. The Bash tool
+fails on its *own* log path, so every command including `df` becomes
+unavailable — the failure presents as total tool loss, not as a disk warning.
+The `PHX-BS25-FIX` dispatch stopped on it correctly and reported instead of
+retrying. If a session loses Bash entirely with `ENOSPC` in the message, that
+is this, and the fix is outside the session.
+
+### Process finding, still not filed as a backlog item
+
+Five dispatch runs in this phase ended at or past budget, four with no report at
+all. `templates/prompts/goldfish-task.md` frames the report-early duty as advice
+for packages over ~25 tool uses. Under this repository's closed shell grammar
+(one simple command per call, evidence capture through a Node wrapper) that
+threshold is crossed by nearly every dispatch, so the duty is in practice
+unconditional while being written as conditional. The one dispatch that carried
+an explicit "begin writing your report at N" block is the one that reported.
+Draft text and the two options (amend the template vs. record it in calibration)
+were written but not persisted — they need re-drafting. Deliberately not filed
+mid-flight: an unregistered item file makes `check-backlog-state` red and would
+have poisoned the running dispatch's own diagnostics.
+
+---
+
 **CRITIC VERDICT: FAIL, ONE FINDING, AND IT IS CORRECT (2026-08-08).** Dispatched
 from `templates/prompts/critic-review.md` with paths only; the Critic reported
 `Briefing violations observed: none`. Enumerated object: `ce75672, 0a47171,
