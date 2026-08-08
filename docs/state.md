@@ -439,6 +439,65 @@ the third instance of that pattern today. It added `assertReachedRegistration()`
 so staleness fails *by name* instead of anonymously. Mitigated, not eliminated,
 and said so.
 
+### Critic round 3: **PASS** — and two defects in my own dispatch
+
+The full gate is green at `6746ba1` and the review passes. Two minor findings
+stand, neither repairable inside the delta:
+
+- **F-1:** the AC-P3 discrepancy was declared "filed" in a test comment with no
+  dated, owned filing behind it — the only record lived in a gitignored evidence
+  file, which QG-06 does not accept. **Now resolved rather than filed:** the PO
+  decided the acceptance item, and `3896d88` amends it with the reasoning and the
+  accepted residual stated in the document itself.
+- **F-2:** genuine and unfixed. The fixture's stub-marker never operates —
+  `gitCommonDirectory()` throws before `runVerifyJournal` is reached in a non-Git
+  temp root — so one new assertion **cannot fail**, dead stub code reads as
+  coverage it does not provide, and a comment points at `assertStaleFixture`,
+  a function that does not exist (it is `assertReachedRegistration`). The
+  discrimination itself survives on other lines, so this is an accuracy defect
+  rather than a false green. Three lines, follow-up dispatch.
+
+**Two reference defects in my dispatch, both mine:**
+
+1. **The bounded-delta bounds were wrong.** I declared base `ae7fed1` → head
+   `6746ba1` with two changed paths; that range actually spans **seven** paths,
+   because two docs/backlog commits of mine sit inside it. The enumerated-SHA
+   rule saved the review — the two enumerated commits do touch exactly two paths
+   — but the base/head pair I stated was not the delta I described. Enumerating
+   SHAs is what made an inaccurate range harmless, which is exactly why the
+   template demands enumeration rather than a range.
+2. **I cited the wrong file for `AC-P3`.** I named `specs/sprint-phoenix-epic/acceptance.md`;
+   the criterion lives at `specs/sprint-phoenix-epic/phase-plan_gate-integrity.md:438-440`.
+   The Critic found the real definition and proceeded rather than stopping — it
+   was entitled to stop on an unresolvable reference.
+
+**On the model tier:** it reported effective identity **`unknown`**, explicitly
+declining to infer it from the host label the environment showed. That is the
+correct behaviour and better than the confident answer: it means the earlier
+`claude-sonnet-5` report was a genuine self-declaration, and that this round's
+tier is unconfirmed rather than confirmed-correct. Setting the model at the call
+is still right; it just is not independently observable from inside.
+
+### PO decisions taken 2026-08-08
+
+1. **AC-P3 acceptance item 2 — amended** (`3896d88`), per above.
+2. **The hand digest repair — accepted as a recorded deviation.** `ece6041`
+   rebound two stale manifest digests by hand, which P-AC-08 forbids as a
+   substitute for its transaction. The forward position is unchanged: the writer
+   exists, and every future reconciliation runs through preview, PO-bound apply
+   and readback. What is accepted is a permanent hole in the audit trail for that
+   one repair, which cannot be created retroactively — and the alternative,
+   manufacturing a reconciliation so the writer has something to do, would be
+   theatre rather than evidence.
+3. **The seven red excluded suites — one package, not seven.** Already filed as
+   `pipeline.seven-unregistered-suites-are-red` (due 2026-09-07). Note what the
+   green gate does and does not mean: 366/366 pass, and **seven test files are
+   red and not run at all**, by declared exclusion. One of them,
+   `codex-host-plugin-list.test.mjs` (missing export `observeCodexRulesetSource`),
+   is the direct blocker of PHX-0's ruleset-trust-root slice and five criteria.
+   Registering any of them touches `verify.mjs`, so the batch is worth one signed
+   window rather than seven.
+
 ### F1 is closed, and closed on evidence I produced myself
 
 The Critic's single FAIL finding is repaired in `358c709`. BS25 rebuilds its
