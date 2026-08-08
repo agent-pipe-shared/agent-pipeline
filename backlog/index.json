@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "a8c613f85187d7e71d0086547e850764c85b4a6b8e95dcbbd2a40ee064788897"
+    "transitionHead": "03e4e1600d910cb67d093759933944cbf7ae4eb10b12ee82f831d411f2d92ed5"
   },
   "counts": {
-    "open": 56,
+    "open": 58,
     "in_progress": 21,
     "closed": 22
   },
@@ -264,6 +264,14 @@
       "tracking": "Sentinel recovery baseline; no completion claim."
     },
     {
+      "id": "pipeline.git-appears-despite-initializes-git-false",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Structured handover from the greenfield happy-path test of the local 0.5.4 build, 2026-08-08 (defect D-4)."
+    },
+    {
       "id": "pipeline.greenfield-onboarding-writes-mixed-authority-tiers",
       "status": "open",
       "type": "defect",
@@ -310,6 +318,14 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Critic round on the 2026-08-08 greenfield hardening block, finding F3, severity minor. Independently corroborated from the reviewing agent's own denial trajectory."
+    },
+    {
+      "id": "pipeline.guard-refuses-documented-bounded-diagnostic",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Structured handover from the greenfield happy-path test of the local 0.5.4 build, 2026-08-08 (defect D-3). Independently hit in the Pipeline's own repository in the same session."
     },
     {
       "id": "pipeline.handover-file-has-no-rotation-obligation",
