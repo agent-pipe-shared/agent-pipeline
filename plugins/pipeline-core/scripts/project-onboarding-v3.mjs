@@ -31,11 +31,28 @@ const APPLY_SHAPED_COMMANDS = new Set([
   "kickoff-apply", "kickoff-promote-apply", "adopt-remote-apply",
 ]);
 
+// CLI-edge runner resolution -- NOT the reverted library-level default
+// (project-onboarding-v3.mjs carries the full history). Deep inside the
+// library a `runner` parameter answers "which runner is this project for",
+// a fact about the project that a helper must never guess. Here, at the
+// process entry point, the question is "which runner is executing this
+// process" -- and at exactly this boundary the two questions coincide,
+// because the entry point IS the running session. Same environment signal
+// pipeline-start-preflight.mjs already resolves the active runner from
+// (CLAUDECODE is set by every Claude Code session, main and subagent);
+// reused rather than re-derived so the two entry points speak one
+// convention. A CLI invocation that omits --runner therefore resolves and
+// threads this value explicitly -- it never raises and never passes
+// `undefined` onward to a library helper.
+function resolveActiveRunner(env) {
+  return env.CLAUDECODE === "1" ? "claude" : "codex";
+}
+
 function usage() {
   return [
     "Usage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-reinstall|apply-reinstall|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]",
-    "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> [--profile <epic|feature|mini> --source <selection>]",
-    "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--plan-sha256 <sha256>] [--activate]",
+    "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs plan-partial-authority --root <project-dir> --runner <claude|codex> [--profile <epic|feature|mini> --source <selection>]",
+    "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs adopt-remote <plan|apply> --root <project-dir> --remote <url> --ref <refs/heads/branch> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> --design-input-path <path> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>",
@@ -100,19 +117,21 @@ export function main(args = process.argv.slice(2), {
   write = process.stdout.write.bind(process.stdout),
   writeError = process.stderr.write.bind(process.stderr),
   deps,
+  env = process.env,
 } = {}) {
   const options = parse(args);
   if (options.help) { write(`${usage()}\n`); return 0; }
   if (options.error) { write(`${usage()}\n${options.error}\n`); return 2; }
+  if (options.runner === undefined) options.runner = resolveActiveRunner(env);
   let output;
   try {
     if (options.command === "inspect") output = inspectProjectOnboardingV3({ rootDir: options.root, deps, intent: options.intent, runner: options.runner });
     else if (options.command === "plan-reinstall") output = planProjectOnboardingReinstall({ rootDir: options.root, deps });
     else if (options.command === "apply-reinstall") output = applyProjectOnboardingReinstall({ rootDir: options.root, planSha256: options.planSha256, activate: options.activate, deps });
-    else if (options.command === "plan-partial-authority") output = planProjectPartialAuthorityAdoption({ rootDir: options.root, profile: options.profile, source: options.source, deps });
-    else if (options.command === "apply-partial-authority") output = applyProjectPartialAuthorityAdoption({ rootDir: options.root, profile: options.profile, source: options.source, planSha256: options.planSha256, activate: options.activate, deps });
+    else if (options.command === "plan-partial-authority") output = planProjectPartialAuthorityAdoption({ rootDir: options.root, profile: options.profile, source: options.source, runner: options.runner, deps });
+    else if (options.command === "apply-partial-authority") output = applyProjectPartialAuthorityAdoption({ rootDir: options.root, profile: options.profile, source: options.source, runner: options.runner, planSha256: options.planSha256, activate: options.activate, deps });
     else if (options.command === "adopt-remote-plan") output = planProjectRemoteAdoptionV4({ rootDir: options.root, remote: options.remote, ref: options.ref, deps });
-    else if (options.command === "adopt-remote-apply") output = applyProjectRemoteAdoptionV4({ rootDir: options.root, remote: options.remote, ref: options.ref, planSha256: options.planSha256, activate: options.activate, deps });
+    else if (options.command === "adopt-remote-apply") output = applyProjectRemoteAdoptionV4({ rootDir: options.root, remote: options.remote, ref: options.ref, runner: options.runner, planSha256: options.planSha256, activate: options.activate, deps });
     else if (options.command === "continuity-inspect") output = inspectProjectOnboardingV3({ rootDir: options.root, deps, intent: "onboarding", runner: options.runner });
     else if (options.command === "plan") output = planProjectOnboardingLifecycleV4({ rootDir: options.root, deps, operation: "portable", intent: options.intent, runner: options.runner });
     else if (options.command === "plan-runtime") output = planProjectOnboardingLifecycleV4({ rootDir: options.root, deps, operation: "runtime", intent: options.intent, runner: options.runner });
@@ -122,6 +141,7 @@ export function main(args = process.argv.slice(2), {
     else if (options.command === "plan-manifest-repair") output = planProjectOnboardingManifestRepairV4({ rootDir: options.root, deps, runner: options.runner, sessionIntent: options.intent });
     else if (options.command === "apply-manifest-repair") output = applyProjectOnboardingManifestRepairV4({
       rootDir: options.root,
+      runner: options.runner,
       planSha256: options.planSha256,
       activate: options.activate,
       deps,

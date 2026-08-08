@@ -105,6 +105,39 @@ const MANIFEST_REPAIR_SCHEMA = "pipeline.project-onboarding-manifest-repair-plan
 function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
 function clone(value) { return JSON.parse(JSON.stringify(value)); }
 function diagnostic(path, code, message, repair) { return { path, code, message, repair }; }
+
+// Fail-closed runner identity (ADR-0051/ADR-0057 R1; backlog:
+// absent-runner-flag-silently-defaults-to-codex, decision: candidate 1). No
+// helper in this module may reach a runner identity by assuming one -- an
+// absent `runner` is a caller error, never a silently substituted "codex".
+// Same shape and naming convention as the sibling contract already enforced
+// on the apply-action constructor (commit 94b8a72,
+// APPLY-ACTION-RUNNER-REQUIRED in onboarding-continuity.mjs): a typed error
+// that names the exact function that could not resolve one, so the module
+// speaks one convention rather than two.
+//
+// This is deliberately distinct from "which runner is executing this
+// process" (an environment read, legitimate only at a CLI/session entry
+// boundary that then threads the value forward explicitly -- see
+// pipeline-start-preflight.mjs) versus "which runner is this project for"
+// (what every parameter validated here answers). Deriving the latter from
+// `process.env.CLAUDECODE` inside this module was tried and reverted: it
+// broke every test that exercises a Codex-shaped project from a session that
+// is itself running under Claude Code, because the two questions coincide
+// live and diverge under test -- evidence the questions are different, not
+// evidence either answer is safe to assume.
+class OnboardingRunnerRequiredError extends Error {
+  constructor(caller) {
+    super(`${caller} cannot proceed without an explicit runner identity; none is assumed`);
+    this.name = "OnboardingRunnerRequiredError";
+    this.code = "ONBOARDING-RUNNER-REQUIRED";
+    this.caller = caller;
+  }
+}
+function requireRunner(runner, caller) {
+  if (typeof runner !== "string" || runner.length === 0) throw new OnboardingRunnerRequiredError(caller);
+  return runner;
+}
 function bytesOf(value) { return Buffer.isBuffer(value) ? value : Buffer.from(value, "utf8"); }
 function describe(bytes) {
   if (bytes === null) return { status: "absent", sha256: null, byteLength: 0 };
@@ -227,7 +260,8 @@ function rootEntries(root, fs) {
  * This deliberately inventories user surfaces but does not infer a V3 source
  * from legacy calibration and does not create any target.
  */
-export function planProjectPartialAuthorityAdoption({ rootDir = process.cwd(), profile = null, source = null, deps: overrides = {} } = {}) {
+export function planProjectPartialAuthorityAdoption({ rootDir = process.cwd(), profile = null, source = null, runner, deps: overrides = {} } = {}) {
+  requireRunner(runner, "planProjectPartialAuthorityAdoption");
   const fs = deps(overrides);
   let root;
   try { root = safeRoot(rootDir, fs); } catch (error) {
@@ -249,7 +283,7 @@ export function planProjectPartialAuthorityAdoption({ rootDir = process.cwd(), p
   const paths = [".claude", ".agents", ".codex", "docs"].filter((relative) => fs.existsSync(safePath(root, relative, fs))).sort();
   try {
     const artifacts = paths.map((relative) => ({ path: relative, snapshot: physicalTreeSnapshot(safePath(root, relative, fs), fs) }));
-    const intent = freshIntent();
+    const intent = freshIntent(runner);
     if (!validatePipelineUserV3(intent).ok) throw new Error("canonical V3 source is invalid");
     // This path holds an explicit PO profile selection, so the seeded gate
     // chapter is the one that profile asks for.
@@ -268,14 +302,15 @@ export function planProjectPartialAuthorityAdoption({ rootDir = process.cwd(), p
   }
 }
 
-export function applyProjectPartialAuthorityAdoption({ rootDir = process.cwd(), profile = null, source = null, planSha256, activate = false, deps: overrides = {} } = {}) {
+export function applyProjectPartialAuthorityAdoption({ rootDir = process.cwd(), profile = null, source = null, runner, planSha256, activate = false, deps: overrides = {} } = {}) {
+  requireRunner(runner, "applyProjectPartialAuthorityAdoption");
   const fs = deps(overrides);
   if (!activate || !SHA256_RE.test(planSha256 ?? "")) return { schema: PARTIAL_AUTHORITY_PLAN_SCHEMA, status: "activation-required", diagnostics: [diagnostic("$.activate", "activation_required", "apply requires explicit activation", "review the digest-bound plan and pass --activate")] };
-  const plan = planProjectPartialAuthorityAdoption({ rootDir, profile, source, deps: fs });
+  const plan = planProjectPartialAuthorityAdoption({ rootDir, profile, source, runner, deps: fs });
   if (plan.status !== "ready" || plan.planSha256 !== planSha256) return { schema: PARTIAL_AUTHORITY_PLAN_SCHEMA, status: "invalid-plan", root: plan.root, diagnostics: [diagnostic("$.planSha256", "plan_digest_mismatch", "the supplied plan digest is not current", "run the read-only partial-authority plan again")] };
   const root = plan.root; const created = []; const createdDirectories = [];
   try {
-    const intent = freshIntent(); const baselines = freshBaselines(intent);
+    const intent = freshIntent(runner); const baselines = freshBaselines(intent);
     const bytes = new Map([[SOURCE, renderYaml(intent)], [".claude/pipeline.yaml", baselines[".claude/pipeline.yaml"].bytes], [NEUTRAL_MANIFEST, baselines[NEUTRAL_MANIFEST].bytes]]);
     for (const target of plan.targets) {
       const path = safePath(root, target.path, fs);
@@ -285,7 +320,7 @@ export function applyProjectPartialAuthorityAdoption({ rootDir = process.cwd(), 
       const identity = fileIdentity(fs.lstatSync(path)); if (!identity) throw new Error(`created target identity is unavailable: ${target.path}`);
       created.push({ path, identity });
     }
-    const after = inspectProjectOnboardingV3({ rootDir: root, deps: fs });
+    const after = inspectProjectOnboardingV3({ rootDir: root, deps: fs, runner });
     return { schema: PARTIAL_AUTHORITY_PLAN_SCHEMA, status: "applied", root, changes: plan.targets.map((target) => target.path), postInspection: after };
   } catch (error) {
     const failures = rollback(root, created, createdDirectories, null, null, false, fs);
@@ -626,26 +661,27 @@ function isAdoptableUnmanagedRoot(entries, root, fs) {
   });
 }
 
-// The seeded default runner is the identity the onboarding actually ran under.
-// Seeding a literal here is how a Claude consumer used to end up with a Codex
-// project (ADR-0051/ADR-0057 R1); the literal survives only as the last-resort
-// fallback for a caller that genuinely has no observed identity.
+// The seeded runner is the identity the onboarding actually ran under, echoed
+// explicitly by every caller (ADR-0051/ADR-0057 R1). A literal fallback here
+// is exactly how a Claude consumer used to end up with a Codex project; the
+// decided fix (backlog: absent-runner-flag-silently-defaults-to-codex,
+// candidate 1, fail closed) makes an absent runner a caller error instead.
 //
-// NOTE (NOVA-RESTART-RUNNER-1): this and the other hardcoded `runner =
-// "codex"` defaults below were investigated for correction to
-// `env.CLAUDECODE === "1" ? "claude" : "codex"` per this task's briefed root
-// cause #2. That change was reverted: it directly cascades into breaking the
-// existing, deliberately named regression test "omitting --runner keeps the
-// historical Codex App-Server requirement"
-// (project-onboarding-v3.test.mjs) and dozens of others whenever the
-// process itself runs under Claude Code (CLAUDECODE=1) -- which is every
-// session that could run this task or its own test suite. The prior CLOSED
-// backlog item (onboarding-lifecycle-plan-hardcodes-the-codex-runner)
-// explicitly declined this exact change for the same reason, calling it
-// "its own reviewed change" outside that item's bounded fix. Left as a stop
-// condition for a follow-up task scoped to decide and re-pin the intended
-// default behavior; see this task's final report.
-function freshIntent(runner = "codex") {
+// HISTORY (NOVA-RESTART-RUNNER-1): this and the other hardcoded `runner =
+// "codex"` defaults below were once investigated for correction to
+// `env.CLAUDECODE === "1" ? "claude" : "codex"`. That change was reverted: it
+// directly cascades into breaking the historical regression test "omitting
+// --runner keeps the historical Codex App-Server requirement"
+// (project-onboarding-v3.test.mjs) and dozens of others whenever the process
+// itself runs under Claude Code (CLAUDECODE=1) -- which is every session that
+// could run this task or its own test suite. The prior CLOSED backlog item
+// (onboarding-lifecycle-plan-hardcodes-the-codex-runner) had already declined
+// this exact change for the same reason. The deferred question -- keep the
+// literal, make it visible, or fail closed -- was decided by the follow-up
+// backlog item above, and the regression test named there is now inverted to
+// match: it asserts the omission is an error, not a preserved default.
+function freshIntent(runner) {
+  requireRunner(runner, "freshIntent");
   const registry = loadRunnerProfilesV3Registry();
   return {
     schema: "pipeline.user.v3",
@@ -942,13 +978,14 @@ function cleanupHumanRecoveryAction(root) {
 
 function partialCleanupRecoveryResult({
   root,
-  runner = "codex",
+  runner,
   intent,
   repository,
   runtime = emptyRuntime(),
   deps = {},
   strict = false,
 }) {
+  requireRunner(runner, "partialCleanupRecoveryResult");
   try {
     const planCleanupRecovery = deps.planSessionCleanupRecovery
       ?? planSessionCleanupRecovery;
@@ -1291,7 +1328,8 @@ function observePoProfileRepair(root, fs) {
   };
 }
 
-function runtimeTargetReadOnlyResult({ root, runner = "codex", intent, repository }) {
+function runtimeTargetReadOnlyResult({ root, runner, intent, repository }) {
+  requireRunner(runner, "runtimeTargetReadOnlyResult");
   return lifecycleResult({
     status: "runtime-target-read-only",
     root,
@@ -1381,7 +1419,8 @@ function pluginManagedCodexRuntime(root, fs) {
   return admission.status === "invalid" ? "receipt-invalid" : "reserved-unattested";
 }
 
-function pluginManagedAdmissionDriftResult({ root, runner = "codex", intent, repository, sourceSha256 }) {
+function pluginManagedAdmissionDriftResult({ root, runner, intent, repository, sourceSha256 }) {
+  requireRunner(runner, "pluginManagedAdmissionDriftResult");
   return lifecycleResult({
     status: "projection-drift",
     root,
@@ -1623,7 +1662,7 @@ function externalOperatorRestartAction(runner) {
 function lifecycleResult({
   status,
   root,
-  runner = "codex",
+  runner,
   intent,
   repository,
   runtime,
@@ -1632,6 +1671,18 @@ function lifecycleResult({
   nextAction = null,
   diagnostics = [],
 }) {
+  // Deliberately no `requireRunner` guard here: this is a shared, low-level
+  // result-shape builder. Some callers legitimately pass `runner: null` as an
+  // explicit "no claim" sentinel for a root that cannot be resolved at all
+  // (see `repositoryFailureResult` / the symlink-rejection branch of
+  // `v4Inspection` below) -- a different thing from a caller that never
+  // received an identity to thread through. Every caller that COULD silently
+  // assume "codex" instead of threading its own runner is guarded at its own
+  // boundary (`v4Inspection`, `readyLifecycleResult`,
+  // `afterRuntimeLifecycleResult`, `runtimeTargetReadOnlyResult`,
+  // `pluginManagedAdmissionDriftResult`, `partialCleanupRecoveryResult`, and
+  // the exported entry points below), so by the time `runner` reaches here it
+  // is already either a validated identity or a deliberate `null`.
   return {
     schema: SCHEMA,
     status,
@@ -1684,7 +1735,8 @@ function observeReadyAppServer(intent, runner, fs) {
   }
 }
 
-function readyLifecycleResult({ root, runner = "codex", intent, repository, runtime, continuity = emptyContinuity() }, fs) {
+function readyLifecycleResult({ root, runner, intent, repository, runtime, continuity = emptyContinuity() }, fs) {
+  requireRunner(runner, "readyLifecycleResult");
   // The fresh protected-mount transition is not a ready-state claim.  Its
   // confirmed host repository initializer must be plannable even when the
   // current workspace sandbox cannot reach the host App-Server control
@@ -1942,7 +1994,8 @@ function readyLifecycleResult({ root, runner = "codex", intent, repository, runt
   });
 }
 
-function afterRuntimeLifecycleResult({ root, intent, repository, runtime, runner = "codex" }, fs) {
+function afterRuntimeLifecycleResult({ root, intent, repository, runtime, runner }, fs) {
+  requireRunner(runner, "afterRuntimeLifecycleResult");
   let continuity;
   try {
     continuity = (fs.classifyOnboardingContinuity ?? classifyOnboardingContinuity)({
@@ -1976,7 +2029,8 @@ function sourceRecoveryCategory(inspected, sourceKind, migrationPlan) {
 }
 
 /** Read-only diagnosis of a V4 source transition. */
-export function planProjectOnboardingSourceRecovery({ rootDir = process.cwd(), deps: overrides = {} } = {}) {
+export function planProjectOnboardingSourceRecovery({ rootDir = process.cwd(), runner, deps: overrides = {} } = {}) {
+  requireRunner(runner, "planProjectOnboardingSourceRecovery");
   const fs = deps(overrides);
   let root = null; let sourceSha256 = null; let sourceKind = null; let migrationPlan = null;
   try {
@@ -1999,7 +2053,7 @@ export function planProjectOnboardingSourceRecovery({ rootDir = process.cwd(), d
     }
   } catch { /* diagnosis remains terminal and side-effect free */ }
   let inspected;
-  try { inspected = inspectProjectOnboardingV3({ rootDir, deps: fs, intent: "onboarding" }); }
+  try { inspected = inspectProjectOnboardingV3({ rootDir, deps: fs, intent: "onboarding", runner }); }
   catch (error) { inspected = { status: "unsafe", diagnostics: [diagnostic("$.root", "source_unavailable", error.message, "repair the physical root")] }; }
   const category = sourceRecoveryCategory(inspected, sourceKind, migrationPlan);
   const terminal = ["invalid-authority", "unsupported-source-transition", "unavailable-evidence"].includes(category);
@@ -2061,7 +2115,8 @@ export function planProjectOnboardingManifestRepair({ rootDir = process.cwd(), d
   return plan;
 }
 
-export function applyProjectOnboardingManifestRepair({ rootDir = process.cwd(), planSha256, activate = false, deps: overrides = {} } = {}) {
+export function applyProjectOnboardingManifestRepair({ rootDir = process.cwd(), runner, planSha256, activate = false, deps: overrides = {} } = {}) {
+  requireRunner(runner, "applyProjectOnboardingManifestRepair");
   if (!activate) return { schema: MANIFEST_REPAIR_SCHEMA, status: "activation-required", diagnostics: [diagnostic("$.activate", "activation_required", "apply requires explicit activation", "review the plan and pass --activate")] };
   const fs = deps(overrides); const plan = planProjectOnboardingManifestRepair({ rootDir, deps: fs });
   if (plan.status !== "ready" || plan.planSha256 !== planSha256) return { schema: MANIFEST_REPAIR_SCHEMA, status: "invalid-plan", root: plan.root, diagnostics: [diagnostic("$.planSha256", "plan_digest_mismatch", "the supplied plan digest is not current", "run plan-manifest-repair again")] };
@@ -2089,7 +2144,7 @@ export function applyProjectOnboardingManifestRepair({ rootDir = process.cwd(), 
     if (!sameIdentity(publishedIdentity, target, fs)) throw new Error("manifest target identity changed after publication");
     const readback = loadManifest(root);
     if (readback.status !== "ok") throw new Error("post-apply manifest readback was not valid");
-    const inspection = (fs.inspectProjectOnboardingV3 ?? inspectProjectOnboardingV3)({ rootDir: root, deps: fs, intent: "bootstrap" });
+    const inspection = (fs.inspectProjectOnboardingV3 ?? inspectProjectOnboardingV3)({ rootDir: root, deps: fs, intent: "bootstrap", runner });
     if (inspection.status !== "ready") throw new Error("post-apply V4 readback was not ready");
     return { schema: MANIFEST_REPAIR_SCHEMA, status: "ready", root, planSha256, readback: { schema: SCHEMA, status: inspection.status, manifestSha256: sha256(generated) }, diagnostics: inspection.diagnostics ?? [] };
   } catch (error) {
@@ -2515,13 +2570,15 @@ export function planProjectOnboardingManifestRepairV4({
 
 export function applyProjectOnboardingManifestRepairV4({
   rootDir = process.cwd(),
+  runner,
   planSha256,
   activate = false,
   deps: overrides = {},
 } = {}) {
+  requireRunner(runner, "applyProjectOnboardingManifestRepairV4");
   const fs = deps(overrides);
   if (activate !== true || !/^[a-f0-9]{64}$/u.test(planSha256 ?? "")) {
-    return v4Inspection(rootDir, fs);
+    return v4Inspection(rootDir, fs, "onboarding", runner);
   }
   const plan = planProjectOnboardingManifestRepairV4({ rootDir, deps: fs });
   const authenticated = AUTHENTICATED_MANIFEST_REPAIRS.get(plan);
@@ -2530,7 +2587,7 @@ export function applyProjectOnboardingManifestRepairV4({
     || sha256(JSON.stringify(stable(manifestRepairBinding(plan)))) !== planSha256
     || !authenticated
     || authenticated.signature !== JSON.stringify(plan)) {
-    return v4Inspection(rootDir, fs);
+    return v4Inspection(rootDir, fs, "onboarding", runner);
   }
   let source;
   let parent;
@@ -2662,7 +2719,7 @@ export function applyProjectOnboardingManifestRepairV4({
       if (postCommitFailure) {
         quarantined = quarantineManifestPublication(parent, boundTarget, publicationIdentity, plan.planSha256, fs);
       }
-      const observed = v4Inspection(rootDir, fs);
+      const observed = v4Inspection(rootDir, fs, "onboarding", runner);
       const failure = postCommitFailure && quarantined ? postCommitFailure : postCommitFailure ? {
         code: "manifest_repair_rollback_incomplete",
         message: "publication drift occurred and the exact manifest postimage could not be quarantined",
@@ -2689,11 +2746,11 @@ export function applyProjectOnboardingManifestRepairV4({
         )],
       });
     }
-    return v4Inspection(rootDir, fs);
+    return v4Inspection(rootDir, fs, "onboarding", runner);
   } finally {
     try { if (parent) fs.closeSync(parent.fd); } catch {}
   }
-  return v4Inspection(rootDir, fs);
+  return v4Inspection(rootDir, fs, "onboarding", runner);
 }
 
 const REPOSITORY_FAILURES = {
@@ -2748,7 +2805,13 @@ const REPOSITORY_FAILURES = {
   },
 };
 
-function repositoryFailureResult(rootDir, fs, intent, repository) {
+// `runner` is threaded from the caller (`v4Inspection`, already validated),
+// never assumed here. This was previously a hardcoded `"codex"` literal in
+// the returned result -- the same defect class as the parameter defaults
+// this task removes, just spelled as an object-literal value instead of a
+// default (backlog: absent-runner-flag-silently-defaults-to-codex).
+function repositoryFailureResult(rootDir, fs, intent, repository, runner) {
+  requireRunner(runner, "repositoryFailureResult");
   let failure = REPOSITORY_FAILURES[repository.status] ?? null;
   if (repository.status === "local-uninitialized" && !["onboarding", "bootstrap"].includes(intent)) {
     failure = REPOSITORY_FAILURES["control-path-invalid"];
@@ -2782,7 +2845,7 @@ function repositoryFailureResult(rootDir, fs, intent, repository) {
   return lifecycleResult({
     status: failure.status,
     root,
-    runner: root === null ? null : "codex",
+    runner: root === null ? null : runner,
     intent,
     repository,
     runtime: emptyRuntime(),
@@ -2796,7 +2859,8 @@ function repositoryFailureResult(rootDir, fs, intent, repository) {
   });
 }
 
-function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
+function v4Inspection(rootDir, fs, intent = "onboarding", runner) {
+  requireRunner(runner, "v4Inspection");
   try {
     const requestedRoot = resolve(rootDir);
     const requestedInfo = fs.lstatSync(requestedRoot);
@@ -2821,7 +2885,7 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
     // The repository observer below owns all other resolution/read failures.
   }
   const repository = observeRepositoryCapability(rootDir, fs, intent, intent === "onboarding");
-  const repositoryFailure = repositoryFailureResult(rootDir, fs, intent, repository);
+  const repositoryFailure = repositoryFailureResult(rootDir, fs, intent, repository, runner);
   if (repositoryFailure) return repositoryFailure;
   const legacy = legacyInspection(rootDir, fs);
   const unavailable = lifecycleResult({
@@ -3003,7 +3067,9 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
     }
     const cleanupRecovery = partialCleanupRecoveryResult({ root: legacy.root, runner, intent, repository });
     if (cleanupRecovery !== null) return cleanupRecovery;
-    const partialPlan = planProjectPartialAuthorityAdoption({ rootDir: legacy.root, deps: fs });
+    // This is an internal, read-only-caller inspection of a partial state, run
+    // as the same runner that is inspecting -- never a second identity.
+    const partialPlan = planProjectPartialAuthorityAdoption({ rootDir: legacy.root, runner, deps: fs });
     const reparable = partialPlan.status === "selection-required";
     return lifecycleResult({
       status: "partial",
@@ -3282,7 +3348,9 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
   }
   const cleanupRecovery = partialCleanupRecoveryResult({ root: legacy.root, runner, intent, repository });
   if (cleanupRecovery !== null) return cleanupRecovery;
-  const partialPlan = planProjectPartialAuthorityAdoption({ rootDir: legacy.root, deps: fs });
+  // Same internal, read-only-caller inspection as the sibling partial branch
+  // above: the inspecting runner, threaded through, never assumed.
+  const partialPlan = planProjectPartialAuthorityAdoption({ rootDir: legacy.root, runner, deps: fs });
   const reparable = partialPlan.status === "selection-required";
   return lifecycleResult({
     status: "partial",
@@ -3296,7 +3364,8 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
   });
 }
 
-export function inspectProjectOnboardingV3({ rootDir = process.cwd(), deps: overrides = {}, intent = "onboarding", runner = "codex" } = {}) {
+export function inspectProjectOnboardingV3({ rootDir = process.cwd(), deps: overrides = {}, intent = "onboarding", runner } = {}) {
+  requireRunner(runner, "inspectProjectOnboardingV3");
   return v4Inspection(rootDir, deps(overrides), intent, runner);
 }
 
@@ -3641,7 +3710,8 @@ function rollbackRemoteAdoption(root, worktree, gitIdentity, gitTree, fs) {
 }
 
 /** Apply an exact remote plan and then classify the branch's own authority. */
-export function applyProjectRemoteAdoptionV4({ rootDir = process.cwd(), remote, ref, planSha256, activate = false, deps: overrides = {} } = {}) {
+export function applyProjectRemoteAdoptionV4({ rootDir = process.cwd(), remote, ref, runner, planSha256, activate = false, deps: overrides = {} } = {}) {
+  requireRunner(runner, "applyProjectRemoteAdoptionV4");
   if (!activate) return { schema: REMOTE_ADOPTION_PLAN_SCHEMA, status: "activation-required", diagnostics: [remoteAdoptionDiagnostic("activation_required", "remote adoption requires explicit activation", "review the digest-bound adoption plan and pass --activate")] };
   const fs = deps(overrides);
   const plan = planProjectRemoteAdoptionV4({ rootDir, remote, ref, deps: fs });
@@ -3673,7 +3743,7 @@ export function applyProjectRemoteAdoptionV4({ rootDir = process.cwd(), remote, 
     worktree = ownedWorktreeSnapshot(plan.root, fs);
     if (gitIdentity) gitTree = physicalTreeSnapshot(join(plan.root, ".git"), fs);
     runRemoteGit(fs, plan.root, ["branch", "--set-upstream-to", `origin/${plan.branch}`, plan.branch]);
-    return v4Inspection(plan.root, fs, "onboarding");
+    return v4Inspection(plan.root, fs, "onboarding", runner);
   } catch (error) {
     // An owned, newly-created Git control tree can be removed only when both
     // the checkout tree and Git identity remain exactly the transaction's.
@@ -3916,14 +3986,16 @@ export function applyProjectOnboardingLifecycleV4({ rootDir = process.cwd(), dep
 // as the caller's runner. Substituting one here is the same identity loss the
 // consumer chain guards against (ADR-0051, ADR-0057 R1): a runner without a
 // native runtime readback would be told it owes a Codex attestation and could
-// never reach a kickoff at all. The default stays `"codex"`, so an omitted
-// runner keeps its exact historical behaviour and is never promoted silently.
+// never reach a kickoff at all. An omitted runner is now a caller error
+// (backlog: absent-runner-flag-silently-defaults-to-codex, candidate 1) --
+// never a silently promoted `"codex"`.
 export function planProjectOnboardingKickoffV4({
   rootDir = process.cwd(),
   goal,
-  runner = "codex",
+  runner,
   deps: overrides = {},
 } = {}) {
+  requireRunner(runner, "planProjectOnboardingKickoffV4");
   const fs = deps(overrides);
   const observed = v4Inspection(rootDir, fs, "onboarding", runner);
   if (observed.status !== "kickoff-required") return observed;
@@ -3940,11 +4012,12 @@ export function planProjectOnboardingKickoffV4({
 export function applyProjectOnboardingKickoffV4({
   rootDir = process.cwd(),
   goal,
-  runner = "codex",
+  runner,
   planSha256,
   activate = false,
   deps: overrides = {},
 } = {}) {
+  requireRunner(runner, "applyProjectOnboardingKickoffV4");
   const fs = deps(overrides);
   const observed = v4Inspection(rootDir, fs, "onboarding", runner);
   if (!["kickoff-required", "ready"].includes(observed.status)
@@ -3974,11 +4047,14 @@ export function applyProjectOnboardingKickoffV4({
 // those siblings' comment already warns about: promotion is unreachable for
 // every non-Codex runner without it (backlog:
 // kickoff-apply-action-drops-the-runner-the-plan-was-made-for, mechanism A;
-// ADR-0051, ADR-0057 R1). The default stays `"codex"` for the same reason.
+// ADR-0051, ADR-0057 R1). An omitted runner is now a caller error for the
+// same reason as the kickoff siblings (backlog:
+// absent-runner-flag-silently-defaults-to-codex, candidate 1).
 export function planProjectOnboardingKickoffPromotionV4({
   rootDir = process.cwd(), profile, featureId, planPath, prdPath, specPath, designInputPath,
-  runner = "codex", deps: overrides = {},
+  runner, deps: overrides = {},
 } = {}) {
+  requireRunner(runner, "planProjectOnboardingKickoffPromotionV4");
   const fs = deps(overrides);
   const observed = v4Inspection(rootDir, fs, "onboarding", runner);
   if (observed.status !== "ready" || observed.continuity.status !== "valid") return observed;
@@ -3990,8 +4066,9 @@ export function planProjectOnboardingKickoffPromotionV4({
 
 export function applyProjectOnboardingKickoffPromotionV4({
   rootDir = process.cwd(), profile, featureId, planPath, prdPath, specPath, designInputPath,
-  runner = "codex", planSha256, activate = false, deps: overrides = {},
+  runner, planSha256, activate = false, deps: overrides = {},
 } = {}) {
+  requireRunner(runner, "applyProjectOnboardingKickoffPromotionV4");
   const fs = deps(overrides);
   const observed = v4Inspection(rootDir, fs, "onboarding", runner);
   if (observed.status !== "ready" || observed.continuity.status !== "valid") return observed;

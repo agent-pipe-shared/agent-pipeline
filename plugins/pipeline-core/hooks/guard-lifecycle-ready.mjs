@@ -989,9 +989,14 @@ function isExactPoAuthorityRebindPlannerRecovery(command, root, dependencies = {
     || words[2] !== "po-authority-rebind-plan") return false;
   let observed;
   try {
+    // Threaded from this same evaluation's own resolved runner
+    // (dependencies.runner, set by the caller from --runner argv), never
+    // assumed here: project-onboarding-v3.mjs no longer defaults an absent
+    // runner to "codex" (backlog: absent-runner-flag-silently-defaults-to-codex).
     observed = (dependencies.inspectProjectOnboardingV3Fn ?? inspectProjectOnboardingV3)({
       rootDir: root,
       intent: "session",
+      runner: dependencies.runner,
     });
   } catch {
     return false;

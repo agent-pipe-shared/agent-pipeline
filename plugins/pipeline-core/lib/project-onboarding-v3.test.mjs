@@ -180,10 +180,14 @@ function repositoryCapability(status, intent = "dispatch") {
   };
 }
 
-function initializeRestartRequiredRoot(path, deps = fakeDeps) {
-  const portable = planProjectOnboardingV3({ rootDir: path, deps });
+// `runner` defaults to the historical fixture identity ("codex") so every
+// existing caller of this shared test setup keeps its exact prior behaviour
+// -- this is a test-fixture default, not the library default this task
+// removes; project-onboarding-v3.mjs itself never assumes one.
+function initializeRestartRequiredRoot(path, deps = fakeDeps, runner = "codex") {
+  const portable = planProjectOnboardingV3({ rootDir: path, deps, runner });
   assert.equal(applyProjectOnboardingV3(portable, { rootDir: path, activate: true, deps }).status, "applied");
-  const runtime = planProjectOnboardingLifecycleV4({ rootDir: path, deps, operation: "runtime" });
+  const runtime = planProjectOnboardingLifecycleV4({ rootDir: path, deps, operation: "runtime", runner });
   const digest = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
   const initialized = applyProjectOnboardingLifecycleV4({
     rootDir: path,
@@ -191,13 +195,14 @@ function initializeRestartRequiredRoot(path, deps = fakeDeps) {
     operation: "runtime",
     planSha256: digest,
     activate: true,
+    runner,
   });
   assert.equal(initialized.status, "restart-required");
   return readRestartBarrier({ rootDir: path, spawn: fakeGit });
 }
 
-function initializeRuntimeProjectionRoot(path, deps = fakeDeps) {
-  const barrier = initializeRestartRequiredRoot(path, deps);
+function initializeRuntimeProjectionRoot(path, deps = fakeDeps, runner = "codex") {
+  const barrier = initializeRestartRequiredRoot(path, deps, runner);
   clearRuntimeBarrier(path, barrier);
 }
 
@@ -231,8 +236,8 @@ function clearRuntimeBarrier(path, barrier) {
   });
 }
 
-function completeKickoff(path, goal = "Build a safe project", deps = fakeDeps, expectedStatus = "ready") {
-  const plan = planProjectOnboardingKickoffV4({ rootDir: path, goal, deps });
+function completeKickoff(path, goal = "Build a safe project", deps = fakeDeps, expectedStatus = "ready", runner = "codex") {
+  const plan = planProjectOnboardingKickoffV4({ rootDir: path, goal, deps, runner });
   assert.equal(plan.schema, "pipeline.codex-onboarding-kickoff-plan.v1");
   const result = applyProjectOnboardingKickoffV4({
     rootDir: path,
@@ -240,6 +245,7 @@ function completeKickoff(path, goal = "Build a safe project", deps = fakeDeps, e
     planSha256: plan.planSha256,
     activate: true,
     deps,
+    runner,
   });
   assert.equal(result.status, expectedStatus);
   assert.equal(result.continuity.status, "valid");
@@ -391,7 +397,7 @@ test("repository capability failures map exactly and stop before source/runtime 
   try {
     for (const [componentStatus, aggregateStatus, diagnosticCode] of rows) {
       const repository = repositoryCapability(componentStatus);
-      const observed = inspectProjectOnboardingV3({
+      const observed = inspectProjectOnboardingV3({ runner: "codex",
         rootDir: path,
         intent: "dispatch",
         deps: {
@@ -441,7 +447,7 @@ test("host-managed session and dispatch map to repository-mode-unsupported befor
     const path = spacedRoot();
     try {
       const repository = repositoryCapability("host-managed", intent);
-      const observed = inspectProjectOnboardingV3({
+      const observed = inspectProjectOnboardingV3({ runner: "codex",
         rootDir: path,
         intent,
         deps: {
@@ -467,7 +473,7 @@ test("host-bound dispatch smoke observes and rolls back real session/worktree ca
     hostGit(path, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "fixture"]);
     const refsBefore = hostGit(path, ["for-each-ref", "--format=%(refname)%00%(objectname)"]);
     const worktreesBefore = hostGit(path, ["worktree", "list", "--porcelain", "-z"]);
-    const observed = inspectProjectOnboardingV3({ rootDir: path, intent: "dispatch" });
+    const observed = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, intent: "dispatch" });
     assert.equal(observed.status, "adoption-required");
     assert.equal(observed.repository.status, "local-valid-writable");
     assert.equal(observed.repository.mode, "local");
@@ -491,7 +497,7 @@ test("App Server is observed only on the ready path and exactly once for require
     completeKickoff(path);
 
     let onboardingCalls = 0;
-    const onboarding = inspectProjectOnboardingV3({
+    const onboarding = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: path,
       intent: "onboarding",
       deps: {
@@ -508,7 +514,7 @@ test("App Server is observed only on the ready path and exactly once for require
 
     for (const intent of ["bootstrap", "session", "dispatch"]) {
       let calls = 0;
-      const observed = inspectProjectOnboardingV3({
+      const observed = inspectProjectOnboardingV3({ runner: "codex",
         rootDir: path,
         intent,
         deps: {
@@ -552,7 +558,7 @@ test("runtime-current bootstrap exposes cleanup recovery before App Server or se
         statuses: ["retired"],
       },
     };
-    const observed = inspectProjectOnboardingV3({
+    const observed = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: path,
       intent: "bootstrap",
       deps: {
@@ -578,7 +584,7 @@ test("runtime-current bootstrap exposes cleanup recovery before App Server or se
     assertDiagnostic(observed, "cleanup_recovery_required");
 
     let activeSessionAppServerCalls = 0;
-    const activeSession = inspectProjectOnboardingV3({
+    const activeSession = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: path,
       intent: "session",
       deps: {
@@ -611,7 +617,7 @@ test("runtime-current bootstrap exposes cleanup recovery before App Server or se
       },
     };
 
-    const unavailable = inspectProjectOnboardingV3({
+    const unavailable = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: path,
       intent: "bootstrap",
       deps: {
@@ -632,7 +638,7 @@ test("runtime-current bootstrap exposes cleanup recovery before App Server or se
     assert.deepEqual(unavailable.nextAction, humanRecoveryAction);
     assertDiagnostic(unavailable, "cleanup_recovery_unavailable");
 
-    const unobserved = inspectProjectOnboardingV3({
+    const unobserved = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: path,
       intent: "bootstrap",
       deps: {
@@ -677,7 +683,7 @@ test("PRD/Spec drift exposes only the validated digest-bound PO rebind action", 
       requiresConfirmation: false,
       expected: { schema: "pipeline.po-authority-rebind-plan.v1" },
     };
-    const observed = inspectProjectOnboardingV3({
+    const observed = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: path,
       intent: "dispatch",
       deps: {
@@ -726,7 +732,7 @@ test("PRD/Spec drift exposes only the validated digest-bound PO rebind action", 
       },
     });
 
-    const invalidPlan = inspectProjectOnboardingV3({
+    const invalidPlan = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: path,
       intent: "dispatch",
       deps: {
@@ -758,7 +764,7 @@ test("PRD/Spec drift exposes only the validated digest-bound PO rebind action", 
     assertSingleLineAction(invalidPlan.nextAction, diagnosticAction);
     assertDiagnostic(invalidPlan, "po_authority_rebind_planner_plan_invalid");
 
-    const rejectedPlan = inspectProjectOnboardingV3({
+    const rejectedPlan = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: path,
       intent: "dispatch",
       deps: {
@@ -790,7 +796,7 @@ test("unapproved kickoff state has no PO authority to rebind", () => {
     completeKickoff(path);
     const deps = { ...fakeDeps };
     delete deps.observePersistedPoAuthority;
-    const observed = inspectProjectOnboardingV3({ rootDir: path, intent: "session", deps });
+    const observed = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, intent: "session", deps });
     assert.equal(observed.status, "ready", JSON.stringify(observed.diagnostics));
     assert.equal(observed.nextAction, null);
     assert.equal(observed.diagnostics.length, 0);
@@ -798,7 +804,7 @@ test("unapproved kickoff state has no PO authority to rebind", () => {
     const malformedApproved = JSON.parse(readFileSync(statePath, "utf8"));
     malformedApproved.planApproved = true;
     writeFileSync(statePath, `${JSON.stringify(malformedApproved, null, 2)}\n`);
-    const rejected = inspectProjectOnboardingV3({ rootDir: path, intent: "session", deps });
+    const rejected = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, intent: "session", deps });
     assert.equal(rejected.status, "partial");
   } finally { dispose(path); }
 });
@@ -816,7 +822,7 @@ test("V4 exposes only the read-only completed-cleanup recovery planner while aut
       descriptorSha256: "a".repeat(64),
     };
     writeFileSync(statePath, `${JSON.stringify(state)}\n`);
-    const observed = inspectProjectOnboardingV3({
+    const observed = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: path,
       intent: "session",
       deps: {
@@ -868,7 +874,7 @@ test("completed legacy cleanup recovery returns session V4 to ready after exact 
       descriptorSha256: descriptor.descriptorSha256,
     };
     writeFileSync(statePath, `${JSON.stringify(state)}\n`);
-    const blocked = inspectProjectOnboardingV3({ rootDir: path, intent: "session", deps: fakeDeps });
+    const blocked = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, intent: "session", deps: fakeDeps });
     assert.equal(blocked.status, "invalid");
     assertSingleLineAction(blocked.nextAction, {
       kind: "command",
@@ -884,7 +890,7 @@ test("completed legacy cleanup recovery returns session V4 to ready after exact 
     const plan = planProjectAuthoritySessionCleanupRecovery({ rootDir: path });
     assert.equal(plan.status, "ready");
     assert.equal(applyProjectAuthoritySessionCleanupRecovery(plan, { rootDir: path, activate: true }).status, "recovered");
-    const ready = inspectProjectOnboardingV3({ rootDir: path, intent: "session", deps: fakeDeps });
+    const ready = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, intent: "session", deps: fakeDeps });
     assert.equal(ready.status, "ready", JSON.stringify(ready.diagnostics));
     assert.equal(ready.nextAction, null);
   } finally { dispose(path); }
@@ -919,7 +925,7 @@ test("active historical cleanup binding exposes privatization and returns V4 to 
     };
     writeFileSync(statePath, `${JSON.stringify(state)}\n`);
 
-    const blocked = inspectProjectOnboardingV3({
+    const blocked = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: path,
       intent: "session",
       deps: fakeDeps,
@@ -950,7 +956,7 @@ test("active historical cleanup binding exposes privatization and returns V4 to 
       sessionId: descriptor.sessionId,
       descriptorSha256: descriptor.descriptorSha256,
     });
-    const ready = inspectProjectOnboardingV3({
+    const ready = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: path,
       intent: "session",
       deps: fakeDeps,
@@ -988,7 +994,7 @@ test("nonportable cleanup authority keeps a null nextAction when privatization i
       () => { throw new Error("malformed cleanup binding"); },
       () => ({ schema: "pipeline.session-cleanup-privatization-plan.v1", status: "unavailable" }),
     ]) {
-      const observed = inspectProjectOnboardingV3({
+      const observed = inspectProjectOnboardingV3({ runner: "codex",
         rootDir: path,
         intent: "session",
         deps: {
@@ -1053,23 +1059,23 @@ test("exact revoke-plan v2 postimage keeps repeated PRD and Spec design edits wr
     writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
     const deps = { ...fakeDeps };
     delete deps.observePersistedPoAuthority;
-    const observed = inspectProjectOnboardingV3({ rootDir: path, intent: "session", deps });
+    const observed = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, intent: "session", deps });
     assert.equal(observed.status, "ready", JSON.stringify(observed.diagnostics));
     assert.equal(observed.nextAction, null);
     assert.deepEqual(observed.diagnostics, []);
 
     writeFileSync(join(path, planPath), `${readFileSync(join(path, planPath), "utf8")}\nFirst revised product decision.\n`);
-    const afterPrdEdit = inspectProjectOnboardingV3({ rootDir: path, intent: "session", deps });
+    const afterPrdEdit = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, intent: "session", deps });
     assert.equal(afterPrdEdit.status, "ready", JSON.stringify(afterPrdEdit.diagnostics));
     writeFileSync(join(path, specPath), `${readFileSync(join(path, specPath), "utf8")}\nFirst revised technical contract.\n`);
     writeFileSync(join(path, planPath), `${readFileSync(join(path, planPath), "utf8")}\nSecond revised product decision.\n`);
-    const afterRepeatedEdits = inspectProjectOnboardingV3({ rootDir: path, intent: "session", deps });
+    const afterRepeatedEdits = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, intent: "session", deps });
     assert.equal(afterRepeatedEdits.status, "ready", JSON.stringify(afterRepeatedEdits.diagnostics));
     assert.equal(afterRepeatedEdits.nextAction, null);
 
     state.planRevocation.specSha256 = "e".repeat(64);
     writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
-    const rejected = inspectProjectOnboardingV3({ rootDir: path, intent: "session", deps });
+    const rejected = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, intent: "session", deps });
     assert.equal(rejected.status, "partial");
     assertDiagnostic(rejected, "po_authority_rebind_unavailable");
   } finally { dispose(path); }
@@ -1138,7 +1144,7 @@ test("general PRD/Spec drift exposes the same neutral read-only decision plan fo
       },
     };
     for (const intent of ["bootstrap", "session", "dispatch"]) {
-      const observed = inspectProjectOnboardingV3({ rootDir: path, intent, deps });
+      const observed = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, intent, deps });
       assert.equal(observed.status, "partial", intent);
       assertDiagnostic(observed, "po_authority_decision_required");
       assert.deepEqual(observed.nextAction, {
@@ -1212,7 +1218,7 @@ test("neutral PO decision apply requires all transactional V4 postimage readback
     const readbacks = [];
     let postimageEvidence = null;
     const v4Inspection = ({ rootDir, intent, deps: transactionDeps }) => {
-      const result = inspectProjectOnboardingV3({
+      const result = inspectProjectOnboardingV3({ runner: "codex",
         rootDir,
         intent,
         deps: {
@@ -1380,7 +1386,7 @@ test("coherent current documents with stale persisted authority require the same
       },
     };
     for (const intent of ["bootstrap", "session", "dispatch"]) {
-      const observed = inspectProjectOnboardingV3({ rootDir: path, intent, deps });
+      const observed = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, intent, deps });
       assert.equal(observed.status, "partial", intent);
       assertDiagnostic(observed, "po_authority_decision_required");
       assert.deepEqual(observed.nextAction?.argv, [writer, "po-authority-decision-plan"]);
@@ -1446,7 +1452,7 @@ test("required App-Server failures map to closed aggregates and exact bounded ac
     completeKickoff(path);
     for (const [component, aggregate, nextAction] of rows) {
       let calls = 0;
-      const observed = inspectProjectOnboardingV3({
+      const observed = inspectProjectOnboardingV3({ runner: "codex",
         rootDir: path,
         intent: "bootstrap",
         deps: {
@@ -1484,7 +1490,7 @@ test("repository, source, and runtime gates precede every required App-Server ob
     },
   };
   try {
-    const repositoryFailure = inspectProjectOnboardingV3({
+    const repositoryFailure = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: repositoryRoot,
       intent: "dispatch",
       deps: neverObserve,
@@ -1492,7 +1498,7 @@ test("repository, source, and runtime gates precede every required App-Server ob
     assert.equal(repositoryFailure.status, "repository-control-path-invalid");
     assert.equal(calls, 0);
 
-    const missingSource = inspectProjectOnboardingV3({
+    const missingSource = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: lifecycleRoot,
       intent: "bootstrap",
       deps: {
@@ -1503,9 +1509,9 @@ test("repository, source, and runtime gates precede every required App-Server ob
     assert.equal(missingSource.status, "portable-seed-required");
     assert.equal(calls, 0);
 
-    const portable = planProjectOnboardingV3({ rootDir: lifecycleRoot, deps: fakeDeps });
+    const portable = planProjectOnboardingV3({ runner: "codex", rootDir: lifecycleRoot, deps: fakeDeps });
     assert.equal(applyProjectOnboardingV3(portable, { rootDir: lifecycleRoot, activate: true, deps: fakeDeps }).status, "applied");
-    const missingRuntime = inspectProjectOnboardingV3({
+    const missingRuntime = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: lifecycleRoot,
       intent: "bootstrap",
       deps: neverObserve,
@@ -1513,20 +1519,20 @@ test("repository, source, and runtime gates precede every required App-Server ob
     assert.equal(missingRuntime.status, "runtime-initialization-required");
     assert.equal(calls, 0);
 
-    const runtime = planProjectOnboardingLifecycleV4({
+    const runtime = planProjectOnboardingLifecycleV4({ runner: "codex",
       rootDir: lifecycleRoot,
       deps: fakeDeps,
       operation: "runtime",
     });
     const digest = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
-    assert.equal(applyProjectOnboardingLifecycleV4({
+    assert.equal(applyProjectOnboardingLifecycleV4({ runner: "codex",
       rootDir: lifecycleRoot,
       deps: fakeDeps,
       operation: "runtime",
       planSha256: digest,
       activate: true,
     }).status, "restart-required");
-    const restartRequired = inspectProjectOnboardingV3({
+    const restartRequired = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: lifecycleRoot,
       intent: "bootstrap",
       deps: neverObserve,
@@ -1543,7 +1549,7 @@ test("host-bound ready-path App-Server health smoke is read-only and typed", () 
     clearRuntimeBarrier(path, barrier);
     completeKickoff(path);
     let calls = 0;
-    const observed = inspectProjectOnboardingV3({
+    const observed = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: path,
       intent: "bootstrap",
       deps: {
@@ -1587,19 +1593,29 @@ test("a Claude Code session never observes the Codex App-Server and reports not-
   } finally { dispose(path); }
 });
 
-test("omitting --runner keeps the historical Codex App-Server requirement", () => {
+// CONTRACT CHANGE, not a loosened pin. This test's predecessor of the same
+// name asserted the opposite: that omitting `--runner` silently resolved to
+// "codex" and kept the historical Codex App-Server requirement. That premise
+// is the defect (backlog: absent-runner-flag-silently-defaults-to-codex,
+// decision: candidate 1, fail closed) -- an absent runner must never be
+// assumed, because that silent substitution is exactly how a Claude consumer
+// once ended up with a Codex project. What is asserted here now is the
+// decided replacement: omitting the runner is a caller error.
+test("omitting --runner is a caller error, not a silent Codex default", () => {
   const path = root();
   try {
     const barrier = initializeRestartRequiredRoot(path);
     clearRuntimeBarrier(path, barrier);
     completeKickoff(path);
-    const observed = inspectProjectOnboardingV3({
+    assert.throws(() => inspectProjectOnboardingV3({
       rootDir: path,
       intent: "bootstrap",
       deps: fakeDeps,
+    }), (error) => {
+      assert.equal(error.code, "ONBOARDING-RUNNER-REQUIRED");
+      assert.equal(error.caller, "inspectProjectOnboardingV3");
+      return true;
     });
-    assert.equal(observed.runner, "codex");
-    assert.equal(observed.appServer.required, true);
   } finally { dispose(path); }
 });
 
@@ -1807,7 +1823,7 @@ test("restart action for the codex runner is unchanged: still the Codex launcher
 test("a V3 source enabling only Claude admits a Claude Code session instead of hard-failing as Codex-disabled", () => {
   const path = root();
   try {
-    const portable = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    const portable = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(applyProjectOnboardingV3(portable, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
     const sourcePath = join(path, "pipeline.user.yaml");
     const claudeOnlySource = readFileSync(sourcePath, "utf8")
@@ -1832,7 +1848,7 @@ test("a V3 source enabling only Claude admits a Claude Code session instead of h
 test("blank real root inspect and plan are read-only", () => {
   const path = root();
   try {
-    const inspected = inspectProjectOnboardingV3({ rootDir: path });
+    const inspected = inspectProjectOnboardingV3({ runner: "codex", rootDir: path });
     assert.equal(inspected.status, "portable-seed-required");
     assert.deepEqual(inspected.repository, {
       status: "local-uninitialized",
@@ -1844,7 +1860,7 @@ test("blank real root inspect and plan are read-only", () => {
       worktreeCapability: "not-required",
     });
     assert.deepEqual(Object.keys(inspected).sort(), ["appServer", "continuity", "diagnostics", "intent", "nextAction", "repository", "root", "runner", "runtime", "schema", "status"]);
-    const plan = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(plan.status, "ready");
     assert.deepEqual(names(path), []);
     assert.deepEqual(plan.targets.map((target) => target.path), [
@@ -1858,7 +1874,7 @@ test("healthy legacy authority exposes one typed runner-neutral migration action
   try {
     initializeRestartRequiredRoot(path);
     rmSync(join(path, "project"), { recursive: true, force: true });
-    const inspected = inspectProjectOnboardingV3({ rootDir: path, intent: "bootstrap", deps: fakeDeps });
+    const inspected = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, intent: "bootstrap", deps: fakeDeps });
     assert.equal(inspected.status, "migration-required");
     assertDiagnostic(inspected, "project_authority_migration_required");
     assertSingleLineAction(inspected.nextAction, {
@@ -1878,7 +1894,7 @@ test("healthy legacy authority exposes one typed runner-neutral migration action
 test("bootstrap inspection of a blank local root offers the portable seed instead of rejecting its absent Git control path", () => {
   const path = root();
   try {
-    const inspected = inspectProjectOnboardingV3({ rootDir: path, intent: "bootstrap" });
+    const inspected = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, intent: "bootstrap" });
     assert.equal(inspected.status, "portable-seed-required");
     assert.equal(inspected.repository.status, "local-uninitialized");
     assert.equal(inspected.repository.initializesGit, false);
@@ -1894,12 +1910,12 @@ test("a git-only Codex control mount carries host-managed state through the rest
   try {
     mkdirSync(join(path, ".git"));
     chmodSync(join(path, ".git"), 0o500);
-    const portable = planProjectOnboardingLifecycleV4({ rootDir: path, operation: "portable", deps: runtimeDeps });
+    const portable = planProjectOnboardingLifecycleV4({ runner: "codex", rootDir: path, operation: "portable", deps: runtimeDeps });
     const portableDigest = portable.nextAction.argv[portable.nextAction.argv.indexOf("--plan-sha256") + 1];
-    assert.equal(applyProjectOnboardingLifecycleV4({ rootDir: path, operation: "portable", planSha256: portableDigest, activate: true, deps: runtimeDeps }).status, "runtime-initialization-required");
-    const runtime = planProjectOnboardingLifecycleV4({ rootDir: path, operation: "runtime", deps: runtimeDeps });
+    assert.equal(applyProjectOnboardingLifecycleV4({ runner: "codex", rootDir: path, operation: "portable", planSha256: portableDigest, activate: true, deps: runtimeDeps }).status, "runtime-initialization-required");
+    const runtime = planProjectOnboardingLifecycleV4({ runner: "codex", rootDir: path, operation: "runtime", deps: runtimeDeps });
     const runtimeDigest = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
-    const initialized = applyProjectOnboardingLifecycleV4({ rootDir: path, operation: "runtime", planSha256: runtimeDigest, activate: true, deps: runtimeDeps });
+    const initialized = applyProjectOnboardingLifecycleV4({ runner: "codex", rootDir: path, operation: "runtime", planSha256: runtimeDigest, activate: true, deps: runtimeDeps });
     assert.equal(initialized.status, "restart-required", JSON.stringify(initialized));
     assert.equal(readRestartBarrier({ rootDir: path, repositoryCapability: "host-managed" }).status, "present");
   } finally {
@@ -1925,13 +1941,13 @@ test("public CLI emits typed inspect, plan, and explicit-apply results", () => {
     assert.match(aliasOutput, /unknown argument: apply/u);
     assert.deepEqual(names(path), []);
 
-    const inspected = invoke(["inspect", "--root", path]);
+    const inspected = invoke(["inspect", "--root", path, "--runner", "codex"]);
     assert.equal(inspected.code, 0); assert.equal(inspected.result.status, "portable-seed-required");
-    const planned = invoke(["plan", "--root", path]);
+    const planned = invoke(["plan", "--root", path, "--runner", "codex"]);
     assert.equal(planned.code, 0); assert.equal(planned.result.status, "portable-seed-required");
     assert.deepEqual(names(path), []);
     const digest = planned.result.nextAction.argv[planned.result.nextAction.argv.indexOf("--plan-sha256") + 1];
-    const applied = invoke(["apply-portable-seed", "--root", path, "--plan-sha256", digest, "--activate"]);
+    const applied = invoke(["apply-portable-seed", "--root", path, "--plan-sha256", digest, "--activate", "--runner", "codex"]);
     assert.equal(applied.code, 0); assert.equal(applied.result.status, "runtime-initialization-required");
   } finally { dispose(path); }
 });
@@ -1993,7 +2009,7 @@ test("matrix source/runtime progress actions are exact, diagnostic-bound, and co
     expected: { schema, statuses },
   });
   try {
-    const portable = inspectProjectOnboardingV3({ rootDir: empty, deps: fakeDeps });
+    const portable = inspectProjectOnboardingV3({ runner: "codex", rootDir: empty, deps: fakeDeps });
     assert.equal(portable.status, "portable-seed-required");
     assert.equal(portable.repository.status, "local-uninitialized");
     assertDiagnostic(portable, "portable_seed_missing");
@@ -2005,7 +2021,7 @@ test("matrix source/runtime progress actions are exact, diagnostic-bound, and co
     mkdirSync(join(existing, ".git", "objects"), { recursive: true });
     writeFileSync(join(existing, ".git", "HEAD"), "ref: refs/heads/main\n");
     writeFileSync(join(existing, "README.md"), "existing local Git project\n");
-    const adoption = inspectProjectOnboardingV3({ rootDir: existing, deps: fakeDeps });
+    const adoption = inspectProjectOnboardingV3({ runner: "codex", rootDir: existing, deps: fakeDeps });
     assert.equal(adoption.status, "adoption-required");
     assert.equal(adoption.repository.status, "local-valid-writable");
     assertDiagnostic(adoption, "adoption_required");
@@ -2015,7 +2031,7 @@ test("matrix source/runtime progress actions are exact, diagnostic-bound, and co
     ));
 
     writeFileSync(join(legacy, "pipeline.user.yaml"), yaml(v0Source()));
-    const migration = inspectProjectOnboardingV3({ rootDir: legacy, deps: fakeDeps });
+    const migration = inspectProjectOnboardingV3({ runner: "codex", rootDir: legacy, deps: fakeDeps });
     assert.equal(migration.status, "migration-required");
     assertDiagnostic(migration, "migration_required");
     assertSingleLineAction(migration.nextAction, action(
@@ -2024,13 +2040,13 @@ test("matrix source/runtime progress actions are exact, diagnostic-bound, and co
       "pipeline.runner-profile-migration-inspect.v3",
     ));
 
-    const portablePlan = planProjectOnboardingV3({ rootDir: runtime, deps: fakeDeps });
+    const portablePlan = planProjectOnboardingV3({ runner: "codex", rootDir: runtime, deps: fakeDeps });
     assert.equal(applyProjectOnboardingV3(portablePlan, {
       rootDir: runtime,
       activate: true,
       deps: fakeDeps,
     }).status, "applied");
-    const missing = inspectProjectOnboardingV3({ rootDir: runtime, deps: fakeDeps });
+    const missing = inspectProjectOnboardingV3({ runner: "codex", rootDir: runtime, deps: fakeDeps });
     assert.equal(missing.status, "runtime-initialization-required");
     assert.equal(missing.runtime.status, "missing");
     assertDiagnostic(missing, "runtime_missing");
@@ -2057,7 +2073,7 @@ test("every lifecycle plan exposes the exact digest-bound apply status contract 
     },
   });
   try {
-    const portable = planProjectOnboardingLifecycleV4({
+    const portable = planProjectOnboardingLifecycleV4({ runner: "codex",
       rootDir: portableRoot,
       deps: fakeDeps,
       operation: "portable",
@@ -2068,13 +2084,13 @@ test("every lifecycle plan exposes the exact digest-bound apply status contract 
       ["runtime-initialization-required", "restart-required", "kickoff-required"],
     )), /'[^']*with spaces[^']*'/u);
 
-    const seed = planProjectOnboardingV3({ rootDir: runtimeRoot, deps: fakeDeps });
+    const seed = planProjectOnboardingV3({ runner: "codex", rootDir: runtimeRoot, deps: fakeDeps });
     assert.equal(applyProjectOnboardingV3(seed, {
       rootDir: runtimeRoot,
       activate: true,
       deps: fakeDeps,
     }).status, "applied");
-    const runtime = planProjectOnboardingLifecycleV4({
+    const runtime = planProjectOnboardingLifecycleV4({ runner: "codex",
       rootDir: runtimeRoot,
       deps: fakeDeps,
       operation: "runtime",
@@ -2084,7 +2100,7 @@ test("every lifecycle plan exposes the exact digest-bound apply status contract 
       [ONBOARDING_SCRIPT, "initialize-runtime", "--root", runtimeRoot, "--plan-sha256", runtimeDigest, "--activate", "--runner", "codex"],
       ["restart-required"],
     ));
-    assert.equal(applyProjectOnboardingLifecycleV4({
+    assert.equal(applyProjectOnboardingLifecycleV4({ runner: "codex",
       rootDir: runtimeRoot,
       deps: fakeDeps,
       operation: "runtime",
@@ -2094,7 +2110,7 @@ test("every lifecycle plan exposes the exact digest-bound apply status contract 
 
     const implementor = join(runtimeRoot, ".codex", "agents", "implementor.toml");
     writeFileSync(implementor, readFileSync(implementor, "utf8").replace(/^model = ".*"$/mu, 'model = "repair-contract-drift"'));
-    const repair = planProjectOnboardingLifecycleV4({
+    const repair = planProjectOnboardingLifecycleV4({ runner: "codex",
       rootDir: runtimeRoot,
       deps: fakeDeps,
       operation: "repair",
@@ -2120,13 +2136,13 @@ test("a projection-current upgraded repository must establish a barrier before n
     });
     assert.equal(validateV3BootstrapAuthority({ rootDir: path, deps: fakeDeps }).status, "projection-current");
 
-    const observed = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    const observed = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(observed.status, "runtime-attestation-required");
     assert.equal(observed.runtime.status, "projection-current");
     assertDiagnostic(observed, "restart_required");
     assert.deepEqual(observed.nextAction.argv, [ONBOARDING_SCRIPT, "plan-readback", "--root", path, "--runner", "codex"]);
 
-    const planned = planProjectOnboardingLifecycleV4({
+    const planned = planProjectOnboardingLifecycleV4({ runner: "codex",
       rootDir: path,
       deps: fakeDeps,
       operation: "readback",
@@ -2144,7 +2160,7 @@ test("a projection-current upgraded repository must establish a barrier before n
       "codex",
     ]);
     const beforeRuntime = treeSnapshot(join(path, ".codex"));
-    const applied = applyProjectOnboardingLifecycleV4({
+    const applied = applyProjectOnboardingLifecycleV4({ runner: "codex",
       rootDir: path,
       deps: fakeDeps,
       operation: "readback",
@@ -2171,7 +2187,7 @@ test("a stale pending restart binding yields a replaceable readback plan", () =>
     delete legacyBarrier.codexExecutablePath;
     writeFileSync(stale.paths.barrier, canonicalJson(legacyBarrier));
 
-    const observed = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    const observed = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(observed.status, "runtime-attestation-required");
     assert.equal(observed.runtime.status, "projection-current");
     assertDiagnostic(observed, "restart_binding_drift");
@@ -2184,13 +2200,13 @@ test("a stale pending restart binding yields a replaceable readback plan", () =>
       "codex",
     ]);
 
-    const planned = planProjectOnboardingLifecycleV4({
+    const planned = planProjectOnboardingLifecycleV4({ runner: "codex",
       rootDir: path,
       deps: fakeDeps,
       operation: "readback",
     });
     const digest = planned.nextAction.argv[planned.nextAction.argv.indexOf("--plan-sha256") + 1];
-    const applied = applyProjectOnboardingLifecycleV4({
+    const applied = applyProjectOnboardingLifecycleV4({ runner: "codex",
       rootDir: path,
       deps: fakeDeps,
       operation: "readback",
@@ -2212,14 +2228,14 @@ test("runtime target preflight maps every reversible probe permission failure wi
     for (const stage of ["create", "fstat", "write", "file-fsync", "close", "rename", "directory-fsync"]) {
       const path = root();
       try {
-        const seed = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+        const seed = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
         assert.equal(applyProjectOnboardingV3(seed, {
           rootDir: path,
           activate: true,
           deps: fakeDeps,
         }).status, "applied");
         const before = treeSnapshot(path);
-        const observed = inspectProjectOnboardingV3({
+        const observed = inspectProjectOnboardingV3({ runner: "codex",
           rootDir: path,
           deps: runtimeProbeFailureDeps(stage, code),
         });
@@ -2244,7 +2260,7 @@ test("runtime target preflight maps every reversible probe permission failure wi
 test("a symlinked runtime target parent fails closed without touching its destination", () => {
   const path = root(); const outside = root();
   try {
-    const seed = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    const seed = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(applyProjectOnboardingV3(seed, {
       rootDir: path,
       activate: true,
@@ -2254,7 +2270,7 @@ test("a symlinked runtime target parent fails closed without touching its destin
     symlinkSync(outside, join(path, ".codex", "agents"), "dir");
     const projectBefore = treeSnapshot(path);
     const outsideBefore = treeSnapshot(outside);
-    const observed = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    const observed = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(observed.status, "runtime-target-read-only", JSON.stringify(observed));
     assertDiagnostic(observed, "runtime_target_read_only");
     assert.equal(observed.nextAction, null);
@@ -2268,13 +2284,13 @@ test("a symlinked runtime target parent fails closed without touching its destin
 test("portable and runtime apply replays are zero-write with identical canonical responses", () => {
   const portableRoot = root(); const runtimeRoot = root();
   try {
-    const portablePlan = planProjectOnboardingLifecycleV4({
+    const portablePlan = planProjectOnboardingLifecycleV4({ runner: "codex",
       rootDir: portableRoot,
       deps: fakeDeps,
       operation: "portable",
     });
     const portableDigest = portablePlan.nextAction.argv[portablePlan.nextAction.argv.indexOf("--plan-sha256") + 1];
-    const portableApplied = applyProjectOnboardingLifecycleV4({
+    const portableApplied = applyProjectOnboardingLifecycleV4({ runner: "codex",
       rootDir: portableRoot,
       deps: fakeDeps,
       operation: "portable",
@@ -2282,7 +2298,7 @@ test("portable and runtime apply replays are zero-write with identical canonical
       activate: true,
     });
     const portableBytes = treeSnapshot(portableRoot);
-    const portableReplayed = applyProjectOnboardingLifecycleV4({
+    const portableReplayed = applyProjectOnboardingLifecycleV4({ runner: "codex",
       rootDir: portableRoot,
       deps: fakeDeps,
       operation: "portable",
@@ -2292,19 +2308,19 @@ test("portable and runtime apply replays are zero-write with identical canonical
     assert.deepEqual(portableReplayed, portableApplied);
     assert.deepEqual(treeSnapshot(portableRoot), portableBytes);
 
-    const seed = planProjectOnboardingV3({ rootDir: runtimeRoot, deps: fakeDeps });
+    const seed = planProjectOnboardingV3({ runner: "codex", rootDir: runtimeRoot, deps: fakeDeps });
     assert.equal(applyProjectOnboardingV3(seed, {
       rootDir: runtimeRoot,
       activate: true,
       deps: fakeDeps,
     }).status, "applied");
-    const runtimePlan = planProjectOnboardingLifecycleV4({
+    const runtimePlan = planProjectOnboardingLifecycleV4({ runner: "codex",
       rootDir: runtimeRoot,
       deps: fakeDeps,
       operation: "runtime",
     });
     const runtimeDigest = runtimePlan.nextAction.argv[runtimePlan.nextAction.argv.indexOf("--plan-sha256") + 1];
-    const runtimeApplied = applyProjectOnboardingLifecycleV4({
+    const runtimeApplied = applyProjectOnboardingLifecycleV4({ runner: "codex",
       rootDir: runtimeRoot,
       deps: fakeDeps,
       operation: "runtime",
@@ -2337,7 +2353,7 @@ test("portable and runtime apply replays are zero-write with identical canonical
     };
     assertSingleLineAction(runtimeApplied.nextAction, expectedRestart);
     const runtimeBytes = treeSnapshot(runtimeRoot);
-    const runtimeReplayed = applyProjectOnboardingLifecycleV4({
+    const runtimeReplayed = applyProjectOnboardingLifecycleV4({ runner: "codex",
       rootDir: runtimeRoot,
       deps: fakeDeps,
       operation: "runtime",
@@ -2360,7 +2376,7 @@ test("invalid current runtime readback maps exactly and exposes no action", () =
     const marker = JSON.parse(readFileSync(current.paths.currentReadback, "utf8"));
     marker.receiptSha256 = sha256("invalid receipt");
     writeFileSync(current.paths.currentReadback, JSON.stringify(marker));
-    const observed = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    const observed = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(observed.status, "runtime-readback-unavailable");
     assert.deepEqual(observed.runtime, {
       status: "readback-unavailable",
@@ -2392,13 +2408,13 @@ test("runtime initialization preserves the exact executable and private-state fa
   ]) {
     const path = root();
     try {
-      const seed = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+      const seed = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
       assert.equal(applyProjectOnboardingV3(seed, {
         rootDir: path,
         activate: true,
         deps: fakeDeps,
       }).status, "applied");
-      const plan = planProjectOnboardingLifecycleV4({
+      const plan = planProjectOnboardingLifecycleV4({ runner: "codex",
         rootDir: path,
         deps: fakeDeps,
         operation: "runtime",
@@ -2410,7 +2426,7 @@ test("runtime initialization preserves the exact executable and private-state fa
           throw new CodexOnboardingRuntimeError(failure.code, failure.phase, "private fixture detail");
         },
       };
-      const observed = applyProjectOnboardingLifecycleV4({
+      const observed = applyProjectOnboardingLifecycleV4({ runner: "codex",
         rootDir: path,
         deps: injectedDeps,
         operation: "runtime",
@@ -2431,13 +2447,13 @@ test("runtime initialization preserves the exact executable and private-state fa
 test("runtime plan preimage drift preserves external bytes and maps to exact projection repair", () => {
   const path = root();
   try {
-    const seed = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    const seed = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(applyProjectOnboardingV3(seed, {
       rootDir: path,
       activate: true,
       deps: fakeDeps,
     }).status, "applied");
-    const plan = planProjectOnboardingLifecycleV4({
+    const plan = planProjectOnboardingLifecycleV4({ runner: "codex",
       rootDir: path,
       deps: fakeDeps,
       operation: "runtime",
@@ -2448,7 +2464,7 @@ test("runtime plan preimage drift preserves external bytes and maps to exact pro
     const driftTarget = join(path, ".codex", "agents", "implementor.toml");
     writeFileSync(driftTarget, external);
     const mixedBefore = treeSnapshot(path);
-    const mixed = inspectProjectOnboardingV3({
+    const mixed = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: path,
       deps: runtimeProbeFailureDeps("create", "EACCES"),
     });
@@ -2467,7 +2483,7 @@ test("runtime plan preimage drift preserves external bytes and maps to exact pro
       },
     });
     assert.deepEqual(treeSnapshot(path), mixedBefore);
-    const observed = applyProjectOnboardingLifecycleV4({
+    const observed = applyProjectOnboardingLifecycleV4({ runner: "codex",
       rootDir: path,
       deps: fakeDeps,
       operation: "runtime",
@@ -2497,13 +2513,13 @@ test("runtime apply permission races roll back every byte and remove the exact r
   for (const code of ["EACCES", "EPERM", "EROFS"]) {
     const path = root();
     try {
-      const seed = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+      const seed = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
       assert.equal(applyProjectOnboardingV3(seed, {
         rootDir: path,
         activate: true,
         deps: fakeDeps,
       }).status, "applied");
-      const plan = planProjectOnboardingLifecycleV4({
+      const plan = planProjectOnboardingLifecycleV4({ runner: "codex",
         rootDir: path,
         deps: fakeDeps,
         operation: "runtime",
@@ -2511,7 +2527,7 @@ test("runtime apply permission races roll back every byte and remove the exact r
       const digest = plan.nextAction.argv[plan.nextAction.argv.indexOf("--plan-sha256") + 1];
       const before = treeSnapshot(path);
       let injected = false;
-      const observed = applyProjectOnboardingLifecycleV4({
+      const observed = applyProjectOnboardingLifecycleV4({ runner: "codex",
         rootDir: path,
         operation: "runtime",
         planSha256: digest,
@@ -2560,13 +2576,13 @@ test("public kickoff plan/apply carries goal as one argv element and reconstruct
   try {
     const barrier = initializeRestartRequiredRoot(path);
     clearRuntimeBarrier(path, barrier);
-    const pristine = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    const pristine = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(pristine.status, "kickoff-required");
     assert.equal(pristine.continuity.status, "absent-pristine");
     assert.equal(pristine.nextAction.kind, "collect-input");
 
     const goal = "Ship safely; keep $(touch nope) as text";
-    const planned = invoke(["kickoff", "plan", "--root", path, "--goal", goal]);
+    const planned = invoke(["kickoff", "plan", "--root", path, "--goal", goal, "--runner", "codex"]);
     assert.equal(planned.code, 0, stderr);
     assert.equal(planned.result.goal, goal);
     const kickoffId = planned.result.targets.state.value.activeFeature.id;
@@ -2588,7 +2604,7 @@ test("public kickoff plan/apply carries goal as one argv element and reconstruct
     ]);
     assert.match(renderProjectOnboardingAction(planned.result.applyAction), /'Ship safely; keep \$\(touch nope\) as text'/u);
     assert.equal(existsSync(join(path, "nope")), false);
-    assert.equal(inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps }).status, "kickoff-required");
+    assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps }).status, "kickoff-required");
 
     const changedGoal = invoke([
       "kickoff", "apply", "--root", path, "--goal", `${goal} changed`,
@@ -2596,7 +2612,7 @@ test("public kickoff plan/apply carries goal as one argv element and reconstruct
     ]);
     assert.equal(changedGoal.code, 2);
     assert.match(stderr, /KICKOFF-PLAN-DIGEST/u);
-    assert.equal(inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps }).status, "kickoff-required");
+    assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps }).status, "kickoff-required");
 
     const wrongDigest = invoke([
       "kickoff", "apply", "--root", path, "--goal", goal,
@@ -2604,7 +2620,7 @@ test("public kickoff plan/apply carries goal as one argv element and reconstruct
     ]);
     assert.equal(wrongDigest.code, 2);
     assert.match(stderr, /KICKOFF-PLAN-DIGEST/u);
-    assert.equal(inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps }).status, "kickoff-required");
+    assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps }).status, "kickoff-required");
 
     const applied = invoke(planned.result.applyAction.argv.slice(1));
     assert.equal(applied.code, 0, stderr);
@@ -2700,10 +2716,10 @@ test("the seeded dev-plan gate refuses implementation before approval and admits
     writeFileSync(join(path, designInputPath), "# Gated design input\n");
     const promotion = {
       rootDir: path, profile: "feature", featureId: "gated-work", planPath: prdPath,
-      prdPath, specPath, designInputPath, deps: localDeps,
+      prdPath, specPath, designInputPath, runner: "codex", deps: localDeps,
     };
     const planned = planProjectOnboardingKickoffPromotionV4(promotion);
-    const promoted = applyProjectOnboardingKickoffPromotionV4({ ...promotion, planSha256: planned.planSha256, activate: true });
+    const promoted = applyProjectOnboardingKickoffPromotionV4({ runner: "codex", ...promotion, planSha256: planned.planSha256, activate: true });
     assert.equal(promoted.status, "ready");
     assert.equal(validatePoGateAuthorityForRepository({ repoRoot: path }).ok, true);
 
@@ -2775,7 +2791,7 @@ test("a claude-onboarded root reaches a real kickoff plan instead of runtime-att
     // The other half of the same contract: omission is never promoted to this
     // runner. Without the identity the entry point still inspects as Codex,
     // which on this root is the historical Codex-only dead end.
-    const substituted = planProjectOnboardingKickoffV4({ rootDir: path, goal, deps: fakeDeps });
+    const substituted = planProjectOnboardingKickoffV4({ runner: "codex", rootDir: path, goal, deps: fakeDeps });
     assert.equal(substituted.schema, "pipeline.project-onboarding.v4");
     assert.equal(substituted.runner, "codex");
     assert.equal(substituted.status, "runtime-attestation-required");
@@ -2806,7 +2822,7 @@ test("codex kickoff plan and apply are unchanged whether the runner is omitted o
   try {
     const barrier = initializeRestartRequiredRoot(path); clearRuntimeBarrier(path, barrier);
     const goal = "Codex kickoff regression pin";
-    const omitted = planProjectOnboardingKickoffV4({ rootDir: path, goal, deps: fakeDeps });
+    const omitted = planProjectOnboardingKickoffV4({ runner: "codex", rootDir: path, goal, deps: fakeDeps });
     const explicit = planProjectOnboardingKickoffV4({ rootDir: path, goal, runner: "codex", deps: fakeDeps });
     assert.equal(omitted.schema, "pipeline.codex-onboarding-kickoff-plan.v1");
     assert.deepEqual(explicit, omitted);
@@ -2819,29 +2835,77 @@ test("codex kickoff plan and apply are unchanged whether the runner is omitted o
   } finally { dispose(path); }
 });
 
-test("omitting --runner on the kickoff CLI keeps the exact historical Codex behaviour", () => {
+// CONTRACT CHANGE, not a loosened pin, mirroring the primary inversion above
+// (backlog: absent-runner-flag-silently-defaults-to-codex, decision:
+// candidate 1, fail closed). This test's predecessor of the same name pinned
+// the opposite: that omitting `--runner` on the kickoff CLI silently resolved
+// to Codex. `--runner` is now a caller-supplied requirement for kickoff plan;
+// an explicit value still behaves exactly as before (asserted below), while
+// an omitted one is now a caller error rather than an assumed identity.
+// CONTRACT CORRECTION, not a loosened pin. The predecessor of this test
+// asserted the kickoff CLI raised a caller error when --runner was omitted.
+// That premise is the defect this dispatch closes: a CLI entry point is
+// where "which runner is executing this process" and "which runner is this
+// project for" legitimately coincide (see resolveActiveRunner in
+// scripts/project-onboarding-v3.mjs), so an omitted --runner now resolves
+// from the environment and threads through explicitly -- it never raises,
+// and it never passes `undefined` onward to a library helper. Split into two
+// tests (RUNDEFAULT-2 field 3, "two levels kept apart"): this one pins the
+// non-Claude-Code resolution and keeps the explicit-runner mechanics the
+// original test pinned; the sibling below pins the Claude Code resolution.
+test("omitting --runner on the kickoff CLI resolves the historical Codex identity outside a Claude Code session, not a caller error", () => {
   const path = root();
   try {
     const barrier = initializeRestartRequiredRoot(path); clearRuntimeBarrier(path, barrier);
     const goal = "Codex kickoff CLI regression pin";
-    const invoke = (args) => {
+    const invoke = (args, env = {}) => {
       let stdout = ""; let stderr = "";
       const code = onboardingCli(args, {
         deps: fakeDeps,
+        env,
         write: (chunk) => { stdout += chunk; },
         writeError: (chunk) => { stderr += chunk; },
       });
       return { code, stderr, result: stdout ? JSON.parse(stdout) : null };
     };
     const omitted = invoke(["kickoff", "plan", "--root", path, "--goal", goal]);
-    const explicit = invoke(["kickoff", "plan", "--root", path, "--goal", goal, "--runner", "codex"]);
     assert.equal(omitted.code, 0, omitted.stderr);
     assert.equal(omitted.result.schema, "pipeline.codex-onboarding-kickoff-plan.v1");
+    assert.deepEqual(omitted.result.applyAction.argv, [
+      ONBOARDING_SCRIPT, "kickoff", "apply", "--root", path, "--goal", goal,
+      "--runner", "codex", "--plan-sha256", omitted.result.planSha256, "--activate",
+    ]);
+    const explicit = invoke(["kickoff", "plan", "--root", path, "--goal", goal, "--runner", "codex"]);
     assert.deepEqual(explicit.result, omitted.result);
-    const applied = invoke(omitted.result.applyAction.argv.slice(1));
+    const applied = invoke(explicit.result.applyAction.argv.slice(1));
     assert.equal(applied.code, 0, applied.stderr);
     assert.equal(applied.result.status, "ready");
     assert.equal(applied.result.runner, "codex");
+  } finally { dispose(path); }
+});
+
+test("omitting --runner on the kickoff CLI resolves the active Claude identity inside a Claude Code session", () => {
+  const path = root();
+  try {
+    initializeClaudeOnboardedRoot(path);
+    const goal = "Claude kickoff CLI environment resolution";
+    const invoke = (args, env) => {
+      let stdout = ""; let stderr = "";
+      const code = onboardingCli(args, {
+        deps: fakeDeps,
+        env,
+        write: (chunk) => { stdout += chunk; },
+        writeError: (chunk) => { stderr += chunk; },
+      });
+      return { code, stderr, result: stdout ? JSON.parse(stdout) : null };
+    };
+    const planned = invoke(["kickoff", "plan", "--root", path, "--goal", goal], { CLAUDECODE: "1" });
+    assert.equal(planned.code, 0, planned.stderr);
+    assert.equal(planned.result.schema, "pipeline.codex-onboarding-kickoff-plan.v1");
+    assert.deepEqual(planned.result.applyAction.argv, [
+      ONBOARDING_SCRIPT, "kickoff", "apply", "--root", path, "--goal", goal,
+      "--runner", "claude", "--plan-sha256", planned.result.planSha256, "--activate",
+    ]);
   } finally { dispose(path); }
 });
 
@@ -2941,17 +3005,29 @@ test("a claude-onboarded root completes kickoff promotion and observes the proje
     assert.equal(applied.runner, "claude");
     assert.equal(applied.continuity.status, "valid");
 
-    // The other half of the same contract: omission is never promoted to this
-    // runner. Without an explicit runner the promotion entry points still
-    // inspect as Codex, which on this claude-onboarded root is the historical
-    // Codex-only dead end that made mechanism A a blocker.
-    const substituted = planProjectOnboardingKickoffPromotionV4({ ...args, runner: undefined });
-    assert.equal(substituted.runner, "codex");
-    assert.equal(substituted.status, "runtime-attestation-required");
+    // The other half of the same contract, inverted by the later fail-closed
+    // decision (backlog: absent-runner-flag-silently-defaults-to-codex):
+    // omission is no longer promoted to Codex -- it is a caller error. Before
+    // that decision, an omitted runner here silently observed as Codex, which
+    // on this claude-onboarded root was the historical Codex-only dead end
+    // that made mechanism A a blocker; now the omission itself is refused
+    // before any such silent identity is assumed.
+    assert.throws(() => planProjectOnboardingKickoffPromotionV4({ ...args, runner: undefined }), (error) => {
+      assert.equal(error.code, "ONBOARDING-RUNNER-REQUIRED");
+      return true;
+    });
   } finally { dispose(path); }
 });
 
-test("codex kickoff promotion plan and apply are unchanged whether the runner is omitted or explicit", () => {
+// CONTRACT CORRECTION, not a loosened pin. The predecessor of this test
+// asserted a direct library-level call with the runner omitted behaved
+// identically to one with `runner: "codex"` explicit. That premise is the
+// defect this dispatch closes: a library helper called directly with no
+// runner now raises (ONBOARDING-RUNNER-REQUIRED), never silently assumes
+// "codex". What is asserted here now is the positive new contract, and the
+// explicit-runner mechanics the title originally pinned survive unchanged
+// below it.
+test("omitting the runner on a direct kickoff promotion call is a caller error, not a silent Codex default", () => {
   const path = root();
   try {
     const barrier = initializeRestartRequiredRoot(path); clearRuntimeBarrier(path, barrier);
@@ -2974,11 +3050,14 @@ test("codex kickoff promotion plan and apply are unchanged whether the runner is
       rootDir: path, profile: "feature", featureId: "codex-promoted-work", planPath: prdPath,
       prdPath, specPath, designInputPath, deps: fakeDeps,
     };
-    const omitted = planProjectOnboardingKickoffPromotionV4(args);
+    assert.throws(() => planProjectOnboardingKickoffPromotionV4(args), (error) => {
+      assert.equal(error.code, "ONBOARDING-RUNNER-REQUIRED");
+      assert.equal(error.caller, "planProjectOnboardingKickoffPromotionV4");
+      return true;
+    });
     const explicit = planProjectOnboardingKickoffPromotionV4({ ...args, runner: "codex" });
-    assert.equal(omitted.schema, "pipeline.codex-onboarding-kickoff-promotion-plan.v1");
-    assert.deepEqual(explicit, omitted);
-    const applied = applyProjectOnboardingKickoffPromotionV4({ ...args, planSha256: omitted.planSha256, activate: true });
+    assert.equal(explicit.schema, "pipeline.codex-onboarding-kickoff-promotion-plan.v1");
+    const applied = applyProjectOnboardingKickoffPromotionV4({ runner: "codex", ...args, planSha256: explicit.planSha256, activate: true });
     assert.equal(applied.status, "ready");
     assert.equal(applied.runner, "codex");
   } finally { dispose(path); }
@@ -3064,18 +3143,19 @@ test("an apply-shaped runtime-attestation-required exits non-zero; the same stat
       });
       return { code, stderr, result: stdout ? JSON.parse(stdout) : null };
     };
-    // Same precondition as the originally observed defect: the CLI carries no
-    // --runner, so the apply resolves the default codex identity on a
-    // claude-onboarded root and aborts before writing anything.
-    const applied = invoke(["kickoff", "apply", "--root", path, "--goal", goal, "--plan-sha256", "0".repeat(64), "--activate"]);
+    // Same precondition as the originally observed defect, now made explicit
+    // rather than implicit (backlog: absent-runner-flag-silently-defaults-to-codex):
+    // the CLI is explicitly given the codex identity on a claude-onboarded
+    // root, and the apply aborts before writing anything.
+    const applied = invoke(["kickoff", "apply", "--root", path, "--goal", goal, "--plan-sha256", "0".repeat(64), "--activate", "--runner", "codex"]);
     assert.equal(applied.result.status, "runtime-attestation-required");
     assert.equal(applied.code, 1, "an apply that wrote nothing must not exit 0");
 
-    const inspected = invoke(["inspect", "--root", path]);
+    const inspected = invoke(["inspect", "--root", path, "--runner", "codex"]);
     assert.equal(inspected.result.status, "runtime-attestation-required");
     assert.equal(inspected.code, 0, "the same status is still a legitimate resting point for inspect");
 
-    const planned = invoke(["kickoff", "plan", "--root", path, "--goal", goal]);
+    const planned = invoke(["kickoff", "plan", "--root", path, "--goal", goal, "--runner", "codex"]);
     assert.equal(planned.result.status, "runtime-attestation-required");
     assert.equal(planned.code, 0, "and for plan");
   } finally { dispose(path); }
@@ -3096,13 +3176,13 @@ test("kickoff promotion replaces only the exact unapproved seed and is replay-sa
       writeFileSync(join(path, designInputPath), `# ${profile} design input\n`);
       const args = {
         rootDir: path, profile, featureId: `${profile}-work`, planPath: prdPath,
-        prdPath, specPath, designInputPath, deps: fakeDeps,
+        prdPath, specPath, designInputPath, runner: "codex", deps: fakeDeps,
       };
       const plan = planProjectOnboardingKickoffPromotionV4(args);
       assert.equal(plan.schema, "pipeline.codex-onboarding-kickoff-promotion-plan.v1");
       assert.equal(plan.targets.state.value.planApproved, false);
       assert.equal(plan.targets.state.value.planSubmission, undefined);
-      const applied = applyProjectOnboardingKickoffPromotionV4({ ...args, planSha256: plan.planSha256, activate: true });
+      const applied = applyProjectOnboardingKickoffPromotionV4({ runner: "codex", ...args, planSha256: plan.planSha256, activate: true });
       assert.equal(applied.status, "ready");
       const state = JSON.parse(readFileSync(join(path, "project", "pipeline-state.json"), "utf8"));
       assert.equal(state.activeFeature.id, `${profile}-work`);
@@ -3110,7 +3190,7 @@ test("kickoff promotion replaces only the exact unapproved seed and is replay-sa
       assert.equal(state.planApproved, false);
       assert.equal(state.planSubmission, undefined);
       assert.equal(state.planApproval, undefined);
-      const replayed = applyProjectOnboardingKickoffPromotionV4({ ...args, planSha256: plan.planSha256, activate: true });
+      const replayed = applyProjectOnboardingKickoffPromotionV4({ runner: "codex", ...args, planSha256: plan.planSha256, activate: true });
       assert.equal(replayed.status, "ready");
     } finally { dispose(path); }
   }
@@ -3236,14 +3316,14 @@ test("kickoff promotion fails closed for authority drift, a real active feature,
     writeFileSync(join(path, "specs", "prd_real.md"), "# PRD\n");
     writeFileSync(join(path, "specs", "spec.md"), "# Spec\n");
     writeFileSync(join(path, "specs", "design-input.md"), "# Design input\n");
-    const args = { rootDir: path, profile: "feature", featureId: "real-work", planPath: "specs/prd_real.md", prdPath: "specs/prd_real.md", specPath: "specs/spec.md", designInputPath: "specs/design-input.md", deps: fakeDeps };
+    const args = { rootDir: path, profile: "feature", featureId: "real-work", planPath: "specs/prd_real.md", prdPath: "specs/prd_real.md", specPath: "specs/spec.md", designInputPath: "specs/design-input.md", runner: "codex", deps: fakeDeps };
     const plan = planProjectOnboardingKickoffPromotionV4(args);
     writeFileSync(join(path, "specs", "spec.md"), "# changed\n");
-    assert.throws(() => applyProjectOnboardingKickoffPromotionV4({ ...args, planSha256: plan.planSha256, activate: true }), /promotion plan digest/u);
+    assert.throws(() => applyProjectOnboardingKickoffPromotionV4({ runner: "codex", ...args, planSha256: plan.planSha256, activate: true }), /promotion plan digest/u);
     writeFileSync(join(path, "specs", "spec.md"), "# Spec\n");
-    const applied = applyProjectOnboardingKickoffPromotionV4({ ...args, planSha256: plan.planSha256, activate: true });
+    const applied = applyProjectOnboardingKickoffPromotionV4({ runner: "codex", ...args, planSha256: plan.planSha256, activate: true });
     assert.equal(applied.status, "ready");
-    assert.throws(() => planProjectOnboardingKickoffPromotionV4({ ...args, featureId: "other-work" }), /exact unapproved kickoff seed/u);
+    assert.throws(() => planProjectOnboardingKickoffPromotionV4({ runner: "codex", ...args, featureId: "other-work" }), /exact unapproved kickoff seed/u);
   } finally { dispose(path); }
 });
 
@@ -3255,7 +3335,7 @@ test("current runtime exposes closed continuity outcomes while required App Serv
       clearRuntimeBarrier(path, barrier);
     }
 
-    const kickoff = inspectProjectOnboardingV3({
+    const kickoff = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: pristine,
       intent: "onboarding",
       deps: fakeDeps,
@@ -3265,7 +3345,7 @@ test("current runtime exposes closed continuity outcomes while required App Serv
     assert.equal(kickoff.appServer.status, "not-requested");
     assert.equal(kickoff.nextAction.kind, "collect-input");
 
-    const appServerFirst = inspectProjectOnboardingV3({
+    const appServerFirst = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: pristine,
       intent: "bootstrap",
       deps: {
@@ -3283,7 +3363,7 @@ test("current runtime exposes closed continuity outcomes while required App Serv
 
     mkdirSync(join(pristine, "docs"));
     writeFileSync(join(pristine, "docs", "state.md"), "manual handover\n", { flag: "wx" });
-    const damaged = inspectProjectOnboardingV3({
+    const damaged = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: pristine,
       intent: "onboarding",
       deps: fakeDeps,
@@ -3310,7 +3390,7 @@ test("current runtime exposes closed continuity outcomes while required App Serv
     assert.equal(JSON.parse(continuityOutput).status, "continuity-damaged");
     assert.equal(JSON.parse(continuityOutput).nextAction, null);
     assertDiagnostic(JSON.parse(continuityOutput), "continuity_repair_unavailable");
-    const compound = inspectProjectOnboardingV3({
+    const compound = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: pristine,
       intent: "bootstrap",
       deps: {
@@ -3327,7 +3407,7 @@ test("current runtime exposes closed continuity outcomes while required App Serv
     assert.equal(compound.nextAction, null);
 
     writeFileSync(join(unavailable, "project", "pipeline-state.json"), "{broken", { flag: "wx" });
-    const unreadable = inspectProjectOnboardingV3({
+    const unreadable = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: unavailable,
       intent: "onboarding",
       deps: fakeDeps,
@@ -3391,7 +3471,7 @@ test("closed feature re-entry stays ready through the sanctioned set-feature tra
       "--plan-path", "specs/previous/prd.md",
     );
     assert.equal(initial.status, 0, initial.stderr);
-    const designBeforeClose = inspectProjectOnboardingV3({
+    const designBeforeClose = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: path,
       intent: "bootstrap",
       deps: fakeDeps,
@@ -3401,7 +3481,7 @@ test("closed feature re-entry stays ready through the sanctioned set-feature tra
 
     const closedByWriter = runStateCommand("close-feature", "--by", "PO");
     assert.equal(closedByWriter.status, 0, closedByWriter.stderr);
-    const closed = inspectProjectOnboardingV3({
+    const closed = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: path,
       intent: "bootstrap",
       deps: fakeDeps,
@@ -3420,7 +3500,7 @@ test("closed feature re-entry stays ready through the sanctioned set-feature tra
       "--plan-path", "specs/next/prd.md",
     );
     assert.equal(selected.status, 0, selected.stderr);
-    const design = inspectProjectOnboardingV3({
+    const design = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: path,
       intent: "bootstrap",
       deps: fakeDeps,
@@ -3440,7 +3520,7 @@ test("closed feature re-entry stays ready through the sanctioned set-feature tra
 test("portable seed is manifest-valid, then onboarding owns the runtime initialization transaction", () => {
   const path = root();
   try {
-    const plan = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.deepEqual(
       plan.targets.map((target) => target.path),
       ["pipeline.user.yaml", "project/pipeline.json", "project/pipeline.yaml"],
@@ -3452,14 +3532,14 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
     assert.equal(existsSync(join(path, ".git")), true);
     assert.equal(existsSync(join(path, ".claude")), false, "portable seed must not create legacy Claude authority files");
     assert.equal(existsSync(join(path, ".codex")), false);
-    assert.equal(inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps }).status, "runtime-initialization-required");
-    const runtimePlan = planProjectOnboardingLifecycleV4({ rootDir: path, deps: fakeDeps, operation: "runtime" });
+    assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps }).status, "runtime-initialization-required");
+    const runtimePlan = planProjectOnboardingLifecycleV4({ runner: "codex", rootDir: path, deps: fakeDeps, operation: "runtime" });
     const digest = runtimePlan.nextAction.argv[runtimePlan.nextAction.argv.indexOf("--plan-sha256") + 1];
-    const runtimeApplied = applyProjectOnboardingLifecycleV4({ rootDir: path, deps: fakeDeps, operation: "runtime", planSha256: digest, activate: true });
+    const runtimeApplied = applyProjectOnboardingLifecycleV4({ runner: "codex", rootDir: path, deps: fakeDeps, operation: "runtime", planSha256: digest, activate: true });
     assert.equal(runtimeApplied.status, "restart-required");
     assert.equal(runtimeApplied.runtime.status, "restart-required");
     assert.equal(runtimeApplied.nextAction.kind, "restart-process");
-    const sameProcess = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    const sameProcess = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(sameProcess.status, "restart-required", "the writer process cannot clear its own runtime barrier");
     assert.equal(existsSync(join(path, ".codex/agents/implementor.toml")), true);
     assert.equal(existsSync(join(path, ".codex/agents/critic.toml")), true);
@@ -3509,14 +3589,14 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
         observedAtEpochMs: 40_001,
       },
     });
-    const freshProcess = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, intent: "bootstrap" });
+    const freshProcess = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps, intent: "bootstrap" });
     assert.equal(freshProcess.status, "kickoff-required");
     assert.equal(freshProcess.runtime.status, "readback-current");
     assert.notEqual(freshProcess.runtime.barrierSha256, freshProcess.runtime.readbackSha256);
     const afterHostAuthority = validateV3BootstrapAuthority({ rootDir: path, deps: fakeDeps });
     assert.equal(afterHostAuthority.status, "ready", JSON.stringify(afterHostAuthority));
     completeKickoff(path);
-    assert.equal(inspectProjectOnboardingV3({
+    assert.equal(inspectProjectOnboardingV3({ runner: "codex",
       rootDir: path,
       deps: fakeDeps,
       intent: "bootstrap",
@@ -3529,20 +3609,20 @@ test("existing unmanaged projects plan read-only while partial and symlink roots
   const aliasParent = root(); const alias = join(aliasParent, "project-alias");
   try {
     writeFileSync(join(unrelated, "README.md"), "existing\n");
-    assert.equal(inspectProjectOnboardingV3({ rootDir: unrelated }).status, "adoption-required");
-    assert.equal(planProjectOnboardingV3({ rootDir: unrelated, deps: fakeDeps }).status, "ready");
+    assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: unrelated }).status, "adoption-required");
+    assert.equal(planProjectOnboardingV3({ runner: "codex", rootDir: unrelated, deps: fakeDeps }).status, "ready");
     assert.deepEqual(names(unrelated), ["README.md"]);
     mkdirSync(join(partial, ".codex")); writeFileSync(join(partial, ".codex/config.toml"), "existing\n");
-    assert.equal(inspectProjectOnboardingV3({ rootDir: partial }).status, "partial");
+    assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: partial }).status, "partial");
     symlinkSync(linkedParent, join(unsafe, "linked"));
-    assert.equal(inspectProjectOnboardingV3({ rootDir: unsafe }).status, "unsafe");
+    assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: unsafe }).status, "unsafe");
     assert.deepEqual(names(unsafe), ["linked"]);
     symlinkSync(linkedParent, join(unsafeClaude, ".claude"));
-    assert.equal(inspectProjectOnboardingV3({ rootDir: unsafeClaude }).status, "unsafe");
-    assert.equal(planProjectOnboardingV3({ rootDir: unsafeClaude, deps: fakeDeps }).status, "unsafe");
+    assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: unsafeClaude }).status, "unsafe");
+    assert.equal(planProjectOnboardingV3({ runner: "codex", rootDir: unsafeClaude, deps: fakeDeps }).status, "unsafe");
     assert.deepEqual(names(unsafeClaude), [".claude"]);
     symlinkSync(unrelated, alias, "dir");
-    const rootAlias = inspectProjectOnboardingV3({ rootDir: alias, deps: fakeDeps });
+    const rootAlias = inspectProjectOnboardingV3({ runner: "codex", rootDir: alias, deps: fakeDeps });
     assert.equal(rootAlias.status, "unsafe");
     assert.equal(rootAlias.root, null);
     assert.equal(rootAlias.diagnostics[0].code, "root_symlink_rejected");
@@ -3558,7 +3638,7 @@ test("a recognized read-only host control layout receives portable onboarding wi
       mkdirSync(target);
       chmodSync(target, 0o555);
     }
-    const inspected = inspectProjectOnboardingV3({ rootDir: path });
+    const inspected = inspectProjectOnboardingV3({ runner: "codex", rootDir: path });
     assert.equal(inspected.status, "portable-seed-required");
     assert.equal(inspected.repository.status, "host-managed");
     assertDiagnostic(inspected, "portable_seed_missing");
@@ -3573,7 +3653,7 @@ test("a recognized read-only host control layout receives portable onboarding wi
         statuses: ["portable-seed-required"],
       },
     });
-    const planned = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    const planned = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(planned.status, "ready");
     assert.equal(planned.state, "fresh-host-managed");
     assert.equal(planned.git.mode, "host-managed");
@@ -3588,7 +3668,7 @@ test("a recognized read-only host control layout receives portable onboarding wi
     const cleanupNotNeededDeps = {
       planSessionCleanupRecovery: fakeDeps.planSessionCleanupRecovery,
     };
-    const postSeed = inspectProjectOnboardingV3({
+    const postSeed = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: path,
       deps: cleanupNotNeededDeps,
     });
@@ -3603,7 +3683,7 @@ test("a recognized read-only host control layout receives portable onboarding wi
     );
     assert.equal(kickoff.repositoryCapability, "host-managed");
     let appServerCalls = 0;
-    const postKickoff = inspectProjectOnboardingV3({
+    const postKickoff = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: path,
       intent: "bootstrap",
       deps: {
@@ -3635,7 +3715,7 @@ test("a recognized read-only host control layout receives portable onboarding wi
     assert.deepEqual(names(join(path, ".git")), []);
     chmodSync(join(path, ".git"), 0o700);
     appServerCalls = 0;
-    const afterHostGit = inspectProjectOnboardingV3({
+    const afterHostGit = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: path,
       intent: "session",
       deps: {
@@ -3664,9 +3744,9 @@ test("an existing unmanaged project receives an additive adoption plan", () => {
   const path = root();
   try {
     writeFileSync(join(path, "README.md"), "existing project\n");
-    const inspected = inspectProjectOnboardingV3({ rootDir: path });
+    const inspected = inspectProjectOnboardingV3({ runner: "codex", rootDir: path });
     assert.equal(inspected.status, "adoption-required");
-    const plan = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(plan.status, "ready");
     assert.equal(plan.state, "existing-unmanaged");
     assert.equal(plan.git.initializesGit, true);
@@ -3684,7 +3764,7 @@ test("adoption preserves directory and linked-worktree Git metadata and blocks u
     writeFileSync(join(adopted, "README.md"), "existing project\n");
     mkdirSync(join(adopted, ".git", "objects"), { recursive: true });
     writeFileSync(join(adopted, ".git", "HEAD"), "ref: refs/heads/main\n");
-    const plan = planProjectOnboardingV3({ rootDir: adopted, deps: fakeDeps });
+    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: adopted, deps: fakeDeps });
     assert.equal(plan.status, "ready");
     assert.equal(plan.git.initializesGit, false);
     const applied = applyProjectOnboardingV3(plan, { rootDir: adopted, activate: true, deps: fakeDeps });
@@ -3693,8 +3773,8 @@ test("adoption preserves directory and linked-worktree Git metadata and blocks u
 
     writeFileSync(join(linked, "README.md"), "linked worktree project\n");
     writeFileSync(join(linked, ".git"), "gitdir: /outside/managed-worktree\n");
-    const linkedPlan = planProjectOnboardingV3({ rootDir: linked, deps: fakeDeps });
-    assert.equal(inspectProjectOnboardingV3({ rootDir: linked, deps: fakeDeps }).status, "adoption-required");
+    const linkedPlan = planProjectOnboardingV3({ runner: "codex", rootDir: linked, deps: fakeDeps });
+    assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: linked, deps: fakeDeps }).status, "adoption-required");
     assert.equal(linkedPlan.status, "ready");
     assert.equal(linkedPlan.git.initializesGit, false);
     const linkedApplied = applyProjectOnboardingV3(linkedPlan, { rootDir: linked, activate: true, deps: fakeDeps });
@@ -3703,7 +3783,7 @@ test("adoption preserves directory and linked-worktree Git metadata and blocks u
 
     writeFileSync(join(reserved, "README.md"), "existing project\n");
     mkdirSync(join(reserved, ".codex"));
-    assert.equal(inspectProjectOnboardingV3({ rootDir: reserved }).status, "partial");
+    assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: reserved }).status, "partial");
   } finally { dispose(adopted); dispose(linked); dispose(reserved); }
 });
 
@@ -3711,8 +3791,8 @@ test("legacy V0 is migration-required and never receives a fresh fallback", () =
   const path = root();
   try {
     writeFileSync(join(path, "pipeline.user.yaml"), yaml(v0Source()));
-    assert.equal(inspectProjectOnboardingV3({ rootDir: path }).status, "migration-required");
-    assert.equal(planProjectOnboardingV3({ rootDir: path, deps: fakeDeps }).status, "migration-required");
+    assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: path }).status, "migration-required");
+    assert.equal(planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps }).status, "migration-required");
     assert.deepEqual(names(path), ["pipeline.user.yaml"]);
   } finally { dispose(path); }
 });
@@ -3728,7 +3808,7 @@ test("post-git failure rolls every generated preimage back", () => {
     },
   };
   try {
-    const plan = planProjectOnboardingV3({ rootDir: path, deps: failing });
+    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: failing });
     const applied = applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: failing });
     assert.equal(applied.status, "rolled-back");
     assert.deepEqual(names(path), []);
@@ -3753,7 +3833,7 @@ test("portable rollback preserves a target whose identity changed after exclusiv
     },
   };
   try {
-    const plan = planProjectOnboardingV3({ rootDir: path, deps: racing });
+    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: racing });
     const applied = applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: racing });
     assert.equal(applied.status, "rollback-failed");
     assert.equal(readFileSync(firstTarget, "utf8"), "foreign bytes\n");
@@ -3774,7 +3854,7 @@ test("portable rollback preserves foreign content added beneath its Git director
     },
   };
   try {
-    const plan = planProjectOnboardingV3({ rootDir: path, deps: racing });
+    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: racing });
     const applied = applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: racing });
     assert.equal(applied.status, "rollback-failed");
     assert.equal(readFileSync(join(path, ".git", "foreign"), "utf8"), "foreign git bytes\n");
@@ -3784,9 +3864,9 @@ test("portable rollback preserves foreign content added beneath its Git director
 test("a fresh portable seed remains non-ready until its missing Codex runtime is initialized", () => {
   const path = root();
   try {
-    const plan = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
-    const inspected = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    const inspected = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(inspected.schema, "pipeline.project-onboarding.v4");
     assert.equal(inspected.status, "runtime-initialization-required");
     assert.equal(inspected.runtime.status, "missing");
@@ -3796,7 +3876,7 @@ test("a fresh portable seed remains non-ready until its missing Codex runtime is
 test("Codex bootstrap accepts a dual-runner source whose default runner is Claude", () => {
   const path = root();
   try {
-    const plan = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(applyProjectOnboardingV3(plan, {
       rootDir: path,
       activate: true,
@@ -3806,7 +3886,7 @@ test("Codex bootstrap accepts a dual-runner source whose default runner is Claud
     const source = readFileSync(sourcePath, "utf8")
       .replace('  default: "codex"\n', '  default: "claude"\n');
     writeFileSync(sourcePath, source);
-    const inspected = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    const inspected = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(inspected.status, "runtime-initialization-required");
     assert.equal(inspected.runtime.status, "missing");
     assert.equal(inspected.runner, "codex");
@@ -3816,10 +3896,10 @@ test("Codex bootstrap accepts a dual-runner source whose default runner is Claud
 test("an invalid generated manifest is never accepted as a current fresh authority", () => {
   const path = root();
   try {
-    const plan = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
     writeFileSync(join(path, "project", "pipeline.yaml"), "not: a canonical pipeline manifest\n");
-    const inspected = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    const inspected = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(inspected.schema, "pipeline.project-onboarding.v4");
     assert.equal(inspected.status, "partial");
     assertDiagnostic(inspected, "manifest_invalid");
@@ -3843,7 +3923,7 @@ test("manifest-only repair is source/preimage/plan bound, confirmed, and read ba
     initializeRuntimeProjectionRoot(path);
     const manifestPath = join(path, ".claude", "pipeline.yaml");
     unlinkSync(manifestPath);
-    const invalid = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    const invalid = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(invalid.status, "runtime-initialization-required");
 
     const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
@@ -3863,7 +3943,7 @@ test("manifest-only repair is source/preimage/plan bound, confirmed, and read ba
       "--activate",
     ]);
 
-    const wrong = applyProjectOnboardingManifestRepairV4({
+    const wrong = applyProjectOnboardingManifestRepairV4({ runner: "codex",
       rootDir: path,
       planSha256: "0".repeat(64),
       activate: true,
@@ -3873,7 +3953,7 @@ test("manifest-only repair is source/preimage/plan bound, confirmed, and read ba
     assert.equal(existsSync(manifestPath), false);
 
     writeFileSync(manifestPath, "foreign: manifest bytes\n");
-    const drifted = applyProjectOnboardingManifestRepairV4({
+    const drifted = applyProjectOnboardingManifestRepairV4({ runner: "codex",
       rootDir: path,
       planSha256: plan.planSha256,
       activate: true,
@@ -3883,7 +3963,7 @@ test("manifest-only repair is source/preimage/plan bound, confirmed, and read ba
     assert.equal(readFileSync(manifestPath, "utf8"), "foreign: manifest bytes\n");
     unlinkSync(manifestPath);
 
-    const repaired = applyProjectOnboardingManifestRepairV4({
+    const repaired = applyProjectOnboardingManifestRepairV4({ runner: "codex",
       rootDir: path,
       planSha256: plan.planSha256,
       activate: true,
@@ -3900,7 +3980,7 @@ test("manifest repair never claims ready when post-publication durability is una
     initializeRuntimeProjectionRoot(path);
     unlinkSync(join(path, ".claude", "pipeline.yaml"));
     const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
-    const result = applyProjectOnboardingManifestRepairV4({
+    const result = applyProjectOnboardingManifestRepairV4({ runner: "codex",
       rootDir: path,
       planSha256: plan.planSha256,
       activate: true,
@@ -3943,7 +4023,7 @@ test("manifest repair rejects source drift before publication and leaves the man
     unlinkSync(manifestPath);
     const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
     let injected = false;
-    const result = applyProjectOnboardingManifestRepairV4({
+    const result = applyProjectOnboardingManifestRepairV4({ runner: "codex",
       rootDir: path,
       planSha256: plan.planSha256,
       activate: true,
@@ -3975,7 +4055,7 @@ test("manifest repair stays inside its pinned parent when the pathname becomes a
     unlinkSync(join(parent, "pipeline.yaml"));
     const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
     let injected = false;
-    const result = applyProjectOnboardingManifestRepairV4({
+    const result = applyProjectOnboardingManifestRepairV4({ runner: "codex",
       rootDir: path,
       planSha256: plan.planSha256,
       activate: true,
@@ -4009,7 +4089,7 @@ test("manifest repair quarantines a publication-boundary source race", () => {
     unlinkSync(manifestPath);
     const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
     let injected = false;
-    const result = applyProjectOnboardingManifestRepairV4({
+    const result = applyProjectOnboardingManifestRepairV4({ runner: "codex",
       rootDir: path,
       planSha256: plan.planSha256,
       activate: true,
@@ -4040,7 +4120,7 @@ test("manifest repair retains its publication binding through final durability r
     unlinkSync(manifestPath);
     const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
     let syncs = 0;
-    const result = applyProjectOnboardingManifestRepairV4({
+    const result = applyProjectOnboardingManifestRepairV4({ runner: "codex",
       rootDir: path,
       planSha256: plan.planSha256,
       activate: true,
@@ -4069,7 +4149,7 @@ test("manifest repair atomically preserves a target that appears at publication"
     unlinkSync(manifestPath);
     const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
     let injected = false;
-    const result = applyProjectOnboardingManifestRepairV4({
+    const result = applyProjectOnboardingManifestRepairV4({ runner: "codex",
       rootDir: path,
       planSha256: plan.planSha256,
       activate: true,
@@ -4098,7 +4178,7 @@ test("manifest repair never quarantines a foreign post-publication target", () =
     unlinkSync(manifestPath);
     const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
     let injected = false;
-    const result = applyProjectOnboardingManifestRepairV4({
+    const result = applyProjectOnboardingManifestRepairV4({ runner: "codex",
       rootDir: path,
       planSha256: plan.planSha256,
       activate: true,
@@ -4129,7 +4209,7 @@ test("source recovery planner distinguishes invalid authority and unsupported ru
   const invalid = root(); const unsupported = root();
   try {
     writeFileSync(join(invalid, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
-    const observedInvalid = inspectProjectOnboardingV3({ rootDir: invalid, deps: fakeDeps });
+    const observedInvalid = inspectProjectOnboardingV3({ runner: "codex", rootDir: invalid, deps: fakeDeps });
     assert.equal(observedInvalid.status, "invalid");
     assert.deepEqual(observedInvalid.nextAction.argv, [
       ONBOARDING_SCRIPT,
@@ -4144,11 +4224,11 @@ test("source recovery planner distinguishes invalid authority and unsupported ru
     assert.equal(invalidPlan.category, "invalid-authority");
     assertDiagnostic(invalidPlan, "source_authority_unrepairable");
 
-    const seed = planProjectOnboardingV3({ rootDir: unsupported, deps: fakeDeps });
+    const seed = planProjectOnboardingV3({ runner: "codex", rootDir: unsupported, deps: fakeDeps });
     assert.equal(applyProjectOnboardingV3(seed, { rootDir: unsupported, activate: true, deps: fakeDeps }).status, "applied");
     const sourcePath = join(unsupported, "pipeline.user.yaml");
     writeFileSync(sourcePath, readFileSync(sourcePath, "utf8").replace(/default: "?codex"?/u, "default: \"claude\""));
-    const observedUnsupported = inspectProjectOnboardingV3({ rootDir: unsupported, deps: fakeDeps });
+    const observedUnsupported = inspectProjectOnboardingV3({ runner: "codex", rootDir: unsupported, deps: fakeDeps });
     assert.equal(observedUnsupported.status, "runtime-initialization-required");
     const unsupportedPlan = planProjectOnboardingSourceRecoveryV4({ rootDir: unsupported, deps: fakeDeps });
     assert.equal(unsupportedPlan.status, "unrepairable");
@@ -4160,14 +4240,14 @@ test("source recovery planner distinguishes invalid authority and unsupported ru
 test("owned runtime drift and invalid V3 sources stay in closed lifecycle classifications", () => {
   const drifted = root(); const invalid = root();
   try {
-    const seed = planProjectOnboardingV3({ rootDir: drifted, deps: fakeDeps });
+    const seed = planProjectOnboardingV3({ runner: "codex", rootDir: drifted, deps: fakeDeps });
     assert.equal(applyProjectOnboardingV3(seed, { rootDir: drifted, activate: true, deps: fakeDeps }).status, "applied");
-    const runtime = planProjectOnboardingLifecycleV4({ rootDir: drifted, deps: fakeDeps, operation: "runtime" });
+    const runtime = planProjectOnboardingLifecycleV4({ runner: "codex", rootDir: drifted, deps: fakeDeps, operation: "runtime" });
     const runtimeDigest = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
-    assert.equal(applyProjectOnboardingLifecycleV4({ rootDir: drifted, deps: fakeDeps, operation: "runtime", planSha256: runtimeDigest, activate: true }).status, "restart-required");
+    assert.equal(applyProjectOnboardingLifecycleV4({ runner: "codex", rootDir: drifted, deps: fakeDeps, operation: "runtime", planSha256: runtimeDigest, activate: true }).status, "restart-required");
     const implementor = join(drifted, ".codex", "agents", "implementor.toml");
     writeFileSync(implementor, readFileSync(implementor, "utf8").replace(/^model = ".*"$/mu, "model = \"drifted\""));
-    const observedDrift = inspectProjectOnboardingV3({ rootDir: drifted, deps: fakeDeps });
+    const observedDrift = inspectProjectOnboardingV3({ runner: "codex", rootDir: drifted, deps: fakeDeps });
     assert.equal(observedDrift.status, "projection-drift");
     assert.equal(observedDrift.runtime.status, "projection-drift");
     assertDiagnostic(observedDrift, "projection_drift");
@@ -4184,7 +4264,7 @@ test("owned runtime drift and invalid V3 sources stay in closed lifecycle classi
     });
 
     writeFileSync(join(invalid, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
-    const observedInvalid = inspectProjectOnboardingV3({ rootDir: invalid, deps: fakeDeps });
+    const observedInvalid = inspectProjectOnboardingV3({ runner: "codex", rootDir: invalid, deps: fakeDeps });
     assert.equal(observedInvalid.status, "invalid");
     assert.equal(observedInvalid.runner, null);
     assert.equal(observedInvalid.diagnostics[0].code, "source_invalid");
@@ -4196,7 +4276,7 @@ test("H3 recovery planners are typed, read-only, and closed on invalid source ev
   const path = root();
   try {
     const before = readdirSync(path);
-    const source = planProjectOnboardingSourceRecovery({ rootDir: path, deps: fakeDeps });
+    const source = planProjectOnboardingSourceRecovery({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(source.schema, "pipeline.project-onboarding-source-recovery.v1");
     assert.equal(source.status, "unrepairable");
     assert.equal(source.category, "invalid-authority");
@@ -4214,7 +4294,7 @@ test("H3 manifest repair uses a real V3 authority fixture and returns ready read
     const barrier = initializeRestartRequiredRoot(path, fakeDeps);
     clearRuntimeBarrier(path, barrier);
     completeKickoff(path, "H3 manifest repair ready readback", fakeDeps);
-    const ready = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, intent: "bootstrap" });
+    const ready = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps, intent: "bootstrap" });
     assert.equal(ready.status, "ready");
     unlinkSync(join(path, ".claude", "pipeline.yaml"));
     const before = names(path);
@@ -4223,10 +4303,10 @@ test("H3 manifest repair uses a real V3 authority fixture and returns ready read
     assert.deepEqual(names(path), before);
     const repeat = planProjectOnboardingManifestRepair({ rootDir: path, deps: fakeDeps });
     assert.equal(repeat.planSha256, plan.planSha256);
-    const applied = applyProjectOnboardingManifestRepair({ rootDir: path, planSha256: plan.planSha256, activate: true, deps: fakeDeps });
+    const applied = applyProjectOnboardingManifestRepair({ runner: "codex", rootDir: path, planSha256: plan.planSha256, activate: true, deps: fakeDeps });
     assert.equal(applied.status, "ready", JSON.stringify(applied));
     assert.equal(applied.readback.status, "ready");
-    assert.equal(inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, intent: "bootstrap" }).status, "ready");
+    assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps, intent: "bootstrap" }).status, "ready");
   } finally { dispose(path); }
 });
 
@@ -4244,8 +4324,8 @@ test("H3 manifest repair rejects wrong digest and missing activation without wri
   try {
     const plan = planProjectOnboardingManifestRepair({ rootDir: path, deps: fakeDeps });
     const before = names(path);
-    assert.equal(applyProjectOnboardingManifestRepair({ rootDir: path, planSha256: "0".repeat(64), activate: true, deps: fakeDeps }).status, "invalid-plan");
-    assert.equal(applyProjectOnboardingManifestRepair({ rootDir: path, planSha256: plan.planSha256, activate: false, deps: fakeDeps }).status, "activation-required");
+    assert.equal(applyProjectOnboardingManifestRepair({ runner: "codex", rootDir: path, planSha256: "0".repeat(64), activate: true, deps: fakeDeps }).status, "invalid-plan");
+    assert.equal(applyProjectOnboardingManifestRepair({ runner: "codex", rootDir: path, planSha256: plan.planSha256, activate: false, deps: fakeDeps }).status, "activation-required");
     assert.deepEqual(names(path), before);
   } finally { dispose(path); }
 });
@@ -4255,7 +4335,7 @@ test("H3 manifest repair preserves absent target after source drift and target a
   try {
     const plan = planProjectOnboardingManifestRepair({ rootDir: drift, deps: fakeDeps });
     writeFileSync(join(drift, "pipeline.user.yaml"), `${readFileSync(join(drift, "pipeline.user.yaml"), "utf8")}\n# drift\n`);
-    const result = applyProjectOnboardingManifestRepair({ rootDir: drift, planSha256: plan.planSha256, activate: true, deps: fakeDeps });
+    const result = applyProjectOnboardingManifestRepair({ runner: "codex", rootDir: drift, planSha256: plan.planSha256, activate: true, deps: fakeDeps });
     assert.equal(result.status, "invalid-plan");
     assert.equal(existsSync(join(drift, ".claude", "pipeline.yaml")), false);
   } finally { dispose(drift); }
@@ -4267,7 +4347,7 @@ test("H3 manifest repair preserves absent target after source drift and target a
       if (kind === "file") writeFileSync(target, "foreign\n");
       else if (kind === "symlink") symlinkSync(join(path, "pipeline.user.yaml"), target);
       else linkSync(join(path, "pipeline.user.yaml"), target);
-      const result = applyProjectOnboardingManifestRepair({ rootDir: path, planSha256: plan.planSha256, activate: true, deps: fakeDeps });
+      const result = applyProjectOnboardingManifestRepair({ runner: "codex", rootDir: path, planSha256: plan.planSha256, activate: true, deps: fakeDeps });
       assert.equal(result.status, "invalid-plan");
       assert.equal(lstatSync(target).isSymbolicLink(), kind === "symlink");
     } finally { dispose(path); }
@@ -4280,7 +4360,7 @@ test("H3 manifest repair rolls back only owned output on fsync and publication r
     const plan = planProjectOnboardingManifestRepair({ rootDir: fsyncRoot, deps: fakeDeps });
     assert.equal(plan.status, "ready", JSON.stringify(plan));
     const failing = { ...fakeDeps, fsyncSync() { throw new Error("injected fsync failure"); } };
-    const result = applyProjectOnboardingManifestRepair({ rootDir: fsyncRoot, planSha256: plan.planSha256, activate: true, deps: failing });
+    const result = applyProjectOnboardingManifestRepair({ runner: "codex", rootDir: fsyncRoot, planSha256: plan.planSha256, activate: true, deps: failing });
     assert.equal(result.status, "rolled-back", JSON.stringify({
       result,
       planned: plan,
@@ -4307,7 +4387,7 @@ test("H3 manifest repair rolls back only owned output on fsync and publication r
         return info;
       },
     };
-    const result = applyProjectOnboardingManifestRepair({ rootDir: raceRoot, planSha256: plan.planSha256, activate: true, deps: race });
+    const result = applyProjectOnboardingManifestRepair({ runner: "codex", rootDir: raceRoot, planSha256: plan.planSha256, activate: true, deps: race });
     assert.equal(result.status, "rolled-back", JSON.stringify({
       result,
       planned: plan,
@@ -4323,7 +4403,7 @@ test("H3 manifest repair fails closed on V4 readback failure and physical-root s
     const plan = planProjectOnboardingManifestRepair({ rootDir: path, deps: fakeDeps });
     assert.equal(plan.status, "ready", JSON.stringify(plan));
     const failingReadback = { ...fakeDeps, inspectProjectOnboardingV3() { return { status: "partial", diagnostics: [] }; } };
-    const result = applyProjectOnboardingManifestRepair({ rootDir: path, planSha256: plan.planSha256, activate: true, deps: failingReadback });
+    const result = applyProjectOnboardingManifestRepair({ runner: "codex", rootDir: path, planSha256: plan.planSha256, activate: true, deps: failingReadback });
     assert.equal(result.status, "rolled-back", JSON.stringify({
       result,
       planned: plan,
@@ -4341,16 +4421,16 @@ test("H3 manifest repair fails closed on V4 readback failure and physical-root s
 
 test("H3 source recovery exposes authentic invalid, unsupported, and current categories", () => {
   const invalid = root();
-  try { assert.equal(planProjectOnboardingSourceRecovery({ rootDir: invalid, deps: fakeDeps }).category, "invalid-authority"); } finally { dispose(invalid); }
+  try { assert.equal(planProjectOnboardingSourceRecovery({ runner: "codex", rootDir: invalid, deps: fakeDeps }).category, "invalid-authority"); } finally { dispose(invalid); }
   const unsupported = root();
   try {
     writeFileSync(join(unsupported, "pipeline.user.yaml"), yaml(v0Source()));
-    assert.equal(planProjectOnboardingSourceRecovery({ rootDir: unsupported, deps: fakeDeps }).category, "unsupported-source-transition");
+    assert.equal(planProjectOnboardingSourceRecovery({ runner: "codex", rootDir: unsupported, deps: fakeDeps }).category, "unsupported-source-transition");
   } finally { dispose(unsupported); }
   const current = root();
   try {
     const barrier = initializeRestartRequiredRoot(current, fakeDeps); clearRuntimeBarrier(current, barrier); completeKickoff(current, "H3 current authority", fakeDeps);
-    assert.equal(planProjectOnboardingSourceRecovery({ rootDir: current, deps: fakeDeps }).category, "current-authority");
+    assert.equal(planProjectOnboardingSourceRecovery({ runner: "codex", rootDir: current, deps: fakeDeps }).category, "current-authority");
   } finally { dispose(current); }
 });
 
@@ -4361,9 +4441,9 @@ test("H3 source recovery distinguishes stale generated projection from unavailab
     clearRuntimeBarrier(stale, barrier);
     completeKickoff(stale, "H3 stale projection authority", fakeDeps);
     unlinkSync(join(stale, ".claude", "pipeline.yaml"));
-    const inspected = inspectProjectOnboardingV3({ rootDir: stale, deps: fakeDeps });
+    const inspected = inspectProjectOnboardingV3({ runner: "codex", rootDir: stale, deps: fakeDeps });
     assert.notEqual(inspected.status, "ready", JSON.stringify(inspected));
-    const plan = planProjectOnboardingSourceRecovery({ rootDir: stale, deps: fakeDeps });
+    const plan = planProjectOnboardingSourceRecovery({ runner: "codex", rootDir: stale, deps: fakeDeps });
     assert.equal(plan.category, "stale-generated-projection");
     assert.equal(plan.status, "ready");
     assert.equal(plan.nextAction?.mutation, false);
@@ -4383,9 +4463,9 @@ test("H3 source recovery distinguishes stale generated projection from unavailab
         historySha256: null,
       }),
     };
-    const inspected = inspectProjectOnboardingV3({ rootDir: unavailable, deps: unavailableDeps });
+    const inspected = inspectProjectOnboardingV3({ runner: "codex", rootDir: unavailable, deps: unavailableDeps });
     assert.equal(inspected.status, "continuity-damaged", JSON.stringify(inspected));
-    const plan = planProjectOnboardingSourceRecovery({ rootDir: unavailable, deps: unavailableDeps });
+    const plan = planProjectOnboardingSourceRecovery({ runner: "codex", rootDir: unavailable, deps: unavailableDeps });
     assert.equal(plan.category, "unavailable-evidence");
     assert.equal(plan.status, "unrepairable");
     assert.equal(plan.nextAction, null);
@@ -4455,7 +4535,7 @@ test("remote branch adoption plans read-only, preserves .codex, and advances onl
     assert.equal(plan.applyAction.mutation, true);
     assert.equal(plan.applyAction.requiresConfirmation, true);
     assert.equal(plan.applyAction.requiresHostBoundary, true);
-    const applied = applyProjectRemoteAdoptionV4({
+    const applied = applyProjectRemoteAdoptionV4({ runner: "codex",
       rootDir: target, remote: "https://example.test/governed.git", ref: "refs/heads/remote-adoption",
       planSha256: plan.planSha256, activate: true, deps: remoteDeps,
     });
@@ -4486,7 +4566,7 @@ test("remote adoption rejects a remote .agents and preserves the target control 
     const plan = planProjectRemoteAdoptionV4({
       rootDir: target, remote: "https://example.test/governed.git", ref: "refs/heads/remote-adoption", deps: remoteDeps,
     });
-    const applied = applyProjectRemoteAdoptionV4({
+    const applied = applyProjectRemoteAdoptionV4({ runner: "codex",
       rootDir: target, remote: "https://example.test/governed.git", ref: "refs/heads/remote-adoption",
       planSha256: plan.planSha256, activate: true, deps: remoteDeps,
     });
@@ -4508,7 +4588,7 @@ test("remote adoption rejects a remote .codex and rolls back only its owned Git 
     const plan = planProjectRemoteAdoptionV4({
       rootDir: target, remote: "https://example.test/governed.git", ref: "refs/heads/remote-adoption", deps: remoteDeps,
     });
-    const applied = applyProjectRemoteAdoptionV4({
+    const applied = applyProjectRemoteAdoptionV4({ runner: "codex",
       rootDir: target, remote: "https://example.test/governed.git", ref: "refs/heads/remote-adoption",
       planSha256: plan.planSha256, activate: true, deps: remoteDeps,
     });
@@ -4527,7 +4607,7 @@ test("remote adoption rolls back the checked-out branch when its owned upstream 
     const plan = planProjectRemoteAdoptionV4({
       rootDir: target, remote: "https://example.test/governed.git", ref: "refs/heads/remote-adoption", deps: remoteDeps,
     });
-    const applied = applyProjectRemoteAdoptionV4({
+    const applied = applyProjectRemoteAdoptionV4({ runner: "codex",
       rootDir: target, remote: "https://example.test/governed.git", ref: "refs/heads/remote-adoption",
       planSha256: plan.planSha256, activate: true, deps: remoteDeps,
     });
@@ -4561,9 +4641,9 @@ test("partial authority planner requires an explicit V3 selection and hashes pre
     writeFileSync(join(path, ".claude", "pipeline.json"), '{"project":"legacy"}\n');
     mkdirSync(join(path, ".agents"));
     writeFileSync(join(path, ".agents", "AGENTS.md"), "user-owned\n");
-    const missing = planProjectPartialAuthorityAdoption({ rootDir: path, deps: fakeDeps });
+    const missing = planProjectPartialAuthorityAdoption({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(missing.status, "selection-required");
-    const planned = planProjectPartialAuthorityAdoption({ rootDir: path, profile: "epic", source: "canonical-fresh-v3", deps: fakeDeps });
+    const planned = planProjectPartialAuthorityAdoption({ runner: "codex", rootDir: path, profile: "epic", source: "canonical-fresh-v3", deps: fakeDeps });
     assert.equal(planned.status, "ready");
     assert.match(planned.planSha256, /^[a-f0-9]{64}$/u);
     assert.deepEqual(planned.artifacts.map((entry) => entry.path), [".agents", ".claude"]);
@@ -4580,8 +4660,8 @@ test("partial authority apply creates only absent owned targets and preserves us
     writeFileSync(join(path, ".agents", "AGENTS.md"), "user-owned\n");
     mkdirSync(join(path, ".codex"));
     writeFileSync(join(path, ".codex", "hooks.json"), "user-owned\n");
-    const plan = planProjectPartialAuthorityAdoption({ rootDir: path, profile: "feature", source: "canonical-fresh-v3", deps: fakeDeps });
-    const applied = applyProjectPartialAuthorityAdoption({ rootDir: path, profile: "feature", source: "canonical-fresh-v3", planSha256: plan.planSha256, activate: true, deps: fakeDeps });
+    const plan = planProjectPartialAuthorityAdoption({ runner: "codex", rootDir: path, profile: "feature", source: "canonical-fresh-v3", deps: fakeDeps });
+    const applied = applyProjectPartialAuthorityAdoption({ runner: "codex", rootDir: path, profile: "feature", source: "canonical-fresh-v3", planSha256: plan.planSha256, activate: true, deps: fakeDeps });
     assert.equal(applied.status, "applied", JSON.stringify(applied));
     assert.equal(existsSync(join(path, "pipeline.user.yaml")), true);
     assert.equal(existsSync(join(path, ".claude", "pipeline.yaml")), true);
@@ -4597,11 +4677,11 @@ test("reinstall quarantines only current V3 authority and leaves legacy calibrat
   try {
     assert.equal(spawnSync("git", ["init", "--initial-branch=main"], { cwd: path }).status, 0);
     const realDeps = { ...fakeDeps, spawnSync };
-    const portable = planProjectOnboardingV3({ rootDir: path, deps: realDeps });
+    const portable = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: realDeps });
     assert.equal(applyProjectOnboardingV3(portable, { rootDir: path, activate: true, deps: realDeps }).status, "applied");
-    const runtime = planProjectOnboardingLifecycleV4({ rootDir: path, deps: realDeps, operation: "runtime" });
+    const runtime = planProjectOnboardingLifecycleV4({ runner: "codex", rootDir: path, deps: realDeps, operation: "runtime" });
     const runtimeDigest = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
-    assert.equal(applyProjectOnboardingLifecycleV4({ rootDir: path, deps: realDeps, operation: "runtime", planSha256: runtimeDigest, activate: true }).status, "restart-required");
+    assert.equal(applyProjectOnboardingLifecycleV4({ runner: "codex", rootDir: path, deps: realDeps, operation: "runtime", planSha256: runtimeDigest, activate: true }).status, "restart-required");
     const legacy = readFileSync(join(path, ".claude", "pipeline.json"), "utf8");
     const plan = planProjectOnboardingReinstall({ rootDir: path, deps: realDeps });
     assert.equal(plan.status, "ready", JSON.stringify(plan));
@@ -4679,7 +4759,7 @@ test("a freshly seeded project is honest about its authority tier, its verify co
   const path = root();
   const legacyPath = root();
   try {
-    const seed = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    const seed = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(applyProjectOnboardingV3(seed, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
 
     // (a) The seed lands in the neutral authority tier and NOT in the legacy

@@ -180,9 +180,16 @@ function applyAction(root, planSha256) {
 
 export function planHostRepositoryInit({ rootDir = process.cwd(), deps = {} } = {}) {
   const root = safeRoot(rootDir, deps);
+  // "codex" here is a fact about this path, not a default being preserved:
+  // this whole file binds Codex's own sandbox-observed virtual .git/.codex
+  // control mounts to one host-only Git initialization, so it is Codex-only
+  // by construction and never reachable for any other runner
+  // (project-onboarding-v3.mjs no longer assumes an absent runner is
+  // "codex"; backlog: absent-runner-flag-silently-defaults-to-codex).
   const lifecycle = (deps.inspectProjectOnboardingV3 ?? inspectProjectOnboardingV3)({
     rootDir: root,
     intent: "bootstrap",
+    runner: "codex",
     deps,
   });
   const accepted = lifecycle.status === "host-repository-init-required"
