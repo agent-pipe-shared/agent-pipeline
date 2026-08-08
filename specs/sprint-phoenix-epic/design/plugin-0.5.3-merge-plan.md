@@ -315,7 +315,24 @@ So P5 is not the question it looks like. "Add it to the kernel list" does not
 harden GS-8 in a source checkout; it changes behaviour only for the self-hosted
 case, and only via GS-6. Whoever answers P5 should be answering *which layout are
 we defending*, not *is this file important*. That reframing is the useful output
-here and it is recorded, not decided.
+here.
+
+**Decided (PO, 2026-08-08): do not add it; record why.** Confirmed against the
+merged code, not taken on trust from this document: in
+`plugins/pipeline-core/hooks/guard-gate-strength.mjs`, `isNeverLiftableKernelPath`
+(imported at `:63`) is called exactly once, at `:229`, inside the
+`if (matched === LIVE_PLUGIN_RULE)` block opened at `:227` — the GS-6/GMW branch.
+A path-table rule such as GS-8 is matched earlier, by `gateStrengthRuleFor` at
+`:211`, which sets `matched` to that rule's own object, never to `LIVE_PLUGIN_RULE`
+(`:205`); the two branches are mutually exclusive (`matched !== LIVE_PLUGIN_RULE`
+at `:249`). GS-8 therefore never reaches the kernel-path check at all, in any
+layout. An entry in `NEVER_LIFTABLE_KERNEL_PATHS` for
+`public-core-origin-allowlist.mjs` would be inert for GS-8 for that reason, and
+an inert entry in a kernel list is worse than no entry, because the next reader
+takes it for protection that exists. The question P5 was standing in for —
+*which layout is being defended* — is real but is a separate, named requirement
+if the self-hosted layout is ever to be defended; it is not this one, and is not
+decided here.
 
 ## 9. Honest limits of this plan
 
