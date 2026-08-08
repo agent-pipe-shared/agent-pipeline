@@ -51,6 +51,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { duplicateSuiteIds } from "./check-verify-suite-registration.mjs";
 import { resolveAuthorityArtifactPath } from "../../plugins/pipeline-core/lib/project-authority.mjs";
 import { validateScopedVerifyRegistration } from "../../plugins/pipeline-core/lib/scoped-verify-registration.mjs";
 import { validateWindowsAssuranceVerifyRegistration } from "../../plugins/pipeline-core/lib/windows-assurance-verify-registration.mjs";
@@ -84,22 +85,6 @@ function gitCommonDirectory() {
   const result = spawnSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], { encoding: "utf8", cwd: repoRoot });
   if (result.status !== 0 || result.stdout.trim() === "") throw new Error("VERIFY-GIT-COMMON-DIR-UNAVAILABLE");
   return result.stdout.trim();
-}
-// AC-P3/R1.4 (staged: specs/sprint-phoenix-epic/design/acp3-preplanning-patch.md). The
-// staged text names `duplicateSuiteIds` as a shared export of
-// check-verify-suite-registration.mjs so the CLI checker and this gate carry exactly one
-// definition. This dispatch (PHX-WINDOW) is scoped to touch ONLY
-// harness/scripts/pipeline-state.test.mjs and harness/scripts/verify.mjs, so the counting
-// logic is defined locally here instead -- a disclosed deviation from the staged text, not
-// a silent one; see the PHX-WINDOW dispatch report for the open follow-up (moving this to
-// the shared export once a dispatch is scoped to touch that file too).
-function duplicateSuiteIds(suites) {
-  const counts = new Map();
-  for (const suite of suites) counts.set(suite.name, (counts.get(suite.name) ?? 0) + 1);
-  return [...counts.entries()]
-    .filter(([, count]) => count > 1)
-    .map(([id, count]) => ({ id, count }))
-    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 const startedCandidate = candidateIdentity();
 const command = "node harness/scripts/verify.mjs";

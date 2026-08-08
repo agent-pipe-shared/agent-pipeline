@@ -315,6 +315,29 @@ export function validateExclusions(exclusions, nowDayStart, findings) {
   return { honoured, malformed, expired };
 }
 
+/**
+ * Counts each suite's `name` across an already-assembled registered-suites
+ * array (the shape `verify.mjs` builds at runtime: `[...TEST_SUITES,
+ * ...scopedTests, ...windowsAssuranceTests, ...phaseSteps]`) and returns
+ * every id registered more than once, as `{ id, count }`, sorted by id.
+ * `name` is the field verify-journal.mjs threads through unchanged as the
+ * suite `id` (`return { id: suite.name, ... }`) -- the same invariant Class 3
+ * (DUPLICATE-NAME) above checks statically over the parsed source text; this
+ * is the runtime counterpart, called by verify.mjs on the suites array it is
+ * about to hand to `runVerifyJournal` so a duplicate surfaces as a reported
+ * step instead of the throw inside `planVerifyResume()` aborting the whole
+ * journal before any suite runs (AC-P3/R1.4,
+ * specs/sprint-phoenix-epic/design/acp3-preplanning-patch.md).
+ */
+export function duplicateSuiteIds(suites) {
+  const counts = new Map();
+  for (const suite of suites) counts.set(suite.name, (counts.get(suite.name) ?? 0) + 1);
+  return [...counts.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([id, count]) => ({ id, count }))
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+
 export function checkVerifySuiteRegistration({
   verifyPath = join(DEFAULT_ROOT, VERIFY_REL),
   registeredRoots = REGISTERED_ROOTS,
