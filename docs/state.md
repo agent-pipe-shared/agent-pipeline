@@ -1023,6 +1023,60 @@ a dispatch the authority to clear a control whose purpose is to check that
 dispatch's own class of work. "Show your evidence" is not a substitute for
 separation of duties — it is what makes the absence of separation look rigorous.
 
+### CLOSING STATE: gate green at 368/368 on `29c9a0a`, window closed
+
+`node harness/scripts/verify.mjs` exit 0, 368 steps, `binding: "exact"`, clean at
+commit `29c9a0a` tree `f06b186` at both start and finish, 2026-08-08T22:37:51Z →
+22:41:11Z. Evidence written by the script, not composed. Run from the detached
+worktree, as the candidate lock requires.
+
+The signed TP-3/TP-6 maintenance window is **closed** rather than left to expire.
+Its work is done, and a lifted guard with nothing left to lift is just a widened
+window.
+
+Registered suites went 365 → 366 and exclusions 6 → 5. The step count is 368
+because two of the additions are checks rather than suites.
+
+**Do not read the green as covering the night's real findings.** The two blockers,
+the nine dropped implementations, and the unloadable freshness module are all
+compatible with 368 green steps — that is exactly what makes them worth reading
+first.
+
+### BS25 is hermetic now (`29c9a0a`), and the dispatch was right to keep going
+
+BS25 derives its fixture from the 38 pinned historical events alone: items come from
+their terminal states and reachability is stated as a predicate instead of probed
+against the live repository. The invariance is pinned by its own conjunct, so the
+coupling cannot silently return.
+
+**The dispatch found my field-2 measurements stale and did not stop.** By the time it
+started, my own backlog repair had already turned BS25 green, so the failure I
+briefed it to fix no longer reproduced. Its stop conditions said a wrong measurement
+means stop. It judged instead that a suite flipping red→green with zero
+production-code change *is* the coupling, that the goal and every DoD item remained
+executable verbatim, and it carried on — then reported the deviation plainly rather
+than quietly enjoying the easier world.
+
+**I accept that deviation and would want it repeated.** A stop condition exists to
+prevent work built on a false premise, not to stop work whose premise got better.
+The test for that distinction is whether the goal survives the correction, and here
+it did. The runner now pins the point permanently: the pre-repair suite goes red
+against a drifted backlog copy while being green at the real root — green "only
+because of today's live state" is the exact sentence the repair removes.
+
+**And it caught a fourth briefing defect of mine.** I named a sibling suite path,
+`plugins/pipeline-core/lib/backlog-ledger-reconciliation.test.mjs`, that does not
+exist. I built it from the suite *name* in `verify.mjs` instead of resolving the
+file, which is the same failure as PHX-RED5's wrong commit and PHX-0A1's unchecked
+design: asserting a repository fact from an adjacent artifact rather than from the
+repository. Four times in one night is not four slips, it is a habit, and the cheap
+fix is mechanical — resolve every path in a briefing before sending it, the same way
+I resolve every commit SHA.
+
+The dispatch substituted two real sibling suites under an explicit label rather than
+skipping the check, and it removed a QG-06 deferred decision whose promise its own
+work had made obsolete instead of leaving a stale expiry standing.
+
 ### DECISIONS WAITING FOR THE PO — read this block first (2026-08-09)
 
 Five, ordered by how much they cost to get wrong. Each is stated with what I
