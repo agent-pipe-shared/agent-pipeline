@@ -39,6 +39,7 @@
 | pipeline.evidence-bound-review-retry-economics | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.execution-model-switchback | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.first-verify-run-is-red-with-four-failures | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.gate-strength-override-route-advertised-not-offered | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.gate-strength-shell-comment-understates-its-own-scope | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger | open | requirement | pipeline | 2026-08-07 | — |
 | pipeline.governance-product-verify-suites-deregistered | open | defect | pipeline | 2026-08-07 | — |
@@ -117,6 +118,6 @@
 
 ## Counts
 
-- open: 60
+- open: 61
 - in_progress: 26
 - closed: 23

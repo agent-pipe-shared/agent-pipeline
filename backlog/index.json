@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "3a86047c69c3182b7babbc8c9047668daf41741b26726e44dd65b78a66ac1101"
+    "transitionHead": "d57813ba144471b7f35ada8504c9ce7dc5f680385c048f65b2239fa99c399fc7"
   },
   "counts": {
-    "open": 60,
+    "open": 61,
     "in_progress": 26,
     "closed": 23
   },
@@ -302,6 +302,14 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "The first end-to-end verify run this repository has completed in some time, obtained after repairing a duplicate suite registration the 0.5.3 merge introduced. 256 of 260 steps pass; four fail. All four are pre-existing and were invisible while the gate could not start."
+    },
+    {
+      "id": "pipeline.gate-strength-override-route-advertised-not-offered",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Found live on 2026-08-08 while preparing the two gate-strength edits Sprint-Phoenix's gate-integrity phase needs (the TP-11 legacy-tier row and the new TP-12 row). Both denials advertise an in-session override and neither offers one. Observed against this tree at commit c425170."
     },
     {
       "id": "pipeline.gate-strength-shell-comment-understates-its-own-scope",
