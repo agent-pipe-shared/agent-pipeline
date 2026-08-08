@@ -28,7 +28,6 @@ import {
   WSL_FRESHNESS_BOUNDARY_ID,
 } from "./ruleset-freshness.mjs";
 import { freshnessHostActionForPreflight, observePipelineStartPreflight } from "./pipeline-start-preflight.mjs";
-import { observeCodexRulesetSource } from "../lib/codex-host-plugin-list.mjs";
 import { CODEX_APP_SERVER_HEALTH_SCHEMA, observeCodexAppServer } from "./codex-app-server-health.mjs";
 
 const SHA = /^[0-9a-f]{40,64}$/iu;
@@ -217,7 +216,18 @@ function parseArgs(argv) {
   return { repoPath: resolve(argv[1]), preflightSha256: argv[3] };
 }
 
-export function main(argv = process.argv.slice(2), { observePreflight = observePipelineStartPreflight } = {}) {
+/**
+ * `observeRulesetSource` has no default producer.  The pre-merge default was
+ * `observeCodexRulesetSource`, whose retirement is a recorded product decision;
+ * its designated successor -- shaping a `pipeline.ruleset-source.v1` observation
+ * from `observeCodexPublicCoreIdentity`/`observeSelectedCodexPipelinePlugin` --
+ * is designed but not yet built.  Until a producer is injected this CLI
+ * therefore fails closed: `inspectCliRulesetFreshness` types the absent
+ * observation as `invalid-input` and `main` exits 2.  The exported host
+ * contract below is unaffected, because every exported entry takes the
+ * observation as a parameter.
+ */
+export function main(argv = process.argv.slice(2), { observePreflight = observePipelineStartPreflight, observeRulesetSource = null } = {}) {
   const parsed = parseArgs(argv);
   if (parsed === null) {
     process.stderr.write("ruleset-freshness-host: usage: ruleset-freshness-host.mjs --repo <existing-freshness-root> --preflight-sha256 <sha256>\n");
@@ -229,10 +239,15 @@ export function main(argv = process.argv.slice(2), { observePreflight = observeP
     if (selected?.preflightSha256 === parsed.preflightSha256) preflightBinding = selected;
   } catch { preflightBinding = null; }
   const loadedPluginRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-  const codexObservation = observeCodexRulesetSource({
-    loadedPluginRoot,
-    selfApplicationRoot: resolve(loadedPluginRoot, "..", ".."),
-  });
+  let codexObservation = null;
+  if (typeof observeRulesetSource === "function") {
+    try {
+      codexObservation = observeRulesetSource({
+        loadedPluginRoot,
+        selfApplicationRoot: resolve(loadedPluginRoot, "..", ".."),
+      });
+    } catch { codexObservation = null; }
+  }
   const output = inspectHostRulesetFreshness({ ...parsed, loadedPluginRoot, codexObservation, preflightBinding });
   process.stdout.write(`${JSON.stringify(output)}\n`);
   return output?.status === "equal" || output?.status === "ahead"

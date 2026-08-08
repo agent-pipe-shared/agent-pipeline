@@ -3,6 +3,7 @@
 
 /** Report loaded distribution identity and restart-handoff presence without secrets. */
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, resolve } from "node:path";
@@ -11,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import { measureBootstrapPayload } from "../lib/bootstrap-payload-budget.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { evaluateSelfApplicationAttestation } from "../lib/self-application-attestation-gate.mjs";
+import { WSL_FRESHNESS_BOUNDARY_ID } from "./ruleset-freshness.mjs";
 
 export const SCHEMA = "pipeline.start-preflight.v1";
 const PLUGIN_ID = "pipeline-core@agent-pipeline";
@@ -168,6 +170,42 @@ export function installedPipelineIdentity(
 
 export function installedPipelineVersion(pluginList = () => readInstalledPluginList("codex"), runner = "codex") {
   return installedPipelineIdentity(pluginList, runner)?.version ?? null;
+}
+
+/**
+ * Return only the selected host route after a WSL preflight. Control identity
+ * selection occurs in the authorized host helper immediately before it starts
+ * the fixed Git child; a sandbox preflight must not claim host availability.
+ *
+ * Restored from 75b8361^1.  The projection below is the pre-merge allowlist and
+ * is deliberately unchanged: `rulesetSource` is absent from the merged-base
+ * preflight and is therefore simply omitted from the digest input, and the
+ * merged-base `bootstrapPayload` is not admitted into the binding.
+ */
+export function freshnessHostActionForPreflight(preflight) {
+  if (!preflight || typeof preflight !== "object"
+    || preflight.schema !== SCHEMA
+    || preflight.status !== "ready"
+    || preflight.executionBoundary !== "host-authorized-wsl") return null;
+  // Bind the host freshness adapter to this exact preflight projection.  The
+  // digest is opaque to callers, so it does not disclose the physical plugin
+  // root or the normalized source observation carried by the preflight.
+  const bound = {
+    schema: preflight.schema,
+    status: preflight.status,
+    version: preflight.version,
+    installedVersion: preflight.installedVersion,
+    installedSource: preflight.installedSource,
+    rulesetSource: preflight.rulesetSource,
+    executionBoundary: preflight.executionBoundary,
+    pluginRoot: preflight.pluginRoot,
+    nextAction: preflight.nextAction,
+  };
+  return Object.freeze({
+    executionBoundary: "host-authorized-wsl",
+    boundaryId: WSL_FRESHNESS_BOUNDARY_ID,
+    preflightSha256: createHash("sha256").update(JSON.stringify(bound)).digest("hex"),
+  });
 }
 
 export function observePipelineStartPreflight({
