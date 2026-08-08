@@ -3,7 +3,7 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "a58e4be1576f3f0e38e08c9af25cc05b40557264603eff746ae15a4ece3461af"
+    "transitionHead": "58f5cc9da3ebd0849144f7ebdde80bd8552faf4f830702fb68e75dd4b9dd83a1"
   },
   "counts": {
     "open": 62,

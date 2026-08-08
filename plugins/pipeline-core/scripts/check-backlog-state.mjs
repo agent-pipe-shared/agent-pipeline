@@ -17,6 +17,8 @@ import { fileURLToPath } from "node:url";
 import {
   INDEX_SCHEMA,
   ITEM_SCHEMA,
+  PRE_PUBLIC_CORE_REACHABILITY_KIND,
+  PRE_PUBLIC_CORE_REACHABILITY_TARGETS,
   SENTINEL_RECOVERY_CATALOG_SCHEMA,
   TRANSITION_SCHEMA,
   TRANSITION_V2_SCHEMA,
@@ -28,6 +30,7 @@ import {
   planBacklogTransition,
   planElephantAfkLedgerRepair,
   planManagedOnboardingLedgerRepair,
+  planPrePublicCoreReachabilityRepair,
   projectBacklog,
   renderBacklogItem,
   transitionHash,
@@ -405,7 +408,7 @@ export function loadBacklogState(root = DEFAULT_ROOT, { checkCommit = true, auth
       const bytes = itemBytes.get(event.id);
       if (typeof bytes !== "string" || event.evidence.itemSha256 !== createHash("sha256").update(bytes).digest("hex")) findings.push(`ledger event ${event.sequence}: itemSha256 does not bind the current item bytes`);
     }
-    if (event?.evidence?.kind === "reachability-amendment") {
+    if (event?.evidence?.kind === "reachability-amendment" || event?.evidence?.kind === PRE_PUBLIC_CORE_REACHABILITY_KIND) {
       findings.push(...reachabilityAmendmentFindings(root, event));
     }
   }
@@ -772,6 +775,54 @@ export function applyBacklogReachabilityRepair(root = DEFAULT_ROOT, input, optio
     return { ...current, ok: false, findings: ["reachability repair commit is not reachable"], wrote: false, transitions: [] };
   }
   const planned = planBacklogReachabilityRepair(current.items, current.events, input);
+  if (!planned.ok) {
+    return { ...current, ok: false, findings: planned.errors, wrote: false, transitions: [] };
+  }
+  for (const event of planned.appended) {
+    const referenceFindings = reachabilityAmendmentFindings(root, event);
+    if (referenceFindings.length > 0) {
+      return { ...current, ok: false, findings: referenceFindings, wrote: false, transitions: [] };
+    }
+  }
+  const ledgerBefore = readFileSync(join(root, LEDGER_PATH), "utf8");
+  const targets = [
+    {
+      path: LEDGER_PATH,
+      after: `${ledgerBefore}${planned.appended.map((event) => JSON.stringify(event)).join("\n")}\n`,
+    },
+    { path: STATUS_PATH, after: planned.projection.statusText },
+    { path: INDEX_PATH, after: planned.projection.indexText },
+  ];
+  const transaction = writeBacklogTransaction(root, targets, options);
+  return transaction.ok
+    ? { ...current, ok: true, findings: [], wrote: true, transitions: planned.appended }
+    : { ...current, ok: false, findings: transaction.findings, wrote: false, transitions: [] };
+}
+
+/**
+ * Append the 38 PHX-LEDGER-REACH pre-public-core reachability amendments and
+ * regenerate projections. Sibling to applyBacklogReachabilityRepair; it never
+ * touches that function or the events-39/40 mechanism it wraps.
+ */
+export function applyPrePublicCoreReachabilityRepair(root = DEFAULT_ROOT, input, options = {}) {
+  const current = checkBacklogState(root, options);
+  const expectedFindings = Object.keys(PRE_PUBLIC_CORE_REACHABILITY_TARGETS)
+    .map(Number)
+    .sort((left, right) => left - right)
+    .map((sequence) => `ledger event ${sequence}: evidence.commit is not a reachable local Git commit`);
+  if (current.findings.join("\n") !== expectedFindings.join("\n")) {
+    return {
+      ...current,
+      ok: false,
+      findings: ["pre-public-core reachability repair requires exactly its authorized 38 currently failing events", ...current.findings],
+      wrote: false,
+      transitions: [],
+    };
+  }
+  if (options.checkCommit !== false && !localCommitExists(root, input?.commit)) {
+    return { ...current, ok: false, findings: ["pre-public-core reachability repair commit is not reachable"], wrote: false, transitions: [] };
+  }
+  const planned = planPrePublicCoreReachabilityRepair(current.items, current.events, input);
   if (!planned.ok) {
     return { ...current, ok: false, findings: planned.errors, wrote: false, transitions: [] };
   }

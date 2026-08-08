@@ -12,6 +12,7 @@ import {
   BACKLOG_TYPES,
   EVIDENCE_AMENDMENT_SCHEMA,
   ITEM_SCHEMA,
+  PRE_PUBLIC_CORE_REACHABILITY_KIND,
   PROJECT_CLOSURE_READBACK_SCHEMA,
   TRANSITION_SCHEMA,
   TRANSITION_V2_SCHEMA,
@@ -23,6 +24,7 @@ import {
   planBacklogTransition,
   planElephantAfkLedgerRepair,
   planManagedOnboardingLedgerRepair,
+  planPrePublicCoreReachabilityRepair,
   projectBacklog,
   renderBacklogItem,
   transitionHash,
@@ -1102,6 +1104,66 @@ function managedRepairInput(root, overrides = {}) {
       && !rejectedReplay.ok
       && rejectedReplay.errors.some((error) => error.includes("already appended")),
     [...planned.errors, ...rejectedReplay.errors].join("; "));
+}
+
+{
+  const root = fixtureRoot();
+  const reference = "backlog/items/example.md";
+  write(root, reference, "status: open\n");
+  git(root, ["init", "-q"]);
+  git(root, ["add", reference]);
+  git(root, ["-c", "user.email=tests@example.invalid", "-c", "user.name=Pipeline Tests", "commit", "-qm", "fixture"]);
+  const commit = git(root, ["rev-parse", "HEAD"]);
+  const blobOid = git(root, ["rev-parse", `HEAD:${reference}`]);
+  const amendment = {
+    sequence: 2,
+    id: "pipeline.example",
+    from: "open",
+    to: "open",
+    evidence: {
+      kind: PRE_PUBLIC_CORE_REACHABILITY_KIND,
+      commit,
+      reference,
+      supersedesSequence: 1,
+      supersedesEntryHash: "a".repeat(64),
+      referenceBlobOid: blobOid,
+      referenceSha256: createHash("sha256").update("wrong").digest("hex"),
+    },
+  };
+  const rejected = reachabilityAmendmentFindings(root, amendment);
+  check("BS24 a pre-public-core reachability amendment whose referenceSha256 does not bind the retained projection is refused",
+    rejected.some((finding) => finding.includes("referenceSha256")), rejected.join("; "));
+}
+
+{
+  // A dedicated planner-level test for the PHX-LEDGER-REACH sibling repair,
+  // replayed against this repository's own real canonical ledger and items
+  // (mirroring BS12's style), so the 38-entry authorized registry is
+  // exercised for real rather than against a hand-rolled fixture registry.
+  const canonical = loadBacklogState(process.cwd(), { checkCommit: false });
+  const historical = canonical.events.filter((entry) => entry?.evidence?.kind !== PRE_PUBLIC_CORE_REACHABILITY_KIND);
+  const expectedSequences = Array.from({ length: 38 }, (_, index) => index + 1);
+  function realCommitExists(oid) {
+    return spawnSync("git", ["cat-file", "-e", `${oid}^{commit}`], { cwd: process.cwd(), stdio: "ignore" }).status === 0;
+  }
+  const overriddenCommitExists = (oid) => (oid === "933e1a8d17d6c7bed040d13f8fccca2511fff9dc" ? true : realCommitExists(oid));
+  const dummyReferences = expectedSequences.map((sequence) => ({
+    sequence,
+    reference: historical[sequence - 1].evidence.reference,
+    referenceBlobOid: "a".repeat(40),
+    referenceSha256: "a".repeat(64),
+  }));
+  const input = { at: "2026-08-08", actor: "hotfix-phx-ledger-reach-repair", commit: "a".repeat(40), references: dummyReferences };
+  const reachableOverrideRejected = planPrePublicCoreReachabilityRepair(canonical.items, historical, input, { commitExists: overriddenCommitExists });
+  check("BS25 a pre-public-core reachability amendment for an event whose commit IS already reachable is refused",
+    !reachableOverrideRejected.ok
+      && reachableOverrideRejected.errors.some((error) => error.includes("exactly its authorized set of currently failing events")),
+    reachableOverrideRejected.errors.join("; "));
+
+  const duplicateRejected = planPrePublicCoreReachabilityRepair(canonical.items, canonical.events, input);
+  check("BS26 a second pre-public-core reachability repair run is refused rather than appending duplicates",
+    !duplicateRejected.ok && duplicateRejected.errors.some((error) => error.includes("already appended")),
+    duplicateRejected.errors.join("; "));
 }
 
 for (const root of roots) rmSync(root, { recursive: true, force: true });
