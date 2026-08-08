@@ -2489,6 +2489,64 @@ test("MACHPATH-1: a symlinked .agent-pipeline that redirects INSIDE the same hom
   }
 });
 
+// Closed, not pinned: unlike the directory-redirect case just above, `machine.json` ITSELF
+// already existing as a symlink is refused unconditionally, whatever it points at -- the
+// shared containment walk alone cannot catch this (it only climbs when the candidate does not
+// yet exist), so isMachinePlaneWritePath() checks the leaf explicitly before that walk runs.
+test("MACHPATH-1: machine.json planted as a symlink to another existing file inside the same home directory is refused -- closed, not pinned", () => {
+  const path = root();
+  const { home, target } = machinePlaneHomeFixture();
+  mkdirSync(dirname(target), { recursive: true });
+  const otherExistingFile = join(home, "settings.json");
+  writeFileSync(otherExistingFile, "{}\n");
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    symlinkSync(otherExistingFile, target);
+    assert.equal(isMachinePlaneWritePath(target, { homedirFn: () => home }), false);
+    let readinessCalls = 0;
+    const result = evaluateLifecycleReadyGuard(edit(target), {
+      projectDir: path,
+      homedirFn: () => home,
+      requireProjectOnboardingReadyFn() { readinessCalls += 1; return readiness; },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /only inside its own physical project root/u);
+    assert.equal(readinessCalls, 0);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("MACHPATH-1: machine.json planted as a symlink to a path outside the home directory is refused -- closed, not pinned", () => {
+  const path = root();
+  const { home, target } = machinePlaneHomeFixture();
+  mkdirSync(dirname(target), { recursive: true });
+  const outsideDir = mkdtempSync(join(SCRATCH_ROOT, "guard-lifecycle-machine-leaf-escape-"));
+  const outsideFile = join(outsideDir, "settings.json");
+  writeFileSync(outsideFile, "{}\n");
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    symlinkSync(outsideFile, target);
+    assert.equal(isMachinePlaneWritePath(target, { homedirFn: () => home }), false);
+    let readinessCalls = 0;
+    const result = evaluateLifecycleReadyGuard(edit(target), {
+      projectDir: path,
+      homedirFn: () => home,
+      requireProjectOnboardingReadyFn() { readinessCalls += 1; return readiness; },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /only inside its own physical project root/u);
+    assert.equal(readinessCalls, 0);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+    rmSync(outsideDir, { recursive: true, force: true });
+  }
+});
+
 test("MACHPATH-1: an absent, empty, relative, or unresolvable home directory fails closed rather than guessing", () => {
   const arbitraryAbsoluteTarget = join(SCRATCH_ROOT, "guard-lifecycle-machine-unrelated-notes.md");
   const cases = [
