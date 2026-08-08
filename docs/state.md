@@ -1023,6 +1023,42 @@ a dispatch the authority to clear a control whose purpose is to check that
 dispatch's own class of work. "Show your evidence" is not a substitute for
 separation of duties — it is what makes the absence of separation look rigorous.
 
+### The Critic's repairable findings are repaired (`e097b27`), all seven were real
+
+F4, F5 and F6 are closed. All seven measurements the Critic reported held up when
+checked at source — none was a false positive, which says something about the
+review and something less flattering about the sweep that produced the defects.
+
+Ten citation edits across `harness/review-protocol.md`, `roles/critic.md` and
+`plugins/pipeline-core/skills/critic-review/SKILL.md`. The repairs went the honest
+direction in the two places where a shortcut was available: the "word-identical"
+claim now names only carriers that actually hold the wording and states plainly that
+the operating model does not carry it, and the "Flow diagram" reference says no such
+diagram exists rather than pointing at the nearest plausible thing. One item was
+repaired by deletion — "transfer format 3" had no enumeration behind it anywhere in
+the canon, and `git log -S` showed the ordinal arrived unanchored in the initial
+snapshot, so there was nothing to restore and nothing to invent.
+
+**The lasting part is `harness/scripts/check-critic-contract-citations.mjs`**, a new
+permanent check that resolves each citing line as written and exits non-zero when a
+cited target stops containing its cited content. It was run RED against the
+unrepaired tree first — 11 findings across all seven classes — and green after. A
+citation defect in the Critic's binding contract can no longer rot silently, which
+is the difference between fixing seven sentences and closing a class.
+
+**What this deliberately did NOT do, and why it matters:** the dispatch was forbidden
+from touching the protected preimage record, and its own edits drive that record's
+drift further. That is correct and intended. The party repairing the files is not
+the party who gets to re-pin them; a tripwire you reset yourself measures nothing.
+The re-pin is a separate act and an independent review of `e097b27` is running now.
+
+**New PO question (6th), small but real.** Three contracts treated
+`docs/operating-model.md` as the canonical anchor for the T1 trigger wording, and it
+does not carry that wording. The repair pointed the citations at the carriers that
+do. The open question is whether the operating model *should* carry it — that is,
+whether the citations were wrong or the canon has a hole. Editing it was forbidden
+to this dispatch precisely so the choice stays yours.
+
 ### CLOSING STATE: gate green at 368/368 on `29c9a0a`, window closed
 
 `node harness/scripts/verify.mjs` exit 0, 368 steps, `binding: "exact"`, clean at
