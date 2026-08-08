@@ -28,12 +28,14 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import { parseHumanArgs, runHumanApproval } from "./po-human-approval.mjs";
 import { run as runApprovalGate } from "./po-approval-gate.mjs";
 import { PO_APPROVAL_PROOF_SCHEMA, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
 import { createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
+import { MACHINE_PLANE_SCHEMA, writeMachinePlane } from "../lib/machine-plane.mjs";
 // Namespace import ON PURPOSE (same reason as in lib/guard-maintenance-window.test.mjs):
 // a not-yet-existing named export must fail the checks that use it, not ESM linking for
 // the whole suite.
@@ -81,6 +83,39 @@ function cleanup({ repoRoot, directory }) {
 }
 
 const PO_APPROVAL_DIRECTORY_ENV = "PIPELINE_PO_APPROVAL_DIRECTORY";
+
+// SETUP-2b: this repository's own gitignored scratch/ tree, never system tmpdir and
+// never the real $HOME -- every test that reaches the new machine-plane consultation
+// (any call omitting --directory) must inject a fixture home, per the briefing's field-4
+// constraint that nothing here ever reads or writes the real ~/.agent-pipeline/.
+const SCRATCH_ROOT = fileURLToPath(new URL("../../../scratch/", import.meta.url));
+
+/** A fixture home directory with no machine plane at all, so readMachinePlane()
+ * resolves "absent" and the PODIR-1 (env-only) tests below observe exactly the
+ * behaviour they did before this task. */
+function noMachinePlaneHomeFixture() {
+  mkdirSync(SCRATCH_ROOT, { recursive: true });
+  return mkdtempSync(join(SCRATCH_ROOT, "po-human-approval-no-plane-home-"));
+}
+
+/** A fixture home directory carrying a valid machine plane with the given
+ * poKeyDirectory, written through the library's own writer (never hand-assembled
+ * JSON) so the fixture matches the real on-disk contract. */
+function machinePlaneHomeFixture(poKeyDirectory) {
+  mkdirSync(SCRATCH_ROOT, { recursive: true });
+  const home = mkdtempSync(join(SCRATCH_ROOT, "po-human-approval-plane-home-"));
+  writeMachinePlane({
+    schema: MACHINE_PLANE_SCHEMA,
+    poKeyDirectory,
+    pushApprovalDefault: "chat",
+    routing: null,
+    language: null,
+    session: null,
+    usage: null,
+    updatedAt: new Date().toISOString(),
+  }, { homedirFn: () => home });
+  return home;
+}
 
 /** Runs `fn` with PIPELINE_PO_APPROVAL_DIRECTORY set to `value` (or removed for `undefined`),
  * restoring whatever the ambient environment had before, regardless of outcome. */
@@ -762,34 +797,52 @@ test("an explicit --directory always wins and behaves exactly as before: the env
 });
 
 test("PIPELINE_PO_APPROVAL_DIRECTORY resolves the directory when --directory is absent", () => {
-  withEnvDirectory("/tmp/po-podir1-env-dir", () => {
-    const parsed = parseHumanArgs(["setup", "--repo-root", "/tmp/po-podir1-repo", "--human-name", "Test Operator"]);
-    assert.equal(parsed.error, undefined);
-    assert.equal(parsed.directory, "/tmp/po-podir1-env-dir");
-    assert.equal(parsed.directorySource, "environment");
-  });
+  const home = noMachinePlaneHomeFixture();
+  try {
+    withEnvDirectory("/tmp/po-podir1-env-dir", () => {
+      const parsed = parseHumanArgs(["setup", "--repo-root", "/tmp/po-podir1-repo", "--human-name", "Test Operator"], { homedirFn: () => home });
+      assert.equal(parsed.error, undefined);
+      assert.equal(parsed.directory, "/tmp/po-podir1-env-dir");
+      assert.equal(parsed.directorySource, "environment");
+    });
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
 });
 
 test("a relative PIPELINE_PO_APPROVAL_DIRECTORY value fails the same absolute-path check as a relative --directory", () => {
-  const viaFlag = parseHumanArgs(["setup", "--repo-root", "/tmp/po-podir1-repo", "--directory", "relative/dir"]);
-  assert.match(viaFlag.error, /Usage:/u);
+  const home = noMachinePlaneHomeFixture();
+  try {
+    const viaFlag = parseHumanArgs(["setup", "--repo-root", "/tmp/po-podir1-repo", "--directory", "relative/dir"], { homedirFn: () => home });
+    assert.match(viaFlag.error, /Usage:/u);
 
-  const viaEnv = withEnvDirectory("relative/dir", () => parseHumanArgs(["setup", "--repo-root", "/tmp/po-podir1-repo"]));
-  assert.match(viaEnv.error, /Usage:/u);
-  assert.match(viaEnv.error, /must be an absolute path/u);
+    const viaEnv = withEnvDirectory("relative/dir", () => parseHumanArgs(["setup", "--repo-root", "/tmp/po-podir1-repo"], { homedirFn: () => home }));
+    assert.match(viaEnv.error, /Usage:/u);
+    assert.match(viaEnv.error, /must be an absolute path/u);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
 });
 
-test("when neither --directory nor PIPELINE_PO_APPROVAL_DIRECTORY is present, the usage error names the variable and prints no path", () => {
-  withEnvDirectory(undefined, () => {
-    const parsed = parseHumanArgs(["setup", "--repo-root", "/tmp/po-podir1-repo"]);
-    assert.match(parsed.error, /Usage:/u);
-    assert.match(parsed.error, new RegExp(PO_APPROVAL_DIRECTORY_ENV, "u"), "the usage error must name the environment variable as the alternative");
-    assert.doesNotMatch(parsed.error, /\/tmp\//u, "there is nothing resolved yet, so no path may appear in the message");
-  });
+test("when neither --directory nor the machine plane nor PIPELINE_PO_APPROVAL_DIRECTORY is present, the usage error names all three routes and prints no path", () => {
+  const home = noMachinePlaneHomeFixture();
+  try {
+    withEnvDirectory(undefined, () => {
+      const parsed = parseHumanArgs(["setup", "--repo-root", "/tmp/po-podir1-repo"], { homedirFn: () => home });
+      assert.match(parsed.error, /Usage:/u);
+      assert.match(parsed.error, /--directory/u, "the usage error must name the flag");
+      assert.match(parsed.error, /machine-scoped configuration plane/u, "the usage error must name the machine plane route (AC-15)");
+      assert.match(parsed.error, new RegExp(PO_APPROVAL_DIRECTORY_ENV, "u"), "the usage error must name the environment variable as the alternative");
+      assert.doesNotMatch(parsed.error, /\/tmp\//u, "there is nothing resolved yet, so no path may appear in the message");
+    });
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
 });
 
 test("an unsafe directory fed through PIPELINE_PO_APPROVAL_DIRECTORY is refused exactly like the same unsafe value passed via --directory, and the refusal names its own source without printing the path", () => {
   const dirs = fixtureDirs();
+  const home = noMachinePlaneHomeFixture();
   try {
     // "unsafe": a directory inside the repository, which externalDirectory()'s outside()
     // check must reject no matter which route the path arrived by -- there is no weaker
@@ -797,11 +850,11 @@ test("an unsafe directory fed through PIPELINE_PO_APPROVAL_DIRECTORY is refused 
     const insideRepo = join(dirs.repoRoot, "not-outside-the-repo");
     mkdirSync(insideRepo, { recursive: true });
 
-    const viaFlagError = thrown(() => runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", insideRepo, "--human-name", "Test Operator"], {}));
+    const viaFlagError = thrown(() => runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", insideRepo, "--human-name", "Test Operator"], { homedirFn: () => home }));
     assert.ok(viaFlagError, "an unsafe --directory must be refused");
     assert.match(viaFlagError.message, /approval directory \(from --directory\) must be outside the repository/u);
 
-    const viaEnvError = withEnvDirectory(insideRepo, () => thrown(() => runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--human-name", "Test Operator"], {})));
+    const viaEnvError = withEnvDirectory(insideRepo, () => thrown(() => runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--human-name", "Test Operator"], { homedirFn: () => home })));
     assert.ok(viaEnvError, "the identical unsafe value must be refused when it arrives via the environment");
     assert.match(viaEnvError.message, new RegExp(`approval directory \\(from the ${PO_APPROVAL_DIRECTORY_ENV} environment variable\\) must be outside the repository`, "u"));
 
@@ -814,6 +867,7 @@ test("an unsafe directory fed through PIPELINE_PO_APPROVAL_DIRECTORY is refused 
     assert.equal(viaFlagError.message.includes(insideRepo), false);
   } finally {
     cleanup(dirs);
+    rmSync(home, { recursive: true, force: true });
   }
 });
 
@@ -825,12 +879,13 @@ test("PIPELINE_PO_APPROVAL_DIRECTORY runs a full sign-intent ceremony exactly li
   // helper instead, and this one does the same for the same reason).
   const dirsFlag = fixtureDirs();
   const dirsEnv = fixtureDirs();
+  const home = noMachinePlaneHomeFixture();
   try {
     const { authority: authorityFlag } = keyFixture(dirsFlag.directory);
     const { authority: authorityEnv } = keyFixture(dirsEnv.directory);
     const intentSha256Flag = createHash("sha256").update("podir-1-parity-flag-fixture").digest("hex");
     const intentSha256Env = createHash("sha256").update("podir-1-parity-env-fixture").digest("hex");
-    const dependencies = { readConfirmation: () => "approve" };
+    const dependencies = { readConfirmation: () => "approve", homedirFn: () => home };
 
     const viaFlag = runHumanApproval(["sign-intent", "--repo-root", dirsFlag.repoRoot, "--directory", dirsFlag.directory, "--intent-sha256", intentSha256Flag], dependencies);
     assert.equal(viaFlag.ok, true);
@@ -849,5 +904,128 @@ test("PIPELINE_PO_APPROVAL_DIRECTORY runs a full sign-intent ceremony exactly li
   } finally {
     cleanup(dirsFlag);
     cleanup(dirsEnv);
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+/* ------------------------------------------------------------------ *
+ * SETUP-2b: the machine-scoped configuration plane's poKeyDirectory,
+ * resolved with the precedence AC-11 specifies -- flag, then plane, then
+ * PIPELINE_PO_APPROVAL_DIRECTORY, then the "directory is required" error.
+ * ------------------------------------------------------------------ */
+
+test("AC-11: the machine plane's poKeyDirectory resolves the directory when --directory is absent, and wins over the environment variable", () => {
+  const dirs = fixtureDirs();
+  const home = machinePlaneHomeFixture(dirs.directory);
+  try {
+    const parsed = withEnvDirectory("/should/never/be/read", () => parseHumanArgs(
+      ["setup", "--repo-root", dirs.repoRoot, "--human-name", "Test Operator"],
+      { homedirFn: () => home },
+    ));
+    assert.equal(parsed.error, undefined);
+    assert.equal(parsed.directory, dirs.directory);
+    assert.equal(parsed.directorySource, "machine-plane");
+  } finally {
+    cleanup(dirs);
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("AC-11/AC-13: an explicit --directory still wins over a present, valid machine plane", () => {
+  const dirs = fixtureDirs();
+  const otherDirectory = mkdtempSync(join(tmpdir(), "po-machine-plane-unused-"));
+  const home = machinePlaneHomeFixture(otherDirectory);
+  try {
+    const parsed = parseHumanArgs(
+      ["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--human-name", "Test Operator"],
+      { homedirFn: () => home },
+    );
+    assert.equal(parsed.error, undefined);
+    assert.equal(parsed.directory, dirs.directory);
+    assert.equal(parsed.directorySource, "flag");
+  } finally {
+    cleanup(dirs);
+    rmSync(otherDirectory, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("AC-12: an invalid machine plane fails closed, naming the plane as the cause, and does NOT fall through to the environment variable", () => {
+  const home = noMachinePlaneHomeFixture();
+  try {
+    mkdirSync(join(home, ".agent-pipeline"), { recursive: true });
+    writeFileSync(join(home, ".agent-pipeline", "machine.json"), "{ not valid json");
+    const parsed = withEnvDirectory("/tmp/po-podir1-env-dir-should-not-be-used", () => parseHumanArgs(
+      ["setup", "--repo-root", "/tmp/po-podir1-repo", "--human-name", "Test Operator"],
+      { homedirFn: () => home },
+    ));
+    assert.match(parsed.error, /machine-scoped configuration plane is invalid/u);
+    assert.match(parsed.error, /MP-MALFORMED/u);
+    assert.equal(parsed.error.includes("/tmp/po-podir1-env-dir-should-not-be-used"), false, "an invalid plane must never silently fall through to the environment variable");
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("AC-12: an unreadable machine plane (a directory at the leaf) is also reported as invalid, not silently absent", () => {
+  const home = noMachinePlaneHomeFixture();
+  try {
+    mkdirSync(join(home, ".agent-pipeline", "machine.json"), { recursive: true });
+    const parsed = parseHumanArgs(["setup", "--repo-root", "/tmp/po-podir1-repo", "--human-name", "Test Operator"], { homedirFn: () => home });
+    assert.match(parsed.error, /machine-scoped configuration plane is invalid/u);
+    assert.match(parsed.error, /MP-UNREADABLE/u);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("AC-11: a valid machine plane with no poKeyDirectory configured (null) falls through to the environment variable, exactly like an absent plane", () => {
+  const home = machinePlaneHomeFixture(null);
+  try {
+    const parsed = withEnvDirectory("/tmp/po-podir1-env-dir", () => parseHumanArgs(
+      ["setup", "--repo-root", "/tmp/po-podir1-repo", "--human-name", "Test Operator"],
+      { homedirFn: () => home },
+    ));
+    assert.equal(parsed.error, undefined);
+    assert.equal(parsed.directory, "/tmp/po-podir1-env-dir");
+    assert.equal(parsed.directorySource, "environment");
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("AC-14: a plane-sourced directory runs through the identical unsafe-directory refusal as a flag- or environment-sourced one, naming the plane as its source and never printing the path", () => {
+  const dirs = fixtureDirs();
+  const insideRepo = join(dirs.repoRoot, "not-outside-the-repo");
+  mkdirSync(insideRepo, { recursive: true });
+  const home = machinePlaneHomeFixture(insideRepo);
+  try {
+    const viaPlaneError = thrown(() => runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--human-name", "Test Operator"], { homedirFn: () => home }));
+    assert.ok(viaPlaneError, "an unsafe plane-sourced directory must be refused");
+    assert.match(viaPlaneError.message, /approval directory \(from the machine-scoped configuration plane \(poKeyDirectory\)\) must be outside the repository/u);
+    assert.equal(viaPlaneError.message.includes(insideRepo), false, "the resolved absolute path must never appear in the refusal message");
+  } finally {
+    cleanup(dirs);
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("AC-11/AC-14: a full sign-intent ceremony resolved entirely from the machine plane's poKeyDirectory behaves exactly like the same directory passed via --directory", () => {
+  const dirs = fixtureDirs();
+  const home = machinePlaneHomeFixture(dirs.directory);
+  try {
+    const { authority } = keyFixture(dirs.directory);
+    const intentSha256 = createHash("sha256").update("setup-2b-plane-parity-fixture").digest("hex");
+    const result = runHumanApproval(
+      ["sign-intent", "--repo-root", dirs.repoRoot, "--intent-sha256", intentSha256],
+      { readConfirmation: () => "approve", homedirFn: () => home },
+    );
+    assert.equal(result.ok, true);
+    assert.equal(result.code, "PO-HUMAN-SIGN-INTENT-READY");
+    const proof = JSON.parse(readFileSync(join(dirs.directory, "proof-manual.json"), "utf8"));
+    assert.equal(verifyPoApprovalProof({ intent: { sha256: intentSha256 }, trustPolicy: authority, proof }).verified, true);
+  } finally {
+    cleanup(dirs);
+    rmSync(home, { recursive: true, force: true });
   }
 });

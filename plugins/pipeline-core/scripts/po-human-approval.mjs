@@ -26,6 +26,7 @@ import { readPublicRepositoryFile, verifyThreatModelApprovalRequest } from "../l
 import { CRITICAL_ACTION_KINDS, createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
 import { describeGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { readMachinePlane } from "../lib/machine-plane.mjs";
 
 const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication> --subject-sha256 <sha256> --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | sign-intent --repo-root <repo> --directory <external-dir> --intent-sha256 <sha256> | authorize-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication> --subject-sha256 <sha256> --expires-at <ISO-8601>";
 // This repo's own environment inputs are all named PIPELINE_<PURPOSE> (see
@@ -34,7 +35,14 @@ const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory
 // follows that convention rather than inventing a new one, and is read ONLY as a
 // fallback when no explicit --directory is supplied on the command line.
 const PO_APPROVAL_DIRECTORY_ENV = "PIPELINE_PO_APPROVAL_DIRECTORY";
-function directorySourceLabel(source) { return source === "environment" ? `the ${PO_APPROVAL_DIRECTORY_ENV} environment variable` : "--directory"; }
+// SETUP-2b/AC-13: a third source, ordered between --directory and the environment
+// fallback (SETUP-2b/AC-11) -- the machine-scoped configuration plane's own
+// poKeyDirectory field (specs/sprint-nova-epic/plans/nova-setup-bootstrap.md SS2/SS6a).
+function directorySourceLabel(source) {
+  if (source === "environment") return `the ${PO_APPROVAL_DIRECTORY_ENV} environment variable`;
+  if (source === "machine-plane") return "the machine-scoped configuration plane (poKeyDirectory)";
+  return "--directory";
+}
 // Recorded as non-enumerable: pre-existing exact-shape assertions elsewhere
 // (lib/threat-model-approval-request.test.mjs) compare the whole parseHumanArgs()/
 // parseGateArgs() return value with assert.deepStrictEqual, which considers only own
@@ -112,7 +120,7 @@ function artifactPath(directory, name) {
   return path;
 }
 
-export function parseHumanArgs(argv) {
+export function parseHumanArgs(argv, dependencies = {}) {
   const [command, ...tokens] = argv; const values = { command, keyReference: "local-po-key" }; const supplied = new Set();
   for (let index = 0; index < tokens.length; index += 1) {
     const key = tokens[index]; const value = tokens[index + 1];
@@ -122,18 +130,35 @@ export function parseHumanArgs(argv) {
     supplied.add(normalized); values[normalized] = value; index += 1;
   }
   if (!new Set(["setup", "prepare", "prepare-all", "approve", "approve-all", "verify", "verify-all", "prepare-critical", "approve-critical", "verify-critical", "authorize-critical", "sign-intent"]).has(command)) return { error: USAGE };
-  // An explicit --directory always wins and is used exactly as before. Only when it is absent
-  // do we fall back to the environment variable -- and the resolved value then runs through the
-  // identical isAbsolute check and, downstream, the identical externalDirectory() safety checks
-  // as a flag-supplied value: there is no separate, weaker path for an environment-sourced value.
+  // SETUP-2b/AC-11: precedence, in this exact order. An explicit --directory always
+  // wins and is used exactly as before, never even consulting the machine plane. Absent
+  // that, the machine-scoped configuration plane's own poKeyDirectory (SS2/SS6a of
+  // nova-setup-bootstrap.md); absent that in turn, the PIPELINE_PO_APPROVAL_DIRECTORY
+  // environment variable, exactly as before this task. Whichever route resolves a
+  // value, that value then runs through the identical isAbsolute check below and,
+  // downstream, the identical externalDirectory() safety checks (AC-14) -- there is no
+  // separate, weaker path for a plane- or environment-sourced value.
   if (supplied.has("directory")) {
     setDirectorySource(values, "flag");
   } else {
-    const fromEnv = process.env[PO_APPROVAL_DIRECTORY_ENV];
-    if (text(fromEnv)) { values.directory = fromEnv; setDirectorySource(values, "environment"); }
+    const plane = (dependencies.readMachinePlaneFn ?? readMachinePlane)(dependencies);
+    // AC-12: an invalid or unreadable plane is a reported failure, never silently
+    // treated as absent -- it must NOT fall through to the environment variable as
+    // though nothing were there. An ABSENT plane (the ordinary case: a machine that
+    // has not been set up yet) falls through normally and silently, exactly as before.
+    if (plane.status === "invalid") {
+      return { error: `machine-scoped configuration plane is invalid (${plane.code}): fix or remove ~/.agent-pipeline/machine.json, or pass --directory explicitly.` };
+    }
+    if (plane.status === "valid" && text(plane.plane?.poKeyDirectory)) {
+      values.directory = plane.plane.poKeyDirectory;
+      setDirectorySource(values, "machine-plane");
+    } else {
+      const fromEnv = process.env[PO_APPROVAL_DIRECTORY_ENV];
+      if (text(fromEnv)) { values.directory = fromEnv; setDirectorySource(values, "environment"); }
+    }
   }
   if (!text(values.directory) || !isAbsolute(values.directory)) {
-    return { error: `${USAGE}\napproval directory is required and must be an absolute path: pass --directory <path>, or set $${PO_APPROVAL_DIRECTORY_ENV} to an absolute path as a fallback (an explicit --directory always overrides it).` };
+    return { error: `${USAGE}\napproval directory is required and must be an absolute path: pass --directory <path>, configure poKeyDirectory in the machine-scoped configuration plane, or set $${PO_APPROVAL_DIRECTORY_ENV} to an absolute path as a fallback (an explicit --directory always overrides the plane, which overrides the environment variable).` };
   }
   if (!text(values.repoRoot) || !isAbsolute(values.repoRoot)) return { error: USAGE };
   // FIXTURE-2: --human-name is validated where the authority directory's state is known
@@ -258,7 +283,7 @@ function signIntentIntoProof({ intentSha256, keys, artifacts, io, dependencies }
 }
 
 export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}) {
-  const args = parseHumanArgs(argv); if (args.error) fail(args.error);
+  const args = parseHumanArgs(argv, dependencies); if (args.error) fail(args.error);
   if (args.command.endsWith("-all")) {
     const action = args.command.slice(0, -4);
     const results = ["cyb-4", "cyb-5"].map((featureId) => runHumanApproval([
