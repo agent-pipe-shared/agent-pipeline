@@ -1023,6 +1023,109 @@ a dispatch the authority to clear a control whose purpose is to check that
 dispatch's own class of work. "Show your evidence" is not a substitute for
 separation of duties — it is what makes the absence of separation look rigorous.
 
+### DECISIONS WAITING FOR THE PO — read this block first (2026-08-09)
+
+Five, ordered by how much they cost to get wrong. Each is stated with what I
+recommend and why, so none of them needs a conversation to resolve.
+
+**1. The push is not clean, and this one has a closing window.** 22 unpushed
+commits carry `Co-Authored-By: Claude Sonnet 5` and 23 carry
+`Claude-Session: https://claude.ai/code/session_…`. GIT-03 forbids exactly these
+(`guardrails/git.md:30`; patterns at `plugins/pipeline-core/lib/commit-message-policy.mjs:58,61,64`).
+Verified myself with `git log --grep`. The conflict is real and has no clean exit:
+GIT-03 says this must not enter public history, and the hard rules say never
+rewrite history. Both cannot hold for these 22 commits. **My recommendation: do
+not push until you have chosen**, because the choice disappears the moment the
+branch is public. The options are (a) accept the trailers and push, recording the
+acceptance, (b) authorize a history rewrite as an explicit one-off override, or
+(c) leave the branch local until the range is rebuilt. Note also that
+`guard-push.mjs:662` refuses this trailer class in the anonymous-public delivery
+range, so the push may be blocked mechanically regardless of your decision — worth
+establishing before you plan around it.
+
+**Where these trailers come from, since it matters for prevention:** my own harness
+default instructs me to append them to every commit. This repository forbids them.
+The project rule wins and every commit I made tonight carries only
+`AI-Assisted: true` — but the default is still there, so the leak recurs on any
+session that does not actively suppress it. That is a standing hazard, not a
+past incident.
+
+**2. The Critic returned FAIL, and its second blocker answers your question.**
+The pin re-baseline you asked about: the Critic found the tamper detection over
+the Critic execution surface is currently non-enforcing for six of nine files,
+and that the suite is parked out of the gate until 2026-09-07. It classes that as
+a blocker independent of whether the drift itself was legitimate. **So the answer
+to the RED3 question is now: not a re-baseline first.** The control needs to be
+enforcing again; re-pinning while it is excluded from the gate buys the appearance
+of a green tripwire and none of the protection.
+
+**3. One pin was never correct.** `codex-critic-dispatch.schema.json` has not
+changed once since the baseline and still does not hash to its pinned value.
+Independently confirmed. This is a recording error in a security control, not
+drift, and it means the nine-path inventory was wrong the day it was written.
+
+**4. The 0.5.2 merge dropped nine implementations while keeping their tests.**
+The audit is at `evidence/phx-merge-audit.md` with a reproducible runner. The
+largest is not any of the parked red suites: the WSL freshness host-action family
+lost 19 definitions, and the surviving production entry point
+`plugins/pipeline-core/scripts/ruleset-freshness-host.mjs` was not touched by the
+merge and can no longer load. I verified that myself rather than taking it from
+the report — `import()` fails with *does not provide an export named
+`FRESHNESS_HOST_CONTROL_SCHEMA`*. **Nothing is red because no registered suite
+loads it.** That is the worst shape a defect can have here: a gate at 366 green
+suites that cannot see a broken production module. **Recommended first: this one**,
+ahead of the recovery-bridge writer, because the recovery bridge at least announces
+itself as a red suite.
+
+**This also bears on Phoenix Part B.** The sub-design
+`specs/sprint-phoenix-epic/design/codex-wsl-freshness-host-action-family.md`
+describes this family's invocations. Whether it was written against the surviving
+code or the deleted code is now a question I have to answer before that design is
+built on, and I have not answered it yet.
+
+**5. Deferred, unchanged from last night:** the BFAM §13 threat-model sentence
+(recommend option A, accept and amend) and the RED1 GIT-04 contract contradiction
+(a decision, not a task — two suites assert opposite verdicts for the same
+command and both cannot be green).
+
+### The gate went red, and both failures were mine
+
+`e24ff6f` failed at 368 steps: `backlog-state-tests` and `backlog-state-check`.
+Neither came from the registration. Both came from the backlog item I filed in
+`e63b9ba`: `owner: PO` is not an accepted value — the field names the owning
+product, not the person who decides, and all 120 other items say `pipeline`. The
+second failure was the first one's shadow: the reconciler had already appended
+ledger event 229, so once the item failed validation the ledger named an id that
+matched no current item. That ordering is itself already filed as a defect in this
+backlog; my invalid item is simply the first thing to exercise it.
+
+Fixed in `3279621`, projections regenerated through the checker's own `--write`
+path. The checker is clean again.
+
+**What this actually exposes is my own gate discipline.** I filed the item and did
+not re-run the gate afterwards, so a red I introduced rode along under several
+later commits without anyone noticing. My standing instruction to dispatches — do
+not run the full gate, it corrupts the candidate lock — is correct, and it means
+*I* am the only one who can catch this class. A commit that adds a governed
+artifact changes what the gate checks, and that is precisely the moment when
+skipping the gate is cheapest and worst.
+
+**Still red and now dispatched:** BS25 in `backlog-state.test.mjs`. I established
+that it passes 35/35 at `1a71d7c` and fails at HEAD, and that it failed both while
+the live checker had two findings and while it had none. That points at the test
+reading live repository state rather than its own fixture — a hermeticity defect,
+not a product defect. `PHX-BS25` is briefed to fix the coupling and is explicitly
+forbidden from reaching green by weakening the assertion.
+
+### The registration landed (`e24ff6f`) and the gate confirms the suite
+
+366 registered suites, five exclusions, `binding: "exact"`, and
+`windows-assurance-verify-registration-tests=0` in the full run. The count grew
+rather than the exclusion list for the second time this phase. The dispatch also
+corrected a backlog item that stated the old exclusion count in seven places, and
+deliberately left `backlog/index.json` alone as out of its scope — which is why
+the projection regeneration above was still outstanding.
+
 ### The PO authorized the Critic pass, and it is running
 
 Asked whether the pins may be re-baselined on the recorded evidence or whether
@@ -1054,6 +1157,50 @@ hashes to `1d447929…` against a recorded `ccca8d81…`. That pin never matched
 file it names. A tripwire with a wrong pin in it fires on the honest and the
 dishonest alike, which is how nine paths' worth of protection decays into noise
 someone eventually silences.
+
+### CRITIC VERDICT: FAIL — two blockers, and it did not answer the question I did not ask
+
+Six findings, no briefing violations, trajectory `consistent`. The route was
+`claude-opus-5` at max; the Critic recorded effective model identity as `unknown`
+rather than inferring it, which is the correct behaviour and worth noting because
+it declined to overclaim in the one place nobody would have checked.
+
+- **F1 (blocker) — prohibited correlation trailers.** Reproduced independently and
+  widened: the Critic saw 2 inside its review object, I measured 22 and 23 across
+  the unpushed range. See decision 1 above.
+- **F2 (blocker) — the tamper detection is non-enforcing.** The diff moved five of
+  nine pinned files without re-baselining; drift grew from three mismatches at the
+  review base to six at HEAD; the enforcing suite is excluded from the gate and
+  appears in none of the 366 steps of the evidence run. This is the finding that
+  reframes the RED3 question, and it is a better answer than either option I had
+  put to the PO. I asked *may the pins move*. The real defect is that the control
+  is switched off, which makes the pin values almost beside the point.
+- **F3 (major) — an orchestrator-authored production diff.** `6b2e637` carries an
+  elephant trailer and misses EL-01's fast-path exception on four of five criteria.
+  Not mine — it predates this session — but it is exactly the rule I have been
+  measuring myself against all night, found by someone other than me.
+- **F4 (major) — repointed citations that resolve to sections lacking the content.**
+  A documentation-repair sweep replaced dangling numeric references with named
+  headings that do not carry what is cited, including a "word-identical" claim about
+  wording absent from the target file entirely. A dangling `§3.3` announces itself;
+  a named citation that resolves to the wrong section fails silently. Three of these
+  govern T1 staffing and isolation — the Critic's own contract.
+- **F5, F6 (minor) — a circular self-reference where the normative definition should
+  be, and two further mis-citations from the same sweep.**
+
+**What it cleared, and why that matters:** the QG-06 form of the exclusion table
+(reason, owner, expiry all present) was examined and explicitly *not* flagged, with
+F2 aimed at the resulting control gap instead of the bookkeeping. `isDirectInvocation`
+was examined and called a strict improvement. That is a reviewer distinguishing
+"checked, in order" from "not looked at", which is the whole point of the rubric.
+
+**Two process facts it reported against the harness, not the code.** It could not
+persist its report — the closed shell grammar blocks redirects and the Critic holds
+no write tool — so a FAIL verdict with six findings existed only as chat text. And
+its first run ended on an intermediate line with no report at all; I recovered it by
+asking for the mandated format without re-running the review. Both belong in the
+backlog: a review contract that cannot write its own verdict is one truncation away
+from losing it.
 
 ### PHX-RED6 landed (`afa00fd`): a fixture that lied is now a fixture that names its cause
 
