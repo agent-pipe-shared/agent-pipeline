@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "9ee657ff4b02e41a8824885e562d9ea10bffe2026255eda404a0e23bd58a22bc"
+    "transitionHead": "df965b325699b175d2f899e45562a9a0e4c90a68a2c1a294cd0173400b44079c"
   },
   "counts": {
-    "open": 72,
+    "open": 73,
     "in_progress": 21,
     "closed": 25
   },
@@ -903,6 +903,14 @@
       "closureRepository": "self",
       "closureCommit": "d3db4a07dee565c1eeee2eb1e1e77ffcd2ca4e0a",
       "closureEvidence": "backlog/evidence/2026-08-06-second-reconciliation-pass.md"
+    },
+    {
+      "id": "pipeline.signed-guard-override-has-no-command-that-emits-the-digest-to-sign",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Found while walking the signature-mode HGO flow end to end for the GS-2 migration of project/critical-human-proof.json, 2026-08-08. The flow is walkable by reading library source, not by following the CLI."
     },
     {
       "id": "pipeline.single-trust-anchor-excludes-key-rotation-and-teams",
