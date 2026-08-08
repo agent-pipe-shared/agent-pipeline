@@ -2,7 +2,7 @@
 name: close-feature
 description: "Feature-lifecycle close: ends the CURRENT activeFeature in .claude/pipeline-state.json via the sanctioned pipeline-state.mjs writer (close-feature subcommand) -- appends an audit entry to closedFeatures, clears activeFeature/planApproval/planRevocation, sets planApproved=false, silences the stop-suggest nudge. Invoke when a feature's work is done and its plan/phase tracking should stop, independent of any session boundary."
 argument-hint: "<name performing the close>"
-allowed-tools: Bash(node harness/scripts/usage-ledger.mjs:*), Bash(node harness/scripts/pipeline-state.mjs:*), Bash(node plugins/pipeline-core/scripts/close-coordinator.mjs:*)
+allowed-tools: Bash(node harness/scripts/usage-ledger.mjs:*), Bash(node plugins/pipeline-core/scripts/pipeline-state.mjs:*), Bash(node plugins/pipeline-core/scripts/close-coordinator.mjs:*)
 ---
 
 # close-feature — end a feature's lifecycle tracking
@@ -49,14 +49,14 @@ The returned action has this shape (the Continuity flag is mandatory whenever
 it is present in the returned argv):
 
 ```
-node harness/scripts/pipeline-state.mjs close-feature --by "<name>" \
+node plugins/pipeline-core/scripts/pipeline-state.mjs close-feature --by "<name>" \
   --coordinator-lifecycle "<lifecycle-id>" \
   --coordinator-sha256 "<exact-state-sha256>" \
   --continuity-close-request "<exact-repo-relative-request>"
 ```
 
 This is the ONLY sanctioned writer for this transition (see the header doc in
-`harness/scripts/pipeline-state.mjs` for the full contract). No `activeFeature` present -> the CLI
+`plugins/pipeline-core/scripts/pipeline-state.mjs` for the full contract). No `activeFeature` present -> the CLI
 refuses (error, exit 2, nothing written) -- report that back rather than working around it.
 A `git rev-parse HEAD` failure during this step is NOT fatal (deliberate deviation from
 `approve-push`, documented in that file's header): the close still completes with `forCommit: null`.
