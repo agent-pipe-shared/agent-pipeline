@@ -79,8 +79,21 @@ no window. The prior window carried 105 lines; this one carries roughly 12.
 1. `node harness/scripts/verify.mjs` with a duplicate present exits non-zero,
    prints a line naming the duplicated id, and its evidence artifact records
    `verify-suite-registration-duplicates` as the failing step.
-2. Suites still run: the duplicate must not abort the journal, so the step list
-   is longer than one entry.
+2. **Zero suites run, and the step list is exactly one entry.** *(Amended
+   2026-08-08 on PO decision. This item previously read "Suites still run: the
+   duplicate must not abort the journal, so the step list is longer than one
+   entry." That was never implemented and contradicted this document's own staged
+   patch text below, which makes the duplicate check the `if` and the journal the
+   `else`. The implemented behaviour is the correct one: a duplicate registration
+   means the run's results cannot be trusted, so failing fast is right and
+   continuing would produce a report nobody should act on. The clause was
+   optimistic rather than considered, and is amended to match reality rather than
+   reality being bent to match it. Pinned by `check-verify-suite-registration.test.mjs`
+   case 36 — see `6746ba1`.)*
+
+   Note the residual this leaves standing: `verify-suite-registration-check`
+   (`verify.mjs:541`) therefore still never executes for the duplicate class.
+   That is a known, accepted consequence of failing fast, not an oversight.
 3. Restore leaves `verify.mjs` byte-identical by sha256 with a clean porcelain.
 4. The whole cycle is machine-captured, like
    `evidence/phx-acp2-demonstration.txt` and `evidence/phx-acp3-name.txt`.
