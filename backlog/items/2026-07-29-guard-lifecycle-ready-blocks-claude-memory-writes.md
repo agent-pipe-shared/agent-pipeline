@@ -96,3 +96,73 @@ point.
 - **Assignment (if accepted):** n/a — no implementation assigned; PO should
   first confirm/re-locate the cited 2026-07-29 decision.
 - **Date:** 2026-08-06
+
+## PO decision, 2026-08-08 — Option A, and the signal the 2026-07-29 triage said was missing
+
+The PO reversed the 2026-07-29 holding position: *"ich finde das sind die
+standard claude pfade und bei codex gibt es vllt was ähnliches. Ich will die CLI
+UX schon erhalten. Das sollten wir erlauben oder?"* The write is admitted. What
+follows is the boundary the implementation must hold, and the finding that makes
+open question 1 answerable rather than a guess.
+
+### Open question 1 has an authoritative answer, and it is not the hashing scheme
+
+The 2026-07-29 proposal asked for "a stable, documented way for the hook to
+identify the memory directory that belongs to THIS governed project without
+reverse-engineering Claude Code's internal project-directory naming/hashing
+scheme", and treated its absence as the reason to defer.
+
+The signal exists and is already in the guard's hands. `guard-lifecycle-ready.mjs`
+parses the complete hook-input object (`:1360`) and passes it around as `input`;
+the payload carries `transcript_path`. The transcript file lives in the same
+directory as this project's memory directory, so `dirname(transcript_path)` is
+the project directory **as the CLI itself reports it** — no naming scheme is
+reconstructed, no sample is generalized. `<dirname(transcript_path)>/memory/` is
+then exactly this project's memory directory.
+
+`transcript_path` currently appears nowhere in `plugins/pipeline-core` (zero
+matches across the plugin). It is unused, not unavailable.
+
+**Verification status, stated honestly:** the shape was confirmed against one
+live session's own values on one platform, not across the four first-class
+platforms the original proposal demanded. This converts the question from
+unknowable to checkable; it does not discharge it. The implementing dispatch
+owns that check, and a platform where the relationship does not hold is a stop
+condition, not something to paper over.
+
+### The boundary: derived path, never a prefix
+
+Admit writes under `<dirname(transcript_path)>/memory/**` only.
+
+Do **not** admit `~/.claude/**` as a prefix. That directory also holds
+`settings.json`, `agents/`, and `plugins/`, and the local marketplace sits
+adjacent to it. An agent able to write `settings.json` edits its own
+permissions, which is not a UX concession but the exit from the guard. The
+carve-out is defined by the shape the CLI reports, not by a home-relative
+prefix — this is also what keeps it from generalizing into the broader escape
+that open question 3 warns against.
+
+### What must not be folded in
+
+The session scratchpad produces the identical denial code and is a **separate**
+decision (`2026-08-07-session-scratchpad-is-unwritable-under-the-cross-repo-guard.md`).
+`GUARD-CROSS-REPO-MUTATION` is unliftable by ADR-0059 Decision 5, and that item's
+candidate 2 — an in-repository `scratch/`, already half-built — is the stronger
+answer there. Solving both with one carve-out would widen this one past its
+justification.
+
+### Runner parity is owed, not optional
+
+ADR-0057 R1 forbids shipping a runner-specific capability one-sided. The
+implementing dispatch establishes, as an inventory rather than an assumption,
+which runner-owned paths each CLI actually writes during a normal session, and
+either opens the Codex counterpart or records explicitly that none exists. No
+path enters the allowlist on the strength of a guess about what a CLI "probably
+needs".
+
+### Assignment
+
+A `goldfish-deep` dispatch, sequenced after the runner-aware restart work
+releases `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs`. It carries the
+platform check above as a DoD item and the prefix prohibition as a hard scope
+boundary.

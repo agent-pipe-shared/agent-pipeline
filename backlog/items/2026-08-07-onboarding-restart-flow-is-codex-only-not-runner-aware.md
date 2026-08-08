@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.onboarding-restart-flow-is-codex-only-not-runner-aware
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 source: "PO handover from a separate session (rune_test1_claude), submitted through the PO's own channel, 2026-08-07."
 due: 2026-09-06
@@ -190,6 +190,54 @@ and there is nothing for a Claude session to re-read there.
 Priority is no longer "not urgent enough to interrupt" — the PO has now hit this
 on three separate occasions, and it is the first thing any new adopter on the
 Claude runner will meet.
+
+## Closure, 2026-08-08 — fixed by `864c7f1`, verified independently
+
+Closed against commit `864c7f1f84b5e0a874e360bf26e168fa92f14aaf` (dispatch
+RUNAUT-1), which landed on `feat/sprint-nova-codex-v046` after this item's last
+re-verification and therefore was not visible to it.
+
+Both halves this item names are addressed, and the fix follows the conclusion
+this item itself reached — not the earlier "Suggested fix direction":
+
+1. **The barrier is no longer published for a runner that has nothing to
+   re-read.** `applyLifecycle` gates publication on
+   `requiresNativeRuntimeReadback(beforeApply.runner)`
+   (`plugins/pipeline-core/lib/project-onboarding-v3.mjs:3809`). A `claude`
+   chain never reaches `prepareRuntimeRestartBinding`, so the unclearable gate
+   this item described does not come into existence. The exemption is one closed
+   membership test asserted equal to the set the V3 bootstrap authority already
+   uses, and it fails closed: an **unnamed** runner keeps the Codex-strength
+   barrier.
+2. **`restartAction` is runner-aware.** It now takes `runner` and returns
+   `externalOperatorRestartAction(runner)` for anything other than `codex`
+   (`:1572`), so no Claude session is handed the Codex launcher.
+3. **The kickoff dead end is gone.** `planProjectOnboardingKickoffV4` and its
+   apply sibling no longer inspect with a hardcoded `"codex"`, which is what
+   made a Claude initialization report `runtime-attestation-required` and
+   produce no plan at all.
+
+**Verification.** Re-read at the two line numbers above by the orchestrator
+independently of the dispatch that reported the closure, because a
+"pre-existing/already fixed" claim is a claim needing evidence
+(`2026-08-08-pre-existing-failure-is-a-claim-that-needs-evidence.md`), and two
+such claims were wrong earlier the same night. Suites green on the current tip:
+`project-onboarding-v3` 107/0, `guard-lifecycle-ready` 51/0,
+`codex-onboarding-runtime` 19/0.
+
+**Not closed by this, and deliberately still open:** the `runner = "codex"`
+parameter defaults this item lists as root cause #2 remain. They are their own
+decision, now taken as fail-closed in
+`2026-08-07-absent-runner-flag-silently-defaults-to-codex.md`, with its own
+implementation still to come. Closing this item does not close that one.
+
+**Process note.** A dispatch was briefed against this item on 2026-08-08 and
+correctly stopped on a briefing-vs-repo contradiction rather than inventing work.
+The orchestrator had not checked the code before briefing, although the closing
+commit was already on the branch and had already been reported to the PO by name.
+The cost was one dispatch budget. The general lesson is recorded in
+`2026-08-08-pre-existing-failure-is-a-claim-that-needs-evidence.md`, which until
+now only covered the inverse error.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 

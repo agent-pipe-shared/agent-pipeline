@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.restart-launch-is-codex-only-for-every-runner
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-06
 source: "Manual re-run of the empty-directory onboarding smoke test in scratch/onboarding-smoke-test while re-verifying backlog/items/2026-08-06-onboarding-lifecycle-plan-hardcodes-the-codex-runner.md (see backlog/evidence/2026-08-06-onboarding-runner-identity-reverification.md), 2026-08-06."
 due: 2026-09-05
@@ -82,6 +82,35 @@ confirming the actual runtime behavior, not just the naming.
   ready/restart machinery) — investigate both together, they may share a
   root cause or a fix.
 - **Date:** 2026-08-07
+
+## Closure, 2026-08-08 — both open questions answered, fixed by `864c7f1`
+
+This item declined to propose a fix until its two open questions were answered.
+They now are, and the answer to the first is why the fix took the shape it did.
+
+- **"Is `codex-onboarding-launch.mjs` actually runner-generic in effect, or does
+  a Claude consumer end up running Codex-specific host-readback logic?"** Neither.
+  It is Codex-specific *and* unreachable-by-design for a tool call, so a Claude
+  consumer following the instruction could not run it at all. Its declared target
+  set is frozen to `.codex/*` and it clears only through a ticket proving a fresh
+  Codex process re-read those bytes. The naming was not stale wording; it was
+  accurate, and the instruction pointing a Claude session at it was the defect.
+- **"Does a live Claude session ever actually reach this `nextAction`?"** Yes —
+  three independent live repros, recorded in the sibling item.
+
+Fixed by `864c7f1f84b5e0a874e360bf26e168fa92f14aaf` (dispatch RUNAUT-1). A runner
+that reads none of the barrier's targets no longer gets a barrier at all
+(`plugins/pipeline-core/lib/project-onboarding-v3.mjs:3809`), and `restartAction`
+branches on the runner rather than naming the Codex launcher unconditionally
+(`:1572`). `LAUNCH_SCRIPT` in `guard-lifecycle-ready.mjs` still names only the
+Codex launcher, which is now correct rather than incomplete: it is the only
+launcher there is, and it is only ever offered to the runner it belongs to.
+
+Verified independently by the orchestrator at both line numbers; suites green on
+the current tip (`project-onboarding-v3` 107/0, `guard-lifecycle-ready` 51/0,
+`codex-onboarding-runtime` 19/0). The paired item named in the triage
+assignment, `2026-08-07-onboarding-ready-path-unconditional-restart-barrier-read.md`,
+is not closed by this and keeps its own status.
 
 ## Update, 2026-08-07 (second live session)
 
