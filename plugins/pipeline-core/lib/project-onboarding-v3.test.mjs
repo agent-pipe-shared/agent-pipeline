@@ -783,7 +783,12 @@ test("PRD/Spec drift exposes only the validated digest-bound PO rebind action", 
       },
     });
     assert.equal(rejectedPlan.status, "partial");
-    assertSingleLineAction(rejectedPlan.nextAction, diagnosticAction);
+    // backlog: 2026-08-08-the-guard-refuses-the-recovery-the-inspection-prescribes.md
+    // (C1, AC-6 branch b). The planner was already run, as part of this same
+    // inspection, and rejected; re-offering the identical command as a
+    // `nextAction` would prescribe a route already proven to refuse. No action
+    // is returned for this exact diagnostic.
+    assert.equal(rejectedPlan.nextAction, null);
     assertDiagnostic(rejectedPlan, "po_authority_rebind_planner_rejected");
   } finally { dispose(path); }
 });

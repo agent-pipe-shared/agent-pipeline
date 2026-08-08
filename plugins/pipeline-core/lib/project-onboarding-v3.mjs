@@ -1745,6 +1745,30 @@ function observeReadyAppServer(intent, runner, fs) {
   }
 }
 
+// backlog: 2026-08-08-the-guard-refuses-the-recovery-the-inspection-prescribes.md
+// (C1). One shared table, read by BOTH the producer below (readyLifecycleResult)
+// and the guard's contract suite (guard-lifecycle-ready.test.mjs), so a reason
+// added here is automatically covered by that suite instead of depending on a
+// hand-written duplicate staying in sync. `offersPlannerRetry: false` marks the
+// one reason where re-running the planner cannot help: `observePoAuthorityRebind`
+// already spawned the planner as part of THIS SAME inspection and observed it
+// reject (`planned.status !== 0`) -- offering to run the identical command again
+// against the same on-disk preimage would prescribe a route already proven to
+// refuse. Every other reason keeps its existing read-only retry action
+// unchanged (AC-7).
+export const PO_AUTHORITY_REBIND_UNAVAILABLE_DIAGNOSTICS = [
+  { reason: "writer-unavailable", code: "po_authority_rebind_writer_unavailable", message: "the PO authority rebind writer could not be observed safely", repair: "restore the sanctioned writer before retrying; do not edit Pipeline State manually", offersPlannerRetry: true },
+  { reason: "planner-execution-unavailable", code: "po_authority_rebind_planner_execution_unavailable", message: "the PO authority rebind planner could not be executed", repair: "repair the planner execution boundary and retry the read-only planner", offersPlannerRetry: true },
+  { reason: "planner-rejected", code: "po_authority_rebind_planner_rejected", message: "the PO authority rebind planner already examined this authority preimage, in this same inspection, and rejected it", repair: "no automated rebind route exists for this preimage; retain both authority documents and repair the underlying PRD/Spec mismatch by hand; do not edit Pipeline State manually", offersPlannerRetry: false },
+  { reason: "planner-protocol-violation", code: "po_authority_rebind_planner_protocol_invalid", message: "the PO authority rebind planner emitted an invalid protocol response", repair: "repair the planner response contract before retrying", offersPlannerRetry: true },
+  { reason: "planner-malformed-output", code: "po_authority_rebind_planner_output_invalid", message: "the PO authority rebind planner did not emit a valid structured plan", repair: "repair the planner output contract before retrying", offersPlannerRetry: true },
+  { reason: "planner-invalid-plan", code: "po_authority_rebind_planner_plan_invalid", message: "the PO authority rebind planner emitted a plan outside the closed rebind contract", repair: "repair the planner plan binding before retrying", offersPlannerRetry: true },
+  // Fallback: every other `unavailable(...)` reason not named above
+  // (persisted-authority-drift, persisted-authority-unavailable, plan-digest-stale)
+  // falls through to this entry. `reason: null` marks it as the default.
+  { reason: null, code: "po_authority_rebind_unavailable", message: "the PRD and specification authority differ but no closed rebind action could be validated", repair: "retain both authority documents and repair the typed PO rebind planner; do not edit Pipeline State manually", offersPlannerRetry: true },
+];
+
 function readyLifecycleResult({ root, runner, intent, repository, runtime, continuity = emptyContinuity() }, fs) {
   requireRunner(runner, "readyLifecycleResult");
   // The fresh protected-mount transition is not a ready-state claim.  Its
@@ -1954,16 +1978,8 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
         )],
       });
     }
-    const plannerDiagnostics = {
-      "writer-unavailable": ["po_authority_rebind_writer_unavailable", "the PO authority rebind writer could not be observed safely", "restore the sanctioned writer before retrying; do not edit Pipeline State manually"],
-      "planner-execution-unavailable": ["po_authority_rebind_planner_execution_unavailable", "the PO authority rebind planner could not be executed", "repair the planner execution boundary and retry the read-only planner"],
-      "planner-rejected": ["po_authority_rebind_planner_rejected", "the PO authority rebind planner rejected the current authority preimage", "inspect and repair the typed planner precondition; do not edit Pipeline State manually"],
-      "planner-protocol-violation": ["po_authority_rebind_planner_protocol_invalid", "the PO authority rebind planner emitted an invalid protocol response", "repair the planner response contract before retrying"],
-      "planner-malformed-output": ["po_authority_rebind_planner_output_invalid", "the PO authority rebind planner did not emit a valid structured plan", "repair the planner output contract before retrying"],
-      "planner-invalid-plan": ["po_authority_rebind_planner_plan_invalid", "the PO authority rebind planner emitted a plan outside the closed rebind contract", "repair the planner plan binding before retrying"],
-    };
-    const [code, message, repair] = plannerDiagnostics[poAuthorityRebind.reason]
-      ?? ["po_authority_rebind_unavailable", "the PRD and specification authority differ but no closed rebind action could be validated", "retain both authority documents and repair the typed PO rebind planner; do not edit Pipeline State manually"];
+    const entry = PO_AUTHORITY_REBIND_UNAVAILABLE_DIAGNOSTICS.find((row) => row.reason === poAuthorityRebind.reason)
+      ?? PO_AUTHORITY_REBIND_UNAVAILABLE_DIAGNOSTICS.find((row) => row.reason === null);
     return lifecycleResult({
       status: "partial",
       root,
@@ -1973,21 +1989,23 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
       runtime,
       continuity,
       appServer,
-      nextAction: {
-        kind: "command",
-        executable: process.execPath,
-        argv: [PO_AUTHORITY_REBIND_WRITER, "po-authority-rebind-plan"],
-        mutation: false,
-        requiresConfirmation: false,
-        expected: {
-          schema: "pipeline.po-authority-rebind-plan.v1",
-        },
-      },
+      nextAction: entry.offersPlannerRetry
+        ? {
+          kind: "command",
+          executable: process.execPath,
+          argv: [PO_AUTHORITY_REBIND_WRITER, "po-authority-rebind-plan"],
+          mutation: false,
+          requiresConfirmation: false,
+          expected: {
+            schema: "pipeline.po-authority-rebind-plan.v1",
+          },
+        }
+        : null,
       diagnostics: [lifecycleDiagnostic(
         "$.authority.poGate",
-        code,
-        message,
-        repair,
+        entry.code,
+        entry.message,
+        entry.repair,
       )],
     });
   }

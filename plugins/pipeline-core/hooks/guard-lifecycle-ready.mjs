@@ -1066,6 +1066,19 @@ function sanctionedPoAuthorityRebindArgs(args) {
  * The rebind planner is read-only but must still be unavailable to every
  * unrelated partial lifecycle state. This narrowly admits its exact argv only
  * when the same inspection reports the diagnosis that the planner repairs.
+ *
+ * backlog: 2026-08-08-the-guard-refuses-the-recovery-the-inspection-prescribes.md
+ * (C1). This used to also require `observed.nextAction === null`, which
+ * `project-onboarding-v3.mjs` stopped producing for this diagnostic once it
+ * started returning the read-only planner argv as `nextAction` (2026-08-02,
+ * commit fb0e9ac1) -- so that clause could never match a real inspection
+ * again and this admission was silently dead against production state,
+ * covered only by a hand-mocked test shape that had drifted from reality.
+ * `po_authority_rebind_unavailable` is emitted from exactly one call site
+ * (`PO_AUTHORITY_REBIND_UNAVAILABLE_DIAGNOSTICS`, `reason: null` entry) whose
+ * `nextAction` is a fixed literal, so the diagnostic code alone already
+ * uniquely identifies this state; the `nextAction` shape does not need its
+ * own re-check.
  */
 function isExactPoAuthorityRebindPlannerRecovery(command, root, dependencies = {}) {
   const words = simpleWords(command, root);
@@ -1091,7 +1104,6 @@ function isExactPoAuthorityRebindPlannerRecovery(command, root, dependencies = {
     && observed?.status === "partial"
     && observed?.root === root
     && observed?.intent === "session"
-    && observed?.nextAction === null
     && Array.isArray(observed?.diagnostics)
     && observed.diagnostics.length === 1
     && observed.diagnostics[0]?.code === "po_authority_rebind_unavailable";
