@@ -253,11 +253,44 @@ the canonical writer satisfies the named path.
 **Split into two dispatches deliberately**, because one dispatch over the whole
 family would die at budget as `PHX-COVERAGE` nearly did:
 
-- `PHX-0A-READ` — `inspect`, `status`, `plan`. Writes nothing. **In flight**; the
-  first run reached 67 tool uses and stopped without a report, and was re-briefed
-  with a hard report point.
+- `PHX-0A-READ` — **landed (`a5e5b65`)**: `inspect`, `status`, `plan`, writing
+  nothing, routed ahead of `readState()` so a read-only report is never gated by
+  the operator's state file. Verified independently, not accepted from the
+  report: run against the live manifest it returns `state: draft`, 13 artifacts,
+  0 findings. The staged cases run 37/37.
 - `PHX-0A-WRITE` — `apply`, `recover`, the PO-bound reconciliation and the
-  Result-reconciliation fence. Not yet dispatched.
+  Result-reconciliation fence. **Deliberately not dispatched** — see below.
+
+> **AUTONOMOUS PROGRESS ON THE EPIC IS NOW STRUCTURALLY CAPPED, and it is not an
+> effort problem.** `harness/scripts/pipeline-state.test.mjs` — the suite
+> P-AC-08 names by path — is TP-5-protected (`project/guard-config.json:24-27`).
+> The 37 cases are written and green but cannot land without a signed window,
+> and registering them afterwards needs a second one (TP-3, `verify.mjs`). Until
+> both, **this slice has not passed the focused Verify gate P-AC-08 requires, so
+> PHX-0's ruleset-trust-root slice and PHX-1 remain formally blocked.**
+> The dispatch attempted no override and left the protected file byte-unchanged,
+> which is the correct behaviour.
+>
+> `PHX-0A-WRITE` is held back for the same reason: its tests would hit the same
+> wall, and landing an *untested transactional state writer* to show motion
+> would be worse than landing nothing.
+
+**Two things the dispatch surfaced that change later briefings.**
+
+1. **P-AC-08's stale-digest reconciliation duty is moot today.** The inherited
+   Phoenix `draft` manifest validates clean — 13 artifacts, zero findings. The
+   criterion's reconciliation half describes a repair with nothing to repair.
+   Confirm before briefing that work rather than building a transaction for a
+   condition that does not exist.
+2. **`validateFeatureTopology()` is deliberately unused** by `inspect`, so its
+   stray-nested-manifest check is not surfaced. Named by the dispatch rather
+   than silently added, and worth a decision when the write half is briefed.
+
+**One correction of mine, recorded because the pattern repeats.** I read a
+truncated dispatch output as a stop and pushed it to finish; it had not stopped —
+only the commit was outstanding. Truncated output is not evidence of a stall,
+and treating it as one costs a round and misattributes a failure to the
+implementor.
 
 ### PUSH DEFERRED BY PO DECISION; THE TP LIFT CANNOT GO THROUGH CHAT (2026-08-08)
 
