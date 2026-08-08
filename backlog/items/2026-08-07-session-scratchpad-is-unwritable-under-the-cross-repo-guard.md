@@ -68,6 +68,27 @@ review without a scratchpad". Independently, the orchestrator's own attempt to
 park held material in the same directory was refused identically, which is what
 prompted the PO's remark.
 
+**A third instance, and a different casualty (2026-08-08).** The same refusal
+also blocks the agent's own **cross-session memory store**, which lives outside
+the project root by design. The PO asked, with visible irritation and fairly,
+that a machine-local path be remembered rather than re-established every session;
+the write was refused as `GUARD-CROSS-REPO-MUTATION`, so it could not be.
+
+This is worse than the scratchpad case in one specific way. A missing scratchpad
+degrades a single dispatch and the dispatch says so. A missing memory store
+degrades **every future session silently** — nothing reports that a fact was
+supposed to be retained and was not, and the cost lands on the human as a
+repeated question. It also cannot be worked around the way the scratchpad can:
+dispatches now park working files under `.git/`, but a memory store deliberately
+sits outside the repository so that it survives the repository, and relocating it
+inside would defeat its purpose.
+
+Two further observations from that instance, both relevant to whichever option is
+chosen: the refusal has no carve-out for a path the runtime itself designates as
+the session's own store, and it does not distinguish a *write to another
+repository* (the risk the rule exists for) from a *write to agent-private state
+that belongs to no repository at all*.
+
 ## Affected artifact
 
 `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs` —
