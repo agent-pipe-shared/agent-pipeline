@@ -748,6 +748,97 @@ test("grammar denials return closed typed retries only for independent read diag
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+test("GRAMMARHINT-1 AC-1: the rejected element is named from what the parser already determined", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+
+    // Operator: parsed.operators[0] already carries the exact token -- pure read, no re-derivation.
+    const operator = evaluateLifecycleReadyGuard(bash("rg -n lifecycle . | tee output.txt"), { projectDir: path });
+    assert.equal(operator.exitCode, 2);
+    assert.match(operator.stderr, /GUARD-OPERATOR-UNAPPROVED/u);
+    assert.match(operator.stderr, /Rejected element: the operator "\|"\./u);
+
+    // Redirect: parsed.redirects[0] carries the token; the target path itself must never appear (AC-5).
+    const redirect = evaluateLifecycleReadyGuard(
+      bash("rg -n lifecycle . > output.txt | head -n 20"), { projectDir: path },
+    );
+    assert.equal(redirect.exitCode, 2);
+    assert.match(redirect.stderr, /GUARD-REDIRECT-UNAPPROVED/u);
+    assert.match(redirect.stderr, /Rejected element: the redirect operator ">"\./u);
+    assert.doesNotMatch(redirect.stderr, /Rejected element:[^\n]*output\.txt/u);
+
+    // Newline: the one control-character case mirrored from parseGuardCommand()'s own
+    // unconditional first-line gate -- the exact GRAMMARHINT-1 regression.
+    const newline = evaluateLifecycleReadyGuard(bash('git commit -m "line one\n\nline two"'), { projectDir: path });
+    assert.equal(newline.exitCode, 2);
+    assert.match(newline.stderr, /GUARD-PARSE-UNSUPPORTED/u);
+    assert.match(newline.stderr, /Rejected element: a newline character inside the command text\./u);
+
+    // Composed with && (also GUARD-PARSE-UNSUPPORTED, no raw control character): denied()
+    // does not preserve which of its several rejection paths fired, so this deliberately
+    // prints NO "Rejected element:" line rather than guessing one (see the function's own
+    // doc comment for why this specific case is out of reach without touching
+    // guard-command-grammar.mjs, out of this dispatch's scope).
+    const composed = evaluateLifecycleReadyGuard(bash("rg -n lifecycle . && touch output.txt"), { projectDir: path });
+    assert.equal(composed.exitCode, 2);
+    assert.match(composed.stderr, /GUARD-PARSE-UNSUPPORTED/u);
+    assert.doesNotMatch(composed.stderr, /Rejected element:/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("GRAMMARHINT-1 AC-2: a git commit -m value with an embedded newline gets a real -F retryAction", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const command = 'git commit -m "line one\n\nline two"';
+    const expected = [{
+      executable: "git", argv: ["commit", "-F", "<message-file>"], mutation: true,
+      requiresConfirmation: false, executionBoundary: "separate-tool-call", expected: { exitCodes: [0] },
+    }];
+    assert.deepEqual(retryActionsForDeniedCommand(command, path), expected);
+    const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: path });
+    assert.equal(result.exitCode, 2);
+    const envelopeLine = result.stderr.split("\n").find((line) => line.startsWith('{"schema":"pipeline.guard-retry-actions.v1"'));
+    assert.ok(envelopeLine);
+    assert.deepEqual(JSON.parse(envelopeLine).retryActions, expected);
+
+    // --message spelling and a bare trailing newline (no second line) both still match; an
+    // ordinary single-line -m commit (no control character at all) is untouched, and an
+    // ordinary multi-part denied command keeps returning [] exactly as before this change.
+    assert.deepEqual(
+      retryActionsForDeniedCommand('git commit --message "one\ntwo"', path),
+      expected,
+    );
+    assert.deepEqual(retryActionsForDeniedCommand("git commit -m fixture", path), []);
+    assert.deepEqual(
+      retryActionsForDeniedCommand("sed -n '1,10p' one.txt ; touch changed.txt", path),
+      [],
+    );
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("GRAMMARHINT-1 AC-4: GUARD-OPERATOR-UNAPPROVED and GUARD-PARSE-UNSUPPORTED stay distinct, own codes never conflated", () => {
+  const path = hgoGitFixture("chat");
+  try {
+    const operator = evaluateLifecycleReadyGuard(bash("rg -n lifecycle . | tee output.txt"), { projectDir: path });
+    assert.match(operator.stderr, /GUARD-OPERATOR-UNAPPROVED/u);
+    assert.doesNotMatch(operator.stderr, /GUARD-PARSE-UNSUPPORTED/u);
+    // Unaffected by this dispatch: the operator/redirect codes already route through
+    // humanOverrideRoute() the same way GUARD-PARSE-UNSUPPORTED does (guard-lifecycle-ready.mjs,
+    // unchanged by this dispatch) -- a plain "nothing armed" fixture offers the route for both;
+    // pinned here as the CURRENT, unchanged behaviour, not narrowed or widened by this change.
+    assert.match(operator.stderr, /Human override available for this exact command/u);
+
+    const parseUnsupported = evaluateLifecycleReadyGuard(
+      bash('git commit -m "line one\n\nline two"'), { projectDir: path },
+    );
+    assert.match(parseUnsupported.stderr, /GUARD-PARSE-UNSUPPORTED/u);
+    assert.doesNotMatch(parseUnsupported.stderr, /GUARD-OPERATOR-UNAPPROVED/u);
+    assert.match(parseUnsupported.stderr, /Human override available for this exact command/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 test("non-ready Bash permits only exact plugin-local lifecycle remediation argv", () => {
   const path = root();
   try {

@@ -157,7 +157,51 @@ const GRAMMAR_DENIAL_GUIDANCE = {
   "GUARD-REDIRECT-UNAPPROVED": "The command contains an unapproved shell redirection.",
 };
 
-function blocked(code = "GUARD-LIFECYCLE-NOT-READY", lifecycleStatus = null, retryActions = [], overrideGuidance = "") {
+/**
+ * GRAMMARHINT-1 AC-1: name the specific construct the ALREADY-COMPLETED parse rejected,
+ * using only what parseGuardCommand() (guard-command-grammar.mjs, out of this dispatch's
+ * scope) determined -- never a second, competing parse.
+ *
+ * GUARD-OPERATOR-UNAPPROVED / GUARD-REDIRECT-UNAPPROVED: the accepted() parse already
+ * carries the exact operator/redirect token in parsed.operators / parsed.redirects; naming
+ * those is a pure read of data the guard already holds, nothing re-derived. The redirect
+ * target itself is never surfaced (AC-5: it can be an absolute, machine-specific path) --
+ * only the operator/direction/fd, which is fixed vocabulary.
+ *
+ * GUARD-PARSE-UNSUPPORTED: parseGuardCommand()'s denied() branch does not preserve which of
+ * its several rejection paths fired -- unbalanced quote, backtick, malformed redirect,
+ * mismatched segment count and a raw control character are all indistinguishable once
+ * denied() returns (guard-command-grammar.mjs, 5 call sites). Carrying that distinction
+ * through denied() is a guard-command-grammar.mjs change and out of this dispatch's scope
+ * (GRAMMARHINT-1 briefing SS4) -- reported, not made, per SS5's stop condition. The one
+ * exception mirrored below is the control-character gate: parseGuardCommand()'s FIRST,
+ * unconditional line (`command.trim() === "" || /[\0\r\n]/u.test(command)`) always
+ * short-circuits before any tokenization runs, so if this predicate is true the real parser
+ * is GUARANTEED, by that same unconditional early return, to have denied the command for
+ * exactly this reason -- no other path through parseGuardCommand() can produce "denied" for
+ * a command matching this test. Reading that off is not a second parser: no tokenization, no
+ * admission decision, no possible drift from what the real parser already concluded.
+ */
+function rejectedGrammarElement(code, command, parsed) {
+  if (code === "GUARD-REDIRECT-UNAPPROVED" && parsed.redirects.length > 0) {
+    const redirect = parsed.redirects[0];
+    const token = redirect.fd === 2 ? "2>" : redirect.direction;
+    return `the redirect operator "${token}"`;
+  }
+  if (code === "GUARD-OPERATOR-UNAPPROVED" && parsed.operators.length > 0) {
+    return `the operator "${parsed.operators[0].operator}"`;
+  }
+  if (code === "GUARD-PARSE-UNSUPPORTED" && typeof command === "string") {
+    if (/\n/u.test(command)) return "a newline character inside the command text";
+    if (/\r/u.test(command)) return "a carriage-return character inside the command text";
+    if (/\0/u.test(command)) return "a NUL character inside the command text";
+  }
+  return null;
+}
+
+function blocked(
+  code = "GUARD-LIFECYCLE-NOT-READY", lifecycleStatus = null, retryActions = [], overrideGuidance = "", rejectedElement = null,
+) {
   const typedLifecycleStatus = code === "GUARD-LIFECYCLE-NOT-READY"
     && CONTROLLING_NON_READY_STATUSES.has(lifecycleStatus)
     ? lifecycleStatus
@@ -172,9 +216,10 @@ function blocked(code = "GUARD-LIFECYCLE-NOT-READY", lifecycleStatus = null, ret
       2,
       "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
         + `${code}: ${grammarReason}\n`
+        + (rejectedElement ? `Rejected element: ${rejectedElement}.\n` : "")
         + "Use one simple shell command per tool call; issue independent read-only commands as separate parallel tool calls.\n"
         + "Do not construct a new composed command with &&, ;, pipelines, redirects, or line continuation.\n"
-        + "If typed retryActions are present, run only those exact read-only actions as separate tool calls.\n"
+        + "If typed retryActions are present, run only those exact typed actions as separate tool calls.\n"
         + "Only bounded rg-to-rg and rg-to-head diagnostic pipelines are admitted as exceptions.\n"
         + `${JSON.stringify(retryEnvelope)}\n`
         + overrideGuidance,
@@ -758,12 +803,45 @@ export function isReadOnlyDiagnosticCommand(command, root) {
 }
 
 /**
+ * GRAMMARHINT-1 AC-2: the one GUARD-PARSE-UNSUPPORTED shape with a fixed, safe, universally
+ * available remediation -- a `git commit ... -m <value>` (or `--message`) whose message text
+ * carries a literal newline or carriage return, which the closed grammar can never admit
+ * (control characters are refused unconditionally, parseGuardCommand()'s first line, before
+ * any tokenization runs). The fix does not depend on the message content: write it to a
+ * file, then `git commit -F <file>`.
+ *
+ * Detected narrowly, by raw text, never by re-parsing the command into the closed grammar:
+ * "git commit" at the start, an -m/--message flag present, and a literal newline/CR
+ * somewhere in the command. A false negative here only means no retryAction is offered (same
+ * as today, never worse); it can never offer a wrong one, and offering it never changes what
+ * the grammar admits (AC-3) -- retryActions are advisory text only, never auto-executed.
+ * Deliberately narrow: `git -C <dir> commit` and other prefixed invocations are not matched
+ * (reported as a known limitation, not silently claimed as covered).
+ */
+function commitMessageFileRetryAction(command) {
+  if (typeof command !== "string") return null;
+  if (!/^\s*git\s+commit\b/u.test(command)) return null;
+  if (!/(?:^|\s)-m(?:[\s"'=]|$)|(?:^|\s)--message\b/u.test(command)) return null;
+  if (!/[\r\n]/u.test(command)) return null;
+  return {
+    executable: "git",
+    argv: ["commit", "-F", "<message-file>"],
+    mutation: true,
+    requiresConfirmation: false,
+    executionBoundary: "separate-tool-call",
+    expected: { exitCodes: [0] },
+  };
+}
+
+/**
  * Recover only independent semicolon- or physical-newline-separated
  * diagnostics. This is a correction hint, never an execution bypass: each
  * returned argv must pass the same closed single-command read-only policy on
  * its own. Quoted and escaped newlines are deliberately not normalized.
  */
 export function retryActionsForDeniedCommand(command, root) {
+  const commitFix = commitMessageFileRetryAction(command);
+  if (commitFix) return [commitFix];
   if (typeof command !== "string" || command.trim() === ""
     || /[\0`]/u.test(command) || /\$\s*\(/u.test(command)) return [];
   const parts = [];
@@ -1614,6 +1692,7 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
           null,
           retryActionsForDeniedCommand(input.tool_input.command, root),
           route.overrideGuidance,
+          rejectedGrammarElement(code, input.tool_input.command, parsed),
         ));
       }
       lifts.push(route.admitted);
@@ -1623,7 +1702,9 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
         code, `${code}: ${GRAMMAR_DENIAL_GUIDANCE[code]}`, "command", root, toolName, input.tool_input, dependencies,
       );
       if (!route.admitted) {
-        return withLifts(lifts, blocked(code, null, [], route.overrideGuidance));
+        return withLifts(lifts, blocked(
+          code, null, [], route.overrideGuidance, rejectedGrammarElement(code, input.tool_input.command, parsed),
+        ));
       }
       lifts.push(route.admitted);
     }
