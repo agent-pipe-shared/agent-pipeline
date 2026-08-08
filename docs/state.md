@@ -184,9 +184,46 @@ A keys-level entry is a typed refusal rather than an approximation — a file de
 standing in for a key removal would destroy project-owned content, which is the
 harm the item was filed for.
 
-**Still to build:** R3 (the sanctioned second kickoff that retires the previous
-anchor, the one remaining leg), the repair map, SETUP-3/4, and the script move the
-PO just decided.
+**Every package of this block is now built, and each suite was re-run by the
+Elephant rather than accepted from a report.** R3 closed the third leg
+(`a246156`): a provisional anchor is derived from the same `^kickoff-[a-f0-9]{16}$`
+shape the library already enforces, never a `startsWith` test that would also
+match an adopter's `specs/kickoff-ideas/`; a *promoted* anchor carrying the
+supersession marker is a record and is kept. The repair map (`598601b`) asks the
+real planner at runtime which refusals can be lifted and by whom, separating three
+answers that all look like "refused" from outside. The obligations block
+(`d71aa71`) is generated from the guards themselves — the measurement that filed
+it went from **0 hits to 4** — and `guard-devplan`'s prefix list moved to
+`lib/guard-devplan-policy.mjs` because a hook script that exits at import time
+cannot be a reader's source. The grammar refusal now names the element it
+rejected and offers `git commit -F` (`53aa19a`), proven behaviour-neutral by a
+differential over 30 command shapes: **9 admitted before, 9 after, 0 changed**.
+The script move landed in both halves (`e3bf10e`, `563e63e`, `02a8888`,
+`33a9f38`); the degradation question it raised needed no new code — a consumer
+without gitleaks, osv-scanner or semgrep gets a typed `SKIPPED`/`binary_missing`
+and exit 0, pinned by the suite. SETUP-3/4 landed (`60fa062`, `537eae2`), the
+second written from the live ceremony rather than from the policy.
+
+**Final sweep, all re-run:** guard-lifecycle-ready 71/0 · project-reset 41/0 ·
+onboarding-continuity 124/0 · inspection-contract 3/0 · gate-strength 36/0 ·
+obligations-contract 8/0 · stop-suggest 250/0 · security-scan 126/0 ·
+guard-devplan 41/0 · project-onboarding-v3 109/0 · repair-map 7/0 ·
+recovery-contract 2/0 · pipeline-start-v3 green · consumer-safe-paths green over
+778 tracked plugin files with 40 allowlist entries, all used.
+
+**Two smaller repairs worth naming.** The recovery-contract suite used to run 109
+unrelated cases as an import side effect to borrow four fixture helpers;
+`project-onboarding-v3.test.mjs` now guards its own `test()` behind
+`isDirectInvocation`, which fixes it for every importer rather than for the one
+caller, and running it directly is unchanged at 109/0. And SETUP-3 shipped a
+bullet naming a reference file that did not yet exist — a dangling pointer a green
+suite never noticed. The suite now reads the core, extracts every
+`references/*.md` it names, and opens each one.
+
+**Still open, and human-only:** the maintenance window the PO signed for `TP-3`
+expires 2026-08-09T01:56Z; the plugin sync (`rsync -a --delete` + `/reload-plugins`)
+and the local candidate test are theirs, as is the push approval once a candidate
+commit exists.
 
 **A defect this block's own dispatches produced, now filed** (`85eca12`):
 `rg -c 'one simple command|closed shell grammar|GUARD-PARSE-UNSUPPORTED'
