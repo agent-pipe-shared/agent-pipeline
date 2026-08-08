@@ -2,7 +2,7 @@
 schema: pipeline.backlog-item.v1
 id: pipeline.agent-can-self-arm-the-git-override
 type: defect
-owner: PO
+owner: pipeline
 status: open
 created: 2026-08-08
 source: "Found on 2026-08-08 by the PHX-RED1 dispatch while diagnosing why plugins/pipeline-core/hooks/guard-git-phoenix.test.mjs is red. The suite is not a broken test: it specifies a human-authority binding that was never built, and diagnosing that surfaced the live hole below. Verified independently at source by the Elephant before filing, not taken from the dispatch report."
