@@ -22,12 +22,14 @@
 // dispatch's scope/budget. This is the one surface backlog item C1
 // concerns, and the one this task fixed.
 //
-// Known cost of reusing the fixture: importing project-onboarding-v3.test.mjs
-// runs its own 109 tests as an import side effect, so their output appears
-// above this suite's. That is noise and a false-attribution risk, not a
-// coverage gap -- the alternative, duplicating the fixture, is the failure
-// mode this file exists to prevent. Extracting the shared helpers into their
-// own module is filed rather than done here.
+// Reusing the fixture used to cost 109 unrelated test cases: importing
+// project-onboarding-v3.test.mjs ran its whole suite as an import side effect,
+// so its output appeared above this one's -- noise and a false-attribution
+// risk. Closed 2026-08-09: that file now guards its own `test()` behind
+// `isDirectInvocation`, so an importer gets the exported helpers and nothing
+// else, while running it directly is unchanged. Duplicating the fixture instead
+// was never on the table -- it is the exact failure mode this file exists to
+// prevent.
 
 import assert from "node:assert/strict";
 import test from "node:test";

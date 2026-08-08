@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.contract-suite-borrows-its-fixture-by-importing-a-109-test-file
 type: improvement
 owner: pipeline
-status: open
+status: resolved
 created: 2026-08-08
 due: 2026-08-22
 source: "Elephant, 2026-08-08, GF-057. Noted while verifying the C1/C3 contract suite; recorded rather than fixed so the block's remaining consumer blockers keep the budget."
@@ -52,9 +52,21 @@ own errand.
 - `docs/pending-verify-registrations.md` — the suite is not yet registered in
   `verify.mjs`.
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted and fixed 2026-08-09, but **not** by the extraction this
+  item assumed. `project-onboarding-v3.test.mjs` now guards its own `test()` and
+  its summary line behind `isDirectInvocation(import.meta.url)`. An importer gets
+  the exported helpers and nothing else; running the file directly is byte-for-byte
+  unchanged (109 passed, 0 failed, verified before and after). The contract suite
+  went from 109 borrowed cases plus 2 of its own to 2, in under a second.
+- **Rationale for guarding rather than extracting:** the helpers are woven through
+  the suite's own setup, so lifting them into a separate module means moving code
+  out of a 109-case file to save an import — and a mis-lift there breaks in a way
+  that *looks* like a fixture problem, which is the most expensive kind of
+  breakage to diagnose. The guard is two lines, changes nothing when the file is
+  run directly, and fixes it for every importer that will ever exist rather than
+  for this one caller. The PO's framing was cost/benefit: this is the version
+  where the benefit is general and the cost is two lines.
+- **Assignment:** GF-057, Elephant.
+- **Date:** 2026-08-09

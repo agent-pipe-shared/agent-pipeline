@@ -62,9 +62,23 @@ import { captureResumeHint, discardResumeHint, inspectResumeHint } from "./resum
 import { inspectObservationGovernanceBootstrap } from "./observation-governance-bootstrap.mjs";
 import { validatePoGateAuthorityForRepository } from "./po-gate-authority.mjs";
 import { initializePoGateProfileReceipt as initializeActualPoGateProfileReceipt } from "./po-gate-profile-publisher.mjs";
+import { isDirectInvocation } from "./entrypoint.mjs";
 
+// This file is BOTH a 109-case suite and the fixture library other suites borrow
+// (`root`, `dispose`, `fakeDeps`, ... are exported below). Until this guard, an
+// importer paid for the whole suite as an import side effect: the lifecycle
+// recovery contract test needed four helpers and ran 109 unrelated cases to get
+// them, which is minutes of wall clock and a confusing double report.
+//
+// Guarding `test()` rather than extracting the fixtures is deliberate. The
+// helpers are woven through the suite's own setup; lifting them into a separate
+// module would mean moving code out of a 109-case file to save an import, and a
+// mis-lift there is exactly the kind of change whose breakage looks like a
+// fixture problem. This is two lines, changes nothing when the file is run
+// directly, and fixes it for every importer that will ever exist.
+const RUNNING_AS_SUITE = isDirectInvocation(import.meta.url);
 let passed = 0; const failures = [];
-function test(name, run) { try { run(); passed += 1; console.log(`PASS  ${name}`); } catch (error) { failures.push(`${name}: ${error.message}`); console.log(`FAIL  ${name} -- ${error.message}`); } }
+function test(name, run) { if (!RUNNING_AS_SUITE) return; try { run(); passed += 1; console.log(`PASS  ${name}`); } catch (error) { failures.push(`${name}: ${error.message}`); console.log(`FAIL  ${name} -- ${error.message}`); } }
 // `root`, `dispose`, `fakeDeps`, `fakeGit`, `initializeRestartRequiredRoot`,
 // `clearRuntimeBarrier`, `completeKickoff` and `PLUGIN_PIPELINE_STATE_SCRIPT`
 // are exported below so the contract suite
@@ -4890,5 +4904,7 @@ test("an ordinary consumer project's runtime initialization never seeds the priv
   } finally { dispose(path); }
 });
 
-console.log(`\nproject-onboarding-v3: ${passed} passed, ${failures.length} failed`);
-if (failures.length) { console.error(failures.join("\n")); process.exitCode = 1; }
+if (RUNNING_AS_SUITE) {
+  console.log(`\nproject-onboarding-v3: ${passed} passed, ${failures.length} failed`);
+  if (failures.length) { console.error(failures.join("\n")); process.exitCode = 1; }
+}
