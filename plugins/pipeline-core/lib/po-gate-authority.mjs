@@ -77,6 +77,24 @@ const PROFILE_REPAIR = "Run node setup.mjs --publish-po-profile from the canonic
   + " In a consumer project, run the pipeline-core script po-gate-profile-repair.mjs (plan, then apply --activate)"
   + " against that project's own primary checkout; add --human-facing <de|en> to set or correct the operator-facing language.";
 const PRD_REPAIR = "Repair activeFeature.planPath and the active feature directory; do not create child PRDs.";
+// A PRD language marker that disagrees with the configured language is not a
+// plan-path defect, and PRD_REPAIR's route repairs nothing about it. The PO in
+// this state has two legitimate resolutions: change the configured language to
+// match the document, or change the marker to match the configuration. Name the
+// first one first -- ADR-0011 leaves the operator-facing language to the PO, so
+// guidance that led with "edit the marker" would read as an instruction to mark
+// the document inaccurately. The invocation is the one po-gate-profile-repair.mjs
+// itself parses and emits; it names the operator's own project root and no
+// absolute path, which keeps this string inside the no-machine-path contract the
+// rest of this module's failures hold to.
+const LANGUAGE_REPAIR = (expected) =>
+  `The active PRD must declare the configured operator-facing language exactly once, as ${PO_GATE_PRD_LANGUAGE_MARKER(expected)} on its own line;`
+  + ` this project is configured for "${expected}".`
+  + " If the document is genuinely written in the other language, change the configuration rather than the document:"
+  + " run the pipeline-core script po-gate-profile-repair.mjs plan --root <project-root> --human-facing <de|en>"
+  + " against that project's own primary checkout, then po-gate-profile-repair.mjs apply --root <project-root>"
+  + " --human-facing <de|en> --plan-sha256 <sha256> --activate with the digest that plan reports."
+  + " Otherwise correct the marker in the PRD to match the configured language.";
 const UTF8 = new TextDecoder("utf-8", { fatal: true });
 
 function sha256(value) {
@@ -611,7 +629,11 @@ function prdAuthority(repoRoot, active, expectedLanguage) {
   }
   const markers = [...text.matchAll(PRD_LANGUAGE_MARKER)].map((match) => match[1]);
   if (markers.length !== 1 || markers[0] !== expectedLanguage) {
-    return fail("PO-GATE-PRD-LANGUAGE-MISMATCH", "The active PRD must declare the repository-scoped PO language exactly once.", PRD_REPAIR);
+    return fail(
+      "PO-GATE-PRD-LANGUAGE-MISMATCH",
+      "The active PRD must declare the repository-scoped PO language exactly once.",
+      LANGUAGE_REPAIR(expectedLanguage),
+    );
   }
 
   const specPath = `${featureDirectory}/spec.md`;

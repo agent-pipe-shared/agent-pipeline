@@ -1086,4 +1086,110 @@ check("profile repair guidance names a route a consumer project can actually run
   });
 });
 
+// --- The refusal names the route that resolves its own cause ----------------
+//
+// A PRD language marker that disagrees with the configured language is not a
+// plan-path defect. The PO who hits it has exactly two legitimate resolutions:
+// change the configured language to match the document, or change the marker to
+// match the configuration. Guidance about `activeFeature.planPath` and child
+// PRDs addresses neither, and the seeded dev-plan gate now blocks rather than
+// warns, so this refusal is on the only path to `submit-plan`.
+
+check("a language-mismatched PRD is signposted to the operator-language route, not to plan-path repair", () => {
+  withFixture({}, ({ primary, validate }) => {
+    write(join(primary, "specs", "feature", "prd_feature.md"), prd("en"));
+    const result = validate();
+    assert.equal(result.ok, false, JSON.stringify(result));
+    assert.equal(result.code, "PO-GATE-PRD-LANGUAGE-MISMATCH", JSON.stringify(result));
+    assert.match(result.repair, /po-gate-profile-repair\.mjs/u, JSON.stringify(result));
+    assert.match(result.repair, /--human-facing <de\|en>/u, JSON.stringify(result));
+    // The configured language and the exact marker the gate expects are named,
+    // so the PO can see which of the two states is the one they disagree with.
+    assert.ok(result.repair.includes(PO_GATE_PRD_LANGUAGE_MARKER("de")), JSON.stringify(result));
+    // Both resolutions are visible, and the honest one -- correcting the
+    // configuration -- is named before editing the marker, so the message never
+    // reads as an instruction to mark the document inaccurately.
+    assert.ok(result.repair.includes("correct the marker in the PRD"), JSON.stringify(result));
+    assert.ok(
+      result.repair.indexOf("--human-facing") < result.repair.indexOf("correct the marker in the PRD"),
+      JSON.stringify(result),
+    );
+    // The unrelated repair is gone from this cause.
+    assert.equal(/activeFeature\.planPath/u.test(result.repair), false, JSON.stringify(result));
+  });
+});
+
+check("the language guidance names an invocation the repair script itself accepts", () => {
+  const guidance = withFixture({}, ({ primary, validate }) => {
+    write(join(primary, "specs", "feature", "prd_feature.md"), prd("en"));
+    return validate().repair;
+  });
+  // The script's own usage line is the contract: every flag form the guidance
+  // quotes must be a form the script actually parses.
+  const usage = repair([]);
+  assert.equal(usage.status, 64, usage.stdout);
+  for (const token of ["--root <project-root>", "--human-facing <de|en>", "--plan-sha256 <sha256>", "--activate"]) {
+    assert.ok(usage.stdout.includes(token), `${token} is not in the script usage: ${usage.stdout}`);
+    assert.ok(guidance.includes(token), `${token} is not in the guidance: ${guidance}`);
+  }
+  assert.ok(
+    guidance.includes("po-gate-profile-repair.mjs plan --root <project-root> --human-facing <de|en>"),
+    guidance,
+  );
+  // And the apply step the guidance names is the one the plan step emits.
+  withConsumerProject("en", ({ root }) => {
+    const plan = repairJson(["plan", "--root", root, "--human-facing", "de"]);
+    assert.equal(plan.status, 0, plan.stdout);
+    assert.ok(
+      plan.value.applyAction.argv[0].endsWith("po-gate-profile-repair.mjs"),
+      "applyAction does not invoke the repair script named in the guidance",
+    );
+    assert.deepEqual(
+      plan.value.applyAction.argv.slice(1),
+      ["apply", "--root", root, "--human-facing", "de", "--plan-sha256", plan.value.planSha256, "--activate"],
+    );
+  });
+});
+
+check("a real plan-path defect still returns the plan-path repair, unchanged", () => {
+  withFixture({}, ({ primary, validate }) => {
+    write(join(primary, "specs", "feature", "prd_second.md"), prd("de"));
+    const result = validate();
+    assert.equal(result.code, "PO-GATE-PRD-CARDINALITY", JSON.stringify(result));
+    assert.equal(
+      result.repair,
+      "Repair activeFeature.planPath and the active feature directory; do not create child PRDs.",
+      JSON.stringify(result),
+    );
+  });
+  withFixture({}, ({ primary, validate }) => {
+    write(join(primary, ".claude", "pipeline-state.json"), state("specs/feature/prd_absent.md"));
+    const result = validate();
+    assert.equal(result.code, "PO-GATE-PLAN-PATH-MISMATCH", JSON.stringify(result));
+    assert.match(result.repair, /Repair activeFeature\.planPath/u, JSON.stringify(result));
+    assert.equal(/--human-facing/u.test(result.repair), false, JSON.stringify(result));
+  });
+});
+
+check("missing, duplicate and malformed language markers still fail before approval", () => {
+  const specBytes = spec();
+  const marker = PO_GATE_PRD_LANGUAGE_MARKER("de");
+  for (const content of [
+    // missing, duplicated, other language, prefixed, uppercased, split over two lines
+    `${TECHNICAL_SPEC_MARKER(sha256(specBytes))}\n# PRD\n`,
+    `${prd("de")}${marker}\n`,
+    prd("en"),
+    `prefix ${marker}\n${TECHNICAL_SPEC_MARKER(sha256(specBytes))}\n# PRD\n`,
+    `<!-- po-language: DE -->\n${TECHNICAL_SPEC_MARKER(sha256(specBytes))}\n# PRD\n`,
+    `<!-- po-language:\nde -->\n${TECHNICAL_SPEC_MARKER(sha256(specBytes))}\n# PRD\n`,
+  ]) {
+    withFixture({}, ({ primary, validate }) => {
+      write(join(primary, "specs", "feature", "prd_feature.md"), content);
+      const result = validate();
+      assert.equal(result.ok, false, JSON.stringify(result));
+      assert.equal(result.code, "PO-GATE-PRD-LANGUAGE-MISMATCH", JSON.stringify(result));
+    });
+  }
+});
+
 process.stdout.write(`po-gate-authority: ${passed} checks passed\n`);
