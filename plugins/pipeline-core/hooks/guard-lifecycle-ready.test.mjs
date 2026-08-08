@@ -27,10 +27,12 @@ import {
   evaluateLifecycleReadyGuard,
   isClaudeSessionMemoryWritePath,
   isForbiddenCrossRepositoryMutation,
+  isMachinePlaneWritePath,
   isNarrowRepositoryRecoveryCommand,
   isProjectWritePath,
   isReadOnlyDiagnosticCommand,
   isSanctionedLifecycleCommand,
+  machinePlaneFilePath,
   main,
   retryActionsForDeniedCommand,
 } from "./guard-lifecycle-ready.mjs";
@@ -82,6 +84,13 @@ function write(filePath = "src/implementation.mjs") {
   return { tool_name: "Write", tool_input: { file_path: filePath } };
 }
 
+// MACHPATH-1: NotebookEdit is the third WRITE_TOOLS member and carries its target under
+// `notebook_path`, not `file_path` (lib/tool-write-target.mjs) -- AC-1 requires every
+// write-capable tool proven, not only the two `edit`/`write` helpers above already cover.
+function notebookEdit(filePath = "src/implementation.ipynb") {
+  return { tool_name: "NotebookEdit", tool_input: { notebook_path: filePath } };
+}
+
 // MEMPATH-1: real Edit/Write PreToolUse payloads carry `file_path` alongside sibling
 // top-level fields the tool itself never sees or sets, `transcript_path` among them. `edit`/
 // `write` above stay unmodified (every pre-existing test relies on their exact shape); these
@@ -107,6 +116,25 @@ function claudeMemorySessionFixture() {
   const memoryDir = join(sessionDir, "memory");
   mkdirSync(memoryDir, { recursive: true });
   return { sessionDir, transcriptPath, memoryDir };
+}
+
+// MACHPATH-1: the repository's own gitignored scratch/ tree, never system tmpdir and never
+// the real $HOME (field-4 constraint: this feature IS a home-directory write surface, so its
+// own fixtures must stay inside the repository rather than merely stand in for one, unlike the
+// pre-existing MEMPATH-1 session fixtures above which model Claude Code's own session dir).
+const SCRATCH_ROOT = fileURLToPath(new URL("../../../scratch/", import.meta.url));
+
+/**
+ * A fake home directory rooted under SCRATCH_ROOT, standing in for `os.homedir()` via the
+ * injected `homedirFn` dependency -- never the real one. Returns the fixture directory plus
+ * the exact single file this feature is meant to admit, both already realpathed so the fixture
+ * agrees with what machinePlaneFilePath() itself derives.
+ */
+function machinePlaneHomeFixture() {
+  mkdirSync(SCRATCH_ROOT, { recursive: true });
+  const home = mkdtempSync(join(SCRATCH_ROOT, "guard-lifecycle-machine-home-"));
+  const realHome = realpathSync(home);
+  return { home, target: join(realHome, ".agent-pipeline", "machine.json") };
 }
 
 function bash(command = "printf implementation") {
@@ -2320,5 +2348,182 @@ test("MEMPATH-1: every other standard-Claude-path shape stays refused -- setting
     rmSync(path, { recursive: true, force: true });
     rmSync(home, { recursive: true, force: true });
     rmSync(otherRepo, { recursive: true, force: true });
+  }
+});
+
+// MACHPATH-1 (specs/sprint-nova-epic/plans/nova-setup-bootstrap.md SS6a, "Where the machine
+// plane lives", PO decision 2026-08-08). The second write surface this guard admits outside
+// the project root: exactly one file, `<homedir>/.agent-pipeline/machine.json`, derived only
+// from an injected `homedirFn` -- never tool_input, never process.env, never repository
+// config. Fixtures below stand in for the home directory under the repository's own
+// gitignored scratch/ tree (machinePlaneHomeFixture()), never system tmpdir and never the
+// real $HOME, per the briefing's field-4 constraint.
+
+test("MACHPATH-1: a governed session admits the exact machine-plane file, for every write-capable tool", () => {
+  const path = root();
+  const { home, target } = machinePlaneHomeFixture();
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const build of [edit, write, notebookEdit]) {
+      assert.deepEqual(evaluateLifecycleReadyGuard(build(target), {
+        projectDir: path,
+        homedirFn: () => home,
+        requireProjectOnboardingReadyFn() { return readiness; },
+      }), { exitCode: 0, stderr: "" }, build.name);
+    }
+    assert.equal(isMachinePlaneWritePath(target, { homedirFn: () => home }), true);
+    assert.equal(machinePlaneFilePath({ homedirFn: () => home }), target);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("MACHPATH-1: nothing else under the derived home directory is admitted -- the directory itself, a sibling, a nested file, a similarly-named neighbour, and a bare-home file", () => {
+  const path = root();
+  const { home, target } = machinePlaneHomeFixture();
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  const agentPipelineDir = dirname(target);
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const targets = [
+      ["the .agent-pipeline directory itself", agentPipelineDir],
+      ["sibling file", join(agentPipelineDir, "other.json")],
+      ["deeper nested file", join(agentPipelineDir, "sub", "machine.json")],
+      ["similarly-named neighbour directory", join(home, ".agent-pipeline-backup", "machine.json")],
+      ["bare home directory file", join(home, "machine.json")],
+    ];
+    for (const [label, candidate] of targets) {
+      assert.equal(isMachinePlaneWritePath(candidate, { homedirFn: () => home }), false, label);
+      let readinessCalls = 0;
+      const result = evaluateLifecycleReadyGuard(edit(candidate), {
+        projectDir: path,
+        homedirFn: () => home,
+        requireProjectOnboardingReadyFn() { readinessCalls += 1; return readiness; },
+      });
+      assert.equal(result.exitCode, 2, label);
+      assert.match(result.stderr, /only inside its own physical project root/u, label);
+      assert.equal(readinessCalls, 0, label);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("MACHPATH-1: a lexical escape through the derived file path is refused", () => {
+  const path = root();
+  const { home, target } = machinePlaneHomeFixture();
+  const escapeTarget = `${target}/../../.claude/settings.json`;
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    assert.equal(isMachinePlaneWritePath(escapeTarget, { homedirFn: () => home }), false);
+    let readinessCalls = 0;
+    const result = evaluateLifecycleReadyGuard(edit(escapeTarget), {
+      projectDir: path,
+      homedirFn: () => home,
+      requireProjectOnboardingReadyFn() {
+        readinessCalls += 1;
+        return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+      },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /only inside its own physical project root/u);
+    assert.equal(readinessCalls, 0);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("MACHPATH-1: a symlinked .agent-pipeline ancestor cannot redirect the write outside the derived home directory", () => {
+  const path = root();
+  const { home, target } = machinePlaneHomeFixture();
+  const outside = mkdtempSync(join(SCRATCH_ROOT, "guard-lifecycle-machine-escape-"));
+  let readinessCalls = 0;
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    symlinkSync(outside, dirname(target));
+    assert.equal(isMachinePlaneWritePath(target, { homedirFn: () => home }), false);
+    const result = evaluateLifecycleReadyGuard(edit(target), {
+      projectDir: path,
+      homedirFn: () => home,
+      requireProjectOnboardingReadyFn() {
+        readinessCalls += 1;
+        return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+      },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /only inside its own physical project root/u);
+    assert.equal(readinessCalls, 0);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("MACHPATH-1: an absent, empty, relative, or unresolvable home directory fails closed rather than guessing", () => {
+  const arbitraryAbsoluteTarget = join(SCRATCH_ROOT, "guard-lifecycle-machine-unrelated-notes.md");
+  const cases = [
+    { label: "homedirFn returns undefined", homedirFn: () => undefined },
+    { label: "homedirFn returns empty string", homedirFn: () => "" },
+    { label: "homedirFn returns a relative path", homedirFn: () => "relative/home" },
+    { label: "homedirFn throws", homedirFn: () => { throw new Error("no home"); } },
+    // A value that does not itself exist on disk is equally unusable -- fails closed rather
+    // than admitting a guessed, never-realpathed anchor.
+    {
+      label: "homedirFn names a directory that does not exist",
+      homedirFn: () => join(SCRATCH_ROOT, "guard-lifecycle-machine-home-does-not-exist"),
+    },
+  ];
+  for (const { label, homedirFn } of cases) {
+    assert.equal(machinePlaneFilePath({ homedirFn }), null, label);
+    assert.equal(isMachinePlaneWritePath(arbitraryAbsoluteTarget, { homedirFn }), false, label);
+  }
+});
+
+test("MACHPATH-1: the machine-plane admission still requires session readiness, not a substitute for it", () => {
+  const path = root();
+  const { home, target } = machinePlaneHomeFixture();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const result = evaluateLifecycleReadyGuard(edit(target), {
+      projectDir: path,
+      homedirFn: () => home,
+      requireProjectOnboardingReadyFn() { deny("partial"); },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("MACHPATH-1: the shell lane stays unchanged -- a Bash write to the same machine-plane path is still refused as a cross-repository mutation, with the same code as before this change", () => {
+  const path = root();
+  const { home, target } = machinePlaneHomeFixture();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const command = `touch ${target}`;
+    assert.equal(isForbiddenCrossRepositoryMutation(command, path), true);
+    let readinessCalls = 0;
+    const result = evaluateLifecycleReadyGuard(bash(command), {
+      projectDir: path,
+      homedirFn: () => home,
+      requireProjectOnboardingReadyFn() {
+        readinessCalls += 1;
+        return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+      },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /GUARD-CROSS-REPO-MUTATION/u);
+    assert.match(result.stderr, /only inside its own physical project root/u);
+    assert.equal(readinessCalls, 0);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
   }
 });

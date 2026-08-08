@@ -3,6 +3,7 @@
 
 /** Codex implementation-write guard for already Pipeline-governed roots. */
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 import {
   basename,
   dirname,
@@ -468,6 +469,78 @@ export function isClaudeSessionMemoryWritePath(filePath, input, dependencies = {
   const memoryDir = claudeSessionMemoryDirectory(input, dependencies);
   if (memoryDir === null) return false;
   return isPathWithinRealpathedRoot(filePath, memoryDir, dependencies);
+}
+
+/**
+ * MACHPATH-1 (PO decision, 2026-08-08 -- specs/sprint-nova-epic/plans/nova-setup-bootstrap.md
+ * SS6a, "Where the machine plane lives"). The second, and so far last, write surface this
+ * guard admits outside the project root: exactly one file, `<homedir>/.agent-pipeline/
+ * machine.json`, the machine-scoped configuration plane a bootstrap writes once per machine
+ * (push-approval default, key directory, model routing, language -- never a project's own
+ * committed `gates.push_approval`, which stays inside the repository, SS2/SS7 of that plan).
+ *
+ * `os.homedir()` -- through the same injectable `dependencies` pattern as
+ * `existsSyncFn`/`realpathSyncFn`/`statSyncFn` above -- is the ONLY source for the anchor:
+ * never `tool_input`, never `process.env` read directly by this file, never repository
+ * configuration. `homedir()` is realpathed once so a symlinked home directory anchors the
+ * boundary at the same place `isMachinePlaneWritePath()` below resolves it to, the identical
+ * discipline `claudeSessionMemoryDirectory()` applies to `transcript_path` above.
+ *
+ * Fails closed whenever the home directory is absent, empty, relative, or cannot itself be
+ * realpathed (a login/service account with no real home is refused, not guessed) -- it never
+ * requires `.agent-pipeline/` or `machine.json` itself to already exist, since the very point
+ * of this carve-out is the FIRST write that creates both.
+ *
+ * What this does NOT defend against, stated plainly rather than implied: `os.homedir()` is an
+ * opaque OS primitive this function trusts as given, and on POSIX platforms Node's own
+ * implementation of it may itself consult the `HOME` environment variable when the OS user
+ * database does not resolve one -- this file never reads `process.env` itself, but it cannot
+ * see through what `os.homedir()` already decided before returning. Nor does it defend against
+ * a party who can already write inside the real home directory before this check ever runs
+ * (planting `.agent-pipeline` as an ordinary directory the guard would then legitimately admit
+ * into) -- that party already holds the access SS5a of the same plan excludes from this layer.
+ */
+export function machinePlaneFilePath(dependencies = {}) {
+  const homedirFn = dependencies.homedirFn ?? homedir;
+  let home;
+  try {
+    home = homedirFn();
+  } catch {
+    return null;
+  }
+  if (typeof home !== "string" || home.trim() === "" || home.includes("\0") || !isAbsolute(home)) return null;
+  const realpath = dependencies.realpathSyncFn ?? realpathSync;
+  try {
+    return join(realpath(home), ".agent-pipeline", "machine.json");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Admit a write only when it is EXACTLY the single derived file above -- never a prefix, never
+ * a directory. `isPathWithinRealpathedRoot()` alone has no notion of "exactly one file": rooted
+ * at a directory it legitimately admits anything nested inside it, which is precisely what the
+ * memory carve-out above wants for its directory and precisely what THIS carve-out must refuse
+ * (a sibling `other.json`, a nested `sub/machine.json`, the bare `.agent-pipeline` directory).
+ * Reusing it unmodified with root = the target FILE itself is not possible either: the file
+ * need not already exist (the whole point is the first write that creates it), and that walk's
+ * base case realpaths its own root, which would throw on a not-yet-created file.
+ *
+ * So identity is checked first, against the resolved (lexically normalized) candidate -- this
+ * alone closes the single-file, no-prefix, and lexical-escape (`../..`) requirements. The
+ * shared containment walk is then reused exactly as every other caller uses it, rooted at the
+ * already-realpathed home directory (which does exist) rather than at the file itself, purely
+ * for the symlink-ancestor protection it gives for free: a `.agent-pipeline` planted as a
+ * symlink before this write runs cannot redirect the boundary. The realpath semantics are
+ * identical to every other caller of that walk; only the root differs.
+ */
+export function isMachinePlaneWritePath(filePath, dependencies = {}) {
+  if (typeof filePath !== "string" || filePath.trim() === "" || filePath.includes("\0")
+    || !isAbsolute(filePath)) return false;
+  const target = machinePlaneFilePath(dependencies);
+  if (target === null || resolve(filePath) !== target) return false;
+  return isPathWithinRealpathedRoot(filePath, dirname(dirname(target)), dependencies);
 }
 
 function isRestartResumeHintInputWrite(input, root) {
@@ -1360,14 +1433,19 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
     // the writer-owned-State check (meaningless for a target this far outside root) are
     // skipped.
     const memoryWrite = isClaudeSessionMemoryWritePath(target, input, dependencies);
-    if (!memoryWrite && !isProjectWritePath(target, root, dependencies)) {
+    // MACHPATH-1: the second, narrower carve-out (specs/sprint-nova-epic/plans/
+    // nova-setup-bootstrap.md SS6a) -- exactly one file, never a directory or a prefix. Same
+    // treatment as memoryWrite immediately above: admitted outright, never through the
+    // human-override route, and it skips the identical two checks for the identical reason.
+    const machineWrite = !memoryWrite && isMachinePlaneWritePath(target, dependencies);
+    if (!memoryWrite && !machineWrite && !isProjectWritePath(target, root, dependencies)) {
       const route = humanOverrideRoute(
         CROSS_REPO_DENIAL_CODE, crossRepoReason, "write", root, toolName, input.tool_input, dependencies,
       );
       if (!route.admitted) return crossRepositoryMutationBlocked(route.overrideGuidance);
       lifts.push(route.admitted);
     }
-    if (!memoryWrite) {
+    if (!memoryWrite && !machineWrite) {
       const requested = resolve(root, target);
       if (requested === join(root, ".claude", "pipeline-state.json")
         || requested === join(root, "project", "pipeline-state.json")) {
