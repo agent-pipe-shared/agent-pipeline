@@ -180,7 +180,7 @@ the boundary the PO wants.
 The block above ended by naming the open questions. The PO answered them, and one
 answer reversed a decision this repository had recorded the day before.
 
-**Decision 6 of [ADR-0059](adr/0059-guard-lift-boundary.md): cross-repository
+**Decision 6 of [ADR-0059](adr/0059-signed-human-guard-override.md): cross-repository
 mutation becomes signature-liftable** (`6d86110`). The prior Decision 5 argued
 from the human-override implementation — a repository-scoped identity model — to
 a policy conclusion. That inference is wrong in a way worth recording: the

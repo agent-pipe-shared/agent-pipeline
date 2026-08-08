@@ -121,8 +121,8 @@ step and carries its own calibration.
 
 - `2026-08-08-kickoff-apply-action-drops-the-runner-the-plan-was-made-for.md` —
   same onboarding path, same greenfield run class.
-- [ADR-0054](../../docs/adr/0054-authority-tier-precedence.md) — the three-tier
-  precedence chain whose legacy tier this file belongs to.
+- [ADR-0054](../../docs/adr/0054-arbitheon-authority-directory-and-precedence-chain.md)
+  — the three-tier precedence chain whose legacy tier this file belongs to.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
