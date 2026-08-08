@@ -54,8 +54,8 @@ gates:
   dev-plan:
     mode: blocking
     type: human
-    # exemptPaths:
-    #   - scratch/
+    exemptPaths:
+      - scratch/
   push:
     mode: blocking
     type: human
