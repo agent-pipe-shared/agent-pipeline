@@ -33,7 +33,9 @@ project's very first transaction, plus the reasoning to work out why.
 - `plugins/pipeline-core/lib/onboarding-continuity.mjs:2983` — `applyAction()`
   builds the kickoff apply argv without `--runner`.
 - `plugins/pipeline-core/lib/onboarding-continuity.mjs:3319` —
-  `promotionApplyAction()` has the same shape and the same omission.
+  `promotionApplyAction()` has the same shape and the same omission. The PO
+  observed this second site independently, at the PRD binding, after reporting the
+  first.
 
 The runtime layer does not have this gap: the `initialize-runtime` action in the
 same run carried `--runner claude --intent bootstrap` correctly. So this is a
@@ -53,6 +55,18 @@ attestation* demand inside a Claude project. That is a misleading diagnosis: it
 names a runtime capability rather than a dropped flag, and it points the operator
 at Codex onboarding for a problem that has nothing to do with Codex.
 
+## The PO's framing: this is the fourth round, so the fix must not be a fourth patch
+
+The PO confirmed the same loss at the PRD binding — the promotion apply — and named
+the pattern rather than the site: *"ist dann die 4. Runde Fixes damit Claude geht,
+das muss nachhaltiger werden."*
+
+That is the governing constraint on this item. Repairing two argv literals would
+close the two sites a single happy-path run happened to exercise and would leave
+the class intact, exactly as the three previous rounds did. What is missing is not
+two flags; it is an invariant that a plan-bound action cannot be constructed
+without the runner its plan was made under.
+
 ## Direction, not a design
 
 1. **Carry the runner into the plan and out through the action.** The apply argv
@@ -60,14 +74,26 @@ at Codex onboarding for a problem that has nothing to do with Codex.
    output is inside the plan digest (`onboarding-continuity.mjs:3130` compares the
    canonical JSON), so plan and validation move together by construction — but
    the runner must first become part of what the plan records.
-2. **Cover the promotion action in the same change.** `promotionApplyAction` has
-   the identical omission and would otherwise be found again by the next test.
-3. **Sweep for the remaining plan/apply pairs.** Two were found by inspecting the
-   two the run happened to exercise. The question worth answering once is whether
-   any other returned action omits a parameter its plan was bound to.
-4. **Make the wrong-runner failure name the cause.** A Claude-rooted project that
+2. **Make the omission unrepresentable, not merely absent.** Each of these actions
+   is built by a hand-written argv array literal, so a new one starts from a copy
+   of an old one and inherits whatever the old one forgot. A single constructor
+   that takes the runner as a required argument turns the next omission into a
+   construction error instead of a runtime failure in someone's fresh project.
+3. **Enforce it with an enumerating test, not a review.** A check that walks every
+   plan-producing entry point, resolves its returned action, and asserts the
+   runner is present is the thing that survives the next contributor. Point 2
+   without point 3 is a convention; the previous three rounds were also
+   conventions.
+4. **Then sweep the remaining plan/apply pairs once** — under that test, so the
+   sweep produces a permanent result rather than a list. The open question the
+   sweep answers is whether any returned action drops a *different* parameter its
+   plan was bound to; the runner is the instance that was observed, not
+   necessarily the only one.
+5. **Make the wrong-runner failure name the cause.** A Claude-rooted project that
    fails a Codex attestation should say that the action resolved a different
-   runner than the plan, not merely that an attestation is missing.
+   runner than the plan, not merely that an attestation is missing. This one is
+   worth doing even after 1–4, because a future mismatch from any other source
+   still surfaces here.
 
 ## Triggering situation
 
