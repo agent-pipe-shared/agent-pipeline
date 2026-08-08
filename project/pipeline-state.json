@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
-  "planApproved": false,
-  "updatedAt": "2026-08-08T06:03:50.917Z",
+  "planApproved": true,
+  "updatedAt": "2026-08-08T06:05:46.650Z",
   "closedFeatures": [
     {
       "id": "sprint-sentinel-epic",
@@ -240,21 +240,21 @@
   "planApproval": {
     "schema": "pipeline.plan-approval.v4",
     "approvedBy": "PO",
-    "approvedAt": "2026-08-06T05:55:13.328Z",
-    "submissionSha256": "a737d5b0a8f568a29f530edc546c79569b6f8c54b73783ad2bb95b34fd876a01",
-    "profileSha256": "72a1601a9a904136f5fef9bf6146cfb5da3c03da175309353576f09a97861b05",
+    "approvedAt": "2026-08-08T06:05:46.650Z",
+    "submissionSha256": "7f394f4c028cf7b7b6e840a859443aefe5759cb629313bb0809f3daf3b1dda65",
+    "profileSha256": "26494e6fbe5634bf4b7bbd698f5348b74f766bb3bcb715d926f5def107d50ba0",
     "poGateAuthority": {
       "schema": "pipeline.po-gate-authority.v2",
       "humanFacing": "en",
-      "sourceSha256": "7f93ca3989ba226afeaf55615280851d2a1602f25a892866b433cfc9a47c0870",
-      "runtimeSha256": "1f469b84b984ea505db77f60a23f0bed3e49cb2dc9929321893e88cbc9408f63",
-      "receiptSha256": "874a1779e0d0e2f72f8cdeb44ab2258938d371f63bb5201b62c2750f9375144c",
+      "sourceSha256": "ce50d74d16fdbcd0b9f8b3b606297e88af3d2f139b3cd14b692f4ea15599b023",
+      "runtimeSha256": "5fa4492e52d5987142bcd7eb466bba8492a4ba53a7938995783e93c3e43df58f",
+      "receiptSha256": "708c217f156dd2b00fdaca9071494fa0ee4e917ed17e00c1c1379ec583eb60c9",
       "repositoryFingerprint": "92f4f001424af56c17e443aec9969d0ff5ac0e426b8f388fe06d4b1800aa2d35",
       "planPath": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
-      "planSha256": "303586c891173ba4c5741df9869d4b7b3508f3029d1a6914093d1e6683ba292b",
+      "planSha256": "8b820ea5907c24061eeab1a8f2255939401f5a2002792c5f16d39836712b3177",
       "specPath": "specs/sprint-phoenix-epic/spec.md",
       "specSha256": "f7e32bb764d408ec21d6578d72b4729d8d5931bcf840ebac2198a2d652233d4f"
     },
-    "priorInvalidationSha256": "e66ea494884441c644ded3e6ef0545140a4b49417bb14b1d977ce5984e562c57"
+    "priorInvalidationSha256": "9a21c3932ffeaed261a4abaa76383eaa7b14ec44df50502e546264cb68911495"
   }
 }
