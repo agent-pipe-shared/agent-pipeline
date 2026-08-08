@@ -91,11 +91,22 @@ they name `docs/operating-model.md` by heading title, which is the correct
 post-sweep shape. Only `docs/deploy/README.md:8,23` genuinely carries
 `docs/operating-model.md §3.5` and `§3.1/§3.5`.
 
-**One adjacent instance found by the same search, same class, different target:**
-`roles/elephant.md:105` cites `docs/deploy/README.md §7.1` — a numeric section
-citation into a document whose headings can drift exactly as the operating
-model's did. AC-P4 is scoped to citations of the operating model, so this is
-outside it; it belongs to whatever generalises the rule.
+**One adjacent instance, and the first reading of it here was wrong.**
+`roles/elephant.md:105` cites `docs/deploy/README.md §7.1`. This item first
+recorded that as "the same class, different target", which overstates it:
+`### 7.1 Evidence schema` **exists** in that document, so the citation currently
+resolves. It is a numeric citation and therefore carries the same *fragility* —
+a renumbering of the deploy README would silently break it — but it is not a
+broken citation today and is not part of this defect. Corrected rather than left
+standing, because an item that inflates its own scope is harder to triage than
+one that states it narrowly.
+
+**Carriers repaired 2026-08-08** (`162c30c`, dispatch `PHX-DEPLOY-CITE`): both
+`docs/deploy/README.md` citations now read `` `docs/operating-model.md` — *The
+lifecycle* ``, matching the `roles/elephant.md:105` precedent for the same
+Release/Promotion subject matter. `check-doc-contracts.mjs` green; a
+repository-wide search for the pattern now returns only the six false positives
+described above. **Step 1 of the proposal is done; step 2 is the open part.**
 
 **Consequence for the proposal:** step 1 stays a two-line repair. Step 2 is no
 longer an investigation but a choice — whether a census may ever be authored
