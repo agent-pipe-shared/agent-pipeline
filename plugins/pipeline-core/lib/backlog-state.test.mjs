@@ -1140,8 +1140,40 @@ function managedRepairInput(root, overrides = {}) {
   // replayed against this repository's own real canonical ledger and items
   // (mirroring BS12's style), so the 38-entry authorized registry is
   // exercised for real rather than against a hand-rolled fixture registry.
+  //
+  // The raw ledger, filtered to drop the 38 amendments, is not contiguous:
+  // any ordinary event appended after the (now-removed) amendment block
+  // keeps its original sequence number and previousHash, so
+  // validateTransitionLedger reports sequence-order and hash-chain findings
+  // unconditionally, on top of whatever `commitExists` reports. That makes
+  // the asserted refusal fire regardless of the override, which is exactly
+  // the failure mode this rebuild closes (PHX-BS25-FIX). Renumbering only
+  // rewrites the tail that no longer matches physical order -- the first 38
+  // events (the amendment targets, whose entryHash is pinned by
+  // PRE_PUBLIC_CORE_REACHABILITY_TARGETS) always come out byte-identical --
+  // so the result is stable no matter how many events the live ledger later
+  // grows by.
+  function renumberPrePublicCoreHistory(events) {
+    const rebuilt = [];
+    let previousHash = null;
+    for (const [index, original] of events.entries()) {
+      const sequence = index + 1;
+      if (original.sequence === sequence && original.previousHash === previousHash) {
+        rebuilt.push(original);
+        previousHash = original.entryHash;
+        continue;
+      }
+      const updated = { ...original, sequence, previousHash, entryHash: "" };
+      updated.entryHash = transitionHash(updated);
+      rebuilt.push(updated);
+      previousHash = updated.entryHash;
+    }
+    return rebuilt;
+  }
+
   const canonical = loadBacklogState(process.cwd(), { checkCommit: false });
-  const historical = canonical.events.filter((entry) => entry?.evidence?.kind !== PRE_PUBLIC_CORE_REACHABILITY_KIND);
+  const historical = renumberPrePublicCoreHistory(
+    canonical.events.filter((entry) => entry?.evidence?.kind !== PRE_PUBLIC_CORE_REACHABILITY_KIND));
   const expectedSequences = Array.from({ length: 38 }, (_, index) => index + 1);
   function realCommitExists(oid) {
     return spawnSync("git", ["cat-file", "-e", `${oid}^{commit}`], { cwd: process.cwd(), stdio: "ignore" }).status === 0;
@@ -1154,11 +1186,24 @@ function managedRepairInput(root, overrides = {}) {
     referenceSha256: "a".repeat(64),
   }));
   const input = { at: "2026-08-08", actor: "hotfix-phx-ledger-reach-repair", commit: "a".repeat(40), references: dummyReferences };
+  const TARGET_ERROR = "exactly its authorized set of currently failing events";
+  // The first 38 targets must survive renumbering byte-for-byte: they are
+  // never physically displaced (the amendments always sit after them), so
+  // renumberPrePublicCoreHistory should never have touched them.
+  const first38Untouched = expectedSequences.every((sequence) => historical[sequence - 1] === canonical.events[sequence - 1]);
   const reachableOverrideRejected = planPrePublicCoreReachabilityRepair(canonical.items, historical, input, { commitExists: overriddenCommitExists });
+  const reachableWithoutOverride = planPrePublicCoreReachabilityRepair(canonical.items, historical, input, { commitExists: realCommitExists });
   check("BS25 a pre-public-core reachability amendment for an event whose commit IS already reachable is refused",
-    !reachableOverrideRejected.ok
-      && reachableOverrideRejected.errors.some((error) => error.includes("exactly its authorized set of currently failing events")),
-    reachableOverrideRejected.errors.join("; "));
+    first38Untouched
+      // Discrimination, pinned in both directions: the refusal fires once
+      // the target commit is reported reachable (override) and must NOT
+      // fire on the identical input when it is not (no override) -- proving
+      // the refusal tracks reachability rather than incidental ledger noise.
+      && !reachableOverrideRejected.ok
+      && reachableOverrideRejected.errors.some((error) => error.includes(TARGET_ERROR))
+      && !reachableWithoutOverride.errors.some((error) => error.includes(TARGET_ERROR)),
+    [`WITH override: ${reachableOverrideRejected.errors.join("; ")}`,
+      `WITHOUT override: ${reachableWithoutOverride.errors.join("; ")}`].join(" | "));
 
   const duplicateRejected = planPrePublicCoreReachabilityRepair(canonical.items, canonical.events, input);
   check("BS26 a second pre-public-core reachability repair run is refused rather than appending duplicates",
