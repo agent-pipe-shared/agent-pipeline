@@ -795,6 +795,66 @@ code to test, not a test we failed to write. The honest statement is that the
 *classification decision* moved out of the Pipeline's own code and is now trusted
 from its caller. Owner PO, review by 2026-09-07, alongside the exclusion package.
 
+### The retired suite is gone (`14cca32`), and the rename was correctly refused
+
+Deleted, exclusion entry removed, the seven-entry literal in
+`check-verify-suite-registration.test.mjs` down to six with its case name
+corrected and its deep-equality intact, and the backlog item updated with a
+section stating **why** the entry left the set — a debt vanishing quietly from a
+tracked list is the failure this requirement exists to prevent. 37 cases before
+and after; `check-verify-suite-registration.mjs` now reports 365 registered, **6**
+exclusions, 0 unregistered.
+
+The filename and the item's `id` still say "seven", deliberately.
+`backlog/transitions.ndjson` is an append-only hash-chained ledger and its entry
+179 names the path; `backlog/index.json` and this file reference it too. Renaming
+needs a ledger-aware step, so the dispatch took the briefing's own fallback — a
+stale filename beats a broken chain — and said so in the item, the checker
+comment and the commit body rather than leaving it to be discovered.
+
+### The gate went red, and the cause is a briefing rule of mine
+
+`fcb66f5` failed on `product-capability-inventory-tests`: exactly one surface id
+missing, `verify-phase:harness/scripts/verify.mjs:bootstrap-source-attestation-acceptance-tests`.
+Registering a suite in `verify.mjs` *adds a discovered product surface*, and the
+inventory must cover the discovered set exactly. Fixed in `1a71d7c` — the entry
+in the sorted `surfaces` array and in the `surfaceIds` of the
+`deterministic-verification` capability that owns every verify-phase surface.
+
+The cause is worth stating as a rule rather than an incident. Every dispatch
+tonight was told **not** to run the full gate, because a second concurrent run
+corrupts the candidate lock. That instruction is correct and stays. But it makes
+a dispatch structurally blind to any coupling only the full gate can see, and
+suite registration is exactly such a coupling. The compensating control belongs
+in the briefing — *a dispatch that registers a suite is told, in its own
+definition of done, that the inventory is part of the registration act* — not in
+loosening the concurrency rule. Three briefing defects this phase were about the
+environment rather than the task; this is a fourth of the same family.
+
+### Three red suites are being repaired in parallel, and the triage that ordered them
+
+I ran the six excluded suites' actual failures rather than trusting their
+recorded reasons, which turn out to describe only the first failure in each file:
+
+| suite | real symptom |
+| --- | --- |
+| `guard-git-phoenix` | one case, `1 !== 2` |
+| `afk-activation` | **8 of 13** fail, five of them reporting `AFK-HOST-OBSERVATION-FAILED` where a specific code was expected — the shape of one early step masking every later branch |
+| `codex-isolated-critic-protected-preimage` | a pinned sha256 of `harness/review-protocol.md` has drifted |
+| `plan-spec-state-v2` | missing export `bindPlanSpecApprovalWithHumanDecision` |
+| `recovery-bridge-approval` | missing export `RECOVERY_BRIDGE_DECISION_SCHEMA` |
+| `windows-assurance-verify-registration` | WAVR19, plus it is itself an unregistered self-check of `verify.mjs`'s ordering |
+
+The first three are dispatched (`PHX-RED1/2/3`). The next two are the **same class
+as the suite deleted tonight and as PHX-0B**: a writer that was never built, not a
+test that broke. Each briefing names that class as a stop condition precisely so a
+dispatch does not quietly invent a missing export to reach green.
+
+**None of the three may register itself.** Registration is batched by me into one
+`verify.mjs` commit once I know which are genuinely green — three dispatches
+writing the same protected file inside one window would collide, and the window is
+the scarce thing here, not the edits.
+
 ### F1 is closed, and closed on evidence I produced myself
 
 The Critic's single FAIL finding is repaired in `358c709`. BS25 rebuilds its
