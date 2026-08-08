@@ -855,6 +855,80 @@ dispatch does not quietly invent a missing export to reach green.
 writing the same protected file inside one window would collide, and the window is
 the scarce thing here, not the edits.
 
+### The gate is green at 367/367, and the count went up for the right reason
+
+`1a71d7c`, exit 0, `binding: "exact"`, **367 of 367** — 366 before plus the new
+`bootstrap-source-attestation-acceptance-tests`. That is the first time this phase
+the registered-suite count has grown rather than the exclusion list.
+
+### PHX-RED2: one product defect wearing eight failures
+
+`c12caa1`. 5 pass / 8 fail → **13/13**, and not one expectation was touched.
+
+The cause was a single hand-rolled fallback in `afk-activation.mjs`: it asked for
+the neutral State path unless the resolver's result carried `source === "legacy"`
+— a field an unreadable or missing authority never carries at all, so that arm was
+dead code. The State read then left the suite's fabricated world, threw, and the
+surrounding host-observation `catch` reported `AFK-HOST-OBSERVATION-FAILED` for
+every branch behind it. That is exactly why the five *passing* cases were the five
+that return before that block.
+
+`project-authority.mjs:534-548` (ADR-0054 step 1) says the shared resolver exists
+so that readers stop inventing this fallback, and that a reader must never become
+stricter by being routed. The hand-rolled version was stricter. The repair is one
+call to `resolveAuthorityArtifactPath`.
+
+Two things the dispatch left alone and named, both correct calls:
+
+- The masking `try/catch` that collapses six distinct host-observation steps into
+  one opaque code is *why one defect looked like eight*. Narrowing it is a design
+  change the briefing did not authorize, so it was reported, not done.
+- `project-authority.test.mjs:297` copies from `process.cwd()`, so that suite is
+  red from any working directory other than the repo root. It passes in the gate
+  because verify runs from the root. A cwd-bound fixture is a latent portability
+  defect on a repo that runs on two machines.
+
+Ready for registration.
+
+### PHX-RED1 stopped, and the stop is the most valuable result of the night
+
+The dispatch was sent to repair one failing assertion — `1 !== 2` — and reported
+that **neither side is wrong**, then stopped without changing a line. That is the
+right answer and it took reading the guard, the guardrail and a protected sibling
+suite to reach.
+
+The two numbers are guard exit codes: `1` is allow-with-loud-notice, `2` is block.
+The code is correct against `guardrails/git.md` GIT-04 as written. The Phoenix
+suite specifies a **different, stronger, unbuilt** contract — a fourth arming
+segment naming a `pipeline.git-override-authority-reference.v1` document resolved
+against the human ledger and single-consumed there. That schema name appears in
+exactly one file in the repository: the test.
+
+**Filed as `pipeline.agent-can-self-arm-the-git-override`** (`e63b9ba`, owner PO,
+due 2026-09-07), because diagnosing the red surfaced something live:
+`guardrails/git.md:64` says in those words that an agent must not self-arm the
+override, and nothing enforces it. The arming contract is three segments whose
+values the arming party chooses; the token is checked for freshness, never for
+provenance; every field of the ledger line is agent-supplied. For the whole
+GG-01…GG-16 union — `reset --hard`, history rewriting, branch deletion — the
+difference between a confirmed human decision and an agent's own initiative is a
+sentence in a Markdown file. I verified this at source before filing rather than
+relaying the dispatch's claim.
+
+**Why it is a PO decision and not a task.** `guard-git.test.mjs` (TP-1-protected)
+case OV-AC1 at `:289-297` asserts exit 1 and `OVERRIDE APPLIED` for
+`git reset --hard HEAD~1` under three-segment arming — the same rule and the same
+command the Phoenix suite requires blocked. Two live suites, one command, opposite
+expectations. Both cannot be green under one contract. If the Phoenix binding
+supersedes GIT-04 this is a feature block needing a signed window for the TP-1
+suite; if it does not, the honest act is to delete the Phoenix suite and record
+the hole as accepted risk. Leaving it excluded with a reason that reads
+`"AssertionError, 1 !== 2"` is the one option that is dishonest, and that wording
+is itself a QG-05 defect to correct either way.
+
+**This suite is NOT ready for registration**, and it is not repairable by the same
+motion as the others.
+
 ### F1 is closed, and closed on evidence I produced myself
 
 The Critic's single FAIL finding is repaired in `358c709`. BS25 rebuilds its
