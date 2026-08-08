@@ -929,6 +929,55 @@ is itself a QG-05 defect to correct either way.
 **This suite is NOT ready for registration**, and it is not repairable by the same
 motion as the others.
 
+### PHX-RED4 stopped too, and it demolished my premise rather than my briefing
+
+I briefed it as a merge-loss recovery: the writer existed at `48e5813`, so restore
+it. The premise is wrong, and the dispatch established that instead of executing
+it.
+
+**What the merge actually did.** `75b8361` ("integrate origin/main 0.5.2 into
+sprint_phoenix") did not delete a function. It replaced `harness/lib/plan-spec-state-v2.mjs`
+**wholesale with a 192-byte re-export shim** pointing at
+`plugins/pipeline-core/lib/plan-spec-state-v2.mjs` — the main lineage, which never
+had the symbol. And `verify.mjs:488` registers the *successor* suite,
+`plugins/pipeline-core/lib/plan-spec-state-v2.test.mjs`, which is **green**.
+
+So `harness/lib/plan-spec-state-v2.test.mjs` is not a broken suite. It is the
+**pre-merge suite the merge orphaned**, still sitting in the tree, testing a module
+that is now a shim, while its registered successor runs in the gate. Same shape as
+`codex-host-plugin-list.test.mjs`, which was deleted tonight for the same reason.
+
+**Three separate reasons restoration would have been wrong**, each of which I
+would not have found from the design documents alone:
+
+1. **Scope.** The historical body needs twelve module-private helpers the plugin
+   lib does not export. Faithful restoration means editing a second production
+   file; doing it in the shim means duplicating ~100 lines of authority
+   validation — the "restoration quietly becomes a rewrite" the briefing forbade.
+2. **A schema-identifier collision.** `pipeline.plan-approval.v3` is already taken
+   on the merged base by `PREVIOUS_CURRENT_APPROVAL_SCHEMA`, itself superseded by
+   `.v4`. A restored historical v3 record would match nothing that
+   `currentApproval()` accepts, so `derivePlanLifecycle` would read a freshly
+   written approval as **no approval**. The orphaned test pins that exact colliding
+   string. Reconciling means deciding which authority model owns the identifier.
+3. **A PO decision already covers it.**
+   `backlog/items/2026-08-07-ledger-backed-plan-and-push-authority-absent-on-merged-base.md`
+   names this exact symbol as a PO-directed merge loss and directs PHX-2 to be
+   additive, *"not as a from-scratch resurrection of the pre-merge Phoenix
+   implementation against the old base."* My briefing would have had a dispatch do
+   precisely the forbidden thing.
+
+**What I am NOT doing tonight, deliberately.** The obvious move is to delete the
+orphan the way the codex one was deleted. I am not doing it in the small hours,
+because the orphan differs from its registered successor by **+567/−204 lines** —
+the deletion needs the same property-by-property mapping the codex retirement got,
+and if it turns out the orphan pins something the successor does not, deleting it
+loses real coverage. That mapping is the follow-up; the deletion is not.
+
+Also surfaced and worth carrying: `harness/scripts/pipeline-state.mjs` lost
+`1af6624`'s `--human-decision-file` integration in the same merge. That is a
+second loss on the same subject, and PHX-RED5 is currently in that file.
+
 ### F1 is closed, and closed on evidence I produced myself
 
 The Critic's single FAIL finding is repaired in `358c709`. BS25 rebuilds its
