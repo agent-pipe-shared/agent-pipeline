@@ -339,6 +339,29 @@ outside an agent session" as the escape hatch, and `LIFTABLE_RULE_IDS` is
 unchanged at `["GS-6"]` plus the `TP-` prefix. The critical-action lane got the
 fix; the guard-lift lane did not.
 
+**Correction (2026-08-08, measured against this tree during implementation).**
+The sentence above overstates the escape hatch, and the difference matters to the
+PO's standing rule rather than to the count. Read at
+`plugins/pipeline-core/hooks/guard-gate-strength.mjs:308-318`, "the PO edits this
+file directly, outside an agent session" is the **GS-6 branch only** — the string
+sits inside a ternary on `matched.id === "GS-6"`. Every other rule in the table,
+GS-1..GS-5 and GS-7, takes the else branch and is routed through the ordinary HGO
+override (`:249-300`): the guard plans the exact edit, the human authorizes that
+one tool call, and the mode follows whatever `gates.push_approval` is actually
+committed.
+
+**So neither of this phase's two GS-class rows requires the PO to edit a
+configuration file by hand outside a session.** Both are ordinary
+signature-backed authorizations of one exact, audited edit. The *number* of human
+commands is unchanged at four — HGO binds one signature to one tool call, and the
+two rows live in two different files, so they cannot share one — but the *kind*
+changes: four authorizations, zero hand-edits of protected configuration.
+
+That distinction is the acceptance test the PO actually stated. It is recorded
+here because the table above was written from the earlier reading and would
+otherwise be cited as evidence that the guard-lift lane still demands manual file
+surgery.
+
 ## Risks and mitigation
 
 | Risk | Mitigation |
