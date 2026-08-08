@@ -129,6 +129,25 @@
  *                                                 --continuity-close-request <repo-relative-json>
  *                                                 bound to the exact close-head revision and
  *                                                 byte-verified Result/close-evidence files.
+ *   discard-feature --by <name>                   Discards the current activeFeature before
+ *                 --reason <text>                 any Result exists: appends {id, planPath,
+ *                                                 phaseAtDiscard, discardedAt, discardedBy,
+ *                                                 reason, forCommit} to discardedFeatures
+ *                                                 (existing entries kept, append-only),
+ *                                                 deletes activeFeature, sets
+ *                                                 planApproved=false, clears planApproval/
+ *                                                 planRevocation/continuity. Admitted EXACTLY
+ *                                                 where close-feature is structurally
+ *                                                 unsatisfiable: refused when continuity is
+ *                                                 absent (close-feature needs only --by
+ *                                                 there) or when continuity.authority.result
+ *                                                 already exists (close-feature is the route
+ *                                                 that IS available) -- never a heuristic.
+ *                                                 Likewise refused (same hardening as
+ *                                                 close-feature): no activeFeature, a blank
+ *                                                 activeFeature.id/planPath, an unattributed
+ *                                                 or unexplained discard, or an existing
+ *                                                 discardedFeatures present but NOT an array.
  *   approve-deploy --env <environment> --artifact <tag-or-sha> --by <name>
  *                                                 Appends a record {forArtifact,
  *                                                 forEnvironment, approvedBy, approvedAt}
@@ -5494,6 +5513,85 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       return 0;
     }
 
+    case "discard-feature": {
+      const by = flags.by;
+      const reason = flags.reason;
+      if (isBlank(by)) {
+        console.error('Error: discard-feature requires --by <name> (non-empty) -- an unattributed discard is refused.');
+        return 2;
+      }
+      if (isBlank(reason)) {
+        console.error('Error: discard-feature requires --reason <text> (non-empty) -- an unexplained discard is refused.');
+        return 2;
+      }
+      const activeFeature = base.activeFeature;
+      if (!activeFeature || typeof activeFeature !== "object") {
+        console.error('Error: no active feature present -- nothing to discard.');
+        return 2;
+      }
+      if (isBlank(activeFeature.id) || isBlank(activeFeature.planPath)) {
+        console.error('Error: activeFeature.id and activeFeature.planPath must both be non-empty -- discard-feature refused (no unattributed audit entry).');
+        return 2;
+      }
+      if (base.discardedFeatures !== undefined && !Array.isArray(base.discardedFeatures)) {
+        console.error('Error: existing discardedFeatures is not an array -- aborting WITHOUT changes (no silent overwrite).');
+        return 2;
+      }
+      // Admitted EXACTLY where close-feature is structurally unsatisfiable
+      // (validateContinuityCloseRequest's own gate, :903 -- continuity.authority.result ===
+      // null). No continuity at all means close-feature needs only --by and succeeds
+      // unconditionally, so this refuses and names it; continuity present with a Result
+      // already means the close ceremony is available, so this refuses for the same reason.
+      // Never widen this to a heuristic ("was anything implemented").
+      if (base.continuity === undefined) {
+        console.error('Error: discard-feature refused -- no active continuity gates this feature; close-feature is the route that is available (no Result requirement blocks it).');
+        return 2;
+      }
+      if (base.continuity.authority.result !== null) {
+        console.error('Error: discard-feature refused -- continuity.authority.result already exists; close-feature is the route that is available.');
+        return 2;
+      }
+      const discardHead = gitHead(dir);
+      let discardForCommit = null;
+      if (discardHead.ok) {
+        discardForCommit = discardHead.commit;
+      } else {
+        console.error(`Warning: current commit (git rev-parse HEAD) could not be determined: ${discardHead.error}.`);
+        console.error("discard-feature proceeds anyway -- forCommit is recorded as null.");
+      }
+      const discardedAt = now();
+      const priorDiscarded = Array.isArray(base.discardedFeatures) ? base.discardedFeatures : [];
+      const discardedEntry = {
+        id: activeFeature.id,
+        planPath: activeFeature.planPath,
+        phaseAtDiscard: activeFeature.phase ?? null,
+        discardedAt,
+        discardedBy: by,
+        reason,
+        forCommit: discardForCommit,
+      };
+      const discardNext = {
+        ...base,
+        schema: SCHEMA_ID,
+        discardedFeatures: [...priorDiscarded, discardedEntry],
+        planApproved: false,
+        updatedAt: discardedAt,
+      };
+      delete discardNext.activeFeature;
+      delete discardNext.planApproval;
+      delete discardNext.planRevocation;
+      delete discardNext.planSubmission;
+      delete discardNext.planInvalidation;
+      delete discardNext.continuity;
+      if (!stateWriteSucceeded(writeState(dir, discardNext, base))) {
+        return 2;
+      }
+      console.log(
+        `Feature "${activeFeature.id}" discarded by "${by}" (commit ${discardForCommit ?? "—"}, ${discardedAt}). Reason: ${reason}. activeFeature removed, planApproved=false.`,
+      );
+      return 0;
+    }
+
     case "approve-deploy": {
       const policy = criticalHumanProofPolicy(dir);
       if (!policy.ok) { console.error(`Error: approve-deploy refused (${policy.code}).`); return 2; }
@@ -5632,7 +5730,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
 
     default: {
       console.error(
-        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, submit-plan, approve-plan, reopen-design, seal-plan-approval, set-phase, set-gate-estimate, revoke-plan, bind-plan-spec, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy, po-authority-rebind-plan, po-authority-rebind-apply, po-authority-decision-plan, po-authority-decision-select, po-authority-decision-apply, continuity-init, continuity-cas, continuity-apply-native, continuity-integrate-final, continuity-record-course-brief, continuity-select-course, continuity-apply-decision, continuity-clear-decision, continuity-result-bootstrap-plan, continuity-result-bootstrap-apply, continuity-result-rebind-plan, continuity-result-rebind-apply, continuity-result-case-migration-plan, continuity-result-case-migration-apply, continuity-result-close-plan, continuity-result-close-apply, publication-prepare, publication-approve, publication-authorize, publication-reconcile, publication-observe, publication-start-readback, publication-close, publication-rearm, publication-block.`,
+        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, submit-plan, approve-plan, reopen-design, seal-plan-approval, set-phase, set-gate-estimate, revoke-plan, bind-plan-spec, approve-push, close-feature, discard-feature, approve-deploy, consume-deploy, clear-deploy, po-authority-rebind-plan, po-authority-rebind-apply, po-authority-decision-plan, po-authority-decision-select, po-authority-decision-apply, continuity-init, continuity-cas, continuity-apply-native, continuity-integrate-final, continuity-record-course-brief, continuity-select-course, continuity-apply-decision, continuity-clear-decision, continuity-result-bootstrap-plan, continuity-result-bootstrap-apply, continuity-result-rebind-plan, continuity-result-rebind-apply, continuity-result-case-migration-plan, continuity-result-case-migration-apply, continuity-result-close-plan, continuity-result-close-apply, publication-prepare, publication-approve, publication-authorize, publication-reconcile, publication-observe, publication-start-readback, publication-close, publication-rearm, publication-block.`,
       );
       return 2;
     }
