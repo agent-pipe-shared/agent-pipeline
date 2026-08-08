@@ -170,3 +170,25 @@ append-only `discardedFeatures` array, never `closedFeatures` — a discarded
 feature that appears in the closed list is the manufactured closure record this
 item exists to prevent — and `--reason` is mandatory, for the same reason
 `close-feature` refuses an unattributed close.
+
+### Measured for R2: the delete list cannot be a literal list
+
+The section "What a fix must not become" is right that the reset must remove
+seeded files by name. Two measurements say the names are not knowable in
+advance:
+
+- **The State and calibration paths are authority-tier-resolved, not fixed.**
+  `authorityPaths()` (`onboarding-continuity.mjs:146`) asks
+  `resolveProjectAuthorityPaths` first and only falls back to a neutral/legacy
+  pair by probing which one exists. A project on the legacy tier keeps its files
+  under `.claude/`; a current one under `project/`.
+- **The handover path is configurable.** `onboarding-continuity.mjs:482` reads
+  `calibration.handover` and uses `docs/state.md` only as the default. A project
+  that configured its handover elsewhere would have that file missed and the
+  default one deleted — the failure in both directions at once.
+
+So the reset's plan step must **derive** its path set from the resolved authority
+and the parsed calibration of the project in front of it, and print what it
+derived. A hardcoded list in the reset is the same defect as a hardcoded list in
+an agent's head, only harder to notice: `docs/state.md` is a default, not a fact,
+and it was the entry that swept `docs/` into the observed `rm -rf`.
