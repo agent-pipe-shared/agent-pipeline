@@ -148,6 +148,54 @@ Approval: signature mode, proof `CRITICAL-ACTION-PROOF-VERIFIED`, subject
 **This section and everything after it is not yet pushed** — it was written after
 the candidate. It goes out with the next approved push.
 
+### THE PHASE'S IMPLEMENTATION HAD NEVER BEEN REVIEWED. NOW IT HAS — FAIL, 5 FINDINGS (2026-08-08)
+
+Found by checking rather than by reading the handover: of the 58 commits between
+the phase's implementation start (`d846430`) and `da4cc39`, only eight
+(`ce75672..3345efe`) plus the F1 repair had ever been a Critic's review object.
+**The DoD requires an independent review per work stream** — R3's B3 sweep, R4,
+R5, R6, R7, the registration checker and the 105-line registration had none.
+
+Round 1 (full, T1, `claude-opus-5` at max, assurance
+`functional-equivalent-read-only; OS isolation not asserted`, effective identity
+`unknown`), base `d846430` → candidate `da4cc39`, 58 enumerated SHAs, 73 files,
++4712/−258. `Briefing violations observed: none`. **Verdict: FAIL.**
+
+**It corrected me on AC-P10.** I had concluded the criterion was unsatisfiable
+because the 105 registration lines landed in one commit with no batch
+boundaries. Wrong: the 14 batches are defined in
+`specs/sprint-phoenix-epic/evidence/verify-registration-patch.md:96`, each
+independently revertible, and the Critic accepted it as met by construction. I
+had looked for the structure only in git history.
+
+| # | Severity | Finding | Repairable |
+|---|---|---|---|
+| F1 | major | Five production diffs with no `Dispatch:` trailer and no dispatch record: `6686b16`, `ce75672`, `e7f6e96`, `ddd1830`, `74346bf` — none fits EL-01's stage-0 exception | No — history |
+| F2 | major | AC-P2/AC-P3 say "demonstrated … not asserted"; no output artifact of the break-and-restore run exists | Partly — AC-P3 needs a TP-3 window |
+| F3 | major | Deferred risks carry an owner but no expiry: the checker's `EXCLUSIONS` map has no owner/expiry field, and the new backlog items carry no `due:` | Yes |
+| F4 | minor | AC-P5's deliberate-break half is evidenced only by R1-rework artifacts, not bound to B3's swept files | Yes |
+| F5 | minor | `lifecycle.json` rebound the `sha256` of an entry declared `mutability: immutable`, with no amendment record | Yes |
+
+**F1 widens F-A from one commit to five, and the Critic found the mitigation I
+had not.** For `6686b16` the 105 lines were *staged by dispatched sessions* —
+`verify-registration-patch.md:11-14` says so, and the artifact's last change
+precedes the application commit — so its content is dispatch-authored and only
+its application is not. `ce75672` and `e7f6e96` have no such staging artifact,
+and those two are the ones where the session that decided the gate also wrote
+the guardrail rows and the test pinning them. That is the shape EL-01 exists to
+prevent, stated plainly.
+
+**What the Critic explicitly did not claim, so no pass is implied:** it could not
+read the bytes matched by the 38 added gitleaks fingerprints (the session guard
+refused `sed`/`cut`), so "these are false positives" rests on fingerprint
+structure and coordinate alignment with `a368552`'s 38 appended ledger lines, not
+on reading the content.
+
+**One out-of-scope observation worth acting on:** `docs/deploy/README.md:8,23`
+still carry live `docs/operating-model.md §3.5` / `§3.1/§3.5` citations. It is in
+neither B3 inventory, so AC-P4's 39-file scope never reached it — the sweep is
+complete against its inventory and the inventory was incomplete.
+
 ### The push gate cost four failed attempts. All four causes, so the next one does not
 
 The gate itself worked correctly every time; each stop was a real defect in what
