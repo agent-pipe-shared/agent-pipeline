@@ -47,6 +47,7 @@
 | pipeline.guard-lifecycle-ready-blocks-claude-memory-writes | open | defect | pipeline | 2026-07-29 | — |
 | pipeline.guard-lifecycle-ready-rejects-plan-runtime-intent-argv | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.handover-file-has-no-rotation-obligation | open | workflow-improvement | pipeline | 2026-08-07 | — |
+| pipeline.hash-chained-ledger-collides-with-the-secret-scanner | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.human-approval-ux-directory-clarity-and-single-command | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.human-authorization-prompts-ignore-the-configured-language-profile | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.human-legible-approval-record | open | requirement | pipeline | 2026-08-06 | — |
@@ -119,6 +120,6 @@
 
 ## Counts
 
-- open: 62
+- open: 63
 - in_progress: 26
 - closed: 23

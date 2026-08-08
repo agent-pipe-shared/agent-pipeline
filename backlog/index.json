@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "58f5cc9da3ebd0849144f7ebdde80bd8552faf4f830702fb68e75dd4b9dd83a1"
+    "transitionHead": "8e77992aecb980635d51b9400aca21f6993302c9726252c9a9d8895b97a14ccd"
   },
   "counts": {
-    "open": 62,
+    "open": 63,
     "in_progress": 26,
     "closed": 23
   },
@@ -366,6 +366,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "PO, 2026-08-07: 'state wird aber auch hoffentlich nicht unendlich lang sondern irgendwann wieder leer :) wenn etwas dauerhaft als regel geschrieben wird, dann muss es in adrs'."
+    },
+    {
+      "id": "pipeline.hash-chained-ledger-collides-with-the-secret-scanner",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Observed 2026-08-08 while repairing the 38 pre-public-core reachability findings: the repair commit turned the live security scan red, one finding per appended ledger line."
     },
     {
       "id": "pipeline.human-approval-ux-directory-clarity-and-single-command",
