@@ -362,6 +362,52 @@ any attempt to reopen native execution without a fresh follow-up authority.
 
 The exact B5 candidate receives the applicable Nova Verify, Security,
 independent high-risk Critic and PO acceptance without a native macOS claim.
+
+## Slice B7 — `.arbitheon/` as the project-authority directory
+
+**Authority:** [ADR-0054](../../../docs/adr/0054-arbitheon-authority-directory-and-precedence-chain.md),
+accepted (design and sequencing) with implementation staged. Admitted to Nova B
+by PO instruction, 2026-08-08.
+
+**Outcome:** the top authority tier the ADR decided actually exists. Today it does
+not: `arbitheon` appears nowhere under `plugins/pipeline-core/`, the seed writes
+`project/`, and `readProjectAuthority` reports `source: "neutral"` for it. The
+three-tier chain the ADR specifies — `.arbitheon/` ahead of `project/` ahead of
+the `.claude/` legacy layer, with the top tier configurable and an unset value
+meaning `.arbitheon` — is unbuilt.
+
+**Why it is a slice and not a repair.** The ADR's own reason for the directory is
+that `project/` is a collision hazard in an arbitrary consumer repository, so this
+changes where every governed project keeps its authority. It touches the resolver,
+the seed, the tier-union classifiers and markers the ADR enumerates, and every
+reader that names a tier literally. It cannot ride along on a defect fix without
+becoming an unreviewed migration.
+
+**Order:**
+
+1. establish, by measurement rather than by reading, every site that names a tier
+   literally — the ADR lists a starting set, and the greenfield work of 2026-08-08
+   found one it did not (the kickoff bound its PO profile receipt to a hardcoded
+   legacy path while the gate resolved the neutral one, which is exactly the class
+   of defect a partially-built precedence chain produces);
+2. build the resolver and its configuration, unset meaning `.arbitheon`, with a
+   configured value replacing only the top tier;
+3. move what a **fresh** project is seeded with, leaving what exists alone — the
+   same "changes what is newly written, never migrates what exists" rule the
+   2026-08-08 seed work used; and
+4. give an existing project a reviewed, digest-bound migration of its own, or
+   decide explicitly that it keeps resolving where it is.
+
+**Stop:** any change that migrates an existing project's authority as a side
+effect of a seed change; any tier literal left in place without being named in the
+step-1 enumeration; any claim that the chain is built while a reader still resolves
+a tier by a hardcoded name.
+
+**Bounded prerequisite, already decided.** The day-one `.claude/pipeline.yaml`
+write is removed separately and ahead of this slice, under the PO rule that
+Claude-owned files may live in `.claude/` but Pipeline-owned files may not. That
+correction is deliberately not folded in here: it is two files and a retired
+invariant, and it must not wait on a three-tier migration.
 The #72 follow-up independently owns native lifecycle and Apple-Silicon
 candidate evidence. The close tail may add only append-only evidence that binds
 the frozen candidate; any relevant byte change invalidates and reruns the

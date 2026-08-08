@@ -74,7 +74,25 @@ Greenfield onboarding of a `feature`-profile project with the Claude runner,
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Sections 2 and 3 are done. Section 1 is done as far as a shape
+  filter can take it; its **residual is accepted as declared** by PO decision, not
+  left open pending work.
+- **Rationale:** Sections 2 and 3 were repaired and independently reviewed. For
+  section 1 the filter now rejects a credential value beside its own label
+  whenever the value is assigned, quoted, mixed-alphabet, ten characters or more,
+  four or more with a digit, or followed by a preposition or coordinating
+  conjunction. What remains is a value of four to nine lowercase digit-free
+  characters whose clause resumes on a verb — shape-identical to prose a PO
+  genuinely writes (`credentials: ownership moves to the platform team`). The rule
+  that would close it costs eight of eleven pinned admissible sentences, and was
+  reported rather than taken. The three closing options — a word list of roughly
+  ten thousand entries with locale and maintenance cost, a card grammar banning a
+  bare colon after a credential noun, or a separate structured value field — are
+  each a larger and worse trade than the exposure: the card is advisory,
+  discardable, mode `0600`, gitignored, expires after seven days, and grants
+  nothing.
+- **Assignment (if accepted):** None. The residual is pinned by the exported
+  `ADMITTED_RESIDUAL` array in `resume-hint.test.mjs`, whose characterization check
+  turns red the moment the band is closed — which is the trigger to move those
+  entries into `FORBIDDEN` rather than a reason to open work now.
+- **Date:** 2026-08-08
