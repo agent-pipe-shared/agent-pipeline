@@ -201,6 +201,64 @@ rather than only repairing the two carriers.
 
 ### Round-1 repairs: four of five findings closed, one cannot be (2026-08-08)
 
+### WHERE THE EPIC ACTUALLY STANDS — MEASURED, 157 CRITERIA (2026-08-08)
+
+The PO asked whether Phoenix is functionally complete against PRD, Spec and the
+`sprint:phoenix` issues. It was never measured, so it was measured: full
+reconciliation in `evidence/phx-epic-coverage.md` (gitignored, on disk),
+dispatch `PHX-COVERAGE`, every criterion adjudicated from the tree rather than
+from this file.
+
+**Answer: no — and not close to nothing.** 71 of 157 criteria carry a named
+assertion in a green registered suite; 65 partial, 4 designed-only, 6
+not-started, 10 unresolved. All eight issues open.
+
+> **Phoenix has built the libraries and left the integration.** Ten of eleven
+> packages have closed schemas, validators, CLIs and tests of real quality.
+> `appendPortableGovernanceEvent`, `appendHumanGovernanceDecision` and
+> `recordCommandOffer` have **no caller** outside their own module family and
+> the `governance-event` CLI, and no Pipeline path emits a lifecycle event. The
+> records can be written by hand; the system whose behaviour the issues describe
+> does not write them.
+
+Substance per issue — the number that decides whether an issue comment would say
+anything: #23 eleven, #32 eleven, #30 nine, #24 eight, #5 six, #9 five, #17
+three, **#31 two of sixteen**.
+
+**Two findings that are not implementation debt.**
+
+1. **A schema contradicts its criterion.**
+   `governance/schemas/agent-decision-event.schema.json:13` enumerates six
+   states; A-AC-11 requires seven, and `"assumed"` appears nowhere in the tree.
+   That is a decision for the PO, not a gap to fill quietly.
+2. **A wrapper calls commands that do not exist.**
+   `plugins/pipeline-core/scripts/phoenix-authority-revision.mjs:19-20` names
+   `continuity-authority-revision-plan|apply` — neither exists, so that wrapper
+   cannot succeed today.
+
+### PHX-0A IS THE ONLY PLACE WORK MAY START, AND IT IS UNDERWAY (2026-08-08)
+
+Not a choice: **P-AC-08 (`acceptance.md:346-373`) makes the `feature-package`
+command family the mandatory first slice of PHX-0 and forbids PHX-0's
+ruleset-trust-root slice and PHX-1 from starting until it passes its focused
+Verify and Critic gates.** The family does not exist. The planner it must
+consume does — `lib/feature-package-topology.mjs` is registered and green, and
+already exports the absent-manifest `draft` bootstrap preview the criterion asks
+slice A to extend, so this slice is wiring and transaction, not new rules.
+
+`harness/scripts/pipeline-state.mjs`, which the criterion names, is a re-export
+shim over `plugins/pipeline-core/scripts/pipeline-state.mjs`; implementing in
+the canonical writer satisfies the named path.
+
+**Split into two dispatches deliberately**, because one dispatch over the whole
+family would die at budget as `PHX-COVERAGE` nearly did:
+
+- `PHX-0A-READ` — `inspect`, `status`, `plan`. Writes nothing. **In flight**; the
+  first run reached 67 tool uses and stopped without a report, and was re-briefed
+  with a hard report point.
+- `PHX-0A-WRITE` — `apply`, `recover`, the PO-bound reconciliation and the
+  Result-reconciliation fence. Not yet dispatched.
+
 ### PUSH DEFERRED BY PO DECISION; THE TP LIFT CANNOT GO THROUGH CHAT (2026-08-08)
 
 **PO, AFK:** skip the push until further notice, and work around the protected
