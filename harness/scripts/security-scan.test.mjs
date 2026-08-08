@@ -539,7 +539,34 @@ process.exit(0);
   });
   assertEqual("gitleaks run: clean fixture -> PASS, 0 findings", { status: result.status, count: result.findings.length }, { status: "PASS", count: 0 });
   assertTrue("gitleaks run: candidate-tree scan disables Git history", invocations.length === 1 && invocations[0].includes("--no-git"), JSON.stringify(invocations));
-  assertTrue("gitleaks run: candidate-tree scan keeps repository-relative fingerprints", invocations.length === 1 && invocations[0][invocations[0].indexOf("--source") + 1] === ".", JSON.stringify(invocations));
+}
+{
+  // Real gitleaks reports absolute filesystem paths when scanning the detached candidate
+  // snapshot passed via --source (see gitleaks.mjs normalizeCandidateFindingPath header
+  // comment). This fixture reproduces that shape by echoing the absolute --source it was
+  // invoked with back into the report, so the case actually exercises the normalization
+  // step rather than pinning an argv value that is already covered elsewhere.
+  const rootDir = makeRootDir("gitleaks-absolute-path-root");
+  mkdirSync(join(rootDir, "config"), { recursive: true });
+  writeFileSync(join(rootDir, "config", "secrets.txt"), "aws_key = fixture-access-key-01\n");
+  const result = await gitleaksAdapter.run({
+    rootDir,
+    config: { binaryPath: gitleaksClean },
+    spawnFn(cmd, args, opts) {
+      const source = args[args.indexOf("--source") + 1];
+      const report = [
+        { RuleID: "aws-access-key", File: join(source, "config", "secrets.txt"), StartLine: 3, StartColumn: 7, Description: "AWS Access Key detected" },
+      ];
+      writeFileSync(args[args.indexOf("--report-path") + 1], JSON.stringify(report));
+      return { status: 0, stdout: "", stderr: "" };
+    },
+    timeoutMs: 5000,
+  });
+  assertEqual(
+    "gitleaks run: candidate-tree scan keeps repository-relative fingerprints",
+    result.findings.map((finding) => finding.path),
+    ["config/secrets.txt"],
+  );
 }
 {
   const rootDir = makeRootDir("gitleaks-candidate-tree-root");
