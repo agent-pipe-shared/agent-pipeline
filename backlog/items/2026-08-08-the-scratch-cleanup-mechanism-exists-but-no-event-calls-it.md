@@ -52,19 +52,53 @@ Note the trap this sits behind: those manifest files cannot be committed by an
 agent by name, per
 `2026-08-08-a-guard-string-match-makes-a-file-uncommittable-by-any-agent.md`.
 
+## PO correction, 2026-08-08 — close is the wrong event to hang this on
+
+The first draft of this item's direction said "bind on session start, release on
+ordinary session close". The PO rejected the second half on a ground that is worth
+stating as the governing observation, because it generalizes past this item:
+
+> a close is often not planned or structured — so cleanup actions actually belong
+> in the bootstrap of a new session, to keep the new session clean, or tied to a
+> push gate, where a human really is transporting a finished state.
+
+This is correct and it inverts the design. A close is the *least* reliable moment
+to schedule work: the sessions whose scratch directories most need collecting are
+precisely the ones that ended abruptly and never reached a close. Building cleanup
+on the close path optimizes for the case that does not need it.
+
+Two events remain, and neither is the close:
+
+1. **Bootstrap of the next session.** A new session is a reliable, frequent,
+   already-instrumented moment, and it has the right motive: it is cleaning up
+   *before* it starts working, so it begins in a known state rather than
+   inheriting whatever the last run left. Orphan retirement stops being an
+   exception path and becomes the ordinary mechanism.
+2. **The push gate.** The point at which a human transports a finished state
+   outward is the one moment where "is this tree actually clean" has a consequence
+   beyond tidiness. Cleanup there is not housekeeping; it is part of what the gate
+   asserts.
+
+A release-on-close may still exist as a fast path when a close does happen, but
+nothing may depend on it. Correctness must come from the bootstrap sweep alone.
+
 ## Direction, not a design
 
-1. **Name the two events.** Bind on session start, release on ordinary session
-   close. Both already have a call site in the bootstrap and close flows; this is
-   wiring, not new machinery.
-2. **Retire orphans on a later bootstrap**, not at close — a crashed session by
-   definition does not reach its close. Reuse the existing orphan-retirement path
-   rather than adding a second.
-3. **Exempt `scratch/` in this repository's own manifests**, which requires the
+1. **Bind on session start; sweep on the NEXT session's bootstrap.** No step in
+   the correctness argument may reference the close path.
+2. **Sweep only what a descriptor claims**, never the directory wholesale — a
+   bootstrap sweep runs against a tree whose other contents it did not create, so
+   the descriptor binding matters more here than it would at close, not less.
+3. **Decide what the push gate asserts about scratch state**, and whether an
+   unswept scratch directory is a finding, a warning, or silently swept. This is a
+   PO-facing question about what the gate promises, not an implementation detail.
+4. **Exempt `scratch/` in this repository's own manifests**, which requires the
    guard trap above to be resolved first or a human to make the edit.
-4. **Pin the wiring, not just the mechanism.** A test that a session start creates
-   a descriptor and a session close removes exactly what that descriptor claims —
+5. **Pin the wiring, not just the mechanism.** A test that a bootstrap sweep
+   removes exactly what a *previous* session's descriptor claims and nothing else —
    the current 45 tests cover the functions, which is why the gap survived them.
+   A test that only exercises bind-then-release within one session would reproduce
+   the very assumption the PO just rejected.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 

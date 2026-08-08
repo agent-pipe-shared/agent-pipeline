@@ -141,6 +141,59 @@ What it adds to the picture:
    "existing tests pass" and "write the new tests" — reinforcing point 2 above
    and further weakening any context-volume explanation.
 
+## The first measured sample, 2026-08-08
+
+The PO asked for this to be investigated rather than only counted. Six dispatches
+from one block, with the figures the runtime reports:
+
+| Dispatch | Tool uses | Subagent tokens | Outcome |
+|---|---|---|---|
+| RESTART-1 | 39 | 108k | clean stop |
+| AUTHAPPLY-1 | 42 | 82k | completed |
+| MEMPATH-1 | 59 | 156k | **truncated** |
+| SEEDINT-1 | 60 | 148k | **truncated** |
+| DOCS-1 | 76 | 105k | **truncated** |
+| SCRATCH-1 | 79 | 194k | **truncated** |
+
+Continuations after a procedural resume: SEEDINT-1 completed at 47 uses,
+SCRATCH-1 at 44, MEMPATH-1 at 73.
+
+**What this supports:** truncation correlates with run length. **What it does not
+support:** a token-volume threshold — DOCS-1 truncated at 105k while RESTART-1
+finished at 108k — nor a hard tool-count cliff, since MEMPATH-1's continuation ran
+to 73 uses and finished. Tool-use count is the better of the two predictors in
+this sample, and neither is a mechanism.
+
+**The environment question is open and cheaply answerable.** Every observation so
+far comes from one machine, a WSL Ubuntu host. Whether the same rate appears on
+the repository's second machine is the single measurement that would separate an
+environment cause from a general one, and it has not been taken. Until it is,
+"long dispatches truncate" and "long dispatches truncate *here*" are both
+consistent with the evidence, and this item must not assert the first.
+
+## Cheap diagnosability, adopted 2026-08-08
+
+The PO asked whether dispatches could write debug information without much budget.
+The mechanism already half-existed and failed for one reason:
+
+- **The dispatch record is created last, so a truncated run leaves none.**
+  MEMPATH-1 ended with the words "now let's write the dispatch record". `GF-09-D`
+  asks for the `log` to be appended as work lands, but a record that is created at
+  the end exists exactly when it is no longer needed.
+
+Two changes to `templates/prompts/goldfish-task.md`, both costing one write and no
+new tool or permission:
+
+1. **Create the record as the opening act**, with `outcome: "in-progress"` and an
+   empty `log`, before any other work.
+2. **Each `log` entry carries the phase entered and the running tool-use count.**
+   A run that never emits a final report is then still legible: which phase it
+   reached, how far into its budget, what its last completed step produced.
+
+Deliberately nothing more. Richer instrumentation would cost the budget the PO
+asked to protect, and the two fields above are what the six-row table above was
+missing when it was assembled by hand from runtime notifications.
+
 ## Triggering situation
 
 An unattended hardening block, 2026-08-07/08, with four to five concurrent
