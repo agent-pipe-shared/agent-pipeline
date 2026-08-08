@@ -5,7 +5,7 @@
 
 **Last updated:** 2026-08-08
 **Project status:** ACTIVE
-**Current block:** implementing the PO's six decisions of 2026-08-08 on the questions the greenfield hardening left open, into a second `0.5.4` local candidate, under the same signed 4-hour Guard Maintenance Window; 0.5.3 is released to `main` and the human-authorization ceremony recorded as [ADR-0061](adr/0061-uniform-human-approval-ceremony.md) remains the governing thread; Nova A completion still paused on genuine ADR-gated/evidence-gated blockers
+**Current block:** GF-057 — a second `0.5.4` local candidate that closes the onboarding deadlock both runners hit against the first one, the consumer blockers the PO's consolidated review found, and the setup work (SETUP-2 done, SETUP-3/4 open); 0.5.3 is released to `main` and the human-authorization ceremony recorded as [ADR-0061](adr/0061-uniform-human-approval-ceremony.md) remains the governing thread; Nova A completion still paused on genuine ADR-gated/evidence-gated blockers
 **Repair baseline:** `5d2b83dcc765d50801f4491e1bd9bed32090112b`
 **Release version:** `0.5.3` released
 **Release state:** version `0.5.3` · tag `v0.5.3` · commit `2740041d59458f949b597905816af12048502469` · tree `e72cca9b69e105ec6aac9833c4ac0bccb385d25b` · status `published`
@@ -15,6 +15,115 @@ Its `observedAt` is the UTC time when this public projection was produced from
 the supplied authoritative release identity; it is not a claimed release time.
 The historical candidate-qualification sections below are retained as
 session history and no longer describes the current publication disposition.
+
+## 2026-08-08 Nova GF-057 — the second 0.5.4 candidate: setup, and the deadlock both runners hit (current, in progress)
+
+The PO installed the first `0.5.4` candidate (`0.5.4+claude.20260808104333.c4be063`,
+confirmed installed by the bootstrap preflight, byte-identical to the checkout
+manifest) and then ran two greenfield onboarding tests against it, one per runner.
+Both ended in a deadlock. The PO's instruction for this block: no new local
+candidate soon, one that has solved all of it — and "es muss gut getestet sein,
+keine Folge-Deadlocks."
+
+**The deadlock, and it is the Pipeline's trap rather than an agent's mistake.**
+Three facts, each verified at a line before anything was filed:
+`initialPrdContent()` (`onboarding-continuity.mjs:2884`) seeds the provisional
+kickoff PRD *with* `<!-- technical-spec-sha256: … -->`; `po-gate-authority.mjs:59`
+requires it; `promotionArtifacts()` (`:3487`) validated paths, existence and
+non-reuse of kickoff artifacts but never looked inside the PRD. And
+`skills/pipeline-start/SKILL.md`, which specifies the hand-authored design
+package, never mentioned either marker. So following the instruction produced a
+PRD the gate refuses, and the promotion froze its bytes first.
+
+**Two runners, independently, from the same instruction.** The Claude session
+added the marker afterwards, broke the byte binding, and lost session readiness to
+`continuity-observation-unavailable` — no agent-executable exit, and on a
+greenfield repository no commit to `git restore` from either. It ended with the
+human typing `sed -i`. The Codex session never touched the PRD and hit a *circular*
+block instead: `submit-plan` demands the marker, the marker cannot be added, the
+rebind demands an approval `submit-plan` prevents. Every typed recovery in the
+authority family begins after plan approval; the error class is created before it.
+
+**The refusal text was not silent — it was precise and wrong.** `SPEC_REPAIR`
+models two lifecycle states, "not yet bound" (edit the documents) and
+"approved and drifted" (rebind). The observed state is a third,
+*promoted-and-byte-bound-but-unapproved*, where the first instruction is
+destructive and the second refuses. Both agents followed the advice in front of
+them and failed in the two directions the two sentences invite.
+
+**What was fixed, and each suite was re-run by the Elephant rather than accepted
+from the report.**
+
+| Commits | What it closes | Suites, re-run |
+|---|---|---|
+| `c301420` `a529d4d` `98862c1` | The machine-plane write carve-out, bound by the four properties the session-memory carve-out already had; an existing `machine.json` planted as a symlink is refused, closing a route onto `~/.claude/settings.json` | guard-lifecycle-ready 67/0 |
+| `08e8163` `ac5913d` `2943820` | `lib/machine-plane.mjs` as the sole owner of the path, a three-valued reader, an exact key set that makes the plane/repository zero-overlap rule *enforceable*, and the PO approval directory resolved from it | machine-plane 22/0, guard 68/0, po-human-approval 32/0 |
+| `fb918b8` `cc6cbec` `0ecd75e` `19aa65a` `36a5679` `14c7807` | The promotion refuses at plan time and names the missing line; absent and mismatched markers are distinct codes; the inspection stops offering a rebind that is known to refuse; the skill names both markers | onboarding-continuity 115/0, po-gate-authority 54/0, project-onboarding-v3 109/0 |
+| `36331b8` `05822c5` `0acee40` `7e1d4b2` `2a4e8d6` `783e62f` | The push threat model resolves at one fixed in-project path, so a consumer can reach `approve-push` at all; `materialize-push-threat-model` creates it and refuses to overwrite | pipeline-state 1/1, critical-human-proof-gate 20/0, authorization 36/0 |
+| `37c063b` `bdcc998` | `close-feature`'s commands and its `allowed-tools:` frontmatter, and the push preparation recipe, name paths a consumer has | pipeline-start-v3 green |
+
+**Four findings came from reading the code, not from a red suite — and that is the
+pattern of this block.** The suites were green every time.
+
+1. **A1's own fix opened a second route into the deadlock.** The new marker
+   precondition ran during plan reconstruction and *shadowed*
+   `KICKOFF-PROMOTION-PLAN-DIGEST`, so a spec that drifted after planning would be
+   reported as a PRD marker mismatch — pointing the operator at the PRD and
+   inviting the edit that bricks the session. Closed in `14c7807` by separating
+   plan-time admission from apply-time identity. The test that caught it was one
+   nobody had touched.
+2. **"Project configuration" was implemented as an environment variable.**
+   Functionally correct, tests green, and a weakening: the bound artifact became
+   agent-choosable by prefixing one command with `env NAME=…`. This repository had
+   already written the rule down, in the MEMPATH-1 doctrine comment, in a
+   different file. Configurability was removed entirely; one fixed path,
+   `project/push-threat-model.md`, for every project.
+3. **A plugin-shipped default could not have worked at all.** `boundRepositoryArtifact`
+   requires containment inside the *pushed project's* tree, and `authorizeRecordedPush`
+   re-derives the digest at push time rooted at that same project. The measurement
+   dispatch found this before implementing, which is the only reason the design was
+   corrected rather than shipped.
+4. **`guard-testpath` blocked a dispatch's in-scope edit and refused its own
+   override ceremony** — the second confirmed instance. The first, recorded in
+   GF-056, was walked around with a shell write; this one was reported and stopped.
+   The discipline improved, the mechanism did not.
+
+**The generalisation this block earned, and the standing check for the rest of it:**
+the assurances hold and the signposts point wrong. `SPEC_REPAIR` naming a
+destructive route, `observePoAuthorityRebind` offering a rebind that refuses,
+and A1's own shadowed diagnosis are three instances of one shape. The question at
+every remaining fix is therefore not only "does it refuse correctly" but "where
+does the refusal send the reader, and is that route open in *this* state".
+
+**Eleven backlog items filed, every claim verified at a line first** (`518dd03`,
+`dadf8e2`, `6a16fcf`, `b4eb34e`). The consumer blockers the PO's consolidated
+review added, none of which the Elephant's own analysis had found: `approve-push`
+was structurally unreachable for a consumer and the only way through was to
+weaken the gate; `pipeline.verify-evidence.v0` has a schema and consumers and no
+producer; the Critic preflight cannot peel a root commit, so the first review a
+new adopter attempts is the one that cannot run; and a guard that admits one
+diagnostic code where the inspection emits two, refusing the very recovery the
+inspection prescribes.
+
+**Practices this block confirmed by using them.** A baseline worktree at the
+dispatch's start commit settles every "pre-existing failure" claim in one run —
+used three times, correct three times, and it is cheap. And the dispatch record's
+`log` is what makes a truncated run diagnosable; where a dispatch logged once and
+went silent for fifty tool uses, recovery cost a full re-read instead of a prompt.
+
+**Truncations reached twenty-one in this block alone**, consistently around tool
+use 55–70 regardless of the stated budget, and repeatedly with an uncommitted
+diff despite the commit-when-green rule now being in `templates/prompts/goldfish-task.md`.
+The rule is in the template and it is not holding. Smaller work packages, not a
+sterner instruction, is the response being tried.
+
+**Open, and the human steps.** The verify registration for every suite this block
+adds is batched into one edit for the PO, because TP-3's override follows the
+`signature` mode and binds to an exact command that cannot be pre-authorized;
+`evidence/pending-verify-registrations.md` collects them. Still to build: the
+guard runtime messages that name `harness/scripts/`, the verify-evidence
+producer, the root-commit case, C1–C3 with the missing test level, the reset and
+discard paths, the kickoff re-entry, the repair map, SETUP-3/4 and SCRATCH-2.
 
 ## 2026-08-08 Nova GF-054 — the greenfield handover, hardened into the 0.5.4 local candidate
 
