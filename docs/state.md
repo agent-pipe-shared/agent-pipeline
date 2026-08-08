@@ -124,6 +124,70 @@ goal, and one further hardening — write the output file after the FIRST settle
 item, not at the end, so a budget stop still leaves a deliverable on disk rather
 than in a dead context.
 
+### The transactional half landed (`b7a6e98`), and the epic's unknowns are gone
+
+**PHX-0A-WRITE is in.** `feature-package-apply` and `feature-package-recover`
+exist in `plugins/pipeline-core/scripts/pipeline-state.mjs`: 29 staged cases
+green, the protected TP-5 suite unchanged at 313/313, `feature-package-inspect`
+still exit 0, and the run script proves via porcelain before/after that it wrote
+nothing to the live repository. I checked the sanitization myself rather than
+accepting it — zero `/home/` or `/tmp/` hits in the committed file.
+
+Two things in it are worth keeping:
+
+- It chose the `continuity-result-bootstrap` journal shape over the
+  PO-authority-rebind rollback shape, because the criterion wants the journal
+  *retained on every failure path* rather than rolled back inline.
+- It added one predicate beyond the eight required: a fresh
+  `validateFeaturePackage` re-check of the preimage before writing, closing a
+  TOCTOU gap the planner leaves open. Disclosed as a deviation rather than
+  slipped in.
+
+One honest defect, caught by its own evidence review and fixed before the commit:
+the receipts echoed an absolute `--root`, unlike the read half. PHX-0B's briefing
+now carries an explicit assertion against exactly that.
+
+**`feature-package-recover` diagnoses; it does not auto-resolve.** Resolution is a
+re-run of `-apply` with the same `--plan-sha256`, matching the precedent's
+idempotent-replay shape. That is a deviation from the goal prose, reported rather
+than built silently, and it is the PO's to accept or extend.
+
+### All ten unresolved criteria are adjudicated, and none of them was implemented
+
+`evidence/phx-adjudication.md`. The coverage run's ten `not-adjudicable` verdicts
+were budget, not genuine undecidability, and resolving them moves the epic's
+picture in one direction only:
+
+| verdict | prior | new |
+| --- | --- | --- |
+| implemented | 71 | **71** |
+| partial | 65 | **68** |
+| designed-only | 4 | **5** |
+| not-started | 6 | **12** |
+| not-adjudicable | 10 | **0** |
+
+**`not-started` doubled.** And six of the ten are absent capabilities of one
+specific kind: *a criterion requires two packages to be connected, and no carrier
+connects them.* X-AC-11 wants the external-reference adapter to consult
+organization policy — neither module names the other. E-AC-20 wants an audit
+bundle to carry export metadata — the bundle carries `effectivePolicySha256` and
+nothing from the export package, and the export modules never mention the bundle.
+H-AC-09, A-AC-05 and H-AC-08 are the same shape.
+
+This turns the coverage run's phrase — "Phoenix built the libraries and left the
+integration" — from an impression into a count. The gap is not diffuse: it is six
+named seams between packages that are each individually implemented and mutually
+unaware. That is a scope fact the PO should have before the next planning
+decision, because closing six seams is a different job from finishing six
+features.
+
+EPIC-AC-02 is the exception worth reading separately:
+`planParallelSprintIntegration` exists with a registered green suite but is
+called only from its own test file and has no concept of "unpublished" at all —
+so the criterion's actual requirement, that Phoenix verification fail while
+Nova/Cyborg/Nightwing commits are unpublished, is unimplemented rather than
+partially met.
+
 ### F1 is closed, and closed on evidence I produced myself
 
 The Critic's single FAIL finding is repaired in `358c709`. BS25 rebuilds its
