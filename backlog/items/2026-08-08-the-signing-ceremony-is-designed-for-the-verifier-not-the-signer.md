@@ -130,6 +130,37 @@ function, two quality levels.
   carried forward as reported, and whoever picks this up measures them first, the
   same way (2) and (1) were measured.
 
+## The PO's own conclusion after walking it, and it outranks the individual fixes
+
+> *"mE auch quark dass ich 2 sachen eingeben muss. Ich denke es braucht für diese
+> ganzen Sachen ein verlässliches Skript `.sh`, was man immer aufruft und was
+> dann alles sauber managed."* — PO, 2026-08-08, immediately after completing the
+> ceremony on the third attempt.
+
+That is the right shape and it is worth more than fixing the five messages.
+Walking the ceremony by hand means the human holds state the tooling already has:
+which digest is current, where the proof was written, whether HEAD moved since
+prepare. Every one of the eight findings in this item is an instance of the human
+being made the integrator. A single entry point — prepare, present, sign,
+install, verify, and say plainly what happened — removes the class rather than
+its symptoms.
+
+Two constraints it must not break, both of which the current design gets right
+and a convenience wrapper could easily lose:
+
+- **The passphrase prompt stays a real, attended OpenSSL prompt.** The value of
+  the ceremony is that a human sees what they are signing; a wrapper that hides
+  the confirmation block would be worse than the friction it removes.
+- **One human decision, not zero.** The goal is one entry point, not one
+  keystroke. The confirmation display (`intent sha256`, scope, expiry, candidate)
+  is the part that must survive verbatim.
+
+A companion observation from the same walkthrough: `prepare` and `install` are
+two commands because a signature happens between them, but nothing forces the
+human to run `prepare` at all — the wrapper can do it, notice HEAD has moved,
+re-prepare, and present exactly one digest to sign. That alone removes findings
+1, 6, 7 and 8 as *situations* rather than fixing them as *messages*.
+
 ## Direction
 
 1. **One pass, one question, at every human handoff:** what can the person see at
