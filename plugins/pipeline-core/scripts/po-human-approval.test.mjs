@@ -30,7 +30,7 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import test from "node:test";
 
-import { runHumanApproval } from "./po-human-approval.mjs";
+import { parseHumanArgs, runHumanApproval } from "./po-human-approval.mjs";
 import { run as runApprovalGate } from "./po-approval-gate.mjs";
 import { PO_APPROVAL_PROOF_SCHEMA, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
 import { createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
@@ -71,6 +71,27 @@ function fixtureDirs() {
 function cleanup({ repoRoot, directory }) {
   rmSync(repoRoot, { recursive: true, force: true });
   rmSync(directory, { recursive: true, force: true });
+}
+
+const PO_APPROVAL_DIRECTORY_ENV = "PIPELINE_PO_APPROVAL_DIRECTORY";
+
+/** Runs `fn` with PIPELINE_PO_APPROVAL_DIRECTORY set to `value` (or removed for `undefined`),
+ * restoring whatever the ambient environment had before, regardless of outcome. */
+function withEnvDirectory(value, fn) {
+  const had = Object.hasOwn(process.env, PO_APPROVAL_DIRECTORY_ENV);
+  const previous = process.env[PO_APPROVAL_DIRECTORY_ENV];
+  if (value === undefined) delete process.env[PO_APPROVAL_DIRECTORY_ENV];
+  else process.env[PO_APPROVAL_DIRECTORY_ENV] = value;
+  try { return fn(); }
+  finally {
+    if (had) process.env[PO_APPROVAL_DIRECTORY_ENV] = previous;
+    else delete process.env[PO_APPROVAL_DIRECTORY_ENV];
+  }
+}
+
+/** Captures a thrown error instead of letting it propagate, so its message can be inspected. */
+function thrown(fn) {
+  try { fn(); return null; } catch (error) { return error; }
 }
 
 test("sign-intent fails closed before setup (no key material present)", () => {
@@ -697,5 +718,107 @@ test("the disclosure stays bounded: an oversized reason and scope cannot flood o
     assert.ok(prompts[0].includes(prepared.intent.sha256));
   } finally {
     cleanupWindow(dirs);
+  }
+});
+
+/* ------------------------------------------------------------------ *
+ * PODIR-1: PIPELINE_PO_APPROVAL_DIRECTORY -- an optional environment
+ * fallback for --directory, only ever consulted when --directory is
+ * absent, resolving through the identical validation either way.
+ * ------------------------------------------------------------------ */
+
+test("an explicit --directory always wins and behaves exactly as before: the environment variable is not even read", () => {
+  withEnvDirectory("/should/never/be/read", () => {
+    const parsed = parseHumanArgs(["setup", "--repo-root", "/tmp/po-podir1-repo", "--directory", "/tmp/po-podir1-flag-dir"]);
+    assert.equal(parsed.error, undefined);
+    assert.equal(parsed.directory, "/tmp/po-podir1-flag-dir");
+    assert.equal(parsed.directorySource, "flag");
+  });
+});
+
+test("PIPELINE_PO_APPROVAL_DIRECTORY resolves the directory when --directory is absent", () => {
+  withEnvDirectory("/tmp/po-podir1-env-dir", () => {
+    const parsed = parseHumanArgs(["setup", "--repo-root", "/tmp/po-podir1-repo"]);
+    assert.equal(parsed.error, undefined);
+    assert.equal(parsed.directory, "/tmp/po-podir1-env-dir");
+    assert.equal(parsed.directorySource, "environment");
+  });
+});
+
+test("a relative PIPELINE_PO_APPROVAL_DIRECTORY value fails the same absolute-path check as a relative --directory", () => {
+  const viaFlag = parseHumanArgs(["setup", "--repo-root", "/tmp/po-podir1-repo", "--directory", "relative/dir"]);
+  assert.match(viaFlag.error, /Usage:/u);
+
+  const viaEnv = withEnvDirectory("relative/dir", () => parseHumanArgs(["setup", "--repo-root", "/tmp/po-podir1-repo"]));
+  assert.match(viaEnv.error, /Usage:/u);
+  assert.match(viaEnv.error, /must be an absolute path/u);
+});
+
+test("when neither --directory nor PIPELINE_PO_APPROVAL_DIRECTORY is present, the usage error names the variable and prints no path", () => {
+  withEnvDirectory(undefined, () => {
+    const parsed = parseHumanArgs(["setup", "--repo-root", "/tmp/po-podir1-repo"]);
+    assert.match(parsed.error, /Usage:/u);
+    assert.match(parsed.error, new RegExp(PO_APPROVAL_DIRECTORY_ENV, "u"), "the usage error must name the environment variable as the alternative");
+    assert.doesNotMatch(parsed.error, /\/tmp\//u, "there is nothing resolved yet, so no path may appear in the message");
+  });
+});
+
+test("an unsafe directory fed through PIPELINE_PO_APPROVAL_DIRECTORY is refused exactly like the same unsafe value passed via --directory, and the refusal names its own source without printing the path", () => {
+  const dirs = fixtureDirs();
+  try {
+    // "unsafe": a directory inside the repository, which externalDirectory()'s outside()
+    // check must reject no matter which route the path arrived by -- there is no weaker
+    // route for an environment-resolved value than for a flag-supplied one.
+    const insideRepo = join(dirs.repoRoot, "not-outside-the-repo");
+    mkdirSync(insideRepo, { recursive: true });
+
+    const viaFlagError = thrown(() => runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", insideRepo], {}));
+    assert.ok(viaFlagError, "an unsafe --directory must be refused");
+    assert.match(viaFlagError.message, /approval directory \(from --directory\) must be outside the repository/u);
+
+    const viaEnvError = withEnvDirectory(insideRepo, () => thrown(() => runHumanApproval(["setup", "--repo-root", dirs.repoRoot], {})));
+    assert.ok(viaEnvError, "the identical unsafe value must be refused when it arrives via the environment");
+    assert.match(viaEnvError.message, new RegExp(`approval directory \\(from the ${PO_APPROVAL_DIRECTORY_ENV} environment variable\\) must be outside the repository`, "u"));
+
+    // Same refusal reason either way -- the two messages differ only in which source is named.
+    assert.equal(
+      viaFlagError.message.replace("--directory", "SOURCE"),
+      viaEnvError.message.replace(`the ${PO_APPROVAL_DIRECTORY_ENV} environment variable`, "SOURCE"),
+    );
+    assert.equal(viaEnvError.message.includes(insideRepo), false, "the resolved absolute path must never appear in the refusal message");
+    assert.equal(viaFlagError.message.includes(insideRepo), false);
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("PIPELINE_PO_APPROVAL_DIRECTORY runs a full sign-intent ceremony exactly like the same value passed via --directory", () => {
+  // Deliberately NOT `setup`: that subcommand's real branch shells out to
+  // `openssl genpkey -aes-256-cbc`, which blocks on an interactive passphrase
+  // prompt with no dependency-injection seam in this suite (every other test in
+  // this file provisions key material through the non-interactive `keyFixture()`
+  // helper instead, and this one does the same for the same reason).
+  const dirsFlag = fixtureDirs();
+  const dirsEnv = fixtureDirs();
+  try {
+    const { authority: authorityFlag } = keyFixture(dirsFlag.directory);
+    const { authority: authorityEnv } = keyFixture(dirsEnv.directory);
+    const intentSha256Flag = createHash("sha256").update("podir-1-parity-flag-fixture").digest("hex");
+    const intentSha256Env = createHash("sha256").update("podir-1-parity-env-fixture").digest("hex");
+    const dependencies = { readConfirmation: () => "approve" };
+
+    const viaFlag = runHumanApproval(["sign-intent", "--repo-root", dirsFlag.repoRoot, "--directory", dirsFlag.directory, "--intent-sha256", intentSha256Flag], dependencies);
+    assert.deepEqual(viaFlag, { ok: true, code: "PO-HUMAN-SIGN-INTENT-READY", intentSha256: intentSha256Flag });
+
+    const viaEnv = withEnvDirectory(dirsEnv.directory, () => runHumanApproval(["sign-intent", "--repo-root", dirsEnv.repoRoot, "--intent-sha256", intentSha256Env], dependencies));
+    assert.deepEqual(viaEnv, { ok: true, code: "PO-HUMAN-SIGN-INTENT-READY", intentSha256: intentSha256Env });
+
+    const proofFlag = JSON.parse(readFileSync(join(dirsFlag.directory, "proof-manual.json"), "utf8"));
+    const proofEnv = JSON.parse(readFileSync(join(dirsEnv.directory, "proof-manual.json"), "utf8"));
+    assert.equal(verifyPoApprovalProof({ intent: { sha256: intentSha256Flag }, trustPolicy: authorityFlag, proof: proofFlag }).verified, true);
+    assert.equal(verifyPoApprovalProof({ intent: { sha256: intentSha256Env }, trustPolicy: authorityEnv, proof: proofEnv }).verified, true);
+  } finally {
+    cleanup(dirsFlag);
+    cleanup(dirsEnv);
   }
 });

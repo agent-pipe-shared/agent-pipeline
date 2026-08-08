@@ -28,6 +28,20 @@ import { describeGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication> --subject-sha256 <sha256> --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | sign-intent --repo-root <repo> --directory <external-dir> --intent-sha256 <sha256> | authorize-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication> --subject-sha256 <sha256> --expires-at <ISO-8601>";
+// This repo's own environment inputs are all named PIPELINE_<PURPOSE> (see
+// PIPELINE_GUARD_OVERRIDE, PIPELINE_LIVE_CERTIFICATION_AUTHORITY,
+// PIPELINE_SECURITY_REVIEWER_ID elsewhere in this plugin); PO_APPROVAL_DIRECTORY
+// follows that convention rather than inventing a new one, and is read ONLY as a
+// fallback when no explicit --directory is supplied on the command line.
+const PO_APPROVAL_DIRECTORY_ENV = "PIPELINE_PO_APPROVAL_DIRECTORY";
+function directorySourceLabel(source) { return source === "environment" ? `the ${PO_APPROVAL_DIRECTORY_ENV} environment variable` : "--directory"; }
+// Recorded as non-enumerable: pre-existing exact-shape assertions elsewhere
+// (lib/threat-model-approval-request.test.mjs) compare the whole parseHumanArgs()/
+// parseGateArgs() return value with assert.deepStrictEqual, which considers only own
+// enumerable properties. A plain `values.directorySource = ...` would fail every one of
+// those unrelated, pre-existing checks; this keeps the value fully readable by this
+// file's own code (args.directorySource) without joining the object's public shape.
+function setDirectorySource(values, source) { Object.defineProperty(values, "directorySource", { value: source, enumerable: false, configurable: true }); }
 const own = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 const SHA = /^[a-f0-9]{64}$/u;
 const text = (value) => typeof value === "string" && value.trim() !== "";
@@ -42,30 +56,34 @@ function publicKeyPolicy(publicKey, keyReference) {
   createPublicKey(publicKey);
   return { keyReference, publicKeySha256: createHash("sha256").update(publicKey).digest("hex") };
 }
-function externalDirectory(repository, directory, { create = false } = {}) {
-  if (!outside(repository, directory)) fail("approval directory must be outside the repository");
+function externalDirectory(repository, directory, { create = false, source = "--directory" } = {}) {
+  // `source` names where this directory came from (--directory or the environment-variable
+  // fallback) so a failure message can say which one was used. It is a fixed label, never the
+  // resolved path itself: nothing here prints an absolute path into any string that could end up
+  // in a committed artifact.
+  if (!outside(repository, directory)) fail(`approval directory (from ${source}) must be outside the repository`);
   let canonicalRepository; let ancestor = directory; const missing = [];
   try { canonicalRepository = realpathSync(repository); }
   catch { fail("approval directory or repository is missing or unreadable"); }
   for (;;) {
     try { lstatSync(ancestor); break; }
     catch (error) {
-      if (error?.code !== "ENOENT") fail("approval directory is unreadable");
-      const parent = dirname(ancestor); if (parent === ancestor) fail("approval directory is missing or unreadable");
+      if (error?.code !== "ENOENT") fail(`approval directory (from ${source}) is unreadable`);
+      const parent = dirname(ancestor); if (parent === ancestor) fail(`approval directory (from ${source}) is missing or unreadable`);
       missing.unshift(basename(ancestor)); ancestor = parent;
     }
   }
   let canonicalAncestor;
   try { canonicalAncestor = realpathSync(ancestor); }
-  catch { fail("approval directory is missing or unreadable"); }
-  if (!outside(canonicalRepository, canonicalAncestor)) fail("approval directory must be outside the repository");
+  catch { fail(`approval directory (from ${source}) is missing or unreadable`); }
+  if (!outside(canonicalRepository, canonicalAncestor)) fail(`approval directory (from ${source}) must be outside the repository`);
   const target = missing.reduce((path, segment) => join(path, segment), canonicalAncestor);
   if (create) mkdirSync(target, { recursive: true, mode: 0o700 });
   let canonicalDirectory;
   try { canonicalDirectory = realpathSync(target); }
-  catch { fail("approval directory is missing or unreadable"); }
-  if (!outside(canonicalRepository, canonicalDirectory)) fail("approval directory must be outside the repository");
-  if (!statSync(canonicalDirectory).isDirectory()) fail("approval directory must be a directory");
+  catch { fail(`approval directory (from ${source}) is missing or unreadable`); }
+  if (!outside(canonicalRepository, canonicalDirectory)) fail(`approval directory (from ${source}) must be outside the repository`);
+  if (!statSync(canonicalDirectory).isDirectory()) fail(`approval directory (from ${source}) must be a directory`);
   if (create) chmodSync(canonicalDirectory, 0o700);
   return canonicalDirectory;
 }
@@ -89,8 +107,21 @@ export function parseHumanArgs(argv) {
     if (!new Set(["directory", "repoRoot", "keyReference", "featureId", "plan", "spec", "model", "kind", "subjectSha256", "expiresAt", "intentSha256"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
     supplied.add(normalized); values[normalized] = value; index += 1;
   }
-  if (!new Set(["setup", "prepare", "prepare-all", "approve", "approve-all", "verify", "verify-all", "prepare-critical", "approve-critical", "verify-critical", "authorize-critical", "sign-intent"]).has(command) || !text(values.directory) || !isAbsolute(values.directory)
-    || !text(values.repoRoot) || !isAbsolute(values.repoRoot)) return { error: USAGE };
+  if (!new Set(["setup", "prepare", "prepare-all", "approve", "approve-all", "verify", "verify-all", "prepare-critical", "approve-critical", "verify-critical", "authorize-critical", "sign-intent"]).has(command)) return { error: USAGE };
+  // An explicit --directory always wins and is used exactly as before. Only when it is absent
+  // do we fall back to the environment variable -- and the resolved value then runs through the
+  // identical isAbsolute check and, downstream, the identical externalDirectory() safety checks
+  // as a flag-supplied value: there is no separate, weaker path for an environment-sourced value.
+  if (supplied.has("directory")) {
+    setDirectorySource(values, "flag");
+  } else {
+    const fromEnv = process.env[PO_APPROVAL_DIRECTORY_ENV];
+    if (text(fromEnv)) { values.directory = fromEnv; setDirectorySource(values, "environment"); }
+  }
+  if (!text(values.directory) || !isAbsolute(values.directory)) {
+    return { error: `${USAGE}\napproval directory is required and must be an absolute path: pass --directory <path>, or set $${PO_APPROVAL_DIRECTORY_ENV} to an absolute path as a fallback (an explicit --directory always overrides it).` };
+  }
+  if (!text(values.repoRoot) || !isAbsolute(values.repoRoot)) return { error: USAGE };
   if (command.endsWith("-all") && (values.featureId || values.plan || values.spec || values.model)) return { error: USAGE };
   if (command.endsWith("-critical") && !CRITICAL_ACTION_KINDS.includes(values.kind)) return { error: USAGE };
   if (command === "sign-intent" && !SHA.test(values.intentSha256 ?? "")) return { error: USAGE };
@@ -220,7 +251,10 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
     };
   }
   const repository = resolve(args.repoRoot);
-  const directory = externalDirectory(repository, resolve(args.directory), { create: args.command === "setup" || args.command === "prepare" || args.command === "prepare-critical" || args.command === "authorize-critical" });
+  const directory = externalDirectory(repository, resolve(args.directory), {
+    create: args.command === "setup" || args.command === "prepare" || args.command === "prepare-critical" || args.command === "authorize-critical",
+    source: directorySourceLabel(args.directorySource),
+  });
   const critical = args.command.endsWith("-critical");
   if (critical && (args.command === "prepare-critical" || args.command === "authorize-critical") && !text(args.featureId)) fail("critical approval requires a feature id");
   const featureId = args.featureId ?? "cyb-4";

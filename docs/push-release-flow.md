@@ -50,6 +50,16 @@ the candidate commit and tree, the subject binding, the expiry, the intent
 digest, and what the approval does **not** cover. The human types `approve`,
 then the passphrase. That is the whole human ceremony.
 
+**`--directory` has an optional environment fallback.** Every
+`po-human-approval.mjs` subcommand accepts the approval directory from
+`$PIPELINE_PO_APPROVAL_DIRECTORY` when `--directory` is not passed explicitly;
+an explicit `--directory` always overrides it and behaves exactly as before.
+Export the variable once in your shell profile so the ceremony stops requiring
+this path to be retyped or re-located every time — the value itself is
+machine-specific and must never be committed (`pipeline.user.yaml` is tracked,
+and CLAUDE.md forbids machine-specific absolute paths in commits, docs, or
+prompts), so it belongs in shell configuration, never in this repository.
+
 The agent still constructs the command — in particular `--subject-sha256`, whose
 computation is described under the old layer 2 below and has not changed. The
 agent cannot run it: signing needs the private key, and `po-approval-gate.mjs`
