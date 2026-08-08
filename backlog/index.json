@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "3a86320f6245a7f6619837635205273b000b18ff54aecfb2f9e5c371879053f1"
+    "transitionHead": "2270c089d53b72b21d4a2851fe5ca30ce6216671433957f3920fd15bee0fc4ff"
   },
   "counts": {
-    "open": 70,
+    "open": 71,
     "in_progress": 26,
     "closed": 23
   },
@@ -211,6 +211,14 @@
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.commit-trailer-cannot-distinguish-authorship-from-commit-act",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Raised as finding F3 by an independent Critic review on 2026-08-08. A dispatch authored a diff but stopped before committing it; the orchestrator performed the commit act. The resulting trailer is textually identical to one whose dispatch committed its own work, and the deviation was discoverable only from a separate document that git does not bind."
     },
     {
       "id": "pipeline.critic-context-isolation",
