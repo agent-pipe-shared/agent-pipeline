@@ -34,12 +34,16 @@
  * "chat" -- reachable only through a real, prior, deliberate human commit (ADR-0056
  * Decision 4's accepted "chosen for ergonomics" downgrade), never something a ready
  * agent session can bootstrap from "signature" by itself. A SIGNED capability is always
- * admissible regardless of the committed mode, exactly like everywhere else in HGO. The
- * PO editing the file directly, outside an agent session, remains available too. GS-6
+ * admissible regardless of the committed mode, exactly like everywhere else in HGO. GS-6
  * (the live plugin root below) is the one exception: it keeps its own separate, narrower
  * Guard Maintenance Window lift (ADR-0058) rather than HGO, because a time-boxed window
  * is the right shape for "the PO is actively developing guard code" and the wrong shape
- * for a one-shot config edit (ADR-0058 Decision 2).
+ * for a one-shot config edit (ADR-0058 Decision 2). Neither route is a human hand-editing
+ * the file outside a session: every rule this guard denies is either reachable through one
+ * of these two audited ceremonies, or -- the live-plugin kernel below -- genuinely
+ * unliftable, and says so with no route at all (ADR-0059's 2026-08-08 companion
+ * instruction to Decision 6: never both an unreachable rule and a hand-editing escape
+ * hatch beside it).
  *
  * SCOPE, and it is narrower than it looks. This hook is wired for write TOOLS only
  * (`Edit|Write|NotebookEdit`, asserted by GST07), so it never sees a shell command.
@@ -209,10 +213,18 @@ if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mj
   // correctly-scoped, unexpired window that claims to cover it. GS-1..GS-5/GS-7 are
   // untouched by this block (ADR-0058 Decision 2); it fires only when `matched` is
   // the live-plugin rule set above.
+  //
+  // `liveKernelPath` is hoisted to outer scope (rather than staying local to this try)
+  // so the refusal message below can name the reason correctly: a kernel path is
+  // genuinely unliftable and must say so with no route at all, while a non-kernel
+  // live-plugin path that simply has no window open right now still has a real route
+  // -- prepare/install one. No control-flow change from the prior version: the same
+  // `isNeverLiftableKernelPath` call, gating the same window lookup, in the same order.
+  let liveKernelPath = false;
   if (matched === LIVE_PLUGIN_RULE) {
     try {
-      const isKernel = isNeverLiftableKernelPath(filePath, { rootDir: projectDir, livePluginRoot: matchedLivePluginRoot });
-      if (!isKernel) {
+      liveKernelPath = isNeverLiftableKernelPath(filePath, { rootDir: projectDir, livePluginRoot: matchedLivePluginRoot });
+      if (!liveKernelPath) {
         const { covered, window } = windowCoversRule({ rootDir: projectDir, ruleId: "GS-6" });
         if (covered) {
           process.stderr.write(
@@ -284,6 +296,22 @@ if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mj
     }
   }
 
+  // GS-6 non-kernel: name the signed Guard Maintenance Window and the exact prepare/install
+  // commands (ADR-0059 Decision 4: every denial reports its next step) -- never a hand-editing
+  // hint. Built only for that one branch; GS-6 kernel gets none at all, and GS-1..GS-5/GS-7 keep
+  // their own `overrideGuidance` (HGO) computed above.
+  let gmwGuidance = "";
+  if (matched === LIVE_PLUGIN_RULE && !liveKernelPath) {
+    const gmwScript = join(PLUGIN_ROOT, "scripts", "guard-maintenance-window.mjs");
+    gmwGuidance = [
+      "",
+      "Guard Maintenance Window available (ADR-0058; externally signed, scoped to GS-6, time-boxed; no in-session activation step -- presence of the installed, verified record IS the window):",
+      `${process.execPath} ${JSON.stringify(gmwScript)} prepare --repo-root ${JSON.stringify(projectDir)} --scope GS-6 --ttl-seconds <n> --reason "<reason>"`,
+      "Then, outside this session, sign the prepared request's digest and hand back the proof:",
+      `${process.execPath} ${JSON.stringify(gmwScript)} install --repo-root ${JSON.stringify(projectDir)} --request <request.json> --proof <external-proof.json>`,
+    ].join("\n");
+  }
+
   process.stderr.write([
     `BLOCKED (guard-gate-strength, plugin pipeline-core): ${matched.reason}`,
     `Rule ID: ${matched.id}`,
@@ -291,17 +319,24 @@ if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mj
     "Why: an agent that can weaken the gate that authorizes its own actions has no gate. " +
       "This file decides a gate's strength, so it is not agent-writable" +
       (matched.id === "GS-6"
-        ? " -- there is deliberately no in-session override at all for this rule, because an " +
-          "in-session override for 'may I disarm the gate that is enforcing right now' is the " +
-          "same hole with an extra step. Escape hatch: the PO edits this file directly, outside " +
-          "an agent session; guard code itself is changed in a source checkout, reviewed, and " +
-          "then installed."
+        ? (liveKernelPath
+          ? " -- this is one of the hardcoded NEVER_LIFTABLE_KERNEL_PATHS (ADR-0058 point 3): " +
+            "the code that verifies windows and the guards that enforce this one, so a window " +
+            "covering it would let the first edit disable its own expiry check or the guard " +
+            "itself. It is refused before any Guard Maintenance Window lookup even runs, " +
+            "unconditionally -- no window, however scoped, freshly signed or otherwise valid, " +
+            "can ever cover it, and no human-guard-override capability is consulted for GS-6 " +
+            "either. There is no route to lift this refusal; the file stays refused for the " +
+            "remainder of this session and every session after it."
+          : " -- there is deliberately no in-session override at all for this rule, because an " +
+            "in-session override for 'may I disarm the gate that is enforcing right now' is the " +
+            "same hole with an extra step. The sanctioned route is a signed Guard Maintenance " +
+            "Window (ADR-0058) -- see below for the exact commands.")
         : " in-session by default -- a human-authorized override (chat- or signature-mode, " +
           "matching whatever gates.push_approval is actually committed) can admit one exact, " +
           "audited edit, exactly like every other guard this override family already covers " +
-          "(ADR-0059). Escape hatch: the PO edits this file directly, outside an agent session, " +
-          "or authorizes the override below."),
-    overrideGuidance,
+          "(ADR-0059) -- see below."),
+    matched.id === "GS-6" ? gmwGuidance : overrideGuidance,
   ].join("\n") + "\n");
   process.exit(2);
 }

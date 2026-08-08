@@ -361,10 +361,14 @@ function gateStrengthShellRefusal(command, root) {
       + `This command names ${hit}, a file whose contents decide how strong a gate is, `
       + "and it is not a read-only diagnostic.\n"
       + "An agent that can weaken the gate authorizing its own actions has no gate, and the "
-      + "Edit/Write refusal (GS-1..GS-6) is worth nothing if a shell command reaches the same "
-      + "file. There is deliberately no in-session override.\n"
+      + "Edit/Write refusal (GS-1..GS-5/GS-7) is worth nothing if a shell command reaches the same "
+      + "file. There is deliberately no in-session override for this shell-lane refusal itself -- "
+      + "not even the audited one.\n"
       + "Reading is unaffected: cat, rg, head, sha256sum and git diff/log/show on these paths "
-      + "are admitted. To change one, the PO edits it outside an agent session.\n",
+      + "are admitted. To actually change this file, use the Edit or Write tool instead of a shell "
+      + "command: guard-gate-strength.mjs enforces the identical rule there and offers the audited "
+      + "human-guard-override ceremony (chat- or signature-mode, matching whatever "
+      + "gates.push_approval is actually committed) -- never a hand-edit outside a session.\n",
   );
 }
 

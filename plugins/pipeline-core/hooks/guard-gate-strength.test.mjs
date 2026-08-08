@@ -80,10 +80,20 @@ try {
     }
   });
 
-  check("GST02 the refusal names the one sanctioned escape and offers no in-session override", () => {
+  check("GST02 the refusal names the audited ceremony, never a hand-editing route, and offers no in-session activation of its own", () => {
+    // Inverted 2026-08-08 (LIFTRULES-2, ADR-0059's companion instruction to Decision 6):
+    // this used to pin the exact stale text -- "the PO edits this file directly, outside
+    // an agent session" -- as the DESIRED escape hatch. It is now the forbidden one: every
+    // rule this guard denies is reachable through an audited ceremony (HGO for GS-1..GS-5/
+    // GS-7, GMW for GS-6) or is genuinely unliftable and says so, never a human hand-edit
+    // named as the route. What this check still guards, unchanged: no PIPELINE_GUARD_OVERRIDE-
+    // style in-session bypass exists for weakening one's own gate.
     const root = governed();
     const { stderr } = ask(root, "pipeline.user.yaml");
-    assert.match(stderr, /the PO edits this file directly, outside an agent session/u);
+    assert.doesNotMatch(stderr, /the PO edits this file directly,? outside an agent session/u,
+      "a hand-edit must never be advertised as the route");
+    assert.doesNotMatch(stderr, /PO may still edit/u, "a hand-edit must never be advertised as the route");
+    assert.match(stderr, /human-authorized override.*audited edit/su, "the audited HGO ceremony must be named");
     assert.doesNotMatch(stderr, /PIPELINE_GUARD_OVERRIDE|OVERRIDE </u,
       "an in-session override for weakening one's own gate is the same hole with an extra step");
   });
@@ -242,11 +252,21 @@ try {
     }
   });
 
-  check("GST15 the shell refusal offers no in-session override either", () => {
+  check("GST15 the shell lane itself offers no in-session override, and names the real route (the Edit/Write tool) instead of a hand-edit", () => {
+    // Inverted 2026-08-08 (LIFTRULES-2): previously pinned the exact stale phrase "outside
+    // an agent session" as desired text (it matched both the removed hand-editing hint AND
+    // this check's own intended meaning by coincidence). What this check actually guards,
+    // unchanged: the shell lane itself never offers an in-session override, audited or not.
+    // What is new: the refusal now names the ACTUAL route -- use the Edit/Write tool, whose
+    // guard-gate-strength.mjs write lane does carry the audited ceremony -- rather than a
+    // human hand-edit.
     const root = governed();
     const { stderr } = shell(root, "touch pipeline.user.yaml");
-    assert.match(stderr, /outside an agent session/u);
+    assert.match(stderr, /deliberately no in-session override for this shell-lane refusal/u);
+    assert.doesNotMatch(stderr, /the PO edits it outside an agent session/u);
+    assert.doesNotMatch(stderr, /PO\b[\s\S]{0,40}\bedits?\b[\s\S]{0,100}\boutside\b[\s\S]{0,40}\bsession\b/iu);
     assert.doesNotMatch(stderr, /PIPELINE_GUARD_OVERRIDE/u);
+    assert.match(stderr, /use the Edit or Write tool instead/u, "must name the route that actually exists");
   });
 
   check("GST16 an unrelated command in the same repository is untouched", () => {
@@ -628,6 +648,38 @@ try {
     assert.equal(block.split("\n").length, 2, block);
     assert.doesNotMatch(block, /[\\/]/u, `the reason leaked a path separator:\n${block}`);
     assert.ok(!block.includes(root), "the reason leaked the repository root");
+  });
+
+  // ---- LIFTRULES-2: no refusal anywhere in the guard family may advertise hand-editing a
+  // governed file as the escape hatch (ADR-0059's 2026-08-08 companion instruction to
+  // Decision 6). GST31 is a source-text regression pin across all three governed hook files
+  // (this one, the shell lane, and guard-testpath.mjs); GST32 pins the kernel-path GS-6
+  // refusal's runtime content specifically, since it is the one branch that must say "no
+  // route" rather than name one.
+  const GATE_TESTPATH_GUARD = join(HOOKS, "guard-testpath.mjs");
+  const HAND_EDIT_PATTERN = /\bPO\b[\s\S]{0,40}\bedits?\b[\s\S]{0,100}\boutside\b[\s\S]{0,40}\bsession\b/iu;
+
+  check("GST31 no refusal text in the three governed hook files advertises hand-editing a governed file as the escape hatch", () => {
+    for (const file of [GUARD, LIFECYCLE_GUARD, GATE_TESTPATH_GUARD]) {
+      const source = readFileSync(file, "utf8");
+      assert.doesNotMatch(source, HAND_EDIT_PATTERN, `${file} still advertises hand-editing as a route`);
+    }
+  });
+
+  check("GST32 the kernel-path GS-6 refusal says no route exists and why, and names no file to edit", () => {
+    const base = mkdtempSync(join(tmpdir(), "gate-strength-kernel-noroute-"));
+    roots.push(base);
+    writeFileSync(join(base, "README.md"), "# unrelated, ungoverned\n");
+    for (const target of ["hooks/guard-gate-strength.mjs", "hooks/hooks.json", "lib/guard-maintenance-window.mjs"]) {
+      const { blocked, stderr } = ask(base, join(PLUGIN_ROOT, target));
+      assert.equal(blocked, true, `${target} must stay refused`);
+      assert.match(stderr, /Rule ID: GS-6\b/u);
+      assert.match(stderr, /no route to lift this refusal/iu, `${target}: refusal did not say plainly that no route exists`);
+      assert.match(stderr, /NEVER_LIFTABLE_KERNEL_PATHS/u, `${target}: refusal did not explain why (kernel-path membership)`);
+      assert.doesNotMatch(stderr, HAND_EDIT_PATTERN, `${target}: refusal named a hand-editing route`);
+      assert.doesNotMatch(stderr, /guard-maintenance-window\.mjs" (?:prepare|install)/u,
+        `${target}: kernel refusal must not print a GMW command -- none exists for this path`);
+    }
   });
 
   console.log(`\nguard-gate-strength: ${passed} passed, ${failed} failed`);

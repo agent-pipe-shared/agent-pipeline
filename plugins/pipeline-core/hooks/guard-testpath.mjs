@@ -80,10 +80,13 @@
  *     framing as below).
  *   - Task-type awareness (see SCOPE above): the guard still cannot tell whether this
  *     agent is briefed to change tests right now. The audited override answers that with
- *     a human decision per action instead of with inference. The older escape hatches
- *     remain: a deliberate, git-tracked edit of the guard config to remove the entry, or
- *     the PO editing the file directly outside the session (the guard binds agents, not
- *     humans — same principle as guard-git.mjs).
+ *     a human decision per action instead of with inference. There is no hand-editing
+ *     escape hatch named here (ADR-0059's 2026-08-08 companion instruction to Decision 6:
+ *     never an unreachable-to-the-agent rule stated beside a hand-editing hint): a rule
+ *     this guard denies is either covered by an active, signed Guard Maintenance Window
+ *     (ADR-0058, checked first, silently, for GS-6/TP-* only) or reached through the
+ *     audited human-guard-override ceremony below (chat- or signature-mode, matching
+ *     whatever gates.push_approval is actually committed).
  *   - Obfuscation (symlinks, path traversal `..`, case-only path variants beyond the
  *     case-insensitive match already applied): not defended against — a regex guard
  *     is a tripwire, not a sandbox (same accepted trade-off as guard-git.mjs).
@@ -325,9 +328,7 @@ if (matched) {
       : `Clearance: gates.push_approval is "${approvalMode}", so the in-session activation ` +
         `step is refused — a ready session could otherwise clear its own gate. A signed ` +
         `override is admitted instead: presence of a valid, correctly-bound external ` +
-        `Ed25519 signature IS the authorization — see below for the exact next command. ` +
-        `(The PO may still edit ${guardConfigRelPath} or the test file directly, outside ` +
-        `this session, instead.)`,
+        `Ed25519 signature IS the authorization — see below for the exact next command.`,
     overrideGuidance,
   ]);
 }
