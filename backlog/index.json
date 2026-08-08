@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "f6c71e3aa75804df9e8f8ebe6f99de6eca842b540ded40457964020f8d3e4145"
+    "transitionHead": "2cd82d634635fee5f6ea610f82992558da11e701b06a2ac0380ed75e66b91b1a"
   },
   "counts": {
-    "open": 63,
+    "open": 64,
     "in_progress": 21,
     "closed": 22
   },
@@ -140,6 +140,14 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Reported by a Goldfish during the 2026-08-08 hardening block and then reproduced and isolated directly by the Elephant."
+    },
+    {
+      "id": "pipeline.briefing-model-field-contradicts-agent-definition",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Three dispatches in the 2026-08-08 decisions wave were briefed 'claude-opus-5 at xhigh' and ran on claude-sonnet-5. Two of them reported the mismatch themselves; the Elephant's first reading of it was wrong in the opposite direction."
     },
     {
       "id": "pipeline.canonical-worktree-lifecycle",
