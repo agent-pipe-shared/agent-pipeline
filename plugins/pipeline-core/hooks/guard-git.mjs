@@ -4,7 +4,7 @@
  * git-guard — central PreToolUse deny-guard for Bash|PowerShell tool calls.
  *
  * Plugin: pipeline-core (Agent-Pipeline). Canon: docs/adr/0013-git-guard-union.md,
- * docs/operating-model.md §4.1 (gate honesty) + §8 (calibration).
+ * docs/operating-model.md, What the model protects (gate honesty) + Project calibration and extensions (calibration).
  *
  * WHY THIS FILE EXISTS
  *   The three project guards (<PROJECT_A>, <PROJECT_B>, <PROJECT_C>) are divergent copies — none is a
@@ -81,7 +81,7 @@
  *   audit record would violate the override audit contract; ordinary (unarmed) guard operation
  *   stays fail-open, unchanged.
  *
- *   HONESTY NOTE (gate honesty, operating-model §4.1/M20): the mechanism cannot
+ *   HONESTY NOTE (gate honesty, docs/operating-model.md, What the model protects, M20): the mechanism cannot
  *   technically distinguish who typed the arming prefix — an agent could arm it
  *   without the PO. The defense is procedural + forensic, not technical: GIT-04
  *   forbids agents to self-arm, the arming is visible in the permission prompt, every
@@ -131,7 +131,7 @@
  *   → Projects re-add these via the per-project guard-config (example below).
  *
  * PER-PROJECT EXTRA DENIES — config instead of fork (denies live here or in the
- * committed settings.json, NOT in .claude/pipeline.json — operating-model §8):
+ * committed settings.json, NOT in .claude/pipeline.json — docs/operating-model.md, Project calibration and extensions):
  *   File:   <project>/.claude/guard-config.json   (committed in the project repo)
  *   Schema: { "extraDenyPatterns": [ { "pattern": "<JS regex body>",
  *                                      "reason": "<agent-facing explanation>",
@@ -152,7 +152,7 @@
  *   Config is looked up under $CLAUDE_PROJECT_DIR (set by Claude Code for hooks),
  *   falling back to the process cwd. The override ledger uses the same lookup.
  *
- * WHAT THIS GUARD DOES NOT BLOCK (gate honesty, operating-model §4.1 / M20)
+ * WHAT THIS GUARD DOES NOT BLOCK (gate honesty, docs/operating-model.md, What the model protects, M20)
  *   - The everyday workflow: git push (incl. `push origin main` = <PROJECT_A> deploy path),
  *     push -u, tag creation, merge/pull/fetch/commit, deleting FEATURE branches
  *     (part of the branch-archival convention).

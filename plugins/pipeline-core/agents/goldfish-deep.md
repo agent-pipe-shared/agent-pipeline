@@ -27,7 +27,7 @@ tools: Read, Edit, Write, Grep, Glob, Bash
 #   medium, the standard tier) instead; purely mechanical/uniform/pure-plan-execution work belongs to
 #   goldfish-mechanic (effort low). A weaker (weakest-tier) model for implementation remains FORBIDDEN
 #   regardless of tier (MP-03).
-# maxTurns: 50 = same leash as goldfish-implementor (operating-model §4.3, stage 1); start value,
+# maxTurns: 50 = same leash as goldfish-implementor (docs/operating-model.md, Rigor, risk and gates, stage 1); start value,
 #   calibrate via telemetry (design-latitude tasks may warrant a higher cap - not decided here).
 # Out-of-project paths (plugin cache, other repos): Glob searches only its `path` argument and
 #   defaults to the project cwd - pass the absolute out-of-project path explicitly, or fall back

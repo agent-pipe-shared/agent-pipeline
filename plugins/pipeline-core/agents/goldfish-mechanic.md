@@ -29,7 +29,7 @@ tools: Read, Edit, Write, Grep, Glob, Bash
 #   anticipate, that is a stop condition (genuine ambiguity, see Stop conditions below) - never a
 #   reason to improvise. A weaker (weakest-tier) model for implementation remains FORBIDDEN regardless
 #   of tier (MP-03).
-# maxTurns: 50 = same leash as goldfish-implementor (operating-model §4.3, stage 1); mechanical
+# maxTurns: 50 = same leash as goldfish-implementor (docs/operating-model.md, Rigor, risk and gates, stage 1); mechanical
 #   tasks are typically far smaller in practice, but the hard cap is left at parity pending
 #   telemetry - lowering it further is a calibration candidate, not decided here.
 # Out-of-project paths (plugin cache, other repos): Glob searches only its `path` argument and
