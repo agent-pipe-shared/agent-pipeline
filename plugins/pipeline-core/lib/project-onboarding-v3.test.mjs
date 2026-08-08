@@ -3171,8 +3171,15 @@ test("kickoff promotion replaces only the exact unapproved seed and is replay-sa
       const prdPath = `specs/${profile}/prd_${profile}.md`;
       const specPath = `specs/${profile}/spec.md`;
       const designInputPath = `specs/${profile}/design-input.md`;
-      writeFileSync(join(path, prdPath), `# ${profile} PRD\n`);
       writeFileSync(join(path, specPath), `# ${profile} Spec\n`);
+      const specSha256 = sha256(readFileSync(join(path, specPath)));
+      writeFileSync(join(path, prdPath), [
+        "<!-- po-language: en -->",
+        `<!-- technical-spec-sha256: ${specSha256} -->`,
+        "",
+        `# ${profile} PRD`,
+        "",
+      ].join("\n"));
       writeFileSync(join(path, designInputPath), `# ${profile} design input\n`);
       const args = {
         rootDir: path, profile, featureId: `${profile}-work`, planPath: prdPath,
@@ -3268,8 +3275,15 @@ test("public cleanup privatization preserves the historical kickoff seed for CLI
     const prdPath = "specs/post-private/prd_post_private.md";
     const specPath = "specs/post-private/spec.md";
     const designInputPath = "specs/post-private/design-input.md";
-    writeFileSync(join(path, prdPath), "# Post-private PRD\n");
     writeFileSync(join(path, specPath), "# Post-private specification\n");
+    const postPrivateSpecSha256 = sha256(readFileSync(join(path, specPath)));
+    writeFileSync(join(path, prdPath), [
+      "<!-- po-language: en -->",
+      `<!-- technical-spec-sha256: ${postPrivateSpecSha256} -->`,
+      "",
+      "# Post-private PRD",
+      "",
+    ].join("\n"));
     writeFileSync(join(path, designInputPath), "# Post-private design input\n");
     const promoteArgs = [
       "kickoff", "promote", "plan", "--root", path,
