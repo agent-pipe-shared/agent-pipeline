@@ -152,6 +152,27 @@ so the question "who approved this" remains answerable after the fact even thoug
 it is not enforced beforehand. Unrestricted is not the same as unrecorded, and
 conflating the two would be the real loss.
 
+**The scope statement this rests on, from the PO, 2026-08-08.** It governs more
+than this feature and is recorded here because §5a is where it first becomes
+load-bearing:
+
+> we make sure agents do not break out and do strange things; humans doing strange
+> things is a layer addressed elsewhere
+
+Everything §5a gives up sits on the far side of that line. Creating a key and
+approving with it requires access to both the repository *and* the machine. A
+party holding both is not the adversary this layer is built against, and defending
+against them here would only be a second, weaker copy of a control that belongs
+somewhere else. The pinned anchor is exactly that duplicated control: it costs
+rotation, recovery and teams, and it does not stop anyone who already holds both.
+
+**Attribution needs a name, not a constraint.** The PO's addition: keys carry
+names, or the approving human supplies their name alongside the key identifier
+instead of a bare `approve`. Either way the record answers "who" without the policy
+ever restricting "who may". Concretely, the approval record carries the key's
+`publicKeySha256`, its `keyReference`, and the human-supplied name — three fields,
+none of which gates anything.
+
 **Direction for implementation** (not built here):
 
 - Replace the single `trustAnchor` with an optional anchor *set*. Absent or empty
