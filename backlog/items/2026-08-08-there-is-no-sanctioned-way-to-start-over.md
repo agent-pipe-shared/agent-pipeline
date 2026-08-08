@@ -56,6 +56,30 @@ different line yields a different directory. It worked, it is not a path, and it
 leaves the old anchor behind as litter that the next attempt will trip over
 again.
 
+## A partial reset is a trap, and the guard closes it from the inside
+
+The transcript adds two facts the sections above did not have, and together they
+decide the shape of the fix.
+
+**A half-completed reset changes the state that authorizes the rest of it.** After
+`rm -rf project/` the session's readiness flipped to `migration-required`, and
+that status refused the remaining deletions. The reset was not merely
+interrupted — it destroyed its own authorization halfway through, leaving a
+project in a state neither the old nor the new path recognises.
+
+**And the remaining step is deliberately hard.** `GG-12` blocks
+`rm -rf .git/agent-pipeline` behind a token ceremony. That is correct in
+isolation: pipeline-owned private state should not be casually removed. Combined
+with the partial-reset trap, the two guarantee the human is reached, because the
+agent is now in a state whose exit requires the one command it cannot run.
+
+So the requirement is stronger than "provide a reset command": **the reset must
+be atomic, or it must refuse to begin.** A plan/apply pair whose apply can fail
+halfway reproduces exactly what was observed. Whatever mechanism is chosen, the
+acceptance criterion is that an interrupted reset leaves either the original
+state or the finished one, never the state in between — and that the ordering
+never removes the authority the later steps need before those steps have run.
+
 ## What a fix must not become
 
 A typed `reset` that deletes `docs/` is not an improvement over an untyped one.
