@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.project-reset-plan.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "status", "code", "root", "authorityTier", "remove", "keep", "neverTouched", "planSha256"],
+  "properties": {
+    "schema": { "type": "string", "enum": ["pipeline.project-reset-plan.v1"] },
+    "status": { "type": "string", "enum": ["ready", "not-a-project", "authority-unreadable", "root-unsafe"] },
+    "code": { "type": ["string", "null"] },
+    "root": { "type": ["string", "null"] },
+    "authorityTier": { "type": ["string", "null"], "enum": ["neutral", "legacy", null] },
+    "remove": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "kind", "type", "existed"],
+        "properties": {
+          "path": { "type": "string" },
+          "kind": { "type": "string", "enum": ["manifest", "state", "calibration", "guardConfig", "guardAudit", "handover", "privateState"] },
+          "type": { "type": "string", "enum": ["file", "directory"] },
+          "existed": { "type": "boolean" }
+        }
+      }
+    },
+    "keep": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "kind", "type", "existed", "reason"],
+        "properties": {
+          "path": { "type": "string" },
+          "kind": { "type": "string", "enum": ["manifest", "state", "calibration", "guardConfig", "guardAudit", "privateState"] },
+          "type": { "type": "string", "enum": ["file", "directory"] },
+          "existed": { "type": "boolean" },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+    "neverTouched": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["category", "description"],
+        "properties": {
+          "category": { "type": "string" },
+          "description": { "type": "string" }
+        }
+      }
+    },
+    "planSha256": { "type": ["string", "null"] }
+  }
+}
