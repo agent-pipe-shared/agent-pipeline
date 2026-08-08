@@ -5,6 +5,7 @@
 
 | ID | Status | Type | Owner | Created | Tracking |
 | --- | --- | --- | --- | --- | --- |
+| pipeline.a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.absent-runner-flag-silently-defaults-to-codex | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.adr-0047-numbering-collision | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.adr-0051-follow-up-gaps-untracked | closed | defect | pipeline | 2026-08-05 | — |
@@ -35,6 +36,7 @@
 | pipeline.dispatches-report-completed-on-a-truncated-fragment | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.documentation-information-architecture | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.dual-channel-publication | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
+| pipeline.el-01-has-no-in-session-tripwire | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.elephant-direct-implementation-under-afk-authorization | in_progress | workflow-improvement | pipeline | 2026-07-23 | — |
 | pipeline.evidence-bound-review-retry-economics | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.execution-model-switchback | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -90,6 +92,7 @@
 | pipeline.regulated-document-hooks | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.release-preflight-cli-base-commit-not-peeled | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.release-preflight-has-a-builder-but-no-cli | in_progress | defect | pipeline | 2026-08-06 | — |
+| pipeline.report-early-duty-is-conditional-in-writing-and-unconditional-in-practice | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.restart-launch-is-codex-only-for-every-runner | open | defect | pipeline | 2026-08-06 | — |
 | pipeline.ruleset-freshness-wsl-subsystem-absent | in_progress | defect | pipeline | 2026-08-07 | — |
 | pipeline.ruleset-source-test-unregistered-in-the-verify-gate | open | defect | pipeline | 2026-08-07 | — |
@@ -107,6 +110,7 @@
 | pipeline.stateful-design-contract-template | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.t1-governance-path-preflight | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.technical-lock-for-pipeline-consent-before-onboarding-complete | open | workflow-improvement | pipeline | 2026-08-07 | — |
+| pipeline.the-ledger-reconciler-writes-before-the-items-are-validated | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.trust-mismatch-names-neither-key-nor-directory | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.unified-human-authorization-ux | open | workflow-improvement | pipeline | 2026-08-02 | Current CYB-4 helper is a compatible first adapter only; no programme-wide migration or closure is claimed. |
 | pipeline.verify-gate-scoped-registration | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -120,6 +124,6 @@
 
 ## Counts
 
-- open: 63
+- open: 67
 - in_progress: 26
 - closed: 23
