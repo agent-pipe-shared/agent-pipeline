@@ -143,6 +143,36 @@ one and normalizes afterwards — unconditional, unchanged since the run the ite
 reports, and independent of this repair. No live matching defect; which side
 should move is left open in the item.
 
+**THE GATE, AND THE BLOCKER FOUND AT IT (2026-08-08).** Attempting the two
+gate-strength edits — rather than reading the guard again — showed both denials
+ending with "or authorizes the override below" and printing nothing below. A
+read-only probe settled it: the capability store answers
+`{"status":"invalid","code":"HGO-CAPABILITY"}` to *every* call, so **every
+override-routed denial in this checkout is silent**, not just these two.
+
+Root cause: the store holds one record from 2026-07-30 declaring capability
+schema **v1**; the reader requires **v2** and an exact key set, so it fails on
+schema and keys before the MAC is computed. The version bump happened; eviction
+of what the previous version left behind did not, and meeting one such record
+abandons the whole store instead of skipping it. Filed with the two corrections
+that matter — the foreign plugin identity is a red herring, and the same shape
+could affect any versioned private store — in
+`backlog/items/2026-08-08-the-gate-strength-override-route-is-advertised-but-never-offered.md`.
+
+**What that does to the gate.** Authorization 1, the TP-3 window, is unaffected
+and prepared (intent `ab9c6551…`, bound to `c425170`). Authorizations 2 and 3
+cannot be bought with a signature at all while the store is down; the only route
+the guard leaves is the PO hand-editing two protected files outside a session,
+which is precisely what the standing rule forbids. **This is the PO's decision,
+not the Elephant's** — a v1 record confers no authority under v2, but an agent
+that deletes from a private security store to unblock itself is the movement the
+store exists to prevent.
+
+**Recorded because it is the second occurrence in one phase:** the earlier
+correction in the phase plan was read carefully out of the guard's own source and
+was wrong about this repository. A claim about what a gate *does* is verified by
+provoking it, not by reading it.
+
 **The next hard gate: four authorizations, and none of them is a hand edit.**
 One signed maintenance window over TP-3 (the 104 registration lines plus the two
 in-window demonstrations), two HGO overrides for the GS-class configuration rows,
