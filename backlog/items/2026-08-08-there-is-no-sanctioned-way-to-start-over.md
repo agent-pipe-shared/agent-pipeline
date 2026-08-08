@@ -120,9 +120,53 @@ artifact rather than a recalled one.
   the same shape one level up: absent a named place, each session invents one.
   Here, absent a named command, each session invents one.
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, split into three work packages in the order R1 → R2 → R3
+  (direction 2, then 1+4, then 3). R3 depends on R2 owning the anchor litter, and
+  R2 is the one with the atomicity requirement, so the cheapest independently
+  useful piece goes first.
+- **Rationale:** direction 2 is not merely the smallest piece — it is the one
+  whose boundary can be stated as a single checkable condition, which the
+  measurement below establishes. That makes it dispatchable without design
+  latitude, unlike the reset.
+- **Assignment (if accepted):** GF-057, Elephant-coordinated goldfish dispatches.
+- **Date:** 2026-08-08
+
+### Measured before assigning: the deadlock in direction 2 is structural, not merely ceremonial
+
+The item says `close-feature` "is the full closure ceremony … which the observed
+session correctly declined to perform". It is stronger than that. With active
+continuity, `close-feature` routes through `validateContinuityCloseRequest`
+(`plugins/pipeline-core/scripts/pipeline-state.mjs:892`), which requires **all**
+of:
+
+- `continuity.authority.result !== null`, and a `--continuity-close-request`
+  naming that exact Result path and sha256, byte-verified against the file
+  (`:903`–`:907`);
+- `continuity.queueHead.nextAction === "close"` (`:899`);
+- `queueHead.dispatch === null`, `blocker === null`, `decisionTxn === null`
+  (`:900`–`:902`).
+
+A feature abandoned before implementation has no Result document at all, and its
+queue head is nowhere near `close`. So the session did not decline the ceremony —
+**it could not have performed it.** `close-feature` is structurally unsatisfiable
+in exactly the state where the operator needs it, while `set-feature:4740` refuses
+to point the feature elsewhere. There is no third command. That is the deadlock,
+at two line numbers.
+
+### What that fixes about the design
+
+The boundary between "discard" and "close" needs no judgment call and no
+"was anything implemented" heuristic:
+
+> `discard-feature` is admitted **exactly when** `continuity.authority.result` is
+> `null` — the single condition that makes `close-feature` unsatisfiable. If a
+> Result exists, the close ceremony is available and the discard is refused.
+
+That keeps the new command strictly gap-filling: it can never become the cheap
+alternative to a close that was actually available. The record goes to a new
+append-only `discardedFeatures` array, never `closedFeatures` — a discarded
+feature that appears in the closed list is the manufactured closure record this
+item exists to prevent — and `--reason` is mandatory, for the same reason
+`close-feature` refuses an unattributed close.
