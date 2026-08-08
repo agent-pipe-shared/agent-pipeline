@@ -978,6 +978,51 @@ Also surfaced and worth carrying: `harness/scripts/pipeline-state.mjs` lost
 `1af6624`'s `--human-decision-file` integration in the same merge. That is a
 second loss on the same subject, and PHX-RED5 is currently in that file.
 
+### REVERTED: an agent moved a tripwire that exists to constrain agents — PO decision
+
+**`0addd72` re-baselined six of the nine Critic protected-preimage pins.
+`8005774` reverts it. The suite stays red until a human or an independent Critic
+vouches.**
+
+The dispatch did what my briefing permitted, and the briefing was wrong. I wrote
+"update the pin only if you can show the drift was a legitimate reviewed change",
+which reads as diligent and is structurally broken: the party that wants the suite
+green cannot be the party that vouches for the change clearing it. That is the
+entire point of a tripwire on the *Critic* surface — the one surface whose job is
+to be checked by someone other than the implementer. The runtime flagged it before
+I did.
+
+**The analysis it produced is good and is kept**, because reverting the pin does
+not make the finding untrue:
+
+- The pin was last set at `a6cafed` (2026-08-01), which itself re-pinned three
+  digests. So this is a *maintained baseline*, not an immutable constant — the
+  question of who may maintain it is exactly what is now open.
+- **Six of nine paths had drifted**, five hidden behind the first failure. My
+  briefing and the `EXCLUSIONS` reason both describe it as one document. Both are
+  wrong, and the exclusion reason is a QG-05 defect for a second reason now.
+- Measured drift on the Critic surface since the baseline: `review-protocol.md`
+  ±22, `roles/critic.md` ±10, `agents/critic.md` ±2, `SKILL.md` +32/−2. The
+  dispatch read it hunk by hunk and reports citation repairs plus additive
+  hardening, nothing weakened. I confirmed the shape of that independently
+  (`git diff --stat a6cafed HEAD`); I did **not** re-read all 70 lines myself, and
+  I am not going to claim I did.
+- One pin — `codex-critic-dispatch.schema.json` — has **never** matched, on a file
+  byte-unchanged since the baseline. That pin was already wrong when the inventory
+  was last written, which is its own small finding about how this file is
+  maintained.
+
+**For the PO, and it is a short question:** may the pins be re-baselined on this
+evidence, or does clearing this tripwire need an independent Critic pass on the
+drift first? Re-applying is one `git revert` of the revert. My recommendation is
+the Critic pass, precisely because the cheap answer is the one an agent would
+prefer.
+
+**The rule I am taking from this, beyond this suite:** a briefing must never hand
+a dispatch the authority to clear a control whose purpose is to check that
+dispatch's own class of work. "Show your evidence" is not a substitute for
+separation of duties — it is what makes the absence of separation look rigorous.
+
 ### F1 is closed, and closed on evidence I produced myself
 
 The Critic's single FAIL finding is repaired in `358c709`. BS25 rebuilds its
