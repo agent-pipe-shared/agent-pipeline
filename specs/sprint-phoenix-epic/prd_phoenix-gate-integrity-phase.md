@@ -203,8 +203,15 @@ not bound the same set.
 class, "repoint to the correct heading" has no correct heading — there is nothing
 to point at. Repointing them to the nearest plausible section would convert a
 kind-A defect (dead number) into a kind-B defect (resolves, wrong topic), which is
-the outcome R3 exists to remove. **This needs a decision before the sweep reaches
-those lines** — see decision point 4.
+the outcome R3 exists to remove.
+
+**Decided (PO, 2026-08-08): option (b)** — `roles/elephant.md` becomes the single
+definition site, every citation is repointed there by heading title, and
+`harness/checklists/small-session.md` is reduced to a reference. The surviving
+text is the **broader** of the two exclusion sets, because making one canonical
+decides which set the rule has and the exception should admit fewer changes, not
+more. The options as presented and the rationale are in decision point 4; the
+criterion is **AC-P11**.
 
 **R3.2 — R1's remaining acceptance criteria.** AC-R1-5, AC-R1-8 (the GS-4
 protected-test-path row) and the export-set half of AC-R1-1. AC-R1-8 touches the
@@ -384,17 +391,41 @@ than being maintained here.
 3. **Confirm the approval budget** (four human commands, now measurement-backed)
    is acceptable for this phase, or defer the two GS-class edits until the Nova
    mechanism lands.
-4. **Where the stage-0 fast-path definition lives (§R3.4).** The sweep is blocked
-   on this for ~30 citations. Four options, with what each costs:
+4. **Where the stage-0 fast-path definition lives (§R3.4) — DECIDED (PO,
+   2026-08-08): option (b).** `roles/elephant.md`'s statement becomes canonical,
+   every citation is repointed there by heading title, and
+   `harness/checklists/small-session.md` is reduced to a reference. The options
+   table is kept as it was presented, because a decision that hides what it was
+   chosen from cannot be audited.
+
+   **One judgement falls out of (b) and is fixed here rather than left to the
+   sweep.** The two restatements do not bound the same set, so making one
+   canonical decides which set the rule has. **The broader one wins** —
+   `roles/elephant.md`'s exclusion of "architecture / schema / public-API / test /
+   guardrail-hook-CI / dependency / security-surface" changes, not
+   `small-session.md`'s shorter "architecture / schema / API / test / guardrail".
+   The rule governs when an Elephant may bypass a Goldfish dispatch and write
+   production code itself; where two readings exist, the one that admits fewer
+   changes to that path is the one to keep. Narrowing the exception is safe in
+   the direction the guard family already fails.
+
+   The four options as presented:
 
    | | Option | Cost | Consequence |
    | --- | --- | --- | --- |
    | **a** | Write the definition into `docs/operating-model.md` under a real anchor, then repoint the citations to it | one edit to the target document | Contradicts §II.6's boundary ("R3 repairs citations, it does not restructure the target") — so it is a deliberate, named exception to that boundary, not a slip |
-   | **b** — *recommended* | Designate `roles/elephant.md`'s statement canonical, repoint every citation there by heading title, and reduce `small-session.md` to a reference | edits inside B3's existing scope | Puts the definition where the rule it governs lives. Resolves the two disagreeing restatements into one. No change to the operating model |
+   | **b** — **CHOSEN** | Designate `roles/elephant.md`'s statement canonical, repoint every citation there by heading title, and reduce `small-session.md` to a reference | edits inside B3's existing scope | Puts the definition where the rule it governs lives. Resolves the two disagreeing restatements into one. No change to the operating model |
    | **c** | Repoint to the nearest plausible operating-model heading | cheapest | Manufactures ~30 kind-B citations. Rejected on its face, listed so the decision is auditable |
    | **d** | Delete the criteria from the citing sentences and leave EL-01's exception unbounded | trivial | Removes the only bound on when an Elephant may write production code. Not recommended under any reading |
 
-   **Recommendation: (b).** It is the only option that both closes the citation
-   and fixes the substantive defect — a rule whose scope is defined twice, in two
+   (b) was chosen because it is the only option that both closes the citation and
+   fixes the substantive defect — a rule whose scope is defined twice, in two
    different sets of words, in files that each say the definition is somewhere
    else.
+
+   **Acceptance criterion for this decision.** **AC-P11** — the stage-0 fast-path
+   criteria appear in exactly one place in the repository; every other mention is
+   a reference to it by file and heading title with no section number; the
+   surviving text is the broader exclusion set; and `roles/elephant.md`'s EL-01
+   exception no longer names a target outside its own file. Verified by
+   `rg -n "25 diff lines"` returning exactly one definition site.
