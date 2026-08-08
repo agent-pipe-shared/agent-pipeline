@@ -8,8 +8,18 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const core = readFileSync(join(here, "SKILL.md"), "utf8");
 const closeBlock = readFileSync(join(here, "..", "close-block", "SKILL.md"), "utf8");
-const refs = ["onboarding-recovery.md", "private-overlay.md", "roles.md", "freshness.md", "failure-cases.md", "continuation.md"]
+const refs = ["onboarding-recovery.md", "private-overlay.md", "roles.md", "freshness.md", "failure-cases.md", "continuation.md", "push-approval.md"]
   .map((name) => readFileSync(join(here, "references", name), "utf8")).join("\n");
+// Every reference the core's lazy-loading list names must exist and be readable.
+// SETUP-3 shipped a bullet for a file SETUP-4 had not written yet; the dangling
+// pointer survived a green suite because nothing checked the two agree. It does
+// now, and the check is the cheap kind: read the core, extract the names, open
+// each one.
+const namedReferences = [...readFileSync(join(here, "SKILL.md"), "utf8").matchAll(/`references\/([a-z0-9-]+\.md)`/gu)].map((match) => match[1]);
+assert.ok(namedReferences.length > 0, "the core must name at least one reference file");
+for (const name of new Set(namedReferences)) {
+  assert.ok(readFileSync(join(here, "references", name), "utf8").length > 0, `SKILL.md names references/${name}, which is missing or empty`);
+}
 const all = `${core}\n${refs}`;
 // Context-economy budget for the bootstrap skill: it is read at the start of every
 // session, so every byte here is paid on every session, and the cap exists to stop it
@@ -75,4 +85,39 @@ assert.match(core, /Recommendation: match the language you would already write t
 assert.match(core, /Bind the answer into `<!-- po-language: \(de\|en\) -->` before drafting/u);
 assert.match(core, /Recommendation: `feature` unless the work is visibly cross-package or\ntrivially small\./u);
 assert.ok(!core.includes("Set gates.push_approval?"), "a question must not be posed as a bare setting name");
+// SETUP-4: the push-approval reference. These pin the claims an operator acts
+// on, not the prose around them -- each one is either a fact about the gate or a
+// warning derived from the live 2026-08-08 ceremony that took three attempts.
+// Matched against a whitespace-flattened copy on purpose. Pinning a phrase that
+// happens to span a line break makes the test fail on a reflow that changed no
+// meaning -- which cost this file two fix-and-rerun cycles today. The claim is
+// what is pinned, not the wrapping.
+const pushApproval = readFileSync(join(here, "references", "push-approval.md"), "utf8").replace(/\s+/gu, " ");
+// Both supported values named, and the default stated as the fail-closed one.
+assert.match(pushApproval, /`signature`/u);
+assert.match(pushApproval, /`chat`/u);
+assert.match(pushApproval, /unreadable or unrecognised value resolves to/u);
+// The signature route's defining property: the proof IS the authorization.
+assert.match(pushApproval, /there is no in-session step that activates it afterwards/u);
+// chat is bounded, and explicitly not a workaround. The negative pin matters
+// more than the positive one: it is what stops a session offering a gate
+// downgrade as the fix for a confusing refusal.
+assert.match(pushApproval, /attribution record, not a proof/u);
+assert.match(pushApproval, /posture choice, not an escape hatch/u);
+assert.match(pushApproval, /Do not: propose a mode change to get past a refusal/u);
+// The absolute prohibitions gain nothing from either value.
+assert.match(pushApproval, /no force-push, no history rewrite/u);
+// Liftability is delegated at runtime, never restated.
+assert.match(pushApproval, /repair-map\.mjs/u);
+assert.doesNotMatch(pushApproval, /\bHGO-[A-Z-]+\b/u, "the reference must not restate the repair map's codes");
+// The three live-ceremony warnings, each pinned by its operative instruction.
+assert.match(pushApproval, /stop committing between preparing an approval and installing it/u);
+assert.match(pushApproval, /older than the field/u);
+assert.match(pushApproval, /writes a proof file and does not name it/u);
+// The two argument traps, both met live.
+assert.match(pushApproval, /`--repo-root` must be an absolute path/u);
+assert.match(pushApproval, /machine-scoped configuration plane/u);
+// A shipped file must not pin a subcommand list that has changed before.
+assert.match(pushApproval, /rather than trusting a list written here/u);
+
 process.stdout.write("pipeline-start V3: core budget and lazy-reference checks passed\n");
