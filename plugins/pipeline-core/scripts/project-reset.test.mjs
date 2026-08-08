@@ -101,8 +101,29 @@ test("AC-2: legacy and neutral authority tiers differ in exactly the five tier-r
         "project/pipeline.yaml", "project/pipeline-state.json", "project/pipeline.json",
         "project/guard-config.json", "project/guard-override.log.jsonl",
       ]);
-      // Only the five tier-resolved entries differ; the fixed order after them (handover) is identical.
-      assert.deepEqual(legacyPlan.remove.slice(5).map((e) => e.path), neutralPlan.remove.slice(5).map((e) => e.path));
+      // Beyond the five tier-resolved entries, the fixed order is identical --
+      // EXCEPT for the two runtime-projection collision paths (R2B):
+      // .claude/pipeline.yaml and .claude/pipeline.json are ALSO runtime-
+      // projection targets. On the legacy tier both are already the
+      // tier-resolved manifest/calibration entries above (positions 0 and 2),
+      // so the runtime-projection loop skips them (already claimed). On the
+      // neutral tier neither is claimed by the authority loop (this fixture
+      // never created a legacy compatibility copy), so both get a
+      // runtimeOwnedKeys entry the legacy plan does not have. Exclude that
+      // documented asymmetry from the "otherwise identical" comparison and
+      // assert it explicitly instead of letting it silently pass or fail.
+      const isCollisionEntry = (entry) => entry.kind === "runtimeOwnedKeys"
+        && (entry.path === ".claude/pipeline.yaml" || entry.path === ".claude/pipeline.json");
+      const nonCollision = (entries) => entries.filter((entry) => !isCollisionEntry(entry));
+      assert.deepEqual(
+        nonCollision(legacyPlan.remove.slice(5)).map((e) => e.path),
+        nonCollision(neutralPlan.remove.slice(5)).map((e) => e.path),
+      );
+      assert.equal(legacyPlan.remove.some(isCollisionEntry), false);
+      assert.deepEqual(
+        neutralPlan.remove.filter(isCollisionEntry).map((e) => e.path).sort(),
+        [".claude/pipeline.json", ".claude/pipeline.yaml"],
+      );
     });
   });
 });
@@ -150,6 +171,13 @@ test("AC-1: neverTouched names git history, adopter files, and specs/ as a desig
 
 test("AC-4: plan is read-only -- byte-identical before and after, including a damaged/non-ready project", () => {
   withFixture(kickoffFixture("readonly-ready"), (root) => {
+    // R2B: the fixture also carries runtime-projection targets now covered
+    // by the plan (a preserve-only .codex/config.toml and an owned-keys
+    // .codex/agents/critic.toml), so read-only-ness is proven over the
+    // extended plan, not just the original five authority artifacts.
+    mkdirSync(join(root, ".codex", "agents"), { recursive: true });
+    writeFileSync(join(root, ".codex", "config.toml"), "# codex config\n");
+    writeFileSync(join(root, ".codex", "agents", "critic.toml"), 'model = "x"\nmodel_reasoning_effort = "y"\n');
     const before = inventory(root);
     const plan = planProjectReset({ rootDir: root });
     assert.equal(plan.status, "ready");
@@ -286,5 +314,77 @@ test("privateState: an ordinary repository's private Pipeline directory is a who
     assert.equal(entry.type, "directory");
     assert.equal(entry.existed, true);
     assert.equal(existsSync(join(root, ".git", "agent-pipeline", "onboarding", "continuity-history.json")), true);
+  });
+});
+
+test("AC-1: runtime-projection targets are runner-neutral -- both .claude/* and .codex/* paths appear", () => {
+  withFixture(freshProject("runner-neutral"), (root) => {
+    const plan = planProjectReset({ rootDir: root });
+    const allPaths = [...plan.remove, ...plan.keep].map((entry) => entry.path);
+    assert.equal(allPaths.some((path) => path.startsWith(".claude/")), true);
+    assert.equal(allPaths.some((path) => path.startsWith(".codex/")), true);
+  });
+});
+
+test("AC-2: a runtime target with owned keys becomes a keys-scoped removal entry, never a whole-file remove", () => {
+  withFixture(freshProject("owned-keys", { tier: "neutral" }), (root) => {
+    const plan = planProjectReset({ rootDir: root });
+    const entry = plan.remove.find((candidate) => candidate.path === ".claude/pipeline.yaml");
+    assert.ok(entry, "expected a runtime-projection entry for .claude/pipeline.yaml");
+    assert.equal(entry.kind, "runtimeOwnedKeys");
+    assert.equal(entry.type, "keys");
+    assert.deepEqual(entry.ownedKeys, ["language.human_facing", "modelRouting", "runnerRoutes", "criticExport", "session.keep_awake"]);
+    assert.equal(entry.existed, false);
+    // Never a whole-file remove for the same path.
+    assert.equal(plan.remove.filter((candidate) => candidate.path === ".claude/pipeline.yaml").length, 1);
+  });
+});
+
+test("AC-3: a preserve-only runtime target with no owned keys is never removed", () => {
+  withFixture(freshProject("preserve-only"), (root) => {
+    const plan = planProjectReset({ rootDir: root });
+    for (const path of [".claude/settings.json", ".codex/config.toml"]) {
+      const keepEntry = plan.keep.find((candidate) => candidate.path === path);
+      assert.ok(keepEntry, `expected ${path} to be kept`);
+      assert.equal(keepEntry.kind, "runtimePreserveOnly");
+      assert.equal(typeof keepEntry.reason, "string");
+      assert.equal(plan.remove.some((candidate) => candidate.path === path), false);
+    }
+  });
+});
+
+test("AC-4: no path appears in more than one of remove/keep, legacy and neutral tiers", () => {
+  for (const tier of ["legacy", "neutral"]) {
+    withFixture(kickoffFixture(`no-duplicate-${tier}`, { tier }), (root) => {
+      const plan = planProjectReset({ rootDir: root });
+      const paths = [...plan.remove.map((entry) => entry.path), ...plan.keep.map((entry) => entry.path)];
+      assert.equal(new Set(paths).size, paths.length, `duplicate path in ${tier} plan`);
+    });
+  }
+});
+
+test("AC-4: the collision paths are claimed by the authority loop and skipped by the runtime loop, on both tiers", () => {
+  withFixture(freshProject("collision-legacy", { tier: "legacy" }), (root) => {
+    const plan = planProjectReset({ rootDir: root });
+    assert.equal(plan.remove.filter((entry) => entry.path === ".claude/pipeline.yaml").length, 1);
+    assert.equal(plan.remove.find((entry) => entry.path === ".claude/pipeline.yaml").kind, "manifest");
+    assert.equal(plan.remove.filter((entry) => entry.path === ".claude/pipeline.json").length, 1);
+    assert.equal(plan.remove.find((entry) => entry.path === ".claude/pipeline.json").kind, "calibration");
+  });
+  withFixture(freshProject("collision-neutral", { tier: "neutral" }), (root) => {
+    const plan = planProjectReset({ rootDir: root });
+    assert.equal(plan.remove.find((entry) => entry.path === ".claude/pipeline.yaml").kind, "runtimeOwnedKeys");
+    assert.equal(plan.remove.find((entry) => entry.path === ".claude/pipeline.json").kind, "runtimeOwnedKeys");
+  });
+});
+
+test("AC-7: a plan containing runtime-projection removal and preserve-only keep entries validates against the schema", () => {
+  withFixture(freshProject("schema-runtime", { tier: "neutral" }), (root) => {
+    const plan = planProjectReset({ rootDir: root });
+    const result = validateAgainstSchema(plan, SCHEMA);
+    assert.deepEqual(result.errors, []);
+    assert.equal(result.valid, true);
+    assert.equal(plan.remove.some((entry) => entry.kind === "runtimeOwnedKeys"), true);
+    assert.equal(plan.keep.some((entry) => entry.kind === "runtimePreserveOnly"), true);
   });
 });

@@ -18,9 +18,10 @@
         "required": ["path", "kind", "type", "existed"],
         "properties": {
           "path": { "type": "string" },
-          "kind": { "type": "string", "enum": ["manifest", "state", "calibration", "guardConfig", "guardAudit", "handover", "privateState"] },
-          "type": { "type": "string", "enum": ["file", "directory"] },
-          "existed": { "type": "boolean" }
+          "kind": { "type": "string", "enum": ["manifest", "state", "calibration", "guardConfig", "guardAudit", "handover", "privateState", "runtimeOwnedKeys"] },
+          "type": { "type": "string", "enum": ["file", "directory", "keys"] },
+          "existed": { "type": "boolean" },
+          "ownedKeys": { "type": "array", "items": { "type": "string" } }
         }
       }
     },
@@ -32,7 +33,7 @@
         "required": ["path", "kind", "type", "existed", "reason"],
         "properties": {
           "path": { "type": "string" },
-          "kind": { "type": "string", "enum": ["manifest", "state", "calibration", "guardConfig", "guardAudit", "privateState"] },
+          "kind": { "type": "string", "enum": ["manifest", "state", "calibration", "guardConfig", "guardAudit", "privateState", "runtimePreserveOnly"] },
           "type": { "type": "string", "enum": ["file", "directory"] },
           "existed": { "type": "boolean" },
           "reason": { "type": "string" }

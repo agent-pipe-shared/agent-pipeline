@@ -31,6 +31,27 @@
  * categories the reset does not enter at all -- this repository's own git
  * history, the adopter's own files, and any design package under `specs/`.
  *
+ * A THIRD REMOVAL KIND (R2B). `remove` also derives every runtime-projection
+ * target from the unfiltered `loadRuntimeProjectionV3OwnedKeys().targets`
+ * (`runtime-projection-v3.mjs`), runner-neutrally -- never `.codex/`-only or
+ * `.claude/`-only. Two shapes fall out of that manifest: a `preserve-only`
+ * target the Pipeline owns no key of at all (`.claude/settings.json`,
+ * `.codex/config.toml`) is `keep`, never `remove`. A target with non-empty
+ * `ownedKeys` (e.g. `modelRouting` inside `.claude/pipeline.yaml`, which also
+ * carries the project's OWN gates/security/governance declarations) is a
+ * `remove` entry that names the exact owned keys and never the file -- the
+ * same "remove what was seeded, never the container" rule from the docs/
+ * `specs/` case, one level down, inside a file instead of a directory. Two
+ * runtime-projection paths (`.claude/pipeline.yaml`, `.claude/pipeline.json`)
+ * physically coincide with an authority artifact (manifest, calibration);
+ * where the authority loop above has ALREADY classified that exact path --
+ * as a whole-file `remove` at the currently selected tier, or as a
+ * whole-file `keep` for an existing compatibility copy at the other tier --
+ * that classification is a strict superset of the runtime-projection
+ * treatment (removing/keeping the whole file removes/keeps the owned keys
+ * inside it too), so the runtime-projection loop SKIPS an already-claimed
+ * path. A path is therefore classified exactly once, never twice.
+ *
  * FAILS CLOSED, NAMES WHICH. A root that is not a project, one whose
  * authority is unreadable, and one that is a symlink each produce a
  * distinct typed refusal with a non-zero exit -- never a guessed path set.
@@ -56,6 +77,7 @@ import {
   NEUTRAL_MANIFEST,
   resolveAuthorityArtifactPath,
 } from "../lib/project-authority.mjs";
+import { loadRuntimeProjectionV3OwnedKeys } from "../lib/runtime-projection-v3.mjs";
 
 export const PROJECT_RESET_PLAN_SCHEMA = "pipeline.project-reset-plan.v1";
 
@@ -220,6 +242,40 @@ export function planProjectReset({ rootDir } = {}) {
         type: "directory",
         existed: existsSync(privateDir),
         reason: "private Pipeline state resolves outside this project root (a linked worktree's Git common directory); a project-scoped reset does not remove state shared with other worktrees",
+      });
+    }
+  }
+
+  // RUNTIME-PROJECTION TARGETS (R2B). Derived from the unfiltered manifest --
+  // never a `.claude/`- or `.codex/`-only literal -- so a future filter that
+  // narrowed the reset to one runner would fail the runner-neutral test
+  // rather than silently ship. `claimedPaths` is exactly the set of paths
+  // the authority loop above already put in `remove` or `keep`; skipping
+  // those keeps every path classified exactly once (see the header comment).
+  const claimedPaths = new Set([...remove, ...keep].map((entry) => entry.path));
+  const runtimeTargets = [...loadRuntimeProjectionV3OwnedKeys().targets]
+    .sort((left, right) => left.path.localeCompare(right.path));
+  for (const target of runtimeTargets) {
+    if (claimedPaths.has(target.path)) continue;
+    const existed = existsSync(join(root, target.path));
+    if (target.ownedKeys.length === 0) {
+      // `preserve-only`: the Pipeline projects nothing into this file --
+      // it is the runner's own configuration, never touched by a reset.
+      keep.push({
+        path: target.path,
+        kind: "runtimePreserveOnly",
+        type: "file",
+        existed,
+        reason: "runtime-projection target the Pipeline owns no key of; the runner's own configuration, left untouched by a reset",
+      });
+    } else {
+      // THE THIRD KIND: name the exact owned keys, never the file.
+      remove.push({
+        path: target.path,
+        kind: "runtimeOwnedKeys",
+        type: "keys",
+        existed,
+        ownedKeys: [...target.ownedKeys],
       });
     }
   }
