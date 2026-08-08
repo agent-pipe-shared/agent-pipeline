@@ -230,6 +230,154 @@ check("inactive and design transition lookalikes remain damaged", () => {
   assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
 });
 
+check("writer-shaped discard state is a valid feature re-entry boundary", () => {
+  const root = fixture("discard-feature-transition");
+  const kickoff = planOnboardingKickoff({ rootDir: root, goal: "Discard after a real kickoff" });
+  applyOnboardingKickoff({ plan: kickoff, expectedPlanSha256: kickoff.planSha256, activate: true });
+  const statePath = join(root, ".claude", "pipeline-state.json");
+  const before = JSON.parse(readFileSync(statePath, "utf8"));
+  const discardedAt = "2026-07-29T09:00:00.000Z";
+  writeFileSync(statePath, `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    discardedFeatures: [{
+      id: before.activeFeature.id,
+      planPath: before.activeFeature.planPath,
+      phaseAtDiscard: before.activeFeature.phase,
+      discardedAt,
+      discardedBy: "PO",
+      reason: "abandoned before implementation",
+      forCommit: null,
+    }],
+    planApproved: false,
+    updatedAt: discardedAt,
+  }, null, 2)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "valid");
+});
+
+check("writer-shaped discard state with a prior closed feature remains valid", () => {
+  const root = fixture("discard-after-closed-transition");
+  const kickoff = planOnboardingKickoff({ rootDir: root, goal: "Discard after an earlier close" });
+  applyOnboardingKickoff({ plan: kickoff, expectedPlanSha256: kickoff.planSha256, activate: true });
+  const statePath = join(root, ".claude", "pipeline-state.json");
+  const before = JSON.parse(readFileSync(statePath, "utf8"));
+  const discardedAt = "2026-07-29T09:05:00.000Z";
+  writeFileSync(statePath, `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    closedFeatures: [{
+      id: "earlier-feature",
+      planPath: "specs/earlier/prd.md",
+      phaseAtClose: "implementation",
+      closedAt: "2026-07-29T08:00:00.000Z",
+      closedBy: "PO",
+      forCommit: null,
+    }],
+    discardedFeatures: [{
+      id: before.activeFeature.id,
+      planPath: before.activeFeature.planPath,
+      phaseAtDiscard: before.activeFeature.phase,
+      discardedAt,
+      discardedBy: "PO",
+      reason: "abandoned after a prior close",
+      forCommit: null,
+    }],
+    planApproved: false,
+    updatedAt: discardedAt,
+  }, null, 2)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "valid");
+});
+
+function baseDiscardEntry() {
+  return {
+    id: "abandoned-feature",
+    planPath: "specs/abandoned/prd.md",
+    phaseAtDiscard: "implementation",
+    discardedAt: "2026-07-29T09:00:00.000Z",
+    discardedBy: "PO",
+    reason: "superseded",
+    forCommit: null,
+  };
+}
+
+check("discard transition with a stale updatedAt remains damaged", () => {
+  const root = fixture("discard-stale-updated-at");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    planApproved: false,
+    updatedAt: "2026-07-29T09:00:01.000Z",
+    discardedFeatures: [baseDiscardEntry()],
+  }, null, 2)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
+});
+
+check("discard entry with an extra key remains damaged", () => {
+  const root = fixture("discard-extra-key");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    planApproved: false,
+    updatedAt: "2026-07-29T09:00:00.000Z",
+    discardedFeatures: [{ ...baseDiscardEntry(), unexpected: true }],
+  }, null, 2)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
+});
+
+check("discard entry missing a required key remains damaged", () => {
+  const root = fixture("discard-missing-key");
+  const entry = baseDiscardEntry();
+  delete entry.reason;
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    planApproved: false,
+    updatedAt: "2026-07-29T09:00:00.000Z",
+    discardedFeatures: [entry],
+  }, null, 2)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
+});
+
+check("discard transition with planApproved true remains damaged", () => {
+  const root = fixture("discard-plan-approved");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    planApproved: true,
+    updatedAt: "2026-07-29T09:00:00.000Z",
+    discardedFeatures: [baseDiscardEntry()],
+  }, null, 2)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
+});
+
+check("discard transition with continuity still present remains damaged", () => {
+  const root = fixture("discard-continuity-present");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    planApproved: false,
+    updatedAt: "2026-07-29T09:00:00.000Z",
+    continuity: {},
+    discardedFeatures: [baseDiscardEntry()],
+  }, null, 2)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
+});
+
+check("discard transition with an empty discardedFeatures array remains damaged", () => {
+  const root = fixture("discard-empty-array");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    planApproved: false,
+    updatedAt: "2026-07-29T09:00:00.000Z",
+    discardedFeatures: [],
+  }, null, 2)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
+});
+
+check("discard entry whose planPath escapes the project root remains damaged", () => {
+  const root = fixture("discard-path-escape");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    planApproved: false,
+    updatedAt: "2026-07-29T09:00:00.000Z",
+    discardedFeatures: [{ ...baseDiscardEntry(), planPath: "../outside.md" }],
+  }, null, 2)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
+});
+
 check("orphan continuity and invalid active feature are damaged", () => {
   const root = fixture("orphan-state");
   writeFileSync(join(root, ".claude", "pipeline-state.json"), JSON.stringify({

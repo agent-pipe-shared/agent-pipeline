@@ -256,6 +256,47 @@ function validClosedTransitionState(root, state) {
     && state.closedFeatures.at(-1).closedAt === state.updatedAt;
 }
 
+function validDiscardedFeatureEntry(root, entry) {
+  const expectedKeys = new Set(["id", "planPath", "phaseAtDiscard", "discardedAt", "discardedBy", "reason", "forCommit"]);
+  if (!exactKeys(entry, expectedKeys)
+    || typeof entry.id !== "string" || entry.id.length === 0
+    || typeof entry.planPath !== "string" || entry.planPath.length === 0
+    || !(entry.phaseAtDiscard === null || typeof entry.phaseAtDiscard === "string")
+    || !canonicalIsoTimestamp(entry.discardedAt)
+    || typeof entry.discardedBy !== "string" || entry.discardedBy.length === 0
+    || typeof entry.reason !== "string" || entry.reason.length === 0
+    || !(entry.forCommit === null || /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(entry.forCommit))) return false;
+  try { safeRelativePath(entry.planPath, "discarded feature plan"); } catch { return false; }
+  return true;
+}
+
+// `discard-feature` (pipeline-state.mjs:5516) deliberately never writes to
+// `closedFeatures` -- a discard is an honest record of abandonment, not a
+// manufactured closure -- so this is a sibling of validClosedTransitionState,
+// not a replacement for it. A project may carry BOTH arrays (one feature
+// closed, a later one discarded, or the reverse): validity is decided by
+// timestamp, not by which array happens to exist -- the last entry of
+// whichever array carries `updatedAt` must be well-formed, and every entry of
+// BOTH arrays must be individually well-formed.
+function validDiscardedTransitionState(root, state) {
+  if (!isObject(state)
+    || state.schema !== "pipeline.state.v0"
+    || state.activeFeature !== undefined
+    || state.continuity !== undefined
+    || state.planApproval !== undefined
+    || state.planRevocation !== undefined
+    || state.planApproved !== false
+    || !canonicalIsoTimestamp(state.updatedAt)
+    || !Array.isArray(state.discardedFeatures)
+    || state.discardedFeatures.length === 0
+    || !state.discardedFeatures.every((entry) => validDiscardedFeatureEntry(root, entry))
+    || state.discardedFeatures.at(-1).discardedAt !== state.updatedAt) return false;
+  if (state.closedFeatures !== undefined
+    && (!Array.isArray(state.closedFeatures)
+      || !state.closedFeatures.every((entry) => validClosedFeatureEntry(root, entry)))) return false;
+  return true;
+}
+
 function validDesignTransitionState(state) {
   const valid = isObject(state)
     && state.schema === "pipeline.state.v0"
@@ -589,7 +630,8 @@ function observeDetailed({
     let status;
     if (projected.code === "CS-STATUS-ACTIVE" && projected.continuity.status === "valid") {
       status = "valid";
-    } else if (projected.code === "CS-STATUS-INACTIVE" && validClosedTransitionState(root, state)) {
+    } else if (projected.code === "CS-STATUS-INACTIVE"
+      && (validClosedTransitionState(root, state) || validDiscardedTransitionState(root, state))) {
       status = "valid";
     } else if (projected.code === "CS-STATUS-ACTIVE-NO-CONTINUITY" && validDesignTransitionState(state)) {
       status = "valid";
