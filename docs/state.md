@@ -74,14 +74,59 @@ elsewhere for "true stage-0 fast-path" — plus `templates/prd.md:14`,
 `templates/prompts/critic-review.md:218` and three lines in
 `templates/prompts/kickoff-new-project.md`.
 
-**In flight at the context cut:** `PHX-STAGE0-SWEEP` (the repository-wide
-repoint) and `PHX-REGCHECK` (the suite-registration completeness checker, its
-suite, and the *unapplied* `verify.mjs` registration patch as an evidence
-artifact). Neither needs a human act.
+**Both in-flight dispatches completed (2026-08-08). AC-P11 is satisfied.**
+`PHX-STAGE0-SWEEP` landed `c3aca42`: eight files, both language halves of
+`harness/session-bootstrap.md`, and two carriers inside
+`plugins/pipeline-core/**` that turned out to hold genuine stage-0 definition
+claims (`agents/critic.md:83`, `skills/close-block/SKILL.md:132`) — found and
+fixed under the briefing's own exception clause, and reported rather than
+quietly included. Verified by the Elephant: `rg -n "25 diff lines"` over the
+tracked tree outside `docs/`/`specs/`/`backlog/` returns exactly one hit,
+`roles/elephant.md:35`, the definition site itself. The remaining hits are
+archival documents that quote the defect deliberately.
 
-**The next hard gate is one act:** a signed maintenance window over TP-3, so the
-102 green registrations and the new check land together. Everything else in the
-phase that needs no signature is done or in flight.
+**One check I ran because the sweep touched a literally-checked string.** The
+bootstrap's third confirmation line is pinned verbatim in three documents and the
+sweep changed all three. Nothing in code asserts that string —
+`rg -n "Role prohibitions loaded|Rollen-Verbote geladen"` returns only those
+three Markdown files — so the change is complete rather than half-applied.
+
+**`PHX-REGCHECK` landed `c40f01d` (checker + suite) and `c8d2044` (the unapplied
+patch).** Verified independently: `verify.mjs`'s last commit is still `0ffe37c`,
+so it was not touched; the checker's own suite passes 9/9 including two
+process-level runs that prove it actually goes red; run against the real tree it
+exits 2 with 103 unregistered and 7 declared exclusions.
+
+**The dispatch found a real gap in its own work and said so, and it was right.**
+The patch registered only the checker's *unit-test* suite. AC-P2 and AC-P3
+require that **verify** goes non-zero when a suite is unregistered or a name is
+duplicated — fixture tests inside the gate do not do that. `PHX-REGPATCH-13`
+(`7d66812`) added Batch 13, the live `-check` step following the established
+`<name>-tests`/`<name>-check` pairing, re-derived every count to 104, and staged
+a break-and-restore procedure so AC-P1/AC-P2/AC-P3 are *demonstrated* inside the
+window rather than asserted after it.
+
+**Two backlog items filed** (`4f203e8`, `36bceb6`): the R3 coordinate checker's
+bare-basename resolution, which returned five silent wrong-file greens under an
+`ok` status (R3.3, the last unfiled R3 residual), and the PO authority decision's
+`prd` candidate, which is presented with a status column but is a literal in the
+output object. The second is Nova-owned and filed, not repaired.
+
+**The transition ledger is reconciled** (`c1f5a76`). Four items had no entry,
+including two filed earlier in this session; recorded through the sanctioned
+reconciler, which is the remedy `verify.mjs`'s own comment names. That finding
+class is now empty and the two frozen projections (`backlog/index.json`,
+`backlog/STATUS.md`) caught up. `check-backlog-state.mjs` still exits 2 on the 38
+pre-export events — unchanged, diagnosed, and owned by its own item.
+
+**The next hard gate: four authorizations, and none of them is a hand edit.**
+One signed maintenance window over TP-3 (the 104 registration lines plus the two
+in-window demonstrations), two HGO overrides for the GS-class configuration rows,
+and the push. The correction that matters is recorded in the phase plan: the
+"PO edits this file directly, outside an agent session" escape hatch applies to
+the live-plugin rule only — every other gate-strength rule routes through the
+ordinary one-tool-call override. Everything in this phase that needs no signature
+is now done.
 
 **PHASE APPROVED AND IN IMPLEMENTATION (2026-08-08).** The PO authority decision
 was applied (candidate `spec`, continuity revision 4), the plan was submitted
