@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "0711a603b1c9170beaed64c054584aefefff79b11fc289165c6ade33584d635a"
+    "transitionHead": "f6c71e3aa75804df9e8f8ebe6f99de6eca842b540ded40457964020f8d3e4145"
   },
   "counts": {
-    "open": 61,
+    "open": 63,
     "in_progress": 21,
     "closed": 22
   },
@@ -79,6 +79,22 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "NOVA-GMW-1 first dispatch attempt, 2026-08-07 -- Agent tool isolation:worktree."
+    },
+    {
+      "id": "pipeline.approved-not-implementing-is-a-silent-trap",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Reported by the Phoenix session of 2026-08-08, which lost a dispatch round to it and diagnosed it correctly."
+    },
+    {
+      "id": "pipeline.authority-decision-apply-defaults-to-codex",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Found while checking the approval layer for runner neutrality on 2026-08-08, after the PO named that layer as a target for the next candidate. The residue is documented in the source itself."
     },
     {
       "id": "pipeline.authority-decision-candidate-is-a-literal",
