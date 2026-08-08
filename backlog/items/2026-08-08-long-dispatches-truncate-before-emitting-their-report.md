@@ -95,9 +95,10 @@ cheapest and closes the worst case.
 
 ## Measured frequency, updated 2026-08-08
 
-The count is now **eleven** occurrences across the 2026-08-07/08 blocks, not
+The count is now **fourteen** occurrences across the 2026-08-07/08 blocks, not
 three. Seven fell in the first block; four more fell in the decisions wave that
-followed, two of them in the *same* dispatch after a procedural resume.
+followed, two of them in the *same* dispatch after a procedural resume; three
+more fell in the runner-neutrality wave, the last of them detailed below.
 
 Three facts the larger sample adds, none of which were visible at three:
 
@@ -118,10 +119,32 @@ One practice earned its place from the larger sample: **instruct the dispatch to
 commit as soon as its suites are green, rather than after the last DoD check.**
 A commit that exists survives a truncation; a commit that was planned does not.
 
+## Fourteenth occurrence, 2026-08-08 — and the first with a measured cost
+
+`SEEDINT-1` truncated after 60 tool uses and roughly 148k subagent tokens, mid
+sentence, immediately before writing the pinning tests its DoD required. The
+usage figures are recorded here because they are the first quantitative data
+this item has: every prior occurrence was noted qualitatively as "long".
+
+What it adds to the picture:
+
+4. **The commit-early practice above was not followed and the cost was
+   immediate.** Two source files carried uncommitted modifications and no commit
+   existed, so a truncation that should have cost a report cost the whole
+   diff's durability instead. The practice is recorded in this item and was not
+   written into the briefing — which makes this an orchestration failure, not a
+   dispatch failure. **Any direction taken from this item must put the
+   commit-early instruction into `templates/prompts/goldfish-task.md`, where a
+   briefing is actually built from, rather than leaving it as a lesson recorded
+   in a backlog item that nobody reads while dispatching.**
+5. **The truncation point was a task boundary, not a sweep.** It stopped between
+   "existing tests pass" and "write the new tests" — reinforcing point 2 above
+   and further weakening any context-volume explanation.
+
 ## Triggering situation
 
 An unattended hardening block, 2026-08-07/08, with four to five concurrent
-dispatches against the local `0.5.4` candidate. Reproduced eleven times without
+dispatches against the local `0.5.4` candidate. Reproduced fourteen times without
 being sought.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
