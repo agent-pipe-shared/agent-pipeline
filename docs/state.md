@@ -20,6 +20,29 @@ H-AC-11 amended for GMW; the window singleton (O-5) and the inert kernel-list
 entry (P5) recorded as decisions with reasons; `requirement` added to the item
 taxonomy; and the stage-0 definition site decided as option (b).
 
+**PHASE APPROVED AND IN IMPLEMENTATION (2026-08-08).** The PO authority decision
+was applied (candidate `spec`, continuity revision 4), the plan was submitted
+(`Elephant`, profile `epic`) and **approved by the PO in-session at
+`2026-08-08T06:05:46Z` — no signature, no external act**. `planApproved=true`
+with a v2 `planApproval` carrying its Spec binding (`5b08565`). Worth recording
+against the standing UX rule: the plan gate cost the human exactly **one command
+inside the session**. The signature requirement lives on the push gate only.
+
+**A trap between approval and work, found by a dispatch rather than by reading.**
+Approving the plan is not sufficient to do anything. `guard-devplan.mjs` refuses
+every `Edit`/`Write`/`NotebookEdit` whose target lies outside
+`docs/`, `specs/`, `.claude/`, `backlog/` (`DEFAULT_EXEMPT_PREFIXES`, no
+`gates.dev-plan.exemptPaths` configured at either tier) for as long as the plan
+lifecycle is `"approved"` but not yet `"implementing"`. The transition is
+`pipeline-state.mjs set-phase --phase implementation`, it is agent-executable, and
+the guard's own denial text names it — but nothing prompts for it, and the state
+in between looks fully approved. **`.git/` is also non-exempt**, so a dispatch
+cannot even write its own evidence artifact there. The B3 sweep for C6–C8 hit
+this on its first edit, diagnosed it from the hook source, and stopped rather than
+working around it; the phase was moved and both sweeps resumed. Costs the human
+nothing — but it cost a dispatch round, and it will cost every future one until
+either the approval implies the transition or something prompts for it.
+
 **A self-inflicted gate break, recorded because the repair is a rule worth
 knowing.** The phase document was first created as
 `specs/sprint-phoenix-epic/prd_phoenix-gate-integrity-phase.md`. The PO gate
