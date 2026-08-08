@@ -94,7 +94,7 @@ strength required to leave it.**
 | Repository state | Switching to `chat` requires |
 |---|---|
 | Never carried a signed approval | An ordinary committed configuration change, with the risk statement shown once and acknowledged. |
-| Has carried at least one signed approval | A signature. You prove you hold the key before you relinquish the mode that key protected. |
+| Has carried at least one signed approval | A signature — from **any** valid key, not the original one. See §5a, which decides this deliberately downward. |
 
 This is not ceremony for its own sake. In the second case the repository's history
 contains approvals whose weight came from `signature`; silently lowering the mode
@@ -165,6 +165,30 @@ party holding both is not the adversary this layer is built against, and defendi
 against them here would only be a second, weaker copy of a control that belongs
 somewhere else. The pinned anchor is exactly that duplicated control: it costs
 rotation, recovery and teams, and it does not stop anyone who already holds both.
+
+The PO's reason, stated on 2026-08-08 and generalized here because it decides more
+than one question: a person with repository and machine access **can open any file
+natively and change anything**, without an agent and without the Pipeline being
+involved. There is no configuration this system can hold that such a person cannot
+edit directly. Building protection against them is therefore not defence in depth;
+it is a control with no reachable threat, paid for in capability.
+
+The test to apply to any proposed restriction: **what does it stop an agent from
+doing?** If the answer is "nothing an agent could do anyway", the restriction is
+aimed at humans and does not belong in this layer.
+
+**This resolves §5's downgrade rule, and it resolves it downward.** Leaving
+`signature` on a repository with signed history is secured by "a human is present",
+not by "the same human" — the same standard as any other approval. The earlier
+formulation, that the strength you leave is the strength required to leave it,
+survives only in that weaker sense: a signature is still required, so an agent
+cannot perform the downgrade on its own. Requiring the *original* key would be the
+duplicated control again, and it would recreate the dead end §5a exists to remove.
+
+**Attribution is untouched by all of this.** The record still carries which key and
+which name performed the downgrade. Removing a restriction is not the same as
+removing the record, and conflating the two would be the one genuine regression
+available here.
 
 **Attribution needs a name, not a constraint.** The PO's addition: keys carry
 names, or the approving human supplies their name alongside the key identifier
