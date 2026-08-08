@@ -153,8 +153,8 @@ every `{{PLACEHOLDER}}`, keep every numbered block, add nothing from its
 ("Run the pipeline bootstrap first: `/pipeline-core:pipeline-start`"),
 confirm it survived the fill. **Correct-from-birth role language:**
 under "Pipeline binding", state that the Elephant orchestrates and EVERY
-implementation runs as a briefed Goldfish dispatch (stage-0, `docs/operating-model.md`
-— Rigor, risk and gates — the only exception, further ones only from the PO) — the "Claude Code = implementing IT"/"Claude Code = all IT" phrase class must never be written
+implementation runs as a briefed Goldfish dispatch (stage-0, `roles/elephant.md`
+— EL-01 — the only exception, further ones only from the PO) — the "Claude Code = implementing IT"/"Claude Code = all IT" phrase class must never be written
 into this file in the first place. Length gate: Step 2's `claudeMdMaxLines`.
 
 ### Step 4 — Handover file
@@ -209,7 +209,7 @@ Run `/pipeline-core:close-block`. It runs the telemetry line (MP-20 —
 `/usage` paste is optional, "not collected" is a valid outcome) and the
 mandatory **6b authorship check**: enumerate this session's production diffs
 and confirm each maps to a Goldfish dispatch or an explicitly invoked
-stage-0 fast path (`docs/operating-model.md` — Rigor, risk and gates) — any Elephant-authored diff outside stage-0 is an
+stage-0 fast path (`roles/elephant.md` — EL-01) — any Elephant-authored diff outside stage-0 is an
 INCIDENT, not a retro footnote. File the mandatory self-retro as
 a backlog item in the agent-pipeline repo before ending the session.
 
@@ -226,7 +226,7 @@ session specifically:
   never a direct foreign-repo edit.
 - **PO-Gate (PRD):** for rigor ≥1 / class-high work, run `node harness/scripts/check-po-gate-authority.mjs` before authoring the PO-facing `prd_<topic>.md`. Use only the repository-scoped language from its canonical primary source/runtime projection and shared receipt; branch-local profiles are not authority. If unavailable or stale, stop and repair setup; never infer a language or copy a profile. A readable PRD marked `freigegeben` by the PO authorizes the first implementation dispatch exactly once — no second implementation approval; merge/push/release gates stay distinct (EL-19 / `docs/operating-model.md` — The lifecycle). True stage-0 hotfixes are exempt.
 - **EL-01** — every implementation is a briefed Goldfish
-  dispatch; stage-0 (`docs/operating-model.md` — Rigor, risk and gates) is the only exception, further ones only from
+  dispatch; stage-0 (`roles/elephant.md` — EL-01) is the only exception, further ones only from
   the PO.
 - **Onboarding-sweep bullet:** not literally applicable at birth —
   nothing to sweep yet. Its point IS why Step 3 gets the role language right

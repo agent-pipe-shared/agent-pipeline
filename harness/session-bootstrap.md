@@ -144,7 +144,7 @@ continues to govern consent and tool/export boundaries.
 
 This step ends in a **third mandatory confirmation line** (printed directly under the model/effort line; literally checked like line 1 — format → §6.1):
 
-> "Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (Tier-0 per operating-model.md, Rigor risk and gates; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'"
+> "Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (Tier-0 per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'"
 
 ### Step 2 — Staleness check against the marketplace remote
 
@@ -291,7 +291,7 @@ All mandatory steps including **1b** (set and verify model/effort per model-poli
 
 Directly below that, per **1d**, a **third line**:
 
-> "Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (Tier-0 per operating-model.md, Rigor risk and gates; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'"
+> "Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (Tier-0 per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'"
 
 The Elephant must additionally be able to speak to the session-lifecycle policy (Elephant retention at full context, Goldfish cadence — a mandatory part of the operating model, → `docs/operating-model.md`); the bootstrap loads no extra files for this, the policy ships with the ruleset.
 
@@ -540,7 +540,7 @@ und Tool-/Exportgrenzen.
 
 Dieser Schritt endet in einer **dritten verbindlichen Bestätigungszeile** (Deutsch, wörtlich, direkt unter der Modell/Effort-Zeile gedruckt; literal geprüft wie Zeile 1 — Format → §6.1):
 
-> „Rollen-Verbote geladen: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — Implementierung nur per Goldfish-Dispatch (Stufe-0 per operating-model.md, Rigor risk and gates; weitere Ausnahmen nur durch den PO); PRD-Gate: lesbar vorlegen + auf ‚freigegeben' warten"
+> „Rollen-Verbote geladen: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — Implementierung nur per Goldfish-Dispatch (Stufe-0 per roles/elephant.md — EL-01; weitere Ausnahmen nur durch den PO); PRD-Gate: lesbar vorlegen + auf ‚freigegeben' warten"
 
 ### Schritt 2 — Repository-Freshness und Pipeline-Update-Verfügbarkeit
 
@@ -676,7 +676,7 @@ Alle Pflicht-Schritte inklusive **1b** (Modell/Effort gemäß model-policy setze
 
 Direkt darunter, gemäß **1d**, eine **dritte Zeile**:
 
-> „Rollen-Verbote geladen: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — Implementierung nur per Goldfish-Dispatch (Stufe-0 per operating-model.md, Rigor risk and gates; weitere Ausnahmen nur durch den PO); PRD-Gate: lesbar vorlegen + auf ‚freigegeben' warten"
+> „Rollen-Verbote geladen: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — Implementierung nur per Goldfish-Dispatch (Stufe-0 per roles/elephant.md — EL-01; weitere Ausnahmen nur durch den PO); PRD-Gate: lesbar vorlegen + auf ‚freigegeben' warten"
 
 Der Elephant muss außerdem zur Session-Lifecycle-Politik auskunftsfähig sein (Elephant-Erhalt bei vollem Kontext, Goldfish-Kadenz — Pflichtteil des Operating Model, → docs/operating-model.md); der Bootstrap lädt dafür keine Zusatzdateien, die Politik kommt mit dem Regelwerk.
 

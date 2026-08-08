@@ -11,7 +11,7 @@ The active feature directory contains exactly one physical `prd_*.md`, equal to
 Source of truth: docs/operating-model.md, *The lifecycle* (Step 3b) / *Rigor, risk and gates* / roles/elephant.md EL-19.
 Purpose: the PO release gate. Written by the Elephant AFTER the solution is designed
 and the spec passed readiness, BEFORE the first implementation dispatch. Mandatory at
-rigor >=1 OR risk class high; a true stage-0 fast-path (docs/operating-model.md, *Rigor, risk and gates*) is exempt.
+rigor >=1 OR risk class high; a true stage-0 fast-path (roles/elephant.md, *EL-01*) is exempt.
 Keep it to ~1 page. It carries product RATIONALE, not acceptance criteria — those live
 agent-facing/English in spec.md, which this PRD references (no duplication).
 Location: specs/<task>/prd_<topic>.md

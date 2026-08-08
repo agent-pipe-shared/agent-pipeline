@@ -129,7 +129,7 @@ Rules: extension points not defined by this skill (e.g. a future `newBlockReview
 
 6b. **Authorship check (EL-01/EL-16)** — mandatory, BEFORE step 7's self-retro (an incident reclassifies the retro, not vice versa; this sub-step does not renumber the surrounding steps):
    - Enumerate the session's production diffs: `git log` over the session range (lower bound = the repo HEAD recorded by this session's bootstrap, named in the handover session block; fallback: all commits of the current calendar day) + diff stat.
-   - Answer the mandatory question (verbatim): "Whose are this session's production diffs?" — every diff MUST map to a Goldfish/Critic dispatch (`dispatch-record.json` + `Dispatch: <TASK_ID> (goldfish)` trailer line) or to the `docs/operating-model.md`, *Rigor, risk and gates*, stage-0 fast path. Cross-reference source: the session block's dispatch enumeration and the telemetry line.
+   - Answer the mandatory question (verbatim): "Whose are this session's production diffs?" — every diff MUST map to a Goldfish/Critic dispatch (`dispatch-record.json` + `Dispatch: <TASK_ID> (goldfish)` trailer line) or to the `roles/elephant.md`, *EL-01*, stage-0 fast path. Cross-reference source: the session block's dispatch enumeration and the telemetry line.
    - Any Elephant-authored production diff outside stage-0 ⇒ **INCIDENT**, never a retro "discussion point": flag explicitly to the PO in the close output, write an incident note into the handover file and the telemetry line.
 
 6c. **Handover rotation (head-size discipline — keeps the handover file slim, not just once but ON EVERY CLOSE)** — mandatory check, same non-renumbering contract as 6b:

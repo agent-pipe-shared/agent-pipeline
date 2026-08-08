@@ -215,7 +215,7 @@ Hunt systematically, in this order:
    fresh-context sessions (commit/session trailers, dispatch records in the
    briefing/evidence), or from the orchestrator session itself?
    Orchestrator-authored production diffs outside the stage-0 fast
-   path (`docs/operating-model.md` — Rigor, risk and gates) = a
+   path (`roles/elephant.md` — EL-01) = a
    lifecycle-violation finding (EL-01/EL-16), severity at least
    major. The grounded `Dispatch: <TASK_ID> (goldfish)` commit trailer is
    primary trailer evidence; `AI-Assisted: true` records anonymous assistance
