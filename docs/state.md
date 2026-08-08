@@ -143,6 +143,40 @@ one and normalizes afterwards — unconditional, unchanged since the run the ite
 reports, and independent of this repair. No live matching defect; which side
 should move is left open in the item.
 
+**THE OVERRIDE STORE IS REPAIRED AND THE ROUTE IS BACK (PO, 2026-08-08).** The
+PO removed the stale v1 capability record. Measured before and after: the audit
+ledger is untouched — still 6 entries, identical `lastMac` — confirming that the
+deleted file was a spent one-time token and not audit evidence. The next
+gate-strength refusal printed its override block again, so the diagnosis and the
+disposition were both correct.
+
+**Mid-flight at the context cut: authorization 2 of 4.** The `.claude/`-tier edit
+(TP-11 + TP-12 appended) is planned and prepared; the PO is signing. Nothing is
+committed for it yet. **The digests are 5-minute-TTL ephemeral — do not carry
+them forward; replan from a fresh refused Edit instead.** The sequence, for
+whoever repeats it: attempt the byte-identical Edit → the guard prints
+`plan --request-sha256 …` → `plan` → `prepare-authorization --reason` (the fixed
+`HGO_SIGNATURE_REASON` text, `human-guard-override.mjs:60`) → the PO signs the
+intent digest → `authorize-by-signature --proof` → retry the byte-identical Edit.
+Then the same for `project/guard-config.json` (TP-12 only).
+
+**A helper worth keeping:** `.git/phx-hgo-digest.mjs` (untracked) recomputes the
+intent digest the PO must sign, from the request/plan/selection triple. It exists
+because **the tooling never prints that digest** — it is built internally from
+fixed constants, the repo head/tree and the selection, so the human is asked to
+sign a value they cannot see beforehand unless someone recomputes it.
+
+**Two further signing-UX findings, not yet filed** (the PO deferred repairs in
+this area until Nova's work settles, so these belong in the existing
+trust-mismatch item rather than a new one):
+
+1. **The 5-minute plan TTL is too short for a human with a passphrase.** Plan,
+   prepare, read the digest, switch terminals, type a passphrase — the window is
+   sized for a flow in which nobody stops to check anything, which defeats the
+   confirmation step it contains.
+2. **The intent digest is undisclosed** (above). The PO can only cross-check the
+   value the confirmation prompt shows against one that was derived by accident.
+
 **AUTHORIZATION 1 SPENT — THE TP-3 WINDOW IS DONE AND CLOSED (2026-08-08).**
 The PO signed the intent, the window was installed over `TP-3`, all 105 staged
 registration lines landed (`6686b16`), and the window is closed again. The gate
