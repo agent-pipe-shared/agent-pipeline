@@ -18,17 +18,37 @@ more — a `reachability-amendment` also carries `referenceSha256` and
 `supersedesEntryHash`. These are SHA-256 digests, so every line contains
 multiple bare 64-character lowercase hex strings.
 
-gitleaks' `sentry-access-token` rule pattern-matches exactly that shape. The
-consequence is mechanical and unavoidable: **one high-severity finding per
-appended ledger line**, forever, for a file whose entire purpose is to
-accumulate digests.
+gitleaks' `sentry-access-token` rule pattern-matches exactly that shape.
 
-This is not a theory. Appending 38 amendment events on 2026-08-08 produced
-exactly 38 findings, all on that file, all on the new lines 182–219, all under
-`sentry-access-token`, and turned `security-scan` from exit 0 to exit 2. It also
-happened, at smaller scale, to the 2026-07-30 repair that appended two events:
-`.gitleaksignore:75-78` carries four `sentry-access-token` authorities for
-ledger lines 42 and 43. Nobody recorded then that the cost recurs.
+**The exact incidence, measured over all 220 ledger lines rather than inferred.**
+An earlier draft of this item claimed one finding per appended line. That was
+wrong, and the correction sharpens the item rather than dissolving it:
+
+| event kind | lines | trip the scanner | 64-hex digests per line |
+| --- | --- | --- | --- |
+| `reachability-amendment` | 2 | **2 (100%)** | 4 |
+| `pre-public-core-reachability-amendment` | 38 | **38 (100%)** | 4 |
+| `item-file-reconciliation` | 125 | 2 (1.6%) | 2 |
+| the other 13 kinds | 62 | 0 | 1–5 |
+
+So the collision is **deterministic for amendment events and sporadic for
+everything else**. The discriminator is the digest count: an amendment carries
+four 64-hex values (`entryHash`, `previousHash`, `referenceSha256`,
+`supersedesEntryHash`) where an ordinary event carries two, and four is enough
+for the rule's context window to match. The two sporadic hits are not even the
+same rule — they fire `generic-api-key`, at
+`.gitleaksignore:70` and `:82-83`.
+
+This was measured, not assumed, and the prediction that produced the correction
+is itself recorded below: filing this very item appended one ordinary
+`item-file-reconciliation` event, the scan was re-run against that candidate
+expecting a new finding, and it returned **0 findings**.
+
+The historical evidence is consistent with the corrected reading: the 2026-07-30
+repair appended two amendment events and both tripped it —
+`.gitleaksignore:75-78` carries their four `sentry-access-token` authorities.
+Nobody recorded then that the cost recurs, or that it is specific to the
+amendment shape.
 
 ## Why this is worth an item rather than a shrug
 
@@ -51,13 +71,15 @@ The problem is the accumulation, and it has three separate costs:
    batches of 38 makes that review surface unreadable in practice: nobody will
    re-derive 38 justifications, so they will be re-justified as a block, which
    is the thing the rule was written to prevent.
-3. **Every ordinary backlog transition pays it.** This is not confined to
-   repairs. Any sanctioned writer that appends an event — a status change, a
-   closure, a reconciliation — appends a line with digests. Whether it trips the
-   rule depends only on whether a 64-hex run lands where the rule looks. That
-   makes the tax unpredictable rather than absent, which is worse: it surfaces
-   as a red gate at commit time, in whichever unrelated work package happened to
-   move a backlog item.
+3. **Repairs pay it in full; everything else pays a lottery.** Every future
+   ledger repair appends amendment events, and those trip the rule at 100% —
+   a repair of N events costs N suppressions, by construction, with no
+   variance. Ordinary transitions mostly do not trip it, but 2 of 125 did, and
+   nothing about those two is visible in advance. An occasional, unpredictable
+   red gate is in one respect worse than a constant one: a constant cost gets
+   designed around, while a 1.6% cost surfaces as a surprise failure inside
+   whichever unrelated work package happened to move a backlog item, and gets
+   diagnosed from scratch each time. It cost this session one such diagnosis.
 
 ## Triggering situation
 
