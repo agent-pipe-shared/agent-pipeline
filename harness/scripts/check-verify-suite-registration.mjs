@@ -23,7 +23,7 @@
  * that protects nothing, and the gap is invisible precisely because the
  * file exists and passes when run by hand."
  *
- * THREE DEFECT CLASSES, each reported with its own distinct message:
+ * FIVE DEFECT CLASSES, each reported with its own distinct message:
  *   1. UNREGISTERED   -- a *.test.mjs file under a registered root has no
  *      registration entry in any of verify.mjs's three suite arrays, and is
  *      not a declared exclusion (R1.3).
@@ -36,6 +36,19 @@
  *      verify-resume.mjs:114's `planVerifyResume()` keys on and throws on
  *      the FIRST duplicate of, before planning anything. This check instead
  *      names every duplicate it finds (R1.4).
+ *   4. MALFORMED-EXCLUSION -- a declared exclusion that does not carry all
+ *      three fields QG-06 requires (reason, owner, expires), or whose
+ *      `expires` is not a YYYY-MM-DD calendar date. Reported per missing
+ *      field, and the entry is NOT honoured: a half-written exclusion must
+ *      not silently suppress the UNREGISTERED finding it names.
+ *   5. EXPIRED-EXCLUSION -- a declared exclusion whose `expires` day has
+ *      passed. QG-06: "At expiry it is promoted to blocking or deleted -- no
+ *      third option, no silent extension." Promotion to blocking is what this
+ *      class implements: the entry stops suppressing, so the excluded file
+ *      resurfaces as UNREGISTERED alongside the expiry finding. This is the
+ *      clause that makes the list self-clearing rather than a permanent
+ *      parking lot; it is checked for every declared exclusion, including one
+ *      whose file has meanwhile been deleted -- a stale entry is debt too.
  *
  * STATIC PARSING, NOT IMPORT. This module never imports or executes
  * verify.mjs: importing it spawns git, requires a clean candidate, and runs
@@ -75,12 +88,24 @@
  * literals. No expression is left unresolved in this check's output.
  *
  * EXCLUSIONS. A file that legitimately carries no registration entry is
- * named in EXCLUSIONS below, each with a one-line reason. An exclusion is a
- * debt with an owner, not a permanent state (R1.2): it is filed, not fixed,
- * and every line here is expected to eventually become either a
- * registration or a deletion. A file absent from both the registration
- * arrays AND this list is always a failure -- this checker's own two files
- * are deliberately not on this list.
+ * named in EXCLUSIONS below, each carrying the three fields QG-06
+ * (guardrails/quality-gates.md) requires of any temporary exception: a
+ * reason, an owner, and an expiry date. An exclusion is a debt with an owner,
+ * not a permanent state (R1.2): it is filed, not fixed, and every line here is
+ * expected to eventually become either a registration or a deletion. Those
+ * three fields are what makes that sentence enforceable rather than
+ * aspirational -- the header used to claim it while the structure below could
+ * only hold a reason string, so nothing ever expired and "temporary" had no
+ * end date. A file absent from both the registration arrays AND this list is
+ * always a failure -- this checker's own two files are deliberately not on
+ * this list.
+ *
+ * WALL CLOCK IS AN INPUT, NOT AN AMBIENT FACT. The day the expiry comparison
+ * is made against is the `now` option, defaulting to the real clock. A gate
+ * whose verdict silently depends on the calendar cannot be tested on both
+ * sides of its own boundary; injecting the day lets the suite pin "expired"
+ * and "not yet expired" deterministically. An exclusion is valid THROUGH the
+ * end of its `expires` day (UTC) and expired from the following day on.
  *
  * Exit 0: no defect in any class, and every array was found and parsed.
  * Exit 2: at least one finding; every finding names the concrete file,
@@ -98,28 +123,60 @@ const VERIFY_REL = join("harness", "scripts", "verify.mjs");
  *  headline: "tracked *.test.mjs under plugins/pipeline-core/ + harness/"). */
 export const REGISTERED_ROOTS = Object.freeze(["harness", join("plugins", "pipeline-core")]);
 
+/** The three fields QG-06 requires of every temporary exception. */
+export const REQUIRED_EXCLUSION_FIELDS = Object.freeze(["reason", "owner", "expires"]);
+
 /**
  * Declared exclusions -- files that legitimately carry no registration
  * entry today. Seeded 2026-08-08 from the red 7 in
  * specs/sprint-phoenix-epic/evidence/unregistered-suite-classification.md
  * (R1.2: filed, not fixed -- each is a debt with an owner, not a permanent
  * state). Do not add this checker's own two files here; see header.
+ *
+ * All seven are owned by one filed backlog item --
+ * backlog/items/2026-08-08-seven-unregistered-suites-are-red-and-must-not-be-registered.md
+ * (`id: pipeline.seven-unregistered-suites-are-red`, owner: PO for
+ * assignment) -- and every `expires` below is that item's own `due: 2026-09-07`.
+ * They are deliberately identical: the exclusions do not get to outlive the
+ * item that justifies them, and a single date means closing the item closes
+ * the list rather than leaving six orphans behind.
  */
 export const EXCLUSIONS = Object.freeze({
-  "harness/lib/plan-spec-state-v2.test.mjs":
-    "red (R1.2): SyntaxError, plan-spec-state-v2.mjs has no export bindPlanSpecApprovalWithHumanDecision",
-  "harness/scripts/recovery-bridge-approval.test.mjs":
-    "red (R1.2): SyntaxError, pipeline-state.mjs has no export RECOVERY_BRIDGE_DECISION_SCHEMA",
-  "plugins/pipeline-core/lib/codex-host-plugin-list.test.mjs":
-    "red (R1.2): SyntaxError, codex-host-plugin-list.mjs has no export observeCodexRulesetSource",
-  "plugins/pipeline-core/hooks/guard-git-phoenix.test.mjs":
-    "red (R1.2): AssertionError, 1 !== 2",
-  "plugins/pipeline-core/scripts/afk-activation.test.mjs":
-    "red (R1.2): AssertionError, false !== true",
-  "plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs":
-    "red (R1.2): AssertionError against harness/review-protocol.md",
-  "plugins/pipeline-core/lib/windows-assurance-verify-registration.test.mjs":
-    "red (R1.2): WAVR19 fails; also itself an unregistered self-check of verify.mjs's own ordering",
+  "harness/lib/plan-spec-state-v2.test.mjs": Object.freeze({
+    reason: "red (R1.2): SyntaxError, plan-spec-state-v2.mjs has no export bindPlanSpecApprovalWithHumanDecision",
+    owner: "PO",
+    expires: "2026-09-07",
+  }),
+  "harness/scripts/recovery-bridge-approval.test.mjs": Object.freeze({
+    reason: "red (R1.2): SyntaxError, pipeline-state.mjs has no export RECOVERY_BRIDGE_DECISION_SCHEMA",
+    owner: "PO",
+    expires: "2026-09-07",
+  }),
+  "plugins/pipeline-core/lib/codex-host-plugin-list.test.mjs": Object.freeze({
+    reason: "red (R1.2): SyntaxError, codex-host-plugin-list.mjs has no export observeCodexRulesetSource",
+    owner: "PO",
+    expires: "2026-09-07",
+  }),
+  "plugins/pipeline-core/hooks/guard-git-phoenix.test.mjs": Object.freeze({
+    reason: "red (R1.2): AssertionError, 1 !== 2",
+    owner: "PO",
+    expires: "2026-09-07",
+  }),
+  "plugins/pipeline-core/scripts/afk-activation.test.mjs": Object.freeze({
+    reason: "red (R1.2): AssertionError, false !== true",
+    owner: "PO",
+    expires: "2026-09-07",
+  }),
+  "plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs": Object.freeze({
+    reason: "red (R1.2): AssertionError against harness/review-protocol.md",
+    owner: "PO",
+    expires: "2026-09-07",
+  }),
+  "plugins/pipeline-core/lib/windows-assurance-verify-registration.test.mjs": Object.freeze({
+    reason: "red (R1.2): WAVR19 fails; also itself an unregistered self-check of verify.mjs's own ordering",
+    owner: "PO",
+    expires: "2026-09-07",
+  }),
 });
 
 function toPosix(rawPath) { return rawPath.split(sep).join("/"); }
@@ -174,20 +231,111 @@ function parseLiteralEntries(block, arrayName, repoRoot) {
   return entries;
 }
 
+const ISO_DAY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * Parses a strict `YYYY-MM-DD` calendar day into the UTC timestamp of its start,
+ * or null if it is not one. Deliberately stricter than `new Date(string)`, which
+ * accepts "2026-9-7", "September 7" and a dozen other shapes, and which rolls
+ * 2026-02-30 silently forward to March 2 instead of rejecting it -- the
+ * round-trip comparison below is what catches that. An expiry a human cannot
+ * read at a glance is not an expiry, and a date the parser quietly reinterprets
+ * is worse than none: it would extend the debt by two days without saying so.
+ */
+export function parseExclusionDay(value) {
+  if (typeof value !== "string") return null;
+  const match = ISO_DAY_RE.exec(value.trim());
+  if (match === null) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const timestamp = Date.UTC(year, month - 1, day);
+  const roundTrip = new Date(timestamp);
+  if (roundTrip.getUTCFullYear() !== year) return null;
+  if (roundTrip.getUTCMonth() !== month - 1) return null;
+  if (roundTrip.getUTCDate() !== day) return null;
+  return timestamp;
+}
+
+/** The UTC day-start of the injected comparison date; throws on an unusable `now`. */
+function toUtcDayStart(now) {
+  const date = now instanceof Date ? now : new Date(now);
+  if (Number.isNaN(date.getTime())) {
+    throw new TypeError(`checkVerifySuiteRegistration: "now" is not a usable date (${String(now)})`);
+  }
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+}
+
+/**
+ * QG-06 enforcement over the exclusion table itself: every declared exclusion
+ * must carry reason, owner and a parseable expiry, and must not have expired.
+ * Only entries that pass BOTH are returned as honoured -- i.e. only they may
+ * suppress an UNREGISTERED finding. That is the whole point: a malformed entry
+ * that still silenced its file would let a typo buy permanent amnesty, and an
+ * expired entry that still silenced its file would be the "silent extension"
+ * QG-06 names in so many words.
+ */
+export function validateExclusions(exclusions, nowDayStart, findings) {
+  const honoured = new Set();
+  const malformed = [];
+  const expired = [];
+  for (const [path, entry] of Object.entries(exclusions ?? {})) {
+    const record = (typeof entry === "object" && entry !== null) ? entry : {};
+    let missingField = false;
+    for (const field of REQUIRED_EXCLUSION_FIELDS) {
+      const value = record[field];
+      if (typeof value === "string" && value.trim() !== "") continue;
+      findings.push(
+        `MALFORMED-EXCLUSION "${path}": required exclusion field "${field}" is missing or not a non-empty string ` +
+        `(QG-06: a temporary exception carries reason, owner and expiry)`,
+      );
+      missingField = true;
+    }
+    if (missingField) { malformed.push(path); continue; }
+
+    const expiryDay = parseExclusionDay(record.expires);
+    if (expiryDay === null) {
+      findings.push(
+        `MALFORMED-EXCLUSION "${path}": required exclusion field "expires" is not a YYYY-MM-DD calendar date ` +
+        `(got "${record.expires}")`,
+      );
+      malformed.push(path);
+      continue;
+    }
+    if (nowDayStart > expiryDay) {
+      findings.push(
+        `EXPIRED-EXCLUSION "${path}": the exclusion expired on ${record.expires} ` +
+        `(QG-06: at expiry it is promoted to blocking or deleted -- no third option, no silent extension)`,
+      );
+      expired.push(path);
+      continue;
+    }
+    honoured.add(path);
+  }
+  return { honoured, malformed, expired };
+}
+
 export function checkVerifySuiteRegistration({
   verifyPath = join(DEFAULT_ROOT, VERIFY_REL),
   registeredRoots = REGISTERED_ROOTS,
   exclusions = EXCLUSIONS,
+  now = new Date(),
 } = {}) {
   const findings = [];
+  // Classes 4 and 5 first: they are properties of the exclusion table alone and
+  // must be reported even when verify.mjs cannot be read at all.
+  const exclusionState = validateExclusions(exclusions, toUtcDayStart(now), findings);
+
   let verifySource;
   try {
     verifySource = readFileSync(verifyPath, "utf8");
   } catch (error) {
+    findings.push(`READ-ERROR: could not read ${verifyPath} (${error.code ?? error.message})`);
     return {
       ok: false,
-      findings: [`READ-ERROR: could not read ${verifyPath} (${error.code ?? error.message})`],
+      findings,
       registeredCount: 0, unregisteredCount: 0, excludedCount: 0, entries: [], unregisteredFiles: [],
+      malformedExclusions: exclusionState.malformed, expiredExclusions: exclusionState.expired,
     };
   }
 
@@ -255,7 +403,10 @@ export function checkVerifySuiteRegistration({
   for (const absolutePath of discovered) {
     if (registeredPaths.has(resolve(absolutePath))) continue;
     const relativePath = toPosix(relative(repoRoot, absolutePath));
-    if (Object.prototype.hasOwnProperty.call(exclusions, relativePath)) { excludedCount += 1; continue; }
+    // Only an exclusion that survived QG-06 validation suppresses; a malformed or
+    // expired one has already produced its own finding and is deliberately let
+    // through to UNREGISTERED as well ("promoted to blocking").
+    if (exclusionState.honoured.has(relativePath)) { excludedCount += 1; continue; }
     unregisteredFiles.push(relativePath);
     findings.push(`UNREGISTERED ${relativePath} is a *.test.mjs suite under a registered root with no verify.mjs registration entry`);
   }
@@ -268,6 +419,8 @@ export function checkVerifySuiteRegistration({
     excludedCount,
     entries,
     unregisteredFiles,
+    malformedExclusions: exclusionState.malformed,
+    expiredExclusions: exclusionState.expired,
   };
 }
 
@@ -285,7 +438,8 @@ if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import
   for (const finding of result.findings) console.error(finding);
   console.error(
     `Verify suite registration check failed: ${result.findings.length} finding(s) ` +
-    `(${result.unregisteredCount} unregistered, ${result.excludedCount} declared exclusion(s)).`,
+    `(${result.unregisteredCount} unregistered, ${result.excludedCount} honoured exclusion(s), ` +
+    `${result.malformedExclusions.length} malformed, ${result.expiredExclusions.length} expired).`,
   );
   process.exit(2);
 }
