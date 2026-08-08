@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "6869ffdb6f4b7bb70b535874540873b701551a04a21daadff3f97aecc8d0b741"
+    "transitionHead": "a8c613f85187d7e71d0086547e850764c85b4a6b8e95dcbbd2a40ee064788897"
   },
   "counts": {
-    "open": 55,
+    "open": 56,
     "in_progress": 21,
     "closed": 22
   },
@@ -270,6 +270,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "PO, live greenfield onboarding of an empty repository with the Claude runner, 2026-08-07: 'da liegen trotz frischem repo wieder dateien auf die sich die pipeline bezieht im .claude ordner und nicht in .arbetheon'."
+    },
+    {
+      "id": "pipeline.greenfield-seeded-with-private-overlay-calibration",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Found by the CLAUDETIER-1 dispatch of 2026-08-08 while measuring what a fresh seed leaves under .claude/; the dispatch was investigating a different question and stopped on this."
     },
     {
       "id": "pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions",
