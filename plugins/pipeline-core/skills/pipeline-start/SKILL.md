@@ -34,6 +34,23 @@ For local development also print:
 
 `Agent Pipeline source: local-development · registered local marketplace`
 
+## Scratch space
+
+For any temporary file (probe script, held note, throwaway fixture) use the
+repository's own `scratch/` directory: gitignored, inside the project root,
+and the only location the containment guard needs no exception for. Never a
+host-temp path — the guard refuses a write outside the project root and there
+is no exception for one, so do not fall back to guessing at one when a write
+is refused. Never `.git/` either: `.git/agent-pipeline/**` is pipeline-owned
+private state written by the plugin's own lifecycle code, not a scratch
+location for an agent. A session that needs disciplined cleanup (bind at
+start, release at close, retire an orphan left by a crashed session on a
+later bootstrap) uses `bindScratchDescriptor`/`releaseScratchDescriptor`/
+`retireOrphanScratchDescriptors` in
+`plugins/pipeline-core/lib/session-cleanup-recovery.mjs`; an ad hoc temporary
+file that does not need that lifecycle can be written directly under
+`scratch/` without it.
+
 ## Normal bootstrap command sequence
 
 ### One onboarding consent, not a chain of prompts

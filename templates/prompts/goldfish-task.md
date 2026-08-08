@@ -35,6 +35,12 @@ USAGE (Elephant)
    every claim to what was actually run, state what was not reached. Never let
    the resume message evaluate the work. Where the dispatcher re-runs the suites
    anyway, re-running them itself can be cheaper than the resume.
+9. **Commit as soon as green, not only at the end.** A dispatch that holds every
+   change uncommitted until its last DoD check is one truncation away from
+   losing all of it — observed repeatedly in one block (sixteen truncations).
+   Tell the goldfish (see the field-4/field-6 text below) to split its work into
+   commits as each piece is verified, instead of a single commit at the very
+   end.
 ═══════════════════════════════════════════════════════════════════════════
 COPY EVERYTHING BELOW THIS LINE
 -->
@@ -53,6 +59,21 @@ with the ruleset SHA from field 6):
 
 If this briefing lacks the ruleset SHA, that is a briefing defect: stop and
 report back to the Elephant — do not research it yourself.
+
+**Scratch location:** for any temporary file (probe script, held note,
+throwaway fixture) use the repository's own `scratch/` directory — gitignored,
+inside the project root, and the only location the guard needs no exception
+for. Never a host-temp path (the guard refuses writes outside the project
+root, and there is no exception for one — do not fall back to guessing at one
+when a write is refused); never `.git/` either (that is pipeline-owned private
+state, not a scratch location for you).
+
+**Commit as soon as a suite goes green, not only at the very end:** split your
+work into commits as each verified piece lands, rather than holding everything
+for one commit after the last DoD check. A commit that exists survives a
+truncated run; a commit that is only planned does not — this is a measured
+practice from repeated truncations losing otherwise-good, uncommitted diffs in
+one block, not a style preference.
 
 ---
 
@@ -100,6 +121,7 @@ Fixed BEFORE this run — they are the contract, not negotiable during the run.
 - **Do not change the tests/checks of your own implementation** — tests are the
   contract. Test-file edits listed in the spec are the only exception.
 - No-go paths: {{NO_GO_PATHS e.g. "prisma/migrations/**, .claude/**" or "none beyond project denies"}}
+- **Never `.git/` as a working/scratch location** for helper scripts, notes, or evidence — use `scratch/` (see above) for anything temporary; `.git/agent-pipeline/**` is pipeline-owned private state written by the plugin itself, not a place for you to write.
 - Project denies apply (committed `.claude/settings.json` / git-guard).
 - **Commit discipline:** never `git add -A` / a bare `git commit` — only `git commit -- <own paths>`; new files need `git add -- <path>` (pathspec) before the commit, same paths in both.
 - {{ADVISOR_DEMAND_LINE: if the Elephant has a current bounded Advisor demand, include verbatim: "Do not invoke or reuse the Advisor; consultation ownership remains with the Elephant" (MP-26) — else delete this line.}}

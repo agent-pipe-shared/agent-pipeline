@@ -90,8 +90,9 @@ USAGE (Elephant)
 6. A final message that does not match the mandatory report shape is a TRUNCATED
    review, not a finished one, and a truncated Critic leaves nothing actionable.
    Recover in this order: read the Critic's `critic-notes.md` in its
-   per-dispatch scratchpad subdirectory (report durability, `roles/critic.md`
-   §5.5 — locate it by listing the session scratchpad root); if the verdict is
+   per-dispatch `scratch/` subdirectory (report durability, `roles/critic.md`
+   §5.5 — locate it by listing `scratch/` at the project root, its gitignored
+   in-repository scratch location, never a host-temp path); if the verdict is
    not there, resume the run with a PURELY PROCEDURAL message naming only what
    remains — finish, emit the report in the mandatory format, scope the verdict
    to what was actually examined, state what was not reached. A resumed Critic
@@ -184,12 +185,26 @@ session's START, not now — never use it as a freshness reference; your diff
 and commit state come exclusively from {{COMMIT_SHAS}} above, confirmed via
 your own `git diff`/`git show`.
 
-**Scratchpad isolation (evidence-contamination guard):** each Critic dispatch
-works in a FRESH scratchpad subdirectory (per-dispatch isolation) to prevent
-cross-dispatch contamination — before building any evidence (fixtures,
-repros, baselines), create your own fresh subdirectory and work ONLY there;
-if you find pre-existing scratch state from a prior dispatch, name it as a
-disclosure item rather than silently building evidence on top of it.
+**Scratchpad isolation (evidence-contamination guard):** the scratch location
+is the project's own `scratch/` directory — inside the repository, gitignored,
+reused by every session, and never an external host-temp path; no guard
+exception is needed to write there because it is already inside the project
+root. Gitignored is not invisible: you read the actual working tree with your
+Read/Grep/Glob/Bash grant, so `scratch/` content — including another in-flight
+dispatch's subdirectory or residue left by a crashed session — is something
+you CAN see if you look; isolation means staying inside your own subdirectory
+and never reading a sibling's content as evidence, not that the rest of
+`scratch/` does not exist. Never `.git/` for this purpose. Before building any
+evidence (fixtures, repros, baselines), create your own fresh subdirectory
+`scratch/<codename>-<random-hex>/`, where `<random-hex>` is at least 8 hex
+characters from a CSPRNG (e.g. `openssl rand -hex 4`) — the random component
+is what makes two independently dispatched Critics collision-free without
+coordinating; use a bare `mkdir` (not `mkdir -p`) so the filesystem enforces
+atomicity — if it fails because the name already exists, draw a new random
+suffix and retry, never adopt a directory you did not create. Work ONLY inside
+your own subdirectory; if you find pre-existing scratch state from a prior or
+concurrent dispatch, name it as a disclosure item rather than silently
+building evidence on top of it.
 
 ---
 
@@ -284,15 +299,20 @@ any direct evidence; a verdict with evidenced route contradiction is invalid.
 restated here):** your judgement is the entire deliverable, so it must exist as
 a file before it exists as a message. Persist MATERIAL, never conclusions: in
 Phase A, append each candidate as `file:line` plus one line, labelled `candidate
-— not a finding`, to `critic-notes.md` inside the fresh per-dispatch scratchpad
+— not a finding`, to `critic-notes.md` inside the fresh per-dispatch `scratch/`
 subdirectory you already create; the moment Phase B produces them, write the
 surviving findings, the deliberately-not-flagged list, the trajectory verdict
 and any requested pass/fail into the same file — that write is your LAST ACT
-before returning the report as text. Name the path in the report. This is a
-repository-external note via your existing Bash grant: no repository write, no
-new tool, no wider scope, and no change to the two-phase protocol or the
-evidence gate. Where no writable scratchpad exists, state that persistence was
-unavailable and emit the report as the first thing after Phase B completes.
+before returning the report as text. Name the path in the report. Stated
+honestly: this IS a write inside the repository directory tree via your
+existing Bash grant, not a filesystem-external one — `scratch/` is gitignored,
+never committed, and never part of any diff, candidate snapshot, or gate that
+binds to tracked state, but it is not invisible to a Critic that reads the
+working tree. No TRACKED repository file is written, no tracked state is
+changed, no new tool, no wider scope, and no change to the two-phase protocol
+or the evidence gate. Where no writable scratchpad exists, state that
+persistence was unavailable and emit the report as the first thing after
+Phase B completes.
 
 1. **Findings** (ordered by severity), each exactly:
    - `Gap`: what is missing/deviates vs. spec or guardrail (1–2 sentences)
