@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -36,6 +37,10 @@ import {
   main,
   retryActionsForDeniedCommand,
 } from "./guard-lifecycle-ready.mjs";
+// AC-10: imported straight from the library module the guard now defers to, never
+// through the guard's own re-export, so this test cannot pass merely because both
+// names happen to reference the identical function object.
+import { MACHINE_PLANE_SCHEMA, machinePlaneFilePath as libMachinePlaneFilePath, writeMachinePlane } from "../lib/machine-plane.mjs";
 import {
   isBoundedReadOnlyPipeline,
   parseGuardCommand,
@@ -2605,6 +2610,46 @@ test("MACHPATH-1: the shell lane stays unchanged -- a Bash write to the same mac
     assert.match(result.stderr, /GUARD-CROSS-REPO-MUTATION/u);
     assert.match(result.stderr, /only inside its own physical project root/u);
     assert.equal(readinessCalls, 0);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+// AC-10: the wiring, not the mechanism. A test that only exercised each side
+// separately (the guard's own admission function in isolation, the library's own
+// resolver in isolation) would not catch the two drifting apart if a future edit gave
+// the guard a second, independent derivation. This test instead writes a real plane
+// through the LIBRARY's own writer, resolves the path independently through the
+// LIBRARY's own resolver (never the guard's re-export), and then asserts the GUARD
+// admits a write at exactly that path -- so the guard's admission and the writer's
+// destination are proven to be the same file, not merely the same function reference.
+test("MACHPATH-1/AC-10: the path the guard admits is exactly the path the machine-plane writer writes to -- proven via the library's own writer and resolver, not the guard's re-export", () => {
+  const path = root();
+  const { home } = machinePlaneHomeFixture();
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const dependencies = { homedirFn: () => home };
+    const libPath = libMachinePlaneFilePath(dependencies);
+    const plane = {
+      schema: MACHINE_PLANE_SCHEMA,
+      poKeyDirectory: null,
+      pushApprovalDefault: "chat",
+      routing: null,
+      language: null,
+      session: null,
+      usage: null,
+      updatedAt: new Date().toISOString(),
+    };
+    writeMachinePlane(plane, dependencies);
+    assert.equal(existsSync(libPath), true, "the library writer must have created its own resolved path");
+    assert.equal(isMachinePlaneWritePath(libPath, dependencies), true);
+    assert.deepEqual(evaluateLifecycleReadyGuard(edit(libPath), {
+      projectDir: path,
+      homedirFn: () => home,
+      requireProjectOnboardingReadyFn() { return readiness; },
+    }), { exitCode: 0, stderr: "" });
   } finally {
     rmSync(path, { recursive: true, force: true });
     rmSync(home, { recursive: true, force: true });

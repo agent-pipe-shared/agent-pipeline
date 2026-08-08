@@ -3,7 +3,6 @@
 
 /** Codex implementation-write guard for already Pipeline-governed roots. */
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
-import { homedir } from "node:os";
 import {
   basename,
   dirname,
@@ -33,12 +32,19 @@ import {
   humanGuardRouteUnavailableReason,
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
+import { machinePlaneFilePath } from "../lib/machine-plane.mjs";
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
 import { GATE_STRENGTH_PATHS } from "./guard-gate-strength.mjs";
 import {
   isBoundedReadOnlyPipeline,
   parseGuardCommand,
 } from "./guard-command-grammar.mjs";
+// MACHPATH-1/AC-9: machinePlaneFilePath() is re-exported here so no existing test import
+// changes -- lib/machine-plane.mjs is now the sole owner of that derivation (no second
+// copy anywhere in this plugin). isMachinePlaneWritePath() below keeps its own guard-side
+// admission logic (the exact-identity check, the existing-symlink refusal, the containment
+// walk) unchanged; only where the path comes from moved.
+export { machinePlaneFilePath };
 
 // ADR-0059 Decision 3/4: the same generic, exact-command-bound Human-Guard-Override
 // (HGO) route the other guards in this family already use for their own denials
@@ -479,43 +485,14 @@ export function isClaudeSessionMemoryWritePath(filePath, input, dependencies = {
  * (push-approval default, key directory, model routing, language -- never a project's own
  * committed `gates.push_approval`, which stays inside the repository, SS2/SS7 of that plan).
  *
- * `os.homedir()` -- through the same injectable `dependencies` pattern as
- * `existsSyncFn`/`realpathSyncFn`/`statSyncFn` above -- is the ONLY source for the anchor:
- * never `tool_input`, never `process.env` read directly by this file, never repository
- * configuration. `homedir()` is realpathed once so a symlinked home directory anchors the
- * boundary at the same place `isMachinePlaneWritePath()` below resolves it to, the identical
- * discipline `claudeSessionMemoryDirectory()` applies to `transcript_path` above.
- *
- * Fails closed whenever the home directory is absent, empty, relative, or cannot itself be
- * realpathed (a login/service account with no real home is refused, not guessed) -- it never
- * requires `.agent-pipeline/` or `machine.json` itself to already exist, since the very point
- * of this carve-out is the FIRST write that creates both.
- *
- * What this does NOT defend against, stated plainly rather than implied: `os.homedir()` is an
- * opaque OS primitive this function trusts as given, and on POSIX platforms Node's own
- * implementation of it may itself consult the `HOME` environment variable when the OS user
- * database does not resolve one -- this file never reads `process.env` itself, but it cannot
- * see through what `os.homedir()` already decided before returning. Nor does it defend against
- * a party who can already write inside the real home directory before this check ever runs
- * (planting `.agent-pipeline` as an ordinary directory the guard would then legitimately admit
- * into) -- that party already holds the access SS5a of the same plan excludes from this layer.
+ * SETUP-2b/AC-9: `machinePlaneFilePath()` itself now lives in `../lib/machine-plane.mjs`,
+ * imported above and re-exported unchanged so no existing test import breaks -- that module
+ * is the SOLE derivation of this path anywhere in the plugin, and this guard's admission
+ * decision reads it from there rather than keeping a second copy that could drift. Its own
+ * doctrine (never `tool_input`/`process.env`/repository config, `os.homedir()` realpathed
+ * once, fails closed on an absent/empty/relative/unresolvable home) is documented in full at
+ * its new home; nothing about that doctrine changed by moving it.
  */
-export function machinePlaneFilePath(dependencies = {}) {
-  const homedirFn = dependencies.homedirFn ?? homedir;
-  let home;
-  try {
-    home = homedirFn();
-  } catch {
-    return null;
-  }
-  if (typeof home !== "string" || home.trim() === "" || home.includes("\0") || !isAbsolute(home)) return null;
-  const realpath = dependencies.realpathSyncFn ?? realpathSync;
-  try {
-    return join(realpath(home), ".agent-pipeline", "machine.json");
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Admit a write only when it is EXACTLY the single derived file above -- never a prefix, never
