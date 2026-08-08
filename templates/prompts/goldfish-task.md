@@ -27,6 +27,14 @@ USAGE (Elephant)
 7. Normative value lists in the briefing (enums, schema fields, gate modes) are
    spelled out VERBATIM — never paraphrased (a paraphrased enum has caused a
    briefing-defect stop).
+8. A final message that does not match the mandatory report shape is a TRUNCATED
+   dispatch, not a finished one. Recovery that worked: first read the dispatch
+   record (its `log`/`report` fields survive the truncation, GF-09-D); if the
+   report is not there, resume the run with a PURELY PROCEDURAL message naming
+   only what remains — finish, emit the report in the mandatory format, scope
+   every claim to what was actually run, state what was not reached. Never let
+   the resume message evaluate the work. Where the dispatcher re-runs the suites
+   anyway, re-running them itself can be cheaper than the resume.
 ═══════════════════════════════════════════════════════════════════════════
 COPY EVERYTHING BELOW THIS LINE
 -->
@@ -128,13 +136,8 @@ Stop and report (do not keep iterating) when ANY of these occurs:
 - Worktree: {{WORKTREE e.g. "yes — per calibration `worktree: on-write`" or "no — read-only task"}}
 - Profile: {{standard | light}} — `light` ONLY for stage-0 mechanical or bounded implementation tasks (operating-model §3.3): condensed 3-field report (see below), mechanic `low` or implementor `medium`, skip the pre-edit baseline verify. Never `light` for deep, class-high, architecture, guardrail, or security work.
 - **Tool budget (TB-09, hard cap, first-class field):** {{TOOL_BUDGET default: "≤45 tool uses"}}. This is a mandatory field in EVERY goldfish briefing, not just workflow-agent dispatches. Approaching or reaching the cap is a stop condition (field 5): stop cleanly and report what is done + what remains — never "push through" past it. **Honesty note:** this is a briefing/behavior rule, not a hook-enforced count — no automated per-subagent tool-call counter exists (yet); documented as such rather than overclaimed as "will be blocked" (the G1 lesson, `policies/tooling-policy.md` AP-T2).
-- **Dispatch record (standard evidence):** write `dispatch-record.json` next to your evidence artifact with fields `taskId`, `model`, `rulesetSha`, `dispatcher`, `outcome` — this template is the authoritative definition of that file's shape. Together with the `Dispatch: {{TASK_ID}} (goldfish)` commit-trailer line (see Final report below), it is the deterministic authorship/evidence pair for close step 6b and the Critic; `AI-Assisted: true` is only the anonymous assistance marker. Do not put provider/model co-author data, session URLs/IDs, account identifiers, or other private correlation data in a commit.
-- **Report-early duty (truncated-final mitigation):** for packages expected to
-  need >~25 tool uses, maintain a RUNNING report skeleton/evidence log inside
-  `dispatch-record.json` (or an adjoining evidence file), updated after each
-  commit/milestone — never held only in working context. Your final report
-  then condenses this persisted log rather than being composed from scratch,
-  which survives a mid-run truncation a chat-only draft would not.
+- **Dispatch record (standard evidence):** write `dispatch-record.json` next to your evidence artifact — or `dispatch-record-{{TASK_ID}}.json` where this briefing names a path — with fields `taskId`, `model`, `rulesetSha`, `dispatcher`, `outcome`, plus `log` (append-only running entries) and `report` (your final report text). This template is the authoritative definition of that file's SHAPE; the duty governing what goes in and when is `roles/goldfish.md` §6 (GF-09-D), stated once there. Together with the `Dispatch: {{TASK_ID}} (goldfish)` commit-trailer line (see Final report below), it is the deterministic authorship/evidence pair for close step 6b and the Critic; `AI-Assisted: true` is only the anonymous assistance marker. Do not put provider/model co-author data, session URLs/IDs, account identifiers, or other private correlation data in a commit.
+- **Report durability (GF-09-D, `roles/goldfish.md` §6 — authoritative, not restated here):** append findings, DoD results and evidence pointers to the dispatch record's `log` AS THEY LAND (each suite of a verification sweep when that suite finishes, not after the last one), and write the final report into the record's `report` field as your LAST ACT BEFORE returning it as text: commit → write `report` → return it. Adds no tool, no permission, no scope.
 
 ---
 

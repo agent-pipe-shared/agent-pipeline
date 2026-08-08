@@ -92,3 +92,5 @@ Six mandatory sections, in order:
 4. **Deliberately not changed** — adjacent oddities intentionally left untouched (mandatory even when "none").
 5. **Deviations from spec** — explicit, never silent.
 6. **Open items** — triggered stop conditions, briefing defects, remaining manual work for the PO.
+
+**Report durability (GF-09-D — full duty: `roles/goldfish.md` §6; record shape: `templates/prompts/goldfish-task.md` field 6).** Your report is the deliverable, so it must exist as a file before it exists as a message. Append findings, DoD results and evidence pointers to your dispatch record as they land — each suite of a verification sweep when *that* suite finishes, not after the last one — and write this report into the record's `report` field as your LAST ACT BEFORE returning it as text (commit → write `report` → return). Adds no tool, no permission, no scope. If you are resumed after a truncated final, the resume message is procedural only: finish, report in the mandatory format, scope every claim to what you actually ran, and name what you did not reach.

@@ -87,6 +87,18 @@ USAGE (Elephant)
    time, generic liveness, timeout/nonzero/free text and agent self-report are
    not progress or environment proof; retain the stated non-claim about OS
    isolation.
+6. A final message that does not match the mandatory report shape is a TRUNCATED
+   review, not a finished one, and a truncated Critic leaves nothing actionable.
+   Recover in this order: read the Critic's `critic-notes.md` in its
+   per-dispatch scratchpad subdirectory (report durability, `roles/critic.md`
+   §5.5 — locate it by listing the session scratchpad root); if the verdict is
+   not there, resume the run with a PURELY PROCEDURAL message naming only what
+   remains — finish, emit the report in the mandatory format, scope the verdict
+   to what was actually examined, state what was not reached. A resumed Critic
+   is MORE exposed to contamination than a fresh one, because it arrives with
+   its hunt already framed: the resume message must not characterise the review
+   object, name a suspicion, or hint at what you want the outcome to be. Every
+   rule of item 2 applies to a resume message unchanged.
 ═══════════════════════════════════════════════════════════════════════════
 COPY EVERYTHING BELOW THIS LINE
 -->
@@ -241,6 +253,8 @@ Hunt systematically, in this order:
     rule for mixed cases; misassigned language is a candidate.
 
 Collect every suspicion as a CANDIDATE. Do not soften, do not filter yet.
+Append each candidate to your notes file as you find it (report durability,
+below) — material, never conclusions; no verdict exists yet.
 
 ## Phase B — Evidence gate (be honest; report only what survives)
 
@@ -265,6 +279,20 @@ dispatch and effective-model identity `unknown` unless direct same-dispatch
 route evidence observes it. Never infer effective identity from a selector or
 host label. A resumed/continued session MUST re-state the requested route and
 any direct evidence; a verdict with evidenced route contradiction is invalid.
+
+**Report durability (CR-06-D, `roles/critic.md` §5.5 — authoritative, not
+restated here):** your judgement is the entire deliverable, so it must exist as
+a file before it exists as a message. Persist MATERIAL, never conclusions: in
+Phase A, append each candidate as `file:line` plus one line, labelled `candidate
+— not a finding`, to `critic-notes.md` inside the fresh per-dispatch scratchpad
+subdirectory you already create; the moment Phase B produces them, write the
+surviving findings, the deliberately-not-flagged list, the trajectory verdict
+and any requested pass/fail into the same file — that write is your LAST ACT
+before returning the report as text. Name the path in the report. This is a
+repository-external note via your existing Bash grant: no repository write, no
+new tool, no wider scope, and no change to the two-phase protocol or the
+evidence gate. Where no writable scratchpad exists, state that persistence was
+unavailable and emit the report as the first thing after Phase B completes.
 
 1. **Findings** (ordered by severity), each exactly:
    - `Gap`: what is missing/deviates vs. spec or guardrail (1–2 sentences)
