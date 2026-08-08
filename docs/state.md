@@ -686,6 +686,115 @@ Also in flight: `PHX-BFAM`, the sub-design for Part B's closed host-action
 family. §B.8 names that family as real remaining design surface deliberately left
 unresolved, so Part B has no implementable contract until it lands.
 
+### Part B's deferred design surface is closed (`e844bcf`), and it found a real hole
+
+`specs/sprint-phoenix-epic/design/codex-wsl-freshness-host-action-family.md`,
+757 lines. §B.8 named this family as "real remaining design surface, flagged
+rather than resolved" and asked for its own Critic pass before implementation —
+so until now Part B had a rationale but no implementable contract. It has one
+now: eight typed shapes with per-field validation, the exact argv each expands
+to quoted from the real call site, a seven-rule dispatch, a typed rejection path,
+and a test plan with nine negative controls.
+
+Two things from it are worth carrying forward independent of Part B:
+
+- **The nine-versus-eight discrepancy is resolved and is not a defect.** The
+  parent design's provisional list carried nine names for eight invocations
+  because `ruleset-freshness.mjs:185` is one call site with a two-value selector.
+  The 2-network / 6-local class split is unchanged.
+- **The parent design carries a stale claim** that the origin-allowlist module is
+  future work. It already exists at
+  `plugins/pipeline-core/lib/public-core-origin-allowlist.mjs`. Corrected in the
+  sub-design's own corrections section rather than edited into the parent — which
+  is the right call, but it means the parent design is now the less accurate of
+  the two documents on that point.
+
+**OPEN FOR THE PO — not blocking tonight, nothing waits on it.** The family gives
+the WSL host adapter a bounded *local write*: the `fetch` writes objects and one
+ref into the disposable comparison repository. `docs/phoenix-governance-threat-model.md:61-62`
+states, without qualification, that "the productive WSL adapter has no durable
+state, lockfile, repository mutation, or fallback executor." The write is to a
+throwaway repo in the OS tmpdir, not to the project repository — but the sentence
+as written does not say that, so the family falsifies it as stated. §B.6 flagged
+that paragraph only for export names, so this is a genuine gap in the parent's
+own list of required doc edits, not a re-litigation.
+
+- **Option A (the sub-design's recommendation):** accept it and amend the sentence
+  to name the disposable repository explicitly. Cost: a crisp invariant becomes a
+  qualified one.
+- **Option B:** restrict the network class to `ls-remote` only. Cost is decisive —
+  the caller fetches before it compares, so Part B would ship the whole machinery
+  and still return exactly today's `unknown`. That is building the thing and not
+  getting the thing.
+- **Option C:** change the caller. Forbidden by §B.8; listed only to show it was
+  considered.
+
+I did not take this one, unlike §A.6. Amending a threat-model invariant is a
+different class of decision from choosing between two disclosed implementation
+scopes, and nothing is waiting on it — Part B's implementation is not dispatched
+and will not be before the PO is back.
+
+### Part A was mostly already built, and PHX-0A1 found that out by checking
+
+`f32e21c`. The dispatch reports most of its own briefing as **already satisfied
+by earlier work** rather than rebuilding it, and says so explicitly instead of
+claiming the credit:
+
+- `lib/public-core-origin-allowlist.mjs` — already landed.
+- The attestation itself — already landed, as `lib/self-application-attestation-gate.mjs`,
+  called at `pipeline-start-preflight.mjs:213`.
+- The advisory `nextAction`, the two `SKILL.md` edits and the
+  `onboarding-recovery.md` entry — already landed (`:249-265`).
+- The `GATE_STRENGTH_PATHS` entry — already landed, and as **two** rules (GS-8
+  and GS-9), covered by name in `hooks/guard-gate-strength-origin-attestation.test.mjs`.
+
+That is my briefing defect, not the dispatch's: I built the briefing from the
+design document and never checked the design against the repository first. The
+design's own header discloses that a prior revision landed part of its scope; I
+read past it. The cost was bounded only because the dispatch verified instead of
+overwriting.
+
+**What was genuinely missing, and is now in:** the five criteria had no suite
+anywhere. `lib/bootstrap-source-attestation-acceptance.test.mjs` pins
+`PX0-AC-09/10/11/16/17` across a chain no single module owns — 14 cases, real
+negative controls including nine near-miss origin URLs — and it is **registered in
+`verify.mjs`**, which is what the window was signed for. 365 registered, 7
+exclusions, 0 unregistered.
+
+The TP-6 half of the window went **unused**: GS-8/GS-9 already had coverage, and
+adding a second copy would have been noise. A lift not spent is the right outcome
+when the work turns out to be done.
+
+**One deviation worth keeping.** The break/restore fault could not be injected in
+place: GS-9 and GS-8 protect exactly the two files that had to be broken, and the
+window covers TP-3/TP-6 only. Rather than route around a guard, the dispatch ran
+the mutation on a byte-copy under `evidence/` with rebased imports, and the
+artifact records the original's sha256 before and after, unchanged. That is the
+correct instinct — the alternative was to treat a guard refusal as an obstacle.
+
+### The retired suite is still there, and the reason is a good one
+
+The deletion of `codex-host-plugin-list.test.mjs` did **not** happen, and the stop
+was correct. Removing its `EXCLUSIONS` entry turns
+`check-verify-suite-registration.test.mjs:198-208` red: that case deep-equals the
+key set against a literal seven-entry list naming the exact path, and its own name
+says "the classification report's red 7". That suite was outside the dispatch's
+scope, so it reverted the edit byte-identically and stopped rather than widening.
+
+The follow-up is small and needs three things in one scope: the file deletion, the
+`EXCLUSIONS` entry, and that case's literal list plus its name. The backlog item
+`2026-08-08-seven-unregistered-suites-are-red-and-must-not-be-registered.md` drops
+to six and needs the same edit.
+
+**A residual that is nobody's oversight and should not be quietly dropped.** Two
+properties the retired suite pinned have no equivalent in the new one: the
+`sourceClass` classifier's self-application-vs-local-development distinction, and
+its `marketplace-private` classification. They are uncovered because the design
+retired the classifier and made the class caller-supplied — so there is no longer
+code to test, not a test we failed to write. The honest statement is that the
+*classification decision* moved out of the Pipeline's own code and is now trusted
+from its caller. Owner PO, review by 2026-09-07, alongside the exclusion package.
+
 ### F1 is closed, and closed on evidence I produced myself
 
 The Critic's single FAIL finding is repaired in `358c709`. BS25 rebuilds its
