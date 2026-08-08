@@ -6,25 +6,25 @@ argument-hint: "[elephant|goldfish|critic]"
 
 # Pipeline start (runner-neutral happy path)
 
-NVA-B60-17 uses `lib/bootstrap-payload-budget.mjs`: the privacy-safe metric is
-`utf8-byte-upper-bound` (one UTF-8 byte is a conservative upper-bound unit, not
-an exact model-token count). A full Elephant bootstrap is session-bound: run it
-at `startup|resume|clear`, an actual runtime re-entry, or a typed recovery that
-requires it — never for an ordinary task, message, tool result, commit, test,
-PO response, or active-goal continuation in the same ready session. Normal
-bootstrap targets 10–15k units and rejects an original payload over 15,000.
+NVA-B60-17 uses `lib/bootstrap-payload-budget.mjs` (metric
+`utf8-byte-upper-bound`: a conservative UTF-8-byte upper bound, not a model
+token count). A full Elephant bootstrap is session-bound: run it at
+`startup|resume|clear`, a runtime re-entry, or a typed recovery needing it —
+never for an ordinary task, message, tool result, commit, test, PO response,
+or active-goal continuation in the same ready session. Normal bootstrap
+targets 10–15k units; an original payload over 15,000 is rejected.
 ## Role and runtime identity
 
-Resolve the plugin root from this skill and run exactly:
+Resolve the plugin root, then run exactly:
 
 `node "${PIPELINE_PLUGIN_ROOT}/scripts/pipeline-start-preflight.mjs"`
 
 Accept only schema `pipeline.start-preflight.v1`, status `ready` or
-`plugin-refresh-required`, absolute matching `pluginRoot`, valid version/source/
-boundary/handoff and a read-only `nextAction` when ready. For Goldfish/Critic,
-validate but do not execute onboarding; Elephant executes the exact returned
-action at its declared boundary. Resolve role before preflight: conflicting or
-unknown carriers stop; Critic is closed and never becomes Elephant.
+`plugin-refresh-required`, absolute matching `pluginRoot`, valid
+version/source/boundary/handoff, and a read-only `nextAction` when ready.
+Goldfish/Critic validate but never execute onboarding; Elephant executes the
+returned action at its declared boundary. Resolve role before preflight:
+conflicting or unknown carriers stop — Critic is closed, never Elephant.
 
 Print only after a ready result:
 
@@ -38,78 +38,74 @@ For local development also print:
 
 For any temporary file (probe script, held note, throwaway fixture) use the
 repository's own `scratch/` directory: gitignored, inside the project root,
-and the only location the containment guard needs no exception for. Never a
-host-temp path — the guard refuses a write outside the project root and there
-is no exception for one, so do not fall back to guessing at one when a write
-is refused. Never `.git/` either: `.git/agent-pipeline/**` is pipeline-owned
-private state written by the plugin's own lifecycle code, not a scratch
-location for an agent. A session that needs disciplined cleanup (bind at
-start, release at close, retire an orphan left by a crashed session on a
-later bootstrap) uses `bindScratchDescriptor`/`releaseScratchDescriptor`/
-`retireOrphanScratchDescriptors` in
-`plugins/pipeline-core/lib/session-cleanup-recovery.mjs`; an ad hoc temporary
-file that does not need that lifecycle can be written directly under
-`scratch/` without it.
+the only location the containment guard permits without an exception. Never
+a host-temp path — the guard refuses a write outside the project root; do
+not fall back to guessing one when a write is refused. Never `.git/` either:
+`.git/agent-pipeline/**` is pipeline-owned private state, not agent scratch.
+A session needing disciplined cleanup (bind at start, release at close,
+retire a crashed session's orphan on a later bootstrap) uses
+`bindScratchDescriptor`/`releaseScratchDescriptor`/`retireOrphanScratchDescriptors`
+in `plugins/pipeline-core/lib/session-cleanup-recovery.mjs`; an ad hoc file
+needing no lifecycle can be written directly under `scratch/`.
 
 ## Normal bootstrap command sequence
 
 ### One onboarding consent, not a chain of prompts
 
 When the user has directly agreed to use Agent Pipeline for this repository,
-that consent authorizes the complete bounded local onboarding happy path:
-read-only plans and readbacks, portable authority seed, any plan-disclosed local
-Git initialization, runtime initialization, restart-barrier preparation, and
-the first kickoff artifacts. State the bounded effects once, then execute each
-returned digest-bound action and its readback without asking again for the next
-individual digest. `requiresConfirmation` describes the action's safety shape;
-it does not invent a second PO chat gate after this consent exists.
+consent authorizes the bounded local onboarding happy path: read-only plans
+and readbacks, portable authority seed, any plan-disclosed local Git init,
+runtime init, restart-barrier prep, and the first kickoff artifacts. State
+the bounded effects once, then execute each returned digest-bound action and
+readback without re-asking per digest. `requiresConfirmation` describes the
+action's safety shape, not a second PO chat gate.
 
-After a required restart, an already seeded repository is evidence that this
-onboarding consent has been exercised; resume its ordinary local bootstrap
-without re-asking. Stop for a new human input only when no usable project goal
-or material design input exists, a configured plan/acceptance gate is reached,
-an action is external or irreversible, or a typed hard block has no supplied
-safe recovery. Never treat this consent as approval for unrelated adoption,
-remote operations, deployment, publication, destructive work, or a scope
-change.
+After a required restart, an already seeded repository shows this consent
+was exercised; resume ordinary bootstrap without re-asking. Stop for new
+human input only when no usable goal or material design input exists, a
+configured plan/acceptance gate is reached, an action is external or
+irreversible, or a typed hard block has no supplied safe recovery. Never
+treat this consent as approval for unrelated adoption, remote operations,
+deployment, publication, destructive work, or scope change.
 
 1. **Step 0 / V4 onboarding:** execute the exact read-only
    `project-onboarding-v3.mjs inspect --root "$PWD" --intent bootstrap` action
-   returned by preflight. Accept only `pipeline.project-onboarding.v4` ready
-   native local or receipt-bound plugin-managed forms, including CAS-READY
+   returned by preflight. Accept only ready `pipeline.project-onboarding.v4`
+   native-local or receipt-bound plugin-managed forms, including CAS-READY
    App-Server readback where required. Empty `.codex` is not authority.
 2. **Loaded authority:** read ruleset presence, V3 source/runtime authority,
    profile, model/effort, Advisor model-free preflight, calibration, role
-   prohibitions, repository freshness/update availability, handover/state and
-   Verify availability. Machine-read full sources and emit digest-bound compact
+   prohibitions, freshness/update availability, handover/state and Verify
+   availability. Machine-read full sources and emit digest-bound compact
    facts; never claim a skipped or cached check passed.
-3. **Boundary:** use one simple shell command per tool call. Do not compose
+3. **Boundary:** one simple shell command per tool call; never compose
    `&&`, `;`, redirects or pipelines except bounded, expansions-free
    `rg … | rg …` or `rg … | head -n 1..500` diagnostics. Treat
-   `executionBoundary: "host-authorized-wsl"` as a mandatory
-   host execution profile: submit the exact returned action directly at that
-   boundary, including every Git observation, and keep that routing
-   authoritative. For Codex, never first retry it in the Codex workspace
-   sandbox and never probe both sandbox and host views. Runner-owned structured `executable`/`argv`
-   actions are primary; any human copy-only rendering must use a tested native
-   Bash/zsh, PowerShell or cmd.exe renderer with explicit safe continuation,
-   not a visually wrapped long command.
+   `executionBoundary: "host-authorized-wsl"` as mandatory: submit the exact
+   returned action directly at that boundary, including every Git
+   observation, keeping that routing authoritative. For Codex, never retry
+   in the Codex workspace sandbox first, and never probe both sandbox and
+   host views. Runner-owned structured `executable`/`argv` actions are
+   primary; a human copy-only rendering must use a tested native Bash/zsh,
+   PowerShell or cmd.exe renderer with explicit safe continuation, never a
+   visually wrapped long command.
 4. **Confirmation:** after all checks, print the auditable confirmation line
    with version, root, V3/runtime, profile, model/effort, role, calibration,
-   handover and Verify evidence. No confirmation is printed on non-ready,
-   unavailable, stale, malformed or drifted state.
-   The four required confirmation facts are: `runtime.status`, `profile/model`
-   and `role`, `calibration/handover`, and `Verify availability`; each is
-   digest-bound to the machine readback and printed before continuation.
+   handover and Verify evidence. Print no confirmation on non-ready,
+   unavailable, stale, malformed or drifted state. The four required facts
+   are `runtime.status`, `profile/model and role`, `calibration/handover`,
+   and `Verify availability`; each is digest-bound to the machine readback
+   and printed before continuation.
 5. **Observation governance:** run
    `node "${PIPELINE_PLUGIN_ROOT}/scripts/observation-governance-bootstrap.mjs" --root "$PWD"`
    before confirmation. `not-applicable` is the successful Consumer-project
-   result: do not look for, copy, or repair `harness/scripts/check-observation-governance.mjs` there.
-   Only a checkout that carries the Pipeline source manifest is `required`; it
-   runs `node harness/scripts/check-observation-governance.mjs`. A `failed`
-   source-checkout result is case **F6**: fail closed, perform read-only
-   diagnosis only, and correct the governed artifact through its reviewed
-   recovery path before restarting bootstrap.
+   result: never look for, copy, or repair
+   `harness/scripts/check-observation-governance.mjs` there. Only a checkout
+   carrying the Pipeline source manifest is `required`; it runs
+   `node harness/scripts/check-observation-governance.mjs`. A `failed`
+   source-checkout result is case **F6**: fail closed, diagnose read-only, and
+   correct the governed artifact through its reviewed recovery path before
+   restarting bootstrap.
 
 6. **Restart hint for material session input:** before a first kickoff **and
    before proposing, displaying, or performing any restart, session cut or
@@ -165,9 +161,9 @@ or proposing a restart, then use the sanctioned kickoff-promotion flow. Its
 directory is `specs/YYYY-MM-DD_short-topic/`, where the date is the local
 creation date and `short-topic` is a short, lowercase, ASCII-safe summary of
 the user's topic. Use `prd_short-topic.md`, `spec.md`, and `design-input.md`.
-Do not overwrite an existing package; choose an unambiguous suffix after a
-readback. The promotion's `--profile`, feature ID, plan path, PRD path and Spec
-path must bind to that package exactly.
+Never overwrite an existing package; choose an unambiguous suffix after a
+readback. The promotion's `--profile`, feature ID, plan/PRD/Spec paths must
+bind to that package exactly.
 
 Treat that named package as a pre-authority staging set: write and review its
 PRD, Spec, and `design-input.md` there first, then run `kickoff promote plan`
@@ -185,11 +181,10 @@ records a faithful, sanitised structured extraction of the material input
 (context, goals/non-goals, requested behaviour, constraints, risks, open
 questions, and stated decisions) plus its capture date. The PRD and Spec both
 link to it and carry a compact traceability table from its sections to their
-requirements/decisions. Preserve the user's specificity; do not collapse a
+requirements/decisions. Preserve the user's specificity; never collapse a
 detailed design into the initial one-line goal. Never persist private
-identifiers, credentials, host paths, URLs, commands, or raw transcripts; when
-such data is material, record only a redacted statement and a digest/reference
-that is safe for the repository.
+identifiers, credentials, host paths, URLs, commands, or raw transcripts;
+when material, record only a redacted statement and a safe digest/reference.
 
 The source-evidence file is immutable after its PRD/Spec reference is bound.
 If the design input materially changes, create a new safely named evidence
@@ -197,17 +192,17 @@ version and promote/rebind it through the ordinary planning change, rather than
 rewriting an old evidence file and provoking authority-hash drift.
 
 For material input, replace the bootstrap placeholders with a useful PRD and
-Spec before a normal plan gate. The PRD covers problem/users, outcomes and
-success measures, scope/non-goals, requirements with testable acceptance
-criteria, assumptions/risks/open questions, and user-flow decisions. The Spec
-covers linked source evidence, architecture and component responsibilities,
-interfaces/state or data, operational constraints, test/verification approach,
-and explicit PRD-to-Spec traceability. If the input describes an ordered user
-flow, state transition, branching, event handoff, or operational workflow,
+Spec before a normal plan gate. The PRD covers problem/users, outcomes,
+success measures, scope/non-goals, testable-acceptance requirements,
+assumptions/risks/open questions, and user-flow decisions. The Spec covers
+linked source evidence, architecture, component responsibilities,
+interfaces/state/data, operational constraints, test/verification approach,
+and PRD-to-Spec traceability. If the input describes an ordered user flow,
+state transition, branching, event handoff, or workflow,
 include a valid Mermaid flow/sequence/state diagram wherever it materially
 clarifies that flow (normally the PRD user flow and/or the Spec execution
-flow), and record a syntax self-check. Do not add a decorative diagram when no
-flow exists.
+flow), with a syntax self-check. Skip a decorative diagram when no flow
+exists.
 
 ## Typed lazy loading
 
@@ -229,8 +224,8 @@ continuation checks.
 ## Gate authority and autonomous continuation
 
 The applicable Operating Model, compiled runtime manifest and recorded active
-plan are the only gate authority. Do not create a chat, confirmation or human
-checkpoint merely because a routine implementation step needs to happen.
+plan are the only gate authority. Never add a chat or human checkpoint for a
+routine implementation step.
 
 Once bootstrap is ready and the required plan gate is recorded, continue the
 approved implementation autonomously: scoped edits, focused tests, state
@@ -238,23 +233,22 @@ readback, one-line commits, Verify, Critic preparation and ordinary block
 continuation are agent work. A standing approval is not a fresh human touch.
 
 A recorded PRD/Spec approval is an execution mandate for its accepted scope.
-Choose ordinary implementation details, task sequencing, bounded recovery,
-test fixes and internal alternatives without asking the human again; record
-material choices and return results for acceptance. Ask only where alternatives
-materially change accepted scope, acceptance criteria, priority, risk, cost,
-an external or irreversible consequence, or a configured decision/acceptance
-gate. Do not turn routine uncertainty or several implementation options into a
-series of PO approvals.
+Choose implementation details, sequencing, bounded recovery, test fixes and
+internal alternatives without asking again; record material choices and
+return results for acceptance. Ask only where alternatives materially change
+accepted scope, acceptance criteria, priority, risk, cost, an external or
+irreversible consequence, or a configured decision/acceptance gate. Never
+turn routine uncertainty or several options into a series of PO approvals.
 
-Ask the human decision role only for a configured decision gate, required final
-acceptance, an irreversible or externally consequential action, or a typed hard
-block for which the returned safe recovery actions cannot progress. A guard
+Ask the human only for a configured decision gate, required final acceptance,
+an irreversible or externally consequential action, or a typed hard block
+whose safe recovery actions cannot progress. A guard
 denial alone is not a human gate: first run its exact typed read-only or
-lifecycle recovery action. Never bypass a real configured gate or turn an
-automated evidence failure into an invented PO approval.
+lifecycle recovery action. Never bypass a real gate or turn an automated
+evidence failure into an invented PO approval.
 
 ## Compact
 
-Compact preserves the active goal/revision and emits bounded re-grounding. It
+Compact preserves active goal/revision, emits bounded re-grounding. It
 does not trigger a second full Elephant bootstrap unless a real SessionStart or
 typed recovery follows; `PCR-READY` loads no recovery references.
