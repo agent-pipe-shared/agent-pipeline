@@ -65,10 +65,19 @@ import { initializePoGateProfileReceipt as initializeActualPoGateProfileReceipt 
 
 let passed = 0; const failures = [];
 function test(name, run) { try { run(); passed += 1; console.log(`PASS  ${name}`); } catch (error) { failures.push(`${name}: ${error.message}`); console.log(`FAIL  ${name} -- ${error.message}`); } }
-function root() { return mkdtempSync(join(tmpdir(), "project onboarding v3 matrix with spaces-")); }
+// `root`, `dispose`, `fakeDeps`, `fakeGit`, `initializeRestartRequiredRoot`,
+// `clearRuntimeBarrier`, `completeKickoff` and `PLUGIN_PIPELINE_STATE_SCRIPT`
+// are exported below so the contract suite
+// (guard-lifecycle-recovery-contract.test.mjs) can drive the REAL,
+// dependency-injected `inspectProjectOnboardingV3` through the same
+// already-tested fixture this file uses, rather than duplicating ~150 lines
+// of fixture setup or hand-typing a result shape (the exact anti-pattern
+// backlog item 2026-08-08-the-guard-refuses-the-recovery-the-inspection-
+// prescribes.md's AC-8 calls out).
+export function root() { return mkdtempSync(join(tmpdir(), "project onboarding v3 matrix with spaces-")); }
 function spacedRoot() { return mkdtempSync(join(tmpdir(), "project onboarding v3 with spaces-")); }
-function dispose(path) { rmSync(path, { recursive: true, force: true }); }
-function fakeGit(command, args, options = {}) {
+export function dispose(path) { rmSync(path, { recursive: true, force: true }); }
+export function fakeGit(command, args, options = {}) {
   if (command !== "git") return { status: 1, stderr: "unexpected program" };
   if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
   if (args[0] === "rev-parse" && args[1] === "--path-format=absolute" && args[2] === "--git-common-dir") return { status: 0, stdout: `${join(options.cwd, ".git")}\n`, stderr: "" };
@@ -109,7 +118,7 @@ function fakeAppServer({ intent }) {
     ? { required: false, status: "not-requested", code: null }
     : { required: true, status: "running", code: "CAS-READY" };
 }
-const fakeDeps = {
+export const fakeDeps = {
   spawnSync: fakeGit,
   codexExecutable: process.execPath,
   observeCodexOnboardingCapabilities: fakeCapabilities,
@@ -139,7 +148,7 @@ const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host
 const ONBOARDING_LAUNCH_SCRIPT = fileURLToPath(new URL("../scripts/codex-onboarding-launch.mjs", import.meta.url));
 const APP_SERVER_HEALTH_SCRIPT = fileURLToPath(new URL("../scripts/codex-app-server-health.mjs", import.meta.url));
 const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
-const PLUGIN_PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
+export const PLUGIN_PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
 const SESSION_CLEANUP_SCRIPT = fileURLToPath(new URL("../scripts/session-cleanup.mjs", import.meta.url));
 const SESSION_CAPABILITY_DIAGNOSE_SCRIPT = fileURLToPath(new URL("../scripts/session-capability-diagnose.mjs", import.meta.url));
 function names(path) { return readdirSync(path).sort(); }
@@ -184,7 +193,7 @@ function repositoryCapability(status, intent = "dispatch") {
 // existing caller of this shared test setup keeps its exact prior behaviour
 // -- this is a test-fixture default, not the library default this task
 // removes; project-onboarding-v3.mjs itself never assumes one.
-function initializeRestartRequiredRoot(path, deps = fakeDeps, runner = "codex") {
+export function initializeRestartRequiredRoot(path, deps = fakeDeps, runner = "codex") {
   const portable = planProjectOnboardingV3({ rootDir: path, deps, runner });
   assert.equal(applyProjectOnboardingV3(portable, { rootDir: path, activate: true, deps }).status, "applied");
   const runtime = planProjectOnboardingLifecycleV4({ rootDir: path, deps, operation: "runtime", runner });
@@ -206,7 +215,7 @@ function initializeRuntimeProjectionRoot(path, deps = fakeDeps, runner = "codex"
   clearRuntimeBarrier(path, barrier);
 }
 
-function clearRuntimeBarrier(path, barrier) {
+export function clearRuntimeBarrier(path, barrier) {
   const issued = issueLaunchTicket({
     rootDir: path,
     barrierSha256: barrier.rawSha256,
@@ -236,7 +245,7 @@ function clearRuntimeBarrier(path, barrier) {
   });
 }
 
-function completeKickoff(path, goal = "Build a safe project", deps = fakeDeps, expectedStatus = "ready", runner = "codex") {
+export function completeKickoff(path, goal = "Build a safe project", deps = fakeDeps, expectedStatus = "ready", runner = "codex") {
   const plan = planProjectOnboardingKickoffV4({ rootDir: path, goal, deps, runner });
   assert.equal(plan.schema, "pipeline.codex-onboarding-kickoff-plan.v1");
   const result = applyProjectOnboardingKickoffV4({

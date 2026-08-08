@@ -19,7 +19,10 @@ import {
   ProjectOnboardingReadyError,
   requireProjectOnboardingReady,
 } from "../lib/project-onboarding-ready-gate.mjs";
-import { inspectProjectOnboardingV3 } from "../lib/project-onboarding-v3.mjs";
+import {
+  inspectProjectOnboardingV3,
+  PO_AUTHORITY_REBIND_UNAVAILABLE_DIAGNOSTICS,
+} from "../lib/project-onboarding-v3.mjs";
 import { loadRuntimeProjectionV3OwnedKeys } from "../lib/runtime-projection-v3.mjs";
 import {
   hasCodexExistingGitControlMount,
@@ -1074,11 +1077,18 @@ function sanctionedPoAuthorityRebindArgs(args) {
  * commit fb0e9ac1) -- so that clause could never match a real inspection
  * again and this admission was silently dead against production state,
  * covered only by a hand-mocked test shape that had drifted from reality.
- * `po_authority_rebind_unavailable` is emitted from exactly one call site
- * (`PO_AUTHORITY_REBIND_UNAVAILABLE_DIAGNOSTICS`, `reason: null` entry) whose
- * `nextAction` is a fixed literal, so the diagnostic code alone already
- * uniquely identifies this state; the `nextAction` shape does not need its
- * own re-check.
+ * The admitted code set is read from `PO_AUTHORITY_REBIND_UNAVAILABLE_DIAGNOSTICS`
+ * itself rather than named here. That table is the single call site that emits
+ * this whole family, and every entry marked `offersPlannerRetry` hands the
+ * operator the SAME fixed planner argv under a DIFFERENT diagnostic code. A
+ * hardcoded `po_authority_rebind_unavailable` therefore admitted the fallback
+ * reason and refused the five named ones -- prescribing a command and then
+ * blocking it, which is the exact defect this backlog item is about; the
+ * contract suite (`guard-lifecycle-recovery-contract.test.mjs`) found it by
+ * enumerating the table. Deriving the set from the producer means a reason
+ * added there cannot reopen the gap. `offersPlannerRetry: false` entries stay
+ * out: they return `nextAction: null`, so admitting their code would be the
+ * mirror-image defect -- a route the guard allows that nothing offers.
  */
 function isExactPoAuthorityRebindPlannerRecovery(command, root, dependencies = {}) {
   const words = simpleWords(command, root);
@@ -1106,7 +1116,8 @@ function isExactPoAuthorityRebindPlannerRecovery(command, root, dependencies = {
     && observed?.intent === "session"
     && Array.isArray(observed?.diagnostics)
     && observed.diagnostics.length === 1
-    && observed.diagnostics[0]?.code === "po_authority_rebind_unavailable";
+    && PO_AUTHORITY_REBIND_UNAVAILABLE_DIAGNOSTICS
+      .some((entry) => entry.offersPlannerRetry && entry.code === observed.diagnostics[0]?.code);
 }
 
 function sanctionedPipelineStateArgs(args) {

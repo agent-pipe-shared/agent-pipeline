@@ -1746,10 +1746,15 @@ function observeReadyAppServer(intent, runner, fs) {
 }
 
 // backlog: 2026-08-08-the-guard-refuses-the-recovery-the-inspection-prescribes.md
-// (C1). One shared table, read by BOTH the producer below (readyLifecycleResult)
-// and the guard's contract suite (guard-lifecycle-ready.test.mjs), so a reason
-// added here is automatically covered by that suite instead of depending on a
-// hand-written duplicate staying in sync. `offersPlannerRetry: false` marks the
+// (C1). One shared table with three readers: the producer below
+// (`readyLifecycleResult`), the guard's admission check
+// (`isExactPoAuthorityRebindPlannerRecovery` in guard-lifecycle-ready.mjs), and
+// the contract suite that asserts the two agree
+// (hooks/guard-lifecycle-recovery-contract.test.mjs). A reason added here is
+// therefore offered, admitted and covered at once, instead of depending on two
+// hand-written duplicates staying in sync -- they did not, and the guard
+// refused five of the six actions this table offers until the contract suite
+// enumerated them. `offersPlannerRetry: false` marks the
 // one reason where re-running the planner cannot help: `observePoAuthorityRebind`
 // already spawned the planner as part of THIS SAME inspection and observed it
 // reject (`planned.status !== 0`) -- offering to run the identical command again
