@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "1109c573b15e253c9c2f5e575abbd0c2a59a5ebdd299eca34cdc17450f4898e1"
+    "transitionHead": "c4d67563b894896d12a224c97a54a32408c4d1d444fffe5e16a3f44be5bf07e2"
   },
   "counts": {
-    "open": 67,
+    "open": 69,
     "in_progress": 26,
     "closed": 23
   },
@@ -103,6 +103,14 @@
       "owner": "pipeline",
       "created": "2026-08-06",
       "source": "Phoenix §7 authority revision; approve step failed twice inside an agent session"
+    },
+    {
+      "id": "pipeline.b3-inventory-missed-agent-facing-documents-under-docs-deploy",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Critic out-of-scope observation, Phoenix gate-integrity full review round 1, 2026-08-08: docs/deploy/README.md carries live operating-model section citations and appears in neither B3 inventory."
     },
     {
       "id": "pipeline.backlog-delivery-status-reconciliation",
@@ -414,6 +422,14 @@
       "owner": "pipeline",
       "created": "2026-08-06",
       "source": "Product Owner requirement raised at the Phoenix plan-approval gate"
+    },
+    {
+      "id": "pipeline.immutable-manifest-entries-can-be-rebound-with-no-amendment-record",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Critic finding F5, Phoenix gate-integrity full review round 1, 2026-08-08: lifecycle.json rebound the sha256 of an entry declared mutability immutable, and the schema has no field that could have carried the reason."
     },
     {
       "id": "pipeline.ledger-backed-plan-and-push-authority-absent-on-merged-base",

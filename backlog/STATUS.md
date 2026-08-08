@@ -16,6 +16,7 @@
 | pipeline.approval-mechanisms-require-out-of-session-po-acts | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.attestation-git-presence-gate-not-gs8-protected | in_progress | defect | pipeline | 2026-08-07 | — |
 | pipeline.authority-signing-terminal-contract | open | workflow-improvement | pipeline | 2026-08-06 | — |
+| pipeline.b3-inventory-missed-agent-facing-documents-under-docs-deploy | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.backlog-delivery-status-reconciliation | in_progress | workflow-improvement | pipeline | 2026-07-25 | Nova A / issue #57 |
 | pipeline.backlog-ledger-closure-reason-misleading | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.canonical-worktree-lifecycle | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -53,6 +54,7 @@
 | pipeline.human-approval-ux-directory-clarity-and-single-command | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.human-authorization-prompts-ignore-the-configured-language-profile | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.human-legible-approval-record | open | requirement | pipeline | 2026-08-06 | — |
+| pipeline.immutable-manifest-entries-can-be-rebound-with-no-amendment-record | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.ledger-backed-plan-and-push-authority-absent-on-merged-base | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.live-plugin-root-undefended-in-the-shell-lane | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root | open | defect | pipeline | 2026-08-06 | — |
@@ -124,6 +126,6 @@
 
 ## Counts
 
-- open: 67
+- open: 69
 - in_progress: 26
 - closed: 23
