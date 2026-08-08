@@ -1360,6 +1360,77 @@ check("promotion refuses a plan that is the Spec, a plan that is not a prd_*.md,
   assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
 });
 
+// A1-PROMOGATE: `kickoff promote plan` must refuse a PRD the PO plan gate
+// (po-gate-authority.mjs) will reject anyway, before anything is frozen --
+// naming the exact line and digest to add, not just a generic authority
+// refusal. The marker grammars come from po-gate-authority.mjs itself, so
+// these fixtures use the identical `<!-- ... -->` shapes the gate parses.
+
+check("promotion refuses a PRD without the technical Spec marker, naming the exact digest to add", () => {
+  const seed = promotionSeed("spec-marker-missing");
+  const path = promotedArtifact(seed, "prd_promoted.md");
+  const specSha256 = digest(readFileSync(promotedArtifact(seed, "spec.md")));
+  writeFileSync(path, readFileSync(path, "utf8").split("\n")
+    .filter((line) => !line.startsWith("<!-- technical-spec-sha256:")).join("\n"));
+  assert.throws(() => planOnboardingKickoffPromotion(seed.request),
+    (error) => error?.code === "KICKOFF-PROMOTION-PRD-SPEC-MARKER-MISSING" && error.message.includes(specSha256));
+});
+
+check("promotion refuses a PRD carrying more than one technical Spec marker, with the same missing-marker code", () => {
+  const seed = promotionSeed("spec-marker-duplicate");
+  const path = promotedArtifact(seed, "prd_promoted.md");
+  const original = readFileSync(path, "utf8");
+  const markerLine = original.split("\n").find((line) => line.startsWith("<!-- technical-spec-sha256:"));
+  writeFileSync(path, `${markerLine}\n${original}`);
+  assert.throws(() => planOnboardingKickoffPromotion(seed.request),
+    (error) => error?.code === "KICKOFF-PROMOTION-PRD-SPEC-MARKER-MISSING");
+});
+
+check("promotion refuses a PRD whose technical Spec marker disagrees with the neighboring spec.md, with a distinct code", () => {
+  const seed = promotionSeed("spec-marker-mismatch");
+  const path = promotedArtifact(seed, "prd_promoted.md");
+  writeFileSync(path, readFileSync(path, "utf8").replace(
+    /<!-- technical-spec-sha256: [0-9a-f]{64} -->/u,
+    `<!-- technical-spec-sha256: ${"a".repeat(64)} -->`,
+  ));
+  assert.throws(() => planOnboardingKickoffPromotion(seed.request),
+    (error) => error?.code === "KICKOFF-PROMOTION-PRD-SPEC-MARKER-MISMATCH");
+});
+
+check("promotion refuses a PRD carrying no po-language marker, or one whose value is not in the supported set", () => {
+  const missing = promotionSeed("language-marker-missing");
+  const missingPath = promotedArtifact(missing, "prd_promoted.md");
+  writeFileSync(missingPath, readFileSync(missingPath, "utf8").split("\n")
+    .filter((line) => !line.startsWith("<!-- po-language:")).join("\n"));
+  assert.throws(() => planOnboardingKickoffPromotion(missing.request),
+    (error) => error?.code === "KICKOFF-PROMOTION-PRD-LANGUAGE-MARKER-INVALID");
+
+  const unsupported = promotionSeed("language-marker-unsupported");
+  const unsupportedPath = promotedArtifact(unsupported, "prd_promoted.md");
+  writeFileSync(unsupportedPath, readFileSync(unsupportedPath, "utf8")
+    .replace("<!-- po-language: en -->", "<!-- po-language: fr -->"));
+  assert.throws(() => planOnboardingKickoffPromotion(unsupported.request),
+    (error) => error?.code === "KICKOFF-PROMOTION-PRD-LANGUAGE-MARKER-INVALID");
+});
+
+check("promote apply independently refuses a PRD that lost its technical Spec marker after plan", () => {
+  const seed = promotionSeed("apply-marker-missing");
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  const path = promotedArtifact(seed, "prd_promoted.md");
+  writeFileSync(path, readFileSync(path, "utf8").split("\n")
+    .filter((line) => !line.startsWith("<!-- technical-spec-sha256:")).join("\n"));
+  assert.throws(() => applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true }),
+    (error) => error?.code === "KICKOFF-PROMOTION-PRD-SPEC-MARKER-MISSING");
+});
+
+check("promotion admits a PRD carrying both correct po-gate markers exactly as before", () => {
+  const seed = promotionSeed("markers-valid");
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  assert.equal(plan.authority.prd.sha256, digest(readFileSync(promotedArtifact(seed, "prd_promoted.md"))));
+  const applied = applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  assert.equal(applied.status, "applied");
+});
+
 function publishPoGateProfile(root) {
   const gitCommonDir = join(root, ".git");
   writeFileSync(join(root, "pipeline.user.yaml"),

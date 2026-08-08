@@ -63,7 +63,11 @@ import {
   resolveProjectAuthorityPaths,
   validatePortablePipelineState,
 } from "./project-authority.mjs";
-import { validatePoGateLanguageProjection } from "./po-gate-authority.mjs";
+import {
+  PRD_LANGUAGE_MARKER,
+  TECHNICAL_SPEC_MARKER,
+  validatePoGateLanguageProjection,
+} from "./po-gate-authority.mjs";
 import {
   inspectSessionClosure,
   listActiveSessionDescriptors,
@@ -3494,6 +3498,39 @@ function promotionArtifacts(root, input) {
   if ([input.prdPath, input.specPath, input.designInputPath]
     .some((path) => path.startsWith("specs/kickoff-"))) {
     fail("KICKOFF-PROMOTION-AUTHORITY", "promotion authority must not reuse kickoff artifacts");
+  }
+  // The PO plan gate (po-gate-authority.mjs) will refuse a promoted PRD that
+  // does not already carry both markers it requires. Checking here, before
+  // anything is frozen, turns what used to be a session-bricking dead end --
+  // the promotion binds the PRD's bytes, so adding a marker afterward breaks
+  // the very binding this function just recorded -- into a one-line refusal
+  // now, while the PRD is still freely editable. The grammars are imported
+  // from po-gate-authority.mjs, never re-declared, so the two checks cannot
+  // drift apart. This function is the one path shared by plan-building and
+  // apply's own fresh re-read of the bytes, so both refuse alike.
+  const prdText = prd.raw.toString("utf8");
+  const languageMarkers = [...prdText.matchAll(PRD_LANGUAGE_MARKER)].map((match) => match[1]);
+  if (languageMarkers.length !== 1) {
+    fail(
+      "KICKOFF-PROMOTION-PRD-LANGUAGE-MARKER-INVALID",
+      "The promoted PRD must carry the PO-gate language marker exactly once, as <!-- po-language: de --> or"
+        + " <!-- po-language: en --> on its own line; the PO plan gate will otherwise refuse it.",
+    );
+  }
+  const specMarkers = [...prdText.matchAll(TECHNICAL_SPEC_MARKER)].map((match) => match[1]);
+  if (specMarkers.length !== 1) {
+    fail(
+      "KICKOFF-PROMOTION-PRD-SPEC-MARKER-MISSING",
+      "The promoted PRD must carry the technical Spec marker exactly once, as"
+        + ` <!-- technical-spec-sha256: ${spec.sha256} --> on its own line; the PO plan gate will otherwise refuse it.`,
+    );
+  }
+  if (specMarkers[0] !== spec.sha256) {
+    fail(
+      "KICKOFF-PROMOTION-PRD-SPEC-MARKER-MISMATCH",
+      "The promoted PRD technical Spec marker does not match the neighboring spec.md; it must read exactly"
+        + ` <!-- technical-spec-sha256: ${spec.sha256} -->; the PO plan gate will otherwise refuse it.`,
+    );
   }
   return {
     prd: { path: input.prdPath, sha256: prd.sha256 },
