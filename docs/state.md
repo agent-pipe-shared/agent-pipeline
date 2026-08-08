@@ -19,7 +19,7 @@ activeFeature `sprint-phoenix-epic` in implementation, observation governance
 passed. Update channel `alpha` unreachable — availability `unknown`,
 non-blocking.**
 
-**HEAD: `e7f6e96` on `sprint_phoenix`. Nothing pushed. Working tree clean apart
+**HEAD: `7c2df7d` on `sprint_phoenix`. Nothing pushed. Working tree clean apart
 from `.claude/settings.json` and `project/resume-hint.json`, which are
 permanently dirty in this checkout and are never committed.**
 
@@ -83,21 +83,94 @@ silently.
 
 Probe script: `scratch/phx-append-stability-probe.mjs` (gitignored, on disk).
 
+### CRITIC ROUND 2 (delta): FAIL — and F1 is not why (2026-08-08)
+
+Ran because F1 was a *vacuous test*, the one failure mode self-review is worst
+at catching. Round 2 of at most 4. Base `3345efe` → head `dbeefc3`, enumerated
+object `2647bb4, 084f308, 358c709, 3d24033, e7f6e96, dbeefc3`, preflight
+`packet-ready`, route requested `claude-opus-5` at `max`, effective identity
+`unknown`, assurance `functional-equivalent-read-only; OS isolation not
+asserted`. `Briefing violations observed: none`.
+
+**F1 is independently closed.** The Critic reproduced both states in memory
+rather than reading the report: pre-fix `{withTarget: true, withoutTarget:
+true}` (the vacuity is real), at `dbeefc3` `{filtered: 182, renumbered: 1,
+untouched: true, withTarget: true, withoutTarget: false}`. It also reproduced
+the append-stability table row for row, negative control included. The
+two-direction pin is structurally immune to re-hollowing: any finding present in
+both directions breaks the `!reachableWithoutOverride` conjunct.
+
+**F-A (major) — the violation is mine, and it is correct.** `e7f6e96` changed
+`plugins/pipeline-core/lib/backlog-state.test.mjs` from the orchestrator session
+with no `Dispatch:` trailer and no dispatch record. EL-01's exception is
+`rigor-0 fast-path only` and excludes a **test** change outright and any task
+with a **risk flag set**; this feature is `rigor 2 · risk high`
+(`phase-plan_gate-integrity.md:7`), so the fast path was categorically
+unavailable (`roles/elephant.md:35`). Checked the anchors myself before
+accepting. The commit body even asserts "No production code touched" — that
+sentence is wrong under the rule it was implicitly invoking.
+
+*Not repairable by a diff.* History is not rewritten here, and a `git revert`
+would itself be a second orchestrator-authored source commit. What is available
+is disclosure — which is exactly what the Critic said distinguishes this
+instance from the `ce75672` one — and not doing it again. The corrective was
+applied immediately: the F-B repair below went out as a dispatch
+(`PHX-QG06-DATE`), not as another orchestrator edit. **This one belongs in front
+of the PO, not in front of another Critic round: it is a governance finding
+about the Elephant's own conduct, and no further diff changes it.**
+
+**F-B (minor, QG-06) — closed.** The BS25 comment deferred the
+fixture-versus-live-binding decision with no owner and no expiry, which QG-06
+calls a finding rather than a mitigation. `7c2df7d` gives it owner **PO** and
+expiry **2026-09-08**, with the no-third-option/no-silent-extension rule stated
+in the comment. Verified independently of the implementor's report: comment-only
+diff, no assertion touched, suite 35/35.
+
+**What the Critic declared it did *not* cover** — no pass is implied on any of
+it: guardrail category partial (`.claude/pipeline.json`, `.claude/pipeline.yaml`,
+`guardrails/global.md`, `guardrails/git.md` and the nine `governance/examples/**`
+files were not read); edge cases partial (no concurrency, no empty/huge ledger,
+no independent BS26 re-provocation); security read-level only, no scanner;
+spec fidelity bounded to F1, so AC-P1..AC-P11 were not re-examined. Two prior
+`not verifiable` items stand as before, plus the three orchestrator break-proofs
+which exist only as prose — the Critic reproduced the decisive one's substance
+independently, so the conclusion is verified even though the claimed runs are
+not.
+
 ### Immediate next steps, in order
 
-1. **Delta re-Critic — decided: yes, run it.** F1 was a *vacuous test*, which is
-   precisely the failure mode self-review misses; closing it on the Elephant's
-   own break-proofs is weaker evidence than the finding deserves. Round 2 of at
-   most 4. Base `3345efe` (head of the reviewed object), head = final commit,
-   changed paths bound exactly.
-2. Full verify from a **fresh** detached worktree at the final commit — the tree
-   cannot be made clean in place, so verify only runs there:
-   `git worktree add --detach .git/phx-verify-wt <commit>`, run with
-   `--root <worktree>`, then `git worktree remove --force`.
+1. Full verify from a **fresh** detached worktree at the final commit — the tree
+   cannot be made clean in place, so verify only runs there.
+   `git worktree add --detach .git/phx-verify-wt <commit>`, then run **that
+   worktree's own** `harness/scripts/verify.mjs` (it derives its root from its
+   own location; there is no `--root` flag — the earlier note here was wrong),
+   copy `evidence/verify-latest.json` back into the primary tree, then
+   `git worktree remove --force`.
    The push gate (`guard-push.mjs:49`) needs `evidence/verify-latest.json` with
    `exitCode === 0` and `commit` equal to the pushed commit, so this must be
-   redone at the final commit, not reused from `3345efe`.
-3. Push gate — the fourth and last PO authorization. **Only to `sprint_phoenix`.**
+   redone at the final commit.
+2. Push gate — the fourth and last PO authorization. **Only to `sprint_phoenix`.**
+   The PO decides it holding the round-2 FAIL and F-A, not around them.
+
+### Two process items, now with an owner and a date (QG-06 applies to me too)
+
+Neither is filed yet, deliberately: an unregistered item file makes
+`check-backlog-state` red and would poison a running candidate. Owner
+**Elephant**, due **at the opening of the next block**, filed through the
+sanctioned backlog writer before any other work in that block:
+
+1. **Report-early duty is written as conditional and is in practice
+   unconditional.** `templates/prompts/goldfish-task.md` frames it as advice for
+   packages over ~25 tool uses; under this repo's closed shell grammar nearly
+   every dispatch crosses that. Six dispatches in this phase ended at or past
+   budget, four with no report at all — including the round-2 Critic, which
+   stopped at 46 tool uses and only reported when explicitly asked. Every
+   dispatch that carried an explicit "begin writing your report at N" block did
+   report; `PHX-QG06-DATE` carried one and reported.
+2. **EL-01 has no in-session tripwire.** F-A was caught by a Critic after the
+   commit existed, not by anything at write time. A guard that refuses an
+   orchestrator-authored write to a source path while a risk-flagged feature is
+   active would have made it impossible rather than reviewable.
 
 ### One Critic "not verifiable" item is now closed
 
