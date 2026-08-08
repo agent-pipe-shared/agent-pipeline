@@ -50,6 +50,17 @@ capability that could not be used.
 5. **Dispatch records landed in `evidence/` untracked**, which each dispatch
    independently decided was correct. It may well be correct — but five
    dispatches arrived at it separately rather than reading it anywhere.
+6. **`evidence/` mixes citable artifacts with throwaway material and nothing ever
+   prunes it.** Its file listing alone is now 128.7 KB of paths.
+   `plugins/pipeline-core/lib/session-cleanup-recovery.mjs` — the built,
+   descriptor-bound cleanup machinery — contains no reference to the directory,
+   so nothing retires anything there. The quantity is the lesser half. The
+   directory holds, side by side and indistinguishable by any rule: one-off probe
+   scripts, TAP dumps, commit-message drafts, **and** artifacts that Verify
+   receipts and backlog `closure_evidence` fields actively cite. A cleanup that
+   cannot tell those apart breaks citations; one that refuses to run leaves the
+   directory growing without bound. Neither is acceptable, and no rule currently
+   distinguishes them — which is this item's thesis in its sharpest form.
 
 ## Why an ADR rather than a README section
 
