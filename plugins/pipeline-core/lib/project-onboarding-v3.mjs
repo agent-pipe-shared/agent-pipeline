@@ -1131,6 +1131,16 @@ function observePoAuthorityRebind(root, fs) {
   if (authority?.code === "PO-GATE-PLAN-DIGEST-STALE") {
     return unavailable("plan-digest-stale");
   }
+  // A PRD that never carried the technical Spec marker at all (or carries more
+  // than one) has no recorded digest for a rebind to fold in, and the rebind
+  // writer itself refuses this state (PO-REBIND-STATE): it requires an
+  // existing approval, which a PRD that never carried the marker cannot have
+  // reached. Offering the rebind route here would be offering a route already
+  // known to refuse, so this is explicitly not-applicable rather than left to
+  // fall through the inequality below alongside every other unrelated code.
+  if (authority?.code === "PO-GATE-PRD-SPEC-MARKER-MISSING") {
+    return { status: "not-applicable" };
+  }
   if (authority?.code !== "PO-GATE-PRD-SPEC-MISMATCH") {
     return { status: "not-applicable" };
   }
