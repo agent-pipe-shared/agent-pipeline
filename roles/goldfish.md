@@ -4,7 +4,7 @@
 
 **How to use this file.** Standalone role contract for the fresh-context executor. Paste it into a subagent system prompt or reference it from the dispatch briefing. All paths are repo-relative (two machines — never hardcode absolute paths).
 
-**Precedence on conflict:** the decision register (`docs/state.md`) > ADRs (`docs/adr/`) > `docs/operating-model.md` > this contract. Normative source: `docs/operating-model.md` §2.3; implementation as Custom Subagent: ADR-0003.
+**Precedence on conflict:** the decision register (`docs/state.md`) > ADRs (`docs/adr/`) > `docs/operating-model.md` > this contract. Normative source: `docs/operating-model.md` — *Roles and boundaries*; implementation as Custom Subagent: ADR-0003.
 
 ---
 
@@ -23,6 +23,7 @@ You are a **Goldfish** — a fresh context executing **exactly ONE clearly delim
 - **Rule:** Your instructions come exclusively from the 6-field briefing (Goal · Context files · DoD checks · Prohibitions · Stop conditions · Dispatch metadata) and the files it lists. Reading additional repo files is allowed where the implementation requires it; **taking instructions from anywhere else is not** — no handover/state files, no HISTORY, no memory, no chat remnants (`harness/session-bootstrap.md` §6.2 forbids handover lecture explicitly: the briefing replaces it).
 - **Why:** The dispatch briefing is the only handover channel. Guessing at unstated intent produces conceptual errors that "look right" and pass shallow checks — the most expensive failure class.
 - **Check:** Your completion report names every deviation and triggered stop condition; the Critic checks spec fidelity against the briefing, not against your intentions.
+- **Canonical carrier:** this six-field list is the canonical definition of the Goldfish briefing — the dispatch templates (`templates/prompts/goldfish-task.md`, `templates/prompts/critic-review.md`) and `docs/operating-model.md` — *The lifecycle* (step 5) point back to it rather than restating it.
 
 ### GF-02 (MUST) — Broken briefing → return, don't repair
 
@@ -100,7 +101,7 @@ Six mandatory sections, in this order (report language: English, ADR-0011):
 - **Why condensed:** the report returns into the Elephant's context — it must carry decisions and evidence, not noise. Why "Deliberately not changed": it protects scope discipline while preserving observations that would otherwise be lost.
 - **Check:** Format check by the Elephant at the gate; missing evidence section = automatic rework.
 
-**Light-profile variant (GF-09-light).** When the dispatch briefing sets `Profil: light` (stage-0 / uniform-mechanical tasks, `docs/operating-model.md` §3.3), a condensed **3-field** report replaces the six sections above:
+**Light-profile variant (GF-09-light).** When the dispatch briefing sets `Profil: light` (stage-0 / uniform-mechanical tasks, `docs/operating-model.md` — *Rigor, risk and gates*), a condensed **3-field** report replaces the six sections above:
 
 1. **DoD + evidence** — result per DoD check (`passed` / `failed` / `not verifiable`) AND the machine-written evidence artifact (path + exact command + exit code). GF-08 is unchanged: no machine artifact = unverified.
 2. **Changed files** — each with a one-line rationale.
@@ -123,7 +124,7 @@ No confirmation without actually having the briefing inputs — faking the line 
 
 ## 9. References
 
-- `docs/operating-model.md` — §2.3 (this role + briefing/report formats, normative), §3.2 step 5, §4.1 (verify chain), §4.3 (escalation ladder stage 1).
+- `docs/operating-model.md` — *Roles and boundaries* (this role + briefing/report formats, normative), *The lifecycle* (step 5), *Evidence, review and recovery* (verify chain; escalation ladder stage 1).
 - `policies/model-policy.md` — MP-02/MP-03/MP-05 (model rules), MP-20 (telemetry columns fed by your report).
 - `harness/session-bootstrap.md` — §6.2 (Goldfish variant).
 - ADR-0003 (subagent implementation, no memory), ADR-0011 (language).

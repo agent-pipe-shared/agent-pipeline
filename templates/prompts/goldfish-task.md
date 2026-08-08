@@ -2,9 +2,9 @@
 ═══════════════════════════════════════════════════════════════════════════
 PROMPT TEMPLATE: Goldfish task briefing (6 mandatory fields) — Agent-Pipeline
 v0.1.0-draft · Sprint 0 Phase 3 · 2026-07-03
-Source of truth: docs/operating-model.md §2.3 — the canonical briefing field
+Source of truth: roles/goldfish.md GF-01 — the canonical six-field briefing
 list. The six fields below are: Goal, Context files, DoD checks, Forbidden,
-Stop conditions, and Dispatch metadata (per operating-model.md §2.3).
+Stop conditions, and Dispatch metadata (per roles/goldfish.md GF-01).
 Also: harness/session-bootstrap.md §6.2 (Goldfish bootstrap), model-policy
 MP-02/MP-05 (model/effort, escalation justification), the no-memory rule and the
 two-failed-attempts rule.
@@ -12,7 +12,8 @@ Language: English (agent-facing prompt, ADR-0011).
 
 USAGE (Elephant)
 1. Fill ALL six fields. An incomplete briefing is not dispatchable — the
-   briefing-format check (operating-model §3.2 step 4) fails.
+   briefing-format check (`roles/goldfish.md` GF-01/GF-02; `docs/operating-model.md`
+   — The lifecycle, step 5) fails.
 2. This text plus the files listed in field 2 are the Goldfish's ENTIRE input.
    Never paste chat history, never paste your reasoning about alternatives.
 3. Dispatch as subagent (default: `goldfish-implementor`, effort `medium` per MP-27).
@@ -126,7 +127,7 @@ Stop and report (do not keep iterating) when ANY of these occurs:
 - Model justification (ONLY if deviating from the Goldfish default, MP-05):
   {{MODEL_JUSTIFICATION e.g. ">15 files across two subsystems → the design-tier model per MP-05 criterion 1" or "n/a — role default"}}
 - Worktree: {{WORKTREE e.g. "yes — per calibration `worktree: on-write`" or "no — read-only task"}}
-- Profile: {{standard | light}} — `light` ONLY for stage-0 mechanical or bounded implementation tasks (operating-model §3.3): condensed 3-field report (see below), mechanic `low` or implementor `medium`, skip the pre-edit baseline verify. Never `light` for deep, class-high, architecture, guardrail, or security work.
+- Profile: {{standard | light}} — `light` ONLY for stage-0 mechanical or bounded implementation tasks (`roles/goldfish.md` §6): condensed 3-field report (see below), mechanic `low` or implementor `medium` per `docs/operating-model.md` — V3 routing: profiles, duties and phases (Duties), skip the pre-edit baseline verify. Never `light` for deep, class-high, architecture, guardrail, or security work.
 - **Tool budget (TB-09, hard cap, first-class field):** {{TOOL_BUDGET default: "≤45 tool uses"}}. This is a mandatory field in EVERY goldfish briefing, not just workflow-agent dispatches. Approaching or reaching the cap is a stop condition (field 5): stop cleanly and report what is done + what remains — never "push through" past it. **Honesty note:** this is a briefing/behavior rule, not a hook-enforced count — no automated per-subagent tool-call counter exists (yet); documented as such rather than overclaimed as "will be blocked" (the G1 lesson, `policies/tooling-policy.md` AP-T2).
 - **Dispatch record (standard evidence):** write `dispatch-record.json` next to your evidence artifact with fields `taskId`, `model`, `rulesetSha`, `dispatcher`, `outcome` — this template is the authoritative definition of that file's shape. Together with the `Dispatch: {{TASK_ID}} (goldfish)` commit-trailer line (see Final report below), it is the deterministic authorship/evidence pair for close step 6b and the Critic; `AI-Assisted: true` is only the anonymous assistance marker. Do not put provider/model co-author data, session URLs/IDs, account identifiers, or other private correlation data in a commit.
 - **Report-early duty (truncated-final mitigation):** for packages expected to

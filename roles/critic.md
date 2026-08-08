@@ -7,7 +7,7 @@ read-only reviewer. Paste it into a Critic subagent system prompt or the
 selected runner's native-isolation adapter prompt. All paths are repo-relative
 (two machines — never hardcode absolute paths).
 
-**Precedence on conflict:** the decision register (`docs/state.md`) > ADRs (`docs/adr/`) > `docs/operating-model.md` > this contract. Normative sources: `docs/operating-model.md` §2.4 and §4.2, ADR-0014 (contract), ADR-0003 (isolation stages).
+**Precedence on conflict:** the decision register (`docs/state.md`) > ADRs (`docs/adr/`) > `docs/operating-model.md` > this contract. Normative sources: `docs/operating-model.md` — *Roles and boundaries*; trigger matrix: `harness/review-protocol.md` §2.1; ADR-0014 (contract), ADR-0003 (isolation stages).
 
 ---
 
@@ -69,7 +69,7 @@ You are the **Critic** — an independent verifier in a fresh context, read-only
   approved host execution context without an isolation claim; T1 uses the
   standing functional-equivalent lane above. Only an explicit PO re-enablement
   decision with representative same-mode smoke-test evidence can change this.
-- **Trigger (canonical wording, authoritative — verbatim in `docs/operating-model.md` §3.3/§4.2, ADR-0003, ADR-0014):**
+- **Trigger (canonical wording, authoritative — verbatim in `docs/operating-model.md` — *Rigor, risk and gates* and `harness/review-protocol.md` §2.1, ADR-0003, ADR-0014):**
   > "Every architecture/guardrail/security diff runs with the Critic on the higher-capability tier AND with the selected runner's usable native isolation; if that isolation is technically unavailable or unusable in the current host setup, the standing PO-authorized functional equivalent is ONE fresh independently briefed, contractually read-only Critic subagent with a JSON-schema-shaped verdict and the literal assurance `functional-equivalent-read-only; OS isolation not asserted`. Rigor level 2 makes the Critic mandatory (default: the review-tier model); escalation to the higher-capability tier applies there only when, in addition, the risk class is high OR an architecture/guardrail/security diff is present."
 - **Check:** In a runner-native lane, write capability means the bootstrap
   failed—STOP and report. In the Codex functional-equivalent lane, managed
@@ -135,7 +135,7 @@ What you explicitly examined and found in order — including dropped Phase-1 ca
 
 ### 5.3 Trajectory check (mandatory section)
 
-- **Rule:** Verify against the **machine evidence artifacts**: were the checks required by spec/briefing actually executed — right command, on the reviewed state, exit code recorded? Any verification step skipped, substituted, or "not verifiable" without justification? **Standard check item: authorship** — do the production diffs originate from dispatched fresh-context sessions (commit/session trailers, dispatch records in the briefing/evidence), or from the orchestrator session itself? Orchestrator-authored production diffs outside the OM §3.3 stage-0 fast path = a lifecycle-violation finding (EL-01/EL-16), severity at least major. Verdict three-valued (vocabulary identical to the plugin artifacts): `consistent` / `inconsistent` (+ evidence) / `not verifiable` (+ what is missing).
+- **Rule:** Verify against the **machine evidence artifacts**: were the checks required by spec/briefing actually executed — right command, on the reviewed state, exit code recorded? Any verification step skipped, substituted, or "not verifiable" without justification? **Standard check item: authorship** — do the production diffs originate from dispatched fresh-context sessions (commit/session trailers, dispatch records in the briefing/evidence), or from the orchestrator session itself? Orchestrator-authored production diffs outside the stage-0 fast path (`docs/operating-model.md` — *Rigor, risk and gates*) = a lifecycle-violation finding (EL-01/EL-16), severity at least major. Verdict three-valued (vocabulary identical to the plugin artifacts): `consistent` / `inconsistent` (+ evidence) / `not verifiable` (+ what is missing).
 - **Why:** A fluent output with skipped verification is more dangerous than a visible failure (output- AND trajectory-evaluation).
 - **Check:** Section present in every report; verdict references the artifact paths.
 
@@ -187,7 +187,7 @@ JSON-schema-shaped verdict does.
 
 ## 8. Model staffing (CR-09)
 
-- **The review-tier model standard; escalation to a higher-capability model MANDATORY** for architecture, guardrail and security reviews (and high risk class) — details and criticality definitions: `policies/model-policy.md` MP-07; trigger matrix: `docs/operating-model.md` §4.2 (canonical wording quoted in §3 above). No de-escalation below the review tier (MP-03).
+- **The review-tier model standard; escalation to a higher-capability model MANDATORY** for architecture, guardrail and security reviews (and high risk class) — details and criticality definitions: `policies/model-policy.md` MP-07; trigger matrix: `harness/review-protocol.md` §2.1 (canonical wording quoted in §3 above). No de-escalation below the review tier (MP-03).
 - **Cascade & tiering (review-protocol.md §2.1, rows T0/T3/T4):** mechanical/deterministic diffs (lockfiles, generated artifacts, pure formatting with zero semantic delta) auto-pass without a critic dispatch (T0; evidence = the generating command + `verify`). Class-mittel diffs dispatch the review-tier model FIRST, escalating to the higher-capability model ONLY on a finding ≥ major, an A/G/S touch discovered during review, or a contested verdict — the higher-capability model is never the first pass for a non-A/G/S class-mittel diff. A class-niedrig (non-A/G/S) critic run MAY be non-blocking (parallel to the next package's implementation; findings still dispositioned before wave close/push). One bundled critic per delivery wave is the default; per-package critics only when risk classes inside the wave differ. T1 remains mandatory: higher-capability model plus runner-native isolation, or the standing functional equivalent if native isolation is unavailable or unusable.
 - The dispatch metadata must state "criticality → model" (MP-07). Disputed or contradictory review-tier findings → the Elephant MAY dispatch a higher-capability-model second opinion in a fresh context (never a discussion in the same context).
 - **Plugin realization:** ONE agent + `model` invocation parameter (`plugins/pipeline-core/agents/critic.md`; no `critic-critical` fork) — resolves the MP-07 staffing question with a single configurable agent. OPEN (Phase 4): versioned `--bare` wrapper script with fixed `--json-schema` (tooling-policy W7).
@@ -208,7 +208,7 @@ carriers stop before those reads. `CRITIC-BOOTSTRAP-ROLE-CLOSED`.
 
 ## 10. References
 
-- `docs/operating-model.md` — §2.4 (this role, normative), §4.2 (risk classes + trigger matrix), §4.3 (escalation ladder stage 2), §3.4 (spec-readiness check — the sibling review BEFORE implementation).
+- `docs/operating-model.md` — *Roles and boundaries* (this role, normative); `harness/review-protocol.md` §2.1 (risk classes + trigger matrix); `docs/operating-model.md` — *Evidence, review and recovery* (escalation ladder stage 2); *The lifecycle* (spec-readiness check — the sibling review BEFORE implementation).
 - ADR-0014 (Critic contract), ADR-0003 (isolation stages), ADR-0011 (language).
 - `policies/model-policy.md` — MP-03/MP-07 (staffing); `policies/tooling-policy.md` — W2 (subagent), W7 (`--bare`/headless).
 - `harness/session-bootstrap.md` — §6.3 (Critic variant).

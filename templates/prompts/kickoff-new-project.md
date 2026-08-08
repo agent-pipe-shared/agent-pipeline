@@ -2,7 +2,7 @@
 ═══════════════════════════════════════════════════════════════════════════
 PROMPT TEMPLATE: Elephant kickoff — BRAND-NEW project · Agent-Pipeline · Sprint 1
 Source of truth: harness/session-bootstrap.md §5.1/§6.4 · templates/pipeline.json.example
-· templates/CLAUDE.project.md · templates/handover.md · docs/operating-model.md §8.
+· templates/CLAUDE.project.md · templates/handover.md · docs/operating-model.md.
 Counterpart to the migration kickoff templates (which lift an EXISTING project
 to pipeline level): this sets a BRAND-NEW project up AT pipeline level from the
 first commit — nothing to migrate. Structure modeled on
@@ -153,8 +153,8 @@ every `{{PLACEHOLDER}}`, keep every numbered block, add nothing from its
 ("Run the pipeline bootstrap first: `/pipeline-core:pipeline-start`"),
 confirm it survived the fill. **Correct-from-birth role language:**
 under "Pipeline binding", state that the Elephant orchestrates and EVERY
-implementation runs as a briefed Goldfish dispatch (stage-0, §3.3, the
-only exception, further ones only from the PO) — the "Claude Code = implementing IT"/"Claude Code = all IT" phrase class must never be written
+implementation runs as a briefed Goldfish dispatch (stage-0, `docs/operating-model.md`
+— Rigor, risk and gates — the only exception, further ones only from the PO) — the "Claude Code = implementing IT"/"Claude Code = all IT" phrase class must never be written
 into this file in the first place. Length gate: Step 2's `claudeMdMaxLines`.
 
 ### Step 4 — Handover file
@@ -173,7 +173,7 @@ from `templates/architecture-doc.md` (both agent-pipeline repo templates),
 filled for the current, pre-release state. If the §0 project header names a
 UI: add the one-line cross-pointer here too — a main-feature UI redesign
 requires a confirmed ASCII/wireframe sketch BEFORE implementation
-(`docs/operating-model.md` §3.2 step 6c). Note for later reference: this
+(`docs/operating-model.md` — The lifecycle). Note for later reference: this
 transfer package ships this doc-structure standard as an adoption option for
 already-migrated projects (ADR-0032 — never automatic, always the PO's call).
 
@@ -209,7 +209,7 @@ Run `/pipeline-core:close-block`. It runs the telemetry line (MP-20 —
 `/usage` paste is optional, "not collected" is a valid outcome) and the
 mandatory **6b authorship check**: enumerate this session's production diffs
 and confirm each maps to a Goldfish dispatch or an explicitly invoked
-stage-0 fast path (§3.3) — any Elephant-authored diff outside stage-0 is an
+stage-0 fast path (`docs/operating-model.md` — Rigor, risk and gates) — any Elephant-authored diff outside stage-0 is an
 INCIDENT, not a retro footnote. File the mandatory self-retro as
 a backlog item in the agent-pipeline repo before ending the session.
 
@@ -224,9 +224,9 @@ session specifically:
 - **Workspace boundary (EL-18)** — one repo, one Elephant; cross-project
   findings become a transfer item in the target repo's `backlog/items/`,
   never a direct foreign-repo edit.
-- **PO-Gate (PRD):** for rigor ≥1 / class-high work, run `node harness/scripts/check-po-gate-authority.mjs` before authoring the PO-facing `prd_<topic>.md`. Use only the repository-scoped language from its canonical primary source/runtime projection and shared receipt; branch-local profiles are not authority. If unavailable or stale, stop and repair setup; never infer a language or copy a profile. A readable PRD marked `freigegeben` by the PO authorizes the first implementation dispatch exactly once — no second implementation approval; merge/push/release gates stay distinct (EL-19 / operating-model §3.2 step 3b). True stage-0 hotfixes are exempt.
+- **PO-Gate (PRD):** for rigor ≥1 / class-high work, run `node harness/scripts/check-po-gate-authority.mjs` before authoring the PO-facing `prd_<topic>.md`. Use only the repository-scoped language from its canonical primary source/runtime projection and shared receipt; branch-local profiles are not authority. If unavailable or stale, stop and repair setup; never infer a language or copy a profile. A readable PRD marked `freigegeben` by the PO authorizes the first implementation dispatch exactly once — no second implementation approval; merge/push/release gates stay distinct (EL-19 / `docs/operating-model.md` — The lifecycle). True stage-0 hotfixes are exempt.
 - **EL-01** — every implementation is a briefed Goldfish
-  dispatch; stage-0 (§3.3) is the only exception, further ones only from
+  dispatch; stage-0 (`docs/operating-model.md` — Rigor, risk and gates) is the only exception, further ones only from
   the PO.
 - **Onboarding-sweep bullet:** not literally applicable at birth —
   nothing to sweep yet. Its point IS why Step 3 gets the role language right

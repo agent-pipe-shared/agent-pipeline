@@ -174,7 +174,7 @@ Elephant adds a second line directly below (MP-17):
 
 Elephant adds a third line directly below that:
 
-> Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (Tier-0 per OM §3.3; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'
+> Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (Tier-0 per operating-model.md, Rigor risk and gates; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'
 
 All five fields must carry concrete values — no placeholders, no "unknown"
 outside the defined suffix cases.
