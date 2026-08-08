@@ -5,7 +5,7 @@
 
 **Last updated:** 2026-08-08
 **Project status:** ACTIVE
-**Current block:** hardening the local `0.5.4` candidate against the greenfield-onboarding defect handover, unattended, under a signed 4-hour Guard Maintenance Window; 0.5.3 is released to `main` and the human-authorization ceremony recorded as [ADR-0061](adr/0061-uniform-human-approval-ceremony.md) remains the governing thread; Nova A completion still paused on genuine ADR-gated/evidence-gated blockers
+**Current block:** implementing the PO's six decisions of 2026-08-08 on the questions the greenfield hardening left open, into a second `0.5.4` local candidate, under the same signed 4-hour Guard Maintenance Window; 0.5.3 is released to `main` and the human-authorization ceremony recorded as [ADR-0061](adr/0061-uniform-human-approval-ceremony.md) remains the governing thread; Nova A completion still paused on genuine ADR-gated/evidence-gated blockers
 **Repair baseline:** `5d2b83dcc765d50801f4491e1bd9bed32090112b`
 **Release version:** `0.5.3` released
 **Release state:** version `0.5.3` · tag `v0.5.3` · commit `2740041d59458f949b597905816af12048502469` · tree `e72cca9b69e105ec6aac9833c4ac0bccb385d25b` · status `published`
@@ -174,6 +174,44 @@ divergence and, in the same motion, made that write a guarded invariant — a
 consequence that fell out rather than being decided), and whether the guard
 reclassification that moved a denial from non-liftable to signature-liftable is
 the boundary the PO wants.
+
+## 2026-08-08 Nova GF-055 — the PO's six decisions on the open questions, implemented (in progress)
+
+The block above ended by naming the open questions. The PO answered them, and one
+answer reversed a decision this repository had recorded the day before.
+
+**Decision 6 of [ADR-0059](adr/0059-guard-lift-boundary.md): cross-repository
+mutation becomes signature-liftable** (`6d86110`). The prior Decision 5 argued
+from the human-override implementation — a repository-scoped identity model — to
+a policy conclusion. That inference is wrong in a way worth recording: the
+identity model bounds what an override can **prove**, not what a human may
+**decide**. Critical repair across a repository boundary is exactly the case a
+deliberate, signed, audited human authorization exists for.
+
+**The day-one `.claude/pipeline.yaml` write goes away** under the PO rule that
+Claude-owned files may live in `.claude/` and Pipeline-owned files may not. It is
+a bounded prerequisite, deliberately taken ahead of and separately from the
+three-tier migration, so two files and a retired byte-identity invariant do not
+wait on it.
+
+**`.arbitheon` is admitted to Nova B as slice B7** (`38e3b0e`), not carried as a
+defect. ADR-0054 decided the precedence chain and marked the implementation
+staged; it is unbuilt, and the name appears nowhere under `plugins/pipeline-core`.
+The slice puts measurement before the site list, because the greenfield work of
+2026-08-08 found a tier literal the ADR's own enumeration had missed.
+
+**The sanitizer residual is accepted as declared**, with its three closing options
+and their costs written into the item's triage and the pinned residual array named
+as the trigger that reopens the question.
+
+**Landed so far in this wave.** `5415923` — the PO gate's `PRD_REPAIR` string had
+been attached at thirteen sites spanning three unlike causes; Spec-marker drift,
+UTF-8 decode failure and digest staleness now each name the remedy that actually
+resolves them. Verified independently rather than from the report: 53/53, and the
+named `pipeline-state.mjs po-authority-rebind-plan/-apply` route confirmed against
+that writer's own allowed-command list. Digest staleness deliberately names no
+script — the operation to repeat is the operator's own, and the check the item
+suggested does not exist in a consumer project.
 
 ## 2026-08-07 Nova REL-053 — 0.5.3 published, and the PO order that came out of publishing it
 
