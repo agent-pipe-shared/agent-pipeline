@@ -19,7 +19,7 @@ activeFeature `sprint-phoenix-epic` in implementation, observation governance
 passed. Update channel `alpha` unreachable — availability `unknown`,
 non-blocking.**
 
-**HEAD: `7c2df7d` on `sprint_phoenix`. Nothing pushed. Working tree clean apart
+**HEAD: `d5daebf` on `sprint_phoenix`, pushed. Working tree clean apart
 from `.claude/settings.json` and `project/resume-hint.json`, which are
 permanently dirty in this checkout and are never committed.**
 
@@ -137,20 +137,55 @@ which exist only as prose — the Critic reproduced the decisive one's substance
 independently, so the conclusion is verified even though the claimed runs are
 not.
 
-### Immediate next steps, in order
+### PUSHED — `d5daebf` is on `origin/sprint_phoenix` (2026-08-08)
 
-1. Full verify from a **fresh** detached worktree at the final commit — the tree
-   cannot be made clean in place, so verify only runs there.
-   `git worktree add --detach .git/phx-verify-wt <commit>`, then run **that
-   worktree's own** `harness/scripts/verify.mjs` (it derives its root from its
-   own location; there is no `--root` flag — the earlier note here was wrong),
-   copy `evidence/verify-latest.json` back into the primary tree, then
-   `git worktree remove --force`.
-   The push gate (`guard-push.mjs:49`) needs `evidence/verify-latest.json` with
-   `exitCode === 0` and `commit` equal to the pushed commit, so this must be
-   redone at the final commit.
-2. Push gate — the fourth and last PO authorization. **Only to `sprint_phoenix`.**
-   The PO decides it holding the round-2 FAIL and F-A, not around them.
+The PO cleared the gate holding the round-2 FAIL and F-A, not around them.
+`git ls-remote origin refs/heads/sprint_phoenix` → `d5daebf4a22…`. Verify
+366/366 exit 0 and security CLEAN, both bound to that exact commit/tree.
+Approval: signature mode, proof `CRITICAL-ACTION-PROOF-VERIFIED`, subject
+`b3ddd45a…`, consumed by `approve-push` at 11:56:08Z.
+
+**This section and everything after it is not yet pushed** — it was written after
+the candidate. It goes out with the next approved push.
+
+### The push gate cost four failed attempts. All four causes, so the next one does not
+
+The gate itself worked correctly every time; each stop was a real defect in what
+was handed to it. Full commands in `evidence/phx-push-gate-packet.md`.
+
+1. **`--expires-at` needs milliseconds.** The check is
+   `new Date(x).toISOString() !== x` (`po-human-approval.mjs:197`), so
+   `…T12:00:00Z` fails while `…T12:00:00.000Z` passes. The error says only
+   `critical approval request is invalid` — it names neither field nor reason.
+2. **`prepare-critical` demands a fully clean tree**, `git status
+   --porcelain=v1 --untracked-files=all` empty (`po-approval-request.mjs:38`).
+   This checkout can never satisfy that: `.claude/settings.json` and
+   `project/resume-hint.json` are permanently dirty. **Resolution: run Layers 2
+   and 3 against a clean detached worktree at the candidate commit.** Safe by
+   construction — `observeCleanCandidate` takes only `HEAD` and `HEAD^{tree}`
+   from that root, and the request binds candidate plus plan/spec bytes, never a
+   path, so the request is byte-identical to one prepared in the primary tree.
+   Layers 4 and 5 run in the primary tree; `approve-push` reads only
+   `HEAD`/`HEAD^{tree}` and needs no cleanliness.
+3. **The push must name the destination ref explicitly.**
+   `git push origin sprint_phoenix` parses to `destination: null`
+   (`guard-push.mjs:357`, no colon in the refspec), and `authorizeRecordedPush`
+   rejects `null` as `PUSH-PROOF-INPUT-INVALID` — which reads like a broken
+   authorization and is in fact a malformed command. Correct form:
+   `git push origin sprint_phoenix:refs/heads/sprint_phoenix`, matching the
+   signed `--destination`.
+4. **The security scan writes THREE paired artifacts**, and the guard checks the
+   pair for consistency: `evidence/security-latest.json`,
+   `security-latest.v2.json` **and** `security-latest.v2.verdict.json`. Copying
+   two of the three back from the worktree produces
+   `verdict is not consistent with … capability records (stale or mismatched
+   pair)`. Copy all three, or none.
+
+The deeper item behind 2 and 4 — a checkout that structurally cannot be clean,
+so every cleanliness-gated tool needs a worktree dance and every evidence
+artifact needs hand-copying — is not filed as a backlog item yet. Owner
+**Elephant**, due **at the opening of the next block**, together with the two
+items above.
 
 ### Two process items, now with an owner and a date (QG-06 applies to me too)
 
