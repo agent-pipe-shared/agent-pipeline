@@ -131,7 +131,8 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { join, relative, isAbsolute, posix, resolve } from "node:path";
+import { dirname, join, relative, isAbsolute, posix, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { loadManifest, gateConfig } from "../lib/manifest.mjs";
 import {
@@ -144,6 +145,26 @@ import { derivePlanLifecycle } from "../lib/plan-spec-state-v2.mjs";
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
 
 const DEFAULT_EXEMPT_PREFIXES = ["docs/", "specs/", ".claude/", "backlog/"];
+
+// The plugin root this guard is itself running from -- same self-location resolution
+// guard-lifecycle-ready.mjs / guard-human-override.mjs already use (`resolve(dirname(
+// fileURLToPath(import.meta.url)), "..")`), reused rather than a second mechanism, so a
+// path this hook prints resolves inside a consumer's installed plugin, never this
+// repository's own harness/ layout (backlog: 2026-08-08-shipped-artifacts-assume-the-
+// pipelines-own-repository.md).
+const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+/**
+ * Runnable reference to pipeline-state.mjs under the plugin actually enforcing this
+ * guard. Degrades to a locate-it hint (never a broken path or an empty string) if the
+ * script cannot be found under PLUGIN_ROOT.
+ */
+function pipelineStateScriptRef() {
+  const script = join(PLUGIN_ROOT, "scripts", "pipeline-state.mjs");
+  return existsSync(script)
+    ? script
+    : "pipeline-state.mjs (locate it under your installed pipeline-core plugin's scripts directory)";
+}
 
 function emit(code, lines) {
   process.stderr.write(lines.filter(Boolean).join("\n") + "\n");
@@ -228,7 +249,7 @@ try {
   emit(1, [
     `[guard-devplan] WARN: ${statePath} contains invalid JSON (${e.message}).`,
     `Dev-Plan gate is being skipped (fail-open) -- please repair the state file (rewrite only via ` +
-      `harness/scripts/pipeline-state.mjs, never by hand).`,
+      `${pipelineStateScriptRef()}, never by hand).`,
   ]);
 }
 

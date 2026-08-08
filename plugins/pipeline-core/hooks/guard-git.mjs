@@ -256,7 +256,8 @@
 import { existsSync, readFileSync, appendFileSync, realpathSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { join, resolve, sep } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { commitMessageFindings, markerPolicyMode } from "../lib/commit-message-policy.mjs";
 import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv } from "../lib/git-cmd.mjs";
@@ -269,6 +270,26 @@ import {
   NEUTRAL_STATE,
   resolveProjectAuthorityPaths,
 } from "../lib/project-authority.mjs";
+
+// The plugin root this guard is itself running from -- same self-location resolution
+// guard-lifecycle-ready.mjs / guard-human-override.mjs already use (`resolve(dirname(
+// fileURLToPath(import.meta.url)), "..")`), reused rather than a second mechanism, so a
+// path this hook prints resolves inside a consumer's installed plugin, never this
+// repository's own harness/ layout (backlog: 2026-08-08-shipped-artifacts-assume-the-
+// pipelines-own-repository.md).
+const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+/**
+ * Runnable reference to pipeline-state.mjs under the plugin actually enforcing this
+ * guard. Degrades to a locate-it hint (never a broken path or an empty string) if the
+ * script cannot be found under PLUGIN_ROOT.
+ */
+function pipelineStateScriptRef() {
+  const script = join(PLUGIN_ROOT, "scripts", "pipeline-state.mjs");
+  return existsSync(script)
+    ? script
+    : "pipeline-state.mjs (locate it under your installed pipeline-core plugin's scripts directory)";
+}
 
 // ---- read tool input (fail-open) --------------------------------------------------
 let cmd = "";
@@ -773,7 +794,7 @@ const PUSH_SAFE_FLAGS = new Set([
 ]);
 const SIGNED_ROUTE_HINT =
   "A push approval that verifies for THIS commit, THIS remote and THIS destination ref lifts GG-03 with no token and no " +
-  "typed phrase (record one: node harness/scripts/pipeline-state.mjs approve-push --by <name> --remote <remote> " +
+  `typed phrase (record one: node ${pipelineStateScriptRef()} approve-push --by <name> --remote <remote> ` +
   "--destination <full-ref> --proof-request <path> --proof-authority <path> --proof <path>). The push must write its " +
   "destination out (`HEAD:refs/heads/<branch>`): an approval names a ref, and a command that names none cannot be matched against it.";
 function parseAttestablePush(rawCmd) {
