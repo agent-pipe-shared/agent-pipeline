@@ -529,6 +529,90 @@ that shortcut is finding F3 from round 1 and is not to be repeated.
 **Still open for the PO:** nothing blocking. The three decisions asked on
 2026-08-08 are taken and recorded above.
 
+### `A-AC-11` has a carrier (`5d0fc6a`), and the gate is green on it
+
+`PHX-AAC11` finished; its record carries `outcome: "completed"`, so no resume was
+needed. I verified the result rather than relaying it:
+
+- The seven values in the schema and in `ASSUMPTION_STATES` are the criterion's
+  own list, character for character — `assumed`, `inferred`, `observed`,
+  `verified`, `contradicted`, `unavailable`, `unknown` (`acceptance.md:261-263`).
+- The property is `assumptionState`, **optional**, on the assumption branch only.
+  The command-offer branch does not carry it and rejects it, at the validator and
+  in the schema's own `additionalProperties: false`.
+- Closure holds because the admission reuses the existing `exact()` helper with a
+  key list extended only when the key is present — an unknown *name* fails the
+  same check an unknown *value* does.
+- Suite `agent-decision-journal-tests`: **5 cases before, 9 after**, exit 0. The
+  consumer suite `governance-event-store` is 11/11, unchanged.
+- The two axes are genuinely independent: one new case walks all 6 lifecycle
+  states × 7 epistemic values and asserts neither constrains the other.
+
+**Full gate re-run at `5d0fc6a` from the detached worktree: 366/366 completed,
+`evidence/verify-latest.json` `exitCode: 0`.** So the writer slice, AC-P3 and
+A-AC-11 are all green together, not just individually.
+
+`assumptionState` has no producer yet. The carrier exists; nothing writes it.
+That is the honest state, and it is what the criterion asks for — the criterion
+governs the case *when* a state is recorded, not that one must be.
+
+### Correction: `observeCodexRulesetSource` is not a missing export
+
+Recorded above as "the direct blocker of PHX-0's ruleset-trust-root slice"
+(twice, in the PO-decision list and in the next-steps list). That reading is
+wrong, and reading the design rather than the error message is what corrects it.
+
+`design/bootstrap-origin-allowlist-and-codex-wsl-freshness.md` §A.3 lists
+`observeCodexRulesetSource` under **"Explicitly not revived"** — retired by PO
+decision, superseded by reusing `observeCodexPublicCoreIdentity`, which performs
+an equivalent host-list re-read through `observeSelectedCodexPipelinePlugin` (the
+current, non-retired export) plus its own `SNT-A2-CODEX-HOST-MISMATCH` check.
+Writing the export back would undo a decision, not unblock a slice.
+
+What follows from that:
+
+- All **nine** cases in `codex-host-plugin-list.test.mjs` test the retired
+  function and nothing else. It is a suite for an API that was deliberately
+  removed — which is why registering it was never the right move, and why it sits
+  in the exclusion list rather than in the gate.
+- The properties it pins are exactly `PX0-AC-09/10/11/16/17`: allowlisted origins
+  only, a dirty or drifted checkout rejected without leaking paths, pre-HEAD as a
+  typed observation, ambiguous selection failing closed. So the file is not
+  garbage — it is the acceptance surface of the replacement, written against the
+  wrong carrier.
+- The correct sequencing is therefore: Part A builds the new carrier **with its
+  own suite covering those same properties**, and this file is deleted in the same
+  package. Not "add the missing export", and not "delete it now".
+- `scripts/ruleset-freshness-host.mjs` is broken the same way and worse: the
+  design counts **ten** missing imports there, of which `observeCodexRulesetSource`
+  is one and eight more come from `ruleset-freshness.mjs`. It fails at import, so
+  the Codex-under-WSL freshness boundary (Part B) does not run at all today. That
+  is a lost-in-merge gap, not a design gap.
+
+One open question in that design is still the PO's and is flagged as such in §A.4:
+whether the loaded-vs-installed comparison being tautological in this calling
+pattern is acceptable (the design recommends yes), or whether a second,
+independently sourced observation is wanted at the cost of an extra host
+round-trip. It is not blocking today — it becomes blocking when Part A is
+dispatched.
+
+**Next steps, superseding the list under "In flight at the compaction boundary":**
+
+1. `PHX-F2` is dispatched and running — the fixture-accuracy repair in
+   `harness/scripts/check-verify-suite-registration.test.mjs`. Its record is
+   `evidence/dispatch-record-phx-f2.json`, written as its opening act; the same
+   resume rule applies as for `PHX-AAC11`.
+2. **PHX-0 Part A** — the origin-allowlist module, its `GATE_STRENGTH_PATHS`
+   entry, the shaping code that feeds `normalizeRulesetSource`, and a suite for
+   `PX0-AC-09/10/11/16/17` written against the *new* carrier. §A.4's question goes
+   to the PO with the dispatch, not after it.
+3. **PHX-0 Part B** — restore `ruleset-freshness-host.mjs`'s ten lost imports.
+   Independent of Part A in file ownership, so the two can run in parallel.
+4. **The seven red excluded suites** — one package, one signed window. Note that
+   `codex-host-plugin-list.test.mjs` leaves this package: it is Part A's to delete,
+   not this package's to register.
+5. **Push** — deferred to 2026-08-09 by PO decision; gate green at `5d0fc6a`.
+
 ### F1 is closed, and closed on evidence I produced myself
 
 The Critic's single FAIL finding is repaired in `358c709`. BS25 rebuilds its
