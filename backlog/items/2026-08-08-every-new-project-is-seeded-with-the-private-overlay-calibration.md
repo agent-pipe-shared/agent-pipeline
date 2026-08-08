@@ -3,9 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.greenfield-seeded-with-private-overlay-calibration
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
 due: 2026-08-15
+closed_at: 2026-08-08
+closure_repository: self
+closure_commit: 43ab69fa4e468a48a084bdd11deffedc4716dd20
+closure_evidence: backlog/evidence/2026-08-08-consumer-seed-calibration-closure.md
 source: "Found by the CLAUDETIER-1 dispatch of 2026-08-08 while measuring what a fresh seed leaves under .claude/; the dispatch was investigating a different question and stopped on this."
 ---
 
@@ -123,6 +127,25 @@ step and carries its own calibration.
   same onboarding path, same greenfield run class.
 - [ADR-0054](../../docs/adr/0054-arbitheon-authority-directory-and-precedence-chain.md)
   — the three-tier precedence chain whose legacy tier this file belongs to.
+
+## Closure, 2026-08-08 — all four direction steps discharged
+
+Fixed by `43ab69fa4e468a48a084bdd11deffedc4716dd20` (dispatch SEEDINT-1). Full
+detail in
+[`backlog/evidence/2026-08-08-consumer-seed-calibration-closure.md`](../evidence/2026-08-08-consumer-seed-calibration-closure.md).
+
+Step 4's open question is answered and the answer is the good one this item hoped
+for: **latent, never active.** The resolver always prefers the neutral tier when
+present, and the portable seed writes `project/pipeline.json` before any runtime
+step can write `.claude/pipeline.json`, so the wrong calibration was never the one
+that won. The evidence file records the scope limit on that conclusion — the
+resolver and its already-routed callers, not an exhaustive audit of every reader
+in the repository — so the finding is not read as broader than it is.
+
+The `.claude/` tier removal this item discusses under "Relationship to the
+`.claude/` tier decision" is untouched and stays blocked on its own prerequisites.
+Closing this item closes the *content* defect, which was the half that could be
+fixed cheaply and independently, exactly as the item argued.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
