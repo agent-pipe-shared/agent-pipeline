@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "75f0d2878a0678755c5a35d52074cfb7465369631016b5232a9c1fa307eb6daf"
+    "transitionHead": "2547c9e3cd68100f36496afc0e1ef371ae8d7a102701f31164bc790653089e74"
   },
   "counts": {
-    "open": 67,
+    "open": 69,
     "in_progress": 21,
     "closed": 25
   },
@@ -418,6 +418,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "PO request in the 2026-08-07 Nova session for a deliberate confirmation before PIN entry, explicitly qualified as language-profile dependent; partially delivered by NOVA-PO-CONFIRM-1 in commits 5efb0f1 and 584a598."
+    },
+    {
+      "id": "pipeline.installing-consumer-is-never-asked-any-setup-decision",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "PO, 2026-08-08, preparing the tester mail: 'wenn ich den Leuten sage, soundso installiert ihr das Plugin, dann führen Sie aber ja nie das Setup aus. Das heißt, an den Entscheidungen bezüglich Scratchpad beziehungsweise Keyordner, welche Runner, auch PO Gate, welches ist Blocking, Chatfreigabe versus Signature -- da kommen Sie nirgendwo dran vorbei. Wann und wie entscheidet man das, wenn man installiert?'"
     },
     {
       "id": "pipeline.kickoff-apply-action-drops-runner",
@@ -871,6 +879,14 @@
       "closureRepository": "self",
       "closureCommit": "d3db4a07dee565c1eeee2eb1e1e77ffcd2ca4e0a",
       "closureEvidence": "backlog/evidence/2026-08-06-second-reconciliation-pass.md"
+    },
+    {
+      "id": "pipeline.single-trust-anchor-excludes-key-rotation-and-teams",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "PO, 2026-08-08, on reading that a lost key has no signature path back: 'auch im team werden ja verschiedene schlüssel benutzt. Meine Erwartungshaltung war hier, dass wir sicherstellen das ein mensch auditiert aber bewusst nicht welcher. Sprich für eine neue freigabe muss auch ein neuer human key funktionieren den es vorher nicht gab.'"
     },
     {
       "id": "pipeline.source-available-commercial-licensing",
