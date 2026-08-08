@@ -89,6 +89,26 @@ the session's own store, and it does not distinguish a *write to another
 repository* (the risk the rule exists for) from a *write to agent-private state
 that belongs to no repository at all*.
 
+**Half of this item is already being solved elsewhere, and the split matters
+(PO, 2026-08-08).** Nova is building a **repository-internal, gitignored
+scratchpad** that becomes the standard location for anything transitional —
+inside the repository's own directory structure, so nothing can mutate outward.
+That is the right answer to the scratchpad case and supersedes the `.git/`
+convention dispatches have been improvising; when it lands, the Critic-contract
+clause this item opens with is satisfiable again.
+
+**It does not address the memory case, and cannot.** A repo-internal store is
+by construction scoped to the repository, while a cross-session memory store
+exists precisely to outlive it: it holds facts about the *human and the machine*
+— which key directory this repository's anchor pins, how the PO prefers commands
+delivered — that are not properties of the checkout and would be lost with it.
+Relocating memory inside the repository would also publish machine-local paths
+into tracked content, which this repository's own language and secrets rules
+forbid.
+
+So the two halves need different answers, and closing this item on the
+scratchpad fix alone would silently drop the one whose cost is invisible.
+
 ## Affected artifact
 
 `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs` —
