@@ -36,6 +36,31 @@ telling the human the documentation is wrong. Both cost the session, and the
 second costs confidence. The rule and the enforcement disagreeing is worse than
 either a narrower rule or a wider guard.
 
+## A third instance, from the guard's own text this time
+
+`git check-ignore -v pipeline.user.yaml` was refused as `GUARD-GATE-STRENGTH-SHELL`
+in this repository on 2026-08-08. The refusal's own next sentence reads:
+
+> Reading is unaffected: cat, rg, head, sha256sum and git diff/log/show on these
+> paths are admitted.
+
+`git check-ignore` is a read-only query — it prints which ignore rule, if any,
+matches a path, and cannot alter anything. It is simply not in the enumerated
+allow-list, and the list is stated in the refusal as though it were a description
+of a category ("reading is unaffected") rather than what it is, a closed
+enumeration.
+
+This is the sharpest form of the defect in this item: the guard and its own message
+disagree, in the same output, one line apart.
+
+The dispatch that removed the stale hand-editing text from that file found this and
+deliberately left it, because closing it widens what the guard admits and that was
+outside its brief. That was the correct call and the reason it is recorded here
+rather than lost.
+
+Whether the fix is to extend the enumeration or to stop describing it as a
+category is the decision, and it is the same decision as direction 1 below.
+
 ## Second finding in the same refusal
 
 The refusal carried:

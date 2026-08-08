@@ -1307,6 +1307,164 @@ test("the rendered reason is bounded to typed tokens against any outcome shape",
   );
 });
 
+// ---------------------------------------------------------------------------------
+// ADR-0059 Decision 6 (2026-08-08): eligibility() gains a new, honestly-scoped
+// "cross-repository-target" class for a target that genuinely escapes the physical
+// project root (dispatch HGOELIG-1). guard-lifecycle-ready.mjs (a separate file, out of
+// this dispatch's scope) already always-attempts-consume-first and offers the
+// mode-appropriate route for GUARD-CROSS-REPO-MUTATION; what closes here is that
+// eligibility() now answers "eligible" for the 7 of 10 previously-probed out-of-root
+// shapes that were not already classifiable through some other route (cp, rm, git -C,
+// sed -i, an out-of-root redirect, Edit ../x, Write <absolute-outside>).
+
+test("NOVA-HGOELIG-1: an out-of-root target reaches the identical plan/prepare/authorize-by-signature/consume/ledger route, honestly scoped", () => {
+  const root = fixtureSignature();
+  const outside = mkdtempSync(join(tmpdir(), "hgoelig-1-outside-"));
+  try {
+    const target = join(outside, "escape.txt");
+    const toolInput = { file_path: target, content: "outside\n" };
+    const { scriptPath, recorded, plan, proof } = prepareSignedArming(root, { toolName: "Write", toolInput, denials: denial });
+    assert.equal(recorded.status, "planned");
+    assert.equal(plan.commandClass, "cross-repository-target");
+    assert.deepEqual(plan.eligiblePaths, [target]);
+    // DoD 3: the record states explicitly what it proves and what it does not, rather
+    // than reading like an ordinary in-root capability.
+    assert.equal(plan.preview.scopeAttestation.schema, "pipeline.human-guard-override-scope-attestation.v1");
+    assert.ok(plan.preview.scopeAttestation.proves.some((line) => /this repository's own physical root/u.test(line)));
+    assert.ok(plan.preview.scopeAttestation.doesNotProve.some((line) => /identity, existence, or git status of the out-of-root target/u.test(line)));
+    assert.match(plan.preview.expectedEffects.repository, /never inspects, and cannot attest/u);
+    const armed = authorizeHumanGuardOverrideBySignature({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256,
+      planSha256: plan.planSha256, proof, nowMs: 3000, scriptPath,
+    });
+    assert.equal(armed.status, "armed");
+    const consumed = consumeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 4000,
+    });
+    assert.equal(consumed.status, "consumed");
+    const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const audit = join(common, "agent-pipeline", "human-guard-overrides", "audit.jsonl");
+    const auditEvents = readFileSync(audit, "utf8").trim().split("\n").map((line) => JSON.parse(line).event);
+    assert.deepEqual(auditEvents.map(({ type }) => type), ["denied", "authorized", "consumed"]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+// DoD 7: whether `chat` mode should reach the same out-of-root class with the same
+// power as `signature` mode is a real design question, answered here explicitly rather
+// than left implicit. ADR-0059 Decision 3's own standing principle ("every guard this
+// repository ever adds that blocks an agent action gets the SAME lift shape... signature
+// always, chat whenever the human has genuinely, committedly configured it... no file- or
+// guard-specific exception") and Decision 6's own text ("it remains subject to the
+// committed signature/chat mode") both draw no distinction for the cross-repository
+// class. No code change was needed to implement this: `authorizeHumanGuardOverride()`'s
+// existing signature-mode-required refusal and `consumeHumanGuardOverride()`'s
+// mode-independent matching already apply uniformly to every commandClass, this one
+// included -- so parity is the DEFAULT this dispatch inherited, not something it had to
+// add. This test proves that default holds for the new class specifically, the same way
+// NOVA-XREPO-HGO-3 already proves it for the previously-classifiable cross-repo shapes.
+test("NOVA-HGOELIG-2: chat mode reaches the identical out-of-root class with the same reach as signature mode (ADR-0059 Decision 3/6 parity, no special-casing)", () => {
+  const root = fixture(); // committed gates.push_approval: "chat"
+  const outside = mkdtempSync(join(tmpdir(), "hgoelig-1-outside-chat-"));
+  try {
+    const target = join(outside, "chat-escape.txt");
+    const toolInput = { file_path: target, content: "outside via chat\n" };
+    const recorded = recordHumanGuardDenial({ rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 1000 });
+    assert.equal(recorded.status, "planned");
+    const plan = planHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, nowMs: 2000,
+      scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+    });
+    assert.equal(plan.commandClass, "cross-repository-target");
+    const reason = "PO attended recovery for the exact out-of-root write, via chat";
+    const prepared = prepareHumanGuardOverrideAuthorization({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256,
+      reason, nowMs: 2500, scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+    });
+    const armed = authorizeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256,
+      selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
+      nowMs: 3000, scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+    });
+    assert.equal(armed.status, "armed");
+    const consumed = consumeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 4000,
+    });
+    assert.equal(consumed.status, "consumed");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("NOVA-HGOELIG-3: an out-of-root capability binds one exact command -- a different command is refused, and consumption is single-use", () => {
+  const root = fixtureSignature();
+  const outside = mkdtempSync(join(tmpdir(), "hgoelig-1-outside-bind-"));
+  try {
+    const boundCommand = `cp README.md ${join(outside, "a.txt")}`;
+    const otherCommand = `cp README.md ${join(outside, "b.txt")}`;
+    const boundInput = { command: boundCommand };
+    const { scriptPath, recorded, plan, proof } = prepareSignedArming(root, { toolName: "Bash", toolInput: boundInput, denials: denial });
+    assert.equal(plan.commandClass, "cross-repository-target");
+    const armed = authorizeHumanGuardOverrideBySignature({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256,
+      planSha256: plan.planSha256, proof, nowMs: 3000, scriptPath,
+    });
+    assert.equal(armed.status, "armed");
+    // A different out-of-root command, differing only in its destination path, does not
+    // consume the armed capability -- toolInputSha256 binds the WHOLE command string.
+    const mismatched = consumeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash", toolInput: { command: otherCommand }, denials: denial, nowMs: 3500,
+    });
+    assert.equal(mismatched.status, "absent");
+    // The exact bound command still consumes it, exactly once.
+    const consumed = consumeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash", toolInput: boundInput, denials: denial, nowMs: 4000,
+    });
+    assert.equal(consumed.status, "consumed");
+    const second = consumeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash", toolInput: boundInput, denials: denial, nowMs: 4500,
+    });
+    assert.equal(second.status, "absent", "a consumed out-of-root capability admitted a second run");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+// Security regression pin, at the classification unit rather than the full pipeline:
+// a target that FAILS safePath()'s in-root symlink/hardlink walk must never be
+// reclassified into the new class, however deep the symlink indirection -- only a
+// candidate that genuinely escapes `root` (the same escape test safePath() itself
+// applies) may become eligible. crossBoundaryTarget() re-derives that escape test
+// independently rather than trusting "safePath() said no" as sufficient on its own.
+test("NOVA-HGOELIG-4: an in-root symlink or hardlink attack is never reclassified as a cross-repository target", () => {
+  const root = fixture();
+  try {
+    mkdirSync(join(root, "physical", "nested"), { recursive: true });
+    symlinkSync(join(root, "physical"), join(root, "linked"), "dir");
+    writeFileSync(join(root, "physical", "nested", "source.txt"), "shared\n");
+    linkSync(join(root, "physical", "nested", "source.txt"), join(root, "hardlinked-deep.txt"));
+    for (const filePath of [
+      "linked/nested/escape.txt", // resolves in-root via a symlinked ancestor
+      "hardlinked-deep.txt", // an in-root file with more than one hard link
+    ]) {
+      const result = humanGuardOverrideInternals.eligibility(root, "Write", { file_path: filePath, content: "x" });
+      assert.equal(result.eligible, false, filePath);
+      assert.equal(result.code, "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", filePath);
+      assert.notEqual(result.commandClass, "cross-repository-target", filePath);
+    }
+    // A genuine escape, by contrast, IS the new class.
+    const escaping = humanGuardOverrideInternals.eligibility(root, "Write", { file_path: "../genuinely-outside.txt", content: "x" });
+    assert.equal(escaping.eligible, true);
+    assert.equal(escaping.commandClass, "cross-repository-target");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("repository identity failures name the sanitized Git operation", () => {
   const root = fixture();
   try {
