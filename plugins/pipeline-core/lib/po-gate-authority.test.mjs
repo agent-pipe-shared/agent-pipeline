@@ -1226,7 +1226,14 @@ check("a Spec-binding mismatch is signposted to spec.md and its marker, not to p
       assert.equal(result.ok, false, JSON.stringify(result));
       assert.equal(result.code, "PO-GATE-PRD-SPEC-MISMATCH", JSON.stringify(result));
       assert.match(result.repair, /spec\.md/u, JSON.stringify(result));
-      assert.match(result.repair, /<!-- technical-spec-sha256: <sha256-of-spec\.md> -->/u, JSON.stringify(result));
+      // `<[!]--` rather than the literal `<!--`: in a JavaScript source, `<!--` is an
+      // Annex B single-line comment opener, so a parser reading `/<!--` takes the `/`
+      // as division and lets the comment swallow the rest of the line. Node's own
+      // parser is fine with it; semgrep's is not, and reported the whole file as a
+      // partial parse, which the security gate classifies as a scanner error. The
+      // character class matches exactly the same text and cannot be mistaken for the
+      // comment token.
+      assert.match(result.repair, /<[!]-- technical-spec-sha256: <sha256-of-spec\.md> -->/u, JSON.stringify(result));
       // The unrelated remedy is gone, and the wrong edit it invited is named as
       // the thing NOT to do.
       assert.equal(result.repair.includes(PLAN_PATH_REPAIR), false, JSON.stringify(result));
