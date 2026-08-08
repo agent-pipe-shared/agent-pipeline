@@ -5,6 +5,43 @@
 
 **Last updated:** 2026-08-08
 
+**THE GATE IS GREEN: 366/366, EXIT 0, AT `3345efe` (2026-08-08).** All four
+verify failures the phase plan gave owners are repaired, each demonstrated rather
+than asserted:
+
+| failure | commit | how it was shown |
+| --- | --- | --- |
+| `authority-tier-agreement-check` | `ce75672` | tier agreement across the 3 multi-tier artifacts; TP-12 provoked into refusing an edit |
+| `product-capability-inventory-tests` | `5017c51` | 449 discovered = 449 listed = 449 assigned, 0 duplicates, both arrays still sorted |
+| `security-scan-tests` | `7fcd252` | break-and-restore repeated independently by the Elephant: exactly one case goes red |
+| `backlog-state-check` | `a368552` | break-and-restore repeated independently; ledger restored byte-identical |
+
+**R2 failure 2 was misdiagnosed by the phase plan, and the correction matters.**
+The plan read it as `HAW-A02` rejecting an admissible shape. The checker was right
+all along: the inventory no longer covered the discovered surface, because
+`6686b16` registered 105 suites without the inventory following. The suite had
+been aborting at check 3 of 16, so the other 13 had never run; all 16 pass now.
+
+**One failure was self-inflicted and is worth remembering.** Appending 38 ledger
+events turned the *live* security scan red — 38 gitleaks findings, one per new
+line. Repaired by `d0de981` with 38 exact `content-v1:` authorities, and filed as
+its own structural item (`1cd2f71`), because the collision recurs.
+
+**That item was filed with an overstated claim and corrected by measurement
+(`3345efe`).** It claimed one finding per appended line. Measured across all 220
+lines: the two amendment kinds trip the rule at 100% (40/40, four 64-hex digests
+per line), `item-file-reconciliation` at 1.6% (2/125, and under a different
+rule), the other 13 kinds never. The correction came from testing the prediction
+— filing the item appended an ordinary event, the scan was re-run against that
+exact candidate expecting a finding, and returned zero.
+
+**Open against this package, recorded before the Critic saw it**
+(`evidence/phx-review-record.md`, bare facts, no rationale): `ce75672` carries no
+`Dispatch:` trailer and was authored in the orchestrator session; no dispatch
+record exists for `PHX-INV-REFRESH` or `PHX-LEDGER-IGNORE`; three dispatches
+exceeded their stated tool budget, one of them reaching 52 uses with nothing
+written before being continued.
+
 **AUTHORIZATIONS 2 AND 3 ARE SPENT; BOTH TIERS NOW CARRY TP-12 (`ce75672`).**
 `.claude/guard-config.json` gained TP-11 and TP-12, `project/guard-config.json`
 gained TP-12. `check-authority-tier-agreement.mjs` reports agreement across the
