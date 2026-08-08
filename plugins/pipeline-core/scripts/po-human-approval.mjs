@@ -64,6 +64,12 @@ function publicKeyPolicy(publicKey, keyReference) {
 function localAuthority(publicKey, keyReference, humanName) {
   return { ...publicKeyPolicy(publicKey, keyReference), humanName };
 }
+// FIXTURE-2: shared by every branch of `setup` that is about to WRITE a brand-new
+// authority record (no record exists yet, so there is nothing to read a name from) --
+// the fresh-generation branch and the branch that recovers an authority for keys that
+// already exist on disk without one. A branch that already has an authority record on
+// disk reads its stored name instead; see runHumanApproval's "setup" handling.
+const SETUP_NEW_AUTHORITY_NEEDS_NAME = 'setup requires --human-name "<the human this key\'s approvals will be attributed to>": no PO authority record exists yet to read a name from.';
 function externalDirectory(repository, directory, { create = false, source = "--directory" } = {}) {
   // `source` names where this directory came from (--directory or the environment-variable
   // fallback) so a failure message can say which one was used. It is a fixed label, never the
@@ -130,11 +136,10 @@ export function parseHumanArgs(argv) {
     return { error: `${USAGE}\napproval directory is required and must be an absolute path: pass --directory <path>, or set $${PO_APPROVAL_DIRECTORY_ENV} to an absolute path as a fallback (an explicit --directory always overrides it).` };
   }
   if (!text(values.repoRoot) || !isAbsolute(values.repoRoot)) return { error: USAGE };
-  // SETUP-1: the human names themselves once, at key creation. No default -- a name that
-  // silently defaulted would satisfy the shape of "recorded" while recording nothing.
-  if (command === "setup" && !text(values.humanName)) {
-    return { error: `${USAGE}\nsetup requires --human-name "<the human this key's approvals will be attributed to>".` };
-  }
+  // FIXTURE-2: --human-name is validated where the authority directory's state is known
+  // (inside the "setup" branch of runHumanApproval), never here. The parser cannot see
+  // whether an authority record already exists on disk, and a `setup` that recovers or
+  // re-reads an existing record must not be forced to repeat a name it already has.
   if (command.endsWith("-all") && (values.featureId || values.plan || values.spec || values.model)) return { error: USAGE };
   if (command.endsWith("-critical") && !CRITICAL_ACTION_KINDS.includes(values.kind)) return { error: USAGE };
   if (command === "sign-intent" && !SHA.test(values.intentSha256 ?? "")) return { error: USAGE };
@@ -301,17 +306,31 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
   if (args.command === "setup") {
     const present = { privateKey: exists(paths.privateKey), publicKey: exists(paths.publicKey), authority: exists(paths.authority) };
     if (present.privateKey && present.publicKey && !present.authority) {
+      // No authority record exists yet -- there is nothing to read a name from, so this
+      // is exactly the same requirement fresh generation has below (FIXTURE-2).
+      if (!text(args.humanName)) fail(SETUP_NEW_AUTHORITY_NEEDS_NAME);
       const authority = localAuthority(read(paths.publicKey, "utf8"), args.keyReference, args.humanName);
       write(paths.authority, `${JSON.stringify(authority, null, 2)}\n`, { mode: 0o600 });
       return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority, recovered: true };
     }
     if (present.privateKey && present.publicKey && present.authority) {
       const authority = json(paths.authority); const publicKey = read(paths.publicKey, "utf8");
-      if (!own(authority, ["keyReference", "publicKeySha256", "humanName"]) || !text(authority.humanName)
-        || authority.publicKeySha256 !== publicKeyPolicy(publicKey, authority.keyReference).publicKeySha256) fail("existing trust policy does not match the local public key");
+      // Two different questions, two different messages (FIXTURE-2): is this the right
+      // key (identity -- checked against BOTH the pre-humanName and the named shape), and
+      // separately, does this record simply predate --human-name (fixable by re-running
+      // setup, not a mismatch).
+      const legacyShape = own(authority, ["keyReference", "publicKeySha256"]);
+      const namedShape = own(authority, ["keyReference", "publicKeySha256", "humanName"]);
+      if ((!legacyShape && !namedShape) || authority.publicKeySha256 !== publicKeyPolicy(publicKey, authority.keyReference).publicKeySha256) {
+        fail("existing trust policy does not match the local public key");
+      }
+      if (!namedShape || !text(authority.humanName)) {
+        fail('existing PO authority record predates --human-name and has no name recorded; run setup again with --human-name "<the human this key\'s approvals will be attributed to>" to add one.');
+      }
       return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority, recovered: false };
     }
     if (present.privateKey || present.publicKey || present.authority) fail("partial PO authority exists; refusing to overwrite it");
+    if (!text(args.humanName)) fail(SETUP_NEW_AUTHORITY_NEEDS_NAME);
     command("openssl", ["genpkey", "-algorithm", "ED25519", "-aes-256-cbc", "-out", paths.privateKey], dependencies);
     command("openssl", ["pkey", "-in", paths.privateKey, "-pubout", "-out", paths.publicKey], dependencies);
     const authority = localAuthority(read(paths.publicKey, "utf8"), args.keyReference, args.humanName); write(paths.authority, `${JSON.stringify(authority, null, 2)}\n`, { mode: 0o600 }); chmodSync(paths.privateKey, 0o600);

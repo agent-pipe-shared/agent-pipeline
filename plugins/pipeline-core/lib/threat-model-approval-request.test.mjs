@@ -39,12 +39,12 @@ const external = mkdtempSync(join(tmpdir(), "po-human-approval-")); const nomina
 writeFileSync(join(external, "request.json"), JSON.stringify({ ok: true, value: request })); writeFileSync(join(external, "authority.json"), JSON.stringify(trustPolicy)); writeFileSync(join(external, "proof.json"), JSON.stringify(proof));
 assert.equal(runApprovalRequest(["verify", "--repo-root", nominalRepo, "--request", join(external, "request.json"), "--authority", join(external, "authority.json"), "--proof", join(external, "proof.json")], { observeCandidate: () => candidate }).value.verified, true);
 assert.throws(() => runApprovalRequest(["verify", "--repo-root", nominalRepo, "--request", join(external, "request.json"), "--authority", join(external, "authority.json"), "--proof", join(external, "proof.json")], { observeCandidate: () => ({ ...candidate, tree: "f".repeat(40) }) }), /current clean candidate/u);
-writeFileSync(join(external, "trust-policy.json"), JSON.stringify(trustPolicy)); writeFileSync(join(external, "po-public.pem"), publicKey); writeFileSync(join(external, "proof.json"), JSON.stringify(proof));
+writeFileSync(join(external, "trust-policy.json"), JSON.stringify({ ...trustPolicy, humanName: "Test Operator" })); writeFileSync(join(external, "po-public.pem"), publicKey); writeFileSync(join(external, "proof.json"), JSON.stringify(proof));
 assert.equal(runHumanApproval(["verify", "--repo-root", nominalRepo, "--directory", external], { observeCandidate: () => candidate }).value.verified, true);
 assert.equal(runApprovalGate(["verify", "--repo-root", nominalRepo, "--directory", external], { observeCandidate: () => candidate }).value.verified, true);
 assert.throws(() => runHumanApproval(["verify", "--repo-root", nominalRepo, "--directory", external], { observeCandidate: () => ({ ...candidate, commit: "f".repeat(40) }) }), /current clean candidate/u);
 const keyDirectory = mkdtempSync(join(tmpdir(), "po-human-key-"));
-const setup = runHumanApproval(["setup", "--repo-root", nominalRepo, "--directory", keyDirectory], {
+const setup = runHumanApproval(["setup", "--repo-root", nominalRepo, "--directory", keyDirectory, "--human-name", "Test Operator"], {
   spawn: (_executable, args) => {
     const output = args[args.indexOf("-out") + 1];
     writeFileSync(output, args.includes("-pubout") ? publicKey : "encrypted-private-key-placeholder");
@@ -54,10 +54,23 @@ const setup = runHumanApproval(["setup", "--repo-root", nominalRepo, "--director
 assert.equal(setup.code, "PO-HUMAN-AUTHORITY-READY");
 assert.equal(JSON.parse(readFileSync(join(keyDirectory, "trust-policy.json"), "utf8")).publicKeySha256, trustPolicy.publicKeySha256);
 const recoveryDirectory = mkdtempSync(join(tmpdir(), "po-human-recovery-")); writeFileSync(join(recoveryDirectory, "po-private.pem"), "encrypted-private-key-placeholder"); writeFileSync(join(recoveryDirectory, "po-public.pem"), publicKey);
-const recovered = runHumanApproval(["setup", "--repo-root", nominalRepo, "--directory", recoveryDirectory]);
+const recovered = runHumanApproval(["setup", "--repo-root", nominalRepo, "--directory", recoveryDirectory, "--human-name", "Test Operator"]);
 assert.equal(recovered.recovered, true);
 assert.equal(JSON.parse(readFileSync(join(recoveryDirectory, "trust-policy.json"), "utf8")).publicKeySha256, trustPolicy.publicKeySha256);
 assert.equal(runHumanApproval(["setup", "--repo-root", nominalRepo, "--directory", recoveryDirectory]).recovered, false);
+// FIXTURE-2: creating a brand-new key with no authority record yet to read a name from
+// is refused, and the message names --human-name rather than reading as a generic usage
+// error.
+const freshDirectory = mkdtempSync(join(tmpdir(), "po-human-fresh-"));
+assert.throws(() => runHumanApproval(["setup", "--repo-root", nominalRepo, "--directory", freshDirectory]), /--human-name/u);
+// FIXTURE-2: recovery against a directory whose authority record predates --human-name
+// (the old 2-key {keyReference, publicKeySha256} shape, no stored name) is refused with a
+// message that says so, distinct from the generic "does not match the local public key".
+const legacyDirectory = mkdtempSync(join(tmpdir(), "po-human-legacy-"));
+writeFileSync(join(legacyDirectory, "po-private.pem"), "encrypted-private-key-placeholder");
+writeFileSync(join(legacyDirectory, "po-public.pem"), publicKey);
+writeFileSync(join(legacyDirectory, "trust-policy.json"), JSON.stringify(trustPolicy));
+assert.throws(() => runHumanApproval(["setup", "--repo-root", nominalRepo, "--directory", legacyDirectory]), /predates/u);
 assert.throws(() => runHumanApproval(["setup", "--repo-root", nominalRepo, "--directory", `${nominalRepo}/po`]), /outside the repository/u);
 mkdirSync(join(nominalRepo, "inside")); const linkedDirectory = join(external, "linked-po"); symlinkSync(join(nominalRepo, "inside"), linkedDirectory, "dir");
 assert.throws(() => runHumanApproval(["setup", "--repo-root", nominalRepo, "--directory", linkedDirectory]), /outside the repository/u);
@@ -78,4 +91,4 @@ assert.equal(JSON.parse(readFileSync(join(external, "proof.json"), "utf8")).inte
 writeFileSync(join(external, "request-cyb-5.json"), JSON.stringify({ ok: true, value: request }));
 assert.equal(runHumanApproval(["approve-all", "--repo-root", nominalRepo, "--directory", external], { readConfirmation: () => "approve", spawn: (_executable, args) => { writeFileSync(args[args.indexOf("-out") + 1], "detached-signature"); return { status: 0 }; } }).code, "PO-HUMAN-APPROVE-ALL-READY");
 assert.equal(JSON.parse(readFileSync(join(external, "proof-cyb-5.json"), "utf8")).intentSha256, request.approvalIntent.sha256);
-console.log("36 threat-model approval request checks passed");
+console.log("38 threat-model approval request checks passed");
