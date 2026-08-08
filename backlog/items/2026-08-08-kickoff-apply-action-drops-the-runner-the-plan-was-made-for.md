@@ -157,6 +157,42 @@ without the runner its plan was made under.
    not wait on the constructor and the enumerating test, which are the durable
    part but the slower one.
 
+## Resolved 2026-08-08, and what the sweep left behind
+
+Mechanisms A, B and C are closed in `94b8a72`, with the structural part the PO asked
+for rather than three patches:
+
+- `planBoundApplyAction()` is now the single construction site for these actions and
+  takes `runner` as a required argument, throwing `APPLY-ACTION-RUNNER-REQUIRED` when
+  it is absent — omission is a construction error, not a failure in someone's fresh
+  project.
+- `runner` participates in the plan binding, not only the argv, so a plan produced
+  for one runner cannot validate an apply reconstructed for another. The digest
+  mismatch refuses; nothing is silently substituted.
+- An enumerating check discovers the plan builders from the module's own exports and
+  asserts each resolved action carries the runner. It was demonstrated red by
+  dropping the runner from one call site, not merely asserted to work.
+- The exit-0 split reuses the same `APPLY_SHAPED_COMMANDS` set the `--activate`
+  validity check already uses, so the two cannot drift apart.
+
+**Direction 4's sweep returned a negative result for the kickoff/promotion argvs** —
+no other plan-bound parameter is dropped — and one adjacent finding that is
+deliberately still open:
+
+`applyProjectOnboardingManifestRepairV4` has the identical no-runner-parameter shape
+as mechanism A, for a different command. It was left alone because it is outside this
+item's named scope, which is the right call for a dispatch and the wrong place to
+leave the knowledge. It is the next instance of the class and belongs to
+`2026-08-08-runner-neutrality-must-hold-before-a-third-runner-lands.md`.
+
+Two further construction sites were examined and deliberately exempted, each with a
+named reason rather than silence: the lifecycle-family `lifecycleArgv` site, whose
+own documented design tolerates an absent runner, and the cleanup/recovery action
+builders, which have no runner concept. The enumerating check names its exemption
+explicitly, so a future reader sees a decision rather than a gap.
+
+This item stays **open** until the manifest-repair instance is triaged.
+
 ## Triggering situation
 
 Fresh directory, local `0.5.4+claude` build, Claude runner, first kickoff after a
