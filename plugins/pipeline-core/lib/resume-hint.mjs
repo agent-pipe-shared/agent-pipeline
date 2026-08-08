@@ -28,6 +28,10 @@ const CLAUSE_END = /[,;.!?|)\]}]/;
 const VALUE_ALPHABET = /[A-Za-z]\d|\d[A-Za-z]|[a-z][A-Z]/;
 const VALUE_MIN_LENGTH = 10;       // no clause of distilled prose opens on a word this long after a credential label
 const VALUE_MIN_DIGIT_LENGTH = 4;  // with a digit inside it, four characters are already enough to be a value
+// A closed word class, not a lexicon: English prepositions and coordinating conjunctions are a
+// finite set that does not grow. A clause that resumes on one of them has ended a noun phrase, so
+// the candidate before it was that noun phrase — the value — and not the opening word of a sentence.
+const VALUE_TRAILER = /^\s*(?:about|above|across|after|against|along|among|around|as|at|before|behind|below|beneath|beside|besides|between|beyond|by|despite|down|during|except|for|from|in|inside|into|near|of|off|on|onto|opposite|out|outside|over|past|per|since|than|through|throughout|till|to|toward|towards|under|underneath|until|up|upon|versus|via|with|within|without|and|but|nor|or|plus|so|yet)\b/i;
 const FORBIDDEN_SHAPES = [
   /```|~~~/,                                                                                        // fenced code block
   /^\s*(?:user|assistant|system|human|developer|tool)\s*:/i,                                        // transcript role marker opening the text
@@ -78,9 +82,13 @@ function opaqueToken(value) {
  * quoted, is written in an alphabet no English word uses (letters mixed with digits, or an inner
  * capital), is longer than a word prose would open a clause with, or is short but digit-bearing.
  * Trailing words prove nothing — a label, a value and then "for the staging box" is still a leaked
- * value — so the clause-end test below only ADDS the bare "label: value" form; it can never rescue
- * a candidate the alphabet and size tests already condemned. A length floor alone cannot tell
- * "swordfish" from "quarterly", which is why it is one union term here and not the whole rule.
+ * value — so the clause-end tests below only ADD forms; they can never rescue a candidate the
+ * alphabet and size tests already condemned. A length floor alone cannot tell "swordfish" from
+ * "quarterly", which is why it is one union term here and not the whole rule. VALUE_TRAILER is the
+ * remaining term, and it is deliberately PARTIAL: it sees a value whose clause resumes on a closed
+ * word class, and it is blind to one whose clause resumes on a verb, because no shape separates
+ * that from ordinary prose — only a word list would, and none is available here. The residual is
+ * pinned as ADMITTED_RESIDUAL in resume-hint.test.mjs so the hole is visible rather than hidden.
  * Ties resolve toward rejection: this card is advisory, discardable and fails open, so the price
  * of over-rejection is one refused sentence, and the price of under-rejection is a credential
  * written into a git-trackable file.
@@ -94,7 +102,7 @@ function secretAssignment(value) {
     const [assignment, operator, quote, candidate] = match;
     if (operator.includes("=") || quote !== "" || secretValue(candidate)) return true;
     const rest = value.slice(match.index + assignment.length).split(CLAUSE_END, 1)[0];
-    if (!/[A-Za-z0-9]/.test(rest)) return true;
+    if (!/[A-Za-z0-9]/.test(rest) || VALUE_TRAILER.test(rest)) return true;
   }
   return false;
 }

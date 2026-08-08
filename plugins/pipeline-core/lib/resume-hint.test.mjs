@@ -72,6 +72,15 @@ export const FORBIDDEN = [
   "token: abcdefghijklmnopqrst in staging",
   "password: 12345678 for prod",
   "credential: 1234 for the demo tenant",
+  // The short lowercase band: a value the alphabet and size tests cannot see, followed by
+  // further words. Trailing prose is not evidence of prose; the clause-end branch alone
+  // handed every one of these back as admitted.
+  "token: alphabeta for staging",
+  "credential: seashell in prod",
+  "passphrase: bluewhale and it works",
+  "password: swordfish for the staging box",
+  "secret: pineapple for prod",
+  "api key: abcdefghi in staging",
 ];
 
 /** Ordinary distilled prose. Each entry contains a character the old filter banned outright. */
@@ -107,6 +116,21 @@ export const ADMITTED = [
   "secrets: rotation is owned by the platform team",
 ];
 
+/**
+ * KNOWN HOLE, pinned deliberately. Each entry is a credential value in the short lowercase band
+ * whose clause resumes on a VERB rather than on a preposition or conjunction, and each one is
+ * shape-identical to an entry in ADMITTED above ("credentials: ownership moves to the platform
+ * team"). Nothing but a word list can tell the two apart, and no word list is available here, so
+ * these are ADMITTED today. This array is a characterization test, not an endorsement: when a
+ * future change closes the band, this test turns red and the entries move into FORBIDDEN.
+ * Measured in evidence/sanfix-3-differential.after.json.
+ */
+export const ADMITTED_RESIDUAL = [
+  "password: swordfish rotates monthly",
+  "token: alphabeta works fine",
+  "secret: pineapple stopped working",
+];
+
 test("rejects every dangerous shape, in the intent and in a list field alike", () => {
   for (const text of FORBIDDEN) rejects(text);
 });
@@ -132,6 +156,10 @@ test("bans credential values, not the English words for them", () => {
     "Authorization: Bearer 0123456789abcdefzz",
     ["token = sk", "example"].join("-"),
   ]) rejects(text);
+});
+
+test("pins the residual the shape filter cannot close without a word list", () => {
+  for (const text of ADMITTED_RESIDUAL) accepts(text);
 });
 
 test("keeps the digest, byte, control-character, trim and arity contracts unchanged", () => {
