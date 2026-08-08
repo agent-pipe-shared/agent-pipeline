@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-07
 source: "PO, live during the 0.5.2 main-release session, 2026-08-07 — verbatim: 'Eine Entwickler Agent-Pipeline die nicht pushen und releasen kann ist unbrauchbar, außerdem viel zu unhandlich mit so vielen Freigaben.'"
+due: 2026-09-06
 ---
 
 # The push/release flow is unusable for a third-party adopter as shipped

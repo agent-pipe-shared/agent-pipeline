@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-07
 source: "Observed out-of-diff by the PHX-R1-REWORK-3 Critic (round 4) while deriving the shell lane's governance-marker list from source, offered without severity because it is not a defect of that review object. Independently re-verified from source by the Elephant before filing."
+due: 2026-09-06
 ---
 
 # Both admission hooks re-arm the disarm-by-config-fault that the library documents having fixed

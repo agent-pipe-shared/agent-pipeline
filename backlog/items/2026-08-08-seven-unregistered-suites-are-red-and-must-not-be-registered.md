@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-08
 source: "Filed under phase-plan item R1.2 (gate integrity and residual closure) after the unregistered-suite measurement ran all 109 files. 102 are green and are being registered in batches; these 7 are red and are deliberately excluded from that registration. Machine artifact: specs/sprint-phoenix-epic/evidence/unregistered-suite-classification.md"
+due: 2026-09-07
 ---
 
 # Seven unregistered suites fail standalone — file them, do not register them

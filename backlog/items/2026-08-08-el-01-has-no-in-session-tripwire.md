@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-08
 source: "Critic finding F-A, Phoenix gate-integrity delta re-review round 2, 2026-08-08: the orchestrator-authored commit e7f6e96 was caught after the fact, not at write time."
+due: 2026-09-07
 ---
 
 # EL-01 is enforced by review after the fact, never at the moment of the write

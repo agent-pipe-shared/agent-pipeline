@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-08
 source: "Found live on 2026-08-08 while preparing the two gate-strength edits Sprint-Phoenix's gate-integrity phase needs (the TP-11 legacy-tier row and the new TP-12 row). Both denials advertise an in-session override and neither offers one. Observed against this tree at commit c425170."
+due: 2026-09-07
 ---
 
 # The gate-strength guard promises an override "below" and prints nothing below

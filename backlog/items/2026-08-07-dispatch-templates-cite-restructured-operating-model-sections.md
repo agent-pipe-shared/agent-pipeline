@@ -6,6 +6,7 @@ owner: pipeline
 status: in_progress
 created: 2026-08-07
 source: "Critic round-4 briefing-violations note, delta re-review of WP2-WP3-partA-rework-3 (specs/sprint-phoenix-epic/evidence/wp2wp3-parta-rework-3-delta-critic-review-138e2e3.md); widened by the Elephant on verification. Recorded, not fixed, because the correct target is a real decision rather than a renumbering."
+due: 2026-09-06
 ---
 
 # Both dispatch templates cite `operating-model.md` sections that no longer exist

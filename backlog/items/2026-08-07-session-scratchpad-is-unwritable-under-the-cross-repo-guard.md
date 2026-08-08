@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-07
 source: "PO, 2026-08-07, on watching the guard refuse a scratchpad write: 'eigentlich solltest du auf tmp zugriff haben'. The Critic-contract half of the finding was observed independently the same day."
+due: 2026-09-06
 ---
 
 # The session scratchpad is unwritable under `GUARD-CROSS-REPO-MUTATION`, which makes a mandatory clause of the Critic contract impossible to satisfy

@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 source: merge report section 4 finding 3 and section 7.3 (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361
 created: 2026-08-07
+due: 2026-09-06
 ---
 
 # ~30 Phoenix governance-product test suites are on disk but no longer run by Verify

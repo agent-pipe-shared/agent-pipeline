@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-08
 source: "Observed directly on 2026-08-08 while filing three items: reconcile-backlog-ledger.mjs --activate recorded transitions for two items whose frontmatter does not validate."
+due: 2026-09-07
 ---
 
 # The ledger reconciler records transitions for items it has not validated

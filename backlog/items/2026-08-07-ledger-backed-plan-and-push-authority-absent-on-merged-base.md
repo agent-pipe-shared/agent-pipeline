@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 source: merge report section 4 findings 1/2/4/5/6/11 (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361
 created: 2026-08-07
+due: 2026-09-06
 ---
 
 # The PHX-2 Human Governance Decision Ledger has no equivalent on the merged base

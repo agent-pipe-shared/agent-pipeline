@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-07
 source: "Observation from a parallel Phoenix session on the marketplace snapshot that each guard hook carries only one maintenance-window test, sharpened and empirically checked against the live TP-2/TP-6/TP-7 window during the 2026-08-07 Nova session."
+due: 2026-09-06
 ---
 
 # A maintenance window's selectivity holds, and nothing tests it

@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-07
 source: "Observed six times in one Elephant session (2026-08-07) across both Goldfish and Critic dispatches. Recorded with the detection and recovery that worked, because the failure is silent by construction."
+due: 2026-09-06
 ---
 
 # Dispatches signal "completed" while returning a one-sentence fragment

@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-07
 source: "Measured by the PHX-R3-RESCOPE dispatch and re-verified independently by the Elephant. PO decision (APS, 2026-08-07): accepted for implementation."
+due: 2026-09-06
 ---
 
 # The doc-contract anchor check can report green while a link points at German content

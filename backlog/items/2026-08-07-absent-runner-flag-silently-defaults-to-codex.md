@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-07
 source: "NOVA-RESTART-RUNNER-1 stop condition in the 2026-08-07 Nova session; the reverted change is recorded inline at the freshIntent default in plugins/pipeline-core/lib/project-onboarding-v3.mjs in commit 5efb0f1, carrying forward the question deferred by the closed item 2026-08-06-onboarding-lifecycle-plan-hardcodes-the-codex-runner.md."
+due: 2026-09-06
 ---
 
 # An absent `--runner` silently resolves to Codex, and nobody has decided whether it should

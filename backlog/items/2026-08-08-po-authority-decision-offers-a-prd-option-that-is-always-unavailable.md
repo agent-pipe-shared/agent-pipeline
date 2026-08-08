@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-08
 source: "Found live on 2026-08-08 while recovering this repository's own PO authority drift, after an edit to the bound PRD reopened the plan gate. Promised as a filing in that recovery and filed here. Observed against plugins/pipeline-core/scripts/pipeline-state.mjs in this tree."
+due: 2026-09-07
 ---
 
 # `po-authority-decision-plan` presents a PRD option whose unavailability is a constant, not a measurement

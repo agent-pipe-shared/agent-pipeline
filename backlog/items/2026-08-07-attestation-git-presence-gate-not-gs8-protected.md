@@ -6,6 +6,7 @@ owner: pipeline
 status: in_progress
 created: 2026-08-07
 source: "Critic finding F-B, delta re-review of the F2 implementation fix (specs/sprint-phoenix-epic/evidence/wp2wp3-parta-rework-1-delta-critic-review-7aa84f0.md); recorded via the WP2-WP3-partA-rework-2 dispatch (which also fixed F-A/F-C/F-D from the same review)."
+due: 2026-09-06
 ---
 
 # The attestation's own `.git`-presence gate is not GS-8-class protected

@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-08
 source: "Filed under phase-plan item R3.3 (gate integrity and residual closure). Disclosed inside the R3 design's own verification log (specs/sprint-phoenix-epic/design/part-a-residuals-and-dispatch-template-drift.md §II.8, round-2 rework, F-B) but never filed as its own item, so the finding was reachable only by whoever read that section."
+due: 2026-09-07
 ---
 
 # The R3 coordinate checker resolved bare basenames to the wrong file, five of them silently

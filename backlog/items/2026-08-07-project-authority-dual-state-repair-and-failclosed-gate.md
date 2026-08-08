@@ -6,6 +6,7 @@ owner: pipeline
 status: closed
 source: merge report section 4 finding 8 and the two narrowed findings on po-gate-authority.mjs (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361
 created: 2026-08-07
+due: 2026-09-06
 closed_at: 2026-08-07
 closure_repository: self
 closure_commit: 1f070c91743b7340c59ea5836286cd632bb0eba8

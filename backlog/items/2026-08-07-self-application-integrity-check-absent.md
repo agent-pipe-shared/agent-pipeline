@@ -6,6 +6,7 @@ owner: pipeline
 status: in_progress
 source: merge report section 4 findings 7 and 9 (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361
 created: 2026-08-07
+due: 2026-09-06
 ---
 
 # The self-application / public-marketplace-origin allowlist integrity check is gone

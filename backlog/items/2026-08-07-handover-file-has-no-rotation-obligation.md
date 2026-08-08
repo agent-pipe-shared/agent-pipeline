@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-07
 source: "PO, 2026-08-07: 'state wird aber auch hoffentlich nicht unendlich lang sondern irgendwann wieder leer :) wenn etwas dauerhaft als regel geschrieben wird, dann muss es in adrs'."
+due: 2026-09-06
 ---
 
 # `docs/state.md` grows every session and is never rotated; the context-economy gate was placed on the file that grows slowly

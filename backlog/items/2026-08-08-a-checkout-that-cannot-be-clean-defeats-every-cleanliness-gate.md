@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-08
 source: Push gate of 2026-08-08 — two of the four failed attempts trace to this cause; the worktree workaround is currently carried as an instruction in docs/state.md rather than as a fixed mechanism
+due: 2026-09-07
 ---
 
 # A checkout that structurally cannot be clean defeats every cleanliness-gated tool

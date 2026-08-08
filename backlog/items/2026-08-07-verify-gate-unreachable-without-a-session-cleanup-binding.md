@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-07
 source: Elephant diagnosis while dispositioning Critic finding F1 on PHX-R2-THREATMODEL-rework (2026-08-07). The symptom was already recorded in docs/state.md as an unexplained infra gap; this item records the measured cause.
+due: 2026-09-06
 ---
 
 # The verify gate aborts at its first step whenever the session has no cleanup binding

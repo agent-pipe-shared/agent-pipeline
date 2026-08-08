@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-08
 source: "Observed 2026-08-08 while repairing the 38 pre-public-core reachability findings: the repair commit turned the live security scan red, one finding per appended ledger line."
+due: 2026-09-07
 ---
 
 # Every append to the transition ledger produces one gitleaks false positive, so the Pipeline's own tamper-evidence mechanism permanently fights its own secret scanner

@@ -6,6 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-08
 source: "Elephant self-observation across the Phoenix gate-integrity phase, 2026-08-07/08: six dispatches ended at or past budget, four with no report at all; recorded in docs/state.md before being filed here."
+due: 2026-09-07
 ---
 
 # The report-early duty is written as conditional and is in practice unconditional
