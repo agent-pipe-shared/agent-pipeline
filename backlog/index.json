@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "d57813ba144471b7f35ada8504c9ce7dc5f680385c048f65b2239fa99c399fc7"
+    "transitionHead": "a58e4be1576f3f0e38e08c9af25cc05b40557264603eff746ae15a4ece3461af"
   },
   "counts": {
-    "open": 61,
+    "open": 62,
     "in_progress": 26,
     "closed": 23
   },
@@ -901,6 +901,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "PO handover from a separate session (agent-pipeline-share_phoenix), submitted through the PO's own channel, 2026-08-07."
+    },
+    {
+      "id": "pipeline.trust-mismatch-names-neither-key-nor-directory",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Hit live on 2026-08-08 when the PO signed a maintenance-window intent from the wrong one of two same-named key directories. The signature was cryptographically sound; the install refused with a five-word code that named nothing. Diagnosing it took the agent four read-only steps that the tool could have done itself."
     },
     {
       "id": "pipeline.unified-human-authorization-ux",

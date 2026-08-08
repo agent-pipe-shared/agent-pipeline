@@ -106,6 +106,7 @@
 | pipeline.stateful-design-contract-template | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.t1-governance-path-preflight | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.technical-lock-for-pipeline-consent-before-onboarding-complete | open | workflow-improvement | pipeline | 2026-08-07 | — |
+| pipeline.trust-mismatch-names-neither-key-nor-directory | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.unified-human-authorization-ux | open | workflow-improvement | pipeline | 2026-08-02 | Current CYB-4 helper is a compatible first adapter only; no programme-wide migration or closure is claimed. |
 | pipeline.verify-gate-scoped-registration | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.verify-gate-unreachable-without-a-session-cleanup-binding | open | defect | pipeline | 2026-08-07 | — |
@@ -118,6 +119,6 @@
 
 ## Counts
 
-- open: 61
+- open: 62
 - in_progress: 26
 - closed: 23
