@@ -82,6 +82,37 @@ Two events remain, and neither is the close:
 A release-on-close may still exist as a fast path when a close does happen, but
 nothing may depend on it. Correctness must come from the bootstrap sweep alone.
 
+## The second gap is no longer theoretical — observed 2026-08-08 in a consumer project
+
+The section above reasoned that "in a lifecycle state where the dev-plan guard
+restricts writes, an agent in *this* repository can still be refused a scratch
+write it has been told to use." A greenfield Claude session against the 0.5.4
+local candidate hit exactly that, in a *consumer* project rather than this one:
+
+```
+Write(scratch/resume-card.json)
+  → BLOCKED (guard-devplan): the feature is still in draft design
+```
+
+The write was not incidental. `skills/pipeline-start/SKILL.md` step 6 instructs
+the session to capture a Resume-Hint card when material design input exists, and
+the same skill's "Scratch location" section names `scratch/` as "the only
+location the containment guard permits without an exception." One shipped
+artifact requires the write; another shipped artifact refuses it. The session
+resolved the contradiction by skipping the card and saying so — the right call,
+and a capability silently lost.
+
+Two things follow that the original section did not state:
+
+1. **The exemption gap is a consumer-facing defect, not a self-hosting quirk.**
+   The item recorded it as missing from *this repository's* manifests. It is also
+   missing from what a freshly onboarded project gets, which is the population
+   that cannot diagnose it.
+2. **The draft phase is precisely when the card matters.** A Resume-Hint captures
+   material design input before a restart; design input exists during design.
+   Exempting `scratch/` from the dev-plan gate in the implementation phase only
+   would leave the contradiction standing where it actually bites.
+
 ## Direction, not a design
 
 1. **Bind on session start; sweep on the NEXT session's bootstrap.** No step in
