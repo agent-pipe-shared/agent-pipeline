@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "42a2048d24634ed73198024e1a4bcd9fce454014d47d2f758007dc06e76e32fa"
+    "transitionHead": "3a86047c69c3182b7babbc8c9047668daf41741b26726e44dd65b78a66ac1101"
   },
   "counts": {
-    "open": 56,
+    "open": 60,
     "in_progress": 26,
     "closed": 23
   },
@@ -69,21 +69,24 @@
       "status": "open",
       "type": "defect",
       "owner": "pipeline",
-      "created": "2026-08-07"
+      "created": "2026-08-07",
+      "source": "Measured by the PHX-R3-RESCOPE dispatch and re-verified independently by the Elephant. PO decision (APS, 2026-08-07): accepted for implementation."
     },
     {
       "id": "pipeline.approval-mechanisms-require-out-of-session-po-acts",
       "status": "open",
       "type": "defect",
       "owner": "pipeline",
-      "created": "2026-08-07"
+      "created": "2026-08-07",
+      "source": "PO ruling (APS, 2026-08-07) establishing the top rule that no PO activity outside the session may ever be required and that one release must cover everything. Measured from source on origin/main by the Phoenix session the same day; the mechanism work is assigned to the Nova session."
     },
     {
       "id": "pipeline.attestation-git-presence-gate-not-gs8-protected",
       "status": "in_progress",
       "type": "defect",
       "owner": "pipeline",
-      "created": "2026-08-07"
+      "created": "2026-08-07",
+      "source": "Critic finding F-B, delta re-review of the F2 implementation fix (specs/sprint-phoenix-epic/evidence/wp2wp3-parta-rework-1-delta-critic-review-7aa84f0.md); recorded via the WP2-WP3-partA-rework-2 dispatch (which also fixed F-A/F-C/F-D from the same review)."
     },
     {
       "id": "pipeline.authority-signing-terminal-contract",
@@ -122,6 +125,14 @@
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.citation-coordinate-checker-bare-basename",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Filed under phase-plan item R3.3 (gate integrity and residual closure). Disclosed inside the R3 design's own verification log (specs/sprint-phoenix-epic/design/part-a-residuals-and-dispatch-template-drift.md §II.8, round-2 rework, F-B) but never filed as its own item, so the finding was reachable only by whoever read that section."
     },
     {
       "id": "pipeline.claude-dir-leftovers-defeat-runner-neutral-project-migration",
@@ -222,7 +233,8 @@
       "status": "in_progress",
       "type": "defect",
       "owner": "pipeline",
-      "created": "2026-08-07"
+      "created": "2026-08-07",
+      "source": "Critic round-4 briefing-violations note, delta re-review of WP2-WP3-partA-rework-3 (specs/sprint-phoenix-epic/evidence/wp2wp3-parta-rework-3-delta-critic-review-138e2e3.md); widened by the Elephant on verification. Recorded, not fixed, because the correct target is a real decision rather than a renumbering."
     },
     {
       "id": "pipeline.dispatched-agents-return-truncated-mid-step",
@@ -237,7 +249,8 @@
       "status": "open",
       "type": "defect",
       "owner": "pipeline",
-      "created": "2026-08-07"
+      "created": "2026-08-07",
+      "source": "Observed six times in one Elephant session (2026-08-07) across both Goldfish and Critic dispatches. Recorded with the detection and recovery that worked, because the failure is silent by construction."
     },
     {
       "id": "pipeline.documentation-information-architecture",
@@ -283,18 +296,28 @@
       "tracking": "Sentinel recovery baseline; no completion claim."
     },
     {
+      "id": "pipeline.first-verify-run-is-red-with-four-failures",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "The first end-to-end verify run this repository has completed in some time, obtained after repairing a duplicate suite registration the 0.5.3 merge introduced. 256 of 260 steps pass; four fail. All four are pre-existing and were invisible while the gate could not start."
+    },
+    {
       "id": "pipeline.gate-strength-shell-comment-understates-its-own-scope",
       "status": "open",
       "type": "defect",
       "owner": "pipeline",
-      "created": "2026-08-07"
+      "created": "2026-08-07",
+      "source": "Adjacent finding by the Elephant while verifying the GMW lift question for the WP2-WP3 Part A residuals (2026-08-07). Verified against the code, not assumed. Recorded rather than fixed because the affected file is a NEVER_LIFTABLE_KERNEL_PATH and cannot be edited in-session."
     },
     {
       "id": "pipeline.gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger",
       "status": "open",
       "type": "requirement",
       "owner": "pipeline",
-      "created": "2026-08-07"
+      "created": "2026-08-07",
+      "source": "PO requirement (APS, 2026-08-07) — the finalized GMW and HGO modules in the next plugin version must write their evidence cleanly into the audit ledger Phoenix delivers; the information to log is \"what was approved, when, why, by whom\". Recorded with the concrete gaps the Elephant found on verification against the bound Phoenix acceptance criteria."
     },
     {
       "id": "pipeline.governance-product-verify-suites-deregistered",
@@ -355,7 +378,7 @@
     {
       "id": "pipeline.human-legible-approval-record",
       "status": "open",
-      "type": "workflow-improvement",
+      "type": "requirement",
       "owner": "pipeline",
       "created": "2026-08-06",
       "source": "Product Owner requirement raised at the Phoenix plan-approval gate"
@@ -373,7 +396,8 @@
       "status": "open",
       "type": "defect",
       "owner": "pipeline",
-      "created": "2026-08-07"
+      "created": "2026-08-07",
+      "source": "Finding SL-1 of the PHX-R2-THREATMODEL-rework dispatch (2026-08-07), re-verified independently by the Elephant at source. Security class. NOT executed by either party — confirming it empirically would mean disarming the guard that is enforcing at the time."
     },
     {
       "id": "pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root",
@@ -416,14 +440,16 @@
       "status": "in_progress",
       "type": "defect",
       "owner": "pipeline",
-      "created": "2026-08-07"
+      "created": "2026-08-07",
+      "source": "Critic finding F1, delta re-review of the F-A/F-C/F-D/F-B rework (specs/sprint-phoenix-epic/evidence/wp2wp3-parta-rework-2-delta-critic-review-412d33d.md); the residual of *how* Critic finding F2 (WP2-WP3-partA-rework-1) was resolved. Recorded via the WP2-WP3-partA-rework-3 dispatch."
     },
     {
       "id": "pipeline.module-scope-manifest-read-rearms-the-disarm-by-config-fault",
       "status": "open",
       "type": "defect",
       "owner": "pipeline",
-      "created": "2026-08-07"
+      "created": "2026-08-07",
+      "source": "Observed out-of-diff by the PHX-R1-REWORK-3 Critic (round 4) while deriving the shell lane's governance-marker list from source, offered without severity because it is not a defect of that review object. Independently re-verified from source by the Elephant before filing."
     },
     {
       "id": "pipeline.mp22-orchestrator-self-implementation-has-no-enforcement",
@@ -460,9 +486,10 @@
     {
       "id": "pipeline.no-check-validates-prose-section-citations",
       "status": "open",
-      "type": "improvement",
+      "type": "workflow-improvement",
       "owner": "pipeline",
-      "created": "2026-08-07"
+      "created": "2026-08-07",
+      "source": "Measured by the PHX-R3-RESCOPE dispatch (344 stale citations across 57 files). PO decision (APS, 2026-08-07): accepted for implementation, as the follow-up that makes the defect class non-recurring."
     },
     {
       "id": "pipeline.no-gate-is-tested-end-to-end-for-satisfiability",
@@ -477,7 +504,8 @@
       "status": "open",
       "type": "defect",
       "owner": "pipeline",
-      "created": "2026-08-07"
+      "created": "2026-08-07",
+      "source": "Coverage observation made by the PHX-R1-REWORK-2 dispatch while verifying the governance-marker precondition. Outside that briefing's scope, so recorded rather than acted on."
     },
     {
       "id": "pipeline.nonblocking-interaction-continuity",
@@ -555,6 +583,14 @@
       "closureRepository": "self",
       "closureCommit": "7514fb95f23d6b30bd42bbed2435f2dc4d76ca61",
       "closureEvidence": "backlog/evidence/2026-08-06-second-reconciliation-pass.md"
+    },
+    {
+      "id": "pipeline.po-authority-decision-prd-candidate-static",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Found live on 2026-08-08 while recovering this repository's own PO authority drift, after an edit to the bound PRD reopened the plan gate. Promised as a filing in that recovery and filed here. Observed against plugins/pipeline-core/scripts/pipeline-state.mjs in this tree."
     },
     {
       "id": "pipeline.po-gate-authority-path-canonicalization",
@@ -724,7 +760,8 @@
       "status": "open",
       "type": "defect",
       "owner": "pipeline",
-      "created": "2026-08-07"
+      "created": "2026-08-07",
+      "source": "Measured by the PHX-R1-REWORK-1 dispatch while correcting R1's protection boundary, and re-verified independently by the Elephant. Third occurrence of the same defect class in this feature area."
     },
     {
       "id": "pipeline.runtime-projection-v2-eager-manifest-load",
@@ -794,6 +831,14 @@
       "closureRepository": "self",
       "closureCommit": "d3db4a07dee565c1eeee2eb1e1e77ffcd2ca4e0a",
       "closureEvidence": "backlog/evidence/2026-08-06-second-reconciliation-pass.md"
+    },
+    {
+      "id": "pipeline.seven-unregistered-suites-are-red",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Filed under phase-plan item R1.2 (gate integrity and residual closure) after the unregistered-suite measurement ran all 109 files. 102 are green and are being registered in batches; these 7 are red and are deliberately excluded from that registration. Machine artifact: specs/sprint-phoenix-epic/evidence/unregistered-suite-classification.md"
     },
     {
       "id": "pipeline.signed-authority-binding-durability",

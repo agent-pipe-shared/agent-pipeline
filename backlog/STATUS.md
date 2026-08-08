@@ -18,6 +18,7 @@
 | pipeline.backlog-delivery-status-reconciliation | in_progress | workflow-improvement | pipeline | 2026-07-25 | Nova A / issue #57 |
 | pipeline.backlog-ledger-closure-reason-misleading | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.canonical-worktree-lifecycle | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
+| pipeline.citation-coordinate-checker-bare-basename | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.claude-dir-leftovers-defeat-runner-neutral-project-migration | open | defect | pipeline | 2026-08-05 | — |
 | pipeline.claude-has-no-start-time-opt-in-adoption-path | open | idea | pipeline | 2026-08-05 | — |
 | pipeline.close-spec-retention-and-consent | closed | workflow-improvement | pipeline | 2026-07-21 | — |
@@ -37,6 +38,7 @@
 | pipeline.elephant-direct-implementation-under-afk-authorization | in_progress | workflow-improvement | pipeline | 2026-07-23 | — |
 | pipeline.evidence-bound-review-retry-economics | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.execution-model-switchback | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
+| pipeline.first-verify-run-is-red-with-four-failures | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.gate-strength-shell-comment-understates-its-own-scope | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger | open | requirement | pipeline | 2026-08-07 | — |
 | pipeline.governance-product-verify-suites-deregistered | open | defect | pipeline | 2026-08-07 | — |
@@ -46,7 +48,7 @@
 | pipeline.handover-file-has-no-rotation-obligation | open | workflow-improvement | pipeline | 2026-08-07 | — |
 | pipeline.human-approval-ux-directory-clarity-and-single-command | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.human-authorization-prompts-ignore-the-configured-language-profile | open | defect | pipeline | 2026-08-07 | — |
-| pipeline.human-legible-approval-record | open | workflow-improvement | pipeline | 2026-08-06 | — |
+| pipeline.human-legible-approval-record | open | requirement | pipeline | 2026-08-06 | — |
 | pipeline.ledger-backed-plan-and-push-authority-absent-on-merged-base | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.live-plugin-root-undefended-in-the-shell-lane | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root | open | defect | pipeline | 2026-08-06 | — |
@@ -59,7 +61,7 @@
 | pipeline.multi-cli-efficiency-pilots | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.native-windows-verify-red-suite-class | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.neutral-authority-tier-is-a-frozen-snapshot-the-compiler-never-updates | open | defect | pipeline | 2026-08-06 | — |
-| pipeline.no-check-validates-prose-section-citations | open | improvement | pipeline | 2026-08-07 | — |
+| pipeline.no-check-validates-prose-section-citations | open | workflow-improvement | pipeline | 2026-08-07 | — |
 | pipeline.no-gate-is-tested-end-to-end-for-satisfiability | open | workflow-improvement | pipeline | 2026-08-06 | — |
 | pipeline.no-test-pins-the-ungoverned-path-rule-stand-down | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.nonblocking-interaction-continuity | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -70,6 +72,7 @@
 | pipeline.parallel-goldfish-dispatches-race-on-shared-checkout | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.part-a-limitation-2-orphaned-by-the-r2-rework | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.pipeline-state-rebind-codex-default-runner | closed | defect | pipeline | 2026-08-05 | — |
+| pipeline.po-authority-decision-prd-candidate-static | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.po-gate-authority-path-canonicalization | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-authority-receipt-readback | open | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-worktree-authority | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -95,6 +98,7 @@
 | pipeline.session-keep-awake | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.session-scratchpad-is-unwritable-under-the-cross-repo-guard | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.setup-mjs-marketplace-name-collision-defeats-local-dev-installs | closed | defect | pipeline | 2026-08-05 | — |
+| pipeline.seven-unregistered-suites-are-red | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.signed-authority-binding-durability | open | defect | pipeline | 2026-08-06 | — |
 | pipeline.source-available-commercial-licensing | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.spec-retention-on-close | open | defect | pipeline | 2026-07-20 | — |
@@ -113,6 +117,6 @@
 
 ## Counts
 
-- open: 56
+- open: 60
 - in_progress: 26
 - closed: 23
