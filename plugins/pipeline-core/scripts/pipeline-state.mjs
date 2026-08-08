@@ -4783,6 +4783,311 @@ function runFeaturePackageReadCommand(sub, argv) {
   return plan.status === "bootstrap-preview" ? 0 : 2;
 }
 
+// ---- PHX-0A-WRITE: the transactional half of the #22 lifecycle writer family (P-AC-08) ----
+/**
+ * `feature-package-apply` / `feature-package-recover`.
+ *
+ * Neither subcommand re-derives a package rule: every verdict below still comes from
+ * `planFeaturePackageTransition` / `planFeaturePackageBootstrap` / `validateFeaturePackage`
+ * in `../lib/feature-package-topology.mjs`. This layer only (a) refuses fail-closed unless
+ * the caller's `--plan-sha256` matches a FRESH recompute of that exact preview object, (b)
+ * mechanically turns the planner's non-mutating verdict into the one deterministic byte
+ * sequence it implies (either the exact bootstrap proposal bytes, or the current manifest
+ * with only its `state` field replaced), and (c) commits that write as a transaction: a
+ * private, HMAC-authenticated recovery journal (mirroring `continuity-result-bootstrap-*`'s
+ * git-common-dir journal, never inside the working tree) is published BEFORE the manifest
+ * bytes are touched and is retained -- never deleted -- on every failure path; only a
+ * confirmed post-write readback (byte-for-byte plus a fresh `validateFeaturePackage` pass)
+ * retires it. `feature-package-recover` only ever reads that journal back; it never writes.
+ *
+ * Routed ahead of `readState()`, like the read-only three: this family's authority is the
+ * `--root` repository's own topology and its own private journal, never the operator's
+ * local state file.
+ */
+const FEATURE_PACKAGE_WRITE_SUBCOMMANDS = new Set(["feature-package-apply", "feature-package-recover"]);
+const FEATURE_PACKAGE_APPLY_SCHEMA = "pipeline.feature-package-apply.v1";
+const FEATURE_PACKAGE_RECOVER_SCHEMA = "pipeline.feature-package-recover.v1";
+const FEATURE_PACKAGE_APPLY_JOURNAL_SCHEMA = "pipeline.feature-package-apply-journal.v1";
+const FEATURE_PACKAGE_APPLY_LOCK_TOKEN = "pipeline-feature-package-apply-v1";
+const FEATURE_PACKAGE_APPLY_FLAGS = new Set(["root", "manifest", "next-state", "proposal", "plan-sha256"]);
+
+function featurePackageApplyPrivatePaths(dir, deps = {}) {
+  const common = (deps.gitCommonDir ?? defaultGitCommonDir)(dir);
+  if (!common?.ok || typeof common.path !== "string") return null;
+  try {
+    const root = realpathSync(common.path);
+    if (root !== resolve(common.path) || !lstatSync(root).isDirectory() || lstatSync(root).isSymbolicLink()) return null;
+    const namespace = join(root, "agent-pipeline");
+    const base = join(namespace, "feature-package-apply");
+    return { root, namespace, base, key: join(base, "key"), journal: join(base, "journal") };
+  } catch { return null; }
+}
+
+/** Reads and MAC-verifies the retained journal, if any. Never mutates. */
+function loadFeaturePackageApplyJournal(dir, deps = {}) {
+  const paths = featurePackageApplyPrivatePaths(dir, deps);
+  if (paths === null || !observeBootstrapPrivateDirectory(paths)) return { ok: false, code: "FTP-APPLY-JOURNAL-GIT-COMMON-DIR" };
+  const key = readPrivateBootstrap(paths.key);
+  const raw = readPrivateBootstrap(paths.journal);
+  if (raw === null) return { ok: true, journal: null, paths, key };
+  if (key === null || key.byteLength !== 32) return { ok: false, code: "FTP-APPLY-JOURNAL" };
+  try {
+    const value = JSON.parse(raw.toString("utf8"));
+    const keys = ["schema", "planSha256", "manifestPath", "kind", "preSha256", "postSha256", "postBytesBase64", "mode", "mac"];
+    if (!exactObjectKeys(value, keys)
+      || value.schema !== FEATURE_PACKAGE_APPLY_JOURNAL_SCHEMA
+      || !SHA256_RE.test(value.planSha256)
+      || typeof value.manifestPath !== "string"
+      || !["transition", "bootstrap"].includes(value.kind)
+      || !(value.preSha256 === null || SHA256_RE.test(value.preSha256))
+      || !SHA256_RE.test(value.postSha256)
+      || typeof value.postBytesBase64 !== "string"
+      || !Number.isSafeInteger(value.mode) || value.mode < 0 || value.mode > 0o777
+      || !SHA256_RE.test(value.mac)) return { ok: false, code: "FTP-APPLY-JOURNAL" };
+    const { mac, ...core } = value;
+    if (bootstrapJournalMac(key, core) !== mac) return { ok: false, code: "FTP-APPLY-JOURNAL" };
+    return { ok: true, journal: value, paths, key };
+  } catch { return { ok: false, code: "FTP-APPLY-JOURNAL" }; }
+}
+
+/** Publishes the journal BEFORE any manifest byte is touched. `wx`-only: never overwrites a pending one. */
+function publishFeaturePackageApplyJournal(dir, record, deps = {}) {
+  const paths = featurePackageApplyPrivatePaths(dir, deps);
+  if (!ensureBootstrapPrivateDirectory(paths)) return false;
+  let key = readPrivateBootstrap(paths.key);
+  if (key === null) { key = randomBytes(32); if (!writePrivateBootstrap(paths.key, key)) return false; }
+  if (key.byteLength !== 32) return false;
+  const core = {
+    schema: FEATURE_PACKAGE_APPLY_JOURNAL_SCHEMA,
+    planSha256: record.planSha256,
+    manifestPath: record.manifestPath,
+    kind: record.kind,
+    preSha256: record.preSha256,
+    postSha256: record.postSha256,
+    postBytesBase64: record.postBytes.toString("base64"),
+    mode: record.mode,
+  };
+  const bytes = Buffer.from(`${JSON.stringify({ ...core, mac: bootstrapJournalMac(key, core) })}\n`, "utf8");
+  return writePrivateBootstrap(paths.journal, bytes, false);
+}
+
+/** Retires the journal. Only ever called after a confirmed, matching postimage readback. */
+function retireFeaturePackageApplyJournal(paths) {
+  try { return ensureBootstrapPrivateDirectory(paths) && (unlinkSync(paths.journal), syncDirectory(paths.base).ok); } catch { return false; }
+}
+
+/**
+ * Parses the shared root/manifest/next-state/proposal contract (identical to the read
+ * half) plus `--plan-sha256`, then recomputes the exact preview from the SAME accepted
+ * planner `feature-package-plan` uses, and refuses fail-closed on any drift: a stale
+ * manifest, a stale proposal, or a changed `--next-state` all change the recomputed plan
+ * object and therefore its digest. Returns a refusal message (never printed here) or the
+ * resolved, digest-bound request.
+ */
+function buildFeaturePackageApplyPreview(flags) {
+  if (flags.root === undefined) return { ok: false, error: 'argument "--root <dir>" is required' };
+  const root = resolve(flags.root);
+  let rootStat = null;
+  try { rootStat = statSync(root); } catch { rootStat = null; }
+  if (rootStat === null || !rootStat.isDirectory()) {
+    return { ok: false, error: `argument "--root" does not name a readable directory: ${flags.root}` };
+  }
+  if (flags.manifest === undefined) return { ok: false, error: 'argument "--manifest <repo-relative-path>" is required' };
+  const manifest = featurePackageReadRelative(root, flags.manifest);
+  if (manifest === null) return { ok: false, error: `argument "--manifest" must be a canonical path inside --root: ${flags.manifest}` };
+  if (!SHA256_RE.test(flags["plan-sha256"] ?? "")) {
+    return { ok: false, error: 'argument "--plan-sha256 <sha256>" is required and must be a sha256 hex digest' };
+  }
+  const suppliedPlanSha256 = flags["plan-sha256"];
+  const nextState = flags["next-state"];
+  const manifestExists = existsSync(join(root, manifest));
+  let plan; let kind; let manifestBytes = null;
+  if (manifestExists) {
+    if (nextState === undefined) return { ok: false, error: 'argument "--next-state <state>" is required for an existing manifest' };
+    if (flags.proposal !== undefined) return { ok: false, error: `argument "--proposal" applies only to an absent manifest, and ${manifest} exists` };
+    plan = planFeaturePackageTransition(root, manifest, nextState);
+    kind = "transition";
+  } else {
+    if (flags.proposal === undefined) return { ok: false, error: `argument "--proposal <repo-relative-path>" is required because ${manifest} is absent; the bootstrap preview validates the proposed manifest bytes in memory and creates nothing` };
+    const proposalPath = featurePackageReadRelative(root, flags.proposal);
+    if (proposalPath === null) return { ok: false, error: `argument "--proposal" must be a canonical path inside --root: ${flags.proposal}` };
+    try {
+      const stat = lstatSync(join(root, proposalPath));
+      if (!stat.isFile() || stat.isSymbolicLink()) return { ok: false, error: `argument "--proposal" must name a regular non-symlink file: ${proposalPath}` };
+    } catch { return { ok: false, error: `argument "--proposal" names an unreadable file: ${proposalPath}` }; }
+    try { manifestBytes = readFileSync(join(root, proposalPath), "utf8"); }
+    catch { return { ok: false, error: `argument "--proposal" names an unreadable file: ${proposalPath}` }; }
+    plan = planFeaturePackageBootstrap(root, manifest, { manifestBytes, targetState: nextState ?? "draft" });
+    kind = "bootstrap";
+  }
+  const recomputedPlanSha256 = sha256CanonicalJson(plan);
+  if (recomputedPlanSha256 !== suppliedPlanSha256) {
+    return { ok: false, error: `argument "--plan-sha256" does not match the freshly recomputed preview digest for ${manifest}; the manifest, proposal, or --next-state drifted since the preview was taken` };
+  }
+  const actionable = kind === "transition" ? plan.status === "preview" : plan.status === "bootstrap-preview";
+  if (!actionable) {
+    return { ok: false, error: `the recomputed preview for ${manifest} is not an applicable transition (status: ${plan.status}${plan.reason ? `, reason: ${plan.reason}` : ""}); zero mutation` };
+  }
+  return { ok: true, root, manifest, kind, plan, planSha256: suppliedPlanSha256, manifestBytes };
+}
+
+/**
+ * Turns the planner's non-mutating verdict into the one deterministic postimage it
+ * implies. For a bootstrap, that is the exact proposal bytes (already digest-bound to
+ * `plan.receipt.manifestSha256`). For a transition, that is the CURRENT manifest object
+ * re-read fresh (closing the TOCTOU window against the earlier preview) with only its
+ * `state` field replaced -- no other key is ever touched, and a fresh
+ * `validateFeaturePackage` call must still agree the preimage is exactly what `plan.from`
+ * assumed before any byte is written.
+ */
+function computeFeaturePackagePostimage(root, manifest, kind, plan, manifestBytes) {
+  if (kind === "bootstrap") {
+    if (existsSync(join(root, manifest))) return { ok: false, code: "FTP-APPLY-BOOTSTRAP-RACE" };
+    const postBytes = Buffer.from(manifestBytes, "utf8");
+    const postSha256 = sha256Bytes(postBytes);
+    if (postSha256 !== plan.receipt?.manifestSha256) return { ok: false, code: "FTP-APPLY-BOOTSTRAP-DIGEST" };
+    return { ok: true, preSha256: null, postBytes, postSha256, mode: 0o644 };
+  }
+  const preFile = physicalRebindFile(root, manifest);
+  if (preFile === null) return { ok: false, code: "FTP-APPLY-TRANSITION-IDENTITY" };
+  const revalidated = validateFeaturePackage(root, manifest);
+  if (!revalidated.ok || revalidated.receipt.manifestSha256 !== preFile.sha256 || revalidated.receipt.state !== plan.from) {
+    return { ok: false, code: "FTP-APPLY-TRANSITION-DRIFT" };
+  }
+  let value;
+  try { value = JSON.parse(preFile.bytes.toString("utf8")); } catch { return { ok: false, code: "FTP-APPLY-TRANSITION-JSON" }; }
+  const nextValue = { ...value, state: plan.to };
+  const postBytes = Buffer.from(`${JSON.stringify(nextValue, null, 2)}\n`, "utf8");
+  const postSha256 = sha256Bytes(postBytes);
+  const mode = Number(preFile.identity.mode) & 0o777;
+  return { ok: true, preSha256: preFile.sha256, postBytes, postSha256, mode };
+}
+
+function runFeaturePackageApplyCommand(argv, deps) {
+  const sub = "feature-package-apply";
+  const parsed = parseFeaturePackageReadFlags(argv, FEATURE_PACKAGE_APPLY_FLAGS);
+  if (!parsed.ok) return refuseFeaturePackageRead(sub, parsed.error);
+  if (parsed.value.root === undefined) return refuseFeaturePackageRead(sub, 'argument "--root <dir>" is required');
+  const root = resolve(parsed.value.root);
+  let rootStat = null;
+  try { rootStat = statSync(root); } catch { rootStat = null; }
+  if (rootStat === null || !rootStat.isDirectory()) {
+    return refuseFeaturePackageRead(sub, `argument "--root" does not name a readable directory: ${parsed.value.root}`);
+  }
+  const lock = acquireContinuityLock(root, FEATURE_PACKAGE_APPLY_LOCK_TOKEN, deps);
+  if (!lock.ok) return refuseFeaturePackageRead(sub, `writer lock unavailable (${lock.code})`);
+  try {
+    const preview = buildFeaturePackageApplyPreview(parsed.value);
+    if (!preview.ok) return refuseFeaturePackageRead(sub, preview.error);
+    const { manifest, kind, plan, planSha256, manifestBytes } = preview;
+    const nextState = kind === "transition" ? plan.to : (parsed.value["next-state"] ?? "draft");
+
+    const pending = loadFeaturePackageApplyJournal(root, deps);
+    if (!pending.ok) return refuseFeaturePackageRead(sub, `a prior recovery journal is unreadable or tampered (${pending.code}); run feature-package-recover`);
+    if (pending.journal !== null) {
+      return refuseFeaturePackageRead(sub, `a recovery journal is already pending for ${pending.journal.manifestPath}; run feature-package-recover before retrying. Zero new mutation; recovery journal retained`);
+    }
+
+    const postimage = computeFeaturePackagePostimage(root, manifest, kind, plan, manifestBytes);
+    if (!postimage.ok) return refuseFeaturePackageRead(sub, `the preimage drifted since the preview was recomputed (${postimage.code}); zero mutation`);
+
+    const published = publishFeaturePackageApplyJournal(root, {
+      planSha256, manifestPath: manifest, kind,
+      preSha256: postimage.preSha256, postSha256: postimage.postSha256,
+      postBytes: postimage.postBytes, mode: postimage.mode,
+    }, deps);
+    if (!published) return refuseFeaturePackageRead(sub, "journal prepare failed; zero mutation");
+    if (deps.afterFeaturePackageApplyJournal?.() === false) {
+      return refuseFeaturePackageRead(sub, "interrupted after journal preparation; recovery journal retained");
+    }
+
+    const target = join(root, manifest);
+    const replace = deps.replaceFeaturePackageApplyFdContents ?? ((fd, bytes) => { ftruncateSync(fd, 0); let offset = 0; while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset, offset); fsyncSync(fd); });
+    const rename = deps.renameFeaturePackageApply ?? renameSync;
+    const sync = deps.syncFeaturePackageApplyDirectory ?? syncDirectory;
+    const written = writeRebindFile(target, postimage.postBytes, postimage.mode, lock.ownerNonce, replace, rename, sync);
+    if (!written.ok) return refuseFeaturePackageRead(sub, `manifest write failed (${written.code}); recovery journal retained`);
+    if (deps.afterFeaturePackageApplyWrite?.() === false) {
+      return refuseFeaturePackageRead(sub, "interrupted after manifest write; recovery journal retained");
+    }
+
+    const observed = physicalRebindFile(root, manifest);
+    if (observed === null || observed.sha256 !== postimage.postSha256 || !observed.bytes.equals(postimage.postBytes)) {
+      return refuseFeaturePackageRead(sub, "postimage readback did not match the predicted digest; recovery journal retained");
+    }
+    const revalidated = validateFeaturePackage(root, manifest);
+    if (!revalidated.ok) {
+      return refuseFeaturePackageRead(sub, `postimage failed package validation (${revalidated.findings.join("; ")}); recovery journal retained`);
+    }
+
+    const paths = featurePackageApplyPrivatePaths(root, deps);
+    if (!retireFeaturePackageApplyJournal(paths)) {
+      return refuseFeaturePackageRead(sub, "journal retirement is unresolved; recovery journal retained");
+    }
+
+    console.log(JSON.stringify({
+      schema: FEATURE_PACKAGE_APPLY_SCHEMA,
+      status: "applied",
+      kind,
+      manifest,
+      from: kind === "transition" ? plan.from : "absent",
+      to: nextState,
+      planSha256,
+      manifestSha256: postimage.postSha256,
+    }, null, 2));
+    return 0;
+  } finally { releaseContinuityLock(lock); }
+}
+
+/** Read-only diagnosis of any retained journal. Never writes; never retires. */
+function runFeaturePackageRecoverCommand(argv, deps) {
+  const sub = "feature-package-recover";
+  const parsed = parseFeaturePackageReadFlags(argv, new Set(["root"]));
+  if (!parsed.ok) return refuseFeaturePackageRead(sub, parsed.error);
+  if (parsed.value.root === undefined) return refuseFeaturePackageRead(sub, 'argument "--root <dir>" is required');
+  const root = resolve(parsed.value.root);
+  let rootStat = null;
+  try { rootStat = statSync(root); } catch { rootStat = null; }
+  if (rootStat === null || !rootStat.isDirectory()) {
+    return refuseFeaturePackageRead(sub, `argument "--root" does not name a readable directory: ${parsed.value.root}`);
+  }
+  const loaded = loadFeaturePackageApplyJournal(root, deps);
+  if (!loaded.ok) return refuseFeaturePackageRead(sub, `a retained journal is unreadable or tampered (${loaded.code}); manual repository inspection is required`);
+  if (loaded.journal === null) {
+    console.log(JSON.stringify({ schema: FEATURE_PACKAGE_RECOVER_SCHEMA, status: "clean", retained: false }, null, 2));
+    return 0;
+  }
+  const journal = loaded.journal;
+  const observed = physicalRebindFile(root, journal.manifestPath);
+  const observedSha256 = observed === null ? null : observed.sha256;
+  const diagnosis = observedSha256 === journal.postSha256
+    ? "applied-pending-retirement"
+    : observedSha256 === journal.preSha256
+      ? "not-yet-applied"
+      : "diverged";
+  console.log(JSON.stringify({
+    schema: FEATURE_PACKAGE_RECOVER_SCHEMA,
+    status: "retained",
+    root,
+    transaction: {
+      planSha256: journal.planSha256,
+      manifest: journal.manifestPath,
+      kind: journal.kind,
+      expectedPreSha256: journal.preSha256,
+      expectedPostSha256: journal.postSha256,
+    },
+    observed: { present: observed !== null, sha256: observedSha256 },
+    diagnosis,
+  }, null, 2));
+  return 2;
+}
+
+function runFeaturePackageWriteCommand(sub, argv, deps) {
+  return sub === "feature-package-apply"
+    ? runFeaturePackageApplyCommand(argv, deps)
+    : runFeaturePackageRecoverCommand(argv, deps);
+}
+
 /**
  * Runs the CLI logic. Never calls process.exit itself (testable); returns the exit
  * code. `deps` allows tests to inject `dir`, `now`, `gitHead`, and `env` without
@@ -4836,6 +5141,10 @@ export function run(argv = process.argv.slice(2), deps = {}) {
   // Routed ahead of readState(): these three are read-only reports over a repository
   // topology and must not be gated by the operator's local state file.
   if (FEATURE_PACKAGE_READ_SUBCOMMANDS.has(sub)) return runFeaturePackageReadCommand(sub, rest);
+  // Routed ahead of readState() too: this transaction's authority is the --root
+  // repository's own topology and its own private journal, never the operator's
+  // local state file (PHX-0A-WRITE, P-AC-08).
+  if (FEATURE_PACKAGE_WRITE_SUBCOMMANDS.has(sub)) return runFeaturePackageWriteCommand(sub, rest, deps);
 
   const existing = readState(dir);
   if (existing.status === "malformed") {
