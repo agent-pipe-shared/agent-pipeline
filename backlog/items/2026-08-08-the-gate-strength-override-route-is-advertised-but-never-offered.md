@@ -128,12 +128,27 @@ filing, not a repair.
 
 **Owner: PO**, for assignment to Nova. Ordered by what unblocks the most.
 
-1. **The mechanism is established; what remains is why that record fails
-   validation.** The probe above proves `validatedCapability` throws on it. Which
-   check rejects it — the MAC against an audit key rotated since, the foreign
-   plugin identity, a schema field added after 2026-07-30 — decides whether this
-   is a migration defect or a key-lifecycle one, and only the first is a
-   one-repository problem.
+1. **Root cause, established — it is a version upgrade with no eviction, not a
+   security event.** The validator requires
+   `schema === "pipeline.human-guard-override-capability.v2"`
+   (`human-guard-override.mjs:41`, checked at `:1138`) and an exact key set
+   (`CAPABILITY_KEYS`, `:1103`, checked at `:1137`). The stored record declares
+   **`…capability.v1`** and carries the v1 key set: it has no `commandClass`,
+   `policy`, `preview`, `mode` or `authorSourceRoot`. It therefore fails at the
+   first two conditions in the function — **before the MAC is ever computed**.
+   Nothing is wrong with the record; it is a valid v1 artifact meeting a v2
+   reader.
+
+   Two things follow, and the second is the one that matters. The schema *was*
+   versioned properly — v1 → v2 — so this is not an unversioned-evolution bug.
+   What is missing is that **no migration, eviction or skip covers the records
+   the previous version left behind**, and the code's reaction to meeting one is
+   to abandon the entire store rather than that record.
+
+   **A v1 record cannot authorize anything under v2 by construction** — the
+   reader rejects it before any matching. So it confers no authority and removes
+   none; it is inert except for the outage it causes. That should be weighed when
+   deciding the disposition, though the disposition itself is the PO's.
 2. **A denial must never be silent.** Whatever `consumeHumanGuardOverride`
    returns, the guard should emit either a route or a typed reason why there is
    none. The present `if` enumerates two statuses and drops the rest; an `else`
@@ -147,10 +162,21 @@ filing, not a repair.
    we cannot read". Reporting it as a typed, visible error is the reconciliation
    — the present behaviour fails closed *and* silently, which is the worst of
    both.
-4. **Consider whether a foreign-install record should be admitted at all.** The
-   stored record names a different plugin root and version than the one
-   enforcing. Whether such a record should be scanned, ignored, or reported is a
-   design question this item does not settle.
+4. **Every versioned private store has this shape, so check the siblings.** The
+   defect is not specific to override capabilities: it is "a reader whose schema
+   moved forward meets a record the previous version wrote, and fails the whole
+   store instead of that record". The maintenance-window record, the audit
+   ledger, the request store and the continuity receipts are all versioned
+   private artifacts read the same way. Whether any of them shares the failure
+   mode is a measurement nobody has taken.
+
+5. **A note on the plugin identity, which is a red herring here.** The stored
+   record also names a different plugin root and version than the one enforcing
+   (a Codex plugin cache at `0.4.7-partial-auth`). That looks like the cause and
+   is not: validation fails on schema and key set first, and would fail
+   identically for a v1 record written by this very install. Recorded so the
+   diagnosis is not "fixed" by adding an install check that leaves the real
+   defect in place.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
