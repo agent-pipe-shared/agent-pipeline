@@ -18,7 +18,14 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 
-import { PROJECT_RESET_PLAN_SCHEMA, classifyRuntimeProjectionProvenance, planProjectReset } from "./project-reset.mjs";
+import {
+  PROJECT_RESET_APPLY_RESULT_SCHEMA,
+  PROJECT_RESET_PLAN_SCHEMA,
+  RESET_APPLY_FAULT_STAGES,
+  applyProjectReset,
+  classifyRuntimeProjectionProvenance,
+  planProjectReset,
+} from "./project-reset.mjs";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { applyOnboardingKickoff, planOnboardingKickoff } from "../lib/onboarding-continuity.mjs";
 
@@ -82,6 +89,14 @@ function inventory(root) {
   };
   visit(root);
   return entries.join("\n");
+}
+
+/** Every inventory() line whose relPath is exactly `relPrefix` or nested under it. */
+function linesFor(text, relPrefix) {
+  return text.split("\n").filter((line) => {
+    const relPath = line.split("\0")[1];
+    return relPath === relPrefix || relPath.startsWith(`${relPrefix}/`);
+  });
 }
 
 test("AC-2: legacy and neutral authority tiers differ in exactly the five tier-resolved paths", () => {
@@ -455,3 +470,183 @@ test("AC-7: a plan containing runtime-projection removal and preserve-only keep 
     assert.equal(plan.keep.some((entry) => entry.kind === "runtimePreserveOnly"), true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// R2D: apply -- atomic, or it does not begin.
+//
+// Legacy tier is used for the "apply succeeds" fixtures because, per the
+// AC-4/collision tests above, only the NEUTRAL tier produces a `keys`-type
+// remove entry (the `.claude/pipeline.yaml`/`.claude/pipeline.json` runtime-
+// projection collision) -- legacy is where an ordinary happy-path apply is
+// exercised without also hitting the AC-4 keys refusal.
+// ---------------------------------------------------------------------------
+
+test("R2D AC-1: a --plan-sha256 that does not match a freshly derived plan refuses and writes nothing", () => {
+  withFixture(kickoffFixture("apply-digest-mismatch", { tier: "legacy" }), (root) => {
+    const before = inventory(root);
+    const result = applyProjectReset({ rootDir: root, expectedPlanSha256: "f".repeat(64) });
+    assert.equal(result.status, "refused");
+    assert.equal(result.code, "PROJECT-RESET-APPLY-DIGEST-MISMATCH");
+    assert.equal(inventory(root), before, "a digest mismatch must change no byte anywhere under the root");
+  });
+});
+
+test("R2D AC-3: keep and neverTouched entries are byte-identical after a successful apply", () => {
+  // Creating BOTH the .claude/ manifest and calibration compat copies claims
+  // both runtime-projection collision paths for the authority loop's `keep`
+  // set, so neither survives to the runtime loop as a `keys` entry (see the
+  // "AC-4: the collision paths are claimed..." test above) -- an apply that
+  // hit a keys refusal would never reach the move phase this test exercises.
+  withFixture(kickoffFixture("apply-keep-untouched", { tier: "neutral" }), (root) => {
+    mkdirSync(join(root, ".claude"), { recursive: true });
+    writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.project.v1\n");
+    writeFileSync(join(root, ".claude", "pipeline.json"), "{}\n");
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(join(root, "src", "adopter.txt"), "adopter content\n");
+    const plan = planProjectReset({ rootDir: root });
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.remove.some((entry) => entry.type === "keys"), false, "both collision paths must be claimed as keep, not keys");
+    const before = inventory(root);
+    const result = applyProjectReset({ rootDir: root, expectedPlanSha256: plan.planSha256 });
+    assert.equal(result.status, "applied");
+    const after = inventory(root);
+    for (const prefix of ["specs", "src", ".claude/pipeline.yaml", ".claude/pipeline.json"]) {
+      assert.deepEqual(linesFor(after, prefix), linesFor(before, prefix), `expected ${prefix} untouched`);
+    }
+  });
+});
+
+test("R2D AC-4: a plan carrying a keys entry is a typed refusal, not a partial reset", () => {
+  withFixture(kickoffFixture("apply-keys-refusal", { tier: "neutral" }), (root) => {
+    const plan = planProjectReset({ rootDir: root });
+    assert.equal(plan.remove.some((entry) => entry.type === "keys"), true);
+    const before = inventory(root);
+    const result = applyProjectReset({ rootDir: root, expectedPlanSha256: plan.planSha256 });
+    assert.equal(result.status, "refused");
+    assert.equal(result.code, "PROJECT-RESET-APPLY-KEYS-UNIMPLEMENTED");
+    assert.equal(inventory(root), before, "a keys refusal must write nothing");
+  });
+});
+
+test("R2D AC-5: re-running the identical command against an already-reset project is zero-write and honest", () => {
+  withFixture(kickoffFixture("apply-replay", { tier: "legacy" }), (root) => {
+    const plan = planProjectReset({ rootDir: root });
+    const first = applyProjectReset({ rootDir: root, expectedPlanSha256: plan.planSha256 });
+    assert.equal(first.status, "applied");
+    const before = inventory(root);
+    const second = applyProjectReset({ rootDir: root, expectedPlanSha256: plan.planSha256 });
+    assert.equal(second.status, "replayed");
+    assert.equal(second.code, null);
+    assert.equal(inventory(root), before, "replay must write nothing");
+  });
+});
+
+test("R2D AC-6: a target that is itself a symlink is refused rather than followed", () => {
+  withFixture(kickoffFixture("apply-symlink-target", { tier: "legacy" }), (root) => {
+    const plan = planProjectReset({ rootDir: root });
+    const handoverEntry = plan.remove.find((entry) => entry.kind === "handover");
+    const absolute = join(root, handoverEntry.path);
+    rmSync(absolute);
+    symlinkSync(join(root, ".claude", "pipeline.yaml"), absolute);
+    const before = inventory(root);
+    const result = applyProjectReset({ rootDir: root, expectedPlanSha256: plan.planSha256 });
+    assert.equal(result.status, "refused");
+    assert.equal(result.code, "PROJECT-RESET-APPLY-SYMLINK-REFUSED");
+    assert.equal(inventory(root), before, "a symlink refusal must write nothing");
+  });
+});
+
+test("R2D AC-6: a target whose parent became a symlink between plan and apply is refused rather than followed", () => {
+  withFixture(kickoffFixture("apply-symlink-parent", { tier: "legacy" }), (root) => {
+    const plan = planProjectReset({ rootDir: root });
+    const handoverEntry = plan.remove.find((entry) => entry.kind === "handover");
+    // Preserve the handover file's content behind the new symlink so the
+    // fresh plan `apply` re-derives is digest-IDENTICAL to `plan` above --
+    // isolating the symlinked-parent refusal from an (also legitimate, but
+    // different) digest-mismatch refusal.
+    const originalBytes = readFileSync(join(root, handoverEntry.path));
+    rmSync(join(root, "docs"), { recursive: true, force: true });
+    mkdirSync(join(root, ".decoy"), { recursive: true });
+    writeFileSync(join(root, ".decoy", "state.md"), originalBytes);
+    symlinkSync(join(root, ".decoy"), join(root, "docs"), "dir");
+    const before = inventory(root);
+    const result = applyProjectReset({ rootDir: root, expectedPlanSha256: plan.planSha256 });
+    assert.equal(result.status, "refused");
+    assert.equal(result.code, "PROJECT-RESET-APPLY-SYMLINK-REFUSED");
+    assert.equal(inventory(root), before, "a symlinked parent refusal must write nothing");
+  });
+});
+
+test("R2D AC-8: a successful apply's result validates against the schema and separates removed, already-absent, and kept", () => {
+  withFixture(freshProject("apply-report", { tier: "legacy" }), (root) => {
+    const plan = planProjectReset({ rootDir: root });
+    const result = applyProjectReset({ rootDir: root, expectedPlanSha256: plan.planSha256 });
+    assert.equal(result.status, "applied");
+    assert.equal(result.schema, PROJECT_RESET_APPLY_RESULT_SCHEMA);
+    const schemaResult = validateAgainstSchema(result, SCHEMA);
+    assert.deepEqual(schemaResult.errors, []);
+    assert.equal(schemaResult.valid, true);
+    const removedEntries = result.remove.filter((entry) => entry.existed);
+    const absentEntries = result.remove.filter((entry) => !entry.existed);
+    assert.ok(removedEntries.length > 0, "expected at least one actually-removed entry");
+    assert.ok(absentEntries.length > 0, "expected at least one already-absent entry (freshProject has no State/handover)");
+    for (const entry of removedEntries) assert.equal(existsSync(join(root, entry.path)), false);
+    assert.equal(result.keep.some((entry) => entry.path === ".claude/settings.json"), true);
+  });
+});
+
+test("R2D: the apply CLI operates ONLY on --root, never on the process cwd it was invoked from", () => {
+  withFixture(kickoffFixture("apply-cli-root", { tier: "legacy" }), (root) => {
+    const decoy = mkdtempSync(join(tmpdir(), "project-reset-cli-decoy-"));
+    try {
+      const plan = planProjectReset({ rootDir: root });
+      const decoyBefore = inventory(decoy);
+      const result = spawnSync(process.execPath, [
+        new URL("./project-reset.mjs", import.meta.url).pathname,
+        "apply", "--root", root, "--plan-sha256", plan.planSha256,
+      ], { encoding: "utf8", cwd: decoy, shell: false });
+      assert.equal(result.status, 0, result.stderr);
+      const parsed = JSON.parse(result.stdout);
+      assert.equal(parsed.status, "applied");
+      assert.equal(parsed.root, root);
+      assert.equal(inventory(decoy), decoyBefore, "the CLI must never write into the cwd it was invoked from, only --root");
+    } finally {
+      rmSync(decoy, { recursive: true, force: true });
+    }
+  });
+});
+
+// AC-2: every apply fault stage either leaves the root byte-identical to
+// before the interrupted call, or is completed only by re-running the
+// identical command -- named per stage, the way the onboarding-kickoff
+// fault suite is (onboarding-continuity.test.mjs). Only "journal-temp-fsync"
+// precedes the durable publication of the journal (the commit point); every
+// later stage is recovered by resuming the same digest-bound command.
+const PRE_PUBLISH_STAGES = new Set(["journal-temp-fsync"]);
+
+for (const stage of RESET_APPLY_FAULT_STAGES) {
+  const claim = PRE_PUBLISH_STAGES.has(stage)
+    ? "leaves the root unchanged and permits a clean retry"
+    : "is completed only by re-running the identical command";
+  test(`R2D AC-2: fault at ${stage} ${claim}`, () => {
+    withFixture(kickoffFixture(`apply-fault-${stage}`, { tier: "legacy" }), (root) => {
+      const plan = planProjectReset({ rootDir: root });
+      const before = inventory(root);
+      let threw = false;
+      try {
+        applyProjectReset({ rootDir: root, expectedPlanSha256: plan.planSha256, deps: { crashAt: stage } });
+      } catch (error) {
+        threw = true;
+        assert.equal(error.code, "PROJECT-RESET-APPLY-SIMULATED-FAULT");
+      }
+      assert.equal(threw, true, `expected a simulated fault at ${stage}`);
+      if (PRE_PUBLISH_STAGES.has(stage)) {
+        assert.equal(inventory(root), before, "root must be byte-identical to before the interrupted call");
+      }
+      const resumed = applyProjectReset({ rootDir: root, expectedPlanSha256: plan.planSha256 });
+      assert.equal(resumed.status, "applied", `expected the identical command to complete the reset after a fault at ${stage}`);
+      const replay = applyProjectReset({ rootDir: root, expectedPlanSha256: plan.planSha256 });
+      assert.equal(replay.status, "replayed");
+    });
+  });
+}

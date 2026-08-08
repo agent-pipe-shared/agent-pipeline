@@ -74,12 +74,21 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
+  closeSync,
+  constants,
   existsSync,
+  fsyncSync,
   lstatSync,
+  mkdirSync,
+  openSync,
   readFileSync,
   realpathSync,
+  renameSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync,
 } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import {
@@ -91,6 +100,31 @@ import {
 import { loadRuntimeProjectionV3OwnedKeys } from "../lib/runtime-projection-v3.mjs";
 
 export const PROJECT_RESET_PLAN_SCHEMA = "pipeline.project-reset-plan.v1";
+export const PROJECT_RESET_APPLY_RESULT_SCHEMA = "pipeline.project-reset-apply-result.v1";
+
+// The stages `apply` can be interrupted at, frozen so the fault-injection test
+// suite can iterate them and a future stage cannot be added silently: journal
+// write (three sub-stages: temp file written+fsynced, renamed into place,
+// containing directory fsynced), each individual quarantine move, quarantine
+// removal, and journal removal. Every stage from "journal-rename" onward is
+// recovered by resuming the SAME digest-bound command (the journal is the
+// durable record of intent); a fault strictly before "journal-rename" is
+// recovered by discarding the orphaned temporary file and leaves the root
+// byte-identical to before the call.
+export const RESET_APPLY_FAULT_STAGES = Object.freeze([
+  "journal-temp-fsync",
+  "journal-rename",
+  "journal-directory-fsync",
+  "move",
+  "quarantine-remove",
+  "journal-remove",
+]);
+
+const SHA256_RE = /^[a-f0-9]{64}$/u;
+const RESET_QUARANTINE_DIRNAME = ".pipeline-reset-quarantine";
+const RESET_JOURNAL_BASENAME = ".pipeline-reset-journal.json";
+const RESET_RECEIPT_BASENAME = ".pipeline-reset-receipt.json";
+const RESET_JOURNAL_SCHEMA = "pipeline.project-reset-journal.v1";
 
 const AUTHORITY_KINDS = Object.freeze(["manifest", "state", "calibration", "guardConfig", "guardAudit"]);
 const DEFAULT_HANDOVER_PATH = "docs/state.md";
@@ -353,9 +387,239 @@ export function planProjectReset({ rootDir } = {}) {
   return { ...canonical, planSha256: canonicalSha256(canonical) };
 }
 
+function refuseApply(code, root, authorityTier = null) {
+  return {
+    schema: PROJECT_RESET_APPLY_RESULT_SCHEMA,
+    status: "refused",
+    code,
+    root,
+    authorityTier,
+    remove: [],
+    keep: [],
+    neverTouched: NEVER_TOUCHED,
+    planSha256: null,
+  };
+}
+
+function fsyncDirectory(path) {
+  let fd;
+  try {
+    fd = openSync(path, "r");
+    fsyncSync(fd);
+  } catch (error) {
+    if (!(process.platform === "win32"
+      && ["EPERM", "EINVAL", "EISDIR", "ENOTSUP", "EBADF"].includes(error?.code))) {
+      throw error;
+    }
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
+}
+
+function writeControlFileSynced(finalPath, bytes) {
+  const temporary = `${finalPath}.tmp`;
+  let fd;
+  try {
+    fd = openSync(temporary, constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC, 0o600);
+    writeFileSync(fd, bytes);
+    fsyncSync(fd);
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
+  return temporary;
+}
+
+/**
+ * Walk every path segment from `root` to `root/relPath`, refusing (rather
+ * than following) a symlink anywhere in the chain -- the parent may have
+ * become a symlink between plan and apply, not only the target itself
+ * (AC-6). Returns "ok", "symlink", or "vanished" (a segment no longer
+ * exists or is no longer the expected kind -- treated as "already gone
+ * since the plan was derived", never as a refusal on its own).
+ */
+function physicalTargetState(root, relPath) {
+  const parts = relPath.split("/");
+  let cursor = root;
+  for (let index = 0; index < parts.length; index += 1) {
+    cursor = join(cursor, parts[index]);
+    let info;
+    try { info = lstatSync(cursor); } catch { return "vanished"; }
+    if (info.isSymbolicLink()) return "symlink";
+    const isLast = index === parts.length - 1;
+    if (!isLast && !info.isDirectory()) return "vanished";
+  }
+  return "ok";
+}
+
+/**
+ * Apply a project reset, atomically or not at all (R2D). See the module
+ * header for the four-stage mechanism: digest-bound plan re-derivation,
+ * a durably-flushed journal naming exactly what will move, one rename per
+ * target into a quarantine directory inside the root, then quarantine
+ * removal and journal removal as the last two acts. `deps.crashAt` (one of
+ * RESET_APPLY_FAULT_STAGES) and `deps.crashAtOccurrence` (for "move", which
+ * fires once per moved target) exist for the fault-injection test suite
+ * only -- production callers never set them.
+ */
+export function applyProjectReset({ rootDir, expectedPlanSha256, deps = {} } = {}) {
+  if (typeof rootDir !== "string" || rootDir.length === 0) {
+    return refuseApply("PROJECT-RESET-APPLY-ROOT-REQUIRED", null);
+  }
+  if (!SHA256_RE.test(expectedPlanSha256 ?? "")) {
+    return refuseApply("PROJECT-RESET-APPLY-DIGEST-REQUIRED", null);
+  }
+  let root;
+  try {
+    const requested = resolve(rootDir);
+    const info = lstatSync(requested);
+    if (info.isSymbolicLink() || !info.isDirectory()) {
+      return refuseApply("PROJECT-RESET-APPLY-ROOT-UNSAFE", requested);
+    }
+    root = realpathSync(requested);
+  } catch {
+    return refuseApply("PROJECT-RESET-APPLY-ROOT-UNAVAILABLE", null);
+  }
+
+  const fault = (point, occurrence) => {
+    if (deps.crashAt === point
+      && (deps.crashAtOccurrence === undefined || deps.crashAtOccurrence === occurrence)) {
+      const error = new Error(`simulated fault at ${point}`);
+      error.code = "PROJECT-RESET-APPLY-SIMULATED-FAULT";
+      throw error;
+    }
+  };
+
+  // Replay: a prior successful `apply` already wrote a completion receipt.
+  // Honored ONLY for the same digest -- a different digest against a
+  // receipted root is a distinct condition (a different reset already ran
+  // here), never approximated as either "already done" or a bare refusal.
+  const receiptPath = join(root, RESET_RECEIPT_BASENAME);
+  if (existsSync(receiptPath)) {
+    let receipt = null;
+    try { receipt = JSON.parse(readFileSync(receiptPath, "utf8")); } catch { receipt = null; }
+    if (isObject(receipt) && receipt.schema === PROJECT_RESET_APPLY_RESULT_SCHEMA
+      && receipt.planSha256 === expectedPlanSha256) {
+      return { ...receipt, status: "replayed", code: null };
+    }
+    return refuseApply("PROJECT-RESET-APPLY-RECEIPT-DIGEST-MISMATCH", root, receipt?.authorityTier ?? null);
+  }
+
+  const journalPath = join(root, RESET_JOURNAL_BASENAME);
+  const quarantineDir = join(root, RESET_QUARANTINE_DIRNAME);
+  let journal;
+
+  if (existsSync(journalPath)) {
+    let parsed = null;
+    try { parsed = JSON.parse(readFileSync(journalPath, "utf8")); } catch { parsed = null; }
+    if (!isObject(parsed) || parsed.schema !== RESET_JOURNAL_SCHEMA || parsed.root !== root) {
+      return refuseApply("PROJECT-RESET-APPLY-JOURNAL-UNREADABLE", root);
+    }
+    if (parsed.planSha256 !== expectedPlanSha256) {
+      return refuseApply("PROJECT-RESET-APPLY-JOURNAL-DIGEST-MISMATCH", root, parsed.authorityTier ?? null);
+    }
+    journal = parsed;
+  } else {
+    const plan = planProjectReset({ rootDir: root });
+    if (plan.status !== "ready") return refuseApply(plan.code, plan.root, plan.authorityTier);
+    if (plan.planSha256 !== expectedPlanSha256) {
+      return refuseApply("PROJECT-RESET-APPLY-DIGEST-MISMATCH", root, plan.authorityTier);
+    }
+    if (plan.remove.some((entry) => entry.type === "keys")) {
+      return refuseApply("PROJECT-RESET-APPLY-KEYS-UNIMPLEMENTED", root, plan.authorityTier);
+    }
+    for (const reserved of [RESET_QUARANTINE_DIRNAME, RESET_JOURNAL_BASENAME, RESET_RECEIPT_BASENAME]) {
+      const collides = (entry) => entry.path === reserved || entry.path.startsWith(`${reserved}/`);
+      if (plan.remove.some(collides) || plan.keep.some(collides)) {
+        return refuseApply("PROJECT-RESET-APPLY-CONTROL-COLLISION", root, plan.authorityTier);
+      }
+    }
+    const remove = [];
+    for (const entry of plan.remove) {
+      if (!entry.existed) { remove.push(entry); continue; }
+      const state = physicalTargetState(root, entry.path);
+      if (state === "symlink") return refuseApply("PROJECT-RESET-APPLY-SYMLINK-REFUSED", root, plan.authorityTier);
+      remove.push(state === "vanished" ? { ...entry, existed: false } : entry);
+    }
+    journal = {
+      schema: RESET_JOURNAL_SCHEMA,
+      root,
+      planSha256: expectedPlanSha256,
+      authorityTier: plan.authorityTier,
+      remove,
+      keep: plan.keep,
+      neverTouched: plan.neverTouched,
+    };
+    const bytes = Buffer.from(`${JSON.stringify(journal, null, 2)}\n`, "utf8");
+    const temporary = writeControlFileSynced(journalPath, bytes);
+    try {
+      fault("journal-temp-fsync");
+      renameSync(temporary, journalPath);
+    } catch (error) {
+      if (error?.code === "PROJECT-RESET-APPLY-SIMULATED-FAULT" && !existsSync(journalPath)) {
+        try { unlinkSync(temporary); } catch { /* best effort: orphaned temp file, harmless litter */ }
+      }
+      throw error;
+    }
+    fault("journal-rename");
+    fsyncDirectory(root);
+    fault("journal-directory-fsync");
+  }
+
+  const moveable = journal.remove
+    .map((entry, index) => ({ entry, index }))
+    .filter(({ entry }) => entry.existed && entry.type !== "keys");
+  const quarantineAlreadyExists = existsSync(quarantineDir);
+  const anyStillAtOrigin = moveable.some(({ entry }) => existsSync(join(root, entry.path)));
+  if (quarantineAlreadyExists || anyStillAtOrigin) {
+    if (!quarantineAlreadyExists) mkdirSync(quarantineDir, { mode: 0o700 });
+    for (const { entry, index } of moveable) {
+      const source = join(root, entry.path);
+      const destination = join(quarantineDir, String(index));
+      const sourceExists = existsSync(source);
+      const destinationExists = existsSync(destination);
+      if (sourceExists && destinationExists) {
+        return refuseApply("PROJECT-RESET-APPLY-STATE-INDETERMINATE", root, journal.authorityTier);
+      }
+      if (sourceExists) {
+        renameSync(source, destination);
+        fault("move", index);
+      }
+    }
+    fault("quarantine-remove");
+    rmSync(quarantineDir, { recursive: true, force: false });
+    fsyncDirectory(root);
+  }
+
+  if (existsSync(journalPath)) {
+    fault("journal-remove");
+    unlinkSync(journalPath);
+    fsyncDirectory(root);
+  }
+
+  const result = {
+    schema: PROJECT_RESET_APPLY_RESULT_SCHEMA,
+    status: "applied",
+    code: null,
+    root,
+    authorityTier: journal.authorityTier,
+    remove: journal.remove,
+    keep: journal.keep,
+    neverTouched: journal.neverTouched,
+    planSha256: expectedPlanSha256,
+  };
+  const receiptBytes = Buffer.from(`${JSON.stringify(result, null, 2)}\n`, "utf8");
+  const temporaryReceipt = writeControlFileSynced(receiptPath, receiptBytes);
+  renameSync(temporaryReceipt, receiptPath);
+  fsyncDirectory(root);
+  return result;
+}
+
 function parseArgs(argv) {
-  if (argv[0] !== "plan") return { error: "the only supported command is 'plan'" };
-  const values = {};
+  const command = argv[0];
+  if (command !== "plan" && command !== "apply") {
+    return { error: "the only supported commands are 'plan' and 'apply'" };
+  }
+  const values = { command };
   for (let index = 1; index < argv.length; index += 1) {
     const flag = argv[index];
     if (flag === "--root") {
@@ -363,22 +627,34 @@ function parseArgs(argv) {
       if (value === undefined) return { error: "--root requires a value" };
       values.root = value;
       index += 1;
+    } else if (flag === "--plan-sha256" && command === "apply") {
+      const value = argv[index + 1];
+      if (value === undefined) return { error: "--plan-sha256 requires a value" };
+      values.planSha256 = value;
+      index += 1;
     } else {
       return { error: `unknown argument: ${flag}` };
     }
   }
   if (!values.root) return { error: "--root is required" };
+  if (command === "apply" && !values.planSha256) return { error: "--plan-sha256 is required" };
   return values;
 }
 
 if (isDirectInvocation(import.meta.url)) {
   const parsed = parseArgs(process.argv.slice(2));
+  const usage = "Usage: node project-reset.mjs plan --root <project-dir>\n"
+    + "       node project-reset.mjs apply --root <project-dir> --plan-sha256 <digest>\n";
   if (parsed.error) {
-    process.stderr.write(`${parsed.error}\nUsage: node project-reset.mjs plan --root <project-dir>\n`);
+    process.stderr.write(`${parsed.error}\n${usage}`);
     process.exitCode = 2;
-  } else {
+  } else if (parsed.command === "plan") {
     const result = planProjectReset({ rootDir: parsed.root });
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     process.exitCode = result.status === "ready" ? 0 : 1;
+  } else {
+    const result = applyProjectReset({ rootDir: parsed.root, expectedPlanSha256: parsed.planSha256 });
+    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    process.exitCode = (result.status === "applied" || result.status === "replayed") ? 0 : 1;
   }
 }

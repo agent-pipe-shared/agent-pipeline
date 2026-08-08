@@ -5,8 +5,8 @@
   "additionalProperties": false,
   "required": ["schema", "status", "code", "root", "authorityTier", "remove", "keep", "neverTouched", "planSha256"],
   "properties": {
-    "schema": { "type": "string", "enum": ["pipeline.project-reset-plan.v1"] },
-    "status": { "type": "string", "enum": ["ready", "not-a-project", "authority-unreadable", "root-unsafe"] },
+    "schema": { "type": "string", "enum": ["pipeline.project-reset-plan.v1", "pipeline.project-reset-apply-result.v1"] },
+    "status": { "type": "string", "enum": ["ready", "not-a-project", "authority-unreadable", "root-unsafe", "applied", "replayed", "refused"] },
     "code": { "type": ["string", "null"] },
     "root": { "type": ["string", "null"] },
     "authorityTier": { "type": ["string", "null"], "enum": ["neutral", "legacy", null] },
