@@ -11,7 +11,19 @@ const closeBlock = readFileSync(join(here, "..", "close-block", "SKILL.md"), "ut
 const refs = ["onboarding-recovery.md", "private-overlay.md", "roles.md", "freshness.md", "failure-cases.md", "continuation.md"]
   .map((name) => readFileSync(join(here, "references", name), "utf8")).join("\n");
 const all = `${core}\n${refs}`;
-assert.ok(Buffer.byteLength(core, "utf8") <= 15_000);
+// Context-economy budget for the bootstrap skill: it is read at the start of every
+// session, so every byte here is paid on every session, and the cap exists to stop it
+// drifting into a manual. It is a budget, not a correctness property -- the assertions
+// below are the correctness ones.
+//
+// Raised 15,000 -> 18,000 on 2026-08-08 (GF-057), on the PO's explicit authorization to
+// raise it rather than trim the content. Two things needed the room, both of them things
+// a fresh session was measured to be missing: the corrected scratch-space paragraph
+// (which now names both guards instead of one, and states what onboarding does NOT do to
+// a project's .gitignore), and the SETUP-3 bootstrap questions still to land. Recorded
+// here rather than silently bumped, because a cap that moves whenever it is inconvenient
+// is not a budget.
+assert.ok(Buffer.byteLength(core, "utf8") <= 18_000, `pipeline-start SKILL.md is ${Buffer.byteLength(core, "utf8")} bytes, over the 18,000-byte session-bootstrap budget`);
 assert.match(core, /full Elephant bootstrap is session-bound/u);
 assert.match(core, /never for an ordinary task, message, tool result, commit, test,/u);
 assert.match(core, /does not trigger a second full Elephant bootstrap unless a real SessionStart or\n+typed recovery follows/u);

@@ -37,16 +37,22 @@ For local development also print:
 ## Scratch space
 
 For any temporary file (probe script, held note, throwaway fixture) use the
-repository's own `scratch/` directory: gitignored, inside the project root,
-the only location the containment guard permits without an exception. Never
-a host-temp path — the guard refuses a write outside the project root; do
-not fall back to guessing one when a write is refused. Never `.git/` either:
+repository's own `scratch/` directory: inside the project root, permitted by
+the containment guard without an exception, and exempt from the dev-plan gate
+in every phase — including `draft`, which is the phase a fresh project starts
+in and where a write there used to be refused. Never a host-temp path — the
+guard refuses a write outside the project root; do not fall back to guessing
+one when a write is refused. Never `.git/` either:
 `.git/agent-pipeline/**` is pipeline-owned private state, not agent scratch.
 A session needing disciplined cleanup (bind at start, release at close,
 retire a crashed session's orphan on a later bootstrap) uses
 `bindScratchDescriptor`/`releaseScratchDescriptor`/`retireOrphanScratchDescriptors`
 in `plugins/pipeline-core/lib/session-cleanup-recovery.mjs`; an ad hoc file
 needing no lifecycle can be written directly under `scratch/`.
+
+Onboarding does not add `scratch/` to your `.gitignore` — add it yourself if
+you want these files kept out of history. This is stated rather than assumed
+because nothing here writes into a `.gitignore` a project already owns.
 
 ## Normal bootstrap command sequence
 

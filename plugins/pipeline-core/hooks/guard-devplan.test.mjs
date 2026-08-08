@@ -204,13 +204,28 @@ const NO_FEATURE_STATE = { schema: "pipeline.state.v0" };
 
 // ---- DP08 default exempt prefixes -> allow ----------------------------------------------
 {
-  const prefixes = ["docs/", "specs/", ".claude/", "backlog/"];
+  const prefixes = ["docs/", "specs/", ".claude/", "backlog/", "scratch/"];
   for (const prefix of prefixes) {
     const dir = freshDir(`exempt-${prefix.replace(/\W/g, "")}`);
     writeManifest(dir, MANIFEST_BLOCKING);
     writeState(dir, UNAPPROVED_STATE);
     check(`DP08 allow  default exempt prefix "${prefix}"`, "Edit", `${prefix}something.md`, ALLOW, { projectDir: dir, stderrEmpty: true });
   }
+}
+
+// ---- DP27 scratch/ in the draft phase -> allow (the shipped instruction's own phase) -----
+// The measured live instance: a fresh project starts in `draft`, the shipped skill sends
+// every agent to `scratch/`, and this gate refused the write. DP08 above covers the
+// unapproved case generically; this pins the exact phase a consumer actually meets first,
+// so the two cannot drift apart. The Write tool is used deliberately -- the observed
+// refusal was a Write, not an Edit.
+{
+  const dir = freshDir("scratch-draft");
+  writeManifest(dir, MANIFEST_BLOCKING);
+  writeAuthorityDocs(dir);
+  writeState(dir, DRAFT_AUTHORITY_STATE);
+  check("DP27 allow  draft-phase write under scratch/", "Write", "scratch/probe.mjs", ALLOW, { projectDir: dir, stderrEmpty: true });
+  check("DP27b block draft-phase write to a real source path is unchanged", "Write", "src/foo.ts", BLOCK, { projectDir: dir });
 }
 
 // ---- DP09 planPath itself -> allow -------------------------------------------------------
