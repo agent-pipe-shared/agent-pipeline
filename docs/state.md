@@ -498,6 +498,37 @@ is still right; it just is not independently observable from inside.
    Registering any of them touches `verify.mjs`, so the batch is worth one signed
    window rather than seven.
 
+### In flight at the compaction boundary (2026-08-08)
+
+**`PHX-AAC11` is running** and its result is not yet in this file. It adds the
+epistemic dimension `A-AC-11` requires to the agent decision journal, as a
+**distinct property** — the two vocabularies are deliberately not merged, because
+`state` records what became of a claim and the criterion's list records the ground
+it was held on, and an event can be both inferred and later contradicted. Scope:
+`governance/schemas/agent-decision-event.schema.json`,
+`plugins/pipeline-core/lib/agent-decision-journal.mjs` and its test. Evidence will
+land at `evidence/phx-aac11.txt`, record at `evidence/dispatch-record-phx-aac11.json`.
+If that record shows a terminal `outcome` and a commit exists, it finished; if it
+sits at `in-progress`, resume the dispatch rather than committing its work here —
+that shortcut is finding F3 from round 1 and is not to be repeated.
+
+**Immediate next steps, in order:**
+
+1. **F-2 from round 3** — three lines in `harness/scripts/check-verify-suite-registration.test.mjs`:
+   the dead stub-marker mechanism (`:460-461`, `:501-504`), the assertion at `:568`
+   that cannot fail, and the comment at `:467` naming `assertStaleFixture` instead
+   of `assertReachedRegistration`. Accuracy defect, not a false green.
+2. **PHX-0's ruleset-trust-root slice is now unblocked** — P-AC-08 passed both its
+   gates (gate green at `6746ba1`, Critic PASS round 3). Its first obstacle is
+   `codex-host-plugin-list.test.mjs`, red for a missing export
+   `observeCodexRulesetSource`, which gates `PX0-AC-09/10/11/16/17`.
+3. **The seven red excluded suites** — one package, one signed window for all
+   registrations rather than seven.
+4. **Push** — deferred to 2026-08-09 by PO decision; ~30 commits, gate green.
+
+**Still open for the PO:** nothing blocking. The three decisions asked on
+2026-08-08 are taken and recorded above.
+
 ### F1 is closed, and closed on evidence I produced myself
 
 The Critic's single FAIL finding is repaired in `358c709`. BS25 rebuilds its
