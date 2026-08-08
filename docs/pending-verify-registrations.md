@@ -1,7 +1,16 @@
 # Pending Verify registrations — GF-057
 
-New test suites written during this block that are **not yet registered** in
-`harness/scripts/verify.mjs`, and therefore do not run under Verify.
+> **RESOLVED 2026-08-08.** Both steps were applied by the PO with
+> `harness/scripts/apply-pending-protected-edits.mjs` and committed: the seven
+> `TEST_SUITES` entries in `verify.mjs`, and `GST33`–`GST36` plus the `GST14`
+> title repair in `guard-gate-strength.test.mjs` (32 → **36 passed, 0 failed**).
+> Nothing here is pending any more. The file is kept because the *reasoning* —
+> why an agent session cannot do this, and which guard refuses on which grounds —
+> is the durable part, and the same situation will recur the next time a block
+> writes a suite.
+
+New test suites written during this block that were **not registered** in
+`harness/scripts/verify.mjs`, and therefore did not run under Verify.
 
 ## Why they are pending rather than registered
 
