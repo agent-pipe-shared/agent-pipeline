@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "572a05498b5de0c2476a2a7121b3db2a25d1d67ce049044569d1ea41fe93106f"
+    "transitionHead": "6d357ca98cc4d4e3da780fe4597b276e14f4ab643a69353b89b28cebb5c0031e"
   },
   "counts": {
     "open": 66,
     "in_progress": 21,
-    "closed": 22
+    "closed": 24
   },
   "items": [
     {
@@ -524,6 +524,14 @@
       "source": "PO question, 2026-08-06: why does an agent keep stopping and asking instead of working under the operating model. Investigating produced a structural answer rather than a behavioural one — four gate defects in a single session, none found by the suite."
     },
     {
+      "id": "pipeline.no-governed-directory-contract",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "PO, 2026-08-08: 'uns fehlt da noch eine art adr die die verzeichnisstrukturen besser hart vorgibt und definiert was wo hin gehört - agenten neigen bei jeder neuen session dazu neue strukturen zu erfinden. das muss die pipeline steuern.' Five corroborating instances from that same night are recorded below."
+    },
+    {
       "id": "pipeline.nonblocking-interaction-continuity",
       "status": "in_progress",
       "type": "defect",
@@ -566,11 +574,23 @@
     },
     {
       "id": "pipeline.onboarding-restart-flow-is-codex-only-not-runner-aware",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "PO handover from a separate session (rune_test1_claude), submitted through the PO's own channel, 2026-08-07."
+      "source": "PO handover from a separate session (rune_test1_claude), submitted through the PO's own channel, 2026-08-07.",
+      "closedAt": "2026-08-08",
+      "closureRepository": "self",
+      "closureCommit": "864c7f1f84b5e0a874e360bf26e168fa92f14aaf",
+      "closureEvidence": "backlog/evidence/2026-08-08-restart-barrier-runner-exemption-verification.md"
+    },
+    {
+      "id": "pipeline.over-broad-ignore-rule-swallows-closure-evidence",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Hit while closing two backlog items on 2026-08-08: git add refused the closure evidence file the ledger reconciliation had just demanded."
     },
     {
       "id": "pipeline.parallel-goldfish-dispatches-race-on-shared-checkout",
@@ -745,11 +765,15 @@
     },
     {
       "id": "pipeline.restart-launch-is-codex-only-for-every-runner",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-06",
-      "source": "Manual re-run of the empty-directory onboarding smoke test in scratch/onboarding-smoke-test while re-verifying backlog/items/2026-08-06-onboarding-lifecycle-plan-hardcodes-the-codex-runner.md (see backlog/evidence/2026-08-06-onboarding-runner-identity-reverification.md), 2026-08-06."
+      "source": "Manual re-run of the empty-directory onboarding smoke test in scratch/onboarding-smoke-test while re-verifying backlog/items/2026-08-06-onboarding-lifecycle-plan-hardcodes-the-codex-runner.md (see backlog/evidence/2026-08-06-onboarding-runner-identity-reverification.md), 2026-08-06.",
+      "closedAt": "2026-08-08",
+      "closureRepository": "self",
+      "closureCommit": "864c7f1f84b5e0a874e360bf26e168fa92f14aaf",
+      "closureEvidence": "backlog/evidence/2026-08-08-restart-barrier-runner-exemption-verification.md"
     },
     {
       "id": "pipeline.runner-neutrality-before-third-runner",
