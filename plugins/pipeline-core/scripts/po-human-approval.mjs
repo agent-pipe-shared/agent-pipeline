@@ -24,6 +24,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from "node:pat
 import { approvalRequestFromExternalJson, observeCleanCandidate, run as runApprovalRequest } from "./po-approval-request.mjs";
 import { readPublicRepositoryFile, verifyThreatModelApprovalRequest } from "../lib/threat-model-approval-request.mjs";
 import { CRITICAL_ACTION_KINDS, createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
+import { describeGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication> --subject-sha256 <sha256> --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | sign-intent --repo-root <repo> --directory <external-dir> --intent-sha256 <sha256> | authorize-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication> --subject-sha256 <sha256> --expires-at <ISO-8601>";
@@ -289,9 +290,24 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
   if (args.command === "sign-intent") {
     if (!exists(paths.privateKey) || !exists(paths.publicKey) || !exists(paths.authority)) fail("run setup before sign-intent");
     const intentSha256 = args.intentSha256;
+    // The human is not asked to authorize a bare digest (ADR-0061 Decision 4): the
+    // request recorded behind it is resolved and its own recorded reason, scope and
+    // expiry are shown. Everything displayed is READ from that record and bounded by
+    // it (see describeGuardMaintenanceWindowRequest); nothing here composes a guess
+    // about what the action "probably" is. When no record resolves — a digest prepared
+    // by another mechanism, in another repository, or a record that no longer
+    // re-derives to this digest — the command says exactly that and shows nothing else.
+    // The signature covers the digest either way; the summary is disclosure, never
+    // authority.
+    const describe = dependencies.describeIntentRecord ?? describeGuardMaintenanceWindowRequest;
+    const record = describe({ rootDir: repository, intentSha256 });
     requireExplicitConfirmation([
       `intent sha256: ${intentSha256}`,
-      "this arms a one-time, audited guard-lift/guard-override authorization (HGO/GMW) for whatever action was already recorded against this exact digest; this command has no more specific description of that action available to it.",
+      ...(record.resolved ? record.lines : [
+        `no recorded request resolves for this digest in this repository (${record.code}): this command has no description of that action and will not invent one.`,
+        "it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.",
+      ]),
+      "this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.",
     ], dependencies);
     const manual = {
       intent: artifactPath(directory, "intent-manual.txt"),

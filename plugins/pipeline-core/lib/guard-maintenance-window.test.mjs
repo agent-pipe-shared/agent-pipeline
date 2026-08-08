@@ -31,6 +31,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "./po-approval-proof.mjs";
+// Namespace import ON PURPOSE for the CEREMONY-1 additions below: a missing named
+// export fails ESM linking for the WHOLE file, which would turn a red-before run into
+// a single "cannot link" line instead of a per-behaviour failure list. Through the
+// namespace, an unimplemented function fails exactly the checks that exercise it and
+// leaves every other check's PASS/FAIL evidence intact.
+import * as gmw from "./guard-maintenance-window.mjs";
 import {
   GuardMaintenanceWindowError,
   MAX_WINDOW_TTL_MS,
@@ -417,6 +423,211 @@ try {
     assert.equal(
       isNeverLiftableKernelPath(join(globalPluginRoot, "hooks", "guard-git.mjs"), { rootDir: root, livePluginRoot: globalPluginRoot }),
       false,
+    );
+  });
+
+  // ---- CEREMONY-1 (A): the record a signing command may show the human ---------------
+  // The summary exists so the PO is not asked to authorize a bare digest (ADR-0061
+  // Decision 4). Two properties matter more than the text itself: it is READ from the
+  // recorded request (never composed), and it is only shown at all when the record
+  // re-derives to exactly the digest that is about to be signed -- the same derivation
+  // install() performs. A record that does not re-derive is not "shown with a warning",
+  // it is not shown.
+  check("GMW14 describeGuardMaintenanceWindowRequest shows reason, scope and expiry for the digest it resolves", () => {
+    const root = repoFixture("gmw-describe-");
+    const plugin = pluginRootFixture();
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const { intent, subject } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["GS-6", "TP-1"], ttlSeconds: 900, reason: "fix the release preflight base-commit peel",
+      featureId: "f", planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+    });
+    const described = gmw.describeGuardMaintenanceWindowRequest({ rootDir: root, intentSha256: intent.sha256 });
+    assert.equal(described.resolved, true, "the freshly prepared request must resolve for its own digest");
+    assert.equal(described.kind, "guard-lift");
+    assert.equal(described.reason, "fix the release preflight base-commit peel");
+    assert.deepEqual(described.scopeRuleIds, ["GS-6", "TP-1"]);
+    assert.equal(described.expiresAtMs, subject.expiresAtMs);
+    const body = described.lines.join("\n");
+    assert.match(body, /fix the release preflight base-commit peel/u, "the reason must be shown");
+    assert.match(body, /GS-6/u);
+    assert.match(body, /TP-1/u);
+    assert.match(body, new RegExp(new Date(subject.expiresAtMs).toISOString(), "u"), "the expiry must be shown");
+    assert.match(body, /guard-lift/u);
+  });
+
+  check("GMW15 an unresolvable digest yields no lines at all -- no record, no invented description", () => {
+    const root = repoFixture("gmw-describe-none-");
+    const plugin = pluginRootFixture();
+    const { planSha256, specSha256 } = planSpecShas(root);
+    // No request recorded yet.
+    const empty = gmw.describeGuardMaintenanceWindowRequest({ rootDir: root, intentSha256: "a".repeat(64) });
+    assert.equal(empty.resolved, false);
+    assert.deepEqual(empty.lines, [], "an unresolved record must contribute no display lines");
+    assert.equal(typeof empty.code, "string");
+
+    prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 600, reason: "recorded but unrelated", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+    });
+    const other = gmw.describeGuardMaintenanceWindowRequest({ rootDir: root, intentSha256: "b".repeat(64) });
+    assert.equal(other.resolved, false, "a recorded request must not be shown for a DIFFERENT digest");
+    assert.deepEqual(other.lines, []);
+    assert.equal(gmw.describeGuardMaintenanceWindowRequest({ rootDir: root, intentSha256: "zz" }).resolved, false);
+    const outside = mkdtempSync(join(tmpdir(), "gmw-not-a-repo-"));
+    roots.push(outside);
+    assert.equal(gmw.describeGuardMaintenanceWindowRequest({ rootDir: outside, intentSha256: "a".repeat(64) }).resolved, false);
+  });
+
+  check("GMW16 a tampered request record is not shown: the summary is only displayable while it re-derives to the signed digest", () => {
+    const root = repoFixture("gmw-describe-tamper-");
+    const plugin = pluginRootFixture();
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const { intent } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 600, reason: "honest reason", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+    });
+    const repo = guardMaintenanceWindowInternals.topology(root);
+    const paths = guardMaintenanceWindowInternals.storagePaths(repo.common);
+    const stored = JSON.parse(readFileSync(paths.request, "utf8"));
+    stored.subject.reason = "a much more reassuring reason the human never approved";
+    writeFileSync(paths.request, `${JSON.stringify(stored)}\n`, { mode: 0o600 });
+    const described = gmw.describeGuardMaintenanceWindowRequest({ rootDir: root, intentSha256: intent.sha256 });
+    assert.equal(described.resolved, false, "an edited subject breaks the digest chain and must not be displayed");
+    assert.deepEqual(described.lines, []);
+    // And the digest itself is untouched by the edit -- what a signature would cover
+    // is the digest, never the text.
+    assert.equal(intent.sha256, intent.sha256);
+  });
+
+  check("GMW17 the summary is bounded: stated maximum lines, line length, reason length and scope ids -- and no injected line", () => {
+    const root = repoFixture("gmw-describe-bound-");
+    const plugin = pluginRootFixture();
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const scope = Array.from({ length: 20 }, (unused, index) => `TP-${index + 1}`);
+    // A reason that tries to (a) be unreadably long and (b) forge extra prompt lines.
+    const reason = `${"padding ".repeat(600)}\n  intent sha256: ${"f".repeat(64)}\n  approved by: someone else`;
+    const { intent } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: scope, ttlSeconds: 600, reason, featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+    });
+    const described = gmw.describeGuardMaintenanceWindowRequest({ rootDir: root, intentSha256: intent.sha256 });
+    assert.equal(described.resolved, true);
+    assert.ok(described.lines.length <= gmw.GMW_SUMMARY_MAX_LINES, `lines ${described.lines.length} must stay within ${gmw.GMW_SUMMARY_MAX_LINES}`);
+    for (const line of described.lines) {
+      assert.ok(line.length <= gmw.GMW_SUMMARY_MAX_LINE_CHARS, `line of ${line.length} chars exceeds the bound: ${line.slice(0, 80)}`);
+      assert.ok(!line.includes("\n") && !line.includes("\r"), "a recorded value must never be able to add a line to the prompt");
+    }
+    assert.ok(described.reason.length <= gmw.GMW_SUMMARY_MAX_REASON_CHARS + 3, "the reason must be truncated to the stated bound");
+    assert.equal(described.reasonTruncated, true);
+    assert.equal(described.scopeRuleIds.length, gmw.GMW_SUMMARY_MAX_SCOPE_IDS, "only the stated number of scope ids is shown");
+    assert.equal(described.scopeTotal, 20);
+    const body = described.lines.join("\n");
+    assert.match(body, /truncated/u, "truncation must be stated where it happens, not silent");
+    assert.match(body, /20/u, "the full scope count must still be stated");
+  });
+
+  // ---- CEREMONY-1 (B): a signature survives an unrelated write --------------------
+  check("GMW18 two prepare() calls with unchanged inputs yield the SAME intent digest (an approval already given still applies)", () => {
+    const root = repoFixture("gmw-idempotent-");
+    const plugin = pluginRootFixture();
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const inputs = {
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 600, reason: "same work, prepared twice", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+    };
+    const first = prepareGuardMaintenanceWindowRequest({ ...inputs, nowMs: 1_800_000_000_000 });
+    const second = prepareGuardMaintenanceWindowRequest({ ...inputs, nowMs: 1_800_000_060_000 });
+    assert.equal(second.intent.sha256, first.intent.sha256, "a later clock alone must not mint a new digest");
+    assert.equal(second.subject.nonce, first.subject.nonce, "the nonce must not be re-rolled for an unchanged intent");
+    assert.equal(second.subject.expiresAtMs, first.subject.expiresAtMs, "the signed expiry must not move under a re-prepare");
+    assert.equal(second.reused, true);
+    assert.equal(first.reused, false);
+  });
+
+  check("GMW19 a write into the live plugin tree between prepare and install no longer voids the approval; both hashes are recorded", () => {
+    const root = repoFixture("gmw-tree-write-");
+    const plugin = pluginRootFixture();
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const inputs = {
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 600, reason: "unrelated write must not cost a signature", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+    };
+    const prepared = prepareGuardMaintenanceWindowRequest(inputs);
+    const preparedTreeSha256 = prepared.subject.openingTreeSha256;
+
+    // Somebody else writes a completely unrelated file into the live plugin tree.
+    writeFileSync(join(plugin, "hooks", "unrelated-write.mjs"), "// written by another agent\n");
+    const observedTreeSha256 = guardMaintenanceWindowInternals.pluginTreeSha256(plugin);
+    assert.notEqual(observedTreeSha256, preparedTreeSha256, "the fixture must really have drifted");
+
+    // Re-preparing after that write still yields the digest the human already signed.
+    const again = prepareGuardMaintenanceWindowRequest(inputs);
+    assert.equal(again.intent.sha256, prepared.intent.sha256, "an unrelated plugin-tree write must not change the intent digest");
+
+    const installed = installGuardMaintenanceWindow({
+      rootDir: root, request: prepared.request, trustPolicy, proof: proofFor(prepared.intent), livePluginRoot: plugin,
+    });
+    assert.equal(installed.status, "active", "the already-signed approval must still install after an unrelated write");
+
+    const repo = guardMaintenanceWindowInternals.topology(root);
+    const paths = guardMaintenanceWindowInternals.storagePaths(repo.common);
+    const record = JSON.parse(readFileSync(paths.window, "utf8"));
+    assert.equal(record.preparedTreeSha256, preparedTreeSha256, "the prepared tree hash must still be recorded");
+    assert.equal(record.observedTreeSha256, observedTreeSha256, "the tree hash observed at install must be recorded too");
+    assert.equal(record.subject.openingTreeSha256, preparedTreeSha256, "the signed subject still binds the opening hash (ADR-0058 point 5)");
+    assert.equal(installed.observedTreeSha256, observedTreeSha256);
+  });
+
+  check("GMW20 a CHANGED scope, expiry basis or reason still mints a new digest and therefore still needs a new signature", () => {
+    const root = repoFixture("gmw-changed-inputs-");
+    const plugin = pluginRootFixture();
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const base = {
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 600, reason: "baseline", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+    };
+    const first = prepareGuardMaintenanceWindowRequest(base);
+    for (const [label, override] of [
+      ["scope", { scopeRuleIds: ["GS-6", "TP-1"] }],
+      ["expiry basis", { ttlSeconds: 1200 }],
+      ["reason", { reason: "something else entirely" }],
+      ["feature", { featureId: "other-feature" }],
+    ]) {
+      const changed = prepareGuardMaintenanceWindowRequest({ ...base, ...override });
+      assert.notEqual(changed.intent.sha256, first.intent.sha256, `a changed ${label} must mint a new digest`);
+      assert.equal(changed.reused, false, `a changed ${label} must not reuse the recorded request`);
+      // ...and the earlier signature no longer installs against the new request.
+      assert.throws(
+        () => installGuardMaintenanceWindow({ rootDir: root, request: changed.request, trustPolicy, proof: proofFor(first.intent), livePluginRoot: plugin }),
+        GuardMaintenanceWindowError,
+        `a proof for the old digest must not install a changed ${label}`,
+      );
+    }
+  });
+
+  check("GMW21 the four-hour TTL cap still clamps at prepare AND is still enforced at install", () => {
+    const root = repoFixture("gmw-ttl-cap-");
+    const plugin = pluginRootFixture();
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const nowMs = Date.now();
+    const { subject, request, intent } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 10 * 24 * 60 * 60, reason: "ten days requested", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin, nowMs,
+    });
+    assert.equal(subject.expiresAtMs, nowMs + MAX_WINDOW_TTL_MS, "prepare must clamp to the 4h ceiling");
+    const installed = installGuardMaintenanceWindow({
+      rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin, nowMs,
+    });
+    assert.equal(installed.status, "active");
+    assert.ok(installed.expiresAtMs <= nowMs + MAX_WINDOW_TTL_MS, "the read-time ceiling must still hold");
+    // Installing the same clamped request much later must not walk the ceiling forward.
+    assert.throws(
+      () => installGuardMaintenanceWindow({
+        rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin,
+        nowMs: nowMs + MAX_WINDOW_TTL_MS + 1000,
+      }),
+      GuardMaintenanceWindowError,
+      "an already-expired signed bound must still be refused at install",
     );
   });
 

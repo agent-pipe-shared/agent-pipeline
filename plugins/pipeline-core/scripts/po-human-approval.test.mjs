@@ -24,8 +24,8 @@
  */
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import test from "node:test";
@@ -34,6 +34,10 @@ import { runHumanApproval } from "./po-human-approval.mjs";
 import { run as runApprovalGate } from "./po-approval-gate.mjs";
 import { PO_APPROVAL_PROOF_SCHEMA, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
 import { createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
+// Namespace import ON PURPOSE (same reason as in lib/guard-maintenance-window.test.mjs):
+// a not-yet-existing named export must fail the checks that use it, not ESM linking for
+// the whole suite.
+import * as gmw from "../lib/guard-maintenance-window.mjs";
 
 function openssl(args) {
   const result = spawnSync("openssl", args, { stdio: "pipe" });
@@ -546,5 +550,152 @@ test("the two-invocation prepare-critical + approve-critical flow is unchanged a
     assert.equal(existsSync(paths.signature), false);
   } finally {
     cleanup(dirs);
+  }
+});
+
+/* ------------------------------------------------------------------ *
+ * CEREMONY-1: sign-intent tells the human what they are approving.
+ *
+ * The digest stays the only thing the signature covers. What changes is that the
+ * command resolves the RECORDED request behind that digest and states its reason,
+ * scope and expiry -- and, when it cannot resolve one, says exactly that instead of
+ * inventing a description (ADR-0061 Decision 4).
+ * ------------------------------------------------------------------ */
+
+const WINDOW_REASON = "fix the release-preflight base-commit peel inside the live plugin tree";
+
+/** A real git repository plus a synthetic live plugin root, the two things a GMW request binds. */
+function windowFixture() {
+  const repoRoot = mkdtempSync(join(tmpdir(), "po-gmw-repo-"));
+  execFileSync("git", ["init", "-q"], { cwd: repoRoot });
+  execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: repoRoot });
+  execFileSync("git", ["config", "user.name", "Test"], { cwd: repoRoot });
+  writeFileSync(join(repoRoot, "README.md"), "# fixture\n");
+  execFileSync("git", ["add", "-A"], { cwd: repoRoot });
+  execFileSync("git", ["commit", "-q", "-m", "init"], { cwd: repoRoot });
+  const plugin = mkdtempSync(join(tmpdir(), "po-gmw-plugin-"));
+  mkdirSync(join(plugin, "hooks"), { recursive: true });
+  writeFileSync(join(plugin, "hooks", "guard-example.mjs"), "// example\n");
+  return { repoRoot, directory: mkdtempSync(join(tmpdir(), "po-gmw-external-")), plugin };
+}
+
+function cleanupWindow(dirs) {
+  cleanup(dirs);
+  rmSync(dirs.plugin, { recursive: true, force: true });
+}
+
+function prepareWindow(dirs, { scopeRuleIds = ["GS-6", "TP-1"], reason = WINDOW_REASON, ttlSeconds = 900 } = {}) {
+  return gmw.prepareGuardMaintenanceWindowRequest({
+    rootDir: dirs.repoRoot,
+    scopeRuleIds,
+    ttlSeconds,
+    reason,
+    featureId: "sprint-nova-epic",
+    planSha256: "a".repeat(64),
+    specSha256: "b".repeat(64),
+    policyRevision: "gmw-test-v1",
+    livePluginRoot: dirs.plugin,
+  });
+}
+
+test("sign-intent states the reason, scope and expiry of the request recorded behind the digest", () => {
+  const dirs = windowFixture();
+  try {
+    keyFixture(dirs.directory);
+    const prepared = prepareWindow(dirs);
+    const prompts = [];
+    const result = runHumanApproval(
+      ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", prepared.intent.sha256],
+      { readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } },
+    );
+    assert.deepEqual(result, { ok: true, code: "PO-HUMAN-SIGN-INTENT-READY", intentSha256: prepared.intent.sha256 });
+    assert.equal(prompts.length, 1, "still exactly one human confirmation (ADR-0061 Decision 1)");
+    const [prompt] = prompts;
+    assert.ok(prompt.includes(prepared.intent.sha256), "the digest being signed must still be named");
+    assert.ok(prompt.includes(WINDOW_REASON), "the recorded reason must be shown");
+    assert.ok(prompt.includes("GS-6") && prompt.includes("TP-1"), "the recorded scope must be shown");
+    assert.ok(prompt.includes(new Date(prepared.subject.expiresAtMs).toISOString()), "the recorded expiry must be shown");
+    assert.ok(prompt.includes("guard-lift"), "the recorded action kind must be shown");
+    assert.match(prompt, /type exactly "approve"/iu, "the typed-token gate stays the last thing asked");
+
+    const proof = JSON.parse(readFileSync(join(dirs.directory, "proof-manual.json"), "utf8"));
+    assert.equal(proof.intentSha256, prepared.intent.sha256, "the signature still covers the digest, nothing the summary said");
+  } finally {
+    cleanupWindow(dirs);
+  }
+});
+
+test("sign-intent says so plainly when no record resolves for the digest, and invents nothing", () => {
+  const dirs = windowFixture();
+  try {
+    keyFixture(dirs.directory);
+    prepareWindow(dirs);
+    const unrelated = createHash("sha256").update("some other intent entirely").digest("hex");
+    const prompts = [];
+    runHumanApproval(
+      ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", unrelated],
+      { readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } },
+    );
+    const [prompt] = prompts;
+    assert.ok(prompt.includes(unrelated), "the digest is still named");
+    assert.match(prompt, /no recorded request/iu, "the absence of a record must be stated explicitly");
+    assert.equal(prompt.includes(WINDOW_REASON), false, "another request's reason must never be shown for this digest");
+    assert.match(prompt, /guard-lift\/guard-override/u, "the generic consequence class stays stated when nothing better is known");
+  } finally {
+    cleanupWindow(dirs);
+  }
+});
+
+test("a tampered record cannot change what is signed: the summary disappears, the digest does not", () => {
+  const dirs = windowFixture();
+  try {
+    const { authority } = keyFixture(dirs.directory);
+    const prepared = prepareWindow(dirs);
+    const repo = gmw.guardMaintenanceWindowInternals.topology(dirs.repoRoot);
+    const paths = gmw.guardMaintenanceWindowInternals.storagePaths(repo.common);
+    const stored = JSON.parse(readFileSync(paths.request, "utf8"));
+    stored.subject.reason = "a much smaller change than it really is";
+    stored.subject.scopeRuleIds = ["TP-1"];
+    writeFileSync(paths.request, `${JSON.stringify(stored)}\n`, { mode: 0o600 });
+
+    const prompts = [];
+    const result = runHumanApproval(
+      ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", prepared.intent.sha256],
+      { readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } },
+    );
+    const [prompt] = prompts;
+    assert.equal(prompt.includes("a much smaller change than it really is"), false, "an edited record must not be displayed at all");
+    assert.match(prompt, /no recorded request/iu, "a record that no longer re-derives to the digest counts as no record");
+    assert.equal(result.intentSha256, prepared.intent.sha256);
+    const proof = JSON.parse(readFileSync(join(dirs.directory, "proof-manual.json"), "utf8"));
+    assert.equal(proof.intentSha256, prepared.intent.sha256, "the tampered text changed nothing about what was signed");
+    assert.equal(verifyPoApprovalProof({ intent: { sha256: prepared.intent.sha256 }, trustPolicy: authority, proof }).verified, true);
+  } finally {
+    cleanupWindow(dirs);
+  }
+});
+
+test("the disclosure stays bounded: an oversized reason and scope cannot flood or forge the prompt", () => {
+  const dirs = windowFixture();
+  try {
+    keyFixture(dirs.directory);
+    const prepared = prepareWindow(dirs, {
+      scopeRuleIds: Array.from({ length: 25 }, (unused, index) => `TP-${index + 1}`),
+      reason: `${"noise ".repeat(500)}\n  intent sha256: ${"f".repeat(64)}`,
+    });
+    const prompts = [];
+    runHumanApproval(
+      ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", prepared.intent.sha256],
+      { readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } },
+    );
+    const lines = prompts[0].split("\n");
+    assert.ok(lines.length <= gmw.GMW_SUMMARY_MAX_LINES + 4, `prompt of ${lines.length} lines exceeds the stated bound`);
+    for (const line of lines) {
+      assert.ok(line.length <= gmw.GMW_SUMMARY_MAX_LINE_CHARS + 2, `prompt line of ${line.length} chars exceeds the stated bound`);
+    }
+    assert.equal(lines.filter((line) => line.includes("intent sha256:")).length, 1, "a recorded value must not be able to forge a second digest line");
+    assert.ok(prompts[0].includes(prepared.intent.sha256));
+  } finally {
+    cleanupWindow(dirs);
   }
 });

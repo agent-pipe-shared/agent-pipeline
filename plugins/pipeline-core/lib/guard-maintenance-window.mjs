@@ -255,8 +255,15 @@ function writeAtomic(path, bytes) {
   }
 }
 
-function storagePaths(common) {
-  const base = secureDirectory(join(common, "agent-pipeline", "guard-maintenance-window"));
+/**
+ * `create: false` resolves the same paths WITHOUT creating or hardening the directory
+ * — for read-only callers (`describeGuardMaintenanceWindowRequest`) that must not leave
+ * a directory behind in a repository that has never used a window. The per-file
+ * owner-private check (`safePrivateFile`) still runs on every read.
+ */
+function storagePaths(common, { create = true } = {}) {
+  const directory = join(common, "agent-pipeline", "guard-maintenance-window");
+  const base = create ? secureDirectory(directory) : directory;
   return { base, request: join(base, "request.json"), window: join(base, "window.json") };
 }
 
@@ -317,9 +324,77 @@ function validRequest(value) {
   return object(value) && value.schema === GMW_REQUEST_SCHEMA && validSubject(value.subject) && validIntentEnvelope(value.intent);
 }
 
+/**
+ * The ONE re-derivation of a guard-lift intent from a stored envelope, used by
+ * `install`, by `prepare`'s reuse check and by `describeGuardMaintenanceWindowRequest`.
+ * `kind`/`decision` are hardcoded, never read from the stored value: a record claiming a
+ * different kind simply fails to reproduce its own digest.
+ */
+function rebuildGuardLiftIntent(value, subjectSha256) {
+  return createPoApprovalIntent({
+    kind: "guard-lift",
+    featureId: value?.featureId,
+    planSha256: value?.planSha256,
+    specSha256: value?.specSha256,
+    candidate: value?.candidate,
+    policyRevision: value?.policyRevision,
+    subjectSha256,
+    decision: "lift",
+  });
+}
+
+/** Reads the durable request file if it is present, well-formed and owner-private; null otherwise. */
+function readStoredRequest(path) {
+  if (!existsSync(path)) return null;
+  try {
+    safePrivateFile(path);
+    const stored = JSON.parse(readFileSync(path, "utf8"));
+    return validRequest(stored) && validScope(stored.subject.scopeRuleIds) ? stored : null;
+  } catch { return null; }
+}
+
 // ---------------------------------------------------------------------------------
 // prepare / install / status / cover / close
 // ---------------------------------------------------------------------------------
+
+/**
+ * True when the request already on disk expresses EXACTLY the intent being prepared
+ * again, so re-preparing must hand back the same digest instead of minting a new one
+ * (CEREMONY-1 defect B: a signature the PO has already given must not be voided by a
+ * second `prepare`, or by anything that happened between the two).
+ *
+ * Every field the human is shown or that bounds the window is compared: scope, reason,
+ * the physical repository, the expiry basis and the absolute signed expiry, plus the
+ * whole intent envelope (feature, plan, spec, candidate commit/tree, policy revision)
+ * via a full digest re-derivation. Two fields are deliberately NOT compared:
+ *   - `nonce`, because it is what would otherwise change on every call, and re-rolling it
+ *     for an unchanged intent buys nothing: the absolute signed `expiresAtMs` already
+ *     bounds any replay, and install() already documents a repeated install of the same
+ *     {request, proof} as safe-by-construction;
+ *   - `openingTreeSha256`, because a live-plugin-tree write between two prepares is
+ *     exactly the unrelated event that must NOT cost a second signature. It stays bound
+ *     in the signed subject (ADR-0058 point 5) as the hash at the moment this intent was
+ *     first prepared, and install() records what it observes alongside it.
+ * `preparation` is unsigned metadata: tampering with it can only cause a fresh mint or a
+ * reuse of a request whose own signed expiry the PO still sees in the confirmation.
+ */
+function reusablePreparedRequest({ stored, scopeRuleIds, reason, repoFingerprintSha256, ttlSeconds, intentValue, nowMs }) {
+  if (stored === null) return false;
+  const subject = stored.subject;
+  if (subject.reason !== reason) return false;
+  if (subject.repoFingerprintSha256 !== repoFingerprintSha256) return false;
+  if (subject.scopeRuleIds.length !== scopeRuleIds.length) return false;
+  if (subject.scopeRuleIds.some((id, index) => id !== scopeRuleIds[index])) return false;
+  if (!object(stored.preparation) || stored.preparation.ttlSeconds !== ttlSeconds) return false;
+  // A signed expiry that has passed, or that install() would now refuse as too far out,
+  // can never become a usable window — re-preparing must mint a fresh, clamped one.
+  if (!(subject.expiresAtMs > nowMs) || subject.expiresAtMs > nowMs + MAX_WINDOW_TTL_MS) return false;
+  const subjectSha256 = sha(subject);
+  if (subjectSha256 !== stored.intent.value?.subjectSha256) return false;
+  let rebuilt;
+  try { rebuilt = rebuildGuardLiftIntent(intentValue, subjectSha256); } catch { return false; }
+  return rebuilt.sha256 === stored.intent.sha256;
+}
 
 /** Agent-safe: produces only public, digest-bound data for external signing. */
 export function prepareGuardMaintenanceWindowRequest({
@@ -345,38 +420,46 @@ export function prepareGuardMaintenanceWindowRequest({
   }
 
   const repo = topology(rootDir, spawn);
-  const openingTreeSha256 = pluginTreeSha256(livePluginRoot);
   const repoFingerprintSha256 = repoFingerprint(repo);
+  const commit = git(repo.root, ["rev-parse", "HEAD"], spawn);
+  const tree = git(repo.root, ["rev-parse", "HEAD^{tree}"], spawn);
+  const scope = [...new Set(scopeRuleIds)].sort();
+  const trimmedReason = reason.trim();
+  const intentValue = { featureId, planSha256, specSha256, candidate: { commit, tree }, policyRevision };
+  const paths = storagePaths(repo.common);
+
+  // Idempotent over its own intent: an unchanged request keeps its digest, so an
+  // approval the PO has already given still applies (CEREMONY-1 defect B). Any change
+  // to scope, expiry basis, reason, feature, plan/spec or candidate falls through to a
+  // fresh mint below — and therefore still needs its own signature.
+  const stored = readStoredRequest(paths.request);
+  if (reusablePreparedRequest({ stored, scopeRuleIds: scope, reason: trimmedReason, repoFingerprintSha256, ttlSeconds, intentValue, nowMs })) {
+    return { intent: stored.intent, subject: stored.subject, request: stored, reused: true };
+  }
+
+  const openingTreeSha256 = pluginTreeSha256(livePluginRoot);
   const nonce = randomBytes(16).toString("hex");
   // The ABSOLUTE bound is chosen and clamped ONCE, here, and becomes part of the
   // signed subject (F1/F2 fix) -- never a relative ttlSeconds that a later step
   // reinterprets against its own "now".
   const expiresAtMs = Math.min(nowMs + ttlSeconds * 1000, nowMs + MAX_WINDOW_TTL_MS);
   const subject = {
-    scopeRuleIds: [...new Set(scopeRuleIds)].sort(),
+    scopeRuleIds: scope,
     expiresAtMs,
-    reason: reason.trim(),
+    reason: trimmedReason,
     repoFingerprintSha256,
     openingTreeSha256,
     nonce,
   };
   const subjectSha256 = sha(subject);
-  const commit = git(repo.root, ["rev-parse", "HEAD"], spawn);
-  const tree = git(repo.root, ["rev-parse", "HEAD^{tree}"], spawn);
-  const intent = createPoApprovalIntent({
-    kind: "guard-lift",
-    featureId,
-    planSha256,
-    specSha256,
-    candidate: { commit, tree },
-    policyRevision,
-    subjectSha256,
-    decision: "lift",
-  });
-  const request = { schema: GMW_REQUEST_SCHEMA, subject, intent };
-  const paths = storagePaths(repo.common);
+  const intent = rebuildGuardLiftIntent(intentValue, subjectSha256);
+  // `preparation` is UNSIGNED envelope metadata (never part of `subject`, never part of
+  // the digest): it records the expiry basis so a later prepare can tell "same request"
+  // from "same expiry by coincidence". Nothing downstream trusts it — install() and
+  // currentGuardMaintenanceWindow() never read it.
+  const request = { schema: GMW_REQUEST_SCHEMA, subject, intent, preparation: { ttlSeconds, preparedAtMs: nowMs } };
   writeAtomic(paths.request, Buffer.from(`${JSON.stringify(request)}\n`, "utf8"));
-  return { intent, subject, request };
+  return { intent, subject, request, reused: false };
 }
 
 /** Agent-safe: verify-and-place only. Cannot succeed without a genuine proof. */
@@ -393,25 +476,30 @@ export function installGuardMaintenanceWindow({ rootDir, request, trustPolicy, p
   if (repoFingerprintSha256 !== request.subject.repoFingerprintSha256) {
     fail("GMW-DRIFT", "physical repository identity drifted since the request was prepared");
   }
-  const openingTreeSha256 = pluginTreeSha256(livePluginRoot);
-  if (openingTreeSha256 !== request.subject.openingTreeSha256) {
-    fail("GMW-DRIFT", "live plugin tree drifted since the request was prepared");
-  }
+  // The live-plugin tree hash is OBSERVED and RECORDED here, never an admission
+  // precondition (CEREMONY-1 defect B). It used to be compared for equality against the
+  // hash bound at prepare time, which meant any write into the plugin tree between the
+  // two steps — including one by an unrelated process, and including one the window is
+  // about to authorize anyway — destroyed a signature the PO had already given, for a
+  // reason the PO was never asked about. What it would have protected is already covered
+  // by the signed subject (physical repository identity, scope, absolute expiry, reason)
+  // and by the intent's candidate commit/tree binding; the working-tree bytes it
+  // additionally covered are bytes a GS-6 window exists to let the session change, and
+  // the pre-install route to changing them (a same-repo merge/checkout) is the residual
+  // risk ADR-0058 explicitly leaves to delivery discipline rather than to this check.
+  // The observation is kept, in both directions, so the audit record and bootstrap can
+  // still state as fact what the tree looked like when the window was prepared and when
+  // it was armed. A tree that cannot be hashed at all (e.g. a symlink appeared) records
+  // `null` rather than voiding an approval that has already been given.
+  const observedTreeSha256 = (() => {
+    try { return pluginTreeSha256(livePluginRoot); } catch { return null; }
+  })();
 
   const subjectSha256 = sha(request.subject);
   if (subjectSha256 !== request.intent.value?.subjectSha256) fail("GMW-REQUEST-INVALID", "request subject does not match its own intent");
   let rebuiltIntent;
   try {
-    rebuiltIntent = createPoApprovalIntent({
-      kind: "guard-lift",
-      featureId: request.intent.value?.featureId,
-      planSha256: request.intent.value?.planSha256,
-      specSha256: request.intent.value?.specSha256,
-      candidate: request.intent.value?.candidate,
-      policyRevision: request.intent.value?.policyRevision,
-      subjectSha256,
-      decision: "lift",
-    });
+    rebuiltIntent = rebuildGuardLiftIntent(request.intent.value, subjectSha256);
   } catch { fail("GMW-REQUEST-INVALID", "request intent is malformed"); }
   if (rebuiltIntent.sha256 !== request.intent.sha256) fail("GMW-REQUEST-INVALID", "request intent digest does not match its rebuilt preimage");
 
@@ -462,17 +550,33 @@ export function installGuardMaintenanceWindow({ rootDir, request, trustPolicy, p
     intent: rebuiltIntent,
     proof,
     installedAtMs,
+    // Both halves of the tree observation, recorded rather than enforced: what the
+    // signed subject bound when the request was prepared, and what was actually there
+    // when the window was armed.
+    preparedTreeSha256: request.subject.openingTreeSha256,
+    observedTreeSha256,
   };
   const paths = storagePaths(repo.common);
   writeAtomic(paths.window, Buffer.from(`${JSON.stringify(record)}\n`, "utf8"));
   return currentGuardMaintenanceWindow({ rootDir, nowMs, spawn });
 }
 
+/**
+ * `preparedTreeSha256`/`observedTreeSha256` are audit observations, not admission
+ * criteria: absent (a record written before CEREMONY-1) or null (the tree could not be
+ * hashed) is tolerated, a present value must still look like a digest. They carry no
+ * validity weight — the signed subject and the proof do.
+ */
+function validTreeObservation(value) {
+  return value === undefined || value === null || SHA256.test(value);
+}
+
 function validWindowRecord(value) {
   return object(value) && value.schema === GMW_WINDOW_SCHEMA && typeof value.root === "string"
     && SHA256.test(value.repoFingerprintSha256 ?? "") && validSubject(value.subject)
     && object(value.intent) && object(value.intent.value) && SHA256.test(value.intent.sha256 ?? "")
-    && object(value.proof) && Number.isFinite(value.installedAtMs);
+    && object(value.proof) && Number.isFinite(value.installedAtMs)
+    && validTreeObservation(value.preparedTreeSha256) && validTreeObservation(value.observedTreeSha256);
 }
 
 /**
@@ -514,16 +618,7 @@ export function currentGuardMaintenanceWindow({ rootDir, nowMs = Date.now(), spa
   if (subjectSha256 !== record.intent.value?.subjectSha256) return { status: "absent" }; // tamper: subject/intent disagree
   let rebuiltIntent;
   try {
-    rebuiltIntent = createPoApprovalIntent({
-      kind: "guard-lift",
-      featureId: record.intent.value?.featureId,
-      planSha256: record.intent.value?.planSha256,
-      specSha256: record.intent.value?.specSha256,
-      candidate: record.intent.value?.candidate,
-      policyRevision: record.intent.value?.policyRevision,
-      subjectSha256,
-      decision: "lift",
-    });
+    rebuiltIntent = rebuildGuardLiftIntent(record.intent.value, subjectSha256);
   } catch { return { status: "absent" }; }
   if (rebuiltIntent.sha256 !== record.intent.sha256) return { status: "absent" }; // tamper
   const verified = verifyPoApprovalProof({ intent: rebuiltIntent, trustPolicy: trustAnchor, proof: record.proof });
@@ -548,6 +643,9 @@ export function currentGuardMaintenanceWindow({ rootDir, nowMs = Date.now(), spa
     scopeRuleIds: record.subject.scopeRuleIds,
     reason: record.subject.reason,
     openingTreeSha256: record.subject.openingTreeSha256,
+    // Audit-only: what the live plugin tree actually hashed to when this window was
+    // armed. `null` when the record predates CEREMONY-1 or the tree was unhashable.
+    observedTreeSha256: record.observedTreeSha256 ?? null,
   };
   if (!active) {
     return { status: "expired", ...shared, expiresAtMs: Number.isFinite(effectiveExpiresAtMs) ? effectiveExpiresAtMs : null };
@@ -563,6 +661,119 @@ export function windowCoversRule({ rootDir, ruleId, nowMs = Date.now(), spawn = 
   // never report `covered: true` for GS-1..GS-5/GS-7 or an unknown id through this path.
   const covered = window.status === "active" && isLiftableRuleId(ruleId) && window.scopeRuleIds.includes(ruleId);
   return { covered, window };
+}
+
+// ---------------------------------------------------------------------------------
+// What a signing command may show the human (CEREMONY-1 defect A, ADR-0061 Decision 4)
+// ---------------------------------------------------------------------------------
+
+/**
+ * The stated maximum of the disclosure. A summary that can grow without limit is a new
+ * place to hide text a human will not read, so every dimension is capped and every cap
+ * is enforced on the way out (not merely intended): at most this many lines, each at
+ * most this many characters, with the reason and the scope list capped separately and
+ * their truncation stated in the line itself.
+ */
+export const GMW_SUMMARY_MAX_LINES = 8;
+export const GMW_SUMMARY_MAX_LINE_CHARS = 240;
+export const GMW_SUMMARY_MAX_REASON_CHARS = 160;
+export const GMW_SUMMARY_MAX_SCOPE_IDS = 8;
+
+/**
+ * Renders one recorded value for a terminal prompt: control characters (newlines
+ * included) collapse to spaces, so a recorded string can never add, indent or forge a
+ * line of the confirmation; length is capped and the cut is marked.
+ */
+function displayText(value, limit) {
+  const flat = (typeof value === "string" ? value : "").replace(/\p{C}/gu, " ").replace(/\s+/gu, " ").trim();
+  return flat.length <= limit
+    ? { text: flat, truncated: false, length: flat.length }
+    : { text: `${flat.slice(0, limit)}...`, truncated: true, length: flat.length };
+}
+
+function displayTimestamp(expiresAtMs) {
+  try {
+    const iso = new Date(expiresAtMs).toISOString();
+    return typeof iso === "string" ? iso : String(expiresAtMs);
+  } catch { return String(expiresAtMs); }
+}
+
+function clipLines(lines) {
+  return lines.slice(0, GMW_SUMMARY_MAX_LINES).map((line) => {
+    const flat = String(line).replace(/\p{C}/gu, " ");
+    return flat.length <= GMW_SUMMARY_MAX_LINE_CHARS ? flat : `${flat.slice(0, GMW_SUMMARY_MAX_LINE_CHARS - 3)}...`;
+  });
+}
+
+function unresolvedRequest(code) {
+  return { resolved: false, code, lines: [] };
+}
+
+/**
+ * Resolves the guard-maintenance-window request recorded in this repository for
+ * `intentSha256` and renders a bounded, purely-read summary of it.
+ *
+ * Two properties are the point of this function:
+ *
+ * 1. **It never fabricates.** Every displayed value is read from the recorded request.
+ *    When no record resolves, the caller gets `{ resolved: false, lines: [] }` and must
+ *    say exactly that — the honest "no description available" text stays, only the
+ *    ignorance goes away.
+ * 2. **It never becomes authority.** The summary is shown only when the record
+ *    re-derives to exactly the digest about to be signed, through the same
+ *    subject/intent derivation `installGuardMaintenanceWindow` performs. Edit any
+ *    displayed field and the record stops re-deriving, so it stops being displayed —
+ *    it does not start displaying a lie. The signature still covers the digest and
+ *    nothing else; this function has no way to change what is signed.
+ */
+export function describeGuardMaintenanceWindowRequest({ rootDir, intentSha256, spawn = spawnSync } = {}) {
+  try {
+    if (!SHA256.test(intentSha256 ?? "")) return unresolvedRequest("GMW-RECORD-DIGEST-INVALID");
+    let repo;
+    try { repo = topology(rootDir, spawn); } catch { return unresolvedRequest("GMW-RECORD-REPOSITORY-UNAVAILABLE"); }
+    const paths = storagePaths(repo.common, { create: false });
+    const stored = readStoredRequest(paths.request);
+    if (stored === null) return unresolvedRequest("GMW-RECORD-ABSENT");
+    if (stored.intent.sha256 !== intentSha256) return unresolvedRequest("GMW-RECORD-DIGEST-MISMATCH");
+
+    const subjectSha256 = sha(stored.subject);
+    if (subjectSha256 !== stored.intent.value?.subjectSha256) return unresolvedRequest("GMW-RECORD-INCONSISTENT");
+    let rebuilt;
+    try { rebuilt = rebuildGuardLiftIntent(stored.intent.value, subjectSha256); } catch { return unresolvedRequest("GMW-RECORD-INCONSISTENT"); }
+    if (rebuilt.sha256 !== intentSha256) return unresolvedRequest("GMW-RECORD-INCONSISTENT");
+
+    const value = stored.intent.value ?? {};
+    const reason = displayText(stored.subject.reason, GMW_SUMMARY_MAX_REASON_CHARS);
+    const scopeTotal = stored.subject.scopeRuleIds.length;
+    const scopeRuleIds = stored.subject.scopeRuleIds.slice(0, GMW_SUMMARY_MAX_SCOPE_IDS).map((id) => displayText(id, 32).text);
+    const scopeNote = scopeTotal > scopeRuleIds.length ? ` [showing ${scopeRuleIds.length} of ${scopeTotal}]` : "";
+    const reasonNote = reason.truncated ? ` [truncated to ${GMW_SUMMARY_MAX_REASON_CHARS} of ${reason.length} characters]` : "";
+    const expiresAt = displayTimestamp(stored.subject.expiresAtMs);
+    const candidate = value.candidate ?? {};
+
+    return {
+      resolved: true,
+      code: "GMW-RECORD-RESOLVED",
+      schema: stored.schema,
+      kind: displayText(value.kind, 32).text,
+      featureId: displayText(value.featureId, 64).text,
+      scopeRuleIds,
+      scopeTotal,
+      reason: reason.text,
+      reasonTruncated: reason.truncated,
+      expiresAtMs: stored.subject.expiresAtMs,
+      expiresAt,
+      candidate: { commit: displayText(candidate.commit, 64).text, tree: displayText(candidate.tree, 64).text },
+      lines: clipLines([
+        `recorded request: ${displayText(stored.schema, 64).text} (kind ${displayText(value.kind, 32).text}, feature ${displayText(value.featureId, 64).text})`,
+        `guard rules this lifts: ${scopeRuleIds.join(", ")}${scopeNote}`,
+        `reason recorded with the request: "${reason.text}"${reasonNote}`,
+        `window expires at (signed, absolute): ${expiresAt}`,
+        `candidate commit: ${displayText(candidate.commit, 64).text}`,
+        `candidate tree: ${displayText(candidate.tree, 64).text}`,
+      ]),
+    };
+  } catch { return unresolvedRequest("GMW-RECORD-UNREADABLE"); }
 }
 
 /** Agent-safe, unauthenticated: closing only narrows capability. No-op if absent. */
