@@ -71,10 +71,35 @@ they were pinned to are suppressions nobody is re-justifying.
 
 ### 4. `backlog-state-check`
 
-`ledger event N: evidence.commit is not a reachable local Git commit`, for events
-**14 through 38** — a contiguous run of 25. A contiguous block points at one episode
-(a rebase, a squashed branch, a re-created history) rather than 25 independent
-mistakes, so it likely has a single explanation and a single repair.
+`ledger event N: evidence.commit is not a reachable local Git commit`. A contiguous
+block points at one episode (a rebase, a squashed branch, a re-created history)
+rather than N independent mistakes, so it likely has a single explanation and a
+single repair.
+
+**Corrected 2026-08-08, and the correction changes the reading.** This section
+first recorded the range as "events **14 through 38** — a contiguous run of 25".
+Re-run directly (`node plugins/pipeline-core/scripts/check-backlog-state.mjs`,
+exit 2, 39 findings): the range is **events 1 through 38** — *every* event in the
+ledger up to 38, plus one separate finding
+(`pipeline.first-verify-run-is-red-with-four-failures has no transition-ledger
+entry`, the mirror case this item's own filing created).
+
+The original figure supported "one episode somewhere in the middle of the
+history". The measured figure does not: a block starting at event **1** is not an
+episode inside the history, it is the whole inherited chain. The likely
+explanation is the ledger reconciliation performed during the 0.5.3 merge — the
+`main` chain was adopted wholesale and our items re-added on top
+(`reconcile-backlog-ledger.mjs --activate`, 31 transitions, `6a5331d`) — so the
+adopted events carry `evidence.commit` values from a history this branch cannot
+reach. **That is a repair on the reconciliation, not on 38 events.** It should be
+confirmed before it is acted on; it is recorded as the leading hypothesis, not as
+a finding.
+
+**A consequence nobody had connected to this suite.** `backlog/index.json` and
+`backlog/STATUS.md` are generator output, and the generator (`--write`) fails
+closed on these findings before it projects anything. Both files are therefore
+frozen at a stale state for as long as this failure stands — one red suite is
+silently holding two artifacts hostage, and neither shows any sign of it.
 
 ## Why this is one item and not four
 

@@ -5,6 +5,89 @@
 
 **Last updated:** 2026-08-08
 
+**DESIGN PHASE CLOSED; A PHASE PRD IS ON THE TABLE (2026-08-08).** All four
+design packages are Critic-clean under the round cap — R1 4/4 PASS, R2 1 PASS,
+R3 3 PASS, PHX-LEDGER-INTAKE 4/4 PASS with one minor. The 0.5.3 merge landed as
+`35d9e11`, releasing R3's sequencing constraint.
+
+**Seven PO decisions were taken on 2026-08-08 and are recorded in artifacts, not
+only here:**
+`specs/sprint-phoenix-epic/prd_phoenix-gate-integrity-phase.md` (`6122ae1`,
+updated `75b2d1a`, `35bee8e`). Ledger-intake design accepted; suite-registration
+completeness becomes a verify step; owners assigned for the four verify
+failures with the 13 gitleaks fingerprints **approved** as deadlock repairs;
+H-AC-11 amended for GMW; the window singleton (O-5) and the inert kernel-list
+entry (P5) recorded as decisions with reasons; `requirement` added to the item
+taxonomy; and the stage-0 definition site decided as option (b).
+
+**The ledger-intake minor is closed without a fifth round** (`546407b`, PO
+release). §7.3/§4 grounded the `validity.expiresAtEpochMs` byte-identity on
+`GMW-EXPIRY-TOO-FAR` having "already refused" over-long requests — but that check
+sits inside `installGuardMaintenanceWindow`, which §7.4 calls at step (d), *after*
+the appends at (b)/(c). The replacement separates the honest `prepare()`-built
+case (signed value, unchanged) from the hand-built corner (clock-derived, already
+fail-closed, now stated instead of elided). §14 no longer lags a round. No
+normative claim moved.
+
+**The B3 inventory is done and it answers the approval question.** Two dispatches
+measured every citation at `84c5c0f`: `evidence/phx-r3-b3-inventory-c1-c5.md`
+(`aa8937d`) and `evidence/phx-r3-b3-inventory-c6-c8.md` (`dca461c`). **238
+citations over 39 files** against the design's 233 — every delta in the
+found-more direction, each explained by a named line. **Guard protection was
+established, not assumed:** nothing in C6/C7/C8, and not
+`harness/scripts/check-claude-md-lines.mjs`, is refused by any GS-* path-table
+rule, by GS-6, or by a protected-test-path rule in this checkout — the
+repository's own `plugins/pipeline-core/**` is a source tree here, not the
+enforcing copy. **The sweep therefore adds zero human approvals**, and the
+phase's four-command budget is measurement-backed. The GS-6 half of that result
+is session/host-configuration dependent and must be re-confirmed by whoever runs
+the sweep.
+
+**THE FINDING THAT MATTERS MOST FROM THAT INVENTORY, and it is not a citation
+defect.** `roles/elephant.md:35` carries EL-01's only exception — the rule
+permitting an interactive Elephant to write production code itself — and scopes
+it "EXCLUSIVELY to the OM §3.3 definition … do not extend it by local judgment".
+`harness/checklists/small-session.md:38-40` invokes the same definition and links
+the anchor `stage-0-smallfix-definition`. **Neither exists.**
+`git log -S "25 diff lines" -- docs/operating-model.md` returns nothing: the
+string has never appeared in that file's history, so this is not drift from a
+restructure, and the anchor is absent too. `check-doc-contracts.mjs` is green
+because it validates Markdown links and anchors, not `§N` prose citations. The
+criteria survive only as parentheticals inside the two citing sentences — **and
+the two disagree** (`elephant.md` also excludes public-API, guardrail-hook-CI,
+dependency and security-surface changes; `small-session.md` does not). An agent
+cannot check its own eligibility against the named authority. **PO decision:
+option (b)** — `roles/elephant.md` becomes the single definition site, everything
+else references it by heading title, and the **broader** exclusion set survives,
+because making one canonical decides the rule's scope and the exception should
+admit fewer changes rather than more. Criterion **AC-P11**.
+
+**Taxonomy: `requirement` landed** (`633524b`). `BACKLOG_TYPES` and
+`backlog/schemas/item.schema.json` now agree by assertion (`BS02b` reads the
+schema off disk), and two items were reclassified on their own text. **Three
+further carriers of the same enum were found and deliberately left**:
+`backlog-delivery-reconciliation.mjs:67`,
+`scripts/backlog-delivery-intent.schema.json:11`, and
+`backlog/schemas/sentinel-recovery.schema.json:19` — the first two are a live
+third duplicate and are a follow-up, not a closed item.
+**A causal link worth keeping:** `backlog/index.json` and `backlog/STATUS.md` are
+generator output, and the generator fails closed on the 39 pre-existing ledger
+findings. Those two files therefore stay stale until R2 failure 4 is repaired —
+one red suite is silently freezing two artifacts nobody has connected to it.
+
+**Truncated-fragment defect: thirteenth occurrence**, this time the taxonomy
+dispatch, again with uncommitted work in the tree (seven files). Recovered by
+`SendMessage` resume from its own transcript, never by re-dispatch.
+**Resolved upstream (PO, 2026-08-08): the next Nova plugin version has agents
+write their final report to a file** instead of only returning it into the
+session. That makes proposal 3's diagnosis question moot — truncation or genuine
+early stop, the report survives either way — and turns proposal 1's acceptance
+check from a rule an Elephant must remember into a state a check can read. **Two
+halves are not covered and stay open:** the orchestrator writing under its own
+running dispatch (a reference-set collision, not a delivery problem), and
+sub-case 2, where the work genuinely is unfinished and resume — never
+re-dispatch — remains the recovery.
+
 **Design phase, open packages (2026-08-07 evening).** Two design documents were
 authored this session and both are in the Critic cycle:
 - **PHX-LEDGER-INTAKE** (`f68a17d`, GMW/HGO evidence into the human decision

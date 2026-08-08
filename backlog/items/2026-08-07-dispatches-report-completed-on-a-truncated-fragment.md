@@ -123,9 +123,49 @@ one.
    different fixes. Six samples are recorded above; the transcripts exist. Do
    not build a detector before knowing which failure it would be detecting.
 
+## Resolution in flight (PO, 2026-08-08)
+
+**The next Nova plugin version carries a fix: dispatched agents will write their
+final report to a file rather than only returning it into the session.**
+
+That closes the defect at its cause rather than detecting it after the fact, and
+it is the right shape for a reason the proposals above only half-anticipated.
+Proposal 3 asked for a diagnosis before any tooling — truncation artifact or
+genuine early stop. **Writing the report to a file makes the distinction stop
+mattering**: whichever it is, the report survives the message that failed to
+carry it. Fourteen recorded occurrences in this repository were all recovered by
+resume, so no report was ever actually lost — but every recovery cost a detection
+step, and detection depended on someone thinking to run `git status`.
+
+**It also makes proposal 1's acceptance check mechanical instead of behavioural.**
+As written, that proposal asks an Elephant to *remember* to verify a trailer and
+a clean tree before booking a dispatch as done. With a report file, the check
+becomes: the file exists and is complete, or the dispatch did not finish. That is
+the same move this repository made for the verify gate — replace a rule an agent
+must remember with a state a check can read.
+
+**What the fix does not cover, stated so it is not assumed away.** The second
+defect recorded in this item is the *orchestrator* writing under its own running
+worker (twice, an hour apart, the second time after the rule forbidding it had
+been written down). A report file does nothing about that: it is a
+reference-set-collision problem, not a message-delivery problem, and its durable
+fix is still the mechanical one named above — a dispatch declares its reference
+set, and the orchestrator's writes are checked against open dispatches.
+
+**Sub-case 2 also survives.** A report file distinguishes "finished, report lost"
+from "never finished" far more cheaply than today, but an agent that genuinely
+stops mid-task still leaves uncommitted work. The resume recovery in proposal 2
+remains the right response there, and re-dispatching remains the wrong one —
+it discards finished work and, for a Critic, consumes a review round.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted; resolved upstream.
+- **Rationale:** Fixed at the cause in the next Nova plugin version — agents write
+  their final report to a file. Supersedes the detector contemplated in proposal 3
+  and makes proposal 1's acceptance check mechanical. Proposals 1's second half
+  (orchestrator writes under an open dispatch) and proposal 2 (resume, not
+  re-dispatch) remain open and are not covered by it.
+- **Assignment (if accepted):** Nova session (plugin); the reference-set rule
+  stays with the Pipeline.
+- **Date:** 2026-08-08
