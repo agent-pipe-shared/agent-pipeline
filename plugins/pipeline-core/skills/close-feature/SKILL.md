@@ -2,7 +2,7 @@
 name: close-feature
 description: "Feature-lifecycle close: ends the CURRENT activeFeature in .claude/pipeline-state.json via the sanctioned pipeline-state.mjs writer (close-feature subcommand) -- appends an audit entry to closedFeatures, clears activeFeature/planApproval/planRevocation, sets planApproved=false, silences the stop-suggest nudge. Invoke when a feature's work is done and its plan/phase tracking should stop, independent of any session boundary."
 argument-hint: "<name performing the close>"
-allowed-tools: Bash(node harness/scripts/usage-ledger.mjs:*), Bash(node plugins/pipeline-core/scripts/pipeline-state.mjs:*), Bash(node plugins/pipeline-core/scripts/close-coordinator.mjs:*)
+allowed-tools: Bash(node plugins/pipeline-core/scripts/usage-ledger.mjs:*), Bash(node plugins/pipeline-core/scripts/pipeline-state.mjs:*), Bash(node plugins/pipeline-core/scripts/close-coordinator.mjs:*)
 ---
 
 # close-feature — end a feature's lifecycle tracking
@@ -28,7 +28,7 @@ for the full flag reference) -- this skill does not duplicate that logic, it reu
 ledger CLI:
 
 ```
-node harness/scripts/usage-ledger.mjs "$HOME/.claude/projects" --latest --row "<feature-id>"
+node plugins/pipeline-core/scripts/usage-ledger.mjs "$HOME/.claude/projects" --latest --row "<feature-id>"
 ```
 
 (Windows: `"%USERPROFILE%\.claude\projects"`.) Append the printed row to the project's

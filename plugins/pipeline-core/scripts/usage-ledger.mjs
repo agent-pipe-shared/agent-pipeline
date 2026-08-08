@@ -101,11 +101,11 @@ const DEFAULT_PRICES_PATH = path.join(SCRIPT_DIR, "model-prices.json");
 function usage(msg) {
   if (msg) console.error(msg);
   console.error(
-    "Usage: node harness/scripts/usage-ledger.mjs <transcripts-root> [--session <uuid>] [--latest [projectDirName]] [--row [label]] [--prices <path>]",
+    "Usage: node plugins/pipeline-core/scripts/usage-ledger.mjs <transcripts-root> [--session <uuid>] [--latest [projectDirName]] [--row [label]] [--prices <path>]",
   );
-  console.error('Example (full table):  node harness/scripts/usage-ledger.mjs "$HOME/.claude/projects"');
+  console.error('Example (full table):  node plugins/pipeline-core/scripts/usage-ledger.mjs "$HOME/.claude/projects"');
   console.error(
-    'Example (close row):   node harness/scripts/usage-ledger.mjs "$HOME/.claude/projects" --latest --row "S1/B2"',
+    'Example (close row):   node plugins/pipeline-core/scripts/usage-ledger.mjs "$HOME/.claude/projects" --latest --row "S1/B2"',
   );
   process.exit(1);
 }

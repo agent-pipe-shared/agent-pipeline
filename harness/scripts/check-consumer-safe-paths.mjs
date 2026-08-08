@@ -61,15 +61,6 @@ export const SOURCE_ONLY_PREFIXES = Object.freeze(["harness/", "specs/sprint-nov
 
 export const ALLOWLIST = Object.freeze([
   {
-    file: "plugins/pipeline-core/skills/close-feature/SKILL.md",
-    match: "harness/scripts/usage-ledger.mjs",
-    reason:
-      "Content defect, not a path defect (CB-1b stop condition, field 5): usage-ledger.mjs " +
-      "has no plugin-relative equivalent anywhere under plugins/pipeline-core/ -- no path " +
-      "substitution makes this instruction consumer-correct. Reported as an open item for a " +
-      "separate decision rather than silently left broken or silently rewritten.",
-  },
-  {
     file: "plugins/pipeline-core/skills/pipeline-start/SKILL.md",
     match: "harness/scripts/check-observation-governance.mjs",
     reason:
@@ -117,20 +108,6 @@ export const ALLOWLIST = Object.freeze([
     reason:
       "Explicitly scoped \"(Agent-Pipeline checkout only)\" in the same sentence -- the same " +
       "self-application-only pattern as pipeline-start/SKILL.md's Observation governance step.",
-  },
-  {
-    file: "plugins/pipeline-core/skills/close-block/SKILL.md",
-    match: "harness/scripts/usage-ledger.mjs",
-    reason:
-      "Content defect, not a path defect (CB-1b stop condition, field 5) -- same gap as " +
-      "close-feature/SKILL.md's usage-ledger.mjs reference; no plugin-relative equivalent exists.",
-  },
-  {
-    file: "plugins/pipeline-core/skills/close-block/SKILL.md",
-    match: "harness/scripts/model-prices.json",
-    reason:
-      "Companion data file of the same harness-only usage-ledger.mjs telemetry capability; " +
-      "same content-defect gap, no plugin-relative equivalent exists.",
   },
 
   // --- Widened sweep (CB-1b, coordinator-directed): every tracked file under

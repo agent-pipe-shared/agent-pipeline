@@ -1,5 +1,5 @@
 {
-  "$comment": "Price table for harness/scripts/usage-ledger.mjs --row estimation. Values copied byte-for-byte from policies/model-policy.md §6 — no invented numbers. MP-21 price review (31.08.2026) updates BOTH §6 and this file.",
+  "$comment": "Price table for plugins/pipeline-core/scripts/usage-ledger.mjs --row estimation. Values copied byte-for-byte from policies/model-policy.md §6 — no invented numbers. MP-21 price review (31.08.2026) updates BOTH §6 and this file.",
   "asOf": "2026-07-02",
   "reviewDue": "2026-08-31",
   "source": "policies/model-policy.md §6",

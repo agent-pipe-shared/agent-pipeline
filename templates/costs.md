@@ -25,7 +25,7 @@ level is actually paying for itself.
   provider's usage view reports them — use the per-subagent attribution where the
   runtime offers it.
 - **Est. cost** is *always* a marked estimate derived from a local price table
-  (e.g. `../harness/scripts/model-prices.json`, if present). The real per-session
+  (e.g. `../plugins/pipeline-core/scripts/model-prices.json`, if present). The real per-session
   dollar figure is not delivered machine-readably by the runtime, so this column
   is a calculation aid, never a settled invoice. Never compare $/MTok across model
   generations — a newer generation can emit noticeably more tokens for the same
@@ -33,7 +33,7 @@ level is actually paying for itself.
 - **Notes** captures anything unusual: an escalation to a higher tier, a model
   fallback, a cache anomaly, a calibration run, or the agent count of a workflow.
 
-**Automation.** If the usage-ledger script (`../harness/scripts/usage-ledger.mjs`)
+**Automation.** If the usage-ledger script (`../plugins/pipeline-core/scripts/usage-ledger.mjs`)
 ships with your setup, it fills the token half automatically at close (read-only —
 it only reads local transcripts). The cost column stays a marked estimate; a real
 figure that arrives later is folded into the existing row as a dated addendum.
