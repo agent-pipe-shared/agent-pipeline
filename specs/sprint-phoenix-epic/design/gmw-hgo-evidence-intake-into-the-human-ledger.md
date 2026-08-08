@@ -1557,15 +1557,26 @@ Gate: `node harness/scripts/check-doc-contracts.mjs` for this document;
   storage, and choosing between them is the PO's call, not this document's. What is
   needed is which exit to take — and, until one is taken, whether increment 1 may
   ship with the residual disclosed as R-3 states it.
-- **O-5 (open, narrow).** Two *different* signed requests installed concurrently
-  each produce their own `requested`/`granted` chain, while GMW keeps `window.json`
-  a singleton (`writeAtomic`, `guard-maintenance-window.mjs:467`). The ledger can
-  therefore hold two live grants behind one machine-local window, and a later
-  repair `revoked` (§8.2 row 5) would have to dispose both. §7.3 specifies the
-  identical-request race only; this one is disclosed rather than designed around,
-  because closing it means deciding whether a second live grant should be refused
-  at intake or recorded and reconciled — a design call the PO's sequencing should
-  make together with increment 2.
+- **O-5 (decided, PO 2026-08-08: leave it, documented).** Two *different* signed
+  requests installed concurrently each produce their own `requested`/`granted`
+  chain, while GMW keeps `window.json` a singleton (`writeAtomic`,
+  `guard-maintenance-window.mjs:467`). The ledger can therefore hold two live
+  grants behind one machine-local window, and a later repair `revoked` (§8.2 row
+  5) would have to dispose both. §7.3 specifies the identical-request race only;
+  this divergence is a separate, distinct-request case.
+  **Decision: leave it, documented, rather than designed around.** Two
+  concurrent *distinct* maintenance-window requests are not a reachable state
+  for a single-human PO, so the cost of designing around the divergence today
+  would be an unrequested design change. The cost of not recording it is the
+  part that matters: someone generalizes the mechanism later — to a multi-human
+  PO, or to a second signer — without knowing that `window.json`'s
+  singleton shape and the ledger's two-grant capacity were left to diverge on
+  purpose rather than by oversight. This disclosure is that record; it is not
+  deleted or softened by the decision, because a decision that hides what it
+  decided against cannot be audited. Closing it, should it ever become
+  necessary, means deciding whether a second live grant is refused at intake or
+  recorded and reconciled — a design call for whoever revisits this together
+  with increment 2.
 - **O-3 (no ceremony added).** Nothing here adds a human step. The one producer-
   side ask is a `reasonCode` field inside GMW's *existing* signed subject
   (§5.3) — same signature, one more field. If that is not wanted, the fallback is
