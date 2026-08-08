@@ -397,6 +397,48 @@ a module graph by hand is a latent failure with no owner.** Two such fixtures
 exist, both went red from ordinary import additions, and neither failure was
 visible until a full gate ran.
 
+### AC-P3 now has coverage (`6746ba1`) — and the design contradicts itself and the code
+
+`harness/scripts/check-verify-suite-registration.test.mjs` goes from 27 to **37**
+cases: eight unit cases for `duplicateSuiteIds`, which had no test anywhere, plus
+a fixture that injects a duplicate into its own copy of `verify.mjs` and asserts
+the end-to-end behaviour. Proven by breaking it — the injection expression
+neutralised, case 36 goes red naming the exact expected stderr line, restored
+byte-identical, green again.
+
+**The dispatch added a negative control nobody asked for**, and its reason is the
+right one: it is what makes the positive case a discrimination rather than a
+branch that always fires. That is the same gap this repository has been repairing
+in its own tests all week.
+
+**The stop condition it reported is the substantive part.** `verify.mjs:596-602`
+makes the duplicate check the `if` and `runVerifyJournal` the `else`. So on a
+duplicate:
+
+- AC-P3's headline clause **holds** — reported as a step, not thrown before planning;
+- the design's Acceptance item 2 — *"suites still run … the step list is longer
+  than one entry"* — **does not hold**: zero suites run, and `steps` is exactly
+  one entry;
+- and `acp3-preplanning-patch.md:39-49`, the design's **own staged patch text**,
+  carries that same `else` structure. The document contradicts its own acceptance
+  criterion.
+
+The consequence matters more than the bookkeeping: `verify-suite-registration-check`
+(`verify.mjs:541`) **still never executes for the duplicate class** — which is the
+condition AC-P3 was written to remove. The patch achieved its stated clause and
+not its purpose.
+
+The dispatch asserted what the code does and adjusted neither side. Correct: this
+is a PO decision — amend Acceptance item 2 to match the implemented behaviour, or
+open a TP-3 window so non-duplicate suites continue past a duplicate. It cannot
+be settled by a dispatch, and it should not be settled by whoever notices it.
+
+**One honest residual it named itself:** its fixture's seven-entry module list is
+hand-enumerated and will go stale the next time `verify.mjs` gains an import —
+the third instance of that pattern today. It added `assertReachedRegistration()`
+so staleness fails *by name* instead of anonymously. Mitigated, not eliminated,
+and said so.
+
 ### F1 is closed, and closed on evidence I produced myself
 
 The Critic's single FAIL finding is repaired in `358c709`. BS25 rebuilds its
