@@ -113,6 +113,77 @@ which is the worst moment for a first impression.
 - `2026-08-05-claude-has-no-start-time-opt-in-adoption-path.md`
 - `docs/adr/0056-push-approval-mode.md` — the two modes and the fail-closed rule.
 
+## PO decision, 2026-08-08 — the questions go into the bootstrap, split into two planes
+
+The PO chose: the decisions are asked in the bootstrap, not by a separate consumer
+setup command, and `signature` stays the default but must explain itself. They
+then asked the sharper question this section answers: is that once per machine,
+once per repository, or do the configurations split by scope?
+
+**They split.** The split already exists physically and was never named.
+
+### The fields, as they actually are
+
+`pipeline.user.yaml` in this repository carries: `advisor_export.consent`,
+`agent_runtime`, `autonomy` (branch model, push policy, WIP limit), `critic_export`
+(what may leave the repository), `gates` (`claude_md_max_lines`, `dev_plan`,
+`push`, `push_approval`, `security`), `language` (agent- and human-facing),
+`roles.po`, `routing` (per-duty model assignment, ~270 lines), `runners`,
+`session.keep_awake`, `usage`.
+
+### The narrow-gauge split, adopted now
+
+The PO asked explicitly for a minimum viable base now, with the full treatment
+deferred to Nightwing.
+
+| Plane | Fields | Asked |
+|---|---|---|
+| Machine | PO key directory (with guided key creation and a proposed default location), `routing`, `language`, `session`, `usage` | once per machine |
+| Repository | `gates.push_approval`, the remaining `gates`, `autonomy`, `critic_export` / `advisor_export` | once per repository |
+| Never asked | the runner, the scratch location, `claude_md_max_lines` | — |
+
+**Zero field overlap between the planes.** This is not a stylistic preference:
+this repository already applies the rule between `pipeline.yaml` and
+`pipeline.json` (ADR-0046/ADR-0054). Two configurations with different threat
+models must not share a field, because a shared field needs a precedence rule, and
+every precedence rule is a place where the weaker plane can override the stronger.
+
+### Two corrections to the PO's first formulation, and why
+
+**1. There must be no persisted runner property at all.** The PO's own case
+decides it: the same repository may be worked with Codex and with Claude
+alternately, for cost or model reasons, and that must keep working. A stored
+project runner cannot express that. The runner is therefore read from the running
+session every time — at the CLI edge, where "which runner is executing" and "which
+runner is meant" are the same question — and carried explicitly inward, where
+helpers still raise if it is absent.
+
+This makes `agent_runtime: "claude-code"` and `runners.default` non-authoritative
+for identity. They exist today and are exactly the shape being removed.
+
+**2. `gates.push_approval` cannot move to the machine plane.** The PO wrote both
+"gates, language etc. are machine, not repo" and "chat versus signature is decided
+per repository". The second is taken, because the first would destroy the
+setting's only security property: `readPushApprovalMode` falls back to the strict
+default whenever the file is *uncommitted*, precisely so a local edit cannot
+weaken a repository-wide gate. Machine-scoped, it becomes a setting each
+participant can switch off for themselves.
+
+The same argument applies more weakly to the other blocking gates: whether
+`security` or `dev_plan` blocks is a statement about the project's risk, not the
+operator's preference. Machine-scoped, two developers on one repository would get
+different enforcement, and CI has no machine configuration at all. `language` and
+`routing` are genuinely operator properties and move to the machine plane without
+objection.
+
+### Open, deliberately not decided here
+
+Where the machine plane physically lives. An environment variable
+(`PIPELINE_PO_APPROVAL_DIRECTORY` today) is losable and undiscoverable; a file
+under the user's configuration directory would be better but needs its own guard
+treatment, since the guard currently admits only one derived directory outside the
+project root.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:**
