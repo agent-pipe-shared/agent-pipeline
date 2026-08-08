@@ -393,7 +393,7 @@ const TEST_SUITES = [
   { name: "license-contract-tests", file: join(scriptDir, "check-license-contract.test.mjs") },
   { name: "license-contract-check", file: join(scriptDir, "check-license-contract.mjs") },
   { name: "pr-contributor-gate-tests", file: join(scriptDir, "check-pr-contributor-gates.test.mjs") },
-  { name: "security-scan-tests", file: join(scriptDir, "security-scan.test.mjs") },
+  { name: "security-scan-tests", file: join(pluginScriptsDir, "security-scan.test.mjs") },
   { name: "no-autoupdate-key-tests", file: join(scriptDir, "no-autoupdate-key.test.mjs") },
   { name: "phase26-invariants-tests", file: join(scriptDir, "check-phase26-invariants.test.mjs") },
   { name: "phase26-invariants-check", file: join(scriptDir, "check-phase26-invariants.mjs"), args: phase26Result ? ["--result", phase26Result] : [] },
@@ -477,7 +477,7 @@ const PHASE_STEPS =
     ? []
     : [
         { name: "validate-manifest", file: join(scriptDir, "validate-manifest.mjs") },
-        ...(manifestPresence === "present" ? [{ name: "security-scan", file: join(scriptDir, "security-scan.mjs") }] : []),
+        ...(manifestPresence === "present" ? [{ name: "security-scan", file: join(pluginScriptsDir, "security-scan.mjs") }] : []),
       ];
 
 const steps = [];
