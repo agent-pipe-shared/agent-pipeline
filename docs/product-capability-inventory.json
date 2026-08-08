@@ -755,6 +755,12 @@
       "member": "bootstrap-payload-measure-cli-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:bootstrap-source-attestation-acceptance-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "bootstrap-source-attestation-acceptance-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:capture-observation-intake-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -2885,6 +2891,7 @@
         "verify-phase:harness/scripts/verify.mjs:bootstrap-env-check-tests",
         "verify-phase:harness/scripts/verify.mjs:bootstrap-payload-budget-tests",
         "verify-phase:harness/scripts/verify.mjs:bootstrap-payload-measure-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:bootstrap-source-attestation-acceptance-tests",
         "verify-phase:harness/scripts/verify.mjs:capture-observation-intake-tests",
         "verify-phase:harness/scripts/verify.mjs:change-control-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:change-control-core-tests",
