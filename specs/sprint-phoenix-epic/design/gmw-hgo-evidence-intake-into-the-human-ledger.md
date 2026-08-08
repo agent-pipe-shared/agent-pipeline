@@ -286,7 +286,7 @@ All field names are from the validated payload (§3.1) unless prefixed `envelope
 | | `scope.artifacts` | plan + spec `{path, sha256}`, digests re-checked against the signed intent | the layered, source-established set of §7.5 — representable `eligiblePaths`, else the present `policy.project` entries; **never** a plan/spec pair, which HGO does not have | H-AC-04 "artifact" | digest-verified at intake |
 | | `scope.environment` | `local-checkout` | `local-checkout` | H-AC-04 "environment" | deterministic |
 | | `validity.singleUse` | `false` (a window is time-boxed, not single-use) | `true` | H-AC-04 "single-use" | structural |
-| **when** | `validity.notBeforeEpochMs` / `expiresAtEpochMs` | `installedAtMs` / `min(signed expiresAtMs, installedAtMs + MAX_WINDOW_TTL_MS)` — the **same formula** the enforcement path uses (`:542-545`). The two halves have **different provenance**, and §7.3 turns on that: `installedAtMs` is an unsigned per-process clock read (`const installedAtMs = nowMs;`, `:456`, which the module's own comment marks as "NOT part of the signed subject", carrying "no security weight of its own", `:446-447`), while the upper bound is in practice the **signed** `subject.expiresAtMs` itself — the `min` cannot select the ceiling term at install, because `GMW-EXPIRY-TOO-FAR` (`:443-445`) already refuses any request whose signed bound exceeds `nowMs + MAX_WINDOW_TTL_MS`; the ceiling bites only afterwards, against an `installedAtMs` tampered downward. The intake takes **one** clock read per install and passes it to both the builder and `installGuardMaintenanceWindow` (`nowMs`, `:383`), so this record's `notBeforeEpochMs` *is* that process's `installedAtMs` rather than an approximation of it | authorization time / capability expiry | H-AC-04 "validity", H-AC-11 "time" | — |
+| **when** | `validity.notBeforeEpochMs` / `expiresAtEpochMs` | `installedAtMs` / `min(signed expiresAtMs, installedAtMs + MAX_WINDOW_TTL_MS)` — the **same formula** the enforcement path uses (`:542-545`). The two halves have **different provenance**, and §7.3 turns on that: `installedAtMs` is an unsigned per-process clock read (`const installedAtMs = nowMs;`, `:456`, which the module's own comment marks as "NOT part of the signed subject", carrying "no security weight of its own", `:446-447`), while the upper bound is, for a request built by `prepare()`, the **signed** `subject.expiresAtMs` itself: `prepare()` already clamps it to `min(signed, nowMs_prepare + MAX_WINDOW_TTL_MS)` (`:354`), and because install's own clock read can only be at or after that, its `min()` re-selects the same signed term — this is the honest-builder case and the normal one. For a hand-built subject whose signed `expiresAtMs` exceeds install-time `nowMs + MAX_WINDOW_TTL_MS` — the case `GMW-EXPIRY-TOO-FAR` (`:443-445`) exists to block — the value the intake commits at §7.4 step (b)/(c) is instead the **clock** term `installedAtMs + MAX_WINDOW_TTL_MS`, computed by the intake's own `min()` before `installGuardMaintenanceWindow` ever runs; that call then throws at step (d) and step (e) appends `revoked`, so no window arms, but the ledger briefly held a `granted` record whose bound was clock-derived, not signed. The intake takes **one** clock read per install and passes it to both the builder and `installGuardMaintenanceWindow` (`nowMs`, `:383`), so this record's `notBeforeEpochMs` *is* that process's `installedAtMs` rather than an approximation of it | authorization time / capability expiry | H-AC-04 "validity", H-AC-11 "time" | — |
 | | `envelope.occurredAtEpochMs`, `envelope.observedAtEpochMs` | local clock at the transition | local clock | H-AC-11 "time and assurance" | — |
 | | `timeAssurance` (payload and envelope) | **`locally-observed`, always** | `locally-observed` | H-AC-05 (never claim trusted time) | there is no attested time source anywhere in this path |
 | **why** | `reasonCode` | signed `subject.reasonCode` if the final GMW carries one; otherwise `GUARD.MAINTENANCE.WINDOW_UNATTESTED` (§5.3) | stable code per HGO outcome, e.g. `GUARD.OVERRIDE.CONSUMED` | H-AC-11 "stable reason code" | signed → attested by the same proof; unsigned → explicitly marked as unattested by the code itself |
@@ -770,11 +770,23 @@ honest racers derive the same bytes or one of them is not honest: `scope` and
 `ruleDigest` come from the signed subject and the signed intent (§4), `policyDigest`
 from §5.5's closed preimage of signed and published constants, `singleUse` is the
 constant `false`, and `expiresAtEpochMs` is the signed `subject.expiresAtMs` itself
-— `min(signed, installedAtMs + MAX_WINDOW_TTL_MS)` cannot select the clock term at
-install, because `GMW-EXPIRY-TOO-FAR` (`guard-maintenance-window.mjs:443-445`)
-already refused every request whose signed bound exceeds `nowMs +
-MAX_WINDOW_TTL_MS` (§4). The bound that actually bounds the lift is therefore still
-compared byte for byte, and it is a signed value.
+for an honest, `prepare()`-built request — the normal case: `prepare()` already
+clamps it to `min(signed, nowMs_prepare + MAX_WINDOW_TTL_MS)` (`:354`), and because
+install's own clock read can only be at or after that, `min(signed, installedAtMs +
+MAX_WINDOW_TTL_MS)` at commit time (§7.4 step (b)/(c), *before*
+`installGuardMaintenanceWindow` runs) re-selects the same signed term. Two honest
+racers therefore derive the same bytes there too. A hand-built subject whose signed
+`expiresAtMs` exceeds install-time `nowMs + MAX_WINDOW_TTL_MS` is the one case this
+does not hold for: the intake's own `min()` there selects the **clock** term, not the
+signed value, so the field this section pins to the signature is briefly committed as
+a clock-derived value before `GMW-EXPIRY-TOO-FAR`
+(`guard-maintenance-window.mjs:443-445`) throws at the later install call (§7.4 step
+(d)) and step (e) appends `revoked`. Capability is not widened by this — `min()` can
+never exceed the signed bound, so no window ever arms off the clock-derived value —
+but in that corner the byte-identity on `expiresAtEpochMs` between two honest racers
+is, once again, coincidence-decided rather than signature-decided. For the case this
+design is built for — a `prepare()`-built request — the bound that actually bounds
+the lift is still compared byte for byte, and it is a signed value.
 
 `validity.notBeforeEpochMs` is not such a field. It is GMW's `installedAtMs`, and
 `installedAtMs` is a per-process clock read — `const installedAtMs = nowMs;`
@@ -1622,3 +1634,31 @@ Gate: `node harness/scripts/check-doc-contracts.mjs` for this document;
   H-AC-15 coverage claim versus the actual tests (§12), the §9 amendment versus the
   §11 inventory, and F-4 above — with the generation-suffixed identifiers of §7.3
   kept and their concurrency story corrected as described above.
+- **Corrections carried into this revision (review round 4).** Round 3's major
+  finding — the byte-identical `validity` precondition made the adoption branch
+  unreachable, because `notBeforeEpochMs` is `installedAtMs`, an unsigned
+  per-process clock read that two honest racers never share — is resolved by
+  narrowing the identity check rather than relaxing it. `scope`, `ruleDigest`,
+  `policyDigest`, `validity.singleUse` and `validity.expiresAtEpochMs` stay
+  byte-identical (the last is the signed `subject.expiresAtMs` itself for a
+  `prepare()`-built request, because `GMW-EXPIRY-TOO-FAR` bounds it);
+  `validity.notBeforeEpochMs` leaves the byte-identity set and is instead bound by
+  two replacement checks — the enforcement formula of `:542-545` evaluated on the
+  committed pair, and in-force resolution at the adopter's own clock, which
+  `resolveHumanGovernanceAuthority` already performs. I-12 asserts the one outcome
+  this produces, with the racers' differing clock reads pinned in the test rather
+  than left to timing.
+- **Correction (round-4 PASS, minor finding F-A).** The round-4 review's sole
+  finding flagged that §7.3/§4's justification for keeping
+  `validity.expiresAtEpochMs` in the byte-identity set argued from a check
+  (`GMW-EXPIRY-TOO-FAR`) that has not yet run at the moment the value is committed:
+  the ledger append happens at §7.4 step (b)/(c), while the check lives inside
+  `installGuardMaintenanceWindow`, called only at step (d). The justification is
+  now scoped to the honest, `prepare()`-built request — the normal case, where
+  `prepare()`'s own clamp (`:354`) already bounds the signed value before install's
+  `min()` runs — and states the exceptional case explicitly: a hand-built subject
+  whose signed `expiresAtMs` exceeds install-time `nowMs + MAX_WINDOW_TTL_MS` is
+  briefly committed with a clock-derived `expiresAtEpochMs` before
+  `GMW-EXPIRY-TOO-FAR` throws and step (e) appends `revoked`. The mechanism, the
+  byte-identity set, the step order and I-12's asserted outcomes are unchanged;
+  only the stated reason for one field's membership in that set was corrected.
