@@ -190,6 +190,22 @@ which name performed the downgrade. Removing a restriction is not the same as
 removing the record, and conflating the two would be the one genuine regression
 available here.
 
+**Where the name is required, and where it is not** (decided 2026-08-08 while
+implementing this): creating a new signing key requires it — there is no record to
+read it from, and an approval that cannot name its human is the gap being closed.
+A `setup` that recovers or re-reads an existing authority record does **not**:
+the stored name is used. Requiring it there would be a usability regression with
+no gain in attribution, and it would break the recovery path against a directory
+that already holds keys. A record predating the field is the one recovery case
+that must still ask, with an error saying so rather than the generic usage text.
+The distinction belongs where the directory's state is known, never in the
+argument parser, which cannot see whether a record exists.
+
+Found because a mechanic-tier dispatch refused to decide it: briefed to add one
+argument at one call site, it reported five call sites and one whose intent the
+briefing did not settle, rather than choosing. The refusal is what surfaced the
+over-broad requirement.
+
 **Attribution needs a name, not a constraint.** The PO's addition: keys carry
 names, or the approving human supplies their name alongside the key identifier
 instead of a bare `approve`. Either way the record answers "who" without the policy
