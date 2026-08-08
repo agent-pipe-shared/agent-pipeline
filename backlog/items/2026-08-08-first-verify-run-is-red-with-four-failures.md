@@ -95,6 +95,41 @@ lapsed and needs its own judgement — never a restored commit-bound line.
 instruction: the assertion is what stops commit-bound suppressions from
 accumulating again after the next rebase.
 
+**Repaired 2026-08-08 (`8d38135`).** The 13 lines were deleted and the result
+measured rather than assumed: the security scan against the committed candidate
+exits 0 with zero findings, so no suppression lapsed, and all three
+gitleaks-ignore assertions now pass. The measurement needed a detached worktree,
+because the live tree can never be clean while a permanently-dirty local settings
+file sits in it and the scanner correctly refuses a mutable candidate.
+
+**Correction to this section's own claim, found while verifying that repair.**
+It said "Every other security-scan assertion passes." That is **wrong**. The
+suite has always had **two** failures, not one — it now stands at **127/128**:
+
+> `gitleaks run: candidate-tree scan keeps repository-relative fingerprints`
+
+It asserts that the adapter invokes the scanner with `--source .`
+(`harness/scripts/security-scan.test.mjs:542`); the adapter passes the absolute
+`rootDir` instead (`harness/scripts/security-adapters/gitleaks.mjs:266-269`).
+The mismatch is unconditional — no environment or fixture makes it pass — and
+`git log b3901b1..HEAD` over the scan sources is empty, so it was equally red in
+the verify run this item reports. Nothing about the `.gitleaksignore` deletion
+touches it; the two are independent.
+
+**What it is and is not.** Both sides do reach repository-relative fingerprints,
+by different routes: the adapter spawns with `cwd: rootDir` (`:282`) and
+normalizes each reported path back to repository-relative before matching content
+authorities (`:165-175`). So there is no live path-matching defect — which is
+also why the clean scan above is trustworthy. What the assertion wants is the
+*stronger* guarantee: relativity established at the invocation, so it does not
+depend on the normalizer staying correct. Which side should move is a real
+question and is **not** decided here.
+
+**Why the miscount is worth recording rather than quietly fixed.** Whoever picked
+up this failure would have deleted the 13 lines, run the suite, seen red, and had
+to work out from scratch whether they had caused it. The original claim was
+derived from the run's *first* reported failure rather than its failure list.
+
 ### 4. `backlog-state-check`
 
 `ledger event N: evidence.commit is not a reachable local Git commit`. A contiguous
