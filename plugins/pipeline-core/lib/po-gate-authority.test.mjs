@@ -524,6 +524,9 @@ check("missing, duplicate and wrong-language markers fail before approval", () =
 });
 
 check("the technical Spec marker has closed single-line lowercase grammar", () => {
+  // Every case here has zero or two recognisable markers, never exactly one
+  // with a wrong value -- so each is the "absent, or not exactly once" class
+  // (A1-PROMOGATE AC-8), not the "present once but disagrees" class.
   const digest = sha256(spec());
   const validLanguage = PO_GATE_PRD_LANGUAGE_MARKER("de");
   for (const content of [
@@ -537,7 +540,7 @@ check("the technical Spec marker has closed single-line lowercase grammar", () =
       write(join(primary, "specs", "feature", "prd_feature.md"), content);
       const result = validate();
       assert.equal(result.ok, false, JSON.stringify(result));
-      assert.equal(result.code, "PO-GATE-PRD-SPEC-MISMATCH");
+      assert.equal(result.code, "PO-GATE-PRD-SPEC-MARKER-MISSING");
     });
   }
 });
@@ -1240,6 +1243,27 @@ check("a Spec-binding mismatch is signposted to spec.md and its marker, not to p
       assert.match(result.repair, /do not change activeFeature\.planPath/u, JSON.stringify(result));
     });
   }
+});
+
+// A1-PROMOGATE AC-13: the missing-marker remedy is honest that no automated
+// route exists once a promotion has already bound the PRD -- it must not
+// invent one and must not name the rebind, because the rebind refuses that
+// state (PO-REBIND-STATE, no existing approval to rebind).
+check("an absent technical Spec marker is signposted to adding the line, and names no route for an already-bound PRD", () => {
+  withFixture({}, ({ primary, validate }) => {
+    write(join(primary, "specs", "feature", "prd_feature.md"), `${PO_GATE_PRD_LANGUAGE_MARKER("de")}\n# PRD\n`);
+    const result = validate();
+    assert.equal(result.ok, false, JSON.stringify(result));
+    assert.equal(result.code, "PO-GATE-PRD-SPEC-MARKER-MISSING", JSON.stringify(result));
+    assert.match(result.repair, /<[!]-- technical-spec-sha256: <sha256-of-spec\.md> -->/u, JSON.stringify(result));
+    assert.match(result.repair, /add that single line/u, JSON.stringify(result));
+    assert.match(result.repair, /no sanctioned way to add the marker to an already-bound PRD/u, JSON.stringify(result));
+    assert.equal(result.repair.includes(PLAN_PATH_REPAIR), false, JSON.stringify(result));
+    assert.match(result.repair, /do not change activeFeature\.planPath/u, JSON.stringify(result));
+    // No route is named for the already-bound state: it is not offered
+    // because it is known to refuse there.
+    assert.equal(/po-authority-rebind/u.test(result.repair), false, JSON.stringify(result));
+  });
 });
 
 check("the Spec guidance names a rebind route pipeline-state actually provides", () => {

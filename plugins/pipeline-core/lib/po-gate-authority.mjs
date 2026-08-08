@@ -55,8 +55,11 @@ const PO_GATE_PROFILE_SOURCE = "pipeline.user.yaml";
 const SUPPORTED_LANGUAGES = new Set(["de", "en"]);
 const SHA256 = /^[0-9a-f]{64}$/u;
 const PRD_NAME = /^prd_[^/\\]+\.md$/u;
-const PRD_LANGUAGE_MARKER = /^<!-- po-language: (de|en) -->$/gmu;
-const TECHNICAL_SPEC_MARKER = /^<!-- technical-spec-sha256: ([0-9a-f]{64}) -->$/gmu;
+// Exported so a promotion precondition check (onboarding-continuity.mjs) can
+// refuse, at plan time, a PRD the gate below would refuse anyway -- from the
+// same grammar, never a re-declared copy that could drift from this one.
+export const PRD_LANGUAGE_MARKER = /^<!-- po-language: (de|en) -->$/gmu;
+export const TECHNICAL_SPEC_MARKER = /^<!-- technical-spec-sha256: ([0-9a-f]{64}) -->$/gmu;
 const RECEIPT_KEYS = [
   "schema",
   "repositoryFingerprint",
@@ -86,13 +89,47 @@ const PRD_REPAIR = "Repair activeFeature.planPath and the active feature directo
 // where editing the PRD by hand would break the recorded approval -- the
 // sanctioned rebind route pipeline-state.mjs itself provides, in the flag form
 // its own usage line accepts. No absolute path appears in either sentence.
+// The unqualified "bring those two documents back into agreement" used to be
+// the whole remedy, and it is wrong in exactly one of the three lifecycle
+// states this failure can occur in: once a kickoff promotion has bound this
+// PRD's bytes but the plan is not yet approved, editing the PRD in place
+// breaks that binding without making the gate pass, and there is no
+// sanctioned in-place fix from this state -- so the remedy below is
+// conditioned on which of the three states the reader is actually in, rather
+// than naming an edit that only two of the three states can safely make.
 const SPEC_REPAIR = "The active PRD must bind the neighboring spec.md of the same feature directory:"
   + " that spec.md must exist as a physical regular file, and the PRD must carry its digest exactly once,"
   + " as <!-- technical-spec-sha256: <sha256-of-spec.md> --> on its own line."
-  + " Bring those two documents back into agreement; do not change activeFeature.planPath, which is not what is wrong here."
-  + " If the plan is already approved and the Spec changed during implementation, use the sanctioned rebind rather than editing the marker by hand:"
+  + " Which remedy applies depends on this PRD's lifecycle state, and only one of the three below is correct for it:"
+  + " if this PRD has not been bound by a kickoff promotion, edit the marker in the PRD to the neighboring spec.md's current digest;"
+  + " if a kickoff promotion has already bound this PRD and the plan is not yet approved, do not edit either document in place --"
+  + " the promotion already bound their exact bytes, so an in-place edit only breaks that binding and does not make this check pass;"
+  + " if the plan is already approved and the Spec changed during implementation, use the sanctioned rebind rather than editing the marker by hand:"
   + " run the pipeline-core script pipeline-state.mjs po-authority-rebind-plan, then pipeline-state.mjs po-authority-rebind-apply"
-  + " --plan-sha256 <sha256> --updated-at <ISO-8601> --activate with the digest and timestamp that plan reports.";
+  + " --plan-sha256 <sha256> --updated-at <ISO-8601> --activate with the digest and timestamp that plan reports."
+  + " In every case, do not change activeFeature.planPath, which is not what is wrong here.";
+// PO-GATE-PRD-SPEC-MARKER-MISSING is the "absent" half of what used to be a
+// single PO-GATE-PRD-SPEC-MISMATCH: the PRD carries no technical Spec marker
+// at all, or more than one, so there is no single recorded digest to compare
+// against spec.md in the first place -- a different defect from "the recorded
+// digest is wrong" (SPEC_REPAIR), and it needs its own remedy rather than
+// reusing that one. If a kickoff promotion has already bound this PRD's
+// bytes, adding the marker now would change those bytes and break the
+// binding without making this check pass, and there is no sanctioned route
+// back from that state today: the rebind family requires an existing
+// approval, which a PRD that never carried this marker cannot have reached.
+// This text therefore names the fix only for the still-freely-editable case,
+// and for the bound case says plainly that an in-place edit is not a fix --
+// it does not invent a route, and it does not name the rebind, because
+// offering a route that is known to refuse in this state is the failure this
+// module exists to stop repeating.
+const SPEC_MARKER_MISSING_REPAIR = "The active PRD does not carry the technical Spec marker exactly once, as"
+  + " <!-- technical-spec-sha256: <sha256-of-spec.md> --> on its own line, with the neighboring spec.md's own digest."
+  + " If this PRD has not been bound by a kickoff promotion, add that single line to the PRD."
+  + " If a kickoff promotion has already bound this PRD, do not add or edit that line in place: the promotion already"
+  + " bound these exact bytes, and an in-place edit only breaks that binding without making this check pass;"
+  + " there is no sanctioned way to add the marker to an already-bound PRD today;"
+  + " do not change activeFeature.planPath, which is not what is wrong here.";
 // A PRD whose bytes are not decodable UTF-8 never reaches any marker check. The
 // defect is the encoding of one file; no path, directory or PRD count is
 // involved, and no script in this repository re-encodes a document for the PO.
@@ -676,7 +713,15 @@ function prdAuthority(repoRoot, active, expectedLanguage) {
   }
   const specSha256 = sha256(specBytes);
   const specMarkers = [...text.matchAll(TECHNICAL_SPEC_MARKER)].map((match) => match[1]);
-  if (specMarkers.length !== 1 || specMarkers[0] !== specSha256) {
+  // Absent (zero) and duplicate (more than one) markers are the same defect
+  // from the caller's point of view -- there is no single recorded digest to
+  // compare -- and neither is a "the two documents disagree" defect, so both
+  // get the missing-marker code and its own remedy rather than the mismatch
+  // one below.
+  if (specMarkers.length !== 1) {
+    return fail("PO-GATE-PRD-SPEC-MARKER-MISSING", "The active PRD must carry the technical Spec marker exactly once.", SPEC_MARKER_MISSING_REPAIR);
+  }
+  if (specMarkers[0] !== specSha256) {
     return fail("PO-GATE-PRD-SPEC-MISMATCH", "The active PRD technical Spec marker must exactly match the neighboring spec.md bytes.", SPEC_REPAIR);
   }
   return {
