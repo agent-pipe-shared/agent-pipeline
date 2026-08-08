@@ -93,10 +93,35 @@ Not designed here. The questions:
 Question 1 is the one that most directly protects the contract; question 2 is the
 cheapest and closes the worst case.
 
+## Measured frequency, updated 2026-08-08
+
+The count is now **eleven** occurrences across the 2026-08-07/08 blocks, not
+three. Seven fell in the first block; four more fell in the decisions wave that
+followed, two of them in the *same* dispatch after a procedural resume.
+
+Three facts the larger sample adds, none of which were visible at three:
+
+1. **A resumed dispatch truncates again.** Resuming is a recovery, not a fix; a
+   long task can consume two or three resumes before it lands. Any direction
+   below that assumes one recovery per dispatch is calibrated to the wrong number.
+2. **The verification sweep is not the only site.** The original three all fell
+   during or just before a sweep. Later ones fell while writing tests and while
+   diagnosing a hung child process — i.e. anywhere in a long run, which weakens
+   "hold fewer suite results in context" as a sufficient answer.
+3. **Report durability changed the cost, not the rate.** `GF-09-D` / `CR-06-D`
+   landed mid-block. Dispatches after it still truncate at the same rate; what
+   changed is that the material survives. That is the correct division — but it
+   means this item stays open on its own terms, because durability is mitigation
+   and the truncation is the defect.
+
+One practice earned its place from the larger sample: **instruct the dispatch to
+commit as soon as its suites are green, rather than after the last DoD check.**
+A commit that exists survives a truncation; a commit that was planned does not.
+
 ## Triggering situation
 
 An unattended hardening block, 2026-08-07/08, with four to five concurrent
-dispatches against the local `0.5.4` candidate. Reproduced three times without
+dispatches against the local `0.5.4` candidate. Reproduced eleven times without
 being sought.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
