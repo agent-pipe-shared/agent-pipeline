@@ -330,6 +330,7 @@ const TEST_SUITES = [
   { name: "po-gate-authority-fixture-tests", file: join(libDir, "po-gate-authority.test.mjs") },
   { name: "public-core-observation-tests", file: join(libDir, "public-core-observation.test.mjs") },
   { name: "public-core-origin-allowlist-tests", file: join(libDir, "public-core-origin-allowlist.test.mjs") },
+  { name: "bootstrap-source-attestation-acceptance-tests", file: join(libDir, "bootstrap-source-attestation-acceptance.test.mjs") },
   { name: "external-push-ledger-tests", file: join(libDir, "external-push-ledger.test.mjs") },
   { name: "guard-push-external-ledger-tests", file: join(hooksDir, "guard-push-external-ledger.test.mjs") },
   { name: "guard-gate-strength-gmw-tests", file: join(hooksDir, "guard-gate-strength-gmw.test.mjs") },
