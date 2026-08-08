@@ -17,10 +17,28 @@ end-to-end flow; this page only explains installation and adoption.
 ## Before you start
 
 - Node.js 24 or newer and Git are required for the included scripts.
+- Three scanners back the security gates: `gitleaks` (secrets), `osv-scanner`
+  (dependency vulnerabilities), and `semgrep` (static analysis). Install them
+  before running Verify. **A missing scanner makes its gate report `skipped`,
+  not `pass`.** `skipped` means the gate checked nothing for that category —
+  it is not a substitute for a passing scan, and a green Verify result built
+  on a skipped gate does not mean that category was actually scanned. Run
+  `node plugins/pipeline-core/scripts/toolchain-preflight.mjs --root "$PWD"`
+  to see every configured tool with its observed version, or a copyable
+  platform-appropriate install command for whatever is missing.
 - Keep the pipeline source and each governed repository under version control.
 - Treat credentials, account mappings, local paths, and private marketplace
   details as machine-local configuration. Do not commit them into the pipeline
   source, a generated projection, or a project calibration.
+
+- **What this costs you.** Enforcement is not free. Gates, evidence
+  discipline, and an independent review are deliberate friction that trades
+  tokens and speed for correctness — worth it where a mistake is expensive,
+  wrong for fast exploratory work like a same-day spike or a throwaway
+  script. The rigor/governance/profile dials in the top-level
+  [README](README.md#three-dials-not-one-size-fits-all) exist precisely so
+  you are not stuck paying full enforcement cost for work that does not need
+  it.
 
 ### Runner support, stated precisely
 
@@ -226,12 +244,15 @@ In the project repository, add the marketplace that hosts your pipeline source
 and install the plugin at project scope:
 
 ```sh
-claude plugin marketplace add <owner>/<pipeline-repo> --scope project
+claude plugin marketplace add agent-pipe-shared/agent-pipeline --scope project
 claude plugin install pipeline-core@agent-pipeline --scope project
 ```
 
 `--scope project` keeps the binding with the repository rather than with one
-developer's user profile. Confirm the installation with `claude plugin list
+developer's user profile. `claude plugin marketplace add --help` documents
+only `--scope` and `--sparse` for this command — there is no flag or URL
+syntax verified to pin it to a specific branch, so it tracks the source
+repository's default branch. Confirm the installation with `claude plugin list
 --json`. To update a Claude Code binding later, update the marketplace, update
 the same project-scoped plugin, then reload the running host session:
 
@@ -253,14 +274,21 @@ runtime-boundary document.
 
 Codex uses its own marketplace and install commands. Add the approved Git
 source once, refresh its snapshot when the approved ref advances, and install
-the plugin from the marketplace name declared by that source:
+the plugin from the marketplace name declared by that source. Consumers
+default to the `stable` distribution channel, so pin the marketplace snapshot
+to the `stable` branch (`--ref` is the same flag already verified in
+[`docs/codex-local-plugin-development.md`](docs/codex-local-plugin-development.md)):
 
 ```sh
-codex plugin marketplace add <owner>/<pipeline-repo> --ref <approved-ref>
+codex plugin marketplace add https://github.com/agent-pipe-shared/agent-pipeline.git --ref stable
 codex plugin marketplace upgrade agent-pipeline
 codex plugin add pipeline-core@agent-pipeline
 codex plugin list --marketplace agent-pipeline --json
 ```
+
+`stable` tracks the current released version rather than an in-progress
+candidate; it is a distribution channel created at release time, not
+guaranteed to exist ahead of the first release that publishes it.
 
 The final command must report exactly one installed and enabled
 `pipeline-core@agent-pipeline`. A Git marketplace snapshot is not the running

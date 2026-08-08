@@ -21,15 +21,21 @@ feature branches and dogfooding rounds. Feedback welcome.*
 > required next document is `SETUP.md`; deeper and conceptual documentation
 > is optional reference.
 
-> **0.5.1 interim release:** Codex consumers now retain the `0.5.0`
-> security/readiness delivery while gaining the Nova recovery path for the
-> ordinary bootstrap happy path. If the PRD and Spec authorities drift,
-> bootstrap offers only the exact read-only, digest-bound rebind plan; a
-> separately approved apply then returns the session to `ready`. It never
-> broadens lifecycle writes or silently edits bound documents. See the
-> [consumer onboarding guide](docs/v3-consumer-onboarding.md) for the full
-> lifecycle and [What’s new in 0.5.0](docs/whats-new-0.5.0.md) for the
-> security/readiness baseline.
+> **Released version: `0.5.3`.** Policy-complete security evidence, AI-assisted
+> hardening, finding lifecycle, and security readiness all run through the
+> shared Verify gate; a portable human-approval path keeps the encrypted
+> Ed25519 private key and its passphrase outside the repository. `0.5.4` is a
+> release candidate in preparation and is not yet published — do not install
+> against it. See the [consumer onboarding guide](docs/v3-consumer-onboarding.md)
+> for the full lifecycle and [What's new in 0.5.0](docs/whats-new-0.5.0.md) for
+> the security/readiness baseline it builds on.
+
+> **What this costs you.** Enforcement is not free: gates, evidence discipline,
+> and independent review trade tokens and speed for correctness. That trade is
+> wrong for fast, exploratory work — a throwaway script or a same-day spike
+> does not need a Critic review or a signed push. Dial rigor down (or off) for
+> that kind of work via the three dials below; save full enforcement for
+> changes where a mistake is expensive.
 
 ## The problem
 
