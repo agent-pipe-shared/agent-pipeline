@@ -70,6 +70,36 @@ cases staged in `evidence/phx-0a-write-cases.mjs` exactly as the read half stage
 its own — and the one window then lands both halves' cases plus the AC-P3
 residual plus the registration together.
 
+### PHX-0B is admissible now, and it is briefed and queued
+
+I had been reading P-AC-08's fence as "nothing in PHX-0 moves". It names exactly
+two things: PHX-0's **ruleset-trust-root** slice, and PHX-1. PHX-0's *other* half
+— the continuity-authority revision writer, `PX0-AC-01` … `PX0-AC-07` — is named
+nowhere in that fence and is therefore admissible while the feature-package slice
+finishes.
+
+It is also the epic's cheapest large win, because almost everything except the
+commands themselves already exists:
+
+- `lib/authority-revision-proof.mjs` ships `createAuthorityRevisionIntent`, whose
+  parameter list *is* the closed request shape PX0-AC-02 enumerates, plus
+  `verifyAuthorityRevisionProof`. Suite `authority-revision-proof-tests` is
+  registered and green.
+- `scripts/phoenix-authority-approval.mjs` already validates decision scope,
+  candidate, evidence and expiry.
+- `scripts/phoenix-authority-revision.mjs` is a **shipped wrapper that fixes the
+  exact argument contract** — `continuity-authority-revision-plan --proposal-file`
+  and `-apply --request-file --request-sha256 --lock-token` — and calls two
+  commands that exist nowhere in the writer it delegates to. That is the second
+  contradiction put to the PO earlier; the honest repair is to build the callee,
+  not to weaken the caller. The wrapper needs no change.
+
+So PX0-AC-03, -05, -06 and -07 are all four of the epic's `designed-only`
+criteria, and they share one absent implementation. Briefing written and held at
+`scratch/briefing-phx-0b.md`, ready to dispatch. It cannot run in parallel with
+PHX-0A-WRITE: both edit `plugins/pipeline-core/scripts/pipeline-state.mjs`, and
+Spec §4.6 admits parallel work only where file ownership does not overlap.
+
 ### F1 is closed, and closed on evidence I produced myself
 
 The Critic's single FAIL finding is repaired in `358c709`. BS25 rebuilds its
