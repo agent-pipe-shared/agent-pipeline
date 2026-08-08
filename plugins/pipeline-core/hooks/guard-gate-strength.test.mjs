@@ -16,10 +16,11 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { GATE_STRENGTH_PATHS, LIVE_PLUGIN_RULE, gateStrengthRuleFor, insideLivePlugin, livePluginRoots } from "./guard-gate-strength.mjs";
+import { GATE_STRENGTH_SHELL_READ_ONLY_SCRIPTS } from "./guard-lifecycle-ready.mjs";
 import { installGuardMaintenanceWindow, prepareGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
 import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
 import {
@@ -235,7 +236,7 @@ try {
     }
   });
 
-  check("GST14 reading a gate-strength file from the shell is never claimed by this rule", () => {
+  check("GST14 the cat-shaped reads (cat, sha256sum, git diff, rg, head) of a gate-strength file are never claimed by this rule -- GST34 covers the script-identity exemption shape", () => {
     // A guard that stops `cat pipeline.user.yaml` would make the repository unworkable.
     // Asserted as "not refused BY THIS RULE" rather than "admitted", because a governed
     // fixture with no ready bootstrap has its own separate reasons to refuse.
@@ -680,6 +681,123 @@ try {
       assert.doesNotMatch(stderr, /guard-maintenance-window\.mjs" (?:prepare|install)/u,
         `${target}: kernel refusal must not print a GMW command -- none exists for this path`);
     }
+  });
+
+  // Self-application (ADR-0015): this repo's own checkout is a real governed root
+  // (has project/pipeline.json, GOVERNANCE_MARKERS), and its own
+  // plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs is a real file at the
+  // path the exemption's PLUGIN_ROOT resolves to when THIS test file's own sibling
+  // guard-lifecycle-ready.mjs is loaded in-process. That is exactly the shape AC-5
+  // needs: the same real command, not a synthetic tmpdir fixture the exempt script
+  // cannot physically live inside.
+  const PROJECT_ROOT = join(PLUGIN_ROOT, "..", "..");
+
+  const FORBIDDEN_WRITE_APIS = [
+    "writeFileSync", "appendFileSync", "mkdirSync", "rmSync", "renameSync", "unlinkSync",
+    "openSync", "createWriteStream", "cpSync", "copyFileSync", "symlinkSync", "truncateSync",
+    "chmodSync", "utimesSync",
+  ];
+  const FORBIDDEN_PROMISE_WRITE_APIS = FORBIDDEN_WRITE_APIS
+    .filter((name) => name !== "createWriteStream")
+    .map((name) => name.replace(/Sync$/u, ""));
+
+  function importsFsPromises(source) {
+    return /from\s+["']node:fs\/promises["']/u.test(source) || /from\s+["']fs\/promises["']/u.test(source);
+  }
+
+  function relativeImportSpecifiers(source) {
+    const specifiers = new Set();
+    const staticRe = /\bfrom\s+["'](\.\.?\/[^"']+)["']/gu;
+    const dynamicRe = /\bimport\(\s*["'](\.\.?\/[^"']+)["']\s*\)/gu;
+    for (const re of [staticRe, dynamicRe]) {
+      let match;
+      while ((match = re.exec(source)) !== null) specifiers.add(match[1]);
+    }
+    return [...specifiers];
+  }
+
+  // Walks a script's source and its transitive PLUGIN-LOCAL relative imports only (bare
+  // specifiers like "node:fs" are never followed). AC-3's honesty check: this is what
+  // turns "provably write-free" in guard-lifecycle-ready.mjs's comment from a claim into
+  // something verified on every run.
+  function walkPluginLocalSource(entryAbsolutePath, pluginRoot, visited = new Set()) {
+    if (visited.has(entryAbsolutePath)) return [];
+    visited.add(entryAbsolutePath);
+    const source = readFileSync(entryAbsolutePath, "utf8");
+    const files = [{ path: entryAbsolutePath, source }];
+    for (const specifier of relativeImportSpecifiers(source)) {
+      const resolved = resolve(dirname(entryAbsolutePath), specifier);
+      const relPath = relative(pluginRoot, resolved);
+      if (relPath === "" || relPath.startsWith("..")) continue; // plugin-local only
+      files.push(...walkPluginLocalSource(resolved, pluginRoot, visited));
+    }
+    return files;
+  }
+
+  check("GST33 every GATE_STRENGTH_SHELL_READ_ONLY_SCRIPTS entry, and its transitive plugin-local imports, carry no filesystem-write API", () => {
+    assert.ok(GATE_STRENGTH_SHELL_READ_ONLY_SCRIPTS.length > 0, "the exempt set must not be empty for this test to mean anything");
+    for (const entry of GATE_STRENGTH_SHELL_READ_ONLY_SCRIPTS) {
+      const entryPath = join(PLUGIN_ROOT, entry.path);
+      const visited = walkPluginLocalSource(entryPath, PLUGIN_ROOT);
+      assert.ok(visited.length > 0, `no source found for ${entry.path}`);
+      for (const { path: filePath, source } of visited) {
+        for (const api of FORBIDDEN_WRITE_APIS) {
+          assert.doesNotMatch(source, new RegExp(`\\b${api}\\b`, "u"), `${filePath} calls forbidden write API ${api}`);
+        }
+        if (importsFsPromises(source)) {
+          for (const api of FORBIDDEN_PROMISE_WRITE_APIS) {
+            assert.doesNotMatch(source, new RegExp(`\\b${api}\\s*\\(`, "u"), `${filePath} calls forbidden fs/promises write API ${api}() (imports node:fs/promises)`);
+          }
+        }
+      }
+    }
+  });
+
+  check("GST34 the exact preflight command is admitted for every declared gate-strength path", () => {
+    for (const rule of GATE_STRENGTH_PATHS) {
+      const command = `node plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs --root . --base HEAD~1 --candidate HEAD --spec specs/x/spec.md --guardrail ${rule.path} --evidence evidence/e.json`;
+      const { stderr } = shell(PROJECT_ROOT, command);
+      assert.doesNotMatch(stderr, /GUARD-GATE-STRENGTH-SHELL/u, `${rule.id} (${rule.path}) still refused by the shell lane: ${stderr}`);
+    }
+  });
+
+  check("GST35 a lookalike script, a same-basename script elsewhere, and the same relative path under a DIFFERENT root are never exempt", () => {
+    const guardrail = "--guardrail pipeline.user.yaml --evidence evidence/e.json";
+    // (a) same basename, wrong directory under the real project root.
+    {
+      const command = `node scripts/critic-dispatch-preflight.mjs --root . --base HEAD~1 --candidate HEAD --spec specs/x/spec.md ${guardrail}`;
+      const { stderr } = shell(PROJECT_ROOT, command);
+      assert.match(stderr, /GUARD-GATE-STRENGTH-SHELL/u, "a same-basename script outside the exact declared relative path must stay refused");
+    }
+    // (b) outside the plugin root entirely.
+    {
+      const command = `node /tmp/evil/critic-dispatch-preflight.mjs --root . --base HEAD~1 --candidate HEAD --spec specs/x/spec.md ${guardrail}`;
+      const { stderr } = shell(PROJECT_ROOT, command);
+      assert.match(stderr, /GUARD-GATE-STRENGTH-SHELL/u, "a lookalike path outside the plugin root must stay refused");
+    }
+    // (c) the identical relative path, but resolved against a DIFFERENT root than this
+    // module's own PLUGIN_ROOT. The exemption trusts only the copy actually enforcing
+    // (this module's own resolved location), never a vendored copy some other governed
+    // project happens to keep at the same relative path.
+    {
+      const otherRoot = governed();
+      mkdirSync(join(otherRoot, "plugins", "pipeline-core", "scripts"), { recursive: true });
+      writeFileSync(
+        join(otherRoot, "plugins", "pipeline-core", "scripts", "critic-dispatch-preflight.mjs"),
+        readFileSync(join(PLUGIN_ROOT, "scripts", "critic-dispatch-preflight.mjs"), "utf8"),
+      );
+      const command = `node plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs --root . --base HEAD~1 --candidate HEAD --spec specs/x/spec.md ${guardrail}`;
+      const { stderr } = shell(otherRoot, command);
+      assert.match(stderr, /GUARD-GATE-STRENGTH-SHELL/u, "the identical relative path under a different (non-enforcing) root must stay refused");
+    }
+  });
+
+  check("GST36 naming the exempt script inside a write command does not exempt the write", () => {
+    const root = governed();
+    const command = "node -e 'require(\"fs\").writeFileSync(\"pipeline.user.yaml\", \"gates:\\n  push_approval: chat\\n\"); require(\"./plugins/pipeline-core/scripts/critic-dispatch-preflight.mjs\")'";
+    const { blocked, stderr } = shell(root, command);
+    assert.equal(blocked, true, "a write smuggled alongside a mention of the exempt script must still be refused");
+    assert.match(stderr, /GUARD-GATE-STRENGTH-SHELL/u);
   });
 
   console.log(`\nguard-gate-strength: ${passed} passed, ${failed} failed`);

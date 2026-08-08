@@ -449,6 +449,13 @@ const TEST_SUITES = [
   { name: "nova-candidate-freeze-tests", file: join(libDir, "nova-candidate-freeze.test.mjs") },
   { name: "nova-verify-resume-tests", file: join(libDir, "verify-resume.test.mjs") },
   { name: "nova-verify-journal-tests", file: join(pluginScriptsDir, "verify-journal.test.mjs") },
+  { name: "machine-plane-tests", file: join(libDir, "machine-plane.test.mjs") },
+  { name: "consumer-safe-paths-tests", file: join(repoRoot, "harness", "scripts", "check-consumer-safe-paths.test.mjs") },
+  { name: "verify-evidence-producer-tests", file: join(pluginScriptsDir, "verify-evidence-producer.test.mjs") },
+  { name: "lifecycle-recovery-contract-tests", file: join(hooksDir, "guard-lifecycle-recovery-contract.test.mjs") },
+  { name: "pipeline-state-inspection-contract-tests", file: join(pluginScriptsDir, "pipeline-state-inspection-contract.test.mjs") },
+  { name: "project-reset-tests", file: join(pluginScriptsDir, "project-reset.test.mjs") },
+  { name: "po-human-approval-tests", file: join(pluginScriptsDir, "po-human-approval.test.mjs") },
 ];
 
 // Manifest-gated phase steps: see header — only projects that carry a manifest at
