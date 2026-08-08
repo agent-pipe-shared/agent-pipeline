@@ -115,7 +115,7 @@ function assertAcyclic(suites) {
   const visiting = new Set();
   const visited = new Set();
   function visit(id) {
-    if (visiting.has(id)) throw new TypeError("Verify dependency cycle is invalid");
+    if (visiting.has(id)) throw new TypeError(`Verify dependency cycle is invalid: suite ${quoted(id, ID_QUOTE_MAX)} is part of a dependency cycle`);
     if (visited.has(id)) return;
     visiting.add(id);
     for (const dependency of byId.get(id).dependsOn) visit(dependency);

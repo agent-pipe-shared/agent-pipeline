@@ -121,6 +121,11 @@ test("shape and dependency defects stay distinguishable from a duplicate", () =>
   assert.equal(new Set([duplicate, shape, absent, unknown, unusable, unregistered, itself]).size, 7);
 });
 
+test("a dependency cycle names the suite id at which it was detected", () => {
+  const message = registrationError([suite("alpha", { dependsOn: ["beta"] }), suite("beta", { dependsOn: ["alpha"] })]);
+  assert.match(message, /^Verify dependency cycle is invalid: suite "alpha" is part of a dependency cycle$/u);
+});
+
 test("public run evidence cannot report pass with incomplete terminal coverage", () => {
   const complete = createPublicVerifyRunEvidence({ runId: "verify-next", policySha256: A, resumePlanSha256: B, terminalSha256: C, registeredSuiteCount: 2, terminalReceiptCount: 2, terminalStatus: "passed" });
   assert.equal(complete.status, "passed");
