@@ -84,6 +84,43 @@ test("the current registration remains the complete coverage set", () => {
   assert.throws(() => planVerifyResume({ runId: "verify-next", candidate, suites: [suite("alpha", { dependsOn: ["beta"] }), suite("beta", { dependsOn: ["alpha"] })], policySha256: C }), /cycle/u);
 });
 
+// A registration defect reaches the operator only as verify.mjs's
+// `VERIFY-JOURNAL-FAILED: ${message}`, cut at 256 characters: what the message
+// does not say inside that cut, nobody learns. (AC-P3, R1.4)
+function registrationError(registered) {
+  let caught = null;
+  try { planVerifyResume({ runId: "verify-next", candidate, suites: registered, policySha256: C }); } catch (error) { caught = error; }
+  assert.ok(caught instanceof TypeError, "a registration defect stays a TypeError");
+  assert.ok(!/[\n\r]/u.test(caught.message), `the diagnostic stays one line: ${caught.message}`);
+  assert.ok(caught.message.length < 256, `the diagnostic survives the 256-character cut: ${caught.message.length}`);
+  return caught.message;
+}
+
+test("a duplicate suite id is named in the diagnostic verify prints", () => {
+  assert.match(registrationError([suite("alpha"), suite("beta"), suite("alpha")]), /duplicate suite id "alpha"/u);
+  const widest = `z${"y".repeat(127)}`;
+  assert.equal(widest.length, 128);
+  assert.ok(registrationError([suite(widest), suite(widest)]).includes(widest), "a maximal id is named whole, not elided out of its own diagnostic");
+});
+
+test("shape and dependency defects stay distinguishable from a duplicate", () => {
+  const duplicate = registrationError([suite("alpha"), suite("alpha")]);
+  const shape = registrationError([suite("alpha", { implementationSha256: "not-a-digest" })]);
+  const absent = registrationError([{ id: "alpha" }]);
+  const unknown = registrationError([{ ...suite("alpha"), extra: true }]);
+  const unusable = registrationError([{ ...suite("alpha"), id: "not a valid id" }]);
+  const unregistered = registrationError([suite("alpha", { dependsOn: ["ghost"] })]);
+  const itself = registrationError([suite("alpha", { dependsOn: ["alpha"] })]);
+  assert.match(duplicate, /^Verify suite registration is invalid: duplicate suite id "alpha", registered again at index 1$/u);
+  assert.match(shape, /^Verify suite registration is invalid: suite "alpha" at index 0 has an invalid implementationSha256 field$/u);
+  assert.match(absent, /^Verify suite registration is invalid: suite "alpha" at index 0 is missing the implementationSha256 field$/u);
+  assert.match(unknown, /^Verify suite registration is invalid: suite "alpha" at index 0 carries the unregistered field "extra"$/u);
+  assert.match(unusable, /^Verify suite registration is invalid: suite at index 0 has an invalid id field$/u);
+  assert.match(unregistered, /^Verify dependency registration is invalid: suite "alpha" depends on unregistered suite id "ghost"$/u);
+  assert.match(itself, /^Verify dependency registration is invalid: suite "alpha" depends on itself$/u);
+  assert.equal(new Set([duplicate, shape, absent, unknown, unusable, unregistered, itself]).size, 7);
+});
+
 test("public run evidence cannot report pass with incomplete terminal coverage", () => {
   const complete = createPublicVerifyRunEvidence({ runId: "verify-next", policySha256: A, resumePlanSha256: B, terminalSha256: C, registeredSuiteCount: 2, terminalReceiptCount: 2, terminalStatus: "passed" });
   assert.equal(complete.status, "passed");
