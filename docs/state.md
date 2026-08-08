@@ -1023,6 +1023,57 @@ a dispatch the authority to clear a control whose purpose is to check that
 dispatch's own class of work. "Show your evidence" is not a substitute for
 separation of duties — it is what makes the absence of separation look rigorous.
 
+### SECOND CRITIC ROUND on the repair: FAIL, and it corrected my own success claim
+
+Reviewed object `e097b27`, route `claude-opus-5` at max, verdict **FAIL** on two
+major findings — and the review was explicitly reported as *incomplete*, with five
+named unexamined items rather than a complete-sounding pass. That honesty is worth
+more than the verdict.
+
+**F1 — I over-claimed, and the Critic caught it.** I wrote that the new check
+"closes the class". It does not. `roles/critic.md` still carries one instance of the
+very class, in a file the commit edited, and the check reports **green** over it
+because it only reads one line of one other file for that class. A green check
+sitting on top of a known instance is worse than no check: it converts an open
+defect into a documented absence of defects. The exclusion existed only in a
+git-ignored dispatch record — no owner, no expiry, nothing committed, which is
+exactly what QG-06 forbids.
+
+**And two blind spots I had not been told about.** One class of the check *cannot
+fail at all*: the citing line sits inside the section it cites, so the phrase the
+check hunts for is present even when the section stops stating the rule. Another
+discards cross-file section numbers entirely — and section-numbers-off-by-one were
+two of the seven defects the check was written to prevent. Its founding class is
+unguarded in two of the three files it protects.
+
+`PHX-CITE2` is dispatched with the condition that makes this checkable: **every**
+class must be shown to go red when the *cited target* is broken, never the citing
+line, with byte-identical restores. A class whose red can only be produced by
+editing the citing line has not been repaired.
+
+**F2 — the evidence I handed the Critic bound the wrong candidate, and that is a trap
+in the setup rather than a slip.** I pointed at `evidence/verify-latest.json`; it
+recorded commit `d85494c` from midday. The gate runs from the detached worktree at
+`.git/phx-verify`, so it writes **the worktree's** `evidence/verify-latest.json`, and
+the main checkout's copy stays stale indefinitely. Anything reading the obvious path
+gets an obsolete candidate while believing it has the current one. That deserves its
+own fix; noting it here so the next reader does not repeat it.
+
+**The substantive question behind F2 is now answered.** I ran the full gate at
+`abb4518`, which contains `e097b27`: exit 0, 368 steps, `binding: "exact"`, clean at
+tree `0161feb`, 23:16:49Z → 23:20:08Z. The registered suite that consumes
+`review-protocol.md` is green at the reviewed candidate. The Critic was right that
+nobody had measured it; it is measured now.
+
+**My fifth path defect, two hours after I named the fix for it.** I gave the Critic
+`docs/adr/0003-isolation-levels.md` as a spec reference. No such file exists — the
+ADR is `0003-role-implementation-subagents.md`. The Critic resolved it by unique ADR
+number, disclosed the substitution, and pointed out that a strict fail-closed reading
+of its own boundary rule should have *stopped the review instead*. I wrote "resolve
+every path in a briefing before sending it" at 02:00 and then resolved four of them.
+The rule was right; applying it to the paths I happened to doubt was the error.
+**It is a checklist item or it is nothing.**
+
 ### The Critic's repairable findings are repaired (`e097b27`), all seven were real
 
 F4, F5 and F6 are closed. All seven measurements the Critic reported held up when
