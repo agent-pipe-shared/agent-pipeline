@@ -1023,6 +1023,48 @@ a dispatch the authority to clear a control whose purpose is to check that
 dispatch's own class of work. "Show your evidence" is not a substitute for
 separation of duties — it is what makes the absence of separation look rigorous.
 
+### The blind spots are closed (`19e3793`), gate green — and I have just built a third instance of tonight's own pattern
+
+Gate at `19e3793`: exit 0, 368 steps, `binding: "exact"`, clean at tree `4f718a7`,
+23:31:05Z → 23:34:23Z.
+
+Every class of the citation check is now demonstrated falsifiable by breaking **the
+cited target with the citing line left untouched**, each with a byte-identical
+restore. The class that previously could not fail at all now goes red. A new class
+covers cross-file section numbers — the gap through which two of the seven original
+defects would have walked. The remaining unrepaired instance in `roles/critic.md` is
+repaired: the escalation ladder is repointed to `harness/review-protocol.md` §4,
+which is where it actually lives.
+
+**One class resisted, and was reported rather than smoothed over.** `PHX-CITE-7` is a
+prohibition class: in the green state it has no citing line, so there is no target to
+break. Target sensitivity was shown in two steps instead, and the deviation was
+declared. A named exception is checkable; a quietly tidy table is not. That is the
+correct call and I want it on record as such.
+
+**Now the uncomfortable part, which is mine.** Tonight I criticised three controls
+for existing without being in force: the GIT-03 guard that was merged but not loaded,
+the preimage suite that is pinned but excluded from the gate, and a check that
+reported green over a known instance. **The check I just had built is not registered
+in `verify.mjs` either** — the path is protected and its window is closed — and the
+runner that demonstrates its falsifiability lives in git-ignored `evidence/`, so
+neither is executed by the gate. The gate is green at 368 steps and does not run
+this check once.
+
+That is the same pattern, built by me, tonight, hours after naming it. It is not a
+contradiction of the work — the check is real, its repairs are real, and the
+registration is genuinely blocked on a human signature I cannot give myself. But the
+honest description of today's state is: **a citation check exists and does not yet
+guard anything.** Registering it is the first thing to do when a window opens, and
+until then no one should read the green gate as covering citations.
+
+**On stopping the review here.** The contract allows up to four Critic rounds per
+package and two have run. I am not commissioning a third, and that is a judgement
+rather than an omission: what a third round would examine is the falsifiability
+table, and that table is already machine-captured with break-and-restore evidence
+stronger than a reader's inspection. If the PO disagrees, the round is cheap and the
+candidate is fixed.
+
 ### SECOND CRITIC ROUND on the repair: FAIL, and it corrected my own success claim
 
 Reviewed object `e097b27`, route `claude-opus-5` at max, verdict **FAIL** on two
