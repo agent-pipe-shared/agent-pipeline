@@ -362,6 +362,30 @@ here because the table above was written from the earlier reading and would
 otherwise be cited as evidence that the guard-lift lane still demands manual file
 surgery.
 
+**The correction above is right about the code and wrong about this repository —
+found by attempting the edits (2026-08-08).** Both gate-strength edits this phase
+needs were attempted. Both were refused, both took the else branch as read, both
+ended with "or authorizes the override below", and **both printed nothing below**:
+GS-7 on `.claude/guard-config.json` and GS-4 on `project/guard-config.json`. The
+paths are override-eligible, the override family's audit ledger verifies, and the
+guard reached the branch that offers a route. It produced no route.
+
+Diagnosis, mechanism and the parts that remain unproven are filed in
+`backlog/items/2026-08-08-the-gate-strength-override-route-is-advertised-but-never-offered.md`.
+
+**What this does to the approval budget.** The count is unchanged at four, but
+until that defect is diagnosed, rows 2 and 3 of the table above are **not**
+purchasable with a signature: the only route the guard leaves is the PO editing
+two protected configuration files by hand, outside a session — the outcome the
+PO's standing rule exists to prevent. The TP-3 window (row 1) is unaffected and
+still costs exactly one signature.
+
+**The reusable lesson, since this is the second time in one phase.** The earlier
+reading was careful and the code was read correctly; it simply does not execute
+that way here. A claim about what a gate will *do* is verified by provoking it,
+not by reading it. The same shape as the stage-0 scoping error recorded in the
+handover: measure the property, do not infer it from the neighbourhood.
+
 ## Risks and mitigation
 
 | Risk | Mitigation |
