@@ -476,6 +476,31 @@ export function installGuardMaintenanceWindow({ rootDir, request, trustPolicy, p
   if (repoFingerprintSha256 !== request.subject.repoFingerprintSha256) {
     fail("GMW-DRIFT", "physical repository identity drifted since the request was prepared");
   }
+  // Candidate binding: repoFingerprintSha256 above proves this is physically the SAME
+  // repository the PO signed for, but says nothing about whether its committed state is
+  // still the state the signature covers. `request.intent.value.candidate` is the
+  // {commit, tree} prepareGuardMaintenanceWindowRequest() bound into the signed intent
+  // (via `git rev-parse HEAD` / `git rev-parse HEAD^{tree}`, the same derivation used
+  // here) -- install() must refuse when the repository has moved past it. Checked as an
+  // objective fact about reality, independently of and before the cryptographic proof
+  // below, exactly like the repoFingerprintSha256 check just above. `git()` itself
+  // fails closed (GMW-GIT) on a failed or unusable invocation, so an unresolvable HEAD
+  // never falls through to a comparison at all, let alone an admission. Deliberately
+  // does NOT restore the live-plugin-TREE equality check `23d93b0` removed -- that
+  // compared bytes under `livePluginRoot`, an unrelated directory, and killed a
+  // signature on any unrelated write to it; this compares the signed `candidate`
+  // against the repository's actual `HEAD`, so uncommitted working-tree bytes (never
+  // reflected in `rev-parse HEAD`/`HEAD^{tree}`) are still admitted, exactly the
+  // property `23d93b0` established.
+  const candidate = request.intent.value?.candidate ?? {};
+  const currentCommit = git(repo.root, ["rev-parse", "HEAD"], spawn);
+  if (currentCommit !== candidate.commit) {
+    fail("GMW-CANDIDATE-COMMIT-MISMATCH", "current HEAD commit does not match the signed candidate commit");
+  }
+  const currentTree = git(repo.root, ["rev-parse", "HEAD^{tree}"], spawn);
+  if (currentTree !== candidate.tree) {
+    fail("GMW-CANDIDATE-TREE-MISMATCH", "current HEAD tree does not match the signed candidate tree");
+  }
   // The live-plugin tree hash is OBSERVED and RECORDED here, never an admission
   // precondition (CEREMONY-1 defect B). It used to be compared for equality against the
   // hash bound at prepare time, which meant any write into the plugin tree between the

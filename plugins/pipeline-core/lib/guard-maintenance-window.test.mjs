@@ -24,7 +24,7 @@
  * Run: node plugins/pipeline-core/lib/guard-maintenance-window.test.mjs
  */
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -117,8 +117,14 @@ function planSpecShas(root) {
   };
 }
 
-/** Builds a request+intent from a hand-crafted subject, bypassing prepare()'s own checks/clamp entirely. */
-function handBuiltRequest({ root, plugin, scopeRuleIds, expiresAtMs, reason = "hand-built" }) {
+/**
+ * Builds a request+intent from a hand-crafted subject, bypassing prepare()'s own
+ * checks/clamp entirely. `candidate` defaults to the same fabricated, never-real
+ * {commit, tree} every pre-existing caller of this helper already relied on -- passing
+ * one explicitly is how CANDBIND-1's checks construct a candidate that is deliberately
+ * true about one half (commit or tree) and false about the other.
+ */
+function handBuiltRequest({ root, plugin, scopeRuleIds, expiresAtMs, reason = "hand-built", candidate = { commit: "c".repeat(40), tree: "d".repeat(40) } }) {
   const repo = guardMaintenanceWindowInternals.topology(root);
   const subject = {
     scopeRuleIds,
@@ -131,7 +137,7 @@ function handBuiltRequest({ root, plugin, scopeRuleIds, expiresAtMs, reason = "h
   const subjectSha256 = guardMaintenanceWindowInternals.sha(subject);
   const intent = createPoApprovalIntent({
     kind: "guard-lift", featureId: "f", planSha256: "a".repeat(64), specSha256: "b".repeat(64),
-    candidate: { commit: "c".repeat(40), tree: "d".repeat(40) }, policyRevision: "gmw-test-v1",
+    candidate, policyRevision: "gmw-test-v1",
     subjectSha256, decision: "lift",
   });
   return { subject, intent, request: { schema: "pipeline.guard-maintenance-window-request.v1", subject, intent } };
@@ -629,6 +635,131 @@ try {
       GuardMaintenanceWindowError,
       "an already-expired signed bound must still be refused at install",
     );
+  });
+
+  // ---- CANDBIND-1: candidate binding at install closes the gap 23d93b0 left open ----
+  // 23d93b0 turned the live-plugin-tree equality check into a recorded observation
+  // (GMW19 above pins that this stays true). Its consequence: install() performed no
+  // freshness check on the repository's committed state at all -- repoFingerprintSha256
+  // proves PHYSICAL repository identity, but nothing compared the signed candidate
+  // {commit, tree} against the repository's actual HEAD. These checks close exactly
+  // that gap, without reintroducing the removed live-plugin-TREE check under another
+  // name: they compare against `git rev-parse HEAD`/`HEAD^{tree}`, never against bytes
+  // under `livePluginRoot`.
+  check("GMW22 install refuses when the current HEAD commit differs from the signed candidate commit (a new commit landed since prepare)", () => {
+    const root = repoFixture("gmw-candidate-commit-");
+    const plugin = pluginRootFixture();
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "candidate binding, commit", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+    });
+    const preparedCommit = request.intent.value.candidate.commit;
+
+    // A genuine new commit lands on HEAD between prepare and install -- the committed
+    // state the PO's signature covers is no longer the repository's current state.
+    writeFileSync(join(root, "README.md"), "# fixture, updated\n");
+    execFileSync("git", ["add", "-A"], { cwd: root });
+    execFileSync("git", ["commit", "-q", "-m", "drift"], { cwd: root });
+    const newCommit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+    assert.notEqual(newCommit, preparedCommit, "the fixture must really have moved to a new commit, or this test proves nothing");
+
+    let error;
+    try {
+      installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin });
+    } catch (caught) { error = caught; }
+    assert.ok(error instanceof GuardMaintenanceWindowError, "install must refuse a candidate commit that no longer matches HEAD");
+    assert.equal(error.code, "GMW-CANDIDATE-COMMIT-MISMATCH");
+    assert.match(error.message, /candidate/iu, "the message must name the candidate mismatch");
+    assert.equal(/tree drifted/u.test(error.message), false, "must not reuse the wording of the removed live-plugin-tree check");
+    assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent", "a refused install must leave no window record behind");
+  });
+
+  check("GMW23 install refuses when only the HEAD tree differs from the signed candidate tree, even when the candidate commit matches", () => {
+    // Honestly constructed: a real commit object's tree is immutable, so "commit
+    // matches, tree differs" cannot arise from an unmodified prepare()-derived
+    // candidate. It is constructed here as a hand-built candidate that tells the truth
+    // about the commit (the fixture's own real HEAD) and lies about the tree -- the
+    // only way to exercise the tree check independently of the commit check.
+    const root = repoFixture("gmw-candidate-tree-");
+    const plugin = pluginRootFixture();
+    const realCommit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+    const realTree = execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: root, encoding: "utf8" }).trim();
+    const wrongTree = "d".repeat(40);
+    assert.notEqual(wrongTree, realTree, "the deliberately wrong tree must really differ from the fixture's real one, or this test proves nothing");
+
+    const { request, intent } = handBuiltRequest({
+      root, plugin, scopeRuleIds: ["GS-6"], expiresAtMs: Date.now() + 60_000, reason: "candidate binding, tree",
+      candidate: { commit: realCommit, tree: wrongTree },
+    });
+    let error;
+    try {
+      installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin });
+    } catch (caught) { error = caught; }
+    assert.ok(error instanceof GuardMaintenanceWindowError, "install must refuse a candidate tree that no longer matches HEAD^{tree}");
+    assert.equal(error.code, "GMW-CANDIDATE-TREE-MISMATCH");
+    assert.notEqual(error.code, "GMW-CANDIDATE-COMMIT-MISMATCH", "the commit half of the candidate matched; only the tree check must have fired");
+    assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent", "a refused install must leave no window record behind");
+  });
+
+  check("GMW24 install admits when only uncommitted working-tree bytes changed since prepare -- the candidate binding checks HEAD, not the working tree", () => {
+    // Distinct from GMW19 (which pins the SAME property for the live plugin tree
+    // specifically): this confirms the new candidate-binding checks added by
+    // CANDBIND-1 do not regress it for the repository's own working tree either. An
+    // uncommitted, unstaged edit inside `root` never changes what `git rev-parse
+    // HEAD`/`HEAD^{tree}` report, so it must not be refused.
+    const root = repoFixture("gmw-candidate-uncommitted-");
+    const plugin = pluginRootFixture();
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "uncommitted bytes must not void the signature", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+    });
+
+    // Modify a tracked file WITHOUT committing (and without even staging) it.
+    writeFileSync(join(root, "README.md"), "# fixture, uncommitted edit\n");
+    const status = execFileSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" });
+    assert.match(status, /README\.md/u, "the fixture must really carry an uncommitted change, or this test proves nothing");
+
+    const installed = installGuardMaintenanceWindow({
+      rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin,
+    });
+    assert.equal(installed.status, "active", "an uncommitted working-tree edit must not void an already-signed candidate binding");
+  });
+
+  check("GMW25 install fails closed when the candidate check's own git invocation fails, never admitting on an unresolvable HEAD", () => {
+    const root = repoFixture("gmw-candidate-git-fail-");
+    const plugin = pluginRootFixture();
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "git failure at install", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+    });
+
+    const brokenOn = (matchArgs) => (command, args, options) => {
+      if (command === "git" && args.length === matchArgs.length && args.every((value, index) => value === matchArgs[index])) {
+        return { status: 1, stdout: "", stderr: "simulated failure", error: null };
+      }
+      return spawnSync(command, args, options);
+    };
+
+    assert.throws(
+      () => installGuardMaintenanceWindow({
+        rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin, spawn: brokenOn(["rev-parse", "HEAD"]),
+      }),
+      GuardMaintenanceWindowError,
+      "a failed HEAD lookup must refuse install, not admit it",
+    );
+    assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent");
+
+    assert.throws(
+      () => installGuardMaintenanceWindow({
+        rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin, spawn: brokenOn(["rev-parse", "HEAD^{tree}"]),
+      }),
+      GuardMaintenanceWindowError,
+      "a failed HEAD^{tree} lookup must refuse install, not admit it",
+    );
+    assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent");
   });
 
   console.log(`\nguard-maintenance-window: ${passed} passed, ${failed} failed`);
