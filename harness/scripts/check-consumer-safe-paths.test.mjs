@@ -37,7 +37,7 @@ test.after(() => {
 
 test("a fixture naming a source-only path fails", () => {
   const { findings } = checkRepository(FIXTURE_ROOT, {
-    markdownPaths: ["bad.md"],
+    scanPaths: ["bad.md"],
     allowlist: [],
   });
   assert.equal(findings.length, 1);
@@ -46,7 +46,7 @@ test("a fixture naming a source-only path fails", () => {
 
 test("a clean fixture passes", () => {
   const { findings, stats } = checkRepository(FIXTURE_ROOT, {
-    markdownPaths: ["clean.md"],
+    scanPaths: ["clean.md"],
     allowlist: [],
   });
   assert.deepEqual(findings, []);
@@ -55,7 +55,7 @@ test("a clean fixture passes", () => {
 
 test("an allowlisted occurrence passes", () => {
   const { findings } = checkRepository(FIXTURE_ROOT, {
-    markdownPaths: ["allowlisted.md"],
+    scanPaths: ["allowlisted.md"],
     allowlist: [{ file: "allowlisted.md", match: "harness/scripts/example.mjs", reason: "test fixture" }],
   });
   assert.deepEqual(findings, []);
@@ -63,11 +63,11 @@ test("an allowlisted occurrence passes", () => {
 
 test("a stale allowlist entry (never matches) is itself reported", () => {
   const { findings } = checkRepository(FIXTURE_ROOT, {
-    markdownPaths: ["clean.md"],
+    scanPaths: ["clean.md"],
     allowlist: [{ file: "clean.md", match: "harness/scripts/nothing-here.mjs", reason: "test fixture" }],
   });
   assert.equal(findings.length, 1);
-  assert.match(findings[0], /never matched a line/u);
+  assert.match(findings[0], /never matched anything/u);
 });
 
 test("multiple prefix hits on one line each produce a finding", () => {
@@ -87,14 +87,20 @@ test("SOURCE_ONLY_PREFIXES carries the backlog item's minimum set", () => {
   }
 });
 
-test("every ALLOWLIST entry carries a non-empty stated reason", () => {
+test("every ALLOWLIST entry is either a (file, match) pair or a filePattern, each with a non-empty stated reason", () => {
   for (const entry of ALLOWLIST) {
-    assert.equal(typeof entry.file, "string");
-    assert.ok(entry.file.startsWith("plugins/pipeline-core/"));
-    assert.equal(typeof entry.match, "string");
-    assert.ok(entry.match.length > 0);
+    if (entry.filePattern) {
+      assert.ok(entry.filePattern instanceof RegExp, "filePattern entries must carry a RegExp");
+      assert.equal(entry.file, undefined);
+      assert.equal(entry.match, undefined);
+    } else {
+      assert.equal(typeof entry.file, "string");
+      assert.ok(entry.file.startsWith("plugins/pipeline-core/"));
+      assert.equal(typeof entry.match, "string");
+      assert.ok(entry.match.length > 0);
+    }
     assert.equal(typeof entry.reason, "string");
-    assert.ok(entry.reason.length >= 20, `reason for ${entry.file} too short to be a real justification`);
+    assert.ok(entry.reason.length >= 20, `reason for ${entry.file ?? entry.filePattern} too short to be a real justification`);
   }
 });
 
@@ -103,8 +109,8 @@ test("current repository passes with the real ALLOWLIST (AC-11)", () => {
   assert.deepEqual(findings, [], JSON.stringify(findings, null, 2));
 });
 
-test("real allowlisted files still exist and still contain the allowlisted substring", () => {
-  for (const entry of ALLOWLIST) {
+test("real allowlisted (file, match) entries still exist and still contain the allowlisted substring", () => {
+  for (const entry of ALLOWLIST.filter((item) => item.file)) {
     const text = readFileSync(resolve(REPO, entry.file), "utf8");
     assert.ok(text.includes(entry.match), `${entry.file} no longer contains "${entry.match}"`);
   }
