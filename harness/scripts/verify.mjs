@@ -85,6 +85,22 @@ function gitCommonDirectory() {
   if (result.status !== 0 || result.stdout.trim() === "") throw new Error("VERIFY-GIT-COMMON-DIR-UNAVAILABLE");
   return result.stdout.trim();
 }
+// AC-P3/R1.4 (staged: specs/sprint-phoenix-epic/design/acp3-preplanning-patch.md). The
+// staged text names `duplicateSuiteIds` as a shared export of
+// check-verify-suite-registration.mjs so the CLI checker and this gate carry exactly one
+// definition. This dispatch (PHX-WINDOW) is scoped to touch ONLY
+// harness/scripts/pipeline-state.test.mjs and harness/scripts/verify.mjs, so the counting
+// logic is defined locally here instead -- a disclosed deviation from the staged text, not
+// a silent one; see the PHX-WINDOW dispatch report for the open follow-up (moving this to
+// the shared export once a dispatch is scoped to touch that file too).
+function duplicateSuiteIds(suites) {
+  const counts = new Map();
+  for (const suite of suites) counts.set(suite.name, (counts.get(suite.name) ?? 0) + 1);
+  return [...counts.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([id, count]) => ({ id, count }))
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
 const startedCandidate = candidateIdentity();
 const command = "node harness/scripts/verify.mjs";
 const evidenceDir = join(repoRoot, "evidence");
@@ -588,36 +604,48 @@ if (startedCandidate.status === "dirty") {
       const windowsAssuranceTests = WINDOWS_ASSURANCE_VERIFY_SUITES.map((suite) => ({ name: suite.name, file: join(repoRoot, suite.file) }));
       const phaseSteps = PHASE_STEPS.map((suite, index) => ({ ...suite, dependsOn: index === 0 ? [] : [PHASE_STEPS[index - 1].name] }));
       const registeredSuites = [...TEST_SUITES, ...scopedTests, ...windowsAssuranceTests, ...phaseSteps];
-      try {
-        verifyRun = runVerifyJournal({
-          gitCommonDir: gitCommonDirectory(),
-          repoRoot,
-          candidate: { commit: startedCandidate.commit, tree: startedCandidate.tree },
-          suites: registeredSuites,
-          policyInputs: {
-            command,
-            harnessSha256: createHash("sha256").update(readFileSync(fileURLToPath(import.meta.url))).digest("hex"),
-            phase26Result,
-            phase3Result,
-          },
-        });
-        steps.push(...verifyRun.steps.map(({ name, exitCode }) => ({ name, exitCode })));
-        verifyRunEvidence = createPublicVerifyRunEvidence({
-          runId: verifyRun.runId,
-          policySha256: verifyRun.policySha256,
-          resumePlanSha256: verifyRun.plan.planSha256,
-          terminalSha256: verifyRun.terminal.terminalSha256,
-          registeredSuiteCount: registeredSuites.length,
-          terminalReceiptCount: verifyRun.terminal.receipts.length,
-          terminalStatus: verifyRun.terminal.status,
-        });
-        if (verifyRunEvidence.status !== "passed" && steps.every((step) => step.exitCode === 0)) {
-          steps.push({ name: "verify-terminal-coverage", exitCode: 1 });
+      // AC-P3/R1.4: report a duplicate registration as a step rather than letting
+      // planVerifyResume throw before any suite runs. Without this the registration check
+      // below never executes for the defect class it was written to catch, because the
+      // throw aborts the whole journal.
+      const registrationDuplicates = duplicateSuiteIds(registeredSuites);
+      if (registrationDuplicates.length > 0) {
+        for (const duplicate of registrationDuplicates) {
+          console.error(`VERIFY-REGISTRATION-DUPLICATE: suite id ${JSON.stringify(duplicate.id)} is registered ${duplicate.count} times`);
         }
-      } catch (error) {
-        const diagnostic = error instanceof Error ? error.message.slice(0, 256) : "VERIFY-JOURNAL-UNAVAILABLE";
-        console.error(`VERIFY-JOURNAL-FAILED: ${diagnostic}`);
-        steps.push({ name: "verify-journal", exitCode: 1 });
+        steps.push({ name: "verify-suite-registration-duplicates", exitCode: 1 });
+      } else {
+        try {
+          verifyRun = runVerifyJournal({
+            gitCommonDir: gitCommonDirectory(),
+            repoRoot,
+            candidate: { commit: startedCandidate.commit, tree: startedCandidate.tree },
+            suites: registeredSuites,
+            policyInputs: {
+              command,
+              harnessSha256: createHash("sha256").update(readFileSync(fileURLToPath(import.meta.url))).digest("hex"),
+              phase26Result,
+              phase3Result,
+            },
+          });
+          steps.push(...verifyRun.steps.map(({ name, exitCode }) => ({ name, exitCode })));
+          verifyRunEvidence = createPublicVerifyRunEvidence({
+            runId: verifyRun.runId,
+            policySha256: verifyRun.policySha256,
+            resumePlanSha256: verifyRun.plan.planSha256,
+            terminalSha256: verifyRun.terminal.terminalSha256,
+            registeredSuiteCount: registeredSuites.length,
+            terminalReceiptCount: verifyRun.terminal.receipts.length,
+            terminalStatus: verifyRun.terminal.status,
+          });
+          if (verifyRunEvidence.status !== "passed" && steps.every((step) => step.exitCode === 0)) {
+            steps.push({ name: "verify-terminal-coverage", exitCode: 1 });
+          }
+        } catch (error) {
+          const diagnostic = error instanceof Error ? error.message.slice(0, 256) : "VERIFY-JOURNAL-UNAVAILABLE";
+          console.error(`VERIFY-JOURNAL-FAILED: ${diagnostic}`);
+          steps.push({ name: "verify-journal", exitCode: 1 });
+        }
       }
     }
   }
