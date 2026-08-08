@@ -5,6 +5,63 @@
 
 **Last updated:** 2026-08-08
 
+**CRITIC VERDICT: FAIL, ONE FINDING, AND IT IS CORRECT (2026-08-08).** Dispatched
+from `templates/prompts/critic-review.md` with paths only; the Critic reported
+`Briefing violations observed: none`. Enumerated object: `ce75672, 0a47171,
+5017c51, 7fcd252, a368552, d0de981, 1cd2f71, 3345efe`. Route requested
+`claude-opus-5` at `max`; effective identity reported `unknown`; assurance
+`functional-equivalent-read-only; OS isolation not asserted`.
+
+**F1 (major) — BS25 is vacuous, and this session broke it.**
+`backlog-state.test.mjs:1144` builds BS25's input by filtering the 38 amendments
+out of the *live* ledger. `1cd2f71` later appended ordinary event 220, so the
+filtered array is 1..181 + 220 — a sequence gap. `validateTransitionLedger` then
+reports chain/order findings regardless of reachability, so the asserted error
+fires unconditionally and the `commitExists` override is inert.
+
+Reproduced independently before acting:
+
+```
+historical 182 · last sequences [180,181,220] · contiguous false
+assertion fires WITH override: true · WITHOUT override: true → VACUOUS
+```
+
+The shape matters more than the defect: the filter was **sound when written** and
+was hollowed out by a later, unrelated append in the same package. Any repair
+that still depends on the live ledger's length breaks again on the next append.
+And the phase whose stated purpose is that "a gate that cannot be trusted to run
+is worse than no gate" shipped exactly such a gate — invisible to both counters
+that watch it (`35/35`, `366/366`), because the hole is below what they measure.
+
+**Repair in flight: `PHX-BS25-FIX` (goldfish-deep).** Required to pin
+discrimination in BOTH directions inside the test (fires with the override, does
+not fire without), to survive a synthetic further append, to break-and-restore
+against the implementation, and to audit BS26 for the same vacuity rather than
+assume it sound. Not yet committed at the context cut.
+
+**The Critic disproved one thing I expected to be a finding against me.**
+`ce75672` carries no `Dispatch:` trailer and is orchestrator-authored, which
+reads as an EL-01 violation — but `design/part-a-residuals-and-dispatch-template-drift.md:417`
+mandates that route in those words: "the only route is the sanctioned escape
+hatch … **never as a dispatch task**." Evidence over expectation.
+
+**The verdict's coverage is partial and the Critic said so unprompted.** Not
+examined: `0a47171` and `3345efe` at all; the new backlog item file; the
+777-line inventory body (checker only); AC-P2..AC-P5, AC-P7..AC-P11,
+AC-R1-1..AC-R1-7/9 and the `acceptance.md` families; five of the guardrail
+files. Two items `not verifiable`: the two ADR-0059 authorizations behind
+`ce75672` were not resolved against the override audit ledger, and the machine
+authorship artifacts for `PHX-INV-REFRESH` and `PHX-LEDGER-IGNORE` do not exist.
+A pass on anything in that list is **not** implied.
+
+**Process finding about this session, not about the work.** Four subagent runs
+ended without a final report, each having spent its budget on work — one at 52
+tool uses with nothing written. The cause is mine: `templates/prompts/goldfish-task.md`
+carries a report-early duty but frames it as advice for packages over ~25 tool
+uses, and I passed it on only once. It is in practice mandatory for every
+dispatch in this repository, where the closed shell grammar makes each evidence
+capture cost several calls. Worth an item; not yet filed.
+
 **THE GATE IS GREEN: 366/366, EXIT 0, AT `3345efe` (2026-08-08).** All four
 verify failures the phase plan gave owners are repaired, each demonstrated rather
 than asserted:
