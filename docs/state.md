@@ -213,6 +213,44 @@ that writer's own allowed-command list. Digest staleness deliberately names no
 script — the operation to repeat is the operator's own, and the check the item
 suggested does not exist in a consumer project.
 
+Also landed and independently re-measured: `c609ac0` (cross-repo denials route
+through the human-override mechanism, 51/51), `23d93b0` (the signing confirmation
+shows the recorded reason/scope/expiry, and `prepare` is idempotent over its own
+intent, 22/22), `64450b3` (install binds the signed candidate to HEAD, 26/26),
+`78b89af` (report durability, `GF-09-D`/`CR-06-D`).
+
+**One security control was changed and the PO decided it explicitly.** `23d93b0`
+turned the live-plugin-tree drift check at install from an admission precondition
+into a recorded observation, because a signature otherwise died on any unrelated
+write and an idempotent `prepare` alone does not fix that — `install` would then
+compare against the stored hash and fail all the same. The two are coupled. That
+left `install` with no freshness check at all, since the signed candidate was never
+compared to HEAD. Presented to the PO as a decision rather than absorbed; the PO
+chose to keep the observation and add the candidate binding, which `64450b3`
+implements: uncommitted working-tree bytes still pass, a different HEAD commit or
+tree does not. Practical consequence for the next ceremony: do not commit between
+`prepare` and `install`.
+
+**Second window, signed 2026-08-08:** scope `GS-6, TP-6`, four hours. TP-6 was the
+blocker — `guard-gate-strength.test.mjs` pins the stale escape-hatch text, and the
+first attempt at that repair stopped rather than land the guard half alone and
+leave three checks red.
+
+**In flight at the time of writing, four dispatches, uncommitted:** `RUNNERNEUT-1`
+(the runner survives the onboarding chain: promotion entry points, apply argv, the
+exit-0 status list, plus a constructor and an enumerating check), `LIFTRULES-2`
+(every gate-strength refusal names a route that exists; no refusal advertises
+hand-editing, across three hook files), `HGOELIG-1` (out-of-root cross-repository
+targets become liftable, the paradigm case of Decision 6), `PODIR-1` (the approval
+directory resolves from the environment and `setup` establishes it, signature mode
+only).
+
+**Twelve truncations in these two blocks.** The item now carries the measured count
+and what the larger sample changed: a resumed dispatch truncates again, the
+verification sweep is not the only site, and report durability changed the cost
+rather than the rate. The practice that came out of it — commit as soon as the
+suites are green, not after the last DoD check — is recorded there.
+
 ## 2026-08-07 Nova REL-053 — 0.5.3 published, and the PO order that came out of publishing it
 
 **Released.** `main` = `2740041d59458f949b597905816af12048502469`, tag `v0.5.3`
