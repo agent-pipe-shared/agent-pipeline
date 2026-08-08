@@ -255,6 +255,7 @@ import {
   readdirSync,
   realpathSync,
   renameSync,
+  statSync,
   unlinkSync,
   writeSync,
 } from "node:fs";
@@ -310,7 +311,12 @@ import {
   validCurrentPlanApproval,
   validPlanSubmission,
 } from "../lib/plan-spec-state-v2.mjs";
-import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
+import {
+  inventoryFeaturePackages,
+  planFeaturePackageBootstrap,
+  planFeaturePackageTransition,
+  validateFeaturePackage,
+} from "../lib/feature-package-topology.mjs";
 import {
   clearGateEstimateForMutation,
   prepareGateEstimateMutation,
@@ -4586,6 +4592,197 @@ function runPoAuthorityRebindApply(apply, deps, lock, io, stateIo, {
   } catch { console.error("Error: PO authority rebind transaction failed; recovery journal retained."); return 2; }
 }
 
+// ---- PHX-0 slice A: the READ-ONLY half of the #22 lifecycle writer family -----------------
+/**
+ * `feature-package-inspect|status|plan` (P-AC-08).
+ *
+ * These three open no file for writing, take no lock, touch neither the state file nor
+ * any manifest, and are routed BEFORE `readState()` on purpose: a read-only report must
+ * not depend on -- or be refused by -- the operator's local state file.
+ *
+ * Every verdict below comes from the accepted topology validator/transition planner in
+ * `../lib/feature-package-topology.mjs`. This layer parses arguments, refuses fail-closed
+ * naming the argument at fault, and serialises what that planner returned; it re-derives
+ * no package rule of its own, and `feature-package-plan` prints the planner's preview
+ * object verbatim as its whole document rather than a rewrite of it.
+ *
+ * The transactional half (`feature-package-apply` / `feature-package-recover`) is
+ * deliberately ABSENT rather than stubbed -- a stub is precisely the thing a caller
+ * mistakes for a gate.
+ */
+const FEATURE_PACKAGE_READ_SUBCOMMANDS = new Set([
+  "feature-package-inspect",
+  "feature-package-status",
+  "feature-package-plan",
+]);
+const FEATURE_PACKAGE_INSPECT_SCHEMA = "pipeline.feature-package-inspect.v1";
+const FEATURE_PACKAGE_STATUS_SCHEMA = "pipeline.feature-package-status.v1";
+const FEATURE_PACKAGE_READ_FLAGS = new Map([
+  ["feature-package-inspect", new Set(["root"])],
+  ["feature-package-status", new Set(["root", "manifest"])],
+  ["feature-package-plan", new Set(["root", "manifest", "next-state", "proposal"])],
+]);
+
+function refuseFeaturePackageRead(sub, message) {
+  console.error(`Error: ${sub} refused: ${message}.`);
+  return 2;
+}
+
+/**
+ * Closed parser: an unknown, repeated or value-less flag is a refusal that NAMES the
+ * offending argument, not a silently ignored token.
+ */
+function parseFeaturePackageReadFlags(argv, allowed) {
+  const out = {};
+  for (let i = 0; i < argv.length; i++) {
+    const raw = argv[i];
+    if (typeof raw !== "string" || !raw.startsWith("--")) {
+      return { ok: false, error: `unexpected argument "${typeof raw === "string" ? raw : String(raw)}"` };
+    }
+    const name = raw.slice(2);
+    if (!allowed.has(name)) return { ok: false, error: `unknown argument "--${name}"` };
+    if (Object.prototype.hasOwnProperty.call(out, name)) return { ok: false, error: `duplicate argument "--${name}"` };
+    const value = argv[i + 1];
+    if (typeof value !== "string" || value.length === 0 || value.startsWith("--")) {
+      return { ok: false, error: `argument "--${name}" requires a value` };
+    }
+    out[name] = value;
+    i++;
+  }
+  return { ok: true, value: out };
+}
+
+/**
+ * Minimal containment check for the paths THIS layer opens itself. It is not a second
+ * copy of the topology's path contract -- the planner re-checks every package path it
+ * uses -- it exists so a refusal can name the bad argument before any read happens.
+ */
+function featurePackageReadRelative(root, value) {
+  if (typeof value !== "string" || value.length === 0 || isAbsolute(value) || value.includes("\\")) return null;
+  if (value.split("/").some((part) => part === "" || part === "." || part === "..")) return null;
+  const rel = relative(root, resolve(root, value));
+  return rel === "" || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel) ? null : value;
+}
+
+function featurePackageReadArtifactView(artifact) {
+  if (artifact === null || typeof artifact !== "object" || Array.isArray(artifact)) {
+    return { class: null, path: null, sha256: null, authority: null, mutability: null, retention: null };
+  }
+  return {
+    class: artifact.class ?? null,
+    path: artifact.path ?? null,
+    sha256: artifact.sha256 ?? null,
+    authority: artifact.authority ?? null,
+    mutability: artifact.mutability ?? null,
+    retention: artifact.retention ?? null,
+  };
+}
+
+function runFeaturePackageReadCommand(sub, argv) {
+  const parsed = parseFeaturePackageReadFlags(argv, FEATURE_PACKAGE_READ_FLAGS.get(sub));
+  if (!parsed.ok) return refuseFeaturePackageRead(sub, parsed.error);
+  const flags = parsed.value;
+  if (flags.root === undefined) return refuseFeaturePackageRead(sub, 'argument "--root <dir>" is required');
+  const root = resolve(flags.root);
+  let rootStat = null;
+  try { rootStat = statSync(root); } catch { rootStat = null; }
+  if (rootStat === null || !rootStat.isDirectory()) {
+    return refuseFeaturePackageRead(sub, `argument "--root" does not name a readable directory: ${flags.root}`);
+  }
+
+  if (sub === "feature-package-inspect") {
+    const inventory = inventoryFeaturePackages(root);
+    const packages = inventory.packages.map((manifest) => {
+      const checked = validateFeaturePackage(root, manifest);
+      return {
+        manifest,
+        ok: checked.ok,
+        featureId: checked.receipt?.featureId ?? null,
+        state: checked.receipt?.state ?? null,
+        candidate: checked.receipt?.candidate ?? null,
+        manifestSha256: checked.receipt?.manifestSha256 ?? null,
+        artifactCount: checked.receipt?.artifactCount ?? 0,
+        findings: checked.findings,
+      };
+    });
+    const invalidCount = packages.filter((entry) => !entry.ok).length;
+    console.log(JSON.stringify({
+      schema: FEATURE_PACKAGE_INSPECT_SCHEMA,
+      ok: invalidCount === 0,
+      packageCount: packages.length,
+      invalidCount,
+      packages,
+      legacy: inventory.legacy,
+      unknown: inventory.unknown,
+    }, null, 2));
+    return invalidCount === 0 ? 0 : 2;
+  }
+
+  if (flags.manifest === undefined) {
+    return refuseFeaturePackageRead(sub, 'argument "--manifest <repo-relative-path>" is required');
+  }
+  const manifest = featurePackageReadRelative(root, flags.manifest);
+  if (manifest === null) {
+    return refuseFeaturePackageRead(sub, `argument "--manifest" must be a canonical path inside --root: ${flags.manifest}`);
+  }
+
+  if (sub === "feature-package-status") {
+    const checked = validateFeaturePackage(root, manifest);
+    if (checked.receipt === null) {
+      return refuseFeaturePackageRead(sub, `argument "--manifest" names an unreadable or malformed manifest: ${manifest} (${checked.findings.join("; ")})`);
+    }
+    let value = null;
+    try { value = JSON.parse(readFileSync(join(root, checked.receipt.manifest), "utf8")); }
+    catch { return refuseFeaturePackageRead(sub, `argument "--manifest" names an unreadable or malformed manifest: ${manifest}`); }
+    console.log(JSON.stringify({
+      schema: FEATURE_PACKAGE_STATUS_SCHEMA,
+      ok: checked.ok,
+      manifest: checked.receipt.manifest,
+      featureId: checked.receipt.featureId,
+      state: checked.receipt.state,
+      candidate: checked.receipt.candidate,
+      manifestSha256: checked.receipt.manifestSha256,
+      artifactCount: checked.receipt.artifactCount,
+      artifacts: (Array.isArray(value?.artifacts) ? value.artifacts : []).map(featurePackageReadArtifactView),
+      receipt: checked.receipt,
+      findings: checked.findings,
+    }, null, 2));
+    return checked.ok ? 0 : 2;
+  }
+
+  const nextState = flags["next-state"];
+  if (existsSync(join(root, manifest))) {
+    if (nextState === undefined) {
+      return refuseFeaturePackageRead(sub, 'argument "--next-state <state>" is required for an existing manifest');
+    }
+    if (flags.proposal !== undefined) {
+      return refuseFeaturePackageRead(sub, `argument "--proposal" applies only to an absent manifest, and ${manifest} exists`);
+    }
+    const plan = planFeaturePackageTransition(root, manifest, nextState);
+    console.log(JSON.stringify(plan, null, 2));
+    return plan.status === "preview" || plan.status === "noop" ? 0 : 2;
+  }
+  if (flags.proposal === undefined) {
+    return refuseFeaturePackageRead(sub, `argument "--proposal <repo-relative-path>" is required because ${manifest} is absent; the bootstrap preview validates the proposed manifest bytes in memory and creates nothing`);
+  }
+  const proposalPath = featurePackageReadRelative(root, flags.proposal);
+  if (proposalPath === null) {
+    return refuseFeaturePackageRead(sub, `argument "--proposal" must be a canonical path inside --root: ${flags.proposal}`);
+  }
+  try {
+    const stat = lstatSync(join(root, proposalPath));
+    if (!stat.isFile() || stat.isSymbolicLink()) {
+      return refuseFeaturePackageRead(sub, `argument "--proposal" must name a regular non-symlink file: ${proposalPath}`);
+    }
+  } catch { return refuseFeaturePackageRead(sub, `argument "--proposal" names an unreadable file: ${proposalPath}`); }
+  let manifestBytes = null;
+  try { manifestBytes = readFileSync(join(root, proposalPath), "utf8"); }
+  catch { return refuseFeaturePackageRead(sub, `argument "--proposal" names an unreadable file: ${proposalPath}`); }
+  const plan = planFeaturePackageBootstrap(root, manifest, { manifestBytes, targetState: nextState ?? "draft" });
+  console.log(JSON.stringify(plan, null, 2));
+  return plan.status === "bootstrap-preview" ? 0 : 2;
+}
+
 /**
  * Runs the CLI logic. Never calls process.exit itself (testable); returns the exit
  * code. `deps` allows tests to inject `dir`, `now`, `gitHead`, and `env` without
@@ -4636,6 +4833,9 @@ export function run(argv = process.argv.slice(2), deps = {}) {
   }
   if (CONTINUITY_SUBCOMMANDS.has(sub)) return runContinuityCommand(sub, flags, { ...deps, dir, now });
   if (PUBLICATION_SUBCOMMANDS.has(sub)) return runPublicationCommand(sub, flags, { ...deps, dir, now });
+  // Routed ahead of readState(): these three are read-only reports over a repository
+  // topology and must not be gated by the operator's local state file.
+  if (FEATURE_PACKAGE_READ_SUBCOMMANDS.has(sub)) return runFeaturePackageReadCommand(sub, rest);
 
   const existing = readState(dir);
   if (existing.status === "malformed") {
@@ -5521,7 +5721,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
 
     default: {
       console.error(
-        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, submit-plan, approve-plan, reopen-design, seal-plan-approval, set-phase, set-gate-estimate, revoke-plan, bind-plan-spec, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy, po-authority-rebind-plan, po-authority-rebind-apply, po-authority-decision-plan, po-authority-decision-select, po-authority-decision-apply, continuity-init, continuity-cas, continuity-apply-native, continuity-integrate-final, continuity-record-course-brief, continuity-select-course, continuity-apply-decision, continuity-clear-decision, continuity-result-bootstrap-plan, continuity-result-bootstrap-apply, continuity-result-rebind-plan, continuity-result-rebind-apply, continuity-result-case-migration-plan, continuity-result-case-migration-apply, continuity-result-close-plan, continuity-result-close-apply, publication-prepare, publication-approve, publication-authorize, publication-reconcile, publication-observe, publication-start-readback, publication-close, publication-rearm, publication-block.`,
+        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, submit-plan, approve-plan, reopen-design, seal-plan-approval, set-phase, set-gate-estimate, revoke-plan, bind-plan-spec, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy, po-authority-rebind-plan, po-authority-rebind-apply, po-authority-decision-plan, po-authority-decision-select, po-authority-decision-apply, continuity-init, continuity-cas, continuity-apply-native, continuity-integrate-final, continuity-record-course-brief, continuity-select-course, continuity-apply-decision, continuity-clear-decision, continuity-result-bootstrap-plan, continuity-result-bootstrap-apply, continuity-result-rebind-plan, continuity-result-rebind-apply, continuity-result-case-migration-plan, continuity-result-case-migration-apply, continuity-result-close-plan, continuity-result-close-apply, publication-prepare, publication-approve, publication-authorize, publication-reconcile, publication-observe, publication-start-readback, publication-close, publication-rearm, publication-block, feature-package-inspect, feature-package-status, feature-package-plan.`,
       );
       return 2;
     }
