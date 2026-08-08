@@ -18,7 +18,7 @@
         "required": ["path", "kind", "type", "existed"],
         "properties": {
           "path": { "type": "string" },
-          "kind": { "type": "string", "enum": ["manifest", "state", "calibration", "guardConfig", "guardAudit", "handover", "privateState", "runtimeOwnedKeys"] },
+          "kind": { "type": "string", "enum": ["manifest", "state", "calibration", "guardConfig", "guardAudit", "handover", "privateState", "runtimeOwnedKeys", "runtimeSeededFile"] },
           "type": { "type": "string", "enum": ["file", "directory", "keys"] },
           "existed": { "type": "boolean" },
           "ownedKeys": { "type": "array", "items": { "type": "string" } }

@@ -18,7 +18,7 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 
-import { PROJECT_RESET_PLAN_SCHEMA, planProjectReset } from "./project-reset.mjs";
+import { PROJECT_RESET_PLAN_SCHEMA, classifyRuntimeProjectionProvenance, planProjectReset } from "./project-reset.mjs";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { applyOnboardingKickoff, planOnboardingKickoff } from "../lib/onboarding-continuity.mjs";
 
@@ -376,6 +376,73 @@ test("AC-4: the collision paths are claimed by the authority loop and skipped by
     assert.equal(plan.remove.find((entry) => entry.path === ".claude/pipeline.yaml").kind, "runtimeOwnedKeys");
     assert.equal(plan.remove.find((entry) => entry.path === ".claude/pipeline.json").kind, "runtimeOwnedKeys");
   });
+});
+
+test("R2C AC-1: provenance is keyed by the projection field alone -- the classifier never receives a path", () => {
+  // A whole-file-seed projection classifies as a whole-file removal
+  // regardless of how few keys it lists -- the literal shape of the real
+  // `.codex/agents/implementor.toml` / critic.toml manifest entries, which
+  // list only the two route-owned keys yet the whole file is Pipeline prose.
+  assert.equal(classifyRuntimeProjectionProvenance({ projection: "codex-custom-agent-v3", ownedKeys: ["model", "model_reasoning_effort"] }), "file");
+  assert.equal(classifyRuntimeProjectionProvenance({ projection: "codex-advisor-agent-v3", ownedKeys: ["name", "description", "model", "model_reasoning_effort", "developer_instructions", "sandbox_mode"] }), "file");
+  // A keys-patch projection classifies as a keys-scoped entry no matter how
+  // MANY keys it owns, and no matter what its path would look like -- the
+  // function is never given a path, so a `.codex/agents/`-prefix
+  // implementation could not have produced this result.
+  assert.equal(classifyRuntimeProjectionProvenance({ projection: "human-role-display-v3", ownedKeys: ["humanRoles.po.displayLabel"] }), "keys");
+  assert.equal(classifyRuntimeProjectionProvenance({ projection: "claude-model-routing-v3", ownedKeys: ["language.human_facing", "modelRouting", "runnerRoutes", "criticExport", "session.keep_awake"] }), "keys");
+  // preserve-only: no owned keys at all, regardless of projection kind.
+  assert.equal(classifyRuntimeProjectionProvenance({ projection: "preserve-only", ownedKeys: [] }), "preserve");
+  assert.equal(classifyRuntimeProjectionProvenance({ projection: "codex-custom-agent-v3", ownedKeys: [] }), "preserve");
+});
+
+test("R2C AC-1/AC-2: each of the seven manifest targets lands in the documented provenance class", () => {
+  withFixture(freshProject("seven-targets", { tier: "neutral" }), (root) => {
+    const plan = planProjectReset({ rootDir: root });
+    assert.equal(plan.status, "ready");
+    const byPath = Object.fromEntries([
+      ...plan.remove.map((entry) => [entry.path, { ...entry, set: "remove" }]),
+      ...plan.keep.map((entry) => [entry.path, { ...entry, set: "keep" }]),
+    ]);
+    assert.deepEqual(
+      { set: byPath[".claude/settings.json"].set, kind: byPath[".claude/settings.json"].kind },
+      { set: "keep", kind: "runtimePreserveOnly" },
+    );
+    assert.deepEqual(
+      { set: byPath[".codex/config.toml"].set, kind: byPath[".codex/config.toml"].kind },
+      { set: "keep", kind: "runtimePreserveOnly" },
+    );
+    assert.deepEqual(
+      { set: byPath[".claude/pipeline.json"].set, kind: byPath[".claude/pipeline.json"].kind, type: byPath[".claude/pipeline.json"].type },
+      { set: "remove", kind: "runtimeOwnedKeys", type: "keys" },
+    );
+    assert.deepEqual(
+      { set: byPath[".claude/pipeline.yaml"].set, kind: byPath[".claude/pipeline.yaml"].kind, type: byPath[".claude/pipeline.yaml"].type },
+      { set: "remove", kind: "runtimeOwnedKeys", type: "keys" },
+    );
+    // AC-2 pin: the three Pipeline-seeded Codex agent files are whole-file
+    // removals, never a keys entry that would leave a Pipeline-authored stub
+    // (name/description/developer_instructions) behind.
+    for (const path of [".codex/agents/implementor.toml", ".codex/agents/critic.toml", ".codex/agents/consult-advisor.toml"]) {
+      assert.deepEqual(
+        { set: byPath[path].set, kind: byPath[path].kind, type: byPath[path].type },
+        { set: "remove", kind: "runtimeSeededFile", type: "file" },
+        `expected ${path} to be a whole-file removal`,
+      );
+    }
+  });
+});
+
+test("R2C AC-3: preserve-only never appears in remove, on either authority tier", () => {
+  for (const tier of ["legacy", "neutral"]) {
+    withFixture(freshProject(`preserve-only-${tier}`, { tier }), (root) => {
+      const plan = planProjectReset({ rootDir: root });
+      for (const path of [".claude/settings.json", ".codex/config.toml"]) {
+        assert.equal(plan.remove.some((entry) => entry.path === path), false, `${path} must never be a remove entry (${tier})`);
+        assert.equal(plan.keep.some((entry) => entry.path === path), true, `${path} must be a keep entry (${tier})`);
+      }
+    });
+  }
 });
 
 test("AC-7: a plan containing runtime-projection removal and preserve-only keep entries validates against the schema", () => {

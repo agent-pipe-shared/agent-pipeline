@@ -31,26 +31,37 @@
  * categories the reset does not enter at all -- this repository's own git
  * history, the adopter's own files, and any design package under `specs/`.
  *
- * A THIRD REMOVAL KIND (R2B). `remove` also derives every runtime-projection
- * target from the unfiltered `loadRuntimeProjectionV3OwnedKeys().targets`
- * (`runtime-projection-v3.mjs`), runner-neutrally -- never `.codex/`-only or
- * `.claude/`-only. Two shapes fall out of that manifest: a `preserve-only`
- * target the Pipeline owns no key of at all (`.claude/settings.json`,
- * `.codex/config.toml`) is `keep`, never `remove`. A target with non-empty
- * `ownedKeys` (e.g. `modelRouting` inside `.claude/pipeline.yaml`, which also
- * carries the project's OWN gates/security/governance declarations) is a
- * `remove` entry that names the exact owned keys and never the file -- the
- * same "remove what was seeded, never the container" rule from the docs/
- * `specs/` case, one level down, inside a file instead of a directory. Two
- * runtime-projection paths (`.claude/pipeline.yaml`, `.claude/pipeline.json`)
- * physically coincide with an authority artifact (manifest, calibration);
- * where the authority loop above has ALREADY classified that exact path --
- * as a whole-file `remove` at the currently selected tier, or as a
- * whole-file `keep` for an existing compatibility copy at the other tier --
- * that classification is a strict superset of the runtime-projection
- * treatment (removing/keeping the whole file removes/keeps the owned keys
- * inside it too), so the runtime-projection loop SKIPS an already-claimed
- * path. A path is therefore classified exactly once, never twice.
+ * A THIRD REMOVAL KIND (R2B/R2C). `remove` also derives every runtime-
+ * projection target from the unfiltered `loadRuntimeProjectionV3OwnedKeys().
+ * targets` (`runtime-projection-v3.mjs`), runner-neutrally -- never
+ * `.codex/`-only or `.claude/`-only. THREE shapes fall out of that manifest,
+ * keyed on the `projection` field -- never on `ownedKeys.length` alone, and
+ * never on the path -- see `classifyRuntimeProjectionProvenance` below for
+ * why `ownedKeys.length` cannot be the signal. A `preserve-only` target the
+ * Pipeline owns no key of at all (`.claude/settings.json`,
+ * `.codex/config.toml`) is `keep`, never `remove`. A whole-file-seed
+ * projection (`codex-custom-agent-v3`, `codex-advisor-agent-v3`) whose
+ * renderer emits the COMPLETE file body from static role metadata / intent
+ * alone -- the three `.codex/agents/*.toml` files -- is a whole-file
+ * `remove`, exactly like the authority artifacts above, because the whole
+ * file is Pipeline prose. A keys-patch projection (`human-role-display-v3`,
+ * `claude-model-routing-v3`) whose renderer instead patches specific keys
+ * into an EXISTING project-owned document is a `remove` entry that names the
+ * exact owned keys and never the file -- the same "remove what was seeded,
+ * never the container" rule from the docs/`specs/` case, one level down,
+ * inside a file instead of a directory. Two runtime-projection paths
+ * (`.claude/pipeline.yaml`, `.claude/pipeline.json`) physically coincide with
+ * an authority artifact (manifest, calibration); where the authority loop
+ * above has ALREADY classified that exact path -- as a whole-file `remove`
+ * at the currently selected tier, or as a whole-file `keep` for an existing
+ * compatibility copy at the other tier -- that classification is a strict
+ * superset of the runtime-projection treatment (removing/keeping the whole
+ * file removes/keeps the owned keys inside it too), so the runtime-
+ * projection loop SKIPS an already-claimed path. A path is therefore
+ * classified exactly once, never twice. Only `apply` (R2C) actually knows
+ * how to act on the two removal shapes; a `type: "keys"` entry surviving to
+ * `apply` is a typed refusal (key-level surgery is unimplemented), never a
+ * file delete standing in for it.
  *
  * FAILS CLOSED, NAMES WHICH. A root that is not a project, one whose
  * authority is unreadable, and one that is a symlink each produce a
@@ -157,6 +168,41 @@ function refusal(status, code, root) {
   };
 }
 
+// Projection kinds proven, by the renderer source cited below, to emit a
+// COMPLETE file body independent of any pre-existing file -- so the whole
+// file is Pipeline prose, never project content:
+//   - `codex-custom-agent-v3`: `codexCustomAgentSeed()`
+//     (runtime-projection-v3.mjs:47) renders name/description/both model
+//     fields/developer_instructions from static role metadata alone; the V3
+//     renderer only ever patches on top of that self-seeded body.
+//   - `codex-advisor-agent-v3`: its renderer builds all six owned keys from
+//     the routing `intent` alone, the same shape one level up.
+// Every OTHER owned-keys projection (`human-role-display-v3`,
+// `claude-model-routing-v3`) instead REQUIRES a pre-existing baseline and
+// preserves every unowned byte of it -- it patches keys into a document the
+// PROJECT owns. `ownedKeys.length` cannot be the signal that tells these two
+// families apart: the whole-file kind lists only the route-owned keys
+// (`model`, `model_reasoning_effort`), never the static fields it also
+// wrote, so its `ownedKeys` count is systematically smaller than the file it
+// produced. The `projection` kind -- a manifest field, never a path -- is
+// the only signal that actually reflects which renderer produced the file.
+const WHOLE_FILE_SEED_PROJECTIONS = Object.freeze(new Set([
+  "codex-custom-agent-v3",
+  "codex-advisor-agent-v3",
+]));
+
+/**
+ * Classify a runtime-projection manifest target's FILE PROVENANCE -- did the
+ * Pipeline create this file wholesale, or does it merely own keys inside a
+ * file the project owns -- from the manifest's own `projection` field.
+ * Deliberately takes only `{ projection, ownedKeys }`: it cannot special-case
+ * a path because it is never given one.
+ */
+export function classifyRuntimeProjectionProvenance({ projection, ownedKeys }) {
+  if (!Array.isArray(ownedKeys) || ownedKeys.length === 0) return "preserve";
+  return WHOLE_FILE_SEED_PROJECTIONS.has(projection) ? "file" : "keys";
+}
+
 /**
  * Plan a project reset: derive the three closed sets for the project rooted
  * at `rootDir`. Never writes; never throws for an expected refusal -- every
@@ -258,7 +304,8 @@ export function planProjectReset({ rootDir } = {}) {
   for (const target of runtimeTargets) {
     if (claimedPaths.has(target.path)) continue;
     const existed = existsSync(join(root, target.path));
-    if (target.ownedKeys.length === 0) {
+    const provenance = classifyRuntimeProjectionProvenance(target);
+    if (provenance === "preserve") {
       // `preserve-only`: the Pipeline projects nothing into this file --
       // it is the runner's own configuration, never touched by a reset.
       keep.push({
@@ -268,8 +315,21 @@ export function planProjectReset({ rootDir } = {}) {
         existed,
         reason: "runtime-projection target the Pipeline owns no key of; the runner's own configuration, left untouched by a reset",
       });
+    } else if (provenance === "file") {
+      // Whole-file-seed projection: the entire file is Pipeline prose (see
+      // classifyRuntimeProjectionProvenance), so removal targets the file,
+      // never a keys-level entry that would leave a Pipeline-authored stub
+      // behind.
+      remove.push({
+        path: target.path,
+        kind: "runtimeSeededFile",
+        type: "file",
+        existed,
+      });
     } else {
-      // THE THIRD KIND: name the exact owned keys, never the file.
+      // Keys-patch projection: name the exact owned keys, never the file --
+      // the file is project-owned. `apply` (R2C) does not implement key
+      // surgery; a surviving entry of this kind is a typed refusal.
       remove.push({
         path: target.path,
         kind: "runtimeOwnedKeys",
