@@ -121,7 +121,8 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { isAbsolute, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 import { loadManifest, gateConfig, loadDeployPolicy } from "../lib/manifest.mjs";
@@ -157,6 +158,26 @@ function projectCalibrationRelPath(rootDir) {
   return projectAuthorityRelPath(rootDir, "calibration", NEUTRAL_CALIBRATION, LEGACY_CALIBRATION);
 }
 import { checkSecurityCompleteness } from "../lib/security-completeness-gate.mjs";
+
+// The plugin root this guard is itself running from -- same self-location resolution
+// guard-lifecycle-ready.mjs / guard-human-override.mjs already use (`resolve(dirname(
+// fileURLToPath(import.meta.url)), "..")`), reused rather than a second mechanism, so a
+// path this hook prints resolves inside a consumer's installed plugin, never this
+// repository's own harness/ layout (backlog: 2026-08-08-shipped-artifacts-assume-the-
+// pipelines-own-repository.md).
+const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+/**
+ * Runnable reference to pipeline-state.mjs under the plugin actually enforcing this
+ * guard. Degrades to a locate-it hint (never a broken path or an empty string) if the
+ * script cannot be found under PLUGIN_ROOT.
+ */
+function pipelineStateScriptRef() {
+  const script = join(PLUGIN_ROOT, "scripts", "pipeline-state.mjs");
+  return existsSync(script)
+    ? script
+    : "pipeline-state.mjs (locate it under your installed pipeline-core plugin's scripts directory)";
+}
 
 function emit(code, lines) {
   process.stderr.write(lines.filter(Boolean).join("\n") + "\n");
@@ -1138,7 +1159,7 @@ function checkDeployApprovals(required) {
       emit(1, [
         `[guard-push] WARN: ${path} contains invalid JSON (${e.message}).`,
         `Deploy-approval check is being skipped (fail-open on a broken state file) -- please fix ` +
-          `(rewrite only via harness/scripts/pipeline-state.mjs, never by hand).`,
+          `(rewrite only via ${pipelineStateScriptRef()}, never by hand).`,
       ]);
     }
     if (parsed && typeof parsed === "object" && parsed.deployApprovals !== undefined) {
@@ -1146,7 +1167,7 @@ function checkDeployApprovals(required) {
         emit(1, [
           `[guard-push] WARN: ${path} state.deployApprovals is not an array.`,
           `Deploy-approval check is being skipped (fail-open on a broken state file) -- please fix ` +
-            `(rewrite only via harness/scripts/pipeline-state.mjs, never by hand).`,
+            `(rewrite only via ${pipelineStateScriptRef()}, never by hand).`,
         ]);
       }
       deployApprovals = parsed.deployApprovals;
@@ -1186,7 +1207,7 @@ function checkDeployApprovals(required) {
     if (!match) {
       reasons.push(
         `Environment '${req.environment}': no unused deployApproval for artifact '${req.display}' -- record it: ` +
-          `node harness/scripts/pipeline-state.mjs approve-deploy --env ${req.environment} --artifact <tag-or-sha> --by <name>.`,
+          `node ${pipelineStateScriptRef()} approve-deploy --env ${req.environment} --artifact <tag-or-sha> --by <name>.`,
       );
       continue;
     }
@@ -1666,7 +1687,7 @@ try {
       } catch (e) {
         failures.push(
           `Push approval state is malformed: ${stateRelPath} contains invalid JSON (${e.message}). ` +
-          `Rewrite only via harness/scripts/pipeline-state.mjs; publication remains blocked.`,
+          `Rewrite only via ${pipelineStateScriptRef()}; publication remains blocked.`,
         );
       }
       const approval = state?.pushApproval?.lastApproved;
@@ -1675,7 +1696,7 @@ try {
         failures.push(
           `Push approval missing or stale: state.pushApproval.lastApproved.forCommit=${JSON.stringify(
             forCommit ?? null,
-          )}, expected pushed source commit=${JSON.stringify(sourceCommit)}. Record: node harness/scripts/pipeline-state.mjs approve-push --by <name> --remote <remote> --destination <full-ref>. NOTE: with gates.push.approval "required" this state record is NECESSARY BUT NOT SUFFICIENT -- the critical-proof check below is independent and also applies. A pushApproval in mutable state is never executable authority on its own.`,
+          )}, expected pushed source commit=${JSON.stringify(sourceCommit)}. Record: node ${pipelineStateScriptRef()} approve-push --by <name> --remote <remote> --destination <full-ref>. NOTE: with gates.push.approval "required" this state record is NECESSARY BUT NOT SUFFICIENT -- the critical-proof check below is independent and also applies. A pushApproval in mutable state is never executable authority on its own.`,
         );
       }
       // ADR-0055: the project may stand the private-key proof down for `push` with an
@@ -1722,7 +1743,7 @@ try {
             // that fixture cannot reach this line, so PG12s15 covers it. The operator does
             // not need the values echoed back -- they are in the command they just ran.
             ? `Push approval is not externally attested for this exact action (${attested.code}). `
-                + "Record one for this commit, remote and destination ref: node harness/scripts/pipeline-state.mjs "
+                + `Record one for this commit, remote and destination ref: node ${pipelineStateScriptRef()} `
                 + "approve-push --by <name> --remote <remote> --destination <full-ref> "
                 + "--proof-request <path> --proof-authority <path> --proof <path>."
               : `Push approval critical proof is unavailable: project/critical-human-proof.json is ${pushWaiver.code}.`,
@@ -1733,7 +1754,7 @@ try {
         // under a different policy than the one in force now. Re-approve deliberately.
         failures.push(
           "Push approval predates the current critical-proof waiver; re-record it with " +
-          "node harness/scripts/pipeline-state.mjs approve-push so the record states what backed it.",
+          `node ${pipelineStateScriptRef()} approve-push so the record states what backed it.`,
         );
       }
     }
