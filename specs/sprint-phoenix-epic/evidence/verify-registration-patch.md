@@ -27,26 +27,27 @@ runtime rather than declared in these arrays.
 | | count |
 | --- | --- |
 | Currently registered (measured today, this run) | **259** |
-| New entries this patch adds | **+103** (102 green suites + 1 for the new checker's own suite) |
-| Expected total after application | **362** |
+| New entries this patch adds | **+104** (102 green suites + 1 for the new checker's own suite + 1 for the checker's own live `-check` step, R1.3) |
+| Expected total after application | **363** |
 
 The classification report measured 242 registered entries at commit `0ffe37c`
 (2026-08-08, earlier the same day); the 259 measured here reflects registrations
 landed by other dispatches in the same TP-3 window since that measurement. This
-patch's 103 new lines are additive to whatever the registered count is at
+patch's 104 new lines are additive to whatever the registered count is at
 application time — the three self-checks below (re-run immediately before
 application) are what actually gate correctness, not the absolute 259 figure.
 
 ## Self-checks (required by this task's DoD)
 
 All three run via `check-verify-suite-registration.mjs`'s `checkVerifySuiteRegistration()`
-export against the real repository, cross-referenced against the 103 entries below.
+export against the real repository, cross-referenced against the 104 entries below.
 
 | Check | Result |
 | --- | --- |
-| Entry count emitted equals 102 (green, from the classification report) + 1 (this checker's own suite) = 103 | **PASS** — 103 entries below |
-| None of the 103 is one of the classification report's 7 red suites | **PASS** — zero overlap |
-| None of the 103 is already registered in `verify.mjs` today | **PASS** — zero overlap with the 259 currently-registered entries |
+| Entry count emitted equals 102 (green, from the classification report) + 1 (this checker's own suite) + 1 (this checker's own live `-check` step) = 104 | **PASS** — 104 entries below |
+| None of the 104 is one of the classification report's 7 red suites | **PASS** — zero overlap |
+| None of the 104 is already registered in `verify.mjs` today | **PASS** — zero overlap with the 259 currently-registered entries |
+| `check-verify-suite-registration.mjs` (Batch 13's entry) is not a `*.test.mjs` file and was therefore never part of the unregistered-suite measurement (the 102 green files, or the 103rd for the checker's own test file) — it is an added gate STEP, not a discovered suite. Registering it makes verify actually invoke the checker on every run, which is the entire point of R1.3; the entry count above folds it in as a fourth, distinct term precisely so this is not conflated with a suite the classification report found | **N/A — recorded for legibility to whoever applies the patch** |
 
 Cross-enumeration check (stop condition #2 in this dispatch's briefing): running
 the checker's file-system walk against the real repository and subtracting this
@@ -88,7 +89,7 @@ paths (~60-67, ~482-483).
   way, but the explicit rename removes the ambiguity that produced that exact
   false positive.
 - No other collision was found: verified against the live set of 259 currently
-  registered names and against the 103 new names themselves (all 103 are
+  registered names and against the 104 new names themselves (all 104 are
   pairwise distinct and none matches an existing name).
 
 ## Batches (each independently revertible per AC-P10)
@@ -268,23 +269,98 @@ filed under R1.2, not registered.
   { name: "verify-suite-registration-tests", file: join(scriptDir, "check-verify-suite-registration.test.mjs") },
 ```
 
+### Batch 13 — the checker registered as a LIVE verify step (1 step, unmeasured — a gate step, not a suite)
+
+The 102 green suites plus Batch 12's unit-test entry prove the checker's
+*parsing logic* runs correctly inside the gate, but only a live `-check` step
+makes verify itself go non-zero when a future `*.test.mjs` file is added
+without a registration entry — which is what AC-P2 and AC-P3 literally
+require. Without this entry the gate reports nothing when the invariant is
+violated, and the defect is caught only by someone running the checker by
+hand. This follows the established `<name>-tests` / `<name>-check` pairing
+convention already used elsewhere in `TEST_SUITES` (e.g.
+`doc-contract-tests`/`doc-contract-check` at verify.mjs:372-373,
+`authority-tier-agreement-tests`/`-check` at :374-375).
+
+```js
+  { name: "verify-suite-registration-check", file: join(scriptDir, "check-verify-suite-registration.mjs") },
+```
+
 ## Batch totals cross-check
 
-12 batches, 6 + 2 + 6 + 3 + 18 + 3 + 38 + 8 + 8 + 4 + 6 + 1 = **103**. Sum of
+13 batches, 6 + 2 + 6 + 3 + 18 + 3 + 38 + 8 + 8 + 4 + 6 + 1 + 1 = **104**. Sum of
 batches 1-11's runtimes: 1406 + 2678 + 998 + 222 + 2350 + 588 + 3446 + 554 +
 2364 + 305 + 1897 = **16808 ms** (16.8 s), matching the classification report's
 "total runtime for the green set is 16.8 seconds" exactly. Batch 12 adds one
-new, previously-unmeasured suite.
+new, previously-unmeasured suite; Batch 13 adds one new, previously-unmeasured
+gate step (the checker's own CLI invocation, not a `*.test.mjs` suite).
 
 ## Application note (for whoever applies this under the TP-3 window)
 
-All 103 lines are appended to `TEST_SUITES` — insert the batches as a
-contiguous block immediately before the array's closing `];` (today at
-`harness/scripts/verify.mjs:437`; re-confirm the exact line at application
-time, since intervening TP-3 registrations may have moved it). No other file
-changes. Immediately after applying, re-run
+All 104 lines (Batches 1-13) are appended to `TEST_SUITES` — insert the
+batches as a contiguous block immediately before the array's closing `];`
+(today at `harness/scripts/verify.mjs:437`; re-confirm the exact line at
+application time, since intervening TP-3 registrations may have moved it). No
+other file changes. Immediately after applying, re-run
 `node harness/scripts/check-verify-suite-registration.mjs` — it should report
 `0 unregistered` (the current 7 exclusions being the only files legitimately
 outside the arrays) and `node harness/scripts/verify.mjs` should show a
-registered-step count of 362 for the three arrays plus whatever `PHASE_STEPS`
-this checkout carries.
+registered-step count of 363 (259 + 104) for the three arrays plus whatever
+`PHASE_STEPS` this checkout carries.
+
+### Post-application verification procedure (AC-P1, AC-P2, AC-P3)
+
+Run in this order, inside the same TP-3 window that applies the patch — steps
+2 and 3 both mutate the freshly-patched `verify.mjs` or its neighborhood and
+must be fully restored before the window closes or any verify evidence is
+regenerated for a commit.
+
+1. **AC-P1 — registered-step count and clean exit.**
+   ```
+   node harness/scripts/verify.mjs
+   ```
+   Expect exit 0 (or every non-zero step named with a filed owner, per
+   AC-P1's own wording) and a registered-step count of **363** — re-derived
+   above from 259 currently-registered entries + 104 lines this patch adds;
+   this run's own output is the actual evidence, not this stated expectation.
+
+2. **AC-P2 — break and restore: an unregistered suite must fail the gate.**
+   Create one empty, syntactically valid `*.test.mjs` file under a registered
+   root, e.g.:
+   ```
+   printf '%s\n' "import { test } from 'node:test';" "test('placeholder', () => {});" > harness/scripts/_phx-regpatch-13-probe.test.mjs
+   node harness/scripts/check-verify-suite-registration.mjs
+   ```
+   Expect a non-zero exit and an UNREGISTERED finding naming
+   `harness/scripts/_phx-regpatch-13-probe.test.mjs` explicitly. Then restore:
+   ```
+   rm harness/scripts/_phx-regpatch-13-probe.test.mjs
+   node harness/scripts/check-verify-suite-registration.mjs
+   ```
+   Expect exit 0 again. The probe file must be deleted before any commit and
+   before any verify evidence is regenerated — it is scratch, not a
+   deliverable.
+
+3. **AC-P3 — break and restore: a duplicate suite id must fail the gate,
+   named.** This break necessarily edits `harness/scripts/verify.mjs` itself,
+   which is TP-3-protected; it must therefore happen inside this same
+   maintenance window, immediately after step 1's confirming run, and be
+   fully reverted before the window closes. Duplicate the last entry appended
+   by Batch 13 (or any single `TEST_SUITES` line) verbatim immediately below
+   itself, e.g. duplicating:
+   ```
+     { name: "verify-suite-registration-check", file: join(scriptDir, "check-verify-suite-registration.mjs") },
+   ```
+   then run:
+   ```
+   node harness/scripts/check-verify-suite-registration.mjs
+   ```
+   Expect a non-zero exit and a DUPLICATE-NAME finding naming
+   `verify-suite-registration-check` explicitly (per the checker's own
+   contract, header comment lines ~32-38: "names every duplicate it finds").
+   Then restore by deleting the duplicated line so `verify.mjs` returns to
+   exactly the 104-line-patched state, and re-run:
+   ```
+   node harness/scripts/check-verify-suite-registration.mjs
+   ```
+   Expect exit 0 again before the TP-3 window closes.
