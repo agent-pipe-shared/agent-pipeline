@@ -20,7 +20,7 @@
 - [ ] Search harshly, report honestly — findings only with evidence
 - [ ] Per finding: Gap · Risk (blocker/major/minor) · Evidence `file:line` · Spec/guardrail ref
 - [ ] Trajectory section: were claimed checks actually executed per evidence (command + commit state + exit code)?
-- [ ] Authorship (standard check, EL-01/EL-16): production diffs originate from dispatched fresh-context sessions (commit/session trailers, dispatch records) or from the orchestrator itself? Orchestrator-authored diffs outside `docs/operating-model.md` — *Rigor, risk and gates* stage-0 = lifecycle-violation finding, severity ≥ major
+- [ ] Authorship (standard check, EL-01/EL-16): production diffs originate from dispatched fresh-context sessions (commit/session trailers, dispatch records) or from the orchestrator itself? Orchestrator-authored diffs outside `roles/elephant.md` — *EL-01* stage-0 = lifecycle-violation finding, severity ≥ major
 - [ ] Documented-instead-of-fixed risks hunted: known gaps with TODO/comment but no owner + expiry date are findings, not mitigations (AP7/QG-06)
 - [ ] Dependency reality check: every NEW import/package/action/image exists in the official registry under exactly that name, registry evidence (URL + pinned version) present (SEC-04 slopsquatting)
 - [ ] Pipeline-deliverable reviews: language assignment of new artifacts per ADR-0011 checked (agent-facing English / human-facing German / primary-reader rule)
