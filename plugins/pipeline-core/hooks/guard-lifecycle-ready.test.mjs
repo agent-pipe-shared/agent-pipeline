@@ -2464,6 +2464,31 @@ test("MACHPATH-1: a symlinked .agent-pipeline ancestor cannot redirect the write
   }
 });
 
+// Pinned, not aspirational: unlike the escape-outside-home case just above, a symlinked
+// `.agent-pipeline` that redirects to another location still INSIDE the same realpathed home
+// directory is accepted by the walk rooted there, exactly as isMachinePlaneWritePath()'s own
+// doctrine comment now states plainly rather than implies. The redirected write still lands at
+// a leaf literally named `machine.json`, since only `.agent-pipeline` can be a symlink here.
+test("MACHPATH-1: a symlinked .agent-pipeline that redirects INSIDE the same home directory is a pinned, accepted limit -- the write is admitted, not refused", () => {
+  const path = root();
+  const { home, target } = machinePlaneHomeFixture();
+  const insideElsewhere = mkdtempSync(join(home, "guard-lifecycle-machine-inside-"));
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    symlinkSync(insideElsewhere, dirname(target));
+    assert.equal(isMachinePlaneWritePath(target, { homedirFn: () => home }), true);
+    assert.deepEqual(evaluateLifecycleReadyGuard(edit(target), {
+      projectDir: path,
+      homedirFn: () => home,
+      requireProjectOnboardingReadyFn() { return readiness; },
+    }), { exitCode: 0, stderr: "" });
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
 test("MACHPATH-1: an absent, empty, relative, or unresolvable home directory fails closed rather than guessing", () => {
   const arbitraryAbsoluteTarget = join(SCRATCH_ROOT, "guard-lifecycle-machine-unrelated-notes.md");
   const cases = [

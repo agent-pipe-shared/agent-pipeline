@@ -530,10 +530,19 @@ export function machinePlaneFilePath(dependencies = {}) {
  * So identity is checked first, against the resolved (lexically normalized) candidate -- this
  * alone closes the single-file, no-prefix, and lexical-escape (`../..`) requirements. The
  * shared containment walk is then reused exactly as every other caller uses it, rooted at the
- * already-realpathed home directory (which does exist) rather than at the file itself, purely
- * for the symlink-ancestor protection it gives for free: a `.agent-pipeline` planted as a
- * symlink before this write runs cannot redirect the boundary. The realpath semantics are
- * identical to every other caller of that walk; only the root differs.
+ * already-realpathed home directory (which does exist) rather than at the file itself, for the
+ * ancestor protection that root actually gives -- stated exactly, not overclaimed: a
+ * `.agent-pipeline` planted as a symlink before this write runs cannot redirect the write
+ * OUTSIDE the realpathed home directory, but it CAN redirect it to any other location INSIDE
+ * that same home directory, where the created file is always still named exactly
+ * `machine.json` (only `.agent-pipeline` can be a symlink here, never the final segment). That
+ * home directory, on this machine class, also holds the CLI's own `~/.claude/` configuration
+ * tree and the local plugin marketplace beside it -- the same trees `claudeSessionMemoryDirectory()`
+ * above refuses ever to admit as a prefix. This in-home redirect is accepted, not defended
+ * against: a party able to plant such a symlink before this write ever runs already has write
+ * access inside the real home directory, exactly the access section 5a of the same plan
+ * excludes from this guard's threat model. The realpath semantics themselves are identical to
+ * every other caller of that walk; only the root differs.
  */
 export function isMachinePlaneWritePath(filePath, dependencies = {}) {
   if (typeof filePath !== "string" || filePath.trim() === "" || filePath.includes("\0")
