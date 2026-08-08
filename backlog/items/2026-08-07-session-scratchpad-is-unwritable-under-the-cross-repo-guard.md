@@ -109,6 +109,14 @@ forbid.
 So the two halves need different answers, and closing this item on the
 scratchpad fix alone would silently drop the one whose cost is invisible.
 
+**Explicitly out of scope, so it cannot be misread later (PO, 2026-08-08): the
+signing key stays outside the repository, unconditionally.** Two different things
+live outside the project root here — the PO's Ed25519 key material and the
+agent's memory store — and only the second is under discussion. Nothing in this
+item proposes moving key material inward, and no repair of it may have that
+effect: the private key living outside the repository is the property the whole
+signature gate rests on ([ADR-0056](../../docs/adr/0056-push-approval-mode.md)).
+
 ## Affected artifact
 
 `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs` —
