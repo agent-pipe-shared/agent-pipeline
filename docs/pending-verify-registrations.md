@@ -73,6 +73,8 @@ the gate", never "not run".
 | `plugins/pipeline-core/scripts/pipeline-state-inspection-contract.test.mjs` | R1B | Drives the real `run()` from `pipeline-state.mjs` and the real `classifyOnboardingContinuity` against each other for the feature-lifecycle boundary subcommands (`set-feature`, `close-feature`, `discard-feature`), asserting the classification is `valid`. 3 tests — it caught the `discard-feature` classification gap this block fixes: RED before the fix (evidence: `evidence/r1b-contract-red-before.txt`), green after (evidence: `evidence/r1b-inspection-contract.txt`). |
 | `plugins/pipeline-core/scripts/project-reset.test.mjs` | R2A | The read-only `plan` step of the typed project reset (`project-reset.mjs`): derives the three closed sets (`remove`/`keep`/`neverTouched`) from the resolved authority tier and parsed calibration, never a hardcoded path. 13 tests, including tier/`calibration.handover` derivation, byte-for-byte read-only proof over a ready and a damaged/non-ready project, digest determinism, and three distinct fail-closed refusals. Evidence: `evidence/r2a-project-reset.txt`. |
 
+| `plugins/pipeline-core/scripts/repair-map.test.mjs` | REPAIRMAP-1 | The repair map: for each refusal class the guard union can produce, whether it is liftable, by whom, and the exact command — every answer asked of the real planner at runtime rather than stored. 7 tests, two of them contract tests that re-drive each row against a fresh independent live call. Evidence: `evidence/repairmap-1-suite.txt`. |
+
 Note that `plugins/pipeline-core/scripts/po-human-approval.test.mjs` was found
 during SETUP-2b to be unregistered as well — a pre-existing gap, not created by
 this block. It covers the human authority chain. Worth adding in the same pass.
