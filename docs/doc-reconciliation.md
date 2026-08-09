@@ -47,6 +47,18 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 7a53155843493ab67dc4e0235038179e7c0a595f — 2026-08-10, range 3387065..7a531558, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `ae99527b` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `15160121` through `7a531558`: WP-R-AC09's dispatch, closure, evidence-map narrowing, and
+checkpoint. No code in this range touches the canonical artifact topology ADR-0045 governs beyond
+ordinary content evolution inside files it already lists. Same reading as the whole chain:
+`docs/state.md` stays ADR-0012, the generated evidence-map/closure-plan/design-doc set stays
+ADR-0045.
+
 ## Candidate ae99527b55836af285cebb6d1659d5b4708593f6 — 2026-08-10, range 3387065..ae99527b, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
