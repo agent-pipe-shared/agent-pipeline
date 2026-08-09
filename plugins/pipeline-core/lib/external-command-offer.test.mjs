@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import test from "node:test";
-import { recordCommandOffer, recordPipelineAttempt, recordCommandOutcome } from "./external-command-offer.mjs";
+import { recordCommandOffer, recordPipelineAttempt, recordCommandOutcome, acknowledgeNonMaterialOfferWithoutJournal } from "./external-command-offer.mjs";
 
 const SHA = (character) => character.repeat(64);
 function event(overrides = {}) { return { eventId: "offer-1", kind: "command-offer", state: "offered", reasonCode: "EXTERNAL_OPERATION_OFFERED", candidateDigest: SHA("a"), relatedHumanDecisionId: null, supersedesEventId: null, offerOrigin: "pipeline-initiated", operation: { operationClass: "governed-repair", version: "v1", governedArtifactSha256: SHA("b") }, target: { repositoryFingerprint: SHA("c"), scopeDigest: SHA("d") }, sideEffectClass: "non-authoritative", authorityRequirement: "not-required", policyDigest: SHA("e"), redactionPolicyDigest: SHA("f"), executionAssurance: "not-applicable", omissions: ["raw-command", "arguments", "private-coordinates", "unrestricted-output"], offerEventId: null, preEvidenceDigest: null, postEvidenceDigest: null, recoverability: "not-applicable", ...overrides }; }
@@ -144,4 +144,51 @@ test("R-AC-12: the motivating Phoenix bootstrap trajectory fixture — rejected 
 
   assert.match(repairOffer.target.repositoryFingerprint, /^[0-9a-f]{64}$/);
   assert.match(repairOffer.target.scopeDigest, /^[0-9a-f]{64}$/);
+});
+
+test("R-AC-10: journaling unavailable still fails closed by default for recordCommandOffer/recordPipelineAttempt, unaffected by the new non-material exception path", async () => {
+  await assert.rejects(recordCommandOffer({ offer: event() }), (error) => error.code === "ECO-APPEND");
+  await assert.rejects(recordCommandOffer({ offer: event({ sideEffectClass: "destructive" }) }), (error) => error.code === "ECO-APPEND");
+  const offerEvent = event({ relatedHumanDecisionId: "decision-1", sideEffectClass: "guard-bypass", authorityRequirement: "human-decision-required" });
+  const attempt = follow("attempted", { relatedHumanDecisionId: "decision-1", sideEffectClass: "guard-bypass", authorityRequirement: "human-decision-required" });
+  await assert.rejects(recordPipelineAttempt({ offer: offerEvent, attempt, resolveHumanAuthority: async () => ({ granted: true, decisionId: "decision-1", candidateDigest: SHA("a") }) }), (error) => error.code === "ECO-APPEND");
+});
+
+test("R-AC-10: a typed non-material exception is admitted for a non-authoritative, not-required offer when journaling is unavailable, and never claims execution", () => {
+  const nonMaterial = event({ sideEffectClass: "non-authoritative", authorityRequirement: "not-required" });
+  const exceptionReceipt = acknowledgeNonMaterialOfferWithoutJournal({ offer: nonMaterial });
+  assert.equal(exceptionReceipt.eventId, "offer-1");
+  assert.equal(exceptionReceipt.candidateDigest, SHA("a"));
+  assert.equal(exceptionReceipt.journaled, false);
+  assert.equal(exceptionReceipt.status, "unjournaled-non-material-exception");
+});
+
+test("R-AC-10: the non-material exception is rejected for destructive, guard-bypass, and authority-changing offers -- it never becomes a general journaling bypass", () => {
+  for (const sideEffectClass of ["destructive", "guard-bypass", "authority-changing"]) {
+    assert.throws(() => acknowledgeNonMaterialOfferWithoutJournal({ offer: event({ sideEffectClass }) }), (error) => error.code === "ECO-JOURNAL-EXCEPTION-SCOPE");
+  }
+});
+
+test("R-AC-10: the non-material exception is rejected when authorityRequirement is human-decision-required, even for an otherwise non-authoritative offer", () => {
+  const policyRequired = event({ authorityRequirement: "human-decision-required", relatedHumanDecisionId: "decision-1" });
+  assert.throws(() => acknowledgeNonMaterialOfferWithoutJournal({ offer: policyRequired }), (error) => error.code === "ECO-JOURNAL-EXCEPTION-SCOPE");
+});
+
+test("R-AC-10: the non-material exception refuses to run when an append function is actually supplied -- it is not a shortcut around working journaling", () => {
+  assert.throws(() => acknowledgeNonMaterialOfferWithoutJournal({ offer: event(), append }), (error) => error.code === "ECO-JOURNAL-EXCEPTION-SCOPE");
+});
+
+test("R-AC-10: the non-material exception is scoped to the offered state, not attempted or any outcome state", () => {
+  assert.throws(() => acknowledgeNonMaterialOfferWithoutJournal({ offer: follow("attempted") }), (error) => error.code === "ECO-OFFER-STATE");
+});
+
+test("R-AC-10: the exception receipt is structurally distinct from every journaled command state/appendValidated() receipt status, and cannot be reused as an offer/outcome event to claim completion", async () => {
+  const nonMaterial = event({ sideEffectClass: "non-authoritative", authorityRequirement: "not-required" });
+  const exceptionReceipt = acknowledgeNonMaterialOfferWithoutJournal({ offer: nonMaterial });
+  assert.notEqual(exceptionReceipt.schema, "pipeline.external-command-offer-receipt.v1");
+  for (const state of ["offered", "acknowledged", "authorized", "copied", "attempted", "execution-unobserved", "observed-completed", "readback-verified", "failed", "partial", "cancelled", "unknown", "unavailable", "readback-mismatch", "recovery-proposed", "recovered"]) {
+    assert.notEqual(exceptionReceipt.status, state);
+  }
+  await assert.rejects(recordCommandOutcome({ offer: event(), outcome: exceptionReceipt, append }), (error) => error.code === "ADJ-COMMAND-OFFER");
+  await assert.rejects(recordCommandOffer({ offer: exceptionReceipt, append }), (error) => error.code === "ADJ-COMMAND-OFFER");
 });
