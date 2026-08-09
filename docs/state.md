@@ -1887,6 +1887,64 @@ The dispatch substituted two real sibling suites under an explicit label rather 
 skipping the check, and it removed a QG-06 deferred decision whose promise its own
 work had made obsolete instead of leaving a stale expiry standing.
 
+### THE DOCUMENTATION-RECONCILIATION LAYER IS BUILT, AND IT FOUND SOMETHING ON ITS FIRST REAL RUN
+
+Two checks, `f1d254e` and `0b2bd67`, wired into two call sites at `dec2ed4`.
+
+**Layer 1, `harness/scripts/check-adr-consistency.mjs`** — the ADR corpus checked against
+itself. Duplicate numbers, missing status lines, dangling supersession targets, a status
+line whose terms disagree with what the superseding record claims, an index row that does
+not match its file. Both defects that motivated it are reconstructed as a regression case
+and both are reported, so the check is pinned to the history that produced it rather than
+to a fixture written to make it pass. Every class has a fixture that fires it and the same
+fixture without the violation exiting 0.
+
+**Its class 4 is narrow and the header says how narrow.** It recognises two literal
+phrasings and counts anything else as unparsed rather than agreeing with it, which today
+means **one comparable pair in 62 ADRs**. That is the price of "no class that infers" and
+it is the right trade: four findings tonight would have been made worse by a plausible
+repair.
+
+**Layer 2, `harness/scripts/check-doc-reconciliation.mjs`** — the range-bound half, and the
+one that answers the PO's actual argument. An ADR declares the paths it governs; when a
+range changes one, that ADR must appear in `docs/doc-reconciliation.md` under a heading
+naming that exact candidate commit. The stale-proofing is structural, not a special case:
+entries are only ever read out of the section naming the resolved candidate, so **no code
+path lets a record for one commit answer for another**. Both range arguments are required
+and every output repeats the range it measured — a direct consequence of reporting a
+correct count against the wrong range earlier in this sprint.
+
+**Wired where the question actually gets skipped:** step 1b of `docs/push-release-flow.md`,
+before anything is prepared or signed, and a Definition-of-Done item in `templates/spec.md`
+before a feature or sprint closes. Both state what the step does not do — it makes omission
+impossible, not diligence certain. That distinction is the honest description: neither ADR
+drift came from someone looking and getting it wrong.
+
+**Coverage is 5 of 62 and the number is in the success line.** Three of the eight ADRs I
+intended to annotate carry no declaration, and that is the sharper finding: the git guard
+union and the Critic contract **name no implementation file anywhere in their own text**,
+and the verify-run journal names one path only to reject it as a storage location. The
+three decisions closest to the machinery cannot say what implements them. The dispatch was
+right to refuse to guess — a governance claim resting on an agent's inference is the exact
+failure this layer exists to prevent, and the backlog item that proposed this work predicted
+it and called for a named-anchor convention.
+
+**ADR-0040 is the one annotation extended past its own text**, to `setup.mjs` and
+`setup.test.mjs`, because the drift found today was between that ADR and those files. It
+was verified at source, not inferred. An annotation limited to what the ADR names would have
+missed the single case the check was built for — which is itself evidence for the
+named-anchor gap above.
+
+**First real run, `8dcb1cc..dec2ed4`, produced a genuine finding.** ADR-0045's enumeration
+of a feature package root does not cover four artifacts `specs/sprint-phoenix-epic/`
+actually carries, and the PRD filename disagrees three ways: the ADR says `prd.md`, disk
+says `prd_phoenix-epic.md`, and the shipped bootstrap skill prescribes `prd_short-topic.md`
+— the package follows the skill, not the decision. Filed, not repaired: both halves are
+governance questions. The second hit, ADR-0012 over `docs/state.md`, was checked and needs
+no change — though its own recorded risk, *secondary sources creep back in*, materialised
+tonight **inside** this file, when a stale decision list at the top kept reading as
+authoritative.
+
 ### GOAL SET 2026-08-09: finish Phoenix up to the next hard PO gate — and stop asking
 
 Two instructions arrived together and they belong together. *"Goal set: phoenix bis zum
