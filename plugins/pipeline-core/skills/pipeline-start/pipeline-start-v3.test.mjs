@@ -187,8 +187,13 @@ assert.match(pushApproval, /writes a proof file and does not name it/u);
 // The two argument traps, both met live.
 assert.match(pushApproval, /`--repo-root` must be an absolute path/u);
 assert.match(pushApproval, /machine-scoped configuration plane/u);
-// A shipped file must not pin a subcommand list that has changed before.
-assert.match(pushApproval, /rather than trusting a list written here/u);
+// A shipped file must not pin a subcommand list that has changed before (it
+// used to point agents at `--help` instead of a hardcoded list; ADR-0061
+// replaced that with naming the current canonical command directly, the same
+// strategy the actively-maintained docs/push-release-flow.md already uses —
+// pinned by requiring the same cross-reference here, not a `--help` deferral).
+assert.match(pushApproval, /authorize-critical/u);
+assert.match(pushApproval, /docs\/push-release-flow\.md/u);
 
 // BOOTMOD-1: the failure class modularization creates, pinned.
 //
