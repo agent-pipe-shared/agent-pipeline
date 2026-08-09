@@ -7,7 +7,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { canonicalSha256, canonicalizeJson } from "./governance-event.mjs";
 import { createConsumedHumanRoleExceptionDecision, isHumanRoleExceptionDecision, validateHumanRoleExceptionDecision } from "./human-role-exception-decision.mjs";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
@@ -315,3 +315,97 @@ test("H-AC-10 keeps the published schema and the validator in agreement", () => 
   const envelope = JSON.parse(readFileSync(new URL("../../../governance/schemas/governance-event-envelope.schema.json", import.meta.url), "utf8"));
   assert.ok(envelope.properties.payloadSchema.enum.includes("pipeline.human-role-exception-decision.v1"));
 });
+
+// H-AC-15 conformance suite: named-scenario coverage for the human ledger.
+// Each block below is a dedicated, scenario-specific assertion (not a
+// byproduct of an unrelated test), so a future regression in exactly the
+// production line it pins shows up as its own named failure.
+
+test("H-AC-15 denial: an explicitly denied decision resolves as denied for that specific reason, not scope or expiry", () => {
+  const denied = decision({ decisionId: "denied-1", event: "denied", outcome: "denied", links: { requestDecisionId: "request-1", consumesDecisionId: null, revokesDecisionId: null, expiresDecisionId: null, supersedesDecisionId: null, correctsDecisionId: null } });
+  const result = resolveHumanGovernanceAuthority({ decisions: [denied], decisionId: "denied-1", repositoryFingerprint: sha, candidate, nowEpochMs: 50 });
+  assert.equal(result.status, "denied");
+  assert.equal(result.reason, "not-granted");
+});
+
+test("H-AC-15 revocation and correction each dispose a live grant through their own dedicated link, distinct from consumption", () => {
+  const revoked = decision({ decisionId: "revoked-1", event: "revoked", outcome: "revoked", links: { requestDecisionId: null, consumesDecisionId: null, revokesDecisionId: "decision-1", expiresDecisionId: null, supersedesDecisionId: null, correctsDecisionId: null } });
+  assert.equal(resolveHumanGovernanceAuthority({ decisions: [decision(), revoked], decisionId: "decision-1", repositoryFingerprint: sha, candidate, nowEpochMs: 50 }).reason, "disposed");
+  const corrected = decision({ decisionId: "corrected-1", event: "corrected", outcome: "corrected", links: { requestDecisionId: null, consumesDecisionId: null, revokesDecisionId: null, expiresDecisionId: null, supersedesDecisionId: null, correctsDecisionId: "decision-1" } });
+  assert.equal(resolveHumanGovernanceAuthority({ decisions: [decision(), corrected], decisionId: "decision-1", repositoryFingerprint: sha, candidate, nowEpochMs: 50 }).reason, "disposed");
+});
+
+test("H-AC-15 stale candidate: a grant scoped to one candidate commit does not resolve once the candidate has moved", () => {
+  const moved = { commit: "d".repeat(40), tree: candidate.tree };
+  const result = resolveHumanGovernanceAuthority({ decisions: [decision()], decisionId: "decision-1", repositoryFingerprint: sha, candidate: moved, nowEpochMs: 50 });
+  assert.equal(result.status, "denied");
+  assert.equal(result.reason, "scope-mismatch");
+});
+
+test("H-AC-15 cross-repository binding: an intent whose declared repository does not match its own scope is rejected before any store access", async () => {
+  const grant = decision({ scope: { repositoryFingerprint: sha, candidate, packageId: "sprint-phoenix-epic", action: "PLAN.APPROVE", environment: "local", artifacts: [{ path: "specs/sprint-phoenix-epic/spec.md", sha256: sha }] } });
+  const otherFingerprint = "f".repeat(64);
+  const intent = { schema: "pipeline.governance-event-envelope.v1", payloadSchema: "pipeline.human-governance-decision.v1", canonicalization: "RFC8785", digestAlgorithm: "sha-256", eventId: "cross-repo-event-1", idempotencyKey: "cross-repo-idempotency-1", origin: "human", authorityClass: "human-authority", eventType: "human.granted", occurredAtEpochMs: 20, observedAtEpochMs: 20, timeAssurance: "locally-observed", repositoryFingerprint: sha, sourceUri: `urn:pipeline:repository:${sha}`, streamId: "human", correlation: { featureId: absent, packageId: absent, requestId: absent, sessionId: absent, dispatchId: absent, traceId: absent }, candidate, artifacts: [absent], policy: { policyDigest: absent, configurationDigest: absent, capturePolicyDigest: absent, redactionPolicyDigest: absent }, classification: "repository-public-safe", storageProfile: "repository-public-safe", retentionCompatibility: "repository-retained", disclosureClass: "repository-visible", payload: grant };
+  await assert.rejects(() => appendHumanGovernanceDecision({ repositoryRoot: "/nonexistent-fixture-root", repositoryFingerprint: otherFingerprint, intent }), (error) => error instanceof HumanGovernanceLedgerError && error.code === "HGL-CROSS-REPOSITORY");
+});
+
+test("H-AC-15 retry: replaying the identical append intent returns the committed event as a replay, never a duplicate", async (t) => {
+  const values = await ledgerFixture();
+  t.after(() => rm(values.root, { recursive: true, force: true }));
+  const input = consumptionInput(values, "retry-1", "retry-event-1", "retry-idempotency-1", 50);
+  const first = await appendConsumedHumanGovernanceDecision(input);
+  assert.equal(first.outcome, "appended");
+  const second = await appendConsumedHumanGovernanceDecision(input);
+  assert.equal(second.outcome, "idempotent-replay");
+  assert.equal(second.eventDigest, first.eventDigest);
+  const events = await queryHumanGovernanceDecisions({ repositoryRoot: values.root, repositoryFingerprint: values.fingerprint });
+  assert.equal(events.decisions.length, 2);
+});
+
+test("H-AC-15 concurrency: exactly one of two racing consumption attempts on the same single-use grant wins", async (t) => {
+  const values = await ledgerFixture();
+  t.after(() => rm(values.root, { recursive: true, force: true }));
+  const results = await Promise.allSettled([
+    appendConsumedHumanGovernanceDecision(consumptionInput(values, "race-a", "race-event-a", "race-idempotency-a", 50)),
+    appendConsumedHumanGovernanceDecision(consumptionInput(values, "race-b", "race-event-b", "race-idempotency-b", 50)),
+  ]);
+  const fulfilled = results.filter((entry) => entry.status === "fulfilled");
+  const rejected = results.filter((entry) => entry.status === "rejected");
+  assert.equal(fulfilled.length, 1);
+  assert.equal(rejected.length, 1);
+  assert.equal(fulfilled[0].value.outcome, "appended");
+  // The loser is rejected either way exclusivity is enforced: GES-LOCKED if it
+  // arrives while the winner still holds the stream lock, HGL-CONSUME-NOT-LIVE
+  // if it acquires the lock after the winner has already disposed the grant.
+  assert.ok(["GES-LOCKED", "HGL-CONSUME-NOT-LIVE"].includes(rejected[0].reason.code), rejected[0].reason.code);
+  const events = await queryHumanGovernanceDecisions({ repositoryRoot: values.root, repositoryFingerprint: values.fingerprint });
+  assert.equal(events.decisions.length, 2);
+});
+
+test("H-AC-15 interruption: an append recovers from an orphaned temporary file left by an earlier interrupted write", async (t) => {
+  const values = await ledgerFixture();
+  t.after(() => rm(values.root, { recursive: true, force: true }));
+  const orphan = path.join(values.root, "governance/events/human", ".2-orphan-event.json.aaaaaaaaaaaaaaaaaaaaaaaa.tmp");
+  await writeFile(orphan, "simulated interrupted write, never a valid canonical event");
+  const receipt = await appendConsumedHumanGovernanceDecision(consumptionInput(values, "interrupted-1", "interrupted-event-1", "interrupted-idempotency-1", 50));
+  assert.equal(receipt.outcome, "appended");
+  assert.equal(existsSync(orphan), false);
+});
+
+test("H-AC-15 tampering: a mutated persisted event is detected and rejected on read, never silently accepted", async (t) => {
+  const values = await ledgerFixture();
+  t.after(() => rm(values.root, { recursive: true, force: true }));
+  const eventPath = path.join(values.root, "governance/events/human", `${values.grantEvent.sequence}-${values.grantEvent.eventId}.json`);
+  const tampered = { ...values.grantEvent, payload: { ...values.grantEvent.payload, reasonCode: "SCOPE.TAMPERED" } };
+  await writeFile(eventPath, `${canonicalizeJson(tampered)}\n`);
+  await assert.rejects(() => queryHumanGovernanceDecisions({ repositoryRoot: values.root, repositoryFingerprint: values.fingerprint }), (error) => error.code === "GES-EVENT-INVALID");
+});
+
+// H-AC-15 redaction is pinned by the existing forbidden-field loop above (see
+// "H-AC-11 exposes the full reconstruction surface..."): every private,
+// free-form or joinable field is rejected before validateHumanGovernanceDecision
+// returns, and appendHumanGovernanceDecision runs that same validator before
+// any store access -- nothing reaches persistence for a redaction step to act
+// on afterward. No separate active-redaction transform exists in this module
+// (confirmed by reading it in full); the ledger's redaction guarantee is
+// structural rejection at the point of record, not a later scrub.
