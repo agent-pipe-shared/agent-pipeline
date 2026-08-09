@@ -2045,6 +2045,54 @@ needing to be built inside it.
 `8b696bc`, because neither delta was committed to the measurement before the second dispatch
 finished.
 
+### CLASS-A WAVE, FOUR PAIRS LANDED: 84 OF 157 IMPLEMENTED, COMPACTION CHECKPOINT (2026-08-09)
+
+Context is being compacted here; this is the checkpoint. Nothing below is a decision waiting on
+anyone — it is exactly where the closure design's execution stands, and the whole section is
+current as of the commits it cites (no dispatch left running behind it).
+
+**Four work-package pairs landed and every one independently verified before its delta was
+trusted** — never accepted from a dispatch report alone: `node --test` rerun on every owned
+suite standalone, sanitization grep, `git show --stat` confirming the commit touches only its
+declared files. 79 → 82 → 84 of 157 implemented, across three delta commits:
+
+- `55ffd18` — `PHX-WP-K` (`d536fcd`: K-AC-08 pinned, K-AC-05 extended to append/recovery,
+  K-AC-10 reclassified `not-started` — no multi-stream query carrier anywhere) +
+  `PHX-WP-V` (`fdb0292`: V-AC-07/V-AC-09 pinned outright). Issue #5 down to 5/6, V-AC-06's
+  mobile/desktop snapshot gap its only remaining blocker.
+- `85dfd2a` — `PHX-WP-X` (`3161a8e`: X-AC-12 pinned across all four adapter profiles; X-AC-14
+  confirmed `absent` with its exact cause — neither `inspect()` call site in
+  `external-reference-adapter.mjs` (`:61`,`:72`) has a `try/catch`, filed as
+  `a99c131`/`pipeline.external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system.md`)
+  + `PHX-WP-L` (`0b53f89`: L-AC-07 pinned with a two-way break-proof; L-AC-04 confirmed `absent`
+  — the renderer has no origin field to key a visual marker off). Issues #17, #23, #24 each
+  moved by one bullet.
+
+**Two dispatches truncated their final-report turn mid-sentence tonight** (`PHX-WP-GATE`,
+`PHX-WP-L`) despite an explicit briefing instruction to confirm the commit landed before ending
+the turn. Both had actually committed correctly — `PHX-WP-GATE` needed a SendMessage resume to
+produce its real report before I trusted it; `PHX-WP-L`'s commit message was already
+self-explanatory enough to verify directly without a resume. **Worth a standing note for whoever
+briefs the next wave:** this briefing instruction is not fully reliable and independent
+verification via `git show --stat` + rerunning the suite is not a redundant precaution, it is
+the actual safety net.
+
+**L-AC-04 and X-AC-14 are reclassified in the closure design from Class A to Class B** — what
+remains for each is a real production code change (a renderer visual marker; a `try/catch`
+around two call sites), not a missing test, and the design's own class definitions say the
+honest thing about cost only if the classification tracks what a dispatch actually found.
+
+**Next pair by remaining blocked-bullet yield** (unchanged from before this wave, since neither
+K/V/X/L overlapped with these): **WP-C** (C-AC-02/07/09/12) and **WP-A** (A-AC-02/07/12/13/14).
+Same pattern: concurrency 2, the explicit `absent`-over-gamed honesty bar, independent
+verification before the delta is trusted.
+
+**Twelve commits unpushed beyond the last approved push** (`3387065`) as of this checkpoint, all
+docs/backlog/test-authorship, no protected file touched, no window opened. The push signature
+remains the PO's act and nothing here changes that. The `TP-3,TP-5` window for `P-AC-08`'s 26
+staged, independently-verified cases is still the epic's single nearest hard gate — unopened,
+because it is the PO's act, not something a checkpoint can move forward.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
