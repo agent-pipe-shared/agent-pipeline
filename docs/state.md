@@ -3432,6 +3432,32 @@ via `check-doc-reconciliation.mjs` against record commit `aa1b950e`.
 running concurrently, no file overlap. Handover fully current through this checkpoint and
 `doc-reconciliation.md`; safe to compact at any point.
 
+### K-AC-05-REWORK3 VERIFIED (`2cfa2583`) — ROUND-4 (FINAL) CRITIC DISPATCHED ON OPUS; WP-C-AC09 STARTED
+
+Verified independently (own 26/26 test run, diff read): a shared `assertForkDispositionFields`
+helper now backs both the write-side validator (`GES-FORK-DISPOSITION`) and the read-side
+(`GES-FORK-DISPOSITION-RECORD`), so `readForkDisposition` applies the same closed-token/array/
+integer checks the write side always did, plus the missing `GES-NONCANONICAL` byte-exactness
+check mirroring `readEvent`. The write path was independently confirmed to already write exact
+canonical bytes (no write-path discovery). Dispatched K-AC-05's fourth and final permitted Critic
+round (full, four-commit enumerated diff `d2ad02a4,b2a5534,aae6902,2cfa2583`, zero reference to
+prior rounds), also Opus-routed via the Agent tool's `model` parameter this time.
+
+Both design-latitude threads (K-AC-05, O-1/O-2-design) are now simultaneously on their final
+permitted Critic round, both correctly routed to Opus for the first time this session. A FAIL on
+either is an Elephant/PO escalation, not a further silent rework — the cap is real.
+
+With verification capacity otherwise idle, also scoped and dispatched **WP-C-AC09** (file-disjoint
+from both live tracks): a new resolver in `change-control.mjs` that picks exactly one effective
+change-control profile (or `not-required`) from a set of environment-scoped candidates, rejecting
+ambiguous multiple-mandatory sets — C-AC-09's own criterion, currently NO CARRIER. Genuine design
+latitude left to the dispatch: the zero-candidate outcome and whether any tie-break rule among
+mandatory profiles is defensible: both are to be decided and justified in its report, not
+prescribed here.
+
+**Three dispatches live, no file overlap:** K-AC-05 round-4 Critic, O-1/O-2-design round-4 Critic,
+WP-C-AC09. Handover fully current through this checkpoint; safe to compact at any point.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
