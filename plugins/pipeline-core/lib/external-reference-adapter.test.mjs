@@ -181,3 +181,41 @@ test("reconciles external observations without importing them as authority", asy
   const moved = await reconcileExternalReference({ reference: reference(), capabilities, inspect: async () => ({ objectId: "issue-42", revision: "rev-2", state: "moved" }) }); assert.equal(moved.status, "reconciliation-required"); assert.equal(moved.reason, "freshness"); assert.equal(moved.reference.externalRevision, "rev-2");
   const malformed = await reconcileExternalReference({ reference: reference(), capabilities, inspect: async () => ({ objectId: "other", revision: "rev-1", state: "fresh" }) }); assert.equal(malformed.status, "reconciliation-required"); assert.equal(malformed.reference, null);
 });
+
+// X-AC-12: the same core contract (validate/plan/apply/reconcile) is proven,
+// unmodified, against all four systemClass profiles the criterion names --
+// synthetic issue-tracker, knowledge-base, document-store, and secondary-forge.
+// Nothing in this module branches on systemClass to change behavior, so a
+// matched profile completes identically and a cross-profile capability
+// mismatch is rejected identically, for every one of the four.
+test("X-AC-12 proves one provider-neutral core contract across issue-tracker, knowledge-base, document-store, and secondary-forge profiles", async () => {
+  const profiles = [
+    { systemClass: "issue-tracker", adapterProfile: "synthetic-issue-tracker" },
+    { systemClass: "knowledge-base", adapterProfile: "synthetic-knowledge-base" },
+    { systemClass: "document-store", adapterProfile: "synthetic-document-store" },
+    { systemClass: "forge", adapterProfile: "synthetic-secondary-forge" },
+  ];
+  for (const { systemClass, adapterProfile } of profiles) {
+    const ref = { ...reference(), systemClass, adapterProfile };
+    const caps = { ...capabilities, systemClass, adapterProfile };
+    const planned = await planExternalReferenceWrite({ resolveIdentity, reference: ref, capabilities: caps, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }) });
+    assert.equal(planned.status, "preview", systemClass);
+    const receipt = await applyExternalReferenceWrite({ plan: planned.plan, authorize: async (request) => ({ granted: true, ...request }), apply: async () => ({ status: "applied", revision: "rev-2" }), readback: async () => ({ objectId: "issue-42", revision: "rev-2", appliedDigest: canonicalSha256(desired.changes), state: "fresh" }) });
+    assert.equal(receipt.status, "applied", systemClass);
+    const reconciled = await reconcileExternalReference({ reference: ref, capabilities: caps, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }) });
+    assert.equal(reconciled.status, "current", systemClass);
+  }
+  // Cross-profile confinement: a capability declared for one profile's system
+  // class is rejected against every other profile's reference; the contract
+  // never widens by falling back to a "close enough" profile match.
+  for (const target of profiles) {
+    for (const other of profiles) {
+      if (target.systemClass === other.systemClass) continue;
+      const ref = { ...reference(), systemClass: target.systemClass, adapterProfile: target.adapterProfile };
+      const caps = { ...capabilities, systemClass: other.systemClass, adapterProfile: other.adapterProfile };
+      const mismatched = await planExternalReferenceWrite({ resolveIdentity, reference: ref, capabilities: caps, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }) });
+      assert.equal(mismatched.status, "rejected", `${target.systemClass} vs ${other.systemClass}`);
+      assert.equal(mismatched.reason, "capability-or-policy");
+    }
+  }
+});
