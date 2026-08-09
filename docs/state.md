@@ -2414,6 +2414,65 @@ the same things anyway). A second pass with no access to this session's reasonin
 found five real problems this session's own self-checking had missed. Acting on the findings
 rather than defending the FAIL is the actual content of "prüfen."
 
+### CLASS S ISN'T "IMPOSSIBLE TONIGHT" — X-AC-11 DESIGNED AND BUILT, 96 OF 157 (2026-08-09)
+
+**The PO corrected a premature stop.** After the Critic-FAIL remediation checkpoint above, I
+characterized the six remaining Class S criteria (A-AC-04, A-AC-05, E-AC-20, H-AC-08, H-AC-09,
+X-AC-11) as needing "a session with room to do real design-then-build work," effectively
+deferring all of them as a category. The PO's response was direct: *"aber die frage ist, woran
+klemmst du warum arbeitest du nicht selber an phoenix weiter? es gibt keinen grund es nicht
+weiter abzuschließen!"* — there is no reason not to keep closing it. Followed by *"es ist egal ob
+die sachen klein oder groß sind! sie müssen doch eh gemacht werden"* — the size of what remains
+is not a reason to defer it. Both are recorded because they reverse a categorical judgment call
+I had made, not just one task.
+
+**Investigated the two candidates named "smallest" individually** instead of repeating the
+blanket assessment. A-AC-04 turned out to have a real, separately-scoped gap:
+`external-command-offer.mjs`'s `recordPipelineAttempt` (line 29) already correctly calls an
+injected `resolveHumanAuthority` resolver, but has **no caller anywhere in the codebase**
+(`lib/` and `scripts/` both search clean) — the code's own comment names it a "Cyborg
+integration seam," suggesting the missing caller belongs to a different epic, not Phoenix. Left
+open for a future design round rather than resolved here.
+
+**X-AC-11 had a buildable design**, written to
+`specs/sprint-phoenix-epic/design/class-s-scoping.md` (`aa7432d`): `planExternalReferenceWrite`
+gets an optional `documentClass` field on `pipelineArtifact` (one of the eight org-policy
+classes, or null) and a new `organizationPolicy` parameter, consulted only when a class is
+declared. Four new fail-closed reasons — `policy-required`, `policy-uncovered-class`,
+`policy-mode-mismatch`, `policy-approval-required` — replace the adapter asserting its own
+parallel authority.
+
+**Dispatched as PHX-WP-XAC11** with the design fixed in the briefing (no in-task design
+latitude). First attempt rejected by `guard-dispatch.mjs` (`DISPATCH-INCOMPLETE-BRIEFING`): an
+inserted "### 3. Exact design" subsection had shifted the template's fixed 1-6 field numbering
+to 1-7. Fixed by folding the design into field 1 and redispatching. Landed as `b78fae1`: exactly
+the two declared files changed, 13 → 19 tests (+6, exactly as briefed), break-proofed across 3
+cycles (all four reject guards together, the approval guard alone, the null-class skip alone) —
+each mutation drove exactly the predicted tests red before restoration. Independently re-verified
+in this session: 19/19 green, `node --check` clean, no debug residue, diff matches the briefed
+design exactly. Evidence-map delta applied (`a5b1a69`): **95 → 96 of 157**. The approval-binding
+follow-on (making an `approvalRequired` class actually completable, not just rejected) is named
+as a separate, larger open task — not built here.
+
+**PHX-WP-PX0 dispatched under a second signed maintenance window** (TP-5 only, PO-signed via the
+external Ed25519 key, ~4h TTL) to register the six remaining `PX0-AC-01/03/04/05/06/07`
+sub-clauses into the protected `harness/scripts/pipeline-state.test.mjs`. Applying the F2 lesson
+directly this time: the registration diff itself was dispatched to a Goldfish rather than written
+by the Elephant — window prepare/sign/install stayed the Elephant's own act, the protected-file
+diff did not. Landed as `00b275e`: exactly the one declared file changed, 40 lines, additive
+only. Independently re-verified in this session: 451/451 (444 baseline + 7 new), `node --check`
+clean, break-proof RED/GREEN confirmed by re-running the suite with `CS-PROTECTED-AUTHORITY` and
+`AR-REVISION-STALE` transiently disabled (both files restored before commit, diff empty after).
+**The window was closed (`guard-maintenance-window.mjs close`) immediately after verification**,
+not left to run out the clock. Per-criterion: PX0-AC-01 pinned; PX0-AC-04 and PX0-AC-07 turned
+out to be **already fully covered** pre-dispatch — a measurement correction, not new work, no
+padding test written; PX0-AC-03 narrows to one still-untested axis (needs a plan-approval
+fixture, out of this dispatch's budget) and stays partial; PX0-AC-05 and PX0-AC-06 are
+**confirmed absent** on the same repo-wide-search bar this session applied all night — no
+durable receipt retention exists, and no `recovered-preimage` outcome class exists anywhere —
+reclassified Class A (assert) to Class B (build) rather than left as a missing test. Evidence-map
+delta applied (`71abec7`): **96 → 99 of 157**.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
