@@ -47,6 +47,17 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 63e819a2aaeb2082751557d93e5585d789b015ab — 2026-08-09, range 3387065..63e819a, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `ce03fbb` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `46f56eb`, `63e819a`: a doc-reconciliation entry and a checkpoint recording the PO's
+"no time pressure" correction plus the O-1/O-2/O-4 GMW/HGO ledger-intake decisions (no code
+changed). Same reading as the whole chain: `docs/state.md` stays ADR-0012, the generated
+evidence-map/closure-plan trio stays ADR-0045.
+
 ## Candidate ce03fbbeb872716b6131535ef5f05f4abf254935 — 2026-08-09, range 3387065..ce03fbb, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
