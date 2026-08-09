@@ -2899,3 +2899,64 @@ test("MACHPATH-1/AC-10: the path the guard admits is exactly the path the machin
     rmSync(home, { recursive: true, force: true });
   }
 });
+
+/**
+ * GSSHELL-STAGE-1. Staging is not a content change, so the gate-strength shell rule
+ * has no business refusing it.
+ *
+ * Measured on 2026-08-09: `git add … pipeline.user.yaml` was refused in the PO's
+ * greenfield Codex run, the agent shrank the publication scope around the refusal,
+ * and the pushed branch silently lost every Pipeline artifact. Neither greenfield
+ * repository has a commit at all. The refusal even told the reader to "use the Edit
+ * or Write tool instead", which answers a different question -- those change the
+ * bytes, `git add` cannot.
+ *
+ * Both directions, because an admission test alone would pass just as happily on a
+ * rule that had stopped refusing the writes too. Every verb that CAN put different
+ * bytes in the working tree stays refused, and the content path is untouched:
+ * writing this file still goes through guard-gate-strength.mjs and its ceremony.
+ */
+test("GSSHELL-STAGE-1: staging and committing a gate-strength file is admitted, while every verb that can rewrite it stays refused", () => {
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  const path = mkdtempSync(join(SCRATCH_ROOT, "guard-lifecycle-gsstage-"));
+  // The rule only defends a repository the Pipeline governs, so the fixture must
+  // carry the marker -- without it every assertion below passes vacuously, which is
+  // how the first version of this test was green while proving nothing.
+  writeFileSync(join(path, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  const run = (command) => evaluateLifecycleReadyGuard(bash(command), {
+    projectDir: path,
+    requireProjectOnboardingReadyFn() { return readiness; },
+  });
+  try {
+    assert.match(run("sed -i s/a/b/ pipeline.user.yaml").stderr, /GUARD-GATE-STRENGTH-SHELL/u,
+      "fixture check: the rule must actually be active here");
+    for (const command of [
+      "git add pipeline.user.yaml",
+      "git add README.md game.js pipeline.user.yaml specs",
+      `git -C ${path} add pipeline.user.yaml`,
+      "git commit -m 'chore: record pipeline.user.yaml'",
+      "git rm --cached pipeline.user.yaml",
+      "git status --short pipeline.user.yaml",
+      "git add project/guard-config.json",
+    ]) {
+      assert.doesNotMatch(run(command).stderr, /GUARD-GATE-STRENGTH-SHELL/u, command);
+    }
+    for (const command of [
+      "git checkout HEAD -- pipeline.user.yaml",
+      "git restore pipeline.user.yaml",
+      "git restore --source=HEAD pipeline.user.yaml",
+      "git stash pop pipeline.user.yaml",
+      "git apply pipeline.user.yaml.patch",
+      "git reset --hard -- pipeline.user.yaml",
+      "git clean -fd pipeline.user.yaml",
+      "git rm pipeline.user.yaml",
+      "sed -i s/a/b/ pipeline.user.yaml",
+      "cp other.yaml pipeline.user.yaml",
+      "printf x > pipeline.user.yaml",
+    ]) {
+      assert.match(run(command).stderr, /GUARD-GATE-STRENGTH-SHELL|GUARD-/u, command);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});

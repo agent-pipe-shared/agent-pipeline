@@ -404,9 +404,52 @@ function crossRepositoryMutationBlocked(overrideGuidance = "") {
  * command", but one specific, provably write-free plugin-local script, matched on exact
  * identity rather than shape.
  */
+/**
+ * GSSHELL-STAGE-1. Git verbs that cannot write the file, and are therefore not this
+ * rule's business.
+ *
+ * The substring match refuses `git add pipeline.user.yaml` because the NAME appears,
+ * and the refusal then tells the reader to "use the Edit or Write tool instead" --
+ * which answers a different question, because staging is not a content change. The
+ * measured consequence, in the PO's 2026-08-09 greenfield runs on both runners:
+ * neither repository has a single commit, and the Codex run's published branch
+ * silently dropped `.claude/`, `.codex/`, `docs/`, `project/` and `pipeline.user.yaml`
+ * because the agent shrank its publication scope around this refusal. A consumer
+ * that cannot commit its own calibration also cannot make a committed
+ * `gates.push_approval` choice take effect (ADR-0055/ADR-0056), so the rule that
+ * protects the gate from being weakened made the legitimate setting unreachable.
+ * The remaining route -- `git add -A`, which names no file -- is the one
+ * `templates/prompts/agent-obligations.md` §6 forbids, so the rule was pushing agents
+ * into breaking a different rule.
+ *
+ * An ALLOWLIST, never a denylist: only these verbs are admitted, and every other git
+ * subcommand keeps the substring refusal. `checkout`, `restore`, `switch`, `stash`,
+ * `apply`, `reset`, `clean` and a bare `rm` can all put different bytes in the working
+ * tree, so none of them appears here. `rm` is admitted ONLY with `--cached`. The
+ * content path is untouched: writing this file still goes through
+ * `guard-gate-strength.mjs` and its audited override ceremony.
+ */
+const GATE_STRENGTH_SHELL_SAFE_GIT_VERBS = Object.freeze(new Set(["add", "status", "commit", "diff", "log", "show", "ls-files", "check-ignore", "check-attr"]));
+
+function isGateStrengthSafeGitCommand(command, root) {
+  const words = simpleWords(command, root);
+  if (!words || words.length < 2) return false;
+  if (!["git", "git.exe"].includes(basename(words[0]).toLowerCase())) return false;
+  // Skip recognised global options (`-C <dir>`, `-c k=v`, …) to reach the subcommand.
+  let index = 1;
+  while (index < words.length && words[index].startsWith("-")) {
+    index += ["-C", "-c", "--git-dir", "--work-tree", "--namespace"].includes(words[index]) ? 2 : 1;
+  }
+  const verb = words[index];
+  if (verb === undefined) return false;
+  if (verb === "rm") return words.includes("--cached");
+  return GATE_STRENGTH_SHELL_SAFE_GIT_VERBS.has(verb);
+}
+
 function gateStrengthShellRefusal(command, root, dependencies = {}) {
   if (typeof command !== "string" || command === "") return null;
   if (isReadOnlyDiagnosticCommand(command, root)) return null;
+  if (isGateStrengthSafeGitCommand(command, root)) return null;
   if (gateStrengthShellReadOnlyScriptExemption(command, root, dependencies)) return null;
   // Scoped to the five configuration paths (GS-1..GS-5) deliberately. The live plugin
   // root (GS-6) is NOT a needle here: executing a plugin script by absolute path is the
