@@ -3,10 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.pipeline-state-scripts-test-file-never-runs-in-full-verify
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
 source: "Critic review (claude-opus-5, max, functional-equivalent-read-only lane) of GF-074/GF-075 (commits f2a4ac70..42d16e5c), 2026-08-09. Finding F-1, verdict FAIL. The GF-074/GF-075 code fixes themselves (guard-lifecycle-ready kickoff --language allowlist, and F1/F2/F5/F6 on the document-language feature) were cleared as correct; only the F7 test-delivery vehicle is the defect."
 due: 2026-08-16
+closed_at: 2026-08-09
+closure_repository: self
+closure_commit: c0d23d90e4ab79d6dd1fcd081adbd81bc45aa5d4
+closure_evidence: backlog/evidence/2026-08-09-pipeline-state-f7-test-relocation-closure.md
 ---
 
 # `plugins/pipeline-core/scripts/pipeline-state.test.mjs` is never executed by Full Verify
@@ -91,7 +95,16 @@ carry out the edit outside ordinary dispatch discipline.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted, fixed, closed — direction (b) only. Direction (a)
+  (register the whole CB-1a file as its own `verify.mjs` suite, needing TP-3)
+  was raised with the PO and explicitly declined for this session; it remains
+  a separate, independent decision the PO may revisit later, not reopened by
+  this closure.
+- **Rationale:** (b) closes the concrete regression-coverage gap with a
+  single-guard-rule (TP-5) maintenance-window transaction, without newly
+  gating the whole candidate on the CB-1a file's pre-existing,
+  never-audited-as-a-release-gate content.
+- **Assignment:** GF-077 (goldfish-deep), self-verified by the Elephant (diff
+  read, both suites and Full Verify re-run independently) — no third Critic
+  dispatch, per the standing two-round cap already exercised on this lineage.
+- **Date:** 2026-08-09
