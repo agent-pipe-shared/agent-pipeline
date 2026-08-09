@@ -47,6 +47,20 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 991af0e23ae385a66530c7dc4bc4948636d0f6ff — 2026-08-10, range 3387065..991af0e2, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `7a531558` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `d1493dd7` through `991af0e2`: EPIC-AC-01's Class-P classification check, the WP-PX0-AC06
+dispatch, its genuine block on a real guard, and the resulting stash-and-park (no code change
+committed for PX0-AC-06 — the stashed diff carries no ADR implication of its own since it never
+landed). No code in this range touches the canonical artifact topology ADR-0045 governs beyond
+ordinary content evolution inside files it already lists. Same reading as the whole chain:
+`docs/state.md` stays ADR-0012, the generated evidence-map/closure-plan/design-doc set stays
+ADR-0045.
+
 ## Candidate 7a53155843493ab67dc4e0235038179e7c0a595f — 2026-08-10, range 3387065..7a531558, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
