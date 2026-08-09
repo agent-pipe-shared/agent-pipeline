@@ -432,7 +432,7 @@ const CONTINUITY_REQUEST_MAX_BYTES = 32_768;
 const PIPELINE_STATE_COMMANDS = Object.freeze([
   "set-feature", "submit-plan", "approve-plan", "reopen-design", "seal-plan-approval",
   "set-phase", "set-gate-estimate", "revoke-plan", "bind-plan-spec", "approve-push",
-  "materialize-push-threat-model", "close-feature", "discard-feature", "approve-deploy",
+  "materialize-push-threat-model", "prepare-push-subject", "close-feature", "discard-feature", "approve-deploy",
   "consume-deploy", "clear-deploy", "po-authority-rebind-plan", "po-authority-rebind-apply",
   "po-authority-decision-plan", "po-authority-decision-select", "po-authority-decision-apply",
   "continuity-init", "continuity-cas", "continuity-apply-native", "continuity-integrate-final",
@@ -5441,6 +5441,65 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         "signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an " +
         "uncommitted file sits only in the working copy and is never part of what git push transmits.",
       );
+      return 0;
+    }
+
+    // READ-ONLY. Computes and prints the exact `--subject-sha256` an
+    // `authorize-critical`/`prepare-critical` call for a push needs, from the SAME
+    // inputs `approve-push` itself verifies against (git HEAD/tree via `gitCandidate`,
+    // the committed threat-model artifact via `resolvePushThreatModelArtifact`) and the
+    // SAME subject shape (`case "approve-push"` above) and candidate narrowing
+    // (`{ commit, tree }`, matching `criticalActionSubjectSha256`'s own validator) -- so
+    // the printed digest is guaranteed to match what `approve-push` verifies later. This
+    // exists because an agent hand-wrote a throwaway script calling
+    // `criticalActionSubjectSha256` itself, after ~10 tool calls hunting for the
+    // function, rather than being handed this in one call. Never writes state.
+    case "prepare-push-subject": {
+      const parsed = parseExactFlags(rest, new Set(["by", "remote", "destination"]));
+      const by = parsed.value?.by;
+      if (!parsed.ok || isBlank(by)) {
+        console.error("Error: prepare-push-subject requires --by, --remote and --destination.");
+        return 2;
+      }
+      const remote = parsed.value.remote;
+      const destination = parsed.value.destination;
+      if (typeof remote !== "string" || !/^[A-Za-z0-9._-]{1,80}$/u.test(remote)
+        || typeof destination !== "string" || !/^refs\/heads\/[A-Za-z0-9._/-]{1,200}$/u.test(destination)) {
+        console.error("Error: prepare-push-subject requires a safe --remote and full --destination ref.");
+        return 2;
+      }
+      const observed = gitCandidate(dir);
+      if (!observed.ok) {
+        console.error("Error: prepare-push-subject refused -- current candidate commit/tree could not be determined (git rev-parse failed).");
+        return 2;
+      }
+      const threatModel = resolvePushThreatModelArtifact(dir);
+      if (!threatModel.ok) {
+        console.error(threatModel.code === "CRITICAL-PROOF-BOUND-ARTIFACT-UNAVAILABLE"
+          ? `Error: prepare-push-subject refused (${threatModel.code}); no push threat-model artifact exists yet at ` +
+            `${PUSH_THREAT_MODEL_DEFAULT_PATH}. Run the "materialize-push-threat-model" subcommand of this ` +
+            "script (from the same project directory as this command), commit it, then retry."
+          : `Error: prepare-push-subject refused (${threatModel.code}).`);
+        return 2;
+      }
+      const threatModelBinding = { path: threatModel.path, sha256: threatModel.sha256 };
+      const candidate = { commit: observed.commit, tree: observed.tree };
+      const subject = { sourceCommit: observed.commit, remote, destination, threatModel: threatModelBinding };
+      let subjectSha256;
+      try {
+        subjectSha256 = criticalActionSubjectSha256({ kind: "push", candidate, subject });
+      } catch (err) {
+        console.error(`Error: prepare-push-subject refused -- the subject could not be hashed (${err.message}).`);
+        return 2;
+      }
+      console.log(JSON.stringify({
+        schema: "pipeline.push-subject-preview.v1",
+        by,
+        kind: "push",
+        candidate,
+        subject,
+        subjectSha256,
+      }, null, 2));
       return 0;
     }
 
