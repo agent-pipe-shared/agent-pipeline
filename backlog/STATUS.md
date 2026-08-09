@@ -82,6 +82,7 @@
 | pipeline.no-sanctioned-way-to-start-over | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.nonblocking-interaction-continuity | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.observation-intake-document-governance | closed | workflow-improvement | pipeline | 2026-07-20 | — |
+| pipeline.onboarding-does-not-ignore-the-scratch-directory-it-mandates | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.onboarding-lifecycle-plan-hardcodes-the-codex-runner | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.onboarding-ready-path-unconditional-restart-barrier-read | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.onboarding-restart-flow-is-codex-only-not-runner-aware | closed | defect | pipeline | 2026-08-07 | — |
@@ -146,6 +147,6 @@
 
 ## Counts
 
-- open: 89
+- open: 90
 - in_progress: 21
 - closed: 28
