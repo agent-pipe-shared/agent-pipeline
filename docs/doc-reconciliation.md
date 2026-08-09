@@ -47,7 +47,7 @@ something to do here without review.
 
 ## Entries
 
-## Candidate f7062ac — 2026-08-09, range 3387065..f7062ac, the substantive tip of the unpushed range; supersedes the entries below
+## Candidate f7062acc3d95069c350f7318e01e11bea1b5d168 — 2026-08-09, range 3387065..f7062ac, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
 - ADR-0045: checked, no change needed.
