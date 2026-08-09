@@ -19,10 +19,10 @@ one list is what has made the epic look larger and more uniform than it is.
 
 | class | criteria | what closing one actually costs |
 |---|---|---|
-| A — assertion missing | 18 | one named test case in an already-registered, unprotected suite |
+| A — assertion missing | 11 | one named test case in an already-registered, unprotected suite |
 | D — documentation missing | 7 | one document section set; no code, no gate |
 | S — seam missing | 6 | a connector between two packages that already work |
-| B — capability missing | 34 | real implementation plus its tests |
+| B — capability missing | 41 | real implementation plus its tests |
 | P — not code | 5 | a human gate, a sanctioned authority revision, or a proved impossibility |
 | **total** | **70** | |
 
@@ -173,7 +173,7 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 
 ## Per criterion
 
-### Class A — the behaviour exists, the assertion does not (18)
+### Class A — the behaviour exists, the assertion does not (11)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
@@ -182,19 +182,12 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 | A-AC-14 | partial | WP-A | 5 of 13 named conformance scenarios have thin/generic (non-dedicated) coverage, 8 have zero coverage; "decomposition" is not representable in the current `kind` enum at all (PHX-WP-A, not padded) |
 | E-AC-06 | partial | WP-E | governance-export-delivery-tests (PHX-WP-E, break-proofed): stable idempotency (pre-existing) and at-least-once redelivery (new) are pinned; the explicit "SHALL NOT claim exactly-once" structural assertion was dropped for tool-budget reasons -- not confirmed absent by search, just not written this pass |
 | E-AC-14 | partial | WP-E | in-memory, local-file, OTLP-profile and syslog fixtures are each individually cited (PHX-WP-E); dedicated failure-injection coverage was judged sufficient by indirect citation (CAS-conflict, forged-ack tests) rather than confirmed absent by search -- no new test added, budget-limited not capability-limited |
-| K-AC-05 | partial | WP-K | governance-event-store-tests: fork detection now proven to also block append and recovery, not only verify/query (PHX-WP-K, break-proofed). Still absent: no disposition operation exists anywhere in the module -- "governed disposition appended through the sanctioned recovery operation" has no code to test against |
-| P-AC-01 | partial | WP-P | schema/compatibility/merge pinned; provenance, dependency and signature-policy validation are not named |
-| P-AC-03 | partial | WP-P | planOrganizationPolicyActivation pinned; newly-required artifacts, external effects and backfill range are not |
-| P-AC-06 | partial | WP-P | audit-bundle-core-tests: missing, misplaced, illegally-mutable, stale and truncated each pinned (PHX-WP-P, break-proofed). legacy and orphaned remain unpinned: the legacy classification exists (feature-package-topology.mjs:78) but no rejection path consults it, and no code checks a package file is referenced by an artifact |
-| P-AC-11 | partial | WP-P | organization-policy-core-tests: mode (closed reference-only/projection/controlled-publication set) and approval (union, no downgrade) pinned (PHX-WP-P, break-proofed). Target class/binding, owned fields/sections, lifecycle event, preview, retention and revision readback remain unpinned: documentClasses is closed to exactly class/mode/approvalRequired, no field exists for the rest |
 | PX0-AC-01 | partial | WP-PX0 | continuity-state.mjs binds dispatch/intent to prdSha256/specSha256; no assertion names a REJECTED generic CAS authority change |
 | PX0-AC-03 | partial | WP-PX0 | apply exists and rechecks under the writer lock; the recheck breadth the criterion enumerates is not fully pinned |
 | PX0-AC-04 | partial | WP-PX0 | proof half fails closed and is pinned; the State-side preimage/revision/idempotency recheck is only partly asserted |
 | PX0-AC-05 | partial | WP-PX0 | continuity-authority-revision-receipt.v1 now has an emitter; durable retention of the receipt is not pinned |
 | PX0-AC-06 | partial | WP-PX0 | recover replays frozen journal bytes only; the recovered-preimage outcome class is not pinned |
 | PX0-AC-07 | partial | WP-PX0 | zero-write replay implemented; the conflicting-replay/second-writer half is not pinned |
-| V-AC-02 | partial | WP-V | evidence-view-renderer-tests: fact, unknown, unavailable, redacted, invalid and not-applicable each labelled visibly, six of nine (PHX-WP-V, break-proofed). estimate, assumption and human decision remain unpinned: zero occurrences anywhere in the view-model, renderer or CLI modules -- no field carries them at all |
-| V-AC-06 | partial | WP-V | evidence-view-renderer-tests: exact CSP directive value, skip-link keyboard focus target, and landmark/table accessibility structure all pinned (PHX-WP-V, break-proofed). Mobile/desktop snapshot checks remain absent: a viewport meta tag and one CSS breakpoint exist but no test or tooling captures a deterministic snapshot of either, and this repo has no headless-render/visual-regression infrastructure at all |
 
 ### Class D — the gap is a documentation section the criterion enumerates (7)
 
@@ -219,7 +212,7 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 | H-AC-09 | not-started | WP-H | NO CARRIER: external-push-ledger is scoped to single-repo push proofs; nothing binds cross-repository guarded work to one physical target |
 | X-AC-11 | not-started | WP-X | NO CARRIER: the adapter never references organization policy, and the policy modules never reference the adapter |
 
-### Class B — an absent capability (34)
+### Class B — an absent capability (41)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
@@ -241,11 +234,16 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 | E-AC-11 | partial | WP-E | governance-export-delivery-tests (PHX-WP-E, break-proofed): the closed 9-field receipt schema is pinned, rejecting any retention/immutability/analyst-review/compliance-implying extension; CONFIRMED ABSENT: a per-projection/mapping digest field -- only policyRevision exists (governance-event-projection.mjs:22-24) |
 | EPIC-AC-02 | not-started | WP-EPIC | NO CARRIER: planParallelSprintIntegration has no concept of "unpublished" and is called only from its own test file |
 | H-AC-12 | partial | WP-H | guard-push/guard-devplan/change-control validate the decision reference; the DUAL-EVALUATION during migration with shared owner and expiry has no carrier |
+| K-AC-05 | partial | WP-K | governance-event-store-tests: fork detection now proven to also block append and recovery, not only verify/query (PHX-WP-K, break-proofed). Still absent: no disposition operation exists anywhere in the module -- "governed disposition appended through the sanctioned recovery operation" has no code to test against |
 | K-AC-10 | not-started | WP-K | NO CARRIER, confirmed by repo-wide search (PHX-WP-K): queryPortableGovernanceStream, the governance-event CLI and governance-replay.mjs all accept exactly one streamId; no function anywhere queries more than one stream, so per-record provenance preservation across streams has no code to test |
 | L-AC-01 | partial | WP-L | the closed lifecycle schema and validator are pinned; NO PRODUCER exists — no Pipeline path emits a lifecycle event |
 | L-AC-02 | partial | WP-L | six of the eight #10 exchange identities are retained; queueRevision and a distinct correlationId are absent |
 | L-AC-04 | partial | WP-L | semantic classes pinned; the VISUAL class remains confirmed absent (PHX-WP-L): the renderer has no origin field to key a visual marker off and gives every event kind the same CSS class -- a renderer change, not a missing test |
+| P-AC-01 | partial | WP-P | CONFIRMED ABSENT (PHX-WP-P): schema/compatibility/merge pinned; provenance, dependency and signature-policy validation have no corresponding field anywhere in the pack schema, no test was written around the gap |
+| P-AC-03 | partial | WP-P | CONFIRMED ABSENT (PHX-WP-P): planOrganizationPolicyActivation pinned; newly-required artifacts, external effects and backfill range have no corresponding field anywhere in the activation-plan schema, no test was written around the gap |
+| P-AC-06 | partial | WP-P | audit-bundle-core-tests: missing, misplaced, illegally-mutable, stale and truncated each pinned (PHX-WP-P, break-proofed). legacy and orphaned remain unpinned: the legacy classification exists (feature-package-topology.mjs:78) but no rejection path consults it, and no code checks a package file is referenced by an artifact |
 | P-AC-09 | not-started | WP-P | NO CARRIER: no export-backfill preview or explicit consent path exists |
+| P-AC-11 | partial | WP-P | organization-policy-core-tests: mode (closed reference-only/projection/controlled-publication set) and approval (union, no downgrade) pinned (PHX-WP-P, break-proofed). Target class/binding, owned fields/sections, lifecycle event, preview, retention and revision readback remain unpinned: documentClasses is closed to exactly class/mode/approvalRequired, no field exists for the rest |
 | PX0-AC-08 | partial | WP-PX0 | ruleset-source.mjs closed contract pinned by ruleset-source-tests; whether bootstrap actually EMITS one observation is unpinned |
 | PX0-AC-13 | partial | WP-PX0 | ruleset-freshness-host.mjs selects the host transport correctly, but no suite exercises it and bootstrap does not wire it |
 | R-AC-02 | not-started | WP-R | CONFIRMED ABSENT (PHX-WP-R): recovery-proposed/recovered states exist in the schema but are unreachable through any exported function -- no capability correlates a rejected path, alternatives, or selected recovery to the offer |
@@ -256,6 +254,8 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 | R-AC-11 | partial | WP-R | external-command-offer-tests (PHX-WP-R): a mandatory public-safe typed omission is pinned; "sanctioned machine-local state" storage and a distinct "commitment" field are absent from this module (it stores nothing by design; commitment only exists in the unrelated document-lifecycle.mjs) |
 | R-AC-12 | not-started | WP-R | NO CARRIER: no Phoenix bootstrap-trajectory fixture exists |
 | R-AC-13 | partial | WP-R | external-command-offer-tests (PHX-WP-R): 9 of 11 required fixture classes now named (7 pre-existing + secret/malicious command rejection + governed-script identity); approval-without-run and duplicate/retry are confirmed structurally unreachable, each pinned by a dedicated test showing the gap rather than left silently missing |
+| V-AC-02 | partial | WP-V | evidence-view-renderer-tests: fact, unknown, unavailable, redacted, invalid and not-applicable each labelled visibly, six of nine (PHX-WP-V, break-proofed). estimate, assumption and human decision remain unpinned: zero occurrences anywhere in the view-model, renderer or CLI modules -- no field carries them at all |
+| V-AC-06 | partial | WP-V | evidence-view-renderer-tests: exact CSP directive value, skip-link keyboard focus target, and landmark/table accessibility structure all pinned (PHX-WP-V, break-proofed). Mobile/desktop snapshot checks remain absent: a viewport meta tag and one CSS breakpoint exist but no test or tooling captures a deterministic snapshot of either, and this repo has no headless-render/visual-regression infrastructure at all |
 | X-AC-14 | partial | WP-X | confirmed absent (PHX-WP-X): neither inspect() call site (external-reference-adapter.mjs:61,72) has a try/catch, so an unreachable external system throws uncaught instead of producing a typed observation -- filed as pipeline.external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system, a production fix not a missing test |
 
 ### Class P — not closeable by writing code (5)

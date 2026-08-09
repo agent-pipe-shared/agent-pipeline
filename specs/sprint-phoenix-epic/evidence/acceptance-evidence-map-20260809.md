@@ -170,9 +170,9 @@ clause that is not pinned or not built.
 
 | ID | verdict | src | evidence / named gap |
 |---|---|---|---|
-| P-AC-01 | partial | C | schema/compatibility/merge pinned; provenance, dependency and signature-policy validation are not named |
+| P-AC-01 | partial | C | CONFIRMED ABSENT (PHX-WP-P): schema/compatibility/merge pinned; provenance, dependency and signature-policy validation have no corresponding field anywhere in the pack schema, no test was written around the gap |
 | P-AC-02 | implemented | C | organization-policy-tests: floor weakening, unknown rule, single-owner conflict all rejected |
-| P-AC-03 | partial | C | planOrganizationPolicyActivation pinned; newly-required artifacts, external effects and backfill range are not |
+| P-AC-03 | partial | C | CONFIRMED ABSENT (PHX-WP-P): planOrganizationPolicyActivation pinned; newly-required artifacts, external effects and backfill range have no corresponding field anywhere in the activation-plan schema, no test was written around the gap |
 | P-AC-04 | implemented | C | organization-policy-activation-tests: activation only after a bound authority readback; stale plan preimage rejected |
 | P-AC-05 | implemented | C | organization-policy-tests: credential, endpoint, coordinate, actor-mapping and signing-key fields refused at every level |
 | P-AC-06 | partial | WP-P | audit-bundle-core-tests: missing, misplaced, illegally-mutable, stale and truncated each pinned (PHX-WP-P, break-proofed). legacy and orphaned remain unpinned: the legacy classification exists (feature-package-topology.mjs:78) but no rejection path consults it, and no code checks a package file is referenced by an artifact |

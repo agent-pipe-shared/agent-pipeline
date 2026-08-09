@@ -457,9 +457,9 @@ const POINTERS = {
   'L-AC-07': 'governance-replay-core-tests: serial/parallel/retry/cancellation/recovery fixtures replay to identical bounded output on repeat, and a malicious duplicate-sequence fixture is rejected deterministically (PHX-WP-L, break-proofed twice)',
   'L-AC-08': 'no artifact traces each retained element to a stated user or audit need',
 
-  'P-AC-01': 'schema/compatibility/merge pinned; provenance, dependency and signature-policy validation are not named',
+  'P-AC-01': 'CONFIRMED ABSENT (PHX-WP-P): schema/compatibility/merge pinned; provenance, dependency and signature-policy validation have no corresponding field anywhere in the pack schema, no test was written around the gap',
   'P-AC-02': 'organization-policy-tests: floor weakening, unknown rule, single-owner conflict all rejected',
-  'P-AC-03': 'planOrganizationPolicyActivation pinned; newly-required artifacts, external effects and backfill range are not',
+  'P-AC-03': 'CONFIRMED ABSENT (PHX-WP-P): planOrganizationPolicyActivation pinned; newly-required artifacts, external effects and backfill range have no corresponding field anywhere in the activation-plan schema, no test was written around the gap',
   'P-AC-04': 'organization-policy-activation-tests: activation only after a bound authority readback; stale plan preimage rejected',
   'P-AC-05': 'organization-policy-tests: credential, endpoint, coordinate, actor-mapping and signing-key fields refused at every level',
   'P-AC-06': 'audit-bundle-core-tests: missing, misplaced, illegally-mutable, stale and truncated each pinned (PHX-WP-P, break-proofed). legacy and orphaned remain unpinned: the legacy classification exists (feature-package-topology.mjs:78) but no rejection path consults it, and no code checks a package file is referenced by an artifact',
@@ -581,7 +581,7 @@ const CLOSURE = {
   'PX0-AC-08': ['build', 'WP-PX0'],
   'PX0-AC-13': ['build', 'WP-PX0'],
 
-  'K-AC-05': ['assert', 'WP-K'],
+  'K-AC-05': ['build', 'WP-K'],
   'K-AC-08': ['assert', 'WP-K'],
   'K-AC-10': ['build', 'WP-K'],
 
@@ -612,17 +612,17 @@ const CLOSURE = {
   'L-AC-07': ['assert', 'WP-L'],
   'L-AC-08': ['doc', 'WP-DOC'],
 
-  'P-AC-01': ['assert', 'WP-P'],
-  'P-AC-03': ['assert', 'WP-P'],
-  'P-AC-06': ['assert', 'WP-P'],
+  'P-AC-01': ['build', 'WP-P'],
+  'P-AC-03': ['build', 'WP-P'],
+  'P-AC-06': ['build', 'WP-P'],
   'P-AC-08': ['assert', 'WP-GATE'],
   'P-AC-09': ['build', 'WP-P'],
   'P-AC-10': ['assert', 'WP-P'],
-  'P-AC-11': ['assert', 'WP-P'],
+  'P-AC-11': ['build', 'WP-P'],
   'P-AC-13': ['doc', 'WP-DOC'],
 
-  'V-AC-02': ['assert', 'WP-V'],
-  'V-AC-06': ['assert', 'WP-V'],
+  'V-AC-02': ['build', 'WP-V'],
+  'V-AC-06': ['build', 'WP-V'],
   'V-AC-07': ['assert', 'WP-V'],
   'V-AC-09': ['assert', 'WP-V'],
 
