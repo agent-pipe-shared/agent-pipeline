@@ -406,8 +406,12 @@ test("authorize-critical states what it is about to authorize -- and what it doe
 
 test("authorize-critical aborts on an input failure before the prompt and before any signing, writing neither artifact", () => {
   const cases = [
-    { label: "--expires-at that is not an exact toISOString() round trip", overrides: { expiresAt: "2026-08-07T12:00:00Z" }, message: /--expires-at/u },
+    // GF-080 Gap B: a non-canonical but genuinely valid ISO-8601 timestamp (e.g.
+    // "2026-08-07T12:00:00Z", missing explicit milliseconds) is normalized rather than
+    // rejected -- see the dedicated Gap B test -- so this table only keeps inputs that
+    // stay genuinely invalid: free text, and an ISO-shaped-but-out-of-range value.
     { label: "--expires-at that is not a timestamp at all", overrides: { expiresAt: "next tuesday" }, message: /--expires-at/u },
+    { label: "--expires-at that is ISO-shaped but out of range (hour 25)", overrides: { expiresAt: "2026-08-07T25:00:00.000Z" }, message: /--expires-at/u },
     { label: "unreadable --plan", overrides: { plan: "missing-plan.md" }, message: /ENOENT/u },
     { label: "unreadable --spec", overrides: { spec: "missing-spec.md" }, message: /ENOENT/u },
     { label: "malformed --subject-sha256", overrides: { subjectSha256: "not-a-sha256" }, message: /--subject-sha256/u },
@@ -555,20 +559,10 @@ test("prepare-critical names the offending field instead of only saying the requ
     const base = { subjectSha256: subjectDigest("nova-onecmd-fieldnames"), expiresAt: futureExpiry() };
     const dependencies = { observeCandidate: () => ({ ...CANDIDATE }) };
 
-    // The exact input that silently failed in a real session: parsable ISO-8601, but not
-    // the `toISOString()` round trip the digest binds. The message must name the field and
-    // hand back the accepted spelling.
-    assert.throws(
-      () => runApprovalGate(criticalArgv("prepare-critical", dirs, { ...base, expiresAt: "2026-08-07T12:00:00Z" }), dependencies),
-      (error) => {
-        assert.match(error.message, /^critical approval request is invalid: --expires-at/u);
-        assert.match(error.message, /toISOString/u);
-        assert.ok(error.message.includes("2026-08-07T12:00:00.000Z"), "the message must show the accepted spelling of the value supplied");
-        return true;
-      },
-    );
-    assert.equal(existsSync(criticalArtifacts(dirs).request), false, "a rejected request must not be written");
-
+    // GF-080 Gap B: parsable ISO-8601 that is not already the exact `toISOString()` round
+    // trip is normalized, not rejected (see the dedicated Gap B test below) -- the
+    // remaining field-naming coverage here uses inputs that stay genuinely invalid either
+    // way.
     assert.throws(
       () => runApprovalGate(criticalArgv("prepare-critical", dirs, { ...base, subjectSha256: "0xdeadbeef" }), dependencies),
       /critical approval request is invalid: --subject-sha256/u,
@@ -599,6 +593,38 @@ test("prepare-critical names the offending field instead of only saying the requ
     );
   } finally {
     cleanup(dirs);
+  }
+});
+
+test("GF-080 Gap B: --expires-at accepts any parseable ISO-8601 timestamp and normalizes it to the exact Date#toISOString() form used everywhere downstream", () => {
+  const dirs = criticalDirs();
+  const canonicalDirs = criticalDirs();
+  try {
+    keyFixture(dirs.directory);
+    keyFixture(canonicalDirs.directory);
+    const subjectSha256 = subjectDigest("gap-b-normalize-subject");
+    // The exact input that cost a real PO round trip: valid ISO-8601, just without
+    // explicit milliseconds -- previously rejected outright even though Date.parse
+    // accepts it fine.
+    const nonCanonical = "2026-08-10T03:00:00Z";
+    const canonical = new Date(Date.parse(nonCanonical)).toISOString();
+    assert.equal(canonical, "2026-08-10T03:00:00.000Z");
+    const dependencies = { observeCandidate: () => ({ ...CANDIDATE }) };
+
+    const viaNonCanonical = runApprovalGate(criticalArgv("prepare-critical", dirs, { subjectSha256, expiresAt: nonCanonical }), dependencies);
+    assert.equal(viaNonCanonical.code, "PO-HUMAN-CRITICAL-REQUEST-READY");
+    assert.equal(viaNonCanonical.action.expiresAt, canonical, "a non-canonical but valid timestamp must be normalized, never rejected");
+
+    const stored = JSON.parse(readFileSync(criticalArtifacts(dirs).request, "utf8"));
+    assert.equal(stored.action.expiresAt, canonical, "the stored request must carry the normalized value, not the human's original spelling");
+
+    // Normalization happens before the digest is computed, not after: an already-canonical
+    // input of the identical instant must produce the byte-identical digest.
+    const viaCanonical = runApprovalGate(criticalArgv("prepare-critical", canonicalDirs, { subjectSha256, expiresAt: canonical }), dependencies);
+    assert.equal(viaNonCanonical.intentSha256, viaCanonical.intentSha256, "a non-canonical and an already-canonical spelling of the same instant must bind to the identical digest");
+  } finally {
+    cleanup(dirs);
+    cleanup(canonicalDirs);
   }
 });
 

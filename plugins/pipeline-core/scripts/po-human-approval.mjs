@@ -254,21 +254,31 @@ function requireExplicitConfirmation(summaryLines, dependencies) {
 
 /**
  * Names the flag that made a critical request unacceptable instead of only
- * stating that it is. The unattributed message cost a real operator step: an
- * `--expires-at` of `2026-08-07T12:00:00Z` parses, is obviously an ISO-8601
- * timestamp, and is still rejected because it is not the exact
- * `Date#toISOString()` round trip the digest binds — nothing in the old text
- * said so, so the failure read as a bug rather than as a typo.
+ * stating that it is, and normalizes `--expires-at` rather than rejecting a
+ * perfectly valid timestamp that just is not already in one exact byte shape
+ * (GF-080 Gap B). The action object this builds is validated downstream by
+ * `actionValid()`/`iso()` in critical-action-approval-request.mjs, which
+ * requires the exact `Date#toISOString()` round trip before it will compute
+ * a digest at all -- so *some* canonical string is genuinely required before
+ * the digest is bound, but the human should never need to know or produce
+ * that exact shape by hand. A real operator round trip was lost to exactly
+ * this: an `--expires-at` of `2026-08-07T12:00:00Z` parses fine, is obviously
+ * an ISO-8601 timestamp, and was still rejected outright because it was not
+ * already the exact round-trip form. The fix normalizes any timestamp
+ * `Date.parse` accepts into that canonical form and rewrites `args.expiresAt`
+ * in place *before* it is used anywhere downstream (the request written to
+ * disk, and the digest computed from it) -- so a caller reading
+ * `args.expiresAt` after this function returns `null` always sees the
+ * canonical value, never the human's original spelling.
  */
 function criticalRequestFieldError(args) {
   if (!text(args.plan)) return "critical approval request is invalid: --plan is required and must be a repository-relative path";
   if (!text(args.spec)) return "critical approval request is invalid: --spec is required and must be a repository-relative path";
   if (!SHA.test(args.subjectSha256 ?? "")) return "critical approval request is invalid: --subject-sha256 must be exactly 64 lowercase hexadecimal characters";
   if (!text(args.expiresAt)) return "critical approval request is invalid: --expires-at is required";
-  if (!Number.isFinite(Date.parse(args.expiresAt))) return `critical approval request is invalid: --expires-at is not a parsable timestamp: ${JSON.stringify(args.expiresAt)}`;
-  if (new Date(args.expiresAt).toISOString() !== args.expiresAt) {
-    return `critical approval request is invalid: --expires-at must be the exact Date#toISOString() form (UTC, milliseconds, trailing Z), for example ${new Date(Date.parse(args.expiresAt)).toISOString()}; received ${JSON.stringify(args.expiresAt)}`;
-  }
+  const expiresAtMs = Date.parse(args.expiresAt);
+  if (!Number.isFinite(expiresAtMs)) return `critical approval request is invalid: --expires-at is not a parsable timestamp: ${JSON.stringify(args.expiresAt)}`;
+  args.expiresAt = new Date(expiresAtMs).toISOString();
   return null;
 }
 
