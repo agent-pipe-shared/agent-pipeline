@@ -42,8 +42,8 @@ reproduced here rather than referenced.
 
 ## The direct answer
 
-**Phoenix cannot claim complete.** 99 of 157 criteria carry a named assertion in a
-gate-registered suite; 58 do not. EPIC-AC-05 forbids a completion claim while any
+**Phoenix cannot claim complete.** 100 of 157 criteria carry a named assertion in a
+gate-registered suite; 57 do not. EPIC-AC-05 forbids a completion claim while any
 criterion remains unimplemented or unverified, and it currently bites. No issue is closeable on
 its own live acceptance bullets.
 
@@ -61,8 +61,8 @@ A bullet is therefore BLOCKED unless every criterion mapped to it is `implemente
 
 | verdict | count |
 |---|---|
-| implemented | 99 |
-| partial | 40 |
+| implemented | 100 |
+| partial | 39 |
 | designed-only | 1 |
 | not-started | 16 |
 | constraint | 1 |
@@ -237,7 +237,7 @@ clause that is not pinned or not built.
 | C-AC-12 | partial | WP-C | change-control-tests (PHX-WP-C, break-proofed): unavailable external state blocks via C-AC-04, and the distinct "external-unavailable" gate reason is now pinned by name; the explicit advisory-vs-mandatory policy distinction remains absent -- mandatory:false is only representable together with changeClass:"not-required", which short-circuits before ITSM availability is ever inspected |
 | C-AC-13 | implemented | WP-DOC | docs/change-control.md (PHX-WP-DOC-1): threat model, policy precedence, migration, operator runbook, and failure/rollback/recovery procedures all present and grounded in change-control.mjs; migration section honestly states no migration tooling exists |
 
-### E — Governance event export (#32) (13/21 implemented)
+### E — Governance event export (#32) (14/21 implemented)
 
 | ID | verdict | src | evidence / named gap |
 |---|---|---|---|
@@ -254,7 +254,7 @@ clause that is not pinned or not built.
 | E-AC-11 | partial | WP-E | governance-export-delivery-tests (PHX-WP-E, break-proofed): the closed 9-field receipt schema is pinned, rejecting any retention/immutability/analyst-review/compliance-implying extension; CONFIRMED ABSENT: a per-projection/mapping digest field -- only policyRevision exists (governance-event-projection.mjs:22-24) |
 | E-AC-12 | implemented | C | governance-export-adapter-tests: profile and acknowledgements are closed, non-authoritative and deduplicated |
 | E-AC-13 | implemented | C | governance-export-outbox-tests: destination queues, cursors and failure domains stay independent |
-| E-AC-14 | partial | C | in-memory, local-file, OTLP-profile and syslog fixtures are each individually cited (PHX-WP-E); dedicated failure-injection coverage was judged sufficient by indirect citation (CAS-conflict, forged-ack tests) rather than confirmed absent by search -- no new test added, budget-limited not capability-limited |
+| E-AC-14 | implemented | WP-EAC14 | governance-export-delivery-tests (PHX-WP-EAC14, break-proofed): all five named fixture classes individually evidenced -- in-memory/local-file/OTLP-profile/syslog (pre-existing) plus a genuine failure-injection fixture (new): a rejected adapter.deliver() call leaves the outbox untouched and a later retry recovers cleanly. Corrects the prior partial verdict, which had leaned on CAS-conflict/forged-ack tests that direct re-examination found to be validation assertions, not simulated transport failure |
 | E-AC-15 | implemented | C | governance-export-adapter-tests: allowlisting/redaction completed before every persistence boundary |
 | E-AC-16 | implemented | C | nine named assertions: batching bound, compression, payload bound, rate limit, retry budget, backpressure, flush, restart resume, replay |
 | E-AC-17 | implemented | C | governance-export-outbox-tests: duplicate delivery preserves one canonical source history |
@@ -448,7 +448,7 @@ Issues closeable on their own live acceptance bullets: **0 of 8**.
 
 53 of 157 criteria are Phoenix's own stricter contract rather than a live issue obligation.
 They block no issue, but EPIC-AC-05 still forbids an epic completion claim while any of them is not `implemented`.
-27 of those 53 are currently not `implemented` and are listed below; the rest are omitted because they are done.
+26 of those 53 are currently not `implemented` and are listed below; the rest are omitted because they are done.
 
 | criterion | verdict |
 |---|---|
@@ -456,7 +456,6 @@ They block no issue, but EPIC-AC-05 still forbids an epic completion claim while
 | A-AC-09 | designed-only |
 | A-AC-10 | partial |
 | C-AC-07 | partial |
-| E-AC-14 | partial |
 | EPIC-AC-01 | partial |
 | EPIC-AC-02 | not-started |
 | EPIC-AC-03 | partial |

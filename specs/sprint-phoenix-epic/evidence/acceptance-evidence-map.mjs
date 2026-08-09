@@ -513,6 +513,18 @@ const DELTA = {
   'PX0-AC-05': ['not-started', 'WP-PX0'],
   'PX0-AC-06': ['not-started', 'WP-PX0'],
   'PX0-AC-07': ['implemented', 'WP-PX0'],
+
+  // --- evidence/phx-wp-eac14 (task PHX-WP-EAC14, 2026-08-09, commit e7688d4) ---
+  // Independently re-run: 17/17 governance-export-delivery-tests pass, node --check
+  // clean, exactly the one declared file changed (18 lines, additive). Honest
+  // correction: the CAS-conflict/forged-ack tests this criterion's `partial` status
+  // leaned on turned out, on direct re-examination, to be validation/correctness
+  // assertions against malformed input -- not a simulated destination/transport
+  // failure. A genuine failure-injection fixture (a rejected adapter.deliver() call,
+  // proving the outbox stays untouched and a later retry recovers cleanly) is now
+  // present and break-proofed. All five named fixture classes (in-memory, local-file,
+  // OTLP-profile, syslog, failure-injection) are each individually, directly evidenced.
+  'E-AC-14': ['implemented', 'WP-EAC14'],
 };
 
 // --- per-criterion evidence pointer ----------------------------------------
@@ -659,7 +671,7 @@ const POINTERS = {
   'E-AC-11': 'governance-export-delivery-tests (PHX-WP-E, break-proofed): the closed 9-field receipt schema is pinned, rejecting any retention/immutability/analyst-review/compliance-implying extension; CONFIRMED ABSENT: a per-projection/mapping digest field -- only policyRevision exists (governance-event-projection.mjs:22-24)',
   'E-AC-12': 'governance-export-adapter-tests: profile and acknowledgements are closed, non-authoritative and deduplicated',
   'E-AC-13': 'governance-export-outbox-tests: destination queues, cursors and failure domains stay independent',
-  'E-AC-14': 'in-memory, local-file, OTLP-profile and syslog fixtures are each individually cited (PHX-WP-E); dedicated failure-injection coverage was judged sufficient by indirect citation (CAS-conflict, forged-ack tests) rather than confirmed absent by search -- no new test added, budget-limited not capability-limited',
+  'E-AC-14': 'governance-export-delivery-tests (PHX-WP-EAC14, break-proofed): all five named fixture classes individually evidenced -- in-memory/local-file/OTLP-profile/syslog (pre-existing) plus a genuine failure-injection fixture (new): a rejected adapter.deliver() call leaves the outbox untouched and a later retry recovers cleanly. Corrects the prior partial verdict, which had leaned on CAS-conflict/forged-ack tests that direct re-examination found to be validation assertions, not simulated transport failure',
   'E-AC-15': 'governance-export-adapter-tests: allowlisting/redaction completed before every persistence boundary',
   'E-AC-16': 'nine named assertions: batching bound, compression, payload bound, rate limit, retry budget, backpressure, flush, restart resume, replay',
   'E-AC-17': 'governance-export-outbox-tests: duplicate delivery preserves one canonical source history',

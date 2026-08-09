@@ -8,7 +8,7 @@ Parent specification: [../spec.md](../spec.md) · Measurement: [../evidence/acce
 
 ## What this design is for
 
-The measurement established that 58 of 157 acceptance criteria are not
+The measurement established that 57 of 157 acceptance criteria are not
 `implemented` and that no issue is closeable. It did not say how any of them closes. This
 document does, and it is generated from the same verdict data as the measurement, so the two
 cannot drift apart.
@@ -19,12 +19,12 @@ one list is what has made the epic look larger and more uniform than it is.
 
 | class | criteria | what closing one actually costs |
 |---|---|---|
-| A — assertion missing | 3 | one named test case in an already-registered, unprotected suite |
+| A — assertion missing | 2 | one named test case in an already-registered, unprotected suite |
 | D — documentation missing | 1 | one document section set; no code, no gate |
 | S — seam missing | 4 | a connector between two packages that already work |
 | B — capability missing | 45 | real implementation plus its tests |
 | P — not code | 5 | a human gate, a sanctioned authority revision, or a proved impossibility |
-| **total** | **58** | |
+| **total** | **57** | |
 
 **The distribution is the finding.** The largest class by a wide margin is Class A: criteria
 whose behaviour is built, shipped and green, and which fail only because no assertion names the
@@ -133,7 +133,7 @@ is by module family, which makes the disjointness checkable rather than asserted
 | WP-V | 2 | plugins/pipeline-core/lib/evidence-view-model*.mjs, plugins/pipeline-core/lib/evidence-view-renderer*.mjs |
 | WP-X | 1 | plugins/pipeline-core/lib/external-reference-adapter*.mjs |
 | WP-C | 4 | plugins/pipeline-core/lib/change-control*.mjs |
-| WP-E | 8 | plugins/pipeline-core/lib/governance-export-*.mjs |
+| WP-E | 7 | plugins/pipeline-core/lib/governance-export-*.mjs |
 | WP-A | 9 | plugins/pipeline-core/lib/agent-decision-journal*.mjs, governance/schemas/agent-decision-event.schema.json |
 | WP-L | 3 | plugins/pipeline-core/lib/lifecycle-governance-events*.mjs, plugins/pipeline-core/lib/governance-replay*.mjs |
 | WP-H | 3 | plugins/pipeline-core/lib/human-governance-ledger*.mjs, plugins/pipeline-core/lib/governance-authority-resolver*.mjs, plugins/pipeline-core/lib/external-push-ledger*.mjs |
@@ -173,12 +173,11 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 
 ## Per criterion
 
-### Class A — the behaviour exists, the assertion does not (3)
+### Class A — the behaviour exists, the assertion does not (2)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
 | A-AC-14 | partial | WP-A | 11 of 13 named conformance scenarios now have dedicated coverage (PHX-WP-A + PHX-WP-A2); "decomposition" is confirmed not representable in the current `kind` enum; "tampering" stays gapped -- needs store-generic digest-recompute verification, correctly left unattempted rather than guessed at |
-| E-AC-14 | partial | WP-E | in-memory, local-file, OTLP-profile and syslog fixtures are each individually cited (PHX-WP-E); dedicated failure-injection coverage was judged sufficient by indirect citation (CAS-conflict, forged-ack tests) rather than confirmed absent by search -- no new test added, budget-limited not capability-limited |
 | PX0-AC-03 | partial | WP-PX0 | pipeline-state-tests AR03a-g (PHX-WP-PX0): apply rechecks both the next-authority artifact (AR03c) and its own fresh State preimage against a concurrent unrelated mutation (AR03e-g, new). One named axis remains unpinned: active-feature phase != design -> AR-DECISION-SCOPE, reachable in production but needing a full plan-approval fixture the dispatch's budget did not cover |
 
 ### Class D — the gap is a documentation section the criterion enumerates (1)
