@@ -1887,6 +1887,43 @@ The dispatch substituted two real sibling suites under an explicit label rather 
 skipping the check, and it removed a QG-06 deferred decision whose promise its own
 work had made obsolete instead of leaving a stale expiry standing.
 
+### GATE GREEN AT 368/368 ON `1dd95ad` — the run ends here, at the signature
+
+**Full verify: exit 0, 368 suites, candidate `1dd95ad`, tree `e6b838cd`, `binding: "exact"`,
+tree clean at start and at finish.** Evidence in the verify worktree's
+`evidence/verify-latest.json`; that directory is git-ignored by design (QG-03), so this
+register is the durable record.
+
+**How it had to be run, because the first attempt failed and the reason is reusable.**
+Running `harness/scripts/verify.mjs` from the main checkout returns
+`VERIFY-CANDIDATE-PREFLIGHT: Commit or stash tracked changes before Verify; no suite was
+started` — the three permanently-modified operator files (`.claude/settings.json`,
+`project/pipeline-state.json`, `project/resume-hint.json`) are tracked, so the main checkout
+is never clean enough for a candidate-bound run. That is exactly what the detached worktree
+at `.git/phx-verify` exists for. It was still parked on `89a999b`; `git -C .git/phx-verify
+checkout --detach <candidate>` and then running **that** copy of `verify.mjs` produces a
+clean candidate binding. Anyone who reaches for the repo-root copy will lose ten minutes
+rediscovering this.
+
+**What the run covers.** Everything from `88a7133` onward: the ADR renumber and the two
+record corrections, the collision item's closure and its two successor items, both new
+checks with their 12 and 19 cases, the five `Governs:` declarations, the two call sites, and
+the first reconciliation record.
+
+**Where this stops, and why it is not an unfinished job.** The next step is layer 3 of
+`docs/push-release-flow.md`: the detached Ed25519 signature over the candidate, with a
+private key outside this checkout. The agent is cryptographically incapable of producing it
+by design (ADR-0055, ADR-0056), and the instruction that licensed working without asking was
+about method, not consent. So the run ends at a green gate with a signed push as the only
+remaining act.
+
+**One wrinkle the first real use exposed, recorded so the next session does not rediscover
+it.** `docs/state.md` is governed by ADR-0012, so every handover update re-implicates that
+ADR and needs its own record entry. The sequence converges only because the final commit —
+the record itself — touches nothing governed. That is the write-order rule working as
+designed, but it means the record entry is genuinely the last act before a push, not a step
+that can be done early and left.
+
 ### THE DOCUMENTATION-RECONCILIATION LAYER IS BUILT, AND IT FOUND SOMETHING ON ITS FIRST REAL RUN
 
 Two checks, `f1d254e` and `0b2bd67`, wired into two call sites at `dec2ed4`.
