@@ -386,13 +386,13 @@ const DELTA = {
 // For `implemented`: the carrier plus the gate-registered suite that pins it.
 // For anything else: the exact clause that is NOT pinned or NOT built.
 const POINTERS = {
-  'PX0-AC-01': 'continuity-state.mjs binds dispatch/intent to prdSha256/specSha256; no assertion names a REJECTED generic CAS authority change',
+  'PX0-AC-01': 'continuity-state.mjs binds dispatch/intent to prdSha256/specSha256; no assertion names a REJECTED generic CAS authority change. GATE: the carrier suite is harness/scripts/pipeline-state.test.mjs (TP-5) -- closing this needs a signed TP-5 maintenance window, the same class of act P-AC-08 needed, not an ordinary dispatch',
   'PX0-AC-02': 'continuity-authority-revision-plan emits the closed request; pinned in pipeline-state.test.mjs (registered)',
-  'PX0-AC-03': 'apply exists and rechecks under the writer lock; the recheck breadth the criterion enumerates is not fully pinned',
-  'PX0-AC-04': 'proof half fails closed and is pinned; the State-side preimage/revision/idempotency recheck is only partly asserted',
-  'PX0-AC-05': 'continuity-authority-revision-receipt.v1 now has an emitter; durable retention of the receipt is not pinned',
-  'PX0-AC-06': 'recover replays frozen journal bytes only; the recovered-preimage outcome class is not pinned',
-  'PX0-AC-07': 'zero-write replay implemented; the conflicting-replay/second-writer half is not pinned',
+  'PX0-AC-03': 'apply exists and rechecks under the writer lock; the recheck breadth the criterion enumerates is not fully pinned. GATE: carrier is harness/scripts/pipeline-state.test.mjs (TP-5), same as PX0-AC-01',
+  'PX0-AC-04': 'proof half fails closed and is pinned; the State-side preimage/revision/idempotency recheck is only partly asserted. GATE: carrier is harness/scripts/pipeline-state.test.mjs (TP-5), same as PX0-AC-01',
+  'PX0-AC-05': 'continuity-authority-revision-receipt.v1 now has an emitter; durable retention of the receipt is not pinned. GATE: carrier is harness/scripts/pipeline-state.test.mjs (TP-5), same as PX0-AC-01',
+  'PX0-AC-06': 'recover replays frozen journal bytes only; the recovered-preimage outcome class is not pinned. GATE: carrier is harness/scripts/pipeline-state.test.mjs (TP-5), same as PX0-AC-01',
+  'PX0-AC-07': 'zero-write replay implemented; the conflicting-replay/second-writer half is not pinned. GATE: carrier is harness/scripts/pipeline-state.test.mjs (TP-5), same as PX0-AC-01',
   'PX0-AC-08': 'ruleset-source.mjs closed contract pinned by ruleset-source-tests; whether bootstrap actually EMITS one observation is unpinned',
   'PX0-AC-09': 'bootstrap-source-attestation-acceptance-tests (verify.mjs:333) — Codex-only marketplace resolution',
   'PX0-AC-10': 'bootstrap-source-attestation-acceptance-tests — pre-HEAD consumer compares loaded plugin identity',

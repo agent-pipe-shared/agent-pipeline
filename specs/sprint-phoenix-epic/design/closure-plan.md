@@ -182,12 +182,12 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 | A-AC-14 | partial | WP-A | 5 of 13 named conformance scenarios have thin/generic (non-dedicated) coverage, 8 have zero coverage; "decomposition" is not representable in the current `kind` enum at all (PHX-WP-A, not padded) |
 | E-AC-06 | partial | WP-E | governance-export-delivery-tests (PHX-WP-E, break-proofed): stable idempotency (pre-existing) and at-least-once redelivery (new) are pinned; the explicit "SHALL NOT claim exactly-once" structural assertion was dropped for tool-budget reasons -- not confirmed absent by search, just not written this pass |
 | E-AC-14 | partial | WP-E | in-memory, local-file, OTLP-profile and syslog fixtures are each individually cited (PHX-WP-E); dedicated failure-injection coverage was judged sufficient by indirect citation (CAS-conflict, forged-ack tests) rather than confirmed absent by search -- no new test added, budget-limited not capability-limited |
-| PX0-AC-01 | partial | WP-PX0 | continuity-state.mjs binds dispatch/intent to prdSha256/specSha256; no assertion names a REJECTED generic CAS authority change |
-| PX0-AC-03 | partial | WP-PX0 | apply exists and rechecks under the writer lock; the recheck breadth the criterion enumerates is not fully pinned |
-| PX0-AC-04 | partial | WP-PX0 | proof half fails closed and is pinned; the State-side preimage/revision/idempotency recheck is only partly asserted |
-| PX0-AC-05 | partial | WP-PX0 | continuity-authority-revision-receipt.v1 now has an emitter; durable retention of the receipt is not pinned |
-| PX0-AC-06 | partial | WP-PX0 | recover replays frozen journal bytes only; the recovered-preimage outcome class is not pinned |
-| PX0-AC-07 | partial | WP-PX0 | zero-write replay implemented; the conflicting-replay/second-writer half is not pinned |
+| PX0-AC-01 | partial | WP-PX0 | continuity-state.mjs binds dispatch/intent to prdSha256/specSha256; no assertion names a REJECTED generic CAS authority change. GATE: the carrier suite is harness/scripts/pipeline-state.test.mjs (TP-5) -- closing this needs a signed TP-5 maintenance window, the same class of act P-AC-08 needed, not an ordinary dispatch |
+| PX0-AC-03 | partial | WP-PX0 | apply exists and rechecks under the writer lock; the recheck breadth the criterion enumerates is not fully pinned. GATE: carrier is harness/scripts/pipeline-state.test.mjs (TP-5), same as PX0-AC-01 |
+| PX0-AC-04 | partial | WP-PX0 | proof half fails closed and is pinned; the State-side preimage/revision/idempotency recheck is only partly asserted. GATE: carrier is harness/scripts/pipeline-state.test.mjs (TP-5), same as PX0-AC-01 |
+| PX0-AC-05 | partial | WP-PX0 | continuity-authority-revision-receipt.v1 now has an emitter; durable retention of the receipt is not pinned. GATE: carrier is harness/scripts/pipeline-state.test.mjs (TP-5), same as PX0-AC-01 |
+| PX0-AC-06 | partial | WP-PX0 | recover replays frozen journal bytes only; the recovered-preimage outcome class is not pinned. GATE: carrier is harness/scripts/pipeline-state.test.mjs (TP-5), same as PX0-AC-01 |
+| PX0-AC-07 | partial | WP-PX0 | zero-write replay implemented; the conflicting-replay/second-writer half is not pinned. GATE: carrier is harness/scripts/pipeline-state.test.mjs (TP-5), same as PX0-AC-01 |
 
 ### Class D — the gap is a documentation section the criterion enumerates (7)
 
