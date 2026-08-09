@@ -3745,6 +3745,43 @@ turns out to require unstructurable human-intent judgment) while verification ca
 **Live now:** WP-A-AC07, WP-P-AC01-AC03, WP-C-AC02. Both design-latitude threads (O-1/O-2, K-AC-05)
 remain parked pending PO input. Handover fully current through this checkpoint.
 
+### FOUR CLOSURES LANDED: C-AC-02, A-AC-07, P-AC-01, P-AC-03 — ALL INDEPENDENTLY VERIFIED
+
+All three live dispatches returned (one, WP-A-AC07, truncated mid-wrap-up after exceeding its tool
+budget on genuinely deep 7-class investigation — resumed via `SendMessage`, no rework needed, it
+already had working verified code). Verified each independently before booking:
+
+**WP-C-AC02** (`093d3c3b`): `detectChangeClassShopping` composes with today's earlier
+`resolveChangeControlProfile` rather than reimplementing its tuple/ambiguity logic — flags a
+proposed classification when resolving the fuller same-tuple candidate set would not have landed
+on it. 27/27 tests. Closes C-AC-02's remaining half; both halves now closed. Booked `implemented`
+(`7a1f1198`). Note: this reused the task ID `WP-C-AC02` from an earlier segment's dispatch — same
+label, different commit, harmless (each commit's own SHA is what matters for authorship), but
+worth avoiding going forward.
+
+**WP-A-AC07** (`90283a0c`): `representedEventClasses` recognizes all seven named event classes
+through existing fields/kinds — no new `kind` was needed for any of them, confirmed by reading the
+mapping logic directly (candidate→`candidateDigest`, privacy→the existing unconditional
+`personalIdentifiability` gate, authority→`relatedHumanDecisionId`/`authorityRequirement`,
+verification-scope→the existing kind, security/recovery/external-side-effect→command-offer
+fields). `capture-policy.json` gains additive `mandatoryEventClasses`; `appendPortableGovernanceEvent`
+gains an explicit `captureDecision` defaulting to `"captured"` (today's behavior, unchanged) with a
+`"sampled-out"` path that fails closed (`GES-MANDATORY-CAPTURE`) for a mandatory class and is only
+ever admitted for the policy-selected agent origin. 38/38 + 28/28 tests, including every
+pre-existing K-AC-05 test still green — no regression to the parked mechanism. Booked `implemented`
+(`ad105a86`).
+
+**WP-P-AC01-AC03** (`7c2007db`): three optional, pack-scoped fields close P-AC-01 (provenance,
+dependencies, signaturePolicy — mirroring the `targetBinding` optionality precedent so every
+pre-existing fixture stays valid); three deterministically-computed preview fields close P-AC-03
+(`newlyRequiredArtifacts`/`externalEffects`/`backfillRange`, derived only from the plan's existing
+inputs, never caller-supplied, with `assertPlan` failing closed on a tampered preview). 17/17 +
+4/4 tests. Booked both `implemented` (`250163ab`).
+
+**Live now: none.** All three dispatches from this window are closed and booked. Both
+design-latitude threads (O-1/O-2, K-AC-05) remain parked pending PO input; the rest of the
+evidence-map closure queue continues.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
