@@ -9,7 +9,7 @@
  * deliberate item transition; it never changes Markdown items or the ledger.
  */
 import { existsSync, lstatSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
@@ -106,6 +106,48 @@ function regularFile(root, repoPath) {
   } catch {
     return false;
   }
+}
+
+/** Repository-relative, forward-slashed form of `repoPath`, as `git ls-files` prints it. */
+function normalizeRepoPath(root, repoPath) {
+  return relative(root, resolve(root, repoPath)).split(sep).join("/");
+}
+
+/**
+ * Which of `repoPaths` Git has in its index, in ONE invocation.
+ *
+ * Three-valued on purpose. `git ls-files` cannot answer at all outside a work
+ * tree or without a git binary, and a project that keeps a backlog without Git
+ * must not be told its closure citations are broken — it is the question that is
+ * unavailable there, not the answer that is "no". Only `known` may produce a
+ * finding; `indeterminate` produces none.
+ */
+function trackedPaths(root, repoPaths) {
+  const paths = [...new Set(repoPaths.filter((value) => typeof value === "string" && value.trim() !== ""))];
+  if (paths.length === 0) return { state: "known", tracked: new Set() };
+  const probe = spawnSync("git", ["ls-files", "-z", "--", ...paths], { cwd: root, encoding: "utf8" });
+  if (probe.error || probe.status !== 0) return { state: "indeterminate", tracked: new Set() };
+  return { state: "known", tracked: new Set(probe.stdout.split("\0").filter((entry) => entry !== "")) };
+}
+
+/**
+ * `absent` | `untracked` | `tracked` | `indeterminate` for one repository path.
+ *
+ * A closure citation that exists only in the working tree is the failure this
+ * distinguishes from a missing file: the local run is green, and every other
+ * checkout has a closed item whose cited evidence cannot be read. Presence was
+ * never the property the contract needed.
+ */
+export function repositoryTrackingState(root, repoPath) {
+  if (!regularFile(root, repoPath)) return "absent";
+  const probe = trackedPaths(root, [repoPath]);
+  if (probe.state !== "known") return "indeterminate";
+  return probe.tracked.has(normalizeRepoPath(root, repoPath)) ? "tracked" : "untracked";
+}
+
+/** The one sentence that both tells the reader what broke and how to clear it. */
+export function untrackedEvidenceFinding(label, repoPath) {
+  return `${label}: closure_evidence ${repoPath} exists but is not tracked by Git — the citation resolves only in this working tree; stage it (git add ${repoPath}) so every checkout can read it`;
 }
 
 function authorityApproval() { return { ok: true, code: "AUTHORITY:VALID" }; }
@@ -410,10 +452,15 @@ export function loadBacklogState(root = DEFAULT_ROOT, { checkCommit = true, auth
     }
   }
 
+  // ONE ls-files call covers every closed item's citation: this loop is the standing
+  // sweep for untracked closure evidence, not a check of the item being written now.
+  const closedEvidence = trackedPaths(root, items.filter((item) => item.metadata.status === "closed").map((item) => item.metadata.closure_evidence));
   for (const item of items) {
     const metadata = item.metadata;
     if (metadata.status === "closed" && !regularFile(root, metadata.closure_evidence)) {
       findings.push(`${item.path}: closure_evidence is missing or not a regular repository file`);
+    } else if (metadata.status === "closed" && closedEvidence.state === "known" && !closedEvidence.tracked.has(normalizeRepoPath(root, metadata.closure_evidence))) {
+      findings.push(untrackedEvidenceFinding(item.path, metadata.closure_evidence));
     }
     if (metadata.status === "closed" && (metadata.owner.startsWith("project:") || metadata.closure_repository?.startsWith("project:"))) {
       findings.push(...projectReadbackFindings(root, item));
@@ -646,8 +693,12 @@ export function applyBacklogTransition(root = DEFAULT_ROOT, input, options = {})
     if (closing.closure_repository === "self" && !localCommitExists(root, closing.closure_commit)) {
       return { ...current, ok: false, findings: [`${input.id}: closure_commit is not a reachable local Git commit`], wrote: false, transition: null };
     }
-    if (!regularFile(root, closing.closure_evidence)) {
+    const tracking = repositoryTrackingState(root, closing.closure_evidence);
+    if (tracking === "absent") {
       return { ...current, ok: false, findings: [`${input.id}: closure_evidence is missing or not a regular repository file`], wrote: false, transition: null };
+    }
+    if (tracking === "untracked") {
+      return { ...current, ok: false, findings: [untrackedEvidenceFinding(input.id, closing.closure_evidence)], wrote: false, transition: null };
     }
     if (closing.closure_repository.startsWith("project:")) {
       const readbackFindings = projectReadbackFindings(root, { path: input.id, metadata: closing });
@@ -691,7 +742,9 @@ export function applyBacklogEvidenceAmendment(root = DEFAULT_ROOT, input, option
   if (!planned.ok) return { ...current, ok: false, findings: planned.errors, wrote: false, transition: null };
   const changed = planned.items.find((entry) => entry.metadata.id === input.id);
   if (options.checkCommit !== false && !localCommitExists(root, changed.metadata.closure_commit)) return { ...current, ok: false, findings: [`${input.id}: amendment closure_commit is not a reachable local Git commit`], wrote: false, transition: null };
-  if (!regularFile(root, changed.metadata.closure_evidence)) return { ...current, ok: false, findings: [`${input.id}: amendment closure_evidence is missing or not a regular repository file`], wrote: false, transition: null };
+  const amendmentTracking = repositoryTrackingState(root, changed.metadata.closure_evidence);
+  if (amendmentTracking === "absent") return { ...current, ok: false, findings: [`${input.id}: amendment closure_evidence is missing or not a regular repository file`], wrote: false, transition: null };
+  if (amendmentTracking === "untracked") return { ...current, ok: false, findings: [untrackedEvidenceFinding(`${input.id}: amendment`, changed.metadata.closure_evidence)], wrote: false, transition: null };
   let resultRecord;
   try { resultRecord = JSON.parse(readFileSync(join(root, changed.metadata.closure_evidence), "utf8")); } catch { return { ...current, ok: false, findings: [`${input.id}: amendment closure_evidence is not valid JSON`], wrote: false, transition: null }; }
   const resultBound = validReadySnt1Result(resultRecord)

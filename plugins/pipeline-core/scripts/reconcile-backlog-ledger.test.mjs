@@ -8,7 +8,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { canonicalJson, transitionHash } from "../lib/backlog-state.mjs";
-import { checkBacklogState } from "./check-backlog-state.mjs";
+import { checkBacklogState, repositoryTrackingState } from "./check-backlog-state.mjs";
 import { applyBacklogReconciliation, planBacklogReconciliation } from "./reconcile-backlog-ledger.mjs";
 
 const REPO_ROOT = resolve(fileURLToPath(new URL("../../..", import.meta.url)));
@@ -249,6 +249,62 @@ try {
     assert.ok(nonClosing.length > 0 && closing.length > 0);
     for (const event of nonClosing) assert.match(event.reason, /claims no implementation, no review, and no closure/u);
     for (const event of closing) assert.match(event.reason, /attests the sync to that pre-existing closure record/u);
+  });
+
+  check("RBL13 a closure whose evidence exists but is untracked is blocked, and nothing is written", () => {
+    // The failure this closes: `git add` refusing the file is loud, but simply
+    // LEAVING it untracked was silent — the local run went green and every other
+    // checkout got a closure bound to evidence it cannot read.
+    const { base, head } = fixture({
+      items: [ITEM("xi", "closed", {
+        closed_at: "2026-07-02", closure_repository: "self",
+        closure_commit: "PLACEHOLDER", closure_evidence: "backlog/evidence/xi.md",
+      })],
+    });
+    const path = join(base, "backlog", "items", "2026-07-01-xi.md");
+    writeFileSync(path, readFileSync(path, "utf8").replace("PLACEHOLDER", head));
+    // Written AFTER the fixture commit, so it is present on disk and absent from the index.
+    writeFileSync(join(base, "backlog", "evidence", "xi.md"), "untracked evidence\n");
+    const before = readFileSync(join(base, "backlog", "transitions.ndjson"), "utf8");
+    const result = applyBacklogReconciliation(base, { at: "2026-08-09" });
+    assert.equal(result.ok, false);
+    assert.equal(result.wrote, false);
+    assert.match(result.findings.join("\n"), /exists but is not tracked by Git/u);
+    assert.match(result.findings.join("\n"), /git add backlog\/evidence\/xi\.md/u, "the refusal must name the command that clears it");
+    assert.equal(readFileSync(join(base, "backlog", "transitions.ndjson"), "utf8"), before);
+  });
+
+  check("RBL14 staging that same evidence clears the refusal — no commit required", () => {
+    const { base, head } = fixture({
+      items: [ITEM("omicron", "closed", {
+        closed_at: "2026-07-02", closure_repository: "self",
+        closure_commit: "PLACEHOLDER", closure_evidence: "backlog/evidence/omicron.md",
+      })],
+    });
+    const path = join(base, "backlog", "items", "2026-07-01-omicron.md");
+    writeFileSync(path, readFileSync(path, "utf8").replace("PLACEHOLDER", head));
+    writeFileSync(join(base, "backlog", "evidence", "omicron.md"), "evidence\n");
+    assert.equal(planBacklogReconciliation(base, { at: "2026-08-09" }).ok, false);
+    // Trackedness is index membership, not HEAD membership: the ordinary flow writes
+    // the evidence, stages it, reconciles, and commits everything in one commit.
+    git(base, "add", "backlog/evidence/omicron.md");
+    const plan = planBacklogReconciliation(base, { at: "2026-08-09" });
+    assert.equal(plan.ok, true, plan.findings.join("; "));
+    assert.equal(plan.planned.at(-1).to, "closed");
+  });
+
+  check("RBL15 the trackedness reader is three-valued — outside a work tree it answers indeterminate", () => {
+    // A project that keeps a backlog without Git must not be told every one of its
+    // citations is broken. `git ls-files` cannot answer there; the question is
+    // unavailable, and only `untracked` is allowed to become a finding.
+    const { base } = fixture({ items: [ITEM("pi", "open")], evidenceFiles: ["pi.md"] });
+    assert.equal(repositoryTrackingState(base, "backlog/evidence/pi.md"), "tracked");
+    assert.equal(repositoryTrackingState(base, "backlog/evidence/absent.md"), "absent");
+    writeFileSync(join(base, "backlog", "evidence", "rho.md"), "written after the commit\n");
+    assert.equal(repositoryTrackingState(base, "backlog/evidence/rho.md"), "untracked");
+    rmSync(join(base, ".git"), { recursive: true, force: true });
+    assert.equal(repositoryTrackingState(base, "backlog/evidence/pi.md"), "indeterminate");
+    assert.equal(repositoryTrackingState(base, "backlog/evidence/absent.md"), "absent");
   });
 
   check("RBL10 the transaction journal does not survive a successful apply", () => {

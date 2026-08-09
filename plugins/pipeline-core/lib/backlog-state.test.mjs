@@ -485,6 +485,40 @@ function managedRepairInput(root, overrides = {}) {
 }
 
 {
+  // The standing sweep: every closed item's citation is re-checked on every run, so a
+  // closure bound to evidence that exists only in the closing machine's working tree
+  // cannot stay green. Presence was the property that made the failure silent —
+  // `git add` refusing is loud, simply never staging the file was not.
+  const root = fixtureRoot();
+  git(root, ["init", "-q"]);
+  const closed = item({
+    status: "closed",
+    closed_at: "2026-07-17",
+    closure_repository: "self",
+    closure_commit: "b".repeat(40),
+    closure_evidence: "specs/result.md",
+  });
+  const close = event({
+    to: "closed",
+    evidence: { kind: "implementation", commit: "b".repeat(40), reference: "specs/result.md" },
+    reason: "Delivered with local evidence.",
+  });
+  write(root, "backlog/items/example.md", renderBacklogItem(closed));
+  write(root, "backlog/transitions.ndjson", `${canonicalJson(close)}\n`);
+  write(root, "specs/result.md", "# Result\n");
+  const blocked = writeBacklogProjections(root, { checkCommit: false });
+  git(root, ["add", "specs/result.md"]);
+  const written = writeBacklogProjections(root, { checkCommit: false });
+  const valid = checkBacklogState(root, { checkCommit: false });
+  check("BS24 a closure citing evidence that is present but untracked is a finding, cleared by staging it",
+    blocked.ok === false && blocked.wrote === false
+      && blocked.findings.some((finding) => finding.includes("exists but is not tracked by Git"))
+      && blocked.findings.some((finding) => finding.includes("git add specs/result.md"))
+      && written.ok && written.wrote && valid.ok,
+    `${blocked.findings.join("; ")} || ${written.findings.join("; ")}`);
+}
+
+{
   const root = fixtureRoot();
   const reference = "backlog/items/example.md";
   const historicalBytes = Buffer.from("status: open\n");

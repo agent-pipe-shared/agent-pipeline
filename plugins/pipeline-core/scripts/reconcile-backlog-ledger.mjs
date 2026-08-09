@@ -26,9 +26,10 @@
  * status and, for a closure, the item's OWN closure fields. It claims no
  * implementation, no review, and no closure of its own — the reason string on every
  * emitted event says exactly that. It invents nothing: a closure whose commit is
- * unreachable or whose evidence file is missing STOPS the reconciliation for that
- * item rather than being recorded, because a ledger entry pointing at evidence that
- * does not exist is worse than a missing entry.
+ * unreachable, or whose evidence file is missing OR UNTRACKED, STOPS the
+ * reconciliation for that item rather than being recorded, because a ledger entry
+ * pointing at evidence that does not exist — or that exists only on the reconciling
+ * machine — is worse than a missing entry.
  *
  * Usage:
  *   node plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs            # plan (read-only)
@@ -38,7 +39,7 @@
  * reconciled honestly; nothing is written, and the blocked items are named.
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, lstatSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -51,6 +52,10 @@ import {
   transitionHash,
 } from "../lib/backlog-state.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+// One owner for "is this citation readable in every checkout, or only in mine" —
+// the reconciler and the state checker must not each carry their own copy of the
+// answer, which is how a producer and its consumer drift apart while both stay green.
+import { repositoryTrackingState, untrackedEvidenceFinding } from "./check-backlog-state.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = resolve(HERE, "..", "..", "..");
@@ -95,15 +100,6 @@ function commitExists(root, commit) {
   }
 }
 
-function regularFile(root, relPath) {
-  try {
-    const info = lstatSync(join(root, relPath));
-    return info.isFile() && !info.isSymbolicLink();
-  } catch {
-    return false;
-  }
-}
-
 /** Every closure claim must resolve before it may enter the ledger. */
 function closureFindings(root, item) {
   const m = item.metadata;
@@ -115,8 +111,14 @@ function closureFindings(root, item) {
   if (m.closure_repository === "self" && !commitExists(root, m.closure_commit)) {
     out.push(`${item.path}: closure_commit ${m.closure_commit} does not exist in this repository`);
   }
-  if (!regularFile(root, m.closure_evidence)) {
+  // Presence is not the property the closure contract needs. A file that exists only
+  // in this working tree makes the local run green and leaves every other checkout
+  // with a closure bound to evidence nobody can read.
+  const tracking = repositoryTrackingState(root, m.closure_evidence);
+  if (tracking === "absent") {
     out.push(`${item.path}: closure_evidence ${m.closure_evidence} is not a regular repository file`);
+  } else if (tracking === "untracked") {
+    out.push(untrackedEvidenceFinding(item.path, m.closure_evidence));
   }
   return out;
 }
