@@ -47,6 +47,21 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 5bae83c2aac599271a07644d335af8f958771c1f — 2026-08-09, range 3387065..5bae83c, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `16114ee` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `500d5cc`, `78c6ef1`, `7ce3214`, `5bae83c`. Same reading as the whole chain: `docs/state.md`
+stays ADR-0012 (one new checkpoint entry recording the maintenance-window ceremony and its
+outcome), the generated evidence-map/closure-plan pair stays ADR-0045 (one delta commit). The two
+non-generated content commits in this range —
+`plugins/pipeline-core/lib/external-command-offer.test.mjs` (WP-R test-authorship) and
+`harness/scripts/pipeline-state.test.mjs` (the P-AC-08 gate registration, additive-only, run
+under the signed TP-3+TP-5 window rather than any doc-reconciliation-relevant channel) — touch no
+path any `Governs:` line in the corpus names, confirmed by this run.
+
 ## Candidate 4e5f3d3d3deb7fbb855ab6a3e24ae3533ea1147f — 2026-08-09, range 3387065..4e5f3d3, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
