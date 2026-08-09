@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "a1b46737dbb8ba4cf87b1c0996815525dfb2354ba6e899342a0395754b31d7bc"
+    "transitionHead": "bc9dd1a56a08b60d5b6866a82bb2299ee625aafe4aacb77ac846920d77648ff8"
   },
   "counts": {
-    "open": 103,
+    "open": 107,
     "in_progress": 21,
     "closed": 32
   },
@@ -399,6 +399,14 @@
       "source": "close-block ritual step 6b authorship check, native-Windows Verify block (see HISTORY.md 2026-07-23 entry, docs/state.md close-ritual authorship-check incident bullet)"
     },
     {
+      "id": "pipeline.elephant-writes-production-code-directly-without-a-goldfish-dispatch",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "Live observation of the PO's private Claude+Pipeline 0.5.4 happy-path test run (fifth local candidate), 2026-08-09 (sanitized, no PO-identifying data)."
+    },
+    {
       "id": "pipeline.evidence-bound-review-retry-economics",
       "status": "in_progress",
       "type": "workflow-improvement",
@@ -470,6 +478,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "0.5.2 release session, 2026-08-07: PO asked why a release cannot run end-to-end through the Pipeline with only the final signature as the human step, for the version-surface strip specifically."
+    },
+    {
+      "id": "pipeline.guard-denial-escalates-benign-commands-to-human-in-terminal",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "Live observation of the PO's private Codex+Pipeline 0.5.4 happy-path test run (fifth local candidate), 2026-08-09 (sanitized, no PO-identifying data)."
     },
     {
       "id": "pipeline.guard-lifecycle-ready-blocks-claude-memory-writes",
@@ -590,6 +606,14 @@
       "owner": "pipeline",
       "created": "2026-08-09",
       "source": "Command-level analysis of the PO's private Codex + 0.5.4 greenfield test run, 2026-08-09 (Codex rollout, main thread), read from the rollout JSONL. The design/PRD/spec content itself was correct throughout; only the post-promotion pipeline state readback failed."
+    },
+    {
+      "id": "pipeline.language-selection-scope-is-unclear-and-arrives-too-late",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "Live observation of the PO's private Claude+Pipeline and Codex+Pipeline 0.5.4 happy-path test runs (fifth local candidate), 2026-08-09 (sanitized, no PO-identifying data)."
     },
     {
       "id": "pipeline.lifecycle-guard-does-not-know-the-human-signing-commands",
@@ -1042,6 +1066,14 @@
       "closureRepository": "self",
       "closureCommit": "864c7f1f84b5e0a874e360bf26e168fa92f14aaf",
       "closureEvidence": "backlog/evidence/2026-08-08-restart-barrier-runner-exemption-verification.md"
+    },
+    {
+      "id": "pipeline.restart-resume-hint-write-misses-the-project-prefix",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "Live observation of the PO's private Codex+Pipeline 0.5.4 happy-path test run (fifth local candidate), 2026-08-09 (sanitized, no PO-identifying data)."
     },
     {
       "id": "pipeline.runner-neutrality-before-third-runner",
