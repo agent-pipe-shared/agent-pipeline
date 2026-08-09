@@ -28,10 +28,11 @@ test("V-AC-09 includes tampered, misplaced, orphaned, and legacy-layout viewer-c
   assert.match(legacyHtml, /data-value-class="legacy">legacy<\/span> <code>EVM-V1<\/code>: Legacy explicit model; source topology was supplied by its caller\./);
 });
 // V-AC-02: only the value classes this model/renderer pair actually produce
-// are pinned. `estimate`, `assumption`, and `human decision` are not
-// produced anywhere in evidence-view-model.mjs, evidence-view-renderer.mjs,
-// or evidence-viewer.mjs (verified by search; see evidence/phx-wp-v.txt) and
-// are reported absent rather than asserted here.
+// are pinned. `estimate` and `assumption` are not produced anywhere in
+// evidence-view-model.mjs, evidence-view-renderer.mjs, or evidence-viewer.mjs
+// (verified by search; see evidence/phx-wp-v.txt) and are reported absent
+// rather than asserted here. `human decision` IS now produced -- see the
+// "approved lifecycle state" test below -- and is pinned there instead.
 test("V-AC-02 labels fact, unknown, unavailable, redacted, invalid, and not-applicable value classes visibly", () => {
   const model = {
     schema: "pipeline.evidence-view-model.v2",
@@ -52,6 +53,29 @@ test("V-AC-02 labels fact, unknown, unavailable, redacted, invalid, and not-appl
   assert.match(html, /data-value-class="redacted">redacted</);
   assert.match(html, /data-value-class="invalid">invalid</);
   assert.match(html, /data-value-class="not-applicable">not-applicable</);
+});
+// V-AC-02: `human decision` is produced when a feature package's lifecycle
+// state is exactly "approved" -- the one state feature-package-topology.mjs
+// gates behind PO (human) authority specifically (`requiredAuthority: "po"`
+// on the `approve` operation; every other admitted transition uses the
+// general `lifecycle` authority). Labeled in both the summary section and
+// each affected artifact row, and the CSS asset styles it distinctly.
+test("V-AC-02 labels the approved lifecycle state as a human decision, in the summary and per-artifact rows, with distinct CSS", () => {
+  const model = {
+    schema: "pipeline.evidence-view-model.v2",
+    authority: "non-authoritative",
+    source: { topology: "valid" },
+    feature: { id: "f", lifecycleState: "approved" },
+    candidate: { state: "fact", commit: "a".repeat(40), tree: "b".repeat(40) },
+    status: "unknown",
+    sharing: "private",
+    exportStatus: { state: "unavailable", destinationProfile: null, cursor: null, lag: null, receipt: null },
+    artifacts: [{ id: "artifact-1", path: "specs/a.md", sourcePath: "specs/a.md", sha256: "c".repeat(64), state: "verified", lifecycleState: "approved" }],
+    notices: [],
+  };
+  const html = renderEvidenceView(model);
+  assert.equal(html.match(/data-value-class="human-decision">approved</g)?.length, 2);
+  assert.match(html, /\.value-human-decision\{/);
 });
 // V-AC-06: pins the exact CSP value, the skip-link's real keyboard focus
 // target, and landmark/table accessibility structure. "Representative
