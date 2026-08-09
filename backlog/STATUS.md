@@ -8,6 +8,7 @@
 | pipeline.a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.absent-runner-flag-silently-defaults-to-codex | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.accepted-adrs-drift-from-implementation-undetected | open | defect | pipeline | 2026-08-09 | — |
+| pipeline.adr-0045-topology-divergence-from-package-and-skill | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.adr-0047-numbering-collision | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.adr-0047-renumber-left-live-references-behind | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.adr-0051-follow-up-gaps-untracked | closed | defect | pipeline | 2026-08-05 | — |
@@ -132,6 +133,6 @@
 
 ## Counts
 
-- open: 74
+- open: 75
 - in_progress: 26
 - closed: 24
