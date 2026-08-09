@@ -4085,6 +4085,22 @@ was booked, since nothing is actually closed yet.
 **Live now: none.** Third genuinely PO-gated item found this stretch (after O-1/O-2, K-AC-05) —
 all three now clearly documented, none bypassed.
 
+### WP-R-AC11 DISPATCHED — REUSING EXISTING RESTRICTED-STORE INFRASTRUCTURE
+
+Rather than treat "design-heavy work" as uniformly out of reach, checked one more candidate,
+R-AC-11, with fresh research: found `governance-event-store.mjs` already has a full
+restricted-machine-local storage profile (`putRestrictedGovernanceEvent`/
+`queryRestrictedGovernanceEvent`/`eraseRestrictedGovernanceEvent`, AES-256-GCM, outside the repo)
+and `document-lifecycle.mjs` already has an established `commitment`+`receiptId` pairing
+convention — R-AC-11 needs neither new infrastructure nor new design, only wiring
+`external-command-offer.mjs` to the existing mechanisms. Verdict: small, well-scoped addition, not
+a new-infrastructure task like L-AC-01/A-AC-01. Dispatched **WP-R-AC11**, explicitly forbidden from
+building a second/parallel storage mechanism, required to reuse the existing exports as-is, and
+required to run `governance-event-store.mjs`'s own suite as the broader-consumer check —
+`agent-decision-journal.mjs`'s 6th same-day edit.
+
+**Live now:** WP-R-AC11.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
