@@ -3,7 +3,16 @@
 import { createHash } from "node:crypto";
 
 export const BOOTSTRAP_PAYLOAD_SCHEMA = "pipeline.bootstrap-payload-measurement.v1";
-export const BOOTSTRAP_PAYLOAD_MAX_BYTES = 15_000;
+/**
+ * THE single owner of the bootstrap payload budget: every call site imports this
+ * constant, none restates it. It was raised on 2026-08-08 (GF-057) on the PO's
+ * explicit authorization, with the reasoning recorded above the assertion in
+ * skills/pipeline-start/pipeline-start-v3.test.mjs. That raise reached only one
+ * of the then-five copies, and the disagreeing copies are exactly what this
+ * constant now prevents: bootstrap-payload-measure.test.mjs asserts that no
+ * consumer carries a second literal of this number.
+ */
+export const BOOTSTRAP_PAYLOAD_MAX_BYTES = 18_000;
 
 function text(value) {
   return typeof value === "string" ? value : JSON.stringify(value ?? null);

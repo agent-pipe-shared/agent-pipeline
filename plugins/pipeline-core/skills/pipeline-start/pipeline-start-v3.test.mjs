@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { BOOTSTRAP_PAYLOAD_MAX_BYTES } from "../../lib/bootstrap-payload-budget.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const core = readFileSync(join(here, "SKILL.md"), "utf8");
@@ -33,7 +34,12 @@ const all = `${core}\n${refs}`;
 // a project's .gitignore), and the SETUP-3 bootstrap questions still to land. Recorded
 // here rather than silently bumped, because a cap that moves whenever it is inconvenient
 // is not a budget.
-assert.ok(Buffer.byteLength(core, "utf8") <= 18_000, `pipeline-start SKILL.md is ${Buffer.byteLength(core, "utf8")} bytes, over the 18,000-byte session-bootstrap budget`);
+//
+// The number itself now lives in exactly one place, lib/bootstrap-payload-budget.mjs.
+// It did not before: that raise landed here and nowhere else, so this assertion and the
+// payload budget disagreed by 3,000 bytes and the disagreement was invisible until a
+// suite went red. This comment stays the record of WHY; the constant is the value.
+assert.ok(Buffer.byteLength(core, "utf8") <= BOOTSTRAP_PAYLOAD_MAX_BYTES, `pipeline-start SKILL.md is ${Buffer.byteLength(core, "utf8")} bytes, over the ${BOOTSTRAP_PAYLOAD_MAX_BYTES}-byte session-bootstrap budget`);
 assert.match(core, /full Elephant bootstrap is session-bound/u);
 assert.match(core, /never for an ordinary task, message, tool result, commit, test,/u);
 assert.match(core, /does not trigger a second full Elephant bootstrap unless a real SessionStart or\n+typed recovery follows/u);

@@ -8,6 +8,7 @@ import {
   installedPipelineIdentity, installedPipelineVersion, observePipelineStartPreflight,
   normalBootstrapPayloadReceipt, pipelineStartPreflightExitCode, SCHEMA, STATUS_SCOPE,
 } from "./pipeline-start-preflight.mjs";
+import { BOOTSTRAP_PAYLOAD_MAX_BYTES } from "../lib/bootstrap-payload-budget.mjs";
 
 const manifest = JSON.stringify({ version: "0.4.5+test" });
 const pluginList = (
@@ -159,7 +160,10 @@ test("preflight keeps the Codex runner default for any non-Claude-Code session",
 });
 
 test("normal bootstrap receipt retains exact envelope measurement and over-budget state", () => {
-  const receipt = normalBootstrapPayloadReceipt({ schema: "test", payload: "x".repeat(15_001) });
+  // Derived from the owner, never a literal: this probe must prove "over budget"
+  // for whatever the budget is. As a literal one budget behind it silently became
+  // an UNDER-budget payload when the budget was raised, inverting both assertions.
+  const receipt = normalBootstrapPayloadReceipt({ schema: "test", payload: "x".repeat(BOOTSTRAP_PAYLOAD_MAX_BYTES + 1) });
   assert.equal(receipt.overBudget, true);
   assert.equal(receipt.truncated, false);
   assert.equal(receipt.originalMeasurement.withinBudget, false);

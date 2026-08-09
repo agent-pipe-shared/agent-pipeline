@@ -12,7 +12,7 @@ token count). A full Elephant bootstrap is session-bound: run it at
 `startup|resume|clear`, a runtime re-entry, or a typed recovery needing it —
 never for an ordinary task, message, tool result, commit, test, PO response,
 or active-goal continuation in the same ready session. Normal bootstrap
-targets 10–15k units; an original payload over 15,000 is rejected.
+targets 10–15k units; an original payload over 18,000 is rejected.
 ## Role and runtime identity
 
 Resolve the plugin root, then run exactly:
