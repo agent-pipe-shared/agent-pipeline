@@ -85,7 +85,56 @@ in shared library code, both are filed with the evidence.
    project's promoted PRD says `po-language: de` while its state says `en`.
 
 **Neither test repository has a single commit.** Everything, including the seed,
-is untracked. Worth deciding whether that is the intended greenfield end state.
+is untracked. The cause is now known — see the `git add` work-around below.
+
+**Then the PO supplied the Codex rollout logs, and they carry what the chat
+transcript cannot: the refusals that were retried, and what the agent read
+between commands.** Full Verify after this half: **264/264, exit 0**, bound to
+`fea33554` / tree `d27fa631`.
+
+8. `RH-SCHEMA`, and it is the mechanism behind "the runner forgets the input"
+   (`bc0e0a1`-class fix). The bootstrap skill called all four Resume-Hint keys
+   "a short distilled statement"; `resume-hint.mjs:115-118` requires `intent` to
+   be a string and the other three to be **arrays** of at most 4/4/3 entries. A
+   reader who followed the skill got back the four bare characters `RH-SCHEMA`.
+   The schema is not loosened — the arity caps are what stop a transcript being
+   pasted in — the instruction is corrected and `resumeHintContextDetail()` now
+   names the field and its shape without ever echoing a value.
+9. **The real P0, and Codex's own retrospective blamed itself for it wrongly.**
+   Step 17 of the pre-restart session, right after the PO gave language and
+   profile and with `initialize-runtime` already at `restart-required`: the agent
+   ran `resume-hint.mjs --help`, reaching for the §6 duty it had just read, and
+   was refused with `GUARD-LIFECYCLE-NOT-READY`. It issued no further command.
+   The duty applies in exactly the state that refuses it:
+   `isRestartResumeHintCapture` admits one argv — six arguments, card at the
+   fixed `project/.resume-hint-input.json` — and that path appeared in the guard
+   and its own test and in no artifact any agent reads, with `--help` refused too
+   so the shape could not be discovered from inside. §6 now prints the exact
+   command; the predicate is exported and `RHRESTART-1` drives the skill's own
+   printed bytes through the real guard.
+
+**The command-level analysis, filed as
+`2026-08-09-agents-read-the-pipelines-source-because-nothing-describes-its-interface.md`.**
+114 commands, of which roughly **40 are the agent reading Pipeline source** to
+work out how to call the next step: the bootstrap step list does not name the
+checks a normal session runs, `KICKOFF-PROMOTION-INPUT` rejects an id without
+naming the accepted form, and `submit-plan`/`approve-plan`/`set-phase` appear in
+no skill and have no usage output. Five loops; the expensive work-around is
+`git add … pipeline.user.yaml` being refused, after which the agent shrank the
+publication scope — so the pushed branch carries no `.claude/`, `.codex/`,
+`docs/`, `project/` or `pipeline.user.yaml` and the greenfield test is not
+reproducible from its own remote. That is the standing uncommittable-file item
+with a consumer consequence attached.
+
+**Run telemetry, recorded so the Claude and no-Pipeline runs can be compared on
+the same axes:** ~33 min wall across one forced restart, 17 PO turns, 171
+commands, 4 guard refusals, **51,070 output tokens**, 7,339,219 total with 97.0 %
+of input served from cache, plus 2,013,972 tokens for Codex's own auto-reviewer
+(+27 %). Output tokens are the honest cost axis; the auto-reviewer is a runner
+property, not a Pipeline one, so totals are not comparable without saying so.
+
+**A third unregistered suite surfaced:** `resume-hint.test.mjs`. The pending file
+and `apply-pending-protected-edits.mjs` now report three rather than two.
 
 ## 2026-08-09 Local `0.5.4` candidate stamped and verified — ready for the PO's manual copy
 
