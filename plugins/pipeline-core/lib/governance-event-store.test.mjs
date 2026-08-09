@@ -168,6 +168,27 @@ test("tampering, non-canonical bytes, and forks fail before projection or query"
   await assert.rejects(() => verifyPortableGovernanceStream({ repositoryRoot: forkRoot, repositoryFingerprint: fingerprint, streamId: "lifecycle" }), (error) => error.code === "GES-FORK");
 });
 
+test("K-AC-05 a forked stream also fails closed for append and recovery attempts, not only verify/query", async (t) => {
+  const root = await fixtureRoot(); t.after(() => cleanup(root));
+  const first = await append(root);
+  const fork = sealGovernanceEvent({ ...intent({ eventId: "evt-fork", idempotencyKey: "idem-fork" }), sequence: 1, previousEventDigest: null, payloadDigest: "0".repeat(64), eventDigest: "0".repeat(64) });
+  await writeFile(path.join(root, "governance/events/lifecycle/1-evt-fork.json"), `${canonicalizeJson(fork)}\n`);
+  await assert.rejects(() => append(root, intent({ eventId: "evt-after-fork-append", idempotencyKey: "idem-after-fork-append" })), (error) => error.code === "GES-FORK", "append must fail closed on a forked stream, not silently pick a winner");
+  const recovery = { idempotencyKey: "recover-after-fork-1", expectedHeadsDigest: "e".repeat(64), requestedPostimageDigest: "f".repeat(64) };
+  await assert.rejects(() => recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", checkpoint: first.checkpoint, recovery }), (error) => error.code === "GES-FORK", "recovery must also fail closed on a forked stream; there is no separate governed-disposition operation that can process a fork");
+});
+
+test("K-AC-08 rejects a head/index checkpoint asserting an absent or invalid canonical record instead of trusting the projection", async (t) => {
+  const root = await fixtureRoot(); t.after(() => cleanup(root));
+  const first = await append(root);
+  const absent = { ...first.checkpoint, sequence: 99, eventDigest: "e".repeat(64) };
+  await assert.rejects(() => verifyPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", checkpoint: absent }), (error) => error.code === "GES-CHECKPOINT", "an absent asserted record must fail closed");
+  await assert.rejects(() => queryPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", checkpoint: absent }), (error) => error.code === "GES-CHECKPOINT", "query must not trust the absent-record assertion either");
+  const invalid = { ...first.checkpoint, eventDigest: "f".repeat(64) };
+  await assert.rejects(() => verifyPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", checkpoint: invalid }), (error) => error.code === "GES-CHECKPOINT", "an invalid (digest-mismatched) asserted record must fail closed");
+  await assert.rejects(() => queryPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", checkpoint: invalid }), (error) => error.code === "GES-CHECKPOINT", "query must not trust the invalid-record assertion either");
+});
+
 test("symlink, cross-repository, and writer-owned intent fields are rejected", async (t) => {
   const root = await fixtureRoot(); t.after(() => cleanup(root));
   await assert.rejects(() => appendPortableGovernanceEvent({ repositoryRoot: root, repositoryFingerprint: "d".repeat(64), intent: intent() }), (error) => error.code === "GES-CROSS-REPOSITORY");
