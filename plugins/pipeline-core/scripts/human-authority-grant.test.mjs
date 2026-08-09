@@ -259,6 +259,33 @@ test("F2: pointing --repo-root at a subdirectory of the real repository still co
   assert.equal(events.decisions.length, 0);
 });
 
+test("N1: pointing --repo-root at an agent-writable subdirectory that itself contains a forged project/critical-human-proof.json does not cause install to verify against that forged anchor -- it still resolves and verifies against the real repository's committed anchor", async (t) => {
+  const keys = keypair();
+  const { root, fingerprint } = await fixture(keys);
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const external = await mkdtemp(path.join(os.tmpdir(), "human-authority-grant-ext-"));
+  t.after(() => rm(external, { recursive: true, force: true }));
+  const subdir = path.join(root, "subdir");
+  await mkdir(path.join(subdir, "project"), { recursive: true });
+  // An attacker-controlled trust anchor, planted one level down in a
+  // subdirectory of the SAME checkout (no nested .git -- this is not a
+  // separate repository, just an agent-writable path inside the real one).
+  const forgedKeys = keypair();
+  await writeFile(path.join(subdir, "project/critical-human-proof.json"), `${JSON.stringify(trustAnchorPolicy(forgedKeys), null, 2)}\n`);
+  const requestPath = path.join(root, "request.json");
+  const prepared = await run(prepareArgs(root, requestPath));
+  // Signed by the ATTACKER's own key -- this would verify successfully if
+  // `install` read the forged anchor in `subdir/project/critical-human-proof.json`
+  // instead of the real repository's committed one at the true root.
+  const forgedProofPath = await proofFor(external, forgedKeys, prepared.digestToSign);
+  await assert.rejects(
+    () => run(["install", "--repo-root", subdir, "--request", requestPath, "--proof", forgedProofPath]),
+    (error) => /HAG-PROOF-INVALID/u.test(error.message),
+  );
+  const events = await queryHumanGovernanceDecisions({ repositoryRoot: root, repositoryFingerprint: fingerprint });
+  assert.equal(events.decisions.length, 0);
+});
+
 test("a request whose payload has been tampered with after prepare is rejected before append", async (t) => {
   const keys = keypair();
   const { root, fingerprint } = await fixture(keys);

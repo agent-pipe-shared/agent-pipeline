@@ -21,10 +21,15 @@
  * signer and never accepts or writes private-key material. `install` is agent-safe
  * but verify-and-append ONLY: it cannot succeed without a genuine detached Ed25519
  * proof, checked against exactly one trust anchor — this repository's own committed
- * `project/critical-human-proof.json` (`readCriticalHumanProofPolicy`). Unlike
+ * `project/critical-human-proof.json` (`readCriticalHumanProofPolicy`), read from
+ * the repository's own DISCOVERED root (`discoverRepository(...).primaryRoot`),
+ * never from the raw `--repo-root` string a caller supplies. Unlike
  * `guard-maintenance-window.mjs`, this program has NO flag, argument, environment
  * variable, or code path anywhere that lets a caller substitute a different trust
- * anchor: the committed anchor is the only source, unconditionally. Any
+ * anchor: pointing `--repo-root` at a subdirectory (or any other path) cannot
+ * select a different anchor, because the raw string only ever serves as the
+ * starting point `discoverRepository` walks up from — the committed anchor at
+ * the resolved primary root is the only source, unconditionally. Any
  * verification failure exits non-zero and appends nothing.
  *
  * Usage:
@@ -32,7 +37,7 @@
  *     --package-id <id> --action <OVERRIDE.rule> --plan <repo-path> --spec <repo-path> \
  *     --ttl-seconds <n> --reason-code <CODE> --policy-digest <sha256> --rule-digest <sha256> \
  *     --request <output-path> [--environment <id>] [--artifacts <comma-separated-repo-paths>] \
- *     [--request-decision-id <id>] [--event-id <id>] [--idempotency-key <id>]
+ *     [--request-decision-id <id>]
  *   human-authority-grant.mjs install --repo-root <path> --request <path> \
  *     --proof <external-public-json>
  */
@@ -56,7 +61,7 @@ import {
 const REQUEST_SCHEMA = "pipeline.human-authority-grant-request.v1";
 const UNAVAILABLE = Object.freeze({ state: "not-applicable" });
 
-const usage = "Usage: human-authority-grant.mjs prepare --repo-root <path> --decision-id <id> --package-id <id> --action <OVERRIDE.rule> --plan <repo-path> --spec <repo-path> --ttl-seconds <n> --reason-code <CODE> --policy-digest <sha256> --rule-digest <sha256> --request <output-path> [--environment <id>] [--artifacts <comma-separated-repo-paths>] [--request-decision-id <id>] [--event-id <id>] [--idempotency-key <id>] | install --repo-root <path> --request <path> --proof <external-public-json>";
+const usage = "Usage: human-authority-grant.mjs prepare --repo-root <path> --decision-id <id> --package-id <id> --action <OVERRIDE.rule> --plan <repo-path> --spec <repo-path> --ttl-seconds <n> --reason-code <CODE> --policy-digest <sha256> --rule-digest <sha256> --request <output-path> [--environment <id>] [--artifacts <comma-separated-repo-paths>] [--request-decision-id <id>] | install --repo-root <path> --request <path> --proof <external-public-json>";
 
 export function parseArgs(argv) {
   const [command, ...tokens] = argv;
@@ -67,10 +72,15 @@ export function parseArgs(argv) {
   // project/critical-human-proof.json -- and it must stay unconditional. A
   // caller-supplied override flag is not merely unused, it is ABSENT from the
   // grammar entirely, so no future edit can wire one back in by accident.
+  // NOTE (N2): deliberately no "eventId"/"idempotencyKey" entries here either.
+  // `install` always derives both deterministically from `decision.decisionId`
+  // (never from caller-supplied values), so accepting them from `prepare` only
+  // let the CLI's documented contract diverge from its actual behavior --
+  // same "absent from the grammar, not merely unused" principle as F1.
   const known = new Set([
     "repoRoot", "decisionId", "packageId", "action", "environment", "plan", "spec", "artifacts",
-    "ttlSeconds", "reasonCode", "policyDigest", "ruleDigest", "requestDecisionId", "eventId",
-    "idempotencyKey", "request", "proof",
+    "ttlSeconds", "reasonCode", "policyDigest", "ruleDigest", "requestDecisionId",
+    "request", "proof",
   ]);
   for (let index = 0; index < tokens.length; index += 1) {
     const key = tokens[index];
@@ -160,8 +170,12 @@ function runPrepare(args) {
   const nowMs = Date.now();
   const decisionId = args.decisionId;
   const requestDecisionId = args.requestDecisionId ?? `${decisionId}-request`;
-  const eventId = args.eventId ?? `${decisionId}-event`;
-  const idempotencyKey = args.idempotencyKey ?? `${decisionId}-idempotency`;
+  // N2: no caller-supplied override -- `install` always reconstructs both
+  // deterministically from `decision.decisionId` and ignores whatever this
+  // envelope carries, so deriving them any other way here would just restate
+  // the mismatch the removed --event-id/--idempotency-key flags caused.
+  const eventId = `${decisionId}-event`;
+  const idempotencyKey = `${decisionId}-idempotency`;
 
   const decision = {
     decisionId,
@@ -229,10 +243,17 @@ async function runInstall(args) {
   const { repo, fingerprint } = repositoryFingerprintFor(rootDir);
   const proof = externalJson(repo.primaryRoot, args.proof);
 
-  // F1: the ONLY trust anchor is this repository's own committed
-  // project/critical-human-proof.json. No flag, argument, or environment
-  // variable anywhere in this program can substitute a different one.
-  const policy = readCriticalHumanProofPolicy(rootDir);
+  // F1/N1: the ONLY trust anchor is this repository's own committed
+  // project/critical-human-proof.json, read from `repo.primaryRoot` --
+  // the AUTHORITATIVE root `discoverRepository` resolved above -- never from
+  // the raw `rootDir` (`resolve(args.repoRoot)`). Reading from raw `rootDir`
+  // here was the residual self-confirmation shape A-AC-04 forbids: pointing
+  // `--repo-root` at an agent-writable subdirectory containing a forged
+  // project/critical-human-proof.json would otherwise let a caller pick their
+  // own trust anchor while the fingerprint above still bound to the real
+  // repository. No flag, argument, or environment variable anywhere in this
+  // program can substitute a different one.
+  const policy = readCriticalHumanProofPolicy(repo.primaryRoot);
   if (!policy.ok || policy.trustAnchor === null) throw new Error("HAG-TRUST-ANCHOR-MISSING: project/critical-human-proof.json carries no trustAnchor");
   const trustPolicy = policy.trustAnchor;
 
@@ -261,7 +282,8 @@ async function runInstall(args) {
   // (part of the just-verified signed subject), everything else is observed
   // fresh, live, at install time.
   const decision = request.intent.payload;
-  const capturePolicyDigest = capturePolicyDigestFor(rootDir);
+  // N1: same authoritative root as the trust anchor read above -- never `rootDir`.
+  const capturePolicyDigest = capturePolicyDigestFor(repo.primaryRoot);
   const intent = {
     schema: "pipeline.governance-event-envelope.v1",
     payloadSchema: "pipeline.human-governance-decision.v1",
@@ -290,8 +312,9 @@ async function runInstall(args) {
   };
 
   // Only reachable once verification has genuinely succeeded — a rejected or
-  // tampered proof throws above and appends nothing.
-  const receipt = await appendHumanGovernanceDecision({ repositoryRoot: rootDir, repositoryFingerprint: fingerprint, intent });
+  // tampered proof throws above and appends nothing. N1: same authoritative
+  // root as above -- the ledger is written at `repo.primaryRoot`, never `rootDir`.
+  const receipt = await appendHumanGovernanceDecision({ repositoryRoot: repo.primaryRoot, repositoryFingerprint: fingerprint, intent });
   return { ok: true, code: "HUMAN-AUTHORITY-GRANT-INSTALLED", receipt };
 }
 
