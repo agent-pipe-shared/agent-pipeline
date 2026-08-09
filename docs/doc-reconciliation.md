@@ -47,6 +47,19 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 1d288f0aa1456632651c6d938f600cd6de0eb8f8 — 2026-08-09, range 3387065..1d288f0, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `4eba3cb` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `24959bd`, `b2a5534`, `3440e5f`, `1d288f0`: the prior doc-rec entry, the K-AC-05 and
+O-1/O-2-design reworks fixing their respective Critic round-1 findings, and a checkpoint recording
+independent verification of both plus the two round-2 Critic dispatches. Same reading as the whole
+chain: `docs/state.md` stays ADR-0012, the generated evidence-map/closure-plan trio stays
+ADR-0045; neither reworked file (`governance-event-store.mjs`, the design doc) touches an
+ADR-governed path.
+
 ## Candidate 4eba3cb32e3471fdc677c900a29eea2a42ed066b — 2026-08-09, range 3387065..4eba3cb, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
