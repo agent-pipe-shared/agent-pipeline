@@ -30,19 +30,52 @@ communicated clearly and early enough in practice: a documented repair path
 for the drift it can cause is a mitigation for the friction, not a removal
 of it.
 
+## Root cause (found by code reading, 2026-08-09)
+
+Unlike the project `goal`, which `kickoff plan`/`kickoff apply`
+(`planProjectOnboardingKickoffV4`/`applyProjectOnboardingKickoffV4`,
+`project-onboarding-v3.mjs`) accept as a real, structurally-required
+parameter, the document language has **no parameter anywhere in the
+onboarding-through-kickoff call chain**:
+
+- The provisional kickoff-seed PRD's `<!-- po-language: … -->` marker is
+  written by `initialPrdContent()` (`lib/onboarding-continuity.mjs:2990`),
+  using a value from `kickoffLanguage(root)` (`:2946`) — which reads it back
+  from whatever `pipeline.user.yaml`/the runtime manifest were already
+  seeded with at portable-seed time, **not** from anything asked during
+  kickoff itself.
+- The portable-seed step (`project-onboarding-v3.mjs`) has no
+  `humanFacingLanguage`/`--human-facing`-style input anywhere — grepping the
+  whole file for it returns nothing. Whatever seeds `pipeline.user.yaml`'s
+  language field does so with a fixed default, not a live answer.
+- `references/kickoff-design.md` tells the AGENT, in prose, to ask the
+  human for language "together with the goal" — but there is no code path
+  for the agent to actually deliver that answer into either of the two
+  points above. The only place a human's real choice can land today is
+  reactively, in a hand-authored PRD's marker, once promotion or drift
+  detection notices it disagrees with the already-seeded default —
+  exactly the `PO-GATE-PRD-LANGUAGE-MISMATCH` → `po-gate-profile-repair.mjs`
+  cycle this item's "What happened" section observed live, on both runners.
+
+This is why "ask it earlier" alone would not fully close the gap even if an
+agent reliably remembered to: there is currently nowhere for the answer to
+go before kickoff, only after.
+
 ## Direction
 
-Two independent angles, not mutually exclusive:
-
-1. Surface the document-vs-deliverable language distinction explicitly and
-   earlier in the bootstrap flow — before the question is asked, not only as
-   a lazily-loaded reference an agent may read at a different point than
-   when it actually asks the question.
-2. Investigate whether the question's current phrasing and timing (loaded
-   from `references/kickoff-design.md`, itself lazily loaded per
-   `SKILL.md`'s typed-lazy-loading section) reliably reaches the agent
-   before it needs to ask — a timing gap here would explain repair cycles
-   after the fact rather than a clean ask up front.
+Give `kickoff plan`/`kickoff apply` a real `language` parameter (`de`/`en`),
+enforced the same way `goal` already is (the command should refuse to
+proceed without a valid value, not merely have a reference document
+recommend asking for one), and thread it through to both places that
+currently either default or read a stale value: `initialPrdContent()`'s
+`po-language` marker and whatever seeds `pipeline.user.yaml`'s language
+field at portable-seed time. Update the state-machine's `collect-input`
+guidance so an agent is told, structurally, that language is a required
+input alongside goal — not only via `kickoff-design.md` prose. Backward
+compatibility for existing internal/test call sites that omit the
+parameter (many hardcode `en` today) is a judgment call for whoever
+implements this; the load-bearing property is that the live onboarding CLI
+path a real session drives treats it as required, exactly like `goal`.
 
 ## Related
 
