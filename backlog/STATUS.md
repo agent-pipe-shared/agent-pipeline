@@ -15,6 +15,7 @@
 | pipeline.agent-tool-isolation-worktree-snapshots-stale-upstream-ref | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.agents-are-judged-by-rules-no-artifact-ever-tells-them | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.agents-read-the-source-because-nothing-describes-the-interface | open | workflow-improvement | pipeline | 2026-08-09 | — |
+| pipeline.approve-push-rejects-any-fresh-post-setup1-authority-file | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.approved-not-implementing-is-a-silent-trap | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.authority-decision-apply-defaults-to-codex | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.authority-decision-candidate-is-a-literal | open | defect | pipeline | 2026-08-08 | — |
@@ -168,6 +169,6 @@
 
 ## Counts
 
-- open: 107
+- open: 108
 - in_progress: 21
 - closed: 32

@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "bc9dd1a56a08b60d5b6866a82bb2299ee625aafe4aacb77ac846920d77648ff8"
+    "transitionHead": "42f89ce96df59411695d9e9a3475709c21cfa120974855691343ff657d2e06e4"
   },
   "counts": {
-    "open": 107,
+    "open": 108,
     "in_progress": 21,
     "closed": 32
   },
@@ -95,6 +95,14 @@
       "owner": "pipeline",
       "created": "2026-08-09",
       "source": "Full command-level analysis of the PO's Codex greenfield happy path against the 0.5.4 candidate (rollout 019fe56c + 019fe56f, 2026-08-09), read from the Codex rollout logs rather than the chat transcript."
+    },
+    {
+      "id": "pipeline.approve-push-rejects-any-fresh-post-setup1-authority-file",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "Live observation: the PO's private Claude+Pipeline 0.5.4 happy-path re-test (fifth local candidate) failed approve-push and needed a manual terminal fix outside the session; Codex's equivalent run got a signed push through. Confirmed at the code level by reading pipeline-state.mjs, po-approval-proof.mjs and po-human-approval.mjs, 2026-08-09."
     },
     {
       "id": "pipeline.approved-not-implementing-is-a-silent-trap",
