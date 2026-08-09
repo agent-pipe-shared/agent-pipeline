@@ -2709,6 +2709,51 @@ test("a real fresh local kickoff is immediately a valid canonical PO authority",
   } finally { dispose(path); }
 });
 
+// Regression for backlog: language-selection-scope-is-unclear-and-arrives-too-late
+// (GF-079). Portable-seed always defaults pipeline.user.yaml/manifest language
+// to "en" before any language question is asked; this reproduces the ordinary
+// case where the PO's real first answer at kickoff legitimately differs from
+// that silent default, and asserts the whole path reaches a consistent,
+// PASSING authority in one kickoff-apply call -- without the
+// PO-GATE-PRD-LANGUAGE-MISMATCH -> projection-drift two-tool repair chain
+// that used to be required for this exact, ordinary case.
+test("kickoff choosing a language different from the portable-seed default reaches a consistent authority without the mismatch/drift repair chain", () => {
+  const path = root();
+  try {
+    hostGit(path, ["init", "--initial-branch=main"]);
+    const localDeps = { ...fakeDeps, initializePoGateProfileReceipt: initializeActualPoGateProfileReceipt };
+    const barrier = initializeRestartRequiredRoot(path, localDeps);
+    clearRuntimeBarrier(path, barrier);
+    const seededSource = parseYaml(readFileSync(join(path, "pipeline.user.yaml"), "utf8"));
+    assert.equal(seededSource.language.human_facing, "en");
+    const goal = "Ship the first German-language feature";
+    const plan = planProjectOnboardingKickoffV4({ rootDir: path, goal, language: "de", deps: localDeps, runner: "codex" });
+    assert.equal(plan.language, "de");
+    const applied = applyProjectOnboardingKickoffV4({
+      rootDir: path, goal, language: "de", planSha256: plan.planSha256, activate: true, deps: localDeps, runner: "codex",
+    });
+    assert.equal(applied.status, "ready");
+    assert.equal(applied.continuity.status, "valid");
+    const correctedSource = parseYaml(readFileSync(join(path, "pipeline.user.yaml"), "utf8"));
+    assert.equal(correctedSource.language.human_facing, "de");
+    assert.match(readFileSync(join(path, ".claude/pipeline.yaml"), "utf8"), /language:\n {2}human_facing: de\n/u);
+    assert.match(readFileSync(join(path, "project/pipeline.yaml"), "utf8"), /language:\n {2}human_facing: de\n/u);
+    const authority = validatePoGateAuthorityForRepository({ repoRoot: path });
+    assert.equal(authority.ok, true, JSON.stringify(authority));
+    // No projection-drift either: a subsequent lifecycle inspection must stay
+    // "ready", not send the caller through plan-repair/apply-repair to
+    // reconcile the runtime manifest the migration owned-keys table tracks.
+    assert.equal(inspectProjectOnboardingV3({ rootDir: path, deps: localDeps, runner: "codex" }).status, "ready");
+    const stderr = [];
+    const exit = pipelineStateRun(["submit-plan", "--by", "coordinator", "--profile", "feature"], {
+      dir: path,
+      now: () => "2026-08-01T12:00:00.000Z",
+      writeError: (value) => stderr.push(value),
+    });
+    assert.equal(exit, 0, stderr.join(""));
+  } finally { dispose(path); }
+});
+
 // The gate the fresh seed switches on has to be PASSABLE, and that is
 // established by driving the whole path rather than by reading it. Both halves
 // are the contract: a promoted `feature` whose plan nobody approved is REFUSED
