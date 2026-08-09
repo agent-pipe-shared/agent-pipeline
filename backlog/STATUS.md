@@ -33,6 +33,7 @@
 | pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.codex-plugin-validator-host-parity | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.codex-sandbox-critic-longterm | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
+| pipeline.commit-trailer-block-wrapped-continuation-line-parses-as-empty | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.commit-trailer-cannot-distinguish-authorship-from-commit-act | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.critic-context-isolation | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.critical-human-proof-not-wired-to-push-and-prd-gates | open | defect | pipeline | 2026-08-05 | — |
@@ -46,6 +47,7 @@
 | pipeline.documentation-information-architecture | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.dual-channel-publication | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.el-01-has-no-in-session-tripwire | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.elephant-authored-production-diff-closed-its-own-gating-criterion | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.elephant-direct-implementation-under-afk-authorization | in_progress | workflow-improvement | pipeline | 2026-07-23 | — |
 | pipeline.epic-file-contract-has-no-drift-check | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.evidence-bound-review-retry-economics | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
@@ -140,6 +142,6 @@
 
 ## Counts
 
-- open: 82
+- open: 84
 - in_progress: 26
 - closed: 24

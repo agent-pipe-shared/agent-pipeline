@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "fb74b480ea68b602378a4bc2671935098f6c24fe04df30d789959b896b37a14a"
+    "transitionHead": "0f83e935d4f85f6e65cbe9eec577b2e920bf7a0ab13ad254584616c6480d9a2e"
   },
   "counts": {
-    "open": 82,
+    "open": 84,
     "in_progress": 26,
     "closed": 24
   },
@@ -257,6 +257,14 @@
       "tracking": "Sentinel recovery baseline; no completion claim."
     },
     {
+      "id": "pipeline.commit-trailer-block-wrapped-continuation-line-parses-as-empty",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "Independent Critic FAIL (2026-08-09, F6) on a full-range review of the Phoenix measurement/closure wave."
+    },
+    {
       "id": "pipeline.commit-trailer-cannot-distinguish-authorship-from-commit-act",
       "status": "open",
       "type": "defect",
@@ -361,6 +369,14 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Critic finding F-A, Phoenix gate-integrity delta re-review round 2, 2026-08-08: the orchestrator-authored commit e7f6e96 was caught after the fact, not at write time."
+    },
+    {
+      "id": "pipeline.elephant-authored-production-diff-closed-its-own-gating-criterion",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "Independent Critic FAIL (2026-08-09, F2) on a full-range review of the Phoenix measurement/closure wave (57 commits, 8e7a2f7..f7d9c0d)."
     },
     {
       "id": "pipeline.elephant-direct-implementation-under-afk-authorization",
