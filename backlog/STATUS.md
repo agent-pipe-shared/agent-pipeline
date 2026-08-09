@@ -109,7 +109,7 @@
 | pipeline.permitted-edit-drops-session-into-unrecoverable-readiness | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.pipeline-state-rebind-codex-default-runner | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.plan-path-guidance-attached-to-unlike-causes | open | defect | pipeline | 2026-08-08 | — |
-| pipeline.po-approval-request-verify-still-rejects-a-fresh-setup1-authority | open | defect | pipeline | 2026-08-09 | — |
+| pipeline.po-approval-request-verify-still-rejects-a-fresh-setup1-authority | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.po-gate-authority-path-canonicalization | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-authority-receipt-readback | open | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-worktree-authority | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -176,6 +176,6 @@
 
 ## Counts
 
-- open: 112
+- open: 111
 - in_progress: 21
-- closed: 35
+- closed: 36

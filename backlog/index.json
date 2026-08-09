@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "46fef148c7727ca14372dad5bee165b606f831aa854884d23a6e0149b1bd7d7c"
+    "transitionHead": "a33e051fd39553e3e5cec5ec9db16b90bb1e8692edd899571cd261d8406c1113"
   },
   "counts": {
-    "open": 112,
+    "open": 111,
     "in_progress": 21,
-    "closed": 35
+    "closed": 36
   },
   "items": [
     {
@@ -918,11 +918,15 @@
     },
     {
       "id": "pipeline.po-approval-request-verify-still-rejects-a-fresh-setup1-authority",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "Critic review (claude-opus-5, max, functional-equivalent-read-only lane) of GF-067 (commit ad81a9b9), 2026-08-09. Finding F1, verdict FAIL solely on this residual + the missing durable record of it -- GF-067's own commit was cleared as correct, minimal and genuinely tested; do not alter ad81a9b9."
+      "source": "Critic review (claude-opus-5, max, functional-equivalent-read-only lane) of GF-067 (commit ad81a9b9), 2026-08-09. Finding F1, verdict FAIL solely on this residual + the missing durable record of it -- GF-067's own commit was cleared as correct, minimal and genuinely tested; do not alter ad81a9b9.",
+      "closedAt": "2026-08-09",
+      "closureRepository": "self",
+      "closureCommit": "faf4c8dd7c2d01b11d6111ad3512e5e9b7b1f0b0",
+      "closureEvidence": "backlog/evidence/2026-08-09-po-approval-request-humanname-fix-closure.md"
     },
     {
       "id": "pipeline.po-gate-authority-path-canonicalization",

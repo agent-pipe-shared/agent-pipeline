@@ -3,10 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.po-approval-request-verify-still-rejects-a-fresh-setup1-authority
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
 source: "Critic review (claude-opus-5, max, functional-equivalent-read-only lane) of GF-067 (commit ad81a9b9), 2026-08-09. Finding F1, verdict FAIL solely on this residual + the missing durable record of it -- GF-067's own commit was cleared as correct, minimal and genuinely tested; do not alter ad81a9b9."
 due: 2026-08-16
+closed_at: 2026-08-09
+closure_repository: self
+closure_commit: faf4c8dd7c2d01b11d6111ad3512e5e9b7b1f0b0
+closure_evidence: backlog/evidence/2026-08-09-po-approval-request-humanname-fix-closure.md
 ---
 
 # A second, documented reader of `trust-policy.json` still rejects the exact authority file `setup --human-name` produces
