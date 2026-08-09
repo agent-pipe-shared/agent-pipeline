@@ -46,6 +46,7 @@
 | pipeline.dual-channel-publication | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.el-01-has-no-in-session-tripwire | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.elephant-direct-implementation-under-afk-authorization | in_progress | workflow-improvement | pipeline | 2026-07-23 | — |
+| pipeline.epic-file-contract-has-no-drift-check | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.evidence-bound-review-retry-economics | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.execution-model-switchback | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.first-verify-run-is-red-with-four-failures | open | defect | pipeline | 2026-08-08 | — |
@@ -135,6 +136,6 @@
 
 ## Counts
 
-- open: 77
+- open: 78
 - in_progress: 26
 - closed: 24

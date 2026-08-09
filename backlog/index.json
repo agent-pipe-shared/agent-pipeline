@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e826b0f88bfa6cb9ae79d381b94c5b17d5035be7e5a9c5dc3e63f7edda0af1ff"
+    "transitionHead": "8957c209195f16aeaf1ca44b590f946d1d8860a73a24b5f25b81e9bdeb7e3df0"
   },
   "counts": {
-    "open": 77,
+    "open": 78,
     "in_progress": 26,
     "closed": 24
   },
@@ -361,6 +361,14 @@
       "owner": "pipeline",
       "created": "2026-07-23",
       "source": "close-block ritual step 6b authorship check, native-Windows Verify block (see HISTORY.md 2026-07-23 entry, docs/state.md close-ritual authorship-check incident bullet)"
+    },
+    {
+      "id": "pipeline.epic-file-contract-has-no-drift-check",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "Found while preparing the Spec-amendment branch of a Critic finding, by checking first whether comparable files were already listed in specs/sprint-phoenix-epic/spec.md §7. They were not. The finding that raised it had reviewed a sixteen-commit range and could not see the sprint-long pattern."
     },
     {
       "id": "pipeline.evidence-bound-review-retry-economics",
