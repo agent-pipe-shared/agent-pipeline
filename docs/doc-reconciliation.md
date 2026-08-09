@@ -47,6 +47,19 @@ something to do here without review.
 
 ## Entries
 
+## Candidate c806e49d72e3edb1e49e580d5e56acb234178f7a — 2026-08-09, range 3387065..c806e49, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `d48f3ce` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `241a478`, `dedd2ef`, `92d1e44`, `c806e49`: the prior doc-rec entry, WP-C-AC07 (closed,
+retrospective-evidence gate for emergency change completion), a checkpoint recording the K-AC-05
+Critic round-1 FAIL and the rework dispatch it produced, and a checkpoint recording C-AC-07's
+independent verification/closure. Same reading as the whole chain: `docs/state.md` stays
+ADR-0012, the generated evidence-map/closure-plan trio stays ADR-0045; `change-control.mjs`
+touches no ADR-governed path.
+
 ## Candidate d48f3ce8837c760b94579ce45be4ad3c2bad4932 — 2026-08-09, range 3387065..d48f3ce, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
