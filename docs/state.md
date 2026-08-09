@@ -2758,6 +2758,61 @@ integration shape. Good next-session starting points, in rough order of readines
 orphaned-file half, then C-AC-02's distinct-fields half, then K-AC-05 and V-AC-02 (both need a
 real design pass before any dispatch).
 
+**PO correction, same night: presenting researched options is welcome, holding an idle slot is
+not.** After the above four-candidate writeup the PO pushed back on two different things in two
+messages. First: *"wieso nächster slot? es spricht nichts dagegen mir gut recherchierten
+entscheidungen und optionen vorzulegen"* — narrating a researched decision (which is what the
+paragraphs above already do) is welcome and does not need to precede dispatch; it does not mean
+stop-and-wait. Second, after I dispatched C-AC-02's tractable half but then continued with only
+one slot filled while accounting for it: *"du machst aber nichts mehr parallel das ist schlecht"*
+— holding a slot idle is not the same discipline as declining to force a WEAK dispatch; the
+concurrency cap exists to be used, not treated as a ceiling to fall short of. Both corrections are
+now in persistent feedback memory ([[decide-dont-ask]]).
+
+### C-AC-02 (tractable half) AND K-AC-10 CLOSE, PARALLELISM RESTORED: 107 OF 157 (2026-08-09)
+
+**C-AC-02** (`goldfish-implementor`/medium, WP-C-AC02, commit `002144a`): grounded in GitHub issue
+#24 §5 ("A standard-change profile must bind to an externally pre-authorized template and its
+still-valid revision"), quoted directly into the briefing. `validateChangeControlProfile` now
+requires a `standardTemplate` field (`{templateId, revision}`, both `ID`-pattern-validated) exactly
+when `changeClass === "standard"`, and exactly `null` otherwise — giving standard the field-level
+distinction from normal that the criterion's first half asks for. 11/11 `change-control-tests`
+pass, independently re-run; diff read directly and matches the specified shape (the goldfish also
+froze the new field consistently with the file's existing `candidate`/`artifact`/`window` freezing
+convention — a small, in-scope, self-noted addition beyond the literal DoD). Stays partial, count
+unchanged at 106: the anti-class-shopping half and emergency's separately-named "retrospective
+evidence" requirement remain explicitly out of scope, both now documented in-file rather than left
+for a future reader to rediscover.
+
+**K-AC-10** (`goldfish-implementor`/medium, WP-K-AC10, commit `f1f5e24`): chosen specifically
+because it is K-AC-05's much safer sibling — both criteria touch `governance-event-store.mjs`, but
+where K-AC-05 needs a real security decision inside `scanStream`'s fork-detection invariant (see
+the prior entry), K-AC-10 turned out to need nothing but a caller. Every field the criterion names
+("origin, authority class, integrity, and assurance") was already present on the existing
+single-stream `queryPortableGovernanceStream`'s output; nothing anywhere composed more than one
+stream's results without flattening them together, confirmed absent by a repo-wide search that had
+already been done in an earlier pass. The new `queryPortableGovernanceStreams` (plural) calls the
+existing, unmodified singular function once per requested stream and returns each result keyed by
+`streamId` — genuinely additive, zero changes to fork detection, append, or recovery. 14/14
+`governance-event-store-tests` pass, independently re-run; diff read directly, exactly 22 added
+lines in the production file, nothing else touched. Evidence-map deltas `bd386e3` (C-AC-02) and
+`15c9079` (K-AC-10): 106 → 106 → 107.
+
+**A researched-but-abandoned path, worth recording so a future session does not repeat the
+research:** P-AC-06's orphaned-file half looked buildable in isolation until reading
+`specs/sprint-phoenix-epic/lifecycle.json` — THIS repository's own active feature package — against
+its actual directory contents. The manifest's `artifacts` array lists 12 files; the directory
+carries at least half a dozen more that are never referenced (`spec-revision-20260802.md`, both
+`phase-*.md` files, the entire `design/` set beyond what is listed, and all of `evidence/`, which
+is separately gitignored). A naive "every file under `specs/<id>/` must be referenced by an
+artifact" check would make this repository's own live package fail its own validator the moment it
+shipped — a concrete, measured reason (not a guess) that this half needs an explicit exemption
+model designed first, not assumed.
+
+Both build slots stayed full through this leg's second half: WP-E-AC11 (the delivery receipt's
+missing per-projection digest, `goldfish-implementor`/medium) was dispatched into the second slot
+immediately after K-AC-10 landed, and was still in flight when this checkpoint was written.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
