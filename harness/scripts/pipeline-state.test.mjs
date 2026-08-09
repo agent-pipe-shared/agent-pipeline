@@ -52,7 +52,10 @@ import {
 } from "../../plugins/pipeline-core/scripts/publication-close-journal.mjs";
 import {
   planFeaturePackageBootstrap,
+  planFeaturePackageReconcile,
   planFeaturePackageTransition,
+  reconcileNoDriftOk,
+  RESULT_RECONCILIATION_FENCE,
   validateFeaturePackage,
 } from "../../plugins/pipeline-core/lib/feature-package-topology.mjs";
 import { sha256CanonicalJson } from "../../plugins/pipeline-core/lib/plan-spec-state-v2.mjs";
@@ -3859,9 +3862,238 @@ function runAuthorityRevisionTests() {
 
 }
 
+/** A FULL package (all five classes), state "implementing" -- required because reconcile's
+ * fixtures need artifacts from every class the criterion names (PRD/Spec/acceptance/
+ * Result), and "implementing" sits in ACTIVE_STATES with candidate: null permitted. */
+function seedReconcilePackage(prefix, { id = "rec-pkg", state = "implementing" } = {}) {
+  const dir = freshDir(prefix);
+  mkdirSync(join(dir, "specs", id), { recursive: true });
+  const files = {};
+  for (const [key, name, content] of [
+    ["prd", `prd_${id}.md`, `# ${id} PRD\n`],
+    ["spec", "spec.md", `# ${id} Spec\n`],
+    ["acceptance", "acceptance.md", `# ${id} Acceptance\n`],
+    ["result", "Result.md", `# ${id} Result\n`],
+    ["evidence", "evidence.txt", `evidence for ${id}\n`],
+  ]) {
+    const rel = `specs/${id}/${name}`;
+    writeFileSync(join(dir, rel), content);
+    files[key] = { rel, sha256: sha256Hex(content), content };
+  }
+  const value = {
+    schema: "pipeline.feature-package.v1",
+    feature: { id, rigor: 1 },
+    state,
+    artifacts: [
+      { class: "prd", path: files.prd.rel, sha256: files.prd.sha256, authority: true, mutability: "mutable", retention: "active" },
+      { class: "spec", path: files.spec.rel, sha256: files.spec.sha256, authority: true, mutability: "immutable", retention: "active" },
+      { class: "acceptance", path: files.acceptance.rel, sha256: files.acceptance.sha256, authority: false, mutability: "immutable", retention: "active" },
+      { class: "result", path: files.result.rel, sha256: files.result.sha256, authority: false, mutability: "mutable", retention: "active" },
+      { class: "candidate-evidence", path: files.evidence.rel, sha256: files.evidence.sha256, authority: false, mutability: "immutable", retention: "active" },
+    ],
+    candidate: null,
+    supersedes: null,
+  };
+  const manifestRel = `specs/${id}/lifecycle.json`;
+  writeFileSync(join(dir, manifestRel), `${JSON.stringify(value, null, 2)}\n`);
+  const fakeGitCommon = join(dir, ".fake-git-common");
+  mkdirSync(fakeGitCommon, { recursive: true });
+  const deps = {
+    gitCommonDir: () => ({ ok: true, path: fakeGitCommon }),
+    ownerNonce: () => `nonce-${id}`,
+    gitCandidate: () => ({ ok: true, commit: "a".repeat(40), tree: "b".repeat(40) }),
+    featurePackageReconcileApproval: (approval) => ({ ok: true, value: approval }),
+  };
+  return { dir, id, manifestRel, files, deps, value };
+}
+function reconcilePlanDigest(fx, resultAuthority = null) {
+  const plan = planFeaturePackageReconcile(fx.dir, fx.manifestRel, resultAuthority);
+  return { plan, digest: sha256CanonicalJson(plan) };
+}
+function reconcileApplyCmd(dir, extraArgs, deps) {
+  return captureBoth(() => run(["feature-package-reconcile", "--root", dir, ...extraArgs], deps));
+}
+
+function runFeaturePackageReconcileTests() {
+
+// ---- DoD 1: planFeaturePackageReconcile recomputes stale digests from disk and returns
+// preimage, postimage, and per-artifact old/new digest pairs, in the existing plan shape ----
+{
+  const fx = seedReconcilePackage("rg-plan-basic");
+  const newPrd = "# rec-pkg PRD (grown)\n";
+  writeFileSync(join(fx.dir, fx.files.prd.rel), newPrd);
+  const newSha = sha256Hex(newPrd);
+  const { plan } = reconcilePlanDigest(fx);
+  ok("RGa plan is an actionable reconcile-preview carrying the shared plan schema", plan.status === "reconcile-preview"
+    && plan.schema === "pipeline.feature-package-transition-plan.v1" && plan.manifest === fx.manifestRel, JSON.stringify(plan));
+  ok("RGa the plan reports exactly one change: the prd's old->new digest pair", plan.changes.length === 1
+    && plan.changes[0].class === "prd" && plan.changes[0].from === fx.files.prd.sha256 && plan.changes[0].to === newSha, JSON.stringify(plan.changes));
+  ok("RGa preimage/postimage keep state/candidate/supersedes/artifact-set&order identical except the one digest",
+    plan.preimage.state === fx.value.state && plan.postimage.state === fx.value.state
+    && plan.postimage.artifacts.length === plan.preimage.artifacts.length
+    && plan.postimage.artifacts[0].sha256 === newSha && plan.preimage.artifacts[0].sha256 === fx.files.prd.sha256
+    && plan.postimage.artifacts[1].sha256 === fx.files.spec.sha256, JSON.stringify(plan));
+}
+{
+  const fx = seedReconcilePackage("rg-plan-noop");
+  const { plan } = reconcilePlanDigest(fx);
+  ok("RGa2 an already-fresh package (no stale digest) reconciles to noop", plan.status === "noop", JSON.stringify(plan));
+}
+
+// ---- DoD 2: the no-drift invariant is enforced on the PLAN OBJECT, not on intent -- a
+// second field changing (never just a digest) is refused ----
+{
+  const fx = seedReconcilePackage("rg-nodrift");
+  const preimage = fx.value;
+  const digestOnlyPostimage = { ...preimage, artifacts: preimage.artifacts.map((a, i) => (i === 0 ? { ...a, sha256: "1".repeat(64) } : a)) };
+  ok("RGb a digest-only postimage passes the no-drift invariant", reconcileNoDriftOk(preimage, digestOnlyPostimage), "expected true");
+  const stateDrifted = { ...digestOnlyPostimage, state: "approved" };
+  ok("RGb2 a postimage that ALSO changes a second field (state) is refused by the invariant", !reconcileNoDriftOk(preimage, stateDrifted), "expected false");
+  const candidateDrifted = { ...digestOnlyPostimage, candidate: { commit: "c".repeat(40), tree: "d".repeat(40) } };
+  ok("RGb3 a postimage that changes the candidate binding is refused by the invariant", !reconcileNoDriftOk(preimage, candidateDrifted), "expected false");
+  const reorderedArtifacts = { ...digestOnlyPostimage, artifacts: [...digestOnlyPostimage.artifacts].reverse() };
+  ok("RGb4 a postimage that reorders the artifact set is refused by the invariant", !reconcileNoDriftOk(preimage, reorderedArtifacts), "expected false");
+}
+
+// ---- DoD 3: feature-package-reconcile apply consumes the plan under --plan-sha256,
+// recomputes the preview fresh, and refuses on drift, exactly as the existing kinds do ----
+{
+  // RGc -- the successful case, including DoD 7's readback.
+  const fx = seedReconcilePackage("rg-apply-ok");
+  const newPrd = "# rec-pkg PRD (grown)\n";
+  writeFileSync(join(fx.dir, fx.files.prd.rel), newPrd);
+  const { plan, digest } = reconcilePlanDigest(fx);
+  ok("RGc fixture reconcile preview is actionable (sanity)", plan.status === "reconcile-preview", JSON.stringify(plan));
+  const applied = reconcileApplyCmd(fx.dir, ["--manifest", fx.manifestRel, "--plan-sha256", digest], fx.deps);
+  const receipt = JSON.parse(applied.out || "{}");
+  ok("RGc reconcile apply succeeds and returns the pipeline.feature-package-reconcile.v1 receipt", applied.value === 0
+    && receipt.schema === "pipeline.feature-package-reconcile.v1" && receipt.status === "applied" && receipt.kind === "reconcile"
+    && receipt.planSha256 === digest, applied.out || applied.err);
+  const persisted = JSON.parse(readFileSync(join(fx.dir, fx.manifestRel), "utf8"));
+  ok("RGc persisted manifest has ONLY the prd digest changed; state/candidate/supersedes/other artifacts untouched", persisted.state === fx.value.state
+    && persisted.artifacts.length === 5 && persisted.artifacts[0].sha256 === sha256Hex(newPrd)
+    && persisted.artifacts[1].sha256 === fx.files.spec.sha256 && persisted.candidate === null && persisted.supersedes === null, JSON.stringify(persisted));
+  const revalidated = validateFeaturePackage(fx.dir, fx.manifestRel);
+  ok("RGc DoD 7: the persisted manifest is re-read and re-validates ok through the accepted validator before the journal retires", revalidated.ok, revalidated.findings.join("; "));
+}
+{
+  // RGd -- a drifted artifact between plan and apply is refused fail-closed (TOCTOU close).
+  const fx = seedReconcilePackage("rg-apply-drift");
+  const newPrd = "# rec-pkg PRD (grown)\n";
+  writeFileSync(join(fx.dir, fx.files.prd.rel), newPrd);
+  const { digest } = reconcilePlanDigest(fx);
+  writeFileSync(join(fx.dir, fx.files.spec.rel), "# drifted spec after the preview was taken\n");
+  const applied = reconcileApplyCmd(fx.dir, ["--manifest", fx.manifestRel, "--plan-sha256", digest], fx.deps);
+  ok("RGd a drifted artifact since the preview is refused (stale --plan-sha256), zero mutation", applied.value === 2
+    && /does not match the freshly recomputed reconcile preview digest/.test(applied.err), applied.err);
+  const untouched = JSON.parse(readFileSync(join(fx.dir, fx.manifestRel), "utf8"));
+  ok("RGd the manifest is untouched after the refusal", untouched.artifacts[0].sha256 === fx.files.prd.sha256, JSON.stringify(untouched));
+}
+
+// ---- DoD 4: apply is PO-bound -- fails closed and writes nothing without a valid bound
+// decision (proof of zero mutation via before/after manifest bytes) ----
+{
+  const fx = seedReconcilePackage("rg-po-bound");
+  const newPrd = "# rec-pkg PRD (grown)\n";
+  writeFileSync(join(fx.dir, fx.files.prd.rel), newPrd);
+  const { digest } = reconcilePlanDigest(fx);
+  const beforeManifest = readFileSync(join(fx.dir, fx.manifestRel));
+  const noApprovalDeps = { ...fx.deps, featurePackageReconcileApproval: undefined };
+  const refusedNoFn = reconcileApplyCmd(fx.dir, ["--manifest", fx.manifestRel, "--plan-sha256", digest], noApprovalDeps);
+  ok("RGe apply with no injected approval function fails closed (FTP-RECONCILE-APPROVAL-UNAVAILABLE)", refusedNoFn.value === 2
+    && /FTP-RECONCILE-APPROVAL-UNAVAILABLE/.test(refusedNoFn.err), refusedNoFn.err);
+  const rejectingDeps = { ...fx.deps, featurePackageReconcileApproval: () => ({ ok: false }) };
+  const refusedRejected = reconcileApplyCmd(fx.dir, ["--manifest", fx.manifestRel, "--plan-sha256", digest], rejectingDeps);
+  ok("RGe apply with a rejected approval fails closed (FTP-RECONCILE-APPROVAL-REJECTED)", refusedRejected.value === 2
+    && /FTP-RECONCILE-APPROVAL-REJECTED/.test(refusedRejected.err), refusedRejected.err);
+  ok("RGe zero mutation: the manifest bytes are byte-identical before and after both refusals", readFileSync(join(fx.dir, fx.manifestRel)).equals(beforeManifest), "manifest mutated despite a refused/absent approval");
+}
+
+// ---- DoD 5: manual digest replacement is refused -- it cannot stand in for the transaction ----
+{
+  const fx = seedReconcilePackage("rg-manual-replace");
+  const newPrd = "# rec-pkg PRD (grown)\n";
+  writeFileSync(join(fx.dir, fx.files.prd.rel), newPrd);
+  const { digest } = reconcilePlanDigest(fx);
+  const tampered = JSON.parse(readFileSync(join(fx.dir, fx.manifestRel), "utf8"));
+  tampered.artifacts[0] = { ...tampered.artifacts[0], sha256: sha256Hex(newPrd) };
+  writeFileSync(join(fx.dir, fx.manifestRel), `${JSON.stringify(tampered, null, 2)}\n`);
+  const applied = reconcileApplyCmd(fx.dir, ["--manifest", fx.manifestRel, "--plan-sha256", digest], fx.deps);
+  ok("RGf a manual hand-edit of the manifest's digest cannot stand in for the reconcile transaction", applied.value === 2
+    && /does not match the freshly recomputed reconcile preview digest/.test(applied.err), applied.err);
+  const stillTampered = JSON.parse(readFileSync(join(fx.dir, fx.manifestRel), "utf8"));
+  ok("RGf the hand-edited manifest was not further mutated by the refused apply", stillTampered.artifacts[0].sha256 === sha256Hex(newPrd), JSON.stringify(stillTampered));
+}
+
+// ---- DoD 6: the Result fence, each arm with its own typed code and its own case ----
+{
+  // RGg1 -- unbound: no Continuity State binding at all.
+  const fx = seedReconcilePackage("rg-result-unbound");
+  const newResult = `${fx.files.result.content}${RESULT_RECONCILIATION_FENCE}more content\n`;
+  writeFileSync(join(fx.dir, fx.files.result.rel), newResult);
+  const { plan } = reconcilePlanDigest(fx, null);
+  ok("RGg1 a Result reconcile with no Continuity State binding is refused (reconcile-result-unbound)", plan.status === "rejected"
+    && plan.reason === "reconcile-result-unbound", JSON.stringify(plan));
+}
+{
+  // RGg2 -- metadata-only: bound, but the canonical fence marker is entirely absent.
+  const fx = seedReconcilePackage("rg-result-metadata-only");
+  const newResult = `${fx.files.result.content}just appended text with no fence marker\n`;
+  writeFileSync(join(fx.dir, fx.files.result.rel), newResult);
+  const resultAuthority = { path: fx.files.result.rel, sha256: sha256Hex(newResult) };
+  const { plan } = reconcilePlanDigest(fx, resultAuthority);
+  ok("RGg2 a Result digest refresh with no canonical fence marker is refused BY NAME (reconcile-result-metadata-only)", plan.status === "rejected"
+    && plan.reason === "reconcile-result-metadata-only", JSON.stringify(plan));
+}
+{
+  // RGg3 -- fence present, but the bytes preceding it do not hash to the stale digest.
+  const fx = seedReconcilePackage("rg-result-fence-mismatch");
+  const newResult = `some other prefix that does not hash to the stale digest${RESULT_RECONCILIATION_FENCE}more content\n`;
+  writeFileSync(join(fx.dir, fx.files.result.rel), newResult);
+  const resultAuthority = { path: fx.files.result.rel, sha256: sha256Hex(newResult) };
+  const { plan } = reconcilePlanDigest(fx, resultAuthority);
+  ok("RGg3 a Result whose preserved prefix does not hash to the stale digest is refused (reconcile-result-fence-mismatch), distinct from RGg2's code", plan.status === "rejected"
+    && plan.reason === "reconcile-result-fence-mismatch" && plan.reason !== "reconcile-result-metadata-only", JSON.stringify(plan));
+}
+{
+  // RGg4 -- admitted: bound, fence present, and the preserved prefix DOES hash to the stale digest.
+  const fx = seedReconcilePackage("rg-result-fence-ok");
+  const newResult = `${fx.files.result.content}${RESULT_RECONCILIATION_FENCE}the Result legitimately grew\n`;
+  writeFileSync(join(fx.dir, fx.files.result.rel), newResult);
+  const newSha = sha256Hex(newResult);
+  const resultAuthority = { path: fx.files.result.rel, sha256: newSha };
+  const { plan } = reconcilePlanDigest(fx, resultAuthority);
+  ok("RGg4 a Result whose fenced prefix DOES hash to the stale digest and IS Continuity-bound is admitted", plan.status === "reconcile-preview"
+    && plan.changes.some((c) => c.class === "result" && c.to === newSha), JSON.stringify(plan));
+}
+
+// ---- Bonus: reconcile shares the SAME recovery journal machinery feature-package-apply
+// already uses -- an unmodified feature-package-recover diagnoses a retained reconcile
+// journal exactly like the other two kinds. ----
+{
+  const fx = seedReconcilePackage("rg-crash-after-journal");
+  const newPrd = "# rec-pkg PRD (grown)\n";
+  writeFileSync(join(fx.dir, fx.files.prd.rel), newPrd);
+  const { digest } = reconcilePlanDigest(fx);
+  const crashed = reconcileApplyCmd(fx.dir, ["--manifest", fx.manifestRel, "--plan-sha256", digest],
+    { ...fx.deps, afterFeaturePackageReconcileJournal: () => false });
+  ok("RGh interrupted after journal publication refuses, ending in 'recovery journal retained.'", crashed.value === 2
+    && /interrupted after journal preparation; recovery journal retained\.$/.test(crashed.err.trim()), crashed.err);
+  const stillPreimage = JSON.parse(readFileSync(join(fx.dir, fx.manifestRel), "utf8"));
+  ok("RGh the manifest bytes are untouched (the journal precedes the write)", stillPreimage.artifacts[0].sha256 === fx.files.prd.sha256, JSON.stringify(stillPreimage));
+  const recovered = recoverCmd(fx.dir, fx.deps);
+  const report = JSON.parse(recovered.out || "{}");
+  ok("RGh the unmodified feature-package-recover diagnoses the retained reconcile journal as not-yet-applied", recovered.value === 2
+    && report.schema === "pipeline.feature-package-recover.v1" && report.status === "retained"
+    && report.diagnosis === "not-yet-applied" && report.transaction.kind === "reconcile", recovered.out);
+}
+
+}
+
 runFeaturePackageReadTests();
 runFeaturePackageWriteTests();
 runAuthorityRevisionTests();
+runFeaturePackageReconcileTests();
 
 // ---- Cleanup ------------------------------------------------------------------------------
 for (const dir of ALL_DIRS) {
