@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.shipped-guidance-sends-agents-to-a-directory-a-gate-refuses
 type: defect
 owner: pipeline
-status: resolved
+status: in_progress
 created: 2026-08-08
 due: 2026-08-15
 source: "PO, 2026-08-08, live instance observed against the first 0.5.4 local candidate: Write(scratch/resume-card.json) refused in the draft phase. Verified in code by the Elephant before filing."

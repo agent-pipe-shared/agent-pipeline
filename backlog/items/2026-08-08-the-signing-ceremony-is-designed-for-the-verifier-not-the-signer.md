@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.signing-ceremony-designed-for-the-verifier-not-the-signer
-type: improvement
+type: defect
 owner: pipeline
 status: open
 created: 2026-08-08

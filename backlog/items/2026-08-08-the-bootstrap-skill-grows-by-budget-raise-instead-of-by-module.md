@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.bootstrap-skill-grows-by-budget-raise-instead-of-by-module
-type: improvement
+type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-08-08

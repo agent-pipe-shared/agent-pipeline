@@ -1,9 +1,9 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.contract-suite-borrows-its-fixture-by-importing-a-109-test-file
-type: improvement
+type: workflow-improvement
 owner: pipeline
-status: resolved
+status: in_progress
 created: 2026-08-08
 due: 2026-08-22
 source: "Elephant, 2026-08-08, GF-057. Noted while verifying the C1/C3 contract suite; recorded rather than fixed so the block's remaining consumer blockers keep the budget."
