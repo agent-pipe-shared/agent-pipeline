@@ -751,11 +751,51 @@ export function isMachinePlaneWritePath(filePath, dependencies = {}) {
   return isPathWithinRealpathedRoot(filePath, dirname(dirname(target)), dependencies);
 }
 
-function isRestartResumeHintInputWrite(input, root) {
-  if (!WRITE_TOOLS.includes(String(input?.tool_name ?? ""))) return false;
-  const filePath = writeTargetPath(input?.tool_input, String(input?.tool_name ?? ""));
-  return filePath !== ""
-    && resolve(root, filePath) === join(root, RESTART_RESUME_HINT_INPUT_PATH);
+/**
+ * GF-078 bug 1. `writeTargetPath()` (lib/tool-write-target.mjs, out of this dispatch's
+ * scope) only ever reads the Claude Code `file_path`/`notebook_path` keys -- Codex's own
+ * write-capable tool is `apply_patch`, whose `tool_input.command` carries the ENTIRE patch
+ * envelope text (`*** Begin Patch\n*** Add File: <path>\n...\n*** End Patch`), never a
+ * `file_path` field. Simply adding `"apply_patch"` to `WRITE_TOOLS` would therefore not
+ * admit this write -- it would make `writeTargetPath()` see an always-empty target for
+ * EVERY apply_patch call (both of its fallback reads return ""), turning this into a
+ * blanket refusal of every apply_patch write during restart-required rather than the one
+ * narrow admission this function exists to grant. `WRITE_TOOLS` itself, and every other
+ * caller of `writeTargetPath()`, are deliberately left untouched; only this one call site
+ * gains a second, apply_patch-shaped extraction, narrow enough to name only the two patch
+ * headers that create or fully replace a file's content ("Add File" / "Update File"),
+ * mirroring guard-apply-patch.mjs's own header regex. "Delete File" and a bare "Move to"
+ * destination are deliberately not matched: neither writes the resume-hint JSON body this
+ * admission exists for.
+ *
+ * Exported for the same reason `isRestartResumeHintCapture()` already is: direct,
+ * regression-testable coverage of this function's own decision, independent of whatever a
+ * given caller's own tool-name gate happens to admit further up the call chain.
+ */
+function applyPatchTargetsResumeHintInput(command, root) {
+  if (typeof command !== "string") return false;
+  const lines = command.replace(/\r\n/gu, "\n").split("\n");
+  for (const line of lines) {
+    const header = line.match(/^\*\*\* (?:Add File|Update File): (.*)$/u);
+    if (!header) continue;
+    const filePath = header[1];
+    if (typeof filePath === "string" && filePath !== ""
+      && resolve(root, filePath) === join(root, RESTART_RESUME_HINT_INPUT_PATH)) return true;
+  }
+  return false;
+}
+
+export function isRestartResumeHintInputWrite(input, root) {
+  const toolName = String(input?.tool_name ?? "");
+  if (WRITE_TOOLS.includes(toolName)) {
+    const filePath = writeTargetPath(input?.tool_input, toolName);
+    return filePath !== ""
+      && resolve(root, filePath) === join(root, RESTART_RESUME_HINT_INPUT_PATH);
+  }
+  if (toolName === "apply_patch") {
+    return applyPatchTargetsResumeHintInput(input?.tool_input?.command, root);
+  }
+  return false;
 }
 
 function simpleWords(command, root, options = {}) {

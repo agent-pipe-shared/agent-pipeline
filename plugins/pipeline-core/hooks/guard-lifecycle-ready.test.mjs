@@ -33,6 +33,7 @@ import {
   isNarrowRepositoryRecoveryCommand,
   isProjectWritePath,
   isReadOnlyDiagnosticCommand,
+  isRestartResumeHintInputWrite,
   isSanctionedLifecycleCommand,
   machinePlaneFilePath,
   main,
@@ -1709,6 +1710,44 @@ test("restart-required admits only the consumed bounded resume-hint input and ca
         requireProjectOnboardingReadyFn() { deny(status); },
       }).exitCode, 2, `${status}/${input.tool_name}`);
     }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// GF-078 bug 1: Codex's own write-capable tool is `apply_patch`, whose tool_input carries
+// the whole patch envelope under `command`, never a Claude-shaped `file_path`. Before the
+// fix, isRestartResumeHintInputWrite() gated on WRITE_TOOLS (Edit/Write/NotebookEdit only)
+// and returned false unconditionally for this tool name -- this is a direct, exported unit
+// regression on that function's own decision, independent of whichever caller's own
+// tool-name allowlist a given wiring happens to apply further up the chain.
+test("isRestartResumeHintInputWrite recognizes an apply_patch write to the resume-hint input file", () => {
+  const path = root();
+  try {
+    const addPatch = "*** Begin Patch\n*** Add File: project/.resume-hint-input.json\n"
+      + "+{\"schema\":\"pipeline.resume-hint.v1\"}\n*** End Patch";
+    const updatePatch = "*** Begin Patch\n*** Update File: project/.resume-hint-input.json\n"
+      + "@@\n-{}\n+{\"schema\":\"pipeline.resume-hint.v1\"}\n*** End Patch";
+    for (const command of [addPatch, updatePatch]) {
+      assert.equal(
+        isRestartResumeHintInputWrite({ tool_name: "apply_patch", tool_input: { command } }, path),
+        true,
+        command,
+      );
+    }
+    for (const command of [
+      "*** Begin Patch\n*** Add File: project/other-file.json\n+{}\n*** End Patch",
+      "*** Begin Patch\n*** Delete File: project/.resume-hint-input.json\n*** End Patch",
+      "not a patch at all",
+    ]) {
+      assert.equal(
+        isRestartResumeHintInputWrite({ tool_name: "apply_patch", tool_input: { command } }, path),
+        false,
+        command,
+      );
+    }
+    // Unaffected: no other tool name gains a new admission, and a malformed tool_input
+    // still resolves to the same false a missing case already returned.
+    assert.equal(isRestartResumeHintInputWrite({ tool_name: "apply_patch", tool_input: {} }, path), false);
+    assert.equal(isRestartResumeHintInputWrite({ tool_name: "Bash", tool_input: { command: "printf x" } }, path), false);
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
