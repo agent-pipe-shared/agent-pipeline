@@ -82,6 +82,55 @@ export function resolveChangeControlProfile(candidates) {
 }
 
 /**
+ * C-AC-02's "SHALL NOT permit class selection solely to avoid approval" has no
+ * signal on one profile alone: changeClass/mandatory/standardTemplate/
+ * reviewPolicy are already internally consistent by construction --
+ * validateChangeControlProfile above enforces that -- so nothing about a
+ * single valid profile, read in isolation, can say whether its class was
+ * picked to fit the change or to dodge the approval a truer class would have
+ * required. What IS structurally visible is the SAME underlying change
+ * (identical candidate/artifact/environment/scopeSha256 tuple) being
+ * represented under more than one classification: `proposed` is the
+ * classification about to be used; `alternatives` are other classifications
+ * considered for the exact same change (an earlier draft, a peer's
+ * classification, a prior profile recorded for the same scope). This
+ * composes with resolveChangeControlProfile rather than reimplementing its
+ * tuple/ambiguity logic or inventing an unconfigured changeClass precedence
+ * (the same precedence resolveChangeControlProfile's own docstring above
+ * refuses to invent): resolving the fuller set (`proposed` plus every
+ * same-tuple alternative) and finding it would NOT have landed on `proposed`
+ * -- either because a same-tuple alternative is mandatory while `proposed`
+ * is not, or because more than one same-tuple classification is
+ * independently mandatory (resolveChangeControlProfile's own
+ * CC-RESOLVE-AMBIGUOUS) -- is the flag: the change has more than one face,
+ * and the one actually used is the one that avoids or narrows approval.
+ *
+ * Unlike resolveChangeControlProfile, `alternatives` need NOT already share
+ * `proposed`'s tuple: callers may pass a broader candidate pool (e.g. every
+ * profile considered in a review session, or recent journal-adjacent
+ * profiles) and this function filters to the ones that actually describe the
+ * same change before comparing -- picking the resolver's tuple invariant
+ * apart rather than inheriting its all-or-nothing CC-RESOLVE-SCOPE failure.
+ */
+export function detectChangeClassShopping(proposed, alternatives) {
+  const current = validateChangeControlProfile(proposed);
+  if (!Array.isArray(alternatives)) fail("CC-SHOPPING");
+  const validatedAlternatives = alternatives.map((profile) => validateChangeControlProfile(profile));
+  const sameTuple = validatedAlternatives.filter((profile) => profile.profileId !== current.profileId && same(profile.candidate, current.candidate) && same(profile.artifact, current.artifact) && profile.environment === current.environment && profile.scopeSha256 === current.scopeSha256);
+  const outcome = (flagged, reason) => Object.freeze({ schema: "pipeline.change-control-class-shopping.v1", flagged, reason, proposedChangeClass: current.changeClass, alternativeChangeClasses: Object.freeze(sameTuple.map((profile) => profile.changeClass)) });
+  if (sameTuple.length === 0) return outcome(false, "no-alternative-classification");
+  let resolution;
+  try {
+    resolution = resolveChangeControlProfile([current, ...sameTuple]);
+  } catch (error) {
+    if (error.code === "CC-RESOLVE-AMBIGUOUS") return outcome(true, "ambiguous-mandatory-alternatives");
+    throw error;
+  }
+  if (resolution.status === "effective" && resolution.profile.profileId !== current.profileId) return outcome(true, "lighter-than-resolved-classification");
+  return outcome(false, "no-lighter-selection-detected");
+}
+
+/**
  * Deployment journal and its projection.
  *
  * The local event is the record; the external update is a report about it. That

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import test from "node:test";
-import { appendChangeControlEntry, createChangeControlJournal, evaluateChangeControlGate, projectChangeControlState, resolveChangeControlProfile, validateChangeControlProfile } from "./change-control.mjs";
+import { appendChangeControlEntry, createChangeControlJournal, detectChangeClassShopping, evaluateChangeControlGate, projectChangeControlState, resolveChangeControlProfile, validateChangeControlProfile } from "./change-control.mjs";
 
 const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) }; const artifact = { path: "specs/release/result.md", sha256: "c".repeat(64) }; const window = { startsAtEpochMs: 10, endsAtEpochMs: 20 };
 function profile(overrides = {}) { return { schema: "pipeline.change-control-profile.v1", profileId: "production-change", policySha256: "d".repeat(64), changeClass: "normal", candidate, artifact, environment: "production", scopeSha256: "e".repeat(64), window, mandatory: true, standardTemplate: null, reviewPolicy: "mandatory", ...overrides }; }
@@ -308,4 +308,30 @@ test("C-AC-09 rejects malformed input and candidates that do not share the same 
   assert.throws(() => resolveChangeControlProfile("not-an-array"), (error) => error.code === "CC-RESOLVE");
   assert.throws(() => resolveChangeControlProfile([profile({ profileId: "malformed", note: "provider-fixture" })]), (error) => error.code === "CC-PROFILE");
   assert.throws(() => resolveChangeControlProfile([notRequiredProfile(), notRequiredProfile({ profileId: "production-not-required-2", environment: "staging" })]), (error) => error.code === "CC-RESOLVE-SCOPE");
+});
+
+test("C-AC-02 flags class shopping when a not-required classification is chosen over a mandatory alternative for the exact same change", () => {
+  const result = detectChangeClassShopping(notRequiredProfile(), [profile()]);
+  assert.deepEqual(result, { schema: "pipeline.change-control-class-shopping.v1", flagged: true, reason: "lighter-than-resolved-classification", proposedChangeClass: "not-required", alternativeChangeClasses: ["normal"] });
+  assert.equal(Object.isFrozen(result), true);
+});
+
+test("C-AC-02 flags class shopping when the same change carries more than one independently mandatory alternative classification", () => {
+  const result = detectChangeClassShopping(notRequiredProfile(), [profile(), emergencyProfile()]);
+  assert.equal(result.flagged, true);
+  assert.equal(result.reason, "ambiguous-mandatory-alternatives");
+});
+
+test("C-AC-02 does not flag a mandatory classification with no same-tuple alternative, nor one offered alongside a lighter alternative it did not choose", () => {
+  assert.deepEqual(detectChangeClassShopping(profile(), []), { schema: "pipeline.change-control-class-shopping.v1", flagged: false, reason: "no-alternative-classification", proposedChangeClass: "normal", alternativeChangeClasses: [] });
+  const withLighterAlternative = detectChangeClassShopping(profile(), [notRequiredProfile()]);
+  assert.equal(withLighterAlternative.flagged, false);
+  assert.equal(withLighterAlternative.reason, "no-lighter-selection-detected");
+});
+
+test("C-AC-02 ignores alternatives for a different tuple and rejects malformed input", () => {
+  assert.deepEqual(detectChangeClassShopping(notRequiredProfile(), [profile({ environment: "staging" })]), { schema: "pipeline.change-control-class-shopping.v1", flagged: false, reason: "no-alternative-classification", proposedChangeClass: "not-required", alternativeChangeClasses: [] });
+  assert.throws(() => detectChangeClassShopping(profile({ note: "provider-fixture" }), []), (error) => error.code === "CC-PROFILE");
+  assert.throws(() => detectChangeClassShopping(profile(), "not-an-array"), (error) => error.code === "CC-SHOPPING");
+  assert.throws(() => detectChangeClassShopping(profile(), [profile({ note: "provider-fixture" })]), (error) => error.code === "CC-PROFILE");
 });
