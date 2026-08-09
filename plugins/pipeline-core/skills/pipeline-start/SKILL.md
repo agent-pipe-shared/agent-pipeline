@@ -30,9 +30,7 @@ Print only after a ready result:
 
 `Agent Pipeline start: version {{MANIFEST_VERSION}} · plugin root {{ABSOLUTE_PLUGIN_ROOT}}`
 
-For local development also print:
-
-`Agent Pipeline source: local-development · registered local marketplace`
+For local development also print the source line → `references/freshness.md`.
 
 ## Normal bootstrap command sequence
 
@@ -47,14 +45,8 @@ returned digest-bound action and its readback without asking again for the next
 individual digest. `requiresConfirmation` describes the action's safety shape;
 it does not invent a second PO chat gate after this consent exists.
 
-After a required restart, an already seeded repository is evidence that this
-onboarding consent has been exercised; resume its ordinary local bootstrap
-without re-asking. Stop for a new human input only when no usable project goal
-or material design input exists, a configured plan/acceptance gate is reached,
-an action is external or irreversible, or a typed hard block has no supplied
-safe recovery. Never treat this consent as approval for unrelated adoption,
-remote operations, deployment, publication, destructive work, or a scope
-change.
+Restart bounds and what this consent does NOT grant →
+`references/onboarding-recovery.md`.
 
 1. **Step 0 / V4 onboarding:** `nextAction.kind: "advisory"` runs nothing --
    go to Step 2, surfaced. Otherwise execute the exact read-only
@@ -78,23 +70,21 @@ change.
    actions are primary; any human copy-only rendering must use a tested native
    Bash/zsh, PowerShell or cmd.exe renderer with explicit safe continuation,
    not a visually wrapped long command.
-4. **Confirmation:** after all checks, print the auditable confirmation line
-   with version, root, V3/runtime, profile, model/effort, role, calibration,
-   handover and Verify evidence. "Non-ready" excludes `plugin-refresh-required`
-   (soft-refresh; carried forward, not withheld). No confirmation on
-   non-ready, unavailable, stale, malformed or drifted state.
+4. **Confirmation:** after all checks print exactly this line, five concrete
+   fields, no placeholder (additions, role variants → typed references):
+
+   > Bootstrap check passed: ruleset {{VERSION_OR_SHA}} loaded · Project {{PROJECT}} · Calibration {{CALIBRATION_FILE}} · State {{HANDOVER_DATE}} · Role {{Elephant|Goldfish|Critic}}
+
+   Never print it without Steps 1–5. "Non-ready" excludes
+   `plugin-refresh-required` (soft-refresh; carried forward, not withheld). No
+   confirmation on non-ready, unavailable, stale, malformed or drifted state.
    The four required confirmation facts are: `runtime.status`, `profile/model`
    and `role`, `calibration/handover`, and `Verify availability`; each is
    digest-bound to the machine readback and printed before continuation.
 5. **Observation governance:** run
    `node "${PIPELINE_PLUGIN_ROOT}/scripts/observation-governance-bootstrap.mjs" --root "$PWD"`
-   before confirmation. `not-applicable` is the successful Consumer-project
-   result: do not look for, copy, or repair `harness/scripts/check-observation-governance.mjs` there.
-   Only a checkout that carries the Pipeline source manifest is `required`; it
-   runs `node harness/scripts/check-observation-governance.mjs`. A `failed`
-   source-checkout result is case **F6**: fail closed, perform read-only
-   diagnosis only, and correct the governed artifact through its reviewed
-   recovery path before restarting bootstrap.
+   before confirmation. `not-applicable` is the successful Consumer result; a
+   `failed` source checkout is case **F6** → `references/failure-cases.md`.
 
 6. **Restart hint for material session input:** before a first kickoff **and
    before proposing, displaying, or performing any restart, session cut or
@@ -130,6 +120,16 @@ change.
    when the PO explicitly selects `durable-stop` (the topic ends) or
    `runtime-transfer` (PC/CLI/runtime changes); its coordinator rejects any
    other start intent before it can write private lifecycle state.
+
+**Role prohibitions (Elephant, embedded — read no file for this):** EL-01 no
+production code (sole exception: the stage-0 fast path per `roles/elephant.md`
+— EL-01) · EL-02 delegate once, via the 6-field briefing, never step by step ·
+EL-03 judgment stays at its level · EL-04 no silent fundamental decision
+(register + ADR) · EL-16 delegate-first: EVERY implementation is a briefed
+Goldfish dispatch · EL-18 one repo, one Elephant · EL-19 PO gate: present the
+PRD readably, wait for "approved". Print verbatim under the Model/Effort line:
+
+> Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (Tier-0 per roles/elephant.md — EL-01; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'
 
 ### Kickoff intake, durable design package, and document quality
 

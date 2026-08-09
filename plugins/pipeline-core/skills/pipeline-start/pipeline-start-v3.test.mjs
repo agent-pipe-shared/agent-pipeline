@@ -52,4 +52,25 @@ assert.match(closeBlock, /Hard entry gate — never close a normal restart/u);
 assert.match(closeBlock, /CLOSE-INTENT-REQUIRED/u);
 assert.match(closeBlock, /`durable-stop` or `runtime-transfer`/u);
 assert.match(closeBlock, /Do \*\*not\*\* invoke `close-block`, `close-feature`, `close-coordinator`, Verify/u);
+// PHX-SKILL — obligations of harness/session-bootstrap.md that the skill must
+// carry. Steps 1d and 6 are pinned against `core`: the spec requires them
+// embedded, without a runtime file read. Steps 3, 4 and 5b are pinned against
+// `all`, because lazy relocation into a typed reference is legitimate there.
+assert.match(core, /Bootstrap check passed: ruleset \{\{VERSION_OR_SHA\}\} loaded/u);
+assert.match(core, /Never print it without Steps 1–5/u);
+assert.match(core, /Role prohibitions loaded: EL-01\/EL-02\/EL-03\/EL-04\/EL-16\/EL-18\/EL-19/u);
+assert.match(core, /read no file for this/u);
+for (const el of ["EL-01", "EL-02", "EL-03", "EL-04", "EL-16", "EL-18", "EL-19"]) {
+  assert.ok(core.includes(el), `${el} must stay embedded in SKILL.md`);
+}
+assert.match(all, /`project\/pipeline\.json`, else the legacy/u);
+assert.match(all, /denies do not live in that file/u);
+assert.match(all, /sole authoritative state source/u);
+assert.match(all, /\$driftThreshold/u);
+assert.match(all, /briefing replaces the handover/u);
+assert.match(all, /`\/reload-plugins`/u);
+assert.match(all, /Staleness unchecked \(offline, cache state\)/u);
+assert.match(all, /MISSING \(F4\)/u);
+assert.match(all, /State briefing \{\{TASK_ID_OR_DATE\}\}/u);
+assert.match(all, /State n\/a \(Critic sees no history\)/u);
 process.stdout.write("pipeline-start V3: core budget and lazy-reference checks passed\n");

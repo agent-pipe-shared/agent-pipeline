@@ -8,6 +8,15 @@ than withholding it. This covers both the pre-existing loaded/installed
 version-mismatch case and the origin/content self-application attestation
 (design: bootstrap-origin-allowlist-and-codex-wsl-freshness.md §A.5).
 
+After a required restart, an already seeded repository is evidence that the
+onboarding consent has been exercised; resume its ordinary local bootstrap
+without re-asking. Stop for a new human input only when no usable project goal
+or material design input exists, a configured plan/acceptance gate is reached,
+an action is external or irreversible, or a typed hard block has no supplied
+safe recovery. Never treat this consent as approval for unrelated adoption,
+remote operations, deployment, publication, destructive work, or a scope
+change.
+
 For inherited handoff run `codex-project-runtime-readback-host.mjs --root
 "$PWD"`; accept only `pipeline.codex-project-runtime-readback-status.v1`,
 status `produced`, then re-inspect V4 from the beginning. Never print tickets,
