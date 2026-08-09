@@ -42,8 +42,8 @@ reproduced here rather than referenced.
 
 ## The direct answer
 
-**Phoenix cannot claim complete.** 96 of 157 criteria carry a named assertion in a
-gate-registered suite; 61 do not. EPIC-AC-05 forbids a completion claim while any
+**Phoenix cannot claim complete.** 95 of 157 criteria carry a named assertion in a
+gate-registered suite; 62 do not. EPIC-AC-05 forbids a completion claim while any
 criterion remains unimplemented or unverified, and it currently bites. No issue is closeable on
 its own live acceptance bullets.
 
@@ -61,8 +61,8 @@ A bullet is therefore BLOCKED unless every criterion mapped to it is `implemente
 
 | verdict | count |
 |---|---|
-| implemented | 96 |
-| partial | 44 |
+| implemented | 95 |
+| partial | 45 |
 | designed-only | 1 |
 | not-started | 15 |
 | constraint | 1 |
@@ -166,7 +166,7 @@ clause that is not pinned or not built.
 | L-AC-07 | implemented | WP-L | governance-replay-core-tests: serial/parallel/retry/cancellation/recovery fixtures replay to identical bounded output on repeat, and a malicious duplicate-sequence fixture is rejected deterministically (PHX-WP-L, break-proofed twice) |
 | L-AC-08 | partial | J | docs/governance-replay.md "Traceability" (PHX-WP-DOC-3): 8 of 9 lifecycle-governance-events.mjs kinds traced to a stated user/audit need; the `cancellation` kind is honestly flagged unclear -- no structural distinction from `status: "cancelled"` exists in the code, so no confident justification could be constructed |
 
-### P — Policy packs and signed audit bundles (#9) (8/13 implemented)
+### P — Policy packs and signed audit bundles (#9) (7/13 implemented)
 
 | ID | verdict | src | evidence / named gap |
 |---|---|---|---|
@@ -177,7 +177,7 @@ clause that is not pinned or not built.
 | P-AC-05 | implemented | C | organization-policy-tests: credential, endpoint, coordinate, actor-mapping and signing-key fields refused at every level |
 | P-AC-06 | partial | WP-P | audit-bundle-core-tests: missing, misplaced, illegally-mutable, stale and truncated each pinned (PHX-WP-P, break-proofed). legacy and orphaned remain unpinned: the legacy classification exists (feature-package-topology.mjs:78) but no rejection path consults it, and no code checks a package file is referenced by an artifact |
 | P-AC-07 | implemented | C | audit-bundle-tests: signs and verifies only an unchanged manifest, without identity or authority claims |
-| P-AC-08 | implemented | ELEPHANT | harness/scripts/pipeline-state.test.mjs (PHX-WP-GATE built it, Elephant registered it under the signed TP-3+TP-5 window): all three plan kinds (bootstrap, transition, reconcile) and the Result-reconciliation fence are built and now gate-registered, 444/444 including the 26 reconcile cases, re-run independently |
+| P-AC-08 | partial | ELEPHANT | CORRECTED 2026-08-09 (independent Critic FAIL, F3): the reconcile transaction is built and gate-registered (444/444, harness/scripts/pipeline-state.test.mjs), but no shipped entry point ever supplies deps.featurePackageReconcileApproval -- pipeline-state.mjs:5644 has no default (`??`) fallback, unlike its sibling deps, and both CLI entry points call run() with none. Only the test file ever provides the resolver. The command as shipped cannot be invoked by any real operator or agent -- structurally identical to the "interface built, no caller" gap this session found and disclosed for A-AC-04, just not caught here until independent review |
 | P-AC-09 | not-started | C | NO CARRIER: no export-backfill preview or explicit consent path exists |
 | P-AC-10 | implemented | WP-P | organization-policy-core-tests + audit-bundle-core-tests: pack-side compliance-claim rejection and signed-bundle no-identity-claim shape both pinned (PHX-WP-P, break-proofed). Log/viewer halves were out of the dispatched carrier scope and remain unevaluated either way |
 | P-AC-11 | partial | WP-P | organization-policy-core-tests: mode (closed reference-only/projection/controlled-publication set) and approval (union, no downgrade) pinned (PHX-WP-P, break-proofed). Target class/binding, owned fields/sections, lifecycle event, preview, retention and revision readback remain unpinned: documentClasses is closed to exactly class/mode/approvalRequired, no field exists for the rest |
@@ -288,8 +288,8 @@ clause that is not pinned or not built.
 | EPIC-AC-01 | partial | C | the issue-to-criterion mapping exists; no independent closure status exists for any of the eight issues |
 | EPIC-AC-02 | not-started | J | NO CARRIER: planParallelSprintIntegration has no concept of "unpublished" and is called only from its own test file |
 | EPIC-AC-03 | partial | C | an outstanding deviation is recorded (the bound Spec section 7 inventory omits six implemented modules) and is not yet repaired through the sanctioned route |
-| EPIC-AC-04 | partial | C | Full Verify and blocking Security pass on the pushed candidate; privacy review, an independent high-risk Critic on the integrated candidate, and explicit PO acceptance are absent |
-| EPIC-AC-05 | constraint | C | a prohibition, and it currently bites: 79 criteria are not implemented |
+| EPIC-AC-04 | partial | C | Full Verify and blocking Security pass only on the last PUSHED candidate (`3387065`), not the integrated one measured here (see the gates table below). An independent high-risk Critic on the integrated candidate is no longer absent -- it ran 2026-08-09 and returned FAIL (5 major, 2 minor); privacy review and explicit PO acceptance remain absent |
+| EPIC-AC-05 | constraint | C | a prohibition, and it currently bites -- see the summary count above for the exact figure; deliberately not hardcoded here after an independent Critic FAIL found this line stale against the generated total more than once (F4, 2026-08-09) |
 | EPIC-AC-06 | implemented | C | the PRD header records the PO approval binding the first implementation dispatch |
 
 ## Per issue
@@ -450,7 +450,7 @@ Issues closeable on their own live acceptance bullets: **0 of 8**.
 
 53 of 157 criteria are Phoenix's own stricter contract rather than a live issue obligation.
 They block no issue, but EPIC-AC-05 still forbids an epic completion claim while any of them is not `implemented`.
-29 of those 53 are currently not `implemented` and are listed below; the rest are omitted because they are done.
+30 of those 53 are currently not `implemented` and are listed below; the rest are omitted because they are done.
 
 | criterion | verdict |
 |---|---|
@@ -466,6 +466,7 @@ They block no issue, but EPIC-AC-05 still forbids an epic completion claim while
 | EPIC-AC-05 | constraint |
 | L-AC-01 | partial |
 | L-AC-02 | partial |
+| P-AC-08 | partial |
 | P-AC-09 | not-started |
 | PX0-AC-01 | partial |
 | PX0-AC-03 | partial |
@@ -491,11 +492,11 @@ work is not mistaken for paperwork:
 
 | gate | state | evidence |
 |---|---|---|
-| Focused package checks | **partial** | per-package suites are green; P-AC-08 declares the feature-package writer the gating first slice, and it is now fully built (26/26 staged cases, independently re-run) but not yet registered in the gate-registered suite the criterion names by path -- one signed TP-3+TP-5 window away |
-| Full Verify | **passed** | `evidence/verify-latest.json` — exit 0, 368/368, exact binding on `3387065`, clean at start and finish |
-| Blocking Security | **passed** | `pipeline.security-verdict.v2` — `blocking: false`, `cap.sast` pass, `cap.secrets` pass |
+| Focused package checks | **partial** | per-package suites are green; the signed TP-3+TP-5 window was used and the reconcile suite is now gate-registered (444/444), but an independent Critic FAIL (2026-08-09, F3) found no shipped entry point ever supplies the required approval resolver -- the command is built and tested but structurally unreachable by any real caller |
+| Full Verify | **not verifiable for the integrated candidate** | `evidence/verify-latest.json` binds `3387065`, an ancestor of the whole reviewed range -- an independent Critic (2026-08-09, F5) found no full-gate Verify run is bound to the current candidate; per-suite reruns are not a substitute |
+| Blocking Security | **passed (as of `3387065`, not re-run against the integrated candidate)** | `pipeline.security-verdict.v2` — `blocking: false`, `cap.sast` pass, `cap.secrets` pass |
 | Privacy review | **absent** | no privacy-review artifact exists for the integrated candidate |
-| Independent high-risk Critic | **absent for the integrated candidate** | Critic rounds exist per work package; none reviews Phoenix as one integrated candidate |
+| Independent high-risk Critic | **FAIL, 2026-08-09** | one full-range Critic dispatch reviewed all 57 commits from the epic-wide measurement through this correction; verdict FAIL, 5 major + 2 minor findings; F1/F3/F4/F5 addressed in this same correction, F2/F6 filed as disclosed defects (see backlog) |
 | Exact branch push and readback | **passed** | `origin/sprint_phoenix = 3387065`, readback OID equality confirmed, approval bound to that exact commit |
 | Explicit PO acceptance | **absent** | the only recorded PO approval binds the first implementation dispatch (EPIC-AC-06), not completion |
 

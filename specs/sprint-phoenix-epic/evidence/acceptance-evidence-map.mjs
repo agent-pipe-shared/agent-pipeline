@@ -336,9 +336,23 @@ const DELTA = {
   // reusing every existing helper by name), and the window was closed.
   // 444/444 (418 pre-existing + 26 new), node --check clean, diff touches
   // exactly the one file. TP-3 needed no edit: pipeline-state-tests was
-  // already registered in verify.mjs. The criterion now names a
-  // gate-registered suite that actually carries its 26 cases.
-  'P-AC-08': ['implemented', 'ELEPHANT'],
+  // already registered in verify.mjs.
+  //
+  // CORRECTED 2026-08-09 after an independent Critic FAIL (F1/F2/F3) --
+  // this criterion was wrongly promoted to `implemented`. Reverted to
+  // `partial`: no shipped entry point (the CLI's own `run()`, called with
+  // no injected deps by both harness/scripts/pipeline-state.mjs and
+  // plugins/pipeline-core/scripts/pipeline-state.mjs's isDirectRun guard)
+  // ever supplies `deps.featurePackageReconcileApproval` -- only the test
+  // file does. The mechanism is real and the 26 cases are honest, but the
+  // command is structurally unreachable by any real operator or agent
+  // caller, which means the criterion's actual requirement (a working,
+  // usable PO-bound reconcile transaction) is not met, only its test
+  // double is. Separately, commit 78c6ef1 was authored directly by the
+  // Elephant rather than dispatched (Critic F2, EL-01/EL-16) -- a real
+  // lifecycle deviation, disclosed and filed as its own backlog item
+  // rather than quietly folded into this correction.
+  'P-AC-08': ['partial', 'ELEPHANT'],
 
   // --- evidence/phx-wp-h.txt (task PHX-WP-H, 2026-08-09, commit 2594552) ---
   // Independently re-run: 24/24 human-governance-ledger-tests pass. All
@@ -536,7 +550,7 @@ const POINTERS = {
   'P-AC-05': 'organization-policy-tests: credential, endpoint, coordinate, actor-mapping and signing-key fields refused at every level',
   'P-AC-06': 'audit-bundle-core-tests: missing, misplaced, illegally-mutable, stale and truncated each pinned (PHX-WP-P, break-proofed). legacy and orphaned remain unpinned: the legacy classification exists (feature-package-topology.mjs:78) but no rejection path consults it, and no code checks a package file is referenced by an artifact',
   'P-AC-07': 'audit-bundle-tests: signs and verifies only an unchanged manifest, without identity or authority claims',
-  'P-AC-08': 'harness/scripts/pipeline-state.test.mjs (PHX-WP-GATE built it, Elephant registered it under the signed TP-3+TP-5 window): all three plan kinds (bootstrap, transition, reconcile) and the Result-reconciliation fence are built and now gate-registered, 444/444 including the 26 reconcile cases, re-run independently',
+  'P-AC-08': 'CORRECTED 2026-08-09 (independent Critic FAIL, F3): the reconcile transaction is built and gate-registered (444/444, harness/scripts/pipeline-state.test.mjs), but no shipped entry point ever supplies deps.featurePackageReconcileApproval -- pipeline-state.mjs:5644 has no default (`??`) fallback, unlike its sibling deps, and both CLI entry points call run() with none. Only the test file ever provides the resolver. The command as shipped cannot be invoked by any real operator or agent -- structurally identical to the "interface built, no caller" gap this session found and disclosed for A-AC-04, just not caught here until independent review',
   'P-AC-09': 'NO CARRIER: no export-backfill preview or explicit consent path exists',
   'P-AC-10': 'organization-policy-core-tests + audit-bundle-core-tests: pack-side compliance-claim rejection and signed-bundle no-identity-claim shape both pinned (PHX-WP-P, break-proofed). Log/viewer halves were out of the dispatched carrier scope and remain unevaluated either way',
   'P-AC-11': 'organization-policy-core-tests: mode (closed reference-only/projection/controlled-publication set) and approval (union, no downgrade) pinned (PHX-WP-P, break-proofed). Target class/binding, owned fields/sections, lifecycle event, preview, retention and revision readback remain unpinned: documentClasses is closed to exactly class/mode/approvalRequired, no field exists for the rest',
@@ -623,8 +637,8 @@ const POINTERS = {
   'EPIC-AC-01': 'the issue-to-criterion mapping exists; no independent closure status exists for any of the eight issues',
   'EPIC-AC-02': 'NO CARRIER: planParallelSprintIntegration has no concept of "unpublished" and is called only from its own test file',
   'EPIC-AC-03': 'an outstanding deviation is recorded (the bound Spec section 7 inventory omits six implemented modules) and is not yet repaired through the sanctioned route',
-  'EPIC-AC-04': 'Full Verify and blocking Security pass on the pushed candidate; privacy review, an independent high-risk Critic on the integrated candidate, and explicit PO acceptance are absent',
-  'EPIC-AC-05': 'a prohibition, and it currently bites: 79 criteria are not implemented',
+  'EPIC-AC-04': 'Full Verify and blocking Security pass only on the last PUSHED candidate (`3387065`), not the integrated one measured here (see the gates table below). An independent high-risk Critic on the integrated candidate is no longer absent -- it ran 2026-08-09 and returned FAIL (5 major, 2 minor); privacy review and explicit PO acceptance remain absent',
+  'EPIC-AC-05': 'a prohibition, and it currently bites -- see the summary count above for the exact figure; deliberately not hardcoded here after an independent Critic FAIL found this line stale against the generated total more than once (F4, 2026-08-09)',
   'EPIC-AC-06': 'the PRD header records the PO approval binding the first implementation dispatch',
 };
 
@@ -687,7 +701,7 @@ const CLOSURE = {
   'P-AC-01': ['build', 'WP-P'],
   'P-AC-03': ['build', 'WP-P'],
   'P-AC-06': ['build', 'WP-P'],
-  'P-AC-08': ['assert', 'WP-GATE'],
+  'P-AC-08': ['build', 'ELEPHANT'],
   'P-AC-09': ['build', 'WP-P'],
   'P-AC-10': ['assert', 'WP-P'],
   'P-AC-11': ['build', 'WP-P'],
@@ -1348,11 +1362,11 @@ w('work is not mistaken for paperwork:');
 w();
 w('| gate | state | evidence |');
 w('|---|---|---|');
-w('| Focused package checks | **partial** | per-package suites are green; P-AC-08 declares the feature-package writer the gating first slice, and it is now fully built (26/26 staged cases, independently re-run) but not yet registered in the gate-registered suite the criterion names by path -- one signed TP-3+TP-5 window away |');
-w('| Full Verify | **passed** | `evidence/verify-latest.json` — exit 0, 368/368, exact binding on `3387065`, clean at start and finish |');
-w('| Blocking Security | **passed** | `pipeline.security-verdict.v2` — `blocking: false`, `cap.sast` pass, `cap.secrets` pass |');
+w('| Focused package checks | **partial** | per-package suites are green; the signed TP-3+TP-5 window was used and the reconcile suite is now gate-registered (444/444), but an independent Critic FAIL (2026-08-09, F3) found no shipped entry point ever supplies the required approval resolver -- the command is built and tested but structurally unreachable by any real caller |');
+w('| Full Verify | **not verifiable for the integrated candidate** | `evidence/verify-latest.json` binds `3387065`, an ancestor of the whole reviewed range -- an independent Critic (2026-08-09, F5) found no full-gate Verify run is bound to the current candidate; per-suite reruns are not a substitute |');
+w('| Blocking Security | **passed (as of `3387065`, not re-run against the integrated candidate)** | `pipeline.security-verdict.v2` — `blocking: false`, `cap.sast` pass, `cap.secrets` pass |');
 w('| Privacy review | **absent** | no privacy-review artifact exists for the integrated candidate |');
-w('| Independent high-risk Critic | **absent for the integrated candidate** | Critic rounds exist per work package; none reviews Phoenix as one integrated candidate |');
+w('| Independent high-risk Critic | **FAIL, 2026-08-09** | one full-range Critic dispatch reviewed all 57 commits from the epic-wide measurement through this correction; verdict FAIL, 5 major + 2 minor findings; F1/F3/F4/F5 addressed in this same correction, F2/F6 filed as disclosed defects (see backlog) |');
 w('| Exact branch push and readback | **passed** | `origin/sprint_phoenix = 3387065`, readback OID equality confirmed, approval bound to that exact commit |');
 w('| Explicit PO acceptance | **absent** | the only recorded PO approval binds the first implementation dispatch (EPIC-AC-06), not completion |');
 w();
