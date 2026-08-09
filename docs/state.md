@@ -5,7 +5,7 @@
 
 **Last updated:** 2026-08-09
 **Project status:** ACTIVE
-**Local candidate:** `0.5.4+<runner>.20260809091238.7d38484` · commit `53c5b716e8b2deaf3b7b6a78d9b555b7b1867044` · installed by the PO and under happy-path test on both runners
+**Local candidate:** `0.5.4+<runner>.20260809112525.4ad3a30` · commit `9902a541d74d90e3718904a63fed351885a9d8d0` · Verify **264/264 exit 0** bound to that exact commit · ready for the PO's manual copy (supersedes `…20260809091238.7d38484`)
 **Current block:** GF-058 — **the stable blocker is resolved: the push gate is seeded and live, after its satisfying path was measured end to end** (option C, as the PO chose). Two further happy-path defects fixed in the same block: the reopen-design deadlock, and the promoted state's language. Also in this block: the closure-evidence trackedness contract, three routing defects found by reading, the staging exemption, and the defects the PO's three greenfield runs produced; three suite registrations are open for the PO (TP-3); 0.5.3 is released to `main` and the human-authorization ceremony recorded as [ADR-0061](adr/0061-uniform-human-approval-ceremony.md) remains the governing thread; Nova A completion still paused on genuine ADR-gated/evidence-gated blockers
 **Repair baseline:** `5d2b83dcc765d50801f4491e1bd9bed32090112b`
 **Release version:** `0.5.3` released
@@ -145,6 +145,38 @@ and `apply-pending-protected-edits.mjs` now report three rather than two.
     version of its test was green and proved nothing — the fixture carried no
     Pipeline marker, so the rule was inactive; it now opens with a check that the
     rule is firing.
+
+## 2026-08-09 The second local `0.5.4` candidate — the happy-path fixes, stamped and verified
+
+Candidate: `0.5.4+<runner>.20260809112525.4ad3a30`, commit
+`9902a541d74d90e3718904a63fed351885a9d8d0`. Full Verify **264/264, exit 0**,
+bound to that exact commit and tree. Stamp before verify, as this block's
+ordering rule requires.
+
+**What it carries over `…7d38484`:**
+
+1. `3c90882a` — the push gate is seeded and live, after its satisfying path was
+   measured end to end (the stable blocker; option C, as the PO chose).
+2. `3c90882a` — `chat`-mode push approval is reachable in a consumer project for
+   the first time. It never was: `approve-push` consulted the policy file's
+   `requiredKinds` before the operator's stand-down.
+3. `44d6d506` — a reopened design can be edited without ending the session.
+4. `29380a77` — a promoted project's state speaks the language of the PRD the
+   same transaction binds.
+5. `a56f757f` / `4ad3a301` — closures with their measurements, and the
+   Verify-gate flake that TP-5 correctly refused to let this session fix.
+
+**One Verify run was lost to a flake and it is filed, not shrugged off.**
+`guard-push-tests` failed once and passed 150/150 unchanged on the immediate
+re-run; PG11e compares the raw stderr of two separate fixture repositories, and
+their commit hashes are equal only when both `git commit` calls land in the same
+second. `guard-push.test.mjs` is TP-5 protected and this session had just changed
+the seed of the hook that suite gates, so the guard refused the edit — correctly.
+It is `2026-08-09-a-verify-gate-suite-fails-on-where-a-second-boundary-falls.md`
+and it needs its own briefed test-change task.
+
+**Next:** the PO copies the candidate into the local marketplace and restarts the
+sessions. The three TP-3 suite registrations are still open and still human-only.
 
 ## 2026-08-09 STABLE BLOCKER — RESOLVED: the push gate is live, measured before it was seeded
 
