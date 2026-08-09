@@ -685,6 +685,28 @@ export async function queryPortableGovernanceStream({ repositoryRoot, registryPa
   return Object.freeze({ ...verification, events: Object.freeze(scanned.events.slice(0, limit).map((event) => Object.freeze({ ...event }))) });
 }
 
+/**
+ * Query more than one closed portable stream in one call, keyed by streamId.
+ * Composes the existing `queryPortableGovernanceStream` once per requested
+ * stream, unchanged; each stream's own integrity/completeness/events (each
+ * event still carrying its own origin/authorityClass/timeAssurance) is
+ * preserved unflattened.
+ */
+export async function queryPortableGovernanceStreams({ repositoryRoot, registryPath, repositoryFingerprint, streamIds, checkpoints = {} } = {}) {
+  if (!Array.isArray(streamIds) || streamIds.length === 0 || new Set(streamIds).size !== streamIds.length
+    || streamIds.some((streamId) => !STREAMS.has(streamId))) fail("GES-MULTI-STREAM", "streamIds must be a non-empty array of unique closed-set stream identifiers.");
+  if (!isRecord(checkpoints) || Object.keys(checkpoints).some((key) => !streamIds.includes(key))) fail("GES-MULTI-STREAM", "checkpoints must be a plain object whose keys are a subset of streamIds.");
+  const results = [];
+  for (const streamId of streamIds) {
+    results.push(await queryPortableGovernanceStream({ repositoryRoot, registryPath, repositoryFingerprint, streamId, checkpoint: checkpoints[streamId] ?? null }));
+  }
+  return Object.freeze({
+    schema: "pipeline.governance-multi-stream-query.v1",
+    authority: "non-authoritative",
+    streams: Object.freeze(Object.fromEntries(streamIds.map((streamId, index) => [streamId, results[index]]))),
+  });
+}
+
 /** Rebuild only the replaceable heads projection from an already valid chain. */
 export async function recoverPortableGovernanceProjection({ repositoryRoot, registryPath, repositoryFingerprint, streamId, checkpoint, recovery } = {}) {
   if (!exactKeys(recovery, ["idempotencyKey", "expectedHeadsDigest", "requestedPostimageDigest"]) || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(recovery.idempotencyKey)

@@ -21,6 +21,7 @@ import {
   planRestrictedGovernanceOperation,
   queryRestrictedGovernanceEvent,
   queryPortableGovernanceStream,
+  queryPortableGovernanceStreams,
   recoverPortableGovernanceProjection,
   verifyPortableGovernanceStream,
 } from "./governance-event-store.mjs";
@@ -310,4 +311,38 @@ test("restricted storage stays outside the repository, is owner-only encrypted, 
   assert.deepEqual(erased, { status: "erased-active-store", recordId: stored.recordId, preimageDigest: (await import("./governance-event.mjs")).canonicalSha256(encrypted), backupDisclosure: "unknown" });
   await assert.rejects(() => queryRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization: queryAuthorization, key, recordId: stored.recordId }), (error) => error.code === "GES-MISSING");
   await assert.rejects(() => putRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: path.join(root, "restricted"), repositoryFingerprint: fingerprint, authorization: putAuthorization, key, keyGeneration: "key-1", expiresAtEpochMs: Date.now() + 60_000, event: restricted }), (error) => error.code === "GES-RESTRICTED-IN-REPOSITORY");
+});
+
+test("K-AC-10 multi-stream query preserves each stream's own origin, authority class, integrity, and assurance unflattened", async (t) => {
+  const root = await fixtureRoot(); t.after(() => cleanup(root));
+  const lifecycleAppended = await append(root);
+  const agentPayload = { eventId: "agent-decision-1", kind: "assumption", state: "declared", reasonCode: "ASSUMPTION.DECLARED", candidateDigest: canonicalSha256(candidate), relatedHumanDecisionId: null, supersedesEventId: null };
+  const agentAppended = await append(root, intent({ payloadSchema: "pipeline.agent-decision-event.v1", eventId: "agent-event-1", idempotencyKey: "agent-idem-1", origin: "agent", authorityClass: "non-authoritative", eventType: "agent.assumption", streamId: "agent", payload: agentPayload }));
+
+  const soloLifecycle = await queryPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" });
+  const soloAgent = await queryPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "agent" });
+  const multi = await queryPortableGovernanceStreams({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamIds: ["lifecycle", "agent"] });
+  assert.equal(multi.schema, "pipeline.governance-multi-stream-query.v1");
+  assert.equal(multi.authority, "non-authoritative");
+  assert.deepEqual(Object.keys(multi.streams), ["lifecycle", "agent"]);
+  assert.deepEqual(multi.streams.lifecycle, soloLifecycle);
+  assert.deepEqual(multi.streams.agent, soloAgent);
+  assert.equal(multi.streams.lifecycle.events[0].origin, "lifecycle");
+  assert.equal(multi.streams.lifecycle.events[0].authorityClass, "non-authoritative");
+  assert.equal(multi.streams.lifecycle.events[0].timeAssurance, "locally-observed");
+  assert.equal(multi.streams.agent.events[0].origin, "agent");
+  assert.equal(multi.streams.agent.events[0].authorityClass, "non-authoritative");
+  assert.equal(multi.streams.agent.events[0].timeAssurance, "locally-observed");
+  assert.equal(multi.streams.lifecycle.integrity, "prefix-valid");
+  assert.equal(multi.streams.agent.integrity, "prefix-valid");
+
+  const checkpointed = await queryPortableGovernanceStreams({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamIds: ["lifecycle", "agent"], checkpoints: { lifecycle: lifecycleAppended.checkpoint, agent: agentAppended.checkpoint } });
+  assert.equal(checkpointed.streams.lifecycle.completeness, "verified");
+  assert.equal(checkpointed.streams.agent.completeness, "verified");
+
+  await assert.rejects(() => queryPortableGovernanceStreams({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamIds: ["lifecycle", "lifecycle"] }), (error) => error instanceof GovernanceEventStoreError && error.code === "GES-MULTI-STREAM");
+  await assert.rejects(() => queryPortableGovernanceStreams({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamIds: ["lifecycle", "unknown-stream"] }), (error) => error.code === "GES-MULTI-STREAM");
+  await assert.rejects(() => queryPortableGovernanceStreams({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamIds: [] }), (error) => error.code === "GES-MULTI-STREAM");
+  await assert.rejects(() => queryPortableGovernanceStreams({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamIds: ["lifecycle"], checkpoints: ["not-a-plain-object"] }), (error) => error.code === "GES-MULTI-STREAM");
+  await assert.rejects(() => queryPortableGovernanceStreams({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamIds: ["lifecycle"], checkpoints: { agent: agentAppended.checkpoint } }), (error) => error.code === "GES-MULTI-STREAM");
 });
