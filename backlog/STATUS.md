@@ -34,7 +34,7 @@
 | pipeline.codex-plugin-validator-host-parity | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.codex-sandbox-critic-longterm | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.concurrent-dispatches-share-one-index | open | defect | pipeline | 2026-08-08 | — |
-| pipeline.contract-suite-borrows-its-fixture-by-importing-a-109-test-file | in_progress | workflow-improvement | pipeline | 2026-08-08 | — |
+| pipeline.contract-suite-borrows-its-fixture-by-importing-a-109-test-file | closed | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.critic-context-isolation | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.critical-human-proof-not-wired-to-push-and-prd-gates | open | defect | pipeline | 2026-08-05 | — |
 | pipeline.cross-repository-override-ledger-binding | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
@@ -119,7 +119,7 @@
 | pipeline.session-told-ready-but-not-how-to-repair | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.setup-mjs-marketplace-name-collision-defeats-local-dev-installs | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.shipped-artifacts-assume-the-pipelines-own-repository | open | defect | pipeline | 2026-08-08 | — |
-| pipeline.shipped-guidance-sends-agents-to-a-directory-a-gate-refuses | in_progress | defect | pipeline | 2026-08-08 | — |
+| pipeline.shipped-guidance-sends-agents-to-a-directory-a-gate-refuses | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.signed-guard-override-has-no-command-that-emits-the-digest-to-sign | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.signing-ceremony-designed-for-the-verifier-not-the-signer | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.single-trust-anchor-excludes-key-rotation-and-teams | open | defect | pipeline | 2026-08-08 | — |
@@ -147,5 +147,5 @@
 ## Counts
 
 - open: 90
-- in_progress: 23
-- closed: 25
+- in_progress: 21
+- closed: 27

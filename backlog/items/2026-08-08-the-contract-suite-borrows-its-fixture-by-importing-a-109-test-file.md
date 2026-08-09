@@ -3,9 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.contract-suite-borrows-its-fixture-by-importing-a-109-test-file
 type: workflow-improvement
 owner: pipeline
-status: in_progress
+status: closed
 created: 2026-08-08
 due: 2026-08-22
+closed_at: 2026-08-09
+closure_repository: self
+closure_commit: 1dade30b72b9fec6f69fd163ca128c32a5769580
+closure_evidence: backlog/evidence/2026-08-09-onboarding-suite-import-cost-closure.md
 source: "Elephant, 2026-08-08, GF-057. Noted while verifying the C1/C3 contract suite; recorded rather than fixed so the block's remaining consumer blockers keep the budget."
 ---
 

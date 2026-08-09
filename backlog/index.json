@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "03fd1d2d2e93dbbe1508219157f058f9cde40735be6ac06fb8b3db4079a51f8c"
+    "transitionHead": "d42d9f85a46ebc712dbca95aac3e4abc098a9cb7fe505006a8cfbb18d6fa405c"
   },
   "counts": {
     "open": 90,
-    "in_progress": 23,
-    "closed": 25
+    "in_progress": 21,
+    "closed": 27
   },
   "items": [
     {
@@ -262,11 +262,15 @@
     },
     {
       "id": "pipeline.contract-suite-borrows-its-fixture-by-importing-a-109-test-file",
-      "status": "in_progress",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Elephant, 2026-08-08, GF-057. Noted while verifying the C1/C3 contract suite; recorded rather than fixed so the block's remaining consumer blockers keep the budget."
+      "source": "Elephant, 2026-08-08, GF-057. Noted while verifying the C1/C3 contract suite; recorded rather than fixed so the block's remaining consumer blockers keep the budget.",
+      "closedAt": "2026-08-09",
+      "closureRepository": "self",
+      "closureCommit": "1dade30b72b9fec6f69fd163ca128c32a5769580",
+      "closureEvidence": "backlog/evidence/2026-08-09-onboarding-suite-import-cost-closure.md"
     },
     {
       "id": "pipeline.critic-context-isolation",
@@ -1010,11 +1014,15 @@
     },
     {
       "id": "pipeline.shipped-guidance-sends-agents-to-a-directory-a-gate-refuses",
-      "status": "in_progress",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "PO, 2026-08-08, live instance observed against the first 0.5.4 local candidate: Write(scratch/resume-card.json) refused in the draft phase. Verified in code by the Elephant before filing."
+      "source": "PO, 2026-08-08, live instance observed against the first 0.5.4 local candidate: Write(scratch/resume-card.json) refused in the draft phase. Verified in code by the Elephant before filing.",
+      "closedAt": "2026-08-08",
+      "closureRepository": "self",
+      "closureCommit": "6dc5f897fc89609d69ba2991d94bff9add79ecbe",
+      "closureEvidence": "backlog/evidence/2026-08-09-devplan-scratch-exemption-closure.md"
     },
     {
       "id": "pipeline.signed-guard-override-has-no-command-that-emits-the-digest-to-sign",
