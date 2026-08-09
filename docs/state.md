@@ -3212,6 +3212,42 @@ security/guardrail-tier FAILs handled the same way: verify the Critic's reasonin
 then hand back a neutral findings registry, never implementor-justification prose, per
 `templates/prompts/critic-review.md`'s rework input contract.
 
+### BOTH REWORKS VERIFIED — ROUND-2 CRITIC REVIEWS DISPATCHED
+
+**WP-K-AC05-rework1** (`b2a5534`): verified independently (own `node --test` run — 22/22 green — `git
+show --stat`, full diff read). F1's fix is structurally sound: `recoverPortableGovernanceProjection` now
+takes an optional `disposition` parameter; supplying it takes a fork-aware branch, the non-disposition
+path is byte-identical to the pre-rework original (confirmed by reading the diff — the untouched lines
+are literally the same). `appendGovernanceForkDisposition` no longer exists as a separate export; it is
+now an internal `recordGovernanceForkDisposition` called only from inside the sanctioned recovery
+function. F2 (sequence-1 and 3-way fork coverage), F3 (shared `readCandidateStreamEvent` helper between
+`scanStream` and `inspectStreamForForks`, plus GES-CHAIN/GES-IDEMPOTENCY-CONFLICT-without-fork tests),
+F4 (orphaned-temp-file cleanup for the disposition directory) all present with dedicated tests. Genuinely
+well-executed rework, not a rename exercise.
+
+**WP-O1O2-DESIGN-rework1** (`3440e5f`): verified independently (`check-doc-contracts.mjs` re-run clean,
+full diff read). Spot-checked the two most load-bearing NEW factual claims myself rather than trusting
+the dispatch's own report: `hooks/staleness-check.mjs:207-208` does genuinely use top-level `await` inside
+a top-level `if` block in this exact `hooks/` directory (confirmed by reading it); `hooks/hooks.json` does
+give `guard-testpath.mjs` an explicit `"timeout": 10` while `guard-gate-strength.mjs`'s entry (line 39)
+carries no `timeout` key at all (confirmed by reading the raw file, not the dispatch's claim about it).
+§9's contradicting sentence is now quoted-and-superseded in place (not deleted); a new AC-14 gates O-1
+completion on the H-AC-11 text actually landing; the ambiguous "validity" wording is now explicit about
+NOT exempting `validity.expiresAtEpochMs`. Solid, well-evidenced rework.
+
+**Dispatched TWO round-2 Critic reviews**, one per rework, both FULL re-reviews (not narrow delta scope —
+the structural changes in both reworks are significant enough that "missing/unknown/ambiguous impact
+means full review" per `templates/prompts/critic-review.md` applies), each pointed at an ENUMERATED
+two-commit pair (original + rework) rather than a range. Deliberately wrote both dispatches with **zero
+reference to round 1, its findings, or "rework"** — the contamination rules forbid handing a Critic a
+prior verdict or an implementor characterization, and a round-2 dispatch that said "these four findings
+were fixed, please confirm" would be exactly that. Both Critics construct their own adversarial hunt from
+the spec and the current code, blind to what changed or why.
+
+Four dispatches now live: two round-2 Critics (K-AC-05, O-1/O-2-design), nothing else — no Goldfish
+dispatch currently open, so the next new candidate can be picked as soon as review capacity allows without
+waiting on these two (they touch no shared file with anything new).
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
