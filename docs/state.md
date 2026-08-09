@@ -2284,6 +2284,43 @@ either landed or honestly reported gapped. What's left is Class S (6, needs prod
 design), Class B (41, absent capabilities), and Class P (5, not closeable by code) — none of
 which is a "brief a Goldfish and verify the result" task the way tonight's whole wave has been.
 
+### WP-DOC-3 LANDED: CLASS D NEARLY EXHAUSTED, 96 OF 157 — DECLINED TO FORCE CLASS S TONIGHT (2026-08-09)
+
+**`PHX-WP-DOC-3`** (`7376c2c`) closed the two sections my own earlier briefing had accidentally
+omitted from A-AC-15 (schema, privacy threat model) and H-AC-14's one remaining gap (a dedicated
+human-ledger threat model section, eight scenarios each tied to an HGL-* code). Both move to
+`implemented` — all eight named parts present for each. L-AC-08 gets a new traceability artifact
+covering all nine `lifecycle-governance-events.mjs` kinds; eight are justified, one
+(`cancellation`) is honestly flagged unclear — no structural distinction from `status:
+"cancelled"` exists in the code. Stays partial: one of nine genuinely untraced, not padding.
+Independently verified: diff touches exactly three doc files, sanitization clean, every claimed
+header confirmed present by direct grep. **94 becomes 96 of 157. Class D is now down to a single
+honestly-flagged field — every other documentation criterion this epic named is closed.**
+
+**Considered attempting Class S (A-AC-05) directly and declined.** A-AC-05 — "runner, model,
+effort, profile, role, adapter, or capability identity... SHALL include its provenance and
+assurance" — looked like the smallest Class S item, but reading its clause closed that door:
+it requires deciding what "provenance and assurance" concretely means (a confidence score? a
+verification method? which event kinds carry it?), which fields a foundational, widely-depended-
+on schema (`governance-event.mjs` and friends) gains, and how existing passing tests are affected
+— real product design latitude on shared infrastructure, not a bounded wiring task. Forcing that
+through unscoped, alone, under Stop-hook pressure, at a point where context was already very
+large, is exactly the "unstated design latitude executed as bounded implementation" failure mode
+this repo's whole operating model exists to prevent. Declining it is the same discipline this
+session applied all night to *not* writing a test that passes by asserting less than its clause
+requires — applied here to *not* building a capability nobody has actually designed yet.
+
+**What this means plainly: Phoenix is not closeable tonight, and no amount of continued dispatch
+inside this session changes that arithmetic.** 61 criteria remain open. Of those, 6 need a second
+signed TP-5 window (WP-PX0), 6 need real design-then-build work (Class S), 41 need actual
+capability development (Class B — this is the epic's real remaining sprint scope, not a
+measurement gap), and 5 are PO-only acts by definition (Class P: privacy review, an integrated
+Critic pass, an authority-revision route, a proved-impossible GMW half needing amendment). Every
+criterion that a bounded, verifiable, same-session Goldfish dispatch could safely close, has been
+attempted and either closed or honestly reported gapped — the wave that started at 78 of 157 this
+morning ends this leg at 96, fully verified, nothing padded, nothing claimed that the evidence
+doesn't support.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
