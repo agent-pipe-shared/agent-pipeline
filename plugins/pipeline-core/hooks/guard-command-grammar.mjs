@@ -203,18 +203,34 @@ function pathInside(root, target) {
   return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
 }
 
-function approvedReadPath(value, root) {
+/**
+ * GF-078 bug 2: `additionalRoots` admits a read target under one more resolved root besides
+ * the project root -- always resolved from `resolve(root, value)` first (a relative `value`
+ * is still interpreted against the invocation root, `root`, exactly as before; only an
+ * ABSOLUTE `value` can ever resolve outside `root` in the first place, so additionalRoots
+ * only ever matters for that case). Every single, non-piped read-only command this guard
+ * family admits elsewhere (`rg`, `grep`, `cat`, `head`, `tail`, `wc`, `stat`, `file` in
+ * guard-lifecycle-ready.mjs's `isReadOnlyDiagnosticCommand`) carries NO path restriction at
+ * all, so this bounded rg-to-rg/rg-to-head pipeline was the only read-only lane in the whole
+ * guard family that refused a legitimate outside-root read -- a self-inspection of the
+ * plugin's own installed directory, in particular. Passing one additional resolved root is
+ * strictly narrower than that existing single-command allowance, never wider than it.
+ */
+function approvedReadPath(value, root, additionalRoots = []) {
   if (typeof value !== "string" || value === "" || value.includes("\0")) return false;
   if (value === ".") return true;
   try {
     const target = resolve(root, value);
-    return pathInside(resolve(root), target);
+    if (pathInside(resolve(root), target)) return true;
+    return additionalRoots.some((extra) => {
+      try { return pathInside(resolve(extra), target); } catch { return false; }
+    });
   } catch {
     return false;
   }
 }
 
-function validateRg(argv, root, windows) {
+function validateRg(argv, root, windows, additionalRoots = []) {
   const args = [...argv];
   const filesMode = args[0] === "--files";
   if (filesMode) args.shift();
@@ -250,7 +266,7 @@ function validateRg(argv, root, windows) {
   }
   if ((!filesMode && !regexpProvided && patternCount !== 1)
     || (!filesMode && regexpProvided && patternCount !== 0)) return false;
-  return paths.every((path) => approvedReadPath(path, root))
+  return paths.every((path) => approvedReadPath(path, root, additionalRoots))
     && (windows ? true : true);
 }
 
@@ -259,8 +275,12 @@ function validateRg(argv, root, windows) {
  * only the first rg's stdout and is still a closed, read-only diagnostic.  It
  * covers the frequent `rg --files … | rg …` narrowing pattern without
  * admitting a general shell pipeline.
+ *
+ * `additionalRoots` (GF-078 bug 2): zero or more extra resolved roots a read target may
+ * also fall under, threaded straight through to `approvedReadPath()`. Optional and
+ * additive -- every existing call site naming only `(parsed, root)` is unaffected.
  */
-export function isBoundedReadOnlyPipeline(parsed, root) {
+export function isBoundedReadOnlyPipeline(parsed, root, additionalRoots = []) {
   if (!parsed || parsed.parseStatus !== "accepted"
     || parsed.segments.length !== 2
     || parsed.operators.length !== 1
@@ -273,8 +293,8 @@ export function isBoundedReadOnlyPipeline(parsed, root) {
   if (rgName !== expectedRg) return false;
   if (headName === expectedRg) {
     return parsed.redirects.length === 0
-      && validateRg(parsed.segments[0].argv, root, windows)
-      && validateRg(parsed.segments[1].argv, root, windows);
+      && validateRg(parsed.segments[0].argv, root, windows, additionalRoots)
+      && validateRg(parsed.segments[1].argv, root, windows, additionalRoots);
   }
   if (headName !== (windows ? "head.exe" : "head")) return false;
   if (parsed.redirects.length === 1) {
@@ -282,8 +302,14 @@ export function isBoundedReadOnlyPipeline(parsed, root) {
     if (redirect.segment !== 0 || redirect.fd !== 2 || redirect.direction !== ">"
       || (windows ? redirect.target.toLowerCase() !== "nul" : redirect.target !== "/dev/null")) return false;
   }
+  // GF-078 bug 2 (head -N sub-finding): a combined `-N` flag (`head -40`) is the shape an
+  // agent naturally reaches for; only the two-token `-n 40` form was ever accepted, so the
+  // narrower, equally-safe combined shape was refused for no bound-related reason. Same
+  // canonical numeric range both ways, checked by the identical regex.
   const headArgs = parsed.segments[1].argv;
-  if (headArgs.length !== 2 || headArgs[0] !== "-n"
-    || !/^(?:[1-9]|[1-9][0-9]|[1-4][0-9]{2}|500)$/u.test(headArgs[1])) return false;
-  return validateRg(parsed.segments[0].argv, root, windows);
+  const headCount = /^(?:[1-9]|[1-9][0-9]|[1-4][0-9]{2}|500)$/u;
+  const headOk = (headArgs.length === 2 && headArgs[0] === "-n" && headCount.test(headArgs[1]))
+    || (headArgs.length === 1 && headArgs[0].startsWith("-") && headCount.test(headArgs[0].slice(1)));
+  if (!headOk) return false;
+  return validateRg(parsed.segments[0].argv, root, windows, additionalRoots);
 }

@@ -718,6 +718,64 @@ test("only bounded rg search pipelines and platform null redirect are read-only"
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+// GF-078 bug 2 (root scope). Every single, non-piped read-only command
+// isReadOnlyDiagnosticCommand admits elsewhere in this file (rg, grep, cat, head, tail, wc,
+// stat, file) carries NO path restriction at all -- a single `rg pattern <plugin-install-path>`
+// self-inspection read was already unconditionally admitted before this fix. Only the
+// IDENTICAL read piped through a second rg or head was refused, purely for being a pipeline,
+// because isBoundedReadOnlyPipeline only ever knew the project root. This pins that the
+// plugin's own installed root (this file's own resolved location) is now a second approved
+// root for exactly that bounded pipeline shape -- narrower than the single-command allowance
+// above, never wider -- while the underlying grammar function's own two-argument, project-
+// root-only default stays byte-identical (asserted directly against guard-command-grammar.mjs).
+test("bounded rg pipeline admits self-inspection reads of the plugin's own installed root", () => {
+  const path = root();
+  const pluginRoot = fileURLToPath(new URL("../", import.meta.url));
+  const hooksDir = join(pluginRoot, "hooks");
+  const grammarFile = join(hooksDir, "guard-command-grammar.mjs");
+  try {
+    for (const command of [
+      `rg --files ${hooksDir} | rg 'guard-lifecycle-ready'`,
+      `rg -n "isBoundedReadOnlyPipeline" ${grammarFile} | head -n 5`,
+    ]) {
+      const parsed = parseGuardCommand(command, path);
+      assert.equal(isBoundedReadOnlyPipeline(parsed, path), false, `${command} (grammar default stays project-root-only)`);
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("continuity-damaged"); },
+      }).exitCode, 0, command);
+    }
+    const foreign = mkdtempSync(join(tmpdir(), "guard-lifecycle-foreign-"));
+    try {
+      const command = `rg --files ${foreign} | rg 'x'`;
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
+    } finally { rmSync(foreign, { recursive: true, force: true }); }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// GF-078 bug 2 (head -N sub-finding). Only the two-token `head -n 40` form was accepted;
+// the combined single-flag `head -40` form an agent naturally reaches for was refused for
+// no bound-related reason. Same canonical numeric range, both forms.
+test("bounded rg-to-head pipeline accepts both head -n N and combined head -N", () => {
+  const path = root();
+  try {
+    for (const command of ["rg -n lifecycle . | head -40", "rg -n lifecycle . | head -500"]) {
+      const parsed = parseGuardCommand(command, path);
+      assert.equal(isBoundedReadOnlyPipeline(parsed, path), true, command);
+    }
+    for (const command of [
+      "rg -n lifecycle . | head -0",
+      "rg -n lifecycle . | head -501",
+      "rg -n lifecycle . | head -0500",
+    ]) {
+      const parsed = parseGuardCommand(command, path);
+      assert.equal(isBoundedReadOnlyPipeline(parsed, path), false, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 test("redirect-looking quoted data stays argv while hostile composition is typed and denied", () => {
   const path = root();
   try {

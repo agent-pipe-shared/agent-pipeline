@@ -72,6 +72,21 @@ export { machinePlaneFilePath };
 // today. Closing the residual half is an eligibility() change in lib/human-guard-override.mjs,
 // which is out of scope for this file.
 const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+// GF-078 bug 2: the one additional approved root threaded into the bounded rg-to-rg/
+// rg-to-head diagnostic pipeline (guard-command-grammar.mjs's isBoundedReadOnlyPipeline),
+// alongside the project root every call site already carries. Every single, non-piped
+// read-only command in isReadOnlyDiagnosticCommand below (rg, grep, cat, head, tail, wc,
+// stat, file) already carries NO path restriction at all -- an agent reading its own
+// installed plugin's code with a single `rg` call was already unconditionally admitted;
+// only the identical read piped through a second rg or head was refused, purely because it
+// is a pipeline. Resolved once, defensively, from THIS module's own location -- never a
+// project- or command-supplied path -- exactly like gateStrengthShellReadOnlyScriptExemption's
+// own realpath of PLUGIN_ROOT a few lines below. Falling back to the un-realpathed constant
+// on a (practically unreachable, since this module is itself executing from there) realpath
+// failure is still strictly narrower than the single-command allowance above, never wider.
+const BOUNDED_PIPELINE_ADDITIONAL_ROOTS = (() => {
+  try { return [realpathSync(PLUGIN_ROOT)]; } catch { return [PLUGIN_ROOT]; }
+})();
 
 const GOVERNANCE_MARKERS = [
   ".agent-pipeline/core.lock.json",
@@ -782,7 +797,7 @@ export function isRestartResumeHintCapture(command, root, options = {}) {
  */
 export function isReadOnlyDiagnosticCommand(command, root) {
   const parsed = parseGuardCommand(command, root);
-  if (isBoundedReadOnlyPipeline(parsed, root)) return true;
+  if (isBoundedReadOnlyPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return true;
   const words = simpleWords(command, root);
   if (!words || words.length === 0) return false;
   const executable = basename(words[0]).toLowerCase();
@@ -1081,7 +1096,7 @@ export function isForbiddenCrossRepositoryMutation(command, root, dependencies =
     if (poArgs.length === 1 && ["--help", "--version"].includes(poArgs[0])) return false;
     return true;
   }
-  if (isBoundedReadOnlyPipeline(parsed, root)) return false;
+  if (isBoundedReadOnlyPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return false;
   if (parsed.parseStatus !== "accepted" && hasExternalOutputRedirect(command, root)) return true;
   if (parsed.parseStatus === "accepted" && parsed.redirects.length > 0) {
     return parsed.redirects.some((redirect) => {
