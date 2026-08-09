@@ -2254,6 +2254,36 @@ dispatch, not a blind briefing. Class B (41 items, absent capabilities) and Clas
 closeable by code) remain exactly what the closure design always said they were: PO/architecture
 territory, not autonomous Elephant work.
 
+### WP-A2 LANDED: CLASS A TEST-AUTHORSHIP EXHAUSTED FOR THIS SESSION, 94 OF 157 (2026-08-09)
+
+**`PHX-WP-A2`** (`9f5e680`) closed all three residuals it could reach: A-AC-12's restricted-
+machine-local boundary is now fully pinned (the portable path fails closed for any narrower-than-
+repository-public-safe stream; the restricted profile is confirmed owner-authenticated and
+outside the repository), A-AC-13's agent-kind interrupted/concurrent/out-of-order coverage now
+mirrors the generic store directly, and E-AC-06's SHALL-NOT-claim-exactly-once negative is pinned
+structurally (the receipt's closed enums carry no such wording and cannot ever admit one).
+A-AC-14 narrows from 8 to 2 zero-coverage scenarios — six of the seven remaining now have
+dedicated tests; decomposition stays confirmed not representable, tampering stays honestly
+gapped (needs store-generic digest-recompute verification the dispatch correctly declined to
+guess at). E-AC-14 was re-examined and its existing citations judged genuinely adequate — no
+change. Independently verified: 20/20 + 16/16 pass, diff touches exactly two files, sanitization
+clean. **91 becomes 94 of 157.**
+
+**Found and fixed my own mistake while writing this range's checkpoint:** an earlier edit's
+`old_string` anchored on text ending in the `### F3 DISPOSITIONED BY THE PO: OPTION A` header, but
+the replacement never reproduced that header line, silently deleting it while appending unrelated
+content above it. No prose was lost, only the header — found by checking header integrity before
+trusting the file's structure, restored in a dedicated commit (`4eea837`) before this entry was
+written, per the same "verify before trusting" discipline this whole session has used on dispatch
+reports, now turned on my own edits too.
+
+**Class A test-authorship is now exhausted for what's safely dispatchable this session.** The six
+remaining Class A criteria are all WP-PX0 (gate-blocked, needs a second signed TP-5 window).
+Everything else genuinely reachable by a bounded test-writing briefing has been attempted and
+either landed or honestly reported gapped. What's left is Class S (6, needs production wiring +
+design), Class B (41, absent capabilities), and Class P (5, not closeable by code) — none of
+which is a "brief a Goldfish and verify the result" task the way tonight's whole wave has been.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
