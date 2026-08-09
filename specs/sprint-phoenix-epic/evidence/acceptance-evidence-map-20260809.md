@@ -42,8 +42,8 @@ reproduced here rather than referenced.
 
 ## The direct answer
 
-**Phoenix cannot claim complete.** 103 of 157 criteria carry a named assertion in a
-gate-registered suite; 54 do not. EPIC-AC-05 forbids a completion claim while any
+**Phoenix cannot claim complete.** 104 of 157 criteria carry a named assertion in a
+gate-registered suite; 53 do not. EPIC-AC-05 forbids a completion claim while any
 criterion remains unimplemented or unverified, and it currently bites. No issue is closeable on
 its own live acceptance bullets.
 
@@ -61,10 +61,10 @@ A bullet is therefore BLOCKED unless every criterion mapped to it is `implemente
 
 | verdict | count |
 |---|---|
-| implemented | 103 |
+| implemented | 104 |
 | partial | 38 |
 | designed-only | 1 |
-| not-started | 14 |
+| not-started | 13 |
 | constraint | 1 |
 | **total** | **157** |
 
@@ -263,7 +263,7 @@ clause that is not pinned or not built.
 | E-AC-20 | not-started | J | NO CARRIER: audit-bundle carries nothing from the export package, and the export modules never reference the bundle |
 | E-AC-21 | implemented | WP-DOC | docs/governance-event-export.md (PHX-WP-DOC-2): threat model, data-flow diagram, mapping/loss guide, retention guidance, operator runbook, and incident/recovery procedures all present and grounded; the loss guide names the known loss:[] gap explicitly, the retention section reports no pruning/archival/expiry function exists anywhere in the outbox modules |
 
-### R — External command offer, workaround and recovery audit profile (5/13 implemented)
+### R — External command offer, workaround and recovery audit profile (6/13 implemented)
 
 | ID | verdict | src | evidence / named gap |
 |---|---|---|---|
@@ -278,7 +278,7 @@ clause that is not pinned or not built.
 | R-AC-09 | partial | WP-R | external-command-offer-tests (PHX-WP-R): missing offer link, contradictory outcome evidence, and cross-repository/cross-scope substitution all fail closed (never successful); stale and duplicate detection remain absent -- no timestamp field, no supersession semantics for command-offer events |
 | R-AC-10 | partial | C | fail-closed on the append is pinned; the policy-defined typed non-material exception is absent |
 | R-AC-11 | partial | WP-R | external-command-offer-tests (PHX-WP-R): a mandatory public-safe typed omission is pinned; "sanctioned machine-local state" storage and a distinct "commitment" field are absent from this module (it stores nothing by design; commitment only exists in the unrelated document-lifecycle.mjs) |
-| R-AC-12 | not-started | C | NO CARRIER: no Phoenix bootstrap-trajectory fixture exists |
+| R-AC-12 | implemented | WP-R-AC12 | external-command-offer-tests (PHX-WP-R-AC12): the motivating Phoenix bootstrap trajectory is now encoded end to end -- a rejected guard-bypass attempt, an attended local repair through the sanctioned non-authoritative channel, an unchanged public-privacy boundary, a verified readback, and digest-only targets that never embed a machine-specific value |
 | R-AC-13 | partial | WP-R | external-command-offer-tests (PHX-WP-R): 9 of 11 required fixture classes now named (7 pre-existing + secret/malicious command rejection + governed-script identity); approval-without-run and duplicate/retry are confirmed structurally unreachable, each pinned by a dedicated test showing the gap rather than left silently missing |
 
 ### EPIC — Epic integration and release (1/6 implemented)
@@ -443,7 +443,7 @@ Issues closeable on their own live acceptance bullets: **1 of 8**.
 
 53 of 157 criteria are Phoenix's own stricter contract rather than a live issue obligation.
 They block no issue, but EPIC-AC-05 still forbids an epic completion claim while any of them is not `implemented`.
-25 of those 53 are currently not `implemented` and are listed below; the rest are omitted because they are done.
+24 of those 53 are currently not `implemented` and are listed below; the rest are omitted because they are done.
 
 | criterion | verdict |
 |---|---|
@@ -470,7 +470,6 @@ They block no issue, but EPIC-AC-05 still forbids an epic completion claim while
 | R-AC-09 | partial |
 | R-AC-10 | partial |
 | R-AC-11 | partial |
-| R-AC-12 | not-started |
 | R-AC-13 | partial |
 
 ## The epic gates, one by one

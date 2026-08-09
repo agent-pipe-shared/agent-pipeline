@@ -8,7 +8,7 @@ Parent specification: [../spec.md](../spec.md) · Measurement: [../evidence/acce
 
 ## What this design is for
 
-The measurement established that 54 of 157 acceptance criteria are not
+The measurement established that 53 of 157 acceptance criteria are not
 `implemented` and that no issue is closeable. It did not say how any of them closes. This
 document does, and it is generated from the same verdict data as the measurement, so the two
 cannot drift apart.
@@ -22,9 +22,9 @@ one list is what has made the epic look larger and more uniform than it is.
 | A — assertion missing | 2 | one named test case in an already-registered, unprotected suite |
 | D — documentation missing | 1 | one document section set; no code, no gate |
 | S — seam missing | 1 | a connector between two packages that already work |
-| B — capability missing | 44 | real implementation plus its tests |
+| B — capability missing | 43 | real implementation plus its tests |
 | P — not code | 6 | a human gate, a sanctioned authority revision, or a proved impossibility |
-| **total** | **54** | |
+| **total** | **53** | |
 
 **The distribution is the finding.** The largest class by a wide margin is Class A: criteria
 whose behaviour is built, shipped and green, and which fail only because no assertion names the
@@ -136,7 +136,7 @@ is by module family, which makes the disjointness checkable rather than asserted
 | WP-A | 7 | plugins/pipeline-core/lib/agent-decision-journal*.mjs, governance/schemas/agent-decision-event.schema.json |
 | WP-L | 3 | plugins/pipeline-core/lib/lifecycle-governance-events*.mjs, plugins/pipeline-core/lib/governance-replay*.mjs |
 | WP-H | 1 | plugins/pipeline-core/lib/human-governance-ledger*.mjs, plugins/pipeline-core/lib/governance-authority-resolver*.mjs, plugins/pipeline-core/lib/external-push-ledger*.mjs |
-| WP-R | 8 | plugins/pipeline-core/lib/external-command-offer*.mjs |
+| WP-R | 7 | plugins/pipeline-core/lib/external-command-offer*.mjs |
 | WP-PX0 | 4 | plugins/pipeline-core/lib/ruleset-source*.mjs, plugins/pipeline-core/scripts/ruleset-freshness-host.mjs, plugins/pipeline-core/lib/continuity-state.mjs |
 | WP-EPIC | 1 | plugins/pipeline-core/lib/parallel-sprint-integration*.mjs |
 | WP-DOC | 1 | docs/*.md (one section set per package) |
@@ -191,7 +191,7 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 |---|---|---|---|
 | E-AC-20 | not-started | WP-E | NO CARRIER: audit-bundle carries nothing from the export package, and the export modules never reference the bundle |
 
-### Class B — an absent capability (44)
+### Class B — an absent capability (43)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
@@ -235,7 +235,6 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 | R-AC-09 | partial | WP-R | external-command-offer-tests (PHX-WP-R): missing offer link, contradictory outcome evidence, and cross-repository/cross-scope substitution all fail closed (never successful); stale and duplicate detection remain absent -- no timestamp field, no supersession semantics for command-offer events |
 | R-AC-10 | partial | WP-R | fail-closed on the append is pinned; the policy-defined typed non-material exception is absent |
 | R-AC-11 | partial | WP-R | external-command-offer-tests (PHX-WP-R): a mandatory public-safe typed omission is pinned; "sanctioned machine-local state" storage and a distinct "commitment" field are absent from this module (it stores nothing by design; commitment only exists in the unrelated document-lifecycle.mjs) |
-| R-AC-12 | not-started | WP-R | NO CARRIER: no Phoenix bootstrap-trajectory fixture exists |
 | R-AC-13 | partial | WP-R | external-command-offer-tests (PHX-WP-R): 9 of 11 required fixture classes now named (7 pre-existing + secret/malicious command rejection + governed-script identity); approval-without-run and duplicate/retry are confirmed structurally unreachable, each pinned by a dedicated test showing the gap rather than left silently missing |
 | V-AC-02 | partial | WP-V | evidence-view-renderer-tests: fact, unknown, unavailable, redacted, invalid and not-applicable each labelled visibly, six of nine (PHX-WP-V, break-proofed). estimate, assumption and human decision remain unpinned: zero occurrences anywhere in the view-model, renderer or CLI modules -- no field carries them at all |
 | V-AC-06 | partial | WP-V | evidence-view-renderer-tests: exact CSP directive value, skip-link keyboard focus target, and landmark/table accessibility structure all pinned (PHX-WP-V, break-proofed). Mobile/desktop snapshot checks remain absent: a viewport meta tag and one CSS breakpoint exist but no test or tooling captures a deterministic snapshot of either, and this repo has no headless-render/visual-regression infrastructure at all |

@@ -188,10 +188,13 @@ independently and never designed to know about each other.
 ## Suggested order for a future session
 
 1. **E-AC-20** — sequence after E-AC-02 closes (shared root cause).
-2. **H-AC-08** — needs a PO answer to "what counts as a legacy record" before any code.
 
 **A-AC-04** and **X-AC-11** dropped from this order — both built and closed earlier in this
 session. **A-AC-05** dropped 2026-08-09: PO answered the scope question ("only where
 identity-relevant"), built (PHX-WP-AAC05), see its own section above. **H-AC-09** dropped
 2026-08-09: reclassified Class P (not closeable by writing code under Sprint-0 policy), see its
-own section above.
+own section above. **H-AC-08** dropped 2026-08-09: the open scoping question ("what counts as a
+legacy record") turned out to already be answered — issue #30's Migration section and this
+repo's own spec.md §10 "Migration and compatibility" agree on the same four-way classification,
+so no PO input was needed; built (`legacy-import-observation` kind), see its own section above.
+No PO gate was ever the blocker here — reading the issue against the current spec was.

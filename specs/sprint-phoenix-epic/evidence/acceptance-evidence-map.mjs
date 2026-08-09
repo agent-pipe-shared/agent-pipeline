@@ -328,6 +328,15 @@ const DELTA = {
   'R-AC-09': ['partial', 'WP-R'],
   'R-AC-11': ['partial', 'WP-R'],
   'R-AC-13': ['partial', 'WP-R'],
+  // R-AC-12 CLOSED 2026-08-09 (PHX-WP-R-AC12): the criterion asks only that
+  // the motivating trajectory be encoded as a fixture, which is now done --
+  // external-command-offer.test.mjs's new R-AC-12 test walks a rejected
+  // guard-bypass attempt (ECO-AUTHORITY), an attended local repair through
+  // the sanctioned non-authoritative channel, an unchanged public-privacy
+  // boundary, a verified readback, and digest-only targets that embed no
+  // machine-specific value, end to end through the module's existing
+  // exported functions. 17/17 tests pass (independently re-run).
+  'R-AC-12': ['implemented', 'WP-R-AC12'],
 
   // --- evidence/phx-pac08-register.txt (Elephant, 2026-08-09, commit 78c6ef1) ---
   // The signed TP-3+TP-5 maintenance window (evidence/phx-p-ac-08-gmw-request.json)
@@ -802,7 +811,7 @@ const POINTERS = {
   'R-AC-09': 'external-command-offer-tests (PHX-WP-R): missing offer link, contradictory outcome evidence, and cross-repository/cross-scope substitution all fail closed (never successful); stale and duplicate detection remain absent -- no timestamp field, no supersession semantics for command-offer events',
   'R-AC-10': 'fail-closed on the append is pinned; the policy-defined typed non-material exception is absent',
   'R-AC-11': 'external-command-offer-tests (PHX-WP-R): a mandatory public-safe typed omission is pinned; "sanctioned machine-local state" storage and a distinct "commitment" field are absent from this module (it stores nothing by design; commitment only exists in the unrelated document-lifecycle.mjs)',
-  'R-AC-12': 'NO CARRIER: no Phoenix bootstrap-trajectory fixture exists',
+  'R-AC-12': 'external-command-offer-tests (PHX-WP-R-AC12): the motivating Phoenix bootstrap trajectory is now encoded end to end -- a rejected guard-bypass attempt, an attended local repair through the sanctioned non-authoritative channel, an unchanged public-privacy boundary, a verified readback, and digest-only targets that never embed a machine-specific value',
   'R-AC-13': 'external-command-offer-tests (PHX-WP-R): 9 of 11 required fixture classes now named (7 pre-existing + secret/malicious command rejection + governed-script identity); approval-without-run and duplicate/retry are confirmed structurally unreachable, each pinned by a dedicated test showing the gap rather than left silently missing',
 
   'EPIC-AC-01': 'the issue-to-criterion mapping exists; no independent closure status exists for any of the eight issues',
