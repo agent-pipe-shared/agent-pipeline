@@ -47,6 +47,24 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 51eafc7b8c4853ee2663db0dfc1274268ca383f7 — 2026-08-09, range 8dcb1cc..51eafc7, the substantive tip of the push candidate; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+First entry written under the corrected semantics: the two decision records were read out
+of the candidate commit and this record out of `--record-ref`, so neither answer came from
+the working tree. Every earlier entry below was produced by the version that read both from
+disk, which is the defect repaired in `2d413d9` — those entries were true, but the check
+that accepted them could not have known.
+
+Both readings are unchanged from the entry below. ADR-0012's decision still holds: one
+canonical handover file, still the only one. ADR-0045 was read against the package it
+governs and left alone deliberately; the divergence that reading found is filed as
+`pipeline.adr-0045-topology-divergence-from-package-and-skill`, and a second gap found
+since — that no `Governs:` line covers `docs/adr/` itself, so the corpus is invisible to
+this layer — is filed as `pipeline.doc-reconciliation-blind-to-adr-corpus-changes`.
+
 ## Candidate 2e0ea8c8e689edaef82e7a10b2eaa09401be9fa5 — 2026-08-09, range 8dcb1cc..2e0ea8c, the substantive tip of the push candidate; supersedes the 9b27991 and 3a85891 entries below
 
 - ADR-0012: checked, no change needed.
