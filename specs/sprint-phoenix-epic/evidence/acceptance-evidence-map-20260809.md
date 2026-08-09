@@ -42,8 +42,8 @@ reproduced here rather than referenced.
 
 ## The direct answer
 
-**Phoenix cannot claim complete.** 91 of 157 criteria carry a named assertion in a
-gate-registered suite; 66 do not. EPIC-AC-05 forbids a completion claim while any
+**Phoenix cannot claim complete.** 94 of 157 criteria carry a named assertion in a
+gate-registered suite; 63 do not. EPIC-AC-05 forbids a completion claim while any
 criterion remains unimplemented or unverified, and it currently bites. No issue is closeable on
 its own live acceptance bullets.
 
@@ -61,8 +61,8 @@ A bullet is therefore BLOCKED unless every criterion mapped to it is `implemente
 
 | verdict | count |
 |---|---|
-| implemented | 91 |
-| partial | 49 |
+| implemented | 94 |
+| partial | 46 |
 | designed-only | 1 |
 | not-started | 15 |
 | constraint | 1 |
@@ -132,7 +132,7 @@ clause that is not pinned or not built.
 | H-AC-14 | partial | C | docs/governance-events.md (PHX-WP-DOC-1): migration, retention, recovery and operator-guidance sections added and grounded; schema/taxonomy/authority-trust-model coverage confirmed solid (Portable records / Restricted machine-local records / Authority boundary sections). "Threat model" is NOT confirmed complete: the only located coverage is one sentence in docs/phoenix-governance-threat-model.md:75, not a dedicated section -- stays open rather than accepted on the baseline note alone |
 | H-AC-15 | implemented | WP-H | human-governance-ledger-tests (PHX-WP-H): all thirteen named scenarios pinned (grant/consumption/expiry/redaction pre-existing; denial/revocation/correction/retry/concurrency/interruption/tampering/stale-candidate/cross-repository-binding new and break-proofed) |
 
-### A — Agent Decision and Assumption Journal (#31) (4/16 implemented)
+### A — Agent Decision and Assumption Journal (#31) (6/16 implemented)
 
 | ID | verdict | src | evidence / named gap |
 |---|---|---|---|
@@ -147,9 +147,9 @@ clause that is not pinned or not built.
 | A-AC-09 | designed-only | J | materiality is documented as design intent only; no code enforces or measures it |
 | A-AC-10 | partial | C | the offer path fails closed on unavailable journaling; no per-event-class fail-open/fail-closed policy exists |
 | A-AC-11 | implemented | B | agent-decision-event.schema.json:14 assumptionState enumerates exactly the seven required epistemic states (landed 5d0fc6a) |
-| A-AC-12 | partial | C | agent-decision-journal-tests (PHX-WP-A): downstream export/projection policy (governance-event-projection.mjs) is independently configurable from capture eligibility and structurally cannot weaken it; the restricted-machine-local boundary mapping, "sole read boundary" language, and a literal human-ledger side-by-side remain unaddressed |
-| A-AC-13 | partial | C | agent-decision-journal-tests (PHX-WP-A): the duplicate-submission clause is pinned -- exact duplicate is a deterministic idempotent-replay no-write, conflicting duplicate fails closed (GES-IDEMPOTENCY-CONFLICT); concurrent/interrupted/out-of-order for agent-kind events remain covered only by the store's generic tests, not newly pinned |
-| A-AC-14 | partial | C | 5 of 13 named conformance scenarios have thin/generic (non-dedicated) coverage, 8 have zero coverage; "decomposition" is not representable in the current `kind` enum at all (PHX-WP-A, not padded) |
+| A-AC-12 | implemented | WP-A2 | agent-decision-journal-tests (PHX-WP-A + PHX-WP-A2): downstream export/projection policy is independently configurable from capture eligibility and structurally cannot weaken it; the portable path fails closed for any narrower-than-repository-public-safe stream, and the restricted profile is confirmed owner-authenticated and outside the repository |
+| A-AC-13 | implemented | WP-A2 | agent-decision-journal-tests (PHX-WP-A + PHX-WP-A2): the duplicate-submission clause is pinned, and agent-kind fixtures now mirror the generic store's interrupted/concurrent/out-of-order guarantees directly rather than relying on them by implication |
+| A-AC-14 | partial | C | 11 of 13 named conformance scenarios now have dedicated coverage (PHX-WP-A + PHX-WP-A2); "decomposition" is confirmed not representable in the current `kind` enum; "tampering" stays gapped -- needs store-generic digest-recompute verification, correctly left unattempted rather than guessed at |
 | A-AC-15 | partial | C | docs/agent-decision-journal.md (PHX-WP-DOC-1): taxonomy, materiality policy, trust model, retention, recovery, and operator documentation added and grounded (6 of 8). "Schema" and "privacy threat model" sections remain missing -- an Elephant briefing defect, not a dispatch failure: the briefing quoted the full 8-part clause but its own instruction list only named 6 of the 8 parts |
 | A-AC-16 | implemented | C | agent-decision-journal-tests: a journal event cannot present as approval |
 
@@ -237,7 +237,7 @@ clause that is not pinned or not built.
 | C-AC-12 | partial | WP-C | change-control-tests (PHX-WP-C, break-proofed): unavailable external state blocks via C-AC-04, and the distinct "external-unavailable" gate reason is now pinned by name; the explicit advisory-vs-mandatory policy distinction remains absent -- mandatory:false is only representable together with changeClass:"not-required", which short-circuits before ITSM availability is ever inspected |
 | C-AC-13 | implemented | WP-DOC | docs/change-control.md (PHX-WP-DOC-1): threat model, policy precedence, migration, operator runbook, and failure/rollback/recovery procedures all present and grounded in change-control.mjs; migration section honestly states no migration tooling exists |
 
-### E — Governance event export (#32) (12/21 implemented)
+### E — Governance event export (#32) (13/21 implemented)
 
 | ID | verdict | src | evidence / named gap |
 |---|---|---|---|
@@ -246,7 +246,7 @@ clause that is not pinned or not built.
 | E-AC-03 | implemented | C | governance-export-adapter-tests: policy-less exports denied, only explicitly allowed fields projected |
 | E-AC-04 | partial | WP-E | governance-export-adapter-tests (PHX-WP-E, break-proofed): default omission of rationale/summary is pinned; CONFIRMED ABSENT: the "policy allows and redacts" path -- EXPORT_FIELDS is a closed, non-configurable constant (adapter.mjs:15), no policy can ever admit the field |
 | E-AC-05 | implemented | C | governance-export-outbox-tests: independent destination queues, idempotent enqueue, retryable and quarantined entries preserved |
-| E-AC-06 | partial | C | governance-export-delivery-tests (PHX-WP-E, break-proofed): stable idempotency (pre-existing) and at-least-once redelivery (new) are pinned; the explicit "SHALL NOT claim exactly-once" structural assertion was dropped for tool-budget reasons -- not confirmed absent by search, just not written this pass |
+| E-AC-06 | implemented | WP-A2 | governance-export-delivery-tests (PHX-WP-E + PHX-WP-A2): stable idempotency and at-least-once redelivery are pinned; the receipt's closed enums carry no exactly-once wording and structurally cannot ever admit one -- the SHALL-NOT-claim-exactly-once negative is now pinned directly |
 | E-AC-07 | implemented | C | governance-export-delivery-tests: only the safely acknowledged prefix advances after partial delivery |
 | E-AC-08 | partial | WP-E | governance-export-outbox-tests (PHX-WP-E, break-proofed): 4 of 8 detections pinned (destination-mismatch/forged-ack pre-existing, event-gap/schema-downgrade new); CONFIRMED ABSENT: cursor rollback, outbox truncation, source fork, invalid hash -- no bound on cursor vs entries.length or hash-chain check anywhere in outbox.mjs:6-11 |
 | E-AC-09 | partial | WP-E | governance-export-delivery-tests (PHX-WP-E, break-proofed): lag exposed on a failed acknowledgement is pinned; CONFIRMED ABSENT: the "advisory destination" concept itself -- no such distinction exists anywhere in scope, so "canonical governance continues under an unavailable advisory destination" is not representable |
@@ -363,7 +363,7 @@ clause that is not pinned or not built.
 
 ### #31 — Add a privacy-preserving agent decision and assumption journal
 
-5 of 17 live acceptance bullets fully carried; **12 blocked**.
+7 of 17 live acceptance bullets fully carried; **10 blocked**.
 
 | # | live acceptance bullet | blocking criteria (verdict) |
 |---|---|---|
@@ -372,30 +372,27 @@ clause that is not pinned or not built.
 | 3 | Human confirmation correlates to #30; only #30 grants authority | A-AC-04 (partial) |
 | 4 | Runner/model/profile/role/capability carries assurance | A-AC-05 (not-started) |
 | 5 | Mandatory material events are never sampled/discarded silently | A-AC-07 (not-started) |
-| 6 | Retention/access/integrity is independent of human ledger | A-AC-12 (partial) |
-| 7 | Interrupted/concurrent/duplicate/out-of-order behavior is deterministic | A-AC-13 (partial) |
-| 8 | Offline verification detects mutation/gaps/forks/path/repository errors | K-AC-05 (partial) |
-| 9 | #17 replays all origins without authority collapse | L-AC-04 (partial) |
-| 10 | #5 shows uncertainty/status/decision with evidence | V-AC-02 (partial) |
-| 11 | Complete assumption/selection/failure/privacy fixture set | A-AC-14 (partial) |
-| 12 | Schema/taxonomy/materiality/trust/privacy/retention/recovery docs exist | A-AC-15 (partial) |
+| 6 | Offline verification detects mutation/gaps/forks/path/repository errors | K-AC-05 (partial) |
+| 7 | #17 replays all origins without authority collapse | L-AC-04 (partial) |
+| 8 | #5 shows uncertainty/status/decision with evidence | V-AC-02 (partial) |
+| 9 | Complete assumption/selection/failure/privacy fixture set | A-AC-14 (partial) |
+| 10 | Schema/taxonomy/materiality/trust/privacy/retention/recovery docs exist | A-AC-15 (partial) |
 
 ### #32 — Add provider-neutral governance event export for SIEM and audit platforms
 
-10 of 20 live acceptance bullets fully carried; **10 blocked**.
+11 of 20 live acceptance bullets fully carried; **9 blocked**.
 
 | # | live acceptance bullet | blocking criteria (verdict) |
 |---|---|---|
 | 1 | Human/agent/lifecycle origin and authority survive export | K-AC-10 (not-started) |
 | 2 | CloudEvents/OTLP/NDJSON/RFC 5424 mappings are deterministic/loss-declared | E-AC-02 (partial) |
 | 3 | Free-form rationale is explicit-policy-only and redacted | E-AC-04 (partial) |
-| 4 | At-least-once/idempotency/order/retry/rate/backpressure/replay/restart tested | E-AC-06 (partial) |
-| 5 | Cursor/gap/fork/hash/schema/ack failures are typed | E-AC-08 (partial) |
-| 6 | Advisory failure preserves canonical operation | E-AC-09 (partial) |
-| 7 | Required mode blocks only exact named boundary/range | E-AC-10 (not-started) |
-| 8 | Receipts state exact acknowledgement without retention/review claims | E-AC-11 (partial) |
-| 9 | External event correlates to sources/candidate/evidence/policy/chain | K-AC-10 (not-started) |
-| 10 | #9 bundles sanitized export-policy/delivery metadata | E-AC-20 (not-started) |
+| 4 | Cursor/gap/fork/hash/schema/ack failures are typed | E-AC-08 (partial) |
+| 5 | Advisory failure preserves canonical operation | E-AC-09 (partial) |
+| 6 | Required mode blocks only exact named boundary/range | E-AC-10 (not-started) |
+| 7 | Receipts state exact acknowledgement without retention/review claims | E-AC-11 (partial) |
+| 8 | External event correlates to sources/candidate/evidence/policy/chain | K-AC-10 (not-started) |
+| 9 | #9 bundles sanitized export-policy/delivery metadata | E-AC-20 (not-started) |
 
 ## Summary
 
@@ -407,14 +404,14 @@ clause that is not pinned or not built.
 | #23 | 16 | 14 | 2 | **no** |
 | #24 | 12 | 9 | 3 | **no** |
 | #30 | 17 | 8 | 9 | **no** |
-| #31 | 17 | 5 | 12 | **no** |
-| #32 | 20 | 10 | 10 | **no** |
+| #31 | 17 | 7 | 10 | **no** |
+| #32 | 20 | 11 | 9 | **no** |
 
 Issues closeable on their own live acceptance bullets: **0 of 8**.
 
 ## The blocking set, ranked
 
-37 distinct criteria block at least one live acceptance bullet.
+34 distinct criteria block at least one live acceptance bullet.
 
 | criterion | verdict | live bullets blocked |
 |---|---|---|
@@ -429,8 +426,6 @@ Issues closeable on their own live acceptance bullets: **0 of 8**.
 | A-AC-04 | partial | 1 |
 | A-AC-05 | not-started | 1 |
 | A-AC-07 | not-started | 1 |
-| A-AC-12 | partial | 1 |
-| A-AC-13 | partial | 1 |
 | A-AC-14 | partial | 1 |
 | A-AC-15 | partial | 1 |
 | C-AC-02 | partial | 1 |
@@ -438,7 +433,6 @@ Issues closeable on their own live acceptance bullets: **0 of 8**.
 | C-AC-12 | partial | 1 |
 | E-AC-02 | partial | 1 |
 | E-AC-04 | partial | 1 |
-| E-AC-06 | partial | 1 |
 | E-AC-08 | partial | 1 |
 | E-AC-09 | partial | 1 |
 | E-AC-10 | not-started | 1 |

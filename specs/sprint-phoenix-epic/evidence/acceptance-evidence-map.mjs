@@ -402,6 +402,36 @@ const DELTA = {
   'E-AC-21': ['implemented', 'WP-DOC'],
   'P-AC-13': ['implemented', 'WP-DOC'],
   'X-AC-15': ['implemented', 'WP-DOC'],
+
+  // --- evidence/phx-wp-a2.txt (task PHX-WP-A2, 2026-08-09, commit 9f5e680) ---
+  // Independently re-run: 20/20 agent-decision-journal-tests, 16/16
+  // governance-export-delivery-tests pass. A-AC-12 fully pinned: the
+  // portable registry/intent path fails closed for any narrower-than-
+  // repository-public-safe stream (GES-REGISTRY/GES-INTENT), and the
+  // restricted profile is confirmed owner-authenticated and outside the
+  // repository (GES-RESTRICTED-ROOT/IN-REPOSITORY/KEY) -- both residual
+  // sub-clauses landed, not just the already-pinned half. A-AC-13 fully
+  // pinned: agent-kind fixtures now mirror the generic store's interrupted/
+  // concurrent/out-of-order guarantees rather than relying on it by
+  // implication. E-AC-06 fully pinned: the receipt's closed enums carry no
+  // exactly-once wording and structurally cannot ever admit one. A-AC-14
+  // narrows further: 6 of the 7 remaining zero-coverage scenarios now
+  // pinned (verification-scope-change/escalation/fallback/redaction/retry/
+  // missing-journal-availability); decomposition stays confirmed not
+  // representable, tampering stays gapped (needs store-generic digest-
+  // recompute verification, correctly left unattempted rather than guessed
+  // at). E-AC-14 unchanged: the dispatch re-examined the CAS-conflict and
+  // forged-ack tests and judged them genuinely dedicated failure-injection
+  // fixtures, not incidental -- no new test needed, verdict/pointer stand.
+  // Minor process note: this commit's trailer carries only `AI-Assisted:
+  // true`, missing the `Dispatch: PHX-WP-A2 (goldfish)` line every other
+  // dispatch this session included -- the dispatch cited a guardrail
+  // (GIT-03) blocking provider-correlation trailers, which explains
+  // dropping Co-Authored-By but not the separate Dispatch: line; not
+  // pursued further, commit content and attribution are otherwise sound.
+  'A-AC-12': ['implemented', 'WP-A2'],
+  'A-AC-13': ['implemented', 'WP-A2'],
+  'E-AC-06': ['implemented', 'WP-A2'],
 };
 
 // --- per-criterion evidence pointer ----------------------------------------
@@ -465,9 +495,9 @@ const POINTERS = {
   'A-AC-09': 'materiality is documented as design intent only; no code enforces or measures it',
   'A-AC-10': 'the offer path fails closed on unavailable journaling; no per-event-class fail-open/fail-closed policy exists',
   'A-AC-11': 'agent-decision-event.schema.json:14 assumptionState enumerates exactly the seven required epistemic states (landed 5d0fc6a)',
-  'A-AC-12': 'agent-decision-journal-tests (PHX-WP-A): downstream export/projection policy (governance-event-projection.mjs) is independently configurable from capture eligibility and structurally cannot weaken it; the restricted-machine-local boundary mapping, "sole read boundary" language, and a literal human-ledger side-by-side remain unaddressed',
-  'A-AC-13': 'agent-decision-journal-tests (PHX-WP-A): the duplicate-submission clause is pinned -- exact duplicate is a deterministic idempotent-replay no-write, conflicting duplicate fails closed (GES-IDEMPOTENCY-CONFLICT); concurrent/interrupted/out-of-order for agent-kind events remain covered only by the store\'s generic tests, not newly pinned',
-  'A-AC-14': '5 of 13 named conformance scenarios have thin/generic (non-dedicated) coverage, 8 have zero coverage; "decomposition" is not representable in the current `kind` enum at all (PHX-WP-A, not padded)',
+  'A-AC-12': 'agent-decision-journal-tests (PHX-WP-A + PHX-WP-A2): downstream export/projection policy is independently configurable from capture eligibility and structurally cannot weaken it; the portable path fails closed for any narrower-than-repository-public-safe stream, and the restricted profile is confirmed owner-authenticated and outside the repository',
+  'A-AC-13': 'agent-decision-journal-tests (PHX-WP-A + PHX-WP-A2): the duplicate-submission clause is pinned, and agent-kind fixtures now mirror the generic store\'s interrupted/concurrent/out-of-order guarantees directly rather than relying on them by implication',
+  'A-AC-14': '11 of 13 named conformance scenarios now have dedicated coverage (PHX-WP-A + PHX-WP-A2); "decomposition" is confirmed not representable in the current `kind` enum; "tampering" stays gapped -- needs store-generic digest-recompute verification, correctly left unattempted rather than guessed at',
   'A-AC-15': 'docs/agent-decision-journal.md (PHX-WP-DOC-1): taxonomy, materiality policy, trust model, retention, recovery, and operator documentation added and grounded (6 of 8). "Schema" and "privacy threat model" sections remain missing -- an Elephant briefing defect, not a dispatch failure: the briefing quoted the full 8-part clause but its own instruction list only named 6 of the 8 parts',
   'A-AC-16': 'agent-decision-journal-tests: a journal event cannot present as approval',
 
@@ -540,7 +570,7 @@ const POINTERS = {
   'E-AC-03': 'governance-export-adapter-tests: policy-less exports denied, only explicitly allowed fields projected',
   'E-AC-04': 'governance-export-adapter-tests (PHX-WP-E, break-proofed): default omission of rationale/summary is pinned; CONFIRMED ABSENT: the "policy allows and redacts" path -- EXPORT_FIELDS is a closed, non-configurable constant (adapter.mjs:15), no policy can ever admit the field',
   'E-AC-05': 'governance-export-outbox-tests: independent destination queues, idempotent enqueue, retryable and quarantined entries preserved',
-  'E-AC-06': 'governance-export-delivery-tests (PHX-WP-E, break-proofed): stable idempotency (pre-existing) and at-least-once redelivery (new) are pinned; the explicit "SHALL NOT claim exactly-once" structural assertion was dropped for tool-budget reasons -- not confirmed absent by search, just not written this pass',
+  'E-AC-06': 'governance-export-delivery-tests (PHX-WP-E + PHX-WP-A2): stable idempotency and at-least-once redelivery are pinned; the receipt\'s closed enums carry no exactly-once wording and structurally cannot ever admit one -- the SHALL-NOT-claim-exactly-once negative is now pinned directly',
   'E-AC-07': 'governance-export-delivery-tests: only the safely acknowledged prefix advances after partial delivery',
   'E-AC-08': 'governance-export-outbox-tests (PHX-WP-E, break-proofed): 4 of 8 detections pinned (destination-mismatch/forged-ack pre-existing, event-gap/schema-downgrade new); CONFIRMED ABSENT: cursor rollback, outbox truncation, source fork, invalid hash -- no bound on cursor vs entries.length or hash-chain check anywhere in outbox.mjs:6-11',
   'E-AC-09': 'governance-export-delivery-tests (PHX-WP-E, break-proofed): lag exposed on a failed acknowledgement is pinned; CONFIRMED ABSENT: the "advisory destination" concept itself -- no such distinction exists anywhere in scope, so "canonical governance continues under an unavailable advisory destination" is not representable',

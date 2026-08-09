@@ -8,7 +8,7 @@ Parent specification: [../spec.md](../spec.md) · Measurement: [../evidence/acce
 
 ## What this design is for
 
-The measurement established that 66 of 157 acceptance criteria are not
+The measurement established that 63 of 157 acceptance criteria are not
 `implemented` and that no issue is closeable. It did not say how any of them closes. This
 document does, and it is generated from the same verdict data as the measurement, so the two
 cannot drift apart.
@@ -19,12 +19,12 @@ one list is what has made the epic look larger and more uniform than it is.
 
 | class | criteria | what closing one actually costs |
 |---|---|---|
-| A — assertion missing | 11 | one named test case in an already-registered, unprotected suite |
+| A — assertion missing | 8 | one named test case in an already-registered, unprotected suite |
 | D — documentation missing | 3 | one document section set; no code, no gate |
 | S — seam missing | 6 | a connector between two packages that already work |
 | B — capability missing | 41 | real implementation plus its tests |
 | P — not code | 5 | a human gate, a sanctioned authority revision, or a proved impossibility |
-| **total** | **66** | |
+| **total** | **63** | |
 
 **The distribution is the finding.** The largest class by a wide margin is Class A: criteria
 whose behaviour is built, shipped and green, and which fail only because no assertion names the
@@ -133,8 +133,8 @@ is by module family, which makes the disjointness checkable rather than asserted
 | WP-V | 2 | plugins/pipeline-core/lib/evidence-view-model*.mjs, plugins/pipeline-core/lib/evidence-view-renderer*.mjs |
 | WP-X | 2 | plugins/pipeline-core/lib/external-reference-adapter*.mjs |
 | WP-C | 4 | plugins/pipeline-core/lib/change-control*.mjs |
-| WP-E | 9 | plugins/pipeline-core/lib/governance-export-*.mjs |
-| WP-A | 11 | plugins/pipeline-core/lib/agent-decision-journal*.mjs, governance/schemas/agent-decision-event.schema.json |
+| WP-E | 8 | plugins/pipeline-core/lib/governance-export-*.mjs |
+| WP-A | 9 | plugins/pipeline-core/lib/agent-decision-journal*.mjs, governance/schemas/agent-decision-event.schema.json |
 | WP-L | 3 | plugins/pipeline-core/lib/lifecycle-governance-events*.mjs, plugins/pipeline-core/lib/governance-replay*.mjs |
 | WP-H | 3 | plugins/pipeline-core/lib/human-governance-ledger*.mjs, plugins/pipeline-core/lib/governance-authority-resolver*.mjs, plugins/pipeline-core/lib/external-push-ledger*.mjs |
 | WP-R | 8 | plugins/pipeline-core/lib/external-command-offer*.mjs |
@@ -173,14 +173,11 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 
 ## Per criterion
 
-### Class A — the behaviour exists, the assertion does not (11)
+### Class A — the behaviour exists, the assertion does not (8)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
-| A-AC-12 | partial | WP-A | agent-decision-journal-tests (PHX-WP-A): downstream export/projection policy (governance-event-projection.mjs) is independently configurable from capture eligibility and structurally cannot weaken it; the restricted-machine-local boundary mapping, "sole read boundary" language, and a literal human-ledger side-by-side remain unaddressed |
-| A-AC-13 | partial | WP-A | agent-decision-journal-tests (PHX-WP-A): the duplicate-submission clause is pinned -- exact duplicate is a deterministic idempotent-replay no-write, conflicting duplicate fails closed (GES-IDEMPOTENCY-CONFLICT); concurrent/interrupted/out-of-order for agent-kind events remain covered only by the store's generic tests, not newly pinned |
-| A-AC-14 | partial | WP-A | 5 of 13 named conformance scenarios have thin/generic (non-dedicated) coverage, 8 have zero coverage; "decomposition" is not representable in the current `kind` enum at all (PHX-WP-A, not padded) |
-| E-AC-06 | partial | WP-E | governance-export-delivery-tests (PHX-WP-E, break-proofed): stable idempotency (pre-existing) and at-least-once redelivery (new) are pinned; the explicit "SHALL NOT claim exactly-once" structural assertion was dropped for tool-budget reasons -- not confirmed absent by search, just not written this pass |
+| A-AC-14 | partial | WP-A | 11 of 13 named conformance scenarios now have dedicated coverage (PHX-WP-A + PHX-WP-A2); "decomposition" is confirmed not representable in the current `kind` enum; "tampering" stays gapped -- needs store-generic digest-recompute verification, correctly left unattempted rather than guessed at |
 | E-AC-14 | partial | WP-E | in-memory, local-file, OTLP-profile and syslog fixtures are each individually cited (PHX-WP-E); dedicated failure-injection coverage was judged sufficient by indirect citation (CAS-conflict, forged-ack tests) rather than confirmed absent by search -- no new test added, budget-limited not capability-limited |
 | PX0-AC-01 | partial | WP-PX0 | continuity-state.mjs binds dispatch/intent to prdSha256/specSha256; no assertion names a REJECTED generic CAS authority change. GATE: the carrier suite is harness/scripts/pipeline-state.test.mjs (TP-5) -- closing this needs a signed TP-5 maintenance window, the same class of act P-AC-08 needed, not an ordinary dispatch |
 | PX0-AC-03 | partial | WP-PX0 | apply exists and rechecks under the writer lock; the recheck breadth the criterion enumerates is not fully pinned. GATE: carrier is harness/scripts/pipeline-state.test.mjs (TP-5), same as PX0-AC-01 |
