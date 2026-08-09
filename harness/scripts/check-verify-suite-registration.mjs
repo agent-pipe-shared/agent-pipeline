@@ -144,18 +144,24 @@ export const REQUIRED_EXCLUSION_FIELDS = Object.freeze(["reason", "owner", "expi
  * registered entry of verify.mjs's TEST_SUITES -- the outcome this list exists to
  * reach.
  *
- * ONE ENTRY BELOW IS NOT OF THAT CLASS, and the difference matters more than the
- * count. harness/scripts/check-critic-contract-citations.test.mjs is GREEN. It is
- * parked for one reason only: registering it means editing verify.mjs, a protected
- * test path whose maintenance window is closed, and opening one needs a human
- * signature. Every other entry here is parked because it is RED and must not be
- * registered until repaired -- the opposite situation. Reading this list as five-plus-
- * one of a kind would misstate what it records: a passing suite waiting on a
- * signature is a scheduling fact, a failing suite is a defect. Its expiry is shared
- * with the rest deliberately, so that nothing here outlives a single review date, not
- * because it shares their justification.
+ * TWO ENTRIES BELOW ARE NOT OF THAT CLASS, and the difference matters more than the
+ * count. harness/scripts/check-critic-contract-citations.test.mjs and
+ * harness/scripts/recovery-bridge-approval.test.mjs are GREEN. They are parked for one
+ * reason only: registering a suite means editing verify.mjs, a protected test path
+ * whose maintenance window is closed, and opening one needs a human signature. Every
+ * other entry here is parked because it is RED and must not be registered until
+ * repaired -- the opposite situation. Reading this list as six of a kind would
+ * misstate what it records: a passing suite waiting on a signature is a scheduling
+ * fact, a failing suite is a defect. Their expiry is shared with the rest
+ * deliberately, so that nothing here outlives a single review date, not because they
+ * share the others' justification.
  *
- * The other five are owned by one filed backlog item --
+ * A GREEN entry here is the one shape that rots quietly: the suite passes, so nothing
+ * fails, and the stale `reason` keeps asserting a defect that no longer exists. That
+ * is why the reason text is asserted rather than trusted -- see the suite's
+ * `greenAwaitingRegistration` list.
+ *
+ * The other four are owned by one filed backlog item --
  * backlog/items/2026-08-08-seven-unregistered-suites-are-red-and-must-not-be-registered.md
  * (`id: pipeline.seven-unregistered-suites-are-red`, owner: PO for
  * assignment) -- and every `expires` below is that item's own `due: 2026-09-07`.
@@ -175,7 +181,7 @@ export const EXCLUSIONS = Object.freeze({
     expires: "2026-09-07",
   }),
   "harness/scripts/recovery-bridge-approval.test.mjs": Object.freeze({
-    reason: "red (R1.2): SyntaxError, pipeline-state.mjs has no export RECOVERY_BRIDGE_DECISION_SCHEMA",
+    reason: "GREEN, not red: repaired 2026-08-09 (PHX-BRIDGE, commit 77a2f50) by restoring the recovery-bridge decision contract that merge 75b8361 dropped; the suite loads and passes. Parked solely because registering it edits verify.mjs, a protected test path whose maintenance window is closed and whose reopening needs a human signature. Register on the next window; this entry is a scheduling record, not a defect record.",
     owner: "PO",
     expires: "2026-09-07",
   }),
