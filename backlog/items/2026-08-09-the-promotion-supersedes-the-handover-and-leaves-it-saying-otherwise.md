@@ -110,6 +110,28 @@ as `2026-08-07-human-authorization-prompts-ignore-the-configured-language-profil
 this item names a mechanism that produces it even after that one is fixed,
 because here the *stored* value is wrong rather than the *rendering*.
 
+## What instance 1 looks like from outside: "the runner forgets the input"
+
+The PO's own report of the Codex run was that it forgets the input while
+otherwise working cleanly through. The input is not lost from disk — that
+repository's `specs/2026-08-09_runes-minigame/design-input.md` is a full brief:
+context, goals, non-goals, chosen approach, component scope, requested
+behaviour, constraints, risks, three open questions.
+
+It is lost across a session boundary, because nothing that survives one points at
+it:
+
+- `docs/state.md` carries `> Ein Runen-Minispiel entwickeln` — the one-line
+  kickoff goal — and names the superseded kickoff PRD.
+- `resume-hint.mjs inspect --root <that repo>` returns `{"status":"absent"}`.
+
+So a re-grounding session reads a one-line goal and a superseded anchor, and the
+document holding the actual brief is named by neither. "Forgets the input" is the
+symptom; instance 1 is the mechanism, and the absent Resume-Hint is why there is
+no second carrier. Whether the promotion should also capture a Resume-Hint card,
+or whether the handover naming the durable package is enough, belongs to the same
+decision as the handover question above.
+
 ## Affected artifacts
 
 - `plugins/pipeline-core/lib/onboarding-continuity.mjs:3800-3818` — the promotion
