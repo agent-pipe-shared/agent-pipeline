@@ -2542,6 +2542,54 @@ class correction, not a measurement change, so the 101/157 total does not move. 
 reports (`acceptance-evidence-map-20260809.md`, `closure-plan.md`) regenerated, no `INTEGRITY
 FAILURE` marker in either. Class S count: 4 → 3. Class P count: 5 → 6.
 
+### A-AC-04 CLOSES — ROUND 3 CRITIC PASS, THREE MINOR FINDINGS FIXED, 101 → 102 OF 157 (2026-08-09)
+
+**Round 3, dispatched on the corrected single-commit diff bound this time** (`f3eeb3ed…^..f3eeb3ed…`
+verified to be exactly one commit before dispatch, after round 2 was found to have reviewed six
+commits instead of one): **PASS**, three minor findings, no blocker or major. F-1: the docstring's
+absolute claim — "no code path anywhere … lets a caller substitute a different trust anchor" — is
+false; pointing `--repo-root` at a *different, real* repository resolves and binds to *that*
+repository's own anchor, it does not select a different anchor *within* the governed one. The true
+guarantee, which the docstring should have said instead, is containment: anchor, fingerprint, and
+ledger append all resolve from the same `repo.primaryRoot`, so a foreign root cannot forge a grant
+that appears to belong to the repository it does not control. F-2: `runPrepare` (not `runInstall`,
+already correct) still read `plan`/`spec`/extra-artifact/capture-policy digests from the raw
+`--repo-root` value rather than the resolved `repo.primaryRoot` — an audit-fidelity gap (the digests
+shown to the human signer could describe a different directory than the one the fingerprint names),
+not an exploitable bypass, since the one artifact the consumer actually re-checks (`guard-git.mjs`'s
+own file digest) is verified live. F-3: the three green evidence artifacts carried no command/exit-
+code header (GL-01), inconsistent with the RED transcript in the same package.
+
+**PHX-WP-AAC04-FIX3 closed all three** (commit `0022d13`): docstring rewritten to state the
+containment guarantee, `runPrepare` routed through `repo.primaryRoot` with a new break-proofed
+regression test, TAP artifacts regenerated with headers. Independently re-verified in this session:
+14/14 unit (`human-authority-grant.test.mjs`), 1/1 e2e, 25/25 regression, diffs read directly against
+both files. **A-AC-04 moves `partial` → `implemented`**: the correlate half (`guard-git.mjs`'s
+Phoenix override path, proven end to end since the deep re-investigation) and the shall-not-self-
+confirm half (the CLI, now fully closed across three Critic rounds) are both real, tested, and
+production-wired. Evidence-map delta applied (`73501cf`): **101 → 102 of 157**.
+
+### A-AC-05 BUILT: IDENTITY PROVENANCE/ASSURANCE HAS A REAL, TESTED CARRIER — NO CALLER YET, STAYS PARTIAL (2026-08-09)
+
+**Dispatched with the design pre-decided by the Elephant** (per the PO's earlier "only where
+identity-relevant" disposition, read against the journal's own existing kind taxonomy): an optional
+`identity` array — closed `dimension`/`value`/`provenance`/`assurance` shape, 1–7 entries, no
+duplicate dimension — admissible only on `selection`/`escalation`/`fallback`, the three kinds whose
+own semantics are about choosing or changing something; rejected elsewhere with a new
+`ADJ-IDENTITY-SCOPE` code. Built and independently re-verified (commit `8244ab3`): 29/29
+`agent-decision-journal-tests` (8 new named assertions, 2 break-proofed), 13/13
+`governance-event-store-tests` with zero collateral, the published JSON Schema kept byte-equivalent
+and drift-tested the same way `assumptionState` already is.
+
+**Stays `partial`, not `implemented`**: the dispatch's own mandatory repo-wide discovery step
+(`grep -rln validateAgentDecisionEvent plugins/pipeline-core/{lib,scripts}`) confirmed no production
+code path anywhere ever emits a `selection`/`escalation`/`fallback` event at all — the same
+carrier-without-a-caller shape A-AC-04 was in before its own CLI existed. The honest result was
+accepted as specified rather than a wiring point being invented to look more complete. Reclassified
+Class S → Class B in the evidence map and `class-s-scoping.md`: the design question is answered, what
+remains is a confirmed-absent capability, not a seam between two existing packages. Count unchanged
+at 102 (already counted A-AC-04's move above in the same delta commit `73501cf`).
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
