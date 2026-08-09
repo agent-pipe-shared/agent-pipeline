@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "2e3f6f310db50702115ff96ff7cbeb3bcf5fb5ad4698a064e32346748e6b919e"
+    "transitionHead": "7211d02c1a8f8fe1cbe24365b0728d77a1a3d900f5fa5bfdf970d0cced051b9b"
   },
   "counts": {
-    "open": 94,
+    "open": 95,
     "in_progress": 21,
     "closed": 28
   },
@@ -205,6 +205,14 @@
       "owner": "pipeline",
       "created": "2026-08-05",
       "source": "PO observation, Sprint Nova session 2026-08-05, plus a concrete misdiagnosis it caused in that same session (Elephant read .claude/pipeline.yaml as authority and drew the wrong conclusion about the push gate); independently confirmed and extended by the T1 Critic of candidate 8d9b3df as finding F-E (major), which withdrew its own earlier, too-generous disposition of the same drift"
+    },
+    {
+      "id": "pipeline.claude-greenfield-run-happy-path-findings",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "Command-level analysis of the PO's Claude-with-Pipeline greenfield run of 2026-08-09 (transcript ad321d5e), read from the session log. 50 failing tool results across the run."
     },
     {
       "id": "pipeline.claude-has-no-start-time-opt-in-adoption-path",
