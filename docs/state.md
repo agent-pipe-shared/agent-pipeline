@@ -2254,6 +2254,8 @@ dispatch, not a blind briefing. Class B (41 items, absent capabilities) and Clas
 closeable by code) remain exactly what the closure design always said they were: PO/architecture
 territory, not autonomous Elephant work.
 
+### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
+
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
 eine Nacht."* That wording is more precise than the option as I had framed it, and the
 difference is the whole disposition.
