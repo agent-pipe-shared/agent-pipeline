@@ -47,6 +47,19 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 06a4db4a904c07904fbdd629e41624cceefbf373 — 2026-08-09, range 3387065..06a4db4, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `63e819a` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `06a4db4`: a checkpoint recording that the 2-slot parallel-dispatch cap was a
+self-imposed limit, not a written rule (`guardrails/git.md` already permits ungated parallel
+Goldfish dispatch within one open block), and the two additional dispatches (WP-R-AC10,
+WP-C-AC12) started as a result, plus E-AC-04 considered and declined as a fifth. No code
+changed in this commit. Same reading as the whole chain: `docs/state.md` stays ADR-0012, the
+generated evidence-map/closure-plan trio stays ADR-0045.
+
 ## Candidate 63e819a2aaeb2082751557d93e5585d789b015ab — 2026-08-09, range 3387065..63e819a, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
