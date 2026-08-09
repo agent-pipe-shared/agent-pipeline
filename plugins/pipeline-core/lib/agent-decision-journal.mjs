@@ -9,6 +9,8 @@ const IDENTITY_DIMENSIONS=new Set(["runner","model","effort","profile","role","a
 const COMMAND_STATES=new Set(["offered","acknowledged","authorized","copied","attempted","execution-unobserved","observed-completed","readback-verified","failed","partial","cancelled","unknown","unavailable","readback-mismatch","recovery-proposed","recovered"]);
 const COMMAND_ASSURANCE=new Set(["not-applicable","attempted","execution-unobserved","observed-completed","readback-verified","failed","partial","cancelled","unknown","unavailable","readback-mismatch"]);
 const OMITTABLE=new Set(["raw-command","arguments","private-coordinates","unrestricted-output","prompt","transcript","credential"]);
+/** R-AC-04: whether a recorded required cleanup/readback has itself been carried out -- a dimension distinct from `recoverability`'s category and from the original operation's `state`/`executionAssurance`. */
+const CLEANUP_STATUSES=new Set(["pending","completed","verified"]);
 /** H-AC-08: the six legacy record classes issue #30's Migration section names, one-to-one, and the two honest outcomes of trying to reprove their original authority tuple. */
 const LEGACY_SOURCE_CLASSES=new Set(["mutable-approval-state","guard-override-jsonl-record","deployment-approval-log","override-receipt","backlog-transition-record","release-change-evidence"]), AUTHORITY_PROOF_STATUSES=new Set(["unprovable","not-attempted"]);
 /** Local mirror of governance-event.mjs's ARTIFACT_PATH; this module stays dependency-free by design (see header), so the pattern is duplicated exactly rather than imported. */
@@ -52,17 +54,39 @@ export function validateAgentDecisionEvent(value) {
  * Closed, public-safe agent-journal event for a command or script offer.
  * No command text, argument, user identity, private path, or raw output is
  * admissible. The record is observational and can never grant authority.
+ *
+ * R-AC-04: `recoverability` already names WHETHER a mutation needs
+ * cleanup/rollback, as a closed category. `requiredCleanup` is a distinct
+ * field recording WHAT that required cleanup/readback actually is/was: a
+ * stable `cleanupClass` (bounded identifier, same ID pattern as
+ * `operation.operationClass`, but naming the follow-up action rather than
+ * the original operation), a `status` tracking whether that action has
+ * actually been carried out (the "readback" half of the criterion -- a
+ * dimension `recoverability` itself never carries), and a `digest`,
+ * nullable, of a public-safe governed cleanup/readback procedure artifact
+ * (mirrors `operation.governedArtifactSha256`; never raw text). Optional at
+ * the key level, exactly like `assumptionState`/`identity` on
+ * `validateAgentDecisionEvent` above, so every pre-existing command-offer
+ * fixture keeps validating unchanged; when present it is scoped
+ * (ADJ-COMMAND-CLEANUP-SCOPE) to only ever accompany a `recoverability`
+ * other than `not-applicable` -- recording what cleanup/readback is
+ * required only makes sense once WHETHER one is needed has itself been
+ * asserted.
  */
 export function validateCommandOfferEvent(value) {
   const keys=["eventId","kind","state","reasonCode","candidateDigest","relatedHumanDecisionId","supersedesEventId","offerOrigin","operation","target","sideEffectClass","authorityRequirement","policyDigest","redactionPolicyDigest","executionAssurance","omissions","offerEventId","preEvidenceDigest","postEvidenceDigest","recoverability"];
-  if(!exact(value,keys)||value.kind!=="command-offer"||!ID.test(value.eventId)||!COMMAND_STATES.has(value.state)||!CODE.test(value.reasonCode)||!SHA.test(value.candidateDigest)||(value.relatedHumanDecisionId!==null&&!ID.test(value.relatedHumanDecisionId))||(value.supersedesEventId!==null&&!ID.test(value.supersedesEventId))||!["pipeline-initiated","user-requested-pipeline-supplied"].includes(value.offerOrigin)||!exact(value.operation,["operationClass","version","governedArtifactSha256"])||!ID.test(value.operation.operationClass)||(value.operation.version!==null&&!ID.test(value.operation.version))||(value.operation.governedArtifactSha256!==null&&!SHA.test(value.operation.governedArtifactSha256))||!exact(value.target,["repositoryFingerprint","scopeDigest"])||!SHA.test(value.target.repositoryFingerprint)||!SHA.test(value.target.scopeDigest)||!["non-authoritative","destructive","guard-bypass","authority-changing"].includes(value.sideEffectClass)||!["not-required","human-decision-required"].includes(value.authorityRequirement)||!SHA.test(value.policyDigest)||!SHA.test(value.redactionPolicyDigest)||!COMMAND_ASSURANCE.has(value.executionAssurance)||!Array.isArray(value.omissions)||value.omissions.length<4||value.omissions.length>7||new Set(value.omissions).size!==value.omissions.length||value.omissions.some((entry)=>!OMITTABLE.has(entry))||!["raw-command","arguments","private-coordinates","unrestricted-output"].every((entry)=>value.omissions.includes(entry))||(value.offerEventId!==null&&!ID.test(value.offerEventId))||(value.preEvidenceDigest!==null&&!SHA.test(value.preEvidenceDigest))||(value.postEvidenceDigest!==null&&!SHA.test(value.postEvidenceDigest))||!["not-applicable","recoverable","cleanup-required","rollback-required"].includes(value.recoverability))fail("ADJ-COMMAND-OFFER");
+  const hasRequiredCleanup=rec(value)&&Object.hasOwn(value,"requiredCleanup");
+  const extended=hasRequiredCleanup?[...keys,"requiredCleanup"]:keys;
+  const validRequiredCleanup=(cleanup)=>exact(cleanup,["cleanupClass","status","digest"])&&ID.test(cleanup.cleanupClass)&&CLEANUP_STATUSES.has(cleanup.status)&&(cleanup.digest===null||SHA.test(cleanup.digest));
+  if(!exact(value,extended)||value.kind!=="command-offer"||!ID.test(value.eventId)||!COMMAND_STATES.has(value.state)||!CODE.test(value.reasonCode)||!SHA.test(value.candidateDigest)||(value.relatedHumanDecisionId!==null&&!ID.test(value.relatedHumanDecisionId))||(value.supersedesEventId!==null&&!ID.test(value.supersedesEventId))||!["pipeline-initiated","user-requested-pipeline-supplied"].includes(value.offerOrigin)||!exact(value.operation,["operationClass","version","governedArtifactSha256"])||!ID.test(value.operation.operationClass)||(value.operation.version!==null&&!ID.test(value.operation.version))||(value.operation.governedArtifactSha256!==null&&!SHA.test(value.operation.governedArtifactSha256))||!exact(value.target,["repositoryFingerprint","scopeDigest"])||!SHA.test(value.target.repositoryFingerprint)||!SHA.test(value.target.scopeDigest)||!["non-authoritative","destructive","guard-bypass","authority-changing"].includes(value.sideEffectClass)||!["not-required","human-decision-required"].includes(value.authorityRequirement)||!SHA.test(value.policyDigest)||!SHA.test(value.redactionPolicyDigest)||!COMMAND_ASSURANCE.has(value.executionAssurance)||!Array.isArray(value.omissions)||value.omissions.length<4||value.omissions.length>7||new Set(value.omissions).size!==value.omissions.length||value.omissions.some((entry)=>!OMITTABLE.has(entry))||!["raw-command","arguments","private-coordinates","unrestricted-output"].every((entry)=>value.omissions.includes(entry))||(value.offerEventId!==null&&!ID.test(value.offerEventId))||(value.preEvidenceDigest!==null&&!SHA.test(value.preEvidenceDigest))||(value.postEvidenceDigest!==null&&!SHA.test(value.postEvidenceDigest))||!["not-applicable","recoverable","cleanup-required","rollback-required"].includes(value.recoverability)||(hasRequiredCleanup&&!validRequiredCleanup(value.requiredCleanup)))fail("ADJ-COMMAND-OFFER");
   if(value.authorityRequirement==="human-decision-required"&&value.relatedHumanDecisionId===null)fail("ADJ-COMMAND-AUTHORITY");
   if(value.state==="offered"&&(value.offerEventId!==null||value.executionAssurance!=="not-applicable"||value.preEvidenceDigest!==null||value.postEvidenceDigest!==null))fail("ADJ-COMMAND-OFFER");
   if(value.state!=="offered"&&value.offerEventId===null)fail("ADJ-COMMAND-LINK");
   if(value.state==="attempted"&&value.executionAssurance!=="attempted")fail("ADJ-COMMAND-OUTCOME");
   if(value.state==="execution-unobserved"&&value.executionAssurance!=="execution-unobserved")fail("ADJ-COMMAND-OUTCOME");
   if(["observed-completed","readback-verified","failed","partial","cancelled","unknown","unavailable","readback-mismatch"].includes(value.state)&&value.executionAssurance!==value.state)fail("ADJ-COMMAND-OUTCOME");
-  return Object.freeze({...value,operation:Object.freeze({...value.operation}),target:Object.freeze({...value.target}),omissions:Object.freeze([...value.omissions])});
+  if(hasRequiredCleanup&&value.recoverability==="not-applicable")fail("ADJ-COMMAND-CLEANUP-SCOPE");
+  return Object.freeze({...value,operation:Object.freeze({...value.operation}),target:Object.freeze({...value.target}),omissions:Object.freeze([...value.omissions]),...(hasRequiredCleanup?{requiredCleanup:Object.freeze({...value.requiredCleanup})}:{})});
 }
 
 /**

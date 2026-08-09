@@ -88,6 +88,14 @@ test("R-AC-04: binds operation class, target, exact pre/post evidence digests, a
   await assert.rejects(recordCommandOutcome({ offer: event(), outcome: badRecoverability, append }), (error) => error.code === "ADJ-COMMAND-OFFER");
 });
 
+test("R-AC-04: requiredCleanup records what cleanup/readback is required, distinct from recoverability's own category, through recordCommandOutcome", async () => {
+  const withCleanup = follow("cancelled", { preEvidenceDigest: SHA("1"), postEvidenceDigest: SHA("2"), recoverability: "rollback-required", requiredCleanup: { cleanupClass: "manual-file-restore", status: "pending", digest: SHA("8") } });
+  const receipt = await recordCommandOutcome({ offer: event(), outcome: withCleanup, append });
+  assert.equal(receipt.status, "cancelled");
+  const malformedCleanup = follow("cancelled", { preEvidenceDigest: SHA("1"), postEvidenceDigest: SHA("2"), recoverability: "rollback-required", requiredCleanup: { cleanupClass: "manual-file-restore", status: "not-a-status", digest: null } });
+  await assert.rejects(recordCommandOutcome({ offer: event(), outcome: malformedCleanup, append }), (error) => error.code === "ADJ-COMMAND-OFFER");
+});
+
 test("R-AC-08: a readback lifecycle event appends exactly once and never re-appends or mutates the original offer", async () => {
   const calls = [];
   const spy = async (value) => { calls.push(value); return append(value); };

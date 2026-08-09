@@ -31,6 +31,21 @@ test("A-AC-07 recognizes every named event class through an existing field or ki
   const recoveryOffer=validateCommandOfferEvent(offer({recoverability:"rollback-required"}));
   assert.equal(representedEventClasses(recoveryOffer).has("recovery"),true);
 });
+// R-AC-04: `requiredCleanup` records WHAT cleanup/readback is required,
+// distinct from (and never folded into) `recoverability`'s own WHETHER
+// category. Optional at the key level, so the plain `offer()` fixture and
+// every other pre-existing fixture keeps validating with no key present.
+test("R-AC-04 records a distinct required-cleanup/readback field, optional, scoped to a recoverability other than not-applicable",()=>{
+  const withCleanup=validateCommandOfferEvent(offer({recoverability:"rollback-required",requiredCleanup:{cleanupClass:"manual-file-restore",status:"pending",digest:"7".repeat(64)}}));
+  assert.deepEqual(withCleanup.requiredCleanup,{cleanupClass:"manual-file-restore",status:"pending",digest:"7".repeat(64)});
+  assert.equal(Object.isFrozen(withCleanup.requiredCleanup),true);
+  const withoutDigest=validateCommandOfferEvent(offer({recoverability:"cleanup-required",requiredCleanup:{cleanupClass:"readback-confirmation",status:"verified",digest:null}}));
+  assert.equal(withoutDigest.requiredCleanup.digest,null);
+  assert.equal(Object.hasOwn(validateCommandOfferEvent(offer()),"requiredCleanup"),false);
+  assert.throws(()=>validateCommandOfferEvent(offer({recoverability:"rollback-required",requiredCleanup:{cleanupClass:"manual-file-restore",status:"unknown-status",digest:null}})),(error)=>error.code==="ADJ-COMMAND-OFFER");
+  assert.throws(()=>validateCommandOfferEvent(offer({recoverability:"rollback-required",requiredCleanup:{cleanupClass:"manual-file-restore",status:"pending",digest:"not-a-digest"}})),(error)=>error.code==="ADJ-COMMAND-OFFER");
+  assert.throws(()=>validateCommandOfferEvent(offer({recoverability:"not-applicable",requiredCleanup:{cleanupClass:"manual-file-restore",status:"pending",digest:null}})),(error)=>error.code==="ADJ-COMMAND-CLEANUP-SCOPE");
+});
 // R-AC-05 enumerates what must never cross a durable boundary. The journal
 // rejects rather than redacts, and it does so structurally: no prohibited field
 // is representable in either event shape, and the single digest slot is typed
