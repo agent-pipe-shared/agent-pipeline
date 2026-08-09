@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { isSanctionedLifecycleCommand } from "./guard-lifecycle-ready.mjs";
 import {
   consumeHumanGuardOverride,
+  humanGuardOverrideInternals,
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
 import { readPushApprovalMode } from "../lib/critical-human-proof-policy.mjs";
@@ -21,6 +22,10 @@ import {
   rememberNativeHookFailure,
 } from "../lib/native-hook-failure-memory.mjs";
 import { parseGuardCommand } from "./guard-command-grammar.mjs";
+
+// Same pure, no-I/O reuse pattern as scripts/repair-map.mjs: the secret-eligibility
+// screen lives once in eligibility() and is never reimplemented here (GF-060, F2).
+const { eligibility } = humanGuardOverrideInternals;
 
 const DEBUG_PREFIX = "[pipeline.codex-pretool.v1]";
 const PLUGIN_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -496,6 +501,33 @@ if (denials.length > 0) {
       diagnostic("human-override-plan-failed", humanOverrideFailureFields(error));
       const hostBoundary = error?.code === "HGO-GIT" || error?.code === "HGO-ROOT"
         || error?.code === "HGO-COMMON-DIR";
+      // recordHumanGuardDenial() already runs eligibility() once, before the
+      // topology() call that produced this exact error (lib/human-guard-override.mjs:
+      // physicalRoot -> eligibility -> topology) -- but that result never reaches this
+      // catch; the function throws before returning anything (Critic F2, GF-059). Re-run
+      // the SAME pure, no-I/O secret screen rather than duplicate its detection regex
+      // here (scripts/repair-map.mjs already reuses it identically). Fail closed to the
+      // hash-only, safe state on any unexpected error from the probe itself -- exactly
+      // the state every sibling external-operator route in this file already uses.
+      let hostBoundaryAction = { toolName, toolInputSha256, repositoryRoot: projectRoot };
+      if (hostBoundary) {
+        let secretBearing = true;
+        try {
+          const probe = eligibility(projectRoot, toolName, input?.tool_input ?? {});
+          secretBearing = probe.eligible === false && probe.code === "HGO-NONOVERRIDABLE-SECRET";
+        } catch { /* fail closed: secretBearing stays true, guidance stays hash-only */ }
+        // Bash is the only tool with a shell command at all (Edit/Write/apply_patch have
+        // no tool_input.command); `command` above is already "" for those, which the
+        // empty-string form would falsely present as an actionable-but-blank command
+        // (F5, GF-059). Match the codebase's own null-for-no-command convention
+        // (actionPreview() at lib/human-guard-override.mjs:669-684) instead.
+        hostBoundaryAction = {
+          toolName,
+          toolInputSha256,
+          repositoryRoot: projectRoot,
+          command: toolName === "Bash" && !secretBearing ? command : null,
+        };
+      }
       overrideGuidance = [
         "",
         "Guard recovery route:",
@@ -507,7 +539,7 @@ if (denials.length > 0) {
               kind: "external-operator",
               executionBoundary: "attended-host-terminal",
               invocation: "user-copy-only",
-              action: { toolName, toolInputSha256, repositoryRoot: projectRoot },
+              action: hostBoundaryAction,
               reason: "the host repository preimage cannot be attested inside this guard process",
             },
           }

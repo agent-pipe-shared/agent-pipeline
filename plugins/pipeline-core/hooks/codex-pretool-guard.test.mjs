@@ -70,6 +70,14 @@ function decision(result) {
   return JSON.parse(result.stdout).hookSpecificOutput;
 }
 
+/** Isolate and parse the trailing "Guard recovery route:" JSON blob a denial reason carries. */
+function guardRecoveryRoute(reason) {
+  const marker = "Guard recovery route:\n";
+  const index = reason.lastIndexOf(marker);
+  assert.notEqual(index, -1, `no "Guard recovery route:" block in: ${reason}`);
+  return JSON.parse(reason.slice(index + marker.length));
+}
+
 // Local-build stamp convention: <semver>+codex.<YYYYMMDDHHMMSS>.<short-oid>,
 // where <short-oid> is the 7-character OID of the functional commit whose
 // content the build carries. Documented in
@@ -637,6 +645,59 @@ check("malformed, unsupported and incomplete tool inputs fail closed", () => {
     assert.equal(output.permissionDecision, "deny");
     assert.match(output.permissionDecisionReason, /fail closed|Unsupported or missing/);
   }
+});
+
+// GF-060 (F2/F5, Critic FAIL on GF-059): the hostBoundary catch (HGO-GIT/HGO-ROOT/
+// HGO-COMMON-DIR -> HGO-EXTERNAL-REPOSITORY-OBSERVATION) is reached whenever
+// human-guard-override.mjs's topology() cannot attest the repository -- forced here by
+// never running `git init` in the fixture, so `git rev-parse --show-toplevel` genuinely
+// fails with HGO-GIT. `pipeline.user.yaml` makes the repo lifecycle-governed so an
+// ordinary Write/Bash denial reaches the override planner at all.
+function hostBoundaryFixture() {
+  const root = fixture();
+  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  return root;
+}
+
+check("GF-060: a secret-bearing denial reaching the host-boundary route never carries the secret verbatim", () => {
+  const root = hostBoundaryFixture();
+  const secret = "ghp_FAKEFAKEFAKEFAKE1234567890AB";
+  const output = decision(run({
+    tool_name: "Write",
+    tool_input: { file_path: "notes.md", content: `credential leak test: ${secret}\n` },
+  }, root));
+  assert.equal(output.permissionDecision, "deny");
+  assert.doesNotMatch(output.permissionDecisionReason, /ghp_FAKEFAKEFAKEFAKE/u,
+    "the secret-bearing content leaked verbatim into the denial reason");
+  const route = guardRecoveryRoute(output.permissionDecisionReason);
+  assert.equal(route.code, "HGO-EXTERNAL-REPOSITORY-OBSERVATION");
+  assert.equal(route.nextAction.action.command, null);
+});
+
+check("GF-060: a confirmed non-secret Bash denial reaching the host-boundary route keeps the literal command actionable", () => {
+  const root = hostBoundaryFixture();
+  const command = "git reset --hard HEAD~3";
+  const output = decision(run({
+    tool_name: "Bash",
+    tool_input: { command },
+  }, root));
+  assert.equal(output.permissionDecision, "deny");
+  const route = guardRecoveryRoute(output.permissionDecisionReason);
+  assert.equal(route.code, "HGO-EXTERNAL-REPOSITORY-OBSERVATION");
+  assert.equal(route.nextAction.action.command, command);
+});
+
+check("GF-060: a non-Bash denial reaching the host-boundary route never carries a misleading empty-string command", () => {
+  const root = hostBoundaryFixture();
+  const output = decision(run({
+    tool_name: "Write",
+    tool_input: { file_path: "notes.md", content: "plain content, nothing sensitive\n" },
+  }, root));
+  assert.equal(output.permissionDecision, "deny");
+  const route = guardRecoveryRoute(output.permissionDecisionReason);
+  assert.equal(route.code, "HGO-EXTERNAL-REPOSITORY-OBSERVATION");
+  assert.notEqual(route.nextAction.action.command, "");
+  assert.equal(route.nextAction.action.command, null);
 });
 
 if (process.exitCode) process.exit(process.exitCode);
