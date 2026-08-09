@@ -1887,6 +1887,55 @@ The dispatch substituted two real sibling suites under an explicit label rather 
 skipping the check, and it removed a QG-06 deferred decision whose promise its own
 work had made obsolete instead of leaving a stale expiry standing.
 
+### THE TRAILER WINDOW WAS ALREADY CLOSED WHEN I CALLED IT CLOSING, and the PO cleared the pins (2026-08-09)
+
+Two of the three remaining decisions moved. One because the PO answered; one because I
+measured it properly and my own account of it was wrong.
+
+**The pins are authorized.** The PO's answer was direct: *"Okay das mit den Pins passt!
+mach das so ruhig."* That is consent for the act, not for a review about the act, and it
+is the thing that was missing when I stood the re-baseline down. Dispatched as `PHX-PIN2`
+(Goldfish, implementor tier, `claude-sonnet-5`): transcribe the nine `rawSha256` values to
+the bytes on disk, move the exclusion entry from the red class to the green one, and
+correct the header prose above `EXCLUSIONS`, which already understates its own green half
+by one entry and says *"Five remain"* over a six-entry table. Re-measured before
+dispatching: the suite is still red on `harness/review-protocol.md` with exactly the
+computed digest recorded in `evidence/phx-pin.txt` at 00:37, so nothing about the
+measurement has aged.
+
+**The trailer decision is not the decision I described, and the correction is mine.** I
+wrote *"22 unpushed commits carry ..."* and called it the one item with a closing window.
+Measured again just now, against the actual push target:
+
+- `origin/sprint_phoenix..HEAD` is **99 commits**, and **0** of them carry
+  `Co-Authored-By:` or `Claude-Session:`.
+- All **22** offending commits are reachable from `origin/sprint_phoenix`, whose tip
+  (`8dcb1cc`) was pushed **2026-08-08 15:00**. They have been on the shared remote for a
+  day.
+
+The 22 is a count against `origin/main`, not against the push stand — it measures what
+would enter `main` at a merge, not what is still private. I reported one as the other and
+built a "closing window" on top of it. **The window is not closing; it closed before the
+sentence was written.**
+
+What that changes: option (c), keep the branch local, no longer exists, and option (b),
+authorize a rewrite, is now a rewrite of a *published* branch — a force-push, which the
+hard rules forbid without an explicit override and which breaks every existing clone.
+**What remains for the PO is (a): accept the public record and note the acceptance.** That
+is a smaller decision than the one I put in front of them.
+
+The finding underneath survives the correction unchanged and is still the valuable half:
+the enforcing guard landed in `e4d4fa3` on 2026-08-06 and the running session did not load
+it until the 2026-08-08 restart. Twenty-two commits fit in the gap between *merged* and
+*in force*, on the one rule whose damage cannot be undone, and the gap was invisible from
+inside the session that was violating it. Every hook in this repository has that property.
+
+**How I got it wrong is worth more than the fact.** I measured a real range, reported the
+number correctly, and attached it to the wrong question — the same shape as the
+`configure-advisor-export` miss earlier tonight, where I counted the right string and
+answered a question about the states. A count is not a claim until you say which range it
+came from.
+
 ### SUPERSEDED — the block below listed five decisions; three remain. Read this first instead.
 
 The block that follows was written early in the night and is **no longer accurate**. Four
