@@ -834,6 +834,21 @@ const DELTA = {
   // explicitly out of scope for this dispatch.
   'P-AC-11': ['partial', 'WP-P-AC11'],
 
+  // V-AC-02: WP-V-AC02 investigated all three previously-unpinned classes
+  // (estimate, assumption, human decision) rather than assuming all three
+  // needed new representation. Only "human decision" had a genuine grounding:
+  // `approved` is the sole feature-package lifecycle state
+  // feature-package-topology.mjs's admitted-transition table gates behind
+  // `requiredAuthority: "po"` specifically (line 171), distinguishing it from
+  // every other status string, which is just an accurate report of current
+  // state. Wired in the renderer only (matches the existing model.status
+  // precedent -- no model field needed), styled distinctly. `estimate` and
+  // `assumption` remain unpinned: investigated and confirmed no field
+  // anywhere represents an approximate or unverified-premise value; honestly
+  // disclosed rather than fabricated. Still `partial` -- 7 of 9 classes now
+  // labelled, narrowed from 6.
+  'V-AC-02': ['partial', 'WP-V-AC02'],
+
   // C-AC-09: resolveChangeControlProfile (change-control.mjs) picks exactly
   // one effective profile (or `not-required`) from a set of candidates
   // sharing one environment/candidate/artifact/scopeSha256 tuple, rejecting
@@ -970,7 +985,7 @@ const POINTERS = {
   'P-AC-13': 'docs/organization-policy-packs.md + docs/audit-bundles.md (PHX-WP-DOC-2): threat model, pack/schema/activation policy, bundle policy, and compatibility/migration/versioning policy all present and grounded -- the compatibility section honestly states no pack-schema migration mechanism exists (only v1 is accepted; revision is a content digest, not a version number)',
 
   'V-AC-01': 'evidence-view-model-tests: offline report with source links and a candidate-bound receipt',
-  'V-AC-02': 'evidence-view-renderer-tests: fact, unknown, unavailable, redacted, invalid and not-applicable each labelled visibly, six of nine (PHX-WP-V, break-proofed). estimate, assumption and human decision remain unpinned: zero occurrences anywhere in the view-model, renderer or CLI modules -- no field carries them at all',
+  'V-AC-02': 'evidence-view-renderer-tests: fact, unknown, unavailable, redacted, invalid, not-applicable, and now human decision (PHX-WP-V + WP-V-AC02, break-proofed) -- seven of nine. `approved` is the sole feature-package lifecycle state gated behind PO-specific authority (feature-package-topology.mjs:171), labelled distinctly in the renderer. estimate and assumption remain unpinned: investigated, confirmed no field anywhere represents an approximate or unverified-premise value -- disclosed, not fabricated',
   'V-AC-03': 'evidence-view-model-tests: claims linked to canonical source record and exact candidate',
   'V-AC-04': 'evidence-view-model-tests: invalid topology yields an invalid view with no candidate or artifact leak',
   'V-AC-05': 'evidence-view-renderer-tests: deterministic redacted projection withholding artifact paths',
