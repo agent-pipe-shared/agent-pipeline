@@ -42,8 +42,8 @@ reproduced here rather than referenced.
 
 ## The direct answer
 
-**Phoenix cannot claim complete.** 82 of 157 criteria carry a named assertion in a
-gate-registered suite; 75 do not. EPIC-AC-05 forbids a completion claim while any
+**Phoenix cannot claim complete.** 84 of 157 criteria carry a named assertion in a
+gate-registered suite; 73 do not. EPIC-AC-05 forbids a completion claim while any
 criterion remains unimplemented or unverified, and it currently bites. No issue is closeable on
 its own live acceptance bullets.
 
@@ -61,8 +61,8 @@ A bullet is therefore BLOCKED unless every criterion mapped to it is `implemente
 
 | verdict | count |
 |---|---|
-| implemented | 82 |
-| partial | 61 |
+| implemented | 84 |
+| partial | 59 |
 | designed-only | 1 |
 | not-started | 12 |
 | constraint | 1 |
@@ -153,17 +153,17 @@ clause that is not pinned or not built.
 | A-AC-15 | partial | C | agent-decision-journal.md carries one section; no taxonomy, materiality policy, trust model, retention or recovery doc |
 | A-AC-16 | implemented | C | agent-decision-journal-tests: a journal event cannot present as approval |
 
-### L — Lifecycle stream and replay (#17) (3/8 implemented)
+### L — Lifecycle stream and replay (#17) (4/8 implemented)
 
 | ID | verdict | src | evidence / named gap |
 |---|---|---|---|
 | L-AC-01 | partial | C | the closed lifecycle schema and validator are pinned; NO PRODUCER exists — no Pipeline path emits a lifecycle event |
 | L-AC-02 | partial | J | six of the eight #10 exchange identities are retained; queueRevision and a distinct correlationId are absent |
 | L-AC-03 | implemented | C | lifecycle-governance-events-tests: registered namespace only, no credential-carrying namespace, no opaque digest |
-| L-AC-04 | partial | C | semantic classes pinned; the VISUAL class distinction in the renderer is not pinned |
+| L-AC-04 | partial | C | semantic classes pinned; the VISUAL class remains confirmed absent (PHX-WP-L): the renderer has no origin field to key a visual marker off and gives every event kind the same CSS class -- a renderer change, not a missing test |
 | L-AC-05 | implemented | C | lifecycle-governance-events-tests: candidate invalidation visible, duplicate sequences fail closed |
 | L-AC-06 | implemented | C | replay rejects extra event data instead of exposing raw lifecycle bodies |
-| L-AC-07 | partial | C | no serial/parallel/retry/cancellation/recovery/malicious fixture matrix is named |
+| L-AC-07 | implemented | WP-L | governance-replay-core-tests: serial/parallel/retry/cancellation/recovery fixtures replay to identical bounded output on repeat, and a malicious duplicate-sequence fixture is rejected deterministically (PHX-WP-L, break-proofed twice) |
 | L-AC-08 | partial | J | no artifact traces each retained element to a stated user or audit need |
 
 ### P — Policy packs and signed audit bundles (#9) (6/13 implemented)
@@ -199,7 +199,7 @@ clause that is not pinned or not built.
 | V-AC-09 | implemented | WP-V | evidence-view-renderer-tests: all seven required fixtures now covered -- pass/fail/unknown pre-existing, tampered/misplaced/orphaned/legacy-layout added with deterministic snapshots (PHX-WP-V, break-proofed) |
 | V-AC-10 | implemented | C | evidence-viewer-tests: candidate binding rendered before any derived summary |
 
-### X — Traceability and documentation adapters (#23) (11/15 implemented)
+### X — Traceability and documentation adapters (#23) (12/15 implemented)
 
 | ID | verdict | src | evidence / named gap |
 |---|---|---|---|
@@ -214,9 +214,9 @@ clause that is not pinned or not built.
 | X-AC-09 | implemented | C | external-reference-adapter-tests: external content treated as untrusted data, no execution or authority injection |
 | X-AC-10 | implemented | C | external-reference-adapter-tests: identity resolved through the feature package, not a path guess |
 | X-AC-11 | not-started | J | NO CARRIER: the adapter never references organization policy, and the policy modules never reference the adapter |
-| X-AC-12 | partial | C | the CLI test uses local synthetic observations; the four required profiles are not each named |
+| X-AC-12 | implemented | WP-X | external-reference-adapter-tests: plan->apply->reconcile proven identical across synthetic issue-tracker, knowledge-base, document-store and secondary-forge profiles, and every cross-profile capability mismatch rejected (PHX-WP-X, break-proofed) |
 | X-AC-13 | implemented | C | external-reference-adapter-tests: defaults to reference-only or projection, never last-write-wins |
-| X-AC-14 | partial | C | the doc carries a reconciliation section; no assertion shows an offline external system leaving canonical authority intact |
+| X-AC-14 | partial | C | confirmed absent (PHX-WP-X): neither inspect() call site (external-reference-adapter.mjs:61,72) has a try/catch, so an unreachable external system throws uncaught instead of producing a typed observation -- filed as pipeline.external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system, a production fix not a missing test |
 | X-AC-15 | partial | C | external-traceability.md carries three sections; no threat model, publication guide or recovery procedure |
 
 ### C — ITSM change control (#24) (8/13 implemented)
@@ -320,36 +320,33 @@ clause that is not pinned or not built.
 
 ### #17 — Define a sanitized multi-agent event model and local replay view
 
-3 of 6 live acceptance bullets fully carried; **3 blocked**.
+4 of 6 live acceptance bullets fully carried; **2 blocked**.
 
 | # | live acceptance bullet | blocking criteria (verdict) |
 |---|---|---|
 | 1 | Replay is non-authoritative and links canonical evidence | L-AC-04 (partial) |
-| 2 | Serial/parallel/retry/cancellation/malicious fixtures | L-AC-07 (partial) |
-| 3 | Design is driven by user/audit needs, not competitor parity | L-AC-08 (partial) |
+| 2 | Design is driven by user/audit needs, not competitor parity | L-AC-08 (partial) |
 
 ### #23 — Define external work-system and knowledge-base traceability adapters
 
-12 of 16 live acceptance bullets fully carried; **4 blocked**.
+13 of 16 live acceptance bullets fully carried; **3 blocked**.
 
 | # | live acceptance bullet | blocking criteria (verdict) |
 |---|---|---|
 | 1 | #9 governs mandatory documents and external writes | X-AC-11 (not-started) |
-| 2 | Synthetic issue/wiki/document/secondary-forge adapters share one core | X-AC-12 (partial) |
-| 3 | External outage cannot erase local authority | X-AC-14 (partial) |
-| 4 | Contract/threat/mapping/publication/conformance docs exist | X-AC-15 (partial) |
+| 2 | External outage cannot erase local authority | X-AC-14 (partial) |
+| 3 | Contract/threat/mapping/publication/conformance docs exist | X-AC-15 (partial) |
 
 ### #24 — Add policy-governed ITSM change control to release and promotion
 
-7 of 12 live acceptance bullets fully carried; **5 blocked**.
+8 of 12 live acceptance bullets fully carried; **4 blocked**.
 
 | # | live acceptance bullet | blocking criteria (verdict) |
 |---|---|---|
 | 1 | Environment selects no control or exactly one effective profile | C-AC-09 (partial) |
 | 2 | Standard/normal/emergency/not-required have distinct behavior | C-AC-02 (partial) |
-| 3 | Synthetic core; named products only in profiles | X-AC-12 (partial) |
-| 4 | Advisory/mandatory offline and unavailable behavior is explicit | C-AC-12 (partial) |
-| 5 | Threat/policy/migration/runbook/recovery docs exist | C-AC-13 (partial) |
+| 3 | Advisory/mandatory offline and unavailable behavior is explicit | C-AC-12 (partial) |
+| 4 | Threat/policy/migration/runbook/recovery docs exist | C-AC-13 (partial) |
 
 ### #30 — Add a repository-scoped tamper-evident human governance decision ledger
 
@@ -412,9 +409,9 @@ clause that is not pinned or not built.
 |---|---|---|---|---|
 | #5 | 6 | 5 | 1 | **no** |
 | #9 | 11 | 2 | 9 | **no** |
-| #17 | 6 | 3 | 3 | **no** |
-| #23 | 16 | 12 | 4 | **no** |
-| #24 | 12 | 7 | 5 | **no** |
+| #17 | 6 | 4 | 2 | **no** |
+| #23 | 16 | 13 | 3 | **no** |
+| #24 | 12 | 8 | 4 | **no** |
 | #30 | 17 | 7 | 10 | **no** |
 | #31 | 17 | 4 | 13 | **no** |
 | #32 | 20 | 9 | 11 | **no** |
@@ -423,7 +420,7 @@ Issues closeable on their own live acceptance bullets: **0 of 8**.
 
 ## The blocking set, ranked
 
-45 distinct criteria block at least one live acceptance bullet.
+43 distinct criteria block at least one live acceptance bullet.
 
 | criterion | verdict | live bullets blocked |
 |---|---|---|
@@ -433,7 +430,6 @@ Issues closeable on their own live acceptance bullets: **0 of 8**.
 | H-AC-12 | partial | 2 |
 | K-AC-10 | not-started | 2 |
 | L-AC-04 | partial | 2 |
-| X-AC-12 | partial | 2 |
 | A-AC-01 | partial | 1 |
 | A-AC-02 | partial | 1 |
 | A-AC-03 | not-started | 1 |
@@ -462,7 +458,6 @@ Issues closeable on their own live acceptance bullets: **0 of 8**.
 | H-AC-11 | partial | 1 |
 | H-AC-14 | partial | 1 |
 | H-AC-15 | partial | 1 |
-| L-AC-07 | partial | 1 |
 | L-AC-08 | partial | 1 |
 | P-AC-01 | partial | 1 |
 | P-AC-03 | partial | 1 |

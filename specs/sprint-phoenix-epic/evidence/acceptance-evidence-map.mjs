@@ -254,6 +254,14 @@ const DELTA = {
   'V-AC-07': ['implemented', 'WP-V'],
   'V-AC-09': ['implemented', 'WP-V'],
 
+  // --- evidence/phx-wp-x.txt (task PHX-WP-X, 2026-08-09, commit 3161a8e) ---
+  // Independently re-run: 13/13 external-reference-adapter-tests pass.
+  'X-AC-12': ['implemented', 'WP-X'],
+
+  // --- evidence/phx-wp-l.txt (task PHX-WP-L, 2026-08-09, commit 0b53f89) ---
+  // Independently re-run: 4/4 governance-replay-core-tests pass.
+  'L-AC-07': ['implemented', 'WP-L'],
+
   // --- evidence/phx-wp-gate.txt (task PHX-WP-GATE, 2026-08-09, commit 92b21ed) ---
   // The third feature-package plan kind, `reconcile`, landed: the digest-only
   // no-drift invariant, PO-bound apply, manual-replacement refusal, and the
@@ -339,10 +347,10 @@ const POINTERS = {
   'L-AC-01': 'the closed lifecycle schema and validator are pinned; NO PRODUCER exists — no Pipeline path emits a lifecycle event',
   'L-AC-02': 'six of the eight #10 exchange identities are retained; queueRevision and a distinct correlationId are absent',
   'L-AC-03': 'lifecycle-governance-events-tests: registered namespace only, no credential-carrying namespace, no opaque digest',
-  'L-AC-04': 'semantic classes pinned; the VISUAL class distinction in the renderer is not pinned',
+  'L-AC-04': 'semantic classes pinned; the VISUAL class remains confirmed absent (PHX-WP-L): the renderer has no origin field to key a visual marker off and gives every event kind the same CSS class -- a renderer change, not a missing test',
   'L-AC-05': 'lifecycle-governance-events-tests: candidate invalidation visible, duplicate sequences fail closed',
   'L-AC-06': 'replay rejects extra event data instead of exposing raw lifecycle bodies',
-  'L-AC-07': 'no serial/parallel/retry/cancellation/recovery/malicious fixture matrix is named',
+  'L-AC-07': 'governance-replay-core-tests: serial/parallel/retry/cancellation/recovery fixtures replay to identical bounded output on repeat, and a malicious duplicate-sequence fixture is rejected deterministically (PHX-WP-L, break-proofed twice)',
   'L-AC-08': 'no artifact traces each retained element to a stated user or audit need',
 
   'P-AC-01': 'schema/compatibility/merge pinned; provenance, dependency and signature-policy validation are not named',
@@ -381,9 +389,9 @@ const POINTERS = {
   'X-AC-09': 'external-reference-adapter-tests: external content treated as untrusted data, no execution or authority injection',
   'X-AC-10': 'external-reference-adapter-tests: identity resolved through the feature package, not a path guess',
   'X-AC-11': 'NO CARRIER: the adapter never references organization policy, and the policy modules never reference the adapter',
-  'X-AC-12': 'the CLI test uses local synthetic observations; the four required profiles are not each named',
+  'X-AC-12': 'external-reference-adapter-tests: plan->apply->reconcile proven identical across synthetic issue-tracker, knowledge-base, document-store and secondary-forge profiles, and every cross-profile capability mismatch rejected (PHX-WP-X, break-proofed)',
   'X-AC-13': 'external-reference-adapter-tests: defaults to reference-only or projection, never last-write-wins',
-  'X-AC-14': 'the doc carries a reconciliation section; no assertion shows an offline external system leaving canonical authority intact',
+  'X-AC-14': 'confirmed absent (PHX-WP-X): neither inspect() call site (external-reference-adapter.mjs:61,72) has a try/catch, so an unreachable external system throws uncaught instead of producing a typed observation -- filed as pipeline.external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system, a production fix not a missing test',
   'X-AC-15': 'external-traceability.md carries three sections; no threat model, publication guide or recovery procedure',
 
   'C-AC-01': 'change-control-tests: profile validation plus the exact bound tuple for mandatory promotion',
@@ -496,7 +504,7 @@ const CLOSURE = {
 
   'L-AC-01': ['build', 'WP-L'],
   'L-AC-02': ['build', 'WP-L'],
-  'L-AC-04': ['assert', 'WP-L'],
+  'L-AC-04': ['build', 'WP-L'],
   'L-AC-07': ['assert', 'WP-L'],
   'L-AC-08': ['doc', 'WP-DOC'],
 
@@ -516,7 +524,7 @@ const CLOSURE = {
 
   'X-AC-11': ['seam', 'WP-X'],
   'X-AC-12': ['assert', 'WP-X'],
-  'X-AC-14': ['assert', 'WP-X'],
+  'X-AC-14': ['build', 'WP-X'],
   'X-AC-15': ['doc', 'WP-DOC'],
 
   'C-AC-02': ['assert', 'WP-C'],
