@@ -16,6 +16,7 @@
       "properties": {
         "humanFacingLanguage": { "type": "string", "enum": ["de", "en"] },
         "activeDuty": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "documentLanguage": { "type": "string", "pattern": "^[a-z]{2}$" },
         "sessionCleanup": {
           "oneOf": [
             { "type": "null" },

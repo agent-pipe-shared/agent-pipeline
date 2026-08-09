@@ -166,7 +166,8 @@ function validRuntime(value) {
   return allowedKeys(value, RUNTIME_KEYS, ["humanFacingLanguage", "activeDuty"])
     && HUMAN_FACING_LANGUAGES.has(value.humanFacingLanguage)
     && safeId(value.activeDuty)
-    && (value.documentLanguage === undefined || DOCUMENT_LANGUAGE.test(value.documentLanguage))
+    && (value.documentLanguage === undefined
+      || (typeof value.documentLanguage === "string" && DOCUMENT_LANGUAGE.test(value.documentLanguage)))
     && (value.sessionCleanup === undefined || value.sessionCleanup === null || (exactKeys(value.sessionCleanup, SESSION_CLEANUP_KEYS)
       && safeId(value.sessionCleanup.sessionId)
       && digest(value.sessionCleanup.descriptorSha256)));

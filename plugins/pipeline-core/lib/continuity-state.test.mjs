@@ -229,17 +229,26 @@ check("valid queue state passes runtime and supported schema subset", () => {
 
 // GF-070: an optional runtime.documentLanguage carries the hosted PRD/Spec
 // document's own language, decoupled from the hard {de, en} operator-facing
-// axis below. Not asserted against schemaLiteSchema here -- the formal JSON
-// schema file is out of scope for this change and stays as-is, so a
-// documentLanguage-bearing runtime is a deliberate, expected mismatch against
-// it, not something this suite claims parity for.
+// axis below. The formal JSON schema declares this same optional field, so a
+// documentLanguage-bearing runtime is also asserted against schemaLiteSchema
+// here (parity with the sibling checks above/below, not a documented gap).
 check("runtime accepts an optional two-letter documentLanguage without touching humanFacingLanguage enforcement", () => {
   const value = state({ runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator", sessionCleanup: null, documentLanguage: "fr" } });
   assert.deepEqual(validateContinuityState(value, FEATURE), { ok: true, code: "CS-VALID" });
+  assert.equal(validateAgainstSchema(value, schemaLiteSchema).valid, true);
 });
 
 check("runtime with documentLanguage still rejects an unsupported humanFacingLanguage", () => {
   const value = state({ runtime: { humanFacingLanguage: "fr", activeDuty: "Coordinator", sessionCleanup: null, documentLanguage: "fr" } });
+  assert.equal(validateContinuityState(value, FEATURE).ok, false);
+});
+
+// F6: RegExp.prototype.test coerces its argument via ToString, so an untyped
+// documentLanguage check would let a one-element array like ["fr"] pass
+// (it stringifies to "fr"). validRuntime must type-guard it like every other
+// string-shaped check in this file (see safeId).
+check("runtime rejects a non-string documentLanguage even when it stringifies to a valid code", () => {
+  const value = state({ runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator", sessionCleanup: null, documentLanguage: ["fr"] } });
   assert.equal(validateContinuityState(value, FEATURE).ok, false);
 });
 
