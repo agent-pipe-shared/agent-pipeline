@@ -21,7 +21,6 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
-import { statePath, SCHEMA_ID } from "./pipeline-state.mjs";
 import { run } from "./pipeline-state.mjs";
 
 const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
@@ -324,68 +323,6 @@ function approvePushAttempt(root, deps, pushTarget = { remote: "origin", destina
   assert.equal(approval.result, 0, `a legacy two-field authority file must keep being accepted: ${approval.lines.join(" ")}`);
   const state = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
   assert.deepEqual(state.pushApproval.lastApproved.threatModel, expectedThreatModel);
-}
-
-// NOTE: this file is not currently registered as a suite in
-// harness/scripts/verify.mjs, so nothing below runs as part of Full Verify.
-// See backlog/items/2026-08-09-pipeline-state-scripts-test-file-never-runs-in-full-verify.md
-// for the full explanation and why this cannot be fixed within ordinary
-// dispatch authority.
-// F7 (GF-075). validCurrentDecisionDocuments falls back to profile.humanFacing
-// only when continuity.runtime.documentLanguage is unset; when it IS set, the
-// PO-language marker must match documentLanguage instead. A profile configured
-// for "en" with a documentLanguage of "fr" and a PRD marked "fr" must still
-// resolve through po-authority-decision-plan -- the OLD behavior (falling back
-// to profile.humanFacing alone) would have rejected it with
-// PO-DECISION-CURRENT-AUTHORITY.
-{
-  const dir = mkdtempSync(join(tmpdir(), "pipeline-state-po-decision-doclang-"));
-  const featureDir = join(dir, "specs", "document-lang-decision");
-  mkdirSync(featureDir, { recursive: true });
-  mkdirSync(join(dir, "project"), { recursive: true });
-  const planPath = "specs/document-lang-decision/prd_feature.md";
-  const specPath = "specs/document-lang-decision/spec.md";
-  writeFileSync(join(dir, specPath), "# Spec content\n");
-  const currentSpecSha256 = createHash("sha256").update(readFileSync(join(dir, specPath))).digest("hex");
-  const oldSpecSha256 = createHash("sha256").update("# older Spec\n").digest("hex");
-  writeFileSync(join(dir, planPath), `<!-- po-language: fr -->\n<!-- technical-spec-sha256: ${oldSpecSha256} -->\n# PRD\n`);
-  const planSha256Value = createHash("sha256").update(readFileSync(join(dir, planPath))).digest("hex");
-  const profile = {
-    schema: "pipeline.po-gate-authority-evidence.v1", humanFacing: "en",
-    sourceSha256: "a".repeat(64), runtimeSha256: "b".repeat(64), receiptSha256: "c".repeat(64), repositoryFingerprint: "d".repeat(64),
-  };
-  const continuity = {
-    schema: "pipeline.continuity.v0", featureId: "document-lang-decision", revision: 3,
-    runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator", documentLanguage: "fr" },
-    authority: { prd: { path: planPath, sha256: planSha256Value }, spec: { path: specPath, sha256: currentSpecSha256 }, result: null },
-    queueHead: { packageId: "nova", actionId: "doclang", nextAction: "review", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null },
-    blocker: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" }, recovery: null, decisionTxn: null,
-    capacity: { concurrencyLimit: 4, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" },
-  };
-  const state = {
-    schema: SCHEMA_ID, activeFeature: { id: "document-lang-decision", planPath, phase: "implementation" }, planApproved: true,
-    planApproval: {
-      schema: "pipeline.plan-approval.v2", approvedBy: "PO", approvedAt: "2026-08-01T00:00:00.000Z",
-      specBoundBy: "PO", specBoundAt: "2026-08-01T00:00:00.000Z",
-      poGateAuthority: { ...profile, schema: "pipeline.po-gate-authority.v2", planPath, planSha256: planSha256Value, specPath, specSha256: currentSpecSha256 },
-    },
-    continuity, updatedAt: "2026-08-01T00:00:00.000Z",
-  };
-  writeFileSync(statePath(dir), JSON.stringify(state, null, 2) + "\n");
-  const deps = { dir, now: () => "2026-08-09T10:00:00.000Z", poGateProfile: () => ({ ok: true, value: profile }) };
-  let captured = "";
-  const originalLog = console.log;
-  console.log = (line) => { captured += line; };
-  let exitCode;
-  try {
-    exitCode = run(["po-authority-decision-plan"], deps);
-  } finally {
-    console.log = originalLog;
-  }
-  const plan = JSON.parse(captured || "{}");
-  assert.equal(exitCode, 0, `F7: a non-de/en documentLanguage marker matching continuity.runtime.documentLanguage must plan cleanly, got ${captured}`);
-  assert.equal(plan.schema, "pipeline.po-authority-decision-plan.v1");
-  assert.equal(plan.status, "planned");
 }
 
 console.log("pipeline-state.test.mjs (CB-1a): all checks passed");

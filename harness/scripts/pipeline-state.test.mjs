@@ -430,6 +430,56 @@ function runPoAuthorityRebindTests() {
 }
 
 {
+  // Moved here from plugins/pipeline-core/scripts/pipeline-state.test.mjs (F7,
+  // GF-075/GF-077): validCurrentDecisionDocuments falls back to
+  // profile.humanFacing only when continuity.runtime.documentLanguage is
+  // unset; when it IS set, the PO-language marker must match documentLanguage
+  // instead. A profile of "en" with documentLanguage "fr" and a PRD marked
+  // "fr" must still plan cleanly -- the old behavior (falling back to
+  // profile.humanFacing alone) would have rejected it with
+  // PO-DECISION-CURRENT-AUTHORITY.
+  const dir = freshDir("po-decision-doclang");
+  const featureDir = join(dir, "specs", "document-lang-decision");
+  mkdirSync(featureDir, { recursive: true });
+  mkdirSync(dirname(statePath(dir)), { recursive: true });
+  const planPath = "specs/document-lang-decision/prd_feature.md";
+  const specPath = "specs/document-lang-decision/spec.md";
+  writeFileSync(join(dir, specPath), "# Spec content\n");
+  const currentSpecSha256 = createHash("sha256").update(readFileSync(join(dir, specPath))).digest("hex");
+  const oldSpecSha256 = createHash("sha256").update("# older Spec\n").digest("hex");
+  writeFileSync(join(dir, planPath), `<!-- po-language: fr -->\n<!-- technical-spec-sha256: ${oldSpecSha256} -->\n# PRD\n`);
+  const planSha256Value = createHash("sha256").update(readFileSync(join(dir, planPath))).digest("hex");
+  const profile = {
+    schema: "pipeline.po-gate-authority-evidence.v1", humanFacing: "en",
+    sourceSha256: A, runtimeSha256: B, receiptSha256: C, repositoryFingerprint: D,
+  };
+  const continuity = {
+    schema: "pipeline.continuity.v0", featureId: "document-lang-decision", revision: 3,
+    runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator", documentLanguage: "fr" },
+    authority: { prd: { path: planPath, sha256: planSha256Value }, spec: { path: specPath, sha256: currentSpecSha256 }, result: null },
+    queueHead: { packageId: "nova", actionId: "doclang", nextAction: "review", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null },
+    blocker: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" }, recovery: null, decisionTxn: null,
+    capacity: { concurrencyLimit: 4, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" },
+  };
+  const state = {
+    schema: SCHEMA_ID, activeFeature: { id: "document-lang-decision", planPath, phase: "implementation" }, planApproved: true,
+    planApproval: {
+      schema: "pipeline.plan-approval.v2", approvedBy: "PO", approvedAt: "2026-08-01T00:00:00.000Z",
+      specBoundBy: "PO", specBoundAt: "2026-08-01T00:00:00.000Z",
+      poGateAuthority: { ...profile, schema: "pipeline.po-gate-authority.v2", planPath, planSha256: planSha256Value, specPath, specSha256: currentSpecSha256 },
+    },
+    continuity, updatedAt: "2026-08-01T00:00:00.000Z",
+  };
+  writeFileSync(statePath(dir), JSON.stringify(state, null, 2) + "\n");
+  const deps = { dir, now: () => "2026-08-09T10:00:00.000Z", poGateProfile: () => ({ ok: true, value: profile }) };
+  const planned = captureConsole(() => run(["po-authority-decision-plan"], deps));
+  const plan = JSON.parse(planned.text || "{}");
+  ok("PS55j a non-de/en documentLanguage marker matching continuity.runtime.documentLanguage plans cleanly", planned.value === 0
+    && plan.schema === "pipeline.po-authority-decision-plan.v1"
+    && plan.status === "planned");
+}
+
+{
   const fixture = seedPoAuthorityRebind("po-decision-selection-drift");
   const state = readState(fixture.dir).state;
   state.activeFeature.phase = "design";
