@@ -11,6 +11,20 @@ import { validateContinuityState } from "./continuity-state.mjs";
 const APPROVAL_SCHEMA = "pipeline.plan-approval.v2";
 const PREVIOUS_CURRENT_APPROVAL_SCHEMA = "pipeline.plan-approval.v3";
 export const CURRENT_APPROVAL_SCHEMA = "pipeline.plan-approval.v4";
+// Schema-identifier collision, resolved additively and deliberately NOT merged:
+// "pipeline.plan-approval.v3" denotes two disjoint historical record shapes.
+//   - PREVIOUS_CURRENT_APPROVAL_SCHEMA (above): the submission-bound approval
+//     superseded by v4; key set PREVIOUS_CURRENT_APPROVAL_KEYS. Authoritative
+//     for everything submitPlan/approveSubmittedPlan/sealCurrentPlanApproval
+//     write. Untouched by the restoration below.
+//   - HUMAN_APPROVAL_SCHEMA (below): the ledger-first, human-decision-bound
+//     approval of the spec-binding lineage, restored from 998a609 (the last
+//     commit before the 75b8361 integration merge dropped it); key set
+//     HUMAN_APPROVAL_KEYS. The two key sets are disjoint, so hasExactKeys keeps
+//     validV3Approval and validPreviousCurrentPlanApproval mutually exclusive:
+//     no record can satisfy both, and neither reader can misread the other.
+const HUMAN_APPROVAL_SCHEMA = "pipeline.plan-approval.v3";
+const HUMAN_REFERENCE_SCHEMA = "pipeline.human-decision-reference.v1";
 export const PLAN_SUBMISSION_SCHEMA = "pipeline.plan-submission.v1";
 export const PLAN_INVALIDATION_SCHEMA = "pipeline.plan-invalidation.v1";
 const AUTHORITY_SCHEMA = "pipeline.po-gate-authority.v2";
@@ -39,6 +53,8 @@ const APPROVAL_KEYS = [
   "specBoundAt",
   "poGateAuthority",
 ];
+const HUMAN_APPROVAL_KEYS = [...APPROVAL_KEYS, "humanDecision"];
+const HUMAN_REFERENCE_KEYS = ["schema", "decisionId", "decisionDigest", "candidate", "checkpoint"];
 const LEGACY_APPROVAL_KEYS = ["approvedBy", "approvedAt"];
 const REVOCATION_KEYS = [
   "schema",
@@ -208,6 +224,35 @@ function validV2Approval(value) {
     && validAuthority(value.poGateAuthority);
 }
 
+function validHumanDecisionReference(value) {
+  return hasExactKeys(value, HUMAN_REFERENCE_KEYS)
+    && value.schema === HUMAN_REFERENCE_SCHEMA
+    && typeof value.decisionId === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(value.decisionId)
+    && SHA256.test(value.decisionDigest)
+    && hasExactKeys(value.candidate, ["commit", "tree"])
+    && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(value.candidate.commit)
+    && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(value.candidate.tree)
+    && hasExactKeys(value.checkpoint, ["repositoryFingerprint", "streamId", "sequence", "eventDigest", "candidateCommit", "candidateTree"])
+    && SHA256.test(value.checkpoint.repositoryFingerprint)
+    && value.checkpoint.streamId === "human"
+    && Number.isSafeInteger(value.checkpoint.sequence) && value.checkpoint.sequence > 0
+    && SHA256.test(value.checkpoint.eventDigest)
+    && value.checkpoint.candidateCommit === value.candidate.commit
+    && value.checkpoint.candidateTree === value.candidate.tree;
+}
+
+function validV3Approval(value) {
+  return hasExactKeys(value, HUMAN_APPROVAL_KEYS)
+    && value.schema === HUMAN_APPROVAL_SCHEMA
+    && isNonBlankString(value.approvedBy)
+    && isCanonicalIso(value.approvedAt)
+    && isNonBlankString(value.specBoundBy)
+    && isCanonicalIso(value.specBoundAt)
+    && validAuthority(value.poGateAuthority)
+    && validHumanDecisionReference(value.humanDecision)
+    && value.humanDecision.checkpoint.repositoryFingerprint === value.poGateAuthority.repositoryFingerprint;
+}
+
 function validActiveFeature(value) {
   return hasExactKeys(value, ACTIVE_FEATURE_KEYS)
     && isNonBlankString(value.id)
@@ -303,7 +348,14 @@ function currentApproval(state, submission, observation) {
   // Compatibility states had no explicit submission. Their exact approval
   // remains current until the next sanctioned lifecycle write.
   if (state.planSubmission === undefined && state.planApproved === true) {
-    if (validV2Approval(approval)) {
+    // Collision resolution, read side: the restored human-decision-bound v3
+    // approval has exactly the standing of the v2 spec-bound one -- same closed
+    // authority, plus a ledger reference. Without this widening a freshly
+    // written v3 approval would read back as no approval at all
+    // (PLAN-LIFECYCLE-APPROVAL-STALE), which is worse than not restoring the
+    // writer. Strictly additive: this compatibility branch is only reached when
+    // state.planSubmission is undefined, so no submission-bound path changes.
+    if (validV2Approval(approval) || validV3Approval(approval)) {
       const authority = approval.poGateAuthority;
       if (authority.planPath !== state.activeFeature.planPath) return null;
       if (observation.planSha256 !== undefined && observation.planSha256 !== authority.planSha256) return null;
@@ -871,8 +923,48 @@ export function bindPlanSpecApproval({
 }
 
 /**
- * Pure v2-only revocation. Legacy approvals/revocations are history, never an
- * authorization source for this transition.
+ * Ledger-first v3 plan-approval transition. The mutable projection preserves
+ * the exact authority reference, while a reader independently resolves it.
+ * Cyborg integration point: the caller must supply a reference that was bound
+ * to Cyborg's verified-human-attestation receipt at the admission boundary;
+ * this pure state transition must not attempt identity verification itself.
+ */
+export function bindPlanSpecApprovalWithHumanDecision({
+  state,
+  expectedStateSha256,
+  poGateAuthority,
+  expectedPlanSha256,
+  expectedSpecSha256,
+  humanDecision,
+  by,
+  at,
+}) {
+  if (!currentStateMatches(state, expectedStateSha256)) return fail("PS-V3-STATE-STALE");
+  if (!matchingAuthority(poGateAuthority, expectedPlanSha256, expectedSpecSha256)) return fail("PS-V3-AUTHORITY-INVALID");
+  if (!validHumanDecisionReference(humanDecision) || humanDecision.checkpoint.repositoryFingerprint !== poGateAuthority.repositoryFingerprint) return fail("PS-V3-HUMAN-DECISION-INVALID");
+  if (!validStateForAuthority(state, poGateAuthority) || state.planApproved !== true) return fail("PS-V3-APPROVAL-INVALID");
+  if (!isNonBlankString(by) || !isCanonicalIso(at) || Object.prototype.hasOwnProperty.call(state, "planRevocation")) return fail("PS-V3-BIND-REQUEST-INVALID");
+  const approval = state.planApproval;
+  if (validV3Approval(approval)) {
+    if (!equalCanonical(approval.poGateAuthority, poGateAuthority) || !equalCanonical(approval.humanDecision, humanDecision) || approval.specBoundBy !== by || approval.specBoundAt !== at) return fail("PS-V3-BIND-CONFLICT");
+    return { ok: true, replay: true, state, approval };
+  }
+  if (!validLegacyApproval(approval) && !validV2Approval(approval)) return fail("PS-V3-LEGACY-APPROVAL-INVALID");
+  const bound = {
+    schema: HUMAN_APPROVAL_SCHEMA,
+    approvedBy: approval.approvedBy,
+    approvedAt: approval.approvedAt,
+    specBoundBy: by,
+    specBoundAt: at,
+    poGateAuthority,
+    humanDecision,
+  };
+  return { ok: true, replay: false, state: { ...state, planApproved: true, planApproval: bound }, approval: bound };
+}
+
+/**
+ * Pure current-approval revocation. Legacy approvals/revocations are history;
+ * an exact v2 or ledger-first v3 approval supplies the bound authority.
  */
 export function revokePlanV2({
   state,
@@ -885,7 +977,7 @@ export function revokePlanV2({
   if (!currentStateMatches(state, expectedStateSha256)) return fail("PS-V2-STATE-STALE");
   if (!isNonBlankString(by) || !isCanonicalIso(at)) return fail("PS-V2-REVOCATION-REQUEST-INVALID");
   const approval = state?.planApproval;
-  if (!validV2Approval(approval)) return fail("PS-V2-APPROVAL-INVALID");
+  if (!validV2Approval(approval) && !validV3Approval(approval)) return fail("PS-V2-APPROVAL-INVALID");
   const authority = approval.poGateAuthority;
   if (
     !matchingAuthority(authority, expectedPlanSha256, expectedSpecSha256)
