@@ -2165,6 +2165,38 @@ trusted.
 D/S/B wave this whole checkpoint chain has been running, next candidates being the closure
 design's remaining WP-H (`H-AC-15`), WP-PX0, and WP-E packages.
 
+### WP-H AND WP-E LANDED: 87 OF 157, H-AC-15 THE FIRST CRITERION IN THIS WAVE TO CLOSE CLEAN (2026-08-09)
+
+**`PHX-WP-H` landed** (`2594552`), all thirteen H-AC-15 conformance scenarios pinned in one pass
+— grant/consumption/expiry/redaction already covered by existing tests, the other nine
+(denial/revocation/correction/retry/concurrency/interruption/tampering/stale-candidate/cross-
+repository-binding) newly written and independently break-proofed against six distinct temporary
+production faults across two modules, zero collateral on the 16 pre-existing tests. Independently
+verified: 24/24 pass, diff touches exactly the one file. **H-AC-15 moves straight to
+`implemented`** — the first criterion in this whole wave (five packages, dozens of criteria) that
+lands with no residual gap at all. 86 becomes **87**; issue #30 moves 7/17 → 8/17 carried.
+
+**`PHX-WP-E` landed** (`de13e92`), five break-proofed assertions across three governance-export
+suites for E-AC-02/04/06/08/09/11/14. None of the seven moves to implemented — every one is a
+multi-clause enumeration and each still carries a named gap — but the wave sharpened five of them
+from vague "not pinned" into confirmed, code-cited capability absence (E-AC-02's loss-declaration
+field always empty; E-AC-04's EXPORT_FIELDS being a closed constant; half of E-AC-08's eight
+detection classes; E-AC-09's "advisory destination" concept not existing at all; E-AC-11's
+missing per-projection digest field), each reclassified Class A → Class B accordingly.
+**E-AC-06 and E-AC-14 were deliberately left Class A** — their gaps were dropped for tool-budget
+reasons, not confirmed absent by search, and the dispatch was explicit about that distinction
+rather than blurring a "ran out of budget" into a false capability-gap finding. Independently
+verified: 24/24 pass across the three changed files, sanitization clean, all four break-proofed
+production files show zero residual diff. 87 stays 87 — a narrowing wave, not a closing one.
+
+Both deltas are one commit each (`e33618d` for WP-H, `7253d49` for WP-E), landed and verified
+separately since WP-H finished first.
+
+**Next candidates**, per the closure design's remaining Class A inventory: WP-PX0 (7 criteria,
+`ruleset-source*.mjs`/`continuity-state.mjs`), WP-R's already-closed batch leaves no more open
+Class A work in that package, WP-K's `K-AC-10` reclassified to Class B already. WP-PX0 is the
+largest remaining Class A package not yet touched this session.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
