@@ -177,7 +177,7 @@
     {
       "class": "plan",
       "path": "specs/sprint-nova-epic/plans/nova-b.md",
-      "sha256": "cac8d56202027adffdc721f76de257df972201d3eabef2d0d4e8cbbd56eaaf58",
+      "sha256": "bb82311614f798cd9305ca4433196d0fa69b733a832cb2cac33a1cc4835a79a7",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"
