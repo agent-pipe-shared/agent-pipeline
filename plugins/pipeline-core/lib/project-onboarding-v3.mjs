@@ -327,10 +327,18 @@ export function planProjectPartialAuthorityAdoption({ rootDir = process.cwd(), p
     // This path holds an explicit PO profile selection, so the seeded gate
     // chapter is the one that profile asks for.
     const baselines = freshBaselines(intent, { profile });
+    // Same three portable targets the primary onboarding flow writes for the
+    // seeded blocking `push` gate, PLUS the matching proof policy
+    // (CRITICAL_HUMAN_PROOF_POLICY_PATH) -- this route seeds the identical
+    // gate chapter (see freshGateChapter below) and would otherwise leave a
+    // reconstructed project's first `approve-push` refusing with
+    // CRITICAL-PROOF-POLICY-KIND-REQUIRED, exactly the defect
+    // freshCriticalHumanProofPolicyBytes exists to remove.
     const targets = [
       { path: SOURCE, bytes: renderYaml(intent) },
       { path: ".claude/pipeline.yaml", bytes: baselines[".claude/pipeline.yaml"].bytes },
       { path: NEUTRAL_MANIFEST, bytes: baselines[NEUTRAL_MANIFEST].bytes },
+      { path: CRITICAL_HUMAN_PROOF_POLICY_PATH, bytes: baselines[CRITICAL_HUMAN_PROOF_POLICY_PATH].bytes },
     ].sort((left, right) => left.path.localeCompare(right.path));
     for (const target of targets) if (fs.existsSync(safePath(root, target.path, fs))) throw new Error(`Pipeline-owned target already exists: ${target.path}`);
     const plan = { schema: PARTIAL_AUTHORITY_PLAN_SCHEMA, status: "ready", root, selection: { profile, source }, artifacts, targets: targets.map((target) => ({ path: target.path, before: describe(null), after: describe(target.bytes) })), mutation: false };
@@ -350,7 +358,7 @@ export function applyProjectPartialAuthorityAdoption({ rootDir = process.cwd(), 
   const root = plan.root; const created = []; const createdDirectories = [];
   try {
     const intent = freshIntent(runner); const baselines = freshBaselines(intent);
-    const bytes = new Map([[SOURCE, renderYaml(intent)], [".claude/pipeline.yaml", baselines[".claude/pipeline.yaml"].bytes], [NEUTRAL_MANIFEST, baselines[NEUTRAL_MANIFEST].bytes]]);
+    const bytes = new Map([[SOURCE, renderYaml(intent)], [".claude/pipeline.yaml", baselines[".claude/pipeline.yaml"].bytes], [NEUTRAL_MANIFEST, baselines[NEUTRAL_MANIFEST].bytes], [CRITICAL_HUMAN_PROOF_POLICY_PATH, baselines[CRITICAL_HUMAN_PROOF_POLICY_PATH].bytes]]);
     for (const target of plan.targets) {
       const path = safePath(root, target.path, fs);
       if (fs.existsSync(path)) throw new Error(`target appeared during activation: ${target.path}`);

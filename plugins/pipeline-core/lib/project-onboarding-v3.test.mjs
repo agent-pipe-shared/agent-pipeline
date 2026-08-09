@@ -2891,6 +2891,23 @@ test("the seeded push gate refuses an unapproved push and admits it after the sh
 // file regardless of which mode a project's operator later chooses, because
 // that choice is made in `pipeline.user.yaml` -- editable at any point after
 // onboarding -- not at onboarding time itself.
+//
+// `signature` half: `approve-push` in signature mode demands SIX flags
+// (--by/--remote/--destination/--proof-request/--proof-authority/--proof) --
+// `parseExactFlags` refuses BEFORE `verifyCriticalHumanProof` is ever reached
+// if even one is missing, and with the policy file absent that earlier refusal
+// fires regardless of this fix. All six MUST be supplied here so the command
+// actually reaches the policy-kind check this test exists to pin; fewer flags
+// only demonstrates the unrelated flag-parsing refusal and would pass
+// unchanged whether or not this fix exists.
+//
+// `chat` half: ADR-0056's fix in pipeline-state.mjs reads the `push_approval:
+// chat` stand-down BEFORE `requiredKinds` is even consulted, so a chat-mode
+// `approve-push` succeeds whether or not `project/critical-human-proof.json`
+// exists -- there is no policy-kind refusal to reproduce here, pre- or
+// post-fix. This half is therefore driven end to end (PUSHSEED-2's chat
+// shape) as a regression guard: the seeded policy file must not break the
+// already-satisfiable chat path.
 test("onboarding materializes project/critical-human-proof.json declaring push, for both push_approval modes", () => {
   const signatureRoot = root();
   const chatRoot = root();
@@ -2925,24 +2942,38 @@ test("onboarding materializes project/critical-human-proof.json declaring push, 
       }
       commit(`seeded consumer (${mode})`);
 
+      // The artifact `approve-push` binds, for both modes -- required before
+      // either can reach its own next real gate (PUSHSEED-2's step (4)).
+      assert.equal(state("materialize-push-threat-model").status, 0);
+      commit(`push threat model (${mode})`);
+
       if (mode === "signature") {
         // Before this fix: refused with CRITICAL-PROOF-POLICY-KIND-REQUIRED,
-        // because no policy file existed to declare `push` at all. After: the
-        // policy is satisfied, so the command reaches its own NEXT real gate --
-        // the missing external proof flags -- instead of refusing outright.
-        const attempted = state("approve-push", "--by", "po", "--remote", "origin", "--destination", "refs/heads/feat/x");
+        // because no policy file existed to declare `push` at all. All six
+        // flags are supplied (see comment above the test) so the command
+        // actually reaches `verifyCriticalHumanProof` rather than refusing
+        // earlier at `parseExactFlags` for an unrelated reason. The proof
+        // paths are deliberately unresolvable -- reaching the resulting
+        // CRITICAL-PROOF-EXTERNAL-PATH refusal (rather than a completed
+        // signed approval, which is out of this test's scope) is itself the
+        // proof that the policy-kind check was satisfied and passed through.
+        const attempted = state(
+          "approve-push", "--by", "po", "--remote", "origin", "--destination", "refs/heads/feat/x",
+          "--proof-request", "unused-request.json", "--proof-authority", "unused-authority.json", "--proof", "unused-proof.json",
+        );
         assert.equal(attempted.status, 2, attempted.stderr);
         assert.doesNotMatch(String(attempted.stderr), /CRITICAL-PROOF-POLICY-KIND-REQUIRED/u,
           "a fresh signature-mode project must not be refused for an undeclared push policy");
-        assert.match(String(attempted.stderr), /approve-push requires --by, --remote, --destination, --proof-request/u,
-          "the refusal must be the ordinary missing-proof gate, not the policy-kind refusal");
+        assert.match(String(attempted.stderr), /CRITICAL-PROOF-EXTERNAL-PATH/u,
+          "the refusal must be the external-proof gate reached AFTER the policy-kind check, not the policy-kind refusal itself");
       } else {
-        // `chat` mode already stands the private-key proof down before
-        // `requiredKinds` is even consulted (ADR-0056), so this half's contract
-        // is that the file exists and is well-formed -- checked above -- and
-        // that materializing it changes nothing about the already-satisfiable
-        // `chat` path PUSHSEED-2 measures.
-        assert.equal(state("materialize-push-threat-model").status, 0);
+        // `chat` mode stands the private-key proof down before `requiredKinds`
+        // is even consulted (ADR-0056 -- see comment above the test), so this
+        // half exercises `approve-push` to a genuine completed approval
+        // (PUSHSEED-2's chat shape) rather than a proxy command: materializing
+        // the policy file must not regress the already-satisfiable chat path.
+        const approved = state("approve-push", "--by", "po", "--remote", "origin", "--destination", "refs/heads/feat/x");
+        assert.equal(approved.status, 0, approved.stderr);
       }
     }
   } finally { dispose(signatureRoot); dispose(chatRoot); }
@@ -4974,6 +5005,14 @@ test("partial authority planner requires an explicit V3 selection and hashes pre
     assert.match(planned.planSha256, /^[a-f0-9]{64}$/u);
     assert.deepEqual(planned.artifacts.map((entry) => entry.path), [".agents", ".claude"]);
     assert.equal(planned.mutation, false);
+    // F1: this reconstruction route seeds the identical blocking `push` gate
+    // chapter as the primary onboarding flow (freshGateChapter), so it must
+    // also plan the matching proof policy -- otherwise a reconstructed
+    // project's first `approve-push` refuses with
+    // CRITICAL-PROOF-POLICY-KIND-REQUIRED, the exact defect this policy
+    // exists to remove.
+    assert.equal(planned.targets.some((target) => target.path === "project/critical-human-proof.json"), true,
+      "the partial-authority plan must include the critical-human-proof policy target");
   } finally { dispose(path); }
 });
 
@@ -4995,6 +5034,16 @@ test("partial authority apply creates only absent owned targets and preserves us
     assert.equal(readFileSync(join(path, ".claude", "pipeline.json"), "utf8"), '{"project":"legacy"}\n');
     assert.equal(readFileSync(join(path, ".agents", "AGENTS.md"), "utf8"), "user-owned\n");
     assert.equal(readFileSync(join(path, ".codex", "hooks.json"), "utf8"), "user-owned\n");
+    // F1: materialized by activation, not merely planned, and with the same
+    // shape (`requiredKinds: ["push"]`) the primary onboarding route seeds --
+    // this route seeds the identical blocking `push` gate chapter, so the
+    // reconstructed project's first `approve-push` must not refuse with
+    // CRITICAL-PROOF-POLICY-KIND-REQUIRED.
+    const policyPath = join(path, "project", "critical-human-proof.json");
+    assert.equal(existsSync(policyPath), true, "critical-human-proof.json must be materialized by partial-authority activation");
+    const policy = JSON.parse(readFileSync(policyPath, "utf8"));
+    assert.equal(policy.schema, "pipeline.critical-human-proof-policy.v1");
+    assert.deepEqual(policy.requiredKinds, ["push"]);
   } finally { dispose(path); }
 });
 
