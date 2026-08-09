@@ -881,6 +881,17 @@ const DELTA = {
   // activation tests pass.
   'P-AC-03': ['implemented', 'WP-P-AC01-AC03'],
 
+  // R-AC-09: an optional occurredAtEpochMs field on validateCommandOfferEvent
+  // (agent-decision-journal.mjs) closes the "stale" clause -- a comparable
+  // timestamp for a caller to judge staleness against its own policy, no
+  // hardcoded window invented. The "duplicated" clause is deliberately NOT
+  // re-closed here: governance-event-store.mjs's idempotencyKey mechanism
+  // already covers duplicate/conflict detection at the append layer, and a
+  // pre-existing R-AC-13 test documents this validation layer intentionally
+  // delegates that to the caller's append() -- building a second mechanism
+  // would be redundant. Narrowed, not fully closed. 41/41 + 30/30 tests pass.
+  'R-AC-09': ['partial', 'WP-R-AC09'],
+
   // H-AC-12: decision-reference-dual-evaluation.mjs is the shared "dual-
   // evaluate during migration, fail on disagreement, carry a shared
   // compatibility owner+expiry" primitive, wired into the two lowest-risk
@@ -1118,7 +1129,7 @@ const POINTERS = {
   'R-AC-06': 'external-command-offer-tests: user execution stays unobserved; completion admitted only with bounded evidence',
   'R-AC-07': 'external-command-offer-tests: failed, partial, cancelled, mismatch and unknown outcomes retained distinctly',
   'R-AC-08': 'external-command-offer-tests (PHX-WP-R): a readback lifecycle event appends exactly once and never rewrites the original offer; rollback/cleanup as *occurred* events are absent -- no such state exists at all, only prospective values inside recoverability',
-  'R-AC-09': 'external-command-offer-tests (PHX-WP-R): missing offer link, contradictory outcome evidence, and cross-repository/cross-scope substitution all fail closed (never successful); stale and duplicate detection remain absent -- no timestamp field, no supersession semantics for command-offer events',
+  'R-AC-09': 'agent-decision-journal/external-command-offer-tests (PHX-WP-R + WP-R-AC09): missing offer link, contradictory outcome evidence, and cross-repository/cross-scope substitution all fail closed (never successful), AND occurredAtEpochMs now closes the stale clause. Duplicate detection remains at the store layer by design (idempotencyKey, governance-event-store.mjs), not re-built here -- deliberate, not absent. 41/41 + 30/30 tests pass',
   'R-AC-10': 'fail-closed on the append is pinned; the policy-defined typed non-material exception is absent',
   'R-AC-11': 'external-command-offer-tests (PHX-WP-R): a mandatory public-safe typed omission is pinned; "sanctioned machine-local state" storage and a distinct "commitment" field are absent from this module (it stores nothing by design; commitment only exists in the unrelated document-lifecycle.mjs)',
   'R-AC-12': 'external-command-offer-tests (PHX-WP-R-AC12): the motivating Phoenix bootstrap trajectory is now encoded end to end -- a rejected guard-bypass attempt, an attended local repair through the sanctioned non-authoritative channel, an unchanged public-privacy boundary, a verified readback, and digest-only targets that never embed a machine-specific value',
