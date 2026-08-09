@@ -3,7 +3,7 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-08
+**Last updated:** 2026-08-09
 **Project status:** ACTIVE
 **Current block:** GF-057 — a second `0.5.4` local candidate that closes the onboarding deadlock both runners hit against the first one, the consumer blockers the PO's consolidated review found, and the setup work (SETUP-2 done, SETUP-3/4 open); 0.5.3 is released to `main` and the human-authorization ceremony recorded as [ADR-0061](adr/0061-uniform-human-approval-ceremony.md) remains the governing thread; Nova A completion still paused on genuine ADR-gated/evidence-gated blockers
 **Repair baseline:** `5d2b83dcc765d50801f4491e1bd9bed32090112b`
@@ -16,7 +16,89 @@ the supplied authoritative release identity; it is not a claimed release time.
 The historical candidate-qualification sections below are retained as
 session history and no longer describes the current publication disposition.
 
-## 2026-08-08 Nova GF-057 — the second 0.5.4 candidate: setup, and the deadlock both runners hit (current, in progress)
+## 2026-08-09 Nova CRITIC-054 — three independent Critic rounds against the 0.5.4 candidate, all FAIL (current, in progress)
+
+The hardening block was reviewed by three independent read-only Critic rounds
+with disjoint surfaces: A (state writer, continuity classifier, typed reset,
+contract fixture — 8 commits), B (guard grammar, generated obligations, repair
+map, operator tool — 5 commits), C (security-scan and ledger relocation,
+bootstrap skill, role contract — 7 commits). **All three returned FAIL:** one
+blocker, nine major, seven minor.
+
+**Why the round was split, and what splitting did and did not buy.** A single
+round over all 27 commits truncated twice at 44 and 54 tool uses. The limit is
+tool uses per subagent, not commit count, so splitting did not prevent
+truncation — all three split rounds also ran out, at 54, 55 and 64. What it
+bought was recoverability: each round had written enough `candidate — not a
+finding` material to its `scratch/` notes file that a purely procedural
+continuation produced a complete report. The first, unsplit round had left one
+line. **The lesson for `templates/prompts/critic-review.md` is therefore not
+"split the review" but two other things:** a Critic must spend its remaining
+budget on Phase B rather than pushing the hunt, and it must append each
+candidate as it is found rather than in batches.
+
+**The blocker.** `guard-lifecycle-ready.mjs` emitted a `mutation: true` retry
+action inside `pipeline.guard-retry-actions.v1`, whose frozen AC-047-140 says
+the envelope "SHALL never admit … mutation" — and the same commit had weakened
+the guard's own printed guarantee from "read-only actions" to "typed actions" to
+accommodate it. The only in-repo consumer, `human-guard-override.mjs:703`,
+accepts an action only when `mutation === false`, so it silently dropped the one
+thing the change existed to deliver. Fixed in `eda88ff`: the remedy is message
+text, the guarantee is restored, and the grammar differential proves zero
+reclassified shapes against `53aa19a`.
+
+**The recurring shape, in six of the findings.** A producer and its consumer are
+each tested against a copy of the other's assumptions rather than against each
+other, and the resulting green is offered as proof. The reset suite routed its
+happy-path fixtures to the legacy tier and wrote the reason in a comment, which
+hid that `apply` could never complete on the neutral tier the Pipeline actually
+resolves to (`2839389`). The relocation commit cited
+`check-consumer-safe-paths.mjs` as evidence it had followed "every operator-facing
+reference", while that check scans only `plugins/pipeline-core/` and is
+structurally blind to `.github/`, `harness/`, `docs/`, `templates/` and
+`.env.example` — where both missed references actually were (`16001ec`,
+`789b3d2`). The grammar differential defaulted to `--base HEAD`, comparing the
+guard against itself for a vacuously green verdict (`ad53154`).
+
+**A claim of this session's own, withdrawn.** Two commit messages and a backlog
+item asserted that `GUARD-OPERATOR-UNAPPROVED` offers a human override route
+while `GUARD-PARSE-UNSUPPORTED` does not. Both branches call the same function
+with the same arguments (`:1686`, `:1701`); inside it the `code` parameter is
+read once, at `:288`, inside a message string. The counterexample had been in
+hand — an operator-class refusal that offered no route — and was read as an
+ordinary refusal rather than as evidence. Withdrawn in `9fa2cdd`, with the
+mistake left visible.
+
+**Authorship evidence does not bind, and this session added an instance.** All
+three rounds independently found that the `Dispatch:` trailer and the dispatch
+record prove nothing: five commits carry no trailer, two carry trailers their
+own records contradict, one record names an unrelated commit, and eight records
+sit at `outcome: "in-progress"` with an empty report. One hour after reading
+those findings the Elephant committed `1c3cd86` with `Dispatch: GUARDFIX-2
+(goldfish)` for a generator run the goldfish's scope excluded; the correct
+trailer was `AI-Assisted: true` alone. Recorded in
+`backlog/items/2026-08-09-the-dispatch-record-does-not-bind-to-the-commit-it-vouches-for.md`
+(`7f4a94c`), including that instance, because it is the item's own argument: the
+existing check tests for the presence of a trailer, which is the one property
+that carries no information.
+
+**Cachebuster, per the PO's 2026-08-09 decision.** Both runner manifests carry
+`<semver>+<runner>.<YYYYMMDDHHMMSS>.<short-oid>` so a local candidate is testable
+on both runners before a release. `codex-pretool-guard.test.mjs` was the binding
+constraint — it admitted a Codex stamp only without an OID — and changed with it
+(`9df4e39`). Stripping at the release tag is unchanged. See the superseded
+paragraph in the GF-054 section for what this replaces.
+
+**Open at the time of writing.** Three minor findings are deliberately not fixed
+and go to the PO as a decision rather than being folded in silently: the
+obligations document sends agents to `repair-map.mjs`, which the non-ready lane
+refuses; the newline-detection in the guard does not match `git -C <dir> commit`;
+and `docs/pending-verify-registrations.md` declares itself resolved while listing
+rows. A dangling-reference check covering the directories
+`check-consumer-safe-paths.mjs` cannot see is in progress and needs a TP-3
+maintenance window to be registered in `verify.mjs` — the PO has offered one.
+
+## 2026-08-08 Nova GF-057 — the second 0.5.4 candidate: setup, and the deadlock both runners hit (in progress)
 
 The PO installed the first `0.5.4` candidate (`0.5.4+claude.20260808104333.c4be063`,
 confirmed installed by the bootstrap preflight, byte-identical to the checkout
@@ -1570,6 +1652,16 @@ at the bare semver, which `codex-pretool-guard.test.mjs` accepts because it
 compares base versions. That same check caught the Codex manifest being left
 behind on the first bump attempt — a second manifest that had simply been
 overlooked.
+
+> **Superseded 2026-08-09 (`9df4e39`), recorded as an addendum because the
+> paragraph above was true when written.** The PO's requirement is that a local
+> candidate be testable on BOTH runners before a release, which a stamp on only
+> one manifest cannot deliver. Both manifests now carry
+> `<semver>+<runner>.<YYYYMMDDHHMMSS>.<short-oid>`. The Codex guard test was the
+> binding constraint and had to change with it: it admitted a Codex stamp, but
+> only as `codex.<14 digits>` with no OID. Stripping at the tag is unchanged.
+
+
 
 The local install is done and its readback contract holds: `status: "ready"`,
 `version` equal to `installedVersion` at
