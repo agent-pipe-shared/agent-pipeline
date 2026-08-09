@@ -26,11 +26,13 @@
  * never from the raw `--repo-root` string a caller supplies. Unlike
  * `guard-maintenance-window.mjs`, this program has NO flag, argument, environment
  * variable, or code path anywhere that lets a caller substitute a different trust
- * anchor: pointing `--repo-root` at a subdirectory (or any other path) cannot
- * select a different anchor, because the raw string only ever serves as the
- * starting point `discoverRepository` walks up from — the committed anchor at
- * the resolved primary root is the only source, unconditionally. Any
- * verification failure exits non-zero and appends nothing.
+ * anchor while still binding a grant to and appending it into THIS repository:
+ * the anchor, the repository fingerprint, and the ledger append destination are
+ * all derived from the SAME resolved `repo.primaryRoot`. Pointing `--repo-root`
+ * at a different repository (one with its own `.git`) resolves and binds to
+ * THAT repository's own anchor, fingerprint, and ledger, consistently — it
+ * cannot forge a grant that appears to belong to a repository it does not
+ * control. Any verification failure exits non-zero and appends nothing.
  *
  * Usage:
  *   human-authority-grant.mjs prepare --repo-root <path> --decision-id <id> \
@@ -161,10 +163,15 @@ function runPrepare(args) {
   const { repo, fingerprint } = repositoryFingerprintFor(rootDir);
   const candidate = currentCandidate(repo.primaryRoot);
 
-  const plan = artifactFor(rootDir, args.plan);
-  const spec = artifactFor(rootDir, args.spec);
+  // F2: read from the AUTHORITATIVE resolved root (`repo.primaryRoot`), never
+  // the raw `rootDir` -- the artifact/capture-policy digests shown to the
+  // human signer must describe the SAME resolved repository the fingerprint
+  // and candidate above already describe, not whatever directory the raw
+  // `--repo-root` string happened to name.
+  const plan = artifactFor(repo.primaryRoot, args.plan);
+  const spec = artifactFor(repo.primaryRoot, args.spec);
   const extraPaths = (args.artifacts ?? "").split(",").map((entry) => entry.trim()).filter((entry) => entry !== "");
-  const extraArtifacts = extraPaths.map((path) => artifactFor(rootDir, path));
+  const extraArtifacts = extraPaths.map((path) => artifactFor(repo.primaryRoot, path));
   const artifacts = [plan, spec, ...extraArtifacts];
 
   const nowMs = Date.now();
@@ -192,7 +199,7 @@ function runPrepare(args) {
     links: { requestDecisionId, consumesDecisionId: null, revokesDecisionId: null, expiresDecisionId: null, supersedesDecisionId: null, correctsDecisionId: null },
   };
 
-  const capturePolicyDigest = capturePolicyDigestFor(rootDir);
+  const capturePolicyDigest = capturePolicyDigestFor(repo.primaryRoot);
   const intent = {
     schema: "pipeline.governance-event-envelope.v1",
     payloadSchema: "pipeline.human-governance-decision.v1",
@@ -251,8 +258,9 @@ async function runInstall(args) {
   // `--repo-root` at an agent-writable subdirectory containing a forged
   // project/critical-human-proof.json would otherwise let a caller pick their
   // own trust anchor while the fingerprint above still bound to the real
-  // repository. No flag, argument, or environment variable anywhere in this
-  // program can substitute a different one.
+  // repository. Pointing --repo-root at a genuinely different repository
+  // resolves and binds to THAT repository's own anchor/fingerprint/ledger,
+  // consistently -- it cannot forge a grant that appears to belong to this one.
   const policy = readCriticalHumanProofPolicy(repo.primaryRoot);
   if (!policy.ok || policy.trustAnchor === null) throw new Error("HAG-TRUST-ANCHOR-MISSING: project/critical-human-proof.json carries no trustAnchor");
   const trustPolicy = policy.trustAnchor;

@@ -201,6 +201,34 @@ test("F1: --trust-anchor-file is not a recognized flag at all -- install refuses
   assert.equal(events.decisions.length, 0);
 });
 
+test("F2: pointing --repo-root at a subdirectory whose plan/spec/artifact files differ from the real repository's still produces artifact digests bound to the AUTHORITATIVE root's own files, not the subdirectory's", async (t) => {
+  const keys = keypair();
+  const { root } = await fixture(keys);
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const subdir = path.join(root, "subdir");
+  await mkdir(subdir, { recursive: true });
+  // Files at the raw --repo-root value (subdir) with DIFFERENT content than
+  // the real repository root's own plan.md/spec.md/artifact.txt. If `runPrepare`
+  // still read from raw `rootDir` instead of `repo.primaryRoot`, the resulting
+  // request would be signed against these subdirectory files instead of the
+  // ones actually governing the repository.
+  await writeFile(path.join(subdir, "plan.md"), "subdir plan (different)\n");
+  await writeFile(path.join(subdir, "spec.md"), "subdir spec (different)\n");
+  await writeFile(path.join(subdir, "artifact.txt"), "subdir artifact (different)\n");
+  const requestPath = path.join(root, "request.json");
+  const prepared = await run(prepareArgs(subdir, requestPath));
+  assert.equal(prepared.ok, true);
+  const stored = JSON.parse(await readFile(requestPath, "utf8"));
+  const rootPlanDigest = createHash("sha256").update(await readFile(path.join(root, "plan.md"))).digest("hex");
+  const rootSpecDigest = createHash("sha256").update(await readFile(path.join(root, "spec.md"))).digest("hex");
+  const rootArtifactDigest = createHash("sha256").update(await readFile(path.join(root, "artifact.txt"))).digest("hex");
+  assert.equal(stored.plan.sha256, rootPlanDigest);
+  assert.equal(stored.spec.sha256, rootSpecDigest);
+  assert.equal(stored.intent.payload.scope.artifacts.find((a) => a.path === "artifact.txt").sha256, rootArtifactDigest);
+  const subdirPlanDigest = createHash("sha256").update(await readFile(path.join(subdir, "plan.md"))).digest("hex");
+  assert.notEqual(stored.plan.sha256, subdirPlanDigest);
+});
+
 test("prepare refuses to run without its required flags", async () => {
   await assert.rejects(() => run(["prepare", "--repo-root", "/nonexistent"]));
 });
