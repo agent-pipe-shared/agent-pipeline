@@ -289,6 +289,23 @@ const DELTA = {
   'C-AC-07': ['partial', 'WP-C'],
   'C-AC-09': ['not-started', 'WP-C'],
   'C-AC-12': ['partial', 'WP-C'],
+
+  // --- evidence/phx-wp-a.txt (task PHX-WP-A, 2026-08-09, commit 055cb8b) ---
+  // Independently re-run: 12/12 agent-decision-journal-tests pass, all three
+  // new A-AC assertions present by name. A-AC-02 fully pinned: all five
+  // lifecycle transitions accept a linked follow-up event, one exercised
+  // end-to-end through the real store with the original proven unchanged.
+  // A-AC-07 reclassified `not-started` (from `partial`) and Class A to Class
+  // B: repo-wide search found no per-event-class mandatory-capture concept
+  // anywhere in the journal, the shared store, or capture-policy.json --
+  // five of the seven named event classes are not even representable as a
+  // journal `kind`, the same absent-not-merely-unpinned bar applied to
+  // C-AC-09/K-AC-10. A-AC-12/A-AC-13/A-AC-14 stay `partial`/Class A: their
+  // residual gaps are named test coverage, not confirmed capability absence
+  // (A-AC-14's "decomposition" scenario is the one exception -- it needs a
+  // new `kind` enum value, not just a test).
+  'A-AC-02': ['implemented', 'WP-A'],
+  'A-AC-07': ['not-started', 'WP-A'],
 };
 
 // --- per-criterion evidence pointer ----------------------------------------
@@ -342,19 +359,19 @@ const POINTERS = {
   'H-AC-15': 'grant, consumption, expiry, drift, single-use, lifecycle links covered; denial, correction, retry, concurrency, interruption are not',
 
   'A-AC-01': 'record shape pinned; nothing enforces recording BEFORE dependent action where policy requires',
-  'A-AC-02': 'append-only comes from the shared store and link validity is pinned; no assertion names the transition set',
+  'A-AC-02': 'agent-decision-journal-tests (PHX-WP-A): all five lifecycle transitions (verified/contradicted/expired/invalidated/superseded) accept a linked follow-up event, exercised end-to-end through the store with the original proven byte-for-byte unchanged',
   'A-AC-03': 'NO CARRIER: no revalidation/invalidation path identifies objects affected by a changed assumption',
   'A-AC-04': 'self-confirmation is prevented; no correlation path to the human ledger is implemented',
   'A-AC-05': 'NO CARRIER: neither event shape carries a runner/model/effort/profile/role/adapter field at all',
   'A-AC-06': 'agent-decision-journal-tests: free text, authority-shaped fields and unbound supersession rejected',
-  'A-AC-07': 'default-deny capture policy pinned in the kernel; "mandatory classes never silently sampled" is not pinned',
+  'A-AC-07': 'CONFIRMED ABSENT (PHX-WP-A, repo-wide search): no per-event-class "mandatory" capture concept exists anywhere in the journal, the shared store, or capture-policy.json -- five of the seven named event classes are not even representable as a journal `kind`',
   'A-AC-08': 'NO CARRIER: no detector for missing dispatch provenance; the Dispatch: trailer is convention only',
   'A-AC-09': 'materiality is documented as design intent only; no code enforces or measures it',
   'A-AC-10': 'the offer path fails closed on unavailable journaling; no per-event-class fail-open/fail-closed policy exists',
   'A-AC-11': 'agent-decision-event.schema.json:14 assumptionState enumerates exactly the seven required epistemic states (landed 5d0fc6a)',
-  'A-AC-12': 'per-origin capture policy exists; independent projection/export configurability is not pinned',
-  'A-AC-13': 'determinism inherited from the store; no journal-specific interrupted/out-of-order assertion',
-  'A-AC-14': 'the criterion names 13 conformance scenarios; the suite carries far fewer',
+  'A-AC-12': 'agent-decision-journal-tests (PHX-WP-A): downstream export/projection policy (governance-event-projection.mjs) is independently configurable from capture eligibility and structurally cannot weaken it; the restricted-machine-local boundary mapping, "sole read boundary" language, and a literal human-ledger side-by-side remain unaddressed',
+  'A-AC-13': 'agent-decision-journal-tests (PHX-WP-A): the duplicate-submission clause is pinned -- exact duplicate is a deterministic idempotent-replay no-write, conflicting duplicate fails closed (GES-IDEMPOTENCY-CONFLICT); concurrent/interrupted/out-of-order for agent-kind events remain covered only by the store\'s generic tests, not newly pinned',
+  'A-AC-14': '5 of 13 named conformance scenarios have thin/generic (non-dedicated) coverage, 8 have zero coverage; "decomposition" is not representable in the current `kind` enum at all (PHX-WP-A, not padded)',
   'A-AC-15': 'agent-decision-journal.md carries one section; no taxonomy, materiality policy, trust model, retention or recovery doc',
   'A-AC-16': 'agent-decision-journal-tests: a journal event cannot present as approval',
 
@@ -507,7 +524,7 @@ const CLOSURE = {
   'A-AC-03': ['build', 'WP-A'],
   'A-AC-04': ['seam', 'WP-A'],
   'A-AC-05': ['seam', 'WP-A'],
-  'A-AC-07': ['assert', 'WP-A'],
+  'A-AC-07': ['build', 'WP-A'],
   'A-AC-08': ['build', 'WP-A'],
   'A-AC-09': ['build', 'WP-A'],
   'A-AC-10': ['build', 'WP-A'],

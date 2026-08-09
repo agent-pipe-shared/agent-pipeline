@@ -42,8 +42,8 @@ reproduced here rather than referenced.
 
 ## The direct answer
 
-**Phoenix cannot claim complete.** 84 of 157 criteria carry a named assertion in a
-gate-registered suite; 73 do not. EPIC-AC-05 forbids a completion claim while any
+**Phoenix cannot claim complete.** 85 of 157 criteria carry a named assertion in a
+gate-registered suite; 72 do not. EPIC-AC-05 forbids a completion claim while any
 criterion remains unimplemented or unverified, and it currently bites. No issue is closeable on
 its own live acceptance bullets.
 
@@ -61,10 +61,10 @@ A bullet is therefore BLOCKED unless every criterion mapped to it is `implemente
 
 | verdict | count |
 |---|---|
-| implemented | 84 |
-| partial | 58 |
+| implemented | 85 |
+| partial | 56 |
 | designed-only | 1 |
-| not-started | 13 |
+| not-started | 14 |
 | constraint | 1 |
 | **total** | **157** |
 
@@ -132,24 +132,24 @@ clause that is not pinned or not built.
 | H-AC-14 | partial | C | governance-events.md + po-human-approval.md + threat model exist; no migration, retention or recovery section for the ledger package |
 | H-AC-15 | partial | C | grant, consumption, expiry, drift, single-use, lifecycle links covered; denial, correction, retry, concurrency, interruption are not |
 
-### A — Agent Decision and Assumption Journal (#31) (3/16 implemented)
+### A — Agent Decision and Assumption Journal (#31) (4/16 implemented)
 
 | ID | verdict | src | evidence / named gap |
 |---|---|---|---|
 | A-AC-01 | partial | C | record shape pinned; nothing enforces recording BEFORE dependent action where policy requires |
-| A-AC-02 | partial | C | append-only comes from the shared store and link validity is pinned; no assertion names the transition set |
+| A-AC-02 | implemented | WP-A | agent-decision-journal-tests (PHX-WP-A): all five lifecycle transitions (verified/contradicted/expired/invalidated/superseded) accept a linked follow-up event, exercised end-to-end through the store with the original proven byte-for-byte unchanged |
 | A-AC-03 | not-started | C | NO CARRIER: no revalidation/invalidation path identifies objects affected by a changed assumption |
 | A-AC-04 | partial | C | self-confirmation is prevented; no correlation path to the human ledger is implemented |
 | A-AC-05 | not-started | J | NO CARRIER: neither event shape carries a runner/model/effort/profile/role/adapter field at all |
 | A-AC-06 | implemented | C | agent-decision-journal-tests: free text, authority-shaped fields and unbound supersession rejected |
-| A-AC-07 | partial | C | default-deny capture policy pinned in the kernel; "mandatory classes never silently sampled" is not pinned |
+| A-AC-07 | not-started | WP-A | CONFIRMED ABSENT (PHX-WP-A, repo-wide search): no per-event-class "mandatory" capture concept exists anywhere in the journal, the shared store, or capture-policy.json -- five of the seven named event classes are not even representable as a journal `kind` |
 | A-AC-08 | not-started | C | NO CARRIER: no detector for missing dispatch provenance; the Dispatch: trailer is convention only |
 | A-AC-09 | designed-only | J | materiality is documented as design intent only; no code enforces or measures it |
 | A-AC-10 | partial | C | the offer path fails closed on unavailable journaling; no per-event-class fail-open/fail-closed policy exists |
 | A-AC-11 | implemented | B | agent-decision-event.schema.json:14 assumptionState enumerates exactly the seven required epistemic states (landed 5d0fc6a) |
-| A-AC-12 | partial | C | per-origin capture policy exists; independent projection/export configurability is not pinned |
-| A-AC-13 | partial | C | determinism inherited from the store; no journal-specific interrupted/out-of-order assertion |
-| A-AC-14 | partial | C | the criterion names 13 conformance scenarios; the suite carries far fewer |
+| A-AC-12 | partial | C | agent-decision-journal-tests (PHX-WP-A): downstream export/projection policy (governance-event-projection.mjs) is independently configurable from capture eligibility and structurally cannot weaken it; the restricted-machine-local boundary mapping, "sole read boundary" language, and a literal human-ledger side-by-side remain unaddressed |
+| A-AC-13 | partial | C | agent-decision-journal-tests (PHX-WP-A): the duplicate-submission clause is pinned -- exact duplicate is a deterministic idempotent-replay no-write, conflicting duplicate fails closed (GES-IDEMPOTENCY-CONFLICT); concurrent/interrupted/out-of-order for agent-kind events remain covered only by the store's generic tests, not newly pinned |
+| A-AC-14 | partial | C | 5 of 13 named conformance scenarios have thin/generic (non-dedicated) coverage, 8 have zero coverage; "decomposition" is not representable in the current `kind` enum at all (PHX-WP-A, not padded) |
 | A-AC-15 | partial | C | agent-decision-journal.md carries one section; no taxonomy, materiality policy, trust model, retention or recovery doc |
 | A-AC-16 | implemented | C | agent-decision-journal-tests: a journal event cannot present as approval |
 
@@ -367,23 +367,22 @@ clause that is not pinned or not built.
 
 ### #31 — Add a privacy-preserving agent decision and assumption journal
 
-4 of 17 live acceptance bullets fully carried; **13 blocked**.
+5 of 17 live acceptance bullets fully carried; **12 blocked**.
 
 | # | live acceptance bullet | blocking criteria (verdict) |
 |---|---|---|
 | 1 | Closed schema/materiality policy selects journaled events | A-AC-01 (partial) |
-| 2 | Verification/contradiction/expiry/invalidation/supersession append events | A-AC-02 (partial) |
-| 3 | Changed assumptions invalidate/revalidate affected work | A-AC-03 (not-started) |
-| 4 | Human confirmation correlates to #30; only #30 grants authority | A-AC-04 (partial) |
-| 5 | Runner/model/profile/role/capability carries assurance | A-AC-05 (not-started) |
-| 6 | Mandatory material events are never sampled/discarded silently | A-AC-07 (partial) |
-| 7 | Retention/access/integrity is independent of human ledger | A-AC-12 (partial) |
-| 8 | Interrupted/concurrent/duplicate/out-of-order behavior is deterministic | A-AC-13 (partial) |
-| 9 | Offline verification detects mutation/gaps/forks/path/repository errors | K-AC-05 (partial) |
-| 10 | #17 replays all origins without authority collapse | L-AC-04 (partial) |
-| 11 | #5 shows uncertainty/status/decision with evidence | V-AC-02 (partial) |
-| 12 | Complete assumption/selection/failure/privacy fixture set | A-AC-14 (partial) |
-| 13 | Schema/taxonomy/materiality/trust/privacy/retention/recovery docs exist | A-AC-15 (partial) |
+| 2 | Changed assumptions invalidate/revalidate affected work | A-AC-03 (not-started) |
+| 3 | Human confirmation correlates to #30; only #30 grants authority | A-AC-04 (partial) |
+| 4 | Runner/model/profile/role/capability carries assurance | A-AC-05 (not-started) |
+| 5 | Mandatory material events are never sampled/discarded silently | A-AC-07 (not-started) |
+| 6 | Retention/access/integrity is independent of human ledger | A-AC-12 (partial) |
+| 7 | Interrupted/concurrent/duplicate/out-of-order behavior is deterministic | A-AC-13 (partial) |
+| 8 | Offline verification detects mutation/gaps/forks/path/repository errors | K-AC-05 (partial) |
+| 9 | #17 replays all origins without authority collapse | L-AC-04 (partial) |
+| 10 | #5 shows uncertainty/status/decision with evidence | V-AC-02 (partial) |
+| 11 | Complete assumption/selection/failure/privacy fixture set | A-AC-14 (partial) |
+| 12 | Schema/taxonomy/materiality/trust/privacy/retention/recovery docs exist | A-AC-15 (partial) |
 
 ### #32 — Add provider-neutral governance event export for SIEM and audit platforms
 
@@ -413,14 +412,14 @@ clause that is not pinned or not built.
 | #23 | 16 | 13 | 3 | **no** |
 | #24 | 12 | 8 | 4 | **no** |
 | #30 | 17 | 7 | 10 | **no** |
-| #31 | 17 | 4 | 13 | **no** |
+| #31 | 17 | 5 | 12 | **no** |
 | #32 | 20 | 9 | 11 | **no** |
 
 Issues closeable on their own live acceptance bullets: **0 of 8**.
 
 ## The blocking set, ranked
 
-43 distinct criteria block at least one live acceptance bullet.
+42 distinct criteria block at least one live acceptance bullet.
 
 | criterion | verdict | live bullets blocked |
 |---|---|---|
@@ -431,11 +430,10 @@ Issues closeable on their own live acceptance bullets: **0 of 8**.
 | K-AC-10 | not-started | 2 |
 | L-AC-04 | partial | 2 |
 | A-AC-01 | partial | 1 |
-| A-AC-02 | partial | 1 |
 | A-AC-03 | not-started | 1 |
 | A-AC-04 | partial | 1 |
 | A-AC-05 | not-started | 1 |
-| A-AC-07 | partial | 1 |
+| A-AC-07 | not-started | 1 |
 | A-AC-12 | partial | 1 |
 | A-AC-13 | partial | 1 |
 | A-AC-14 | partial | 1 |

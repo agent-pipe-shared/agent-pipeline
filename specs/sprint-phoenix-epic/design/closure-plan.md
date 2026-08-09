@@ -8,7 +8,7 @@ Parent specification: [../spec.md](../spec.md) · Measurement: [../evidence/acce
 
 ## What this design is for
 
-The measurement established that 73 of 157 acceptance criteria are not
+The measurement established that 72 of 157 acceptance criteria are not
 `implemented` and that no issue is closeable. It did not say how any of them closes. This
 document does, and it is generated from the same verdict data as the measurement, so the two
 cannot drift apart.
@@ -19,12 +19,12 @@ one list is what has made the epic look larger and more uniform than it is.
 
 | class | criteria | what closing one actually costs |
 |---|---|---|
-| A — assertion missing | 33 | one named test case in an already-registered, unprotected suite |
+| A — assertion missing | 31 | one named test case in an already-registered, unprotected suite |
 | D — documentation missing | 7 | one document section set; no code, no gate |
 | S — seam missing | 6 | a connector between two packages that already work |
-| B — capability missing | 22 | real implementation plus its tests |
+| B — capability missing | 23 | real implementation plus its tests |
 | P — not code | 5 | a human gate, a sanctioned authority revision, or a proved impossibility |
-| **total** | **73** | |
+| **total** | **72** | |
 
 **The distribution is the finding.** The largest class by a wide margin is Class A: criteria
 whose behaviour is built, shipped and green, and which fail only because no assertion names the
@@ -135,7 +135,7 @@ is by module family, which makes the disjointness checkable rather than asserted
 | WP-X | 2 | plugins/pipeline-core/lib/external-reference-adapter*.mjs |
 | WP-C | 4 | plugins/pipeline-core/lib/change-control*.mjs |
 | WP-E | 9 | plugins/pipeline-core/lib/governance-export-*.mjs |
-| WP-A | 12 | plugins/pipeline-core/lib/agent-decision-journal*.mjs, governance/schemas/agent-decision-event.schema.json |
+| WP-A | 11 | plugins/pipeline-core/lib/agent-decision-journal*.mjs, governance/schemas/agent-decision-event.schema.json |
 | WP-L | 3 | plugins/pipeline-core/lib/lifecycle-governance-events*.mjs, plugins/pipeline-core/lib/governance-replay*.mjs |
 | WP-H | 4 | plugins/pipeline-core/lib/human-governance-ledger*.mjs, plugins/pipeline-core/lib/governance-authority-resolver*.mjs, plugins/pipeline-core/lib/external-push-ledger*.mjs |
 | WP-R | 8 | plugins/pipeline-core/lib/external-command-offer*.mjs |
@@ -174,15 +174,13 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 
 ## Per criterion
 
-### Class A — the behaviour exists, the assertion does not (33)
+### Class A — the behaviour exists, the assertion does not (31)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
-| A-AC-02 | partial | WP-A | append-only comes from the shared store and link validity is pinned; no assertion names the transition set |
-| A-AC-07 | partial | WP-A | default-deny capture policy pinned in the kernel; "mandatory classes never silently sampled" is not pinned |
-| A-AC-12 | partial | WP-A | per-origin capture policy exists; independent projection/export configurability is not pinned |
-| A-AC-13 | partial | WP-A | determinism inherited from the store; no journal-specific interrupted/out-of-order assertion |
-| A-AC-14 | partial | WP-A | the criterion names 13 conformance scenarios; the suite carries far fewer |
+| A-AC-12 | partial | WP-A | agent-decision-journal-tests (PHX-WP-A): downstream export/projection policy (governance-event-projection.mjs) is independently configurable from capture eligibility and structurally cannot weaken it; the restricted-machine-local boundary mapping, "sole read boundary" language, and a literal human-ledger side-by-side remain unaddressed |
+| A-AC-13 | partial | WP-A | agent-decision-journal-tests (PHX-WP-A): the duplicate-submission clause is pinned -- exact duplicate is a deterministic idempotent-replay no-write, conflicting duplicate fails closed (GES-IDEMPOTENCY-CONFLICT); concurrent/interrupted/out-of-order for agent-kind events remain covered only by the store's generic tests, not newly pinned |
+| A-AC-14 | partial | WP-A | 5 of 13 named conformance scenarios have thin/generic (non-dedicated) coverage, 8 have zero coverage; "decomposition" is not representable in the current `kind` enum at all (PHX-WP-A, not padded) |
 | E-AC-02 | partial | WP-E | profiles implemented and documented; DECLARING every lossy field/semantic conversion is not pinned |
 | E-AC-04 | partial | WP-E | no assertion covers free-form rationale omission-unless-permitted-and-redacted |
 | E-AC-06 | partial | WP-E | at-least-once behaviour is exercised by the retry tests; the explicit no-exactly-once claim is documentation only |
@@ -235,12 +233,13 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 | H-AC-09 | not-started | WP-H | NO CARRIER: external-push-ledger is scoped to single-repo push proofs; nothing binds cross-repository guarded work to one physical target |
 | X-AC-11 | not-started | WP-X | NO CARRIER: the adapter never references organization policy, and the policy modules never reference the adapter |
 
-### Class B — an absent capability (22)
+### Class B — an absent capability (23)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
 | A-AC-01 | partial | WP-A | record shape pinned; nothing enforces recording BEFORE dependent action where policy requires |
 | A-AC-03 | not-started | WP-A | NO CARRIER: no revalidation/invalidation path identifies objects affected by a changed assumption |
+| A-AC-07 | not-started | WP-A | CONFIRMED ABSENT (PHX-WP-A, repo-wide search): no per-event-class "mandatory" capture concept exists anywhere in the journal, the shared store, or capture-policy.json -- five of the seven named event classes are not even representable as a journal `kind` |
 | A-AC-08 | not-started | WP-A | NO CARRIER: no detector for missing dispatch provenance; the Dispatch: trailer is convention only |
 | A-AC-09 | designed-only | WP-A | materiality is documented as design intent only; no code enforces or measures it |
 | A-AC-10 | partial | WP-A | the offer path fails closed on unavailable journaling; no per-event-class fail-open/fail-closed policy exists |
