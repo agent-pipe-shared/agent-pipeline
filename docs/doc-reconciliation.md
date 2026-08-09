@@ -47,6 +47,20 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 78b7fb58a19531c7bdd8f05d96b6bba4b350f423 — 2026-08-09, range 3387065..78b7fb5, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `cae20a3` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `0d01845`, `a657e14`, `be825df`, `d0401a2`, `78b7fb5`: X-AC-14's filed backlog fix
+(external-reference-adapter.mjs typed unreachable-response), H-AC-08's legacy-import-observation
+carrier, both evidence-map deltas, and this leg's checkpoint recording the PO's grounding-method
+correction. Same reading as the whole chain: `docs/state.md` stays ADR-0012, the generated
+evidence-map/closure-plan/class-s-scoping trio stays ADR-0045. The one closed backlog item
+(`backlog/items/2026-08-09-external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system.md`)
+confirms `backlog/`'s own dedicated class again, same as every prior occurrence in this chain.
+
 ## Candidate cae20a35134b05a69f56a913253fe7ae6e7142b0 — 2026-08-09, range 3387065..cae20a3, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
