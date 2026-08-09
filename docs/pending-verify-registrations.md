@@ -1,16 +1,47 @@
-# Pending Verify registrations — GF-057
+# Pending Verify registrations
 
-> **RESOLVED 2026-08-08.** Both steps were applied by the PO with
-> `harness/scripts/apply-pending-protected-edits.mjs` and committed: the seven
-> `TEST_SUITES` entries in `verify.mjs`, and `GST33`–`GST36` plus the `GST14`
-> title repair in `guard-gate-strength.test.mjs` (32 → **36 passed, 0 failed**).
-> Nothing here is pending any more. The file is kept because the *reasoning* —
-> why an agent session cannot do this, and which guard refuses on which grounds —
-> is the durable part, and the same situation will recur the next time a block
-> writes a suite.
+> **Status 2026-08-09.** One suite is pending; see the section directly below.
+> The GF-057 batch that this file was created for is **resolved** and is kept
+> below as a worked record.
+>
+> A previous version of this banner said "Nothing here is pending any more"
+> while the body underneath still read as a live to-do list, in the present
+> tense, under a heading announcing that the suites did not run under Verify —
+> when at that moment they did. A Critic round found it on 2026-08-09. Reading
+> that heading was enough to send someone down a route that was already closed,
+> which is the defect a status banner exists to prevent, not one it may cause.
 
-New test suites written during this block that were **not registered** in
-`harness/scripts/verify.mjs`, and therefore did not run under Verify.
+## Pending as of 2026-08-09 — the reference-path check
+
+`harness/scripts/check-reference-paths.test.mjs` and the gate it covers,
+`harness/scripts/check-reference-paths.mjs` (`9b7c3c2`), are not registered in
+`harness/scripts/verify.mjs`. The reason is the same TP-3 constraint described
+below, with one difference: the maintenance window opened for the GF-057 batch
+expired at 2026-08-09T01:56Z, so a fresh signed window is required.
+
+Until it is registered, the gate runs only when someone runs it:
+
+```
+node harness/scripts/check-reference-paths.mjs
+```
+
+It exits 0 at HEAD. Against `ac6ca88` it exits 2 and names the two references a
+script relocation had left pointing at deleted paths — the reason it exists.
+
+## Resolved 2026-08-08 — the GF-057 batch
+
+Both steps were applied by the PO with
+`harness/scripts/apply-pending-protected-edits.mjs` and committed: the seven
+`TEST_SUITES` entries in `verify.mjs`, and `GST33`–`GST36` plus the `GST14`
+title repair in `guard-gate-strength.test.mjs` (32 → **36 passed, 0 failed**).
+
+The rest of this file is kept because the *reasoning* — why an agent session
+cannot do this, and which guard refuses on which grounds — is the durable part,
+and the same situation recurs every time a block writes a suite. It did again on
+2026-08-09.
+
+The suites listed below **were** unregistered when this file was written, and
+therefore did not run under Verify at that time. They do now.
 
 ## Why they are pending rather than registered
 
@@ -32,10 +63,10 @@ is covered by an over-broad ignore rule
 ([filed here](../backlog/items/2026-08-08-an-over-broad-ignore-rule-swallows-the-closure-evidence-the-gate-demands.md)),
 so a handover artifact placed there does not survive the block that produced it.
 
-## The human step
+## The human step (as it was carried out on 2026-08-08)
 
-Both pending edits — the registrations here and the `guard-gate-strength`
-content below — are applied by one operator script:
+Both edits — the registrations here and the `guard-gate-strength` content below
+— were applied by one operator script:
 
 ```
 node harness/scripts/apply-pending-protected-edits.mjs --check     # dry run, writes nothing
