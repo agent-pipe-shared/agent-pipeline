@@ -61,3 +61,17 @@ test("profile and acknowledgements are closed, non-authoritative and deduplicate
   assert.equal(ack.receiptId, "opaque-1");
   assert.throws(() => validateGovernanceExportAcknowledgement({ ...ack, acceptedDestinationEventIds: [sha("a"), sha("a")] }), (error) => error.code === "GEA-ACK");
 });
+// E-AC-04: a free-form human rationale or agent summary must be omitted from
+// every mapped profile output by default. This suite finds no destination
+// policy or adapter profile field anywhere in this module that can opt one
+// back in with redaction: EXPORT_FIELDS is a closed, non-configurable module
+// constant consulted by every format branch, so "unless an explicit
+// destination policy allows and redacts it" has no reachable implementation
+// here (see the dispatch report for the absence citation).
+test("E-AC-04 omits free-form rationale or agent-summary fields from every mapped profile output", () => {
+  for (const format of ["cloudevents-json", "otlp-json", "ndjson", "rfc5424"]) {
+    for (const extra of [{ rationale: "never export this" }, { summary: "agent free text" }]) {
+      assert.throws(() => mapGovernanceExportProjection({ profile: profile(format), projection: projection(format, { eventType: "safe", occurredAtEpochMs: 1, eventId: "event-1", ...extra }) }), (error) => error.code === "GEA-MAP", `${format} must reject ${Object.keys(extra)[0]}`);
+    }
+  }
+});

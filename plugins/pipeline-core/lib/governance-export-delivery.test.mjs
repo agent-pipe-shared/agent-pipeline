@@ -34,6 +34,41 @@ test("partial acknowledgement leaves an independent recoverable suffix with expl
   const result = await deliverGovernanceExportBatch({ outbox: queue(), profile, adapter, batchId: "batch-2", maxEvents: 2, attempt: 2 });
   assert.equal(result.outbox.cursor, 1); assert.equal(result.outbox.entries[1].status, "pending"); assert.equal(result.receipt.terminalDisposition, "retryable-failure");
 });
+// E-AC-06: delivery is at-least-once with stable idempotency, never
+// exactly-once. An unacknowledged attempt must leave the event pending so a
+// later attempt redelivers the very same mapping -- proven here by an
+// adapter that accepts nothing on its first call and everything on its
+// second, over the same outbox reference.
+test("E-AC-06 an unacknowledged attempt leaves the event pending so a retry redelivers the same mapping", async () => {
+  const seen = []; let call = 0;
+  const flaky = { profile, async deliver({ batchId, mappings }) { call += 1; seen.push(mappings[0].destinationEventId); return { schema: "pipeline.governance-export-acknowledgement.v1", profileId: "audit", batchId, acceptedDestinationEventIds: call === 1 ? [] : mappings.map((m) => m.destinationEventId), rejectedDestinationEventIds: [], receiptId: "opaque-1" }; } };
+  const first = await deliverGovernanceExportBatch({ outbox: queue(), profile, adapter: flaky, batchId: "batch-1", maxEvents: 1, attempt: 1 });
+  assert.equal(first.receipt.terminalDisposition, "retryable-failure"); assert.equal(first.outbox.entries[0].status, "pending");
+  const retried = await deliverGovernanceExportBatch({ outbox: first.outbox, profile, adapter: flaky, batchId: "batch-2", maxEvents: 1, attempt: 2 });
+  assert.equal(seen.length, 2); assert.equal(seen[0], seen[1], "the retry must resend the same destination event id, proving redelivery rather than a fresh one");
+  assert.equal(retried.receipt.terminalDisposition, "delivered");
+});
+// E-AC-09: a destination that fails to fully acknowledge must expose the
+// failure/backlog as lag on the receipt rather than absorbing it silently.
+test("E-AC-09 exposes non-zero lag on the receipt when a destination fails to fully acknowledge", async () => {
+  const adapter = { profile, async deliver() { return { schema: "pipeline.governance-export-acknowledgement.v1", profileId: "audit", batchId: "batch-3", acceptedDestinationEventIds: [], rejectedDestinationEventIds: [], receiptId: null }; } };
+  const result = await deliverGovernanceExportBatch({ outbox: queue(), profile, adapter, batchId: "batch-3", maxEvents: 2, attempt: 1 });
+  assert.equal(result.receipt.terminalDisposition, "retryable-failure");
+  assert.equal(result.receipt.lag, 2, "an unacknowledged batch must be reported as outstanding lag, not silently absorbed");
+});
+// E-AC-11: the receipt must state exactly its declared fields and reject any
+// retention/immutability/analyst-review/compliance-implying extension. Pinned
+// as a closed schema (an allowlist of the nine permitted keys), not as a
+// denylist of specific forbidden words.
+test("E-AC-11 the delivery receipt is closed and rejects any retention/immutability/review/compliance-implying field", async () => {
+  const { createGovernanceDeliveryReceipt } = await import("./governance-event-projection.mjs");
+  const collector = createInMemoryGovernanceExportCollector({ profile });
+  const result = await deliverGovernanceExportBatch({ outbox: queue(), profile, adapter: collector, batchId: "batch-4", maxEvents: 1, attempt: 1 });
+  assert.deepEqual(Object.keys(result.receipt).sort(), ["acknowledgementClass", "attempt", "batchId", "cursor", "destinationProfile", "eventCount", "lag", "policyRevision", "schema", "terminalDisposition"].sort());
+  for (const extra of [{ retention: "7y" }, { immutable: true }, { analystReviewed: true }, { compliant: true }]) {
+    assert.throws(() => createGovernanceDeliveryReceipt({ destinationProfile: "audit", policyRevision: sha("b"), batchId: "batch-4", eventCount: 1, attempt: 1, acknowledgementClass: "accepted", terminalDisposition: "delivered", cursor: 1, lag: 0, ...extra }), (error) => error.code === "GEP-RECEIPT");
+  }
+});
 
 const policy = (overrides = {}) => ({ schema: "pipeline.governance-export-delivery-policy.v1", profileId: "audit", maxBatchEvents: 2, compression: "none", minIntervalMs: 100, maxAttempts: 3, initialBackoffMs: 50, backoffFactor: 2, maxBackoffMs: 400, maxPendingEntries: 3, ...overrides });
 const policyProjection = (seed) => ({ schema: "pipeline.governance-export-event.v1", destinationEventId: sha(seed), destinationProfile: "audit", format: "ndjson", policyRevision: sha("b"), sourceEventDigest: sha(seed), fields: { eventType: "lifecycle.dispatch", eventId: `event-${seed}`, occurredAtEpochMs: 1 } });
