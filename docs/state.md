@@ -3793,6 +3793,44 @@ itself if a conflict surfaces.
 
 **Live now:** WP-P-AC06. Handover fully current through this checkpoint.
 
+### WP-P-AC06 REVERTED: IT BROKE THE LOAD-BEARING pipeline-state.test.mjs SUITE
+
+WP-P-AC06 landed (`3a949867`) and reported `pipeline-state.mjs`'s usage checked and not broken —
+"every real caller uses the canonical `specs/{id}/lifecycle.json` path... against fully-referenced
+trees, so neither new finding can fire for existing legitimate usage." That claim was wrong.
+Running `node --test harness/scripts/pipeline-state.test.mjs` myself (the full suite, not just the
+two files the dispatch verified) surfaced 3 real failures: `PS54af`/`PS54ag` (status/plan preview
+against the live Phoenix package) and, most tellingly, `WRb` — a bootstrap-apply test failing with
+`FTP-ORPHAN: specs/wr-boot/lifecycle.proposal.json is present in the package tree but not
+referenced by any manifest artifact`. `lifecycle.proposal.json` is a legitimate bootstrap staging
+file this repo's own machinery writes and reads — never meant to appear in a manifest's `artifacts`
+array — and the new orphan check has no concept of "legitimate non-artifact package file," so it
+flagged real, correct, in-use state as a rejection.
+
+**Reverted immediately** (`891ed44e`, `git revert --no-edit 3a949867`) rather than leave a broken
+load-bearing suite on the branch. Re-ran all three test files afterward: `pipeline-state.test.mjs`
+back to 0 failures, `feature-package-topology.test.mjs` and `audit-bundle.test.mjs` both back to
+their exact pre-dispatch clean state. P-AC-06 was never booked in the evidence map (verification
+came before booking, as always this session) — no DELTA/POINTERS correction needed; it stays
+exactly as it was: 5 of 7 scenarios closed, legacy/orphaned still open.
+
+**Disclosed exception, not hidden:** the revert itself is a 3-file, ~70-line Elephant-authored
+commit — over EL-01's stage-0 fast-path caps (≤2 files, ≤~25 lines). Made the call myself rather
+than dispatch a Goldfish for a mechanical, already-diagnosed, single-command revert of a commit
+that was actively breaking a load-bearing suite: the correction itself carries zero new design
+content (it is the literal inverse of an already-fully-specified prior commit), and dispatching
+would have meant leaving the regression live for another round-trip. Recorded here in the same
+spirit as `P-AC-08`'s existing `ELEPHANT`-attributed evidence-map entry — a precedented,
+disclosed exception, not a new pattern.
+
+**Lesson for the next attempt at P-AC-06's remaining two scenarios:** "orphaned" file detection
+needs to know the full universe of legitimate non-artifact package files (staging/proposal files
+like `lifecycle.proposal.json`, and potentially others not yet discovered) BEFORE writing the
+check, not just the visible test fixtures — a repo-wide survey of what such files exist across
+every real package directory should be the first step, not an afterthought caught by independent
+verification after the fact. Not re-dispatching this now; flagging it for whenever this criterion
+is revisited.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
