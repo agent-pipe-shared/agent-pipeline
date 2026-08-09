@@ -75,6 +75,21 @@ principle and not in practice. The first external tester who hits any GS-rule in
 3. **Then walk the whole flow once from the CLI alone**, with the library closed, and
    fix whatever that surfaces. This item exists because that walk had not been done.
 
+## Reproduced, 2026-08-09
+
+The predicted scenario in "Why this matters now rather than eventually" above
+happened, almost verbatim: the PO's private Claude+Pipeline 0.5.4 happy-path
+test run hit a `push` approval that needed `project/critical-human-proof.json`
+bootstrapped in `signature` mode (fresh project, no such file yet), fell into
+exactly this HGO ceremony, and needed 4 of the session's 8 human terminal
+commands plus 2 harness-classifier denials (blocking even a read-only `Read`
+of `guard-human-override.mjs`) to walk it — roughly 12 of a 42-minute
+push-approval phase. Detailed reconstruction (sanitized, no PO-identifying
+data): the turn-efficiency root-cause analysis this same day. See also the new
+`project/critical-human-proof.json`-materialization gap filed separately as
+`2026-08-09-critical-human-proof-not-materialized-for-signature-mode.md`,
+which would remove the need for this ceremony to run at all in the push case.
+
 ## Related
 
 - `docs/adr/0059-signed-human-guard-override.md` — the promise.
