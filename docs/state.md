@@ -3975,6 +3975,30 @@ surfaces).
 **Live now:** WP-GE-FIX. Once this lands, every currently-known broken test in the repository will
 be closed.
 
+### WP-GE-FIX CLOSED — THE FULL REPO-WIDE REGRESSION SWEEP IS DONE
+
+Verified independently (`f260a738`, 2/2 tests, diff matches exactly). This closes the last known
+broken test: the full chain starting from this morning's `A-AC-07` capture-policy schema change now
+has zero known casualties — 3 fixed inline as each was discovered
+(`governance-event-store.test.mjs`, `agent-decision-journal.test.mjs`, `WP-GA-FIX` for
+`governance-authority.test.mjs`), 6 more via the proactive repo-wide audit (`WP-CP-FIX`), and this
+7th, unrelated, pre-existing stale fixture found while investigating WP-CP-FIX's own remainder
+(`WP-GE-FIX`).
+
+Attempted the full `harness/scripts/verify.mjs` gate as a final comprehensive check — it refused at
+the candidate-preflight stage (`VERIFY-CANDIDATE-PREFLIGHT: Commit or stash tracked changes before
+Verify`), because this session's standing convention keeps 3 config files permanently dirty
+(`local-state-files-stay-uncommitted`, persisted memory) and Verify wants either a clean tree or the
+detached-worktree flow this session hasn't been using. Not pursued further — the targeted,
+hypothesis-driven repo-wide grep for the SPECIFIC regression pattern (every hand-built
+capture-policy fixture, repo-wide, not just the files a dispatch happened to touch) already gave
+high confidence for the actual risk that materialized today; a full from-scratch Verify run in a
+detached worktree is a larger undertaking better suited to a dedicated checkpoint than a
+side-quest at the end of an already very long stretch.
+
+**Live now: none.** Everything from this entire regression-hunting thread is closed, verified, and
+committed.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
