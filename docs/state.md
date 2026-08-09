@@ -5,6 +5,7 @@
 
 **Last updated:** 2026-08-09
 **Project status:** ACTIVE
+**Local candidate:** `0.5.4+<runner>.20260809091238.7d38484` · commit `53c5b716e8b2deaf3b7b6a78d9b555b7b1867044` · Verify 264/264 · ready for manual copy
 **Current block:** GF-057 — a second `0.5.4` local candidate that closes the onboarding deadlock both runners hit against the first one, the consumer blockers the PO's consolidated review found, and the setup work (SETUP-2 done, SETUP-3/4 open); 0.5.3 is released to `main` and the human-authorization ceremony recorded as [ADR-0061](adr/0061-uniform-human-approval-ceremony.md) remains the governing thread; Nova A completion still paused on genuine ADR-gated/evidence-gated blockers
 **Repair baseline:** `5d2b83dcc765d50801f4491e1bd9bed32090112b`
 **Release version:** `0.5.3` released
@@ -16,7 +17,65 @@ the supplied authoritative release identity; it is not a claimed release time.
 The historical candidate-qualification sections below are retained as
 session history and no longer describes the current publication disposition.
 
-## 2026-08-09 Nova CRITIC-054 — three independent Critic rounds against the 0.5.4 candidate, all FAIL (current, in progress)
+## 2026-08-09 Local `0.5.4` candidate stamped and verified — ready for the PO's manual copy (current)
+
+Candidate: commit `53c5b716e8b2deaf3b7b6a78d9b555b7b1867044`. Full Verify
+**264/264, exit 0**, bound to that exact commit and tree — the stamped candidate
+itself, not a predecessor of it.
+
+Everything the CRITIC-054 rounds raised is closed: one blocker, nine major,
+seven minor, plus the six failures the first honest full-gate run surfaced.
+
+**Three commits closed this block.**
+
+1. `046cb0b9` — `check-reference-paths` (suite + gate) registered in
+   `verify.mjs`. TP-3 protects that file, so this needed a fresh signed
+   maintenance window; the GF-057 one had expired at 01:56Z. Prepared, signed by
+   the PO against the exact intent digest, installed for TP-3 alone, and
+   **closed immediately after the single commit** rather than left open for its
+   remaining three and a half hours. `docs/pending-verify-registrations.md` went
+   from a pending section to a resolved one in the same commit — leaving a
+   registered suite under a "Pending" heading would have reproduced the exact
+   defect that file already documents.
+2. `7d384840` — the capability inventory, which the next full run failed on.
+   Registering two suites created two discovered verify-phase surfaces, and the
+   inventory must cover the discovered surface exactly. Same adjudication as the
+   eight divergences earlier in the day (detector right, record stale), except
+   the staleness was self-inflicted one commit before. `sourceBaseline` moved to
+   `046cb0b9`, the functional commit where those surfaces appeared.
+3. `53c5b716` — both runner manifests stamped
+   `0.5.4+<runner>.20260809091238.7d38484`. Claude had carried a stamp from the
+   previous day pointing at a commit that was no longer the candidate; **Codex
+   had carried no stamp at all**, so the Codex runner had no reason to
+   re-materialize — its cache directory is named after the version string.
+   Testing both runners against one candidate required both to move. Stamped
+   *before* the final Verify, so the run covers them.
+
+**Ordering rule confirmed by use:** stamp, then verify. Stamping after a green
+run leaves the one part the human installs unverified.
+
+**Open, deliberately, and not blocking the copy.**
+
+- The guard's newline detection does not match `git -C <dir> commit`. PO agreed
+  to leave it; marked honestly in the code.
+- `reconcile-backlog-ledger.mjs` still checks that a closure-evidence file is
+  *present*, not that it is *tracked*. The anchored ignore rule (`4be63c87`)
+  removed the way that gap produced dangling citations, but the gap is intact.
+- Whether onboarding should append `scratch/` to a consumer's `.gitignore` is
+  undecided and needs its own backlog item.
+- `evidence/` at the repository root stays ignored, so dispatch artifacts still
+  do not survive a clean checkout unless deliberately placed elsewhere.
+- `check-reference-paths` classifies `specs/`, `backlog/`, `evidence/`,
+  `docs/spec-archive/` and `docs/state.md` as record surfaces and skips them,
+  and skips `*.test.mjs`. On those paths its green is exclusion, not inspection.
+  It prints all ten of its own blind spots on every run.
+
+**Next:** the PO copies the candidate into the local marketplace, restarts the
+running sessions, and returns the small findings from the happy-path tests. The
+release itself is explicitly later — this block produced a clean local
+candidate, not a release.
+
+## 2026-08-09 Nova CRITIC-054 — three independent Critic rounds against the 0.5.4 candidate, all FAIL (resolved — see the section above)
 
 The hardening block was reviewed by three independent read-only Critic rounds
 with disjoint surfaces: A (state writer, continuity classifier, typed reset,
