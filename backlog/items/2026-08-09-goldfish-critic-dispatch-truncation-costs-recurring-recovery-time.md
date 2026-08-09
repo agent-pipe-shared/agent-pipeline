@@ -49,6 +49,21 @@ diagnose and resume:
    template's own report-durability rule to append candidates as found).
    Recovery: purely procedural resume.
 
+5. **GF-072** (guard-maintenance-window.mjs authority narrowing) — not a
+   truncation either, but a third distinct dispatch-mechanism failure mode:
+   dispatched with Agent-tool `isolation: "worktree"`, the provisioned
+   worktree's `HEAD` resolved to an old ancestor commit reachable from
+   `origin/main` rather than the current branch tip the Elephant was on at
+   dispatch time. The Goldfish correctly fail-closed (stop condition: briefing
+   contradicts the repo it can see — the cited backlog item and reference-fix
+   commit did not exist in its checkout) instead of guessing. Elephant-side
+   fix: redispatch the identical briefing without worktree isolation, since no
+   concurrent write dispatch was in flight (no collision risk to isolate
+   against). Cost: one full Goldfish dispatch spent discovering the wrong
+   isolation mode, plus the diagnostic step of comparing `git worktree list`
+   / `git branch --contains` output to confirm the base-ref mismatch rather
+   than a genuine repo defect.
+
 `templates/prompts/goldfish-task.md`'s own USAGE notes already document this
 as a known, recurring pattern independent of this session — item 8 names the
 read-dispatch-record-then-procedural-resume recovery as the established
@@ -96,6 +111,13 @@ mid-release. Revisit this item once the candidate has shipped.
 - Consider whether the dispatch-record `log` field should be enforced more
   cheaply/automatically rather than relying on the dispatched agent to
   remember to append it under time pressure — the exact failure GF-070 hit.
+- Check how the Agent tool's `isolation: "worktree"` chooses the new
+  worktree's base ref — GF-072 showed it can pin to an old commit reachable
+  from `origin/main` instead of the dispatcher's current branch tip, which
+  is indistinguishable from a real repo defect until the Elephant manually
+  cross-checks `git worktree list` / `git branch --contains`. If this is
+  systemic (not a one-off), the safe default may need to change: isolate
+  only when a genuine concurrency risk exists, plain dispatch otherwise.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
