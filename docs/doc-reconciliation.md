@@ -47,7 +47,38 @@ something to do here without review.
 
 ## Entries
 
-## Candidate 36a7fb1de06b84a36f55468afce36e1b2b7c97de — 2026-08-09, range 8dcb1cc..36a7fb1, the substantive tip of the push candidate; supersedes the entries below
+## Candidate 382626f42708d10fd17e0607f010d6342e4ac57c — 2026-08-09, range 3387065..382626f, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Both re-read against the candidate rather than carried forward from the entry below, and this
+range is the first since the layer was built where the two readings are not identical to it.
+
+ADR-0045 was implicated by two **new** files, not by an edit to an existing one:
+`specs/sprint-phoenix-epic/evidence/acceptance-evidence-map-20260809.md` and its generator
+`acceptance-evidence-map.mjs`. The decision names `evidence/` as a package directory in its own
+enumeration and constrains its contents no further, so both files land inside what the ADR
+already governs and neither is an extension of it. Recorded explicitly because the tempting
+reading is the opposite one: a `.mjs` inside a spec package looks like a new artifact class, and
+it is not — the ADR draws its line at the directory, not at file type.
+
+The divergence found on this layer's first real run is unchanged and stays filed as
+`pipeline.adr-0045-topology-divergence-from-package-and-skill`: the ADR's root enumeration says
+`prd.md` where disk says `prd_phoenix-epic.md`, and it does not cover four artifacts the package
+already carries. This range adds two more files to that uncovered set. That does **not** widen
+the divergence — the four uncovered artifacts sit at the package **root**, which the ADR
+enumerates exhaustively, while these two sit inside `evidence/`, which it does not. The
+distinction is worth keeping in the record so a later reader does not fold two different gaps
+into one number.
+
+ADR-0012 was implicated by `docs/state.md` and still holds with one canonical handover file. The
+one thing worth checking rather than assuming: this range's handover entry deliberately **points
+at** the committed evidence map instead of restating its numbers, and ADR-0012's own recorded
+risk is that secondary sources creep back in. Checked, and it is the opposite case — A9's
+refinement prescribes exactly this shape ("generated from, or references"), and the map is a
+package evidence artifact rather than a second handover. A restatement of its 157 rows in this
+file would have been the drift the decision forbids. — 2026-08-09, range 8dcb1cc..36a7fb1, the substantive tip of the push candidate; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
 - ADR-0045: checked, no change needed.
