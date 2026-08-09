@@ -213,8 +213,19 @@ export function renderAgentObligations({ rootDir = REPO_ROOT } = {}) {
   put("Do not guess, and do not read a table — **ask**:");
   put();
   put("```");
-  put("node plugins/pipeline-core/scripts/repair-map.mjs");
+  put("node <plugin-root>/scripts/repair-map.mjs");
   put("```");
+  put();
+  // OBLIGROUTE-2. This printed the repository-relative form until 2026-08-09, and the
+  // lifecycle guard refuses it: its admission compares against the absolute path of the
+  // INSTALLED plugin's own copy, resolved from that module's import.meta.url, and its
+  // test pins that a same-named script under any other root stays refused. So the one
+  // command this section exists to hand an agent was itself blocked in the non-ready
+  // state that most needs it -- the guard was fixed and the signpost was not.
+  put("`<plugin-root>` is the absolute path the bootstrap printed as `plugin root`;");
+  put("substitute it yourself. The guard admits that exact path and nothing else — a");
+  put("copy of the same script inside the project tree is a different program and stays");
+  put("refused — which is why no repository-relative form of this command works.");
   put();
   put("It queries the real override planner at runtime and separates three answers");
   put("that all look like \"refused\" from the outside: never liftable by construction,");

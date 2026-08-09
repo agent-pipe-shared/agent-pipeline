@@ -95,6 +95,43 @@ test("AC-5: liftability is delegated to the repair map, never copied", () => {
   assert.doesNotMatch(document, /^\s*\|\s*`?HGO-[A-Z-]+`?\s*\|/mu, "the document must not restate the repair map's rows");
 });
 
+/**
+ * OBLIGROUTE-2. The missing level, again: every assertion above reads the document
+ * against a copy of what the guard is assumed to do. This one drives the real guard.
+ *
+ * The document printed `node plugins/pipeline-core/scripts/repair-map.mjs` until
+ * 2026-08-09 and the lifecycle guard refused exactly that string, so §5's whole
+ * purpose -- handing a stuck agent the one question it may still ask -- did not work
+ * in the state it was written for. Both directions are asserted, because an
+ * admission test alone would also pass on a document that named some other admitted
+ * command.
+ */
+test("AC-9 (contract): the command §5 prints is the command the lifecycle guard admits", async () => {
+  const document = readFileSync(OBLIGATIONS_PATH, "utf8");
+  const printed = /^node (<plugin-root>\/\S+)$/mu.exec(document);
+  assert.ok(printed, "§5 must print exactly one `node <plugin-root>/...` command");
+
+  const guard = await import("../../plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs");
+  // The guard resolves its admitted path from its OWN module URL, so substituting the
+  // plugin root of the guard under test is the substitution a real agent performs.
+  const pluginRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "plugins", "pipeline-core");
+  const resolved = `node ${join(pluginRoot, printed[1].slice("<plugin-root>/".length))}`;
+  const project = tempRootWithGuardConfig(() => {});
+
+  assert.equal(
+    guard.isSanctionedLifecycleCommand(resolved, project),
+    true,
+    `the guard refuses the command the document hands a stuck agent: ${resolved}`,
+  );
+  // The form this fix removed, asserted as refused so a regression to it turns red
+  // here rather than in a dispatch that has already run out of budget.
+  assert.equal(
+    guard.isSanctionedLifecycleCommand("node plugins/pipeline-core/scripts/repair-map.mjs", project),
+    false,
+    "a repository-relative form must stay refused -- that is why the document may not print one",
+  );
+});
+
 test("AC-7: the document carries no absolute or machine-specific path", () => {
   const document = readFileSync(OBLIGATIONS_PATH, "utf8");
   assert.doesNotMatch(document, /\/home\//u);

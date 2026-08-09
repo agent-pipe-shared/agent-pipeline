@@ -33,8 +33,13 @@ their decision to state, not a session's to suggest as a fix.
 ## Never guess whether a refusal can be lifted — ask
 
 ```
-node plugins/pipeline-core/scripts/repair-map.mjs
+node <plugin-root>/scripts/repair-map.mjs
 ```
+
+`<plugin-root>` is the absolute path the bootstrap printed as `plugin root`;
+substitute it yourself. The guard admits that exact path and nothing else, so a
+repository-relative form is refused — and a consumer project has no
+`plugins/pipeline-core/` directory to point at in the first place.
 
 It queries the real override planner at runtime and separates answers that all
 look like "refused" from the outside. Do not restate its verdicts anywhere; a

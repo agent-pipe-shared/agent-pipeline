@@ -127,8 +127,13 @@ these is not treated as a write to a gate-strength path:
 Do not guess, and do not read a table — **ask**:
 
 ```
-node plugins/pipeline-core/scripts/repair-map.mjs
+node <plugin-root>/scripts/repair-map.mjs
 ```
+
+`<plugin-root>` is the absolute path the bootstrap printed as `plugin root`;
+substitute it yourself. The guard admits that exact path and nothing else — a
+copy of the same script inside the project tree is a different program and stays
+refused — which is why no repository-relative form of this command works.
 
 It queries the real override planner at runtime and separates three answers
 that all look like "refused" from the outside: never liftable by construction,
