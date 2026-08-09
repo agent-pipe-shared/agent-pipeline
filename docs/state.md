@@ -4013,6 +4013,22 @@ flagged in the briefing as hot, high-precision, low-margin-for-error work given 
 
 **Live now:** WP-R-AC09.
 
+### R-AC-09 NARROWED (WP-R-AC09) — STALE CLAUSE CLOSED, DUPLICATE DETECTION LEFT AT THE STORE LAYER
+
+WP-R-AC09 landed clean (`8d8996bc`): `occurredAtEpochMs` closes the stale clause (optional,
+format-validated, unscoped by state — a later event in the same lifecycle carrying a later
+timestamp is correctly not treated as substitution, verified via a dedicated test). The
+"duplicated" clause was investigated and deliberately NOT re-addressed: `governance-event-store.mjs`'s
+`idempotencyKey` mechanism already covers duplicate/conflict detection at the append layer, and a
+pre-existing R-AC-13 test explicitly documents that this validation layer delegates duplicate/retry
+detection to the caller's `append()` by design — building a second mechanism would have both
+contradicted that documented design and been redundant. Verified independently (41/41 + 30/30,
+plus `governance-event-store.mjs`'s own 28/28 as the broader consumer — the 5th same-day edit to
+`agent-decision-journal.mjs`, no regression). Narrowed `partial→partial` (`e1dc5271`).
+
+**Live now: none.** Session standing continues to climb; the sprint remains genuinely in progress,
+not finalized, consistent with the Stop-hook's own check.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
