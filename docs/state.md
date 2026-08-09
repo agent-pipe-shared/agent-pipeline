@@ -3295,6 +3295,37 @@ document's O-1/O-2 amendment (of at most 4 permitted per package).
 executed by the Elephant — compaction is a user-run command. Continuing to work through the live
 dispatch queue in the meantime; nothing here is blocked on it.
 
+### WP-P-AC11 CLOSED (NARROWED, STILL PARTIAL) — K-AC-05-REWORK2 DISPATCHED
+
+**WP-P-AC11** (`6de4f44`) verified independently (own test runs on both `organization-policy.test.mjs`
+13/13 and `organization-policy-activation.test.mjs` 2/2 — no regression — diff read). `targetBinding`
+added as optional (not mandatory — a mandatory draft broke out-of-scope `organization-policy-activation`
+fixtures, disclosed and correctly resolved by relaxing to optional rather than expanding scope to fix
+them), closed, provider-neutral, never-merged across packs. Revision readback added as an always-appended
+per-contributing-pack list. Stays `partial` — five sub-concepts still absent. Fixed one disclosed gap
+myself directly (out of the dispatch's permitted scope): `POINTERS['P-AC-11']`'s rendered table text
+still said "seven remain unpinned" after two closed — corrected to five, verified via the map's own
+`--out` render, committed separately (`edecba1`).
+
+**K-AC-05 round 2 Critic: FAIL, but a real, narrow, non-security finding** — verified myself: the
+disposition mechanism (already folded into the sanctioned recovery operation per round 1's fix) produces
+literally zero observable effect anywhere in the read surface; `inspectForkedGovernanceStream` has no
+field reporting whether a fork was ever dispositioned. The Critic itself frames this as an open
+interpretation question with two legitimate resolutions, not a safety defect (explicitly confirmed:
+canonical records remain structurally untouchable either way). Decided this as an Elephant-level design
+call rather than escalating: dispatched **WP-K-AC05-rework2**, a narrow, purely additive fix — expose
+disposition status/content on `inspectForkedGovernanceStream`'s fork entries — without touching the
+already-verified-correct "GES-FORK persists regardless of disposition" behavior for append/verify/query/
+plain-recovery. No acceptance.md change, no PO escalation needed for this one.
+
+Live now: WP-K-AC05-rework2 and WP-O1O2-DESIGN-rework2 (round 3 for the design doc — still writing its
+dispatch record to the repo root due to the same scratchpad-guard limitation WP-C-AC12/WP-P-AC11 already
+hit; left untouched as live state, not cleaned up). This is the fourth Critic round on the K-AC-05 module
+and the third on the O-1/O-2 design amendment — both still within the four-round cap.
+
+Context is very long this session; the Stop hook has repeatedly suggested `/compact`. Handover is fully
+current in this file and `doc-reconciliation.md` through this checkpoint — safe to compact at any point.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
