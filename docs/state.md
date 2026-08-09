@@ -1887,6 +1887,46 @@ The dispatch substituted two real sibling suites under an explicit label rather 
 skipping the check, and it removed a QG-06 deferred decision whose promise its own
 work had made obsolete instead of leaving a stale expiry standing.
 
+### PUSHED — `sprint_phoenix` is at `3387065`, and the last three metres produced three findings
+
+`8dcb1cc..3387065`, readback confirms `origin/sprint_phoenix = 3387065e06…`. All five layers
+ran: request, PO signature, proof consumed into state (`Push approved by "APS"`), push,
+fetch-back OID equality. `sprint_phoenix` is not a protected branch, so the PO's standing
+GG-03 override was neither needed nor used.
+
+**Gate on the pushed commit: exit 0, 368 suites, `commit 3387065`, `tree b819e741`,
+`binding: "exact"`, clean at start and finish.** Recorded here after the push rather than
+before it, because writing a gate result into the register changes the commit the result
+describes — the same arithmetic as the reconciliation record, one layer up.
+
+**Layer 2** produced `PO-HUMAN-CRITICAL-REQUEST-READY`, intent `40869aa4…`, and its own
+`planSha256`/`specSha256` match the recorded authority byte for byte. That is the
+independent confirmation that option A needed no rebind: the Spec never moved.
+
+**Three refusals on the way through, all filed (`d9d152e`), all the same shape — a control
+right to refuse, reporting a reason that sends the reader to the wrong place.** Two cost a
+failed attempt with a passphrase prompt open.
+
+1. **The trust policy carried one extra, inert field** (`humanName`), and `own()` requires
+   exactly two keys. The message read *"does not match the local public key"* — the key
+   matched perfectly. The order of operations was right and must stay: openssl signs, the
+   shape check fails, the `finally` block deletes the signature, no proof written.
+2. **The push gate reads evidence from the project root, which is the one place the
+   prescribed run never writes to.** Verify cannot run from the main checkout here at all —
+   three tracked operator files are permanently modified, so the candidate preflight refuses
+   before a suite starts — so it runs in the detached worktree and leaves the evidence there.
+   The gate reported four stale findings plus an `exitCode=1` left by an aborted preflight,
+   while a genuine green run for the exact pushed commit sat in the worktree. **Resolved by
+   copying the four files to the project root — same commit, same tree, content unchanged,
+   `evidence/` is git-ignored run output by QG-03. That is disclosed as a workaround in the
+   item, not as a fix.**
+3. **A bare branch name is refused as an invalid input.** `git push origin sprint_phoenix`
+   returned `PUSH-PROOF-INPUT-INVALID`; `git push origin sprint_phoenix:refs/heads/sprint_phoenix`
+   went through immediately. Nothing expands the short name to the full ref the approval was
+   bound to, and the defect is upstream in the binding parser rather than in the
+   authorization function, whose contract is correct given a null destination. The push flow
+   documents neither the requirement nor the symptom.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
