@@ -7,7 +7,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { expectedAcceptanceLine, readClaContract, runCli, validatePrContributorGates } from "./check-pr-contributor-gates.mjs";
-import { runSecurityScan } from "./security-scan.mjs";
+// The scanner lives with the plugin, not next to this gate: it moved to
+// plugins/pipeline-core/scripts/ and this import kept pointing at the old
+// sibling path, which made the whole suite unloadable (ERR_MODULE_NOT_FOUND)
+// rather than merely failing an assertion.
+import { runSecurityScan } from "../../plugins/pipeline-core/scripts/security-scan.mjs";
 
 const AUTHOR_NAME = "External Contributor";
 const AUTHOR_EMAIL = "contributor@example.invalid";
@@ -145,7 +149,7 @@ function fixture({ security = "blocking" } = {}) {
 // gate case ABOVE uses `writeSecurityCompletenessEvidence` (a synthetic envelope) -- this is
 // exactly why F1's residual (a real, reproducible blocking verdict from this repo's own `cap.sca`
 // capability) went undetected until a Critic ran the real chain by hand. The cases below instead
-// drive the REAL `runSecurityScan()` (imported above from `./security-scan.mjs`, no synthetic
+// drive the REAL `runSecurityScan()` (imported above from the plugin's own scripts/, no synthetic
 // helper) into the REAL `validatePrContributorGates()` chain.
 // ---------------------------------------------------------------------------------------------
 
