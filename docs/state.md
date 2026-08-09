@@ -2993,6 +2993,91 @@ diff read) applies to each independently as it returns; WP-K-AC05 additionally n
 independent Critic review before being booked closed (CLAUDE.md self-application: it
 touches the tamper-evidence core, not an additive schema-only change).
 
+### C-AC-12 CLOSED, K-AC-05 AND O-1/O-2-DESIGN AWAITING CRITIC, AND A SHARED-WORKING-TREE RACE FOUND
+
+Four dispatches returned. Verified independently (own `node --test` run, `git show --stat`,
+diff read) before recording anything below:
+
+- **WP-K-AC05** (`d2ad02a456fb4e236fc9f2963ac2bb07c1e0aa76`): `inspectForkedGovernanceStream` +
+  `appendGovernanceForkDisposition` added to `governance-event-store.mjs`, additive only
+  (171 insertions, 0 removed lines — confirmed by reading the diff, not just trusting the
+  stat). All 17 tests green under my own run. Deviated from the literal briefed disposition
+  path (`${storageRoot}/${streamId}/fork-disposition/...`) to a top-level sibling of
+  `recovery`/`recovery-journal` instead — verified this deviation was NECESSARY, not
+  cosmetic: `scanStream` (line ~402) readdirs exactly `${storageRoot}/${streamId}`, so the
+  literal briefed path would have nested an unrecognized directory entry inside it and
+  tripped `GES-UNSAFE-PATH` on every future scan (confirmed by reading `scanStream` itself).
+  **Not yet booked as `implemented`** — touches the tamper-evidence core, CLAUDE.md
+  self-application requires an independent Critic pass first; dispatched (below), pending.
+- **WP-O1O2-DESIGN** (`01bafdfb88961aec9014c2175d40e52465ad1542`): adds `## 15` to the
+  GMW/HGO design doc, 352 lines, only that one file. Independently re-verified its central
+  factual claim — that `guard-lifecycle-ready.mjs` does NOT call `windowCoversRule`, and the
+  two real call sites are `guard-testpath.mjs:217`/`guard-gate-strength.mjs:231` — by
+  grepping the hook files myself; the correction holds. §15 gives O-1 a machine-local,
+  role-and-time-keyed identity registry (no portable schema change, H-AC-13 resolved as
+  "no conflict" because the registry never becomes a governance-event payload) and O-2 a
+  narrowing-only synchronous ledger read wired into both real guard-hook call sites, with an
+  honestly flagged open assumption (`queryHumanGovernanceDecisions`'s sync/async signature
+  needs verifying before implementation). Quality read as high on inspection, but this is
+  exactly the class of guardrail-adjacent design work the self-application rule covers — the
+  original document got 4 Critic rounds before any PO decision was made on it; this
+  amendment gets its own round before it becomes the basis of guard-hook code. Dispatched
+  (below), pending.
+- **WP-C-AC12** (`cb0c26dda3f8c27b4adb09b035f27ef50e92d8dd`): closed. Adds `reviewPolicy:
+  "mandatory"|"advisory"` to the change-control profile schema, present only when
+  `mandatory === true`. Advisory + ITSM-unavailable now returns
+  `allowed`/`reconciliation-required` (a named, distinct signal) instead of the old
+  unconditional block; all three pre-existing gate behaviors and the emergency/
+  pipeline-authority checks proven unchanged by dedicated tests. 15/15 green under my own
+  run, diff read, matches the brief. Evidence map moved to `implemented`.
+- **WP-R-AC10**: implementation and tests complete and correct (independently verified: 24/24
+  green on the staged, still-uncommitted diff) — `acknowledgeNonMaterialOfferWithoutJournal`,
+  scoped to `sideEffectClass: "non-authoritative"` + `authorityRequirement: "not-required"`,
+  refuses to run if an `append` function is actually supplied, structurally distinct from
+  every journaled receipt/outcome state. The dispatch's own final turn truncated mid-sentence
+  before committing or reporting — resumed via `SendMessage` rather than taking over its
+  authorship myself (dispatched work commits under its own dispatch trailer, not the
+  Elephant's).
+
+**Process finding: a shared-working-tree race, not worktree-isolated, misattributed one
+dispatch's evidence-map contribution to another's commit trailer.** Both WP-R-AC10 and
+WP-C-AC12 were briefed to edit the same DELTA block in
+`specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs` (their own, disjoint keys —
+`R-AC-10` vs `C-AC-12`), and neither briefing set `Worktree: yes` (both are additive,
+low-conflict-risk tasks by the same reasoning that applies to every dispatch this session).
+WP-R-AC10 wrote its DELTA entry to the shared working-tree file before its interruption;
+WP-C-AC12, running concurrently, staged that same file with `git add -- <its 3 paths>` for
+its own edit — and because `git add` stages the file's *current* on-disk content regardless
+of who wrote which line, WP-R-AC10's already-written (uncommitted) R-AC-10 entry rode along
+into `cb0c26d` under WP-C-AC12's trailer alone. The content itself is accurate — verified by
+reading it — so nothing is factually wrong in the evidence map; only the authorship trailer
+for that one DELTA entry is now attributed to the wrong dispatch. This is the exact failure
+mode the goldfish template's "shared-index race" warning describes, just observed for the
+first time across TWO INDEPENDENT dispatches sharing one target file rather than within one
+dispatch's own staging discipline. **Lesson for future concurrent dispatching:** when two or
+more concurrently-live dispatches are briefed to edit the same shared file (even
+non-conflicting keys in the same object), either serialize their commits (never truly
+concurrent for that one file) or give at least one of them worktree isolation — "additive,
+low file-conflict risk" was true for the *code* files each touched, but not for the *evidence
+map*, which every closure dispatch this session has been asked to touch. Not fixed
+retroactively (the content is correct); recorded so the next round of parallel dispatches
+avoids briefing two of them to touch `acceptance-evidence-map.mjs` at the same time without
+either serialization or isolation.
+
+**Separate operational finding (WP-C-AC12's own report):** writing to the session-provided
+scratchpad path under `/tmp/claude-1000/...` was refused by `guard-lifecycle-ready.mjs`
+with `GUARD-CROSS-REPO-MUTATION`, for both Write and Bash. The dispatch worked around it by
+using `specs/sprint-phoenix-epic/evidence/` (already documented as git-ignored run output)
+instead, and flagged this itself as backlog-worthy rather than routing around it silently.
+Recorded, not yet filed as a formal backlog item — a genuine tooling gap (goldfish
+report-durability, GF-09-D, depends on scratchpad write access working), not urgent enough
+to interrupt the current verification queue for.
+
+Two Critic reviews dispatched (K-AC-05's tamper-evidence-core diff; the O-1/O-2 §15 design
+amendment), both `claude-opus-5 at max` requested route, functional-equivalent read-only
+lane, running in parallel with each other and with WP-R-AC10's resumption. No PO gate
+reached; continuing per the "no time pressure, implement it thoroughly" standing instruction.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
