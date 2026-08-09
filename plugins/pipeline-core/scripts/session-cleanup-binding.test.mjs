@@ -140,8 +140,19 @@ function legacyPromotionCleanupMismatch(name) {
   writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
   const authorityDir = join(root, "specs", "rune");
   mkdirSync(authorityDir, { recursive: true });
-  writeFileSync(join(authorityDir, "prd_rune.md"), "# Rune PRD\n");
   writeFileSync(join(authorityDir, "spec.md"), "# Rune spec\n");
+  // The promoted PRD must carry both PO-gate markers promotionArtifacts()
+  // admits on; the technical-spec value is computed from this fixture's own
+  // spec.md bytes rather than pasted, matching the convention used by the
+  // other promotion fixtures (project-onboarding-v3.test.mjs).
+  const runeSpecSha256 = createHash("sha256").update(readFileSync(join(authorityDir, "spec.md"))).digest("hex");
+  writeFileSync(join(authorityDir, "prd_rune.md"), [
+    "<!-- po-language: en -->",
+    `<!-- technical-spec-sha256: ${runeSpecSha256} -->`,
+    "",
+    "# Rune PRD",
+    "",
+  ].join("\n"));
   writeFileSync(join(authorityDir, "design-input.md"), "# Rune design input\n");
   const promotion = planOnboardingKickoffPromotion({
     rootDir: root, profile: "feature", featureId: "rune-game",
