@@ -2639,6 +2639,38 @@ once mid-doc-update ("Now let's update `docs/agent-decision-journal.md`") with n
 `git status` confirmed no live fault injection, `SendMessage` to the same agent ID resumed it
 cleanly to completion — never re-dispatched.
 
+### R-AC-12 CLOSES ON THE SAME GROUNDING METHOD, FULLY THIS TIME: 104 OF 157 (2026-08-09)
+
+The PO's code>spec/PRD>issue precedence, applied a third time, this time to a criterion with no
+issue at all: the acceptance-map's "R — External command offer, workaround, and recovery audit
+profile" section header carries no `(#N)` tag, unlike every sibling section. `gh issue list`
+searches for "recovery audit", "guard path" and "workaround" surfaced #55 (TTY-only PO guard
+escape hatches — closed obsolete, its mechanism removed from `main` in `8a64369`) and #85
+(trajectory-level means authorization — Sprint Batman, a different "trajectory" than R-AC-12's).
+Neither fit. The criterion itself resolved the question instead: "WHEN the motivating Phoenix
+bootstrap trajectory is encoded as a fixture, THE SYSTEM SHALL demonstrate..." — the deliverable
+IS the fixture, and `external-command-offer.test.mjs`'s own existing convention (six of its tests
+are already named after the criterion ID they demonstrate — R-AC-02/04/08/09/11/13) was the
+design authority to follow, not an issue to hunt further for.
+
+Dispatched to `goldfish-implementor`/medium (WP-R-AC12, no design latitude — the five narrative
+beats and the exact functions/states realizing each were specified in the briefing). One new test:
+a rejected guard-bypass attempt (`ECO-AUTHORITY`), an attended local repair through the sanctioned
+non-authoritative channel, an unchanged public-privacy boundary (`seen.command`/`rawArguments`
+both `undefined`), a verified readback, and digest-only `target.repositoryFingerprint`/`scopeDigest`
+that never embed a machine-specific value. 17/17 tests pass, independently re-run
+(`node --test plugins/pipeline-core/lib/external-command-offer.test.mjs`), commit `5897862`
+inspected with `git show --stat` before accounting for it (exactly the one file, 20 insertions).
+
+Unlike A-AC-05/H-AC-08, this closes fully, not partial — the clause never asked for a production
+caller. Evidence-map delta `2005bb6`: 103 → 104. `class-s-scoping.md`'s "Suggested order" list also
+gets a small correction here: H-AC-08 was still listed as needing a PO answer from an earlier,
+pre-correction session state; it is now dropped with a note that reading resolved it, not asking.
+
+Two goldfish build slots stayed full throughout this leg: WP-L-AC04 (`goldfish-deep`/xhigh, the
+replay renderer's missing visual-class distinction for L-AC-04) was dispatched in parallel and was
+still in flight when this checkpoint was written — its own accounting follows in a later entry.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
