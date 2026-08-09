@@ -112,7 +112,7 @@ function runtime(language) {
   return `schema: pipeline.manifest.v0\nlanguage:\n  human_facing: ${language}\n`;
 }
 
-function state(planPath = "specs/feature/prd_feature.md") {
+function state(planPath = "specs/feature/prd_feature.md", documentLanguage = null) {
   return `${JSON.stringify({
     schema: "pipeline.state.v0",
     activeFeature: { id: "feature", planPath, phase: "design" },
@@ -121,7 +121,9 @@ function state(planPath = "specs/feature/prd_feature.md") {
       schema: "pipeline.continuity.v0",
       featureId: "feature",
       revision: 0,
-      runtime: { humanFacingLanguage: "de", activeDuty: "Coordinator", sessionCleanup: null },
+      runtime: documentLanguage === null
+        ? { humanFacingLanguage: "de", activeDuty: "Coordinator", sessionCleanup: null }
+        : { humanFacingLanguage: "de", activeDuty: "Coordinator", sessionCleanup: null, documentLanguage },
       authority: {
         prd: { path: planPath, sha256: "a".repeat(64) },
         spec: { path: "specs/feature/spec.md", sha256: "b".repeat(64) },
@@ -521,6 +523,27 @@ check("missing, duplicate and wrong-language markers fail before approval", () =
       assert.equal(validate().code, "PO-GATE-PRD-LANGUAGE-MISMATCH");
     });
   }
+});
+
+// GF-070: a hosted project's document language (continuity.runtime.documentLanguage)
+// stands in for the operator-facing profile language ONLY for the PRD marker
+// check, and only when set -- the operator-facing axis (profileEvidence.humanFacing,
+// reported back as result.value.humanFacing) never moves.
+check("a documentLanguage marker admits a non-de/en PRD without moving the operator-facing profile", () => {
+  withFixture({}, ({ primary, validate }) => {
+    write(join(primary, ".claude", "pipeline-state.json"), state("specs/feature/prd_feature.md", "fr"));
+    write(join(primary, "specs", "feature", "prd_feature.md"), prd("fr"));
+    const result = validate();
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(result.value.humanFacing, "de");
+  });
+});
+
+check("without a documentLanguage marker, the PRD language must still equal the operator-facing profile", () => {
+  withFixture({}, ({ primary, validate }) => {
+    write(join(primary, "specs", "feature", "prd_feature.md"), prd("fr"));
+    assert.equal(validate().code, "PO-GATE-PRD-LANGUAGE-MISMATCH");
+  });
 });
 
 check("the technical Spec marker has closed single-line lowercase grammar", () => {

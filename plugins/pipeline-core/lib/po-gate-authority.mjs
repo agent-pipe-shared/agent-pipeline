@@ -58,7 +58,7 @@ const PRD_NAME = /^prd_[^/\\]+\.md$/u;
 // Exported so a promotion precondition check (onboarding-continuity.mjs) can
 // refuse, at plan time, a PRD the gate below would refuse anyway -- from the
 // same grammar, never a re-declared copy that could drift from this one.
-export const PRD_LANGUAGE_MARKER = /^<!-- po-language: (de|en) -->$/gmu;
+export const PRD_LANGUAGE_MARKER = /^<!-- po-language: ([a-z]{2}) -->$/gmu;
 export const TECHNICAL_SPEC_MARKER = /^<!-- technical-spec-sha256: ([0-9a-f]{64}) -->$/gmu;
 const RECEIPT_KEYS = [
   "schema",
@@ -644,7 +644,11 @@ function activeFeatureState(repoRoot) {
   if (!isPlainObject(active) || typeof active.id !== "string" || active.id.trim() === "") return { status: "invalid" };
   const planPath = normalizeRepositoryPath(active.planPath);
   if (planPath === null || !PRD_NAME.test(basename(planPath))) return { status: "invalid" };
-  return { status: "active", id: active.id, planPath };
+  // Same already-parsed object, no new I/O. Absent whenever the promoted PRD's
+  // own marker was {de, en} (the operator-facing axis drove humanFacingLanguage
+  // instead, unchanged) or whenever no promotion has set it at all.
+  const documentLanguage = state?.continuity?.runtime?.documentLanguage ?? null;
+  return { status: "active", id: active.id, planPath, documentLanguage };
 }
 
 function prdAuthority(repoRoot, active, expectedLanguage) {
@@ -763,7 +767,11 @@ export function validatePoGateAuthority({
     }
     return { ok: true, code: "PO-GATE-AUTHORITY-VALID", value: profileEvidence };
   }
-  const prd = prdAuthority(current, active, profileEvidence.humanFacing);
+  // A hosted project's document language stands in for the operator-facing one
+  // only when set; unset (the {de, en}-marker or pre-GF-070 case) falls back to
+  // today's exact behavior.
+  const expectedDocumentLanguage = active.documentLanguage ?? profileEvidence.humanFacing;
+  const prd = prdAuthority(current, active, expectedDocumentLanguage);
   if (!prd.ok) return prd;
   if (expectedPlanSha256 !== undefined && (!SHA256.test(expectedPlanSha256) || expectedPlanSha256 !== prd.planSha256)) {
     return fail("PO-GATE-PLAN-DIGEST-STALE", "The active PRD changed after the authority snapshot was taken.", SNAPSHOT_REPAIR);
