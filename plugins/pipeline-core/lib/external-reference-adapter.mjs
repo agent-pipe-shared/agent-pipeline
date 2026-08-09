@@ -71,7 +71,8 @@ export async function planExternalReferenceWrite({ reference, capabilities, desi
   // an unresolvable or ambiguous artifact never reaches the provider at all.
   const binding = await bindCanonicalArtifactIdentity({ reference: ref, resolveIdentity });
   if (binding.status !== "bound") return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "rejected", reason: "canonical-identity", plan: null });
-  const target = await inspect(frozen({ adapterProfile: ref.adapterProfile, objectId: ref.objectId })); if (!validateTarget(target, ref)) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "reconciliation-required", reason: "invalid-inspection", plan: null });
+  let target; try { target = await inspect(frozen({ adapterProfile: ref.adapterProfile, objectId: ref.objectId })); } catch { return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "reconciliation-required", reason: "external-unreachable", plan: null }); }
+  if (!validateTarget(target, ref)) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "reconciliation-required", reason: "invalid-inspection", plan: null });
   if (target.revision !== ref.externalRevision || target.state !== "fresh" || desired.changes.some((change) => change.ownership !== "pipeline-owned")) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "conflict", reason: "revision-or-ownership", plan: null });
   const proposed = await preview(frozen({ objectId: ref.objectId, revision: target.revision, requestId: desired.requestId, changes: desired.changes.map((change) => frozen({ ...change })) })); if (!exact(proposed, ["previewDigest"]) || !SHA.test(proposed.previewDigest)) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "reconciliation-required", reason: "invalid-preview", plan: null });
   const plan = frozen({ schema: "pipeline.external-reference-write-intent.v1", reference: ref, pipelineArtifactIdentity: binding.identity, requestId: desired.requestId, expectedRevision: target.revision, changes: frozen(desired.changes.map((change) => frozen({ ...change }))), previewDigest: proposed.previewDigest });
@@ -82,7 +83,7 @@ export async function planExternalReferenceWrite({ reference, capabilities, desi
 export async function reconcileExternalReference({ reference, capabilities, inspect } = {}) {
   const ref = validateExternalReference(reference); const caps = validateExternalAdapterCapabilities(capabilities);
   if (ref.adapterProfile !== caps.adapterProfile || ref.systemClass !== caps.systemClass || !caps.operations.includes("inspect") || typeof inspect !== "function") return frozen({ schema: "pipeline.external-reference-reconciliation.v1", status: "rejected", reason: "capability", reference: null });
-  const target = await inspect(frozen({ adapterProfile: ref.adapterProfile, objectId: ref.objectId }));
+  let target; try { target = await inspect(frozen({ adapterProfile: ref.adapterProfile, objectId: ref.objectId })); } catch { return frozen({ schema: "pipeline.external-reference-reconciliation.v1", status: "reconciliation-required", reason: "external-unreachable", reference: null }); }
   if (!validateTarget(target, ref)) return frozen({ schema: "pipeline.external-reference-reconciliation.v1", status: "reconciliation-required", reason: "invalid-inspection", reference: null });
   const status = target.revision === ref.externalRevision && target.state === "fresh" ? "current" : "reconciliation-required";
   const reason = status === "current" ? null : target.state !== "fresh" ? "freshness" : "revision";

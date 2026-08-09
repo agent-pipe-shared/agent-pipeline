@@ -273,3 +273,31 @@ test("X-AC-11 never consults organization policy for an ungoverned reference, ev
   const withoutPolicy = await planExternalReferenceWrite({ resolveIdentity, reference: reference(), capabilities, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }) });
   assert.equal(withPolicy.status, "preview"); assert.deepEqual(withPolicy.plan, withoutPolicy.plan);
 });
+
+// X-AC-14: an unreachable external system (the injected inspect throwing or
+// rejecting) must surface as the module's typed reconciliation-gap shape,
+// never as an uncaught rejection out of the exported function.
+test("X-AC-14 planExternalReferenceWrite types a synchronously throwing inspect as external-unreachable", async () => {
+  const planned = await planExternalReferenceWrite({ resolveIdentity, reference: reference(), capabilities, desired, inspect: () => { throw new Error("transport down"); }, preview: async () => ({ previewDigest: "c".repeat(64) }) });
+  assert.equal(planned.status, "reconciliation-required"); assert.equal(planned.reason, "external-unreachable"); assert.equal(planned.plan, null);
+});
+test("X-AC-14 planExternalReferenceWrite types a rejecting inspect as external-unreachable", async () => {
+  const planned = await planExternalReferenceWrite({ resolveIdentity, reference: reference(), capabilities, desired, inspect: async () => { throw new Error("transport down"); }, preview: async () => ({ previewDigest: "c".repeat(64) }) });
+  assert.equal(planned.status, "reconciliation-required"); assert.equal(planned.reason, "external-unreachable"); assert.equal(planned.plan, null);
+});
+test("X-AC-14 reconcileExternalReference types a synchronously throwing inspect as external-unreachable", async () => {
+  const reconciled = await reconcileExternalReference({ reference: reference(), capabilities, inspect: () => { throw new Error("transport down"); } });
+  assert.equal(reconciled.status, "reconciliation-required"); assert.equal(reconciled.reason, "external-unreachable"); assert.equal(reconciled.reference, null);
+});
+test("X-AC-14 reconcileExternalReference types a rejecting inspect as external-unreachable", async () => {
+  const reconciled = await reconcileExternalReference({ reference: reference(), capabilities, inspect: async () => { throw new Error("transport down"); } });
+  assert.equal(reconciled.status, "reconciliation-required"); assert.equal(reconciled.reason, "external-unreachable"); assert.equal(reconciled.reference, null);
+});
+// Regression: an inspect that resolves normally but with an invalid result
+// still reports invalid-inspection, distinct from external-unreachable.
+test("X-AC-14 an invalid (but non-throwing) inspection still reports invalid-inspection, not external-unreachable", async () => {
+  const planned = await planExternalReferenceWrite({ resolveIdentity, reference: reference(), capabilities, desired, inspect: async () => ({}), preview: async () => ({ previewDigest: "c".repeat(64) }) });
+  assert.equal(planned.status, "reconciliation-required"); assert.equal(planned.reason, "invalid-inspection");
+  const reconciled = await reconcileExternalReference({ reference: reference(), capabilities, inspect: async () => ({}) });
+  assert.equal(reconciled.status, "reconciliation-required"); assert.equal(reconciled.reason, "invalid-inspection");
+});

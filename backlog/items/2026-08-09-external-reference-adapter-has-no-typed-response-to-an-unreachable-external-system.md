@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
 source: "Found while closing X-AC-14 under dispatch PHX-WP-X (2026-08-09), part of the Sprint Phoenix closure design's Class A wave. Confirmed at source by reading plugins/pipeline-core/lib/external-reference-adapter.mjs in full."
 due: 2026-09-08
@@ -66,7 +66,7 @@ production work, not a missing assertion.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted, implemented as proposed
+- **Rationale:** The fix landed in this same commit, wrapping both `inspect(...)` call sites in `try`/`catch` and returning the module's typed `reconciliation-required` shape with `reason: "external-unreachable"`, verified GREEN (24/24) with a break-proof RED confirming the prior uncaught-rejection failure mode.
+- **Assignment (if accepted):** PHX-WP-XAC14 (goldfish)
+- **Date:** 2026-08-09
