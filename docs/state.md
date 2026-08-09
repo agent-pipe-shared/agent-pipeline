@@ -1023,6 +1023,49 @@ a dispatch the authority to clear a control whose purpose is to check that
 dispatch's own class of work. "Show your evidence" is not a substitute for
 separation of duties — it is what makes the absence of separation look rigorous.
 
+### A guard was silently permitting forged approvals (`9473da7`) — and the better decision was the one NOT to restore
+
+Gate at `9473da7`: exit 0, 368 steps, `binding: "exact"`. `guard-devplan.test.mjs`
+38/38, `guard-push.test.mjs` 146/146, both unedited.
+
+Two symbols the merge dropped from two guards. The briefing required a
+**lost-or-superseded determination before any edit**, because a lost security check
+does not fail — it silently permits — so a green suite proves nothing, and a restored
+duplicate is not harmless either.
+
+**`checkLedgerPushAuthority`: SUPERSEDED. Nothing changed, and that is the more
+valuable half.** `authorizeRecordedPush` enforces the same "the record's word is not
+authority" invariant by actual signature verification, and additionally binds remote
+and destination, which the pre-merge check never did. Restoring it would have added a
+second, weaker verdict path to a security guard.
+
+**`hasLedgerBackedPlanApproval`: LOST, and the gap was demonstrated rather than
+argued.** The merged-base permit is a *pure* derivation — no `projectDir`, no file
+access anywhere in its module — so it **cannot consult a ledger at all**. Its v3 branch
+accepts an approval on shape alone, while the approval's own comment concedes it
+carries "a ledger reference": stored, never resolved. The demonstration, on a throwaway
+fixture: a shape-valid v3 approval with **entirely fabricated digests and no ledger
+entry** made the guard exit **0 with empty stderr**. With the restored check: exit 2,
+naming the unresolved authority.
+
+**And it deliberately did not restore the historical code literally.** Pre-merge that
+check was the *only* permit; restored as written it would have become a **second
+permit path**, weakening the guard it was meant to strengthen. It was AND-ed onto the
+existing permit instead, and declared as a deviation. Verbatim would have been
+correct and wrong.
+
+**Three of my own records are now falsified by it:**
+
+- The backlog item calls the push loss *"the single most consequential loss in the whole
+  merge"*. It is not — the push side was re-established additively; the unrepaired gap
+  was on the devplan side.
+- `evidence/phx-merge-audit.md` misclassifies `checkLedgerPushAuthority` as a silent
+  loss.
+- `guard-git.mjs` lost its `GOVERNANCE_AUTHORITY_CLI` binding in the same merge. Out of
+  the briefed scope, **uninvestigated**, and now the highest-value open item.
+
+**Merge losses: 4 of 9 closed, 1 established as a supersession that needs no work.**
+
 ### Third merge loss closed (`1f37b40`, `4a7a750`) — the blocker was real for the wrong approach
 
 `harness/lib/plan-spec-state-v2.test.mjs` loads and passes 8 checks; verified here, not
