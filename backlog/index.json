@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "7211d02c1a8f8fe1cbe24365b0728d77a1a3d900f5fa5bfdf970d0cced051b9b"
+    "transitionHead": "10c21d67cf7f68ec244f142926dd5c5f95b6f8b66015d06798d5fecd69f45466"
   },
   "counts": {
-    "open": 95,
+    "open": 93,
     "in_progress": 21,
-    "closed": 28
+    "closed": 30
   },
   "items": [
     {
@@ -859,11 +859,15 @@
     },
     {
       "id": "pipeline.push-gate-is-silent-in-every-consumer-project",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "Found by the PO while reviewing the Codex greenfield run of 2026-08-09: the agent pushed to a GitHub remote and no approval, verify evidence or security evidence was ever demanded."
+      "source": "Found by the PO while reviewing the Codex greenfield run of 2026-08-09: the agent pushed to a GitHub remote and no approval, verify evidence or security evidence was ever demanded.",
+      "closedAt": "2026-08-09",
+      "closureRepository": "self",
+      "closureCommit": "3c90882afbef72438f94147b6e3a2ac6ded7ec0a",
+      "closureEvidence": "backlog/evidence/2026-08-09-push-gate-satisfying-path-measurement.md"
     },
     {
       "id": "pipeline.push-guard-worktree-target",
@@ -945,11 +949,15 @@
     },
     {
       "id": "pipeline.reopen-design-invites-the-edit-that-ends-the-session",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "Observed live in the PO's greenfield happy-path test of the 0.5.4 local candidate (Claude runner) on 2026-08-09, and reproduced at that moment with the Pipeline's own read-only inspection. The PO's report was 'claude hat sich wieder selber deadlocked'."
+      "source": "Observed live in the PO's greenfield happy-path test of the 0.5.4 local candidate (Claude runner) on 2026-08-09, and reproduced at that moment with the Pipeline's own read-only inspection. The PO's report was 'claude hat sich wieder selber deadlocked'.",
+      "closedAt": "2026-08-09",
+      "closureRepository": "self",
+      "closureCommit": "44d6d506a485178ac2cef46141711d59e013541f",
+      "closureEvidence": "backlog/evidence/2026-08-09-reopen-design-drift-mechanism.md"
     },
     {
       "id": "pipeline.restart-launch-is-codex-only-for-every-runner",

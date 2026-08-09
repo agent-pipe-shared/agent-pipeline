@@ -156,9 +156,50 @@ decision as the handover question above.
    each artifact is checked against its own expectations and never against the
    other.
 
+## Progress (2026-08-09) — instance 2 fixed, instance 1 carried forward
+
+**Instance 2 is closed.** Proposal item 3, in the shape the item asked for. The
+promoted PRD's `<!-- po-language -->` marker is now parsed on every path, carried
+in the plan as `authority.poLanguage` — the plan should state the value it will
+write — and projected into `continuity.runtime.humanFacingLanguage` by the state
+transition. Parsing became unconditional while refusing stayed exactly where it
+was: the applied-replay path re-decides no admissibility, but it must reconstruct
+the same value or its comparison plan would differ from the plan that was applied.
+A PRD carrying no marker, reachable only on that replay path, leaves the kickoff
+value untouched rather than inventing a language.
+
+The item proposed refusing the promotion when the two disagree. Projecting is the
+better answer: the disagreement is not an error state, it is the PO answering the
+question late, which `kickoffLanguage()` documents as expected. Refusing would
+turn a correct sequence into a stop.
+
+PROMOLANG-1 is proposal item 4's second half: both artifacts checked against EACH
+OTHER. That is precisely what every existing test omitted, which is why a `de` PRD
+beside an `en` state passed all of them.
+
+**Instance 1 remains open, and this is the decision on the question the item left
+open.** The PO decided the transaction owns the handover ("wenn es ein agent
+machen kann ist das immer besser als human"), so proposal item 2 is the shape:
+a fourth target with a before/after digest.
+
+It is not in this change, deliberately. The apply path is an ordered
+`history -> cleanupBinding -> state` sequence with a fault-injection point per
+step and a `recoverPrefix` predicate that encodes exactly those three targets; a
+fourth needs its own ordering position, crash point, recovery-prefix arm, plan
+validation, replay branch and fixtures. Rushing that beside a candidate stamp
+risks a partially-applied promotion, which is strictly worse than a stale
+handover. It is the next package on this item, not a deferral of the decision.
+
+Proposal item 4's first half — asserting that after a promotion no artifact the
+transaction wrote still names the kickoff feature — belongs with that package,
+since today the handover legitimately still does.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted; instance 2 fixed 2026-08-09, instance 1 scoped as the
+  next package with the transactional work it requires.
+- **Rationale:** the stored language drives `poGateAuthority.humanFacing`, so a PO
+  who answered German was headed for an approval ceremony in English — and it is
+  the near end of the chain whose far end refused `submit-plan` in the same run.
+- **Assignment (if accepted):** Elephant, 2026-08-09.
+- **Date:** 2026-08-09

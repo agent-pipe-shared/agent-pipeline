@@ -3,10 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.push-gate-is-silent-in-every-consumer-project
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
 source: "Found by the PO while reviewing the Codex greenfield run of 2026-08-09: the agent pushed to a GitHub remote and no approval, verify evidence or security evidence was ever demanded."
 due: 2026-08-10
+closed_at: 2026-08-09
+closure_repository: self
+closure_commit: 3c90882afbef72438f94147b6e3a2ac6ded7ec0a
+closure_evidence: backlog/evidence/2026-08-09-push-gate-satisfying-path-measurement.md
 ---
 
 # The push gate is configured, projected away, and therefore silent in every consumer project
@@ -108,9 +112,78 @@ but a gate that cannot be reached.
 4. Until fixed, a consumer must be told the push gate is inactive rather than
    left to infer it from a calibration that says `blocking`.
 
+## Resolution (2026-08-09, option C as the PO chose it)
+
+**The satisfying path was measured before the gate was made live**, which is what
+option C asked for and the only thing that separates a gate from a deadlock. The
+measurement ran in a real temporary root seeded with exactly what onboarding
+writes, driving `guard-push` step by step and satisfying each demand with shipped
+commands only.
+
+**Step 1 reproduced the defect precisely: exit 0.** The seeded manifest carries no
+push gate, so the hook allows every push while `pipeline.user.yaml` says
+`push: blocking`.
+
+The path, and what each step costs:
+
+| # | Step | Who | Result |
+|---|---|---|---|
+| 1 | configure a real verify command | human | already required — the seeded placeholder exits 1 by design and says so |
+| 2 | `verify-evidence-producer --out evidence/verify-latest.json` | agent | refuses rather than writing when verify fails |
+| 3 | `gates.push_approval` in `pipeline.user.yaml` | human | `signature` (default) or `chat` (ADR-0056) |
+| 4 | `materialize-push-threat-model` | agent | from the plugin's shipped template |
+| 5 | `approve-push --by --remote --destination` | human | plus three proof flags in `signature` mode |
+
+After (5) the same push the guard refused is admitted; one further commit
+re-closes the gate, so an approval never becomes a standing licence.
+
+**The measurement found a second defect that made this unseedable.** In `chat`
+mode — the mode ADR-0056 exists to give a human without key management —
+`approve-push` refused every fresh consumer with
+`CRITICAL-PROOF-POLICY-KIND-REQUIRED`. `verifyCriticalHumanProof` consulted the
+policy file's `requiredKinds` before the operator's stand-down, and a consumer has
+no `project/critical-human-proof.json` at all (gate-strength protected, no
+materializer). So the refusal demanded the project declare push as
+proof-requiring in exactly the configuration where its operator had committed the
+opposite. Nothing covered that code. Reordering is behaviour-preserving for every
+other kind — the policy reader only admits a `waivedKinds` entry whose kind is
+already in `requiredKinds`.
+
+**Direction item 1 was wrong about the mechanism, and it does not matter.** The
+projection is not what drops `push`: `freshGateChapter` in
+`project-onboarding-v3.mjs` is a hardcoded string that only ever contained
+`dev-plan`. The fix is where the string is written.
+
+**Shipped:**
+
+- `push: {mode: blocking, type: human}` in the seeded manifest chapter, with the
+  measured path named in the chapter's own comments (`3c90882a`).
+- The ordering fix in `verifyCriticalHumanProof`, with PUSHORDER-1 pinning both
+  directions.
+- `gates.push_approval: signature` seeded explicitly — absent and `signature`
+  resolve identically, so this changes only what the operator can see. Learning
+  that `chat` exists previously meant reading plugin source.
+- The signature-mode refusal now names the chat alternative; `--dir`, which is not
+  a flag anywhere in the script, is gone from the two refusals that named it.
+- PUSHSEED-2 drives the whole path end to end, both halves.
+
+**Not shipped, deliberately:** `security` stays unseeded. Its satisfying path has
+not been established, and direction item 2 cuts both ways — seeding an
+unsatisfiable gate is the failure this item is about.
+
+**Direction item 3 remains open** and is the durable remedy for the class: a
+contract test that, for each gate a calibration declares, asserts the enforcing
+hook reaches its decision. PUSHSEED-2 covers `push` specifically; the general form
+would have caught this on the first seeded project and would catch `security` when
+it is seeded.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted and fixed; the remaining general contract test is carried
+  forward as direction item 3.
+- **Rationale:** a consumer reading `push: blocking` in its own calibration and
+  getting no push protection is the one defect class where shipping is worse than
+  waiting. Both 2026-08-09 runs demonstrated it, one of them after correctly
+  attempting `approve-push` first.
+- **Assignment (if accepted):** Elephant, 2026-08-09.
+- **Date:** 2026-08-09

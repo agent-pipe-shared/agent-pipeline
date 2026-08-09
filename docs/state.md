@@ -6,7 +6,7 @@
 **Last updated:** 2026-08-09
 **Project status:** ACTIVE
 **Local candidate:** `0.5.4+<runner>.20260809091238.7d38484` · commit `53c5b716e8b2deaf3b7b6a78d9b555b7b1867044` · installed by the PO and under happy-path test on both runners
-**Current block:** GF-058 — **0.5.4 is NOT stable-ready: the push gate is silent in every consumer project** (see the blocker section below; PO chose option C, measure the satisfying path first). Also in this block: the closure-evidence trackedness contract, three routing defects found by reading, the staging exemption, and the defects the PO's three greenfield runs produced; three suite registrations are open for the PO (TP-3); 0.5.3 is released to `main` and the human-authorization ceremony recorded as [ADR-0061](adr/0061-uniform-human-approval-ceremony.md) remains the governing thread; Nova A completion still paused on genuine ADR-gated/evidence-gated blockers
+**Current block:** GF-058 — **the stable blocker is resolved: the push gate is seeded and live, after its satisfying path was measured end to end** (option C, as the PO chose). Two further happy-path defects fixed in the same block: the reopen-design deadlock, and the promoted state's language. Also in this block: the closure-evidence trackedness contract, three routing defects found by reading, the staging exemption, and the defects the PO's three greenfield runs produced; three suite registrations are open for the PO (TP-3); 0.5.3 is released to `main` and the human-authorization ceremony recorded as [ADR-0061](adr/0061-uniform-human-approval-ceremony.md) remains the governing thread; Nova A completion still paused on genuine ADR-gated/evidence-gated blockers
 **Repair baseline:** `5d2b83dcc765d50801f4491e1bd9bed32090112b`
 **Release version:** `0.5.3` released
 **Release state:** version `0.5.3` · tag `v0.5.3` · commit `2740041d59458f949b597905816af12048502469` · tree `e72cca9b69e105ec6aac9833c4ac0bccb385d25b` · status `published`
@@ -146,7 +146,7 @@ and `apply-pending-protected-edits.mjs` now report three rather than two.
     Pipeline marker, so the rule was inactive; it now opens with a check that the
     rule is firing.
 
-## 2026-08-09 STABLE BLOCKER — the push gate is silent in every consumer project
+## 2026-08-09 STABLE BLOCKER — RESOLVED: the push gate is live, measured before it was seeded
 
 **Found by the PO, not by this session.** Both greenfield runs pushed to a GitHub
 remote and nothing demanded an approval, a verify record or a security record.
@@ -166,17 +166,47 @@ an uninstalled hook. The Claude session even **attempted** `approve-push`, was
 refused for the missing proof parameters, and pushed anyway. A gate an agent can
 name and then walk through is worse than an absent one.
 
-**PO decision: option C** — extend the manifest to carry every declared gate,
-but MEASURE the satisfying path first, exactly as the `dev-plan` comment demands
-of itself ("blocking is only defensible because the satisfying path was MEASURED
-end to end"). **Next action, and it is the whole decision:** can a freshly seeded
-consumer satisfy `guard-push` at all? It needs `evidence/verify-latest.json` with
-`exitCode 0` bound to the pushed commit, while the seed's `verify` is the
-placeholder that exits 1 by design. First measurement taken:
-`verify-evidence-producer.mjs` does not write `verify-latest.json`, so who
-produces that file for a consumer is still open. If the path is closed, THAT is
-the blocker and the honest interim is to stop the calibration promising a gate
-that is not enforced.
+**PO decision: option C** — extend the manifest to carry every declared gate, but
+MEASURE the satisfying path first, exactly as the `dev-plan` comment demands of
+itself ("blocking is only defensible because the satisfying path was MEASURED end
+to end").
+
+**The measurement was run, and the answer is yes.** In a real temporary root
+seeded with exactly what onboarding writes, driving `guard-push` step by step and
+satisfying each demand with shipped commands only. Step 1 reproduced the defect
+exactly — **exit 0** with the seed as-is — and the final step reached **exit 0**
+legitimately. Five steps, three agent-executable, two human:
+
+| # | Step | Who |
+|---|---|---|
+| 1 | configure a real verify command | human (already required; the placeholder exits 1 and says so) |
+| 2 | `verify-evidence-producer --out evidence/verify-latest.json` | agent |
+| 3 | `gates.push_approval`: `signature` (default) or `chat` | human |
+| 4 | `materialize-push-threat-model` | agent |
+| 5 | `approve-push --by --remote --destination` (+3 proof flags in `signature`) | human |
+
+One further commit re-closes the gate, so an approval never becomes a standing
+licence. The earlier note that `verify-evidence-producer.mjs` does not write
+`verify-latest.json` was a half-measurement: it writes wherever `--out` points,
+and nothing was telling consumers to point it there.
+
+**The measurement found the second defect, the one that made this unseedable.**
+In `chat` mode — the mode ADR-0056 exists to give a human WITHOUT key management —
+`approve-push` refused every fresh consumer with
+`CRITICAL-PROOF-POLICY-KIND-REQUIRED`, because `verifyCriticalHumanProof`
+consulted the policy file's `requiredKinds` before the operator's stand-down, and
+a consumer has no `project/critical-human-proof.json` at all. The refusal demanded
+the project declare push as proof-requiring in exactly the configuration where its
+operator had committed the opposite. Nothing covered that code.
+
+**Shipped** (`3c90882a`): the seeded `push: blocking` chapter with the measured
+path in its own comments; the ordering fix with PUSHORDER-1 pinning both
+directions; `gates.push_approval: signature` seeded explicitly so `chat` is
+discoverable without reading plugin source; the signature-mode refusal now names
+the chat alternative; `--dir` removed from the two refusals that named a flag the
+closed parser rejects. PUSHSEED-2 drives the whole path, both halves.
+`security` stays unseeded — its path is not established, and seeding an
+unsatisfiable gate is the failure this whole item is about.
 
 **The Claude run's own findings are filed** in
 `2026-08-09-what-the-claude-greenfield-run-adds-to-the-happy-path-findings.md`.
@@ -201,6 +231,45 @@ $1.62**, with the deadlock and the language round-trips inside the first number.
 The control run has no test, no version control and no recorded requirement, and
 nothing in it is exported, so none of its 1,030 lines can be checked without a
 browser. That is the trade this pair actually measures.
+
+## 2026-08-09 The other two fixes from the happy-path analysis
+
+**The reopen-design deadlock is closed at its source** (`44d6d506`). The PO's
+report was "claude hat sich wieder selber deadlocked". The mechanism was one layer
+below where the backlog item looked: it is not `continuity.authority` that throws
+first but the **private promotion history**, whose mutual PRD/Spec digest binding
+raises `KICKOFF-PROMOTION-AUTHORITY-DRIFT` the moment the agent edits `spec.md` —
+the one action `reopen-design` exists to enable. The catch in `observeDetailed`
+then discards that typed code into `unavailable`, and the lifecycle's catch-all
+returns `nextAction: null`.
+
+Decided: **`reopen-design` releases the binding.** The promotion record is a
+transaction, not a live authority; the live binding is `continuity.authority` plus
+`planApproval.poGateAuthority`, both re-established by submit-plan/approve-plan.
+The mutual binding stands down for a state carrying `planInvalidation`, read
+narrowly and failing closed. REOPEN-1 asserts the boundary in both directions:
+the same edited bytes without the recorded reopening still invalidate it. Also
+stopped the catch-all diagnostic asserting "repair continuity read access" as a
+cause it never established.
+
+**Instance 2 of the promotion item is closed** (`29380a77`). The promoted PRD's
+`po-language` marker now travels into `continuity.runtime.humanFacingLanguage`.
+The kickoff freezes the historical English seed by design, so a PO answering
+German after the kickoff had that answer land only in the promoted PRD — and one
+transaction emitted a PRD saying `de` and a state saying `en`. The stored value is
+what `poGateAuthority.humanFacing` derives from, so that PO was headed for an
+approval ceremony in English; it is also the near end of the chain whose far end
+refused `submit-plan` with `PO-GATE-PRD-LANGUAGE-MISMATCH` in the same run.
+PROMOLANG-1 checks both artifacts against EACH OTHER — the shape every existing
+test omitted, which is why the drift passed all of them.
+
+**Instance 1 — the handover frozen at the kickoff — is the next package, not a
+deferral.** The PO decided the transaction owns it, so it becomes a fourth target
+with before/after digests. It is not squeezed in beside a candidate stamp: the
+apply path is an ordered `history → cleanupBinding → state` sequence with a
+fault-injection point per step and a `recoverPrefix` predicate encoding exactly
+those three. A partially-applied promotion is strictly worse than a stale
+handover.
 
 ## 2026-08-09 Local `0.5.4` candidate stamped and verified — ready for the PO's manual copy
 

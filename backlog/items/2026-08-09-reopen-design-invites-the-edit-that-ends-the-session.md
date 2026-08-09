@@ -3,10 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.reopen-design-invites-the-edit-that-ends-the-session
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
 source: "Observed live in the PO's greenfield happy-path test of the 0.5.4 local candidate (Claude runner) on 2026-08-09, and reproduced at that moment with the Pipeline's own read-only inspection. The PO's report was 'claude hat sich wieder selber deadlocked'."
 due: 2026-08-12
+closed_at: 2026-08-09
+closure_repository: self
+closure_commit: 44d6d506a485178ac2cef46141711d59e013541f
+closure_evidence: backlog/evidence/2026-08-09-reopen-design-drift-mechanism.md
 ---
 
 # `reopen-design` opens the design for editing, and the first edit ends the session
@@ -117,9 +121,54 @@ is *stuck*, which is why no existing recovery matches it.
 - `2026-08-08-there-is-no-sanctioned-way-to-start-over.md` — closed by GF-057;
   its three legs do not cover this state, for the reason given above.
 
+## Resolution (2026-08-09)
+
+**The mechanism was one layer below where this item looked, and tracing it first
+was what made the fix small.** It is not `continuity.authority` that throws: the
+PRIVATE PROMOTION HISTORY binds the PRD and Spec digests as they were at
+promotion, the mutual-binding check at `onboarding-continuity.mjs` raises
+`KICKOFF-PROMOTION-AUTHORITY-DRIFT`, and the catch in `observeDetailed` discards
+that typed code into `unavailable`. So instance analysis in "Affected artifacts"
+above is right about the *symptom* path and wrong about the first throw.
+
+**Direction item 2 decided: `reopen-design` releases the binding.** The promotion
+record is a transaction, not a live authority. The live binding for an edited
+package is `continuity.authority` plus `planApproval.poGateAuthority`, both
+re-established by `submit-plan`/`approve-plan` and both checked elsewhere.
+Enforcing the promotion digests forever conflates history with authority, and
+that conflation is what made a sanctioned edit terminal.
+
+The mutual binding and the design-input binding beside it now stand down for a
+state carrying `planInvalidation` — the durable record `reopen-design` writes when
+the lifecycle releases the documents. The marker is read narrowly and fails
+closed: anything unreadable answers "no" and the binding enforces as before.
+`validPlanInvalidation` in the state module stays the only validator; this is a
+read of a marker, never a second source of truth.
+
+REOPEN-1 (direction item 4) drives it and asserts the boundary in both directions:
+the same edited bytes without the recorded reopening still invalidate the binding.
+The two pre-existing drift tests pass untouched.
+
+**Direction item 1, partially.** The catch-all diagnostic no longer asserts a
+cause it never established — it said "repair continuity read access before
+retrying" for every classification that is not valid, damaged or absent-pristine,
+which is what sent the session hunting a read-permission problem while its actual
+state was a digest disagreement. A genuinely typed fourth class, carrying
+`error.code` through the observation, is NOT shipped: it changes the shape of the
+`continuity` object every caller and test compares, and the deadlock it was meant
+to route around no longer occurs. Worth doing when the classification is next
+touched; no longer urgent.
+
+**Direction item 3 stands as written.** The rebind observation below a returning
+branch is still the recurring shape, and `observePoAuthorityRebind` still declines
+to offer itself while the plan is unapproved. That is now unreachable from this
+door, not fixed.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted and fixed at the source.
+- **Rationale:** the lifecycle offered an action, the action's first use ended the
+  session, and the only observed escape was restoring bytes a greenfield
+  repository cannot restore.
+- **Assignment (if accepted):** Elephant, 2026-08-09.
+- **Date:** 2026-08-09
