@@ -3636,6 +3636,28 @@ function preparedRevision(prefix, id = "ar-feat") {
 
 function runAuthorityRevisionTests() {
 
+// ---- PX0-AC-01: a generic continuity CAS that rewrites prd/spec authority is refused; only the sanctioned revision path may move it ----
+{
+  const fx = seedAuthorityRevisionRoot("ar01-generic-cas-authority");
+  const current = JSON.parse(stateBytes(fx.dir).toString("utf8")).continuity;
+  const preBytes = stateBytes(fx.dir);
+  const forgedPrd = structuredClone(current);
+  forgedPrd.revision = 1;
+  forgedPrd.authority = { ...forgedPrd.authority, prd: { ...forgedPrd.authority.prd, sha256: "d".repeat(64) } };
+  const prdRejected = captureBoth(() => run(continuityArgs("continuity-cas", 0, writeRequest(fx.dir, "ar01-forged-prd", forgedPrd)), fx.deps));
+  ok("AR01a a generic continuity-cas that rewrites authority.prd outside the sanctioned revision path is refused (CS-PROTECTED-AUTHORITY)",
+    prdRejected.value === 2 && /CS-PROTECTED-AUTHORITY/.test(prdRejected.err), prdRejected.err);
+  ok("AR01b State bytes are untouched after the refused generic PRD-authority CAS", stateBytes(fx.dir).equals(preBytes), "state mutated by generic CAS authority change");
+
+  const forgedSpec = structuredClone(current);
+  forgedSpec.revision = 1;
+  forgedSpec.authority = { ...forgedSpec.authority, spec: { ...forgedSpec.authority.spec, sha256: "e".repeat(64) } };
+  const specRejected = captureBoth(() => run(continuityArgs("continuity-cas", 0, writeRequest(fx.dir, "ar01-forged-spec", forgedSpec)), fx.deps));
+  ok("AR01c a generic continuity-cas that rewrites authority.spec outside the sanctioned revision path is refused (CS-PROTECTED-AUTHORITY)",
+    specRejected.value === 2 && /CS-PROTECTED-AUTHORITY/.test(specRejected.err), specRejected.err);
+  ok("AR01d State bytes are untouched after the refused generic Spec-authority CAS", stateBytes(fx.dir).equals(preBytes), "state mutated by generic CAS authority change");
+}
+
 // ---- PX0-AC-02: plan emits one closed read-only request; writes no State ----
 {
   const before = seedAuthorityRevisionRoot("ar02-plan");
@@ -3680,6 +3702,24 @@ function runAuthorityRevisionTests() {
   ok("AR03c a next-authority artifact drift AFTER plan (TOCTOU) is refused at apply time, zero mutation", applied.value === 2
     && /AR-NEXT-AUTHORITY-STALE/.test(applied.err), applied.err);
   ok("AR03d State is untouched after the TOCTOU refusal", stateBytes(fx.dir).equals(preBytes), "state mutated despite refusal");
+}
+{
+  // AR03e-g -- apply RECHECKS the State preimage itself at apply time (not just the next-authority
+  // artifact AR03c already covers): a legitimate OTHER continuity mutation landing between plan and
+  // apply (revision advances, authority untouched) is caught by apply's OWN fresh rebuild against
+  // current reality, not trusted from the now-stale plan.
+  const { fx, request } = preparedRevision("ar03-state-preimage-toctou");
+  const current = JSON.parse(stateBytes(fx.dir).toString("utf8")).continuity;
+  const advanced = structuredClone(current);
+  advanced.revision = 1;
+  advanced.resume = { ...advanced.resume, sourceRevision: 1 };
+  const casCode = run(continuityArgs("continuity-cas", 0, writeRequest(fx.dir, "ar03-advanced-cas", advanced)), fx.deps);
+  ok("AR03e-setup an unrelated continuity-cas advances State to revision 1 before apply", casCode === 0, `got ${casCode}`);
+  const preBytes = stateBytes(fx.dir);
+  const applied = arApplyCmd(fx, request.name, request.sha256);
+  ok("AR03f apply's own fresh recheck (not the stale plan) catches the State preimage drift and refuses (AR-REVISION-STALE)",
+    applied.value === 2 && /AR-REVISION-STALE/.test(applied.err), applied.err);
+  ok("AR03g State is untouched after the preimage-drift refusal", stateBytes(fx.dir).equals(preBytes), "state mutated despite refusal");
 }
 
 // ---- PX0-AC-04: named fail-closed cases; State unchanged and no revised authority claimed ----
