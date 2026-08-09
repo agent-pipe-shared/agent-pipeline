@@ -196,7 +196,7 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
-| A-AC-04 | partial | WP-A | self-confirmation is prevented; no correlation path to the human ledger is implemented |
+| A-AC-04 | partial | WP-A | CORRECTED 2026-08-09 (Elephant, direct code read): the correlation mechanism EXISTS and is tested -- recordPipelineAttempt (external-command-offer.mjs:29) calls an injected resolveHumanAuthority resolver and fails closed (self-confirmation prevented) whenever authorityRequirement is "human-decision-required". What is actually missing: zero production call sites invoke recordPipelineAttempt anywhere in the codebase (grep confirms only its own definition and test file reference it) -- the interface is built, nothing calls it with the real resolveHumanGovernanceAuthority resolver at the point an agent actually asks for authority. Smaller Class S task than the old pointer text implied ("no correlation path is implemented" was wrong; the path exists and is dead code, not absent) |
 | A-AC-05 | not-started | WP-A | NO CARRIER: neither event shape carries a runner/model/effort/profile/role/adapter field at all |
 | E-AC-20 | not-started | WP-E | NO CARRIER: audit-bundle carries nothing from the export package, and the export modules never reference the bundle |
 | H-AC-08 | not-started | WP-H | NO CARRIER: no path imports a legacy approval/override/deploy record as an unverified observation |
