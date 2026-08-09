@@ -3163,6 +3163,55 @@ scratchpad-guard workaround WP-C-AC12 hit).
 
 WP-E-AC09 and WP-K-AC05-rework1 still running; the resumed O-1/O-2-design Critic still running.
 
+### E-AC-09 CLOSED (`6388de4`); O-1/O-2-DESIGN CRITIC ALSO FAIL (3 MAJOR) — SECOND REWORK DISPATCHED
+
+**WP-E-AC09 verified and closed.** `advisory: boolean` on the adapter profile schema; threaded
+onto `deliverGovernanceExportBatch`'s returned result as a sibling of `receipt` rather than
+merged into `receipt`'s own pinned closed schema — a disclosed, well-justified deviation from
+the goal text's "surfaced on the delivery receipt" phrasing (the goal text itself granted shape
+latitude; merging would have broken two independent pre-existing pinned tests). A dedicated test
+proves canonical governance functions succeed with zero outbox/adapter/receipt/destination-health
+argument while an advisory destination is actively failing — structural proof, not an absence-of-
+coupling assertion. 30/30 green under my own run, diff read. Evidence map moved to `implemented`.
+
+**The O-1/O-2-design Critic review (resumed after its earlier truncation) also returned FAIL —
+3 major findings, 1 minor.** Independently verified the two most consequential myself before
+accepting:
+- **F1 (major):** `ledgerConfirmsLiveGmwGrant` (§15.2.3) is pseudocoded as a plain, unawaited
+  function, but the only real reader, `queryHumanGovernanceDecisions`, is `async`, and both
+  target hook files (`guard-testpath.mjs`, `guard-gate-strength.mjs`) have zero `async`/`await`
+  anywhere — confirmed by grep myself. The design's own "one open assumption... verify before
+  wiring" resolves unfavorably as written. Went one step further than the Critic's finding:
+  read both hook files in full and found they are ESM (`.mjs`), which supports top-level
+  `await` natively — meaning the likely fix is narrower than the Critic's "restructure the
+  hooks or build a parallel ledger mechanism" framing suggests (one corrected `await` at one
+  call site, not an architecture crisis) — but handed this to the rework dispatch as a LEAD to
+  verify independently (including checking for any hook-execution timeout), not as a
+  conclusion, since I did not check timeout constraints myself.
+- **F2 (major):** §9 (pre-existing, untouched by the amendment) still says the guard-hook
+  closure is "increment 2... not part of increment 1's inventory" — confirmed by reading the
+  exact lines — while new §15 says the opposite (correctly retracting the *parallel* sentence
+  in §8.5.2, but never touching §9's own separately-worded one). A genuine internal
+  self-contradiction the amendment itself created.
+- F3 (major, not independently re-derived, but concretely evidenced): no completion gate covers
+  O-1's proposed H-AC-11 text actually landing in `acceptance.md` (unlike O-2, which needs no
+  criterion-text change) — AC-9 only covers §9's amendments.
+- F4 (minor): an unqualified "validity" reference in the proposed H-AC-11 text risks being read
+  as exempting a field the existing 2026-08-08 paragraph already named as a proven join
+  violation.
+
+Dispatched **WP-O1O2-DESIGN-rework1** (goldfish-deep, xhigh): fix all four, findings handed over
+as the Critic's verbatim text (neutral registry) plus my own top-level-await research as a
+disclosed lead to verify rather than an instruction to follow blindly. Still design-only — no
+`acceptance.md` edit, no production code. Explicitly told this needs a FRESH Critic round before
+being called ready for implementation.
+
+**Now two reworks in flight** alongside nothing else new: WP-K-AC05-rework1 (governance-event-
+store.mjs) and WP-O1O2-DESIGN-rework1 (the design doc) — disjoint files, no conflict. Both
+security/guardrail-tier FAILs handled the same way: verify the Critic's reasoning myself first,
+then hand back a neutral findings registry, never implementor-justification prose, per
+`templates/prompts/critic-review.md`'s rework input contract.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
