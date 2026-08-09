@@ -3,10 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.kickoff-design-names-the-wrong-repair-for-projection-drift
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
 source: "Independent read-only analysis of the PO's private Claude+Pipeline 0.5.4 happy-path re-test (fifth local candidate), 2026-08-09, cross-checked directly against the transcript's actual command sequence and outcomes."
 due: 2026-08-16
+closed_at: 2026-08-09
+closure_repository: self
+closure_commit: e30205e2b6e31377daeeac719fd400f28fc819d4
+closure_evidence: backlog/evidence/2026-08-09-kickoff-design-projection-drift-fix-closure.md
 ---
 
 # `kickoff-design.md` tells an agent the wrong repair path for a `projection-drift` refusal, costing a full extra no-op repair round

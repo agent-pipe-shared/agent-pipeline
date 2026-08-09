@@ -3,10 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.language-selection-scope-is-unclear-and-arrives-too-late
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
 source: "Live observation of the PO's private Claude+Pipeline and Codex+Pipeline 0.5.4 happy-path test runs (fifth local candidate), 2026-08-09 (sanitized, no PO-identifying data)."
 due: 2026-08-16
+closed_at: 2026-08-09
+closure_repository: self
+closure_commit: 485613cfd9d336ee8c6d9abed63aa5e84892ff07
+closure_evidence: backlog/evidence/2026-08-09-language-selection-scope-fix-closure.md
 ---
 
 # The bootstrap language question is scoped to documents only, but that scope isn't clear enough in practice, and it surfaces too late
