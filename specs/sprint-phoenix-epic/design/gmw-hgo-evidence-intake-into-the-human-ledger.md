@@ -1673,3 +1673,355 @@ Gate: `node harness/scripts/check-doc-contracts.mjs` for this document;
   `GMW-EXPIRY-TOO-FAR` throws and step (e) appends `revoked`. The mechanism, the
   byte-identity set, the step order and I-12's asserted outcomes are unchanged;
   only the stated reason for one field's membership in that set was corrected.
+
+## 15. O-1/O-2 amendment (PO-decided 2026-08-09)
+
+Both decisions below are PO-decided, not open again: §14's O-1 and O-2 entries are superseded by this section,
+not re-argued. What follows specifies their implementation to the same bar the rest of this document holds
+itself to — precise enough that an implementor makes no further design choice of its own. O-3 (no ceremony
+added), O-4 (GMW's separate join residual) and O-5 (the distinct-request race) are not reopened; §15.1.6
+extends O-4's disclosure pattern to a second, independently-caused residual rather than touching O-4 itself.
+
+### 15.1 O-1 — "must be able to carry a natural person's identity"
+
+#### 15.1.1 What the PO rejected, and what does not change
+
+The PO rejected the ceiling this document's original §5.2/§14 stated: that from the repository alone a lift
+resolves to `product-owner / locally-attributed` and nothing more, forever. That ceiling followed from two
+facts, neither of which O-1 asks this design to undo: H-AC-13 (`acceptance.md:214-222`) rejects a
+"natural-person identifier... or any data whose policy requires... a retention period shorter than the
+repository's" from **portable** persistence, unconditionally; and §5.2's R-1/R-2 show no identifier scheme
+puts a name into the **portable** payload without violating that. **Nothing below adds a natural-person
+identifier to a portable record.** The `AUTHORITIES` role set and `ASSURANCE` classes in
+`human-governance-decision.mjs:10-11` and `human-role-exception-decision.mjs:27-28` stay exactly as they are —
+confirmed identical in both files, so the gap the PO is closing is structural, not accidental to one schema.
+What O-1 asks for is a decision that *also*, separately, carries an identity — and "also" is answered by
+adding a second, independent record a reviewer consults alongside the decision, never by widening the decision
+itself.
+
+#### 15.1.2 The mechanism: a machine-local identity registry, joined by role and time
+
+**New file, new module, no kernel change.** `plugins/pipeline-core/lib/human-governance-identity-registry.mjs`
+(create) validates and looks up entries in a new machine-local file,
+`<git-common-dir>/agent-pipeline/human-governance-identity/identity-registry.json` — a sibling of GMW's and
+HGO's own machine-local directories (`guard-maintenance-window/`, `human-guard-overrides/`), outside the
+worktree, never synced, never referenced by any commit. Its shape:
+
+```text
+{
+  schema: "pipeline.human-governance-identity-registry.v1",   // a local file-format marker only;
+                                                                // NOT a governance-event payload schema,
+                                                                // and not a candidate for spec.md §6.1's
+                                                                // closed v1 family (F-2, §14) -- this file
+                                                                // never enters governance-event.mjs at all
+  entries: [
+    {
+      authorityClass:        "product-owner",   // one of AUTHORITIES, human-governance-decision.mjs:10 --
+                                                  // the SAME closed set; no new role is invented
+      keyReference:          "local-po-key" | null,  // matches critical-human-proof.json's
+                                                       // trustAnchor.keyReference verbatim when this role
+                                                       // signs; null for a role that never holds a signing
+                                                       // key (its exact shape is whatever
+                                                       // critical-human-proof-policy.mjs already validates --
+                                                       // not redefined here)
+      naturalPersonId:       "roaspeci",         // ID pattern, human-governance-decision.mjs:4 -- see 15.1.3
+      effectiveFromEpochMs:  1754000000000,      // Number.isSafeInteger, >= 0
+      effectiveUntilEpochMs: null,               // null == still current; else > effectiveFromEpochMs
+    },
+  ],
+}
+```
+
+**Validation (exact, closed).** `validateIdentityRegistryEntry(entry)`: `exact()` over the five keys above;
+`authorityClass ∈ AUTHORITIES`; `keyReference` is `null` or a non-empty string; `naturalPersonId` matches the
+`ID` pattern (`human-governance-decision.mjs:4` — an alphanumeric initial followed by up to 127 characters
+drawn from `A-Z`, `a-z`, `0-9`, `.`, `_`, `:` and `-`); `effectiveFromEpochMs` a safe non-negative integer;
+`effectiveUntilEpochMs` is `null` or a safe integer strictly greater than `effectiveFromEpochMs`. **No two
+entries for the same `authorityClass` may have overlapping `[effectiveFromEpochMs, effectiveUntilEpochMs)`
+intervals**, and at most one entry per `authorityClass` may have `effectiveUntilEpochMs === null` (the
+"current holder" slot) — `validateIdentityRegistry(file)` rejects the whole file rather than silently picking
+a winner.
+
+**Lookup (exact).** `resolveNaturalPersonIdentity({ registry, authorityClass, occurredAtEpochMs })` returns
+`{status: "resolved", naturalPersonId}` if exactly one entry matches `authorityClass` and
+`effectiveFromEpochMs <= occurredAtEpochMs < (effectiveUntilEpochMs ?? Infinity)`; `{status: "unknown"}` if
+none matches (a decision may predate the registry, or a role may have no registered holder — not an error);
+`{status: "ambiguous"}` if more than one would match (only reachable if the file was hand-edited around the
+overlap check, so it fails closed rather than guessing).
+
+A reviewer reconstructs an identity for a portable decision `D` by reading `D.authorityClass` and
+`D.envelope.occurredAtEpochMs` (both already portable and unchanged, §4/§7.2) and passing them to
+`resolveNaturalPersonIdentity` against their own local registry file. **No new field is added to the portable
+payload.** This is why no schema change to `human-governance-decision.mjs`, `human-role-exception-decision.mjs`,
+or `governance-event.mjs` is needed for O-1 at all, and why §11's "no change in increment 1" row for those
+three files stands even after this amendment.
+
+**Wiring, minimal.** `plugins/pipeline-core/scripts/governance-authority.mjs` (already gaining a `reconcile`
+path per §11) gains one more read-only command, `resolve-identity --authority-class <class>
+--occurred-at-ms <n>`, a thin CLI wrapper over the lookup above. No producer path (GMW's `install`/`close`,
+HGO's authorize/consume/deny) reads or writes the registry; populating it is a manual, PO-side act, exactly
+like editing `critical-human-proof.json` is today. The registry file is a candidate for the same GS-family
+protection `critical-human-proof.json` already gets (`GATE_STRENGTH_PATHS`, `hooks/guard-gate-strength.mjs:73`)
+so an agent cannot edit it either — noted here as follow-up guard-config work, not designed further; this
+document has no new ground to cover for it.
+
+#### 15.1.3 (a)/(b) Assurance and shape: self-declared, bounded, no new ceremony
+
+**(a) Assurance.** The identifier is exactly as trustworthy as `locally-attributed` already claims for the
+decision it attributes — self-asserted by whoever maintains the registry file on their own machine, never
+independently verified, never signed. **No new value is added to the closed `ASSURANCE` set**
+(`locally-attributed, externally-attested, unknown`), and registry entries carry no assurance field of their
+own: their trust ceiling is inherited, not stated, from `identityAssurance` on the decision(s) resolved through
+them — which is `locally-attributed` in every case this design produces (U-5, AC-4, unchanged). Requiring a
+signature over registry entries would be a new human ceremony and is rejected under §1's constraint; a
+self-declared name is not a stronger claim than what already exists for the same decision, only a more
+complete one.
+
+**(b) Shape.** `naturalPersonId` reuses the same `ID` pattern shared by `human-governance-decision.mjs:4` and
+`human-role-exception-decision.mjs:21` (§15.1.2's validation rule above) rather than admitting free text. Two
+grounds, both already established elsewhere in this document: §5.3 treats a free-text field —
+even a digest of one — as the exact shape of private data this design keeps out of anything durable, and a
+legal name is no different in kind from `subject.reason`; and a bounded pattern makes "is this identifier
+well-formed" a structural check rather than a convention, the same argument §3.1 makes for `reasonCode`. The
+registry is machine-local and therefore outside H-AC-13's reach (§15.1.4), so this constraint is not legally
+required here — it is chosen anyway, as defense in depth and for consistency with the rest of the schema
+family: a handle or short name (`roaspeci`, `po-alex`), not a sentence.
+
+#### 15.1.4 (c)/(d) Storage location, and the H-AC-13 resolution
+
+**(c) Where it is stored.** The briefing poses two options: directly in the portable record, or a machine-local
+mapping file the portable record references by a stable key. **The first is rejected outright by H-AC-13
+(below).** The second is *almost* the answer, with one correction: the portable record does not gain a **new**
+reference key at all. A new dedicated join field (e.g. a registry row ID written into the decision) would
+itself be exactly the "joinable pseudonym" §5.1 already excludes — a stable value, present in every record it
+appears in, that a holder of the machine-local file could use to look up a name; renaming it changes nothing,
+per §5.2's own argument about derivatives. Instead, the machine-local file is keyed by two fields the portable
+record **already carries for an unrelated, pre-existing purpose** — `authorityClass` and the decision's own
+timestamp — so no schema addition, and therefore no new correlator, is needed at all. This is a genuine third
+option, not a restatement of the briefing's second one; §15.1.6 states plainly what it costs.
+
+**(d) The H-AC-13 tension, resolved: no conflict**, because no natural-person identifier ever reaches "a
+proposed portable ledger entry" — H-AC-13's exact trigger condition (`acceptance.md:214-215`). The identity
+registry is not a governance-event payload, is never passed to `appendPortableGovernanceEvent` or
+`putRestrictedGovernanceEvent`, and is not reachable from `governance-event.mjs`'s schema list at all
+(§15.1.2's file-format marker note exists precisely to prevent that confusion). §5.1's exclusion list and
+§5.2's R-1 are therefore unaffected by this amendment: they describe what a *decision* may carry, and
+`naturalPersonId` is never an input to one. Stated explicitly, per this briefing's own instruction, rather
+than left to be inferred from the registry's location.
+
+#### 15.1.5 (e) Does H-AC-11 need reopening — yes, exact text
+
+H-AC-11 already carries one amendment, dated 2026-08-08, disclosing that GMW's machine-local window/request
+record is joinable to the portable record and that increment 1 does not satisfy the "no join handle" clause
+for that half (`acceptance.md:188-206`). The mechanism above creates a second, independently-caused join —
+role-and-time rather than per-decision-request — and it extends to **both** producers, including HGO, which
+the original R-3 (§5.2) found clean of any attribution join. That finding no longer holds once an
+identity-registry entry exists for an `authorityClass` HGO also uses. This is a materially new fact about
+H-AC-11's second clause, not covered by the existing 2026-08-08 paragraph, which is scoped to GMW. **Proposed
+insertion, immediately after that paragraph, same style:**
+
+> **Amendment for the machine-local identity registry (PO, 2026-08-09).** A decision's `authorityClass` and
+> timestamps MAY be used, entirely outside the portable schema, to resolve a self-declared natural-person
+> identifier held in a machine-local identity-registry record keyed by `authorityClass` and a validity time
+> range — never by a decision-level correlator, and never persisted portably
+> (`design/gmw-hgo-evidence-intake-into-the-human-ledger.md` §15.1.2). Because the registry key reuses
+> `authorityClass` and the decision's own `occurredAtEpochMs` — fields the portable record already exposes for
+> their existing purpose under this criterion's own first clause — a local holder of both the portable stream
+> and the registry can attribute any decision, from **either** producer, to a natural person by role and time
+> window. This clause's "no portable counterpart or join handle" is read, as of this amendment, to forbid a
+> correlator manufactured for the purpose of joining — a decision ID, a request digest, a candidate, or any
+> value derived from the trust anchor (§5.1) — not the pre-existing role/time fields the ledger already carries
+> for authority and validity. The residual is disclosed, not softened, on the same terms the 2026-08-08
+> paragraph above established for GMW's separate residual, and is tracked as O-1 in
+> `design/gmw-hgo-evidence-intake-into-the-human-ledger.md` §15.1.6, owner `pipeline` (PHX-2).
+
+This amendment is proposed text only, per this document's own non-scope (§2) and process (§9): applied by the
+reviewed rebind, not here. `acceptance.md` is not touched by this dispatch.
+
+#### 15.1.6 The residual, stated plainly
+
+**What holds.** No portable record produced by this path, before or after this amendment, contains a
+natural-person identifier, a pseudonym, or any value derived from one (R-1 unchanged). Recovering an identity
+requires local possession of a file that never leaves the machine and is never part of any pushed ref.
+
+**What does not hold, and is new.** Before this amendment, HGO's side of R-3 concluded the join reaches no
+attribution at all. After it, both producers' decisions are attributable **at role-and-time granularity** by a
+local registry holder — coarser than GMW's existing per-decision join (O-4), but strictly more identifying,
+since it yields an actual name rather than a key digest. For the single-human-PO shape this repository runs
+under today, `authorityClass: "product-owner"` already narrows to one person informally; this amendment makes
+that explicit and queryable rather than pretending an anonymity the deployment does not actually have. Whether
+that trade is acceptable for a future multi-human PO is not this document's call — it is disclosed, exactly as
+O-5 (§14) disclosed a comparable single-human-shaped simplification, for whoever generalizes this later to read
+rather than discover.
+
+### 15.2 O-2 — closing the synchronous guard-hook gap inside increment 1
+
+#### 15.2.1 What the PO rejected
+
+§8.5.2's original plan ran the dual evaluation at the arming/consumption/status/reconcile boundaries and
+deferred the hook-path closure to increment 2 (D-2), leaving H-AC-02 unconditionally unsatisfied at the hook
+between those boundaries. The PO rejected the deferral, not the mechanism: §8.5.2 already specified the closure
+path (narrowing-only, lock-free) as sound; O-2 asks for it now. Quoted from §8.5.2, and built on rather than
+re-derived: the hook-side check "can turn a `covered: true` into `covered: false` and can never produce a lift
+by itself, since the proof-verified window record remains a necessary condition... no lock is needed (readers
+take none; each event file is published by atomic rename)... no integrity assumption is needed (an agent that
+forges or deletes ledger files can only *deny* itself the lift)." Nothing in that reasoning depended on *when*
+the check runs, only on it being read-only and narrowing-only — so pulling it into increment 1 changes only the
+schedule, not the safety argument, exactly as O-2's decision text frames it.
+
+#### 15.2.2 Corrected finding: which file actually calls `windowCoversRule`
+
+This document's own citation (§8.5.2: "the hooks that call `windowCoversRule`") and this briefing's premise
+both point at `hooks/guard-lifecycle-ready.mjs` as the synchronous call site. **That is not what the source
+shows.** `guard-lifecycle-ready.mjs` imports only `GATE_STRENGTH_PATHS` (the path *list*) from
+`guard-gate-strength.mjs`, for its own shell-command substring check (`gateStrengthShellRefusal`,
+`hooks/guard-lifecycle-ready.mjs:299-327`) — and that function's own comment states explicitly that GS-6, the
+live-plugin-root rule GMW governs, is **deliberately excluded** from its needle set ("the live plugin root
+(GS-6) is NOT a needle here... Shell WRITES into the enforcing plugin root are already refused by
+GUARD-CROSS-REPO-MUTATION", `:302-308`). `guard-lifecycle-ready.mjs` never imports or calls `windowCoversRule`,
+`currentGuardMaintenanceWindow`, or anything else from `lib/guard-maintenance-window.mjs`.
+
+The two actual call sites, found by tracing every import of `windowCoversRule` in the plugin:
+
+- `plugins/pipeline-core/hooks/guard-testpath.mjs:105` (import), `:217` (call) — the TP-* rule family, wired
+  as a PreToolUse deny-guard on `Edit`/`Write` against configured test paths (`guard-testpath.mjs:4`).
+- `plugins/pipeline-core/hooks/guard-gate-strength.mjs:63` (import), `:231` (call) — GS-6 only, wired for write
+  tools only, matcher `Edit|Write|NotebookEdit` (`guard-gate-strength.mjs:44-45`, corroborated from the calling
+  side by `guard-lifecycle-ready.mjs:282`, which is where this document's own §8.5.2 citation was actually
+  found while verifying this section).
+
+Both call sites already wrap the call: `try { const { covered, window } = windowCoversRule(...); if (covered)
+{...; process.exit(0);} } catch { /* an unusable window is not a lift; the refusal below still stands */ }`
+(`guard-testpath.mjs:216-224`, `guard-gate-strength.mjs:228-239`, near-identical). **This existing pattern is
+itself the answer to the failure-mode question §15.2.4 asks:** any error already narrows to "not covered"
+today, for the window read alone; §15.2.3 extends the same convention to the new ledger read rather than
+inventing a different one. Reported as a correction, not a stop condition (this dispatch's own field 5): the
+call chain **was** determined, with source-line certainty, and the design below is written against the files
+it is actually in.
+
+#### 15.2.3 The mechanism: recompute `ruleDigest`, no change to `lib/guard-maintenance-window.mjs`
+
+**The constraint to preserve.** §11 marks `plugins/pipeline-core/lib/guard-maintenance-window.mjs` "no change
+— deliberate: another session owns this file" (§7.1, A-3). O-2 must not force a change there merely to expose
+a field the hook happens to need.
+
+**What `windowCoversRule` already returns is enough.** Its `window` result
+(`lib/guard-maintenance-window.mjs:547-556`, `windowCoversRule` itself at `:559-566`) already carries
+`scopeRuleIds` and `openingTreeSha256` — exactly the two inputs §4's table gives for GMW's `ruleDigest`:
+`ruleDigest = canonicalSha256({scopeRuleIds, openingTreeSha256})`. The hook does not need `intent.sha256`,
+`decisionId`, or any other value `windowCoversRule` does not already return: it can recompute the *same*
+digest the intake wrote into the granting ledger decision at install time, from values the machine-local
+record already exposes, and ask the ledger whether a live grant carries that exact digest. **No export from
+`lib/guard-maintenance-window.mjs` changes.**
+
+**New function**, alongside the write-side builders §7.1/§11 already specify in the same file:
+
+```text
+// plugins/pipeline-core/lib/guard-authority-ledger-intake.mjs
+export function ledgerConfirmsLiveGmwGrant({ rootDir, scopeRuleIds, openingTreeSha256, nowMs = Date.now() }) {
+  // never throws -- any failure below returns false, the same "not covered" outcome an absent or
+  // unusable window already produces (guard-testpath.mjs:224, guard-gate-strength.mjs:239)
+  try {
+    // repositoryFingerprint: the same derivePoGateRepositoryFingerprint({gitCommonDir, primaryRoot})
+    // resolution §7.2's append intent already performs for `rootDir` (po-gate-authority.mjs:212-217,
+    // governance-event-store.mjs:81-88) -- not a new resolution problem, the write side already has it
+    const repositoryFingerprint = derivePoGateRepositoryFingerprint(topologyFor(rootDir));
+    const ruleDigest = canonicalSha256({ scopeRuleIds, openingTreeSha256 });  // same preimage as §4's row
+    // synchronous, lock-free scan of the human stream (§8.5.2: "readers take none") for a decision with:
+    //   event === "granted", outcome === "granted",
+    //   scope.packageId === "guard-maintenance-window", scope.repositoryFingerprint === repositoryFingerprint,
+    //   ruleDigest === ruleDigest (above), validity.notBeforeEpochMs <= nowMs <= validity.expiresAtEpochMs,
+    //   and no committed disposition (revoked/expired/consumed) whose link points back to it
+    return /* at least one such decision exists */;
+  } catch { return false; }
+}
+```
+
+No candidate comparison is performed here, deliberately: §8.5.1 already established that GMW's enforcement is
+candidate-independent and that passing the grant's own candidate makes the resolver's candidate check vacuous
+for GMW specifically. This function checks liveness, repository binding and rule-scope only — the same three
+properties §8.5.1 says the GMW boundary actually enforces — and adds nothing the resolver itself would not
+already treat as vacuous.
+
+**One new assumption, stated the way §10 states the others.** This function rests on the human stream being
+readable synchronously and without the append lock, since only `appendPortableGovernanceEvent` is confirmed
+async (§3.1: "`:629` is **async**"); `queryHumanGovernanceDecisions` (`:228`) is cited only as "the reader," not
+confirmed sync. If it turns out to be async, this function needs its own synchronous file-level scan rather
+than calling it — implementable the same way (event files are read-only, atomically published; §8.5.2 already
+establishes no lock is needed for a reader) but not identical code. **Flag for the implementor: verify
+`queryHumanGovernanceDecisions`'s sync/async signature against current source before wiring this in.**
+
+**Call-site change, both narrower than the file they sit in:**
+
+```text
+// hooks/guard-testpath.mjs, replacing the body of the existing try block at :216-224
+const { covered, window } = windowCoversRule({ rootDir: projectDir, ruleId: matched.id });
+if (covered && ledgerConfirmsLiveGmwGrant({ rootDir: projectDir, scopeRuleIds: window.scopeRuleIds, openingTreeSha256: window.openingTreeSha256 })) {
+  process.stderr.write(`[pipeline-guard-maintenance-window] ${matched.id} lifted: ...\n`);
+  process.exit(0);
+}
+// falls through to the existing refusal path exactly as if `covered` had been false
+```
+
+The same edit shape applies at `hooks/guard-gate-strength.mjs:231-238` for GS-6.
+
+#### 15.2.4 Failure mode, specified explicitly
+
+`ledgerConfirmsLiveGmwGrant` never throws (15.2.3's own `catch { return false; }`), and its call site is
+additionally inside the *existing* outer `try/catch` both hooks already wrap the window check in. Any failure
+— corrupted stream, missing directory, a verification failure, a transient I/O error, an async-reader mismatch
+surfacing as a rejected promise if the sync assumption above turns out false and is implemented incorrectly —
+resolves to **`false`**, which the `if (covered && ledgerConfirmsLiveGmwGrant(...))` guard turns into exactly
+the same refusal path an absent or expired window already produces today. **This can never block a tool call
+harder than today's ordinary refusal, and it can never grant one it would not already have granted**: the
+window check still runs first and is still required (`covered` must be `true` before the ledger call happens
+at all), so the ledger read is purely narrowing, consistent with §8.5's rule stated as one line: "the direction
+that reduces agent capability always wins." The added cost is scoped to exactly the case that matters — an
+active window claiming a lift — and is zero on every call where no window is active, which is the overwhelming
+common case; §8.5.2's "per-call read I/O" concern is therefore bounded to the rare case, not paid on every tool
+call as its original phrasing implied.
+
+One honest consequence, stated rather than hidden: a lift that used to succeed on the machine-local window
+record alone now **also** requires the ledger to confirm it, so an unreadable ledger denies a lift the window
+record alone would have granted. That is the intended effect of closing H-AC-02 at the hook, not a side effect
+of it — the same fail-closed direction §8.1 already chose for the arming boundary, applied here for the first
+time to the read path.
+
+#### 15.2.5 What this removes from increment 2, and what remains
+
+D-2 (§2, "synchronous dual-evaluation inside the guard hot path") is **fully closed** by §15.2.3 — nothing
+partial is left over. §8.5.2's "the hooks that call `windowCoversRule` appear in §9's amendment rather than in
+§11's increment-1 inventory" no longer applies: they are named and specified above, as part of increment 1.
+§14's O-2 entry ("known non-conformance... owner `pipeline`... no date") is resolved: H-AC-02
+(`acceptance.md:143-144`) is satisfied at the hook as of this amendment, not only at the arming/consumption/
+status/reconcile boundaries. H-AC-12's migration clause and its expiry (§9) are untouched — that amendment
+bounds a different clause and was never O-2's subject. D-1 (the restricted attribution store, §5.4) is **not**
+affected by this section; it remains increment 2, and §15.1 does not depend on it (§15.1.2 explicitly avoids
+the kernel path D-1 would need).
+
+### 15.3 §11 implementation inventory — delta only
+
+The rows below are additions to, or modifications of, §11's table; §11 itself is not rewritten.
+
+| File | Change | Rationale |
+| --- | --- | --- |
+| `plugins/pipeline-core/lib/guard-authority-ledger-intake.mjs` | **extend** the create already specified in §11: add `ledgerConfirmsLiveGmwGrant` (§15.2.3) alongside the write-side builders. Same file, one more export. | keeps every ledger-reading and ledger-writing entry point for this design in one module, per §7.1's own reasoning |
+| `plugins/pipeline-core/scripts/guard-authority-ledger-intake.test.mjs` | **extend** the create already specified in §11: integration tests for the narrowing read (ledger confirms → lift proceeds; ledger silent/absent/corrupted → lift denied exactly like an absent window; a disposed grant → denied) | moves an O-2 non-conformance out of "no test exists for it" the same day it moves out of "not implemented" |
+| `plugins/pipeline-core/hooks/guard-testpath.mjs` | **modify**: call `ledgerConfirmsLiveGmwGrant` after `windowCoversRule` returns `covered: true` (§15.2.3) | closes H-AC-02 at the TP-* hook path (§15.2.2 identifies this as an actual call site; the original §11 named no hook file at all for increment 1) |
+| `plugins/pipeline-core/hooks/guard-gate-strength.mjs` | **modify**: same change, GS-6 only (§15.2.3) | closes H-AC-02 at the GS-6 hook path |
+| `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs` | **no change** | §15.2.2's correction: this file does not call `windowCoversRule` and has no role in O-2's closure |
+| `plugins/pipeline-core/lib/guard-maintenance-window.mjs` | **no change** (§11's existing row stands) | §15.2.3's design deliberately avoids needing any export this file does not already have |
+| `plugins/pipeline-core/lib/human-governance-identity-registry.mjs` | **create** — `validateIdentityRegistryEntry`, `validateIdentityRegistry`, `resolveNaturalPersonIdentity` (§15.1.2) | O-1's mechanism; no kernel file changes because of it |
+| `plugins/pipeline-core/lib/human-governance-identity-registry.test.mjs` | **create** — unit tests: shape validation, overlap rejection, resolved/unknown/ambiguous lookup outcomes | same H-AC-15-style discipline §12 already applies to the write-side builders |
+| `plugins/pipeline-core/scripts/governance-authority.mjs` | **extend** the modification already specified in §11: add `resolve-identity --authority-class <class> --occurred-at-ms <n>` (§15.1.2) | one read-only query surface, reusing the file §11 already touches for `reconcile` rather than adding a new script |
+
+### 15.4 §14 disposition
+
+- **O-1 — resolved.** Mechanism specified in §15.1; the identity registry requires no kernel change and can
+  ship independently of D-1/increment 2. The residual it creates (both producers now attributable at
+  role-and-time granularity by a local registry holder) is disclosed in §15.1.6, on the same terms O-4 already
+  established, and does not soften O-4 itself. The H-AC-11 amendment text is proposed in §15.1.5 and applied by
+  the reviewed rebind, not here.
+- **O-2 — resolved.** Mechanism specified in §15.2; D-2 is fully closed and pulled into increment 1 (§15.2.5,
+  §15.3). H-AC-02 is satisfied at the guard hook as of this amendment; no non-conformance remains open for it.
+- **O-3, O-4, O-5 — unchanged.** Not reopened by this section.
