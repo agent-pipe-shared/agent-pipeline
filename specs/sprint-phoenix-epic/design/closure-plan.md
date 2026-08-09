@@ -8,7 +8,7 @@ Parent specification: [../spec.md](../spec.md) · Measurement: [../evidence/acce
 
 ## What this design is for
 
-The measurement established that 63 of 157 acceptance criteria are not
+The measurement established that 61 of 157 acceptance criteria are not
 `implemented` and that no issue is closeable. It did not say how any of them closes. This
 document does, and it is generated from the same verdict data as the measurement, so the two
 cannot drift apart.
@@ -20,11 +20,11 @@ one list is what has made the epic look larger and more uniform than it is.
 | class | criteria | what closing one actually costs |
 |---|---|---|
 | A — assertion missing | 8 | one named test case in an already-registered, unprotected suite |
-| D — documentation missing | 3 | one document section set; no code, no gate |
+| D — documentation missing | 1 | one document section set; no code, no gate |
 | S — seam missing | 6 | a connector between two packages that already work |
 | B — capability missing | 41 | real implementation plus its tests |
 | P — not code | 5 | a human gate, a sanctioned authority revision, or a proved impossibility |
-| **total** | **63** | |
+| **total** | **61** | |
 
 **The distribution is the finding.** The largest class by a wide margin is Class A: criteria
 whose behaviour is built, shipped and green, and which fail only because no assertion names the
@@ -140,7 +140,7 @@ is by module family, which makes the disjointness checkable rather than asserted
 | WP-R | 8 | plugins/pipeline-core/lib/external-command-offer*.mjs |
 | WP-PX0 | 8 | plugins/pipeline-core/lib/ruleset-source*.mjs, plugins/pipeline-core/scripts/ruleset-freshness-host.mjs, plugins/pipeline-core/lib/continuity-state.mjs |
 | WP-EPIC | 1 | plugins/pipeline-core/lib/parallel-sprint-integration*.mjs |
-| WP-DOC | 3 | docs/*.md (one section set per package) |
+| WP-DOC | 1 | docs/*.md (one section set per package) |
 | WP-PO | 5 | none - human gates and recorded deviations |
 
 Concurrency is bounded at **2**, not by preference but by the recorded capacity: the continuity
@@ -186,13 +186,11 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 | PX0-AC-06 | partial | WP-PX0 | recover replays frozen journal bytes only; the recovered-preimage outcome class is not pinned. GATE: carrier is harness/scripts/pipeline-state.test.mjs (TP-5), same as PX0-AC-01 |
 | PX0-AC-07 | partial | WP-PX0 | zero-write replay implemented; the conflicting-replay/second-writer half is not pinned. GATE: carrier is harness/scripts/pipeline-state.test.mjs (TP-5), same as PX0-AC-01 |
 
-### Class D — the gap is a documentation section the criterion enumerates (3)
+### Class D — the gap is a documentation section the criterion enumerates (1)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
-| A-AC-15 | partial | WP-DOC | docs/agent-decision-journal.md (PHX-WP-DOC-1): taxonomy, materiality policy, trust model, retention, recovery, and operator documentation added and grounded (6 of 8). "Schema" and "privacy threat model" sections remain missing -- an Elephant briefing defect, not a dispatch failure: the briefing quoted the full 8-part clause but its own instruction list only named 6 of the 8 parts |
-| H-AC-14 | partial | WP-DOC | docs/governance-events.md (PHX-WP-DOC-1): migration, retention, recovery and operator-guidance sections added and grounded; schema/taxonomy/authority-trust-model coverage confirmed solid (Portable records / Restricted machine-local records / Authority boundary sections). "Threat model" is NOT confirmed complete: the only located coverage is one sentence in docs/phoenix-governance-threat-model.md:75, not a dedicated section -- stays open rather than accepted on the baseline note alone |
-| L-AC-08 | partial | WP-DOC | no artifact traces each retained element to a stated user or audit need |
+| L-AC-08 | partial | WP-DOC | docs/governance-replay.md "Traceability" (PHX-WP-DOC-3): 8 of 9 lifecycle-governance-events.mjs kinds traced to a stated user/audit need; the `cancellation` kind is honestly flagged unclear -- no structural distinction from `status: "cancelled"` exists in the code, so no confident justification could be constructed |
 
 ### Class S — two implemented packages, mutually unaware (6)
 

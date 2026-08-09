@@ -432,6 +432,25 @@ const DELTA = {
   'A-AC-12': ['implemented', 'WP-A2'],
   'A-AC-13': ['implemented', 'WP-A2'],
   'E-AC-06': ['implemented', 'WP-A2'],
+
+  // --- evidence/phx-wp-doc3.txt (task PHX-WP-DOC-3, 2026-08-09, commit
+  // 7376c2c) --- Independently verified: diffs additive-only across three
+  // doc files, sanitization clean, section headers checked directly.
+  // A-AC-15's two missing parts (schema, privacy threat model) are now
+  // present, grounded in agent-decision-event.schema.json and the R-AC-05
+  // test -- all 8 of 8 named parts now present, moves to implemented.
+  // H-AC-14's missing "human ledger: threat model" section is now present,
+  // eight scenarios each tied to an HGL-* code and, where one exists, an
+  // H-AC-15 test -- all 8 of 8 named parts now present, moves to
+  // implemented. L-AC-08 gets a new Traceability artifact covering all nine
+  // lifecycle-governance-events.mjs kinds; eight are justified, one
+  // (`cancellation`) is honestly flagged unclear -- no structural
+  // distinction from `status: "cancelled"` exists in the code, so no
+  // confident audit-need justification could be constructed. Stays
+  // `partial`: the clause requires tracing EACH retained element, and one
+  // of nine genuinely isn't traced yet -- an honest gap, not padding.
+  'A-AC-15': ['implemented', 'WP-DOC'],
+  'H-AC-14': ['implemented', 'WP-DOC'],
 };
 
 // --- per-criterion evidence pointer ----------------------------------------
@@ -481,7 +500,7 @@ const POINTERS = {
   'H-AC-11': 'portable reconstruction surface pinned; the no-join-handle clause is proved UNSATISFIABLE for the GMW half (acceptance.md amendment, tracked as O-4)',
   'H-AC-12': 'guard-push/guard-devplan/change-control validate the decision reference; the DUAL-EVALUATION during migration with shared owner and expiry has no carrier',
   'H-AC-13': 'human-governance-ledger-tests + store admission: prohibited content rejected before any temporary file exists',
-  'H-AC-14': 'docs/governance-events.md (PHX-WP-DOC-1): migration, retention, recovery and operator-guidance sections added and grounded; schema/taxonomy/authority-trust-model coverage confirmed solid (Portable records / Restricted machine-local records / Authority boundary sections). "Threat model" is NOT confirmed complete: the only located coverage is one sentence in docs/phoenix-governance-threat-model.md:75, not a dedicated section -- stays open rather than accepted on the baseline note alone',
+  'H-AC-14': 'docs/governance-events.md (PHX-WP-DOC-1 + PHX-WP-DOC-3): all eight named parts present -- migration/retention/recovery/operator-guidance and schema/taxonomy/authority-trust-model were already solid, and a dedicated "Human ledger: threat model" section now covers eight scenarios each tied to an HGL-* code and, where one exists, an H-AC-15 test',
   'H-AC-15': 'human-governance-ledger-tests (PHX-WP-H): all thirteen named scenarios pinned (grant/consumption/expiry/redaction pre-existing; denial/revocation/correction/retry/concurrency/interruption/tampering/stale-candidate/cross-repository-binding new and break-proofed)',
 
   'A-AC-01': 'record shape pinned; nothing enforces recording BEFORE dependent action where policy requires',
@@ -498,7 +517,7 @@ const POINTERS = {
   'A-AC-12': 'agent-decision-journal-tests (PHX-WP-A + PHX-WP-A2): downstream export/projection policy is independently configurable from capture eligibility and structurally cannot weaken it; the portable path fails closed for any narrower-than-repository-public-safe stream, and the restricted profile is confirmed owner-authenticated and outside the repository',
   'A-AC-13': 'agent-decision-journal-tests (PHX-WP-A + PHX-WP-A2): the duplicate-submission clause is pinned, and agent-kind fixtures now mirror the generic store\'s interrupted/concurrent/out-of-order guarantees directly rather than relying on them by implication',
   'A-AC-14': '11 of 13 named conformance scenarios now have dedicated coverage (PHX-WP-A + PHX-WP-A2); "decomposition" is confirmed not representable in the current `kind` enum; "tampering" stays gapped -- needs store-generic digest-recompute verification, correctly left unattempted rather than guessed at',
-  'A-AC-15': 'docs/agent-decision-journal.md (PHX-WP-DOC-1): taxonomy, materiality policy, trust model, retention, recovery, and operator documentation added and grounded (6 of 8). "Schema" and "privacy threat model" sections remain missing -- an Elephant briefing defect, not a dispatch failure: the briefing quoted the full 8-part clause but its own instruction list only named 6 of the 8 parts',
+  'A-AC-15': 'docs/agent-decision-journal.md (PHX-WP-DOC-1 + PHX-WP-DOC-3): all eight named parts present -- taxonomy/materiality/trust/retention/recovery/operator docs, plus Schema (grounded in agent-decision-event.schema.json) and Privacy threat model (grounded in the R-AC-05 test and assertPortablePayload) closing the two the original briefing accidentally omitted',
   'A-AC-16': 'agent-decision-journal-tests: a journal event cannot present as approval',
 
   'L-AC-01': 'the closed lifecycle schema and validator are pinned; NO PRODUCER exists — no Pipeline path emits a lifecycle event',
@@ -508,7 +527,7 @@ const POINTERS = {
   'L-AC-05': 'lifecycle-governance-events-tests: candidate invalidation visible, duplicate sequences fail closed',
   'L-AC-06': 'replay rejects extra event data instead of exposing raw lifecycle bodies',
   'L-AC-07': 'governance-replay-core-tests: serial/parallel/retry/cancellation/recovery fixtures replay to identical bounded output on repeat, and a malicious duplicate-sequence fixture is rejected deterministically (PHX-WP-L, break-proofed twice)',
-  'L-AC-08': 'no artifact traces each retained element to a stated user or audit need',
+  'L-AC-08': 'docs/governance-replay.md "Traceability" (PHX-WP-DOC-3): 8 of 9 lifecycle-governance-events.mjs kinds traced to a stated user/audit need; the `cancellation` kind is honestly flagged unclear -- no structural distinction from `status: "cancelled"` exists in the code, so no confident justification could be constructed',
 
   'P-AC-01': 'CONFIRMED ABSENT (PHX-WP-P): schema/compatibility/merge pinned; provenance, dependency and signature-policy validation have no corresponding field anywhere in the pack schema, no test was written around the gap',
   'P-AC-02': 'organization-policy-tests: floor weakening, unknown rule, single-owner conflict all rejected',
