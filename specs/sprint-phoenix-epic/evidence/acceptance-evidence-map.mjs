@@ -859,6 +859,14 @@ const DELTA = {
   // mechanism -- disclosed as a residual, not built here. 12/12
   // governance-export-outbox tests pass, 5 new.
   'E-AC-10': ['implemented', 'WP-E-AC10'],
+
+  // E-AC-04: an optional, closed redactedFieldPolicy key on the adapter
+  // profile (governance-export-adapter.mjs) admits only rationale/summary,
+  // each mapped through a closed REDACTION_TRANSFORMS table to a fixed
+  // marker -- never the raw value. Default (no policy) stays unchanged:
+  // still omitted. A named field with a missing/unrecognised transform
+  // fails closed (GEA-PROFILE). 7/7 governance-export-adapter tests pass.
+  'E-AC-04': ['implemented', 'WP-E-AC04'],
 };
 
 // --- per-criterion evidence pointer ----------------------------------------
