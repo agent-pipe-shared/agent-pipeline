@@ -3567,8 +3567,21 @@ R-AC-02 also landed and was independently verified in this same window (`3ef4ac9
 `implemented` in the evidence-map DELTA (`74c76ba9`); C-AC-09 likewise (`86c25d56` /
 `resolveChangeControlProfile`, 23/23 tests, booked at `49f91de5`).
 
-**Live now:** O-1/O-2-design-rework4. K-AC-05 parked. Handover fully current through this
-checkpoint; no `/compact` reliance per the PO's standing instruction.
+With verification capacity otherwise idle and two more well-scoped, file-disjoint candidates
+researched (A-AC-08: no automated dispatch-provenance checker exists anywhere in the repo today,
+natural home alongside `check-doc-reconciliation.mjs`'s CLI/exit-code pattern; E-AC-10: the
+"unacknowledged source range" primitive already exists in `governance-export-outbox.mjs`'s cursor
+mechanism, this is wiring a named boundary-block on top of it, not inventing a new data model —
+P-AC-09 researched too but held back, materially more design surface, `backfill`/`export` are
+entirely absent from `organization-policy*.mjs` today), dispatched **WP-A-AC08** and **WP-E-AC10**
+in parallel. Both dispatch records use task-specific filenames per the process fix above.
+
+The O-1/O-2-design-rework4 dispatch also truncated mid-turn ("F1-F3 done. Let me update the
+dispatch record, then proceed to F4/F5/F6.") — same pattern as the round-4 Critic earlier this
+checkpoint. Resumed via `SendMessage`, told explicitly not to redo F1-F3.
+
+**Live now:** O-1/O-2-design-rework4 (resumed), WP-A-AC08, WP-E-AC10. K-AC-05 parked. Handover
+fully current through this checkpoint; no `/compact` reliance per the PO's standing instruction.
 
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
