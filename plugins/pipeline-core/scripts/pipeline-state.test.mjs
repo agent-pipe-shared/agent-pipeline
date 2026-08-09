@@ -326,6 +326,11 @@ function approvePushAttempt(root, deps, pushTarget = { remote: "origin", destina
   assert.deepEqual(state.pushApproval.lastApproved.threatModel, expectedThreatModel);
 }
 
+// NOTE: this file is not currently registered as a suite in
+// harness/scripts/verify.mjs, so nothing below runs as part of Full Verify.
+// See backlog/items/2026-08-09-pipeline-state-scripts-test-file-never-runs-in-full-verify.md
+// for the full explanation and why this cannot be fixed within ordinary
+// dispatch authority.
 // F7 (GF-075). validCurrentDecisionDocuments falls back to profile.humanFacing
 // only when continuity.runtime.documentLanguage is unset; when it IS set, the
 // PO-language marker must match documentLanguage instead. A profile configured
