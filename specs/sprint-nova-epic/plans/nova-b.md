@@ -9,10 +9,10 @@
 - Nova B uses that exact accepted product candidate as product base and the
   validated `E2` evidence descendant as branch continuation head.
 - No unpublished Cyborg dependency is introduced.
-- The branch is rebased onto the exact Product-Owner-identified stable `main`
-  0.4.7 commit/tree; conflicts are dispositioned against the 17-Issue scope,
-  affected bindings are regenerated and upstream #63 regressions pass without
-  a Nova delivery claim.
+- **Superseded 2026-08-09 (PO instruction):** the original rebase-onto-`main`
+  `0.4.7` criterion no longer applies — the next release candidate (0.5.4)
+  ships from Nova itself, so there is no separately maintained `main` for
+  Nova to rebase onto. See "External 0.4.7 rebase gate" below.
 - External hosts, credentials and mutations remain opt-in and separately
   authorized.
 - The PO-approved pre-rebase lane applies first to Nova A only. Nova B retains
@@ -197,16 +197,25 @@ The ordered goals for this phase are:
    closure for a separately accepted observation.
 
 **Deferred live-provider/capability risk disposition (B1-I):** Accountable
-owner: the Nova Product Owner. Expiry: **2026-08-09**. Until that owner renews
-or replaces this disposition with a separately accepted observation, the Codex
-provider adapter remains inactive, B1 capability remains unadvertised, and
-Issue `#21` remains open. This disposition authorizes neither activation nor
-implementation, credentials, network access, issue closure, push or release.
+owner: the Nova Product Owner. Expiry: **2026-08-30** (renewed 2026-08-09, PO
+instruction: extend three weeks from the original 2026-08-09 expiry). Until
+that owner renews or replaces this disposition with a separately accepted
+observation, the Codex provider adapter remains inactive, B1 capability
+remains unadvertised, and Issue `#21` remains open. This disposition
+authorizes neither activation nor implementation, credentials, network
+access, issue closure, push or release.
 
 **Phase exit:** ADR-0048 alone does not activate a live worker. Nova B starts
-only after the stable 0.4.7 rebase, refreshed 17-Issue bindings, exact accepted
-Nova A receipt and explicit PO activation. Bounded pre-rebase Nova A Execution
-is not a live worker capability claim.
+only after refreshed 17-Issue bindings, exact accepted Nova A receipt and
+explicit PO activation (the stable-`main`-0.4.7-rebase criterion is
+superseded, see "External 0.4.7 rebase gate" below). Bounded pre-rebase
+Nova A Execution is not a live worker capability claim.
+
+**PO instruction, 2026-08-09: Nova B dispatch — including Slice B0, the one
+named by `project/pipeline-state.json`'s `queueHead`
+(`nova-b0`/`runner-native-continuation`) — is deferred until the pending
+0.5.4 candidate is live.** No slice is dispatched before then, regardless of
+entry-gate status.
 
 ## Slice B2-C — Async execution and credential-lease contracts
 
@@ -318,13 +327,16 @@ authentication boundary precedes live access or mutation.
 **Stop:** ambiguous host/project, token exposure, silent weaker control or
 provider-specific field leakage into the core contract.
 
-## External 0.4.7 rebase gate (`#63`)
+## External 0.4.7 rebase gate (`#63`) — superseded 2026-08-09
 
-Issue `#63` belongs to `hotfix:0.4.7`, not Nova. Nova waits for the stable
-`main` 0.4.7 commit/tree, rebases onto it, resolves conflicts, regenerates
-bindings and reruns the upstream recovery regressions. Historical B4R design
-and evidence are retained only for conflict analysis. Nova makes no #63
-implementation, comment, closure or delivery claim.
+Issue `#63` belonged to `hotfix:0.4.7`, not Nova; the plan originally waited
+for the stable `main` 0.4.7 commit/tree, rebased onto it, resolved conflicts,
+regenerated bindings and reran the upstream recovery regressions. **PO
+instruction, 2026-08-09: this gate no longer applies** — the next release
+candidate (0.5.4) ships from Nova itself, so there is no separate stable
+`main` for Nova to rebase onto. Historical B4R design and evidence are
+retained only for conflict analysis; Nova still makes no #63 implementation,
+comment, closure or delivery claim.
 
 ## Slice B5 — Nova-only candidate assembly and freeze
 
