@@ -122,6 +122,24 @@ unclear without a PO answer — and (b) a new event kind or explicit `unverified
 existing human-ledger events that a gate check can reject. Recommend treating the "what counts as
 a legacy record" question as its own scoping question before any code.
 
+### RESOLVED 2026-08-09: the "what counts as a legacy record" question was already answered, just not here
+
+This section framed "what counts as a legacy approval/override/deploy record" as needing a fresh
+PO answer. It didn't: the criterion's own source issue (#30, "Add a repository-scoped
+tamper-evident human governance decision ledger") already names six exact classes in its own
+Migration section -- mutable approval state, guard-override JSONL records, deployment approvals
+and deploy logs, specialized override receipts, backlog transition records, and release/change
+evidence -- and this repo's own, more current `spec.md` section 10 "Migration and compatibility"
+independently confirms the shape (classify each record as provable decision, unverified
+observation, duplicate projection, or unsupported; "legacy records that cannot be proven must be
+imported, if at all, as explicitly unverified observations"). Neither the issue nor the Spec
+needed re-deriving from a PO conversation; they needed reading. Built (PHX-WP-HAC08, commit
+`a657e14`): a third, independent journal event kind, `legacy-import-observation` (dispatched like
+`command-offer`, not folded into the 5-kind observational shape), closing exactly the "unverified
+observation" outcome of the Spec's four-way classification. Stays `partial`, reclassified Class S
+to Class B: a repo-wide search confirmed no production caller imports/migrates a legacy record
+yet -- the mechanism is real, nothing exercises it in production.
+
 ## H-AC-09 — needs a design decision on physical-target binding
 
 **Clause:** "WHEN cross-repository guarded work is authorized, THE SYSTEM SHALL bind evaluation,

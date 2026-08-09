@@ -62,9 +62,9 @@ A bullet is therefore BLOCKED unless every criterion mapped to it is `implemente
 | verdict | count |
 |---|---|
 | implemented | 103 |
-| partial | 37 |
+| partial | 38 |
 | designed-only | 1 |
-| not-started | 15 |
+| not-started | 14 |
 | constraint | 1 |
 | **total** | **157** |
 
@@ -123,7 +123,7 @@ clause that is not pinned or not built.
 | H-AC-05 | implemented | C | human-governance-ledger-tests: detached proof verified without upgrading to human identity; no attribution field admitted |
 | H-AC-06 | implemented | C | human-governance-ledger-tests: append-only consumption disposition; restricted-store erasure pinned separately |
 | H-AC-07 | implemented | C | human-governance-ledger-tests: cross-repository decision rejected before mutation |
-| H-AC-08 | not-started | J | NO CARRIER: no path imports a legacy approval/override/deploy record as an unverified observation |
+| H-AC-08 | partial | WP-HAC08 | agent-decision-journal-tests (PHX-WP-HAC08): a third, independent event kind `legacy-import-observation` (closed legacySourceClass/authorityProofStatus/sourceReference shape, non-authoritative by construction via the existing origin==="agent" binding) is now representable, drift-tested. Still no production caller: CONFIRMED ABSENT (repo-wide search) that any code path imports/migrates a legacy record at all |
 | H-AC-09 | not-started | J | NO CARRIER: external-push-ledger is scoped to single-repo push proofs; nothing binds cross-repository guarded work to one physical target. RECLASSIFIED Class S -> Class P 2026-08-09 (PO-confirmed): the clause's own subject -- authorizing guarded work IN another repository -- is exactly the capability CLAUDE.md's Sprint-0 hard rule currently forbids outright ("Read-only toward the three project repos ... never a write ... until an explicitly approved Phase-4 migration"). There is no design to scope: building a cross-repository binding mechanism for a write capability this repo is not yet authorized to exercise would be building ahead of its own governing policy, not closing a gap. Closes only if/when a Phase-4 migration lifts the restriction, or the PO narrows the clause's scope by amendment (the same route H-AC-11 already used) -- either way, not a code task available now |
 | H-AC-10 | implemented | C | five named assertions covering scope, reason, expiry, constraints, follow-up review, no standing bypass |
 | H-AC-11 | partial | C | portable reconstruction surface pinned; the no-join-handle clause is proved UNSATISFIABLE for the GMW half (acceptance.md amendment, tracked as O-4) |
@@ -354,7 +354,7 @@ No blocking criterion. Closeable subject to the epic-level gates (EPIC-AC-01..06
 | 4 | Interrupted/concurrent append recovers without silent split authority | K-AC-05 (partial) |
 | 5 | Truncation/reorder/change/fork/path/hash failures verify offline | K-AC-05 (partial) |
 | 6 | Guard/plan/release/deploy/override paths reference decision IDs | H-AC-12 (partial) |
-| 7 | Unverified legacy material cannot satisfy a current gate | H-AC-08 (not-started) |
+| 7 | Unverified legacy material cannot satisfy a current gate | H-AC-08 (partial) |
 | 8 | #9 bundles verified ledger records/integrity | P-AC-06 (partial) |
 
 ### #31 — Add a privacy-preserving agent decision and assumption journal
@@ -430,7 +430,7 @@ Issues closeable on their own live acceptance bullets: **1 of 8**.
 | E-AC-10 | not-started | 1 |
 | E-AC-11 | partial | 1 |
 | E-AC-20 | not-started | 1 |
-| H-AC-08 | not-started | 1 |
+| H-AC-08 | partial | 1 |
 | H-AC-09 | not-started | 1 |
 | H-AC-11 | partial | 1 |
 | L-AC-08 | partial | 1 |

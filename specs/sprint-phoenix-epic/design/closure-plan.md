@@ -21,8 +21,8 @@ one list is what has made the epic look larger and more uniform than it is.
 |---|---|---|
 | A — assertion missing | 2 | one named test case in an already-registered, unprotected suite |
 | D — documentation missing | 1 | one document section set; no code, no gate |
-| S — seam missing | 2 | a connector between two packages that already work |
-| B — capability missing | 43 | real implementation plus its tests |
+| S — seam missing | 1 | a connector between two packages that already work |
+| B — capability missing | 44 | real implementation plus its tests |
 | P — not code | 6 | a human gate, a sanctioned authority revision, or a proved impossibility |
 | **total** | **54** | |
 
@@ -135,7 +135,7 @@ is by module family, which makes the disjointness checkable rather than asserted
 | WP-E | 7 | plugins/pipeline-core/lib/governance-export-*.mjs |
 | WP-A | 7 | plugins/pipeline-core/lib/agent-decision-journal*.mjs, governance/schemas/agent-decision-event.schema.json |
 | WP-L | 3 | plugins/pipeline-core/lib/lifecycle-governance-events*.mjs, plugins/pipeline-core/lib/governance-replay*.mjs |
-| WP-H | 2 | plugins/pipeline-core/lib/human-governance-ledger*.mjs, plugins/pipeline-core/lib/governance-authority-resolver*.mjs, plugins/pipeline-core/lib/external-push-ledger*.mjs |
+| WP-H | 1 | plugins/pipeline-core/lib/human-governance-ledger*.mjs, plugins/pipeline-core/lib/governance-authority-resolver*.mjs, plugins/pipeline-core/lib/external-push-ledger*.mjs |
 | WP-R | 8 | plugins/pipeline-core/lib/external-command-offer*.mjs |
 | WP-PX0 | 4 | plugins/pipeline-core/lib/ruleset-source*.mjs, plugins/pipeline-core/scripts/ruleset-freshness-host.mjs, plugins/pipeline-core/lib/continuity-state.mjs |
 | WP-EPIC | 1 | plugins/pipeline-core/lib/parallel-sprint-integration*.mjs |
@@ -185,14 +185,13 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 |---|---|---|---|
 | L-AC-08 | partial | WP-DOC | docs/governance-replay.md "Traceability" (PHX-WP-DOC-3): 8 of 9 lifecycle-governance-events.mjs kinds traced to a stated user/audit need; the `cancellation` kind is honestly flagged unclear -- no structural distinction from `status: "cancelled"` exists in the code, so no confident justification could be constructed |
 
-### Class S — two implemented packages, mutually unaware (2)
+### Class S — two implemented packages, mutually unaware (1)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
 | E-AC-20 | not-started | WP-E | NO CARRIER: audit-bundle carries nothing from the export package, and the export modules never reference the bundle |
-| H-AC-08 | not-started | WP-H | NO CARRIER: no path imports a legacy approval/override/deploy record as an unverified observation |
 
-### Class B — an absent capability (43)
+### Class B — an absent capability (44)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
@@ -214,6 +213,7 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 | E-AC-10 | not-started | WP-E | NO CARRIER: no named lifecycle boundary blocks only the exact unacknowledged source range |
 | E-AC-11 | partial | WP-E | governance-export-delivery-tests (PHX-WP-E, break-proofed): the closed 9-field receipt schema is pinned, rejecting any retention/immutability/analyst-review/compliance-implying extension; CONFIRMED ABSENT: a per-projection/mapping digest field -- only policyRevision exists (governance-event-projection.mjs:22-24) |
 | EPIC-AC-02 | not-started | WP-EPIC | NO CARRIER: planParallelSprintIntegration has no concept of "unpublished" and is called only from its own test file |
+| H-AC-08 | partial | WP-HAC08 | agent-decision-journal-tests (PHX-WP-HAC08): a third, independent event kind `legacy-import-observation` (closed legacySourceClass/authorityProofStatus/sourceReference shape, non-authoritative by construction via the existing origin==="agent" binding) is now representable, drift-tested. Still no production caller: CONFIRMED ABSENT (repo-wide search) that any code path imports/migrates a legacy record at all |
 | H-AC-12 | partial | WP-H | guard-push/guard-devplan/change-control validate the decision reference; the DUAL-EVALUATION during migration with shared owner and expiry has no carrier |
 | K-AC-05 | partial | WP-K | governance-event-store-tests: fork detection now proven to also block append and recovery, not only verify/query (PHX-WP-K, break-proofed). Still absent: no disposition operation exists anywhere in the module -- "governed disposition appended through the sanctioned recovery operation" has no code to test against |
 | K-AC-10 | not-started | WP-K | NO CARRIER, confirmed by repo-wide search (PHX-WP-K): queryPortableGovernanceStream, the governance-event CLI and governance-replay.mjs all accept exactly one streamId; no function anywhere queries more than one stream, so per-record provenance preservation across streams has no code to test |
