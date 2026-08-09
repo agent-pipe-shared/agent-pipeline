@@ -3,11 +3,11 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "0fa2fb602c1a4317f50e7cd98e5d2706c0720133fbc03fba7c07b01479310e6b"
+    "transitionHead": "03fd1d2d2e93dbbe1508219157f058f9cde40735be6ac06fb8b3db4079a51f8c"
   },
   "counts": {
-    "open": 75,
-    "in_progress": 21,
+    "open": 90,
+    "in_progress": 23,
     "closed": 25
   },
   "items": [
@@ -81,6 +81,14 @@
       "source": "NOVA-GMW-1 first dispatch attempt, 2026-08-07 -- Agent tool isolation:worktree."
     },
     {
+      "id": "pipeline.agents-are-judged-by-rules-no-artifact-ever-tells-them",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "PO hypothesis, 2026-08-08: 'kann es sein dass sie durch die vielen neuen guards und vorgaben zu wenig Pflichtwissen darüber haben was erlaubt ist und was nicht und dadurch zu viele guard blocks und hook blocks produzieren?' — measured and confirmed by the Elephant the same day."
+    },
+    {
       "id": "pipeline.approved-not-implementing-is-a-silent-trap",
       "status": "open",
       "type": "defect",
@@ -148,6 +156,14 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Residual of GitHub issue #100 (P0/Security, 'Fail closed when the push approval record is absent'), established by reading the current tree on 2026-08-08. The PO independently reached this state in a greenfield test the same day."
+    },
+    {
+      "id": "pipeline.bootstrap-skill-grows-by-budget-raise-instead-of-by-module",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "PO, 2026-08-08, on raising the pipeline-start byte budget 15,000 -> 18,000: optimisation is worth doing, but as an efficiency pass later, when more files still need to become modules — not as a detour inside the 0.5.4 hardening block."
     },
     {
       "id": "pipeline.bounded-diagnostic-outside-repo-refused-under-wrong-reason",
@@ -245,6 +261,14 @@
       "source": "Observed directly on 2026-08-08: commit 598a78b, trailered Dispatch: HGOELIG-1 (goldfish), contains a backlog-item edit written by the Elephant and staged seconds earlier."
     },
     {
+      "id": "pipeline.contract-suite-borrows-its-fixture-by-importing-a-109-test-file",
+      "status": "in_progress",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Elephant, 2026-08-08, GF-057. Noted while verifying the C1/C3 contract suite; recorded rather than fixed so the block's remaining consumer blockers keep the budget."
+    },
+    {
       "id": "pipeline.critic-context-isolation",
       "status": "in_progress",
       "type": "workflow-improvement",
@@ -275,6 +299,14 @@
       "owner": "pipeline",
       "created": "2026-07-20",
       "source": "Public V3 Foundation stabilization close authorship check: delivered Goldfish work packages lacked required public Dispatch trailers"
+    },
+    {
+      "id": "pipeline.dispatch-record-does-not-bind-to-its-commit",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "Found independently by all three Critic rounds against the 0.5.4 candidate (A-F2/A-F5, B-F3, C-F3/C-F4), then reproduced by the Elephant one hour later in 1c3cd86."
     },
     {
       "id": "pipeline.dispatch-reported-creating-a-record-it-never-created",
@@ -344,6 +376,14 @@
       "source": "Structured handover from the greenfield happy-path test of the local 0.5.4 build, 2026-08-08 (defect D-4)."
     },
     {
+      "id": "pipeline.grammar-refusal-does-not-say-which-part-failed",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Found by REPAIRMAP-1 while building the repair map, and immediately suffered by that same dispatch: it lost its own final commit to this refusal after 40 tool uses of otherwise-good work."
+    },
+    {
       "id": "pipeline.greenfield-onboarding-writes-mixed-authority-tiers",
       "status": "open",
       "type": "defect",
@@ -404,6 +444,14 @@
       "source": "Structured handover from the greenfield happy-path test of the local 0.5.4 build, 2026-08-08 (defect D-3). Independently hit in the Pipeline's own repository in the same session."
     },
     {
+      "id": "pipeline.guard-refuses-the-prescribed-recovery",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "PO, 2026-08-08, findings C1, C2 and C3 from the Claude greenfield transcript against the 0.5.4 local candidate. All three verified in code by the Elephant before filing."
+    },
+    {
       "id": "pipeline.guard-string-match-makes-a-file-uncommittable",
       "status": "open",
       "type": "defect",
@@ -418,6 +466,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "PO, 2026-08-07: 'state wird aber auch hoffentlich nicht unendlich lang sondern irgendwann wieder leer :) wenn etwas dauerhaft als regel geschrieben wird, dann muss es in adrs'."
+    },
+    {
+      "id": "pipeline.hardening-round-cannot-register-its-own-suites",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Observed 2026-08-08 during the 0.5.4 hardening block itself: the SETUP-2b dispatch was refused when registering its own new suite, correctly stopped rather than routing around the guard, and the registration is still outstanding. Second confirmed instance of the guard-testpath gap already recorded in docs/state.md."
     },
     {
       "id": "pipeline.harness-classifier-blocks-authorized-onboarding-action",
@@ -576,6 +632,14 @@
       "source": "PO, 2026-08-08: 'uns fehlt da noch eine art adr die die verzeichnisstrukturen besser hart vorgibt und definiert was wo hin gehört - agenten neigen bei jeder neuen session dazu neue strukturen zu erfinden. das muss die pipeline steuern.' Five corroborating instances from that same night are recorded below."
     },
     {
+      "id": "pipeline.no-sanctioned-way-to-start-over",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "PO, 2026-08-08, unhappy-path transcripts from fresh Claude and Codex sessions on greenfield projects against the 0.5.4 local candidate. The Claude session composed a destructive `rm -rf` for the human to run, because no typed reset exists; the Codex session asked the human for permission to repair the Pipeline by hand."
+    },
+    {
       "id": "pipeline.nonblocking-interaction-continuity",
       "status": "in_progress",
       "type": "defect",
@@ -651,6 +715,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "Observed live during a 2026-08-07 wave of five parallel Nova A evidence-sealing Goldfish dispatches, each briefed 'Worktree: no' on the reasoning that their file scopes were disjoint."
+    },
+    {
+      "id": "pipeline.permitted-edit-drops-session-into-unrecoverable-readiness",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "PO, 2026-08-08, unhappy-path transcript from a fresh Claude session on a greenfield project against the 0.5.4 local candidate. The session edited a bound PRD, lost session readiness, and could not act again until the human ran `sed -i`."
     },
     {
       "id": "pipeline.pipeline-state-rebind-codex-default-runner",
@@ -736,6 +808,14 @@
       "owner": "pipeline",
       "created": "2026-07-20",
       "source": "user-requested feature expansion after the first public observation publication"
+    },
+    {
+      "id": "pipeline.promotion-freezes-a-prd-the-po-gate-will-reject",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "PO, 2026-08-08, two independent unhappy-path transcripts against the 0.5.4 local candidate, one per runner, on separate greenfield browser-game projects. The Claude session reached a deadlock it could not leave without the human running `sed -i` by hand; the Codex session reached a circular gate block with no typed recovery and stopped correctly."
     },
     {
       "id": "pipeline.push-guard-worktree-target",
@@ -901,6 +981,14 @@
       "source": "PO, 2026-08-07, on watching the guard refuse a scratchpad write: 'eigentlich solltest du auf tmp zugriff haben'. The Critic-contract half of the finding was observed independently the same day."
     },
     {
+      "id": "pipeline.session-told-ready-but-not-how-to-repair",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "PO, 2026-08-08: 'einer frischen session fehlt scheinbar die info wie sie gates lifted und wie sie reparaturen macht ... das verschwendet total viele token'. Observed in both the Claude and the Codex greenfield transcripts against the 0.5.4 local candidate."
+    },
+    {
       "id": "pipeline.setup-mjs-marketplace-name-collision-defeats-local-dev-installs",
       "status": "closed",
       "type": "defect",
@@ -913,6 +1001,22 @@
       "closureEvidence": "backlog/evidence/2026-08-06-second-reconciliation-pass.md"
     },
     {
+      "id": "pipeline.shipped-artifacts-assume-the-pipelines-own-repository",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "PO, 2026-08-08, consolidated findings A1 and A4 from the Claude greenfield transcript against the 0.5.4 local candidate. Both verified in code by the Elephant before filing."
+    },
+    {
+      "id": "pipeline.shipped-guidance-sends-agents-to-a-directory-a-gate-refuses",
+      "status": "in_progress",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "PO, 2026-08-08, live instance observed against the first 0.5.4 local candidate: Write(scratch/resume-card.json) refused in the draft phase. Verified in code by the Elephant before filing."
+    },
+    {
       "id": "pipeline.signed-guard-override-has-no-command-that-emits-the-digest-to-sign",
       "status": "open",
       "type": "defect",
@@ -921,12 +1025,28 @@
       "source": "Found while walking the signature-mode HGO flow end to end for the GS-2 migration of project/critical-human-proof.json, 2026-08-08. The flow is walkable by reading library source, not by following the CLI."
     },
     {
+      "id": "pipeline.signing-ceremony-designed-for-the-verifier-not-the-signer",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "PO, 2026-08-08, forwarding findings from the Phoenix project as ONE package for Nova/0.5.4 rather than separate tickets. Trimmed 2026-08-09 on the PO's instruction — 'nur was du reproduzieren kannst, rest komplett verwerfen' — after the Elephant walked the whole ceremony live and measured every claim against this code."
+    },
+    {
       "id": "pipeline.single-trust-anchor-excludes-key-rotation-and-teams",
       "status": "open",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "PO, 2026-08-08, on reading that a lost key has no signature path back: 'auch im team werden ja verschiedene schlüssel benutzt. Meine Erwartungshaltung war hier, dass wir sicherstellen das ein mensch auditiert aber bewusst nicht welcher. Sprich für eine neue freigabe muss auch ein neuer human key funktionieren den es vorher nicht gab.'"
+    },
+    {
+      "id": "pipeline.skill-arguments-and-bootstrap-length",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "PO, 2026-08-08, findings D5 and D6 from the Claude greenfield transcript against the 0.5.4 local candidate. The PO's framing for the whole review was token waste: 'das verschwendet total viele token'."
     },
     {
       "id": "pipeline.source-available-commercial-licensing",
@@ -983,6 +1103,14 @@
       "source": "Observed live on 2026-08-08: the tmpfs inode table on the PO's machine was exhausted, blocking every process that needed to create a file. Diagnosed jointly with the PO from df/mount output during the 0.5.4 candidate run."
     },
     {
+      "id": "pipeline.test-path-guard-blocks-the-briefed-edit-and-offers-no-route",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "Elephant, 2026-08-08, GF-057. Third confirmed instance across two blocks; each one verified at a line before filing. The first (GF-056) was walked around with a shell write, the second and third were reported and stopped."
+    },
+    {
       "id": "pipeline.three-smaller-greenfield-defects",
       "status": "open",
       "type": "defect",
@@ -1014,6 +1142,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "Found incidentally during the 0.5.3 candidate work, 2026-08-07, while looking for something else. Re-confirmed by running the suite directly on candidate d4887b7."
+    },
+    {
+      "id": "pipeline.verify-evidence-has-no-producer",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-08",
+      "source": "PO, 2026-08-08, findings A2 and A3 from the Claude greenfield transcript against the 0.5.4 local candidate. Both verified in code by the Elephant before filing. The session had to write its own verify runner and invent an empty parent commit to get a Critic review at all."
     },
     {
       "id": "pipeline.verify-gate-scoped-registration",
