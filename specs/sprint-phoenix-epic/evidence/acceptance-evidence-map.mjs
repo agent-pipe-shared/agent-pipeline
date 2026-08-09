@@ -867,6 +867,16 @@ const DELTA = {
   // still omitted. A named field with a missing/unrecognised transform
   // fails closed (GEA-PROFILE). 7/7 governance-export-adapter tests pass.
   'E-AC-04': ['implemented', 'WP-E-AC04'],
+
+  // A-AC-08: harness/scripts/check-dispatch-provenance.mjs walks a commit
+  // range and flags MISSING-DISPATCH-PROVENANCE for anything touching
+  // tracked source with neither a valid Dispatch: trailer nor a
+  // conservative stage-0 exemption (a "stage-0 fast path" self-declaration
+  // ANDed with EL-01's two mechanically-checkable caps). Deliberately
+  // cannot verify EL-01's semantic criteria or the undefined "risk flag" --
+  // disclosed explicitly in its own output and header, not assumed away.
+  // Standalone checker only, not wired into CI/hooks. 23/23 tests pass.
+  'A-AC-08': ['implemented', 'WP-A-AC08'],
 };
 
 // --- per-criterion evidence pointer ----------------------------------------
