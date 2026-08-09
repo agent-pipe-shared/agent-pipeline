@@ -95,7 +95,15 @@ deployment, publication, destructive work, or scope change.
    `git commit -F <msgfile> -- <paths>`; capturing output to a file: write it
    from Node instead of `>`/`2>&1`/`| tee`), is
    `templates/prompts/agent-obligations.md` §1 — read it before hitting the
-   same refusal live. Treat
+   same refusal live. This applies whether a Goldfish/Critic dispatch reads
+   that file directly or an Elephant session acts undispatched: every
+   agent-authored commit message ends with the anonymous `AI-Assisted: true`
+   trailer and nothing else that identifies a provider, model, session,
+   run, trace, or account — never a `Co-Authored-By:` line naming an AI
+   provider or model, never a session/conversation URL (GIT-03,
+   `guardrails/git.md`; no override exists). `Dispatch: <TASK_ID> (goldfish)`
+   may accompany it for a dispatched Goldfish, but the trailer contract
+   itself binds every session, not only a dispatched one. Treat
    `executionBoundary: "host-authorized-wsl"` as mandatory: submit the exact
    returned action directly at that boundary, including every Git
    observation, keeping that routing authoritative. For Codex, never retry
@@ -103,7 +111,15 @@ deployment, publication, destructive work, or scope change.
    host views. Runner-owned structured `executable`/`argv` actions are
    primary; a human copy-only rendering must use a tested native Bash/zsh,
    PowerShell or cmd.exe renderer with explicit safe continuation, never a
-   visually wrapped long command.
+   visually wrapped long command. When a tool result already carries such a
+   pre-rendered field — for example `launch.copyCommand` in
+   `project-onboarding-v3.mjs`'s `restartCopyCommands`, whose `posix`/
+   `powershell`/`cmd` arrays are each a line already bounded under
+   `COPY_COMMAND_MAX_COLUMNS` — relay it VERBATIM, line for line, from that
+   same tool result. Never hand-reconstruct the command from memory of a
+   prior turn, even for the identical restart action seen before: a
+   correctly relayed rendering on one occasion does not carry over to the
+   next if the command is retyped instead of re-read.
 4. **Confirmation:** after all checks, print the auditable confirmation line
    with version, root, V3/runtime, profile, model/effort, role, calibration,
    handover and Verify evidence. Print no confirmation on non-ready,
