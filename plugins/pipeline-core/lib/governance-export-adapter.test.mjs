@@ -79,17 +79,37 @@ test("profile and acknowledgements are closed, non-authoritative and deduplicate
   assert.throws(() => validateGovernanceExportAcknowledgement({ ...ack, acceptedDestinationEventIds: [sha("a"), sha("a")] }), (error) => error.code === "GEA-ACK");
 });
 // E-AC-04: a free-form human rationale or agent summary must be omitted from
-// every mapped profile output by default. This suite finds no destination
-// policy or adapter profile field anywhere in this module that can opt one
-// back in with redaction: EXPORT_FIELDS is a closed, non-configurable module
-// constant consulted by every format branch, so "unless an explicit
-// destination policy allows and redacts it" has no reachable implementation
-// here (see the dispatch report for the absence citation).
-test("E-AC-04 omits free-form rationale or agent-summary fields from every mapped profile output", () => {
+// every mapped profile output by default. An explicit destination policy
+// (`redactedFieldPolicy` on the adapter profile) may admit one of a small,
+// closed set of such fields back in, but only its REDACTED form ever reaches
+// the mapped payload -- the raw value is never admitted, an unlisted field
+// name stays rejected even under an active policy, and an allowed field with
+// a malformed/missing transform fails closed instead of silently passing
+// the raw value through.
+test("E-AC-04 omits free-form rationale/summary by default; an explicit policy admits only a redacted form", () => {
   for (const format of ["cloudevents-json", "otlp-json", "ndjson", "rfc5424"]) {
     for (const extra of [{ rationale: "never export this" }, { summary: "agent free text" }]) {
-      assert.throws(() => mapGovernanceExportProjection({ profile: profile(format), projection: projection(format, { eventType: "safe", occurredAtEpochMs: 1, eventId: "event-1", ...extra }) }), (error) => error.code === "GEA-MAP", `${format} must reject ${Object.keys(extra)[0]}`);
+      assert.throws(() => mapGovernanceExportProjection({ profile: profile(format), projection: projection(format, { eventType: "safe", occurredAtEpochMs: 1, eventId: "event-1", ...extra }) }), (error) => error.code === "GEA-MAP", `${format} must reject ${Object.keys(extra)[0]} by default`);
     }
+  }
+
+  for (const format of ["cloudevents-json", "otlp-json", "ndjson", "rfc5424"]) {
+    const redactingProfile = profile(format, { redactedFieldPolicy: { rationale: "fixed-marker" } });
+    const withRationale = projection(format, { eventType: "safe", occurredAtEpochMs: 1, eventId: "event-1", rationale: "never export this raw" });
+    const mapped = mapGovernanceExportProjection({ profile: redactingProfile, projection: withRationale });
+    const serialized = typeof mapped.payload === "string" ? mapped.payload : JSON.stringify(mapped.payload);
+    assert.doesNotMatch(serialized, /never export this raw/u, `${format} must never leak the raw rationale value`);
+  }
+  const redactingNdjsonProfile = profile("ndjson", { redactedFieldPolicy: { rationale: "fixed-marker" } });
+  const ndjsonMapped = mapGovernanceExportProjection({ profile: redactingNdjsonProfile, projection: projection("ndjson", { eventType: "safe", occurredAtEpochMs: 1, eventId: "event-1", rationale: "never export this raw" }) });
+  assert.equal(JSON.parse(ndjsonMapped.payload).fields.rationale, "[REDACTED]");
+
+  assert.throws(() => mapGovernanceExportProjection({ profile: redactingNdjsonProfile, projection: projection("ndjson", { eventType: "safe", occurredAtEpochMs: 1, eventId: "event-1", summary: "agent free text" }) }), (error) => error.code === "GEA-MAP", "a field the policy does not name must still be rejected under an active policy");
+
+  assert.throws(() => validateGovernanceExportAdapterProfile(profile("ndjson", { redactedFieldPolicy: { comment: "fixed-marker" } })), (error) => error.code === "GEA-PROFILE", "a field name outside the small explicit set must not be accepted into the policy");
+
+  for (const badTransform of [undefined, null, "", "plaintext", true]) {
+    assert.throws(() => validateGovernanceExportAdapterProfile(profile("ndjson", { redactedFieldPolicy: { rationale: badTransform } })), (error) => error.code === "GEA-PROFILE", `a malformed transform (${JSON.stringify(badTransform)}) must fail closed, never pass through raw`);
   }
 });
 // E-AC-09 (WP-E-AC09): "a destination is advisory" must be a closed,

@@ -13,6 +13,14 @@ const FORMATS = new Set(["cloudevents-json", "otlp-json", "ndjson", "rfc5424"]);
 const ACKNOWLEDGEMENTS = new Set(["per-event", "per-batch"]);
 const ORDERING = new Set(["per-stream", "none"]);
 const EXPORT_FIELDS = new Set(["eventId", "eventType", "occurredAtEpochMs", "eventDigest", "repositoryFingerprint", "correlation", "candidate", "policyDigest"]);
+// E-AC-04: a free-form human rationale or agent summary is omitted by default
+// (it is never a member of EXPORT_FIELDS). `redactedFieldPolicy` on the
+// adapter profile is the only door back in, and it never admits the raw
+// value: each allowed field name must map to a transform identifier drawn
+// from REDACTION_TRANSFORMS, which resolves only to a fixed redaction
+// marker, never a pass-through.
+const REDACTABLE_FIELDS = new Set(["rationale", "summary"]);
+const REDACTION_TRANSFORMS = new Map([["fixed-marker", "[REDACTED]"]]);
 
 function fail(code) { const error = new Error("Governance export adapter input is invalid."); error.code = code; throw error; }
 function object(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
@@ -37,17 +45,31 @@ function escapedSyslog(value) { return string(value).replace(/[\\"][\r\n]/gu, (c
  * receipt/destination argument and stays unaffected either way); `false`
  * leaves every other destination's own health handling exactly as before.
  * This field alone carries no blocking/boundary behavior -- that is E-AC-10,
- * out of scope here.
+ * out of scope here. The optional `redactedFieldPolicy` key closes E-AC-04:
+ * omitted (the default), it changes nothing -- `rationale`/`summary` stay
+ * rejected exactly as before. Present, it may name only `rationale` and/or
+ * `summary` (the set stays closed; no arbitrary field name reopens the
+ * default-deny boundary), each mapped to a transform identifier from a
+ * closed set that always resolves to a fixed redaction marker -- an allowed
+ * field with a missing or unrecognised transform fails closed here rather
+ * than falling through to a silent raw pass-through later.
  */
 export function validateGovernanceExportAdapterProfile(profile) {
-  const keys = ["schema", "profileId", "format", "adapterVersion", "maxBatchEvents", "maxPayloadBytes", "acknowledgement", "ordering", "deduplication", "advisory"];
+  const baseKeys = ["schema", "profileId", "format", "adapterVersion", "maxBatchEvents", "maxPayloadBytes", "acknowledgement", "ordering", "deduplication", "advisory"];
+  const hasRedactionPolicy = object(profile) && Object.hasOwn(profile, "redactedFieldPolicy");
+  const keys = hasRedactionPolicy ? [...baseKeys, "redactedFieldPolicy"] : baseKeys;
   if (!exact(profile, keys) || profile.schema !== "pipeline.governance-export-adapter-profile.v1" || !ID.test(profile.profileId)
     || !FORMATS.has(profile.format) || !ID.test(profile.adapterVersion)
     || !Number.isSafeInteger(profile.maxBatchEvents) || profile.maxBatchEvents < 1 || profile.maxBatchEvents > 1000
     || !Number.isSafeInteger(profile.maxPayloadBytes) || profile.maxPayloadBytes < 256 || profile.maxPayloadBytes > 10_000_000
     || !ACKNOWLEDGEMENTS.has(profile.acknowledgement) || !ORDERING.has(profile.ordering)
     || typeof profile.deduplication !== "boolean" || typeof profile.advisory !== "boolean") fail("GEA-PROFILE");
-  return freeze({ ...profile });
+  if (hasRedactionPolicy) {
+    const policy = profile.redactedFieldPolicy;
+    const policyKeys = object(policy) ? Object.keys(policy) : null;
+    if (policyKeys === null || policyKeys.some((key) => !REDACTABLE_FIELDS.has(key)) || policyKeys.some((key) => !REDACTION_TRANSFORMS.has(policy[key]))) fail("GEA-PROFILE");
+  }
+  return freeze({ ...profile, ...(hasRedactionPolicy ? { redactedFieldPolicy: freeze({ ...profile.redactedFieldPolicy }) } : {}) });
 }
 
 function cloudEvents(item) {
@@ -94,14 +116,27 @@ function rfc5424(item) {
   return `<14>1 ${timestamp} pipeline - - ${item.destinationEventId} [pipeline@32473 destination_profile="${escapedSyslog(item.destinationProfile)}" source_event_digest="${item.sourceEventDigest}" policy_revision="${item.policyRevision}"] ${message}`;
 }
 
-/** Maps one already-sanitized event into a standards-aligned interchange shape. */
+/**
+ * Maps one already-sanitized event into a standards-aligned interchange
+ * shape. `rationale`/`summary` are omitted by default (E-AC-04); a
+ * `redactedFieldPolicy` on the active profile can admit one, but only its
+ * fixed-marker redaction ever reaches the mapped payload -- the raw value
+ * from `item.fields` is never read past the substitution below.
+ */
 export function mapGovernanceExportProjection({ profile, projection: item } = {}) {
   const active = validateGovernanceExportAdapterProfile(profile);
-  if (!projection(item) || Object.keys(item.fields).some((field) => !EXPORT_FIELDS.has(field)) || item.destinationProfile !== active.profileId || item.format !== active.format) fail("GEA-MAP");
-  const payload = active.format === "cloudevents-json" ? cloudEvents(item)
-    : active.format === "otlp-json" ? otlp(item)
-      : active.format === "ndjson" ? `${JSON.stringify(clone(item))}\n`
-        : rfc5424(item);
+  const policy = active.redactedFieldPolicy ?? {};
+  if (!projection(item)
+    || Object.keys(item.fields).some((field) => !EXPORT_FIELDS.has(field) && !(REDACTABLE_FIELDS.has(field) && Object.hasOwn(policy, field)))
+    || item.destinationProfile !== active.profileId || item.format !== active.format) fail("GEA-MAP");
+  const redactedItem = {
+    ...item,
+    fields: Object.fromEntries(Object.entries(item.fields).map(([field, value]) => [field, REDACTABLE_FIELDS.has(field) ? REDACTION_TRANSFORMS.get(policy[field]) : value])),
+  };
+  const payload = active.format === "cloudevents-json" ? cloudEvents(redactedItem)
+    : active.format === "otlp-json" ? otlp(redactedItem)
+      : active.format === "ndjson" ? `${JSON.stringify(clone(redactedItem))}\n`
+        : rfc5424(redactedItem);
   const bytes = Buffer.byteLength(typeof payload === "string" ? payload : JSON.stringify(payload), "utf8");
   if (bytes > active.maxPayloadBytes) fail("GEA-PAYLOAD-LIMIT");
   const loss = active.format === "rfc5424"
