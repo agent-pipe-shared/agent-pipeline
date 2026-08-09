@@ -842,6 +842,14 @@ const DELTA = {
   // field, so any ordering would be an invented, invisible rule). 23/23
   // change-control tests pass, 6 new for this resolver.
   'C-AC-09': ['implemented', 'WP-C-AC09'],
+
+  // R-AC-02: recordCommandRecoveryDisposition (external-command-offer.mjs)
+  // reaches the previously-unreachable recovery-proposed/recovered states,
+  // correlating trigger/typed-rejection/evidence-gap/candidate-alternatives/
+  // selected-recovery onto the existing closed event shape (offerEventId,
+  // reasonCode, preEvidenceDigest, candidateDigest, supersedesEventId) with
+  // no new field. 27/27 external-command-offer tests pass, 3 new.
+  'R-AC-02': ['implemented', 'WP-R-AC02'],
 };
 
 // --- per-criterion evidence pointer ----------------------------------------
