@@ -254,4 +254,75 @@ function approvePushAttempt(root, deps, pushTarget = { remote: "origin", destina
     "a symlink at the conventional path is not the missing-artifact case");
 }
 
+// SETUP1-1 (GF-067). `po-human-approval.mjs setup --human-name` writes local
+// authority records with THREE fields -- {keyReference, publicKeySha256,
+// humanName} -- and that is also the shape of the external `--proof-authority`
+// file a consumer hands to `approve-push`. `verifyCriticalHumanProof` used to
+// forward `authority.value` unnarrowed into `trustPolicy`, and the shared
+// `own()` exact-key-set check (po-approval-proof.mjs) rejects any object whose
+// key set is not EXACTLY {keyReference, publicKeySha256} -- so a fresh,
+// correctly generated three-field authority file was refused outright, even
+// with perfectly valid key material and signature.
+// backlog/items/2026-08-09-approve-push-rejects-any-fresh-post-setup1-authority-file.md
+{
+  const { root, deps } = freshFixture();
+  assert.equal(run(["materialize-push-threat-model"], deps), 0);
+  const materializedBytes = readFileSync(join(root, "project", "push-threat-model.md"));
+  const external = mktempProjectDir();
+  const pushTarget = { remote: "origin", destination: "refs/heads/main" };
+  const expectedThreatModel = { path: "project/push-threat-model.md", sha256: createHash("sha256").update(materializedBytes).digest("hex") };
+  const subjectSha256 = criticalActionSubjectSha256({ kind: "push", candidate, subject: { sourceCommit: candidate.commit, ...pushTarget, threatModel: expectedThreatModel } });
+  const request = createCriticalActionApprovalRequest({ candidate, featureId: "sprint-nova-epic", planBytes: Buffer.from("plan"), specBytes: Buffer.from("spec"), action: { kind: "push", subjectSha256, expiresAt: "2026-08-08T18:50:00.000Z" } });
+  const keys = generateKeyPairSync("ed25519");
+  const publicKey = keys.publicKey.export({ format: "pem", type: "spki" }).toString();
+  // The modern, SETUP-1 (three-field) authority shape `po-human-approval.mjs
+  // setup --human-name` actually produces -- NOT the legacy two-field shape.
+  const authority = { keyReference: "test-key", publicKeySha256: createHash("sha256").update(publicKey).digest("hex"), humanName: "Jordan PO" };
+  const proof = { schema: "pipeline.po-approval-proof.v1", intentSha256: request.approvalIntent.sha256, keyReference: "test-key", publicKey, signatureBase64: sign(null, Buffer.from(request.approvalIntent.sha256), keys.privateKey).toString("base64") };
+  const requestPath = join(external, "request.json");
+  const authorityPath = join(external, "authority.json");
+  const proofPath = join(external, "proof.json");
+  writeFileSync(requestPath, JSON.stringify(request));
+  writeFileSync(authorityPath, JSON.stringify(authority));
+  writeFileSync(proofPath, JSON.stringify(proof));
+
+  const approval = capturedStderr(() => run(["approve-push", "--by", "PO", "--remote", pushTarget.remote, "--destination", pushTarget.destination,
+    "--proof-request", requestPath, "--proof-authority", authorityPath, "--proof", proofPath], deps));
+  assert.equal(approval.result, 0, `GF-067: a fresh three-field (SETUP-1) authority file must be accepted, not rejected as an exact-shape mismatch: ${approval.lines.join(" ")}`);
+  const state = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+  assert.deepEqual(state.pushApproval.lastApproved.threatModel, expectedThreatModel);
+}
+
+// SETUP1-2 (GF-067). The legacy, pre-SETUP-1 two-field authority shape must
+// keep working exactly as before -- this is a compatibility fix, not a schema
+// migration, so the narrowing in `verifyCriticalHumanProof` must be a no-op
+// for an authority file that already had exactly the two key-identity fields.
+{
+  const { root, deps } = freshFixture();
+  assert.equal(run(["materialize-push-threat-model"], deps), 0);
+  const materializedBytes = readFileSync(join(root, "project", "push-threat-model.md"));
+  const external = mktempProjectDir();
+  const pushTarget = { remote: "origin", destination: "refs/heads/main" };
+  const expectedThreatModel = { path: "project/push-threat-model.md", sha256: createHash("sha256").update(materializedBytes).digest("hex") };
+  const subjectSha256 = criticalActionSubjectSha256({ kind: "push", candidate, subject: { sourceCommit: candidate.commit, ...pushTarget, threatModel: expectedThreatModel } });
+  const request = createCriticalActionApprovalRequest({ candidate, featureId: "sprint-nova-epic", planBytes: Buffer.from("plan"), specBytes: Buffer.from("spec"), action: { kind: "push", subjectSha256, expiresAt: "2026-08-08T18:50:00.000Z" } });
+  const keys = generateKeyPairSync("ed25519");
+  const publicKey = keys.publicKey.export({ format: "pem", type: "spki" }).toString();
+  // The legacy, pre-SETUP-1 shape -- exactly the two key-identity fields, no `humanName`.
+  const authority = { keyReference: "test-key", publicKeySha256: createHash("sha256").update(publicKey).digest("hex") };
+  const proof = { schema: "pipeline.po-approval-proof.v1", intentSha256: request.approvalIntent.sha256, keyReference: "test-key", publicKey, signatureBase64: sign(null, Buffer.from(request.approvalIntent.sha256), keys.privateKey).toString("base64") };
+  const requestPath = join(external, "request.json");
+  const authorityPath = join(external, "authority.json");
+  const proofPath = join(external, "proof.json");
+  writeFileSync(requestPath, JSON.stringify(request));
+  writeFileSync(authorityPath, JSON.stringify(authority));
+  writeFileSync(proofPath, JSON.stringify(proof));
+
+  const approval = capturedStderr(() => run(["approve-push", "--by", "PO", "--remote", pushTarget.remote, "--destination", pushTarget.destination,
+    "--proof-request", requestPath, "--proof-authority", authorityPath, "--proof", proofPath], deps));
+  assert.equal(approval.result, 0, `a legacy two-field authority file must keep being accepted: ${approval.lines.join(" ")}`);
+  const state = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+  assert.deepEqual(state.pushApproval.lastApproved.threatModel, expectedThreatModel);
+}
+
 console.log("pipeline-state.test.mjs (CB-1a): all checks passed");

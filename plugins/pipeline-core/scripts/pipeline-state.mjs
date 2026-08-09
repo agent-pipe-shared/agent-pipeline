@@ -2745,9 +2745,19 @@ function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags,
   const action = request.value?.action;
   const expectedSubject = criticalActionSubjectSha256({ kind, candidate: candidateIdentity, subject });
   if (!action || action.kind !== kind || action.subjectSha256 !== expectedSubject) return { ok: false, code: "CRITICAL-PROOF-SUBJECT" };
+  // The shared trustPolicy contract (verifyPoApprovalProof et al.) checks an EXACT
+  // {keyReference, publicKeySha256} shape; the external authority file may additionally
+  // carry `humanName` (SETUP-1: `po-human-approval.mjs setup --human-name` writes it into
+  // the local authority record, and that is also the shape of the external
+  // `--proof-authority` file). Only the two key-identity fields travel into verification --
+  // the same narrowing `po-human-approval.mjs`'s own `verify` subcommand already applies
+  // to its local authority record (po-human-approval.mjs, ~line 447-453) before calling
+  // this same shared contract. `authority.value` itself is left untouched here, so
+  // `humanName` remains readable from it wherever this code records attribution.
+  const trustPolicy = { keyReference: authority.value?.keyReference, publicKeySha256: authority.value?.publicKeySha256 };
   const result = verifyCriticalActionApprovalRequest({
     request: request.value,
-    trustPolicy: authority.value,
+    trustPolicy,
     proof: proof.value,
     expectedCandidate: candidateIdentity,
     expectedAction: action,
