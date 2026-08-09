@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "a24f0a4c51d88bd52c2b73704ba59866c60e8b813bad0d276a962f922e208db8"
+    "transitionHead": "90f95b707cb42b25ef141f6279cc2eca71c276269a0a9e91420660e4916e6108"
   },
   "counts": {
-    "open": 110,
+    "open": 111,
     "in_progress": 21,
     "closed": 37
   },
@@ -911,6 +911,14 @@
       "closureRepository": "self",
       "closureCommit": "7514fb95f23d6b30bd42bbed2435f2dc4d76ca61",
       "closureEvidence": "backlog/evidence/2026-08-06-second-reconciliation-pass.md"
+    },
+    {
+      "id": "pipeline.pipeline-state-scripts-test-file-never-runs-in-full-verify",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "Critic review (claude-opus-5, max, functional-equivalent-read-only lane) of GF-074/GF-075 (commits f2a4ac70..42d16e5c), 2026-08-09. Finding F-1, verdict FAIL. The GF-074/GF-075 code fixes themselves (guard-lifecycle-ready kickoff --language allowlist, and F1/F2/F5/F6 on the document-language feature) were cleared as correct; only the F7 test-delivery vehicle is the defect."
     },
     {
       "id": "pipeline.plan-path-guidance-attached-to-unlike-causes",
