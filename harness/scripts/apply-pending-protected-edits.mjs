@@ -156,6 +156,11 @@ const VERIFY_REGISTRATIONS = [
     line: '  { name: "obligations-contract-tests", file: join(scriptDir, "generate-agent-obligations.test.mjs") },',
     file: join(REPO_ROOT, "harness", "scripts", "generate-agent-obligations.test.mjs"),
   },
+  {
+    name: "resume-hint-tests",
+    line: '  { name: "resume-hint-tests", file: join(libDir, "resume-hint.test.mjs") },',
+    file: join(REPO_ROOT, "plugins", "pipeline-core", "lib", "resume-hint.test.mjs"),
+  },
 ];
 
 // The terminator moves every time a batch is registered, so this constant is

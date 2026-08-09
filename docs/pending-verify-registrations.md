@@ -11,25 +11,32 @@
 > work. The rule stands and is now applied: the pending section goes first and
 > says so in its heading; a resolved section never keeps that word.
 
-## PENDING — two suites are written, green, and not run by the gate
+## PENDING — three suites are written, green, and not run by the gate
 
-`plugins/pipeline-core/scripts/repair-map.test.mjs` (REPAIRMAP-1) and
-`harness/scripts/generate-agent-obligations.test.mjs` (OBLIG-1) are **not** in
-`TEST_SUITES`. Confirmed by reading `harness/scripts/verify.mjs`, not by
-recalling the batch: neither name appears in it.
+`plugins/pipeline-core/scripts/repair-map.test.mjs` (REPAIRMAP-1),
+`harness/scripts/generate-agent-obligations.test.mjs` (OBLIG-1) and
+`plugins/pipeline-core/lib/resume-hint.test.mjs` are **not** in `TEST_SUITES`.
+Confirmed by reading `harness/scripts/verify.mjs`, not by recalling a batch: none
+of the three names appears in it.
 
-Both pass on their own, run 2026-08-09 at `f1645a4d`:
+All three pass on their own, run 2026-08-09:
 
 ```
 node plugins/pipeline-core/scripts/repair-map.test.mjs          # 7/7, exit 0
 node harness/scripts/generate-agent-obligations.test.mjs        # 9/9, exit 0
+node plugins/pipeline-core/lib/resume-hint.test.mjs             # 6/6, exit 0
 ```
 
-They cover the two halves of the same route. The map answers, at runtime, which
-refusals can be lifted and by whom; the obligations contract keeps the document
-that sends every dispatched agent to that map honest — including `AC-9`, which
-drives the command the document prints through the real lifecycle guard. A
-regression in either is invisible to Verify today.
+The first two cover the two halves of one route: the map answers, at runtime,
+which refusals can be lifted and by whom; the obligations contract keeps the
+document that sends every dispatched agent to that map honest, including `AC-9`,
+which drives the command the document prints through the real lifecycle guard.
+
+The third was found unregistered on 2026-08-09 while fixing the defect it should
+have caught — the bootstrap skill described the Resume-Hint card as four strings
+while the validator requires three of the four keys to be arrays, so the one
+carrier of material input across a session boundary was never written in either
+greenfield run. A regression in any of the three is invisible to Verify today.
 
 **The human step**, unchanged in shape from the batch below and already prepared:
 

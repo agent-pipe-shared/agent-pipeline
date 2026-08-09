@@ -117,6 +117,41 @@ function validContext(value) {
     && validTextList(value.scope, 4) && validTextList(value.constraints, 4) && validTextList(value.questions, 3);
 }
 
+/**
+ * Which field a rejected card actually failed on, as one short clause.
+ *
+ * `RH-SCHEMA` on its own is the whole answer a caller used to get, and a card is
+ * rejected for a reason the caller cannot see: `intent` is a string while the
+ * other three are arrays, and a card built with four strings -- the shape a
+ * reader of the bootstrap skill produced on 2026-08-09 -- fails with no clue
+ * which of the four keys was wrong. The verdict does not become permissive; it
+ * becomes answerable.
+ *
+ * Deliberately shape-only. It never echoes a value: a field can be rejected for
+ * carrying a secret or a credential-shaped token, and repeating it in a
+ * diagnostic would print the exact thing the validator refused to persist.
+ */
+export function resumeHintContextDetail(value) {
+  if (!object(value)) return "context must be an object";
+  const missing = CONTEXT_KEYS.filter((key) => !Object.hasOwn(value, key));
+  const unexpected = Object.keys(value).filter((key) => !CONTEXT_KEYS.includes(key));
+  if (missing.length > 0 || unexpected.length > 0) {
+    return `context keys must be exactly ${CONTEXT_KEYS.join(", ")}`
+      + `${missing.length > 0 ? `; missing: ${missing.join(", ")}` : ""}`
+      + `${unexpected.length > 0 ? `; unexpected: ${unexpected.join(", ")}` : ""}`;
+  }
+  if (!validText(value.intent)) {
+    return "intent must be one non-empty single-line string, free of secrets and opaque tokens";
+  }
+  for (const [key, maximum] of [["scope", 4], ["constraints", 4], ["questions", 3]]) {
+    if (validTextList(value[key], maximum)) continue;
+    return Array.isArray(value[key])
+      ? `${key} must be at most ${maximum} non-empty single-line strings, free of secrets and opaque tokens`
+      : `${key} must be an ARRAY of at most ${maximum} short strings, not a ${typeof value[key]}`;
+  }
+  return "context is not accepted in this shape";
+}
+
 export function validateResumeHint(value) {
   if (!exact(value, ["schema", "nonAuthoritative", "context", "createdAt", "basis", "contentSha256"])
     || value.schema !== RESUME_HINT_SCHEMA || value.nonAuthoritative !== true
@@ -130,7 +165,13 @@ export function buildResumeHint({ context, basis = null, createdAt = new Date().
   const unsigned = { schema: RESUME_HINT_SCHEMA, nonAuthoritative: true, context, createdAt, basis };
   const candidate = { ...unsigned, contentSha256: digest(unsigned) };
   const checked = validateResumeHint(candidate);
-  if (!checked.ok) throw new Error(checked.code);
+  // The code stays the contract; the clause after it is what makes a rejection
+  // actionable. A caller that built the card from the bootstrap skill's own
+  // description used to receive the four bare characters `RH-SCHEMA` and had no
+  // way to learn that three of the four keys are arrays.
+  if (!checked.ok) {
+    throw new Error(checked.code === "RH-SCHEMA" ? `${checked.code}: ${resumeHintContextDetail(context)}` : checked.code);
+  }
   return candidate;
 }
 

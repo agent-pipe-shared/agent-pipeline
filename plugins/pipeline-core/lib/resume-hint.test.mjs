@@ -162,6 +162,52 @@ test("pins the residual the shape filter cannot close without a word list", () =
   for (const text of ADMITTED_RESIDUAL) accepts(text);
 });
 
+/**
+ * RH-DIAG-1. The card shape a reader of the bootstrap skill actually builds.
+ *
+ * On 2026-08-09 a greenfield run distilled the PO's design brief into four
+ * strings -- which is what the skill described -- and received the four bare
+ * characters `RH-SCHEMA`. Nothing in the rejection said that three of the four
+ * keys are arrays, so the one carrier of material input across a session
+ * boundary was never written and the input was lost at the next restart.
+ *
+ * Both halves are asserted: the four-string card is still rejected (the schema
+ * is deliberate -- the arity caps are what stop a transcript being pasted in),
+ * and the rejection now names the field and its expected shape.
+ */
+test("RH-DIAG-1 a four-string card is rejected with a message that names the field", () => {
+  const fourStrings = {
+    intent: "Deliver a small static browser game.",
+    scope: "HTML, CSS and JavaScript only; two puzzles and a finale.",
+    constraints: "Feature profile; no backend, dependencies or accounts.",
+    questions: "Decide fog behaviour and whether the score awards a rank.",
+  };
+  assert.throws(() => buildResumeHint({ context: fourStrings }), (error) => {
+    assert.match(error.message, /^RH-SCHEMA: /u, "the code stays the contract");
+    assert.match(error.message, /scope/u, "the rejection must name the field that failed");
+    assert.match(error.message, /ARRAY/u, "and the shape it expected, which is the fact that was missing");
+    return true;
+  });
+
+  // The same card in the documented shape is accepted, so the diagnostic points
+  // somewhere that actually works.
+  const corrected = {
+    intent: fourStrings.intent,
+    scope: [fourStrings.scope],
+    constraints: [fourStrings.constraints],
+    questions: [fourStrings.questions],
+  };
+  assert.equal(validateResumeHint(buildResumeHint({ context: corrected })).ok, true);
+
+  // A missing key and an unexpected key are distinguishable too -- both used to
+  // be the same four characters.
+  const { questions, ...missing } = corrected;
+  assert.ok(questions);
+  assert.throws(() => buildResumeHint({ context: missing }), /RH-SCHEMA: context keys must be exactly .*missing: questions/u);
+  assert.throws(() => buildResumeHint({ context: { ...corrected, note: "extra" } }), /RH-SCHEMA: context keys must be exactly .*unexpected: note/u);
+  assert.throws(() => buildResumeHint({ context: { ...corrected, intent: ["not a string"] } }), /RH-SCHEMA: intent must be one non-empty single-line string/u);
+});
+
 test("keeps the digest, byte, control-character, trim and arity contracts unchanged", () => {
   const basis = { featureId: "kickoff-demo", planSha256: "a".repeat(64), specSha256: "b".repeat(64) };
   const hint = buildResumeHint({ context: BASE, basis, createdAt: "2026-08-08T09:00:00.000Z" });

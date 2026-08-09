@@ -70,6 +70,30 @@ assert.match(core, /\*\*and\n   before proposing, displaying, or performing any 
 assert.match(core, /input received\n   after a short kickoff goal has already initialized the project/u);
 assert.match(core, /do not reduce it to a new short\n   kickoff goal or merely promise to remember it/u);
 assert.match(core, /Read back `resume-hint\.mjs inspect` after a\n   successful capture/u);
+
+// RHSHAPE-1. The skill's description of the card must be a shape the validator
+// actually accepts. It was not: it called all four keys "a short distilled
+// statement", a reader built four strings, and `buildResumeHint` rejected it with
+// the four bare characters `RH-SCHEMA` -- so on 2026-08-09 the one carrier of
+// material input across a session boundary was never written in either greenfield
+// run. Asserting the prose is not enough on its own; the card built to match the
+// prose is driven through the real validator below, which is the assertion that
+// would have failed before the fix.
+assert.match(core, /`intent` is one string; the other three are \*\*arrays\*\* of\n   short strings, at most 4, 4 and 3 entries/u);
+{
+  const { buildResumeHint, validateResumeHint } = await import("../../lib/resume-hint.mjs");
+  const documented = {
+    intent: "Deliver the described project.",
+    scope: ["One distilled scope statement.", "A second one."],
+    constraints: ["One distilled constraint."],
+    questions: ["One open question?"],
+  };
+  assert.equal(validateResumeHint(buildResumeHint({ context: documented })).ok, true,
+    "the card shape this skill describes must be one the validator accepts");
+  assert.throws(() => buildResumeHint({ context: { ...documented, scope: "a single string" } }),
+    /RH-SCHEMA: scope must be an ARRAY/u,
+    "and the shape it no longer describes must be refused with a message naming the field");
+}
 assert.match(kickoffDesign, /obtain both a single-line project goal and an\nexplicit PO profile: `epic`, `feature`, or `mini`/u);
 assert.match(kickoffDesign, /Never infer, silently select, or retrospectively claim a profile/u);
 assert.match(kickoffDesign, /`specs\/kickoff-\*` files are provisional bootstrap\nanchors, not the standard long-term design location/u);

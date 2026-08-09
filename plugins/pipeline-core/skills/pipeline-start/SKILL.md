@@ -128,8 +128,10 @@ deployment, publication, destructive work, or scope change.
    kickoff or planning step instead.
    The card is never a gate and capture failure must be surfaced honestly rather
    than claimed as persisted context.
-   Its exact keys are `intent`, `scope`, `constraints`, and `questions`; each
-   value is a short distilled statement, never a transcript. Interpret user intent
+   Its exact keys are `intent`, `constraints`, `scope`, and `questions`, and
+   their shapes differ: `intent` is one string; the other three are **arrays** of
+   short strings, at most 4, 4 and 3 entries. Every entry is a distilled
+   statement, never a transcript. Interpret user intent
    rather than keywords: an intended restart/session cut captures it; changed
    scope or constraints refresh it; canonised or revoked information is
    discarded. At bootstrap, `resume-hint.mjs inspect` is passive context only:
