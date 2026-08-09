@@ -3798,7 +3798,7 @@ function validatePromotionPlan(plan) {
     || typeof plan.runner !== "string" || plan.runner.length === 0
     || !exactKeys(plan.feature, new Set(["id", "planPath"]))
     || !exactKeys(plan.authority, new Set(["prd", "spec", "designInput", "poLanguage"]))
-    || !new Set(["de", "en", null]).has(plan.authority.poLanguage)
+    || !(plan.authority.poLanguage === null || /^[a-z]{2}$/u.test(plan.authority.poLanguage))
     || !exactKeys(plan.authority.prd, new Set(["path", "sha256"]))
     || !exactKeys(plan.authority.spec, new Set(["path", "sha256"]))
     || !exactKeys(plan.authority.designInput, new Set(["path", "sha256"]))
@@ -4036,8 +4036,10 @@ function buildKickoffPromotionPlan({
   // answered German was headed for an approval ceremony in English -- and it is
   // the near end of the chain whose far end refused `submit-plan` with
   // PO-GATE-PRD-LANGUAGE-MISMATCH in that same run.
-  if (authority.poLanguage !== null) {
+  if (new Set(["de", "en"]).has(authority.poLanguage)) {
     next.continuity.runtime = { ...next.continuity.runtime, humanFacingLanguage: authority.poLanguage };
+  } else if (authority.poLanguage !== null) {
+    next.continuity.runtime = { ...next.continuity.runtime, documentLanguage: authority.poLanguage };
   }
   if (!validateContinuityState(next.continuity, input.featureId).ok) {
     fail("KICKOFF-PROMOTION-PLAN", "promotion continuity transition is invalid");

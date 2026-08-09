@@ -1724,7 +1724,7 @@ check("promotion refuses a PRD carrying no po-language marker, or one whose valu
   const unsupported = promotionSeed("language-marker-unsupported");
   const unsupportedPath = promotedArtifact(unsupported, "prd_promoted.md");
   writeFileSync(unsupportedPath, readFileSync(unsupportedPath, "utf8")
-    .replace("<!-- po-language: en -->", "<!-- po-language: fr -->"));
+    .replace("<!-- po-language: en -->", "<!-- po-language: eng -->"));
   assert.throws(() => planOnboardingKickoffPromotion(unsupported.request),
     (error) => error?.code === "KICKOFF-PROMOTION-PRD-LANGUAGE-MARKER-INVALID");
 });
@@ -1745,6 +1745,18 @@ check("promotion admits a PRD carrying both correct po-gate markers exactly as b
   assert.equal(plan.authority.prd.sha256, digest(readFileSync(promotedArtifact(seed, "prd_promoted.md"))));
   const applied = applyOnboardingKickoffPromotion({ plan, expectedPlanSha256: plan.planSha256, activate: true });
   assert.equal(applied.status, "applied");
+});
+
+check("promotion admits a PRD carrying a document-language marker outside {de, en} and records it separately from the operator-facing language", () => {
+  const seed = promotionSeed("language-document-fr", { poLanguage: "fr" });
+  const before = JSON.parse(readFileSync(seed.statePath, "utf8"));
+  const beforeHumanFacing = before.continuity.runtime.humanFacingLanguage;
+  promote(seed);
+  const promoted = JSON.parse(readFileSync(seed.statePath, "utf8"));
+  assert.equal(promoted.continuity.runtime.documentLanguage, "fr");
+  assert.equal(promoted.continuity.runtime.humanFacingLanguage, beforeHumanFacing,
+    "a non-de/en document-language marker must not touch the operator-facing language");
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
 });
 
 function publishPoGateProfile(root) {
