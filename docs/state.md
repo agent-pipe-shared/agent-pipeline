@@ -5,8 +5,8 @@
 
 **Last updated:** 2026-08-09
 **Project status:** ACTIVE
-**Local candidate:** `0.5.4+<runner>.20260809165914.a70c52b` · commit `8e6f3d4f6d4574e7eaa5b464d56742fee08d9478` · Verify **267/267 exit 0** bound to that exact commit · ready for the PO's manual copy (supersedes `…20260809131419.bf59a28`)
-**Current block:** Happy-path re-test round two (Claude + Codex) against the fourth local candidate — both corrective lineages landed clean: the Codex hardening lineage (GF-059 FAIL → GF-060 → second Critic FAIL on test-coverage → GF-064 → self-verified green) and the turn-efficiency lineage's onboarding fix (GF-062 → Critic FAIL on partial-authority-route coverage → GF-065 → second, final Critic review PASS). See the dated sections below for the full findings/fix chain of each. Two further turn-efficiency items (GF-061 stale push-approval doc, GF-063 bootstrap/kickoff self-teaching gaps) are fixed and merged; a fifth (git author-identity at onboarding) was found already resolved by an unrelated same-day commit and closed without new work. **The fifth local candidate above is built and Verify-green** — the PO's session-scoped goal ("fix everything, then build a new local candidate") is complete; the two non-blocking follow-up items the final Critic review filed remain open for future triage. Prior block, GF-058 — **the stable blocker is resolved: the push gate is seeded and live, after its satisfying path was measured end to end** (option C, as the PO chose). Two further happy-path defects fixed in the same block: the reopen-design deadlock, and the promoted state's language. Also in this block: the closure-evidence trackedness contract, three routing defects found by reading, the staging exemption, and the defects the PO's three greenfield runs produced; three suite registrations are open for the PO (TP-3); the third candidate's two TP-5-blocked findings (PG11e's commit-hash flake, and `security: warn` hard-blocking under `push: blocking`) are now fixed under one bundled HGO override; 0.5.3 is released to `main` and the human-authorization ceremony recorded as [ADR-0061](adr/0061-uniform-human-approval-ceremony.md) remains the governing thread; Nova A completion still paused on genuine ADR-gated/evidence-gated blockers
+**Local candidate:** `0.5.4+<runner>.20260809214216.ea79347` · commit `f4b28df421efbca6f114a6f75dd0c9042fc3525d` · Verify **267/267 exit 0** bound to that exact commit · ready for the PO's manual copy (supersedes `…20260809204950.42d16e5`)
+**Current block:** Two live greenfield happy-path re-tests (Claude, Codex) against the fifth local candidate each hit a real blocker: Claude's kickoff `plan`/`apply` had no admissible argv shape at all (`--language` required CLI-side since GF-066, never added to `guard-lifecycle-ready.mjs`'s allowlist); Codex's mandatory attended-host-terminal `sign-intent` copy-paste line-wrapped mid-path and broke. **GF-074 fixed both** (guard allowlist widened; a new `failure-cases.md` §F7 documents safe one-flag-per-line backslash-continued command rendering for this whole class of host-terminal command). A combined Critic review of GF-074 plus GF-075 (5 fixes for an earlier round's document-language-decoupling findings F1/F2/F5/F6/F7) returned **FAIL**: F-1 major — GF-075's new F7 regression test landed in `plugins/pipeline-core/scripts/pipeline-state.test.mjs`, a file `verify.mjs` never registers, so it carried zero enforced coverage; F-2 major — the only documented kickoff example still omitted `--language`; F-3 minor — a self-contradictory PRD-language-marker line in the same doc. **GF-076 fixed F-2/F-3** and added an honest disclosure comment for F-1 (pointing at a new backlog item; the two files needed to fix F-1 properly, `harness/scripts/pipeline-state.test.mjs` and `harness/scripts/verify.mjs`, are TP-5/TP-3 hard-guard-protected with no override route — a documented stop condition, not a route to hunt around). **Closed this block:** the PO ran a full signed `guard-maintenance-window.mjs` TP-5-lift ceremony (Ed25519, `po-human-approval.mjs sign-intent`, humanName `APS-PO`) — the first signature went stale when GF-076's own commits moved HEAD mid-ceremony (the window's exact-candidate binding working as designed, not a bug), so it was re-prepared and re-signed against the new HEAD. Under the installed window, **GF-077** moved the F7 test (as `PS55j`) into the enforced suite; the PO explicitly scoped this to TP-5 only, declining the broader TP-3 option (registering the whole pre-existing CB-1a file as its own new release-gating suite) as a separate future decision. Backlog item `2026-08-09-pipeline-state-scripts-test-file-never-runs-in-full-verify.md` is closed with evidence. Three new local candidates were built and stamped along the way (sixth `484c961`, seventh `42d16e5`, eighth/current `ea79347`), each Verify-green. See the dated section below for the full commit-by-commit chain. Prior block, happy-path re-test round two — both corrective lineages (Codex hardening GF-059→060→064; turn-efficiency onboarding GF-062→065) landed clean; the fifth local candidate (`a70c52b`) was Verify-green and is now superseded. Earlier, GF-058 — **the stable blocker is resolved: the push gate is seeded and live, after its satisfying path was measured end to end** (option C, as the PO chose). Two further happy-path defects fixed in the same block: the reopen-design deadlock, and the promoted state's language. Also in this block: the closure-evidence trackedness contract, three routing defects found by reading, the staging exemption, and the defects the PO's three greenfield runs produced; three suite registrations are open for the PO (TP-3); the third candidate's two TP-5-blocked findings (PG11e's commit-hash flake, and `security: warn` hard-blocking under `push: blocking`) are now fixed under one bundled HGO override; 0.5.3 is released to `main` and the human-authorization ceremony recorded as [ADR-0061](adr/0061-uniform-human-approval-ceremony.md) remains the governing thread; Nova A completion still paused on genuine ADR-gated/evidence-gated blockers
 **Repair baseline:** `5d2b83dcc765d50801f4491e1bd9bed32090112b`
 **Release version:** `0.5.3` released
 **Release state:** version `0.5.3` · tag `v0.5.3` · commit `2740041d59458f949b597905816af12048502469` · tree `e72cca9b69e105ec6aac9833c4ac0bccb385d25b` · status `published`
@@ -17,7 +17,112 @@ the supplied authoritative release identity; it is not a claimed release time.
 The historical candidate-qualification sections below are retained as
 session history and no longer describes the current publication disposition.
 
-## 2026-08-09 Happy-path re-test round two — both corrective lineages landed clean (GF-060→GF-064; GF-062→GF-065, both second reviews resolved) (current)
+## 2026-08-09 Live greenfield re-tests find a kickoff deadlock and a host-terminal rendering break; combined Critic review FAILs the fix, TP-5 maintenance window closes it (GF-074→GF-076→GF-077) (current)
+
+The PO ran two live greenfield onboarding sessions against the fifth local
+candidate (`a70c52b`) — one Claude Code, one Codex — and both hit real
+blockers, reported with full session-file paths and line numbers.
+
+**Claude: total kickoff deadlock.** `project-onboarding-v3.mjs` has required
+`--language <de|en>` on `kickoff plan`/`kickoff apply` since GF-066, but
+`guard-lifecycle-ready.mjs`'s `sanctionedOnboardingArgs` allowlist was never
+widened to admit that flag — no argv shape satisfied both the CLI and the
+guard simultaneously, a genuine happy-path dead end for a non-ready project.
+
+**Codex: broken copy-paste.** The mandatory attended-host-terminal command for
+`HGO-EXTERNAL-REPOSITORY-OBSERVATION` line-wrapped mid-path when rendered as
+one long line; the PO's copy-paste truncated it, producing `MODULE_NOT_FOUND`.
+The PO rejected this outright: "nicht happy path."
+
+**GF-074 fixed both** (`f2a4ac70`, `d4484a8e`): widened the guard's kickoff
+`plan`/`apply` branches to require `--language de|en` at the CLI's exact
+canonical position (6→8 / 9→11 args, no reordering tolerance), with 6 new
+negative fixture cases; added `references/failure-cases.md` §F7 documenting a
+general safe-rendering rule for long, version-dependent host-terminal
+commands (one argv token/flag-pair per physical line, backslash-continued,
+never split mid-token) — validated in real time later this session when the
+PO's own copy-paste of an unformatted `sign-intent` command truncated
+`--intent-sha256` to 21/64 characters.
+
+**Combined Critic review (2nd round for this lineage, `claude-opus-5`/max,
+`scratch/critic-nova-bf1c2d1b/critic-notes.md`) of GF-074 plus GF-075** (5
+fixes — F1/F2/F5/F6/F7 — for an earlier round's document-language-decoupling
+findings, commits `536eabd9`/`f71083fc`/`2271e2a3`/`42d16e5c`) **returned
+FAIL**, clearing GF-074's guard fix and GF-075's actual code (F1/F2/F5/F6) as
+correct, but finding:
+
+- **F-1 (major):** GF-075's new F7 regression test (`validCurrentDecisionDocuments`'s
+  `documentLanguage` fallback) landed in
+  `plugins/pipeline-core/scripts/pipeline-state.test.mjs` — a file
+  `harness/scripts/verify.mjs` never registers under any suite name; the
+  267-suite green evidence this session's candidates cite carried zero signal
+  about it. Pre-existing gap in that file (CB-1a), not introduced by GF-075,
+  but its test rode along uncovered.
+- **F-2 (major):** `references/onboarding-recovery.md` — the only documented
+  kickoff invocation in the whole skill tree — still omitted `--language`,
+  even after GF-074's guard fix made that the only admissible shape.
+- **F-3 (minor):** `kickoff-design.md:101` still said the promoted PRD "must
+  carry `<!-- po-language: (de|en) -->`", contradicting the same file's own
+  already-widened grammar (lines 31-34) and F5's guard-message wording.
+
+**GF-076 fixed F-2/F-3** (`716b1cc6`, `735bd9a9`) and added an honest
+disclosure comment above the orphaned F7 test (`4292ff54`) rather than
+silently leaving the gap undocumented, pointing at a new backlog item:
+`2026-08-09-pipeline-state-scripts-test-file-never-runs-in-full-verify.md`
+(filed directly by the Elephant, `17db0b4f`). That item states plainly why
+F-1 cannot be fixed within ordinary dispatch authority: both files that would
+need to change — `harness/scripts/pipeline-state.test.mjs` (TP-5) and
+`harness/scripts/verify.mjs` (TP-3) — are hard guard-protected with no
+override route (`templates/prompts/agent-obligations.md`: "needing one of
+these is a stop condition — report it, do not hunt for a route"), and offers
+two remediation directions: (a) register the whole CB-1a file as its own new
+`verify.mjs` suite (TP-3, and a new release-gate on content never audited as
+one), or (b) move just the F7 test into the canonical TP-5-protected sibling.
+
+**Closing it required a real maintenance-window transaction, not a dispatch.**
+The PO explicitly offered to sign: "klar können wir ein Maintenance Window
+aufmachen, ich signiere es." `guard-maintenance-window.mjs prepare` was run
+scoped to `TP-5` only; the PO ran `po-human-approval.mjs sign-intent` in
+their own trusted terminal and produced a valid first signature — which went
+stale before `install` because GF-076's three commits moved HEAD
+concurrently while the PO was signing (the window's exact-candidate binding
+correctly refusing a mismatched HEAD, not a defect). Re-prepared against the
+new HEAD (`4292ff54`) and re-signed; `install` then succeeded
+(`{"status":"active"}`). Before dispatching the fix, the Elephant asked the
+PO explicitly whether to also widen scope to TP-3 for direction (a) — the PO
+chose **TP-5 only**; direction (a) remains open as a separate, independent
+decision for a future session.
+
+**GF-077 (goldfish-deep) closed F-1** under the active window (`c0d23d90`):
+moved the F7 test into `harness/scripts/pipeline-state.test.mjs` as `PS55j`,
+matching that file's `freshDir`/`captureConsole` conventions, and dropped the
+now-unused `statePath`/`SCHEMA_ID` import from the CB-1a file. Independently
+re-verified by the Elephant (not just the dispatch report): both test files
+re-run directly (314/314 and "all checks passed" respectively), full
+`node harness/scripts/verify.mjs` re-run directly — 267/267 suites,
+`exitCode: 0`, `candidate.binding: "exact"`, bound to `c0d23d90`, including
+the now-covering `pipeline-state-tests` suite. The maintenance window was
+closed immediately after (`guard-maintenance-window.mjs close` →
+`{"status":"closed"}`). The backlog item was closed with full evidence
+(`backlog/evidence/2026-08-09-pipeline-state-f7-test-relocation-closure.md`,
+commit `ea79347d`). No third Critic round was dispatched for this
+lineage — the standing two-round cap had already been exercised (two FAILs
+recorded on this exact diff lineage), so the Elephant self-verified the
+rework directly, per the same pattern used earlier this session for GF-064
+and GF-072.
+
+Three new local `0.5.4` candidates were built and stamped along the way,
+each independently Verify-green at 267/267 before the next fix landed:
+sixth (`ae7d927e`, `…20260809200613.484c961`, after GF-072's
+`guard-maintenance-window.mjs install --authority` SETUP-1 fix — the third
+and, per an exhaustive caller sweep recorded in
+`backlog/evidence/2026-08-09-guard-maintenance-window-humanname-fix-closure.md`,
+final instance of the SETUP-1 authority-narrowing class alongside GF-067
+`ad81a9b9` and GF-069 `faf4c8dd`), seventh (`2d01eee7`,
+`…20260809204950.42d16e5`, after GF-074/GF-075), and eighth/current
+(`f4b28df4`, `…20260809214216.ea79347`, after this block's F-1 closure).
+
+## 2026-08-09 Happy-path re-test round two — both corrective lineages landed clean (GF-060→GF-064; GF-062→GF-065, both second reviews resolved)
 
 Both fix lineages opened by the round below needed one corrective round each
 before landing. Per the PO's own same-day, per-diff Critic-cadence
