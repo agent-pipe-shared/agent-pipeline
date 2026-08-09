@@ -9,7 +9,14 @@ import { BOOTSTRAP_PAYLOAD_MAX_BYTES } from "../../lib/bootstrap-payload-budget.
 const here = dirname(fileURLToPath(import.meta.url));
 const core = readFileSync(join(here, "SKILL.md"), "utf8");
 const closeBlock = readFileSync(join(here, "..", "close-block", "SKILL.md"), "utf8");
-const refs = ["onboarding-recovery.md", "private-overlay.md", "roles.md", "freshness.md", "failure-cases.md", "continuation.md", "push-approval.md"]
+// BOOTMOD-1 moved the kickoff-intake block out of the core verbatim, because the
+// core is read at the start of every session and pays for every byte, including in
+// the sessions that never reach a kickoff. Every phrase this suite pinned against
+// the core for that block is pinned below against this file instead -- the same
+// patterns, including the ones that span a line break, because the move preserved
+// the wrapping. Retargeted, never dropped.
+const kickoffDesign = readFileSync(join(here, "references", "kickoff-design.md"), "utf8");
+const refs = ["onboarding-recovery.md", "private-overlay.md", "roles.md", "freshness.md", "failure-cases.md", "continuation.md", "push-approval.md", "kickoff-design.md"]
   .map((name) => readFileSync(join(here, "references", name), "utf8")).join("\n");
 // Every reference the core's lazy-loading list names must exist and be readable.
 // SETUP-3 shipped a bullet for a file SETUP-4 had not written yet; the dangling
@@ -63,17 +70,17 @@ assert.match(core, /\*\*and\n   before proposing, displaying, or performing any 
 assert.match(core, /input received\n   after a short kickoff goal has already initialized the project/u);
 assert.match(core, /do not reduce it to a new short\n   kickoff goal or merely promise to remember it/u);
 assert.match(core, /Read back `resume-hint\.mjs inspect` after a\n   successful capture/u);
-assert.match(core, /obtain both a single-line project goal and an\nexplicit PO profile: `epic`, `feature`, or `mini`/u);
-assert.match(core, /Never infer, silently select, or retrospectively claim a profile/u);
-assert.match(core, /`specs\/kickoff-\*` files are provisional bootstrap\nanchors, not the standard long-term design location/u);
-assert.match(core, /`specs\/YYYY-MM-DD_short-topic\/`/u);
-assert.match(core, /`prd_short-topic\.md`, `spec\.md`, and `design-input\.md`/u);
-assert.match(core, /The PRD and Spec both\nlink to it and carry a compact traceability table/u);
-assert.match(core, /include a valid Mermaid flow\/sequence\/state diagram wherever it materially\nclarifies that flow/u);
-assert.match(core, /Treat that named package as a pre-authority staging set/u);
-assert.match(core, /only its digest-bound `kickoff promote apply` to bind the PRD\/Spec in State\nand the source-evidence path\/hash in the same immutable continuity transaction\./u);
-assert.match(core, /Do not invoke a repair, generic continuity CAS, manifest\nrepair, or hash-rebinding cascade solely because a new design package was\ncreated/u);
-assert.match(core, /The source-evidence file is immutable after its PRD\/Spec reference is bound/u);
+assert.match(kickoffDesign, /obtain both a single-line project goal and an\nexplicit PO profile: `epic`, `feature`, or `mini`/u);
+assert.match(kickoffDesign, /Never infer, silently select, or retrospectively claim a profile/u);
+assert.match(kickoffDesign, /`specs\/kickoff-\*` files are provisional bootstrap\nanchors, not the standard long-term design location/u);
+assert.match(kickoffDesign, /`specs\/YYYY-MM-DD_short-topic\/`/u);
+assert.match(kickoffDesign, /`prd_short-topic\.md`, `spec\.md`, and `design-input\.md`/u);
+assert.match(kickoffDesign, /The PRD and Spec both\nlink to it and carry a compact traceability table/u);
+assert.match(kickoffDesign, /include a valid Mermaid flow\/sequence\/state diagram wherever it materially\nclarifies that flow/u);
+assert.match(kickoffDesign, /Treat that named package as a pre-authority staging set/u);
+assert.match(kickoffDesign, /only its digest-bound `kickoff promote apply` to bind the PRD\/Spec in State\nand the source-evidence path\/hash in the same immutable continuity transaction\./u);
+assert.match(kickoffDesign, /Do not invoke a repair, generic continuity CAS, manifest\nrepair, or hash-rebinding cascade solely because a new design package was\ncreated/u);
+assert.match(kickoffDesign, /The source-evidence file is immutable after its PRD\/Spec reference is bound/u);
 assert.match(core, /Normal restart is handover-only/u);
 assert.match(core, /Never invoke `close-block`, `close-feature`, or the close\n   coordinator merely to start a new chat/u);
 assert.match(closeBlock, /Hard entry gate — never close a normal restart/u);
@@ -83,14 +90,16 @@ assert.match(closeBlock, /Do \*\*not\*\* invoke `close-block`, `close-feature`, 
 
 // SETUP-3: bootstrap questions (language, profile) come before any artifact
 // is written, and are shaped problem/options/cost/recommendation -- never a
-// bare setting name.
-assert.match(core, /Bootstrap questions are answered before any artifact is written/u);
-assert.match(core, /never\ninferred from the greeting, the repository's contents, or the runner's\nlocale/u);
-assert.match(core, /problem, options, cost, recommendation — never a bare setting name/u);
-assert.match(core, /Recommendation: match the language you would already write the PRD/u);
-assert.match(core, /Bind the answer into `<!-- po-language: \(de\|en\) -->` before drafting/u);
-assert.match(core, /Recommendation: `feature` unless the work is visibly cross-package or\ntrivially small\./u);
+// bare setting name. BOOTMOD-1 moved their full wording into the reference; the
+// claims are unchanged and are pinned there now.
+assert.match(kickoffDesign, /Bootstrap questions are answered before any artifact is written/u);
+assert.match(kickoffDesign, /never\ninferred from the greeting, the repository's contents, or the runner's\nlocale/u);
+assert.match(kickoffDesign, /problem, options, cost, recommendation — never a bare setting name/u);
+assert.match(kickoffDesign, /Recommendation: match the language you would already write the PRD/u);
+assert.match(kickoffDesign, /Bind the answer into `<!-- po-language: \(de\|en\) -->` before drafting/u);
+assert.match(kickoffDesign, /Recommendation: `feature` unless the work is visibly cross-package or\ntrivially small\./u);
 assert.ok(!core.includes("Set gates.push_approval?"), "a question must not be posed as a bare setting name");
+assert.ok(!kickoffDesign.includes("Set gates.push_approval?"), "a question must not be posed as a bare setting name");
 // SETUP-4: the push-approval reference. These pin the claims an operator acts
 // on, not the prose around them -- each one is either a fact about the gate or a
 // warning derived from the live 2026-08-08 ceremony that took three attempts.
@@ -125,5 +134,51 @@ assert.match(pushApproval, /`--repo-root` must be an absolute path/u);
 assert.match(pushApproval, /machine-scoped configuration plane/u);
 // A shipped file must not pin a subcommand list that has changed before.
 assert.match(pushApproval, /rather than trusting a list written here/u);
+
+// BOOTMOD-1: the failure class modularization creates, pinned.
+//
+// Moving content out of the core is only safe while the core keeps the CONDITION
+// that says the content is needed. Move the condition out with it and nothing goes
+// red: a session in that state never learns it must load the file, skips the step,
+// and reports success. An oversized core is visible in a byte count; a silently
+// skipped step is visible nowhere.
+//
+// This is deliberately NOT "the core still names the file" -- the existence check
+// at the top of this file already does that, and it is exactly the check that
+// stays green through this failure. What is pinned here is that the directive
+// naming the reference also names the states that send a reader to it, in the same
+// paragraph, so a session cannot meet the pointer without meeting its trigger.
+const KICKOFF_REFERENCE = "`references/kickoff-design.md`";
+const kickoffTriggerStates = [
+  { state: "a pristine project", pattern: /pristine/u },
+  { state: "a first `kickoff plan`", pattern: /first `kickoff plan`/u },
+  { state: "material design input has arrived", pattern: /material design input/u },
+  { state: "a design package is being created or promoted", pattern: /promot/u },
+];
+const kickoffDirectives = (text) => text.split(/\n{2,}/u).filter((paragraph) => paragraph.includes(KICKOFF_REFERENCE));
+function assertKickoffPointerCarriesItsTrigger(text) {
+  const directives = kickoffDirectives(text);
+  assert.ok(directives.length > 0, `the core must name ${KICKOFF_REFERENCE}`);
+  const missingPerDirective = directives.map((paragraph) =>
+    kickoffTriggerStates.filter(({ pattern }) => !pattern.test(paragraph)).map(({ state }) => state));
+  const missing = missingPerDirective.reduce((best, current) => (current.length < best.length ? current : best));
+  assert.equal(missing.length, 0,
+    `the core names ${KICKOFF_REFERENCE}, but no single directive names the states that need it: ${missing.join("; ")}. A session in that state cannot know it has to load the file, and skipping it fails silently.`);
+}
+assertKickoffPointerCarriesItsTrigger(core);
+// Proof that the pin above is about the trigger and not about the file name,
+// carried in the suite rather than asserted in a report: a core that names the
+// reference with no condition attached must fail it.
+assert.throws(
+  () => assertKickoffPointerCarriesItsTrigger(core.replace(kickoffDirectives(core)[0], () => `Load ${KICKOFF_REFERENCE}.`)),
+  /no single directive names the states that need it/u,
+  "the trigger pin must go red on a core that names the reference without its condition",
+);
+// The three rules the move deliberately left in the core, because a session that
+// never loads the reference is still bound by them. These are decisions (whether
+// something applies), not elaboration, and moving them would be the failure above.
+assert.match(core, /No artifact of a pristine project is written before\nits bootstrap questions are answered/u);
+assert.match(core, /never inferred, defaulted, or claimed after the fact/u);
+assert.match(core, /`specs\/kickoff-\*` files a bootstrap transaction creates are provisional anchors\nonly/u);
 
 process.stdout.write("pipeline-start V3: core budget and lazy-reference checks passed\n");
