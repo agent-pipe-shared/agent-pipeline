@@ -1023,6 +1023,47 @@ a dispatch the authority to clear a control whose purpose is to check that
 dispatch's own class of work. "Show your evidence" is not a substitute for
 separation of duties — it is what makes the absence of separation look rigorous.
 
+### Third merge loss closed (`1f37b40`, `4a7a750`) — the blocker was real for the wrong approach
+
+`harness/lib/plan-spec-state-v2.test.mjs` loads and passes 8 checks; verified here, not
+taken from the report. Exclusions now three red, three green.
+
+**The twelve "missing helpers" were never missing.** They were *unexported* — which
+blocks a restore across file boundaries and is irrelevant when restoring **into the
+same module**, where all 35 historical definitions already sit in lexical scope. The
+earlier dispatch's blocker was correct for the approach it had in mind and moot for the
+right one. Worth remembering as a shape: "symbol not available" and "symbol not
+exported" read identically from outside and are different problems.
+
+**The schema-id collision was real, and the danger was demonstrated rather than
+asserted.** `pipeline.plan-approval.v3` names two disjoint records — submission-bound on
+the merged base, human-decision-bound pre-merge. One record read by two readers:
+
+- merged-base reader → `PLAN-LIFECYCLE-APPROVAL-STALE`, `approvalCurrent=false`
+- restored reader → `approvalCurrent=true`, digest-bound
+
+**A valid approval reading back as no approval**, on an approval-authority surface, is
+the worst failure this restoration could have shipped. Resolved additively: a second
+constant under a distinct name, the merged binding untouched and authoritative, key
+sets disjoint on their discriminating members so the validators stay mutually
+exclusive. No v2 or legacy record reads differently than before.
+
+**And the recommendation went against the obvious action.** This suite looked like a
+duplicate of its registered successor, and deletion was the comfortable conclusion — it
+is what I had queued for it. It pins the human-decision lineage the successor does not
+cover **at all**. Deleting it would have dropped coverage silently, which is the exact
+failure the property-by-property mapping requirement exists to prevent. That reasoning
+is now in the exclusion entry, so the next reader does not re-derive the same wrong
+instinct.
+
+**One line was adapted rather than restored verbatim, and it was declared:** the
+compatibility branch in `currentApproval()` had no pre-merge original because the
+pre-merge module had no reader for it. Everything else is byte-compared against the
+historical blob.
+
+**Merge losses: 3 of 9 closed. Six remain**, ranked in `evidence/phx-merge-audit.md`,
+none blocked on the PO.
+
 ### The second merge loss is closed (`77a2f50`, `8b81816`) — and I had closed the night too early
 
 Gate at `8b81816`: exit 0, 368 steps, `binding: "exact"`, clean at tree `201157f`.
