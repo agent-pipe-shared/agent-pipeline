@@ -513,14 +513,29 @@ if (denials.length > 0) {
       if (hostBoundary) {
         let secretBearing = true;
         try {
+          // eligibility()'s secret screen (lib/human-guard-override.mjs) is
+          // pattern-based, not exhaustive: it matches known credential shapes
+          // (gh*_ tokens, github_pat_, AKIA-style keys, PEM private-key headers,
+          // token/password/secret=<value> assignments) but does NOT catch every
+          // credential shape -- e.g. a bare `Authorization: Bearer <JWT>`-style
+          // value in a command is NOT flagged (`eligible: true`) and would be
+          // emitted verbatim below (Critic F2, GF-064). Closing that gap would
+          // mean widening the shared regex, which is out of scope here.
           const probe = eligibility(projectRoot, toolName, input?.tool_input ?? {});
           secretBearing = probe.eligible === false && probe.code === "HGO-NONOVERRIDABLE-SECRET";
         } catch { /* fail closed: secretBearing stays true, guidance stays hash-only */ }
-        // Bash is the only tool with a shell command at all (Edit/Write/apply_patch have
-        // no tool_input.command); `command` above is already "" for those, which the
-        // empty-string form would falsely present as an actionable-but-blank command
-        // (F5, GF-059). Match the codebase's own null-for-no-command convention
-        // (actionPreview() at lib/human-guard-override.mjs:669-684) instead.
+        // Corrected (Critic F3, GF-064): the prior comment here claimed Bash was the
+        // only tool with a shell command at all and that `command` above was already
+        // "" for Edit/Write/apply_patch -- that is false for apply_patch. Codex passes
+        // the full patch body in `tool_input.command` for an apply_patch call (the same
+        // field lib/human-guard-override.mjs's eligibility() reads at line ~951), and
+        // `command` above (line 178, `input?.tool_input?.command`) reads that field
+        // unconditionally -- so for apply_patch it holds the ENTIRE patch body, not "".
+        // The `toolName === "Bash"` check below is therefore a real, load-bearing
+        // restriction: it is what actually stops a complete apply_patch body from being
+        // emitted verbatim in this guidance, not a formality over an already-empty string.
+        // Match the codebase's own null-for-no-command convention (actionPreview() at
+        // lib/human-guard-override.mjs:669-684) instead.
         hostBoundaryAction = {
           toolName,
           toolInputSha256,

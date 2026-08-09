@@ -700,5 +700,36 @@ check("GF-060: a non-Bash denial reaching the host-boundary route never carries 
   assert.equal(route.nextAction.action.command, null);
 });
 
+// GF-064 (Critic F1): the two "Write" tests above pass unconditionally --
+// codex-pretool-guard.mjs's `command` field is already null for any non-Bash
+// toolName regardless of secretBearing, so they prove nothing about the
+// `&& !secretBearing` conjunct. This is the missing Bash+secret pairing: a
+// secret-bearing Bash command reaching the exact same host-boundary route
+// must still come back with `command: null`, or the secret would be emitted
+// verbatim in an attended-host-terminal guidance blob (real disclosure risk,
+// not just a formatting concern).
+check("GF-064: a secret-bearing Bash denial reaching the host-boundary route never carries the secret verbatim", () => {
+  const root = hostBoundaryFixture();
+  const secret = "ghp_FAKEFAKEFAKEFAKE1234567890AB";
+  // A non-git mutating command: guard-git.mjs's own denial reasons always echo
+  // `Command: <cmd>` verbatim (guard-git.mjs formatBlockHeader) regardless of
+  // secret content -- an orthogonal, out-of-scope UX behavior of a different
+  // guard. Routing through guard-lifecycle-ready.mjs's own NOT-READY denial
+  // (which never echoes the raw command) isolates the exact mechanism F1 is
+  // about: the `command` field this adapter itself builds for the host-boundary
+  // guidance blob.
+  const command = `touch ${secret}`;
+  const output = decision(run({
+    tool_name: "Bash",
+    tool_input: { command },
+  }, root));
+  assert.equal(output.permissionDecision, "deny");
+  assert.doesNotMatch(output.permissionDecisionReason, /ghp_FAKEFAKEFAKEFAKE/u,
+    "the secret-bearing Bash command leaked verbatim into the denial reason");
+  const route = guardRecoveryRoute(output.permissionDecisionReason);
+  assert.equal(route.code, "HGO-EXTERNAL-REPOSITORY-OBSERVATION");
+  assert.equal(route.nextAction.action.command, null);
+});
+
 if (process.exitCode) process.exit(process.exitCode);
 process.stdout.write(`1..${passed}\n`);
