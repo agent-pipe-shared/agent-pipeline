@@ -8,7 +8,7 @@ Parent specification: [../spec.md](../spec.md) · Measurement: [../evidence/acce
 
 ## What this design is for
 
-The measurement established that 71 of 157 acceptance criteria are not
+The measurement established that 70 of 157 acceptance criteria are not
 `implemented` and that no issue is closeable. It did not say how any of them closes. This
 document does, and it is generated from the same verdict data as the measurement, so the two
 cannot drift apart.
@@ -19,12 +19,12 @@ one list is what has made the epic look larger and more uniform than it is.
 
 | class | criteria | what closing one actually costs |
 |---|---|---|
-| A — assertion missing | 24 | one named test case in an already-registered, unprotected suite |
+| A — assertion missing | 23 | one named test case in an already-registered, unprotected suite |
 | D — documentation missing | 7 | one document section set; no code, no gate |
 | S — seam missing | 6 | a connector between two packages that already work |
 | B — capability missing | 29 | real implementation plus its tests |
 | P — not code | 5 | a human gate, a sanctioned authority revision, or a proved impossibility |
-| **total** | **71** | |
+| **total** | **70** | |
 
 **The distribution is the finding.** The largest class by a wide margin is Class A: criteria
 whose behaviour is built, shipped and green, and which fail only because no assertion names the
@@ -136,7 +136,7 @@ is by module family, which makes the disjointness checkable rather than asserted
 | WP-E | 9 | plugins/pipeline-core/lib/governance-export-*.mjs |
 | WP-A | 11 | plugins/pipeline-core/lib/agent-decision-journal*.mjs, governance/schemas/agent-decision-event.schema.json |
 | WP-L | 3 | plugins/pipeline-core/lib/lifecycle-governance-events*.mjs, plugins/pipeline-core/lib/governance-replay*.mjs |
-| WP-H | 4 | plugins/pipeline-core/lib/human-governance-ledger*.mjs, plugins/pipeline-core/lib/governance-authority-resolver*.mjs, plugins/pipeline-core/lib/external-push-ledger*.mjs |
+| WP-H | 3 | plugins/pipeline-core/lib/human-governance-ledger*.mjs, plugins/pipeline-core/lib/governance-authority-resolver*.mjs, plugins/pipeline-core/lib/external-push-ledger*.mjs |
 | WP-R | 8 | plugins/pipeline-core/lib/external-command-offer*.mjs |
 | WP-PX0 | 8 | plugins/pipeline-core/lib/ruleset-source*.mjs, plugins/pipeline-core/scripts/ruleset-freshness-host.mjs, plugins/pipeline-core/lib/continuity-state.mjs |
 | WP-EPIC | 1 | plugins/pipeline-core/lib/parallel-sprint-integration*.mjs |
@@ -173,7 +173,7 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 
 ## Per criterion
 
-### Class A — the behaviour exists, the assertion does not (24)
+### Class A — the behaviour exists, the assertion does not (23)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
@@ -187,7 +187,6 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 | E-AC-09 | partial | WP-E | viewer renders lag; no assertion shows canonical governance continuing under an unavailable advisory destination |
 | E-AC-11 | partial | WP-E | the privacy half is pinned; attempt, counts, cursor/lag and policy digests are not each pinned |
 | E-AC-14 | partial | WP-E | the in-memory collector is pinned; local-file, syslog and failure-injection fixtures are not named |
-| H-AC-15 | partial | WP-H | grant, consumption, expiry, drift, single-use, lifecycle links covered; denial, correction, retry, concurrency, interruption are not |
 | K-AC-05 | partial | WP-K | governance-event-store-tests: fork detection now proven to also block append and recovery, not only verify/query (PHX-WP-K, break-proofed). Still absent: no disposition operation exists anywhere in the module -- "governed disposition appended through the sanctioned recovery operation" has no code to test against |
 | P-AC-01 | partial | WP-P | schema/compatibility/merge pinned; provenance, dependency and signature-policy validation are not named |
 | P-AC-03 | partial | WP-P | planOrganizationPolicyActivation pinned; newly-required artifacts, external effects and backfill range are not |

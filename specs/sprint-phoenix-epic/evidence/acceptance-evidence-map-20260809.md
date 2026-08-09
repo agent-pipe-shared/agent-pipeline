@@ -42,8 +42,8 @@ reproduced here rather than referenced.
 
 ## The direct answer
 
-**Phoenix cannot claim complete.** 86 of 157 criteria carry a named assertion in a
-gate-registered suite; 71 do not. EPIC-AC-05 forbids a completion claim while any
+**Phoenix cannot claim complete.** 87 of 157 criteria carry a named assertion in a
+gate-registered suite; 70 do not. EPIC-AC-05 forbids a completion claim while any
 criterion remains unimplemented or unverified, and it currently bites. No issue is closeable on
 its own live acceptance bullets.
 
@@ -61,8 +61,8 @@ A bullet is therefore BLOCKED unless every criterion mapped to it is `implemente
 
 | verdict | count |
 |---|---|
-| implemented | 86 |
-| partial | 54 |
+| implemented | 87 |
+| partial | 53 |
 | designed-only | 1 |
 | not-started | 15 |
 | constraint | 1 |
@@ -112,7 +112,7 @@ clause that is not pinned or not built.
 | K-AC-09 | implemented | C | governance-event-core-tests: six exact typed absence states preserved |
 | K-AC-10 | not-started | WP-K | NO CARRIER, confirmed by repo-wide search (PHX-WP-K): queryPortableGovernanceStream, the governance-event CLI and governance-replay.mjs all accept exactly one streamId; no function anywhere queries more than one stream, so per-record provenance preservation across streams has no code to test |
 
-### H — Human Governance Decision Ledger (#30) (9/15 implemented)
+### H — Human Governance Decision Ledger (#30) (10/15 implemented)
 
 | ID | verdict | src | evidence / named gap |
 |---|---|---|---|
@@ -130,7 +130,7 @@ clause that is not pinned or not built.
 | H-AC-12 | partial | C | guard-push/guard-devplan/change-control validate the decision reference; the DUAL-EVALUATION during migration with shared owner and expiry has no carrier |
 | H-AC-13 | implemented | C | human-governance-ledger-tests + store admission: prohibited content rejected before any temporary file exists |
 | H-AC-14 | partial | C | governance-events.md + po-human-approval.md + threat model exist; no migration, retention or recovery section for the ledger package |
-| H-AC-15 | partial | C | grant, consumption, expiry, drift, single-use, lifecycle links covered; denial, correction, retry, concurrency, interruption are not |
+| H-AC-15 | implemented | WP-H | human-governance-ledger-tests (PHX-WP-H): all thirteen named scenarios pinned (grant/consumption/expiry/redaction pre-existing; denial/revocation/correction/retry/concurrency/interruption/tampering/stale-candidate/cross-repository-binding new and break-proofed) |
 
 ### A — Agent Decision and Assumption Journal (#31) (4/16 implemented)
 
@@ -350,7 +350,7 @@ clause that is not pinned or not built.
 
 ### #30 — Add a repository-scoped tamper-evident human governance decision ledger
 
-7 of 17 live acceptance bullets fully carried; **10 blocked**.
+8 of 17 live acceptance bullets fully carried; **9 blocked**.
 
 | # | live acceptance bullet | blocking criteria (verdict) |
 |---|---|---|
@@ -363,7 +363,6 @@ clause that is not pinned or not built.
 | 7 | Unverified legacy material cannot satisfy a current gate | H-AC-08 (not-started) |
 | 8 | #9 bundles verified ledger records/integrity | P-AC-06 (partial) |
 | 9 | Schema/taxonomy/authority/threat/migration/retention/recovery docs exist | H-AC-14 (partial) |
-| 10 | Complete decision/failure/privacy fixture set | H-AC-15 (partial) |
 
 ### #31 — Add a privacy-preserving agent decision and assumption journal
 
@@ -411,7 +410,7 @@ clause that is not pinned or not built.
 | #17 | 6 | 4 | 2 | **no** |
 | #23 | 16 | 13 | 3 | **no** |
 | #24 | 12 | 8 | 4 | **no** |
-| #30 | 17 | 7 | 10 | **no** |
+| #30 | 17 | 8 | 9 | **no** |
 | #31 | 17 | 5 | 12 | **no** |
 | #32 | 20 | 9 | 11 | **no** |
 
@@ -419,7 +418,7 @@ Issues closeable on their own live acceptance bullets: **0 of 8**.
 
 ## The blocking set, ranked
 
-42 distinct criteria block at least one live acceptance bullet.
+41 distinct criteria block at least one live acceptance bullet.
 
 | criterion | verdict | live bullets blocked |
 |---|---|---|
@@ -455,7 +454,6 @@ Issues closeable on their own live acceptance bullets: **0 of 8**.
 | H-AC-09 | not-started | 1 |
 | H-AC-11 | partial | 1 |
 | H-AC-14 | partial | 1 |
-| H-AC-15 | partial | 1 |
 | L-AC-08 | partial | 1 |
 | P-AC-01 | partial | 1 |
 | P-AC-03 | partial | 1 |

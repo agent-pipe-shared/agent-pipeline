@@ -339,6 +339,17 @@ const DELTA = {
   // already registered in verify.mjs. The criterion now names a
   // gate-registered suite that actually carries its 26 cases.
   'P-AC-08': ['implemented', 'ELEPHANT'],
+
+  // --- evidence/phx-wp-h.txt (task PHX-WP-H, 2026-08-09, commit 2594552) ---
+  // Independently re-run: 24/24 human-governance-ledger-tests pass. All
+  // thirteen H-AC-15 scenarios pinned: grant/consumption/expiry/redaction
+  // were already covered by existing tests; denial/revocation/correction/
+  // retry/concurrency/interruption/tampering/stale-candidate/cross-
+  // repository-binding are new, each independently break-proofed against a
+  // temporary production fault (8 new tests, 6 distinct faults across two
+  // modules, zero collateral on the 16 pre-existing tests). No capability
+  // gap found -- the criterion is fully implemented, not merely partial.
+  'H-AC-15': ['implemented', 'WP-H'],
 };
 
 // --- per-criterion evidence pointer ----------------------------------------
@@ -389,7 +400,7 @@ const POINTERS = {
   'H-AC-12': 'guard-push/guard-devplan/change-control validate the decision reference; the DUAL-EVALUATION during migration with shared owner and expiry has no carrier',
   'H-AC-13': 'human-governance-ledger-tests + store admission: prohibited content rejected before any temporary file exists',
   'H-AC-14': 'governance-events.md + po-human-approval.md + threat model exist; no migration, retention or recovery section for the ledger package',
-  'H-AC-15': 'grant, consumption, expiry, drift, single-use, lifecycle links covered; denial, correction, retry, concurrency, interruption are not',
+  'H-AC-15': 'human-governance-ledger-tests (PHX-WP-H): all thirteen named scenarios pinned (grant/consumption/expiry/redaction pre-existing; denial/revocation/correction/retry/concurrency/interruption/tampering/stale-candidate/cross-repository-binding new and break-proofed)',
 
   'A-AC-01': 'record shape pinned; nothing enforces recording BEFORE dependent action where policy requires',
   'A-AC-02': 'agent-decision-journal-tests (PHX-WP-A): all five lifecycle transitions (verified/contradicted/expired/invalidated/superseded) accept a linked follow-up event, exercised end-to-end through the store with the original proven byte-for-byte unchanged',
