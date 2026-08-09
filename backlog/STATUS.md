@@ -50,6 +50,7 @@
 | pipeline.epic-file-contract-has-no-drift-check | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.evidence-bound-review-retry-economics | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.execution-model-switchback | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
+| pipeline.external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.first-verify-run-is-red-with-four-failures | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.gate-strength-override-route-advertised-not-offered | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.gate-strength-shell-comment-understates-its-own-scope | open | defect | pipeline | 2026-08-07 | — |
@@ -139,6 +140,6 @@
 
 ## Counts
 
-- open: 81
+- open: 82
 - in_progress: 26
 - closed: 24
