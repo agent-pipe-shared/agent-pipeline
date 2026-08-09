@@ -479,6 +479,12 @@
       "member": "prd.md"
     },
     {
+      "surfaceId": "template-extension:templates/prompts/agent-obligations.md:prompts/agent-obligations.md",
+      "kind": "template-extension",
+      "path": "templates/prompts/agent-obligations.md",
+      "member": "prompts/agent-obligations.md"
+    },
+    {
       "surfaceId": "template-extension:templates/prompts/critic-review.md:prompts/critic-review.md",
       "kind": "template-extension",
       "path": "templates/prompts/critic-review.md",
@@ -831,6 +837,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "commit-message-policy-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:consumer-safe-paths-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "consumer-safe-paths-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-host-adapter-tests",
@@ -1193,6 +1205,12 @@
       "member": "lifecycle-ready-enforcement-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:lifecycle-recovery-contract-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "lifecycle-recovery-contract-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:local-supervisor-setup-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1215,6 +1233,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "local-worker-supervisor-core-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:machine-plane-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "machine-plane-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:main-session-route-tests",
@@ -1445,6 +1469,12 @@
       "member": "pipeline-start-v3-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:pipeline-state-inspection-contract-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "pipeline-state-inspection-contract-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:pipeline-state-rebind-runner-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1485,6 +1515,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "po-gate-profile-publisher-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:po-human-approval-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "po-human-approval-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:po-language-projection-check",
@@ -1581,6 +1617,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "project-onboarding-v3-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:project-reset-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "project-reset-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:provenance-attestation-tests",
@@ -2003,6 +2045,12 @@
       "member": "validate-manifest-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:verify-evidence-producer-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "verify-evidence-producer-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:windows-private-state-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -2232,6 +2280,7 @@
         "verify-phase:harness/scripts/verify.mjs:codex-sandbox-select-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-session-start-hint-tests",
         "verify-phase:harness/scripts/verify.mjs:commit-message-policy-tests",
+        "verify-phase:harness/scripts/verify.mjs:consumer-safe-paths-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-host-adapter-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-result-bootstrap-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-result-case-migration-tests",
@@ -2292,10 +2341,12 @@
         "verify-phase:harness/scripts/verify.mjs:license-contract-tests",
         "verify-phase:harness/scripts/verify.mjs:lifecycle-gate-satisfiability-tests",
         "verify-phase:harness/scripts/verify.mjs:lifecycle-ready-enforcement-tests",
+        "verify-phase:harness/scripts/verify.mjs:lifecycle-recovery-contract-tests",
         "verify-phase:harness/scripts/verify.mjs:local-supervisor-setup-tests",
         "verify-phase:harness/scripts/verify.mjs:local-supervisor-state-tests",
         "verify-phase:harness/scripts/verify.mjs:local-worker-supervisor-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:local-worker-supervisor-core-tests",
+        "verify-phase:harness/scripts/verify.mjs:machine-plane-tests",
         "verify-phase:harness/scripts/verify.mjs:main-session-route-tests",
         "verify-phase:harness/scripts/verify.mjs:migrate-backlog-state-tests",
         "verify-phase:harness/scripts/verify.mjs:no-autoupdate-key-tests",
@@ -2333,12 +2384,14 @@
         "verify-phase:harness/scripts/verify.mjs:phase3-sdlc-coherence-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-start-preflight-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-start-v3-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-state-inspection-contract-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-rebind-runner-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-revocation-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-tests",
         "verify-phase:harness/scripts/verify.mjs:po-approval-proof-tests",
         "verify-phase:harness/scripts/verify.mjs:po-gate-authority-fixture-tests",
         "verify-phase:harness/scripts/verify.mjs:po-gate-profile-publisher-tests",
+        "verify-phase:harness/scripts/verify.mjs:po-human-approval-tests",
         "verify-phase:harness/scripts/verify.mjs:po-language-projection-check",
         "verify-phase:harness/scripts/verify.mjs:po-language-projection-tests",
         "verify-phase:harness/scripts/verify.mjs:post-compact-reground-tests",
@@ -2355,6 +2408,7 @@
         "verify-phase:harness/scripts/verify.mjs:project-onboarding-e2e-tests",
         "verify-phase:harness/scripts/verify.mjs:project-onboarding-ready-gate-tests",
         "verify-phase:harness/scripts/verify.mjs:project-onboarding-v3-tests",
+        "verify-phase:harness/scripts/verify.mjs:project-reset-tests",
         "verify-phase:harness/scripts/verify.mjs:provenance-attestation-tests",
         "verify-phase:harness/scripts/verify.mjs:provenance-envelope-tests",
         "verify-phase:harness/scripts/verify.mjs:provenance-fixture-matrix-tests",
@@ -2425,6 +2479,7 @@
         "verify-phase:harness/scripts/verify.mjs:v3-bootstrap-authority-tests",
         "verify-phase:harness/scripts/verify.mjs:validate-manifest",
         "verify-phase:harness/scripts/verify.mjs:validate-manifest-tests",
+        "verify-phase:harness/scripts/verify.mjs:verify-evidence-producer-tests",
         "verify-phase:harness/scripts/verify.mjs:windows-private-state-tests",
         "verify-phase:harness/scripts/verify.mjs:workflow-runner-boundary-tests",
         "verify-phase:harness/scripts/verify.mjs:workflow-writer-preflight-tests",
@@ -3016,6 +3071,7 @@
         "template-extension:templates/pipeline.json.example:pipeline.json.example",
         "template-extension:templates/pipeline.yaml.example:pipeline.yaml.example",
         "template-extension:templates/prd.md:prd.md",
+        "template-extension:templates/prompts/agent-obligations.md:prompts/agent-obligations.md",
         "template-extension:templates/prompts/critic-review.md:prompts/critic-review.md",
         "template-extension:templates/prompts/elephant-kickoff.md:prompts/elephant-kickoff.md",
         "template-extension:templates/prompts/goldfish-task.md:prompts/goldfish-task.md",
@@ -3065,6 +3121,7 @@
         "templates/pipeline.json.example",
         "templates/pipeline.yaml.example",
         "templates/prd.md",
+        "templates/prompts/agent-obligations.md",
         "templates/prompts/critic-review.md",
         "templates/prompts/elephant-kickoff.md",
         "templates/prompts/goldfish-task.md",
@@ -3078,6 +3135,7 @@
         "templates/three-scope-fixtures.md"
       ],
       "testEvidence": [
+        "harness/scripts/generate-agent-obligations.test.mjs",
         "harness/scripts/validate-manifest.test.mjs"
       ],
       "targets": [
