@@ -1,8 +1,8 @@
 # Pending Verify registrations
 
-> **Status 2026-08-09.** One suite is pending; see the section directly below.
-> The GF-057 batch that this file was created for is **resolved** and is kept
-> below as a worked record.
+> **Status 2026-08-09.** **Nothing is pending.** Both batches this file was
+> created for are resolved and are kept below as worked records, in the past
+> tense.
 >
 > A previous version of this banner said "Nothing here is pending any more"
 > while the body underneath still read as a live to-do list, in the present
@@ -10,16 +10,19 @@
 > when at that moment they did. A Critic round found it on 2026-08-09. Reading
 > that heading was enough to send someone down a route that was already closed,
 > which is the defect a status banner exists to prevent, not one it may cause.
+> If a future edit makes something pending again, the pending section goes
+> first and says so in its heading; a resolved section never keeps that word.
 
-## Pending as of 2026-08-09 — the reference-path check
+## Resolved 2026-08-09 — the reference-path check
 
 `harness/scripts/check-reference-paths.test.mjs` and the gate it covers,
-`harness/scripts/check-reference-paths.mjs` (`9b7c3c2`), are not registered in
-`harness/scripts/verify.mjs`. The reason is the same TP-3 constraint described
-below, with one difference: the maintenance window opened for the GF-057 batch
-expired at 2026-08-09T01:56Z, so a fresh signed window is required.
+`harness/scripts/check-reference-paths.mjs` (`9b7c3c2`), are registered in
+`harness/scripts/verify.mjs` as `reference-path-tests` and
+`reference-path-check`. Getting there needed a fresh signed maintenance window
+under the same TP-3 constraint described below, because the one opened for the
+GF-057 batch had expired at 2026-08-09T01:56Z.
 
-Until it is registered, the gate runs only when someone runs it:
+The gate can still be run on its own:
 
 ```
 node harness/scripts/check-reference-paths.mjs
@@ -27,6 +30,12 @@ node harness/scripts/check-reference-paths.mjs
 
 It exits 0 at HEAD. Against `ac6ca88` it exits 2 and names the two references a
 script relocation had left pointing at deleted paths — the reason it exists.
+
+One property of its green is worth carrying: it classifies `specs/`, `backlog/`,
+`evidence/`, `docs/spec-archive/` and `docs/state.md` as record surfaces and
+skips them, and it skips `*.test.mjs`. On those paths its green is exclusion,
+not inspection. The gate prints all ten of its own blind spots on every run
+rather than leaving them to be rediscovered.
 
 ## Resolved 2026-08-08 — the GF-057 batch
 
