@@ -1100,6 +1100,7 @@ check("authentic post-privatization kickoff seed promotes revision 1 to revision
 
 for (const stage of [
   "promotion-history-published",
+  "promotion-handover-published",
   "promotion-cleanup-binding-published",
   "promotion-state-published",
 ]) {
@@ -1196,15 +1197,113 @@ check("promotion retires the provisional kickoff anchors with a marker naming it
   assert.deepEqual(entry, plan.targets.history.value.transactions[1]);
   assert.deepEqual(Object.keys(entry).sort(), [
     "afterStateSha256", "beforeStateSha256", "designInputPath", "designInputSha256",
-    "featureId", "kickoffFeatureId", "kind", "planPath", "prdSha256",
+    // `handover` joined the record on 2026-08-09 when the promotion gained its
+    // fourth target. It is a target binding like `cleanupBinding`, not an
+    // authority record: the marker below still gains nothing from it.
+    "featureId", "handover", "kickoffFeatureId", "kind", "planPath", "prdSha256",
     "previousTransactionSha256", "profile", "specPath", "specSha256", "transactionSha256",
   ]);
   assert.equal(entry.specPath, seed.request.specPath);
   assert.equal(entry.planPath, seed.request.planPath);
 });
 
+// HANDOVER-1. The defect this target closes, stated as the test: after a
+// promotion, the canonical handover must not still describe the provisional
+// kickoff feature whose directory the same transaction just marked SUPERSEDED.md.
+// Both of the PO's 2026-08-09 greenfield repositories ended in exactly that state,
+// and the bootstrap reads this file first and treats it as canonical for "where am
+// I" -- so a resuming session was pointed at a superseded anchor by the artifact
+// that exists to prevent it.
+check("the promotion replaces the handover the kickoff wrote", () => {
+  const seed = promotionSeed("handover");
+  const handoverPath = join(seed.root, "docs", "state.md");
+  const kickoffFeatureId = basename(dirname(seed.kickoff.targets.prd.path));
+  const before = readFileSync(handoverPath, "utf8");
+  assert.ok(before.includes(kickoffFeatureId), "the kickoff handover names the provisional feature");
+
+  const plan = promote(seed);
+  const after = readFileSync(handoverPath, "utf8");
+
+  // What must no longer be there, and what must be.
+  assert.ok(!after.includes(kickoffFeatureId),
+    "no artifact this transaction wrote may still name the superseded kickoff feature");
+  for (const named of [seed.request.featureId, seed.request.prdPath, seed.request.specPath,
+    seed.request.designInputPath, seed.request.profile]) {
+    assert.ok(after.includes(named), `the promoted handover must name ${named}`);
+  }
+  // The design input is the line that matters across a session boundary: the PO's
+  // report of the Codex run was that the runner "forgets the input", and the brief
+  // was never lost from disk -- nothing that survived the session pointed at it.
+  assert.ok(after.includes(seed.request.designInputPath), "the handover names the durable brief");
+
+  // Bound like the other three targets, not written and forgotten.
+  assert.equal(plan.targets.handover.path, "docs/state.md");
+  assert.equal(plan.targets.handover.beforeSha256, digest(before));
+  assert.equal(plan.targets.handover.afterSha256, digest(after));
+  const entry = JSON.parse(readFileSync(promotionHistoryPath(seed.root), "utf8")).transactions[1];
+  assert.deepEqual(entry.handover, {
+    path: "docs/state.md", beforeSha256: digest(before), afterSha256: digest(after),
+  });
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
+
+  // Replay is zero-write and returns the identical plan digest.
+  const replayed = applyOnboardingKickoffPromotion({
+    plan, expectedPlanSha256: plan.planSha256, activate: true,
+  });
+  assert.equal(replayed.status, "replayed");
+  assert.equal(replayed.mutated, false);
+  assert.equal(readFileSync(handoverPath, "utf8"), after);
+});
+
+// HANDOVER-2. The handover is published BEFORE the State, which is this
+// transaction's commit point. A crash between them must therefore leave a
+// handover that is ahead of a State that is behind -- recoverable, roll-forward,
+// and never the reverse (a promoted State beside a handover still naming the
+// kickoff is the exact state the target exists to prevent).
+check("a crash after the handover publication rolls forward, never backward", () => {
+  const seed = promotionSeed("handover-crash", { privatized: true });
+  const handoverPath = join(seed.root, "docs", "state.md");
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  assert.throws(() => applyOnboardingKickoffPromotion({
+    plan, expectedPlanSha256: plan.planSha256, activate: true,
+    deps: { crashAt: "promotion-handover-published" },
+  }));
+
+  const crashed = readFileSync(handoverPath, "utf8");
+  assert.equal(digest(crashed), plan.targets.handover.afterSha256, "the handover reached its postimage");
+  assert.ok(!crashed.includes(basename(dirname(seed.kickoff.targets.prd.path))));
+  assert.notEqual(JSON.parse(readFileSync(seed.statePath, "utf8")).continuity.featureId, seed.request.featureId,
+    "the State has NOT been published -- the commit point was never reached");
+
+  // The same digest-bound plan completes it. The simulated crash holds the locks,
+  // exactly as a real one would, so recovery goes through the stale-lock path.
+  const resumed = applyOnboardingKickoffPromotion({
+    plan, expectedPlanSha256: plan.planSha256, activate: true,
+    deps: { lockStaleMs: 0, nowMs: Date.now() + 1_000 },
+  });
+  assert.equal(resumed.status, "applied");
+  assert.equal(readFileSync(handoverPath, "utf8"), crashed, "the recovered run rewrites no handover byte");
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
+});
+
+// HANDOVER-3. A third party writing the handover between plan and apply is drift,
+// not a recoverable prefix: rolling forward over it would destroy bytes this
+// transaction never saw.
+check("a foreign handover write is drift, not a prefix to roll forward over", () => {
+  const seed = promotionSeed("handover-foreign");
+  const handoverPath = join(seed.root, "docs", "state.md");
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  writeFileSync(handoverPath, "# Someone else was here\n");
+  expectKickoffError("KICKOFF-PROMOTION-CAS-DRIFT", () => applyOnboardingKickoffPromotion({
+    plan, expectedPlanSha256: plan.planSha256, activate: true,
+  }));
+  assert.equal(readFileSync(handoverPath, "utf8"), "# Someone else was here\n",
+    "the foreign bytes are preserved exactly");
+});
+
 for (const stage of [
   "promotion-history-published",
+  "promotion-handover-published",
   "promotion-cleanup-binding-published",
   "promotion-state-published",
 ]) {

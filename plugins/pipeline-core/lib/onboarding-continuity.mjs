@@ -126,6 +126,17 @@ const PROMOTION_PLAN_KEYS = new Set([
 const PROMOTION_TARGET_KEYS = {
   state: new Set(["path", "beforeSha256", "afterSha256", "value"]),
   history: new Set(["path", "beforeSha256", "afterSha256", "value"]),
+  // Same shape as the kickoff's own handover target, deliberately: the kickoff
+  // writes this file and the promotion supersedes everything it names, so the
+  // transaction that supersedes it owns updating it. Before 2026-08-09 nothing
+  // did -- `onboarding-continuity.mjs` is the only writer of that path in the
+  // whole plugin, and the promotion had no handover target, so both of the PO's
+  // greenfield repositories ended with a canonical handover describing the
+  // provisional kickoff feature whose own directory the same transaction had
+  // marked SUPERSEDED.md. The bootstrap reads that file first and treats it as
+  // canonical for "where am I", so a resuming session was pointed at a
+  // superseded anchor by the artifact that exists to prevent exactly that.
+  handover: new Set(["path", "beforeSha256", "afterSha256", "content"]),
   cleanupBinding: new Set(["beforeSha256", "afterSha256"]),
 };
 const PROMOTION_PROFILES = new Set(["epic", "feature", "mini"]);
@@ -463,9 +474,13 @@ function validateHistory(value) {
   // `specPath` is the second half of the PRD/Spec pair.  It is optional on the
   // record so promotions written before the pair existed stay readable; new
   // promotions always carry it (validatePromotionPlan requires it).
+  // `handover` is optional on the same terms and for the same reason as
+  // `cleanupBinding`: a promotion written before that target existed carries no
+  // handover record, and it stays readable. New promotions always carry it.
   const promotionEntryKeySets = [promotionEntryKeys, promotionEvidenceEntryKeys]
     .flatMap((base) => [base, new Set([...base, "specPath"])])
-    .flatMap((base) => [base, new Set([...base, "cleanupBinding"])]);
+    .flatMap((base) => [base, new Set([...base, "cleanupBinding"])])
+    .flatMap((base) => [base, new Set([...base, "handover"])]);
   const safePath = (value) => {
     try { safeRelativePath(value, "promotion authority"); return true; } catch { return false; }
   };
@@ -491,7 +506,13 @@ function validateHistory(value) {
       && SHA256_RE.test(entry.designInputSha256)
       && (() => { try { safeRelativePath(entry.designInputPath, "promotion design input"); return true; } catch { return false; } })()))
     && (entry.cleanupBinding === undefined || (exactKeys(entry.cleanupBinding, new Set(["beforeSha256", "afterSha256"]))
-      && SHA256_RE.test(entry.cleanupBinding.beforeSha256) && SHA256_RE.test(entry.cleanupBinding.afterSha256)));
+      && SHA256_RE.test(entry.cleanupBinding.beforeSha256) && SHA256_RE.test(entry.cleanupBinding.afterSha256)))
+    // `beforeSha256` admits null: an absent handover is a legitimate preimage for a
+    // project whose calibration names a file the kickoff never wrote.
+    && (entry.handover === undefined || (exactKeys(entry.handover, new Set(["path", "beforeSha256", "afterSha256"]))
+      && typeof entry.handover.path === "string" && safePath(entry.handover.path)
+      && (entry.handover.beforeSha256 === null || SHA256_RE.test(entry.handover.beforeSha256))
+      && SHA256_RE.test(entry.handover.afterSha256)));
   if (!exactKeys(value, new Set(["schema", "transactions"]))
     || value.schema !== KICKOFF_HISTORY_SCHEMA
     || !Array.isArray(value.transactions)
@@ -3027,6 +3048,69 @@ function handoverContent(goal, featureId, prdPath, specPath) {
   ].join("\n");
 }
 
+/**
+ * The handover the PROMOTION writes, replacing the kickoff's.
+ *
+ * It names the durable design package -- PRD, Spec and, unlike the kickoff text,
+ * the design input. That last line is the one that matters most across a session
+ * boundary: the PO's report of the Codex run was that the runner "forgets the
+ * input", and the input was never lost from disk. `design-input.md` held a full
+ * brief -- context, goals, non-goals, chosen approach, scope, constraints, risks,
+ * three open questions -- and nothing that survived the session pointed at it. The
+ * handover carried a one-line kickoff goal and a superseded PRD path, and
+ * `resume-hint.mjs inspect` returned absent. Naming the design input here gives a
+ * re-grounding session one durable pointer to the actual brief.
+ */
+function promotionHandoverContent({ featureId, prdPath, specPath, designInputPath, profile }) {
+  return [
+    "# Project state",
+    "",
+    "## Current state",
+    "",
+    `Feature \`${featureId}\` is active in design (PO profile: \`${profile}\`).`,
+    `PRD: \`${prdPath}\`.`,
+    `Technical specification: \`${specPath}\`.`,
+    `Design input this package was promoted from: \`${designInputPath}\`.`,
+    "",
+    "The provisional kickoff PRD and specification are superseded; their directory",
+    "carries a `SUPERSEDED.md` naming this package as their successor.",
+    "",
+    "## Next action",
+    "",
+    "Review the PRD and specification, then submit the plan for PO approval:",
+    "`pipeline-state submit-plan --by <name> --profile <epic|feature|mini>`.",
+    "Implementation writes stay refused until the plan is approved and the phase is",
+    "switched to `implementation`.",
+    "",
+  ].join("\n");
+}
+
+/**
+ * Rebuild an applied promotion's handover target from its recorded transaction.
+ *
+ * The content is never stored in the history -- it is a pure function of the
+ * promotion's own inputs, all of which the entry already names. Reconstructing it
+ * and checking the digest is therefore a real verification, not a restatement: if
+ * the rebuilt bytes do not hash to what the transaction recorded, the entry and
+ * the content generator disagree and the replay must fail rather than hand back a
+ * plan whose target does not describe what was written.
+ */
+function replayHandoverTarget(entry, input, authority) {
+  const content = promotionHandoverContent({
+    featureId: input.featureId, prdPath: authority.prd.path, specPath: authority.spec.path,
+    designInputPath: authority.designInput.path, profile: input.profile,
+  });
+  if (sha256(Buffer.from(content, "utf8")) !== entry.handover?.afterSha256) {
+    fail("KICKOFF-PROMOTION-REPLAY", "promotion handover does not match the exact completed postimage");
+  }
+  return {
+    path: entry.handover.path,
+    beforeSha256: entry.handover.beforeSha256,
+    afterSha256: entry.handover.afterSha256,
+    content,
+  };
+}
+
 function initialContinuity({ featureId, prdPath, prdSha256, specPath, specSha256, language }) {
   return {
     schema: "pipeline.continuity.v0",
@@ -3659,7 +3743,12 @@ function promotionResult(plan, status, mutated, spawn = defaultGitSpawn) {
     spawn,
   });
   if (continuity.status !== "valid" || continuity.stateSha256 !== plan.targets.state.afterSha256
-    || continuity.historySha256 !== plan.targets.history.afterSha256) {
+    || continuity.historySha256 !== plan.targets.history.afterSha256
+    // The handover is read back like the other two, not written and forgotten.
+    // `classifyOnboardingContinuity` already observes the calibrated handover on
+    // every call, so this costs nothing and closes the case where the file was
+    // written and then changed underneath the transaction before it committed.
+    || (plan.targets.handover !== undefined && continuity.handoverSha256 !== plan.targets.handover.afterSha256)) {
     fail("KICKOFF-PROMOTION-READBACK", "promotion hashes did not validate immediately");
   }
   return {
@@ -3686,12 +3775,36 @@ function validatePromotionPlan(plan) {
     || !exactKeys(plan.authority.spec, new Set(["path", "sha256"]))
     || !exactKeys(plan.authority.designInput, new Set(["path", "sha256"]))
     || !exactKeys(plan.kickoff, new Set(["featureId", "transactionSha256", "stateSha256", "historySha256", "revision"]))
-    || !(exactKeys(plan.targets, new Set(["state", "history"]))
-      || exactKeys(plan.targets, new Set(["state", "history", "cleanupBinding"])))
+    // `handover` and `cleanupBinding` are each independently optional: a promotion
+    // applied before either existed replays without it, so all four combinations
+    // are admitted rather than enumerated as a growing list of literal key sets.
+    || !isObject(plan.targets)
+    || plan.targets.state === undefined || plan.targets.history === undefined
+    || Object.keys(plan.targets).some((key) => !["state", "history", "handover", "cleanupBinding"].includes(key))
     || !exactKeys(plan.targets.state, PROMOTION_TARGET_KEYS.state)
     || !exactKeys(plan.targets.history, PROMOTION_TARGET_KEYS.history)
+    || (plan.targets.handover !== undefined && (!exactKeys(plan.targets.handover, PROMOTION_TARGET_KEYS.handover)
+      || typeof plan.targets.handover.content !== "string" || plan.targets.handover.content.length === 0
+      || !SHA256_RE.test(plan.targets.handover.afterSha256 ?? "")
+      // An ABSENT handover is a legitimate preimage -- a project whose calibration
+      // names a handover the kickoff never wrote -- so `null` is admitted here and
+      // nowhere else. Any other non-digest value is a malformed plan.
+      || !(plan.targets.handover.beforeSha256 === null || SHA256_RE.test(plan.targets.handover.beforeSha256 ?? ""))
+      || sha256(Buffer.from(plan.targets.handover.content, "utf8")) !== plan.targets.handover.afterSha256))
     || (plan.targets.cleanupBinding !== undefined && !exactKeys(plan.targets.cleanupBinding, PROMOTION_TARGET_KEYS.cleanupBinding))) {
     fail("KICKOFF-PROMOTION-PLAN", "promotion plan is not closed and valid");
+  }
+  if (plan.targets.handover !== undefined) {
+    // Same containment rules the kickoff applies to its own handover target, and
+    // the same collision refusal: a handover that resolves onto the state or the
+    // calibration would let this transaction overwrite its own authority.
+    safeRelativePath(plan.targets.handover.path, "configured handover");
+    const selectedPaths = authorityPaths(physicalRoot(plan.root));
+    if ([selectedPaths.state, selectedPaths.calibration, plan.authority.prd.path, plan.authority.spec.path,
+      plan.authority.designInput.path].includes(plan.targets.handover.path)
+      || plan.targets.handover.path === ".git" || plan.targets.handover.path.startsWith(".git/")) {
+      fail("KICKOFF-PROMOTION-PLAN", "promotion handover target collides with a bound artifact");
+    }
   }
   const input = promotionInput({
     profile: plan.profile, featureId: plan.feature.id, planPath: plan.feature.planPath,
@@ -3773,7 +3886,12 @@ function validatePromotionPlan(plan) {
     ))) {
     fail("KICKOFF-PROMOTION-PLAN", "promotion action binding is invalid");
   }
-  return { input, stateBytes, historyBytes };
+  return {
+    input, stateBytes, historyBytes,
+    handoverBytes: plan.targets.handover === undefined
+      ? null
+      : Buffer.from(plan.targets.handover.content, "utf8"),
+  };
 }
 
 function buildKickoffPromotionPlan({
@@ -3827,6 +3945,12 @@ function buildKickoffPromotionPlan({
       targets: {
         state: { path: authorityPaths(observed.root).state, beforeSha256: entry.beforeStateSha256, afterSha256: observed.stateObservation.sha256, value: observed.state },
         history: { path: HISTORY_BASENAME, beforeSha256: sha256(expectedHistoryBytes(historyBefore)), afterSha256: observed.historyObservation.sha256, value: observed.history },
+        // Keyed off the recorded transaction, exactly like `cleanupBinding` beside
+        // it, and for the same reason: a promotion applied before the handover
+        // target existed recorded no handover, and reconstructing one for it would
+        // change its plan digest and make its own replay fail. Only a promotion
+        // that actually wrote a handover replays with one.
+        ...(entry.handover === undefined ? {} : { handover: replayHandoverTarget(entry, input, authority) }),
         ...(entry.cleanupBinding === undefined ? {} : { cleanupBinding: structuredClone(entry.cleanupBinding) }),
       },
       transactionSha256: entry.transactionSha256, onboardingScript,
@@ -3900,12 +4024,28 @@ function buildKickoffPromotionPlan({
       beforeSha256: kickoff.cleanupBinding.sha256,
       afterSha256: sha256(cleanupBindingAfterBytes),
     };
+  // The handover the promotion writes over the kickoff's. `null` before-digest is
+  // an absent file, which the apply path treats exactly as the kickoff's own
+  // handover target does. The content is a pure function of the plan's own inputs,
+  // so the replay branch above can reconstruct it byte for byte from the recorded
+  // transaction without storing prose in the history.
+  const handoverContentBytes = promotionHandoverContent({
+    featureId: input.featureId, prdPath: authority.prd.path, specPath: authority.spec.path,
+    designInputPath: authority.designInput.path, profile: input.profile,
+  });
+  const handoverTarget = {
+    path: observed.handoverPath,
+    beforeSha256: observed.handoverObservation.sha256,
+    afterSha256: sha256(Buffer.from(handoverContentBytes, "utf8")),
+    content: handoverContentBytes,
+  };
   const transaction = {
     schema: "pipeline.codex-onboarding-kickoff-promotion-transaction.v1",
     root: observed.root, repositoryCapability, profile: input.profile, feature: { id: input.featureId, planPath: input.planPath },
     kickoffTransactionSha256: kickoff.transactionSha256, beforeStateSha256, afterStateSha256,
     prdSha256: authority.prd.sha256, specPath: authority.spec.path, specSha256: authority.spec.sha256,
     designInputPath: authority.designInput.path, designInputSha256: authority.designInput.sha256,
+    handover: { path: handoverTarget.path, beforeSha256: handoverTarget.beforeSha256, afterSha256: handoverTarget.afterSha256 },
   };
   const transactionSha256 = canonicalSha256(transaction);
   const history = {
@@ -3917,6 +4057,7 @@ function buildKickoffPromotionPlan({
       prdSha256: authority.prd.sha256, specSha256: authority.spec.sha256,
       designInputPath: authority.designInput.path, designInputSha256: authority.designInput.sha256,
       beforeStateSha256, afterStateSha256,
+      handover: { path: handoverTarget.path, beforeSha256: handoverTarget.beforeSha256, afterSha256: handoverTarget.afterSha256 },
       ...(cleanupBindingTarget === null ? {} : { cleanupBinding: cleanupBindingTarget }),
     }],
   };
@@ -3933,6 +4074,7 @@ function buildKickoffPromotionPlan({
     targets: {
       state: { path: authorityPaths(observed.root).state, beforeSha256: beforeStateSha256, afterSha256: afterStateSha256, value: next },
       history: { path: HISTORY_BASENAME, beforeSha256: beforeHistorySha256, afterSha256: sha256(expectedHistoryBytes(history)), value: history },
+      handover: handoverTarget,
       ...(cleanupBindingTarget === null ? {} : { cleanupBinding: cleanupBindingTarget }),
     },
     transactionSha256, onboardingScript,
@@ -4470,10 +4612,14 @@ export function applyOnboardingKickoffPromotion({
   const paths = {
     state: absoluteProjectPath(plan.root, plan.targets.state.path, "Pipeline machine state"),
     history: join(privatePaths.directory, HISTORY_BASENAME),
+    ...(plan.targets.handover === undefined ? {} : {
+      handover: absoluteProjectPath(plan.root, plan.targets.handover.path, "configured handover"),
+    }),
     ...(plan.targets.cleanupBinding === undefined ? {} : {
       cleanupBinding: join(privatePaths.directory, SESSION_CLEANUP_BINDING_BASENAME),
     }),
   };
+  if (paths.handover !== undefined) assertPhysicalChain(plan.root, paths.handover);
   const token = `kickoff-promotion-${plan.planSha256.slice(0, 32)}`;
   const lockOptions = { nowMs: deps.nowMs ?? Date.now, lockStaleMs: deps.lockStaleMs ?? 30_000 };
   const stateLock = acquireLock(`${paths.state}.lock`, "pipeline.continuity-lock.v0", token, lockOptions);
@@ -4486,7 +4632,14 @@ export function applyOnboardingKickoffPromotion({
     const cleanupBinding = plan.targets.cleanupBinding === undefined
       ? { status: "exact" }
       : currentTarget(paths.cleanupBinding, plan.targets.cleanupBinding.afterSha256);
-    if (state.status === "exact" && history.status === "exact" && cleanupBinding.status === "exact") {
+    // A plan with no handover target behaves exactly as before: `{status:"exact"}`
+    // is the neutral element of every conjunction below, so the three-target
+    // algebra is unchanged for a promotion applied before this target existed.
+    const handover = plan.targets.handover === undefined
+      ? { status: "exact" }
+      : currentTarget(paths.handover, plan.targets.handover.afterSha256);
+    if (state.status === "exact" && history.status === "exact" && cleanupBinding.status === "exact"
+      && handover.status === "exact") {
       return promotionResult(plan, "replayed", false, deps.spawn ?? defaultGitSpawn);
     }
     const stateBefore = currentTarget(paths.state, plan.targets.state.beforeSha256);
@@ -4494,10 +4647,19 @@ export function applyOnboardingKickoffPromotion({
     const cleanupBindingBefore = plan.targets.cleanupBinding === undefined
       ? { status: "exact" }
       : currentTarget(paths.cleanupBinding, plan.targets.cleanupBinding.beforeSha256);
+    const handoverBefore = plan.targets.handover === undefined
+      ? { status: "exact" }
+      : currentTarget(paths.handover, plan.targets.handover.beforeSha256);
     const exactPreimage = stateBefore.status === "exact" && historyBefore.status === "exact"
-      && cleanupBindingBefore.status === "exact";
+      && cleanupBindingBefore.status === "exact" && handoverBefore.status === "exact";
+    // The handover joins the recoverable prefix on the same terms as the cleanup
+    // binding: either it already carries the postimage (this step completed before
+    // the crash) or it still carries the preimage (it did not). Anything else is a
+    // third party having written the file, which is drift and must not roll
+    // forward over it.
     const recoverPrefix = stateBefore.status === "exact" && history.status === "exact"
       && (cleanupBinding.status === "exact" || cleanupBindingBefore.status === "exact")
+      && (handover.status === "exact" || handoverBefore.status === "exact")
       && stateLock.recovered === true && privateLock.recovered === true;
     if (!exactPreimage && !recoverPrefix) {
       fail("KICKOFF-PROMOTION-CAS-DRIFT", "promotion target preimage drifted");
@@ -4541,6 +4703,24 @@ export function applyOnboardingKickoffPromotion({
       if (deps.crashAt === "promotion-cleanup-binding-published") {
         simulatedCrash = true;
         throw new SimulatedKickoffCrash("promotion-cleanup-binding-published");
+      }
+    }
+    // Before the State, deliberately. The State publication is the commit point of
+    // this transaction -- `promotionResult` reads back only after it, and
+    // `publishKickoffSupersession` runs only after that -- so a handover written
+    // ahead of it can never be the artifact that survives a promotion which did
+    // not complete. The reverse order would leave a crash between them showing a
+    // promoted State beside a handover still naming the kickoff, which is the
+    // exact state this target exists to prevent.
+    if (plan.targets.handover !== undefined && handoverBefore.status === "exact") {
+      mkdirSync(dirname(paths.handover), { recursive: true });
+      const handoverTemp = join(dirname(paths.handover), `.${basename(paths.handover)}.promotion-${suffix}.tmp`);
+      writeExclusiveSynced(handoverTemp, bytes.handoverBytes, 0o644);
+      renameSync(handoverTemp, paths.handover);
+      fsyncDirectory(dirname(paths.handover));
+      if (deps.crashAt === "promotion-handover-published") {
+        simulatedCrash = true;
+        throw new SimulatedKickoffCrash("promotion-handover-published");
       }
     }
     const stateTemp = join(dirname(paths.state), `.${basename(paths.state)}.promotion-${suffix}.tmp`);
