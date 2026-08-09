@@ -262,6 +262,20 @@ const DELTA = {
   // Independently re-run: 4/4 governance-replay-core-tests pass.
   'L-AC-07': ['implemented', 'WP-L'],
 
+  // WP-L-AC04 CLOSED 2026-08-09 (goldfish-deep, commit 1def755): a
+  // KIND_RECORD_CLASS lookup maps the 9 verified lifecycle kinds onto the
+  // four L-AC-04 record classes (gate/review -> human, recovery/
+  // reconciliation -> agent, verification/candidate-invalidation ->
+  // deterministic, dispatch/status/cancellation -> runner-observed); the
+  // renderer's kind cell now keys off it instead of defaulting to the
+  // shared "fact" style, and four new evidence-viewer.css rules give each
+  // class a genuinely distinct color, none reusing an existing status-
+  // severity color. New tests exercise all 9 kinds plus a same-view
+  // cross-class distinctness assertion. 8/8 governance-replay-view-tests
+  // pass (independently re-run). Semantic classes were already pinned; this
+  // closes the visual half the prior verdict named as the only gap.
+  'L-AC-04': ['implemented', 'WP-L-AC04'],
+
   // --- evidence/phx-wp-gate.txt (task PHX-WP-GATE, 2026-08-09, commit 92b21ed) ---
   // The third feature-package plan kind, `reconcile`, landed: the digest-only
   // no-drift invariant, PO-bound apply, manual-replacement refusal, and the
@@ -717,7 +731,7 @@ const POINTERS = {
   'L-AC-01': 'the closed lifecycle schema and validator are pinned; NO PRODUCER exists — no Pipeline path emits a lifecycle event',
   'L-AC-02': 'six of the eight #10 exchange identities are retained; queueRevision and a distinct correlationId are absent',
   'L-AC-03': 'lifecycle-governance-events-tests: registered namespace only, no credential-carrying namespace, no opaque digest',
-  'L-AC-04': 'semantic classes pinned; the VISUAL class remains confirmed absent (PHX-WP-L): the renderer has no origin field to key a visual marker off and gives every event kind the same CSS class -- a renderer change, not a missing test',
+  'L-AC-04': 'governance-replay-view-tests (PHX-WP-L-AC04): the 9 verified lifecycle kinds now render with one of four distinct value-record-<class> CSS classes (human/agent/deterministic/runner-observed) instead of the shared "fact" default, proven by per-class tests plus a cross-class distinctness assertion within one rendered view',
   'L-AC-05': 'lifecycle-governance-events-tests: candidate invalidation visible, duplicate sequences fail closed',
   'L-AC-06': 'replay rejects extra event data instead of exposing raw lifecycle bodies',
   'L-AC-07': 'governance-replay-core-tests: serial/parallel/retry/cancellation/recovery fixtures replay to identical bounded output on repeat, and a malicious duplicate-sequence fixture is rejected deterministically (PHX-WP-L, break-proofed twice)',

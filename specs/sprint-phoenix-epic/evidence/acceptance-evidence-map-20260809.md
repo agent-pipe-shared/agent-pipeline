@@ -42,8 +42,8 @@ reproduced here rather than referenced.
 
 ## The direct answer
 
-**Phoenix cannot claim complete.** 104 of 157 criteria carry a named assertion in a
-gate-registered suite; 53 do not. EPIC-AC-05 forbids a completion claim while any
+**Phoenix cannot claim complete.** 105 of 157 criteria carry a named assertion in a
+gate-registered suite; 52 do not. EPIC-AC-05 forbids a completion claim while any
 criterion remains unimplemented or unverified, and it currently bites. No issue is closeable on
 its own live acceptance bullets.
 
@@ -61,8 +61,8 @@ A bullet is therefore BLOCKED unless every criterion mapped to it is `implemente
 
 | verdict | count |
 |---|---|
-| implemented | 104 |
-| partial | 38 |
+| implemented | 105 |
+| partial | 37 |
 | designed-only | 1 |
 | not-started | 13 |
 | constraint | 1 |
@@ -153,14 +153,14 @@ clause that is not pinned or not built.
 | A-AC-15 | implemented | WP-DOC | docs/agent-decision-journal.md (PHX-WP-DOC-1 + PHX-WP-DOC-3): all eight named parts present -- taxonomy/materiality/trust/retention/recovery/operator docs, plus Schema (grounded in agent-decision-event.schema.json) and Privacy threat model (grounded in the R-AC-05 test and assertPortablePayload) closing the two the original briefing accidentally omitted |
 | A-AC-16 | implemented | C | agent-decision-journal-tests: a journal event cannot present as approval |
 
-### L — Lifecycle stream and replay (#17) (4/8 implemented)
+### L — Lifecycle stream and replay (#17) (5/8 implemented)
 
 | ID | verdict | src | evidence / named gap |
 |---|---|---|---|
 | L-AC-01 | partial | C | the closed lifecycle schema and validator are pinned; NO PRODUCER exists — no Pipeline path emits a lifecycle event |
 | L-AC-02 | partial | J | six of the eight #10 exchange identities are retained; queueRevision and a distinct correlationId are absent |
 | L-AC-03 | implemented | C | lifecycle-governance-events-tests: registered namespace only, no credential-carrying namespace, no opaque digest |
-| L-AC-04 | partial | C | semantic classes pinned; the VISUAL class remains confirmed absent (PHX-WP-L): the renderer has no origin field to key a visual marker off and gives every event kind the same CSS class -- a renderer change, not a missing test |
+| L-AC-04 | implemented | WP-L-AC04 | governance-replay-view-tests (PHX-WP-L-AC04): the 9 verified lifecycle kinds now render with one of four distinct value-record-<class> CSS classes (human/agent/deterministic/runner-observed) instead of the shared "fact" default, proven by per-class tests plus a cross-class distinctness assertion within one rendered view |
 | L-AC-05 | implemented | C | lifecycle-governance-events-tests: candidate invalidation visible, duplicate sequences fail closed |
 | L-AC-06 | implemented | C | replay rejects extra event data instead of exposing raw lifecycle bodies |
 | L-AC-07 | implemented | WP-L | governance-replay-core-tests: serial/parallel/retry/cancellation/recovery fixtures replay to identical bounded output on repeat, and a malicious duplicate-sequence fixture is rejected deterministically (PHX-WP-L, break-proofed twice) |
@@ -319,12 +319,11 @@ clause that is not pinned or not built.
 
 ### #17 — Define a sanitized multi-agent event model and local replay view
 
-4 of 6 live acceptance bullets fully carried; **2 blocked**.
+5 of 6 live acceptance bullets fully carried; **1 blocked**.
 
 | # | live acceptance bullet | blocking criteria (verdict) |
 |---|---|---|
-| 1 | Replay is non-authoritative and links canonical evidence | L-AC-04 (partial) |
-| 2 | Design is driven by user/audit needs, not competitor parity | L-AC-08 (partial) |
+| 1 | Design is driven by user/audit needs, not competitor parity | L-AC-08 (partial) |
 
 ### #23 — Define external work-system and knowledge-base traceability adapters
 
@@ -359,7 +358,7 @@ No blocking criterion. Closeable subject to the epic-level gates (EPIC-AC-01..06
 
 ### #31 — Add a privacy-preserving agent decision and assumption journal
 
-9 of 17 live acceptance bullets fully carried; **8 blocked**.
+10 of 17 live acceptance bullets fully carried; **7 blocked**.
 
 | # | live acceptance bullet | blocking criteria (verdict) |
 |---|---|---|
@@ -368,9 +367,8 @@ No blocking criterion. Closeable subject to the epic-level gates (EPIC-AC-01..06
 | 3 | Runner/model/profile/role/capability carries assurance | A-AC-05 (partial) |
 | 4 | Mandatory material events are never sampled/discarded silently | A-AC-07 (not-started) |
 | 5 | Offline verification detects mutation/gaps/forks/path/repository errors | K-AC-05 (partial) |
-| 6 | #17 replays all origins without authority collapse | L-AC-04 (partial) |
-| 7 | #5 shows uncertainty/status/decision with evidence | V-AC-02 (partial) |
-| 8 | Complete assumption/selection/failure/privacy fixture set | A-AC-14 (partial) |
+| 6 | #5 shows uncertainty/status/decision with evidence | V-AC-02 (partial) |
+| 7 | Complete assumption/selection/failure/privacy fixture set | A-AC-14 (partial) |
 
 ### #32 — Add provider-neutral governance event export for SIEM and audit platforms
 
@@ -394,18 +392,18 @@ No blocking criterion. Closeable subject to the epic-level gates (EPIC-AC-01..06
 |---|---|---|---|---|
 | #5 | 6 | 5 | 1 | **no** |
 | #9 | 11 | 3 | 8 | **no** |
-| #17 | 6 | 4 | 2 | **no** |
+| #17 | 6 | 5 | 1 | **no** |
 | #23 | 16 | 16 | 0 | yes |
 | #24 | 12 | 9 | 3 | **no** |
 | #30 | 17 | 9 | 8 | **no** |
-| #31 | 17 | 9 | 8 | **no** |
+| #31 | 17 | 10 | 7 | **no** |
 | #32 | 20 | 11 | 9 | **no** |
 
 Issues closeable on their own live acceptance bullets: **1 of 8**.
 
 ## The blocking set, ranked
 
-29 distinct criteria block at least one live acceptance bullet.
+28 distinct criteria block at least one live acceptance bullet.
 
 | criterion | verdict | live bullets blocked |
 |---|---|---|
@@ -414,7 +412,6 @@ Issues closeable on their own live acceptance bullets: **1 of 8**.
 | P-AC-06 | partial | 3 |
 | H-AC-12 | partial | 2 |
 | K-AC-10 | not-started | 2 |
-| L-AC-04 | partial | 2 |
 | A-AC-01 | partial | 1 |
 | A-AC-03 | not-started | 1 |
 | A-AC-05 | partial | 1 |

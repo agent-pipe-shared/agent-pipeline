@@ -8,7 +8,7 @@ Parent specification: [../spec.md](../spec.md) · Measurement: [../evidence/acce
 
 ## What this design is for
 
-The measurement established that 53 of 157 acceptance criteria are not
+The measurement established that 52 of 157 acceptance criteria are not
 `implemented` and that no issue is closeable. It did not say how any of them closes. This
 document does, and it is generated from the same verdict data as the measurement, so the two
 cannot drift apart.
@@ -22,9 +22,9 @@ one list is what has made the epic look larger and more uniform than it is.
 | A — assertion missing | 2 | one named test case in an already-registered, unprotected suite |
 | D — documentation missing | 1 | one document section set; no code, no gate |
 | S — seam missing | 1 | a connector between two packages that already work |
-| B — capability missing | 43 | real implementation plus its tests |
+| B — capability missing | 42 | real implementation plus its tests |
 | P — not code | 6 | a human gate, a sanctioned authority revision, or a proved impossibility |
-| **total** | **53** | |
+| **total** | **52** | |
 
 **The distribution is the finding.** The largest class by a wide margin is Class A: criteria
 whose behaviour is built, shipped and green, and which fail only because no assertion names the
@@ -134,7 +134,7 @@ is by module family, which makes the disjointness checkable rather than asserted
 | WP-C | 4 | plugins/pipeline-core/lib/change-control*.mjs |
 | WP-E | 7 | plugins/pipeline-core/lib/governance-export-*.mjs |
 | WP-A | 7 | plugins/pipeline-core/lib/agent-decision-journal*.mjs, governance/schemas/agent-decision-event.schema.json |
-| WP-L | 3 | plugins/pipeline-core/lib/lifecycle-governance-events*.mjs, plugins/pipeline-core/lib/governance-replay*.mjs |
+| WP-L | 2 | plugins/pipeline-core/lib/lifecycle-governance-events*.mjs, plugins/pipeline-core/lib/governance-replay*.mjs |
 | WP-H | 1 | plugins/pipeline-core/lib/human-governance-ledger*.mjs, plugins/pipeline-core/lib/governance-authority-resolver*.mjs, plugins/pipeline-core/lib/external-push-ledger*.mjs |
 | WP-R | 7 | plugins/pipeline-core/lib/external-command-offer*.mjs |
 | WP-PX0 | 4 | plugins/pipeline-core/lib/ruleset-source*.mjs, plugins/pipeline-core/scripts/ruleset-freshness-host.mjs, plugins/pipeline-core/lib/continuity-state.mjs |
@@ -191,7 +191,7 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 |---|---|---|---|
 | E-AC-20 | not-started | WP-E | NO CARRIER: audit-bundle carries nothing from the export package, and the export modules never reference the bundle |
 
-### Class B — an absent capability (43)
+### Class B — an absent capability (42)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
@@ -219,7 +219,6 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 | K-AC-10 | not-started | WP-K | NO CARRIER, confirmed by repo-wide search (PHX-WP-K): queryPortableGovernanceStream, the governance-event CLI and governance-replay.mjs all accept exactly one streamId; no function anywhere queries more than one stream, so per-record provenance preservation across streams has no code to test |
 | L-AC-01 | partial | WP-L | the closed lifecycle schema and validator are pinned; NO PRODUCER exists — no Pipeline path emits a lifecycle event |
 | L-AC-02 | partial | WP-L | six of the eight #10 exchange identities are retained; queueRevision and a distinct correlationId are absent |
-| L-AC-04 | partial | WP-L | semantic classes pinned; the VISUAL class remains confirmed absent (PHX-WP-L): the renderer has no origin field to key a visual marker off and gives every event kind the same CSS class -- a renderer change, not a missing test |
 | P-AC-01 | partial | WP-P | CONFIRMED ABSENT (PHX-WP-P): schema/compatibility/merge pinned; provenance, dependency and signature-policy validation have no corresponding field anywhere in the pack schema, no test was written around the gap |
 | P-AC-03 | partial | WP-P | CONFIRMED ABSENT (PHX-WP-P): planOrganizationPolicyActivation pinned; newly-required artifacts, external effects and backfill range have no corresponding field anywhere in the activation-plan schema, no test was written around the gap |
 | P-AC-06 | partial | WP-P | audit-bundle-core-tests: missing, misplaced, illegally-mutable, stale and truncated each pinned (PHX-WP-P, break-proofed). legacy and orphaned remain unpinned: the legacy classification exists (feature-package-topology.mjs:78) but no rejection path consults it, and no code checks a package file is referenced by an artifact |
