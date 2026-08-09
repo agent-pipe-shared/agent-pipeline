@@ -1887,7 +1887,39 @@ The dispatch substituted two real sibling suites under an explicit label rather 
 skipping the check, and it removed a QG-06 deferred decision whose promise its own
 work had made obsolete instead of leaving a stale expiry standing.
 
-### DECISIONS WAITING FOR THE PO — read this block first (2026-08-09)
+### SUPERSEDED — the block below listed five decisions; three remain. Read this first instead.
+
+The block that follows was written early in the night and is **no longer accurate**. Four
+of the five items in it have since dissolved, been repaired, or been reframed. Leaving a
+stale decision list at the top of the handover is exactly the defect I spent the night
+finding elsewhere — a record that still reads as authoritative after it stopped being
+true — so it is corrected here rather than quietly left.
+
+**The three that actually remain, in the order I recommend:**
+
+1. **The 22 commits with forbidden trailers.** GIT-03 says this must not enter public
+   history; the hard rules say never rewrite history. Both cannot hold for the same
+   commits: accept and push, authorize a rewrite as an explicit one-off, or keep the
+   branch local. **This is the only one with a closing window** — it stops being decidable
+   the moment the branch is public. Recurrence is already closed: the guard refuses these
+   trailers with no override, proven by probe.
+2. **The pin re-baseline.** Measurement complete (six of nine differ), three independent
+   Critic rounds behind it, every finding against the pinned files repaired. I stood it
+   down because I had inferred consent from an answer that only authorized the review. It
+   needs a yes or no, and it is one transcription dispatch either way.
+3. **The two ADR contradictions**, filed as
+   `backlog/items/2026-08-09-accepted-adrs-contradict-the-implementation-and-nothing-detects-it.md`
+   with owner and a 2026-09-08 due date. Not urgent; already durable.
+
+**What happened to the other two:** the freshness "retirement collision" (old item 4) and
+the RED1 "contract contradiction" (old item 5) **both dissolved on inspection** — each was
+a missing implementation that I had described as a conflict of rules. Old items 2 and 3,
+the Critic-surface findings, are repaired.
+
+**Nothing else is waiting on you.** Both merge audits are closed at 9/9 and 6/6, and every
+finding is either repaired or filed with an owner.
+
+### DECISIONS WAITING FOR THE PO — SUPERSEDED, see the block above (2026-08-09, early)
 
 Five, ordered by how much they cost to get wrong. Each is stated with what I
 recommend and why, so none of them needs a conversation to resolve.
