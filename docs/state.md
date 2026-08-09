@@ -2197,6 +2197,50 @@ separately since WP-H finished first.
 Class A work in that package, WP-K's `K-AC-10` reclassified to Class B already. WP-PX0 is the
 largest remaining Class A package not yet touched this session.
 
+### WP-PX0 IS GATE-BLOCKED, SEVEN CLASSIFICATIONS CORRECTED, CLASS D CLOSES FOUR: 91 OF 157 (2026-08-09)
+
+**WP-PX0 turned out not to be a plain dispatch target.** Before briefing it, checked where its
+six remaining criteria's assertions would actually land — all six (`PX0-AC-01/03/04/05/06/07`)
+resolve to `harness/scripts/pipeline-state.test.mjs`'s `runAuthorityRevisionTests` section (the
+AR02–AR07 cases), the same TP-5-protected file P-AC-08's 26 cases were just registered into.
+Closing any of them needs another signed maintenance window, not an ordinary Goldfish dispatch —
+flagged in the evidence map (`a7471a0`) rather than casually opening a second PO ceremony without
+a clearer signal that it's warranted, especially with a session restart pending.
+
+**Seven Class A/B misclassifications corrected** (`bd8d73e`), found while scoping the next pair:
+P-AC-01, P-AC-03, K-AC-05, P-AC-06, P-AC-11, V-AC-02, and V-AC-06 all carried Class A ("the
+assertion is missing") in the closure design while their OWN pointer text — written by the
+dispatches that produced them — already stated confirmed capability absence, the exact bar this
+session has used everywhere else to reclassify. Pure bookkeeping: no verdict changed, totals
+stayed 87.
+
+**Moved to Class D instead (no gate): `PHX-WP-DOC-1`** (`f9e300c`, A-AC-15/C-AC-13/H-AC-14) **and
+`PHX-WP-DOC-2`** (`3f09bed`, E-AC-21/P-AC-13/X-AC-15) each wrote every documentation section their
+target criteria enumerate by name, grounded in file:line citations, naming known capability gaps
+inline rather than papering over them (the export loss-declaration gap, the external-reference-
+adapter recovery gap, the absent pack-schema migration mechanism). **The two dispatches collided**
+on the shared, non-worktree-isolated checkout — `WP-DOC-1`'s first commit briefly absorbed
+`WP-DOC-2`'s four staged files, `WP-DOC-1` caught it and un-bundled via a local `git reset --soft`
+on its own just-made commit, and `WP-DOC-2`'s content was committed separately once reconciled
+by hand. **This is the second live occurrence of `pipeline.parallel-goldfish-dispatches-race-on-
+shared-checkout`** (first: 2026-08-07); updated that item rather than filing a duplicate (`e3967ba`)
+— this time the self-correcting reset guessed right, but it is the exact unverified-reset action
+the item's Proposal #4 already says to forbid, now with two data points instead of one.
+
+**Four of the six Class D criteria close clean; two stay honestly partial.** C-AC-13, E-AC-21,
+P-AC-13, X-AC-15 move to `implemented`. A-AC-15 stays partial for a reason worth naming plainly:
+**my own briefing dropped two of the eight required sections** — it quoted A-AC-15's full clause
+correctly but its own instruction list only named six of the eight parts ("schema" and "privacy
+threat model" never got asked for), caught by checking the written headers against the clause
+after the dispatch reported success, not by the dispatch itself. H-AC-14 stays partial because its
+claimed pre-existing "threat model" coverage turned out to be one scattered sentence in
+`docs/phoenix-governance-threat-model.md:75`, not confirmed as a dedicated section — left open
+rather than accepted on the baseline note's word (`c48f327`).
+
+87 implemented becomes **91 of 157**. Independently verified throughout: every new section's
+headers checked against its clause's named enumeration one by one, diffs additive-only, no
+production `.mjs` file touched, sanitization clean.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
