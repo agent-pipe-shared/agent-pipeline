@@ -3583,6 +3583,47 @@ checkpoint. Resumed via `SendMessage`, told explicitly not to redo F1-F3.
 **Live now:** O-1/O-2-design-rework4 (resumed), WP-A-AC08, WP-E-AC10. K-AC-05 parked. Handover
 fully current through this checkpoint; no `/compact` reliance per the PO's standing instruction.
 
+### O-1/O-2-DESIGN-REWORK4 VERIFIED (`ec999395`) — ROUND-5 (FINAL) CRITIC DISPATCHED; E-AC-10 CLOSED; A-AC-08 STOPPED-THEN-REDISPATCHED
+
+WP-O1O2-DESIGN-rework4 landed all six round-4 findings; independently verified each against source
+rather than trusting the report: F1 (§15.3's inventory row now matches the payload-flag CLI §15.1.2
+actually specifies), F2 (the topology claim now correctly states `<git-common-dir>` resolves to
+`.git`, inside the project root, in this repo's standard checkout — read the corrected paragraph
+myself), F3 (§2's D-2 bullet now carries an explicit "Superseded by §15.2" annotation, read
+directly), F5 (`topologyFor` replaced with `discoverRepository`, confirmed that function genuinely
+exists at `worktree-lifecycle.mjs:235` exactly as newly cited), F6 (the checkpoint/completeness
+disclosure is present at §15.2.4 as claimed). `check-doc-contracts.mjs` clean. Dispatched the
+fifth and — per the PO's explicit authorization — truly final Critic round (full, five-commit
+enumerated diff `01bafdf,3440e5f,d7bf77b,d0ce4887,ec999395`, zero reference to prior rounds,
+Opus-routed via the tool parameter).
+
+WP-E-AC10 landed clean: `evaluateGovernanceExportBoundaryGate` in `governance-export-outbox.mjs`,
+a pure read-only gate reusing the outbox's existing acknowledged-prefix cursor to name the exact
+unacknowledged range (pending + quarantined, neither silently dropped) at one named boundary, with
+a structured per-status recovery description. Verified independently (12/12 tests, diff read):
+the quarantined-entry recovery path is honestly disclosed as a residual (no unquarantine mechanism
+exists anywhere in this module or its siblings) rather than invented. Booked `implemented`
+(`19f1e9ed`).
+
+WP-A-AC08's first attempt hit a genuine, well-reasoned stop condition: whether the EL-01 "stage-0
+fast path" exemption can be auto-detected from commit metadata alone is ambiguous — the criterion
+mixes mechanically-checkable caps (file/line counts) with semantic judgment (architecture/schema/
+public-API/security-surface change, an undefined "risk flag") no heuristic can verify, and the
+existing close-block mechanism treats this as human judgment by design. This is exactly the kind
+of finding the stop-condition mechanism exists to surface — not a failure. Made the design call
+myself (Elephant-level, not a PO gate: this is a new auxiliary tool's own internal conservatism,
+not a canon/trailer-format change): build a documented, deliberately conservative heuristic — a
+"stage-0 fast path" phrase match ANDed with the two mechanically-checkable EL-01 caps, with an
+explicit "WHAT THIS CHECK CANNOT DO" section naming the blind spot, following
+`check-doc-reconciliation.mjs`'s own precedent for disclosing known limitations rather than either
+inventing a new required trailer format (a real canon change, out of a Goldfish's authority to
+originate) or making the checker so conservative it flags every legitimate stage-0 commit.
+Redispatched with this decision stated as already-resolved, not re-open for the Goldfish to
+re-litigate.
+
+**Live now:** O-1/O-2-design round-5 (final) Critic, WP-A-AC08 (redispatched). K-AC-05 parked.
+Handover fully current through this checkpoint.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
