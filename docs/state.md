@@ -1887,6 +1887,69 @@ The dispatch substituted two real sibling suites under an explicit label rather 
 skipping the check, and it removed a QG-06 deferred decision whose promise its own
 work had made obsolete instead of leaving a stale expiry standing.
 
+### CRITIC ON `a69c288..7161102`: FAIL — and the defect is in the check built to prevent it
+
+Independent review of the sixteen commits, references only, no dispatch records handed over
+(that file format embeds the implementor's completion report and would have been CR-01
+contamination). The Critic reported no briefing violation. **Verdict FAIL on F1.**
+
+**F1 (major, being repaired as `PHX-RECFIX`).** `check-doc-reconciliation.mjs` derives only
+the changed-path set from git. It reads **the record and every ADR body from the working
+tree** — `readRaw(join(root, RECORD_REL))` and `listAdrFiles(root)`. Two consequences, each
+reproduced against a real temporary repository running the shipped CLI unmodified:
+
+1. A record that exists in **no commit** satisfies the check, while the candidate commit
+   still carries the old bytes.
+2. A `Governs:` line deleted in the **working tree only** silences that ADR for a fixed
+   range, while the line is still in the candidate.
+
+So the check is candidate-bound on the accusation side and unbound on the exoneration side.
+Its own header claims the opposite under "STALE-PROOF BY CONSTRUCTION", and Spec §5.6 says
+uncommitted inputs invalidate a claim. **The failure mode the artifact exists to prevent is
+present in the artifact.** Worse for the record: my own sequence tonight ran straight
+through the hole — I saw exit 0 from a record that was not yet committed, and only committed
+it afterwards by habit. The end state is correct by luck, not by control. The existing 19
+cases could not catch it because every fixture commits its record first.
+
+**F2 (minor, same repair).** `amended in <commit>` captures a hex id and discards it. A
+record may cite a commit that never existed and the check reports all reconciled. The
+QG-05 blind-spot text scopes its caveat only to the other line shape.
+
+**F3 (major, PO disposition — not mine to resolve).** Five files land outside the Epic's
+declared file contract: both checks, both suites, and `docs/doc-reconciliation.md`. Spec §7
+requires the Elephant to update the Spec **before dispatch** for any implementation file
+outside the inventory, and EPIC-AC-03 requires the Spec updated and the affected approval
+renewed before merge. I did not do that. Either this is Phoenix work and the Spec needs the
+reviewed rebind, or it is not Phoenix work and gate-adjacent code shipped under no spec. The
+commits self-identify as Phoenix through their `Dispatch:` trailers.
+
+**F4 (minor, corrected in this commit).** The gate paragraph above claimed the run covered
+"both new checks with their 12 and 19 cases". It did not; both are unregistered and parked.
+Corrected in place with the limit stated next to the claim.
+
+**F5 (minor, open).** The reconciliation obligation was added to `templates/spec.md` as
+narrative, but the very next bullet names `harness/definition-of-done.md` §2 as the
+canonical checklist, and that checklist has no such item. The tickable list omits the
+obligation.
+
+**What the Critic examined and deliberately cleared**, which matters as much as what it
+found: it recomputed all nine protected preimage digests itself (9/9), ran both suites, and
+went looking specifically for a decorative check — *"This is not decoration; I looked for
+that specifically and did not find it."* It confirmed the exclusion table's QG-06 shape,
+every `feat`/`fix` commit's `Dispatch:` trailer, zero forbidden trailers in the range, and
+that the `Governs:` globs all resolve to tracked files.
+
+**What it did not reach, in its own words**, so the gap is visible rather than implied by
+silence: the backlog ledger and projections, `governance/observation-doc-governance.json`,
+the ADR prose amendments in `88a7133`, the topology backlog item's content, and the
+registration checker's suites. It also verified only the sixteen-commit range, not the
+99-commit trailer claim.
+
+**One unverified observation it flagged and did not build a repro for**, worth more than
+some of the findings: renaming an ADR changes paths under `docs/adr/`, which **no `Governs:`
+glob covers** — so the reconciliation layer implicates nothing when an ADR is renumbered,
+which is the exact event class that motivated it.
+
 ### GATE GREEN AT 368/368 ON `1dd95ad` — the run ends here, at the signature
 
 **Full verify: exit 0, 368 suites, candidate `1dd95ad`, tree `e6b838cd`, `binding: "exact"`,
@@ -1906,9 +1969,17 @@ clean candidate binding. Anyone who reaches for the repo-root copy will lose ten
 rediscovering this.
 
 **What the run covers.** Everything from `88a7133` onward: the ADR renumber and the two
-record corrections, the collision item's closure and its two successor items, both new
-checks with their 12 and 19 cases, the five `Governs:` declarations, the two call sites, and
-the first reconciliation record.
+record corrections, the collision item's closure and its two successor items, the five
+`Governs:` declarations, the two call sites, and the first reconciliation record.
+
+**What it does NOT cover, corrected after a Critic caught the original wording (F4).** This
+paragraph first read *"both new checks with their 12 and 19 cases"*, which invites the
+reading that the 368-suite gate executed them. **It did not.** Neither
+`check-adr-consistency.test.mjs` nor `check-doc-reconciliation.test.mjs` is registered in
+`verify.mjs`; both were parked in `EXCLUSIONS` in this same range, and both pass only when
+someone runs them by hand. The exclusion entries say so honestly, but they live in a
+different file from this claim, and this file is the canonical handover — so the limit
+belongs next to the claim, which is what QG-05 asks for.
 
 **Where this stops, and why it is not an unfinished job.** The next step is layer 3 of
 `docs/push-release-flow.md`: the detached Ed25519 signature over the candidate, with a
