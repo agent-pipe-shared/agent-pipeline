@@ -4051,6 +4051,40 @@ this time, not just retrospectively.
 
 **Live now:** WP-PX0-AC06.
 
+### WP-PX0-AC06 BLOCKED BY A REAL GUARD — STASHED, PARKED, NOT BYPASSED
+
+WP-PX0-AC06's production change (the `recovered-preimage` outcome in `runAuthorityRevisionRecoverCommand`)
+landed clean and was verified against the FULL `pipeline-state.test.mjs` suite, both before and
+after: 451/451 both times, zero regression. But the dispatch could not add its required new test:
+editing `harness/scripts/pipeline-state.test.mjs` hit `guard-testpath.mjs`'s TP-5 rule, which
+requires an external Ed25519-signed human override (this repo's `gates.push_approval: signature`
+mode) for this specific protected test path — no in-session self-clearance exists. Correctly did
+NOT attempt a workaround ("that would be guard evasion, forbidden regardless of technical
+feasibility") and correctly did NOT commit the untested production change ("bundling a commit now
+would misrepresent the deliverable as complete").
+
+Verified this myself: `git status` showed exactly one unexpected dirty file
+(`plugins/pipeline-core/scripts/pipeline-state.mjs`) beyond the standing three config files; read
+the diff, confirmed it matches the report exactly — a genuinely narrow, well-scoped, additive
+change (one optional `--target` flag, byte-identical default behavior, the new path skips the
+postimage replay and retires the journal in place). Rather than leave it sitting as unexpected dirty
+state (risking a shared-working-tree race with a future dispatch, the same class of incident that
+hit `WP-R-AC10`/`WP-C-AC12` earlier this session) or discard verified-safe work outright, **stashed**
+it: `git stash push -m "WP-PX0-AC06: recovered-preimage outcome, blocked on TP-5 test-file guard
+pending PO authorization" -- plugins/pipeline-core/scripts/pipeline-state.mjs` — preserved,
+reversible, not silently deleted, working tree back to exactly the standing three dirty files.
+
+**This is a genuine, hard PO gate — parked, not pushed on.** To unblock: either run the guard's
+human-override signature flow for the specific edit to `pipeline-state.test.mjs` (the dispatch's
+report captured the exact `request-sha256`: `7df670f23b2d0c95cef25b0e4bb578e757da51fc5f8aeb0113d08b03f0707ebf`
+— but that hash is bound to the exact blocked edit content, so it should be re-derived fresh rather
+than reused blind), or arm a Guard Maintenance Window (ADR-0058) covering TP-5, then re-dispatch to
+pop the stash and add the missing test. PX0-AC-06 stays `not-started` in the evidence map — nothing
+was booked, since nothing is actually closed yet.
+
+**Live now: none.** Third genuinely PO-gated item found this stretch (after O-1/O-2, K-AC-05) —
+all three now clearly documented, none bypassed.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
