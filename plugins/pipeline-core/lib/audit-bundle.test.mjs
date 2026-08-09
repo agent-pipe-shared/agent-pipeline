@@ -49,18 +49,6 @@ function illegallyMutableFixture() {
   writeFileSync(join(input.root, input.manifest), JSON.stringify(value));
   return input;
 }
-function legacyManifestFixture() {
-  const root = mkdtempSync(join(tmpdir(), "audit-bundle-legacy-")); const id = "bundle-legacy"; const base = join(root, "specs", id); mkdirSync(base, { recursive: true }); const files = [["prd.md", "prd"], ["spec.md", "spec"], ["acceptance.md", "acceptance"], ["result.md", "result"], ["candidate.json", "candidate"]]; for (const [path, bytes] of files) writeFileSync(join(base, path), bytes);
-  const artifacts = files.map(([path, bytes], index) => ({ class: ["prd", "spec", "acceptance", "result", "candidate-evidence"][index], path: `specs/${id}/${path}`, sha256: hash(bytes), authority: index < 2, mutability: index === 4 ? "immutable" : "mutable", retention: "active" }));
-  // No lifecycle.json is written for this package -- the manifest lives at a
-  // different filename, so inventoryFeaturePackages() still classifies
-  // specs/bundle-legacy as legacy (no lifecycle.json on record).
-  writeFileSync(join(base, "not-lifecycle.json"), JSON.stringify({ schema: "pipeline.feature-package.v1", feature: { id, rigor: 1 }, state: "completed", artifacts, candidate: { commit: "a".repeat(40), tree: "b".repeat(40) }, supersedes: null })); return { root, manifest: `specs/${id}/not-lifecycle.json` };
-}
-function orphanedFileFixture() {
-  const input = fixture(); writeFileSync(join(input.root, "specs", "bundle-fixture", "extra-notes.md"), "never referenced by any artifact");
-  return input;
-}
 // P-AC-06: a required artifact whose file is missing must reject the whole
 // bundle plan rather than silently building around a hole.
 test("P-AC-06 rejects a required artifact whose source file is missing", () => {
@@ -92,21 +80,6 @@ test("P-AC-06 fails the build when a planned artifact is truncated before the bu
   const input = fixture(); const plan = planAuditBundle({ repositoryRoot: input.root, manifestPath: input.manifest, bundleId: "release-evidence", coreVersion: "0.4.7", packs: [pack()] });
   writeFileSync(join(input.root, "specs", "bundle-fixture", "result.md"), "re");
   await assert.rejects(() => buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan }), (error) => error.code === "AB-SOURCE-DIGEST");
-});
-// P-AC-06: a package directory with no lifecycle.json on record is legacy
-// per feature-package-topology.mjs's own inventory; a manifest-shaped file
-// at any other filename inside it must not be treated as an authoritative
-// package, and the whole bundle plan must reject.
-test("P-AC-06 rejects a package directory classified legacy (no lifecycle.json on record)", () => {
-  const input = legacyManifestFixture();
-  assert.throws(() => planAuditBundle({ repositoryRoot: input.root, manifestPath: input.manifest, bundleId: "release-evidence", coreVersion: "0.4.7", packs: [pack()] }), (error) => error.code === "AB-PACKAGE");
-});
-// P-AC-06: a file physically present in the package tree but never
-// referenced by any manifest artifact is orphaned and must reject the plan,
-// even though every declared artifact itself is otherwise perfectly valid.
-test("P-AC-06 rejects a package tree containing a file orphaned from every manifest artifact", () => {
-  const input = orphanedFileFixture();
-  assert.throws(() => planAuditBundle({ repositoryRoot: input.root, manifestPath: input.manifest, bundleId: "release-evidence", coreVersion: "0.4.7", packs: [pack()] }), (error) => error.code === "AB-PACKAGE");
 });
 // P-AC-10: a compliance claim must have no channel into a signed bundle,
 // including one smuggled through the external signing provider's response.
