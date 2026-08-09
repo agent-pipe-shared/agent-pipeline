@@ -117,6 +117,7 @@
           "docs/marketplace-supply-chain-threat-model.md",
           "docs/next-session-setup-prompt.md",
           "docs/nova-execution-plane-threat-model.md",
+          "docs/pending-verify-registrations.md",
           "docs/po-approval-proof-contract.md",
           "docs/po-human-approval.md",
           "docs/push-release-flow.md",
@@ -226,7 +227,8 @@
         "lifecycle": "review-candidate",
         "paths": [
           "docs/codex-isolated-critic-foundation.md",
-          "docs/known-issues.md"
+          "docs/known-issues.md",
+          "docs/pending-protected-suite-edits/guard-gate-strength-gst33-36.mjs"
         ]
       },
       {
