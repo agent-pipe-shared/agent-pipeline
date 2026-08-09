@@ -7,6 +7,7 @@
 | --- | --- | --- | --- | --- | --- |
 | pipeline.a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.absent-runner-flag-silently-defaults-to-codex | open | defect | pipeline | 2026-08-07 | — |
+| pipeline.accepted-adrs-drift-from-implementation-undetected | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.adr-0047-numbering-collision | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.adr-0051-follow-up-gaps-untracked | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.afk-assumption-mode | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -130,6 +131,6 @@
 
 ## Counts
 
-- open: 73
+- open: 74
 - in_progress: 26
 - closed: 23
