@@ -3889,6 +3889,47 @@ regression.
 
 **Live now:** WP-H-AC12. Handover fully current through this checkpoint.
 
+### H-AC-12 NARROWED; A SEPARATE REGRESSION FOUND (FROM EARLIER A-AC-07) AND FIXED
+
+WP-H-AC12 landed (`20602ae5`) — a genuinely well-designed shared primitive
+(`decision-reference-dual-evaluation.mjs`, thoroughly documented, reuses the existing
+`pipeline.human-decision-reference.v1` shape rather than inventing a new one), wired into
+`guard-devplan.mjs`'s legacy/v2/v4 plan-approval path (previously a bare skip with zero second
+evaluation) and `change-control.mjs`'s `pipelineAuthority` gate (optional, byte-for-byte unchanged
+when absent). Traced the actual behavioral change myself: for every REAL approval today, no writer
+populates the new optional reference fields yet, so `dualEvaluateDecisionReference` always hits its
+`reference === undefined` branch and returns the old verdict unchanged — genuinely non-breaking
+for current real usage, only forward-compatible. Verified independently across ALL FOUR consumer
+test files this time (not just the two the dispatch directly touched, applying the broader-suite
+policy from two checkpoints ago): `guard-devplan.test.mjs` 40/40, `change-control.test.mjs` 33/33,
+`decision-reference-dual-evaluation.test.mjs` 10/10, and the CLI-level
+`scripts/change-control.test.mjs` 3/3 (a consumer the dispatch itself never directly touched or
+ran). `guard-push.mjs`/`pipeline-state.mjs` confirmed absent from the diff. Narrowed
+`partial→partial` (2 of 5 named subsystems; `guard-push`, `pipeline-state`, release/deploy/override
+remain open) at `8d1aca9c`.
+
+**Separately, while reviewing consumers, found `governance-authority.test.mjs` (2 of 3 tests)
+already broken on the branch** — not caused by this dispatch, but by this morning's earlier
+`WP-A-AC07` (`90283a0c`), which added a required `mandatoryEventClasses` key to the capture-policy
+schema. A-AC-07 was booked `implemented` after running only `agent-decision-journal.test.mjs` and
+`governance-event-store.test.mjs` — `governance-authority.test.mjs` has its OWN local capture-policy
+fixture that nobody updated, and nobody ran that file to notice. This is exactly the gap the
+broader-verification policy exists to close, just applied here for the first time to a PAST
+booking rather than a live dispatch. Dispatched a minimal, mechanical fix (**WP-GA-FIX**,
+`27ecd250` — single line, `mandatoryEventClasses: []` added to the fixture) rather than fixing it
+myself directly: this is a TEST-file change, and EL-01's stage-0 fast-path exception explicitly
+excludes test changes regardless of file/line count (`roles/elephant.md` EL-01), unlike the earlier
+P-AC-06 revert (a mechanical inverse of an existing commit, not a fresh test edit). Verified
+independently (3/3, all passing including the two previously-failing tests).
+
+**Lesson, generalized further:** the broader-verification policy needs to also apply
+RETROACTIVELY when discovered — a booked `implemented` criterion whose change touches a
+widely-shared schema is not fully verified just because its own directly-touched files pass;
+every fixture-holding consumer of that schema needs checking, and finding one broken after the
+fact still gets fixed immediately rather than left for a future session to rediscover.
+
+**Live now: none.** Both WP-H-AC12 and WP-GA-FIX are closed, verified, and booked.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
