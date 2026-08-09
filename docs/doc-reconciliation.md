@@ -47,6 +47,18 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 16cfe3a0f8eaeadac84660c9e7e68cff250fb34a — 2026-08-10, range 3387065..16cfe3a0, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `e4b96528` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `1c7280a5` through `16cfe3a0`: the five-category synthesis of the remaining evidence-map
+pool. Pure documentation, no code. No code in this range touches the canonical artifact topology
+ADR-0045 governs beyond ordinary content evolution inside files it already lists. Same reading as
+the whole chain: `docs/state.md` stays ADR-0012, the generated evidence-map/closure-plan/design-doc
+set stays ADR-0045.
+
 ## Candidate e4b96528077c3eaff9ef6abcb9f2921629935035 — 2026-08-10, range 3387065..e4b96528, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
