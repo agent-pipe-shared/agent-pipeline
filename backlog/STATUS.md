@@ -23,6 +23,7 @@
 | pipeline.backlog-delivery-status-reconciliation | in_progress | workflow-improvement | pipeline | 2026-07-25 | Nova A / issue #57 |
 | pipeline.backlog-ledger-closure-reason-misleading | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.blocking-push-gate-has-no-terminal-exception-boundary | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.bootstrap-and-kickoff-teach-their-own-constraints-only-by-live-rejection | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.bootstrap-skill-grows-by-budget-raise-instead-of-by-module | open | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.bounded-diagnostic-outside-repo-refused-under-wrong-reason | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.briefing-model-field-contradicts-agent-definition | open | defect | pipeline | 2026-08-08 | — |
@@ -38,6 +39,7 @@
 | pipeline.concurrent-dispatches-share-one-index | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.contract-suite-borrows-its-fixture-by-importing-a-109-test-file | closed | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.critic-context-isolation | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
+| pipeline.critical-human-proof-not-materialized-for-signature-mode | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.critical-human-proof-not-wired-to-push-and-prd-gates | open | defect | pipeline | 2026-08-05 | — |
 | pipeline.cross-repository-override-ledger-binding | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.dispatch-provenance | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
@@ -49,6 +51,7 @@
 | pipeline.elephant-direct-implementation-under-afk-authorization | in_progress | workflow-improvement | pipeline | 2026-07-23 | — |
 | pipeline.evidence-bound-review-retry-economics | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.execution-model-switchback | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
+| pipeline.fresh-repo-onboarding-never-asks-for-git-identity | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.git-appears-despite-initializes-git-false | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.grammar-refusal-does-not-say-which-part-failed | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.greenfield-onboarding-writes-mixed-authority-tiers | open | defect | pipeline | 2026-08-07 | — |
@@ -56,6 +59,7 @@
 | pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.guard-lifecycle-ready-blocks-claude-memory-writes | open | defect | pipeline | 2026-07-29 | — |
 | pipeline.guard-lifecycle-ready-rejects-plan-runtime-intent-argv | open | defect | pipeline | 2026-08-07 | — |
+| pipeline.guard-lifecycle-ready-runner-allowlist-incomplete | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.guard-reclassification-changed-what-a-signature-can-lift | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.guard-refuses-documented-bounded-diagnostic | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.guard-refuses-the-prescribed-recovery | open | defect | pipeline | 2026-08-08 | — |
@@ -67,6 +71,7 @@
 | pipeline.human-authorization-prompts-ignore-the-configured-language-profile | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.installing-consumer-is-never-asked-any-setup-decision | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.kickoff-apply-action-drops-runner | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.kickoff-promotion-cleanup-readback-has-no-in-session-recovery | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.lifecycle-guard-does-not-know-the-human-signing-commands | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root | open | defect | pipeline | 2026-08-06 | — |
 | pipeline.local-worker-supervisor-cli-suite-flakes-under-full-verify | closed | defect | pipeline | 2026-08-06 | — |
@@ -103,6 +108,7 @@
 | pipeline.project-scoped-github-issue-operations | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.promotion-freezes-a-prd-the-po-gate-will-reject | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.promotion-leaves-the-handover-and-the-runtime-language-frozen-at-kickoff | open | defect | pipeline | 2026-08-09 | — |
+| pipeline.push-approval-skill-reference-predates-adr-0061 | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.push-gate-is-silent-in-every-consumer-project | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.push-guard-worktree-target | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.push-release-flow-unusable-for-third-party-adopters | open | defect | pipeline | 2026-08-07 | — |
@@ -156,6 +162,6 @@
 
 ## Counts
 
-- open: 97
+- open: 103
 - in_progress: 21
 - closed: 30
