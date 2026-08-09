@@ -47,6 +47,30 @@ something to do here without review.
 
 ## Entries
 
+## Candidate d6f7a2e73e1c0fbd55cc9a4df23e53b019141054 — 2026-08-09, range 3387065..d6f7a2e, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `e44fb6e` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `d536fcd`, `55ffd18`, `fdb0292`, `3161a8e`, `a99c131`, `0b53f89`, `85dfd2a`, `d6f7a2e`.
+Every commit in this added range that touches a governed path is `docs/state.md` (ADR-0012) or a
+`specs/sprint-phoenix-epic/evidence/`/`design/` artifact (ADR-0045); the rest —
+`plugins/pipeline-core/lib/*.test.mjs` test-authorship commits and one new `backlog/items/*`
+file — touch no path any `Governs:` line in the corpus names, confirmed by this run rather than
+assumed from the pattern of the prior entry.
+
+ADR-0045: same reading as the prior two entries, extended to one more file class this range
+introduces — `backlog/items/2026-08-09-external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system.md`.
+That file sits under `backlog/`, which is its own dedicated class per the ADR's own text
+("`backlog/`... retain dedicated classes") and is not implicated by ADR-0045's `specs/**` glob at
+all — the check's output above confirms this: only `specs/sprint-phoenix-epic/design/closure-plan.md`
+and the two `specs/sprint-phoenix-epic/evidence/` files triggered it, not the backlog item.
+
+ADR-0012: same reading as the two prior entries. The two new `docs/state.md` entries in this
+range are the same shape as before — pointers at committed package artifacts and a compaction
+checkpoint recording what already landed, not a restatement of their content.
+
 ## Candidate e44fb6e00722c91c3a90b4c9a4dbc89bcbcbfe20 — 2026-08-09, range 3387065..e44fb6e, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
