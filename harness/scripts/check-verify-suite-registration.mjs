@@ -191,7 +191,7 @@ export const EXCLUSIONS = Object.freeze({
     expires: "2026-09-07",
   }),
   "plugins/pipeline-core/hooks/guard-git-phoenix.test.mjs": Object.freeze({
-    reason: "red (R1.2): AssertionError, 1 !== 2",
+    reason: "GREEN, not red: repaired 2026-08-09 (PHX-GITAUTH, commit 1729334) by restoring the phoenixGovernedProject predicate that merge 75b8361 deleted. This was recorded as a contract contradiction with guard-git.test.mjs OV-AC1 and was not one -- the two suites never touched the same path; one fixture is Phoenix-governed and the other is not, and the merge removed the predicate that told them apart. NOTE: this suite is cwd-sensitive (it spawns the guard), so it must be run from the repository root, not from the detached verify worktree. Parked solely because registering it edits verify.mjs, a protected test path whose maintenance window is closed and whose reopening needs a human signature.",
     owner: "PO",
     expires: "2026-09-07",
   }),
