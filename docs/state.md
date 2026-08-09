@@ -2241,7 +2241,18 @@ rather than accepted on the baseline note's word (`c48f327`).
 headers checked against its clause's named enumeration one by one, diffs additive-only, no
 production `.mjs` file touched, sanitization clean.
 
-### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
+**Class A test-authorship is now nearly exhausted for this session.** 6 of the remaining 11
+Class A criteria are WP-PX0 (gate-blocked, above); the other 5 are thin residuals on
+already-touched packages (A-AC-12/13/14, E-AC-06/14) — `PHX-WP-A2` dispatched to attempt them,
+not yet landed as of this entry. **Class S (6 criteria) is next after that, and is a different
+kind of work**: each item needs two already-implemented packages wired together (e.g. A-AC-04's
+self-confirmation-prevention needing an actual correlation path to the human ledger; E-AC-20's
+audit bundle needing to reference the export package), which means real production code and a
+design decision about HOW to wire them — not a bounded test-writing task a Goldfish can execute
+from a short briefing the way every dispatch tonight has. That needs its own scoping pass before
+dispatch, not a blind briefing. Class B (41 items, absent capabilities) and Class P (5 items, not
+closeable by code) remain exactly what the closure design always said they were: PO/architecture
+territory, not autonomous Elephant work.
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
 eine Nacht."* That wording is more precise than the option as I had framed it, and the
