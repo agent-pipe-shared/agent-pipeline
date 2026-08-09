@@ -242,19 +242,19 @@ clause that is not pinned or not built.
 | ID | verdict | src | evidence / named gap |
 |---|---|---|---|
 | E-AC-01 | implemented | C | governance-export-adapter-tests: one validated source mapped deterministically with stable identity |
-| E-AC-02 | partial | C | profiles implemented and documented; DECLARING every lossy field/semantic conversion is not pinned |
+| E-AC-02 | partial | WP-E | CONFIRMED ABSENT (PHX-WP-E): deterministic mapping is pinned (pre-existing); mapGovernanceExportProjection always returns loss:freeze([]) even though rfc5424() drops eventId/correlation/candidate/repositoryFingerprint/eventDigest/policyDigest -- governance-export-adapter.mjs:85,98, no lossy conversion is ever declared |
 | E-AC-03 | implemented | C | governance-export-adapter-tests: policy-less exports denied, only explicitly allowed fields projected |
-| E-AC-04 | partial | C | no assertion covers free-form rationale omission-unless-permitted-and-redacted |
+| E-AC-04 | partial | WP-E | governance-export-adapter-tests (PHX-WP-E, break-proofed): default omission of rationale/summary is pinned; CONFIRMED ABSENT: the "policy allows and redacts" path -- EXPORT_FIELDS is a closed, non-configurable constant (adapter.mjs:15), no policy can ever admit the field |
 | E-AC-05 | implemented | C | governance-export-outbox-tests: independent destination queues, idempotent enqueue, retryable and quarantined entries preserved |
-| E-AC-06 | partial | C | at-least-once behaviour is exercised by the retry tests; the explicit no-exactly-once claim is documentation only |
+| E-AC-06 | partial | C | governance-export-delivery-tests (PHX-WP-E, break-proofed): stable idempotency (pre-existing) and at-least-once redelivery (new) are pinned; the explicit "SHALL NOT claim exactly-once" structural assertion was dropped for tool-budget reasons -- not confirmed absent by search, just not written this pass |
 | E-AC-07 | implemented | C | governance-export-delivery-tests: only the safely acknowledged prefix advances after partial delivery |
-| E-AC-08 | partial | C | two of the eight enumerated detections are pinned; cursor rollback, outbox truncation, event gap, source fork, invalid hash and schema downgrade are not |
-| E-AC-09 | partial | C | viewer renders lag; no assertion shows canonical governance continuing under an unavailable advisory destination |
+| E-AC-08 | partial | WP-E | governance-export-outbox-tests (PHX-WP-E, break-proofed): 4 of 8 detections pinned (destination-mismatch/forged-ack pre-existing, event-gap/schema-downgrade new); CONFIRMED ABSENT: cursor rollback, outbox truncation, source fork, invalid hash -- no bound on cursor vs entries.length or hash-chain check anywhere in outbox.mjs:6-11 |
+| E-AC-09 | partial | WP-E | governance-export-delivery-tests (PHX-WP-E, break-proofed): lag exposed on a failed acknowledgement is pinned; CONFIRMED ABSENT: the "advisory destination" concept itself -- no such distinction exists anywhere in scope, so "canonical governance continues under an unavailable advisory destination" is not representable |
 | E-AC-10 | not-started | C | NO CARRIER: no named lifecycle boundary blocks only the exact unacknowledged source range |
-| E-AC-11 | partial | C | the privacy half is pinned; attempt, counts, cursor/lag and policy digests are not each pinned |
+| E-AC-11 | partial | WP-E | governance-export-delivery-tests (PHX-WP-E, break-proofed): the closed 9-field receipt schema is pinned, rejecting any retention/immutability/analyst-review/compliance-implying extension; CONFIRMED ABSENT: a per-projection/mapping digest field -- only policyRevision exists (governance-event-projection.mjs:22-24) |
 | E-AC-12 | implemented | C | governance-export-adapter-tests: profile and acknowledgements are closed, non-authoritative and deduplicated |
 | E-AC-13 | implemented | C | governance-export-outbox-tests: destination queues, cursors and failure domains stay independent |
-| E-AC-14 | partial | C | the in-memory collector is pinned; local-file, syslog and failure-injection fixtures are not named |
+| E-AC-14 | partial | C | in-memory, local-file, OTLP-profile and syslog fixtures are each individually cited (PHX-WP-E); dedicated failure-injection coverage was judged sufficient by indirect citation (CAS-conflict, forged-ack tests) rather than confirmed absent by search -- no new test added, budget-limited not capability-limited |
 | E-AC-15 | implemented | C | governance-export-adapter-tests: allowlisting/redaction completed before every persistence boundary |
 | E-AC-16 | implemented | C | nine named assertions: batching bound, compression, payload bound, rate limit, retry budget, backpressure, flush, restart resume, replay |
 | E-AC-17 | implemented | C | governance-export-outbox-tests: duplicate delivery preserves one canonical source history |
