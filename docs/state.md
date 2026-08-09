@@ -3326,6 +3326,20 @@ and the third on the O-1/O-2 design amendment — both still within the four-rou
 Context is very long this session; the Stop hook has repeatedly suggested `/compact`. Handover is fully
 current in this file and `doc-reconciliation.md` through this checkpoint — safe to compact at any point.
 
+### O-1/O-2-DESIGN REWORK2 VERIFIED AND CLOSED (`d7bf77b`) — ROUND-3 CRITIC DISPATCHED
+
+Verified independently (doc-contracts clean, diff read): §9 now symmetric with §15.3's full 5-file
+inventory (2 new rows for the hooks, 2 new rows + 1 extension for O-1's files); H-AC-11 text now
+correctly conditional on a covering registry entry, `unknown`/`ambiguous` fallback stated inline.
+Dispatched a round-3 Critic re-review (full, three-commit enumerated diff `01bafdf,3440e5f,d7bf77b`,
+zero reference to prior rounds). K-AC-05-rework2 still in progress (`governance-event-store.mjs`
+uncommitted). Both within the four-round Critic cap (round 3 of 4 for the design doc, round 3
+pending for K-AC-05 once rework2 lands).
+
+**Session is very long; handover is current through this checkpoint.** Safe to `/compact` at any
+point — nothing here is blocked on it, next steps are: verify K-AC-05-rework2 when it returns,
+verify the round-3 design Critic when it returns, continue the dispatch queue.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
