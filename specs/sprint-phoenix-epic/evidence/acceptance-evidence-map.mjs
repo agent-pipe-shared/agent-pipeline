@@ -862,6 +862,25 @@ const DELTA = {
   // change-control tests pass, 6 new for this resolver.
   'C-AC-09': ['implemented', 'WP-C-AC09'],
 
+  // P-AC-01: validateOrganizationPolicyPack gains three OPTIONAL closed
+  // pack-level fields (provenance, dependencies, signaturePolicy), mirroring
+  // the targetBinding precedent so every pre-existing pack fixture stays
+  // valid unchanged. Each is pack-scoped only, never folded into
+  // resolveEffectiveOrganizationPolicy's cross-pack merge. Dependency
+  // validation is shape-only (self-dependency/duplicate/inverted-range
+  // rejection); resolving against an actually-present pack set is a
+  // different, out-of-scope concern. 17/17 organization-policy tests pass.
+  'P-AC-01': ['implemented', 'WP-P-AC01-AC03'],
+
+  // P-AC-03: planOrganizationPolicyActivation computes three deterministic
+  // preview fields (newlyRequiredArtifacts, externalEffects, backfillRange)
+  // from its existing inputs (prior active policy vs. newly resolved
+  // effectivePolicy) -- never caller-supplied. assertPlan re-validates all
+  // three so a hand-tampered plan fails closed (OPA-PREVIEW) before
+  // activation, proven by a dedicated test. 4/4 organization-policy-
+  // activation tests pass.
+  'P-AC-03': ['implemented', 'WP-P-AC01-AC03'],
+
   // A-AC-07: representedEventClasses (agent-decision-journal.mjs) recognizes
   // all seven named classes through existing fields/kinds -- no new kind was
   // needed for any of them (candidate=candidateDigest, always present;
@@ -990,9 +1009,9 @@ const POINTERS = {
   'L-AC-07': 'governance-replay-core-tests: serial/parallel/retry/cancellation/recovery fixtures replay to identical bounded output on repeat, and a malicious duplicate-sequence fixture is rejected deterministically (PHX-WP-L, break-proofed twice)',
   'L-AC-08': 'docs/governance-replay.md "Traceability" (PHX-WP-DOC-3): 8 of 9 lifecycle-governance-events.mjs kinds traced to a stated user/audit need; the `cancellation` kind is honestly flagged unclear -- no structural distinction from `status: "cancelled"` exists in the code, so no confident justification could be constructed',
 
-  'P-AC-01': 'CONFIRMED ABSENT (PHX-WP-P): schema/compatibility/merge pinned; provenance, dependency and signature-policy validation have no corresponding field anywhere in the pack schema, no test was written around the gap',
+  'P-AC-01': 'organization-policy-tests (WP-P-AC01-AC03): schema/compatibility/merge pinned, AND provenance/dependencies/signaturePolicy now validated as optional, pack-scoped, closed fields (OPP-PROVENANCE/OPP-DEPENDENCIES/OPP-SIGNATURE), mirroring the targetBinding precedent. 17/17 tests pass',
   'P-AC-02': 'organization-policy-tests: floor weakening, unknown rule, single-owner conflict all rejected',
-  'P-AC-03': 'CONFIRMED ABSENT (PHX-WP-P): planOrganizationPolicyActivation pinned; newly-required artifacts, external effects and backfill range have no corresponding field anywhere in the activation-plan schema, no test was written around the gap',
+  'P-AC-03': 'organization-policy-activation-tests (WP-P-AC01-AC03): planOrganizationPolicyActivation now computes newlyRequiredArtifacts/externalEffects/backfillRange deterministically from the transition, never caller-supplied; assertPlan fails closed on a tampered preview (OPA-PREVIEW). 4/4 tests pass',
   'P-AC-04': 'organization-policy-activation-tests: activation only after a bound authority readback; stale plan preimage rejected',
   'P-AC-05': 'organization-policy-tests: credential, endpoint, coordinate, actor-mapping and signing-key fields refused at every level',
   'P-AC-06': 'audit-bundle-core-tests: missing, misplaced, illegally-mutable, stale and truncated each pinned (PHX-WP-P, break-proofed). legacy and orphaned remain unpinned: the legacy classification exists (feature-package-topology.mjs:78) but no rejection path consults it, and no code checks a package file is referenced by an artifact',
