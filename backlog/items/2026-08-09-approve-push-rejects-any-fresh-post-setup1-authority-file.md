@@ -3,10 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.approve-push-rejects-any-fresh-post-setup1-authority-file
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
 source: "Live observation: the PO's private Claude+Pipeline 0.5.4 happy-path re-test (fifth local candidate) failed approve-push and needed a manual terminal fix outside the session; Codex's equivalent run got a signed push through. Confirmed at the code level by reading pipeline-state.mjs, po-approval-proof.mjs and po-human-approval.mjs, 2026-08-09."
 due: 2026-08-16
+closed_at: 2026-08-09
+closure_repository: self
+closure_commit: ad81a9b9ab89aab52fb4099971c3c3a0fcd6f852
+closure_evidence: backlog/evidence/2026-08-09-approve-push-humanname-fix-closure.md
 ---
 
 # `approve-push` rejects every authority file `setup --human-name` correctly produces

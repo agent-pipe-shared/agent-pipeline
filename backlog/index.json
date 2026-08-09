@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "09f0e5914103d2704225be311f1252e5e4706fe3157026dcb72e672ef8da92a5"
+    "transitionHead": "dd1e0a8cb0428694944053467d944a824d74fa94eaf2c8ec41a9c315a6580470"
   },
   "counts": {
     "open": 111,
     "in_progress": 21,
-    "closed": 32
+    "closed": 33
   },
   "items": [
     {
@@ -98,11 +98,15 @@
     },
     {
       "id": "pipeline.approve-push-rejects-any-fresh-post-setup1-authority-file",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "Live observation: the PO's private Claude+Pipeline 0.5.4 happy-path re-test (fifth local candidate) failed approve-push and needed a manual terminal fix outside the session; Codex's equivalent run got a signed push through. Confirmed at the code level by reading pipeline-state.mjs, po-approval-proof.mjs and po-human-approval.mjs, 2026-08-09."
+      "source": "Live observation: the PO's private Claude+Pipeline 0.5.4 happy-path re-test (fifth local candidate) failed approve-push and needed a manual terminal fix outside the session; Codex's equivalent run got a signed push through. Confirmed at the code level by reading pipeline-state.mjs, po-approval-proof.mjs and po-human-approval.mjs, 2026-08-09.",
+      "closedAt": "2026-08-09",
+      "closureRepository": "self",
+      "closureCommit": "ad81a9b9ab89aab52fb4099971c3c3a0fcd6f852",
+      "closureEvidence": "backlog/evidence/2026-08-09-approve-push-humanname-fix-closure.md"
     },
     {
       "id": "pipeline.approved-not-implementing-is-a-silent-trap",
@@ -879,6 +883,14 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Established while re-signposting the PO-language mismatch (commit b094cb5); the enumeration was produced by that dispatch and the remaining sites were deliberately left alone."
+    },
+    {
+      "id": "pipeline.po-approval-request-verify-still-rejects-a-fresh-setup1-authority",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "Critic review (claude-opus-5, max, functional-equivalent-read-only lane) of GF-067 (commit ad81a9b9), 2026-08-09. Finding F1, verdict FAIL solely on this residual + the missing durable record of it -- GF-067's own commit was cleared as correct, minimal and genuinely tested; do not alter ad81a9b9."
     },
     {
       "id": "pipeline.po-gate-authority-path-canonicalization",
