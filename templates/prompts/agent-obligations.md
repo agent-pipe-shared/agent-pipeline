@@ -51,6 +51,7 @@ ready session may run, which is wider.
 - `git status --short`
 - `git rev-parse HEAD`
 - `rg -n 'needle' file.txt`
+- `rg -n 'needle' file.txt | head -20`
 - `rg -n 'a' x | rg -n 'b'`
 
 ### 1b. Which refusals carry a typed retry action
@@ -61,7 +62,6 @@ a route it never offered is wasted budget.
 
 | Command | Typed retry actions |
 |---|---|
-| `rg -n 'needle' file.txt | head -20` | 0 |
 | `git commit -F msg.txt -- a.md` | 0 |
 | `git commit -m 'one line'` | 0 |
 | `git commit -m 'line one\n\nline two'` | 0 |
