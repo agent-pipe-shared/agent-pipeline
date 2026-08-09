@@ -100,6 +100,7 @@
 | pipeline.private-overlay-activation-bridge | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.project-scoped-github-issue-operations | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.promotion-freezes-a-prd-the-po-gate-will-reject | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.promotion-leaves-the-handover-and-the-runtime-language-frozen-at-kickoff | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.push-guard-worktree-target | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.push-release-flow-unusable-for-third-party-adopters | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.ready-gate-env-var-runner-authority | closed | defect | pipeline | 2026-08-05 | — |
@@ -147,6 +148,6 @@
 
 ## Counts
 
-- open: 90
+- open: 91
 - in_progress: 21
 - closed: 28
