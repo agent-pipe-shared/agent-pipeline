@@ -43,6 +43,7 @@
 | pipeline.critical-human-proof-not-materialized-for-signature-mode | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.critical-human-proof-not-wired-to-push-and-prd-gates | open | defect | pipeline | 2026-08-05 | — |
 | pipeline.critical-human-proof-policy-seeded-without-trust-anchor | open | idea | pipeline | 2026-08-09 | — |
+| pipeline.critical-push-signing-ceremony-gives-no-path-feedback | open | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.cross-repository-override-ledger-binding | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.dispatch-provenance | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.dispatch-record-does-not-bind-to-its-commit | open | defect | pipeline | 2026-08-09 | — |
@@ -154,6 +155,7 @@
 | pipeline.test-path-guard-blocks-the-briefed-edit-and-offers-no-route | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.three-smaller-greenfield-defects | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.two-manifest-literals-bypass-the-single-seed-owner | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.two-minor-happy-path-retries-in-the-final-codex-run | open | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.unified-human-authorization-ux | open | workflow-improvement | pipeline | 2026-08-02 | Current CYB-4 helper is a compatible first adapter only; no programme-wide migration or closure is claimed. |
 | pipeline.unregistered-suite-is-red-and-invisible-to-verify | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.verify-evidence-has-no-producer | open | defect | pipeline | 2026-08-08 | — |
@@ -169,6 +171,6 @@
 
 ## Counts
 
-- open: 108
+- open: 110
 - in_progress: 21
 - closed: 32

@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "42f89ce96df59411695d9e9a3475709c21cfa120974855691343ff657d2e06e4"
+    "transitionHead": "123304e6846f59168ad1003b0d982423c01077724a3215ed63aa94628e352e8c"
   },
   "counts": {
-    "open": 108,
+    "open": 110,
     "in_progress": 21,
     "closed": 32
   },
@@ -339,6 +339,14 @@
       "owner": "pipeline",
       "created": "2026-08-09",
       "source": "Critic review (round 2, PASS) of GF-062/GF-065's critical-human-proof.json onboarding fix, scratch/critic-1f03ce024c82/critic-notes.md, deliberately not flagged as a finding of that diff."
+    },
+    {
+      "id": "pipeline.critical-push-signing-ceremony-gives-no-path-feedback",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "Independent read-only analysis of the PO's private Codex+Pipeline 0.5.4 happy-path re-test (fifth local candidate, final successful session, 2026-08-09), cross-checked against direct code reading of po-human-approval.mjs. Corrects an earlier self-report from inside that same Codex session, which misidentified the failing subcommand."
     },
     {
       "id": "pipeline.cross-repository-override-ledger-binding",
@@ -1321,6 +1329,14 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Self-reported by the implementing dispatch of commit 7a99a18 and independently confirmed as finding F7 of the second Critic round on the 2026-08-08 hardening block."
+    },
+    {
+      "id": "pipeline.two-minor-happy-path-retries-in-the-final-codex-run",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "Independent read-only analysis of the PO's private Codex+Pipeline 0.5.4 happy-path re-test (fifth local candidate, final successful session), 2026-08-09."
     },
     {
       "id": "pipeline.unified-human-authorization-ux",
