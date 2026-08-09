@@ -47,6 +47,18 @@ something to do here without review.
 
 ## Entries
 
+## Candidate d48f3ce8837c760b94579ce45be4ad3c2bad4932 — 2026-08-09, range 3387065..d48f3ce, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `4a25e1c` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `843c392`, `d48f3ce`: the doc-reconciliation entry for the four-dispatch checkpoint,
+and a checkpoint recording two more dispatches (WP-E-AC09, WP-C-AC07) started while the two
+Critic reviews run. No code changed in this range beyond the two commits already covered by the
+prior entry. Same reading as the whole chain: `docs/state.md` stays ADR-0012, the generated
+evidence-map/closure-plan trio stays ADR-0045.
+
 ## Candidate 4a25e1ccfcd5c6be25ff974cf7f49d979287fe2e — 2026-08-09, range 3387065..4a25e1c, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
