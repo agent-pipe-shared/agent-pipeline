@@ -1023,6 +1023,42 @@ a dispatch the authority to clear a control whose purpose is to check that
 dispatch's own class of work. "Show your evidence" is not a substitute for
 separation of duties — it is what makes the absence of separation look rigorous.
 
+### Two corrections to the second audit, measured before dispatching anything (2026-08-09)
+
+**SILENT-6 is weaker than reported — do not restore it reflexively.** The audit said
+`docs/artifact-topology.md` L41-46 still describes the `lifecycleAuthority` contract. I
+grepped for the literal keys: **neither the documentation nor the checker names
+`lifecycleAuthority` or `governanceEventRegistry`**. The block is present at `998a609`
+and absent at `HEAD`, and nothing references it by name. So this is genuinely silent, and
+restoring it would add configuration nothing reads — the opposite failure from the
+taxonomy case, and one I nearly walked into by treating "audit says restore" as a
+finding rather than a hypothesis.
+
+**LIVE-3 is real and its shape is the inverse of everything else tonight.** Measured with
+`git grep -c` at both commits: `configure-advisor-export` occurs at `HEAD` in `setup.mjs`
+(**6**), `setup.test.mjs` (**3**) and `SETUP.md` (**1**); at `998a609`
+`harness/session-bootstrap.md` carried **2** and now carries **0**. **The implementation,
+its tests and the user-facing document all survived; only the specification lost the
+rule.** An agent reading the spec cannot learn that states the code still produces are
+accepted. `PHX-ADR40` is dispatched to restore it from `998a609`.
+
+**The audit's own reference is wrong here:** it cites `setup.mjs:230/235` under a path
+that does not exist — `setup.mjs` is at the **repository root**, not under `plugins/`.
+
+**And I made the same class of error while correcting it.** I first concluded the flag
+was implemented nowhere, having searched `plugins/`, `harness/` and `docs/` — the three
+places it is not. That is the sixth path mistake of the night, committed in the very act
+of guarding against path mistakes. The fix I wrote down hours ago — *resolve every path
+before relying on it* — is right and I keep applying it to the paths I already doubt.
+**A rule that only fires when you are suspicious is not a rule.**
+
+**A boundary I had to draw against my own earlier instruction.** Tonight I forbade a
+dispatch from editing `harness/session-bootstrap.md`, because the spec must never be bent
+to match a shrunken implementation. That stands. `PHX-ADR40` does not contradict it: the
+spec is not being changed to match anything, it is being restored to what it said before
+the merge cut part of it out. The briefing carries that distinction and a stop condition
+for the moment restoring would become rewriting.
+
 ### LIVE-2 repaired (`dc65e46`) — and the deletion criterion would have eaten the whole taxonomy
 
 `governance-event` is a **live class**, not a retirement, established by production rather
