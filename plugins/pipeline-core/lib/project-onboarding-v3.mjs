@@ -92,8 +92,8 @@ const AUTHENTICATED = new WeakMap();
 const AUTHENTICATED_MANIFEST_REPAIRS = new WeakMap();
 const USER_RESERVED_PATHS = new Set([".agents", ".claude", ".codex", "project"]);
 /**
- * The two directories the Pipeline itself tells a project to write into, ignored
- * so the project is not handed a repository the Pipeline immediately dirties.
+ * The paths the Pipeline itself tells a project to write into, ignored so the
+ * project is not handed a repository the Pipeline immediately dirties.
  *
  * `scratch/` is where the bootstrap skill sends every agent for temporary files,
  * and nothing was ignoring it: the skill said so in its own text ("Onboarding does
@@ -105,8 +105,30 @@ const USER_RESERVED_PATHS = new Set([".agents", ".claude", ".codex", "project"])
  * impossible. Measured 2026-08-09: all four adapters returned
  * `working-tree-not-clean` until `evidence/` was ignored.
  *
- * Both entries are ANCHORED (`/scratch/`, not `scratch/`). An unanchored rule is
- * how `evidence/` once swallowed `backlog/evidence/` in this repository and
+ * `project/pipeline-state.json` is the third: `pipeline-state.mjs`'s own working-
+ * tree state file, which changes on nearly every `pipeline-state.mjs` command --
+ * including `approve-push` itself. Left tracked, that dirties the tree on every
+ * command (blocking `verify-evidence-producer`'s clean-tree requirement the same
+ * way an untracked `evidence/` did) and can invalidate an already-signed,
+ * commit-bound push approval if it gets re-committed after signing
+ * (`docs/state.md`, 2026-08-07/08 push-approval entries). Unlike the other two
+ * this is a FILE, not a directory the Pipeline populates over time -- but the
+ * file itself is never a target THIS module writes (grep confirms
+ * "pipeline-state.json" appears nowhere else in this file): it is created later,
+ * exclusively by `pipeline-state.mjs`'s own write path, which requires the
+ * authority files this module creates (`project/pipeline.json`,
+ * `project/pipeline.yaml`) to already exist and therefore can only run AFTER
+ * `applyProjectOnboardingV3` has returned. `applyProjectOnboardingV3` writes
+ * every target -- including this `.gitignore` seed -- synchronously within one
+ * call and never touches the Git index itself (no `git add`/`git commit`
+ * anywhere in it), so the seed is complete on disk before any later step could
+ * ever create `project/pipeline-state.json`. There is consequently no ordering
+ * window here to close with anything beyond the ignore rule itself (investigated
+ * for GF-084; see the regression test extending IGNORESEED-1 for the checked-in
+ * proof against a real Git repository).
+ *
+ * All three entries are ANCHORED (`/scratch/`, not `scratch/`). An unanchored rule
+ * is how `evidence/` once swallowed `backlog/evidence/` in this repository and
  * silently broke the closure citations the backlog gate demands
  * (`pipeline.over-broad-ignore-rule-swallows-closure-evidence`). The same
  * one-character omission must not be reintroduced by the thing that fixes it.
@@ -118,8 +140,8 @@ const USER_RESERVED_PATHS = new Set([".agents", ".claude", ".codex", "project"])
  */
 const PROJECT_IGNORE_SEED = [
   "# Written by Agent-Pipeline onboarding because this repository had no .gitignore.",
-  "# Both entries are directories the Pipeline itself writes into. Anchored on",
-  "# purpose: an unanchored `evidence/` also matches `<anything>/evidence/`.",
+  "# Entries are paths the Pipeline itself writes into. Anchored on purpose: an",
+  "# unanchored `evidence/` also matches `<anything>/evidence/`.",
   "",
   "# Agent scratch space (the bootstrap skill sends every agent here).",
   "/scratch/",
@@ -127,6 +149,12 @@ const PROJECT_IGNORE_SEED = [
   "# Verify and security evidence. security-scan refuses a dirty working tree, so",
   "# leaving these tracked makes the security gate impossible to satisfy.",
   "/evidence/",
+  "",
+  "# pipeline-state.mjs's own state file. It changes on nearly every",
+  "# pipeline-state.mjs command (including approve-push itself); leaving it",
+  "# tracked dirties the tree on every command and can invalidate an already",
+  "# signed, commit-bound push approval if it gets re-committed after signing.",
+  "/project/pipeline-state.json",
   "",
 ].join("\n");
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));

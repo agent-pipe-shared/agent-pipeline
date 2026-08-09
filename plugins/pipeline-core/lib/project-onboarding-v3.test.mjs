@@ -3030,11 +3030,16 @@ test("onboarding materializes project/critical-human-proof.json declaring push, 
 // documented gap rather than an unknown one. `evidence/` is the one that bites:
 // `security-scan.mjs` refuses a dirty working tree, so the evidence the push gate
 // demands is what makes the scan producing the rest of it impossible.
+// `project/pipeline-state.json` bites the same way from the other direction: it
+// changes on nearly every `pipeline-state.mjs` command (including `approve-push`
+// itself), so leaving it trackable dirties the tree on every command and can
+// invalidate an already-signed, commit-bound push approval if re-committed
+// (`docs/state.md`, GF-084).
 //
 // The other half is the boundary: appending to a `.gitignore` a project already
 // owns is a different decision with a different cost, and the seed does not take
 // it unasked.
-test("onboarding seeds ignore rules for the directories it writes into, and never touches a .gitignore the project owns", () => {
+test("onboarding seeds ignore rules for the paths it writes into, and never touches a .gitignore the project owns", () => {
   const fresh = root();
   const owned = root();
   try {
@@ -3047,6 +3052,7 @@ test("onboarding seeds ignore rules for the directories it writes into, and neve
     const seeded = readFileSync(join(fresh, ".gitignore"), "utf8");
     assert.match(seeded, /^\/scratch\/$/mu, "the directory the bootstrap skill sends every agent to");
     assert.match(seeded, /^\/evidence\/$/mu, "the directory the shipped evidence producers write to");
+    assert.match(seeded, /^\/project\/pipeline-state\.json$/mu, "pipeline-state.mjs's own working-tree state file");
     // Anchored, so `backlog/evidence/` and friends are NOT swallowed. This exact
     // one-character omission already cost this repository its closure citations.
     assert.equal(seeded.includes("\nevidence/"), false, "the rule must be anchored, never bare `evidence/`");
@@ -3057,12 +3063,29 @@ test("onboarding seeds ignore rules for the directories it writes into, and neve
     // is the meaningful answer; `check-ignore` is exactly that shape.
     const checkIgnore = (candidate) => spawnSync("git", ["check-ignore", "-q", candidate],
       { cwd: fresh, encoding: "utf8" }).status;
-    for (const candidate of ["scratch/note.md", "evidence/verify-latest.json"]) {
+    for (const candidate of ["scratch/note.md", "evidence/verify-latest.json", "project/pipeline-state.json"]) {
       assert.equal(checkIgnore(candidate), 0, `git must ignore ${candidate}`);
     }
     // ...and it must NOT reach a nested evidence directory a project may own.
     assert.notEqual(checkIgnore("backlog/evidence/x.md"), 0,
       "an anchored rule must not swallow a nested evidence directory");
+
+    // GF-084 regression: the seed is USELESS if `project/pipeline-state.json` can
+    // already be tracked before it takes effect. Investigation found no such
+    // window in this module -- `pipeline-state.mjs` (out of scope here) is the
+    // only writer of that file, and it can only run once onboarding's own
+    // authority files exist, i.e. strictly after `applyProjectOnboardingV3` has
+    // already written this exact `.gitignore` synchronously. This proves the
+    // "in practice" half against a REAL repository rather than trusting that
+    // reasoning alone: create the file the way it first appears in the wild (a
+    // later writer, simulated directly since `pipeline-state.mjs` is not under
+    // test here), then run the real `git add -A` a first commit would use, and
+    // confirm the index never picked it up.
+    writeFileSync(join(fresh, "project", "pipeline-state.json"), "{}\n");
+    hostGit(fresh, ["add", "-A"]);
+    const staged = spawnSync("git", ["ls-files", "project/pipeline-state.json"],
+      { cwd: fresh, encoding: "utf8" }).stdout.trim();
+    assert.equal(staged, "", "project/pipeline-state.json must never be staged by `git add -A` once it exists");
 
     // A project that already owns one keeps it byte for byte, and gets no target.
     const ownedBytes = "# mine\nnode_modules/\n";
@@ -3914,7 +3937,7 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
         ".gitignore", "pipeline.user.yaml", "project/critical-human-proof.json",
         "project/pipeline.json", "project/pipeline.yaml",
       ],
-      "fresh onboarding seeds the canonical project authority and the ignore rules for the two directories it writes into; runtime targets are initialized later",
+      "fresh onboarding seeds the canonical project authority and the ignore rules for the paths it writes into; runtime targets are initialized later",
     );
     assert.equal(applyProjectOnboardingV3(plan, { rootDir: path, activate: false, deps: fakeDeps }).status, "activation-required");
     const applied = applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: fakeDeps });
@@ -3925,6 +3948,7 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
     const ignore = readFileSync(join(path, ".gitignore"), "utf8");
     assert.match(ignore, /^\/scratch\/$/mu);
     assert.match(ignore, /^\/evidence\/$/mu);
+    assert.match(ignore, /^\/project\/pipeline-state\.json$/mu);
     assert.equal(existsSync(join(path, ".git")), true);
     assert.equal(existsSync(join(path, ".claude")), false, "portable seed must not create legacy Claude authority files");
     assert.equal(existsSync(join(path, ".codex")), false);
