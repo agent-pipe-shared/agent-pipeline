@@ -120,6 +120,14 @@ under test, not to be modified pending its own release decision). Filed for
 whichever session picks up #57/NVA-B61-7, or as its own narrowly-scoped
 guard fix if the escalated-exec attestation gap is confirmed as the trigger.
 
+**Superseded in part, 2026-08-09 (PO instruction, same day):** the PO
+separately authorized a bounded hardening pass on two adjacent points — (i)
+making the `HGO-EXTERNAL-REPOSITORY-OBSERVATION` guidance actionable rather
+than hash-only, and (ii) a `guard-lifecycle-ready.mjs` argv-allowlist gap
+found by direct code inspection while investigating this item. That
+authorization does **not** extend to Direction 1–3 below, which remain fully
+open — see the review record.
+
 ## Direction
 
 1. Confirm or rule out the escalated-exec attestation trigger above.
@@ -131,6 +139,58 @@ guard fix if the escalated-exec attestation gap is confirmed as the trigger.
    the two outcomes (stay blocked vs. needs a human at a terminal) applies
    *before* the agent spends a full round-trip (PO question, reference read,
    blocked command) discovering it has no agent-executable path at all.
+
+**None of the three items above are closed by the review record below.** They
+require the escalated-exec attestation measurement this item's own
+"plausible mechanical trigger" section says is still unconfirmed, and remain
+assigned wherever #57/NVA-B61-7 lands.
+
+## Review record — GF-059 (FAILED, 2026-08-09)
+
+A first attempt at the bounded hardening (points (i)/(ii) above) was
+dispatched as GF-059 and independently Critic-reviewed before merge
+(self-application, ADR-0014). **Verdict: FAIL.** Full report:
+`scratch/nova-4e164e09/critic-notes.md`. Not merged; commits remain on the
+abandoned worktree branch `worktree-agent-a2b2a34b84f687185`
+(`f3bbf275`, `20d562bf`).
+
+- **F1 (blocker):** the diff addressed neither this item's Direction 1–3 nor
+  anything the dispatch briefing had actually asked for in those terms — a
+  scoping error in how this Elephant framed the dispatch, not a Goldfish
+  defect. This section (and the split-out allowlist item, see below) is the
+  correction.
+- **F2 (major, security-relevant):** the guidance-actionability fix ((i)
+  above) added the literal denied command to `codex-pretool-guard.mjs`'s
+  `hostBoundary` catch branch — exactly the branch reached when
+  `human-guard-override.mjs`'s `topology()` throws `HGO-GIT`/`HGO-ROOT`/
+  `HGO-COMMON-DIR` *before* the existing secret-eligibility screen's result
+  is applied. A secret-bearing denied command could now be echoed verbatim
+  into a persisted session transcript, inverting the codebase's own
+  hash-only-for-secrets design on this one path. Must be fixed by gating the
+  literal command on the already-computed eligibility result, not reverted
+  to silence — the human-facing actionability goal (i) is still valid and
+  still PO-authorized.
+- **F3 (major):** consequence of F1 — the diff touched code this item's own
+  "Why it is filed rather than fixed here" section named as
+  not-to-be-modified. Resolved by the "Superseded in part" note above; the
+  PO's later authorization was for (i)/(ii) specifically, not a license to
+  address Direction 1–3.
+- **F4 (minor):** the argv-allowlist widening (ii) covered 6 of the
+  subcommands `session-cleanup.mjs` documents `--runner` for for, not all of
+  them. Split out as its own item (see below) since it is unrelated to this
+  item's actual failure chain — the incident's own transcript shows
+  `plan-privatization` invoked *without* `--runner` at all
+  (`references/private-overlay.md:4` documents it that way), so the
+  allowlist gap, while real, did not cause this incident.
+- **F5 (minor):** the literal-command payload is an empty string for
+  non-Bash tool denials (Edit/Write/apply_patch have no `tool_input.command`)
+  — more misleading than the hash-only form it replaced.
+
+**Follow-up:** the allowlist gap (F4) is tracked as its own item —
+`backlog/items/2026-08-09-guard-lifecycle-ready-runner-allowlist-incomplete.md`
+— since it is a real, independent defect unrelated to this item's root
+cause. A corrected rework of (i), fixing F2/F5, is in progress under this
+item; Direction 1–3 stay open regardless of that rework's outcome.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
