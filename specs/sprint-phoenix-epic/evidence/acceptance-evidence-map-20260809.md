@@ -62,9 +62,9 @@ A bullet is therefore BLOCKED unless every criterion mapped to it is `implemente
 | verdict | count |
 |---|---|
 | implemented | 84 |
-| partial | 59 |
+| partial | 58 |
 | designed-only | 1 |
-| not-started | 12 |
+| not-started | 13 |
 | constraint | 1 |
 | **total** | **157** |
 
@@ -224,17 +224,17 @@ clause that is not pinned or not built.
 | ID | verdict | src | evidence / named gap |
 |---|---|---|---|
 | C-AC-01 | implemented | C | change-control-tests: profile validation plus the exact bound tuple for mandatory promotion |
-| C-AC-02 | partial | C | emergency and not-required are pinned; standard vs. normal distinct inputs and the anti-class-shopping clause are not |
+| C-AC-02 | partial | WP-C | change-control-tests (PHX-WP-C, break-proofed): "standard" is pinned as a distinct changeClass paired with mandatory authority, alongside emergency and not-required; the required-field-level distinction between standard and normal, and any anti-class-shopping check, remain absent -- validateChangeControlProfile requires the identical fixed key set for every class |
 | C-AC-03 | implemented | C | change-control-tests: Pipeline and external authority validated independently against the same tuple |
 | C-AC-04 | implemented | C | change-control-tests: stale, unauthenticated, mismatched, unavailable and outside-window state all block |
 | C-AC-05 | implemented | C | change-control-tests: external update published only after the local deployment event; failed attempts preserved |
 | C-AC-06 | implemented | C | change-control-tests: reconciliation-required entered instead of claiming completed change control |
-| C-AC-07 | partial | C | explicit emergency authority is pinned; bounded scope and retrospective evidence are not |
+| C-AC-07 | partial | WP-C | change-control-tests (PHX-WP-C, break-proofed): explicit emergency authority and bounded-scope rejection of a scope mismatch are pinned; retrospective evidence proving the emergency was real or reviewed is not -- the journal binding does not even carry changeClass, so nothing is gated on it |
 | C-AC-08 | implemented | C | change-control-tests: the deploy adapter stays independently usable when not-required |
-| C-AC-09 | partial | C | no assertion resolves exactly-one-profile or rejects multiple mandatory profiles |
+| C-AC-09 | not-started | WP-C | CONFIRMED ABSENT (PHX-WP-C, repo-wide search): no resolver over multiple candidate change-control profiles exists anywhere in this module or its CLI -- there is no data shape representing "release configuration for an environment" as a set of candidates, so nothing exists to test |
 | C-AC-10 | implemented | C | change-control-tests: an automatically created external record stays draft or observation |
 | C-AC-11 | implemented | C | change-control-tests: provider names and fields kept out of the provider-neutral core schema |
-| C-AC-12 | partial | C | unavailable external state blocks via C-AC-04; the explicit advisory-vs-mandatory application and operator recovery path are not pinned |
+| C-AC-12 | partial | WP-C | change-control-tests (PHX-WP-C, break-proofed): unavailable external state blocks via C-AC-04, and the distinct "external-unavailable" gate reason is now pinned by name; the explicit advisory-vs-mandatory policy distinction remains absent -- mandatory:false is only representable together with changeClass:"not-required", which short-circuits before ITSM availability is ever inspected |
 | C-AC-13 | partial | C | change-control.md is a stub; no threat model, precedence, migration, runbook or rollback procedure |
 
 ### E — Governance event export (#32) (11/21 implemented)
@@ -343,7 +343,7 @@ clause that is not pinned or not built.
 
 | # | live acceptance bullet | blocking criteria (verdict) |
 |---|---|---|
-| 1 | Environment selects no control or exactly one effective profile | C-AC-09 (partial) |
+| 1 | Environment selects no control or exactly one effective profile | C-AC-09 (not-started) |
 | 2 | Standard/normal/emergency/not-required have distinct behavior | C-AC-02 (partial) |
 | 3 | Advisory/mandatory offline and unavailable behavior is explicit | C-AC-12 (partial) |
 | 4 | Threat/policy/migration/runbook/recovery docs exist | C-AC-13 (partial) |
@@ -441,7 +441,7 @@ Issues closeable on their own live acceptance bullets: **0 of 8**.
 | A-AC-14 | partial | 1 |
 | A-AC-15 | partial | 1 |
 | C-AC-02 | partial | 1 |
-| C-AC-09 | partial | 1 |
+| C-AC-09 | not-started | 1 |
 | C-AC-12 | partial | 1 |
 | C-AC-13 | partial | 1 |
 | E-AC-02 | partial | 1 |

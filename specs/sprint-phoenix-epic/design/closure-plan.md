@@ -19,10 +19,10 @@ one list is what has made the epic look larger and more uniform than it is.
 
 | class | criteria | what closing one actually costs |
 |---|---|---|
-| A — assertion missing | 37 | one named test case in an already-registered, unprotected suite |
+| A — assertion missing | 33 | one named test case in an already-registered, unprotected suite |
 | D — documentation missing | 7 | one document section set; no code, no gate |
 | S — seam missing | 6 | a connector between two packages that already work |
-| B — capability missing | 18 | real implementation plus its tests |
+| B — capability missing | 22 | real implementation plus its tests |
 | P — not code | 5 | a human gate, a sanctioned authority revision, or a proved impossibility |
 | **total** | **73** | |
 
@@ -174,7 +174,7 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 
 ## Per criterion
 
-### Class A — the behaviour exists, the assertion does not (37)
+### Class A — the behaviour exists, the assertion does not (33)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
@@ -183,10 +183,6 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 | A-AC-12 | partial | WP-A | per-origin capture policy exists; independent projection/export configurability is not pinned |
 | A-AC-13 | partial | WP-A | determinism inherited from the store; no journal-specific interrupted/out-of-order assertion |
 | A-AC-14 | partial | WP-A | the criterion names 13 conformance scenarios; the suite carries far fewer |
-| C-AC-02 | partial | WP-C | emergency and not-required are pinned; standard vs. normal distinct inputs and the anti-class-shopping clause are not |
-| C-AC-07 | partial | WP-C | explicit emergency authority is pinned; bounded scope and retrospective evidence are not |
-| C-AC-09 | partial | WP-C | no assertion resolves exactly-one-profile or rejects multiple mandatory profiles |
-| C-AC-12 | partial | WP-C | unavailable external state blocks via C-AC-04; the explicit advisory-vs-mandatory application and operator recovery path are not pinned |
 | E-AC-02 | partial | WP-E | profiles implemented and documented; DECLARING every lossy field/semantic conversion is not pinned |
 | E-AC-04 | partial | WP-E | no assertion covers free-form rationale omission-unless-permitted-and-redacted |
 | E-AC-06 | partial | WP-E | at-least-once behaviour is exercised by the retry tests; the explicit no-exactly-once claim is documentation only |
@@ -239,7 +235,7 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 | H-AC-09 | not-started | WP-H | NO CARRIER: external-push-ledger is scoped to single-repo push proofs; nothing binds cross-repository guarded work to one physical target |
 | X-AC-11 | not-started | WP-X | NO CARRIER: the adapter never references organization policy, and the policy modules never reference the adapter |
 
-### Class B — an absent capability (18)
+### Class B — an absent capability (22)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
@@ -248,6 +244,10 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 | A-AC-08 | not-started | WP-A | NO CARRIER: no detector for missing dispatch provenance; the Dispatch: trailer is convention only |
 | A-AC-09 | designed-only | WP-A | materiality is documented as design intent only; no code enforces or measures it |
 | A-AC-10 | partial | WP-A | the offer path fails closed on unavailable journaling; no per-event-class fail-open/fail-closed policy exists |
+| C-AC-02 | partial | WP-C | change-control-tests (PHX-WP-C, break-proofed): "standard" is pinned as a distinct changeClass paired with mandatory authority, alongside emergency and not-required; the required-field-level distinction between standard and normal, and any anti-class-shopping check, remain absent -- validateChangeControlProfile requires the identical fixed key set for every class |
+| C-AC-07 | partial | WP-C | change-control-tests (PHX-WP-C, break-proofed): explicit emergency authority and bounded-scope rejection of a scope mismatch are pinned; retrospective evidence proving the emergency was real or reviewed is not -- the journal binding does not even carry changeClass, so nothing is gated on it |
+| C-AC-09 | not-started | WP-C | CONFIRMED ABSENT (PHX-WP-C, repo-wide search): no resolver over multiple candidate change-control profiles exists anywhere in this module or its CLI -- there is no data shape representing "release configuration for an environment" as a set of candidates, so nothing exists to test |
+| C-AC-12 | partial | WP-C | change-control-tests (PHX-WP-C, break-proofed): unavailable external state blocks via C-AC-04, and the distinct "external-unavailable" gate reason is now pinned by name; the explicit advisory-vs-mandatory policy distinction remains absent -- mandatory:false is only representable together with changeClass:"not-required", which short-circuits before ITSM availability is ever inspected |
 | E-AC-10 | not-started | WP-E | NO CARRIER: no named lifecycle boundary blocks only the exact unacknowledged source range |
 | EPIC-AC-02 | not-started | WP-EPIC | NO CARRIER: planParallelSprintIntegration has no concept of "unpublished" and is called only from its own test file |
 | H-AC-12 | partial | WP-H | guard-push/guard-devplan/change-control validate the decision reference; the DUAL-EVALUATION during migration with shared owner and expiry has no carrier |
