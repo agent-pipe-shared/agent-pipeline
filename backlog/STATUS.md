@@ -86,7 +86,7 @@
 | pipeline.onboarding-ready-path-unconditional-restart-barrier-read | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.onboarding-restart-flow-is-codex-only-not-runner-aware | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.orchestrator-authored-production-commits-have-no-deterministic-control | open | defect | pipeline | 2026-08-08 | — |
-| pipeline.over-broad-ignore-rule-swallows-closure-evidence | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.over-broad-ignore-rule-swallows-closure-evidence | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.parallel-goldfish-dispatches-race-on-shared-checkout | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.permitted-edit-drops-session-into-unrecoverable-readiness | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.pipeline-state-rebind-codex-default-runner | closed | defect | pipeline | 2026-08-05 | — |
@@ -146,6 +146,6 @@
 
 ## Counts
 
-- open: 90
+- open: 89
 - in_progress: 21
-- closed: 27
+- closed: 28

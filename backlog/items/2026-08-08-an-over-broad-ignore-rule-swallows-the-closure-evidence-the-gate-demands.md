@@ -3,10 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.over-broad-ignore-rule-swallows-closure-evidence
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
 due: 2026-08-15
 source: "Hit while closing two backlog items on 2026-08-08: git add refused the closure evidence file the ledger reconciliation had just demanded."
+closed_at: 2026-08-09
+closure_repository: self
+closure_commit: f9d52fe33b7797c7c86eea1bd93c35b0458d26a0
+closure_evidence: backlog/evidence/2026-08-09-closure-evidence-trackedness.md
 ---
 
 # An unanchored ignore rule swallows the closure evidence the backlog gate requires
@@ -84,7 +88,27 @@ than merely present, has not been established and is the first thing to check.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, all three legs.
+- **Rationale:** leg 1 alone leaves the silent direction open — `git add`
+  refusing is loud, never staging the file is not, and the item said so.
+- **Assignment (if accepted):** Elephant, GF-057 follow-on.
+- **Date:** 2026-08-09
+
+## Resolution
+
+- **Leg 1, anchor the rule** — `4be63c87`. `.gitignore:34` is `/evidence/`; the
+  reasoning sits above it in the file. The same sweep confirmed no other rule in
+  the file has that collateral reach.
+- **Leg 2, trackedness rather than presence** — `f9d52fe3`.
+  `repositoryTrackingState()` in `check-backlog-state.mjs` is the single owner;
+  `reconcile-backlog-ledger.mjs` imports it. Three-valued, so a non-Git project
+  is told the question is unavailable rather than that its citations are broken.
+  Four call sites: the checker's closed-item sweep, `applyBacklogTransition`,
+  `applyBacklogEvidenceAmendment`, and the reconciler's `closureFindings`.
+  Trackedness is index membership, so the write-stage-reconcile-commit flow is
+  unchanged.
+- **Leg 3, sweep the existing closures** — count is **zero**: 27 closed items, 0
+  citing an absent or untracked path. The checker's loop is now that sweep and
+  runs on every Verify, so no one-off script was kept.
+
+Evidence: `backlog/evidence/2026-08-09-closure-evidence-trackedness.md`.
