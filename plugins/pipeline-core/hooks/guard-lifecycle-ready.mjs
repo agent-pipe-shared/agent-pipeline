@@ -90,6 +90,7 @@ const LAUNCH_SCRIPT = fileURLToPath(new URL("../scripts/codex-onboarding-launch.
 const READBACK_SCRIPT = fileURLToPath(new URL("../scripts/codex-project-runtime-readback-host.mjs", import.meta.url));
 const APP_SERVER_SCRIPT = fileURLToPath(new URL("../scripts/codex-app-server-health.mjs", import.meta.url));
 const START_PREFLIGHT_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-start-preflight.mjs", import.meta.url));
+const REPAIR_MAP_SCRIPT = fileURLToPath(new URL("../scripts/repair-map.mjs", import.meta.url));
 const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
 const SESSION_CLEANUP_SCRIPT = fileURLToPath(new URL("../scripts/session-cleanup.mjs", import.meta.url));
 const SESSION_CAPABILITY_DIAGNOSE_SCRIPT = fileURLToPath(new URL("../scripts/session-capability-diagnose.mjs", import.meta.url));
@@ -1468,6 +1469,24 @@ export function isSanctionedLifecycleCommand(command, root, options = {}) {
   }
   if (script === READBACK_SCRIPT) return exactRoot(args, root, 0) && args.length === 2;
   if (script === START_PREFLIGHT_SCRIPT) return args.length === 0;
+  // OBLIGROUTE-1. templates/prompts/agent-obligations.md SS5 tells every dispatched agent to
+  // ASK which refusals can be lifted -- `node <plugin-root>/scripts/repair-map.mjs` -- rather
+  // than read a static table, and the map's own `GUARD-LIFECYCLE-NOT-READY` row is the row an
+  // agent needs precisely in the state this branch decides. Until this line the instruction was
+  // unreachable in exactly that state: the answer to "am I stuck?" was itself blocked.
+  //
+  // Admitted as narrowly as the sibling above and for the same reason: this is the file that
+  // stops an agent weakening the gate authorizing it, so the admission is one exact argv shape
+  // -- the absolute path of THIS plugin's own repair-map.mjs (resolved from import.meta.url,
+  // never a directory, prefix or wildcard) with NO arguments at all. That is the whole of its
+  // interface: the script parses no subcommand and no flag, and reads its root from
+  // CLAUDE_PROJECT_DIR/cwd, so every other argv is a shape it would ignore and this gate has no
+  // reason to admit. `node --check <path>` and the sanctioned list stay the only `node` lanes.
+  //
+  // Read-only is a property of the script, not an assumption made here: repair-map.mjs calls
+  // `eligibility()` (pure) and reaches `recordHumanGuardDenial()` only on the branch that
+  // returns before `storage()` -- its own AC-5 test pins that it writes nothing.
+  if (script === REPAIR_MAP_SCRIPT) return args.length === 0;
   if (script === SESSION_CAPABILITY_DIAGNOSE_SCRIPT) return args[0] === "--repo" && args[1] === root && args.length === 2;
   if (script === SESSION_CLEANUP_SCRIPT) return sanctionedSessionCleanupArgs(args, root);
   if (script === PIPELINE_STATE_SCRIPT) {

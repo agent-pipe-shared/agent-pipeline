@@ -8,6 +8,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   realpathSync,
   rmSync,
@@ -63,6 +64,8 @@ const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v
 const ONBOARDING_LAUNCH_SCRIPT = fileURLToPath(new URL("../scripts/codex-onboarding-launch.mjs", import.meta.url));
 const V3_BOOTSTRAP_AUTHORITY_SCRIPT = fileURLToPath(new URL("../scripts/v3-bootstrap-authority.mjs", import.meta.url));
 const START_PREFLIGHT_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-start-preflight.mjs", import.meta.url));
+const REPAIR_MAP_SCRIPT = fileURLToPath(new URL("../scripts/repair-map.mjs", import.meta.url));
+const SCRIPTS_DIR = fileURLToPath(new URL("../scripts/", import.meta.url));
 const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
 const SESSION_CLEANUP_SCRIPT = fileURLToPath(new URL("../scripts/session-cleanup.mjs", import.meta.url));
 const SESSION_CAPABILITY_DIAGNOSE_SCRIPT = fileURLToPath(new URL("../scripts/session-capability-diagnose.mjs", import.meta.url));
@@ -909,6 +912,10 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
     const inspect = `node '${ONBOARDING_SCRIPT}' inspect --root '${path}' --intent bootstrap`;
     const apply = `node '${ONBOARDING_SCRIPT}' apply-readback --root '${path}' --plan-sha256 ${"a".repeat(64)} --activate`;
     const preflight = `node '${START_PREFLIGHT_SCRIPT}'`;
+    // OBLIGROUTE-1: the second zero-argument member of this list. Enumerated here with the
+    // rest so the admitted set stays one list rather than two, and refuted below in the
+    // argument-bearing spellings, which are not part of the map's interface at all.
+    const repairMap = `node '${REPAIR_MAP_SCRIPT}'`;
     const hostPlan = `node '${HOST_REPOSITORY_INIT_SCRIPT}' plan --root '${path}'`;
     const hostApply = `node '${HOST_REPOSITORY_INIT_SCRIPT}' apply --root '${path}' --plan-sha256 ${"b".repeat(64)} --activate`;
     const kickoffPlan = `node '${ONBOARDING_SCRIPT}' kickoff plan --root '${path}' --goal 'Build one HTML game'`;
@@ -935,7 +942,7 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
     const overrideAuthorPlan = `${overridePlan} --author-source-root '${authorRoot}'`;
     const overrideAuthorPrepare = `${overridePrepare} --author-source-root '${authorRoot}'`;
     const overrideAuthorAuthorize = `node '${HUMAN_OVERRIDE_SCRIPT}' authorize --repo '${path}' --request-sha256 ${"f".repeat(64)} --plan-sha256 ${"a".repeat(64)} --selection-sha256 ${"c".repeat(64)} --reason 'PO attended exact action' --reason-sha256 ${"b".repeat(64)} --author-source-root '${authorRoot}' --activate`;
-    for (const command of [inspect, apply, preflight, hostPlan, hostApply, kickoffPlan, kickoffApply, overlayRoute, poRebind, poDecisionPlan, poDecisionSelect, poDecisionApply, legacyRevocationRecoveryPlan, reopenDesign, submitPlan, approvePlan, setPhase, profileRepairPlan, profileRepairApply, authorityMigrationPlan, authorityMigrationApply, overridePlan, overridePrepare, overrideAuthorize, overrideAuthorPlan, overrideAuthorPrepare, overrideAuthorAuthorize]) {
+    for (const command of [inspect, apply, preflight, repairMap, hostPlan, hostApply, kickoffPlan, kickoffApply, overlayRoute, poRebind, poDecisionPlan, poDecisionSelect, poDecisionApply, legacyRevocationRecoveryPlan, reopenDesign, submitPlan, approvePlan, setPhase, profileRepairPlan, profileRepairApply, authorityMigrationPlan, authorityMigrationApply, overridePlan, overridePrepare, overrideAuthorize, overrideAuthorPlan, overrideAuthorPrepare, overrideAuthorAuthorize]) {
       assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
       assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
         projectDir: path,
@@ -947,6 +954,13 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
       `node '${ONBOARDING_SCRIPT}' apply-readback --root /tmp/other --plan-sha256 ${"a".repeat(64)} --activate`,
       `node '${ONBOARDING_SCRIPT}' apply-readback --root '${path}' --plan-sha256 ${"a".repeat(64)} --activate && touch bypass`,
       `${preflight}; touch bypass`,
+      // OBLIGROUTE-1, the closing half: an argument-bearing map invocation is not a narrower
+      // version of an admitted command, it is a different command, and none of these is part
+      // of the map's interface -- it parses no flag and no subcommand.
+      `${repairMap} --json`,
+      `${repairMap} --root '${path}'`,
+      `${repairMap}; touch bypass`,
+      `${repairMap} && touch bypass`,
       `${hostApply} && touch bypass`,
       `node '${ONBOARDING_SCRIPT}' kickoff-plan --root '${path}' --goal 'Build one HTML game'`,
       `node '${ONBOARDING_SCRIPT}' plan-kickoff --root '${path}' --goal 'Build one HTML game'`,
@@ -982,6 +996,72 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
         requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
       }).exitCode, 2, command);
     }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * OBLIGROUTE-1. templates/prompts/agent-obligations.md SS5 instructs every dispatched agent to
+ * ASK which refusals can be lifted -- `node <plugin-root>/scripts/repair-map.mjs` -- and SS1a
+ * calls the non-ready lane "the state you are in precisely when you most need to look around".
+ * The map's `GUARD-LIFECYCLE-NOT-READY` row is the row that state needs, and until this
+ * admission existed the question was refused in exactly the state that asks it.
+ *
+ * Both directions are pinned, because an admission test alone cannot fail for the reason that
+ * matters here. This is the file that stops an agent weakening the gate authorizing it, so the
+ * proof that nothing else rode along is a SWEEP, not an example: every other script this plugin
+ * ships, invoked with the identical zero-argument shape, must still be refused in the same
+ * fixture. The two known zero-argument admissions are named and justified; a third one appearing
+ * turns this test red instead of passing quietly.
+ */
+test("OBLIGROUTE-1: the non-ready lane admits the repair map by exact argv, and nothing beside it", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const nonReady = {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
+    };
+
+    // Direction 1 -- the instruction SS5 gives is now executable in the state SS1a describes.
+    const map = `node '${REPAIR_MAP_SCRIPT}'`;
+    assert.equal(isSanctionedLifecycleCommand(map, path), true, map);
+    assert.deepEqual(evaluateLifecycleReadyGuard(bash(map), nonReady), { exitCode: 0, stderr: "" });
+
+    // Direction 2a -- the named neighbour. critic-dispatch-preflight.mjs is the sharpest case:
+    // agent-obligations SS4 already lists it as a read-only script exempt from the gate-strength
+    // shell lane, so "read-only and already named in that document" is demonstrably NOT what
+    // this admission keys on. Its existence is asserted so a rename fails here loudly rather
+    // than silently degrading this into an assertion about a path that no longer exists.
+    const neighbour = join(SCRIPTS_DIR, "critic-dispatch-preflight.mjs");
+    assert.ok(existsSync(neighbour), "the named neighbour script still exists");
+    const neighbourCommand = `node '${neighbour}'`;
+    assert.equal(isSanctionedLifecycleCommand(neighbourCommand, path), false, neighbourCommand);
+    const refused = evaluateLifecycleReadyGuard(bash(neighbourCommand), nonReady);
+    assert.equal(refused.exitCode, 2, neighbourCommand);
+    assert.match(refused.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
+
+    // Direction 2b -- the sweep. Zero arguments is exactly the shape just admitted, so any
+    // sibling that answers the same way would be a widening this dispatch did not intend.
+    const zeroArgumentAdmissions = new Set(["repair-map.mjs", "pipeline-start-preflight.mjs"]);
+    const siblings = readdirSync(SCRIPTS_DIR)
+      .filter((name) => name.endsWith(".mjs") && !name.endsWith(".test.mjs"))
+      .filter((name) => !zeroArgumentAdmissions.has(name));
+    assert.ok(siblings.length > 10, "the sweep still covers this plugin's script directory");
+    for (const name of siblings) {
+      const command = `node '${join(SCRIPTS_DIR, name)}'`;
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), nonReady).exitCode, 2, command);
+    }
+    // ...and the one sibling deliberately left out of the sweep is the pre-existing zero-argument
+    // admission, restated here so the exclusion above is a justified fact, not a hidden hole.
+    assert.equal(isSanctionedLifecycleCommand(`node '${START_PREFLIGHT_SCRIPT}'`, path), true);
+
+    // Direction 2c -- the admission is the exact resolved path of THIS plugin's map, not a
+    // basename, a suffix or anything under some `scripts/` directory. A same-named script in a
+    // foreign root is a different program entirely and stays refused.
+    const foreign = `node '${join(path, "plugins", "pipeline-core", "scripts", "repair-map.mjs")}'`;
+    assert.equal(isSanctionedLifecycleCommand(foreign, path), false, foreign);
+    assert.equal(evaluateLifecycleReadyGuard(bash(foreign), nonReady).exitCode, 2, foreign);
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
