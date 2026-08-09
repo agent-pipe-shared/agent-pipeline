@@ -806,6 +806,33 @@ const DELTA = {
   // (file untouched), 20/20 governance-export-delivery-tests (18 pre-existing
   // unmodified + 2 new) all pass.
   'E-AC-09': ['implemented', 'WP-E-AC09'],
+
+  // --- specs/sprint-phoenix-epic/evidence/wp-p-ac11 (task WP-P-AC11, 2026-08-09) ---
+  // Independently re-run: 13/13 organization-policy-tests pass (8 pre-existing
+  // + 5 new), 2/2 organization-policy-activation-tests pass UNMODIFIED (its
+  // own 3-key documentClasses fixtures were never touched). Narrows P-AC-11's
+  // gap by exactly two of its seven still-missing sub-concepts, deliberately
+  // not more: target class/binding and revision readback. targetBinding is a
+  // closed, provider-neutral {targetClass: artifact|repository-path-pattern|
+  // external-system, targetRef: bounded-id} descriptor -- never a literal
+  // path/URL/credential -- OPTIONAL rather than mandatory on a documentClasses
+  // entry (a design deviation from a first mandatory-field draft, which broke
+  // organization-policy-activation.test.mjs's own out-of-scope 3-key
+  // fixtures; optional keeps every pre-existing pack valid unchanged while
+  // still being fully closed and rejection-tested when declared). It is
+  // never merged across packs, same rule and same OPP-RESOLVE-CONFLICT code
+  // as mode (a mismatch, including one pack declaring it and another leaving
+  // it undeclared, fails closed) -- proven by two dedicated conflict tests.
+  // Revision readback adds an additive `revisions: [{packId, revision}]`
+  // array to each effective documentClasses entry (alongside the existing
+  // flat packIds), letting a caller determine exactly which pack(s) and
+  // revision(s) contributed that class's effective mode/approval/
+  // targetBinding -- proven with two packs of different revisions merging
+  // into one class. Still `partial`, not `implemented`: owned fields/
+  // sections, lifecycle event, preview, retention and conflict policy remain
+  // entirely absent -- documentClasses has no field for any of the five,
+  // explicitly out of scope for this dispatch.
+  'P-AC-11': ['partial', 'WP-P-AC11'],
 };
 
 // --- per-criterion evidence pointer ----------------------------------------
