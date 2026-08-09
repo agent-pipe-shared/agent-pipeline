@@ -3782,6 +3782,17 @@ inputs, never caller-supplied, with `assertPlan` failing closed on a tampered pr
 design-latitude threads (O-1/O-2, K-AC-05) remain parked pending PO input; the rest of the
 evidence-map closure queue continues.
 
+Regenerated the evidence map to check overall standing: **122 implemented** (up from 109 at this
+segment's start), 26 partial, 7 not-started, of 157 total criteria. Researched and dispatched
+**WP-P-AC06** next (audit-bundle's remaining two P-AC-06 scenarios — legacy-classified packages and
+orphaned files neither checked today; both source data structures already exist inside
+`feature-package-topology.mjs`, just not cross-checked yet). Confirmed file-disjoint from
+everything touched today; explicitly briefed to check for breakage against `pipeline-state.mjs`'s
+existing use of the same topology module before proceeding, stopping rather than fixing that file
+itself if a conflict surfaces.
+
+**Live now:** WP-P-AC06. Handover fully current through this checkpoint.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
