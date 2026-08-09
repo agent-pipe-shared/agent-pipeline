@@ -4101,6 +4101,22 @@ required to run `governance-event-store.mjs`'s own suite as the broader-consumer
 
 **Live now:** WP-R-AC11.
 
+### R-AC-11 CLOSED — BOTH CLAUSES, NOT JUST NARROWED
+
+WP-R-AC11 landed clean (`6ac1b53b`): `recordPrivateHandoffCommitment` mirrors
+`recordCommandOffer`'s existing `append`-callback architecture with a `put`-callback of the same
+shape, wiring `external-command-offer.mjs` to the existing restricted-machine-local store without
+importing `governance-event-store.mjs` directly or owning any key custody — exactly the "read-only
+reference, reuse the exports as-is" boundary the briefing set. `commitment`/`commitmentReceiptId`
+are two flat optional keys on `validateCommandOfferEvent`, deliberately mirroring
+`document-lifecycle.mjs`'s existing pairing convention rather than inventing a third shape, with
+both-or-neither enforced (`ADJ-COMMAND-COMMITMENT-PAIRING`). Verified independently (44/44 + 36/36,
+plus `governance-event-store.mjs`'s own 28/28 as the broader consumer — the 6th same-day edit to
+`agent-decision-journal.mjs`, no regression). Both R-AC-11 clauses (mandatory omission; sanctioned
+storage + commitment) are now closed — booked `implemented`, not narrowed (`10c7fc15`).
+
+**Live now: none.**
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
