@@ -50,9 +50,11 @@ retire a crashed session's orphan on a later bootstrap) uses
 in `plugins/pipeline-core/lib/session-cleanup-recovery.mjs`; an ad hoc file
 needing no lifecycle can be written directly under `scratch/`.
 
-Onboarding does not add `scratch/` to your `.gitignore` — add it yourself if
-you want these files kept out of history. This is stated rather than assumed
-because nothing here writes into a `.gitignore` a project already owns.
+Onboarding writes a `.gitignore` ignoring `/scratch/` and `/evidence/` when the
+project has none. A project that already owns one is never touched — add those
+two entries yourself if you want these files kept out of history. `/evidence/`
+matters beyond tidiness: `security-scan.mjs` refuses a dirty working tree, so
+leaving the evidence artifacts tracked makes the security gate unsatisfiable.
 
 ## Normal bootstrap command sequence
 

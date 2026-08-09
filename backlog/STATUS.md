@@ -118,6 +118,7 @@
 | pipeline.runtime-projection-v2-eager-manifest-load | open | defect | pipeline | 2026-07-27 | — |
 | pipeline.scratch-cleanup-mechanism-not-wired-to-any-event | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.security-scan-cross-branch-gitleaks-findings | closed | defect | pipeline | 2026-07-25 | — |
+| pipeline.security-scan-license-allowlist-assumes-the-pipeline-repository | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.seeded-verify-contract-is-always-green | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.sentinel-go-live-completion | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.session-keep-awake | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -144,6 +145,7 @@
 | pipeline.verify-evidence-has-no-producer | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.verify-gate-scoped-registration | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.verify-gate-suite-fails-on-where-a-second-boundary-falls | open | defect | pipeline | 2026-08-09 | — |
+| pipeline.warn-security-gate-hard-blocks-every-push | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.windows-directory-durability | closed | defect | pipeline | 2026-07-22 | PO-approved Sentinel scope extension; no implementation or closure claim. |
 | pipeline.windows-private-state-assurance | closed | defect | pipeline | 2026-07-22 | PO-approved Sentinel scope extension; no implementation or closure claim. |
 | pipeline.windows-runtime-baseline-containment | closed | defect | pipeline | 2026-07-22 | PO-approved Sentinel scope extension; no implementation or closure claim. |
@@ -153,6 +155,6 @@
 
 ## Counts
 
-- open: 94
+- open: 96
 - in_progress: 21
 - closed: 30

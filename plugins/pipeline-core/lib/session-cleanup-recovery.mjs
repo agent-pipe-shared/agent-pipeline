@@ -1331,9 +1331,14 @@ export function applySessionCleanupRecovery({
 // composite recovery machinery above solves for worktrees -- "does this
 // claimed resource still belong to a live session, and can it be reclaimed
 // safely when it does not" -- with a simpler target: one plain directory
-// under the project's own `scratch/` (already gitignored, already inside the
-// guard's project-root containment boundary, so no guard exception is
-// needed). This is deliberately NOT routed through worktree-lifecycle.mjs's
+// under the project's own `scratch/` (inside the guard's project-root
+// containment boundary, so no guard exception is needed). This comment used to
+// assert the directory was "already gitignored"; it was not, in any consumer
+// project, until onboarding began seeding a `.gitignore` on 2026-08-09 -- and it
+// still is not in a project that already owns one, which onboarding does not
+// touch. Cleanup does not depend on the ignore rule, so the correction is to the
+// claim, not to the mechanism. This is deliberately NOT routed through
+// worktree-lifecycle.mjs's
 // typed registerTemporaryIntent/finalizeTemporaryResource/cleanupSession
 // resource system: that system's allowedRootFor() hard-binds every
 // "scratch-file"/"scratch-directory" resource to the OS temp root

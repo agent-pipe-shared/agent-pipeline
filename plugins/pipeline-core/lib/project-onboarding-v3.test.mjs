@@ -1892,7 +1892,7 @@ test("blank real root inspect and plan are read-only", () => {
     assert.equal(plan.status, "ready");
     assert.deepEqual(names(path), []);
     assert.deepEqual(plan.targets.map((target) => target.path), [
-      "pipeline.user.yaml", "project/pipeline.json", "project/pipeline.yaml",
+      ".gitignore", "pipeline.user.yaml", "project/pipeline.json", "project/pipeline.yaml",
     ]);
   } finally { dispose(path); }
 });
@@ -2876,6 +2876,58 @@ test("the seeded push gate refuses an unapproved push and admits it after the sh
   } finally { dispose(path); }
 });
 
+// IGNORESEED-1. Both halves. The Pipeline tells every agent to write into
+// `scratch/` and every evidence producer to write into `evidence/`, and ignored
+// neither -- the bootstrap skill said so in its own text, which made it a
+// documented gap rather than an unknown one. `evidence/` is the one that bites:
+// `security-scan.mjs` refuses a dirty working tree, so the evidence the push gate
+// demands is what makes the scan producing the rest of it impossible.
+//
+// The other half is the boundary: appending to a `.gitignore` a project already
+// owns is a different decision with a different cost, and the seed does not take
+// it unasked.
+test("onboarding seeds ignore rules for the directories it writes into, and never touches a .gitignore the project owns", () => {
+  const fresh = root();
+  const owned = root();
+  try {
+    // A REAL repository, because the second half of this check is what Git itself
+    // does with the rules -- an assertion about the file's text alone would not
+    // have caught an unanchored rule reaching a nested directory.
+    hostGit(fresh, ["init", "--initial-branch=main"]);
+    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: fresh, deps: fakeDeps });
+    assert.equal(applyProjectOnboardingV3(plan, { rootDir: fresh, activate: true, deps: fakeDeps }).status, "applied");
+    const seeded = readFileSync(join(fresh, ".gitignore"), "utf8");
+    assert.match(seeded, /^\/scratch\/$/mu, "the directory the bootstrap skill sends every agent to");
+    assert.match(seeded, /^\/evidence\/$/mu, "the directory the shipped evidence producers write to");
+    // Anchored, so `backlog/evidence/` and friends are NOT swallowed. This exact
+    // one-character omission already cost this repository its closure citations.
+    assert.equal(seeded.includes("\nevidence/"), false, "the rule must be anchored, never bare `evidence/`");
+    assert.equal(seeded.includes("\nscratch/"), false, "the rule must be anchored, never bare `scratch/`");
+    // And it is a real ignore, not just a file: Git itself must agree. The seed
+    // initializes the repository, so `git check-ignore` runs against the real thing.
+    // `hostGit` asserts exit 0, so it cannot express a check whose non-zero exit
+    // is the meaningful answer; `check-ignore` is exactly that shape.
+    const checkIgnore = (candidate) => spawnSync("git", ["check-ignore", "-q", candidate],
+      { cwd: fresh, encoding: "utf8" }).status;
+    for (const candidate of ["scratch/note.md", "evidence/verify-latest.json"]) {
+      assert.equal(checkIgnore(candidate), 0, `git must ignore ${candidate}`);
+    }
+    // ...and it must NOT reach a nested evidence directory a project may own.
+    assert.notEqual(checkIgnore("backlog/evidence/x.md"), 0,
+      "an anchored rule must not swallow a nested evidence directory");
+
+    // A project that already owns one keeps it byte for byte, and gets no target.
+    const ownedBytes = "# mine\nnode_modules/\n";
+    writeFileSync(join(owned, ".gitignore"), ownedBytes);
+    const ownedPlan = planProjectOnboardingV3({ runner: "codex", rootDir: owned, deps: fakeDeps });
+    assert.equal(ownedPlan.targets.some((target) => target.path === ".gitignore"), false,
+      "a project-owned .gitignore is never a target");
+    assert.equal(applyProjectOnboardingV3(ownedPlan, { rootDir: owned, activate: true, deps: fakeDeps }).status, "applied");
+    assert.equal(readFileSync(join(owned, ".gitignore"), "utf8"), ownedBytes,
+      "the project's own ignore file is untouched");
+  } finally { dispose(fresh); dispose(owned); }
+});
+
 // A runner without a native runtime readback is onboarded exactly as ADR-0057
 // decision 2a describes: portable seed, runtime targets, no barrier, and the
 // lifecycle standing at `kickoff-required`. This is the state from which the
@@ -3658,12 +3710,18 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
     const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.deepEqual(
       plan.targets.map((target) => target.path),
-      ["pipeline.user.yaml", "project/pipeline.json", "project/pipeline.yaml"],
-      "fresh onboarding seeds only the canonical project authority; runtime targets are initialized later",
+      [".gitignore", "pipeline.user.yaml", "project/pipeline.json", "project/pipeline.yaml"],
+      "fresh onboarding seeds the canonical project authority and the ignore rules for the two directories it writes into; runtime targets are initialized later",
     );
     assert.equal(applyProjectOnboardingV3(plan, { rootDir: path, activate: false, deps: fakeDeps }).status, "activation-required");
     const applied = applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: fakeDeps });
     assert.equal(applied.status, "applied");
+    // The ignore rules are ANCHORED. An unanchored `evidence/` also matches
+    // `<anything>/evidence/`, which is how this repository once silently broke the
+    // closure citations its own backlog gate demands.
+    const ignore = readFileSync(join(path, ".gitignore"), "utf8");
+    assert.match(ignore, /^\/scratch\/$/mu);
+    assert.match(ignore, /^\/evidence\/$/mu);
     assert.equal(existsSync(join(path, ".git")), true);
     assert.equal(existsSync(join(path, ".claude")), false, "portable seed must not create legacy Claude authority files");
     assert.equal(existsSync(join(path, ".codex")), false);
@@ -3799,7 +3857,7 @@ test("a recognized read-only host control layout receives portable onboarding wi
     assert.equal(planned.git.mode, "host-managed");
     assert.equal(planned.git.initializesGit, false);
     assert.deepEqual(planned.targets.map((target) => target.path), [
-      "pipeline.user.yaml", "project/pipeline.json", "project/pipeline.yaml",
+      ".gitignore", "pipeline.user.yaml", "project/pipeline.json", "project/pipeline.yaml",
     ]);
     const applied = applyProjectOnboardingV3(planned, { rootDir: path, activate: true, deps: fakeDeps });
     assert.equal(applied.status, "applied");

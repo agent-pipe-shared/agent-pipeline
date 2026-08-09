@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "b7cdf7aecb9f85673b95413014a5979d367a2e078eb25585670379fe9a59a21b"
+    "transitionHead": "16342710fb59b96c2f377b3477775f6587a4d82a25751f7f78d8aa6c36461178"
   },
   "counts": {
-    "open": 94,
+    "open": 96,
     "in_progress": 21,
     "closed": 30
   },
@@ -1008,6 +1008,14 @@
       "closureEvidence": "backlog/items/2026-07-25-security-scan-cross-branch-gitleaks-findings.md"
     },
     {
+      "id": "pipeline.security-scan-license-allowlist-assumes-the-pipeline-repository",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "Measured on a freshly seeded consumer project, 2026-08-09, while establishing whether a `security` gate can be satisfied at all."
+    },
+    {
       "id": "pipeline.seeded-verify-contract-is-always-green",
       "status": "open",
       "type": "defect",
@@ -1235,6 +1243,14 @@
       "owner": "pipeline",
       "created": "2026-08-09",
       "source": "Hit during the 0.5.4 candidate's closing Verify run on 2026-08-09: guard-push-tests failed, the same suite passed unchanged on the immediate re-run, and the diff between the two runs was a commit hash."
+    },
+    {
+      "id": "pipeline.warn-security-gate-hard-blocks-every-push",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "Found by measuring whether a freshly seeded consumer can satisfy a `security` gate, 2026-08-09, while closing `pipeline.push-gate-is-silent-in-every-consumer-project`."
     },
     {
       "id": "pipeline.windows-directory-durability",

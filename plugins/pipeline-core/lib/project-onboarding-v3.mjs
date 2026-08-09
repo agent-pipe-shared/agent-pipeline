@@ -90,6 +90,44 @@ const SAFE_RELATIVE = /^(?!\/)(?!.*(?:^|\/)\.\.?($|\/))[A-Za-z0-9._-]+(?:\/[A-Za
 const AUTHENTICATED = new WeakMap();
 const AUTHENTICATED_MANIFEST_REPAIRS = new WeakMap();
 const USER_RESERVED_PATHS = new Set([".agents", ".claude", ".codex", "project"]);
+/**
+ * The two directories the Pipeline itself tells a project to write into, ignored
+ * so the project is not handed a repository the Pipeline immediately dirties.
+ *
+ * `scratch/` is where the bootstrap skill sends every agent for temporary files,
+ * and nothing was ignoring it: the skill said so in its own text ("Onboarding does
+ * not add `scratch/` to your `.gitignore`"), which made the gap a documented
+ * defect rather than an unknown one. `evidence/` is where the shipped producers
+ * write the verify and security artifacts the push gate demands -- and that one is
+ * not cosmetic: `security-scan.mjs` REFUSES a dirty working tree, so the evidence
+ * the gate requires is what makes the scan that produces the rest of it
+ * impossible. Measured 2026-08-09: all four adapters returned
+ * `working-tree-not-clean` until `evidence/` was ignored.
+ *
+ * Both entries are ANCHORED (`/scratch/`, not `scratch/`). An unanchored rule is
+ * how `evidence/` once swallowed `backlog/evidence/` in this repository and
+ * silently broke the closure citations the backlog gate demands
+ * (`pipeline.over-broad-ignore-rule-swallows-closure-evidence`). The same
+ * one-character omission must not be reintroduced by the thing that fixes it.
+ *
+ * Written ONLY when the project has no `.gitignore` at all. Appending to a file
+ * the project owns is a different decision with a different cost, and the seed
+ * does not take it unasked: a project that already has one keeps it untouched and
+ * is told what to add.
+ */
+const PROJECT_IGNORE_SEED = [
+  "# Written by Agent-Pipeline onboarding because this repository had no .gitignore.",
+  "# Both entries are directories the Pipeline itself writes into. Anchored on",
+  "# purpose: an unanchored `evidence/` also matches `<anything>/evidence/`.",
+  "",
+  "# Agent scratch space (the bootstrap skill sends every agent here).",
+  "/scratch/",
+  "",
+  "# Verify and security evidence. security-scan refuses a dirty working tree, so",
+  "# leaving these tracked makes the security gate impossible to satisfy.",
+  "/evidence/",
+  "",
+].join("\n");
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
 const MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/runner-profile-migration-v3.mjs", import.meta.url));
 const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
@@ -3497,18 +3535,28 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
   const baselines = freshBaselines(intent, { hostManaged });
   const manifest = validateManifest(parseYaml(baselines[NEUTRAL_MANIFEST].bytes), { rootDir: inspected.root });
   if (manifest.status !== "ok") return { schema: PLAN_SCHEMA, status: "invalid-projection", root: inspected.root, diagnostics: manifest.errors, targets: [], requiresExplicitActivation: true };
+  // Only when the project has none. The apply below is create-only (`flag: "wx"`,
+  // and it throws on a target that appeared during activation), so a project that
+  // already owns a `.gitignore` is never touched -- it simply gets no such target.
+  const seedsProjectIgnore = !(inspected.entries ?? []).includes(".gitignore");
   const internal = [
     ...[
       NEUTRAL_CALIBRATION,
       NEUTRAL_MANIFEST,
     ].map((path) => ({ path, bytes: baselines[path].bytes })),
     { path: SOURCE, bytes: renderYaml(intent) },
+    ...(seedsProjectIgnore ? [{ path: ".gitignore", bytes: PROJECT_IGNORE_SEED }] : []),
   ].sort((left, right) => left.path.localeCompare(right.path));
   const targets = internal.map((target) => ({
     path: target.path,
+    // `project-ignore` is its own kind rather than being folded into `runtime`:
+    // the runtime kind is filtered on elsewhere to mean "a compiled V3 runtime
+    // target", and a `.gitignore` is neither compiled nor owned by that projection.
     kind: target.path === SOURCE
       ? "source"
-      : (target.path.startsWith("project/") ? "project-authority" : "runtime"),
+      : (target.path === ".gitignore"
+        ? "project-ignore"
+        : (target.path.startsWith("project/") ? "project-authority" : "runtime")),
     before: describe(null),
     after: describe(target.bytes),
     changed: true,
