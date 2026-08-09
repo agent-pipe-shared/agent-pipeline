@@ -47,6 +47,18 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 09f853a9e585a5db133d441be5c19390acbd3623 — 2026-08-09, range 3387065..09f853a, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `68338ef` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `7376c2c`, `7a2caa6`, `09f853a`. Same reading as the whole chain: `docs/state.md` stays
+ADR-0012 (one new closing-checkpoint entry), the generated evidence-map/closure-plan pair stays
+ADR-0045. The one documentation commit (`docs/agent-decision-journal.md`,
+`docs/governance-events.md`, `docs/governance-replay.md`) touches no path any `Governs:` line in
+the corpus names, confirmed by this run.
+
 ## Candidate 8db7e3cf7d6095743ee72a405ad88d928752958a — 2026-08-09, range 3387065..8db7e3c, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
