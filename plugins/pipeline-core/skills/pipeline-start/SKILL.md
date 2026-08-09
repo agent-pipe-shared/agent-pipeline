@@ -50,11 +50,12 @@ retire a crashed session's orphan on a later bootstrap) uses
 in `plugins/pipeline-core/lib/session-cleanup-recovery.mjs`; an ad hoc file
 needing no lifecycle can be written directly under `scratch/`.
 
-Onboarding writes a `.gitignore` ignoring `/scratch/` and `/evidence/` when the
-project has none. A project that already owns one is never touched — add those
-two entries yourself if you want these files kept out of history. `/evidence/`
-matters beyond tidiness: `security-scan.mjs` refuses a dirty working tree, so
-leaving the evidence artifacts tracked makes the security gate unsatisfiable.
+Onboarding writes a `.gitignore` ignoring `/scratch/`, `/evidence/`, and
+`/project/pipeline-state.json` when the project has none. A project that
+already owns one is never touched — add those three entries yourself if you
+want these files kept out of history. `/evidence/` matters beyond tidiness:
+`security-scan.mjs` refuses a dirty working tree, so leaving the evidence
+artifacts tracked makes the security gate unsatisfiable.
 
 ## Normal bootstrap command sequence
 
@@ -126,7 +127,10 @@ deployment, publication, destructive work, or scope change.
    unavailable, stale, malformed or drifted state. The four required facts
    are `runtime.status`, `profile/model and role`, `calibration/handover`,
    and `Verify availability`; each is digest-bound to the machine readback
-   and printed before continuation.
+   and printed before continuation. If this project has `gates.push_approval`
+   configured, note here that any push will need a signed or chat-cleared
+   approval before it can land — `references/push-approval.md` explains the
+   full ceremony when a push is actually being constructed or discussed.
 5. **Observation governance:** run
    `node "${PIPELINE_PLUGIN_ROOT}/scripts/observation-governance-bootstrap.mjs" --root "$PWD"`
    before confirmation. `not-applicable` is the successful Consumer-project
