@@ -47,6 +47,25 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 36a7fb1de06b84a36f55468afce36e1b2b7c97de — 2026-08-09, range 8dcb1cc..36a7fb1, the substantive tip of the push candidate; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Both readings unchanged from the entry below, and both re-read rather than carried forward:
+the handover decision still holds with one canonical file, and the topology decision was
+read against the package it governs and deliberately left alone.
+
+What changed since that entry is the disposition around ADR-0045, not the reading. The PO
+settled on 2026-08-09 that harness-level checks created outside the Epic's file inventory
+are an acknowledged, repeated practice rather than a one-night exception, so no decision
+record moves here. The gap that produced the practice is filed as
+`pipeline.epic-file-contract-has-no-drift-check`; the divergence between that ADR and the
+package it governs remains filed as
+`pipeline.adr-0045-topology-divergence-from-package-and-skill`; and this layer's blindness
+to changes inside `docs/adr/` itself remains filed as
+`pipeline.doc-reconciliation-blind-to-adr-corpus-changes`.
+
 ## Candidate 51eafc7b8c4853ee2663db0dfc1274268ca383f7 — 2026-08-09, range 8dcb1cc..51eafc7, the substantive tip of the push candidate; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
