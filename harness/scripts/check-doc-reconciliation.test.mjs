@@ -7,6 +7,19 @@
  * and `git rev-parse` for real, so a fixture that never initializes a git
  * repo would not be evidence of anything.
  *
+ * F1/F2 (PHX-RECFIX, 2026-08-09): ADR bodies/`Governs:` lines are read from
+ * the candidate commit (F1(b)); the reconciliation record is read from
+ * `--record-ref` (default `HEAD`), a SEPARATE ref from `candidate` by
+ * construction -- a record naming candidate X cannot live inside X (module
+ * header, check-doc-reconciliation.mjs, "THREE THINGS ABOUT WHERE BYTES
+ * COME FROM"). Every fixture below that wants a record to be READ now
+ * commits it (`commitAll` after `writeRecord`) -- an uncommitted
+ * `writeRecord` is deliberately still used where a fixture's whole point IS
+ * to prove that state is invisible (F1(a)). `amended in <commit>` citations
+ * are resolved (F2), so a placeholder hex no longer qualifies as a
+ * satisfying entry; fixtures citing an amendment use a real, ancestor commit
+ * that actually touches the named ADR.
+ *
  * NOT REGISTERED in harness/scripts/verify.mjs on purpose (that file's
  * maintenance window is closed, same posture as check-adr-consistency.test.mjs);
  * run it directly with `node`.
@@ -144,6 +157,10 @@ check("behaviour 2: the same range with a correct record entry clears", () => {
     "- ADR-0001: checked, no change needed.",
     "",
   ].join("\n"));
+  // The record cannot live INSIDE `candidate` (module header, "THREE THINGS
+  // ABOUT WHERE BYTES COME FROM", point (ii)) -- it is committed as its own,
+  // later commit, and read from --record-ref, which defaults to HEAD.
+  commitAll(root, "record: reconcile ADR-0001 for the candidate");
 
   const result = run(root, base, candidate);
   assert.deepEqual(result.findings, []);
@@ -153,12 +170,18 @@ check("behaviour 2: the same range with a correct record entry clears", () => {
   cleanup(root);
 });
 
-check("behaviour 2b: 'amended in <commit>' is the other recognised satisfying shape", () => {
+check("behaviour 2b: 'amended in <commit>' is the other recognised satisfying shape (F2: citing a real, resolvable commit)", () => {
   const root = buildRoot();
   writeAdr(root, "0001-alpha.md", "**Governs:** src/alpha.txt");
   writeFileSync(join(root, "docs", "doc-reconciliation.md"), "seed\n");
   writeFileSync(join(root, "src.placeholder"), "seed\n");
   const base = commitAll(root, "base");
+  // A real, prior commit that actually amends ADR-0001 -- F2 resolves the
+  // citation (exists, ancestor of candidate, touches the named ADR), so an
+  // arbitrary placeholder hex no longer qualifies here (see the dedicated F2
+  // suite below for the rejection side).
+  writeAdr(root, "0001-alpha.md", "**Governs:** src/alpha.txt", "Amended.");
+  const amendCommit = commitAll(root, "amend ADR-0001");
   mkdirSync(join(root, "src"), { recursive: true });
   writeFileSync(join(root, "src", "alpha.txt"), "changed\n");
   const candidate = commitAll(root, "candidate");
@@ -168,9 +191,10 @@ check("behaviour 2b: 'amended in <commit>' is the other recognised satisfying sh
     "",
     `## Candidate ${candidate}`,
     "",
-    "- ADR-0001: amended in 1234567.",
+    `- ADR-0001: amended in ${amendCommit}.`,
     "",
   ].join("\n"));
+  commitAll(root, "record: cite the real amending commit");
 
   const result = run(root, base, candidate);
   assert.deepEqual(result.findings, []);
@@ -192,7 +216,8 @@ check("behaviour 3: a record entry naming a DIFFERENT candidate commit does not 
   writeFileSync(join(root, "src", "alpha.txt"), "changed again\n");
   const realCandidate = commitAll(root, "candidate 2: touch src/alpha.txt again");
 
-  // A well-formed entry exists, but ONLY under the stale candidate's own heading.
+  // A well-formed entry exists, committed, but ONLY under the stale
+  // candidate's own heading.
   writeRecord(root, [
     "# Doc reconciliation record",
     "",
@@ -201,6 +226,7 @@ check("behaviour 3: a record entry naming a DIFFERENT candidate commit does not 
     "- ADR-0001: checked, no change needed.",
     "",
   ].join("\n"));
+  commitAll(root, "record: reconcile the STALE candidate only");
 
   const result = run(root, base, realCandidate);
   assert.equal(result.ok, false);
@@ -220,6 +246,7 @@ check("behaviour 3: a record entry naming a DIFFERENT candidate commit does not 
     "- ADR-0001: checked, no change needed.",
     "",
   ].join("\n"));
+  commitAll(root, "record: reconcile the REAL candidate");
   const fixed = run(root, base, realCandidate);
   assert.deepEqual(fixed.findings, []);
   assert.equal(fixed.ok, true);
@@ -291,11 +318,129 @@ check("a record line that parses as neither recognised shape is MALFORMED-RECORD
     "- ADR-0001: looked at it, seems fine",
     "",
   ].join("\n"));
+  commitAll(root, "record: a malformed entry");
 
   const result = run(root, base, candidate);
   assert.equal(result.ok, false);
   assert.ok(result.findings.some((f) => f.startsWith("MALFORMED-RECORD-ENTRY") && f.includes("ADR-0001")));
   assert.ok(result.findings.some((f) => f.startsWith("UNRECONCILED-ADR")), "a malformed entry must not silently satisfy the ADR it names");
+  cleanup(root);
+});
+
+// ------------------------------------------- F1(a): record is commit-bound
+
+check("F1(a): a record written but never committed does not satisfy the check -- committing it on --record-ref does", () => {
+  const root = buildRoot();
+  writeAdr(root, "0001-alpha.md", "**Governs:** src/alpha.txt");
+  writeFileSync(join(root, "docs", "doc-reconciliation.md"), "# Doc reconciliation record\n\nNo entries yet.\n");
+  writeFileSync(join(root, "src.placeholder"), "seed\n");
+  const base = commitAll(root, "base");
+  mkdirSync(join(root, "src"), { recursive: true });
+  writeFileSync(join(root, "src", "alpha.txt"), "changed\n");
+  const candidate = commitAll(root, "candidate: touch src/alpha.txt");
+
+  const recordContent = [
+    "# Doc reconciliation record",
+    "",
+    `## Candidate ${candidate}`,
+    "",
+    "- ADR-0001: checked, no change needed.",
+    "",
+  ].join("\n");
+
+  // Write the SAME correctly-shaped, correctly-headed entry -- but leave it
+  // sitting only in the working tree, never committed.
+  writeRecord(root, recordContent);
+  const uncommitted = run(root, base, candidate);
+  assert.equal(uncommitted.ok, false, "an uncommitted record must not satisfy the check (F1)");
+  assert.ok(
+    uncommitted.findings.some((f) => f.startsWith("UNRECONCILED-ADR") && f.includes(candidate)),
+    `expected UNRECONCILED-ADR, got:\n  ${uncommitted.findings.join("\n  ")}`,
+  );
+
+  // Positive control (DoD 1): the SAME record content, actually committed --
+  // on its own, later commit, exactly as the write-order rule prescribes
+  // (docs/doc-reconciliation.md) and as --record-ref (default HEAD) reads.
+  const recordCommit = commitAll(root, "record: reconcile the candidate");
+  const committed = run(root, base, candidate);
+  assert.deepEqual(committed.findings, []);
+  assert.equal(committed.ok, true, `expected the committed record to satisfy the check, got:\n  ${committed.findings.join("\n  ")}`);
+  assert.equal(committed.range.recordRefSha, recordCommit, "default --record-ref (HEAD) must resolve to the just-made record commit");
+  cleanup(root);
+});
+
+// ------------------------------------ F1(b): Governs: line is commit-bound
+
+check("F1(b): a Governs: line deleted in the working tree only does not narrow the implicated set -- committing the deletion does", () => {
+  const root = buildRoot();
+  writeAdr(root, "0001-alpha.md", "**Governs:** src/alpha.txt");
+  writeFileSync(join(root, "docs", "doc-reconciliation.md"), "seed\n");
+  writeFileSync(join(root, "src.placeholder"), "seed\n");
+  const base = commitAll(root, "base");
+  mkdirSync(join(root, "src"), { recursive: true });
+  writeFileSync(join(root, "src", "alpha.txt"), "changed\n");
+  const candidate = commitAll(root, "candidate: touch src/alpha.txt");
+
+  // Delete the Governs: line in the WORKING TREE only -- never committed.
+  writeAdr(root, "0001-alpha.md", null);
+  const stillFires = run(root, base, candidate);
+  assert.equal(stillFires.ok, false, "a working-tree-only deletion of Governs: must not silence the ADR for this candidate (F1)");
+  assert.ok(
+    stillFires.findings.some((f) => f.startsWith("UNRECONCILED-ADR 0001-alpha.md") && f.includes(candidate)),
+    `expected the candidate's OWN committed Governs: line to still implicate ADR-0001, got:\n  ${stillFires.findings.join("\n  ")}`,
+  );
+  assert.equal(stillFires.coverage.adrsWithGoverns, 1, "the candidate's OWN committed tree still carries the Governs: line");
+
+  // Positive control (DoD 1): commit the SAME deletion for real, as a NEW candidate.
+  const candidate2 = commitAll(root, "actually remove the Governs: line");
+  const cleared = run(root, base, candidate2);
+  assert.deepEqual(cleared.findings, []);
+  assert.equal(cleared.ok, true);
+  assert.equal(cleared.coverage.adrsWithGoverns, 0);
+  cleanup(root);
+});
+
+// ------------------------------------------------- F2: amendment resolution
+
+check("F2: an 'amended in <commit>' citing a nonexistent commit is UNRESOLVED-AMENDMENT and does not satisfy -- citing a real, qualifying commit does", () => {
+  const root = buildRoot();
+  writeAdr(root, "0001-alpha.md", "**Governs:** src/alpha.txt");
+  writeFileSync(join(root, "docs", "doc-reconciliation.md"), "seed\n");
+  writeFileSync(join(root, "src.placeholder"), "seed\n");
+  const base = commitAll(root, "base");
+  // A real, prior commit that actually amends ADR-0001 -- the qualifying
+  // citation for the positive control below.
+  writeAdr(root, "0001-alpha.md", "**Governs:** src/alpha.txt", "Amended for real.");
+  const realAmendCommit = commitAll(root, "amend ADR-0001 for real");
+  mkdirSync(join(root, "src"), { recursive: true });
+  writeFileSync(join(root, "src", "alpha.txt"), "changed\n");
+  const candidate = commitAll(root, "candidate: touch src/alpha.txt");
+
+  const fakeSha = "1234567890123456789012345678901234567890";
+  writeRecord(root, [
+    "# Doc reconciliation record", "", `## Candidate ${candidate}`, "",
+    `- ADR-0001: amended in ${fakeSha}.`, "",
+  ].join("\n"));
+  commitAll(root, "record: cite a nonexistent commit");
+
+  const negative = run(root, base, candidate);
+  assert.equal(negative.ok, false);
+  assert.ok(
+    negative.findings.some((f) => f.startsWith("UNRESOLVED-AMENDMENT") && f.includes("ADR-0001") && f.includes(fakeSha)),
+    `expected UNRESOLVED-AMENDMENT, got:\n  ${negative.findings.join("\n  ")}`,
+  );
+
+  // Positive control: the SAME candidate, a NEW record entry citing the
+  // real, ancestor commit that actually touched ADR-0001.
+  writeRecord(root, [
+    "# Doc reconciliation record", "", `## Candidate ${candidate}`, "",
+    `- ADR-0001: amended in ${realAmendCommit}.`, "",
+  ].join("\n"));
+  commitAll(root, "record: cite the real amending commit");
+
+  const positive = run(root, base, candidate);
+  assert.deepEqual(positive.findings, []);
+  assert.equal(positive.ok, true, `expected the resolved citation to satisfy the check, got:\n  ${positive.findings.join("\n  ")}`);
   cleanup(root);
 });
 
@@ -364,6 +509,7 @@ check("CLI: exits 0 against a well-formed fixture root with a reconciled range",
   writeFileSync(join(root, "src", "alpha.txt"), "changed\n");
   const candidate = commitAll(root, "candidate");
   writeRecord(root, ["# Doc reconciliation record", "", `## Candidate ${candidate}`, "", "- ADR-0001: checked, no change needed.", ""].join("\n"));
+  commitAll(root, "record: reconcile the candidate");
 
   const result = spawnSync(process.execPath, [checkerPath, "--root", root, "--base", base, "--candidate", candidate], { encoding: "utf8" });
   assert.equal(result.status, 0, `expected exit 0, got ${result.status}; stderr: ${result.stderr}`);
