@@ -1023,6 +1023,42 @@ a dispatch the authority to clear a control whose purpose is to check that
 dispatch's own class of work. "Show your evidence" is not a substitute for
 separation of duties — it is what makes the absence of separation look rigorous.
 
+### LIVE-2 repaired (`dc65e46`) — and the deletion criterion would have eaten the whole taxonomy
+
+`governance-event` is a **live class**, not a retirement, established by production rather
+than by mention: `governance-event-store.mjs` writes the stream files and binds
+`governance/events/${streamId}/${sequence}-${eventId}.json`; two artifacts of the class
+are tracked at `HEAD`; a schema pins `eventPath` to that root. Fixture mentions in five
+suites were excluded as mentions. Restored verbatim from `998a609`, checker strictness
+restored with it, suite 6 → 10 cases, additions only.
+
+**The mirror is now proven mechanically, not argued.** Against the pre-repair tree the
+checker exits **0** with the produced class absent — and exits **2** when only the
+artifact carries it. That asymmetry is the proof: the checker had been moved to match the
+shrunken file, not the file to match a changed contract. After the repair, deleting the
+class turns both the checker and the suite red, with a byte-identical restore.
+
+**The finding that outweighs the fix.** The merge justified this deletion in its own
+message as *"confirmed unreferenced anywhere in the tree"*. **No topology class is a code
+literal** — the same criterion would equally have deleted `adr`, `state`, `handover` and
+`private-local`. The rule that removed one class would have removed the taxonomy. It was
+applied once; nothing prevents it being applied again, and nothing recorded that it was
+wrong.
+
+**Retirement was excluded on evidence, not assumed away:** the second merge parent never
+contained the class, and exactly one commit in the whole history ever touched that string
+in these files — the one that added it.
+
+**Two records are falsified and one is stale:**
+`specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md` now asserts something
+untrue ("confirmed unreferenced"); `docs/artifact-topology.md` lines 41-46 still describe
+the `lifecycleAuthority` contract whose eight keys are **still missing** (SILENT-6, left
+deliberately for its own commit). The dispatch was forbidden from editing the
+documentation, which was the right constraint: adjusting a document to match a silently
+shrunken artifact is the move that created this defect.
+
+**Remaining from the second audit: four** — LIVE-3, LIVE-4, SILENT-5, SILENT-6.
+
 ### The budget that lied (`a54f53b`, `a0c6301`) — two committed assertions disagreed, and the permissive one won for months
 
 The skill repair turned the gate red twice in a row. Both reds were worth having.
