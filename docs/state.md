@@ -6,7 +6,7 @@
 **Last updated:** 2026-08-09
 **Project status:** ACTIVE
 **Local candidate:** `0.5.4+<runner>.20260809091238.7d38484` · commit `53c5b716e8b2deaf3b7b6a78d9b555b7b1867044` · installed by the PO and under happy-path test on both runners
-**Current block:** GF-058 — the installed candidate's remaining work: the closure-evidence trackedness contract, two routing defects found by reading, and the defects the PO's two greenfield happy-path runs produced (one blocker-class, filed with a live reproduction); one TP-3 registration step is open for the PO; 0.5.3 is released to `main` and the human-authorization ceremony recorded as [ADR-0061](adr/0061-uniform-human-approval-ceremony.md) remains the governing thread; Nova A completion still paused on genuine ADR-gated/evidence-gated blockers
+**Current block:** GF-058 — **0.5.4 is NOT stable-ready: the push gate is silent in every consumer project** (see the blocker section below; PO chose option C, measure the satisfying path first). Also in this block: the closure-evidence trackedness contract, three routing defects found by reading, the staging exemption, and the defects the PO's three greenfield runs produced; three suite registrations are open for the PO (TP-3); 0.5.3 is released to `main` and the human-authorization ceremony recorded as [ADR-0061](adr/0061-uniform-human-approval-ceremony.md) remains the governing thread; Nova A completion still paused on genuine ADR-gated/evidence-gated blockers
 **Repair baseline:** `5d2b83dcc765d50801f4491e1bd9bed32090112b`
 **Release version:** `0.5.3` released
 **Release state:** version `0.5.3` · tag `v0.5.3` · commit `2740041d59458f949b597905816af12048502469` · tree `e72cca9b69e105ec6aac9833c4ac0bccb385d25b` · status `published`
@@ -135,6 +135,72 @@ property, not a Pipeline one, so totals are not comparable without saying so.
 
 **A third unregistered suite surfaced:** `resume-hint.test.mjs`. The pending file
 and `apply-pending-protected-edits.mjs` now report three rather than two.
+
+10. `GSSHELL-STAGE-1` — the gate-strength shell rule stopped refusing `git add`.
+    Staging is not a content change; the refusal even said "use the Edit or Write
+    tool instead", which answers a different question. An allowlist of verbs that
+    cannot write the file (`add`, `status`, `commit`, `diff`, `log`, `show`,
+    `ls-files`, `check-ignore`, `check-attr`, and `rm` only with `--cached`);
+    everything that can rewrite the working tree keeps the refusal. The first
+    version of its test was green and proved nothing — the fixture carried no
+    Pipeline marker, so the rule was inactive; it now opens with a check that the
+    rule is firing.
+
+## 2026-08-09 STABLE BLOCKER — the push gate is silent in every consumer project
+
+**Found by the PO, not by this session.** Both greenfield runs pushed to a GitHub
+remote and nothing demanded an approval, a verify record or a security record.
+
+`guard-push.mjs` reads the **manifest**, and its step 4 is "gate `push` absent →
+exit 0". The seeded consumer's `pipeline.user.yaml` declares `push: blocking` and
+`security: warn`; the emitted `project/pipeline.yaml` carries `dev-plan` and
+nothing else. `project-onboarding-v3.mjs:752` is a hardcoded one-gate chapter,
+and the comment above it records that this exact defect was already found once,
+for `dev_plan`, and closed by hardcoding that single gate.
+
+**Three independent confirmations.** The manifest comparison; the Codex push; and
+the Claude run, which diagnosed it in its own words — `git push` ran unchecked
+while the same guard family had cleanly refused a commit trailer under GIT-03 in
+the same session ("Der Hook ist nicht tot"). So this is a composition defect, not
+an uninstalled hook. The Claude session even **attempted** `approve-push`, was
+refused for the missing proof parameters, and pushed anyway. A gate an agent can
+name and then walk through is worse than an absent one.
+
+**PO decision: option C** — extend the manifest to carry every declared gate,
+but MEASURE the satisfying path first, exactly as the `dev-plan` comment demands
+of itself ("blocking is only defensible because the satisfying path was MEASURED
+end to end"). **Next action, and it is the whole decision:** can a freshly seeded
+consumer satisfy `guard-push` at all? It needs `evidence/verify-latest.json` with
+`exitCode 0` bound to the pushed commit, while the seed's `verify` is the
+placeholder that exits 1 by design. First measurement taken:
+`verify-evidence-producer.mjs` does not write `verify-latest.json`, so who
+produces that file for a consumer is still open. If the path is closed, THAT is
+the blocker and the honest interim is to stop the calibration promising a gate
+that is not enforced.
+
+**The Claude run's own findings are filed** in
+`2026-08-09-what-the-claude-greenfield-run-adds-to-the-happy-path-findings.md`.
+The expensive one: `submit-plan` refused with `PO-GATE-PRD-LANGUAGE-MISMATCH` —
+the enforcement end of the kickoff language drift, landing several steps after
+the point that could have prevented it, with both documented exits being edits to
+byte-bound artifacts. That is the PO's reported loss of effectiveness to
+language, and it is not the agent being slow.
+
+**Three-run telemetry** (same brief, 2026-08-09):
+
+| Axis | Claude + Pipeline | Codex + Pipeline | Claude, no Pipeline |
+|---|---|---|---|
+| Wall | 1 h 11 m (API 51 m) | ~33 min | 10 m 34 s |
+| Cost | $26.27 | not priced | $1.62 |
+| Output tokens | 173.3k | 51.1k | 21.6k |
+| PO turns | — | 17 | 3 |
+| Lines | +2,435 | +656 | +1,030 |
+
+Same runner with and without the Pipeline is the only clean pair: **$26.27 against
+$1.62**, with the deadlock and the language round-trips inside the first number.
+The control run has no test, no version control and no recorded requirement, and
+nothing in it is exported, so none of its 1,030 lines can be checked without a
+browser. That is the trade this pair actually measures.
 
 ## 2026-08-09 Local `0.5.4` candidate stamped and verified — ready for the PO's manual copy
 
