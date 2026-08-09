@@ -186,6 +186,47 @@ function approvePushAttempt(root, deps, pushTarget = { remote: "origin", destina
     `the signature-mode refusal must name the chat alternative: ${sixFlags.lines.join(" ")}`);
 }
 
+// HELP-1. `--help` is a question, not an error. Both 2026-08-09 greenfield runs
+// asked it and were told `unknown command "--help"` -- true and useless, since a
+// reader who does not already know the verbs cannot ask for them without first
+// guessing one wrong. And the verb list the refusal carried had already fallen
+// behind: `materialize-push-threat-model` was absent from it while ANOTHER refusal
+// names that exact command as the way out of a stuck approval. This test binds the
+// three together -- help, refusal, and the real dispatch -- so they cannot drift
+// again.
+{
+  const { root, deps } = freshFixture();
+  const lines = [];
+  const original = console.log;
+  console.log = (...args) => { lines.push(args.join(" ")); };
+  let helpExit;
+  try { helpExit = run(["--help"], deps); } finally { console.log = original; }
+  const help = lines.join("\n");
+  assert.equal(helpExit, 0, "asking for help is not a failure");
+  assert.ok(help.includes("materialize-push-threat-model"),
+    "the command another refusal sends operators to must be listed");
+  // The help says there is NO `--dir` flag rather than staying silent about it:
+  // two refusals used to name one, so a reader who saw those needs the correction,
+  // not just its absence.
+  assert.match(help, /no --dir flag/u, "help must state that --dir does not exist");
+  assert.ok(help.includes("CLAUDE_PROJECT_DIR"), "help must say where the project directory comes from");
+
+  const unknown = capturedStderr(() => run(["definitely-not-a-command"], deps));
+  assert.equal(unknown.result, 2);
+  const refusal = unknown.lines.join("\n");
+  assert.ok(refusal.includes("materialize-push-threat-model"));
+  assert.ok(refusal.includes("--help"), "the refusal must point at the question that answers it");
+
+  // Every name the two lists advertise must actually dispatch: an advertised verb
+  // that falls through to `default` would be the same defect pointing the other way.
+  for (const command of ["materialize-push-threat-model", "approve-push", "submit-plan"]) {
+    const attempted = capturedStderr(() => run([command], deps));
+    assert.ok(!attempted.lines.join("\n").includes(`unknown command "${command}"`),
+      `${command} is advertised and must reach its own handler`);
+  }
+  assert.ok(existsSync(join(root, "project")));
+}
+
 // AC-3c: materialize-push-threat-model refuses to overwrite an existing artifact.
 {
   const { root, deps } = freshFixture();

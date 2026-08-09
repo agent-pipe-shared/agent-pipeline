@@ -424,6 +424,26 @@ const CONTINUITY_REQUEST_MAX_BYTES = 32_768;
 // bytes under an artifact path that may already back a recorded proof,
 // invalidating it (M-2 item 4 again -- the push guard re-hashes current
 // bytes against the recorded digest and refuses on any mismatch).
+// One list, used by both the help output and the unknown-command refusal, so the
+// two can never disagree about what this script accepts. The previous refusal
+// carried the names as a hand-maintained literal and had already fallen behind:
+// `materialize-push-threat-model` was absent from it while another refusal named
+// that exact command as the way out of a stuck approval.
+const PIPELINE_STATE_COMMANDS = Object.freeze([
+  "set-feature", "submit-plan", "approve-plan", "reopen-design", "seal-plan-approval",
+  "set-phase", "set-gate-estimate", "revoke-plan", "bind-plan-spec", "approve-push",
+  "materialize-push-threat-model", "close-feature", "discard-feature", "approve-deploy",
+  "consume-deploy", "clear-deploy", "po-authority-rebind-plan", "po-authority-rebind-apply",
+  "po-authority-decision-plan", "po-authority-decision-select", "po-authority-decision-apply",
+  "continuity-init", "continuity-cas", "continuity-apply-native", "continuity-integrate-final",
+  "continuity-record-course-brief", "continuity-select-course", "continuity-apply-decision",
+  "continuity-clear-decision", "continuity-result-bootstrap-plan", "continuity-result-bootstrap-apply",
+  "continuity-result-rebind-plan", "continuity-result-rebind-apply",
+  "continuity-result-case-migration-plan", "continuity-result-case-migration-apply",
+  "continuity-result-close-plan", "continuity-result-close-apply", "publication-prepare",
+  "publication-approve", "publication-authorize", "publication-reconcile", "publication-observe",
+  "publication-start-readback", "publication-close", "publication-rearm", "publication-block",
+]);
 const PUSH_THREAT_MODEL_DEFAULT_PATH = "project/push-threat-model.md";
 const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_PUSH_THREAT_MODEL_DOC = join(PLUGIN_ROOT, "docs", "default-push-threat-model.md");
@@ -5753,9 +5773,30 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       return 0;
     }
 
+    // `--help` is a QUESTION, not an error. Both 2026-08-09 greenfield runs asked
+    // it and were told `unknown command "--help"`, which is true and useless: a
+    // reader who does not already know the verbs cannot ask for them without first
+    // guessing one wrong. The answer is the same list either way; what changes is
+    // that asking is no longer a failure. `materialize-push-threat-model` was also
+    // missing from that list entirely, while another refusal sends a stuck operator
+    // to exactly that command.
+    case "--help":
+    case "-h":
+    case "help": {
+      console.log(`Usage: node pipeline-state.mjs <command> [flags]
+
+The project directory comes from CLAUDE_PROJECT_DIR, or the current working
+directory. There is no --dir flag.
+
+Commands: ${PIPELINE_STATE_COMMANDS.join(", ")}.
+
+Each command validates its own flags and names what it needs when one is missing.`);
+      return 0;
+    }
+
     default: {
       console.error(
-        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, submit-plan, approve-plan, reopen-design, seal-plan-approval, set-phase, set-gate-estimate, revoke-plan, bind-plan-spec, approve-push, close-feature, discard-feature, approve-deploy, consume-deploy, clear-deploy, po-authority-rebind-plan, po-authority-rebind-apply, po-authority-decision-plan, po-authority-decision-select, po-authority-decision-apply, continuity-init, continuity-cas, continuity-apply-native, continuity-integrate-final, continuity-record-course-brief, continuity-select-course, continuity-apply-decision, continuity-clear-decision, continuity-result-bootstrap-plan, continuity-result-bootstrap-apply, continuity-result-rebind-plan, continuity-result-rebind-apply, continuity-result-case-migration-plan, continuity-result-case-migration-apply, continuity-result-close-plan, continuity-result-close-apply, publication-prepare, publication-approve, publication-authorize, publication-reconcile, publication-observe, publication-start-readback, publication-close, publication-rearm, publication-block.`,
+        `Error: unknown command "${sub ?? ""}". Allowed: ${PIPELINE_STATE_COMMANDS.join(", ")}. Run "--help" for usage.`,
       );
       return 2;
     }

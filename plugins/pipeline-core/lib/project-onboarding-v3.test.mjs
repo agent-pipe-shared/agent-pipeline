@@ -2928,6 +2928,58 @@ test("onboarding seeds ignore rules for the directories it writes into, and neve
   } finally { dispose(fresh); dispose(owned); }
 });
 
+// AUTHORID-1. Both 2026-08-09 greenfield runs lost a PO turn to `Author identity
+// unknown` at their first commit. Onboarding initializes the repository and never
+// looked at whether anything could commit into it, so the stop landed several
+// steps later, mid-implementation, where only the human could answer.
+//
+// The seed WARNS and does not configure: an author identity is a claim about who a
+// human is, and a seed inventing one would put a fabricated name in permanent
+// history — worse than the stop it prevents. Both halves are the contract.
+test("onboarding says the repository cannot name a commit author, and never invents one", () => {
+  const missing = root();
+  const configured = root();
+  try {
+    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: missing, deps: fakeDeps });
+    const applied = applyProjectOnboardingV3(plan, { rootDir: missing, activate: true, deps: fakeDeps });
+    assert.equal(applied.status, "applied", "the warning never fails the seed");
+    const warned = applied.diagnostics.find((entry) => entry.code === "author_identity_unconfigured");
+    assert.notEqual(warned, undefined, "a repository with no author identity must say so at creation");
+    // Which of the two keys is missing depends on the host's own global config, so
+    // the contract is that the guidance names a command for EACH key the message
+    // reports missing -- not that both are always missing.
+    for (const key of ["user.name", "user.email"]) {
+      if (!warned.message.includes(key)) continue;
+      assert.ok(warned.repair.includes(`git config ${key}`), `the repair must name the command for ${key}`);
+    }
+    assert.match(warned.message, /user\.(name|email)/u, "the message must name what is unset");
+    // Warned, never written: the seed must not have configured an identity itself.
+    assert.equal(existsSync(join(missing, ".git", "config")) === false
+      || !readFileSync(join(missing, ".git", "config"), "utf8").includes("[user]"), true,
+      "the seed must not invent an author identity in the repository it created");
+
+    // A repository that already knows its author gets no warning. `fakeGit` answers
+    // nothing for `config --get`, so the identity probe needs a stub that does --
+    // otherwise this half would pass for the wrong reason.
+    const knowsItsAuthor = {
+      ...fakeDeps,
+      spawnSync(command, args, options) {
+        if (command === "git" && args[0] === "config" && args[1] === "--get") {
+          return { status: 0, stdout: "configured\n", stderr: "" };
+        }
+        return fakeDeps.spawnSync(command, args, options);
+      },
+    };
+    const quiet = applyProjectOnboardingV3(
+      planProjectOnboardingV3({ runner: "codex", rootDir: configured, deps: knowsItsAuthor }),
+      { rootDir: configured, activate: true, deps: knowsItsAuthor },
+    );
+    assert.equal(quiet.status, "applied");
+    assert.equal(quiet.diagnostics.some((entry) => entry.code === "author_identity_unconfigured"), false,
+      "a configured repository must not be warned");
+  } finally { dispose(missing); dispose(configured); }
+});
+
 // A runner without a native runtime readback is onboarded exactly as ADR-0057
 // decision 2a describes: portable seed, runtime targets, no barrier, and the
 // lifecycle standing at `kickoff-required`. This is the state from which the

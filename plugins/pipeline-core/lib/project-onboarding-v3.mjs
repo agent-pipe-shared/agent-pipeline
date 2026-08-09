@@ -3567,6 +3567,43 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
   return plan;
 }
 
+/**
+ * Warn — never configure — when the repository cannot name a commit author.
+ *
+ * BOTH 2026-08-09 greenfield runs lost a PO turn to `Author identity unknown` at
+ * their first commit: onboarding initializes the repository and never looks at
+ * whether anything can commit into it. The agent then hits it several steps later,
+ * mid-implementation, where the only person who can answer is the human.
+ *
+ * This deliberately does NOT set `user.name`/`user.email`. An author identity is a
+ * claim about who a human is; a seed inventing one would put a fabricated name in
+ * permanent history, which is worse than the stop it prevents. So the seed says
+ * what is missing, at the moment the repository is created, and names the exact
+ * two commands — which is the whole difference between a surprise and a step.
+ *
+ * Non-fatal by construction: an unreadable Git, a host-managed mount the seed does
+ * not own, or any probe failure yields no diagnostic rather than a false alarm.
+ */
+function authorIdentityDiagnostics(root, state, fs) {
+  if (state.hostManaged) return [];
+  const configured = (key) => {
+    try {
+      const probe = fs.spawnSync("git", ["config", "--get", key], { cwd: root, encoding: "utf8" });
+      return probe.status === 0 && String(probe.stdout ?? "").trim().length > 0;
+    } catch {
+      return true; // Unprobeable is not "missing" -- never warn on evidence we do not have.
+    }
+  };
+  const missing = ["user.name", "user.email"].filter((key) => !configured(key));
+  if (missing.length === 0) return [];
+  return [diagnostic(
+    "$.git.author",
+    "author_identity_unconfigured",
+    `this repository cannot name a commit author (${missing.join(" and ")} unset), so the first commit will fail`,
+    `set it before the first commit: ${missing.map((key) => `git config ${key} "<value>"`).join(" && ")}`,
+  )];
+}
+
 function ensurePreimage(root, expectedState, fs) {
   const now = legacyInspection(root, fs);
   if (now.status !== expectedState) throw new Error(`root changed since planning (${now.status})`);
@@ -3697,7 +3734,7 @@ export function applyProjectOnboardingV3(plan, { rootDir = plan?.root ?? process
     if (source.status !== "ready" || source.sourceKind !== "v3") throw new Error("post-apply portable source validation was not ready");
     const manifest = loadManifest(root);
     if (manifest.status !== "ok") throw new Error("post-apply canonical manifest validation was not ready");
-    return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: state.hostManaged ? { mode: "host-managed", initialized: false, initialBranch: null, committed: false } : { mode: "local", initialized: gitIdentity !== null, initialBranch: "main", committed: false }, authority: { status: "portable-seed", runtimeProjection: "missing" }, diagnostics: [] };
+    return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: state.hostManaged ? { mode: "host-managed", initialized: false, initialBranch: null, committed: false } : { mode: "local", initialized: gitIdentity !== null, initialBranch: "main", committed: false }, authority: { status: "portable-seed", runtimeProjection: "missing" }, diagnostics: authorIdentityDiagnostics(root, state, fs) };
   } catch (error) {
     const rollbackFailures = root ? rollback(root, created, createdDirectories, gitIdentity, gitTree, gitWasExpectedAbsent, fs) : [];
     if (rollbackFailures.length) return { schema: PLAN_SCHEMA, status: "rollback-failed", root, diagnostics: [diagnostic("$.transaction", "rollback_failed", `${error.message}; rollback also failed: ${rollbackFailures[0].message}`, "repair generated paths manually before retrying")] };
