@@ -3340,6 +3340,20 @@ pending for K-AC-05 once rework2 lands).
 point — nothing here is blocked on it, next steps are: verify K-AC-05-rework2 when it returns,
 verify the round-3 design Critic when it returns, continue the dispatch queue.
 
+### K-AC-05-REWORK2 VERIFIED (`aae6902`) — ROUND-3 CRITIC DISPATCHED, BOTH TRACKS NOW ROUND 3
+
+Verified independently (own 24/24 test run, diff read): `readForkDisposition` + `disposition:
+{...}|null` field on `inspectForkedGovernanceStream`'s fork entries, purely additive, validates
+the on-disk record's shape/binding before trusting it, no I/O added to the write path. Dispatched
+round-3 Critic (three-commit enumerated diff `d2ad02a4,b2a5534,aae6902`, zero reference to prior
+rounds). Both tracks — K-AC-05 and the O-1/O-2 design doc — are now on round 3 of the 4-round cap,
+each Critic dispatch running concurrently, no file overlap.
+
+**Handover fully current through this checkpoint; safe to `/compact`.** Next steps on resume:
+verify whichever round-3 Critic returns first, and if both PASS, book both K-AC-05 and the O-1/O-2
+design amendment closed (K-AC-05's evidence-map DELTA still needs writing — deliberately withheld
+until Critic clearance, per this session's established discipline).
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
