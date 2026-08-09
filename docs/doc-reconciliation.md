@@ -47,6 +47,18 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 8db7e3cf7d6095743ee72a405ad88d928752958a — 2026-08-09, range 3387065..8db7e3c, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `62f2f7d` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `338f9cb`, `9f5e680`, `ccd0b13`, `4eea837`, `8db7e3c`. Same reading as the whole chain:
+`docs/state.md` stays ADR-0012 (three new entries: a dispatch note, a header-restoration fix, a
+landing checkpoint), the generated evidence-map/closure-plan pair stays ADR-0045. The one
+test-authorship commit (`plugins/pipeline-core/lib/agent-decision-journal.test.mjs`,
+`governance-export-delivery.test.mjs`) touches no path any `Governs:` line in the corpus names.
+
 ## Candidate 28df389471fda30d3a0c18bc3587195fc6b45069 — 2026-08-09, range 3387065..28df389, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
