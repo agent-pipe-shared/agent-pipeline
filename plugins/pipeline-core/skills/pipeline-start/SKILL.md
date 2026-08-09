@@ -231,6 +231,10 @@ Once bootstrap is ready and the required plan gate is recorded, continue the
 approved implementation autonomously: scoped edits, focused tests, state
 readback, one-line commits, Verify, Critic preparation and ordinary block
 continuation are agent work. A standing approval is not a fresh human touch.
+A feature's implementation is not complete until a Critic review
+(`critic-review` skill) has been dispatched against it and returned a
+result — pass, or a documented fail-then-fix cycle; this is a requirement to
+satisfy before treating the block as done, not an optional or ambient step.
 
 A recorded PRD/Spec approval is an execution mandate for its accepted scope.
 Choose implementation details, sequencing, bounded recovery, test fixes and
