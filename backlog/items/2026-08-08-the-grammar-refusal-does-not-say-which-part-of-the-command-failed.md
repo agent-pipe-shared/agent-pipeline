@@ -32,20 +32,42 @@ emit typed `retryActions` naming exactly what may be run instead. Here the block
 is present and empty, which reads as "there is no narrower path" when in fact
 there is a completely ordinary one. An empty list is a claim, not a silence.
 
-## A second, related coarseness the repair map exposed
+## A second claim recorded here on 2026-08-08, which is false — withdrawn 2026-08-09
 
-The map has one row for the grammar class, and the guards have two behaviours
-under it:
+The withdrawn claim was that the two grammar codes differ in liftability:
+`GUARD-OPERATOR-UNAPPROVED` offering a human override route while
+`GUARD-PARSE-UNSUPPORTED` does not, so the map's single grammar row could not
+say both and needed splitting.
 
-- `GUARD-OPERATOR-UNAPPROVED` (a `|`, `&&` or redirect) **does** offer a human
-  override route, and prints the full plan/prepare/authorize sequence.
-- `GUARD-PARSE-UNSUPPORTED` (the command does not parse into the closed grammar
-  at all) **does not** — the planner returns `external-operator-required`.
+**Measured, and it does not hold.** Both grammar branches call the identical
+function with the identical arguments — `guard-lifecycle-ready.mjs:1686` and
+`:1701` are `humanOverrideRoute(code, …, "command", root, toolName,
+input.tool_input, dependencies)`. Inside `humanOverrideRoute` (`:275-335`) the
+`code` parameter is read exactly once, at `:288`, inside a message string — it
+never reaches a condition. The route itself is decided by
+`consumeHumanGuardOverride` and `recordHumanGuardDenial`, both of which are
+handed the tool input and the project root, not the denial code. The same
+block's own test pins it: at
+`guard-lifecycle-ready.test.mjs:831` and `:838` one fixture yields
+`Human override available for this exact command` for **both** codes.
 
-One row cannot say both, so the map currently reports the class as never
-liftable, which is right for one code and wrong for the other. The map is a
-reader and was correctly not allowed to change a guard, so this is recorded here
-rather than patched there.
+The counterexample in the other direction was in hand and misread. On
+2026-08-09 an operator-class refusal (`rg … | head`, `GUARD-OPERATOR-UNAPPROVED`)
+printed *"No human override route is offered for this exact command"* with
+`status=external-operator-required`, `HGO-EXTERNAL-PROJECT-BOUNDARY` — the exact
+behaviour the withdrawn claim attributed exclusively to the other code.
+
+So the map's single grammar row was never wrong for one code and right for the
+other. It is coarse in a different way: it answers per code, while the guards
+answer per invocation. That is a real limitation and it is not the one recorded
+here in error.
+
+**Why the mistake is worth keeping visible.** It was written into two commit
+messages and this item before anything measured it, and it survived because the
+map was built to read the planner rather than to re-state a rule — the one
+design decision that stopped it from propagating into shipped code. A reader
+that asserts a distinction the enforcing code does not make is worse than the
+coarse row it would have replaced.
 
 ## Partially fixed 2026-08-09 (`53aa19a`), and the fix has a visible seam
 
@@ -86,8 +108,11 @@ for exactly this kind of review.
    difference between one retry and five.
 2. **Emit a real `retryActions` for the newline-in-`-m` case** — `-F <file>` is a
    fixed, safe alternative and the guard can name it.
-3. **Split the map's grammar row** once (1) and (2) land, so each code carries its
-   own liftability answer.
+3. ~~Split the map's grammar row so each code carries its own liftability
+   answer.~~ **Withdrawn 2026-08-09** — the premise is false, see the section
+   above. If the row is refined at all, the axis is per-invocation, not per
+   code, and that means the map would have to be handed a command rather than
+   asked for a table.
 
 ## Related
 
