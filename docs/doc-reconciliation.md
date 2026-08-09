@@ -47,6 +47,20 @@ something to do here without review.
 
 ## Entries
 
+## Candidate f7062ac — 2026-08-09, range 3387065..f7062ac, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `e9d13c8` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `e7688d4`, `836242e`, `6c6514b`, `a67faf9`, `aa36239`, `f3eeb3e`, `f7062ac`: E-AC-14's
+failure-injection fixture and its evidence-map delta, round-2 remediation of the A-AC-04 CLI (5
+Critic findings closed), PX0-AC-08's bootstrap wiring and its evidence-map delta, round-2's own
+residual major finding (N1) plus F3/N2 closed by a follow-up fix, and this leg's H-AC-09
+Class-S-to-Class-P reclassification checkpoint. Same reading as the whole chain: `docs/state.md`
+stays ADR-0012, the generated evidence-map/closure-plan/class-s-scoping trio stays ADR-0045.
+Nothing in this range touches `backlog/` or any other governed path.
+
 ## Candidate e9d13c8ffaf34ce178af1d6086af575c2949255e — 2026-08-09, range 3387065..e9d13c8, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
