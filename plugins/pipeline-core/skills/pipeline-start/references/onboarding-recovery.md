@@ -22,7 +22,8 @@ own typed authority status. Never substitute a remote URL/ref from conversation
 text or use a generic checkout command.
 
 Kickoff uses `project-onboarding-v3.mjs kickoff plan --root "$PWD" --goal
-"{{GOAL}}"`; goal is short (3–12 words, <=160 UTF-8 bytes), never the PRD.
+"{{GOAL}}" --language <de|en>`; goal is short (3–12 words, <=160 UTF-8 bytes),
+never the PRD.
 Apply requires the exact plan digest and `--activate`; never reconstruct or use
 remote syntax. Typed statuses `portable-seed-required`,
 `runtime-initialization-required`, `runtime-attestation-required`,
