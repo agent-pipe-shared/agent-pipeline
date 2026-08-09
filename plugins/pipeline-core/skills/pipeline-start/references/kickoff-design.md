@@ -23,12 +23,19 @@ in."* Bind the answer into `<!-- po-language: (de|en) -->` before drafting.
 
 Two different guard-drift refusals can hit this same PRD-authoring step in a
 row — a `PO-GATE-PRD-LANGUAGE-MISMATCH` on the marker, then a separate
-`projection-drift` refusal right after that repair — and both share the same
-repair path: `po-gate-profile-repair.mjs plan --root <project-root>
---human-facing <de|en>`, then `po-gate-profile-repair.mjs apply --root
-<project-root> --human-facing <de|en> --plan-sha256 <sha256> --activate` with
-the digest the plan step reports. Run the plan/apply round trip again for the
-second refusal rather than treating it as a different, undocumented problem.
+`projection-drift` refusal right after that repair — and they are DIFFERENT
+failure classes with different repair tools, not the same repair path run
+twice. The language mismatch is cleared by `po-gate-profile-repair.mjs plan
+--root <project-root> --human-facing <de|en>`, then `po-gate-profile-repair.mjs
+apply --root <project-root> --human-facing <de|en> --plan-sha256 <sha256>
+--activate` with the digest the plan step reports. Re-running that same
+repair for the `projection-drift` refusal is a no-op: it never touches the
+runtime-manifest generation step that is actually out of sync. The
+`projection-drift` refusal is cleared instead by `project-onboarding-v3.mjs
+plan-repair --root <project-root> --intent <onboarding|bootstrap|session|
+dispatch> [--runner claude|codex]`, then `project-onboarding-v3.mjs
+apply-repair --root <project-root> --plan-sha256 <sha256> --activate` with the
+digest the plan-repair step reports.
 
 Before the first `kickoff plan`, obtain both a single-line project goal and an
 explicit PO profile: `epic`, `feature`, or `mini`. Ask for them together when
