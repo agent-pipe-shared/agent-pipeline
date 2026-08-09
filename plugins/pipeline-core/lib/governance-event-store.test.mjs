@@ -12,7 +12,6 @@ import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
 import {
   GovernanceEventStoreError,
-  appendGovernanceForkDisposition,
   createRestrictedAuthorization,
   appendPortableGovernanceEvent,
   eraseRestrictedGovernanceEvent,
@@ -192,7 +191,7 @@ test("K-AC-05 a forked stream also fails closed for append and recovery attempts
   await writeFile(path.join(root, "governance/events/lifecycle/1-evt-fork.json"), `${canonicalizeJson(fork)}\n`);
   await assert.rejects(() => append(root, intent({ eventId: "evt-after-fork-append", idempotencyKey: "idem-after-fork-append" })), (error) => error.code === "GES-FORK", "append must fail closed on a forked stream, not silently pick a winner");
   const recovery = { idempotencyKey: "recover-after-fork-1", expectedHeadsDigest: "e".repeat(64), requestedPostimageDigest: "f".repeat(64) };
-  await assert.rejects(() => recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", checkpoint: first.checkpoint, recovery }), (error) => error.code === "GES-FORK", "recovery must also fail closed on a forked stream; there is no separate governed-disposition operation that can process a fork");
+  await assert.rejects(() => recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", checkpoint: first.checkpoint, recovery }), (error) => error.code === "GES-FORK", "recovery must still fail closed on a forked stream when no matching governed disposition is supplied — recovery IS the sanctioned recovery operation that can process a fork, but only via its own disposition parameter, not by silently proceeding");
 });
 
 test("inspectForkedGovernanceStream tolerates exactly the forked-sequence condition, returns the correct non-forked prefix, and still throws on unrelated defects with no fork present", async (t) => {
@@ -218,16 +217,77 @@ test("inspectForkedGovernanceStream tolerates exactly the forked-sequence condit
   await assert.rejects(() => inspectForkedGovernanceStream({ repositoryRoot: noncanonicalRoot, repositoryFingerprint: fingerprint, streamId: "lifecycle" }), (error) => error.code === "GES-NONCANONICAL", "non-canonical bytes must still hard-fail even though no fork is present — this is scanStream tolerant of exactly one condition, not scanStream-that-never-throws");
 });
 
-test("appendGovernanceForkDisposition binds the exact fork position and event set, writes exactly one durable record, and never touches either conflicting canonical file", async (t) => {
+test("K-AC-05 a fork at sequence 1 yields an empty non-forked prefix (zero-length prefix boundary), and a matching disposition can still be recorded through recovery", async (t) => {
+  const root = await fixtureRoot(); t.after(() => cleanup(root));
+  await mkdir(path.join(root, "governance/events/lifecycle"), { recursive: true });
+  const first = sealGovernanceEvent({ ...intent({ eventId: "evt-1a", idempotencyKey: "idem-1a" }), sequence: 1, previousEventDigest: null, payloadDigest: "0".repeat(64), eventDigest: "0".repeat(64) });
+  const second = sealGovernanceEvent({ ...intent({ eventId: "evt-1b", idempotencyKey: "idem-1b" }), sequence: 1, previousEventDigest: null, payloadDigest: "0".repeat(64), eventDigest: "0".repeat(64) });
+  await writeFile(path.join(root, "governance/events/lifecycle/1-evt-1a.json"), `${canonicalizeJson(first)}\n`);
+  await writeFile(path.join(root, "governance/events/lifecycle/1-evt-1b.json"), `${canonicalizeJson(second)}\n`);
+
+  const inspected = await inspectForkedGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" });
+  assert.deepEqual(inspected.prefix, [], "a fork at the very first sequence must yield an empty, not a throwing, non-forked prefix");
+  assert.equal(inspected.forks.length, 1);
+  assert.equal(inspected.forks[0].sequence, 1);
+  assert.deepEqual(inspected.forks[0].entries.map((entry) => entry.eventId).sort(), ["evt-1a", "evt-1b"]);
+
+  const disposition = { idempotencyKey: "fork-disp-seq1", sequence: 1, acknowledgedEventIds: ["evt-1a", "evt-1b"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 1 };
+  const recorded = await recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition });
+  assert.equal(recorded.status, "fork-disposition-recorded");
+  assert.equal(recorded.path, "governance/events/fork-disposition/lifecycle/1.json");
+});
+
+test("K-AC-05 a 3-way fork at one sequence is detected in full, and a disposition must acknowledge every conflicting record", async (t) => {
+  const root = await fixtureRoot(); t.after(() => cleanup(root));
+  const first = await append(root);
+  const makeConflict = (eventId, idempotencyKey) => sealGovernanceEvent({ ...intent({ eventId, idempotencyKey }), sequence: 2, previousEventDigest: first.eventDigest, payloadDigest: "0".repeat(64), eventDigest: "0".repeat(64) });
+  const conflictA = makeConflict("evt-2a", "idem-2a");
+  const conflictB = makeConflict("evt-2b", "idem-2b");
+  const conflictC = makeConflict("evt-2c", "idem-2c");
+  await writeFile(path.join(root, "governance/events/lifecycle/2-evt-2a.json"), `${canonicalizeJson(conflictA)}\n`);
+  await writeFile(path.join(root, "governance/events/lifecycle/2-evt-2b.json"), `${canonicalizeJson(conflictB)}\n`);
+  await writeFile(path.join(root, "governance/events/lifecycle/2-evt-2c.json"), `${canonicalizeJson(conflictC)}\n`);
+
+  const inspected = await inspectForkedGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" });
+  assert.equal(inspected.forks.length, 1);
+  assert.equal(inspected.forks[0].sequence, 2);
+  assert.deepEqual(inspected.forks[0].entries.map((entry) => entry.eventId).sort(), ["evt-2a", "evt-2b", "evt-2c"]);
+
+  const disposition = { idempotencyKey: "fork-disp-3way", sequence: 2, acknowledgedEventIds: ["evt-2a", "evt-2b", "evt-2c"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 2 };
+  await assert.rejects(() => recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition: { ...disposition, idempotencyKey: "fork-disp-3way-partial", acknowledgedEventIds: ["evt-2a", "evt-2b"] } }), (error) => error.code === "GES-FORK-DISPOSITION-MISMATCH", "acknowledging only two of three conflicting records must fail closed");
+  const recorded = await recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition });
+  assert.equal(recorded.status, "fork-disposition-recorded");
+  assert.deepEqual(recorded.disposition.acknowledgedEventIds, ["evt-2a", "evt-2b", "evt-2c"].sort());
+});
+
+test("inspectForkedGovernanceStream still throws GES-CHAIN on a sequence gap with no fork present anywhere", async (t) => {
+  const root = await fixtureRoot(); t.after(() => cleanup(root));
+  const first = await append(root);
+  const gapped = sealGovernanceEvent({ ...intent({ eventId: "evt-3", idempotencyKey: "idem-3" }), sequence: 3, previousEventDigest: first.eventDigest, payloadDigest: "0".repeat(64), eventDigest: "0".repeat(64) });
+  await writeFile(path.join(root, "governance/events/lifecycle/3-evt-3.json"), `${canonicalizeJson(gapped)}\n`);
+  await assert.rejects(() => inspectForkedGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" }), (error) => error.code === "GES-CHAIN", "a sequence gap with no fork anywhere must still hard-fail exactly as scanStream would");
+});
+
+test("inspectForkedGovernanceStream still throws GES-IDEMPOTENCY-CONFLICT on a duplicate idempotency key across two singleton, non-forked sequences", async (t) => {
+  const root = await fixtureRoot(); t.after(() => cleanup(root));
+  const first = await append(root);
+  const reused = sealGovernanceEvent({ ...intent({ eventId: "evt-2", idempotencyKey: "idem-1", payload: { ...intent().payload, eventId: "lifecycle-2", reasonCode: "DIFFERENT" } }), sequence: 2, previousEventDigest: first.eventDigest, payloadDigest: "0".repeat(64), eventDigest: "0".repeat(64) });
+  await writeFile(path.join(root, "governance/events/lifecycle/2-evt-2.json"), `${canonicalizeJson(reused)}\n`);
+  await assert.rejects(() => inspectForkedGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" }), (error) => error.code === "GES-IDEMPOTENCY-CONFLICT", "a reused idempotency key across two singleton, non-forked sequences must still hard-fail exactly as scanStream would");
+});
+
+test("K-AC-05 recovering a forked stream with a matching disposition is recoverPortableGovernanceProjection itself: it binds the exact fork position and event set, writes exactly one durable record, never touches heads.json, and never touches either conflicting canonical file", async (t) => {
   const { root } = await forkedLifecycleFixture(); t.after(() => cleanup(root));
   const canonicalPathA = path.join(root, "governance/events/lifecycle/2-evt-2.json");
   const canonicalPathB = path.join(root, "governance/events/lifecycle/2-evt-fork.json");
+  const headsPath = path.join(root, "governance/events/heads.json");
   const beforeA = await readFile(canonicalPathA);
   const beforeB = await readFile(canonicalPathB);
+  const headsBefore = await readFile(headsPath, "utf8");
 
   const disposition = { idempotencyKey: "fork-disp-1", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 12345 };
-  const recorded = await appendGovernanceForkDisposition({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition });
-  assert.equal(recorded.status, "recorded");
+  const recorded = await recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition });
+  assert.equal(recorded.status, "fork-disposition-recorded");
   assert.equal(recorded.path, "governance/events/fork-disposition/lifecycle/2.json");
   const dispositionPath = path.join(root, recorded.path);
   const persisted = JSON.parse(await readFile(dispositionPath, "utf8"));
@@ -236,31 +296,44 @@ test("appendGovernanceForkDisposition binds the exact fork position and event se
 
   assert.deepEqual(await readFile(canonicalPathA), beforeA, "the original event at 2-evt-2.json must be byte-for-byte unchanged");
   assert.deepEqual(await readFile(canonicalPathB), beforeB, "the original event at 2-evt-fork.json must be byte-for-byte unchanged");
+  assert.equal(await readFile(headsPath, "utf8"), headsBefore, "recording a disposition through recovery must never touch heads.json — this is never a projection rebuild");
 
-  await assert.rejects(() => appendGovernanceForkDisposition({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition: { ...disposition, idempotencyKey: "fork-disp-2", sequence: 1, acknowledgedEventIds: ["evt-1", "evt-x"] } }), (error) => error.code === "GES-FORK-DISPOSITION-MISMATCH", "naming a sequence that is not actually forked must fail closed");
+  await assert.rejects(() => recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition: { ...disposition, idempotencyKey: "fork-disp-2", sequence: 1, acknowledgedEventIds: ["evt-1", "evt-x"] } }), (error) => error.code === "GES-FORK-DISPOSITION-MISMATCH", "naming a sequence that is not actually forked must fail closed");
 
-  await assert.rejects(() => appendGovernanceForkDisposition({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition: { ...disposition, idempotencyKey: "fork-disp-3", acknowledgedEventIds: ["evt-2"] } }), (error) => error.code === "GES-FORK-DISPOSITION-MISMATCH", "omitting a conflicting eventId must fail closed");
-  await assert.rejects(() => appendGovernanceForkDisposition({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition: { ...disposition, idempotencyKey: "fork-disp-4", acknowledgedEventIds: ["evt-2", "evt-fork", "evt-extra"] } }), (error) => error.code === "GES-FORK-DISPOSITION-MISMATCH", "naming an extra eventId must fail closed");
+  await assert.rejects(() => recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition: { ...disposition, idempotencyKey: "fork-disp-3", acknowledgedEventIds: ["evt-2"] } }), (error) => error.code === "GES-FORK-DISPOSITION-MISMATCH", "omitting a conflicting eventId must fail closed");
+  await assert.rejects(() => recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition: { ...disposition, idempotencyKey: "fork-disp-4", acknowledgedEventIds: ["evt-2", "evt-fork", "evt-extra"] } }), (error) => error.code === "GES-FORK-DISPOSITION-MISMATCH", "naming an extra eventId must fail closed");
 
   const beforeMtime = (await stat(dispositionPath)).mtimeMs;
-  const replay = await appendGovernanceForkDisposition({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition });
-  assert.equal(replay.status, "idempotent-replay");
+  const replay = await recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition });
+  assert.equal(replay.status, "fork-disposition-idempotent-replay");
   const afterMtime = (await stat(dispositionPath)).mtimeMs;
   assert.equal(afterMtime, beforeMtime, "an identical replay must be a zero-additional-write idempotent replay");
 
-  await assert.rejects(() => appendGovernanceForkDisposition({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition: { ...disposition, reasonCode: "DIFFERENT_REASON" } }), (error) => error.code === "GES-FORK-DISPOSITION-CONFLICT", "the same idempotencyKey with different disposition content must fail closed with a distinct conflict code");
+  await assert.rejects(() => recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition: { ...disposition, reasonCode: "DIFFERENT_REASON" } }), (error) => error.code === "GES-FORK-DISPOSITION-CONFLICT", "the same idempotencyKey with different disposition content must fail closed with a distinct conflict code");
 });
 
-test("K-AC-05 a recorded fork disposition never makes the stream normally usable again — append/verify/query/recovery still fail closed with GES-FORK", async (t) => {
+test("K-AC-05 recording a fork disposition removes an orphaned temporary disposition file left behind by a crashed writer, exactly as canonical-event orphans are swept", async (t) => {
+  const { root } = await forkedLifecycleFixture(); t.after(() => cleanup(root));
+  const dispositionDir = path.join(root, "governance/events/fork-disposition/lifecycle");
+  await mkdir(dispositionDir, { recursive: true });
+  const orphan = path.join(dispositionDir, ".2.json.0123456789abcdef01234567.tmp");
+  await writeFile(orphan, "partial writer bytes");
+  const disposition = { idempotencyKey: "fork-disp-orphan", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 5 };
+  const recorded = await recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition });
+  assert.equal(recorded.status, "fork-disposition-recorded");
+  await assert.rejects(() => stat(orphan), { code: "ENOENT" }, "an orphaned temporary disposition file must be swept while the stream's exclusive lock is held");
+});
+
+test("K-AC-05 a recorded fork disposition never makes the stream normally usable again — append/verify/query/an ordinary recovery call carrying no matching disposition still fail closed with GES-FORK", async (t) => {
   const { root, first } = await forkedLifecycleFixture(); t.after(() => cleanup(root));
   const disposition = { idempotencyKey: "fork-disp-boundary-1", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 999 };
-  const recorded = await appendGovernanceForkDisposition({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition });
-  assert.equal(recorded.status, "recorded");
+  const recorded = await recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition });
+  assert.equal(recorded.status, "fork-disposition-recorded");
   await assert.rejects(() => append(root, intent({ eventId: "evt-after-disposition", idempotencyKey: "idem-after-disposition" })), (error) => error.code === "GES-FORK", "append must still fail closed after a disposition is recorded");
   await assert.rejects(() => verifyPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" }), (error) => error.code === "GES-FORK", "verify must still fail closed after a disposition is recorded");
   await assert.rejects(() => queryPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" }), (error) => error.code === "GES-FORK", "query must still fail closed after a disposition is recorded");
   const recovery = { idempotencyKey: "recover-after-disposition-1", expectedHeadsDigest: "e".repeat(64), requestedPostimageDigest: "f".repeat(64) };
-  await assert.rejects(() => recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", checkpoint: first.checkpoint, recovery }), (error) => error.code === "GES-FORK", "recovery must still fail closed after a disposition is recorded");
+  await assert.rejects(() => recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", checkpoint: first.checkpoint, recovery }), (error) => error.code === "GES-FORK", "an ordinary recovery call carrying no matching disposition must still fail closed after a disposition is recorded");
 });
 
 test("K-AC-08 rejects a head/index checkpoint asserting an absent or invalid canonical record instead of trusting the projection", async (t) => {

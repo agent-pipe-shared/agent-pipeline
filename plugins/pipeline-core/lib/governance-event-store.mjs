@@ -397,6 +397,34 @@ async function readEvent(file) {
   return value;
 }
 
+/**
+ * Validate one directory entry as a candidate canonical event for `stream`.
+ * Shared by `scanStream` and `inspectStreamForForks` so every symlink,
+ * path-safety, orphan-filtering, and envelope-path-binding check fires with
+ * exactly one piece of code at any stream position, in either caller. Returns
+ * null for an entry that is not a candidate event (lock/guard/orphaned temp
+ * file); throws on any unsafe or invalid entry; otherwise returns the parsed
+ * `{ sequence, event }` pair, unvalidated against sibling entries.
+ */
+async function readCandidateStreamEvent(root, registry, stream, streamId, entry) {
+  if (entry.name === ".lock") return null;
+  // The advisory acquisition guard is deliberately non-authoritative.  It
+  // serializes lock acquisition and stale-lock recovery only; a lingering
+  // regular guard file must never make a committed event prefix unreadable.
+  if (entry.name === STREAM_LOCK_GUARD_FILE && entry.isFile()) return null;
+  // A writer publishes only after rename.  Its own unlinked temporary bytes
+  // are never authority and must not make a valid committed prefix unreadable.
+  if (TEMPORARY_EVENT_FILE.test(entry.name) && entry.isFile()) return null;
+  if (entry.isSymbolicLink()) fail("GES-SYMLINK", "Symbolic links are forbidden in governance storage.");
+  const match = EVENT_FILE.exec(entry.name);
+  if (!match || !entry.isFile()) fail("GES-UNSAFE-PATH", "The stream contains an unsafe or unrecognized path.");
+  const event = await readEvent(repositoryPath(root, `${registry.storageRoot}/${stream.relativeRoot}/${entry.name}`));
+  const sequence = Number(match[1]);
+  if (event.sequence !== sequence || event.eventId !== match[2] || event.streamId !== streamId
+    || event.repositoryFingerprint !== registry.repositoryFingerprint) fail("GES-EVENT-PATH", "Event path and envelope binding disagree.");
+  return { sequence, event };
+}
+
 async function scanStream(root, registry, streamId) {
   const stream = streamFor(registry, streamId);
   const streamRoot = repositoryPath(root, `${registry.storageRoot}/${stream.relativeRoot}`);
@@ -408,22 +436,10 @@ async function scanStream(root, registry, streamId) {
   const bySequence = new Map();
   const byIdempotency = new Map();
   const events = [];
-  for (const entry of entries) {
-    if (entry.name === ".lock") continue;
-    // The advisory acquisition guard is deliberately non-authoritative.  It
-    // serializes lock acquisition and stale-lock recovery only; a lingering
-    // regular guard file must never make a committed event prefix unreadable.
-    if (entry.name === STREAM_LOCK_GUARD_FILE && entry.isFile()) continue;
-    // A writer publishes only after rename.  Its own unlinked temporary bytes
-    // are never authority and must not make a valid committed prefix unreadable.
-    if (TEMPORARY_EVENT_FILE.test(entry.name) && entry.isFile()) continue;
-    if (entry.isSymbolicLink()) fail("GES-SYMLINK", "Symbolic links are forbidden in governance storage.");
-    const match = EVENT_FILE.exec(entry.name);
-    if (!match || !entry.isFile()) fail("GES-UNSAFE-PATH", "The stream contains an unsafe or unrecognized path.");
-    const event = await readEvent(repositoryPath(root, `${registry.storageRoot}/${stream.relativeRoot}/${entry.name}`));
-    const sequence = Number(match[1]);
-    if (event.sequence !== sequence || event.eventId !== match[2] || event.streamId !== streamId
-      || event.repositoryFingerprint !== registry.repositoryFingerprint) fail("GES-EVENT-PATH", "Event path and envelope binding disagree.");
+  for (const dirEntry of entries) {
+    const candidate = await readCandidateStreamEvent(root, registry, stream, streamId, dirEntry);
+    if (!candidate) continue;
+    const { sequence, event } = candidate;
     if (bySequence.has(sequence)) fail("GES-FORK", "Multiple records claim one sequence.");
     if (byIdempotency.has(event.idempotencyKey)) {
       const prior = byIdempotency.get(event.idempotencyKey);
@@ -707,8 +723,27 @@ export async function queryPortableGovernanceStreams({ repositoryRoot, registryP
   });
 }
 
-/** Rebuild only the replaceable heads projection from an already valid chain. */
-export async function recoverPortableGovernanceProjection({ repositoryRoot, registryPath, repositoryFingerprint, streamId, checkpoint, recovery } = {}) {
+/**
+ * Rebuild the replaceable heads projection from an already valid chain, OR —
+ * when the stream is forked (K-AC-05) and the caller supplies `disposition`
+ * — record the governed fork disposition itself. This IS the sanctioned
+ * recovery operation for both cases; there is no separate operation living
+ * beside it. Without `disposition`, an already-forked stream still fails
+ * closed with `GES-FORK` exactly as every other operation does, and a normal
+ * (non-forked) stream is recovered exactly as before this function grew a
+ * `disposition` parameter. With `disposition`, `recovery` is unused: a
+ * disposition is recorded (never `heads.json`, never either conflicting
+ * canonical file) instead of a projection being rebuilt, and the outcome is
+ * never "recovered"/"projection-rebuilt" — recording a disposition never
+ * makes the stream normally writable/readable again.
+ */
+export async function recoverPortableGovernanceProjection({ repositoryRoot, registryPath, repositoryFingerprint, streamId, checkpoint, recovery, disposition } = {}) {
+  if (disposition !== undefined) {
+    const { root, fingerprint } = await assertPhysicalRoot(repositoryRoot);
+    const { registry } = await loadRegistry(root, registryPath);
+    if (repositoryFingerprint !== fingerprint || registry.repositoryFingerprint !== fingerprint) fail("GES-CROSS-REPOSITORY", "The expected repository fingerprint does not match the physical repository.");
+    return recordGovernanceForkDisposition(root, registry, streamId, disposition);
+  }
   if (!exactKeys(recovery, ["idempotencyKey", "expectedHeadsDigest", "requestedPostimageDigest"]) || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(recovery.idempotencyKey)
     || (recovery.expectedHeadsDigest !== null && !SHA256.test(recovery.expectedHeadsDigest)) || !SHA256.test(recovery.requestedPostimageDigest)) fail("GES-RECOVERY-REQUEST", "Recovery requires a closed idempotent preimage/postimage request.");
   const verification = await verifyPortableGovernanceStream({ repositoryRoot, registryPath, repositoryFingerprint, streamId, checkpoint });
@@ -755,6 +790,7 @@ export async function recoverPortableGovernanceProjection({ repositoryRoot, regi
 }
 
 const FORK_DISPOSITION_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+const FORK_DISPOSITION_TEMP_FILE = /^\.[1-9][0-9]*\.json\.[a-f0-9]{24}\.tmp$/u;
 
 function assertForkDisposition(disposition) {
   if (!exactKeys(disposition, ["idempotencyKey", "sequence", "acknowledgedEventIds", "reasonCode", "disposedAtEpochMs"])) fail("GES-FORK-DISPOSITION", "A closed fork disposition is required.");
@@ -763,8 +799,8 @@ function assertForkDisposition(disposition) {
   // The structural minimum is deliberately just "non-empty, unique, closed
   // tokens" — whether the named set actually has enough members to match a
   // real fork (always >= 2 conflicting entries) is a reality-binding
-  // question, decided below against `inspectForkedGovernanceStream`, not a
-  // shape question decided here.
+  // question, decided below in `recordGovernanceForkDisposition` against
+  // `inspectStreamForForks`, not a shape question decided here.
   if (!Array.isArray(disposition.acknowledgedEventIds) || disposition.acknowledgedEventIds.length < 1
     || disposition.acknowledgedEventIds.some((eventId) => typeof eventId !== "string" || !FORK_DISPOSITION_TOKEN.test(eventId))
     || new Set(disposition.acknowledgedEventIds).size !== disposition.acknowledgedEventIds.length) fail("GES-FORK-DISPOSITION", "A fork disposition requires the closed set of every conflicting event identifier.");
@@ -774,8 +810,9 @@ function assertForkDisposition(disposition) {
 }
 
 /**
- * Read-only strict superset of `scanStream`'s detection (K-AC-05). Every
- * symlink, path-safety, orphan-filtering, and envelope-validation check
+ * Read-only strict superset of `scanStream`'s detection (K-AC-05), sharing
+ * `scanStream`'s own per-entry validation via `readCandidateStreamEvent`.
+ * Every symlink, path-safety, orphan-filtering, and envelope-validation check
  * `scanStream` performs still fires with `scanStream`'s own code, at any
  * stream position; the ONLY condition tolerated instead of throwing
  * `GES-FORK` is more than one canonical file claiming the same sequence.
@@ -784,11 +821,11 @@ function assertForkDisposition(disposition) {
  * the whole stream when no fork is present anywhere — so when the returned
  * fork list is empty, this function has enforced exactly what `scanStream`
  * would have enforced. It never weakens detection; it adds one capability.
+ * `recoverPortableGovernanceProjection` uses this same helper internally to
+ * decide whether a governed fork disposition applies — there is no separate
+ * detection path for that decision either.
  */
-export async function inspectForkedGovernanceStream({ repositoryRoot, registryPath, repositoryFingerprint, streamId } = {}) {
-  const { root, fingerprint } = await assertPhysicalRoot(repositoryRoot);
-  const { registry } = await loadRegistry(root, registryPath);
-  if (repositoryFingerprint !== fingerprint || registry.repositoryFingerprint !== fingerprint) fail("GES-CROSS-REPOSITORY", "The expected repository fingerprint does not match the physical repository.");
+async function inspectStreamForForks(root, registry, streamId) {
   const stream = streamFor(registry, streamId);
   const streamRoot = repositoryPath(root, `${registry.storageRoot}/${stream.relativeRoot}`);
   await assertNoSymlinkAncestry(streamRoot);
@@ -798,17 +835,10 @@ export async function inspectForkedGovernanceStream({ repositoryRoot, registryPa
     await assertNoSymlink(streamRoot, { directory: true });
     const entries = await readdir(streamRoot, { withFileTypes: true });
     const byIdempotency = new Map();
-    for (const entry of entries) {
-      if (entry.name === ".lock") continue;
-      if (entry.name === STREAM_LOCK_GUARD_FILE && entry.isFile()) continue;
-      if (TEMPORARY_EVENT_FILE.test(entry.name) && entry.isFile()) continue;
-      if (entry.isSymbolicLink()) fail("GES-SYMLINK", "Symbolic links are forbidden in governance storage.");
-      const match = EVENT_FILE.exec(entry.name);
-      if (!match || !entry.isFile()) fail("GES-UNSAFE-PATH", "The stream contains an unsafe or unrecognized path.");
-      const event = await readEvent(repositoryPath(root, `${registry.storageRoot}/${stream.relativeRoot}/${entry.name}`));
-      const sequence = Number(match[1]);
-      if (event.sequence !== sequence || event.eventId !== match[2] || event.streamId !== streamId
-        || event.repositoryFingerprint !== registry.repositoryFingerprint) fail("GES-EVENT-PATH", "Event path and envelope binding disagree.");
+    for (const dirEntry of entries) {
+      const candidate = await readCandidateStreamEvent(root, registry, stream, streamId, dirEntry);
+      if (!candidate) continue;
+      const { sequence, event } = candidate;
       if (!bySequence.has(sequence)) bySequence.set(sequence, []);
       bySequence.get(sequence).push(event);
     }
@@ -850,38 +880,54 @@ export async function inspectForkedGovernanceStream({ repositoryRoot, registryPa
     previousDigest = event.eventDigest;
     expectedSequence += 1;
   }
+  return { stream, streamRoot, prefix, forks };
+}
+
+/** Exported read-only projection of `inspectStreamForForks` (K-AC-05); see that function for the full detection contract. */
+export async function inspectForkedGovernanceStream({ repositoryRoot, registryPath, repositoryFingerprint, streamId } = {}) {
+  const { root, fingerprint } = await assertPhysicalRoot(repositoryRoot);
+  const { registry } = await loadRegistry(root, registryPath);
+  if (repositoryFingerprint !== fingerprint || registry.repositoryFingerprint !== fingerprint) fail("GES-CROSS-REPOSITORY", "The expected repository fingerprint does not match the physical repository.");
+  const { prefix, forks } = await inspectStreamForForks(root, registry, streamId);
   return Object.freeze({
     schema: "pipeline.governance-event-fork-inspection.v1",
     streamId,
     repositoryFingerprint: registry.repositoryFingerprint,
     prefix: Object.freeze(prefix),
-    forks: Object.freeze(forks),
+    forks,
   });
 }
 
+async function removeOrphanedTemporaryForkDispositions(dispositionRoot) {
+  const entries = await readdir(dispositionRoot, { withFileTypes: true });
+  for (const entry of entries) {
+    if (FORK_DISPOSITION_TEMP_FILE.test(entry.name) && entry.isFile()) await unlink(path.join(dispositionRoot, entry.name));
+  }
+}
+
 /**
- * Append one durable, append-only governed disposition over a forked stream
- * position (K-AC-05). This is a SEPARATE operation from
- * `recoverPortableGovernanceProjection`: it never rescans with the raw
- * `scanStream` helper (which still throws `GES-FORK` on this same stream) and
- * it never writes `heads.json`. It binds the exact forked sequence and the
- * exact set of conflicting event identifiers to reality via
- * `inspectForkedGovernanceStream` before writing, stores the disposition once
- * at a path neither conflicting canonical file occupies, and never deletes,
- * renames, or rewrites either of them. Recording a disposition does not make
- * the stream normally writable or readable again — every other exported
- * operation keeps failing closed with `GES-FORK` exactly as before; restoring
- * write availability afterward is a separate, out-of-scope policy decision.
+ * Record one durable, append-only governed disposition over a forked stream
+ * position (K-AC-05). Called only from inside `recoverPortableGovernanceProjection`
+ * when a caller supplies `disposition` — this is that same sanctioned
+ * recovery operation's fork-aware branch, never a second operation living
+ * beside it. It never rescans with the raw `scanStream` helper (which still
+ * throws `GES-FORK` on this same stream) and it never writes `heads.json`. It
+ * binds the exact forked sequence and the exact set of conflicting event
+ * identifiers to reality via `inspectStreamForForks` before writing, stores
+ * the disposition once at a path neither conflicting canonical file
+ * occupies, and never deletes, renames, or rewrites either of them.
+ * Recording a disposition does not make the stream normally writable or
+ * readable again — every other exported operation, and an ordinary recovery
+ * call without a matching disposition, keeps failing closed with `GES-FORK`
+ * exactly as before; restoring write availability afterward is a separate,
+ * out-of-scope policy decision.
  */
-export async function appendGovernanceForkDisposition({ repositoryRoot, registryPath, repositoryFingerprint, streamId, disposition } = {}) {
-  const { root, fingerprint } = await assertPhysicalRoot(repositoryRoot);
-  const { registry } = await loadRegistry(root, registryPath);
-  if (repositoryFingerprint !== fingerprint || registry.repositoryFingerprint !== fingerprint) fail("GES-CROSS-REPOSITORY", "The expected repository fingerprint does not match the physical repository.");
+async function recordGovernanceForkDisposition(root, registry, streamId, disposition) {
   const stream = streamFor(registry, streamId);
   assertForkDisposition(disposition);
   const streamRoot = await ensureSafeDirectory(root, `${registry.storageRoot}/${stream.relativeRoot}`);
   return withExclusiveStreamLock(streamRoot, async () => {
-    const inspection = await inspectForkedGovernanceStream({ repositoryRoot, registryPath, repositoryFingerprint, streamId });
+    const inspection = await inspectStreamForForks(root, registry, streamId);
     const fork = inspection.forks.find((entry) => entry.sequence === disposition.sequence);
     if (!fork) fail("GES-FORK-DISPOSITION-MISMATCH", "The disposition does not name a sequence that is actually forked in this stream.");
     const actualEventIds = fork.entries.map((entry) => entry.eventId).sort();
@@ -895,7 +941,12 @@ export async function appendGovernanceForkDisposition({ repositoryRoot, registry
     // recognize (GES-UNSAFE-PATH), so a disposition artifact must live
     // outside it or every later scan of this stream would break on an
     // unrelated path instead of on GES-FORK.
-    await ensureSafeDirectory(root, `${registry.storageRoot}/fork-disposition/${streamId}`);
+    const dispositionRoot = await ensureSafeDirectory(root, `${registry.storageRoot}/fork-disposition/${streamId}`);
+    // Same cleanup contract as `withExclusiveStreamLock`'s own
+    // `removeOrphanedTemporaryEvents(streamRoot)`: a crash mid-`writeAtomic`
+    // can leave an orphaned `.tmp` file here too, and this directory is never
+    // otherwise swept while under the stream's exclusive lock.
+    await removeOrphanedTemporaryForkDispositions(dispositionRoot);
     const relativePath = `${registry.storageRoot}/fork-disposition/${streamId}/${disposition.sequence}.json`;
     const target = repositoryPath(root, relativePath);
     const record = Object.freeze({
@@ -914,14 +965,14 @@ export async function appendGovernanceForkDisposition({ repositoryRoot, registry
       let existingRecord;
       try { existingRecord = parseStrictJson(await readFile(target)); } catch { fail("GES-FORK-DISPOSITION-RECORD", "The recorded fork disposition is not strict JSON."); }
       if (canonicalizeJson(existingRecord) !== canonicalizeJson(record)) fail("GES-FORK-DISPOSITION-CONFLICT", "A different fork disposition is already recorded for this stream position.");
-      return Object.freeze({ status: "idempotent-replay", streamId, sequence: disposition.sequence, path: relativePath, disposition: Object.freeze({ ...existingRecord }) });
+      return Object.freeze({ status: "fork-disposition-idempotent-replay", streamId, sequence: disposition.sequence, path: relativePath, disposition: Object.freeze({ ...existingRecord }) });
     }
     await writeAtomic(target, `${canonicalizeJson(record)}\n`);
     await assertNoSymlink(target, { directory: false });
     let persisted;
     try { persisted = parseStrictJson(await readFile(target)); } catch { fail("GES-FORK-DISPOSITION-RECORD", "The recorded fork disposition is not strict JSON."); }
     if (canonicalSha256(persisted) !== canonicalSha256(record)) fail("GES-FORK-DISPOSITION-READBACK", "Fork disposition readback differs from the written record.");
-    return Object.freeze({ status: "recorded", streamId, sequence: disposition.sequence, path: relativePath, disposition: Object.freeze({ ...persisted }) });
+    return Object.freeze({ status: "fork-disposition-recorded", streamId, sequence: disposition.sequence, path: relativePath, disposition: Object.freeze({ ...persisted }) });
   });
 }
 
