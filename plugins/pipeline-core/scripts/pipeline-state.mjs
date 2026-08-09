@@ -5435,7 +5435,12 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       } finally {
         if (fd !== undefined) closeSync(fd);
       }
-      console.log(`Created ${PUSH_THREAT_MODEL_DEFAULT_PATH} from the plugin's shipped template. Review it, then approve-push will bind it.`);
+      console.log(
+        `Created ${PUSH_THREAT_MODEL_DEFAULT_PATH} from the plugin's shipped template. Review it, then commit it ` +
+        `(git add ${PUSH_THREAT_MODEL_DEFAULT_PATH}; git commit) BEFORE running approve-push -- the human's ` +
+        "signature is meant to bind a file that actually lives inside the pushed project's own tree (M-4); an " +
+        "uncommitted file sits only in the working copy and is never part of what git push transmits.",
+      );
       return 0;
     }
 
