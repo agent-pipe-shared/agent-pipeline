@@ -47,6 +47,21 @@ something to do here without review.
 
 ## Entries
 
+## Candidate e6ded9e24b6605bc7028280be376b8ce0b78747e — 2026-08-09, range 3387065..e6ded9e, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `6b96d75` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `002144a`, `bd386e3`, `f1f5e24`, `15c9079`, `0523d7e`, `5bb4269`, `6c33824`, `afe3ff0`,
+`554a173`, `1b266e2`, `2b8ad9a`, `f3db193`, `e6ded9e`: C-AC-02's standard-template field, K-AC-10's
+multi-stream query, E-AC-11's projection digest, E-AC-08's three more typed outbox failures,
+L-AC-02's two missing #10 exchange identities (dispatched to goldfish-deep for its two-validator
+blast radius), A-AC-14's tampering scenario, four evidence-map deltas, and two checkpoints. Same
+reading as the whole chain: `docs/state.md` stays ADR-0012, the generated evidence-map/closure-plan
+trio stays ADR-0045. None of the eleven touched `plugins/pipeline-core/lib/*.mjs` production/test
+files implicate either ADR.
+
 ## Candidate 6b96d75c2632557381eedab77a977b1e780a708b — 2026-08-09, range 3387065..6b96d75, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
