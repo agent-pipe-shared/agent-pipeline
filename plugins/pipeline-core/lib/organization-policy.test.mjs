@@ -37,3 +37,24 @@ test("rejects duplicate pack bindings and incompatible modes instead of choosing
   assert.throws(() => resolveEffectiveOrganizationPolicy({ coreVersion: "0.4.7", packs: [first, first] }), (error) => error.code === "OPP-RESOLVE-DUPLICATE");
   assert.throws(() => resolveEffectiveOrganizationPolicy({ coreVersion: "0.4.7", packs: [first, conflicting] }), (error) => error.code === "OPP-RESOLVE-CONFLICT");
 });
+// P-AC-11: mode is part of the closed scoping vocabulary a document-class
+// entry may declare; an unrecognized mode must be rejected rather than
+// silently accepted as an undefined fourth publication boundary.
+test("P-AC-11 rejects a document class mode outside the closed reference-only/projection/controlled-publication set", () => {
+  assert.throws(() => validateOrganizationPolicyPack(pack({ documentClasses: [{ class: "security", mode: "public-broadcast", approvalRequired: true }] }), { coreVersion: "0.4.7" }), (error) => error instanceof OrganizationPolicyError && error.code === "OPP-DOCUMENT");
+});
+// P-AC-11: approval is the other scoping dimension this pack schema actually
+// carries (approvalRequired); a later, laxer pack must never downgrade an
+// earlier pack's required approval for the same document class.
+test("P-AC-11 unions approval requirements so a later pack cannot downgrade an earlier pack's required approval", () => {
+  const strict = pack({ packId: "security-strict", revision: "e".repeat(64), documentClasses: [{ class: "security", mode: "controlled-publication", approvalRequired: true }] });
+  const lax = pack({ packId: "security-lax", revision: "f".repeat(64), documentClasses: [{ class: "security", mode: "controlled-publication", approvalRequired: false }] });
+  const resolved = resolveEffectiveOrganizationPolicy({ coreVersion: "0.4.7", packs: [strict, lax] });
+  assert.equal(resolved.documentClasses.find((entry) => entry.class === "security").approvalRequired, true);
+});
+// P-AC-10: a compliance/regulatory-assessment claim has no field anywhere in
+// this closed pack schema; injecting one must be rejected exactly like any
+// other unknown field, so a portable policy pack can never carry that claim.
+test("P-AC-10 rejects a compliance or regulatory-assessment claim field on a portable policy pack", () => {
+  assert.throws(() => validateOrganizationPolicyPack(pack({ complianceCertification: "SOC2-attested" }), { coreVersion: "0.4.7" }), (error) => error instanceof OrganizationPolicyError && error.code === "OPP-SHAPE");
+});
