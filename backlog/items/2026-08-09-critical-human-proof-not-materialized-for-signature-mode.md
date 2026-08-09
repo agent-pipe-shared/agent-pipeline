@@ -3,10 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.critical-human-proof-not-materialized-for-signature-mode
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
 source: "Turn-efficiency root-cause analysis of the PO's private Claude+Pipeline 0.5.4 happy-path test run, 2026-08-09 (sanitized, no PO-identifying data)."
 due: 2026-08-16
+closed_at: 2026-08-09
+closure_repository: self
+closure_commit: 3db838f2c7822faa7d17bea9459aed347e9f69b4
+closure_evidence: backlog/evidence/2026-08-09-critical-human-proof-onboarding-closure.md
 ---
 
 # A fresh `signature`-mode project has no `project/critical-human-proof.json`, forcing the full Human-Guard-Override ceremony just to bootstrap it
@@ -65,7 +69,13 @@ Two independent remedies, not mutually exclusive:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, implemented, closed.
+- **Rationale:** Direction remedy 1 shipped across both onboarding routes
+  (`d777e67d` primary route, `3db838f2` partial-authority route + test
+  fixes after an independent Critic review found the first commit
+  incomplete); a second, final Critic review of both commits together
+  returned PASS with no surviving findings. See
+  `backlog/evidence/2026-08-09-critical-human-proof-onboarding-closure.md`.
+- **Assignment (if accepted):** implemented same day (2026-08-09) as
+  GF-062/GF-065 within the 0.5.4 local-candidate happy-path hardening work.
+- **Date:** 2026-08-09

@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "c02f9b7c6aba0b99247418336ba9287a5f10366cad2b11eade92bd598157de85"
+    "transitionHead": "a1b46737dbb8ba4cf87b1c0996815525dfb2354ba6e899342a0395754b31d7bc"
   },
   "counts": {
-    "open": 102,
+    "open": 103,
     "in_progress": 21,
-    "closed": 31
+    "closed": 32
   },
   "items": [
     {
@@ -306,11 +306,15 @@
     },
     {
       "id": "pipeline.critical-human-proof-not-materialized-for-signature-mode",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "Turn-efficiency root-cause analysis of the PO's private Claude+Pipeline 0.5.4 happy-path test run, 2026-08-09 (sanitized, no PO-identifying data)."
+      "source": "Turn-efficiency root-cause analysis of the PO's private Claude+Pipeline 0.5.4 happy-path test run, 2026-08-09 (sanitized, no PO-identifying data).",
+      "closedAt": "2026-08-09",
+      "closureRepository": "self",
+      "closureCommit": "3db838f2c7822faa7d17bea9459aed347e9f69b4",
+      "closureEvidence": "backlog/evidence/2026-08-09-critical-human-proof-onboarding-closure.md"
     },
     {
       "id": "pipeline.critical-human-proof-not-wired-to-push-and-prd-gates",
@@ -319,6 +323,14 @@
       "owner": "pipeline",
       "created": "2026-08-05",
       "source": "PO question during Sprint Nova session, 2026-08-05: asked whether the ed25519 human-proof mechanism (built for Sprint Cyborg) needed one-time setup before this session's branch push. Investigation found it exists but is not enforced for either of the two human gates it was meant to secure."
+    },
+    {
+      "id": "pipeline.critical-human-proof-policy-seeded-without-trust-anchor",
+      "status": "open",
+      "type": "idea",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "Critic review (round 2, PASS) of GF-062/GF-065's critical-human-proof.json onboarding fix, scratch/critic-1f03ce024c82/critic-notes.md, deliberately not flagged as a finding of that diff."
     },
     {
       "id": "pipeline.cross-repository-override-ledger-binding",
@@ -876,6 +888,14 @@
       "closureRepository": "self",
       "closureCommit": "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb",
       "closureEvidence": "backlog/evidence/2026-07-24-completed-companion-deliveries.md"
+    },
+    {
+      "id": "pipeline.project-reset-does-not-classify-the-proof-policy-artifact",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "Critic review (round 2, PASS) of GF-062/GF-065's critical-human-proof.json onboarding fix, scratch/critic-1f03ce024c82/critic-notes.md, deliberately not flagged as a finding of that diff."
     },
     {
       "id": "pipeline.project-scoped-github-issue-operations",
