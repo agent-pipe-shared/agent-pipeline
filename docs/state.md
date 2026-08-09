@@ -3723,8 +3723,17 @@ verification-scope) maps to an EXISTING mechanism before building a new `kind` �
 `verification-scope` is a `kind` today, and several of the others plausibly correspond to fields
 this codebase already has (`candidateDigest`, `personalIdentifiability`, `relatedHumanDecisionId`).
 
-**Live now:** WP-A-AC07. Both design-latitude threads (O-1/O-2, K-AC-05) remain parked pending PO
-input. Handover fully current through this checkpoint.
+Researched R-AC-04 next but found its real edit surface is `agent-decision-journal.mjs` (the
+`recoverability` enum this criterion extends actually lives there, not in
+`external-command-offer.mjs` as the evidence-map POINTERS text implies) — directly colliding with
+the live WP-A-AC07 dispatch on that same file. Held back, not dispatched, until WP-A-AC07 clears.
+Dispatched **WP-P-AC01-AC03** instead (the organization-policy pack/preview pair — genuinely
+file-disjoint from WP-A-AC07): P-AC-01 adds provenance/dependency/signature-policy validation to
+`validateOrganizationPolicyPack`; P-AC-03 adds newly-required-artifacts/external-effects/backfill-
+range fields to the activation-preview plan, deterministically computed rather than caller-supplied.
+
+**Live now:** WP-A-AC07, WP-P-AC01-AC03. Both design-latitude threads (O-1/O-2, K-AC-05) remain
+parked pending PO input. Handover fully current through this checkpoint.
 
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
