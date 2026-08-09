@@ -47,6 +47,18 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 13bebf6a5d15fb0c425d9599c34e82bbc510c12c — 2026-08-09, range 3387065..13bebf6, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `63de074` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `8a98057`, `aa7432d`, `13bebf6`. Same reading as the whole chain: `docs/state.md` stays
+ADR-0012, the generated evidence-map/closure-plan pair stays ADR-0045 -- extended this range to a
+new file under the same covered root, `specs/sprint-phoenix-epic/design/class-s-scoping.md`,
+which the check's own output confirms falls under the same `specs/**` glob as every other
+evidence/design artifact in this chain. Nothing else in this range touches a governed path.
+
 ## Candidate 09f853a9e585a5db133d441be5c19390acbd3623 — 2026-08-09, range 3387065..09f853a, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
