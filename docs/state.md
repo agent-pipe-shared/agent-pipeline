@@ -3845,6 +3845,26 @@ dispatches (`WP-A-AC07`, `WP-R-AC02`) so it composes cleanly rather than conflic
 
 **Live now:** WP-R-AC04. Handover fully current through this checkpoint.
 
+### R-AC-04 CLOSED, VERIFIED WITH THE BROADER-SUITE POLICY APPLIED
+
+WP-R-AC04 landed (`f9fe8299`): an optional `requiredCleanup` field
+(`cleanupClass`/`status`/`digest`) on `validateCommandOfferEvent`, scoped
+(`ADJ-COMMAND-CLEANUP-SCOPE`) to only accompany a non-`not-applicable` `recoverability`. Verified
+independently — this time explicitly applying the policy stated two checkpoints ago: found
+`governance-event-store.mjs` is the sole other consumer of `agent-decision-journal.mjs`
+(`grep`-confirmed), and ran its 28/28 suite too, not just the two directly-touched files (39/39 +
+28/28). All three clean, no regression. Booked `implemented` (`f4d7376e`).
+
+**Live now: none.** This window's dispatch queue (four candidates: C-AC-02, A-AC-07,
+P-AC-01/P-AC-03, R-AC-04, plus P-AC-06 caught-and-reverted) is fully processed and persisted.
+
+**Session standing after this stretch:** 126 of 157 criteria implemented (up from 109 at this
+segment's start), both design-latitude threads (O-1/O-2, K-AC-05) parked pending PO input with
+full findings recorded, one regression caught and reverted with the lesson applied immediately.
+Everything is committed; `docs/state.md` and `docs/doc-reconciliation.md` are current through every
+checkpoint in this stretch. No `/compact` was run or requested, per the PO's standing AFK
+instruction — safe to resume from here whenever the PO returns or the session continues.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
