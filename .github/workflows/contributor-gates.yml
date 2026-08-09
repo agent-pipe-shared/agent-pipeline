@@ -64,7 +64,7 @@ jobs:
       # completeness-check step below.
       - name: Generate PR-bound security evidence for the untrusted candidate
         timeout-minutes: 3
-        run: node trusted-gate/harness/scripts/security-scan.mjs --root candidate || true
+        run: node trusted-gate/plugins/pipeline-core/scripts/security-scan.mjs --root candidate || true
 
       - name: Verify current CLA acceptance and every PR commit DCO sign-off
         run: >-
