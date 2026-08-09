@@ -81,7 +81,7 @@ test("E-AC-06 the delivery receipt is structurally unable to ever claim exactly-
     assert.equal(vocabulary.some((value) => /exactly.?once|single.?delivery|guarantee/iu.test(value)), false, "E-AC-06: the receipt vocabulary must never spell out an exactly-once or single-delivery guarantee");
   }
   for (const extra of [{ deliveryGuarantee: "exactly-once" }, { exactlyOnce: true }, { semantics: "exactly-once" }]) {
-    assert.throws(() => createGovernanceDeliveryReceipt({ destinationProfile: "audit", policyRevision: sha("b"), batchId: "batch-exactly-once", eventCount: 1, attempt: 1, acknowledgementClass: "accepted", terminalDisposition: "delivered", cursor: 1, lag: 0, ...extra }), (error) => error.code === "GEP-RECEIPT", "E-AC-06: no field claiming exactly-once semantics can ever be admitted onto the receipt");
+    assert.throws(() => createGovernanceDeliveryReceipt({ destinationProfile: "audit", policyRevision: sha("b"), projectionDigest: sha("d"), batchId: "batch-exactly-once", eventCount: 1, attempt: 1, acknowledgementClass: "accepted", terminalDisposition: "delivered", cursor: 1, lag: 0, ...extra }), (error) => error.code === "GEP-RECEIPT", "E-AC-06: no field claiming exactly-once semantics can ever be admitted onto the receipt");
   }
   // The positive half is already pinned above: an unacknowledged attempt
   // leaves the event pending so a retry redelivers the same mapping, proving
@@ -103,10 +103,22 @@ test("E-AC-11 the delivery receipt is closed and rejects any retention/immutabil
   const { createGovernanceDeliveryReceipt } = await import("./governance-event-projection.mjs");
   const collector = createInMemoryGovernanceExportCollector({ profile });
   const result = await deliverGovernanceExportBatch({ outbox: queue(), profile, adapter: collector, batchId: "batch-4", maxEvents: 1, attempt: 1 });
-  assert.deepEqual(Object.keys(result.receipt).sort(), ["acknowledgementClass", "attempt", "batchId", "cursor", "destinationProfile", "eventCount", "lag", "policyRevision", "schema", "terminalDisposition"].sort());
+  assert.deepEqual(Object.keys(result.receipt).sort(), ["acknowledgementClass", "attempt", "batchId", "cursor", "destinationProfile", "eventCount", "lag", "policyRevision", "projectionDigest", "schema", "terminalDisposition"].sort());
   for (const extra of [{ retention: "7y" }, { immutable: true }, { analystReviewed: true }, { compliant: true }]) {
-    assert.throws(() => createGovernanceDeliveryReceipt({ destinationProfile: "audit", policyRevision: sha("b"), batchId: "batch-4", eventCount: 1, attempt: 1, acknowledgementClass: "accepted", terminalDisposition: "delivered", cursor: 1, lag: 0, ...extra }), (error) => error.code === "GEP-RECEIPT");
+    assert.throws(() => createGovernanceDeliveryReceipt({ destinationProfile: "audit", policyRevision: sha("b"), projectionDigest: sha("d"), batchId: "batch-4", eventCount: 1, attempt: 1, acknowledgementClass: "accepted", terminalDisposition: "delivered", cursor: 1, lag: 0, ...extra }), (error) => error.code === "GEP-RECEIPT");
   }
+});
+// E-AC-11: the receipt's projectionDigest is a deterministic function of the
+// batch's own mappings -- the same batch content must always produce the
+// same digest, and different batch content must produce a different one.
+test("E-AC-11 the receipt's projectionDigest is deterministic over batch content and changes when content changes", async () => {
+  const collector = createInMemoryGovernanceExportCollector({ profile });
+  const first = await deliverGovernanceExportBatch({ outbox: queue(), profile, adapter: collector, batchId: "batch-5", maxEvents: 2, attempt: 1 });
+  const second = await deliverGovernanceExportBatch({ outbox: queue(), profile, adapter: collector, batchId: "batch-5", maxEvents: 2, attempt: 1 });
+  assert.equal(first.receipt.projectionDigest, second.receipt.projectionDigest, "identical batch content must produce the identical projection digest");
+  const differentQueue = () => enqueueGovernanceExport(enqueueGovernanceExport(createGovernanceExportOutbox({ destinationProfile: "audit", policyRevision: sha("b") }), projection("a")), projection("f"));
+  const third = await deliverGovernanceExportBatch({ outbox: differentQueue(), profile, adapter: collector, batchId: "batch-5", maxEvents: 2, attempt: 1 });
+  assert.notEqual(first.receipt.projectionDigest, third.receipt.projectionDigest, "different batch content must produce a different projection digest");
 });
 
 const policy = (overrides = {}) => ({ schema: "pipeline.governance-export-delivery-policy.v1", profileId: "audit", maxBatchEvents: 2, compression: "none", minIntervalMs: 100, maxAttempts: 3, initialBackoffMs: 50, backoffFactor: 2, maxBackoffMs: 400, maxPendingEntries: 3, ...overrides });

@@ -14,5 +14,5 @@ test("rejects invalid source events and policy attempts to permit unknown/raw fi
   assert.equal(projectGovernanceEvent({ event: { bad: true }, policy: policy() }).status, "rejected"); assert.throws(() => projectGovernanceEvent({ event: event(), policy: policy({ allowedFields: ["payload"] }) }), (error) => error.code === "GEP-POLICY");
 });
 test("creates sanitized delivery receipts without destination coordinates or authority claims", () => {
-  const receipt = createGovernanceDeliveryReceipt({ destinationProfile: "test-siem", policyRevision: "c".repeat(64), batchId: "batch-1", eventCount: 2, attempt: 1, acknowledgementClass: "partial", terminalDisposition: "retryable-failure", cursor: 1, lag: 1 }); assert.equal(receipt.schema, "pipeline.governance-delivery-receipt.v1"); assert.doesNotMatch(JSON.stringify(receipt), /endpoint|token|authority/);
+  const receipt = createGovernanceDeliveryReceipt({ destinationProfile: "test-siem", policyRevision: "c".repeat(64), projectionDigest: "d".repeat(64), batchId: "batch-1", eventCount: 2, attempt: 1, acknowledgementClass: "partial", terminalDisposition: "retryable-failure", cursor: 1, lag: 1 }); assert.equal(receipt.schema, "pipeline.governance-delivery-receipt.v1"); assert.doesNotMatch(JSON.stringify(receipt), /endpoint|token|authority/);
 });
