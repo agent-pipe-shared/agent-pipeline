@@ -49,6 +49,24 @@ test("E-AC-06 an unacknowledged attempt leaves the event pending so a retry rede
   assert.equal(seen.length, 2); assert.equal(seen[0], seen[1], "the retry must resend the same destination event id, proving redelivery rather than a fresh one");
   assert.equal(retried.receipt.terminalDisposition, "delivered");
 });
+// PHX-WP-EAC14 (E-AC-14, failure-injection fixture): a genuine destination/
+// transport failure -- the adapter's deliver() call rejecting, as a real
+// SIEM connection-refused or timeout would -- must propagate without ever
+// mutating the outbox. The failed attempt leaves the exact same pending
+// state behind so a later attempt against an unchanged destination can
+// simply retry, not resume from a partially-applied delivery.
+test("PHX-WP-EAC14 a simulated destination transport failure leaves the outbox untouched for a safe retry", async () => {
+  const before = queue();
+  const unreachable = { profile, async deliver() { throw new Error("ECONNREFUSED: simulated destination unreachable"); } };
+  await assert.rejects(() => deliverGovernanceExportBatch({ outbox: before, profile, adapter: unreachable, batchId: "batch-fail", maxEvents: 1, attempt: 1 }), /ECONNREFUSED/);
+  assert.deepEqual(before.entries.map((entry) => entry.status), ["pending", "pending"]);
+  assert.equal(before.cursor, 0);
+  // A subsequent attempt against a healthy adapter, over the exact same
+  // outbox reference, proves the failed attempt left nothing to recover from.
+  const collector = createInMemoryGovernanceExportCollector({ profile });
+  const retried = await deliverGovernanceExportBatch({ outbox: before, profile, adapter: collector, batchId: "batch-recover", maxEvents: 1, attempt: 2 });
+  assert.equal(retried.receipt.terminalDisposition, "delivered");
+});
 // PHX-WP-A2 pins the residual E-AC-06 negative: the receipt shape must never
 // be able to claim exactly-once delivery. Both closed enums the receipt can
 // ever carry are asserted here directly against the vocabulary the schema
