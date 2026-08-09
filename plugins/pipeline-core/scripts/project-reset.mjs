@@ -67,9 +67,12 @@
  * file removes/keeps the owned keys inside it too), so the runtime-
  * projection loop SKIPS an already-claimed path. A path is therefore
  * classified exactly once, never twice. Only `apply` (R2C) actually knows
- * how to act on the two removal shapes; a `type: "keys"` entry surviving to
- * `apply` is a typed refusal (key-level surgery is unimplemented), never a
- * file delete standing in for it.
+ * how to act on the two removal shapes; a `type: "keys"` entry whose file is
+ * PRESENT when `apply` runs is a typed refusal (key-level surgery is
+ * unimplemented), never a file delete standing in for it. One naming a file
+ * that is not there describes no work at all -- there are no owned keys to
+ * strip out of a document nobody wrote -- and is carried through the reset
+ * untouched instead of refusing it (see `planRequiresKeySurgery`).
  *
  * FAILS CLOSED, NAMES WHICH. A root that is not a project, one whose
  * authority is unreadable, and one that is a symlink each produce a
@@ -450,7 +453,9 @@ export function planProjectReset({ rootDir } = {}) {
     } else {
       // Keys-patch projection: name the exact owned keys, never the file --
       // the file is project-owned. `apply` (R2C) does not implement key
-      // surgery; a surviving entry of this kind is a typed refusal.
+      // surgery, so an entry of this kind IS a typed refusal there when its
+      // file exists; when it does not, there are no owned keys to strip and
+      // the entry is already-satisfied work (`planRequiresKeySurgery`).
       remove.push({
         path: target.path,
         kind: "runtimeOwnedKeys",
@@ -539,6 +544,49 @@ function physicalTargetState(root, relPath) {
 }
 
 /**
+ * Does this plan require KEY SURGERY -- stripping the Pipeline's owned keys
+ * out of a file the PROJECT owns -- before the reset can be called done?
+ *
+ * THE DISTINCTION. "Is there key surgery to perform here", never "is there a
+ * keys-shaped entry in the plan". A `keys` entry naming a file that is not
+ * there describes work that does not exist: there are no owned keys to strip
+ * out of a document nobody wrote. Refusing on the shape alone made `apply`
+ * unusable on the NEUTRAL authority tier -- the tier onboarding resolves to
+ * by default -- because every neutral-tier plan carries two keys entries by
+ * construction: `.claude/pipeline.json` and `.claude/pipeline.yaml` are
+ * runtime-projection targets the authority loop leaves unclaimed there, and
+ * on a project that never had a `.claude/` directory both name an absent
+ * file. The legacy tier completed the identical reset fine, which is the
+ * shape of the defect: a refusal earned by the tier a project resolved to,
+ * not by any work the reset was unable to do.
+ *
+ * WHAT STAYS REFUSED is the real case: a keys entry whose file IS present.
+ * Key-level surgery is genuinely unimplemented, and a whole-file delete
+ * standing in for it would destroy a document the project owns.
+ *
+ * `existed` is not a stale plan-time observation at the only call site: the
+ * plan there was re-derived from this filesystem moments earlier and
+ * digest-matched against the caller's, so `existed` is this filesystem's
+ * answer, not a remembered one.
+ *
+ * REACH, STATED RATHER THAN IMPLIED. Under today's runtime-projection
+ * manifest the two keys targets ARE the two legacy authority artifacts
+ * (`AUTHORITY_ARTIFACTS.manifest.legacy`, `.calibration.legacy`), and the
+ * authority loop in `planProjectReset` claims each of them whenever it
+ * physically exists -- as a whole-file `remove` where that tier is the
+ * resolved one, as a `keep` compatibility copy where it is not. A keys entry
+ * with `existed: true` is therefore not producible from a real project as
+ * the manifest stands; this predicate is written against that manifest as
+ * DATA, so a future keys target outside the authority paths reaches the
+ * refusal with no further change here. project-reset.test.mjs pins both
+ * halves of that statement rather than leaving it as a claim.
+ */
+export function planRequiresKeySurgery(plan) {
+  const entries = Array.isArray(plan?.remove) ? plan.remove : [];
+  return entries.some((entry) => entry?.type === "keys" && entry?.existed === true);
+}
+
+/**
  * Apply a project reset, atomically or not at all (R2D). See the module
  * header for the four-stage mechanism: digest-bound plan re-derivation,
  * a durably-flushed journal naming exactly what will move, one rename per
@@ -611,7 +659,7 @@ export function applyProjectReset({ rootDir, expectedPlanSha256, deps = {} } = {
     if (plan.planSha256 !== expectedPlanSha256) {
       return refuseApply("PROJECT-RESET-APPLY-DIGEST-MISMATCH", root, plan.authorityTier);
     }
-    if (plan.remove.some((entry) => entry.type === "keys")) {
+    if (planRequiresKeySurgery(plan)) {
       return refuseApply("PROJECT-RESET-APPLY-KEYS-UNIMPLEMENTED", root, plan.authorityTier);
     }
     for (const reserved of [RESET_QUARANTINE_DIRNAME, RESET_JOURNAL_BASENAME, RESET_RECEIPT_BASENAME]) {

@@ -25,6 +25,7 @@ import {
   applyProjectReset,
   classifyRuntimeProjectionProvenance,
   planProjectReset,
+  planRequiresKeySurgery,
 } from "./project-reset.mjs";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import {
@@ -274,10 +275,11 @@ test("R3 AC-1: a provisional kickoff anchor is a shape-derived directory remove 
 });
 
 test("R3 AC-2: an adopter's design package, and a plausible non-anchor specs/kickoff-* directory, are never touched", () => {
-  // Legacy tier: as R2D's own comment above notes, only the neutral tier
-  // (without a legacy compat copy) produces a `keys`-type remove entry that
-  // `apply` refuses outright -- irrelevant to what this test exercises.
-  withFixture(kickoffFixture("adopter-design-package", { tier: "legacy" }), (root) => {
+  // NEUTRAL tier (RESETKEYS-1). This fixture used to be routed to legacy for
+  // one reason only: the neutral tier produces `keys`-type remove entries and
+  // `apply` refused for their mere presence. It no longer does, so the tier a
+  // real adopter actually resolves to is where this is exercised.
+  withFixture(kickoffFixture("adopter-design-package", { tier: "neutral" }), (root) => {
     const realTopicDir = join(root, "specs", "2026-08-08_real-topic");
     mkdirSync(realTopicDir, { recursive: true });
     writeFileSync(join(realTopicDir, "prd.md"), "# Real topic PRD\n");
@@ -340,8 +342,8 @@ test("R3 AC-4: a promoted kickoff anchor -- one already carrying the supersessio
 });
 
 test("R3 AC-5: several attempted kickoffs leave several anchors -- all are planned and removed", () => {
-  // Legacy tier, for the same reason as the AC-2 test above.
-  withFixture(freshProject("several-anchors", { tier: "legacy" }), (root) => {
+  // Neutral tier, for the same reason as the AC-2 test above.
+  withFixture(freshProject("several-anchors", { tier: "neutral" }), (root) => {
     const names = ["first attempt", "second attempt", "third attempt"].map(
       (label) => `kickoff-${createHash("sha256").update(label).digest("hex").slice(0, 16)}`,
     );
@@ -656,11 +658,16 @@ test("AC-7: a plan containing runtime-projection removal and preserve-only keep 
 // ---------------------------------------------------------------------------
 // R2D: apply -- atomic, or it does not begin.
 //
-// Legacy tier is used for the "apply succeeds" fixtures because, per the
-// AC-4/collision tests above, only the NEUTRAL tier produces a `keys`-type
-// remove entry (the `.claude/pipeline.yaml`/`.claude/pipeline.json` runtime-
-// projection collision) -- legacy is where an ordinary happy-path apply is
-// exercised without also hitting the AC-4 keys refusal.
+// TIER ROUTING, CORRECTED (RESETKEYS-1). The "apply succeeds" fixtures below
+// used to be routed to the LEGACY tier wholesale. The reason was never about
+// legacy: only the NEUTRAL tier produces `keys`-type remove entries (the
+// `.claude/pipeline.yaml`/`.claude/pipeline.json` runtime-projection
+// collision, see the AC-4/collision tests above) and `apply` refused for the
+// mere presence of one -- so the happy path could only be demonstrated on the
+// tier a real adopter does NOT resolve to. That refusal now fires only where
+// key surgery is real, so the success path runs on the default tier too:
+// where the tier is a variable these tests iterate both, and where a fixture
+// still names one tier it says why at the fixture.
 // ---------------------------------------------------------------------------
 
 test("R2D AC-1: a --plan-sha256 that does not match a freshly derived plan refuses and writes nothing", () => {
@@ -710,29 +717,144 @@ test("R2D AC-3: keep and neverTouched entries are byte-identical after a success
   });
 });
 
-test("R2D AC-4: a plan carrying a keys entry is a typed refusal, not a partial reset", () => {
-  withFixture(kickoffFixture("apply-keys-refusal", { tier: "neutral" }), (root) => {
+test("R2D AC-4: a keys entry naming a file that is not there is no work, and the reset completes", () => {
+  // The tier the Pipeline resolves to by DEFAULT, with no `.claude/` files at
+  // all -- which is every neutral-tier plan, because the two keys targets are
+  // `.claude/pipeline.json` and `.claude/pipeline.yaml`. There are no owned
+  // keys to strip out of a document nobody wrote, so there is nothing here
+  // for the unimplemented key surgery to do, and refusing would have been a
+  // refusal earned by the tier rather than by the work.
+  withFixture(kickoffFixture("apply-keys-absent", { tier: "neutral" }), (root) => {
     const plan = planProjectReset({ rootDir: root });
-    assert.equal(plan.remove.some((entry) => entry.type === "keys"), true);
-    const before = inventory(root);
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.authorityTier, "neutral");
+    const keysEntries = plan.remove.filter((entry) => entry.type === "keys");
+    assert.deepEqual(
+      keysEntries.map((entry) => entry.path),
+      [".claude/pipeline.json", ".claude/pipeline.yaml"],
+      "the neutral tier must still produce both keys entries -- this is not a plan-side change",
+    );
+    for (const entry of keysEntries) {
+      assert.equal(entry.existed, false, `${entry.path} must be planned as absent`);
+      assert.equal(existsSync(join(root, entry.path)), false, `${entry.path} must really be absent`);
+    }
+    assert.equal(planRequiresKeySurgery(plan), false, "absent keys entries are not key surgery");
     const result = applyProjectReset({ rootDir: root, expectedPlanSha256: plan.planSha256 });
-    assert.equal(result.status, "refused");
-    assert.equal(result.code, "PROJECT-RESET-APPLY-KEYS-UNIMPLEMENTED");
-    assert.equal(inventory(root), before, "a keys refusal must write nothing");
+    assert.equal(result.status, "applied");
+    assert.equal(result.code, null);
+    assert.equal(result.authorityTier, "neutral");
+    // The reset really ran rather than reporting success over an empty set.
+    const removedEntries = result.remove.filter((entry) => entry.existed);
+    assert.ok(
+      removedEntries.some((entry) => entry.path.startsWith("project/")),
+      "expected the neutral authority artifacts to be among the removed entries",
+    );
+    for (const entry of removedEntries) assert.equal(existsSync(join(root, entry.path)), false);
+    // And nothing invented a file for the entries it could not act on.
+    for (const entry of keysEntries) {
+      assert.equal(existsSync(join(root, entry.path)), false, `${entry.path} must still be absent after apply`);
+    }
+    const schemaResult = validateAgainstSchema(result, SCHEMA);
+    assert.deepEqual(schemaResult.errors, []);
+    assert.equal(schemaResult.valid, true);
+  });
+});
+
+test("R2D AC-4: key surgery the reset would REALLY have to perform is still a typed refusal", () => {
+  // WHY THIS IS A PREDICATE TEST AND NOT A PROJECT FIXTURE, stated rather
+  // than quietly worked around. `applyProjectReset` derives its own plan and
+  // requires it to digest-match the caller's, so a keys entry with
+  // `existed: true` can only reach the gate if `planProjectReset` can emit
+  // one from a real project -- and under today's runtime-projection manifest
+  // it cannot, which the test below this one proves against real roots
+  // rather than asserting here. Hand-building a project shape the planner
+  // never emits would be a fixture invented to make a check pass, not
+  // coverage. The gate in `applyProjectReset` is a one-line call to this
+  // exported predicate, so this is the level at which the refusal is
+  // testable honestly, and it is tested against the literal entry shapes the
+  // manifest's two keys projections produce.
+  const keysEntry = (existed) => ({
+    path: ".claude/pipeline.json",
+    kind: "runtimeOwnedKeys",
+    type: "keys",
+    existed,
+    ownedKeys: ["humanRoles.po.displayLabel"],
+  });
+  assert.equal(planRequiresKeySurgery({ remove: [keysEntry(true)] }), true);
+  assert.equal(planRequiresKeySurgery({ remove: [keysEntry(false)] }), false);
+  // One present keys target among absent ones is still key surgery.
+  assert.equal(
+    planRequiresKeySurgery({
+      remove: [keysEntry(false), { ...keysEntry(true), path: ".claude/pipeline.yaml" }],
+    }),
+    true,
+  );
+  // A present file the plan removes WHOLESALE is not key surgery: the
+  // distinction is the entry's type, never its existence on its own.
+  assert.equal(
+    planRequiresKeySurgery({
+      remove: [{ path: "project/pipeline.yaml", kind: "manifest", type: "file", existed: true }],
+    }),
+    false,
+  );
+  assert.equal(planRequiresKeySurgery({ remove: [] }), false);
+  assert.equal(planRequiresKeySurgery({}), false);
+});
+
+test("R2D AC-4: a keys target that physically exists is claimed by the authority loop, never left as a keys entry", () => {
+  // The reach of the refusal above, as behaviour rather than as a claim. The
+  // manifest's two keys-projection targets ARE the legacy manifest and
+  // calibration artifacts, and the authority loop claims each of them
+  // whenever it physically exists -- as a whole-file `remove` where legacy is
+  // the resolved tier (pinned by the collision test further up), as a `keep`
+  // compatibility copy where it is not (here) -- and the runtime-projection
+  // loop skips an already-claimed path. That is why no real project produces
+  // a keys entry with `existed: true` today. A future manifest gaining a keys
+  // target outside the authority paths would show up as a change here rather
+  // than silently.
+  withFixture(freshProject("keys-target-present", { tier: "neutral" }), (root) => {
+    const absent = planProjectReset({ rootDir: root });
+    assert.equal(absent.remove.filter((entry) => entry.type === "keys").length, 2);
+    assert.equal(planRequiresKeySurgery(absent), false);
+    mkdirSync(join(root, ".claude"), { recursive: true });
+    writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.project.v1\n");
+    writeFileSync(join(root, ".claude", "pipeline.json"), "{}\n");
+    const present = planProjectReset({ rootDir: root });
+    assert.equal(present.status, "ready");
+    assert.equal(present.authorityTier, "neutral");
+    assert.equal(
+      present.remove.some((entry) => entry.type === "keys"),
+      false,
+      "a physically present keys target must be claimed as a whole-file entry, never left as a keys entry",
+    );
+    for (const [path, kind] of [[".claude/pipeline.yaml", "manifest"], [".claude/pipeline.json", "calibration"]]) {
+      const keepEntry = present.keep.find((entry) => entry.path === path);
+      assert.ok(keepEntry, `${path} must be claimed by the authority loop`);
+      assert.equal(keepEntry.kind, kind);
+      assert.equal(keepEntry.type, "file");
+      assert.equal(keepEntry.existed, true);
+    }
+    assert.equal(planRequiresKeySurgery(present), false);
   });
 });
 
 test("R2D AC-5: re-running the identical command against an already-reset project is zero-write and honest", () => {
-  withFixture(kickoffFixture("apply-replay", { tier: "legacy" }), (root) => {
-    const plan = planProjectReset({ rootDir: root });
-    const first = applyProjectReset({ rootDir: root, expectedPlanSha256: plan.planSha256 });
-    assert.equal(first.status, "applied");
-    const before = inventory(root);
-    const second = applyProjectReset({ rootDir: root, expectedPlanSha256: plan.planSha256 });
-    assert.equal(second.status, "replayed");
-    assert.equal(second.code, null);
-    assert.equal(inventory(root), before, "replay must write nothing");
-  });
+  // Both tiers: the neutral one is what a real adopter resolves to, and its
+  // plan carries the two absent keys entries -- so replay is proven honest
+  // for a plan that contains entries `apply` never acts on, not only for one
+  // whose every entry is a file move.
+  for (const tier of ["legacy", "neutral"]) {
+    withFixture(kickoffFixture(`apply-replay-${tier}`, { tier }), (root) => {
+      const plan = planProjectReset({ rootDir: root });
+      const first = applyProjectReset({ rootDir: root, expectedPlanSha256: plan.planSha256 });
+      assert.equal(first.status, "applied", `expected apply to complete on the ${tier} tier`);
+      const before = inventory(root);
+      const second = applyProjectReset({ rootDir: root, expectedPlanSha256: plan.planSha256 });
+      assert.equal(second.status, "replayed");
+      assert.equal(second.code, null);
+      assert.equal(inventory(root), before, "replay must write nothing");
+    });
+  }
 });
 
 test("R2D AC-6: a target that is itself a symlink is refused rather than followed", () => {
@@ -772,21 +894,23 @@ test("R2D AC-6: a target whose parent became a symlink between plan and apply is
 });
 
 test("R2D AC-8: a successful apply's result validates against the schema and separates removed, already-absent, and kept", () => {
-  withFixture(freshProject("apply-report", { tier: "legacy" }), (root) => {
-    const plan = planProjectReset({ rootDir: root });
-    const result = applyProjectReset({ rootDir: root, expectedPlanSha256: plan.planSha256 });
-    assert.equal(result.status, "applied");
-    assert.equal(result.schema, PROJECT_RESET_APPLY_RESULT_SCHEMA);
-    const schemaResult = validateAgainstSchema(result, SCHEMA);
-    assert.deepEqual(schemaResult.errors, []);
-    assert.equal(schemaResult.valid, true);
-    const removedEntries = result.remove.filter((entry) => entry.existed);
-    const absentEntries = result.remove.filter((entry) => !entry.existed);
-    assert.ok(removedEntries.length > 0, "expected at least one actually-removed entry");
-    assert.ok(absentEntries.length > 0, "expected at least one already-absent entry (freshProject has no State/handover)");
-    for (const entry of removedEntries) assert.equal(existsSync(join(root, entry.path)), false);
-    assert.equal(result.keep.some((entry) => entry.path === ".claude/settings.json"), true);
-  });
+  for (const tier of ["legacy", "neutral"]) {
+    withFixture(freshProject(`apply-report-${tier}`, { tier }), (root) => {
+      const plan = planProjectReset({ rootDir: root });
+      const result = applyProjectReset({ rootDir: root, expectedPlanSha256: plan.planSha256 });
+      assert.equal(result.status, "applied", `expected apply to complete on the ${tier} tier`);
+      assert.equal(result.schema, PROJECT_RESET_APPLY_RESULT_SCHEMA);
+      const schemaResult = validateAgainstSchema(result, SCHEMA);
+      assert.deepEqual(schemaResult.errors, []);
+      assert.equal(schemaResult.valid, true);
+      const removedEntries = result.remove.filter((entry) => entry.existed);
+      const absentEntries = result.remove.filter((entry) => !entry.existed);
+      assert.ok(removedEntries.length > 0, "expected at least one actually-removed entry");
+      assert.ok(absentEntries.length > 0, "expected at least one already-absent entry (freshProject has no State/handover)");
+      for (const entry of removedEntries) assert.equal(existsSync(join(root, entry.path)), false);
+      assert.equal(result.keep.some((entry) => entry.path === ".claude/settings.json"), true);
+    });
+  }
 });
 
 test("R2D: the apply CLI operates ONLY on --root, never on the process cwd it was invoked from", () => {
