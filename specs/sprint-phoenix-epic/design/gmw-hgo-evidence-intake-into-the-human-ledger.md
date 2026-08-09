@@ -98,7 +98,13 @@ H-AC-12 needs; a file-level implementation inventory and test approach.
 - **D-2 — synchronous dual-evaluation inside the guard hot path.** §8.5.2 explains
   why the intersection check is placed at the arming/consumption boundary and in
   reconcile, not on every hook read, what that costs, and which criterion the
-  remaining residual does **not** satisfy.
+  remaining residual does **not** satisfy. **Superseded by §15.2 (PO-decided
+  2026-08-09).** D-2 is closed as of increment 1: §15.2.3 adds a narrowing-only
+  ledger read at the two hooks that call `windowCoversRule`
+  (`guard-testpath.mjs`, `guard-gate-strength.mjs`), and §15.3 moves both files
+  into the increment-1 inventory. Retained here, quoted rather than deleted, so a
+  reader consulting this deferral list in isolation is told the same thing §15
+  already decided, not the opposite.
 - **D-3 — lazy `expired` dispositions.** Emitted by an explicit reconcile step,
   not by a timer or by the guard read path (§7.5).
 
@@ -1151,6 +1157,15 @@ stale-candidate test pins both halves of the rule.
 
 #### 8.5.2 Where the dual evaluation runs (D-2), and the criterion it does not meet
 
+**Superseded by §15.2 (PO-decided 2026-08-09).** D-2 is closed as of increment 1: §15.2.3 adds the
+narrowing-only ledger read this section's "closure path" paragraph below describes directly to the two hooks
+that call `windowCoversRule` (`guard-testpath.mjs`, `guard-gate-strength.mjs`), and it ships as part of
+increment 1, not increment 2. The paragraphs immediately below (through "It satisfies it at every boundary that
+grants or consumes") describe the **original, now-superseded** position — retained, quoted rather than
+deleted, so a reader consulting this section in isolation is told the same thing §15 already decided, not the
+opposite; §15.2.5 also retracts the "appear in §9's amendment rather than in §11's increment-1 inventory"
+clause in the paragraph after them, by name.
+
 At the arming boundary (`install`), at the consumption boundary (HGO `consume`),
 in `status`, and in reconcile — **not** inside the synchronous guard hook read
 path. The hook path (`windowCoversRule`, `guard-maintenance-window.mjs:559-566`)
@@ -1376,6 +1391,13 @@ test, rather than breaking the intake silently.
 | `plugins/pipeline-core/lib/human-governance-ledger.mjs`, `human-governance-decision.mjs`, `governance-event*.mjs` | **no change in increment 1** | design to what exists; increment 2's kernel change is D-1 |
 | `docs/human-governance-ledger.md` | **create** — the file does not exist in this checkout (untracked, and absent from disk); `spec.md:418` still carries it as a create. This path contributes the two producers' section: reason codes, what is portable, what is not | H-AC-14; the row is a creation, not an edit, so the work is not understated (§14, F-4) |
 | `specs/sprint-phoenix-epic/acceptance.md`, `spec.md` | **amendments specified in §9, applied by the rebind, not here** | bound artifacts |
+
+**Note (superseded in part by §15.2/§15.3, PO-decided 2026-08-09).** The table above reflects this document's
+original increment-1 scope, in which the guard-hook closure of D-2 (§8.5.2) was deferred to increment 2 and
+named no hook file. That deferral no longer holds: §15.2 closes D-2 inside increment 1, and §15.3's delta table
+adds `plugins/pipeline-core/hooks/guard-testpath.mjs` and `plugins/pipeline-core/hooks/guard-gate-strength.mjs`
+as **modify** rows, alongside the identity-registry rows for O-1. Retained here rather than rewritten, per
+§15.3's own note that "§11 itself is not rewritten" — see §15.3 for the current, complete delta.
 
 ## 12. Verification approach
 
@@ -1802,13 +1824,42 @@ shape, calls `resolveNaturalPersonIdentity` directly against the local registry 
 freeze-and-print convention every other branch already uses (`:102`). No producer path (GMW's
 `install`/`close`, HGO's authorize/consume/deny) reads or writes the registry; populating it is a manual,
 PO-side act, exactly like editing `critical-human-proof.json` is today. **Unlike `critical-human-proof.json`,
-no guard protects this file today.** `identity-registry.json` lives outside the worktree (above);
+no guard protects this file today — but the reason is registration, not structural reach.**
+`identity-registry.json` lives outside the worktree in the git sense (never tracked, never committed, above);
 `gateStrengthRuleFor` (`guard-gate-strength.mjs:170-178`) resolves every candidate path against the project
-root and returns no rule whenever the resolved path lies outside it (`rel.startsWith('..' + sep)`) — GS-family
-protection is worktree-relative by construction and structurally cannot reach a path outside the project
-directory without unrelated guard changes out of this design-doc-only dispatch's scope. Populating **and**
-protecting this file are therefore both currently unenforced, manual, PO-side acts. Disclosed as a residual,
-not designed around here — §15.1.6.
+root and returns no rule only when the resolved path lies **outside the project directory itself**
+(`rel.startsWith('..' + sep)`). In a standard, non-linked checkout — this repository's own topology —
+`git rev-parse --git-common-dir` resolves to `.git`, which sits **inside** the project root;
+`.git/agent-pipeline/human-governance-identity/identity-registry.json` is a path that exclusion check does not
+fire on at all. The function falls through to its allowlist lookup and returns `null` only because no
+`GATE_STRENGTH_PATHS` entry names this path yet — the same mechanism that already protects
+`project/critical-human-proof.json` (GS-2) would reach it with one more entry, a real, cheap, available
+mitigation for the common case. (A linked-worktree topology can differ: there `<git-common-dir>` resolves into
+the *primary* checkout, a sibling tree outside the linked worktree's own project root, and the exclusion check
+genuinely fires — but that is not this repository's standard checkout and does not generalize to it.)
+Populating **and** protecting this file are therefore both currently unenforced, manual, PO-side acts —
+protecting it needs one `GATE_STRENGTH_PATHS` entry, out of this design-doc-only dispatch's scope, not a
+structural impossibility. Disclosed as a residual, not designed around here — §15.1.6.
+
+**Loading the registry from disk, and the absent-file case.** `human-governance-identity-registry.mjs` (§15.3)
+exports `loadIdentityRegistry({ rootDir })`: it resolves `<git-common-dir>` via
+`discoverRepository(rootDir).commonDir` (`worktree-lifecycle.mjs:235-253`) — the same resolution the write side
+already performs for the portable stream (`governance-event-store.mjs:81-88`, and §15.2.3's
+`ledgerConfirmsLiveGmwGrant` reuses it too) — then reads
+`<commonDir>/agent-pipeline/human-governance-identity/identity-registry.json`. **When the file does not
+exist — the default state on every machine, since populating it is a manual, PO-side act (above) —
+`loadIdentityRegistry` returns an empty registry (`{schema: "pipeline.human-governance-identity-registry.v1",
+entries: []}`), not an error.** This is a deliberate fold, not an omission: an absent file and a
+present-but-empty one are behaviourally identical inputs to `resolveNaturalPersonIdentity` — both produce zero
+matching entries for any `authorityClass` — so `resolveNaturalPersonIdentity` returns its existing
+`{status: "unknown"}` outcome (above) for the absent-registry case, rather than gaining a fourth, distinct
+status. A fourth outcome would ripple through every consumer of the closed three-value set this section already
+establishes (the CLI branch, the reviewer-facing lookup contract, §13 AC-14's rebind text) for no behavioural
+gain, since `unknown` already means exactly "no registered holder resolves this decision" — the absent-file
+case is one instance of that, not a different question. A malformed-but-present file (one that fails
+`validateIdentityRegistry`) is a distinct case from either: `resolve-identity` fails closed with
+`GAC-IDENTITY-REGISTRY`, the same fail-closed-on-malformed-input posture `parse(argv)`'s other branches already
+use, rather than being silently treated as absent or empty.
 
 #### 15.1.3 (a)/(b) Assurance and shape: self-declared, bounded, no new ceremony
 
@@ -1908,17 +1959,19 @@ O-5 (§14) disclosed a comparable single-human-shaped simplification, for whoeve
 rather than discover.
 
 **Also new, and not currently closed: the registry file itself carries no write protection today.**
-`identity-registry.json` lives outside the worktree (§15.1.2), and `gateStrengthRuleFor`
-(`guard-gate-strength.mjs:170-178`) resolves every candidate path against the project root, returning no rule
-whenever that path lies outside it — GS-family protection is worktree-relative by construction and cannot
-reach a machine-local file outside the project directory without guard changes this document does not design
-(out of scope here, §15.1.2). No guard today prevents an agent with local write access from editing or
-corrupting this file undetected. This is not a weaker claim than the mechanism already makes: §15.1.3(a)
+`identity-registry.json` lives outside the worktree in the git sense (§15.1.2), but in this repository's
+standard, non-linked checkout topology `<git-common-dir>` resolves to `.git`, inside the project root —
+`gateStrengthRuleFor` (`guard-gate-strength.mjs:170-178`) does not structurally exclude this path; it is simply
+unregistered in `GATE_STRENGTH_PATHS` today (§15.1.2 corrects the structural-impossibility framing this
+paragraph originally carried). No guard today prevents an agent with local write access from editing or
+corrupting this file undetected — not because the mechanism cannot reach it, but because nobody has added the
+one-entry registration yet. This is not a weaker claim than the mechanism already makes: §15.1.3(a)
 already sets the registry's assurance ceiling at self-asserted, never independently verified, never signed —
 an unprotected file is consistent with, not a regression from, that ceiling, since the ceiling never assumed
 write protection existed. Tracked as a residual, owner `pipeline` (PHX-2), alongside the role-and-time-
-granularity residual above; closing it is follow-up guard-config work outside a design-doc-only dispatch's
-scope, not designed further here.
+granularity residual above; adding the `GATE_STRENGTH_PATHS` entry is follow-up guard-config work outside a
+design-doc-only dispatch's scope, not designed further here — but it is available and cheap, not blocked on
+any further design.
 
 ### 15.2 O-2 — closing the synchronous guard-hook gap inside increment 1
 
@@ -1989,13 +2042,15 @@ export async function ledgerConfirmsLiveGmwGrant({ rootDir, scopeRuleIds, openin
   // outcome an absent or unusable window already produces (guard-testpath.mjs:224, guard-gate-strength.mjs:239)
   try {
     // repositoryFingerprint: the same derivePoGateRepositoryFingerprint({gitCommonDir, primaryRoot})
-    // resolution §7.2's append intent already performs for `rootDir` (po-gate-authority.mjs:212-217,
-    // governance-event-store.mjs:81-88) -- not a new resolution problem, the write side already has it
-    const repositoryFingerprint = derivePoGateRepositoryFingerprint(topologyFor(rootDir));
+    // resolution the write side already performs for `rootDir` (§7.2, governance-event-store.mjs:81-88,
+    // via discoverRepository, worktree-lifecycle.mjs:235-253) -- not a new resolution problem
+    const { commonDir, primaryRoot } = discoverRepository(rootDir);
+    const repositoryFingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: commonDir, primaryRoot });
     const ruleDigest = canonicalSha256({ scopeRuleIds, openingTreeSha256 });  // same preimage as §4's row
     // async, lock-free read of the human stream (§8.5.2: "readers take none") via the existing reader --
     // queryHumanGovernanceDecisions (human-governance-ledger.mjs:228), awaited here, not reimplemented;
-    // see the resolved-assumption note below for why no separate synchronous scan is written
+    // see the resolved-assumption note below for why no separate synchronous scan is written.
+    // No `checkpoint` is passed -- deliberately; see the completeness/integrity disclosure in §15.2.4.
     const { decisions } = await queryHumanGovernanceDecisions({ repositoryRoot: rootDir, repositoryFingerprint });
     // true iff `decisions` contains at least one entry with:
     //   event === "granted", outcome === "granted",
@@ -2082,6 +2137,31 @@ record alone would have granted. That is the intended effect of closing H-AC-02 
 of it — the same fail-closed direction §8.1 already chose for the arming boundary, applied here for the first
 time to the read path.
 
+**Completeness and integrity, disclosed rather than assumed.** Every other consumer of
+`queryHumanGovernanceDecisions` in this codebase (`governance-authority.mjs`) passes a `checkpoint` it received
+from an earlier operation and refuses to trust the result unless `completeness === "verified"` (the default and
+consumption-readback paths) or `integrity` is `"valid"`/`"prefix-valid"` against that specific witnessed
+checkpoint (the consumption path). `ledgerConfirmsLiveGmwGrant` deliberately departs from that pattern: it
+passes **no** `checkpoint`, because none is available to it — the machine-local window record carries only
+`scopeRuleIds` and `openingTreeSha256` (above), and `lib/guard-maintenance-window.mjs` cannot change to add a
+retained ledger sequence without violating the "no change" constraint this design already preserves (§7.1,
+A-3, §11). Without a `checkpoint`, `verifyPortableGovernanceStream` always returns `completeness: "unknown"`
+and `integrity: "prefix-valid"` (`governance-event-store.mjs:687`) — never `"verified"`/`"valid"` — regardless
+of the ledger's actual state, so gating on those fields the way the other consumers do is not written into this
+design: gating on `completeness` would always refuse, and gating on `integrity` would never refuse, since it is
+unconditionally `"prefix-valid"` here. What the read still gets for free, unconditionally, is `scanStream`'s
+hash-chain re-verification of every retained event on every call (`governance-event-store.mjs:453-457`,
+`GES-CHAIN`) — a corrupted or non-contiguous stream still fails, which `ledgerConfirmsLiveGmwGrant`'s own
+`catch` turns into `false`. What it does **not** get, and could not get without a checkpoint no producer here
+retains: proof that the retained stream is *complete* — that no disposition (`revoked`/`expired`/`consumed`)
+that once existed for this grant was later deleted from the end of the stream. This read cannot distinguish
+"no disposition exists" from "a disposition existed and the on-disk record for it was removed"; an agent with
+local write access to the human stream's storage root could delete a disposition file and make a lifted grant
+continue to read as live here. This is a genuine, new residual, disclosed rather than assumed away: it does not
+weaken H-AC-02's satisfaction at any boundary that *does* hold a checkpoint (arming, consumption, status,
+reconcile — §8.5.2, unaffected by this section), and is tracked as a residual of the hook-path closure
+specifically, owner `pipeline` (PHX-2), alongside §15.1.6's residuals.
+
 #### 15.2.5 What this removes from increment 2, and what remains
 
 D-2 (§2, "synchronous dual-evaluation inside the guard hot path") is **fully closed** by §15.2.3 — nothing
@@ -2106,9 +2186,9 @@ The rows below are additions to, or modifications of, §11's table; §11 itself 
 | `plugins/pipeline-core/hooks/guard-gate-strength.mjs` | **modify**: same change, GS-6 only (§15.2.3) | closes H-AC-02 at the GS-6 hook path |
 | `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs` | **no change** | §15.2.2's correction: this file does not call `windowCoversRule` and has no role in O-2's closure |
 | `plugins/pipeline-core/lib/guard-maintenance-window.mjs` | **no change** (§11's existing row stands) | §15.2.3's design deliberately avoids needing any export this file does not already have |
-| `plugins/pipeline-core/lib/human-governance-identity-registry.mjs` | **create** — `validateIdentityRegistryEntry`, `validateIdentityRegistry`, `resolveNaturalPersonIdentity` (§15.1.2) | O-1's mechanism; no kernel file changes because of it |
+| `plugins/pipeline-core/lib/human-governance-identity-registry.mjs` | **create** — `validateIdentityRegistryEntry`, `validateIdentityRegistry`, `resolveNaturalPersonIdentity`, `loadIdentityRegistry` (§15.1.2) | O-1's mechanism; no kernel file changes because of it |
 | `plugins/pipeline-core/lib/human-governance-identity-registry.test.mjs` | **create** — unit tests: shape validation, overlap rejection, resolved/unknown/ambiguous lookup outcomes | same H-AC-15-style discipline §12 already applies to the write-side builders |
-| `plugins/pipeline-core/scripts/governance-authority.mjs` | **extend** the modification already specified in §11: add `resolve-identity --authority-class <class> --occurred-at-ms <n>` (§15.1.2) | one read-only query surface, reusing the file §11 already touches for `reconcile` rather than adding a new script |
+| `plugins/pipeline-core/scripts/governance-authority.mjs` | **extend** the modification already specified in §11: add the `--resolve-identity-file`/`--resolve-identity-json` verb pair to `parse(argv)`'s `Set` (`:13`) and one more early branch in `main()` (`:39-99`), each carrying the canonical-JSON payload `{authorityClass, occurredAtEpochMs}` — not the two-flag `resolve-identity --authority-class <class> --occurred-at-ms <n>` form §15.1.2 already rejects as not fitting `parse(argv)`'s closed shape (§15.1.2) | one read-only query surface, reusing the file §11 already touches for `reconcile` rather than adding a new script |
 
 ### 15.4 §14 disposition
 
