@@ -5,8 +5,8 @@
 
 **Last updated:** 2026-08-09
 **Project status:** ACTIVE
-**Local candidate:** `0.5.4+<runner>.20260809091238.7d38484` · commit `53c5b716e8b2deaf3b7b6a78d9b555b7b1867044` · Verify 264/264 · ready for manual copy
-**Current block:** GF-057 — a second `0.5.4` local candidate that closes the onboarding deadlock both runners hit against the first one, the consumer blockers the PO's consolidated review found, and the setup work (SETUP-2 done, SETUP-3/4 open); 0.5.3 is released to `main` and the human-authorization ceremony recorded as [ADR-0061](adr/0061-uniform-human-approval-ceremony.md) remains the governing thread; Nova A completion still paused on genuine ADR-gated/evidence-gated blockers
+**Local candidate:** `0.5.4+<runner>.20260809091238.7d38484` · commit `53c5b716e8b2deaf3b7b6a78d9b555b7b1867044` · installed by the PO and under happy-path test on both runners
+**Current block:** GF-058 — the installed candidate's remaining work: the closure-evidence trackedness contract, two routing defects found by reading, and the defects the PO's two greenfield happy-path runs produced (one blocker-class, filed with a live reproduction); one TP-3 registration step is open for the PO; 0.5.3 is released to `main` and the human-authorization ceremony recorded as [ADR-0061](adr/0061-uniform-human-approval-ceremony.md) remains the governing thread; Nova A completion still paused on genuine ADR-gated/evidence-gated blockers
 **Repair baseline:** `5d2b83dcc765d50801f4491e1bd9bed32090112b`
 **Release version:** `0.5.3` released
 **Release state:** version `0.5.3` · tag `v0.5.3` · commit `2740041d59458f949b597905816af12048502469` · tree `e72cca9b69e105ec6aac9833c4ac0bccb385d25b` · status `published`
@@ -17,7 +17,77 @@ the supplied authoritative release identity; it is not a claimed release time.
 The historical candidate-qualification sections below are retained as
 session history and no longer describes the current publication disposition.
 
-## 2026-08-09 Local `0.5.4` candidate stamped and verified — ready for the PO's manual copy (current)
+## 2026-08-09 GF-058 — the candidate installed, the remaining work closed, and what the PO's happy-path runs produced (current)
+
+The PO installed `0.5.4+claude.20260809091238.7d38484` and ran one greenfield
+onboarding per runner against it while this session continued the remaining work.
+Bootstrap confirmed the installed version is exactly the stamped candidate.
+
+**Full Verify 264/264, exit 0**, bound to commit `f1645a4d` and tree `7bafe63a`.
+
+**Closed from the previous block's open list.**
+
+1. `f9d52fe3` — the closure contract binds its evidence to the **index**, not to
+   the local disk. `repositoryTrackingState()` in `check-backlog-state.mjs` is the
+   single owner; the reconciler imports it. Three-valued, so a project without Git
+   is told the question is unavailable rather than that its citations are broken.
+   Four call sites; the checker's closed-item loop is the standing sweep and runs
+   on every Verify. Leg 3's measurement: 27 closed items, **0** broken citations.
+   The item's own closure was refused by its own fix until the evidence was
+   staged — that is the readback.
+2. `77f8d0bf` — the ignore-rule item closed, all three legs.
+3. `f1645a4d` — the undecided `scratch/`-`.gitignore` question filed as its own
+   item, with the consequence measured rather than asserted: `security-scan.mjs`
+   reads the tree with `--untracked-files=all`, so in a consumer the Pipeline's own
+   instruction to write under `scratch/` makes the next candidate `dirty`.
+
+**Two defects found by reading, in the artifact meant to prevent exactly this.**
+
+4. `df629c3e` — `agent-obligations.md` §5 and the shipped `push-approval.md`
+   printed `node plugins/pipeline-core/scripts/repair-map.mjs`, and the guard
+   refuses it: the admission compares against the **installed** plugin's absolute
+   path. Measured — the printed form `false`, the installed form `true`. So the one
+   command §5 exists to hand a stuck agent was blocked in the state that asks it.
+   The guard had been fixed in the previous block and the signpost had not. `AC-9`
+   now drives the printed command through the real guard, both directions.
+5. `b0d317d5` — `docs/pending-verify-registrations.md` said "Nothing is pending"
+   while `repair-map-tests` and `obligations-contract-tests` were genuinely
+   unregistered, appended to the table after the batch was resolved. Same defect
+   the banner was corrected for that morning, in the opposite direction.
+   `apply-pending-protected-edits.mjs` is usable again — its `VERIFY_ANCHOR` had
+   gone stale the moment the 2026-08-08 batch landed.
+
+**Open for the PO, and it is a TP-3 step:** registering those two suites.
+`node harness/scripts/apply-pending-protected-edits.mjs --check` reports exactly
+them; `--only=verify` applies. Both pass standalone (7/7 and 9/9) and neither runs
+under the gate today.
+
+**What the happy-path runs produced.** The PO's report: Codex works cleanly
+through but forgets the input; Claude deadlocked itself again. Both mechanisms are
+in shared library code, both are filed with the evidence.
+
+6. `2026-08-09-reopen-design-invites-the-edit-that-ends-the-session.md` — caught
+   live at 07:48Z. `reopen-design` leaves `continuity.authority` bound to the
+   submitted digests (`plan-spec-state-v2.mjs:644-654`); the agent edits `spec.md`,
+   which is the point of reopening, and the inspection returns
+   `continuity-observation-unavailable` with `nextAction: null` and guidance naming
+   a read-access cause it never established. Six minutes later the same command
+   returned `ready` with the spec back at its old digest — the escape was restoring
+   the bytes, which a repository with no commits cannot offer. The rebind
+   observation sits one line below the branch that already returned.
+7. `2026-08-09-the-promotion-supersedes-the-handover-and-leaves-it-saying-otherwise.md`
+   — the promotion has no handover target (`onboarding-continuity.mjs:3862-3866`,
+   against the kickoff's `:3319`), so both repositories' `docs/state.md` still name
+   a directory the same transaction marked `SUPERSEDED.md`. That is also why Codex
+   "forgets the input": the brief is complete in `design-input.md`, and nothing
+   surviving a session boundary points at it — the Resume-Hint is `absent`. The same
+   transaction reassigns every continuity field except `runtime`, so the Claude
+   project's promoted PRD says `po-language: de` while its state says `en`.
+
+**Neither test repository has a single commit.** Everything, including the seed,
+is untracked. Worth deciding whether that is the intended greenfield end state.
+
+## 2026-08-09 Local `0.5.4` candidate stamped and verified — ready for the PO's manual copy
 
 Candidate: commit `53c5b716e8b2deaf3b7b6a78d9b555b7b1867044`. Full Verify
 **264/264, exit 0**, bound to that exact commit and tree — the stamped candidate
