@@ -3604,9 +3604,14 @@ function promotionArtifacts(root, input, { checkMarkers = true } = {}) {
   // now, while the PRD is still freely editable. The grammars are imported
   // from po-gate-authority.mjs, never re-declared, so the two checks cannot
   // drift apart.
+  // Parsed on EVERY path, refused only where markers are checked. The promoted
+  // PRD's marker is the transaction's own answer to "what language is this
+  // project", and the state transition writes it -- so the applied-replay path,
+  // which deliberately re-decides no admissibility, still has to reconstruct the
+  // same value or its comparison plan would differ from the plan that was applied.
+  const prdText = prd.raw.toString("utf8");
+  const languageMarkers = [...prdText.matchAll(PRD_LANGUAGE_MARKER)].map((match) => match[1]);
   if (checkMarkers) {
-    const prdText = prd.raw.toString("utf8");
-    const languageMarkers = [...prdText.matchAll(PRD_LANGUAGE_MARKER)].map((match) => match[1]);
     if (languageMarkers.length !== 1) {
       fail(
         "KICKOFF-PROMOTION-PRD-LANGUAGE-MARKER-INVALID",
@@ -3634,6 +3639,12 @@ function promotionArtifacts(root, input, { checkMarkers = true } = {}) {
     prd: { path: input.prdPath, sha256: prd.sha256 },
     spec: { path: input.specPath, sha256: spec.sha256 },
     designInput: { path: input.designInputPath, sha256: designInput.sha256 },
+    // The language the state transition will project. Exactly one marker is
+    // admitted where markers are checked, so a single value is the only shape
+    // this can take; `null` is reachable only on the applied-replay path over a
+    // PRD that never carried one, and the transition below leaves the kickoff
+    // value untouched for it rather than inventing a language.
+    poLanguage: languageMarkers.length === 1 ? languageMarkers[0] : null,
   };
 }
 
@@ -3669,7 +3680,8 @@ function validatePromotionPlan(plan) {
     || !SHA256_RE.test(plan.transactionSha256 ?? "")
     || typeof plan.runner !== "string" || plan.runner.length === 0
     || !exactKeys(plan.feature, new Set(["id", "planPath"]))
-    || !exactKeys(plan.authority, new Set(["prd", "spec", "designInput"]))
+    || !exactKeys(plan.authority, new Set(["prd", "spec", "designInput", "poLanguage"]))
+    || !new Set(["de", "en", null]).has(plan.authority.poLanguage)
     || !exactKeys(plan.authority.prd, new Set(["path", "sha256"]))
     || !exactKeys(plan.authority.spec, new Set(["path", "sha256"]))
     || !exactKeys(plan.authority.designInput, new Set(["path", "sha256"]))
@@ -3858,6 +3870,23 @@ function buildKickoffPromotionPlan({
   };
   next.continuity.recovery = null;
   next.continuity.decisionTxn = null;
+  // THE PROMOTION IS THE TRANSACTION THAT LEARNS THE ANSWER. `kickoffLanguage()`
+  // deliberately freezes the historical English seed, because at kickoff time no
+  // portable source exists yet -- so a PO who answers "German" after the kickoff
+  // has their answer land in the PROMOTED PRD's marker, which this transaction
+  // binds, while `continuity.runtime` still carried the pre-answer default. One
+  // transaction then emitted a PRD saying `de` and a state saying `en`, observed
+  // in the PO's 2026-08-09 Claude greenfield run alongside a `pipeline.user.yaml`
+  // and a `project/pipeline.yaml` that both already said `de`.
+  //
+  // The stored value being wrong is worse than a rendering being wrong: it is what
+  // `planApproval.poGateAuthority.humanFacing` is later derived from, so a PO who
+  // answered German was headed for an approval ceremony in English -- and it is
+  // the near end of the chain whose far end refused `submit-plan` with
+  // PO-GATE-PRD-LANGUAGE-MISMATCH in that same run.
+  if (authority.poLanguage !== null) {
+    next.continuity.runtime = { ...next.continuity.runtime, humanFacingLanguage: authority.poLanguage };
+  }
   if (!validateContinuityState(next.continuity, input.featureId).ok) {
     fail("KICKOFF-PROMOTION-PLAN", "promotion continuity transition is invalid");
   }

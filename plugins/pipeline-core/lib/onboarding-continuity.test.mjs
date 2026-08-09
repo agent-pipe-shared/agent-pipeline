@@ -949,7 +949,7 @@ for (const stage of KICKOFF_FAULT_STAGES) {
   });
 }
 
-function promotionSeed(name, { privatized = false } = {}) {
+function promotionSeed(name, { privatized = false, poLanguage = "en" } = {}) {
   const root = fixture(`promotion-${name}`, { neutral: privatized });
   const kickoff = planOnboardingKickoff({ rootDir: root, goal: `Promote ${name}` });
   const statePath = join(root, kickoff.targets.state.path);
@@ -980,7 +980,7 @@ function promotionSeed(name, { privatized = false } = {}) {
   // The promoted PRD is the approval subject, so it carries the PO-gate
   // markers: the human-facing language and the digest of the Spec beside it.
   writeFileSync(join(directory, "prd_promoted.md"), [
-    "<!-- po-language: en -->",
+    `<!-- po-language: ${poLanguage} -->`,
     `<!-- technical-spec-sha256: ${digest(specBytes)} -->`,
     `# ${name} PRD`,
     "",
@@ -1486,6 +1486,35 @@ check("editing the promoted Spec invalidates the mutual digest binding", () => {
   const path = promotedArtifact(seed, "spec.md");
   writeFileSync(path, `${readFileSync(path, "utf8")}\nEdited after promotion.\n`);
   assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "unavailable");
+});
+
+// PROMOLANG-1. Both artifacts checked against EACH OTHER, which is what every
+// existing test omitted: each was checked against its own expectations, so a
+// transaction that emitted a PRD saying `de` and a state saying `en` passed all of
+// them. The kickoff freezes the historical English seed by design -- at that point
+// no portable source exists -- so a PO who answers German after the kickoff has
+// their answer arrive only in the promoted PRD's marker. The promotion is the
+// transaction that binds that PRD, so it is the transaction that must learn from
+// it. Observed in the PO's 2026-08-09 Claude greenfield run.
+check("the promoted state's language is the promoted PRD's marker, not the kickoff default", () => {
+  const seed = promotionSeed("language", { poLanguage: "de" });
+  const kickoffState = JSON.parse(readFileSync(seed.statePath, "utf8"));
+  assert.equal(kickoffState.continuity.runtime.humanFacingLanguage, "en",
+    "the kickoff seed still freezes the historical English default -- that is the state this fixes, not a bug in itself");
+
+  promote(seed);
+  const promoted = JSON.parse(readFileSync(seed.statePath, "utf8"));
+  const prdText = readFileSync(promotedArtifact(seed, "prd_promoted.md"), "utf8");
+  assert.match(prdText, /<!-- po-language: de -->/u);
+  assert.equal(promoted.continuity.runtime.humanFacingLanguage, "de",
+    "one transaction must not emit a PRD saying de and a state saying en");
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
+
+  // A PRD that answers English leaves the value where it already was, so the
+  // ordinary consistent case is untouched rather than rewritten.
+  const english = promotionSeed("language-en");
+  promote(english);
+  assert.equal(JSON.parse(readFileSync(english.statePath, "utf8")).continuity.runtime.humanFacingLanguage, "en");
 });
 
 // REOPEN-1. The two checks above are the assurance; this one is its boundary. The
