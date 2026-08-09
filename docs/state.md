@@ -1023,6 +1023,46 @@ a dispatch the authority to clear a control whose purpose is to check that
 dispatch's own class of work. "Show your evidence" is not a substitute for
 separation of duties — it is what makes the absence of separation look rigorous.
 
+### The second merge loss is closed (`77a2f50`, `8b81816`) — and I had closed the night too early
+
+Gate at `8b81816`: exit 0, 368 steps, `binding: "exact"`, clean at tree `201157f`.
+
+**I wrote "night closed" while eight of the nine merge losses were still open.** The
+audit ranked them and I repaired the first, then filed the rest as roadmap. That was
+comfortable rather than correct: the recovery-bridge writer was ranked second, was not
+blocked on anyone, and the method that worked on the first one was sitting right there.
+The two genuinely blocked decisions were never the reason the epic was unfinished.
+
+`harness/scripts/recovery-bridge-approval.test.mjs` now loads and passes — verified
+here, not taken from the report. This target had already stopped one dispatch tonight,
+correctly, so its briefing carried the three prior blockers as measurements to verify
+rather than obstacles to push through, and said plainly that stopping again would be
+the right outcome if any still held.
+
+**The trap it walked past is the whole point.** Rebuilding a canonicalisation helper by
+hand would have made the suite's digest assertions pass *by construction* — a suite
+verifying its own reconstruction. Instead: ten regions compared **mechanically** against
+the historical blob, not by eye, `verbatimMismatches=0`. And the first report was wrong
+about one of the five "missing helpers": `canonicalPhxJson` was never a function, it is
+an import alias, and the `canonicalJson` behind it is byte-identical to its pre-merge
+self. **The digest binds through original code.**
+
+**It also restored less than it could have.** Two helpers and five constants exist in
+history and were deliberately left dropped — their only consumers are an adapter that
+is still gone, so restoring them would be dead code. Machine-listed as `NOT-RESTORED`
+rather than quietly swept in. No collisions: every restored identifier was absent from
+the merged module, so no merged binding was shadowed.
+
+**Then a gate artifact had become untrue, and that needed its own fix (`8b81816`).**
+The exclusion entry still asserted a `SyntaxError` about a suite that now passes. That
+is the quietest kind of rot — nothing fails, so nothing draws attention, while the
+table describes a defect that no longer exists. Four red, two green, six total:
+unchanged in count, changed in meaning, with the reason text asserted rather than
+trusted.
+
+**Still open from the merge: seven losses**, ranked in `evidence/phx-merge-audit.md`,
+none of them blocked on the PO. The next is the plan-spec-state orphan.
+
 ### NIGHT CLOSED — `e676e48`, gate green at 368/368, exactly two things left and both are the PO's
 
 Final gate: exit 0, 368 steps, `binding: "exact"`, clean at tree `9480300`,
