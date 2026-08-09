@@ -1892,7 +1892,8 @@ test("blank real root inspect and plan are read-only", () => {
     assert.equal(plan.status, "ready");
     assert.deepEqual(names(path), []);
     assert.deepEqual(plan.targets.map((target) => target.path), [
-      ".gitignore", "pipeline.user.yaml", "project/pipeline.json", "project/pipeline.yaml",
+      ".gitignore", "pipeline.user.yaml", "project/critical-human-proof.json",
+      "project/pipeline.json", "project/pipeline.yaml",
     ]);
   } finally { dispose(path); }
 });
@@ -2876,6 +2877,77 @@ test("the seeded push gate refuses an unapproved push and admits it after the sh
   } finally { dispose(path); }
 });
 
+// PUSHPROOF-1. Backlog:
+// 2026-08-09-critical-human-proof-not-materialized-for-signature-mode. Before
+// this seed existed, a fresh project had NO `project/critical-human-proof.json`
+// at all, so the very first `approve-push` in `signature` mode -- this repo's
+// own default, and the mode PUSHSEED-2 above does NOT exercise -- refused with
+// `CRITICAL-PROOF-POLICY-KIND-REQUIRED` instead of reaching the proof-flag gate
+// PUSHSEED-2 measures. The only way out was the full signed Human-Guard-Override
+// ceremony just to create the one file that declares `push` as proof-requiring.
+//
+// Driven end to end in a REAL temporary root, the same standard as PUSHSEED-2,
+// for BOTH `gates.push_approval` modes: onboarding must materialize the policy
+// file regardless of which mode a project's operator later chooses, because
+// that choice is made in `pipeline.user.yaml` -- editable at any point after
+// onboarding -- not at onboarding time itself.
+test("onboarding materializes project/critical-human-proof.json declaring push, for both push_approval modes", () => {
+  const signatureRoot = root();
+  const chatRoot = root();
+  try {
+    for (const { path, mode } of [{ path: signatureRoot, mode: "signature" }, { path: chatRoot, mode: "chat" }]) {
+      hostGit(path, ["init", "--initial-branch=main"]);
+      hostGit(path, ["config", "user.email", "po@example.invalid"]);
+      hostGit(path, ["config", "user.name", "PO"]);
+      const seed = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+      assert.equal(applyProjectOnboardingV3(seed, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+
+      // The file exists at onboarding, not after a manual follow-up command.
+      const policyPath = join(path, "project", "critical-human-proof.json");
+      assert.equal(existsSync(policyPath), true, `${mode}: critical-human-proof.json must be materialized at onboarding`);
+      const policy = JSON.parse(readFileSync(policyPath, "utf8"));
+      assert.equal(policy.schema, "pipeline.critical-human-proof-policy.v1");
+      assert.deepEqual(policy.requiredKinds, ["push"]);
+
+      // A REAL subprocess, not the in-process `run()` entry point: the CLI's
+      // refusal text is written with `console.error` directly, which the
+      // in-process call has no way to intercept, so pattern-matching the
+      // refusal (the whole point of this half) needs the real stderr stream.
+      const state = (...args) => spawnSync(process.execPath, [PIPELINE_STATE_SCRIPT, ...args], {
+        cwd: path, encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: path },
+      });
+      // `gates.push_approval` is read from COMMITTED bytes (ADR-0056), same as
+      // PUSHSEED-2 above.
+      const commit = (message) => { hostGit(path, ["add", "-A"]); hostGit(path, ["commit", "-q", "-m", message]); };
+      if (mode === "chat") {
+        const userPath = join(path, "pipeline.user.yaml");
+        writeFileSync(userPath, readFileSync(userPath, "utf8").replace(/push_approval: "?signature"?/u, 'push_approval: "chat"'));
+      }
+      commit(`seeded consumer (${mode})`);
+
+      if (mode === "signature") {
+        // Before this fix: refused with CRITICAL-PROOF-POLICY-KIND-REQUIRED,
+        // because no policy file existed to declare `push` at all. After: the
+        // policy is satisfied, so the command reaches its own NEXT real gate --
+        // the missing external proof flags -- instead of refusing outright.
+        const attempted = state("approve-push", "--by", "po", "--remote", "origin", "--destination", "refs/heads/feat/x");
+        assert.equal(attempted.status, 2, attempted.stderr);
+        assert.doesNotMatch(String(attempted.stderr), /CRITICAL-PROOF-POLICY-KIND-REQUIRED/u,
+          "a fresh signature-mode project must not be refused for an undeclared push policy");
+        assert.match(String(attempted.stderr), /approve-push requires --by, --remote, --destination, --proof-request/u,
+          "the refusal must be the ordinary missing-proof gate, not the policy-kind refusal");
+      } else {
+        // `chat` mode already stands the private-key proof down before
+        // `requiredKinds` is even consulted (ADR-0056), so this half's contract
+        // is that the file exists and is well-formed -- checked above -- and
+        // that materializing it changes nothing about the already-satisfiable
+        // `chat` path PUSHSEED-2 measures.
+        assert.equal(state("materialize-push-threat-model").status, 0);
+      }
+    }
+  } finally { dispose(signatureRoot); dispose(chatRoot); }
+});
+
 // IGNORESEED-1. Both halves. The Pipeline tells every agent to write into
 // `scratch/` and every evidence producer to write into `evidence/`, and ignored
 // neither -- the bootstrap skill said so in its own text, which made it a
@@ -3762,7 +3834,10 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
     const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.deepEqual(
       plan.targets.map((target) => target.path),
-      [".gitignore", "pipeline.user.yaml", "project/pipeline.json", "project/pipeline.yaml"],
+      [
+        ".gitignore", "pipeline.user.yaml", "project/critical-human-proof.json",
+        "project/pipeline.json", "project/pipeline.yaml",
+      ],
       "fresh onboarding seeds the canonical project authority and the ignore rules for the two directories it writes into; runtime targets are initialized later",
     );
     assert.equal(applyProjectOnboardingV3(plan, { rootDir: path, activate: false, deps: fakeDeps }).status, "activation-required");
@@ -3909,7 +3984,8 @@ test("a recognized read-only host control layout receives portable onboarding wi
     assert.equal(planned.git.mode, "host-managed");
     assert.equal(planned.git.initializesGit, false);
     assert.deepEqual(planned.targets.map((target) => target.path), [
-      ".gitignore", "pipeline.user.yaml", "project/pipeline.json", "project/pipeline.yaml",
+      ".gitignore", "pipeline.user.yaml", "project/critical-human-proof.json",
+      "project/pipeline.json", "project/pipeline.yaml",
     ]);
     const applied = applyProjectOnboardingV3(planned, { rootDir: path, activate: true, deps: fakeDeps });
     assert.equal(applied.status, "applied");

@@ -75,6 +75,7 @@ import {
 } from "./project-authority.mjs";
 import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
+import { CRITICAL_HUMAN_PROOF_POLICY_PATH, CRITICAL_HUMAN_PROOF_POLICY_V1 } from "./critical-human-proof-policy.mjs";
 
 const SOURCE = "pipeline.user.yaml";
 const SCHEMA = "pipeline.project-onboarding.v4";
@@ -902,6 +903,31 @@ export function freshManifestBytes(profile = null) {
 export function freshCalibrationBytes() {
   return `${JSON.stringify({ project: "new-project", verify: UNCONFIGURED_VERIFY, handover: "docs/state.md", autonomy: "gated", branchModel: "feature-branch", repositoryMode: "local-only", worktree: "optional", stakes: "standard", constraints: ["Configure project-specific policy before delivery."] }, null, 2)}\n`;
 }
+// Materializes `project/critical-human-proof.json` at onboarding time,
+// unconditionally of `gates.push_approval` (ADR-0056) -- that setting is
+// read from `pipeline.user.yaml`, which a human may edit at any point after
+// onboarding, so the policy file cannot be seeded conditionally on a mode
+// that has not been chosen yet.
+//
+// Backlog: 2026-08-09-critical-human-proof-not-materialized-for-signature-mode.
+// A fresh project had NO `project/critical-human-proof.json` at all, so
+// `readCriticalHumanProofPolicy` saw an empty `requiredKinds`, and
+// `verifyCriticalHumanProof` refused the very first `approve-push` with
+// `CRITICAL-PROOF-POLICY-KIND-REQUIRED` -- demanding the project declare
+// `push` as proof-requiring in exactly the configuration (a freshly onboarded
+// project) where nobody had yet had the chance to. The seeded manifest gate
+// chapter (`freshGateChapter` above) already tells the operator `push` is
+// blocking; this is the matching declaration the proof-policy reader needs to
+// reach its own next real gate instead of refusing outright.
+//
+// `.v1` only, `requiredKinds: ["push"]` only: no waiver, no trust anchor, no
+// kind beyond the one gate this seed already turns on. A project that wants
+// more (a waiver, a trust anchor, `deploy`/`publication`) edits this file
+// itself -- gate-strength protected (GS-2), by design, same as every other
+// change to its own strength.
+export function freshCriticalHumanProofPolicyBytes() {
+  return `${JSON.stringify({ schema: CRITICAL_HUMAN_PROOF_POLICY_V1, requiredKinds: ["push"] }, null, 2)}\n`;
+}
 function freshBaselines(intent, { hostManaged = false, profile = null } = {}) {
   const baselines = {
     ".claude/settings.json": { status: "present", bytes: "{}\n" },
@@ -937,6 +963,10 @@ function freshBaselines(intent, { hostManaged = false, profile = null } = {}) {
   baselines[NEUTRAL_MANIFEST] = {
     status: "present",
     bytes: baselines[".claude/pipeline.yaml"].bytes,
+  };
+  baselines[CRITICAL_HUMAN_PROOF_POLICY_PATH] = {
+    status: "present",
+    bytes: freshCriticalHumanProofPolicyBytes(),
   };
   return baselines;
 }
@@ -3543,6 +3573,7 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
     ...[
       NEUTRAL_CALIBRATION,
       NEUTRAL_MANIFEST,
+      CRITICAL_HUMAN_PROOF_POLICY_PATH,
     ].map((path) => ({ path, bytes: baselines[path].bytes })),
     { path: SOURCE, bytes: renderYaml(intent) },
     ...(seedsProjectIgnore ? [{ path: ".gitignore", bytes: PROJECT_IGNORE_SEED }] : []),
