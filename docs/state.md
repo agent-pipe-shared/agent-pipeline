@@ -5,8 +5,8 @@
 
 **Last updated:** 2026-08-09
 **Project status:** ACTIVE
-**Local candidate:** `0.5.4+<runner>.20260809121256.1d5bba1` · commit `963fc5f159c50cff86123dc337bcf846f60aca3c` · Verify **267/267 exit 0** bound to that exact commit · ready for the PO's manual copy (supersedes `…20260809112525.4ad3a30`)
-**Current block:** GF-058 — **the stable blocker is resolved: the push gate is seeded and live, after its satisfying path was measured end to end** (option C, as the PO chose). Two further happy-path defects fixed in the same block: the reopen-design deadlock, and the promoted state's language. Also in this block: the closure-evidence trackedness contract, three routing defects found by reading, the staging exemption, and the defects the PO's three greenfield runs produced; three suite registrations are open for the PO (TP-3); 0.5.3 is released to `main` and the human-authorization ceremony recorded as [ADR-0061](adr/0061-uniform-human-approval-ceremony.md) remains the governing thread; Nova A completion still paused on genuine ADR-gated/evidence-gated blockers
+**Local candidate:** `0.5.4+<runner>.20260809131419.bf59a28` · commit `cdec8a4cdd0dbd2df3607d26fe18aaed6b5a25cb` · Verify **267/267 exit 0** bound to that exact commit · ready for the PO's manual copy (supersedes `…20260809121256.1d5bba1`)
+**Current block:** GF-058 — **the stable blocker is resolved: the push gate is seeded and live, after its satisfying path was measured end to end** (option C, as the PO chose). Two further happy-path defects fixed in the same block: the reopen-design deadlock, and the promoted state's language. Also in this block: the closure-evidence trackedness contract, three routing defects found by reading, the staging exemption, and the defects the PO's three greenfield runs produced; three suite registrations are open for the PO (TP-3); the third candidate's two TP-5-blocked findings (PG11e's commit-hash flake, and `security: warn` hard-blocking under `push: blocking`) are now fixed under one bundled HGO override; 0.5.3 is released to `main` and the human-authorization ceremony recorded as [ADR-0061](adr/0061-uniform-human-approval-ceremony.md) remains the governing thread; Nova A completion still paused on genuine ADR-gated/evidence-gated blockers
 **Repair baseline:** `5d2b83dcc765d50801f4491e1bd9bed32090112b`
 **Release version:** `0.5.3` released
 **Release state:** version `0.5.3` · tag `v0.5.3` · commit `2740041d59458f949b597905816af12048502469` · tree `e72cca9b69e105ec6aac9833c4ac0bccb385d25b` · status `published`
@@ -17,7 +17,69 @@ the supplied authoritative release identity; it is not a claimed release time.
 The historical candidate-qualification sections below are retained as
 session history and no longer describes the current publication disposition.
 
-## 2026-08-09 GF-058 — the candidate installed, the remaining work closed, and what the PO's happy-path runs produced (current)
+## 2026-08-09 The fourth local `0.5.4` candidate — the two TP-5-blocked findings, fixed (current)
+
+Candidate: `0.5.4+<runner>.20260809131419.bf59a28`, commit `cdec8a4c`. Full Verify
+**267/267, exit 0**, bound to that exact commit.
+
+The third candidate's table (below) closed every finding except two, both filed
+as TP-5-blocked because `guard-push.test.mjs` gates the exact hook this session
+had just changed. The PO explicitly cleared both for this pass ("beides jetzt
+machen") and ran the signature ceremony twice — once wasted by drift (see
+below), once clean.
+
+**`guard-push.mjs` now dispatches each gate's own findings under that gate's own
+mode.** Security findings ((b)/(b.2)) collect into their own bucket, dispatched
+under `gates.security.mode` instead of `gates.push.mode`; either bucket
+demanding "blocking" blocks the whole push, only when every bucket carrying a
+finding is "warn" does it stay non-blocking. `PG08b`/`PG08c` pin both
+directions. Header docstring (steps 5/7) updated to match.
+
+**PG11e no longer compares two commits.** Each fixture's own commit hash is
+normalized out of both stderr strings before comparing — the property under
+test is that the two STATES produce the same message, not that two
+independently created repositories share a hash. Every other byte still pinned
+exactly.
+
+Both fixes landed in one bundled `Write`/`Edit` to `guard-push.test.mjs` and
+one HGO override, deliberately: `gates.push_approval: signature` binds an
+override to the exact tool-call preimage including the full repository status
+hash, so a second override would have cost the PO a second full sign ceremony
+for no reason.
+
+**One override was burned by drift, and it is worth recording exactly why.**
+Between the first successful `plan`/`prepare-authorization` and
+`authorize-by-signature`, a backlog item Markdown file was written — a
+tracked, non-ignored path. `authorizeHumanGuardOverrideBySignature()` re-checks
+`repositoryObservation()` (which includes `git status --porcelain
+--untracked-files=all`) against what the original denial captured, and any
+change to a non-ignored path fails it closed with `HGO-DRIFT`, discarding the
+signature already obtained. `scratch/` itself was NOT the cause — it is
+correctly `.gitignore`d and confirmed absent from `git status` throughout; the
+whole session's ceremony after that point ran with zero writes to any
+non-ignored path between request creation and consumption. Filed nowhere
+separately since it is a correct, if expensive, security property working
+exactly as designed — the lesson is procedural (sequence writes before the
+override chain, not during it), not a defect.
+
+**A live defect in `po-human-approval.mjs` surfaced while signing:** a PO key
+directory created before this session's own `--human-name` addition (SETUP-1)
+has `trust-policy.json` with two fields, not three; `sign-intent` (and
+`approve`/`approve-critical`, same shared `signIntentIntoProof()`) refuse it.
+`setup`'s own message says "run setup again with --human-name ... to add one"
+— no branch does that write when authority already exists; re-running would
+fail identically. Filed as
+`2026-08-09-setup-promises-a-human-name-repair-it-cannot-perform.md`.
+Workaround used live: hand-add the missing field (safe — no cryptographic
+material touched, identity fields unchanged).
+
+Backlog housekeeping: both fixed items' files carry a "Fixed" section but stay
+`status: open` — closing them is a formal ledger transition this session did
+not additionally claim. `reconcile-backlog-ledger.mjs --activate` was needed
+once, to record the new item's own `open` status (it had been created by
+editing Markdown directly, same class of drift the tool exists to repair).
+
+## 2026-08-09 GF-058 — the candidate installed, the remaining work closed, and what the PO's happy-path runs produced
 
 The PO installed `0.5.4+claude.20260809091238.7d38484` and ran one greenfield
 onboarding per runner against it while this session continued the remaining work.
