@@ -119,9 +119,14 @@ deployment, publication, destructive work, or scope change.
    material design input, scope, constraints, or open questions since the last
    durable PRD/Spec update or Resume-Hint capture. This includes input received
    after a short kickoff goal has already initialized the project. When it did,
-   distil that input into a bounded, closed context card and capture it with
-   `resume-hint.mjs capture --card-file <json>`; do not reduce it to a new short
-   kickoff goal or merely promise to remember it. A short goal with no further
+   distil that input into a bounded, closed context card and capture it; do not
+   reduce it to a new short kickoff goal or merely promise to remember it.
+   **Before a restart the session is not ready, and then exactly one argv shape
+   is admitted** — card at the fixed path, no other flags, `--help` included in
+   what is refused:
+   `node <plugin-root>/scripts/resume-hint.mjs capture --root <root> --card-file <root>/project/.resume-hint-input.json --consume-card`.
+   Write the card to that exact path first. Elsewhere (a ready session) any
+   `--card-file <json>` works. A short goal with no further
    material input needs no card. Read back `resume-hint.mjs inspect` after a
    successful capture and state that the `available` card will be used in the
    next session; when no restart follows, use it as context for the current

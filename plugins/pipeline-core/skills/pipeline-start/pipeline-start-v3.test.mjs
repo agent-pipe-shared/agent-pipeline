@@ -68,7 +68,7 @@ assert.match(core, /scoped edits, focused tests, state\nreadback, one-line commi
 assert.match(core, /A guard\ndenial alone is not a human gate/u);
 assert.match(core, /\*\*and\n   before proposing, displaying, or performing any restart, session cut or\n   Compact after kickoff\*\*/u);
 assert.match(core, /input received\n   after a short kickoff goal has already initialized the project/u);
-assert.match(core, /do not reduce it to a new short\n   kickoff goal or merely promise to remember it/u);
+assert.match(core, /do not;? ?\n?\s*reduce it to a new short kickoff goal or merely promise to remember it/u);
 assert.match(core, /Read back `resume-hint\.mjs inspect` after a\n   successful capture/u);
 
 // RHSHAPE-1. The skill's description of the card must be a shape the validator
@@ -80,6 +80,37 @@ assert.match(core, /Read back `resume-hint\.mjs inspect` after a\n   successful 
 // prose is driven through the real validator below, which is the assertion that
 // would have failed before the fix.
 assert.match(core, /`intent` is one string; the other three are \*\*arrays\*\* of\n   short strings, at most 4, 4 and 3 entries/u);
+
+// RHRESTART-1. The capture command the skill prints for the pre-restart state must
+// be one the lifecycle guard admits THERE. Measured on 2026-08-09: a greenfield
+// Codex run reached `restart-required`, was given material design input in the same
+// breath, ran `resume-hint.mjs --help` to learn the card shape, and was refused with
+// GUARD-LIFECYCLE-NOT-READY. It issued no further command; the input was lost at the
+// restart. The guard admits exactly one argv shape there, with the card at a fixed
+// path that appeared in no artifact any agent reads -- so the §6 duty was
+// unsatisfiable in precisely the state that imposes it.
+{
+  const guard = await import("../../hooks/guard-lifecycle-ready.mjs");
+  const pluginRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+  const projectRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
+  const printed = /`(node <plugin-root>\/scripts\/resume-hint\.mjs capture [^`]+)`/u.exec(core);
+  assert.ok(printed, "§6 must print the exact pre-restart capture command");
+  const resolved = printed[1]
+    .replace("<plugin-root>", pluginRoot)
+    .replaceAll("<root>", projectRoot);
+  assert.equal(
+    guard.isRestartResumeHintCapture(resolved, projectRoot), true,
+    `the guard refuses the pre-restart capture the skill prints: ${resolved}`,
+  );
+  // The shape the run actually tried, and a freely chosen card path, both stay
+  // refused -- which is why naming the exact one is the whole fix.
+  assert.equal(guard.isRestartResumeHintCapture(`node ${pluginRoot}/scripts/resume-hint.mjs --help`, projectRoot), false);
+  assert.equal(
+    guard.isRestartResumeHintCapture(`node ${pluginRoot}/scripts/resume-hint.mjs capture --root ${projectRoot} --card-file ${projectRoot}/scratch/card.json --consume-card`, projectRoot),
+    false,
+    "a freely chosen card path is refused before a restart",
+  );
+}
 {
   const { buildResumeHint, validateResumeHint } = await import("../../lib/resume-hint.mjs");
   const documented = {

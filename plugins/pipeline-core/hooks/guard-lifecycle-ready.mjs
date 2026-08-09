@@ -713,7 +713,11 @@ function exactRoot(args, root, index) {
   return args[index] === "--root" && args[index + 1] === root;
 }
 
-function isRestartResumeHintCapture(command, root, options = {}) {
+// Exported so the artifact that PRINTS this command can be tested against the rule
+// that admits it. It was not, and the two disagreed: the bootstrap skill described a
+// free `--card-file <json>` while this admits one fixed path, so the §6 duty was
+// unsatisfiable in the pre-restart state that imposes it (measured 2026-08-09).
+export function isRestartResumeHintCapture(command, root, options = {}) {
   const words = simpleWords(command, root, options);
   const platform = options.platform ?? process.platform;
   const directNode = platform === "win32" ? ["node", "node.exe"] : ["node"];
