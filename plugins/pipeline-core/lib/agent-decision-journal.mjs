@@ -9,6 +9,10 @@ const IDENTITY_DIMENSIONS=new Set(["runner","model","effort","profile","role","a
 const COMMAND_STATES=new Set(["offered","acknowledged","authorized","copied","attempted","execution-unobserved","observed-completed","readback-verified","failed","partial","cancelled","unknown","unavailable","readback-mismatch","recovery-proposed","recovered"]);
 const COMMAND_ASSURANCE=new Set(["not-applicable","attempted","execution-unobserved","observed-completed","readback-verified","failed","partial","cancelled","unknown","unavailable","readback-mismatch"]);
 const OMITTABLE=new Set(["raw-command","arguments","private-coordinates","unrestricted-output","prompt","transcript","credential"]);
+/** H-AC-08: the six legacy record classes issue #30's Migration section names, one-to-one, and the two honest outcomes of trying to reprove their original authority tuple. */
+const LEGACY_SOURCE_CLASSES=new Set(["mutable-approval-state","guard-override-jsonl-record","deployment-approval-log","override-receipt","backlog-transition-record","release-change-evidence"]), AUTHORITY_PROOF_STATUSES=new Set(["unprovable","not-attempted"]);
+/** Local mirror of governance-event.mjs's ARTIFACT_PATH; this module stays dependency-free by design (see header), so the pattern is duplicated exactly rather than imported. */
+const SOURCE_PATH=/^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9][A-Za-z0-9._\/-]{0,255}$/u;
 export class AgentDecisionJournalError extends Error { constructor(code){super("Agent decision event is invalid.");this.code=code;} }
 const rec=(v)=>v!==null&&typeof v==="object"&&!Array.isArray(v), exact=(v,k)=>rec(v)&&Object.keys(v).length===k.length&&k.every((x)=>Object.hasOwn(v,x)); const fail=(c)=>{throw new AgentDecisionJournalError(c);};
 const validIdentity=(identity)=>Array.isArray(identity)&&identity.length>=1&&identity.length<=7&&identity.every((entry)=>exact(entry,["dimension","value","provenance","assurance"])&&IDENTITY_DIMENSIONS.has(entry.dimension)&&ID.test(entry.value)&&IDENTITY_PROVENANCE.has(entry.provenance)&&IDENTITY_ASSURANCE.has(entry.assurance))&&new Set(identity.map((entry)=>entry.dimension)).size===identity.length;
@@ -26,6 +30,7 @@ const validIdentity=(identity)=>Array.isArray(identity)&&identity.length>=1&&ide
 export function validateAgentDecisionEvent(value) {
   const keys=["eventId","kind","state","reasonCode","candidateDigest","relatedHumanDecisionId","supersedesEventId"];
   if(value?.kind==="command-offer") return validateCommandOfferEvent(value);
+  if(value?.kind==="legacy-import-observation") return validateLegacyImportObservationEvent(value);
   const epistemic=rec(value)&&Object.hasOwn(value,"assumptionState");
   const identified=rec(value)&&Object.hasOwn(value,"identity");
   const extended=[...keys,...(epistemic?["assumptionState"]:[]),...(identified?["identity"]:[])];
@@ -50,4 +55,19 @@ export function validateCommandOfferEvent(value) {
   if(value.state==="execution-unobserved"&&value.executionAssurance!=="execution-unobserved")fail("ADJ-COMMAND-OUTCOME");
   if(["observed-completed","readback-verified","failed","partial","cancelled","unknown","unavailable","readback-mismatch"].includes(value.state)&&value.executionAssurance!==value.state)fail("ADJ-COMMAND-OUTCOME");
   return Object.freeze({...value,operation:Object.freeze({...value.operation}),target:Object.freeze({...value.target}),omissions:Object.freeze([...value.omissions])});
+}
+
+/**
+ * H-AC-08: a pre-Phoenix or external approval/override/deploy record whose
+ * original authority tuple cannot be reproven. Imported only as this closed,
+ * explicitly unverified observation, never as an authority-bearing event; it
+ * rides the existing, unmodified `origin === "agent"` ->
+ * `authorityClass: "non-authoritative"` binding (governance-event.mjs:175),
+ * so it structurally cannot satisfy a gate.
+ */
+export function validateLegacyImportObservationEvent(value) {
+  const keys=["eventId","kind","state","reasonCode","candidateDigest","relatedHumanDecisionId","supersedesEventId","legacySourceClass","authorityProofStatus","sourceReferencePath","sourceReferenceDigest"];
+  if(!exact(value,keys)||value.kind!=="legacy-import-observation"||!ID.test(value.eventId)||!STATES.has(value.state)||!CODE.test(value.reasonCode)||!SHA.test(value.candidateDigest)||(value.relatedHumanDecisionId!==null&&!ID.test(value.relatedHumanDecisionId))||(value.supersedesEventId!==null&&!ID.test(value.supersedesEventId))||!LEGACY_SOURCE_CLASSES.has(value.legacySourceClass)||!AUTHORITY_PROOF_STATUSES.has(value.authorityProofStatus)||(value.sourceReferencePath!==null&&!SOURCE_PATH.test(value.sourceReferencePath))||(value.sourceReferenceDigest!==null&&!SHA.test(value.sourceReferenceDigest)))fail("ADJ-LEGACY-SHAPE");
+  if(value.state==="superseded"&&value.supersedesEventId===null)fail("ADJ-SUPERSESSION");
+  return Object.freeze({...value});
 }

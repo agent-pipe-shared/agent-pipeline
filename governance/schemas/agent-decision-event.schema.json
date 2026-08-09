@@ -76,6 +76,23 @@
         "postEvidenceDigest": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
         "recoverability": { "enum": ["not-applicable", "recoverable", "cleanup-required", "rollback-required"] }
       }
+    },
+    {
+      "additionalProperties": false,
+      "required": ["eventId", "kind", "state", "reasonCode", "candidateDigest", "relatedHumanDecisionId", "supersedesEventId", "legacySourceClass", "authorityProofStatus", "sourceReferencePath", "sourceReferenceDigest"],
+      "properties": {
+        "eventId": { "type": "string" },
+        "kind": { "const": "legacy-import-observation" },
+        "state": { "enum": ["declared", "verified", "contradicted", "expired", "invalidated", "superseded"] },
+        "reasonCode": { "type": "string" },
+        "candidateDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "relatedHumanDecisionId": { "type": ["string", "null"] },
+        "supersedesEventId": { "type": ["string", "null"] },
+        "legacySourceClass": { "enum": ["mutable-approval-state", "guard-override-jsonl-record", "deployment-approval-log", "override-receipt", "backlog-transition-record", "release-change-evidence"] },
+        "authorityProofStatus": { "enum": ["unprovable", "not-attempted"] },
+        "sourceReferencePath": { "type": ["string", "null"] },
+        "sourceReferenceDigest": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
+      }
     }
   ]
 }

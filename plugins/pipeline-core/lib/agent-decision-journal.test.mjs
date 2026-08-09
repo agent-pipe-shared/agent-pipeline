@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: SUL-1.0
-import assert from "node:assert/strict"; import test from "node:test"; import { AgentDecisionJournalError, validateAgentDecisionEvent, validateCommandOfferEvent } from "./agent-decision-journal.mjs";
+import assert from "node:assert/strict"; import test from "node:test"; import { AgentDecisionJournalError, validateAgentDecisionEvent, validateCommandOfferEvent, validateLegacyImportObservationEvent } from "./agent-decision-journal.mjs";
 const value=(overrides={})=>({eventId:"agent-1",kind:"assumption",state:"declared",reasonCode:"EVIDENCE_UNAVAILABLE",candidateDigest:"a".repeat(64),relatedHumanDecisionId:null,supersedesEventId:null,...overrides});
 test("accepts a bounded observational agent assumption",()=>assert.equal(Object.isFrozen(validateAgentDecisionEvent(value())),true));
 test("rejects free text, authority-shaped fields, and unbound supersession",()=>{for(const entry of [{...value(),reasonCode:"reason text"},{...value(),approval:true},value({state:"superseded"})])assert.throws(()=>validateAgentDecisionEvent(entry),(error)=>error instanceof AgentDecisionJournalError);});
@@ -364,4 +364,60 @@ test("A-AC-14 missing-journal-availability is a representable, distinctly named 
   assert.equal(unavailableAssumption.assumptionState,"unavailable");
   const unavailableOffer=validateCommandOfferEvent(offer({state:"unavailable",executionAssurance:"unavailable",offerEventId:"offer-unavailable-source"}));
   assert.equal(unavailableOffer.executionAssurance,"unavailable","A-AC-14: missing journal availability must be representable as its own typed unavailable state, not silently dropped");
+});
+
+// H-AC-08 gives the journal a third, independent event kind: a pre-Phoenix or
+// external approval/override/deploy record whose original authority tuple
+// cannot be reproven, imported only as this closed, explicitly unverified
+// observation. Like `command-offer`, it is dispatched to its own validator
+// before the 5-kind observational branch's `KINDS` check ever runs, and it
+// rides the existing, unmodified `origin === "agent"` ->
+// `authorityClass: "non-authoritative"` binding, so it structurally cannot
+// satisfy a gate; that binding is exercised end-to-end elsewhere (this file's
+// A-AC-02/A-AC-13 store-integration tests) and is not re-pinned here.
+const LEGACY_SOURCE_CLASSES=["mutable-approval-state","guard-override-jsonl-record","deployment-approval-log","override-receipt","backlog-transition-record","release-change-evidence"];
+const AUTHORITY_PROOF_STATUSES=["unprovable","not-attempted"];
+const legacyImport=(overrides={})=>({eventId:"legacy-1",kind:"legacy-import-observation",state:"declared",reasonCode:"LEGACY_RECORD_IMPORTED",candidateDigest:"a".repeat(64),relatedHumanDecisionId:null,supersedesEventId:null,legacySourceClass:"mutable-approval-state",authorityProofStatus:"not-attempted",sourceReferencePath:null,sourceReferenceDigest:null,...overrides});
+test("H-AC-08 accepts a well-formed legacy-import-observation via the dispatched kind and the direct validator, across representative legacySourceClass/authorityProofStatus/sourceReference combinations",()=>{
+  for(const legacySourceClass of LEGACY_SOURCE_CLASSES){
+    const accepted=validateAgentDecisionEvent(legacyImport({legacySourceClass}));
+    assert.equal(accepted.legacySourceClass,legacySourceClass,`legacySourceClass ${legacySourceClass} was not preserved`);
+    assert.equal(Object.isFrozen(accepted),true);
+  }
+  for(const authorityProofStatus of AUTHORITY_PROOF_STATUSES){
+    const accepted=validateAgentDecisionEvent(legacyImport({authorityProofStatus,sourceReferencePath:"specs/legacy/override-log.jsonl",sourceReferenceDigest:"b".repeat(64)}));
+    assert.equal(accepted.authorityProofStatus,authorityProofStatus,`authorityProofStatus ${authorityProofStatus} was not preserved`);
+    assert.equal(accepted.sourceReferencePath,"specs/legacy/override-log.jsonl");
+    assert.equal(accepted.sourceReferenceDigest,"b".repeat(64));
+  }
+  const nullPair=validateLegacyImportObservationEvent(legacyImport());
+  assert.equal(nullPair.sourceReferencePath,null,"a fully-null sourceReferencePath must stay representable for legacy material with no stable reference at all");
+  assert.equal(nullPair.sourceReferenceDigest,null);
+});
+test("H-AC-08 rejects an unrecognized legacySourceClass with ADJ-LEGACY-SHAPE",()=>{
+  assert.throws(()=>validateAgentDecisionEvent(legacyImport({legacySourceClass:"unknown-legacy-class"})),(error)=>error instanceof AgentDecisionJournalError&&error.code==="ADJ-LEGACY-SHAPE","an unrecognized legacySourceClass was admitted");
+});
+test("H-AC-08 rejects an unrecognized authorityProofStatus",()=>{
+  assert.throws(()=>validateAgentDecisionEvent(legacyImport({authorityProofStatus:"proven"})),(error)=>error instanceof AgentDecisionJournalError&&error.code==="ADJ-LEGACY-SHAPE","an unrecognized authorityProofStatus was admitted");
+});
+test("H-AC-08 rejects a superseded legacy-import-observation with no supersedesEventId, with ADJ-SUPERSESSION",()=>{
+  assert.throws(()=>validateAgentDecisionEvent(legacyImport({state:"superseded"})),(error)=>error instanceof AgentDecisionJournalError&&error.code==="ADJ-SUPERSESSION","a superseded legacy-import-observation with no supersedesEventId was admitted");
+  const superseded=validateAgentDecisionEvent(legacyImport({state:"superseded",supersedesEventId:"legacy-0"}));
+  assert.equal(superseded.supersedesEventId,"legacy-0","H-AC-08: a genuinely provable later human-ledger decision must be able to supersede the unverified stand-in");
+});
+test("H-AC-08 rejects an extra/unknown key on a legacy-import-observation",()=>{
+  assert.throws(()=>validateAgentDecisionEvent({...legacyImport(),approval:true}),(error)=>error instanceof AgentDecisionJournalError&&error.code==="ADJ-LEGACY-SHAPE","an extra key was admitted");
+});
+test("H-AC-08 rejects a sourceReferencePath escaping the repository or shaped as an absolute path",()=>{
+  for(const sourceReferencePath of ["../secret","governance/../../etc/passwd","/etc/passwd"])
+    assert.throws(()=>validateAgentDecisionEvent(legacyImport({sourceReferencePath,sourceReferenceDigest:"c".repeat(64)})),(error)=>error instanceof AgentDecisionJournalError&&error.code==="ADJ-LEGACY-SHAPE",`sourceReferencePath ${sourceReferencePath} was admitted`);
+});
+test("H-AC-08 keeps the published legacy-import-observation schema closed and in step with the validator",()=>{
+  const schema=JSON.parse(readFileSync(new URL("../../../governance/schemas/agent-decision-event.schema.json",import.meta.url),"utf8"));
+  const branch=schema.oneOf.find((entry)=>entry.properties.kind.const==="legacy-import-observation");
+  assert.deepEqual(branch.properties.legacySourceClass.enum,LEGACY_SOURCE_CLASSES);
+  assert.deepEqual(branch.properties.authorityProofStatus.enum,AUTHORITY_PROOF_STATUSES);
+  assert.equal(branch.additionalProperties,false,"the legacy-import-observation shape stopped being closed");
+  assert.deepEqual(branch.required.slice().sort(),["authorityProofStatus","candidateDigest","eventId","kind","legacySourceClass","reasonCode","relatedHumanDecisionId","sourceReferenceDigest","sourceReferencePath","state","supersedesEventId"]);
+  for(const entry of schema.oneOf)assert.equal(entry.additionalProperties,false,"a journal event shape stopped being closed");
 });

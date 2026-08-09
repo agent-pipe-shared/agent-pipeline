@@ -37,16 +37,16 @@ not execute commands and cannot itself grant authority.
 
 ## Schema
 
-Two closed event shapes exist under a `oneOf`
-(`governance/schemas/agent-decision-event.schema.json:6-81`), enforced
+Three closed event shapes exist under a `oneOf`
+(`governance/schemas/agent-decision-event.schema.json:6-97`), enforced
 identically by the runtime validators the store actually calls
-(`plugins/pipeline-core/lib/agent-decision-journal.mjs:26-53`):
+(`plugins/pipeline-core/lib/agent-decision-journal.mjs:30-73`):
 
 1. **Observational shape** (`assumption`, `selection`, `verification-scope`,
    `fallback`, `escalation`) — six required keys plus up to two optional
    ones: `eventId`, `kind`, `state`, `reasonCode`, `candidateDigest`,
    `relatedHumanDecisionId`, `supersedesEventId`
-   (`agent-decision-journal.mjs:27`), plus the optional `assumptionState`,
+   (`agent-decision-journal.mjs:31`), plus the optional `assumptionState`,
    present only when the epistemic axis described under Taxonomy is recorded
    (`agent-decision-event.schema.json:14`), and the optional `identity`
    array (A-AC-05: one to seven entries, each a closed
@@ -54,7 +54,7 @@ identically by the runtime validators the store actually calls
    an identity choice is material to the decision being recorded — admitted
    only on `selection`/`escalation`/`fallback`, rejected on
    `assumption`/`verification-scope` with the dedicated `ADJ-IDENTITY-SCOPE`
-   code (`agent-decision-journal.mjs:34`,
+   code (`agent-decision-journal.mjs:39`,
    `agent-decision-event.schema.json:15-30`).
 2. **`command-offer` shape** — eighteen required keys covering offer
    identity and provenance (`offerOrigin`), the governed `operation` and
@@ -62,16 +62,47 @@ identically by the runtime validators the store actually calls
    digests (`policyDigest`, `redactionPolicyDigest`, plus the shared
    `candidateDigest`), `executionAssurance`, a bounded `omissions` array,
    offer linkage (`offerEventId`, `preEvidenceDigest`, `postEvidenceDigest`),
-   and `recoverability` (`agent-decision-journal.mjs:44`,
+   and `recoverability` (`agent-decision-journal.mjs:49`,
    `agent-decision-event.schema.json:39`). `identity` does not exist on this
    shape at all — it is additive only to the observational branch above.
+3. **`legacy-import-observation` shape** (H-AC-08) — eleven required keys:
+   the seven base keys shared with the observational shape plus four new
+   ones — `legacySourceClass` (a closed six-value enum,
+   `mutable-approval-state` / `guard-override-jsonl-record` /
+   `deployment-approval-log` / `override-receipt` /
+   `backlog-transition-record` / `release-change-evidence`, one-to-one with
+   the six legacy record classes named in the source GitHub issue's
+   Migration section), `authorityProofStatus` (`unprovable` |
+   `not-attempted`), and the nullable `sourceReferencePath`/
+   `sourceReferenceDigest` pair (`agent-decision-journal.mjs:68-73`,
+   `agent-decision-event.schema.json:80-96`). Like `command-offer`, it is a
+   third, independent `oneOf` branch dispatched away from the observational
+   branch before `KINDS` is ever consulted — not a sixth member of the
+   5-kind observational set (`agent-decision-journal.mjs:33`, the
+   `value?.kind==="legacy-import-observation"` early return, mirroring the
+   `command-offer` dispatch on the line immediately above it). It reuses the
+   existing `STATES` lifecycle set unchanged (no parallel state machine) and
+   the `ADJ-SUPERSESSION` invariant already enforced for the observational
+   branch: `state: "superseded"` requires a non-null `supersedesEventId`
+   (`agent-decision-journal.mjs:71`). `sourceReferencePath` is validated
+   against a local regex constant that duplicates
+   `governance-event.mjs`'s `ARTIFACT_PATH` pattern exactly, rather than
+   importing it, keeping this module dependency-free
+   (`agent-decision-journal.mjs:15`). This shape carries no `identity` or
+   `assumptionState` field — it is a closed shape of its own, not an
+   extension of the observational branch. It inherits its non-authoritative,
+   cannot-satisfy-a-gate guarantee entirely from the existing, unmodified
+   `origin === "agent"` -> `authorityClass: "non-authoritative"` binding in
+   `governance-event.mjs:175`; nothing in this shape or its validator needed
+   to change to get that guarantee.
 
-Both shapes are closed by `additionalProperties: false` in the schema
-(`agent-decision-event.schema.json:8,38`) and by the matching `exact()`
-key-set check in the runtime validator (`agent-decision-journal.mjs:13,32,45`)
-— no undeclared key is representable in either shape; the same `exact()`
-check also closes each individual `identity` array entry to its four named
-keys (`agent-decision-journal.mjs:14`). The published JSON Schema file is
+All three shapes are closed by `additionalProperties: false` in the schema
+(`agent-decision-event.schema.json:8,38,81`) and by the matching `exact()`
+key-set check in the runtime validator
+(`agent-decision-journal.mjs:17,37,50,70`) — no undeclared key is
+representable in any shape; the same `exact()` check also closes each
+individual `identity` array entry to its four named keys
+(`agent-decision-journal.mjs:18`). The published JSON Schema file is
 not itself invoked by `assertPortablePayload` at write time
 (`plugins/pipeline-core/lib/governance-event-store.mjs:318-324` dispatches
 `origin === "agent"` events straight to `validateAgentDecisionEvent`, a
@@ -83,20 +114,23 @@ keeps the published schema closed and in step with the validator";
 `agent-decision-journal.test.mjs:125-134`, "A-AC-05 keeps the published
 identity schema closed and in step with the validator", covering the
 `identity`/`dimension`/`provenance`/`assurance` enums and the 1-7 bounds the
-same way).
+same way; and the H-AC-08 sibling drift test, "H-AC-08 keeps the published
+legacy-import-observation schema closed and in step with the validator",
+covering `legacySourceClass`/`authorityProofStatus`).
 
 ## Taxonomy
 
 Closed event kinds (`plugins/pipeline-core/lib/agent-decision-journal.mjs:4`):
 `assumption`, `selection`, `verification-scope`, `fallback`, `escalation`,
-plus the distinct `command-offer` kind dispatched separately
-(`agent-decision-journal.mjs:28,43`). Lifecycle `state` values are `declared`,
+plus the distinct `command-offer` and `legacy-import-observation` kinds
+dispatched separately, before `KINDS` is ever consulted
+(`agent-decision-journal.mjs:32-33,48,68`). Lifecycle `state` values are `declared`,
 `verified`, `contradicted`, `expired`, `invalidated`, `superseded`
 (`agent-decision-journal.mjs:4`), a closed set orthogonal to the optional
 `assumptionState` epistemic axis (`assumed`, `inferred`, `observed`,
 `verified`, `contradicted`, `unavailable`, `unknown` —
 `agent-decision-journal.mjs:6`); per A-AC-11 the two axes never collapse into
-one enum (`agent-decision-journal.mjs:5,19`).
+one enum (`agent-decision-journal.mjs:5,23`).
 
 A-AC-05 adds a fourth, independent axis: the optional `identity` array
 carries closed provenance/assurance records for the seven named identity
@@ -109,7 +143,7 @@ identity was learned: `same-dispatch-observed`, `requested-route`,
 it is held: `verified`, `reported`, `inferred`, `unknown`
 (`agent-decision-journal.mjs:8`, `IDENTITY_PROVENANCE`/`IDENTITY_ASSURANCE`).
 The array holds one to seven entries and no two entries may share a
-`dimension` (`agent-decision-journal.mjs:14`, mirroring the duplicate-check
+`dimension` (`agent-decision-journal.mjs:18`, mirroring the duplicate-check
 technique `validateCommandOfferEvent` already uses for `omissions`). Unlike
 `assumptionState`, `identity`'s admissibility is itself kind-scoped: it is
 representable only on the kinds where an identity choice is material to the
@@ -117,7 +151,7 @@ decision being recorded — `selection`, `escalation`, `fallback`
 (`agent-decision-journal.mjs:8`, `IDENTITY_KINDS`) — and its presence on
 `assumption` or `verification-scope` fails closed with the dedicated
 `ADJ-IDENTITY-SCOPE` code rather than the generic `ADJ-SHAPE`
-(`agent-decision-journal.mjs:34`).
+(`agent-decision-journal.mjs:39`).
 
 A `command-offer` event carries its own closed state machine (`offered`,
 `acknowledged`, `authorized`, `copied`, `attempted`, `execution-unobserved`,
@@ -127,7 +161,27 @@ A `command-offer` event carries its own closed state machine (`offered`,
 axis (`agent-decision-journal.mjs:10`), a closed `sideEffectClass`
 (`non-authoritative`, `destructive`, `guard-bypass`, `authority-changing`),
 and a `recoverability` class (`not-applicable`, `recoverable`,
-`cleanup-required`, `rollback-required` — `agent-decision-journal.mjs:45`).
+`cleanup-required`, `rollback-required` — `agent-decision-journal.mjs:50`).
+
+H-AC-08 adds a third, independent kind, `legacy-import-observation`: a
+pre-Phoenix or external approval/override/deploy record whose original
+authority tuple cannot be reproven, imported only as this closed, explicitly
+unverified observation. It carries a closed `legacySourceClass` (the six
+legacy record classes named in source GitHub issue #30's Migration section:
+`mutable-approval-state`, `guard-override-jsonl-record`,
+`deployment-approval-log`, `override-receipt`, `backlog-transition-record`,
+`release-change-evidence`) and a closed `authorityProofStatus`
+(`unprovable` | `not-attempted` — the two honest outcomes of trying to
+reprove the original authority tuple, `agent-decision-journal.mjs:13`). It
+reuses the shared `STATES` lifecycle set rather than a parallel state
+machine, and it is dispatched to its own validator exactly like
+`command-offer` — a third `oneOf` branch, not a sixth member of this
+section's 5-kind observational set (`agent-decision-journal.mjs:33,68`). It
+inherits its non-authoritative, cannot-satisfy-a-gate guarantee entirely
+from the existing, unmodified `origin === "agent"` ->
+`authorityClass: "non-authoritative"` binding in `governance-event.mjs:175`
+— nothing in this kind's shape or validator needed to change to get that
+guarantee.
 
 ## Materiality policy
 
@@ -179,8 +233,9 @@ function in this codebase that resolves Pipeline authority, reads
 exclusively from human-stream decisions passed to it; nothing resolves
 authority from `agent`-origin events. This is the code-level backing for the
 prose above ("cannot grant, consume, revoke, or replace human authority"):
-`validateAgentDecisionEvent`/`validateCommandOfferEvent`
-(`agent-decision-journal.mjs:26-53`) admit only closed reason codes, digests
+`validateAgentDecisionEvent`/`validateCommandOfferEvent`/
+`validateLegacyImportObservationEvent`
+(`agent-decision-journal.mjs:30-73`) admit only closed reason codes, digests
 and lifecycle state, never a free-text authority claim.
 
 ## Privacy threat model
@@ -188,8 +243,8 @@ and lifecycle state, never a free-text authority claim.
 What this stream must never carry: free text, prompts, tool output, terminal
 history, raw logs, chain-of-thought, account data, or an authority-shaped
 field (stated in this document's own intro, and structurally enforced — see
-Schema above: neither event shape has a slot typed for prose or an account
-identifier at all). At the field level, R-AC-05 enumerates the concrete
+Schema above: none of the three event shapes has a slot typed for prose or
+an account identifier at all). At the field level, R-AC-05 enumerates the concrete
 prohibited set and pins it as a test: credentials, tokens, account/accountId,
 SSH keys, private paths, private coordinates, raw command text/arguments/
 scripts, shell history, transcripts, prompts, unrestricted output, and any
@@ -199,18 +254,23 @@ scripts, shell history, transcripts, prompts, unrestricted output, and any
 every untyped digest at both journal boundaries").
 
 Enforcement is structural rejection, not redaction or best-effort filtering:
-because both event shapes are `exact()`-closed (`agent-decision-journal.mjs:13`),
+because all three event shapes are `exact()`-closed (`agent-decision-journal.mjs:17`),
 an event carrying an extra key such as `command` or `privatePath` fails
-validation outright (`ADJ-SHAPE`/`ADJ-COMMAND-OFFER`,
-`agent-decision-journal.mjs:32,45`) before it can reach the store. There is
+validation outright (`ADJ-SHAPE`/`ADJ-COMMAND-OFFER`/`ADJ-LEGACY-SHAPE`,
+`agent-decision-journal.mjs:37,50,70`) before it can reach the store. There is
 exactly one digest slot per shape family (`candidateDigest` on the
 observational shape; `policyDigest`/`redactionPolicyDigest`/
 `preEvidenceDigest`/`postEvidenceDigest`/`governedArtifactSha256` on the
-command-offer shape, all typed `^[a-f0-9]{64}$`, `agent-decision-journal.mjs:3`),
-and none is documented or usable as a stand-in for a private-content digest —
-the test asserts the one accepted operation digest is the governed-artifact
-one and that a raw serialization of an accepted event never contains any of
-the prohibited fixture values (`agent-decision-journal.test.mjs:27-33`).
+command-offer shape; `candidateDigest`/`sourceReferenceDigest` on the
+`legacy-import-observation` shape — all typed `^[a-f0-9]{64}$`,
+`agent-decision-journal.mjs:3`), and none is documented or usable as a
+stand-in for a private-content digest — the test asserts the one accepted
+operation digest is the governed-artifact one and that a raw serialization
+of an accepted event never contains any of the prohibited fixture values
+(`agent-decision-journal.test.mjs:27-33`; the R-AC-05 fixture itself is
+exercised only against the observational and command-offer shapes, not
+re-run against `legacy-import-observation`, which the H-AC-08 tests cover
+separately with their own closed-shape assertions).
 
 At the store layer, `assertPortablePayload` additionally requires the agent
 stream's registered capture-policy entry to declare
