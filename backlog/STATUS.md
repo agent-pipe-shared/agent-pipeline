@@ -67,6 +67,7 @@
 | pipeline.guard-lifecycle-ready-blocks-claude-memory-writes | open | defect | pipeline | 2026-07-29 | — |
 | pipeline.guard-lifecycle-ready-rejects-plan-runtime-intent-argv | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.guard-lifecycle-ready-runner-allowlist-incomplete | open | defect | pipeline | 2026-08-09 | — |
+| pipeline.guard-maintenance-window-rejects-a-fresh-setup1-authority-file | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.guard-reclassification-changed-what-a-signature-can-lift | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.guard-refuses-documented-bounded-diagnostic | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.guard-refuses-the-prescribed-recovery | open | defect | pipeline | 2026-08-08 | — |
@@ -175,6 +176,6 @@
 
 ## Counts
 
-- open: 111
+- open: 112
 - in_progress: 21
 - closed: 35
