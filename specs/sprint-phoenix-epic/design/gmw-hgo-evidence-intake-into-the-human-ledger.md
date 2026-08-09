@@ -1259,12 +1259,24 @@ derived row-by-row from §11 rather than summarized:
   **Superseded by §15.2 (PO-decided 2026-08-09).** The sentence above — "not part
   of increment 1's inventory" — no longer applies. §15.2.3/§15.3 name
   `guard-testpath.mjs` and `guard-gate-strength.mjs` as part of increment 1's
-  inventory, not increment 2's, and the corresponding `spec.md` §7.4 rows land in
-  the same rebind this section's H-AC-12 amendment already requires, not a later
-  one. Retained here, quoted rather than deleted, so a reader consulting §9 in
-  isolation is told the same thing §15 already decided, not the opposite — the
-  same quote-and-supersede style §15.2.5 already used to retract the parallel
-  sentence in §8.5.2.
+  inventory, not increment 2's. Neither file appears anywhere in `spec.md` today
+  (confirmed by search), so both get **new** `spec.md` §7.4 rows — not extensions
+  of an existing one, the other direction §9's five-file enumeration above used —
+  and those rows land in the same rebind this section's H-AC-12 amendment already
+  requires, not a later one. Retained here, quoted rather than deleted, so a
+  reader consulting §9 in isolation is told the same thing §15 already decided,
+  not the opposite — the same quote-and-supersede style §15.2.5 already used to
+  retract the parallel sentence in §8.5.2.
+- **For O-1's identity-registry mechanism (§15.1, §15.3).**
+  `plugins/pipeline-core/lib/human-governance-identity-registry.mjs` and its unit
+  test `…/lib/human-governance-identity-registry.test.mjs` are both **new**
+  `spec.md` §7.4 rows: neither file exists in the repository or in `spec.md`
+  today. `plugins/pipeline-core/scripts/governance-authority.mjs` gains
+  `resolve-identity` (§15.1.2) as a further **extension** of the same row already
+  extended above (`:1241-1246`) for the reconcile disposition — one row, extended
+  twice, not duplicated, following `spec.md:421`'s existing entry, the same
+  extended-not-duplicated direction that row already uses. All three rows land in
+  the same rebind as the rest of this section's amendments, gated by AC-9/AC-14.
 - **For the un-representable HGO decisions (increment 2, finding F-3).** The
   portable payload cannot express an override whose only bound paths are
   dot-prefixed or absent, because `scope.artifacts` requires at least one entry
@@ -1845,8 +1857,12 @@ insertion, immediately after that paragraph, same style:**
 > (`design/gmw-hgo-evidence-intake-into-the-human-ledger.md` §15.1.2). Because the registry key reuses
 > `authorityClass` and the decision's own `occurredAtEpochMs` — fields the portable record already exposes for
 > their existing purpose under this criterion's own first clause — a local holder of both the portable stream
-> and the registry can attribute any decision, from **either** producer, to a natural person by role and time
-> window. This clause's "no portable counterpart or join handle" is read, as of this amendment, to forbid a
+> and the registry can attribute a decision, from **either** producer, to a natural person by role and time
+> window whenever the registry holds a covering entry for that decision's `authorityClass` and
+> `occurredAtEpochMs`; where no covering entry exists, resolution yields no identity
+> (`resolveNaturalPersonIdentity`'s `unknown` outcome, or `ambiguous` on an overlap defect, §15.1.2), and this
+> clause's disclosure reaches exactly that conditional case, not an unconditional one. This clause's "no
+> portable counterpart or join handle" is read, as of this amendment, to forbid a
 > correlator manufactured for the purpose of joining — a decision ID, a request digest, a candidate, or any
 > value derived from the trust anchor (§5.1) — not the pre-existing `authorityClass` and `occurredAtEpochMs`
 > fields the ledger already carries for authority and event time. **This does NOT exempt
