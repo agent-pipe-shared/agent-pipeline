@@ -47,6 +47,19 @@ something to do here without review.
 
 ## Entries
 
+## Candidate cae20a35134b05a69f56a913253fe7ae6e7142b0 — 2026-08-09, range 3387065..cae20a3, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `f7062ac` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `8244ab3`, `0022d13`, `73501cf`, `cae20a3`: A-AC-05's identity-provenance/assurance
+carrier (built, stays partial, no production caller), round-3 Critic PASS remediation on the
+A-AC-04 CLI (three minor findings closed), the resulting evidence-map delta closing A-AC-04, and
+this leg's checkpoint. Same reading as the whole chain: `docs/state.md` stays ADR-0012, the
+generated evidence-map/closure-plan/class-s-scoping trio stays ADR-0045. Nothing in this range
+touches `backlog/` or any other governed path.
+
 ## Candidate f7062acc3d95069c350f7318e01e11bea1b5d168 — 2026-08-09, range 3387065..f7062ac, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
