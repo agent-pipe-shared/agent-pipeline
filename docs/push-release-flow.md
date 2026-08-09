@@ -78,6 +78,22 @@ is the adjacent, not identical, filed gap — this exact one is not yet filed
 separately as of this writing), **the PO runs this step**, using the exact
 command the agent constructs and hands over — never freehand.
 
+**Two refusals this step makes with a message that names neither the field nor
+the rule. Both cost a failed attempt on 2026-08-09.**
+
+1. `--expires-at` is validated by `new Date(x).toISOString() === x`, which
+   always produces milliseconds. `2026-08-16T00:00:00Z` is rejected;
+   `2026-08-16T00:00:00.000Z` is accepted. The output is only
+   `PO-APPROVAL-GATE-FAILED: critical approval request is invalid`, which covers
+   five conditions at once.
+2. `--repo-root` must be a checkout that is clean **including untracked files**
+   (`observeCleanCandidate`). In this repository the main checkout can never
+   satisfy that: `.claude/settings.json`, `project/pipeline-state.json` and
+   `project/resume-hint.json` are tracked and permanently modified. Point
+   `--repo-root` at the detached verify worktree instead, after moving it to the
+   candidate — that is what it exists for. The same applies to layer 3, which
+   observes the candidate a second time.
+
 Computing `--subject-sha256` correctly matters: it is
 `criticalActionSubjectSha256({kind, candidate:{commit,tree}, subject})` from
 `plugins/pipeline-core/lib/critical-action-approval-request.mjs`, and for

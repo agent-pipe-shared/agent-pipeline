@@ -15,12 +15,28 @@ reconciliation line for ADR-NNNN is one of exactly two shapes:
 A `- ADR-NNNN: ...` line that matches neither shape is reported as
 MALFORMED-RECORD-ENTRY and does not satisfy the ADR it names.
 
-**Write-order rule.** The record names the candidate commit it covers.
-Committing the record moves `HEAD`, so the record is written and committed
-**last**, and the check is then run with `--candidate` set to the commit the
-record names — the tip of the substantive work, not the record commit itself.
-The push range therefore carries one extra commit that touches only this file
-and no governed path.
+**Write-order rule, and why it is arithmetic rather than convention.** The
+record names the candidate commit it covers, and **it can never live inside that
+commit** — writing it changes the tree, which changes the hash. So the record is
+written and committed **last**, and the check is run with `--candidate` set to
+the commit the record names: the tip of the substantive work, not the record
+commit itself. The push range therefore carries one extra commit that touches
+only this file and no governed path.
+
+That asymmetry is now explicit in the tool rather than implied by this
+paragraph. ADR bodies and their `Governs:` lines are read from the **candidate
+commit** — an ADR's declaration of what it governs exists independently of any
+record, so there is no self-reference. The record is read from **`--record-ref`
+(default `HEAD`)**, a ref that by construction is not the candidate. Neither is
+ever read from the working tree: an uncommitted record satisfies nothing, and a
+`Governs:` line deleted only in the working tree narrows nothing. Before
+2026-08-09 both were read from disk, which meant a record that existed in no
+commit could pass — the failure this file exists to prevent, in the tool that
+enforces it.
+
+A `--record-ref` that does not resolve, that carries no record, or that does not
+have the candidate as an ancestor is its own typed finding. The reason is named,
+never collapsed into an unreconciled decision record.
 
 **Known limitation (v1), stated deliberately.** A record whose section names
 candidate commit X is invisible to a run against candidate commit Y even when

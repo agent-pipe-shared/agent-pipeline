@@ -55,6 +55,7 @@ Copy this block into the task/spec (rigor ≥ 1) or the issue/brief (rigor 0). S
 - [ ] C1 Merge-completion gate: handover file carries the new state
 - [ ] C2 CLAUDE.md length gate: ≤ {{CLAUDE_MD_MAX_LINES}} lines
 - [ ] C3 Lessons + doc sync done (rigor 0: bundling allowed); HISTORY "open/next" generated from or referencing the handover
+- [ ] C3a Documentation reconciliation over the closing range: `node harness/scripts/check-doc-reconciliation.mjs --base <base> --candidate <tip>` is green, every implicated decision record either amended or recorded as checked in `docs/doc-reconciliation.md`. Both arguments are required and the tool names the range it measured — a reconciliation claim that does not say which range it covers is not a claim. It makes omission impossible, not diligence certain, and it covers `docs/adr/` only.
 - [ ] C4 Three-artifacts archive (rigor ≥ 1): problem/spec · acceptance criteria · result report
 - [ ] C5 Telemetry line appended to `telemetry/costs.md` (MP-20)
 ```
