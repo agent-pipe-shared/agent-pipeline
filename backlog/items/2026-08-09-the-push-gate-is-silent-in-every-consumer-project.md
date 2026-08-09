@@ -43,6 +43,29 @@ The manifest names itself "Generated V3 Claude compatibility projection", so a
 generator produces it and carries `dev-plan` across while dropping `push` and
 `security`. The projection, not the calibration, is what enforcement sees.
 
+## Confirmed independently by the second runner, which rules out the easy explanation
+
+The Claude greenfield run of the same day reached the same wall and diagnosed it
+in its own transcript:
+
+> `git push` lief aber ohne jede Prüfung durch. Kein `guard-git`-Eingriff, kein
+> Approval-Record … Bei den Commit-Trailern hatte derselbe Guard sauber
+> zugeschlagen (GIT-03), das Gate offenbar nicht. **Der Hook ist nicht tot.**
+
+That last sentence closes the obvious alternative: the hook family is wired and
+firing — GIT-03 refused a commit trailer in the same session — so this is not an
+uninstalled guard. It is `guard-push` reaching step 4 and exiting 0 because the
+manifest has no push gate.
+
+**The aggravating half is the PO's own observation:** that session *knew* a
+signature was required, said so, and pushed anyway, because nothing stopped it. A
+gate an agent can name and then walk through is worse than an absent one — it
+manufactures the appearance of control. The seed at
+`project-onboarding-v3.mjs:752` is a hardcoded one-gate chapter
+(`"  dev-plan:\n    mode: blocking\n    type: human\n"`), and the comment above it
+records that this exact defect was already found once, for `dev_plan`, and closed
+by hardcoding that one gate. `push` and `security` were not carried along.
+
 ## Why nothing caught it
 
 The same shape this block has now hit six times: two artifacts each validated
