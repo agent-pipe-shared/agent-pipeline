@@ -833,6 +833,15 @@ const DELTA = {
   // entirely absent -- documentClasses has no field for any of the five,
   // explicitly out of scope for this dispatch.
   'P-AC-11': ['partial', 'WP-P-AC11'],
+
+  // C-AC-09: resolveChangeControlProfile (change-control.mjs) picks exactly
+  // one effective profile (or `not-required`) from a set of candidates
+  // sharing one environment/candidate/artifact/scopeSha256 tuple, rejecting
+  // more than one mandatory candidate as CC-RESOLVE-AMBIGUOUS with no
+  // changeClass tie-break (deliberate -- the schema carries no precedence
+  // field, so any ordering would be an invented, invisible rule). 23/23
+  // change-control tests pass, 6 new for this resolver.
+  'C-AC-09': ['implemented', 'WP-C-AC09'],
 };
 
 // --- per-criterion evidence pointer ----------------------------------------
