@@ -362,6 +362,41 @@ test("agents prepare and verify only public PO artifacts while human signing sta
   }
 });
 
+// GF-078 bug 3: isForbiddenCrossRepositoryMutation()'s blanket `poApprovalArgs(...) !== null`
+// branch fired for ANY po-approval-gate.mjs invocation outside the narrow
+// isAgentPoPublicCommand shapes -- including a bare, argument-free --help/--version, which
+// cannot mutate anything, in this repository or any other. Only that one exact, argument-free
+// shape is admitted; every other subcommand or argument combination (including --help
+// alongside something else) still hits the same blanket refusal as before, unchanged.
+test("po-approval-gate --help and --version are read-only, never a forbidden cross-repository mutation", () => {
+  const path = root();
+  const readiness = {
+    schema: "pipeline.project-onboarding-ready-gate.v1",
+    status: "ready",
+    intent: "session",
+  };
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const command of [
+      `node ${PO_APPROVAL_GATE_SCRIPT} --help`,
+      `node ${PO_APPROVAL_GATE_SCRIPT} --version`,
+    ]) {
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
+      assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { return readiness; },
+      }), { exitCode: 0, stderr: "" }, command);
+    }
+    for (const command of [
+      `node ${PO_APPROVAL_GATE_SCRIPT} --help extra`,
+      `node ${PO_APPROVAL_GATE_SCRIPT} prepare --help`,
+      `node ${PO_APPROVAL_GATE_SCRIPT} --help --version`,
+    ]) {
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), true, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 test("cachebuster is source-root scoped while plugin installation remains operator-only", () => {
   const path = root();
   try {

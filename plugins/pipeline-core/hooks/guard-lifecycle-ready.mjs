@@ -1070,7 +1070,17 @@ function isHumanPoSigningCommand(command, root) {
 export function isForbiddenCrossRepositoryMutation(command, root, dependencies = {}) {
   const parsed = parseGuardCommand(command, root);
   if (isAgentPoPublicCommand(command, root)) return false;
-  if (poApprovalArgs(command, root, PO_APPROVAL_GATE_SCRIPT) !== null) return true;
+  const poArgs = poApprovalArgs(command, root, PO_APPROVAL_GATE_SCRIPT);
+  if (poArgs !== null) {
+    // GF-078 bug 3: a bare, argument-free --help/--version is read-only and informational --
+    // it mutates nothing, in this repository or any other, unlike every other shape this
+    // script accepts (which is why every OTHER shape still falls straight through to the
+    // blanket refusal below, unchanged). Narrow by construction: exactly one argument,
+    // exactly one of the two flags; "prepare --help" or "--help extra" still hits the
+    // blanket refusal exactly as before.
+    if (poArgs.length === 1 && ["--help", "--version"].includes(poArgs[0])) return false;
+    return true;
+  }
   if (isBoundedReadOnlyPipeline(parsed, root)) return false;
   if (parsed.parseStatus !== "accepted" && hasExternalOutputRedirect(command, root)) return true;
   if (parsed.parseStatus === "accepted" && parsed.redirects.length > 0) {
