@@ -133,7 +133,7 @@ export const REQUIRED_EXCLUSION_FIELDS = Object.freeze(["reason", "owner", "expi
  * (R1.2: filed, not fixed -- each is a debt with an owner, not a permanent
  * state). Do not add this checker's own two files here; see header.
  *
- * Five remain, and the two departures left by different routes.
+ * Six remain, and the two departures left by different routes.
  * plugins/pipeline-core/lib/codex-host-plugin-list.test.mjs left on 2026-08-08 by
  * deletion, not by repair -- its whole subject was `observeCodexRulesetSource`,
  * retired by PO decision and superseded (see
@@ -144,35 +144,41 @@ export const REQUIRED_EXCLUSION_FIELDS = Object.freeze(["reason", "owner", "expi
  * registered entry of verify.mjs's TEST_SUITES -- the outcome this list exists to
  * reach.
  *
- * HALF THE ENTRIES BELOW ARE NOT OF THAT CLASS, and the difference matters more than
- * the count. harness/lib/plan-spec-state-v2.test.mjs,
- * harness/scripts/check-critic-contract-citations.test.mjs and
- * harness/scripts/recovery-bridge-approval.test.mjs are GREEN. They are parked for one
- * reason only: registering a suite means editing verify.mjs, a protected test path
- * whose maintenance window is closed, and opening one needs a human signature. Every
- * other entry here is parked because it is RED and must not be registered until
- * repaired -- the opposite situation. Reading this list as six of a kind would
- * misstate what it records: a passing suite waiting on a signature is a scheduling
- * fact, a failing suite is a defect. Their expiry is shared with the rest
- * deliberately, so that nothing here outlives a single review date, not because they
- * share the others' justification.
+ * FIVE OF THE SIX ENTRIES BELOW ARE NOT OF THAT CLASS, and the difference matters more
+ * than the count. harness/lib/plan-spec-state-v2.test.mjs,
+ * harness/scripts/check-critic-contract-citations.test.mjs,
+ * harness/scripts/recovery-bridge-approval.test.mjs,
+ * plugins/pipeline-core/hooks/guard-git-phoenix.test.mjs and
+ * plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs are
+ * GREEN. They are parked for one reason only: registering a suite means editing
+ * verify.mjs, a protected test path whose maintenance window is closed, and opening
+ * one needs a human signature. The remaining entry here is parked because it is RED
+ * and must not be registered until repaired -- the opposite situation. Reading this
+ * list as six of a kind would misstate what it records: a passing suite waiting on a
+ * signature is a scheduling fact, a failing suite is a defect. Their expiry is shared
+ * with the rest deliberately, so that nothing here outlives a single review date, not
+ * because they share the others' justification.
  *
- * The green half is growing because three suites the 0.5.2 integration orphaned have
- * been repaired rather than deleted. That direction of travel is the point: this list
- * shrinks by registration or deletion, never by an entry quietly going stale.
+ * The green group is growing: three of its five suites were orphaned by the 0.5.2
+ * integration and have since been repaired rather than deleted. That direction of
+ * travel is the point: this list shrinks by registration or deletion, never by an
+ * entry quietly going stale.
  *
  * A GREEN entry here is the one shape that rots quietly: the suite passes, so nothing
  * fails, and the stale `reason` keeps asserting a defect that no longer exists. That
  * is why the reason text is asserted rather than trusted -- see the suite's
  * `greenAwaitingRegistration` list.
  *
- * The other four are owned by one filed backlog item --
+ * The remaining entry is owned by one filed backlog item --
  * backlog/items/2026-08-08-seven-unregistered-suites-are-red-and-must-not-be-registered.md
  * (`id: pipeline.seven-unregistered-suites-are-red`, owner: PO for
- * assignment) -- and every `expires` below is that item's own `due: 2026-09-07`.
- * They are deliberately identical: the exclusions do not get to outlive the
- * item that justifies them, and a single date means closing the item closes
- * the list rather than leaving five orphans behind.
+ * assignment) -- and its `expires` below is that item's own `due: 2026-09-07`.
+ * It is deliberately identical: the exclusion does not get to outlive the item
+ * that justifies it. The five green entries carry the same date without being
+ * owned by that item, so closing it no longer empties this list -- they leave by
+ * registration on the next maintenance window. The shared date buys one property
+ * only, and it is still the one that matters: nothing here outlives a single
+ * review date.
  */
 export const EXCLUSIONS = Object.freeze({
   "harness/scripts/check-critic-contract-citations.test.mjs": Object.freeze({
@@ -201,7 +207,7 @@ export const EXCLUSIONS = Object.freeze({
     expires: "2026-09-07",
   }),
   "plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs": Object.freeze({
-    reason: "red (R1.2): AssertionError against harness/review-protocol.md",
+    reason: "GREEN, not red: repaired 2026-08-09 (PHX-PIN2) by re-baselining the six drifted rawSha256 pins of nine to the bytes on disk, on recorded PO authorization; the other three already matched, and none of the nine pinned files was touched. The suite loads and passes 4 checks. Parked solely because registering it edits verify.mjs, a protected test path whose maintenance window is closed and whose reopening needs a human signature. Register on the next window; this entry is a scheduling record, not a defect record.",
     owner: "PO",
     expires: "2026-09-07",
   }),
