@@ -9,9 +9,10 @@ import { join } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
 
+import { validateRulesetSource } from "../lib/ruleset-source.mjs";
 import {
   installedPipelineIdentity, installedPipelineVersion, observePipelineStartPreflight,
-  normalBootstrapPayloadReceipt, pipelineStartPreflightExitCode, SCHEMA,
+  normalBootstrapPayloadReceipt, pipelineStartPreflightExitCode, freshnessHostActionForPreflight, SCHEMA,
 } from "./pipeline-start-preflight.mjs";
 
 const manifest = JSON.stringify({ version: "0.4.5+test" });
@@ -106,7 +107,7 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
   });
   assert.deepEqual(Object.keys(result).sort(), [
     "bootstrapPayload", "executionBoundary", "handoff", "installedSource", "installedVersion",
-    "nextAction", "pluginRoot", "schema", "status", "version",
+    "nextAction", "pluginRoot", "rulesetSource", "schema", "status", "version",
   ]);
   assert.equal(result.schema, SCHEMA);
   assert.equal(result.status, "ready");
@@ -676,4 +677,78 @@ test("F4(b): runner codex reaches the real observeCodexPublicCoreIdentity defaul
   } finally {
     rmSync(fixture.gitRoot, { recursive: true, force: true });
   }
+});
+
+// ---- ruleset-source observation (PX0-AC-08) ----
+
+test("PX0-AC-08(a): a self-application/dev-checkout run emits a closed rulesetSource classed self-application with an available content-hash identity", () => {
+  const result = preflight({
+    env: {},
+    pluginList: pluginList(),
+    read: () => manifest,
+  });
+  assert.equal(result.status, "ready");
+  assert.ok(result.rulesetSource, "this checkout has a real .git two levels above plugins/pipeline-core");
+  assert.equal(result.rulesetSource.schema, "pipeline.ruleset-source.v1");
+  assert.equal(result.rulesetSource.runner, "codex");
+  assert.equal(result.rulesetSource.source.class, "self-application");
+  assert.deepEqual(result.rulesetSource.loadedIdentity, {
+    status: "available", algorithm: "content-sha256", value: "d".repeat(64),
+  });
+  assert.deepEqual(result.rulesetSource.installedIdentity, result.rulesetSource.loadedIdentity);
+  assert.deepEqual(validateRulesetSource(result.rulesetSource), { valid: true, errors: [] });
+});
+
+test("PX0-AC-08(b): an ordinary no-.git installed-copy run emits a closed rulesetSource classed marketplace-public with honestly-unavailable identities that still validate", () => {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), "pipeline-start-preflight-rulesetsource-nogit-"));
+  const pluginRoot = join(fixtureRoot, "cache", "agent-pipeline", "pipeline-core", "0.4.5");
+  mkdirSync(pluginRoot, { recursive: true });
+  try {
+    const result = observePipelineStartPreflight({
+      env: {},
+      pluginList: pluginList(),
+      read: () => manifest,
+      scriptUrl: fixtureScriptUrl(pluginRoot),
+    });
+    assert.equal(result.status, "ready");
+    assert.equal(result.installedSource, "remote");
+    assert.ok(result.rulesetSource);
+    assert.equal(result.rulesetSource.source.class, "marketplace-public");
+    assert.deepEqual(result.rulesetSource.loadedIdentity, { status: "unavailable" });
+    assert.deepEqual(result.rulesetSource.installedIdentity, { status: "unavailable" });
+    assert.deepEqual(validateRulesetSource(result.rulesetSource), { valid: true, errors: [] });
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
+test("PX0-AC-08(c): the previously-dangling freshnessHostActionForPreflight read of preflight.rulesetSource now observably binds a real value", () => {
+  const wslEnv = { WSL_DISTRO_NAME: "Ubuntu" };
+  const observeWithHash = (hash) => () => ({
+    ...readyObservation(),
+    plugin: { ...readyObservation().plugin, contentSha256: hash },
+  });
+  const resultA = preflight({
+    env: wslEnv,
+    pluginList: pluginList(),
+    read: () => manifest,
+    observe: observeWithHash("d".repeat(64)),
+  });
+  const resultB = preflight({
+    env: wslEnv,
+    pluginList: pluginList(),
+    read: () => manifest,
+    observe: observeWithHash("e".repeat(64)),
+  });
+  assert.equal(resultA.status, "ready");
+  assert.equal(resultB.status, "ready");
+  assert.notEqual(resultA.rulesetSource.loadedIdentity.value, resultB.rulesetSource.loadedIdentity.value);
+  const actionA = freshnessHostActionForPreflight(resultA);
+  const actionB = freshnessHostActionForPreflight(resultB);
+  assert.ok(actionA && actionB, "both preflight results are ready under the host-authorized-wsl boundary");
+  assert.notEqual(
+    actionA.preflightSha256,
+    actionB.preflightSha256,
+    "if rulesetSource were still dangling/undefined, these two otherwise-identical preflights would bind the same digest",
+  );
 });

@@ -11,7 +11,12 @@ import { fileURLToPath } from "node:url";
 
 import { measureBootstrapPayload } from "../lib/bootstrap-payload-budget.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { evaluateSelfApplicationAttestation } from "../lib/self-application-attestation-gate.mjs";
+import { observeCodexPublicCoreIdentity, observePublicCoreIdentity } from "../lib/public-core-observation.mjs";
+import { RULESET_SOURCE_SCHEMA } from "../lib/ruleset-source.mjs";
+import {
+  evaluateSelfApplicationAttestation,
+  pluginRootHasSelfApplicationGit,
+} from "../lib/self-application-attestation-gate.mjs";
 import { WSL_FRESHNESS_BOUNDARY_ID } from "./ruleset-freshness.mjs";
 
 export const SCHEMA = "pipeline.start-preflight.v1";
@@ -177,10 +182,15 @@ export function installedPipelineVersion(pluginList = () => readInstalledPluginL
  * selection occurs in the authorized host helper immediately before it starts
  * the fixed Git child; a sandbox preflight must not claim host availability.
  *
- * Restored from 75b8361^1.  The projection below is the pre-merge allowlist and
- * is deliberately unchanged: `rulesetSource` is absent from the merged-base
- * preflight and is therefore simply omitted from the digest input, and the
- * merged-base `bootstrapPayload` is not admitted into the binding.
+ * Restored from 75b8361^1.  The projection below is the pre-merge allowlist,
+ * extended by PHX-WP-PX0AC08 to admit `rulesetSource` now that
+ * `observePipelineStartPreflight` actually populates it: previously the field
+ * was always `undefined` here (never built at all), so it was a no-op inside
+ * `JSON.stringify` regardless of whether it was listed; it is now a real
+ * closed `pipeline.ruleset-source.v1` observation (or `null` when no loaded
+ * distribution was resolved) and is bound like every other field on this
+ * allowlist. The merged-base `bootstrapPayload` remains excluded from the
+ * binding, unchanged.
  */
 export function freshnessHostActionForPreflight(preflight) {
   if (!preflight || typeof preflight !== "object"
@@ -248,12 +258,96 @@ export function observePipelineStartPreflight({
   const wsl = [env.WSL_DISTRO_NAME, env.WSL_INTEROP]
     .some((value) => typeof value === "string" && value.trim() !== "");
   const executionBoundary = wsl ? "host-authorized-wsl" : "default";
-  const attestationFailed = evaluateSelfApplicationAttestation({ pluginRoot, runner, version, observe }).failed;
+  // Captures the exact origin/content observation `evaluateSelfApplicationAttestation`
+  // (unmodified, imported read-only) resolves and calls internally, without a
+  // second, independent invocation of the real observer: `observe` (below) is
+  // an already-existing extension point of that function -- production code
+  // never supplies one and always falls through to its own runner-based
+  // default, so this wrapper reproduces that exact default-selection
+  // (`observe ?? (runner === "codex" ? observeCodexPublicCoreIdentity :
+  // observePublicCoreIdentity)`) itself, then forwards unmodified to it and
+  // records the return value as a side effect. `evaluateSelfApplicationAttestation`
+  // therefore receives a non-nullish `observe` on every call and always takes
+  // that branch of its own `observe ?? (...)` selection -- functionally
+  // identical to what it would have selected itself, so its pass/fail
+  // semantics (`attestationFailed`) are unchanged; only the discarded
+  // internal `normalized`/`observation` data is now additionally retained
+  // here for `rulesetSource`. `capturedObservation` stays `null` exactly when
+  // the function's own gate (`version && pluginRootHasSelfApplicationGit`)
+  // never attempted an observation at all.
+  let capturedObservation = null;
+  const resolvedObserveForAttestation = observe
+    ?? (runner === "codex" ? observeCodexPublicCoreIdentity : observePublicCoreIdentity);
+  const captureObserve = (...args) => {
+    capturedObservation = resolvedObserveForAttestation(...args);
+    return capturedObservation;
+  };
+  const attestationFailed = evaluateSelfApplicationAttestation({
+    pluginRoot, runner, version, observe: captureObserve,
+  }).failed;
   const status = !version
     ? "plugin-identity-unavailable"
     : installedIdentity?.ambiguous === true || installedVersion !== null && installedVersion !== version || attestationFailed
       ? "plugin-refresh-required"
       : "ready";
+  // PX0-AC-08: one closed runner-neutral source observation per bootstrap
+  // resolution. Only built when a loaded distribution was actually resolved
+  // (`version` truthy) -- the acceptance clause itself is conditioned on
+  // that ("WHEN bootstrap resolves a loaded Pipeline distribution"), and the
+  // schema has no "unavailable" variant for `selectedPlugin` the way it does
+  // for the identity fields, so a valid observation cannot be constructed
+  // without a real version string in the first place.
+  let rulesetSource = null;
+  if (version) {
+    // Fixed mapping (briefing PHX-WP-PX0AC08, not a design choice made here):
+    // self-application git checkout present -> "self-application"; else an
+    // attested local-development registry match -> "local-development"; else
+    // an ordinary remote/marketplace registry match -> "marketplace-public";
+    // else (no attested installed identity at all) -> "unavailable". This
+    // repo has no private-marketplace distinction today, so that class is
+    // never selected here.
+    const selfApplicationGit = pluginRootHasSelfApplicationGit(pluginRoot);
+    const sourceClass = selfApplicationGit
+      ? "self-application"
+      : installedIdentity?.source === "local-development"
+        ? "local-development"
+        : installedIdentity?.source === "remote"
+          ? "marketplace-public"
+          : "unavailable";
+    // The strongest available identity: the real content hash the
+    // self-application attestation already derived above, when it derived
+    // one; honestly `unavailable` for every other topology (no fabricated
+    // git/content hash is invented for a marketplace-installed or
+    // local-development copy -- see the linked backlog item for the
+    // out-of-scope question of whether those topologies should eventually
+    // get a stronger mechanism).
+    const identityAvailable = selfApplicationGit && capturedObservation?.status === "ready";
+    const loadedIdentity = identityAvailable
+      ? { status: "available", algorithm: "content-sha256", value: capturedObservation.plugin.contentSha256 }
+      : { status: "unavailable" };
+    const installedIdentityForSource = identityAvailable
+      ? { status: "available", algorithm: "content-sha256", value: capturedObservation.plugin.contentSha256 }
+      : { status: "unavailable" };
+    // selectedPlugin.id: reuses the self-application observation's own
+    // resolved plugin name when one was actually derived (the same value
+    // that internal computation itself uses for this field); otherwise
+    // falls back to whichever of the two matching constants this module
+    // already uses internally for installed-registry eligibility, chosen by
+    // the same `local-development` vs. everything-else split as `source.class`.
+    const selectedPluginId = identityAvailable
+      ? capturedObservation.plugin.name
+      : installedIdentity?.source === "local-development"
+        ? LOCAL_PLUGIN_ID
+        : PLUGIN_ID;
+    rulesetSource = {
+      schema: RULESET_SOURCE_SCHEMA,
+      runner,
+      selectedPlugin: { id: selectedPluginId, version },
+      source: { class: sourceClass },
+      loadedIdentity,
+      installedIdentity: installedIdentityForSource,
+    };
+  }
   const result = {
     schema: SCHEMA,
     status,
@@ -262,6 +356,7 @@ export function observePipelineStartPreflight({
     installedSource: installedIdentity?.source ?? "unknown",
     executionBoundary,
     pluginRoot,
+    rulesetSource,
     handoff: ticket && token ? "ready" : ticket || token ? "malformed" : "none",
     nextAction: status === "ready"
       ? {
