@@ -2611,7 +2611,7 @@ test("public kickoff plan/apply carries goal as one argv element and reconstruct
     assert.equal(pristine.nextAction.kind, "collect-input");
 
     const goal = "Ship safely; keep $(touch nope) as text";
-    const planned = invoke(["kickoff", "plan", "--root", path, "--goal", goal, "--runner", "codex"]);
+    const planned = invoke(["kickoff", "plan", "--root", path, "--goal", goal, "--language", "en", "--runner", "codex"]);
     assert.equal(planned.code, 0, stderr);
     assert.equal(planned.result.goal, goal);
     const kickoffId = planned.result.targets.state.value.activeFeature.id;
@@ -2627,7 +2627,7 @@ test("public kickoff plan/apply carries goal as one argv element and reconstruct
     assert.equal(planned.result.targets.spec.content.includes("Initial PRD SHA-256"), false);
     assert.deepEqual(planned.result.applyAction.argv, [
       ONBOARDING_SCRIPT,
-      "kickoff", "apply", "--root", path, "--goal", goal,
+      "kickoff", "apply", "--root", path, "--goal", goal, "--language", "en",
       "--runner", "codex",
       "--plan-sha256", planned.result.planSha256, "--activate",
     ]);
@@ -2636,7 +2636,7 @@ test("public kickoff plan/apply carries goal as one argv element and reconstruct
     assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps }).status, "kickoff-required");
 
     const changedGoal = invoke([
-      "kickoff", "apply", "--root", path, "--goal", `${goal} changed`,
+      "kickoff", "apply", "--root", path, "--goal", `${goal} changed`, "--language", "en",
       "--plan-sha256", planned.result.planSha256, "--activate",
     ]);
     assert.equal(changedGoal.code, 2);
@@ -2644,7 +2644,7 @@ test("public kickoff plan/apply carries goal as one argv element and reconstruct
     assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps }).status, "kickoff-required");
 
     const wrongDigest = invoke([
-      "kickoff", "apply", "--root", path, "--goal", goal,
+      "kickoff", "apply", "--root", path, "--goal", goal, "--language", "en",
       "--plan-sha256", "f".repeat(64), "--activate",
     ]);
     assert.equal(wrongDigest.code, 2);
@@ -3189,14 +3189,14 @@ test("omitting --runner on the kickoff CLI resolves the historical Codex identit
       });
       return { code, stderr, result: stdout ? JSON.parse(stdout) : null };
     };
-    const omitted = invoke(["kickoff", "plan", "--root", path, "--goal", goal]);
+    const omitted = invoke(["kickoff", "plan", "--root", path, "--goal", goal, "--language", "en"]);
     assert.equal(omitted.code, 0, omitted.stderr);
     assert.equal(omitted.result.schema, "pipeline.codex-onboarding-kickoff-plan.v1");
     assert.deepEqual(omitted.result.applyAction.argv, [
-      ONBOARDING_SCRIPT, "kickoff", "apply", "--root", path, "--goal", goal,
+      ONBOARDING_SCRIPT, "kickoff", "apply", "--root", path, "--goal", goal, "--language", "en",
       "--runner", "codex", "--plan-sha256", omitted.result.planSha256, "--activate",
     ]);
-    const explicit = invoke(["kickoff", "plan", "--root", path, "--goal", goal, "--runner", "codex"]);
+    const explicit = invoke(["kickoff", "plan", "--root", path, "--goal", goal, "--language", "en", "--runner", "codex"]);
     assert.deepEqual(explicit.result, omitted.result);
     const applied = invoke(explicit.result.applyAction.argv.slice(1));
     assert.equal(applied.code, 0, applied.stderr);
@@ -3220,11 +3220,11 @@ test("omitting --runner on the kickoff CLI resolves the active Claude identity i
       });
       return { code, stderr, result: stdout ? JSON.parse(stdout) : null };
     };
-    const planned = invoke(["kickoff", "plan", "--root", path, "--goal", goal], { CLAUDECODE: "1" });
+    const planned = invoke(["kickoff", "plan", "--root", path, "--goal", goal, "--language", "en"], { CLAUDECODE: "1" });
     assert.equal(planned.code, 0, planned.stderr);
     assert.equal(planned.result.schema, "pipeline.codex-onboarding-kickoff-plan.v1");
     assert.deepEqual(planned.result.applyAction.argv, [
-      ONBOARDING_SCRIPT, "kickoff", "apply", "--root", path, "--goal", goal,
+      ONBOARDING_SCRIPT, "kickoff", "apply", "--root", path, "--goal", goal, "--language", "en",
       "--runner", "claude", "--plan-sha256", planned.result.planSha256, "--activate",
     ]);
   } finally { dispose(path); }
@@ -3245,11 +3245,11 @@ test("the kickoff CLI applies its closed runner value set: claude is honoured, u
       });
       return { code, stdout, stderr, result: stdout.startsWith("{") ? JSON.parse(stdout) : null };
     };
-    const planned = invoke(["kickoff", "plan", "--root", path, "--goal", goal, "--runner", "claude"]);
+    const planned = invoke(["kickoff", "plan", "--root", path, "--goal", goal, "--language", "en", "--runner", "claude"]);
     assert.equal(planned.code, 0, planned.stderr);
     assert.equal(planned.result.schema, "pipeline.codex-onboarding-kickoff-plan.v1");
     const applied = invoke([
-      "kickoff", "apply", "--root", path, "--goal", goal,
+      "kickoff", "apply", "--root", path, "--goal", goal, "--language", "en",
       "--runner", "claude", "--plan-sha256", planned.result.planSha256, "--activate",
     ]);
     assert.equal(applied.code, 0, applied.stderr);
@@ -3468,7 +3468,7 @@ test("an apply-shaped runtime-attestation-required exits non-zero; the same stat
     // rather than implicit (backlog: absent-runner-flag-silently-defaults-to-codex):
     // the CLI is explicitly given the codex identity on a claude-onboarded
     // root, and the apply aborts before writing anything.
-    const applied = invoke(["kickoff", "apply", "--root", path, "--goal", goal, "--plan-sha256", "0".repeat(64), "--activate", "--runner", "codex"]);
+    const applied = invoke(["kickoff", "apply", "--root", path, "--goal", goal, "--language", "en", "--plan-sha256", "0".repeat(64), "--activate", "--runner", "codex"]);
     assert.equal(applied.result.status, "runtime-attestation-required");
     assert.equal(applied.code, 1, "an apply that wrote nothing must not exit 0");
 
@@ -3476,7 +3476,7 @@ test("an apply-shaped runtime-attestation-required exits non-zero; the same stat
     assert.equal(inspected.result.status, "runtime-attestation-required");
     assert.equal(inspected.code, 0, "the same status is still a legitimate resting point for inspect");
 
-    const planned = invoke(["kickoff", "plan", "--root", path, "--goal", goal, "--runner", "codex"]);
+    const planned = invoke(["kickoff", "plan", "--root", path, "--goal", goal, "--language", "en", "--runner", "codex"]);
     assert.equal(planned.result.status, "runtime-attestation-required");
     assert.equal(planned.code, 0, "and for plan");
   } finally { dispose(path); }
