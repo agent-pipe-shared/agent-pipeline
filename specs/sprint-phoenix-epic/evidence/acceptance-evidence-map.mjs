@@ -310,10 +310,14 @@ const DELTA = {
   // WP-C-AC02 2026-08-09 (goldfish-implementor, commit 002144a): standard now
   // requires its own standardTemplate {templateId, revision} field, null for
   // every other class -- closes the "distinct validated inputs" half for
-  // standard vs normal (issue #24 §5). Still partial: the anti-class-shopping
-  // half has no concept to build on and stays absent, undertaken deliberately
-  // out of scope. 11/11 change-control-tests pass (independently re-run).
-  'C-AC-02': ['partial', 'WP-C-AC02'],
+  // standard vs normal (issue #24 §5). Second WP-C-AC02 dispatch, 2026-08-10
+  // (commit 093d3c3b): detectChangeClassShopping closes the remaining half --
+  // flags a proposed classification when resolving the fuller same-tuple
+  // candidate set (via resolveChangeControlProfile) would not have landed on
+  // it. Composes with the resolver rather than inventing a changeClass
+  // precedence. 27/27 change-control-tests pass (independently re-run both
+  // times). Both halves now closed.
+  'C-AC-02': ['implemented', 'WP-C-AC02'],
   'C-AC-07': ['partial', 'WP-C'],
   'C-AC-09': ['not-started', 'WP-C'],
   'C-AC-12': ['partial', 'WP-C'],
@@ -1012,7 +1016,7 @@ const POINTERS = {
   'X-AC-15': 'docs/external-traceability.md (PHX-WP-DOC-2): threat model, ownership/lifecycle mapping, publication guide, recovery procedure, and conformance suite added and grounded; the recovery procedure names the adapter\'s uncaught-inspect()-rejection gap and its backlog item explicitly rather than describing a graceful path that does not exist',
 
   'C-AC-01': 'change-control-tests: profile validation plus the exact bound tuple for mandatory promotion',
-  'C-AC-02': 'change-control-tests (PHX-WP-C-AC02): "standard" is pinned as a distinct changeClass paired with mandatory authority, alongside emergency and not-required, AND now carries its own required standardTemplate {templateId, revision} field (null for every other class), closing the standard-vs-normal field-level distinction per issue #24 §5. Any anti-class-shopping check remains absent -- no concept anywhere in the module supports detecting a class picked solely to avoid approval',
+  'C-AC-02': 'change-control-tests (PHX-WP-C-AC02): "standard" is pinned as a distinct changeClass paired with mandatory authority, alongside emergency and not-required, AND carries its own required standardTemplate {templateId, revision} field (null for every other class), closing the standard-vs-normal field-level distinction per issue #24 §5. detectChangeClassShopping now closes the remaining half: flags a proposed classification against same-tuple alternatives via resolveChangeControlProfile whenever the fuller candidate set would not have landed on it. 27/27 tests pass',
   'C-AC-03': 'change-control-tests: Pipeline and external authority validated independently against the same tuple',
   'C-AC-04': 'change-control-tests: stale, unauthenticated, mismatched, unavailable and outside-window state all block',
   'C-AC-05': 'change-control-tests: external update published only after the local deployment event; failed attempts preserved',
