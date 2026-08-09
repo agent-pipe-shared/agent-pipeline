@@ -4029,6 +4029,28 @@ plus `governance-event-store.mjs`'s own 28/28 as the broader consumer — the 5t
 **Live now: none.** Session standing continues to climb; the sprint remains genuinely in progress,
 not finalized, consistent with the Stop-hook's own check.
 
+### CORRECTED STANDING (123/157, not 126-127 as stated in two chat replies); WP-PX0-AC06 DISPATCHED
+
+A regenerated evidence map showed 123 implemented / 25 partial / 1 designed-only / 7 not-started /
+1 constraint = 157 — corrected two consecutive chat replies that had drifted to 126 and then 127.
+Checked the next natural candidate, EPIC-AC-01, before dispatching further: confirmed explicitly
+Class P in this repo's own `closure-plan.md` ("not closeable by writing code," WP-PO) — genuinely
+PO-gated, not a dispatch candidate.
+
+Rather than stop at "most of what's left needs the PO," pushed one more carefully-scoped attempt:
+researched `pipeline-state.mjs`'s `recover` command for PX0-AC-06 (a missing 4th outcome class,
+`recovered-preimage`). Found it genuinely low-risk despite the file's 6,727-line size and central
+role in session bootstrap: the target function is 61 lines, structurally isolated (no other function
+in the file references its three existing outcome strings), the fresh-binding recheck PX0-AC-06
+requires already exists and would be reused not reimplemented, and a directly analogous test
+(`diverged`, AR06d) already exists as a template. Dispatched **WP-PX0-AC06**, scoped extremely
+tightly (one function + its CLI flag parsing only, explicitly forbidding `apply`/`plan`/any other
+command in this file) and required to run the FULL 4,155-line `pipeline-state.test.mjs` suite
+(~416 assertions), not just the AC-06 block — the P-AC-06 lesson from earlier applied prospectively
+this time, not just retrospectively.
+
+**Live now:** WP-PX0-AC06.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
