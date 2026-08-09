@@ -6,7 +6,7 @@
 **Last updated:** 2026-08-09
 **Project status:** ACTIVE
 **Local candidate:** `0.5.4+<runner>.20260809131419.bf59a28` · commit `cdec8a4cdd0dbd2df3607d26fe18aaed6b5a25cb` · Verify **267/267 exit 0** bound to that exact commit · ready for the PO's manual copy (supersedes `…20260809121256.1d5bba1`)
-**Current block:** Happy-path re-test round two (Claude + Codex) against the fourth local candidate — **release still not cleared.** GF-059's bounded guard hardening failed independent Critic review (scope mismatch + a security-relevant regression, not merged); GF-060 (corrected rework) and GF-061 (stale push-approval skill doc) are dispatched and pending. A turn-efficiency audit found push-approval alone cost 55% of the Claude run's wall clock; four new backlog items filed. Prior block, GF-058 — **the stable blocker is resolved: the push gate is seeded and live, after its satisfying path was measured end to end** (option C, as the PO chose). Two further happy-path defects fixed in the same block: the reopen-design deadlock, and the promoted state's language. Also in this block: the closure-evidence trackedness contract, three routing defects found by reading, the staging exemption, and the defects the PO's three greenfield runs produced; three suite registrations are open for the PO (TP-3); the third candidate's two TP-5-blocked findings (PG11e's commit-hash flake, and `security: warn` hard-blocking under `push: blocking`) are now fixed under one bundled HGO override; 0.5.3 is released to `main` and the human-authorization ceremony recorded as [ADR-0061](adr/0061-uniform-human-approval-ceremony.md) remains the governing thread; Nova A completion still paused on genuine ADR-gated/evidence-gated blockers
+**Current block:** Happy-path re-test round two (Claude + Codex) against the fourth local candidate — **release still not cleared.** Both the Codex hardening lineage (GF-059 FAIL → GF-060 → second Critic FAIL on test-coverage → GF-064) and the turn-efficiency lineage's onboarding fix (GF-062 → Critic FAIL on partial-authority-route coverage → GF-065, dispatched, outcome pending) each needed a corrective second round before landing clean; see the dated sections below for the full findings/fix chain of each. Two turn-efficiency items (GF-061 stale push-approval doc, GF-063 bootstrap/kickoff self-teaching gaps) are fixed and merged; a fifth (git author-identity at onboarding) was found already resolved by an unrelated same-day commit and closed without new work. Full Verify is green (267/267, exit 0) as of the GF-060/GF-064 lineage landing; the GF-062/GF-065 lineage's own Full Verify run is still pending its dispatch's completion. Prior block, GF-058 — **the stable blocker is resolved: the push gate is seeded and live, after its satisfying path was measured end to end** (option C, as the PO chose). Two further happy-path defects fixed in the same block: the reopen-design deadlock, and the promoted state's language. Also in this block: the closure-evidence trackedness contract, three routing defects found by reading, the staging exemption, and the defects the PO's three greenfield runs produced; three suite registrations are open for the PO (TP-3); the third candidate's two TP-5-blocked findings (PG11e's commit-hash flake, and `security: warn` hard-blocking under `push: blocking`) are now fixed under one bundled HGO override; 0.5.3 is released to `main` and the human-authorization ceremony recorded as [ADR-0061](adr/0061-uniform-human-approval-ceremony.md) remains the governing thread; Nova A completion still paused on genuine ADR-gated/evidence-gated blockers
 **Repair baseline:** `5d2b83dcc765d50801f4491e1bd9bed32090112b`
 **Release version:** `0.5.3` released
 **Release state:** version `0.5.3` · tag `v0.5.3` · commit `2740041d59458f949b597905816af12048502469` · tree `e72cca9b69e105ec6aac9833c4ac0bccb385d25b` · status `published`
@@ -17,7 +17,46 @@ the supplied authoritative release identity; it is not a claimed release time.
 The historical candidate-qualification sections below are retained as
 session history and no longer describes the current publication disposition.
 
-## 2026-08-09 Happy-path re-test round two (Claude + Codex) — GF-059 failed Critic review, GF-060/GF-061 dispatched, turn-efficiency findings filed (current, in progress)
+## 2026-08-09 Happy-path re-test round two — both corrective lineages (GF-060→GF-064 landed; GF-062→GF-065 in flight) (current, in progress)
+
+Both fix lineages opened by the round below needed one corrective round each
+before landing. Per the PO's per-diff Critic-cadence cap (2 rounds, then
+self-verify —
+`/home/skar667/.claude/projects/-home-skar667-src-agent-pipeline-share-nova/memory/feedback-cap-critic-review-rounds-at-two.md`,
+not a repo artifact), each lineage's second round is treated as final review
+for that diff.
+
+**GF-060's second Critic review (`scratch/critic-nova-f50820bb63c4/critic-notes.md`) returned FAIL — F1 major:**
+the three new `codex-pretool-guard.test.mjs` regression tests for the
+secret-leakage fix (GF-059 F2) didn't actually pin the security property —
+two used `tool_name: "Write"`, which always yields `command: null`
+regardless of the fix, and the third used a non-secret Bash command;
+deleting the fix's `!secretBearing` conjunct would leave all three green.
+Two minor doc-accuracy findings (F2: the new echo channel's
+`Authorization: Bearer …`-shaped blind spot was undocumented; F3: a false
+comment claiming `apply_patch` carries no `tool_input.command`, contradicted
+by `human-guard-override.mjs:951`) accompanied it. **GF-064 fixed all
+three** (`56745236`): added a properly-targeted `tool_name: "Bash"` test
+using a fake `ghp_…`-shaped secret routed through
+`guard-lifecycle-ready.mjs`'s own NOT-READY denial, verified RED
+(temporarily removing the safety conjunct) before GREEN (restoring it);
+corrected both comments. Self-verified rather than re-dispatching a third
+Critic round (findings had narrowed to doc-accuracy plus one now-fixed
+coverage gap): `codex-pretool-guard.test.mjs` 27/27, then full repo Verify
+267/267 exit 0, both confirmed directly against this exact commit — not
+taken from the dispatch report.
+
+**Separately, GF-062 (the turn-efficiency audit's `critical-human-proof.json`-at-onboarding fix, `d777e67d`) also failed its first Critic review** (`scratch/critic-bcd4dfc9/critic-notes.md`) — **F1 major:** the fix was wired into `planProjectOnboardingV3`'s primary onboarding route only; `planProjectPartialAuthorityAdoption`, a second pre-V3 migration/reconstruction onboarding route in the same file, seeds the identical push-blocking gate chapter but was left reaching the original `CRITICAL-PROOF-POLICY-KIND-REQUIRED` dead end unchanged — a real second path to the same reported defect, not a hypothetical one. Two minor test-quality findings alongside it (F2/F3: the new `PUSHPROOF-1` regression test's signature- and chat-mode halves each refuse or return too early to actually exercise the reported failure). **GF-065 dispatched** to extend the fix to the second route and correct both test halves, per the PO's "fix everything, don't postpone" instruction preferring an actual code extension over documenting the gap. **Outcome pending** — not yet landed, not yet independently verified.
+
+Along the way, three Full-Verify regressions surfaced that were traced to
+this session's own direct (non-dispatched) edits rather than to any
+Goldfish diff — a stale backlog ledger after several new/edited items, a
+stale `lifecycle.json` artifact digest after a direct plan-doc edit
+(`c8dcca3f`), and a `pipeline-start-v3.test.mjs` assertion invalidated by
+GF-061's own (correct) content change, repinned directly
+(`0a7a27c8`). All three are fixed; Verify is green.
+
+## 2026-08-09 Happy-path re-test round two (Claude + Codex) — GF-059 failed Critic review, GF-060/GF-061 dispatched, turn-efficiency findings filed
 
 Both the Claude+Pipeline and Codex+Pipeline happy-path re-tests against the
 fourth local `0.5.4` candidate (`cdec8a4c`) completed. **Release is still not
