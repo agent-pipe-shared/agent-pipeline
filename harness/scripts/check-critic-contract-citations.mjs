@@ -44,13 +44,16 @@
  *   PHX-CITE-6  the Rensin attribution resolves to a target that names Rensin.
  *   PHX-CITE-7  no "transfer format <n>" ordinal is used while no enumeration
  *               defining that numbering exists anywhere in the canon.
- *   PHX-CITE-8  every CROSS-FILE section coordinate (`path.md` §N[.N], with or
- *               without backticks) in the three contract files resolves to a
- *               section that exists in the cited file — and, where the
- *               coordinate also names the section title, to a heading that
- *               carries that title. Two of the seven founding defects were
- *               §-numbers off by one; before this class the number was parsed
- *               only out of a "this file" clause and discarded everywhere else.
+ *   PHX-CITE-8  every CROSS-FILE section coordinate in the three contract files
+ *               resolves: a §-number to a section that exists in the cited
+ *               file, a section title to a heading that carries it. Two of the
+ *               seven founding defects were §-numbers off by one; before this
+ *               class the number was parsed only out of a "this file" clause
+ *               and discarded everywhere else. Coverage and blind spots are
+ *               enumerated at the class itself (below) and reported in the
+ *               success line — the class once announced "every cross-file
+ *               coordinate" while parsing one separator shape, so two live
+ *               forms were unchecked behind a completeness claim.
  *
  * NO CLASS MAY BE SATISFIED BY ITS OWN CITING LINE. Several citations sit
  * inside the very section they cite (PHX-CITE-5 is the canonical case), so a
@@ -157,6 +160,11 @@ function numberedSection(text, num) {
   return section(text, new RegExp(`^${escaped}[.\\s]`));
 }
 
+/** Section whose heading ENDS in the cited title ("## 6. Evidence, review and recovery"). */
+function titledSection(text, title) {
+  return section(text, new RegExp(`(^|\\s)${title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`));
+}
+
 function line(text, locator) {
   const m = locator.exec(text);
   return m ? m[0] : null;
@@ -204,7 +212,7 @@ function resolveRef(root, ref) {
     return text;
   }
   if (!ref.sectionName) return doc;
-  return section(doc, new RegExp(`(^|\\s)${ref.sectionName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`));
+  return titledSection(doc, ref.sectionName);
 }
 
 function describe(ref) {
@@ -479,18 +487,67 @@ function checkTransferFormatOrdinal(root, findings) {
 
 /**
  * PHX-CITE-8: every cross-file section coordinate resolves to a section that
- * exists — and, where the coordinate also names the title, to a heading that
- * carries it. The number is the part a reader navigates by, and it is the part
- * that silently rots when the target file is renumbered.
+ * exists — and, where the coordinate names the title, to a heading that carries
+ * it. The number is the part a reader navigates by, and it is the part that
+ * silently rots when the target file is renumbered.
+ *
+ * WHAT COUNTS AS A COORDINATE. A `path.md` reference followed by the section it
+ * names. EVERY separator shape that occurs in the three contract files is
+ * parsed — the shapes are listed here because the previous matcher accepted
+ * only the first three while the check announced it resolved "every cross-file
+ * coordinate", leaving two live forms unchecked behind that claim:
+ *
+ *   `path.md` §2.1                       number only
+ *   `path.md` §2.1 (prose aside)         number only; a parenthetical without
+ *                                        italics is prose, not a title claim
+ *   `path.md` §2.1, *Title*              number + title
+ *   `path.md` §2.1 (*Title*)             number + title, parenthesised
+ *   `path.md` — §6.3 (prose aside)       dash between path and number
+ *   `path.md` — *Title*                  title only, no number
+ *   `path.md` (*Title A* … *Title B*)    several titles for one path
+ *
+ * WHAT THIS CLASS DOES NOT CHECK (QG-05 — a gate states its own blind spots;
+ * the success line repeats this, and reports the resolved count so that
+ * shrinking the corpus shows up as a smaller number rather than as silence):
+ *
+ *   - RULE-ID coordinates: `roles/elephant.md` — *EL-01*,
+ *     `policies/model-policy.md` MP-07, `policies/tooling-policy.md` G2/W2.
+ *     These name a rule INSIDE a document, not a heading, so resolving them as
+ *     headings would report a false red on a correct citation. They are
+ *     recognised by shape, skipped, and counted in the success line.
+ *   - Prose descriptions after a path (`…/critic-review.md` — negative-thesis
+ *     critic prompt template) — not a coordinate, nothing to resolve.
+ *   - Bare paths with no coordinate: this class does not assert the file exists.
+ *   - Citations in any file other than the three contract files.
+ *   - German reference translations below the DE-REFERENCE-BELOW marker (ADR-0011).
  */
-const COORDINATE_RE = /`?((?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+\.md)`?\s*§(\d+(?:\.\d+)*)(?:\s*,\s*\*([^*]+)\*)?/g;
+export const COORDINATE_RE = new RegExp(
+  "`?((?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\\.md)`?" + //     1: the cited path
+    "(?:[ \\t]*[—–-])?" + //                                 optional dash separator
+    "(?:[ \\t]*§(\\d+(?:\\.\\d+)*))?" + //                   2: optional §-number
+    "(?:[ \\t]*(?:,[ \\t]*|[—–-][ \\t]*)?(\\*[^*\\n]+\\*|\\([^)\\n]*\\)))?", // 3: optional title carrier
+  "g",
+);
 
-function checkSectionCoordinates(root, findings) {
+/**
+ * A rule/requirement identifier (EL-01, MP-07, GIT-05, W2, T1) rather than a
+ * section title. Anchored whole-string, and a heading title that merely starts
+ * with a digit ("*5. Close deliberately; recover with a bound*") does not match.
+ */
+const RULE_ID_RE = /^[A-Z]{1,5}-?\d[\w./-]*$/;
+
+function checkSectionCoordinates(root, findings, coverage) {
   for (const rel of [PROTOCOL, ROLE, SKILL]) {
     const doc = readDoc(root, rel);
     for (const m of doc.matchAll(COORDINATE_RE)) {
+      const num = m[2] ?? null;
+      const named = [...(m[3] ?? "").matchAll(/\*([^*]+)\*/g)].map((t) => t[1].trim());
+      const titles = named.filter((t) => !RULE_ID_RE.test(t));
+      coverage.ruleIdCoordinatesSkipped += named.length - titles.length;
+      if (!num && titles.length === 0) continue; // a bare path names no section
       const alias = PATH_ALIASES.find(([pattern]) => pattern.test(m[1]));
       const file = alias ? alias[1] : m[1];
+      const coordinate = [num ? `§${num}` : null, ...titles.map((t) => `*${t}*`)].filter(Boolean).join(", ");
       let targetDoc;
       try {
         targetDoc = readDoc(root, file);
@@ -498,18 +555,32 @@ function checkSectionCoordinates(root, findings) {
         // A replay root materializes CITATION_SOURCE_FILES only; an unreadable
         // non-canon target is a defect in the real checkout, absence elsewhere.
         if (root === DEFAULT_ROOT) {
-          findings.push(`PHX-CITE-8 FILE-MISSING: ${rel} cites ${file} §${m[2]}; that file cannot be read.`);
+          findings.push(`PHX-CITE-8 FILE-MISSING: ${rel} cites ${file} ${coordinate}; that file cannot be read.`);
         }
         continue;
       }
-      const text = numberedSection(targetDoc, m[2]);
-      if (text === null) {
-        findings.push(`PHX-CITE-8 SECTION-MISSING: ${rel} cites ${file} §${m[2]}, which does not exist in that file.`);
+      if (num) {
+        coverage.coordinatesResolved += 1;
+        const text = numberedSection(targetDoc, num);
+        if (text === null) {
+          findings.push(`PHX-CITE-8 SECTION-MISSING: ${rel} cites ${file} §${num}, which does not exist in that file.`);
+          continue;
+        }
+        const heading = text.split("\n")[0].trim();
+        for (const title of titles) {
+          coverage.coordinatesResolved += 1;
+          if (!heading.includes(title)) {
+            findings.push(`PHX-CITE-8 TITLE-MISMATCH: ${rel} cites ${file} §${num} as *${title}*; that section is "${heading}".`);
+          }
+        }
         continue;
       }
-      const heading = text.split("\n")[0].trim();
-      if (m[3] && !heading.includes(m[3])) {
-        findings.push(`PHX-CITE-8 TITLE-MISMATCH: ${rel} cites ${file} §${m[2]} as *${m[3]}*; that section is "${heading}".`);
+      // Title without a number: the title itself is the coordinate.
+      for (const title of titles) {
+        coverage.coordinatesResolved += 1;
+        if (titledSection(targetDoc, title) === null) {
+          findings.push(`PHX-CITE-8 HEADING-MISSING: ${rel} cites ${file} — *${title}*; that file has no heading with that title.`);
+        }
       }
     }
   }
@@ -517,6 +588,7 @@ function checkSectionCoordinates(root, findings) {
 
 export function checkCriticContractCitations({ root = DEFAULT_ROOT } = {}) {
   const findings = [];
+  const coverage = { coordinatesResolved: 0, ruleIdCoordinatesSkipped: 0 };
   checkCanonicalWording(root, findings);
   checkRungAnchor(root, findings);
   checkLadderPointer(root, findings);
@@ -526,8 +598,24 @@ export function checkCriticContractCitations({ root = DEFAULT_ROOT } = {}) {
   checkTwoPhaseBackReference(root, findings);
   checkRensinAttribution(root, findings);
   checkTransferFormatOrdinal(root, findings);
-  checkSectionCoordinates(root, findings);
-  return { ok: findings.length === 0, findings, root };
+  checkSectionCoordinates(root, findings, coverage);
+  return { ok: findings.length === 0, findings, root, coverage };
+}
+
+/**
+ * The success line. It states what was resolved AND what was not: an
+ * unqualified "every cited target contains its cited content" is exactly the
+ * overclaim this check was repaired for (QG-05). The counts are measured, so
+ * silently dropping a citation shrinks a number instead of changing nothing.
+ */
+export function successLine({ coverage }) {
+  return [
+    "Critic contract citations: 8 classes green — every citation this check resolves points at a target that carries its cited content.",
+    `PHX-CITE-8 resolved ${coverage.coordinatesResolved} cross-file section coordinates (§-numbers and section titles) across the 3 contract files.`,
+    `NOT checked: rule-ID coordinates such as \`roles/elephant.md\` — *EL-01* (${coverage.ruleIdCoordinatesSkipped} skipped: they name a rule, not a heading),`,
+    "prose after a path, bare paths without a coordinate, citations outside the 3 contract files,",
+    "and German reference translations below the DE-REFERENCE-BELOW marker.",
+  ].join(" ");
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
@@ -535,7 +623,7 @@ if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import
   const root = rootIndex === -1 ? DEFAULT_ROOT : resolve(process.argv[rootIndex + 1] ?? DEFAULT_ROOT);
   const result = checkCriticContractCitations({ root });
   if (result.ok) {
-    console.log("Critic contract citations: every cited target contains its cited content (8 citation classes checked).");
+    console.log(successLine(result));
     process.exit(0);
   }
   for (const finding of result.findings) console.error(finding);
