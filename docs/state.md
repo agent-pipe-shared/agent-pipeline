@@ -3374,6 +3374,64 @@ fifth silent rework.**
 **Session extremely long; context far past normal compaction range. Handover fully current through
 this checkpoint — nothing blocks compaction.**
 
+### K-AC-05 ROUND 3: FAIL ON TWO GROUNDS — A ROUTING DEFECT I CAN ACTUALLY FIX, AND ONE REAL MAJOR
+
+Round-3 Critic FAIL, two independent reasons. **Finding 1 (process):** the dispatch requested
+`claude-opus-5 at max` (MP-07 mandatory for this SECURITY-class diff), but the Critic's own
+same-dispatch self-identification showed it executed on Sonnet 5. This is the routing mismatch
+this session had been treating as an accepted, disclosed, unfixable platform limitation across
+every Critic dispatch so far — but the Agent tool actually exposes a `model` override parameter,
+and checking back, no Critic dispatch this session ever set it; every one relied only on stating
+the model in the prompt's Dispatch-Metadaten text, which the runner does not honor. Not a platform
+limitation — a dispatch defect on my side, and a fixable one. Applied immediately: the O-1/O-2
+round-4 dispatch below was issued with the tool's `model: "opus"` parameter set explicitly, not
+just named in prose. Going forward, every ARCHITECTURE/GUARDRAIL/SECURITY-class Critic dispatch
+sets this parameter.
+
+**Finding 2 (major, verified myself against the code):** `readForkDisposition`
+(`governance-event-store.mjs:895-912`) validates only the 4 binding fields of a persisted fork
+disposition record before returning it; the other 4 (`idempotencyKey`, `acknowledgedEventIds`,
+`reasonCode`, `disposedAtEpochMs`) come back with no shape/type/format check at all, even though
+the write side (`assertForkDisposition`, :795-810) enforces closed-token/array/integer checks on
+exactly those fields, and the sibling `readEvent` (:386-398) enforces a canonical-byte-exactness
+check `readForkDisposition` skips entirely. Confirmed a concrete failure mode reading the code
+directly: a non-iterable `acknowledgedEventIds` (e.g. `null`) throws a raw uncaught `TypeError` at
+`Object.freeze([...record.acknowledgedEventIds])` instead of failing closed with a `GES-*` code —
+breaking the module's own "every failure carries `.code`" contract every other function, and every
+existing test, relies on. This is the only durable evidence K-AC-05's governed disposition
+produces; an unvalidated read path undermines the tamper-evidence property the whole mechanism
+exists for.
+
+Dispatched **WP-K-AC05-rework3**: extend `readForkDisposition` to reuse `assertForkDisposition`'s
+existing field checks on read, add the missing canonical-byte-exactness check, fail closed via the
+module's `fail(...)` helper on every path — never a raw exception. Scope confined to the two
+already-known files. This is K-AC-05's third rework; round 4 is the cap, same as the design doc.
+
+### O-1/O-2-DESIGN-REWORK3 VERIFIED (`d0ce4887`) — ROUND-4 (FINAL) CRITIC DISPATCHED ON OPUS
+
+Verified independently (diff read in full, `gateStrengthRuleFor` line citations checked against
+the actual hook file, doc-contracts clean): the false GS-family-protection claim is gone, replaced
+with honest disclosure plus an owned (`pipeline`/PHX-2) residual in §15.1.6; the H-AC-11
+ambiguous/unknown swap is fixed (opposite conditions, no longer both subordinated to one clause);
+the CLI shape is now precisely specified against `governance-authority.mjs`'s actual closed
+`parse(argv)` structure (two new flag-Set entries, one new `main()` branch). Dispatched the
+fourth and final permitted Critic round (full, four-commit enumerated diff
+`01bafdf,3440e5f,d7bf77b,d0ce4887`, zero reference to prior rounds), this time with the Agent
+tool's `model: "opus"` parameter set explicitly (see K-AC-05 Finding 1 above) rather than only
+named in the prompt text. If this round also FAILs, the document is at its cap — Elephant/PO
+escalation, not a fifth rework.
+
+Also cleaned up a stray root-level `dispatch-record.json` left over from the already-committed,
+already-verified WP-O1O2-DESIGN-rework2 (content matched commit `d7bf77b`, nothing new; the
+scratchpad-guard workaround of writing at repo root had just never been swept). And wrote the
+missing `docs/doc-reconciliation.md` entry for everything since the `c23dc80a` candidate through
+this checkpoint's `d0ce4887` — ADR-0012/ADR-0045, both checked, no change needed; verified clean
+via `check-doc-reconciliation.mjs` against record commit `aa1b950e`.
+
+**Live now:** WP-K-AC05-rework3 and the O-1/O-2-design round-4 (final, Opus-routed) Critic —
+running concurrently, no file overlap. Handover fully current through this checkpoint and
+`doc-reconciliation.md`; safe to compact at any point.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
