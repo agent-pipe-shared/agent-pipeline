@@ -1918,11 +1918,23 @@ about method, not consent. So the run ends at a green gate with a signed push as
 remaining act.
 
 **One wrinkle the first real use exposed, recorded so the next session does not rediscover
-it.** `docs/state.md` is governed by ADR-0012, so every handover update re-implicates that
-ADR and needs its own record entry. The sequence converges only because the final commit —
-the record itself — touches nothing governed. That is the write-order rule working as
-designed, but it means the record entry is genuinely the last act before a push, not a step
-that can be done early and left.
+it — and one wrong sentence of mine about it, corrected here.** `docs/state.md` is governed
+by ADR-0012, so every handover update moves the candidate and needs its own record entry.
+
+I first wrote that the sequence *converges because the final commit touches nothing
+governed*. **That is wrong**, and it is worth correcting rather than quietly fixing, because
+the wrong version would mislead exactly the person who relies on it. The implicated set is
+computed over the whole range `base..candidate`, not over the last commit — so a governed
+path that changed anywhere in the range keeps implicating its ADR no matter what the tip
+touches. There is no convergence. Adding a record entry for the record commit would need
+another record entry, forever.
+
+What actually bounds it is the write-order rule the record file states: **the check is run
+with `--candidate` set to the tip of the substantive work, and the record commit sits
+deliberately outside the reconciled range.** The authoritative reconciliation for this run
+is therefore `8dcb1cc..<substantive tip>`, and the push carries one further commit that
+touches only `docs/doc-reconciliation.md`. Both range arguments are required precisely so
+that this boundary is stated rather than assumed.
 
 ### THE DOCUMENTATION-RECONCILIATION LAYER IS BUILT, AND IT FOUND SOMETHING ON ITS FIRST REAL RUN
 
