@@ -787,34 +787,97 @@ test("GRAMMARHINT-1 AC-1: the rejected element is named from what the parser alr
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
-test("GRAMMARHINT-1 AC-2: a git commit -m value with an embedded newline gets a real -F retryAction", () => {
+test("GRAMMARHINT-1 AC-2 / AC-047-140: a git commit -m value with an embedded newline yields no typed action", () => {
   const path = root();
   try {
     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
     const command = 'git commit -m "line one\n\nline two"';
-    const expected = [{
-      executable: "git", argv: ["commit", "-F", "<message-file>"], mutation: true,
-      requiresConfirmation: false, executionBoundary: "separate-tool-call", expected: { exitCodes: [0] },
-    }];
-    assert.deepEqual(retryActionsForDeniedCommand(command, path), expected);
+    // GUARDFIX-2: this test used to require a `git commit -F` action carrying mutation:true.
+    // The expectation was itself the defect -- AC-047-140 admits only independently admitted
+    // read-only diagnostics into the envelope. The remediation did not disappear; it moved to
+    // the message text, pinned by the GUARDFIX-2 test below. What AC-2 still pins here is that
+    // a quoted newline is normalized into nothing runnable at all.
+    assert.deepEqual(retryActionsForDeniedCommand(command, path), []);
     const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: path });
     assert.equal(result.exitCode, 2);
     const envelopeLine = result.stderr.split("\n").find((line) => line.startsWith('{"schema":"pipeline.guard-retry-actions.v1"'));
     assert.ok(envelopeLine);
-    assert.deepEqual(JSON.parse(envelopeLine).retryActions, expected);
+    assert.deepEqual(JSON.parse(envelopeLine).retryActions, []);
 
-    // --message spelling and a bare trailing newline (no second line) both still match; an
-    // ordinary single-line -m commit (no control character at all) is untouched, and an
-    // ordinary multi-part denied command keeps returning [] exactly as before this change.
-    assert.deepEqual(
-      retryActionsForDeniedCommand('git commit --message "one\ntwo"', path),
-      expected,
-    );
+    // The --message spelling reaches the same remediation (the AC-2 coverage that used to
+    // ride on the action's shape now rides on the text, where it can still fail).
+    const spelling = evaluateLifecycleReadyGuard(bash('git commit --message "one\ntwo"'), { projectDir: path });
+    assert.equal(spelling.exitCode, 2);
+    assert.match(spelling.stderr, /git commit -F <msgfile> -- <paths>/u);
+    assert.deepEqual(retryActionsForDeniedCommand('git commit --message "one\ntwo"', path), []);
+
+    // An ordinary single-line -m commit carries no control character, so it is neither denied
+    // for this reason nor given the remediation, and an ordinary multi-part denied command
+    // keeps returning [] exactly as before this change.
+    const singleLine = evaluateLifecycleReadyGuard(bash("git commit -m fixture -- a.md"), { projectDir: path });
+    assert.doesNotMatch(String(singleLine.stderr ?? ""), /Remediation:/u);
     assert.deepEqual(retryActionsForDeniedCommand("git commit -m fixture", path), []);
     assert.deepEqual(
       retryActionsForDeniedCommand("sed -n '1,10p' one.txt ; touch changed.txt", path),
       [],
     );
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * GUARDFIX-2: AC-047-140 admits a `pipeline.guard-retry-actions.v1` envelope "only when every
+ * returned action is a separate-tool-call, independently admitted read-only diagnostic", and
+ * sprint-nova-epic repeats it -- normalized retries "only when every resulting line is
+ * independently an admitted, read-only, single command". `git commit -F` is a mutation and is
+ * not admitted by the closed grammar, so it can never be an action in that envelope; it is not
+ * a borderline case but the exact thing the sentence excludes. The envelope's only in-repo
+ * consumer agrees: denialRetryActions() (lib/human-guard-override.mjs) drops every action whose
+ * `mutation` is not `false`, so the action could never have been executed through that path
+ * either -- it could only mislead a reader of the raw denial text.
+ *
+ * The help itself is not the problem and is not withdrawn: it moves into the human-readable
+ * message, where a mutating remediation belongs and where no schema promises it is read-only.
+ */
+test("GUARDFIX-2: the newline-in--m refusal carries no mutating action, and states the -F shape as text", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const command = 'git commit -m "line one\n\nline two"';
+    const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: path });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /GUARD-PARSE-UNSUPPORTED/u);
+
+    // The envelope is emitted (the schema line is unconditional for grammar denials) and
+    // carries nothing that declares mutation, under any spelling other than exactly false.
+    const envelopeLine = result.stderr.split("\n").find((line) => line.startsWith('{"schema":"pipeline.guard-retry-actions.v1"'));
+    assert.ok(envelopeLine, "a grammar denial still prints the typed envelope");
+    const actions = JSON.parse(envelopeLine).retryActions;
+    assert.deepEqual(actions.filter((action) => action?.mutation !== false), []);
+    assert.deepEqual(retryActionsForDeniedCommand(command, path), []);
+    assert.deepEqual(retryActionsForDeniedCommand('git commit --message "one\ntwo"', path), []);
+
+    // Every surviving action would also pass the consumer's own filter -- the producer and the
+    // only consumer of this schema now agree instead of one silently discarding the other's work.
+    for (const action of actions) {
+      assert.equal(action.mutation, false);
+      assert.equal(action.requiresConfirmation, false);
+    }
+
+    // The remediation survives as message text, in the exact shape agent-obligations.md SS6
+    // requires: pathspec on both calls, the same paths in each, never a bare commit.
+    assert.match(result.stderr, /git add -- <paths>/u);
+    assert.match(result.stderr, /git commit -F <msgfile> -- <paths>/u);
+
+    // ...and the printed guarantee about the envelope is true again (guardrails/git.md: a gate
+    // states what it actually enforces). "typed" was the weakening that let a mutation in.
+    assert.match(result.stderr, /run only those exact read-only actions as separate tool calls/u);
+    assert.doesNotMatch(result.stderr, /exact typed actions/u);
+
+    // A grammar denial with no commit-message cause must not acquire the commit remediation.
+    const composed = evaluateLifecycleReadyGuard(bash("rg -n lifecycle . && touch output.txt"), { projectDir: path });
+    assert.equal(composed.exitCode, 2);
+    assert.doesNotMatch(composed.stderr, /git commit -F/u);
+    assert.match(composed.stderr, /run only those exact read-only actions as separate tool calls/u);
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 

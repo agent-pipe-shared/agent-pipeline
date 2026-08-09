@@ -201,6 +201,7 @@ function rejectedGrammarElement(code, command, parsed) {
 
 function blocked(
   code = "GUARD-LIFECYCLE-NOT-READY", lifecycleStatus = null, retryActions = [], overrideGuidance = "", rejectedElement = null,
+  remediation = null,
 ) {
   const typedLifecycleStatus = code === "GUARD-LIFECYCLE-NOT-READY"
     && CONTROLLING_NON_READY_STATUSES.has(lifecycleStatus)
@@ -217,9 +218,10 @@ function blocked(
       "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
         + `${code}: ${grammarReason}\n`
         + (rejectedElement ? `Rejected element: ${rejectedElement}.\n` : "")
+        + (remediation ? `${remediation}\n` : "")
         + "Use one simple shell command per tool call; issue independent read-only commands as separate parallel tool calls.\n"
         + "Do not construct a new composed command with &&, ;, pipelines, redirects, or line continuation.\n"
-        + "If typed retryActions are present, run only those exact typed actions as separate tool calls.\n"
+        + "If typed retryActions are present, run only those exact read-only actions as separate tool calls.\n"
         + "Only bounded rg-to-rg and rg-to-head diagnostic pipelines are admitted as exceptions.\n"
         + `${JSON.stringify(retryEnvelope)}\n`
         + overrideGuidance,
@@ -803,45 +805,52 @@ export function isReadOnlyDiagnosticCommand(command, root) {
 }
 
 /**
- * GRAMMARHINT-1 AC-2: the one GUARD-PARSE-UNSUPPORTED shape with a fixed, safe, universally
- * available remediation -- a `git commit ... -m <value>` (or `--message`) whose message text
- * carries a literal newline or carriage return, which the closed grammar can never admit
- * (control characters are refused unconditionally, parseGuardCommand()'s first line, before
- * any tokenization runs). The fix does not depend on the message content: write it to a
- * file, then `git commit -F <file>`.
+ * GRAMMARHINT-1 AC-2 / GUARDFIX-2: the one GUARD-PARSE-UNSUPPORTED shape with a fixed, safe,
+ * universally available remediation -- a `git commit ... -m <value>` (or `--message`) whose
+ * message text carries a literal newline or carriage return, which the closed grammar can
+ * never admit (control characters are refused unconditionally, parseGuardCommand()'s first
+ * line, before any tokenization runs). The fix does not depend on the message content: write
+ * it to a file, then `git commit -F <file>`.
+ *
+ * It is delivered as MESSAGE TEXT, never as a typed retryAction. AC-047-140 admits an entry
+ * into `pipeline.guard-retry-actions.v1` only when "every returned action is a
+ * separate-tool-call, independently admitted read-only diagnostic", and `git commit -F` is a
+ * mutation the closed grammar does not admit on its own -- not a borderline case but exactly
+ * what that sentence excludes. Shipping it as an action also put the producer at odds with the
+ * envelope's only in-repo consumer: denialRetryActions() (lib/human-guard-override.mjs) drops
+ * every action whose `mutation` is not `false`, so it could never be executed through that
+ * path either. Prose carries no such contract -- it can name a mutating fix without claiming
+ * the envelope's read-only guarantee for it, which is why the help survives here undiminished.
  *
  * Detected narrowly, by raw text, never by re-parsing the command into the closed grammar:
  * "git commit" at the start, an -m/--message flag present, and a literal newline/CR
- * somewhere in the command. A false negative here only means no retryAction is offered (same
- * as today, never worse); it can never offer a wrong one, and offering it never changes what
- * the grammar admits (AC-3) -- retryActions are advisory text only, never auto-executed.
- * Deliberately narrow: `git -C <dir> commit` and other prefixed invocations are not matched
- * (reported as a known limitation, not silently claimed as covered).
+ * somewhere in the command. A false negative here only means no remediation line is printed
+ * (never worse than the silence that preceded it); it can never print a wrong one, and
+ * printing it never changes what the grammar admits (AC-3) -- the verdict is untouched, only
+ * better explained. Deliberately narrow: `git -C <dir> commit` and other prefixed invocations
+ * are not matched (reported as a known limitation, not silently claimed as covered).
  */
-function commitMessageFileRetryAction(command) {
+function commitMessageFileRemediation(command) {
   if (typeof command !== "string") return null;
   if (!/^\s*git\s+commit\b/u.test(command)) return null;
   if (!/(?:^|\s)-m(?:[\s"'=]|$)|(?:^|\s)--message\b/u.test(command)) return null;
   if (!/[\r\n]/u.test(command)) return null;
-  return {
-    executable: "git",
-    argv: ["commit", "-F", "<message-file>"],
-    mutation: true,
-    requiresConfirmation: false,
-    executionBoundary: "separate-tool-call",
-    expected: { exitCodes: [0] },
-  };
+  return "Remediation: a commit message carrying a newline cannot be passed on the command line. "
+    + "Write the message to a file, then run \"git add -- <paths>\" and "
+    + "\"git commit -F <msgfile> -- <paths>\" as two separate tool calls, naming the same exact paths in both.";
 }
 
 /**
  * Recover only independent semicolon- or physical-newline-separated
  * diagnostics. This is a correction hint, never an execution bypass: each
  * returned argv must pass the same closed single-command read-only policy on
- * its own. Quoted and escaped newlines are deliberately not normalized.
+ * its own. Quoted and escaped newlines are deliberately not normalized -- a
+ * newline inside quotes (the `git commit -m` case above) yields no action at
+ * all, and its remediation is printed as message text instead. No caller may
+ * add an entry past the per-part policy below: the returned list is the whole
+ * envelope, and every element of it has passed that policy.
  */
 export function retryActionsForDeniedCommand(command, root) {
-  const commitFix = commitMessageFileRetryAction(command);
-  if (commitFix) return [commitFix];
   if (typeof command !== "string" || command.trim() === ""
     || /[\0`]/u.test(command) || /\$\s*\(/u.test(command)) return [];
   const parts = [];
@@ -1693,6 +1702,7 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
           retryActionsForDeniedCommand(input.tool_input.command, root),
           route.overrideGuidance,
           rejectedGrammarElement(code, input.tool_input.command, parsed),
+          commitMessageFileRemediation(input.tool_input.command),
         ));
       }
       lifts.push(route.admitted);
