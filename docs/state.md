@@ -2093,6 +2093,44 @@ remains the PO's act and nothing here changes that. The `TP-3,TP-5` window for `
 staged, independently-verified cases is still the epic's single nearest hard gate — unopened,
 because it is the PO's act, not something a checkpoint can move forward.
 
+### WP-C AND WP-A LANDED, WP-R IN FLIGHT: 85 OF 157 IMPLEMENTED (2026-08-09)
+
+`PHX-WP-C` (`2a25520`) pinned C-AC-02 (standard as a distinct changeClass paired with mandatory
+authority), C-AC-07 (emergency authority stays bounded to its exact scope), and C-AC-12 (the
+distinct "external-unavailable" gate reason), each break-proofed. C-AC-09 was investigated by
+repo-wide search and found fully absent — no resolver over multiple candidate change-control
+profiles exists anywhere in the module or its CLI — so no test was written; verdict moves
+`partial` → `not-started`. **None of the four move to `implemented`**: every residual gap
+(anti-class-shopping check, changeClass-gated retrospective evidence, advisory-mode reason code,
+the resolver itself) is capability-level, not a missing assertion, so all four reclassify from
+Class A to Class B in the closure design — the same bar already applied to L-AC-04/X-AC-14.
+Independently verified before the delta (`e835464`) was trusted: 10/10 `change-control-core-tests`
+pass standalone, diff touches exactly the one test file, sanitization clean. Totals stay at 84 of
+157 implemented (no criterion moved into that bucket); issue #24 stays 8/12 carried.
+
+**`PHX-WP-A`'s first completion notification truncated mid-sentence** ("Now let's re-run the
+final suite once more...") with `plugins/pipeline-core/lib/agent-decision-journal.test.mjs`
+modified but uncommitted — the fourth such incident this session (`WP-GATE`, `WP-L`, now `WP-A`).
+Resumed via `SendMessage` per the same pattern as `WP-GATE`; the resume landed cleanly at `055cb8b`.
+**A-AC-02 is fully pinned, not partial**: all five assumption lifecycle transitions accept a
+linked follow-up event, exercised end-to-end with the original proven byte-for-byte unchanged —
+the first criterion this wave to move straight to `implemented` rather than staying partial.
+A-AC-07 reclassifies `partial` → `not-started` and Class A → Class B on the same confirmed-absent
+bar as `C-AC-09`/`K-AC-10`: no per-event-class mandatory-capture concept exists anywhere, five of
+seven named classes aren't even representable as a journal `kind`. A-AC-12/13/14 stay partial,
+not padded — A-AC-14's 8-of-13-scenarios gap is named precisely (7 need only tests, 1 needs a new
+`kind` value). Independently verified before the delta (part of this same commit) was trusted:
+12/12 `agent-decision-journal-tests` pass standalone, diff touches exactly the one test file, the
+three production files the dispatch break-proofed show zero residual diff, sanitization clean.
+84 implemented becomes **85**; issue #31's append-events bullet is now carried.
+
+**`PHX-WP-R` dispatched** (R-AC-02/04/08/09/11/13, `external-command-offer-tests`) to fill the
+second concurrency slot while `WP-A` finished — same pattern, same honesty bar, ruleset SHA
+`ce50d74d16fdbcd0b9f8b3b606297e88af3d2f139b3cd14b692f4ea15599b023` (read from
+`evidence/dispatch-record-phx-wp-c.json` since the ruleset did not change between waves). Not yet
+landed as of this entry; will be independently verified before its delta is trusted, same as every
+prior wave.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
