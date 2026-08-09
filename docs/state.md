@@ -3621,8 +3621,18 @@ originate) or making the checker so conservative it flags every legitimate stage
 Redispatched with this decision stated as already-resolved, not re-open for the Goldfish to
 re-litigate.
 
-**Live now:** O-1/O-2-design round-5 (final) Critic, WP-A-AC08 (redispatched). K-AC-05 parked.
-Handover fully current through this checkpoint.
+With three dispatches already covering the live-thread verification gap and no file conflicts
+against them, researched and dispatched two more: **WP-E-AC04** (governance-export-adapter.mjs —
+policy-driven allow-and-redact for a rationale/summary field, self-contained/zero-import file,
+well-scoped) and **WP-V-AC02** (the evidence-viewer stack — label estimate/assumption/human-
+decision values; explicitly briefed to disclose rather than fabricate if any of the three lacks a
+real underlying model concept to attach to). Confirmed via import-graph check: neither touches any
+of the six files already worked today (`governance-export-outbox.mjs`, `external-command-offer.mjs`,
+`change-control.mjs`, `organization-policy.mjs`, `agent-decision-journal.mjs`,
+`governance-event-store.mjs`).
+
+**Live now:** O-1/O-2-design round-5 (final) Critic, WP-A-AC08 (redispatched), WP-E-AC04,
+WP-V-AC02. K-AC-05 parked. Handover fully current through this checkpoint.
 
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
