@@ -47,6 +47,22 @@ something to do here without review.
 
 ## Entries
 
+## Candidate cbf656f324827c5ad8ac53b17bb7606f3e338a3b — 2026-08-09, range 3387065..cbf656f3, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `d0ce4887` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `aa1b950e` through `cbf656f3`: K-AC-05's third rework and its round-4 (final, Opus-routed)
+Critic FAIL (parked, not reworked further — a blocker plus six majors revealing the disposition
+mechanism needs redesign, not another surgical fix), two new closures (C-AC-09's
+`resolveChangeControlProfile`, R-AC-02's `recordCommandRecoveryDisposition`), their evidence-map
+DELTA bookings, a POINTERS sync for K-AC-05, and the checkpoint recording the PO's AFK/standing-
+autonomy instruction plus the O-1/O-2 5th-round authorization. No code in this range touches the
+canonical artifact topology ADR-0045 governs beyond ordinary content evolution inside files it
+already lists. Same reading as the whole chain: `docs/state.md` stays ADR-0012, the generated
+evidence-map/closure-plan/design-doc set stays ADR-0045.
+
 ## Candidate d0ce48871592c17b74583b1750d11c9a1c0c4b25 — 2026-08-09, range 3387065..d0ce4887, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
