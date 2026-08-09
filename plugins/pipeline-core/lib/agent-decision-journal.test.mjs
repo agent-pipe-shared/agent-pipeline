@@ -146,7 +146,7 @@ test("A-AC-05 keeps the published identity schema closed and in step with the va
 // a single shallow test per scenario would be possible, which the briefing
 // forbids as padding).
 import { execFileSync } from "node:child_process";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { canonicalSha256, canonicalizeJson, sealGovernanceEvent } from "./governance-event.mjs";
@@ -321,14 +321,10 @@ test("A-AC-13 gives agent-kind submissions the same deterministic interrupted, c
   await assert.rejects(()=>verifyPortableGovernanceStream({repositoryRoot:root,repositoryFingerprint:fingerprint,streamId:"agent"}),(error)=>error instanceof GovernanceEventStoreError&&error.code==="GES-CHAIN","A-AC-13: an out-of-order agent-kind canonical file must fail closed rather than being silently accepted into history");
 });
 
-// PHX-WP-A2 pins six of the seven remaining zero-coverage A-AC-14 named
+// PHX-WP-A2 pins seven of the seven remaining zero-coverage A-AC-14 named
 // scenarios (excluding "decomposition", confirmed not representable: no
 // "decomposition" value exists in `kind`, `state`, or any command-offer
-// enum anywhere in agent-decision-journal.mjs). "tampering" also stays
-// gapped here: pinning it correctly requires confirming exactly which
-// digest fields the store recomputes on read, which is store-generic
-// verification machinery out of this file's budget, not a schema-shape
-// question the other six scenarios below are. unverified-assumptions,
+// enum anywhere in agent-decision-journal.mjs). unverified-assumptions,
 // later-confirmation, contradiction, candidate-invalidation and
 // route-selection remain thinly covered by the generic A-AC-02/A-AC-11
 // tests above and are deliberately not duplicated here.
@@ -364,6 +360,20 @@ test("A-AC-14 missing-journal-availability is a representable, distinctly named 
   assert.equal(unavailableAssumption.assumptionState,"unavailable");
   const unavailableOffer=validateCommandOfferEvent(offer({state:"unavailable",executionAssurance:"unavailable",offerEventId:"offer-unavailable-source"}));
   assert.equal(unavailableOffer.executionAssurance,"unavailable","A-AC-14: missing journal availability must be representable as its own typed unavailable state, not silently dropped");
+});
+test("A-AC-14 tampering is a representable, distinctly named scenario",async(t)=>{
+  const{root,fingerprint,capturePolicyDigest}=await agentFixtureRoot();
+  t.after(()=>rm(root,{recursive:true,force:true}));
+  const payload=validateAgentDecisionEvent({eventId:"agent-tamper-1",kind:"selection",state:"declared",reasonCode:"ROUTE_SELECTED",candidateDigest:canonicalSha256(AGENT_CANDIDATE),relatedHumanDecisionId:null,supersedesEventId:null});
+  const intent=agentIntent({fingerprint,capturePolicyDigest,eventId:"agent-event-tamper-1",idempotencyKey:"agent-idem-tamper-1",eventType:"agent.selection",payload});
+  const receipt=await appendPortableGovernanceEvent({repositoryRoot:root,repositoryFingerprint:fingerprint,intent});
+  assert.equal(receipt.outcome,"appended","A-AC-14: tampering must be proven against a validly written event, not a file that was never appended");
+  const eventFile=path.join(root,receipt.eventPath);
+  const stored=JSON.parse(await readFile(eventFile,"utf8"));
+  const tampered={...stored,payload:{...stored.payload,reasonCode:"ROUTE_RESELECTED"}};
+  await writeFile(eventFile,`${canonicalizeJson(tampered)}\n`);
+  await assert.rejects(()=>verifyPortableGovernanceStream({repositoryRoot:root,repositoryFingerprint:fingerprint,streamId:"agent"}),(error)=>error instanceof GovernanceEventStoreError&&error.code==="GES-EVENT-INVALID","A-AC-14: a payload altered after a successful append must be detected on verify, never silently accepted into history");
+  await assert.rejects(()=>queryPortableGovernanceStream({repositoryRoot:root,repositoryFingerprint:fingerprint,streamId:"agent"}),(error)=>error instanceof GovernanceEventStoreError&&error.code==="GES-EVENT-INVALID","A-AC-14: a payload altered after a successful append must be detected on query, never silently accepted into history");
 });
 
 // H-AC-08 gives the journal a third, independent event kind: a pre-Phoenix or
