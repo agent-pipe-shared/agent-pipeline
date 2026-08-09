@@ -2942,6 +2942,57 @@ privacy tradeoffs (O-1) and direct modification of the synchronous guard-hook cr
 That design work is the immediate next step, continuing in this same session under the PO's
 explicit "no time pressure, implement it thoroughly" instruction — not deferred, not rushed.
 
+### FOUR PARALLEL DISPATCHES LIVE — WIDENING BEYOND THE SELF-IMPOSED CAP OF TWO
+
+After the O-1/O-2/O-4 checkpoint (`63e819a`), two dispatches were already running:
+WP-O1O2-DESIGN (extends `design/gmw-hgo-evidence-intake-into-the-human-ledger.md` §15
+with O-1's identity-field schema and O-2's synchronous guard-hook read spec) and
+WP-K-AC05 (adds `inspectForkedGovernanceStream`/`appendGovernanceForkDisposition` to
+`governance-event-store.mjs`). The PO's "du machst aber nichts mehr parallel das ist
+schlecht" plus "viel dispatchen damit der elephant nicht immer voll läuft" reopened a
+question worth checking rather than assuming: is 2 concurrent Goldfish dispatches an
+actual system limit, or a self-imposed one? `guardrails/git.md` answers it directly —
+the WIP cap is on open blocks/worktrees (calibration `wipLimit`, base default 3), "not a
+cap on parallel Goldfish dispatch within one already-open block, which stays ungated as
+long as files/state don't conflict." The 2-slot rule this session had been running under
+was never written anywhere; it was an Elephant-invented ceiling.
+
+Corrected: found two more well-scoped, file-disjoint, additive gaps from the evidence map
+and dispatched both immediately, no PO check needed (method/sequencing is the Elephant's
+call per `[[decide-dont-ask]]`) —
+
+- **WP-R-AC10** (`external-command-offer.mjs` + its test): R-AC-10's second half — "policy
+  may define a typed non-material exception that still never claims execution" — has no
+  code today; journaling-unavailable always throws `ECO-APPEND`. Briefed to add an
+  exception path usable only for `sideEffectClass: "non-authoritative"` offers, structurally
+  incapable of returning anything a caller could mistake for a completed-execution receipt.
+- **WP-C-AC12** (`change-control.mjs` + its test): the schema currently *couples*
+  `mandatory` to `changeClass === "not-required"` — there is no way to be "ITSM review
+  wanted, but non-blocking if ITSM is down" (advisory) as distinct from "no review
+  required at all." `evaluateChangeControlGate` short-circuits past ITSM availability
+  entirely whenever `mandatory` is false. Briefed to add an orthogonal advisory/mandatory
+  distinction, modelled on the file's own existing `reconciliation-required` precedent,
+  with the three existing gate behaviors proven byte-for-byte unchanged.
+
+Considered and explicitly NOT dispatched as a fifth: **E-AC-04** (free-form
+rationale/summary export-redaction path). Traced the gap one level deeper than the
+evidence map's own note: `EXPORT_FIELDS`/`FIELDS` in `governance-export-adapter.mjs` and
+`governance-event-projection.mjs` are closed sets with no `rationale`/`summary` member at
+all, and a repo-wide grep confirms no governance event anywhere (`human-governance-
+decision.mjs`, `governance-event-store.mjs`, `change-control.mjs`,
+`agent-decision-journal.mjs`) carries such a field yet. Closing E-AC-04 for real means
+first deciding whether/how a rationale field should exist on the canonical governance
+event shape at all — a schema question upstream of export policy, not a redaction-policy
+question — and any first cut would edit `governance-event-store.mjs`, which WP-K-AC05 has
+open right now. Deferred on its own merits (real design decision + live file conflict),
+not on time.
+
+Four dispatches now running: WP-O1O2-DESIGN, WP-K-AC05, WP-R-AC10, WP-C-AC12. None share a
+touched file. Verification queue (git show --stat, git status, `node --test` run locally,
+diff read) applies to each independently as it returns; WP-K-AC05 additionally needs an
+independent Critic review before being booked closed (CLAUDE.md self-application: it
+touches the tamper-evidence core, not an additive schema-only change).
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
