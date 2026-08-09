@@ -3248,6 +3248,25 @@ Four dispatches now live: two round-2 Critics (K-AC-05, O-1/O-2-design), nothing
 dispatch currently open, so the next new candidate can be picked as soon as review capacity allows without
 waiting on these two (they touch no shared file with anything new).
 
+### WP-P-AC11 DISPATCHED WHILE BOTH ROUND-2 CRITICS RUN
+
+Deliberately picked a narrow-scope, low-risk candidate rather than forcing a full closure of a
+large criterion: P-AC-11 lists seven sub-concepts (document class, target class/binding, mode,
+owned fields/sections, lifecycle event, preview, approval, retention, conflict policy, revision
+readback); only class/mode/approval are representable today. Rather than one oversized dispatch
+attempting all seven — the pattern that produced this session's two FAILs was giving a dispatch
+too much surface with too little precision — scoped **WP-P-AC11** to exactly two:
+**target class/binding** (a new closed, provider-neutral descriptor) and **revision readback**
+(which pack/revision contributed an effective document-class entry when multiple packs merge).
+Stays `partial` in the evidence map either way — narrowing the gap, not claiming closure — and
+explicitly required to decide and document a merge-conflict rule for both new fields against the
+file's own two existing precedents (mode's never-merge-fails-closed vs. approval's safe-OR-merge).
+The other five sub-concepts (owned fields/sections, lifecycle event, preview, retention, conflict
+policy) are explicitly out of scope, left for a later dispatch.
+
+Three dispatches now live: two round-2 Critics (K-AC-05, O-1/O-2-design) and WP-P-AC11 —
+`organization-policy.mjs`, touched by nothing else in flight.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
