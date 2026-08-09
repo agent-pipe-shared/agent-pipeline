@@ -3078,6 +3078,31 @@ amendment), both `claude-opus-5 at max` requested route, functional-equivalent r
 lane, running in parallel with each other and with WP-R-AC10's resumption. No PO gate
 reached; continuing per the "no time pressure, implement it thoroughly" standing instruction.
 
+### TWO MORE DISPATCHED WHILE THE TWO CRITICS RUN — WP-E-AC09, WP-C-AC07
+
+No code dispatch was left open (WP-C-AC12/WP-R-AC10 closed and verified; the two Critic
+reviews on WP-K-AC05/WP-O1O2-DESIGN are read-only, no file conflict), so rather than idle
+while those return, picked two more well-scoped, file-disjoint gaps from the evidence map:
+
+- **WP-E-AC09** (`governance-export-adapter.mjs`, `governance-event-projection.mjs`,
+  `governance-export-delivery.mjs` + their tests): no "advisory destination" concept exists
+  anywhere in the export scope today — the acceptance criterion's "expose lag/failure while
+  allowing canonical local governance to continue" has nothing to attach to. Briefed with
+  design latitude on which of the three closed-schema files carries the new classification,
+  plus an explicit requirement to prove architecturally (dedicated test, not just absence-of-
+  coupling assertion) that `governance-event-store.mjs`'s canonical functions take no
+  destination-health input at all.
+- **WP-C-AC07** (`change-control.mjs` + its test, now safe to reopen — WP-C-AC12 already
+  closed): explicit emergency authority and bounded-scope rejection are already pinned;
+  retrospective evidence that the emergency was real or reviewed is not — `journalBinding`
+  doesn't even carry `changeClass` today, so nothing can gate on it. Briefed to require a
+  distinct, necessarily-after-the-fact evidence marker before an emergency-class deployment
+  can report `"completed"`, composing with (not bypassing) the existing C-AC-05/C-AC-06
+  ordering rules, with non-emergency classes proven unaffected.
+
+Four dispatches now live: two Critics (K-AC-05, O-1/O-2-design §15) and two Goldfish
+(E-AC-09, C-AC-07). Verification queue applies to each as it returns.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
