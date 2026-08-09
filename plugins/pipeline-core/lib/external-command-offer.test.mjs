@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import test from "node:test";
-import { recordCommandOffer, recordPipelineAttempt, recordCommandOutcome, acknowledgeNonMaterialOfferWithoutJournal } from "./external-command-offer.mjs";
+import { recordCommandOffer, recordPipelineAttempt, recordCommandOutcome, acknowledgeNonMaterialOfferWithoutJournal, recordCommandRecoveryDisposition } from "./external-command-offer.mjs";
 
 const SHA = (character) => character.repeat(64);
 function event(overrides = {}) { return { eventId: "offer-1", kind: "command-offer", state: "offered", reasonCode: "EXTERNAL_OPERATION_OFFERED", candidateDigest: SHA("a"), relatedHumanDecisionId: null, supersedesEventId: null, offerOrigin: "pipeline-initiated", operation: { operationClass: "governed-repair", version: "v1", governedArtifactSha256: SHA("b") }, target: { repositoryFingerprint: SHA("c"), scopeDigest: SHA("d") }, sideEffectClass: "non-authoritative", authorityRequirement: "not-required", policyDigest: SHA("e"), redactionPolicyDigest: SHA("f"), executionAssurance: "not-applicable", omissions: ["raw-command", "arguments", "private-coordinates", "unrestricted-output"], offerEventId: null, preEvidenceDigest: null, postEvidenceDigest: null, recoverability: "not-applicable", ...overrides }; }
@@ -47,6 +47,35 @@ test("R-AC-02: a considered recovery (recovery-proposed/recovered) has no correl
   await assert.rejects(recordCommandOutcome({ offer: event(), outcome: proposed, append }), (error) => error.code === "ECO-OUTCOME");
   const recovered = follow("recovered", { executionAssurance: "not-applicable" });
   await assert.rejects(recordCommandOutcome({ offer: event(), outcome: recovered, append }), (error) => error.code === "ECO-OUTCOME");
+});
+
+test("R-AC-02: recordCommandRecoveryDisposition correlates a considered recovery-proposed alternative to the existing offer, carrying its typed rejection reason", async () => {
+  const proposed = follow("recovery-proposed", { eventId: "recovery-proposed-1", executionAssurance: "not-applicable", reasonCode: "SANCTIONED_PATH_REJECTED_POLICY_DENIED", candidateDigest: SHA("1") });
+  const receipt = await recordCommandRecoveryDisposition({ anchor: event(), recovery: proposed, append });
+  assert.equal(receipt.status, "recovery-proposed");
+  assert.equal(receipt.offerEventId, "offer-1");
+  assert.equal(receipt.candidateDigest, SHA("1"));
+});
+
+test("R-AC-02: recordCommandRecoveryDisposition correlates a recovered selection, chained via supersedesEventId to the chosen recovery-proposed alternative, to the existing offer", async () => {
+  const proposed = follow("recovery-proposed", { eventId: "recovery-proposed-2", executionAssurance: "not-applicable", reasonCode: "SANCTIONED_PATH_REJECTED_EVIDENCE_GAP", candidateDigest: SHA("2") });
+  const proposedReceipt = await recordCommandRecoveryDisposition({ anchor: event(), recovery: proposed, append });
+  assert.equal(proposedReceipt.status, "recovery-proposed");
+  const recovered = follow("recovered", { eventId: "recovered-1", executionAssurance: "not-applicable", reasonCode: "SANCTIONED_PATH_REJECTED_EVIDENCE_GAP", candidateDigest: SHA("2"), supersedesEventId: proposedReceipt.eventId });
+  const receipt = await recordCommandRecoveryDisposition({ anchor: event(), recovery: recovered, append });
+  assert.equal(receipt.status, "recovered");
+  assert.equal(receipt.offerEventId, "offer-1");
+  assert.equal(recovered.supersedesEventId, proposedReceipt.eventId);
+});
+
+test("R-AC-02: recordCommandRecoveryDisposition fails closed on an undocumented evidence gap, cross-scope substitution, and a mismatched anchor state", async () => {
+  const withEvidence = follow("recovery-proposed", { executionAssurance: "not-applicable", preEvidenceDigest: SHA("3") });
+  await assert.rejects(recordCommandRecoveryDisposition({ anchor: event(), recovery: withEvidence, append }), (error) => error.code === "ECO-RECOVERY-EVIDENCE-GAP");
+  const crossScope = follow("recovery-proposed", { executionAssurance: "not-applicable", target: { repositoryFingerprint: SHA("c"), scopeDigest: SHA("0") } });
+  await assert.rejects(recordCommandRecoveryDisposition({ anchor: event(), recovery: crossScope, append }), (error) => error.code === "ECO-RECOVERY-LINK");
+  const attemptedAnchor = follow("attempted");
+  const proposed = follow("recovery-proposed", { executionAssurance: "not-applicable" });
+  await assert.rejects(recordCommandRecoveryDisposition({ anchor: attemptedAnchor, recovery: proposed, append }), (error) => error.code === "ECO-RECOVERY-ANCHOR");
 });
 
 test("R-AC-04: binds operation class, target, exact pre/post evidence digests, and recoverability together on a state-mutating outcome; rejects malformed digests or an unrecognized recoverability value", async () => {
