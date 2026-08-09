@@ -588,7 +588,7 @@ const POINTERS = {
   'H-AC-06': 'human-governance-ledger-tests: append-only consumption disposition; restricted-store erasure pinned separately',
   'H-AC-07': 'human-governance-ledger-tests: cross-repository decision rejected before mutation',
   'H-AC-08': 'NO CARRIER: no path imports a legacy approval/override/deploy record as an unverified observation',
-  'H-AC-09': 'NO CARRIER: external-push-ledger is scoped to single-repo push proofs; nothing binds cross-repository guarded work to one physical target',
+  'H-AC-09': 'NO CARRIER: external-push-ledger is scoped to single-repo push proofs; nothing binds cross-repository guarded work to one physical target. RECLASSIFIED Class S -> Class P 2026-08-09 (PO-confirmed): the clause\'s own subject -- authorizing guarded work IN another repository -- is exactly the capability CLAUDE.md\'s Sprint-0 hard rule currently forbids outright ("Read-only toward the three project repos ... never a write ... until an explicitly approved Phase-4 migration"). There is no design to scope: building a cross-repository binding mechanism for a write capability this repo is not yet authorized to exercise would be building ahead of its own governing policy, not closing a gap. Closes only if/when a Phase-4 migration lifts the restriction, or the PO narrows the clause\'s scope by amendment (the same route H-AC-11 already used) -- either way, not a code task available now',
   'H-AC-10': 'five named assertions covering scope, reason, expiry, constraints, follow-up review, no standing bypass',
   'H-AC-11': 'portable reconstruction surface pinned; the no-join-handle clause is proved UNSATISFIABLE for the GMW half (acceptance.md amendment, tracked as O-4)',
   'H-AC-12': 'guard-push/guard-devplan/change-control validate the decision reference; the DUAL-EVALUATION during migration with shared owner and expiry has no carrier',
@@ -751,7 +751,7 @@ const CLOSURE = {
   'K-AC-10': ['build', 'WP-K'],
 
   'H-AC-08': ['seam', 'WP-H'],
-  'H-AC-09': ['seam', 'WP-H'],
+  // H-AC-09 moved to the Class P group below 2026-08-09 (PO-confirmed) -- see its POINTERS entry.
   'H-AC-11': ['po', 'WP-PO'],
   'H-AC-12': ['build', 'WP-H'],
   'H-AC-14': ['doc', 'WP-DOC'],
@@ -822,6 +822,7 @@ const CLOSURE = {
   'R-AC-12': ['build', 'WP-R'],
   'R-AC-13': ['build', 'WP-R'],
 
+  'H-AC-09': ['po', 'WP-PO'],
   'EPIC-AC-01': ['po', 'WP-PO'],
   'EPIC-AC-02': ['build', 'WP-EPIC'],
   'EPIC-AC-03': ['po', 'WP-PO'],

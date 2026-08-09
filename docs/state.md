@@ -2518,6 +2518,30 @@ own `dispatch-record.json` claimed two TAP files that did not exist on disk — 
 P-AC-08's F1 finding earlier tonight; remediated by regenerating the real files before the Critic
 dispatch that needed them, backlog item filed for the template gap that lets this recur).
 
+### H-AC-09 RECLASSIFIED CLASS S → CLASS P: THE SCOPE QUESTION WAS ALREADY ANSWERED BY CLAUDE.md (2026-08-09)
+
+**PO decision, taken while clearing open design questions before an unattended stretch of work**:
+H-AC-09 ("bind cross-repository guarded work to one physical target") is not a scoping task for a
+future session, it is Class P — not closeable by writing code right now. `class-s-scoping.md`'s
+own 2026-08-09 write-up had already framed it as "needs a design decision about what 'one physical
+target' binding looks like when a coordinator repository authorizes work IN another repository" —
+but the clause's own subject, authorizing guarded work in another repository, is exactly the
+capability this repo's own governing rule (CLAUDE.md's Sprint-0 hard rule: "Read-only toward the
+three project repos … never a write … until an explicitly approved Phase-4 migration") currently
+forbids outright. Designing a binding mechanism for a write capability not yet authorized is not
+scoping ahead of implementation, it is building for a permission Sprint-0 policy has not granted —
+the same category error a Class S write-up should never make. Closes only if/when a Phase-4
+migration lifts the restriction, or the PO narrows the clause's own scope by amendment (the route
+H-AC-11 already used for its own unsatisfiable half); neither is available this session.
+
+Applied: `evidence/acceptance-evidence-map.mjs` CLOSURE moved from `['seam', 'WP-H']` to
+`['po', 'WP-PO']`, POINTERS entry extended with the reclassification rationale,
+`class-s-scoping.md`'s H-AC-09 section gets a `RECLASSIFIED` subsection and drops out of the
+future-session suggested order. Verdict itself is unchanged (`not-started`) — this is a closure-
+class correction, not a measurement change, so the 101/157 total does not move. Both generated
+reports (`acceptance-evidence-map-20260809.md`, `closure-plan.md`) regenerated, no `INTEGRITY
+FAILURE` marker in either. Class S count: 4 → 3. Class P count: 5 → 6.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für

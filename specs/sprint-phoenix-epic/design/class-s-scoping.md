@@ -121,6 +121,23 @@ physical target" binding looks like when a coordinator repository authorizes wor
 repository without ever holding that repository's private coordinates locally — a real
 cross-repo trust-boundary design question, not a mechanical extension.
 
+### RECLASSIFIED 2026-08-09 (PO-confirmed): Class S -> Class P, not a design task to scope
+
+The paragraph above framed this as a scoping question — what does "one physical target" binding
+look like. It missed that the clause's own subject already answers a prior question: it is about
+authorizing guarded work *in another repository*, and this repo's own governing rule, CLAUDE.md's
+Sprint-0 hard rule, currently forbids that outright: "Read-only toward the three project repos
+(<PROJECT_A>, <PROJECT_B>, <PROJECT_C>) for the duration of Sprint 0: `git fetch/pull/clone` and
+reading only, never a write — until an explicitly approved Phase-4 migration changes this per
+project." Designing a cross-repository binding mechanism for a write capability this repo is not
+yet authorized to exercise is not scoping ahead of implementation — it is building for a capability
+Sprint-0 policy has not yet unlocked, the same category error a design would be making if it
+speculatively designed around a not-yet-approved future permission. This closes only if/when a
+Phase-4 migration lifts the restriction for the target project, or the PO narrows the clause's own
+scope by amendment (the route H-AC-11 already used for its own unsatisfiable half) — neither is a
+code task available in this session. Reclassified Class S to Class P in
+`evidence/acceptance-evidence-map.mjs`'s CLOSURE map; not pursued further this session.
+
 ## X-AC-11 — smallest scope after A-AC-04, but crosses a package boundary
 
 **Clause:** "WHEN organization policy governs a mandatory document class or external write, THE
@@ -141,5 +158,7 @@ independently and never designed to know about each other.
 2. **X-AC-11** — one new call, no new schema, moderate design latitude.
 3. **A-AC-05** — needs a schema-shape decision first (recommend as its own short design note).
 4. **E-AC-20** — sequence after E-AC-02 closes (shared root cause).
-5. **H-AC-09** — needs a cross-repo trust-boundary design decision.
-6. **H-AC-08** — needs a PO answer to "what counts as a legacy record" before any code.
+5. **H-AC-08** — needs a PO answer to "what counts as a legacy record" before any code.
+
+**H-AC-09** dropped from this order 2026-08-09: reclassified Class P (not closeable by writing code
+under Sprint-0 policy), see its own section above.

@@ -21,9 +21,9 @@ one list is what has made the epic look larger and more uniform than it is.
 |---|---|---|
 | A — assertion missing | 2 | one named test case in an already-registered, unprotected suite |
 | D — documentation missing | 1 | one document section set; no code, no gate |
-| S — seam missing | 4 | a connector between two packages that already work |
+| S — seam missing | 3 | a connector between two packages that already work |
 | B — capability missing | 44 | real implementation plus its tests |
-| P — not code | 5 | a human gate, a sanctioned authority revision, or a proved impossibility |
+| P — not code | 6 | a human gate, a sanctioned authority revision, or a proved impossibility |
 | **total** | **56** | |
 
 **The distribution is the finding.** The largest class by a wide margin is Class A: criteria
@@ -136,12 +136,12 @@ is by module family, which makes the disjointness checkable rather than asserted
 | WP-E | 7 | plugins/pipeline-core/lib/governance-export-*.mjs |
 | WP-A | 9 | plugins/pipeline-core/lib/agent-decision-journal*.mjs, governance/schemas/agent-decision-event.schema.json |
 | WP-L | 3 | plugins/pipeline-core/lib/lifecycle-governance-events*.mjs, plugins/pipeline-core/lib/governance-replay*.mjs |
-| WP-H | 3 | plugins/pipeline-core/lib/human-governance-ledger*.mjs, plugins/pipeline-core/lib/governance-authority-resolver*.mjs, plugins/pipeline-core/lib/external-push-ledger*.mjs |
+| WP-H | 2 | plugins/pipeline-core/lib/human-governance-ledger*.mjs, plugins/pipeline-core/lib/governance-authority-resolver*.mjs, plugins/pipeline-core/lib/external-push-ledger*.mjs |
 | WP-R | 8 | plugins/pipeline-core/lib/external-command-offer*.mjs |
 | WP-PX0 | 4 | plugins/pipeline-core/lib/ruleset-source*.mjs, plugins/pipeline-core/scripts/ruleset-freshness-host.mjs, plugins/pipeline-core/lib/continuity-state.mjs |
 | WP-EPIC | 1 | plugins/pipeline-core/lib/parallel-sprint-integration*.mjs |
 | WP-DOC | 1 | docs/*.md (one section set per package) |
-| WP-PO | 5 | none - human gates and recorded deviations |
+| WP-PO | 6 | none - human gates and recorded deviations |
 
 Concurrency is bounded at **2**, not by preference but by the recorded capacity: the continuity
 block reserves one Critic slot and one recovery slot out of four, and the project calibration
@@ -186,14 +186,13 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 |---|---|---|---|
 | L-AC-08 | partial | WP-DOC | docs/governance-replay.md "Traceability" (PHX-WP-DOC-3): 8 of 9 lifecycle-governance-events.mjs kinds traced to a stated user/audit need; the `cancellation` kind is honestly flagged unclear -- no structural distinction from `status: "cancelled"` exists in the code, so no confident justification could be constructed |
 
-### Class S — two implemented packages, mutually unaware (4)
+### Class S — two implemented packages, mutually unaware (3)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
 | A-AC-05 | not-started | WP-A | NO CARRIER: neither event shape carries a runner/model/effort/profile/role/adapter field at all |
 | E-AC-20 | not-started | WP-E | NO CARRIER: audit-bundle carries nothing from the export package, and the export modules never reference the bundle |
 | H-AC-08 | not-started | WP-H | NO CARRIER: no path imports a legacy approval/override/deploy record as an unverified observation |
-| H-AC-09 | not-started | WP-H | NO CARRIER: external-push-ledger is scoped to single-repo push proofs; nothing binds cross-repository guarded work to one physical target |
 
 ### Class B — an absent capability (44)
 
@@ -244,7 +243,7 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 | V-AC-06 | partial | WP-V | evidence-view-renderer-tests: exact CSP directive value, skip-link keyboard focus target, and landmark/table accessibility structure all pinned (PHX-WP-V, break-proofed). Mobile/desktop snapshot checks remain absent: a viewport meta tag and one CSS breakpoint exist but no test or tooling captures a deterministic snapshot of either, and this repo has no headless-render/visual-regression infrastructure at all |
 | X-AC-14 | partial | WP-X | confirmed absent (PHX-WP-X): neither inspect() call site (external-reference-adapter.mjs:61,72) has a try/catch, so an unreachable external system throws uncaught instead of producing a typed observation -- filed as pipeline.external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system, a production fix not a missing test |
 
-### Class P — not closeable by writing code (5)
+### Class P — not closeable by writing code (6)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
@@ -252,5 +251,6 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 | EPIC-AC-03 | partial | WP-PO | an outstanding deviation is recorded (the bound Spec section 7 inventory omits six implemented modules) and is not yet repaired through the sanctioned route |
 | EPIC-AC-04 | partial | WP-PO | Full Verify and blocking Security pass only on the last PUSHED candidate (`3387065`), not the integrated one measured here (see the gates table below). An independent high-risk Critic on the integrated candidate is no longer absent -- it ran 2026-08-09 and returned FAIL (5 major, 2 minor); privacy review and explicit PO acceptance remain absent |
 | EPIC-AC-05 | constraint | WP-PO | a prohibition, and it currently bites -- see the summary count above for the exact figure; deliberately not hardcoded here after an independent Critic FAIL found this line stale against the generated total more than once (F4, 2026-08-09) |
+| H-AC-09 | not-started | WP-PO | NO CARRIER: external-push-ledger is scoped to single-repo push proofs; nothing binds cross-repository guarded work to one physical target. RECLASSIFIED Class S -> Class P 2026-08-09 (PO-confirmed): the clause's own subject -- authorizing guarded work IN another repository -- is exactly the capability CLAUDE.md's Sprint-0 hard rule currently forbids outright ("Read-only toward the three project repos ... never a write ... until an explicitly approved Phase-4 migration"). There is no design to scope: building a cross-repository binding mechanism for a write capability this repo is not yet authorized to exercise would be building ahead of its own governing policy, not closing a gap. Closes only if/when a Phase-4 migration lifts the restriction, or the PO narrows the clause's scope by amendment (the same route H-AC-11 already used) -- either way, not a code task available now |
 | H-AC-11 | partial | WP-PO | portable reconstruction surface pinned; the no-join-handle clause is proved UNSATISFIABLE for the GMW half (acceptance.md amendment, tracked as O-4) |
 
