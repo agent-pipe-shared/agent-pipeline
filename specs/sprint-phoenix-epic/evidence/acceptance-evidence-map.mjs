@@ -379,6 +379,29 @@ const DELTA = {
   'E-AC-08': ['partial', 'WP-E'],
   'E-AC-09': ['partial', 'WP-E'],
   'E-AC-11': ['partial', 'WP-E'],
+
+  // --- evidence/phx-wp-doc1.txt + phx-wp-doc2.txt (tasks PHX-WP-DOC-1/2,
+  // 2026-08-09, commits f9e300c + 3f09bed) ---
+  // Both dispatches wrote every named missing section grounded in file:line
+  // citations to the code they document, and named known capability gaps
+  // inline (export loss-declaration, external-reference-adapter recovery)
+  // rather than papering over them. C-AC-13, E-AC-21, P-AC-13, and X-AC-15
+  // move to implemented -- independently verified: every section the
+  // criterion's clause enumerates by name is now present, additive-only
+  // diffs, sanitization clean. A-AC-15 and H-AC-14 stay `partial`: A-AC-15's
+  // own briefing (mine) omitted "schema" and "privacy threat model" from
+  // its own enumeration of the eight required sections despite quoting the
+  // full clause correctly just above -- six of eight landed, two did not
+  // because I never asked for them; H-AC-14's four newly-written sections
+  // (migration/retention/recovery/operator-guidance) are solid, but its
+  // claimed-pre-existing "threat model" coverage turned out to be one
+  // scattered sentence in docs/phoenix-governance-threat-model.md:75, not a
+  // dedicated section -- not confirmed complete, left honestly partial
+  // rather than accepted on the baseline note's word.
+  'C-AC-13': ['implemented', 'WP-DOC'],
+  'E-AC-21': ['implemented', 'WP-DOC'],
+  'P-AC-13': ['implemented', 'WP-DOC'],
+  'X-AC-15': ['implemented', 'WP-DOC'],
 };
 
 // --- per-criterion evidence pointer ----------------------------------------
@@ -428,7 +451,7 @@ const POINTERS = {
   'H-AC-11': 'portable reconstruction surface pinned; the no-join-handle clause is proved UNSATISFIABLE for the GMW half (acceptance.md amendment, tracked as O-4)',
   'H-AC-12': 'guard-push/guard-devplan/change-control validate the decision reference; the DUAL-EVALUATION during migration with shared owner and expiry has no carrier',
   'H-AC-13': 'human-governance-ledger-tests + store admission: prohibited content rejected before any temporary file exists',
-  'H-AC-14': 'governance-events.md + po-human-approval.md + threat model exist; no migration, retention or recovery section for the ledger package',
+  'H-AC-14': 'docs/governance-events.md (PHX-WP-DOC-1): migration, retention, recovery and operator-guidance sections added and grounded; schema/taxonomy/authority-trust-model coverage confirmed solid (Portable records / Restricted machine-local records / Authority boundary sections). "Threat model" is NOT confirmed complete: the only located coverage is one sentence in docs/phoenix-governance-threat-model.md:75, not a dedicated section -- stays open rather than accepted on the baseline note alone',
   'H-AC-15': 'human-governance-ledger-tests (PHX-WP-H): all thirteen named scenarios pinned (grant/consumption/expiry/redaction pre-existing; denial/revocation/correction/retry/concurrency/interruption/tampering/stale-candidate/cross-repository-binding new and break-proofed)',
 
   'A-AC-01': 'record shape pinned; nothing enforces recording BEFORE dependent action where policy requires',
@@ -445,7 +468,7 @@ const POINTERS = {
   'A-AC-12': 'agent-decision-journal-tests (PHX-WP-A): downstream export/projection policy (governance-event-projection.mjs) is independently configurable from capture eligibility and structurally cannot weaken it; the restricted-machine-local boundary mapping, "sole read boundary" language, and a literal human-ledger side-by-side remain unaddressed',
   'A-AC-13': 'agent-decision-journal-tests (PHX-WP-A): the duplicate-submission clause is pinned -- exact duplicate is a deterministic idempotent-replay no-write, conflicting duplicate fails closed (GES-IDEMPOTENCY-CONFLICT); concurrent/interrupted/out-of-order for agent-kind events remain covered only by the store\'s generic tests, not newly pinned',
   'A-AC-14': '5 of 13 named conformance scenarios have thin/generic (non-dedicated) coverage, 8 have zero coverage; "decomposition" is not representable in the current `kind` enum at all (PHX-WP-A, not padded)',
-  'A-AC-15': 'agent-decision-journal.md carries one section; no taxonomy, materiality policy, trust model, retention or recovery doc',
+  'A-AC-15': 'docs/agent-decision-journal.md (PHX-WP-DOC-1): taxonomy, materiality policy, trust model, retention, recovery, and operator documentation added and grounded (6 of 8). "Schema" and "privacy threat model" sections remain missing -- an Elephant briefing defect, not a dispatch failure: the briefing quoted the full 8-part clause but its own instruction list only named 6 of the 8 parts',
   'A-AC-16': 'agent-decision-journal-tests: a journal event cannot present as approval',
 
   'L-AC-01': 'the closed lifecycle schema and validator are pinned; NO PRODUCER exists — no Pipeline path emits a lifecycle event',
@@ -469,7 +492,7 @@ const POINTERS = {
   'P-AC-10': 'organization-policy-core-tests + audit-bundle-core-tests: pack-side compliance-claim rejection and signed-bundle no-identity-claim shape both pinned (PHX-WP-P, break-proofed). Log/viewer halves were out of the dispatched carrier scope and remain unevaluated either way',
   'P-AC-11': 'organization-policy-core-tests: mode (closed reference-only/projection/controlled-publication set) and approval (union, no downgrade) pinned (PHX-WP-P, break-proofed). Target class/binding, owned fields/sections, lifecycle event, preview, retention and revision readback remain unpinned: documentClasses is closed to exactly class/mode/approvalRequired, no field exists for the rest',
   'P-AC-12': 'audit-bundle-tests: tampered or missing bundle bytes detected; signature invalidated when the manifest changes',
-  'P-AC-13': 'organization-policy-packs.md and audit-bundles.md are stubs; no migration/versioning policy, no pack threat model',
+  'P-AC-13': 'docs/organization-policy-packs.md + docs/audit-bundles.md (PHX-WP-DOC-2): threat model, pack/schema/activation policy, bundle policy, and compatibility/migration/versioning policy all present and grounded -- the compatibility section honestly states no pack-schema migration mechanism exists (only v1 is accepted; revision is a content digest, not a version number)',
 
   'V-AC-01': 'evidence-view-model-tests: offline report with source links and a candidate-bound receipt',
   'V-AC-02': 'evidence-view-renderer-tests: fact, unknown, unavailable, redacted, invalid and not-applicable each labelled visibly, six of nine (PHX-WP-V, break-proofed). estimate, assumption and human decision remain unpinned: zero occurrences anywhere in the view-model, renderer or CLI modules -- no field carries them at all',
@@ -496,7 +519,7 @@ const POINTERS = {
   'X-AC-12': 'external-reference-adapter-tests: plan->apply->reconcile proven identical across synthetic issue-tracker, knowledge-base, document-store and secondary-forge profiles, and every cross-profile capability mismatch rejected (PHX-WP-X, break-proofed)',
   'X-AC-13': 'external-reference-adapter-tests: defaults to reference-only or projection, never last-write-wins',
   'X-AC-14': 'confirmed absent (PHX-WP-X): neither inspect() call site (external-reference-adapter.mjs:61,72) has a try/catch, so an unreachable external system throws uncaught instead of producing a typed observation -- filed as pipeline.external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system, a production fix not a missing test',
-  'X-AC-15': 'external-traceability.md carries three sections; no threat model, publication guide or recovery procedure',
+  'X-AC-15': 'docs/external-traceability.md (PHX-WP-DOC-2): threat model, ownership/lifecycle mapping, publication guide, recovery procedure, and conformance suite added and grounded; the recovery procedure names the adapter\'s uncaught-inspect()-rejection gap and its backlog item explicitly rather than describing a graceful path that does not exist',
 
   'C-AC-01': 'change-control-tests: profile validation plus the exact bound tuple for mandatory promotion',
   'C-AC-02': 'change-control-tests (PHX-WP-C, break-proofed): "standard" is pinned as a distinct changeClass paired with mandatory authority, alongside emergency and not-required; the required-field-level distinction between standard and normal, and any anti-class-shopping check, remain absent -- validateChangeControlProfile requires the identical fixed key set for every class',
@@ -510,7 +533,7 @@ const POINTERS = {
   'C-AC-10': 'change-control-tests: an automatically created external record stays draft or observation',
   'C-AC-11': 'change-control-tests: provider names and fields kept out of the provider-neutral core schema',
   'C-AC-12': 'change-control-tests (PHX-WP-C, break-proofed): unavailable external state blocks via C-AC-04, and the distinct "external-unavailable" gate reason is now pinned by name; the explicit advisory-vs-mandatory policy distinction remains absent -- mandatory:false is only representable together with changeClass:"not-required", which short-circuits before ITSM availability is ever inspected',
-  'C-AC-13': 'change-control.md is a stub; no threat model, precedence, migration, runbook or rollback procedure',
+  'C-AC-13': 'docs/change-control.md (PHX-WP-DOC-1): threat model, policy precedence, migration, operator runbook, and failure/rollback/recovery procedures all present and grounded in change-control.mjs; migration section honestly states no migration tooling exists',
 
   'E-AC-01': 'governance-export-adapter-tests: one validated source mapped deterministically with stable identity',
   'E-AC-02': 'CONFIRMED ABSENT (PHX-WP-E): deterministic mapping is pinned (pre-existing); mapGovernanceExportProjection always returns loss:freeze([]) even though rfc5424() drops eventId/correlation/candidate/repositoryFingerprint/eventDigest/policyDigest -- governance-export-adapter.mjs:85,98, no lossy conversion is ever declared',
@@ -532,7 +555,7 @@ const POINTERS = {
   'E-AC-18': 'governance-export-adapter-tests: destination secrets excluded from every portable export record',
   'E-AC-19': 'evidence-viewer-tests: export lag and receipts rendered as a separate non-authoritative observation',
   'E-AC-20': 'NO CARRIER: audit-bundle carries nothing from the export package, and the export modules never reference the bundle',
-  'E-AC-21': 'governance-event-export.md carries two sections; no data-flow diagram, mapping/loss guide, retention guidance, runbook or incident procedure',
+  'E-AC-21': 'docs/governance-event-export.md (PHX-WP-DOC-2): threat model, data-flow diagram, mapping/loss guide, retention guidance, operator runbook, and incident/recovery procedures all present and grounded; the loss guide names the known loss:[] gap explicitly, the retention section reports no pruning/archival/expiry function exists anywhere in the outbox modules',
 
   'R-AC-01': 'external-command-offer-tests: public-safe offer recorded before presentation, verified append readback required',
   'R-AC-02': 'CONFIRMED ABSENT (PHX-WP-R): recovery-proposed/recovered states exist in the schema but are unreachable through any exported function -- no capability correlates a rejected path, alternatives, or selected recovery to the offer',

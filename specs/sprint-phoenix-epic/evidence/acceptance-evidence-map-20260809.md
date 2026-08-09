@@ -42,8 +42,8 @@ reproduced here rather than referenced.
 
 ## The direct answer
 
-**Phoenix cannot claim complete.** 87 of 157 criteria carry a named assertion in a
-gate-registered suite; 70 do not. EPIC-AC-05 forbids a completion claim while any
+**Phoenix cannot claim complete.** 91 of 157 criteria carry a named assertion in a
+gate-registered suite; 66 do not. EPIC-AC-05 forbids a completion claim while any
 criterion remains unimplemented or unverified, and it currently bites. No issue is closeable on
 its own live acceptance bullets.
 
@@ -61,8 +61,8 @@ A bullet is therefore BLOCKED unless every criterion mapped to it is `implemente
 
 | verdict | count |
 |---|---|
-| implemented | 87 |
-| partial | 53 |
+| implemented | 91 |
+| partial | 49 |
 | designed-only | 1 |
 | not-started | 15 |
 | constraint | 1 |
@@ -129,7 +129,7 @@ clause that is not pinned or not built.
 | H-AC-11 | partial | C | portable reconstruction surface pinned; the no-join-handle clause is proved UNSATISFIABLE for the GMW half (acceptance.md amendment, tracked as O-4) |
 | H-AC-12 | partial | C | guard-push/guard-devplan/change-control validate the decision reference; the DUAL-EVALUATION during migration with shared owner and expiry has no carrier |
 | H-AC-13 | implemented | C | human-governance-ledger-tests + store admission: prohibited content rejected before any temporary file exists |
-| H-AC-14 | partial | C | governance-events.md + po-human-approval.md + threat model exist; no migration, retention or recovery section for the ledger package |
+| H-AC-14 | partial | C | docs/governance-events.md (PHX-WP-DOC-1): migration, retention, recovery and operator-guidance sections added and grounded; schema/taxonomy/authority-trust-model coverage confirmed solid (Portable records / Restricted machine-local records / Authority boundary sections). "Threat model" is NOT confirmed complete: the only located coverage is one sentence in docs/phoenix-governance-threat-model.md:75, not a dedicated section -- stays open rather than accepted on the baseline note alone |
 | H-AC-15 | implemented | WP-H | human-governance-ledger-tests (PHX-WP-H): all thirteen named scenarios pinned (grant/consumption/expiry/redaction pre-existing; denial/revocation/correction/retry/concurrency/interruption/tampering/stale-candidate/cross-repository-binding new and break-proofed) |
 
 ### A — Agent Decision and Assumption Journal (#31) (4/16 implemented)
@@ -150,7 +150,7 @@ clause that is not pinned or not built.
 | A-AC-12 | partial | C | agent-decision-journal-tests (PHX-WP-A): downstream export/projection policy (governance-event-projection.mjs) is independently configurable from capture eligibility and structurally cannot weaken it; the restricted-machine-local boundary mapping, "sole read boundary" language, and a literal human-ledger side-by-side remain unaddressed |
 | A-AC-13 | partial | C | agent-decision-journal-tests (PHX-WP-A): the duplicate-submission clause is pinned -- exact duplicate is a deterministic idempotent-replay no-write, conflicting duplicate fails closed (GES-IDEMPOTENCY-CONFLICT); concurrent/interrupted/out-of-order for agent-kind events remain covered only by the store's generic tests, not newly pinned |
 | A-AC-14 | partial | C | 5 of 13 named conformance scenarios have thin/generic (non-dedicated) coverage, 8 have zero coverage; "decomposition" is not representable in the current `kind` enum at all (PHX-WP-A, not padded) |
-| A-AC-15 | partial | C | agent-decision-journal.md carries one section; no taxonomy, materiality policy, trust model, retention or recovery doc |
+| A-AC-15 | partial | C | docs/agent-decision-journal.md (PHX-WP-DOC-1): taxonomy, materiality policy, trust model, retention, recovery, and operator documentation added and grounded (6 of 8). "Schema" and "privacy threat model" sections remain missing -- an Elephant briefing defect, not a dispatch failure: the briefing quoted the full 8-part clause but its own instruction list only named 6 of the 8 parts |
 | A-AC-16 | implemented | C | agent-decision-journal-tests: a journal event cannot present as approval |
 
 ### L — Lifecycle stream and replay (#17) (4/8 implemented)
@@ -166,7 +166,7 @@ clause that is not pinned or not built.
 | L-AC-07 | implemented | WP-L | governance-replay-core-tests: serial/parallel/retry/cancellation/recovery fixtures replay to identical bounded output on repeat, and a malicious duplicate-sequence fixture is rejected deterministically (PHX-WP-L, break-proofed twice) |
 | L-AC-08 | partial | J | no artifact traces each retained element to a stated user or audit need |
 
-### P — Policy packs and signed audit bundles (#9) (7/13 implemented)
+### P — Policy packs and signed audit bundles (#9) (8/13 implemented)
 
 | ID | verdict | src | evidence / named gap |
 |---|---|---|---|
@@ -182,7 +182,7 @@ clause that is not pinned or not built.
 | P-AC-10 | implemented | WP-P | organization-policy-core-tests + audit-bundle-core-tests: pack-side compliance-claim rejection and signed-bundle no-identity-claim shape both pinned (PHX-WP-P, break-proofed). Log/viewer halves were out of the dispatched carrier scope and remain unevaluated either way |
 | P-AC-11 | partial | WP-P | organization-policy-core-tests: mode (closed reference-only/projection/controlled-publication set) and approval (union, no downgrade) pinned (PHX-WP-P, break-proofed). Target class/binding, owned fields/sections, lifecycle event, preview, retention and revision readback remain unpinned: documentClasses is closed to exactly class/mode/approvalRequired, no field exists for the rest |
 | P-AC-12 | implemented | C | audit-bundle-tests: tampered or missing bundle bytes detected; signature invalidated when the manifest changes |
-| P-AC-13 | partial | C | organization-policy-packs.md and audit-bundles.md are stubs; no migration/versioning policy, no pack threat model |
+| P-AC-13 | implemented | WP-DOC | docs/organization-policy-packs.md + docs/audit-bundles.md (PHX-WP-DOC-2): threat model, pack/schema/activation policy, bundle policy, and compatibility/migration/versioning policy all present and grounded -- the compatibility section honestly states no pack-schema migration mechanism exists (only v1 is accepted; revision is a content digest, not a version number) |
 
 ### V — Human-readable Evidence Viewer (#5) (8/10 implemented)
 
@@ -199,7 +199,7 @@ clause that is not pinned or not built.
 | V-AC-09 | implemented | WP-V | evidence-view-renderer-tests: all seven required fixtures now covered -- pass/fail/unknown pre-existing, tampered/misplaced/orphaned/legacy-layout added with deterministic snapshots (PHX-WP-V, break-proofed) |
 | V-AC-10 | implemented | C | evidence-viewer-tests: candidate binding rendered before any derived summary |
 
-### X — Traceability and documentation adapters (#23) (12/15 implemented)
+### X — Traceability and documentation adapters (#23) (13/15 implemented)
 
 | ID | verdict | src | evidence / named gap |
 |---|---|---|---|
@@ -217,9 +217,9 @@ clause that is not pinned or not built.
 | X-AC-12 | implemented | WP-X | external-reference-adapter-tests: plan->apply->reconcile proven identical across synthetic issue-tracker, knowledge-base, document-store and secondary-forge profiles, and every cross-profile capability mismatch rejected (PHX-WP-X, break-proofed) |
 | X-AC-13 | implemented | C | external-reference-adapter-tests: defaults to reference-only or projection, never last-write-wins |
 | X-AC-14 | partial | C | confirmed absent (PHX-WP-X): neither inspect() call site (external-reference-adapter.mjs:61,72) has a try/catch, so an unreachable external system throws uncaught instead of producing a typed observation -- filed as pipeline.external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system, a production fix not a missing test |
-| X-AC-15 | partial | C | external-traceability.md carries three sections; no threat model, publication guide or recovery procedure |
+| X-AC-15 | implemented | WP-DOC | docs/external-traceability.md (PHX-WP-DOC-2): threat model, ownership/lifecycle mapping, publication guide, recovery procedure, and conformance suite added and grounded; the recovery procedure names the adapter's uncaught-inspect()-rejection gap and its backlog item explicitly rather than describing a graceful path that does not exist |
 
-### C — ITSM change control (#24) (8/13 implemented)
+### C — ITSM change control (#24) (9/13 implemented)
 
 | ID | verdict | src | evidence / named gap |
 |---|---|---|---|
@@ -235,9 +235,9 @@ clause that is not pinned or not built.
 | C-AC-10 | implemented | C | change-control-tests: an automatically created external record stays draft or observation |
 | C-AC-11 | implemented | C | change-control-tests: provider names and fields kept out of the provider-neutral core schema |
 | C-AC-12 | partial | WP-C | change-control-tests (PHX-WP-C, break-proofed): unavailable external state blocks via C-AC-04, and the distinct "external-unavailable" gate reason is now pinned by name; the explicit advisory-vs-mandatory policy distinction remains absent -- mandatory:false is only representable together with changeClass:"not-required", which short-circuits before ITSM availability is ever inspected |
-| C-AC-13 | partial | C | change-control.md is a stub; no threat model, precedence, migration, runbook or rollback procedure |
+| C-AC-13 | implemented | WP-DOC | docs/change-control.md (PHX-WP-DOC-1): threat model, policy precedence, migration, operator runbook, and failure/rollback/recovery procedures all present and grounded in change-control.mjs; migration section honestly states no migration tooling exists |
 
-### E — Governance event export (#32) (11/21 implemented)
+### E — Governance event export (#32) (12/21 implemented)
 
 | ID | verdict | src | evidence / named gap |
 |---|---|---|---|
@@ -261,7 +261,7 @@ clause that is not pinned or not built.
 | E-AC-18 | implemented | C | governance-export-adapter-tests: destination secrets excluded from every portable export record |
 | E-AC-19 | implemented | C | evidence-viewer-tests: export lag and receipts rendered as a separate non-authoritative observation |
 | E-AC-20 | not-started | J | NO CARRIER: audit-bundle carries nothing from the export package, and the export modules never reference the bundle |
-| E-AC-21 | partial | C | governance-event-export.md carries two sections; no data-flow diagram, mapping/loss guide, retention guidance, runbook or incident procedure |
+| E-AC-21 | implemented | WP-DOC | docs/governance-event-export.md (PHX-WP-DOC-2): threat model, data-flow diagram, mapping/loss guide, retention guidance, operator runbook, and incident/recovery procedures all present and grounded; the loss guide names the known loss:[] gap explicitly, the retention section reports no pruning/archival/expiry function exists anywhere in the outbox modules |
 
 ### R — External command offer, workaround and recovery audit profile (5/13 implemented)
 
@@ -304,7 +304,7 @@ clause that is not pinned or not built.
 
 ### #9 — Introduce organization policy packs and signed audit bundles
 
-2 of 11 live acceptance bullets fully carried; **9 blocked**.
+3 of 11 live acceptance bullets fully carried; **8 blocked**.
 
 | # | live acceptance bullet | blocking criteria (verdict) |
 |---|---|---|
@@ -316,7 +316,6 @@ clause that is not pinned or not built.
 | 6 | Publications require preview, source digest, revision readback, reconciliation | P-AC-11 (partial) |
 | 7 | Bundle artifacts resolve through canonical inventory | P-AC-06 (partial) |
 | 8 | Invalid/misplaced/orphaned/unreconciled artifacts cannot enter silently | P-AC-06 (partial) |
-| 9 | Threat model and migration/versioning are documented | P-AC-13 (partial) |
 
 ### #17 — Define a sanitized multi-agent event model and local replay view
 
@@ -329,24 +328,22 @@ clause that is not pinned or not built.
 
 ### #23 — Define external work-system and knowledge-base traceability adapters
 
-13 of 16 live acceptance bullets fully carried; **3 blocked**.
+14 of 16 live acceptance bullets fully carried; **2 blocked**.
 
 | # | live acceptance bullet | blocking criteria (verdict) |
 |---|---|---|
 | 1 | #9 governs mandatory documents and external writes | X-AC-11 (not-started) |
 | 2 | External outage cannot erase local authority | X-AC-14 (partial) |
-| 3 | Contract/threat/mapping/publication/conformance docs exist | X-AC-15 (partial) |
 
 ### #24 — Add policy-governed ITSM change control to release and promotion
 
-8 of 12 live acceptance bullets fully carried; **4 blocked**.
+9 of 12 live acceptance bullets fully carried; **3 blocked**.
 
 | # | live acceptance bullet | blocking criteria (verdict) |
 |---|---|---|
 | 1 | Environment selects no control or exactly one effective profile | C-AC-09 (not-started) |
 | 2 | Standard/normal/emergency/not-required have distinct behavior | C-AC-02 (partial) |
 | 3 | Advisory/mandatory offline and unavailable behavior is explicit | C-AC-12 (partial) |
-| 4 | Threat/policy/migration/runbook/recovery docs exist | C-AC-13 (partial) |
 
 ### #30 — Add a repository-scoped tamper-evident human governance decision ledger
 
@@ -385,7 +382,7 @@ clause that is not pinned or not built.
 
 ### #32 — Add provider-neutral governance event export for SIEM and audit platforms
 
-9 of 20 live acceptance bullets fully carried; **11 blocked**.
+10 of 20 live acceptance bullets fully carried; **10 blocked**.
 
 | # | live acceptance bullet | blocking criteria (verdict) |
 |---|---|---|
@@ -399,26 +396,25 @@ clause that is not pinned or not built.
 | 8 | Receipts state exact acknowledgement without retention/review claims | E-AC-11 (partial) |
 | 9 | External event correlates to sources/candidate/evidence/policy/chain | K-AC-10 (not-started) |
 | 10 | #9 bundles sanitized export-policy/delivery metadata | E-AC-20 (not-started) |
-| 11 | Threat/data-flow/mapping/retention/runbook/recovery docs exist | E-AC-21 (partial) |
 
 ## Summary
 
 | issue | bullets | carried | blocked | closeable |
 |---|---|---|---|---|
 | #5 | 6 | 5 | 1 | **no** |
-| #9 | 11 | 2 | 9 | **no** |
+| #9 | 11 | 3 | 8 | **no** |
 | #17 | 6 | 4 | 2 | **no** |
-| #23 | 16 | 13 | 3 | **no** |
-| #24 | 12 | 8 | 4 | **no** |
+| #23 | 16 | 14 | 2 | **no** |
+| #24 | 12 | 9 | 3 | **no** |
 | #30 | 17 | 8 | 9 | **no** |
 | #31 | 17 | 5 | 12 | **no** |
-| #32 | 20 | 9 | 11 | **no** |
+| #32 | 20 | 10 | 10 | **no** |
 
 Issues closeable on their own live acceptance bullets: **0 of 8**.
 
 ## The blocking set, ranked
 
-41 distinct criteria block at least one live acceptance bullet.
+37 distinct criteria block at least one live acceptance bullet.
 
 | criterion | verdict | live bullets blocked |
 |---|---|---|
@@ -440,7 +436,6 @@ Issues closeable on their own live acceptance bullets: **0 of 8**.
 | C-AC-02 | partial | 1 |
 | C-AC-09 | not-started | 1 |
 | C-AC-12 | partial | 1 |
-| C-AC-13 | partial | 1 |
 | E-AC-02 | partial | 1 |
 | E-AC-04 | partial | 1 |
 | E-AC-06 | partial | 1 |
@@ -449,7 +444,6 @@ Issues closeable on their own live acceptance bullets: **0 of 8**.
 | E-AC-10 | not-started | 1 |
 | E-AC-11 | partial | 1 |
 | E-AC-20 | not-started | 1 |
-| E-AC-21 | partial | 1 |
 | H-AC-08 | not-started | 1 |
 | H-AC-09 | not-started | 1 |
 | H-AC-11 | partial | 1 |
@@ -457,12 +451,10 @@ Issues closeable on their own live acceptance bullets: **0 of 8**.
 | L-AC-08 | partial | 1 |
 | P-AC-01 | partial | 1 |
 | P-AC-03 | partial | 1 |
-| P-AC-13 | partial | 1 |
 | V-AC-02 | partial | 1 |
 | V-AC-06 | partial | 1 |
 | X-AC-11 | not-started | 1 |
 | X-AC-14 | partial | 1 |
-| X-AC-15 | partial | 1 |
 
 ## Criteria not mapped to any live issue bullet
 
