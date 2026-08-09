@@ -30,6 +30,11 @@ import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 const guard = path.resolve("plugins/pipeline-core/hooks/guard-git.mjs");
 const grantCli = path.resolve("plugins/pipeline-core/scripts/human-authority-grant.mjs");
 
+/** The project's committed trust-anchor policy (ADR-0055 shape), pinned to a fixture keypair. Never the real repo's key. */
+function trustAnchorPolicy(publicKeySha256) {
+  return { schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push"], trustAnchor: { keyReference: "fixture-po-key", publicKeySha256 } };
+}
+
 function registry(fingerprint) {
   return { schema: "pipeline.governance-stream-registry.v1", repositoryFingerprint: fingerprint, canonicalization: "RFC8785", digestAlgorithm: "sha-256", eventDigestDomain: "pipeline.governance-event.v1\0", storageRoot: "governance/events", streams: [
     { streamId: "human", origin: "human", authorityClass: "human-authority", relativeRoot: "human", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
@@ -58,7 +63,14 @@ function runGrantCli(args) {
   return spawnSync(process.execPath, [grantCli, ...args], { encoding: "utf8" });
 }
 
-async function fixture() {
+/**
+ * `publicKeySha256` seeds this fixture repository's own committed
+ * `project/critical-human-proof.json` (F1: `install` has no other way to
+ * learn a trust anchor — no override flag exists anymore). This is a
+ * fixture-generated keypair, in-memory for this test run only; never the real
+ * PO key.
+ */
+async function fixture(publicKeySha256) {
   const root = await mkdtemp(path.join(os.tmpdir(), "guard-git-phoenix-authority-grant-"));
   // A copy of the REAL guard-git.mjs bytes at the same repo-relative path the
   // guard checks (`plugins/pipeline-core/hooks/guard-git.mjs`), so that
@@ -69,6 +81,8 @@ async function fixture() {
   await copyFile(guard, path.join(root, "plugins/pipeline-core/hooks/guard-git.mjs"));
   await writeFile(path.join(root, "plan.md"), "fixture plan\n");
   await writeFile(path.join(root, "spec.md"), "fixture spec\n");
+  await mkdir(path.join(root, "project"), { recursive: true });
+  await writeFile(path.join(root, "project/critical-human-proof.json"), `${JSON.stringify(trustAnchorPolicy(publicKeySha256), null, 2)}\n`);
   execFileSync("git", ["init", "-q", root]);
   execFileSync("git", ["-C", root, "add", "-A"]);
   execFileSync("git", ["-C", root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture"]);
@@ -84,18 +98,17 @@ async function fixture() {
 }
 
 test("A-AC-04 end-to-end: a real human-authority-grant.mjs prepare/sign/install grant is what guard-git.mjs's Phoenix override path actually consumes", async (t) => {
-  const values = await fixture();
-  t.after(() => rm(values.root, { recursive: true, force: true }));
-  const external = await mkdtemp(path.join(os.tmpdir(), "guard-git-phoenix-authority-grant-ext-"));
-  t.after(() => rm(external, { recursive: true, force: true }));
-
   // Fixture-local Ed25519 keypair, generated in-memory for this test run only.
-  // Never the real PO key, never `project/critical-human-proof.json`.
+  // Never the real PO key, never the real repo's committed
+  // project/critical-human-proof.json.
   const keys = generateKeyPairSync("ed25519");
   const publicKey = keys.publicKey.export({ type: "spki", format: "pem" });
   const publicKeySha256 = createHash("sha256").update(publicKey).digest("hex");
-  const trustAnchorPath = path.join(external, "trust-anchor.json");
-  await writeFile(trustAnchorPath, JSON.stringify({ keyReference: "fixture-po-key", publicKeySha256 }));
+
+  const values = await fixture(publicKeySha256);
+  t.after(() => rm(values.root, { recursive: true, force: true }));
+  const external = await mkdtemp(path.join(os.tmpdir(), "guard-git-phoenix-authority-grant-ext-"));
+  t.after(() => rm(external, { recursive: true, force: true }));
 
   // 1) prepare — the real CLI, spawned as its own process.
   const requestPath = path.join(external, "request.json");
@@ -128,7 +141,7 @@ test("A-AC-04 end-to-end: a real human-authority-grant.mjs prepare/sign/install 
   // grant actually land in the on-disk ledger.
   const installed = runGrantCli([
     "install", "--repo-root", values.root,
-    "--request", requestPath, "--proof", proofPath, "--trust-anchor-file", trustAnchorPath,
+    "--request", requestPath, "--proof", proofPath,
   ]);
   assert.equal(installed.status, 0, installed.stderr);
   const installedValue = JSON.parse(installed.stdout);

@@ -20,7 +20,12 @@
  * digest-bound request. There is no `sign` mode here — this program contains no
  * signer and never accepts or writes private-key material. `install` is agent-safe
  * but verify-and-append ONLY: it cannot succeed without a genuine detached Ed25519
- * proof, and any verification failure exits non-zero and appends nothing.
+ * proof, checked against exactly one trust anchor — this repository's own committed
+ * `project/critical-human-proof.json` (`readCriticalHumanProofPolicy`). Unlike
+ * `guard-maintenance-window.mjs`, this program has NO flag, argument, environment
+ * variable, or code path anywhere that lets a caller substitute a different trust
+ * anchor: the committed anchor is the only source, unconditionally. Any
+ * verification failure exits non-zero and appends nothing.
  *
  * Usage:
  *   human-authority-grant.mjs prepare --repo-root <path> --decision-id <id> \
@@ -29,12 +34,12 @@
  *     --request <output-path> [--environment <id>] [--artifacts <comma-separated-repo-paths>] \
  *     [--request-decision-id <id>] [--event-id <id>] [--idempotency-key <id>]
  *   human-authority-grant.mjs install --repo-root <path> --request <path> \
- *     --proof <external-public-json> [--trust-anchor-file <external-public-json>]
+ *     --proof <external-public-json>
  */
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
-import { isAbsolute, relative, resolve } from "node:path";
+import { resolve } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { canonicalSha256, parseStrictJson } from "../lib/governance-event.mjs";
@@ -51,16 +56,21 @@ import {
 const REQUEST_SCHEMA = "pipeline.human-authority-grant-request.v1";
 const UNAVAILABLE = Object.freeze({ state: "not-applicable" });
 
-const usage = "Usage: human-authority-grant.mjs prepare --repo-root <path> --decision-id <id> --package-id <id> --action <OVERRIDE.rule> --plan <repo-path> --spec <repo-path> --ttl-seconds <n> --reason-code <CODE> --policy-digest <sha256> --rule-digest <sha256> --request <output-path> [--environment <id>] [--artifacts <comma-separated-repo-paths>] [--request-decision-id <id>] [--event-id <id>] [--idempotency-key <id>] | install --repo-root <path> --request <path> --proof <external-public-json> [--trust-anchor-file <external-public-json>]";
+const usage = "Usage: human-authority-grant.mjs prepare --repo-root <path> --decision-id <id> --package-id <id> --action <OVERRIDE.rule> --plan <repo-path> --spec <repo-path> --ttl-seconds <n> --reason-code <CODE> --policy-digest <sha256> --rule-digest <sha256> --request <output-path> [--environment <id>] [--artifacts <comma-separated-repo-paths>] [--request-decision-id <id>] [--event-id <id>] [--idempotency-key <id>] | install --repo-root <path> --request <path> --proof <external-public-json>";
 
 export function parseArgs(argv) {
   const [command, ...tokens] = argv;
   const values = { command, repoRoot: process.cwd() };
   const supplied = new Set();
+  // NOTE (F1): deliberately no "trustAnchorFile" entry here. `install`'s trust
+  // anchor has exactly one source -- this repository's own committed
+  // project/critical-human-proof.json -- and it must stay unconditional. A
+  // caller-supplied override flag is not merely unused, it is ABSENT from the
+  // grammar entirely, so no future edit can wire one back in by accident.
   const known = new Set([
     "repoRoot", "decisionId", "packageId", "action", "environment", "plan", "spec", "artifacts",
     "ttlSeconds", "reasonCode", "policyDigest", "ruleDigest", "requestDecisionId", "eventId",
-    "idempotencyKey", "request", "proof", "trustAnchorFile",
+    "idempotencyKey", "request", "proof",
   ]);
   for (let index = 0; index < tokens.length; index += 1) {
     const key = tokens[index];
@@ -80,12 +90,28 @@ function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-/** `path` must be supplied outside the repository — genuinely external human-produced material. */
-function externalJson(repoRoot, path) {
-  const root = resolve(repoRoot);
+/**
+ * `path` must be supplied outside the repository — genuinely external
+ * human-produced material.
+ *
+ * F2 fix: mirrors `guard-maintenance-window.mjs`'s already-correct containment
+ * check (`source === root || source.startsWith(`${root}/`)`) instead of the
+ * previous `path.relative()` + `rel.startsWith("..")` heuristic. That heuristic
+ * misclassified an IN-REPO file whose name literally begins with ".." (e.g.
+ * `<repo-root>/..anchor.json`) as external, because `path.relative('/repo',
+ * '/repo/..anchor.json')` returns the string `"..anchor.json"`, which starts
+ * with ".." without the path ever leaving the root. A direct prefix check has
+ * no such blind spot.
+ *
+ * `primaryRoot` must be the AUTHORITATIVE repository root discovered via
+ * `discoverRepository` (`repo.primaryRoot`), never the raw `--repo-root`
+ * string a caller supplies: pointing `--repo-root` at a subdirectory of the
+ * real repository must not reclassify an actually-in-repo file as external.
+ */
+function externalJson(primaryRoot, path) {
+  const root = resolve(primaryRoot);
   const source = resolve(path);
-  const rel = relative(root, source);
-  if (rel === "" || (!rel.startsWith("..") && !isAbsolute(rel))) throw new Error("HAG-EXTERNAL-REQUIRED: proof and trust-anchor-file must be supplied outside the repository");
+  if (source === root || source.startsWith(`${root}/`)) throw new Error("HAG-EXTERNAL-REQUIRED: proof must be supplied outside the repository");
   return JSON.parse(readFileSync(source, "utf8"));
 }
 
@@ -196,20 +222,20 @@ async function runInstall(args) {
   if (!args.request || !args.proof) throw new Error(usage);
   const request = JSON.parse(readFileSync(resolve(args.request), "utf8"));
   if (request?.schema !== REQUEST_SCHEMA) throw new Error("HAG-REQUEST-INVALID: unexpected request schema");
-  const proof = externalJson(rootDir, args.proof);
-  const trustPolicy = args.trustAnchorFile
-    ? (() => {
-      const anchor = externalJson(rootDir, args.trustAnchorFile);
-      if (!anchor || typeof anchor.keyReference !== "string" || typeof anchor.publicKeySha256 !== "string") throw new Error("HAG-TRUST-ANCHOR-INVALID: trust-anchor-file is malformed");
-      return { keyReference: anchor.keyReference, publicKeySha256: anchor.publicKeySha256 };
-    })()
-    : (() => {
-      const policy = readCriticalHumanProofPolicy(rootDir);
-      if (!policy.ok || policy.trustAnchor === null) throw new Error("HAG-TRUST-ANCHOR-MISSING: project/critical-human-proof.json carries no trustAnchor");
-      return policy.trustAnchor;
-    })();
 
-  const { fingerprint } = repositoryFingerprintFor(rootDir);
+  // Authoritative repository identity, computed once and reused for both the
+  // containment check (F2) and the trust anchor / fingerprint checks below —
+  // never the raw `--repo-root` string a caller supplies.
+  const { repo, fingerprint } = repositoryFingerprintFor(rootDir);
+  const proof = externalJson(repo.primaryRoot, args.proof);
+
+  // F1: the ONLY trust anchor is this repository's own committed
+  // project/critical-human-proof.json. No flag, argument, or environment
+  // variable anywhere in this program can substitute a different one.
+  const policy = readCriticalHumanProofPolicy(rootDir);
+  if (!policy.ok || policy.trustAnchor === null) throw new Error("HAG-TRUST-ANCHOR-MISSING: project/critical-human-proof.json carries no trustAnchor");
+  const trustPolicy = policy.trustAnchor;
+
   if (fingerprint !== request.intent?.repositoryFingerprint) throw new Error("HAG-DRIFT: physical repository identity does not match the request");
 
   let rebuiltIntent;
@@ -223,9 +249,49 @@ async function runInstall(args) {
   const verified = verifyExternalHumanGovernanceProof({ intent: rebuiltIntent, trustPolicy, proof });
   if (!verified.verified) throw new Error(`HAG-PROOF-INVALID: ${verified.code}`);
 
+  // F4: the cryptographic proof only covers `{decision, plan, spec}`
+  // (human-governance-ledger.mjs's `subjectSha256 = canonicalSha256({decision,
+  // plan, spec})`). The rest of the stored request's envelope
+  // (`request.intent`) was never signed, so it must never be appended
+  // verbatim -- a party editing the request file between `prepare` and
+  // `install` could otherwise plant unattested material into the append-only
+  // ledger as if a human had signed it. Every non-signed-subject field below
+  // is reconstructed from a trusted source instead of copied from
+  // `request.intent`: decision-derived fields come from `decision` itself
+  // (part of the just-verified signed subject), everything else is observed
+  // fresh, live, at install time.
+  const decision = request.intent.payload;
+  const capturePolicyDigest = capturePolicyDigestFor(rootDir);
+  const intent = {
+    schema: "pipeline.governance-event-envelope.v1",
+    payloadSchema: "pipeline.human-governance-decision.v1",
+    canonicalization: "RFC8785",
+    digestAlgorithm: "sha-256",
+    eventId: `${decision.decisionId}-event`,
+    idempotencyKey: `${decision.decisionId}-idempotency`,
+    origin: "human",
+    authorityClass: "human-authority",
+    eventType: "human.granted",
+    occurredAtEpochMs: decision.validity.notBeforeEpochMs,
+    observedAtEpochMs: Date.now(),
+    timeAssurance: "locally-observed",
+    repositoryFingerprint: fingerprint,
+    sourceUri: `urn:pipeline:repository:${fingerprint}`,
+    streamId: "human",
+    correlation: { featureId: UNAVAILABLE, packageId: UNAVAILABLE, requestId: UNAVAILABLE, sessionId: UNAVAILABLE, dispatchId: UNAVAILABLE, traceId: UNAVAILABLE },
+    candidate: decision.scope.candidate,
+    artifacts: [UNAVAILABLE],
+    policy: { policyDigest: UNAVAILABLE, configurationDigest: UNAVAILABLE, capturePolicyDigest, redactionPolicyDigest: UNAVAILABLE },
+    classification: "repository-public-safe",
+    storageProfile: "repository-public-safe",
+    retentionCompatibility: "repository-retained",
+    disclosureClass: "repository-visible",
+    payload: decision,
+  };
+
   // Only reachable once verification has genuinely succeeded — a rejected or
   // tampered proof throws above and appends nothing.
-  const receipt = await appendHumanGovernanceDecision({ repositoryRoot: rootDir, repositoryFingerprint: fingerprint, intent: request.intent });
+  const receipt = await appendHumanGovernanceDecision({ repositoryRoot: rootDir, repositoryFingerprint: fingerprint, intent });
   return { ok: true, code: "HUMAN-AUTHORITY-GRANT-INSTALLED", receipt };
 }
 
