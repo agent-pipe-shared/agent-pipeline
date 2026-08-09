@@ -125,6 +125,7 @@
 | pipeline.session-scratchpad-is-unwritable-under-the-cross-repo-guard | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.session-told-ready-but-not-how-to-repair | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.setup-mjs-marketplace-name-collision-defeats-local-dev-installs | closed | defect | pipeline | 2026-08-05 | — |
+| pipeline.setup-promises-a-human-name-repair-it-cannot-perform | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.shipped-artifacts-assume-the-pipelines-own-repository | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.shipped-guidance-sends-agents-to-a-directory-a-gate-refuses | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.signed-guard-override-has-no-command-that-emits-the-digest-to-sign | open | defect | pipeline | 2026-08-08 | — |
@@ -155,6 +156,6 @@
 
 ## Counts
 
-- open: 96
+- open: 97
 - in_progress: 21
 - closed: 30

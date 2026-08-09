@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "16342710fb59b96c2f377b3477775f6587a4d82a25751f7f78d8aa6c36461178"
+    "transitionHead": "c3b96dfaff3cd1560246f79a296a6b8aa5763bb5e820b994d2ba50e082d879ea"
   },
   "counts": {
-    "open": 96,
+    "open": 97,
     "in_progress": 21,
     "closed": 30
   },
@@ -1071,6 +1071,14 @@
       "closureRepository": "self",
       "closureCommit": "d3db4a07dee565c1eeee2eb1e1e77ffcd2ca4e0a",
       "closureEvidence": "backlog/evidence/2026-08-06-second-reconciliation-pass.md"
+    },
+    {
+      "id": "pipeline.setup-promises-a-human-name-repair-it-cannot-perform",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "Hit live on 2026-08-09 PO-nova machine while signing the PUSHWARN-1/PG11e-FLAKE TP-5 override: `sign-intent` failed with \"external trust policy does not match the local public key\" against a PO key directory whose key and repo binding were both actually correct."
     },
     {
       "id": "pipeline.shipped-artifacts-assume-the-pipelines-own-repository",
