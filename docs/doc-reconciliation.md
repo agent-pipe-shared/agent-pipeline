@@ -47,6 +47,19 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 506a05434b964754873931c2b42137750b58dc87 — 2026-08-09, range 3387065..506a0543, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `cbf656f3` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `3902d3c5` through `506a0543`: the O-1/O-2 design doc's fifth rework (all six round-4
+Critic findings fixed and independently verified), E-AC-10's closure (`evaluateGovernanceExport
+BoundaryGate`), and the checkpoints recording both plus WP-A-AC08's stop-then-redispatch. No code
+in this range touches the canonical artifact topology ADR-0045 governs beyond ordinary content
+evolution inside files it already lists. Same reading as the whole chain: `docs/state.md` stays
+ADR-0012, the generated evidence-map/closure-plan/design-doc set stays ADR-0045.
+
 ## Candidate cbf656f324827c5ad8ac53b17bb7606f3e338a3b — 2026-08-09, range 3387065..cbf656f3, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
