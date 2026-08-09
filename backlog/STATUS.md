@@ -34,6 +34,7 @@
 | pipeline.critical-human-proof-not-wired-to-push-and-prd-gates | open | defect | pipeline | 2026-08-05 | — |
 | pipeline.cross-repository-override-ledger-binding | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.dispatch-provenance | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
+| pipeline.dispatch-record-contaminates-every-critic-review | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.dispatch-templates-cite-restructured-operating-model-sections | in_progress | defect | pipeline | 2026-08-07 | — |
 | pipeline.dispatched-agents-return-truncated-mid-step | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.dispatches-report-completed-on-a-truncated-fragment | open | defect | pipeline | 2026-08-07 | — |
@@ -129,6 +130,6 @@
 
 ## Counts
 
-- open: 72
+- open: 73
 - in_progress: 26
 - closed: 23

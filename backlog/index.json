@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "b748a2a0bf66332ccebccde7c6e67e7d931a9acbc5b2308f3b7a20bc676a5a83"
+    "transitionHead": "8f80bd696140dad66215032a58e3684864fc41817919c07151a94f58ac418583"
   },
   "counts": {
-    "open": 72,
+    "open": 73,
     "in_progress": 26,
     "closed": 23
   },
@@ -259,6 +259,14 @@
       "owner": "pipeline",
       "created": "2026-07-20",
       "source": "Public V3 Foundation stabilization close authorship check: delivered Goldfish work packages lacked required public Dispatch trailers"
+    },
+    {
+      "id": "pipeline.dispatch-record-contaminates-every-critic-review",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "Found on 2026-08-09 by the third Critic round of the night (review object 19e3793), which reported it as a briefing violation against its own dispatch and disclosed how it handled it. Verified independently at source by the Elephant before filing: templates/prompts/goldfish-task.md defines the record's shape, and every evidence/dispatch-record-*.json in this checkout carries a `report` field."
     },
     {
       "id": "pipeline.dispatch-templates-cite-restructured-operating-model-sections",
