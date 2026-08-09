@@ -246,7 +246,15 @@ const DELTA = {
   // multi-stream query carrier exists anywhere, not merely that the clause
   // is unpinned -- the same bar applied to X-AC-11/E-AC-20/H-AC-08/H-AC-09.
   'K-AC-08': ['implemented', 'WP-K'],
-  'K-AC-10': ['not-started', 'WP-K'],
+  // WP-K-AC10 CLOSED 2026-08-09 (goldfish-implementor, commit f1f5e24):
+  // queryPortableGovernanceStreams (plural) composes the existing, unmodified
+  // queryPortableGovernanceStream once per requested stream, returning each
+  // stream's result keyed by streamId -- never flattened, so each event's
+  // origin/authorityClass/timeAssurance and each stream's own integrity/
+  // completeness stay distinct. Purely additive: scanStream, fork detection,
+  // append and recovery are untouched. 14/14 governance-event-store-tests
+  // pass (independently re-run).
+  'K-AC-10': ['implemented', 'WP-K-AC10'],
 
   // --- evidence/phx-wp-v.txt (task PHX-WP-V, 2026-08-09, commit fdb0292) ---
   // Independently re-run: 17/17 evidence-view-model/renderer/viewer suites
@@ -707,7 +715,7 @@ const POINTERS = {
   'K-AC-07': 'governance-event-store-tests: projection recovery requires a retained checkpoint',
   'K-AC-08': 'governance-event-store-tests: governance-event-store.mjs:673 (GES-CHECKPOINT) rejects a head/index checkpoint asserting an absent or digest-mismatched canonical record, for both verify and query (PHX-WP-K, break-proofed)',
   'K-AC-09': 'governance-event-core-tests: six exact typed absence states preserved',
-  'K-AC-10': 'NO CARRIER, confirmed by repo-wide search (PHX-WP-K): queryPortableGovernanceStream, the governance-event CLI and governance-replay.mjs all accept exactly one streamId; no function anywhere queries more than one stream, so per-record provenance preservation across streams has no code to test',
+  'K-AC-10': 'governance-event-store-tests (PHX-WP-K-AC10): queryPortableGovernanceStreams queries the human/agent/lifecycle streams in one call, keyed by streamId, proven to return exactly what the singular query would for each stream (origin/authorityClass/timeAssurance per event, integrity/completeness per stream) unflattened',
 
   'H-AC-01': 'human-governance-ledger-tests: closed portable grant, single-use consumption under the canonical stream lock',
   'H-AC-02': 'governance-authority-resolver-tests + guard-push consumption receipt',

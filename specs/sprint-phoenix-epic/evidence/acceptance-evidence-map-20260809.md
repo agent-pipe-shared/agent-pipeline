@@ -42,8 +42,8 @@ reproduced here rather than referenced.
 
 ## The direct answer
 
-**Phoenix cannot claim complete.** 106 of 157 criteria carry a named assertion in a
-gate-registered suite; 51 do not. EPIC-AC-05 forbids a completion claim while any
+**Phoenix cannot claim complete.** 107 of 157 criteria carry a named assertion in a
+gate-registered suite; 50 do not. EPIC-AC-05 forbids a completion claim while any
 criterion remains unimplemented or unverified, and it currently bites. No issue is closeable on
 its own live acceptance bullets.
 
@@ -61,10 +61,10 @@ A bullet is therefore BLOCKED unless every criterion mapped to it is `implemente
 
 | verdict | count |
 |---|---|
-| implemented | 106 |
+| implemented | 107 |
 | partial | 36 |
 | designed-only | 1 |
-| not-started | 13 |
+| not-started | 12 |
 | constraint | 1 |
 | **total** | **157** |
 
@@ -97,7 +97,7 @@ clause that is not pinned or not built.
 | PX0-AC-16 | implemented | A | bootstrap-source-attestation-acceptance-tests — equality bound to exact loaded and observed public remote identity |
 | PX0-AC-17 | implemented | A | bootstrap-source-attestation-acceptance-tests — unknown keys, ambiguous selectors, more than one selected plugin all fail closed |
 
-### K — Governance event kernel (8/10 implemented)
+### K — Governance event kernel (9/10 implemented)
 
 | ID | verdict | src | evidence / named gap |
 |---|---|---|---|
@@ -110,7 +110,7 @@ clause that is not pinned or not built.
 | K-AC-07 | implemented | C | governance-event-store-tests: projection recovery requires a retained checkpoint |
 | K-AC-08 | implemented | WP-K | governance-event-store-tests: governance-event-store.mjs:673 (GES-CHECKPOINT) rejects a head/index checkpoint asserting an absent or digest-mismatched canonical record, for both verify and query (PHX-WP-K, break-proofed) |
 | K-AC-09 | implemented | C | governance-event-core-tests: six exact typed absence states preserved |
-| K-AC-10 | not-started | WP-K | NO CARRIER, confirmed by repo-wide search (PHX-WP-K): queryPortableGovernanceStream, the governance-event CLI and governance-replay.mjs all accept exactly one streamId; no function anywhere queries more than one stream, so per-record provenance preservation across streams has no code to test |
+| K-AC-10 | implemented | WP-K-AC10 | governance-event-store-tests (PHX-WP-K-AC10): queryPortableGovernanceStreams queries the human/agent/lifecycle streams in one call, keyed by streamId, proven to return exactly what the singular query would for each stream (origin/authorityClass/timeAssurance per event, integrity/completeness per stream) unflattened |
 
 ### H — Human Governance Decision Ledger (#30) (11/15 implemented)
 
@@ -372,18 +372,16 @@ No blocking criterion. Closeable subject to the epic-level gates (EPIC-AC-01..06
 
 ### #32 — Add provider-neutral governance event export for SIEM and audit platforms
 
-12 of 20 live acceptance bullets fully carried; **8 blocked**.
+14 of 20 live acceptance bullets fully carried; **6 blocked**.
 
 | # | live acceptance bullet | blocking criteria (verdict) |
 |---|---|---|
-| 1 | Human/agent/lifecycle origin and authority survive export | K-AC-10 (not-started) |
-| 2 | Free-form rationale is explicit-policy-only and redacted | E-AC-04 (partial) |
-| 3 | Cursor/gap/fork/hash/schema/ack failures are typed | E-AC-08 (partial) |
-| 4 | Advisory failure preserves canonical operation | E-AC-09 (partial) |
-| 5 | Required mode blocks only exact named boundary/range | E-AC-10 (not-started) |
-| 6 | Receipts state exact acknowledgement without retention/review claims | E-AC-11 (partial) |
-| 7 | External event correlates to sources/candidate/evidence/policy/chain | K-AC-10 (not-started) |
-| 8 | #9 bundles sanitized export-policy/delivery metadata | E-AC-20 (not-started) |
+| 1 | Free-form rationale is explicit-policy-only and redacted | E-AC-04 (partial) |
+| 2 | Cursor/gap/fork/hash/schema/ack failures are typed | E-AC-08 (partial) |
+| 3 | Advisory failure preserves canonical operation | E-AC-09 (partial) |
+| 4 | Required mode blocks only exact named boundary/range | E-AC-10 (not-started) |
+| 5 | Receipts state exact acknowledgement without retention/review claims | E-AC-11 (partial) |
+| 6 | #9 bundles sanitized export-policy/delivery metadata | E-AC-20 (not-started) |
 
 ## Summary
 
@@ -396,13 +394,13 @@ No blocking criterion. Closeable subject to the epic-level gates (EPIC-AC-01..06
 | #24 | 12 | 9 | 3 | **no** |
 | #30 | 17 | 9 | 8 | **no** |
 | #31 | 17 | 10 | 7 | **no** |
-| #32 | 20 | 12 | 8 | **no** |
+| #32 | 20 | 14 | 6 | **no** |
 
 Issues closeable on their own live acceptance bullets: **1 of 8**.
 
 ## The blocking set, ranked
 
-27 distinct criteria block at least one live acceptance bullet.
+26 distinct criteria block at least one live acceptance bullet.
 
 | criterion | verdict | live bullets blocked |
 |---|---|---|
@@ -410,7 +408,6 @@ Issues closeable on their own live acceptance bullets: **1 of 8**.
 | K-AC-05 | partial | 3 |
 | P-AC-06 | partial | 3 |
 | H-AC-12 | partial | 2 |
-| K-AC-10 | not-started | 2 |
 | A-AC-01 | partial | 1 |
 | A-AC-03 | not-started | 1 |
 | A-AC-05 | partial | 1 |
