@@ -47,6 +47,20 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 4e5f3d3d3deb7fbb855ab6a3e24ae3533ea1147f — 2026-08-09, range 3387065..4e5f3d3, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `c004d16` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `2a25520`, `e835464`, `055cb8b`, `80074ee`, `4e5f3d3`. Same reading as every entry in this
+chain: the only governed paths this added range touches are `docs/state.md` (ADR-0012, two new
+checkpoint entries recording work already landed) and the `specs/sprint-phoenix-epic/evidence/`
++ `design/` generated pair (ADR-0045, two delta commits regenerated from the same measurement
+script per the established pattern). The two new test-authorship commits
+(`plugins/pipeline-core/lib/change-control.test.mjs`, `plugins/pipeline-core/lib/agent-decision-journal.test.mjs`)
+touch no path any `Governs:` line in the corpus names, confirmed by this run.
+
 ## Candidate d6f7a2e73e1c0fbd55cc9a4df23e53b019141054 — 2026-08-09, range 3387065..d6f7a2e, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
