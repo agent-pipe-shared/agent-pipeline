@@ -91,6 +91,53 @@ number, so it is a measurement of this run, not a property of the Pipeline. The
 honest comparison stays: same runner, same brief, with and without. That pair is
 $26.27 against $1.62.
 
+## Run telemetry, second wave — fifth local candidate, happy-path re-test (2026-08-09)
+
+A distinct, later test wave, on the fifth local `0.5.4` candidate (which had
+already landed several fixes from the first wave above) — **not the same
+runs as the table above**, kept separate rather than merged into it. Both
+runs independently transcript-analyzed, cross-checked against the runners'
+own self-reported usage figures. Codex figures below cover only its final,
+successful session; two earlier same-day restart attempts on the same
+project preceded it (324 KB/110 records/12 tool calls, then 470 KB/140/16),
+not counted here.
+
+| Axis | Claude + Pipeline | Codex + Pipeline (final session only) |
+|---|---|---|
+| Wall | 43m58s (API 27m18s) | ~34m |
+| Cost | $13.30 | not priced by the runner |
+| Output tokens | 126.4k | 53.1k |
+| Cache read | 32.6M | 9.7M |
+| Tool calls | ~248 (Bash≈201, Read 27, Write 15, Edit 3, Skill 2) | 112 |
+| Turns | 211 distinct assistant messages, 10 genuinely human turns | 10 |
+| Commits | 3 | 3 |
+| Outcome | push succeeded, but only after a manual step in the operator's own terminal outside the session (the `approve-push` field-count bug filed as `2026-08-09-approve-push-rejects-any-fresh-post-setup1-authority-file.md`, since fixed) | push succeeded fully in-session, no external step needed |
+
+**Lines changed, a methodology note rather than a single number:** the
+Claude run's full `git diff` from empty tree to final commit is +1908/−0,
+but 1497+9=1506 of those additions and all 6 of the (elsewhere-reported)
+removals are attributable to the agent's own `Write`/`Edit` tool calls
+specifically — the rest is pipeline scaffolding (`.claude/pipeline.json`,
+`pipeline.user.yaml`, state files) materialized by bootstrap/gate scripts via
+Bash-invoked commands, not authored by the agent's own edit tools. Reporting
+"lines changed" for an agent run without saying which of these two counts is
+meant silently compares different things across runners with different
+scaffolding footprints.
+
+**What cost the turns in each run:** Claude spent its friction on the
+push-signature ceremony (see above) and briefly on a habitual reach for
+composed/piped shell commands (7 single-retry shell-grammar-guard
+corrections across the session, zero requiring a second retry). Codex spent
+its friction on a single dead-end subcommand guess
+(`po-human-approval.mjs authorize-critical`, which does not exist) that it
+did not retry, pivoting instead to manual computation and waiting for
+externally-produced proof files — filed as
+`2026-08-09-critical-push-signing-ceremony-gives-no-path-feedback.md`. Both
+runners ran clean on the language axis in this final/only-counted session;
+Claude's two earlier-in-session language/projection-drift repair cycles are
+root-caused separately in
+`2026-08-09-kickoff-design-names-the-wrong-repair-for-projection-drift.md`.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:**
