@@ -76,6 +76,7 @@
 | pipeline.human-authorization-prompts-ignore-the-configured-language-profile | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.installing-consumer-is-never-asked-any-setup-decision | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.kickoff-apply-action-drops-runner | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.kickoff-design-names-the-wrong-repair-for-projection-drift | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.kickoff-promotion-cleanup-readback-has-no-in-session-recovery | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.language-selection-scope-is-unclear-and-arrives-too-late | open | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.lifecycle-guard-does-not-know-the-human-signing-commands | open | defect | pipeline | 2026-08-07 | — |
@@ -171,6 +172,6 @@
 
 ## Counts
 
-- open: 110
+- open: 111
 - in_progress: 21
 - closed: 32
