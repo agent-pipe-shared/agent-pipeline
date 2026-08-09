@@ -51,7 +51,7 @@
 | pipeline.elephant-direct-implementation-under-afk-authorization | in_progress | workflow-improvement | pipeline | 2026-07-23 | — |
 | pipeline.evidence-bound-review-retry-economics | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.execution-model-switchback | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
-| pipeline.fresh-repo-onboarding-never-asks-for-git-identity | open | defect | pipeline | 2026-08-09 | — |
+| pipeline.fresh-repo-onboarding-never-asks-for-git-identity | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.git-appears-despite-initializes-git-false | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.grammar-refusal-does-not-say-which-part-failed | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.greenfield-onboarding-writes-mixed-authority-tiers | open | defect | pipeline | 2026-08-07 | — |
@@ -162,6 +162,6 @@
 
 ## Counts
 
-- open: 103
+- open: 102
 - in_progress: 21
-- closed: 30
+- closed: 31

@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-09
 source: "Turn-efficiency root-cause analysis of the PO's private Claude+Pipeline 0.5.4 happy-path test run, 2026-08-09 (sanitized, no PO-identifying data)."
 due: 2026-08-16
+closed_at: 2026-08-09
+closure_repository: self
+closure_commit: b045e391513de1b2d16083ba2fe2dfc6b07f9061
+closure_evidence: backlog/evidence/2026-08-09-git-identity-onboarding-already-resolved.md
 ---
 
 # Onboarding initializes a brand-new `.git` without ever provisioning `user.name`/`user.email`, so the first commit fails instead
