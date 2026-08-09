@@ -40,6 +40,7 @@
 | pipeline.codex-restart-cannot-recover-operational-context-from-its-own-prior-transcript | open | idea | pipeline | 2026-08-09 | — |
 | pipeline.codex-sandbox-critic-longterm | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.concurrent-dispatches-share-one-index | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.consumer-projects-have-no-goldfish-dispatch-requirement-for-implementation | open | idea | pipeline | 2026-08-09 | — |
 | pipeline.contract-suite-borrows-its-fixture-by-importing-a-109-test-file | closed | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.critic-context-isolation | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.critic-review-has-no-defined-path-for-a-root-commit | open | defect | pipeline | 2026-08-09 | — |
@@ -182,6 +183,6 @@
 
 ## Counts
 
-- open: 115
+- open: 116
 - in_progress: 21
 - closed: 38

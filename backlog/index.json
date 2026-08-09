@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "d47829d5a93d763bdbbb255e6fd525293a09b97960aa2a365208edbb13c98b1f"
+    "transitionHead": "6eccc553e253c6952c02164b3fbe2161ed5e34164330641842d072082218d07b"
   },
   "counts": {
-    "open": 115,
+    "open": 116,
     "in_progress": 21,
     "closed": 38
   },
@@ -311,6 +311,14 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Observed directly on 2026-08-08: commit 598a78b, trailered Dispatch: HGOELIG-1 (goldfish), contains a backlog-item edit written by the Elephant and staged seconds earlier."
+    },
+    {
+      "id": "pipeline.consumer-projects-have-no-goldfish-dispatch-requirement-for-implementation",
+      "status": "open",
+      "type": "idea",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "Live Claude+Pipeline 0.5.4 greenfield test session, 2026-08-09 (session 6c12cf91): a full three-file browser game was implemented with zero Agent/Task dispatches — confirmed by an exhaustive grep of the whole transcript. PO's direct suspicion, independently confirmed: 'er hat die Entwicklung nicht dispatched sondern im Elephant selber gemacht.'"
     },
     {
       "id": "pipeline.contract-suite-borrows-its-fixture-by-importing-a-109-test-file",
