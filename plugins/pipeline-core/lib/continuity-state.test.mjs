@@ -227,6 +227,22 @@ check("valid queue state passes runtime and supported schema subset", () => {
   assert.equal(validateAgainstSchema(value, schemaLiteSchema).valid, true);
 });
 
+// GF-070: an optional runtime.documentLanguage carries the hosted PRD/Spec
+// document's own language, decoupled from the hard {de, en} operator-facing
+// axis below. Not asserted against schemaLiteSchema here -- the formal JSON
+// schema file is out of scope for this change and stays as-is, so a
+// documentLanguage-bearing runtime is a deliberate, expected mismatch against
+// it, not something this suite claims parity for.
+check("runtime accepts an optional two-letter documentLanguage without touching humanFacingLanguage enforcement", () => {
+  const value = state({ runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator", sessionCleanup: null, documentLanguage: "fr" } });
+  assert.deepEqual(validateContinuityState(value, FEATURE), { ok: true, code: "CS-VALID" });
+});
+
+check("runtime with documentLanguage still rejects an unsupported humanFacingLanguage", () => {
+  const value = state({ runtime: { humanFacingLanguage: "fr", activeDuty: "Coordinator", sessionCleanup: null, documentLanguage: "fr" } });
+  assert.equal(validateContinuityState(value, FEATURE).ok, false);
+});
+
 check("Result-close binding changes only revision, Result, review action and resume", () => {
   const current = state({
     authority: {
@@ -534,6 +550,7 @@ for (const [name, mutate] of [
   ["missing runtime", (value) => { delete value.runtime; }],
   ["unsupported runtime language", (value) => { value.runtime.humanFacingLanguage = "fr"; }],
   ["unsafe active duty", (value) => { value.runtime.activeDuty = "Coordinator duty"; }],
+  ["unsupported documentLanguage pattern", (value) => { value.runtime.documentLanguage = "french"; }],
   ["unknown runtime field", (value) => { value.runtime.provider = "private"; }],
   ["unsafe authority path", (value) => { value.authority.prd.path = "../private/prd.md"; }],
   ["uppercase digest", (value) => { value.authority.prd.sha256 = A.toUpperCase(); }],

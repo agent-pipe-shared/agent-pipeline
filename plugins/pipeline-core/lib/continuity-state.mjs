@@ -18,7 +18,7 @@ const ROOT_KEYS = new Set([
   "closeTransition",
   "nativeContinuation",
 ]);
-const RUNTIME_KEYS = new Set(["humanFacingLanguage", "activeDuty", "sessionCleanup"]);
+const RUNTIME_KEYS = new Set(["humanFacingLanguage", "activeDuty", "sessionCleanup", "documentLanguage"]);
 const SESSION_CLEANUP_KEYS = new Set(["sessionId", "descriptorSha256"]);
 const ARTIFACT_KEYS = new Set(["path", "sha256"]);
 const AUTHORITY_KEYS = new Set(["prd", "spec", "result", "plan"]);
@@ -92,6 +92,11 @@ const FALLBACK_STATUSES = new Set(["fallback-pending", "running", "completed", "
 const FINAL_OUTCOMES = new Set(["succeeded", "failed"]);
 const FALLBACK_POLICIES = new Set(["defer", "pre-authorized-mapped-fallback"]);
 const HUMAN_FACING_LANGUAGES = new Set(["de", "en"]);
+// Optional, additive: the hosted PRD/Spec document's own language, free of the
+// operator-facing {de, en} lock above. Wider by design -- any lowercase
+// two-letter code -- and validated independently so it can never widen
+// HUMAN_FACING_LANGUAGES or the humanFacingLanguage check itself.
+const DOCUMENT_LANGUAGE = /^[a-z]{2}$/;
 const CLOSE_PHASES = new Set(["state-cas", "verified", "delivered", "readback", "closed"]);
 const INTERRUPT_BLOCKER_TYPES = new Set(["authority", "security", "scope"]);
 export const CONTINUITY_STATE_MAX_BYTES = 8_192;
@@ -161,6 +166,7 @@ function validRuntime(value) {
   return allowedKeys(value, RUNTIME_KEYS, ["humanFacingLanguage", "activeDuty"])
     && HUMAN_FACING_LANGUAGES.has(value.humanFacingLanguage)
     && safeId(value.activeDuty)
+    && (value.documentLanguage === undefined || DOCUMENT_LANGUAGE.test(value.documentLanguage))
     && (value.sessionCleanup === undefined || value.sessionCleanup === null || (exactKeys(value.sessionCleanup, SESSION_CLEANUP_KEYS)
       && safeId(value.sessionCleanup.sessionId)
       && digest(value.sessionCleanup.descriptorSha256)));
