@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "0a4eda17e4857d1ac93474a026cd56c60aa680d8b7b26f0ef01bb7b1a33fb47a"
+    "transitionHead": "60989b253846631b61fba3250ca7659869f067066bd4464d3dc65bc767893cbf"
   },
   "counts": {
-    "open": 117,
+    "open": 118,
     "in_progress": 21,
     "closed": 38
   },
@@ -431,6 +431,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "PO, 2026-08-07: 'die goldfische generell und criticer liefern seit einiger zeit immer abgeschnittenes das könnte an der WSL umgebung liegen'. Four instances measured in one session the same day."
+    },
+    {
+      "id": "pipeline.docs-state-md-next-action-text-is-a-static-snapshot-with-no-live-sync",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "Live Codex+Pipeline 0.5.4 greenfield test session, 2026-08-09 (three rollout files): docs/state.md said 'submit the plan for PO approval' while project/pipeline-state.json's activeFeature.phase was already 'implementation' and planApproved was already true. Confirmed by direct code reading against plugins/pipeline-core/lib/onboarding-continuity.mjs."
     },
     {
       "id": "pipeline.documentation-information-architecture",
