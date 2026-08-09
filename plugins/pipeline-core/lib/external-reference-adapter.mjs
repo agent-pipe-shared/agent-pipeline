@@ -4,12 +4,12 @@ import { FEATURE_CLASSES, FEATURE_STATES } from "./feature-package-topology.mjs"
 import { canonicalSha256 } from "./governance-event.mjs";
 
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/u; const SHA = /^[a-f0-9]{64}$/u;
-const CLASSES = new Set(["issue-tracker", "knowledge-base", "document-store", "forge"]); const RELATIONS = new Set(["tracks", "specifies", "implements", "documents", "mirrors", "reviews", "evidences", "releases", "supersedes", "relates-to", "evidence-for", "published-from"]); const DIRECTIONS = new Set(["pipeline-to-external", "external-observation-only", "independent"]); const MODES = new Set(["reference-only", "projection", "controlled-publication"]); const OWNERSHIP = new Set(["pipeline-owned", "external-owned", "projection-only", "independently-maintained", "unsupported"]); const FRESHNESS = new Set(["fresh", "stale", "deleted", "moved", "merged", "duplicated", "inaccessible", "out-of-order"]); const OPERATIONS = new Set(["inspect", "preview", "apply", "readback", "reconcile"]);
+const CLASSES = new Set(["issue-tracker", "knowledge-base", "document-store", "forge"]); const DOCUMENT_CLASSES = new Set(["architecture", "operations", "security", "privacy", "continuity", "recovery", "release", "change-management"]); const RELATIONS = new Set(["tracks", "specifies", "implements", "documents", "mirrors", "reviews", "evidences", "releases", "supersedes", "relates-to", "evidence-for", "published-from"]); const DIRECTIONS = new Set(["pipeline-to-external", "external-observation-only", "independent"]); const MODES = new Set(["reference-only", "projection", "controlled-publication"]); const OWNERSHIP = new Set(["pipeline-owned", "external-owned", "projection-only", "independently-maintained", "unsupported"]); const FRESHNESS = new Set(["fresh", "stale", "deleted", "moved", "merged", "duplicated", "inaccessible", "out-of-order"]); const OPERATIONS = new Set(["inspect", "preview", "apply", "readback", "reconcile"]);
 function fail(code, message = "External reference operation is invalid.") { const error = new Error(message); error.code = code; throw error; }
 function exact(value, keys) { return value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key)); }
 function frozen(value) { return Object.freeze(value); }
 export function validateExternalReference(reference) {
-  if (!exact(reference, ["schema", "systemClass", "adapterProfile", "objectId", "relation", "authorityDirection", "pipelineArtifact", "externalRevision", "mode", "freshness", "ownership"]) || reference.schema !== "pipeline.external-reference.v1" || !CLASSES.has(reference.systemClass) || !ID.test(reference.adapterProfile) || !ID.test(reference.objectId) || !RELATIONS.has(reference.relation) || !DIRECTIONS.has(reference.authorityDirection) || !exact(reference.pipelineArtifact, ["path", "sha256"]) || typeof reference.pipelineArtifact.path !== "string" || !SHA.test(reference.pipelineArtifact.sha256) || !ID.test(reference.externalRevision) || !MODES.has(reference.mode) || !OWNERSHIP.has(reference.ownership) || !exact(reference.freshness, ["state", "observedAtEpochMs"]) || !FRESHNESS.has(reference.freshness.state) || !Number.isSafeInteger(reference.freshness.observedAtEpochMs) || reference.freshness.observedAtEpochMs < 0) fail("ERA-REFERENCE");
+  if (!exact(reference, ["schema", "systemClass", "adapterProfile", "objectId", "relation", "authorityDirection", "pipelineArtifact", "externalRevision", "mode", "freshness", "ownership"]) || reference.schema !== "pipeline.external-reference.v1" || !CLASSES.has(reference.systemClass) || !ID.test(reference.adapterProfile) || !ID.test(reference.objectId) || !RELATIONS.has(reference.relation) || !DIRECTIONS.has(reference.authorityDirection) || !exact(reference.pipelineArtifact, ["path", "sha256", "documentClass"]) || typeof reference.pipelineArtifact.path !== "string" || !SHA.test(reference.pipelineArtifact.sha256) || (reference.pipelineArtifact.documentClass !== null && !DOCUMENT_CLASSES.has(reference.pipelineArtifact.documentClass)) || !ID.test(reference.externalRevision) || !MODES.has(reference.mode) || !OWNERSHIP.has(reference.ownership) || !exact(reference.freshness, ["state", "observedAtEpochMs"]) || !FRESHNESS.has(reference.freshness.state) || !Number.isSafeInteger(reference.freshness.observedAtEpochMs) || reference.freshness.observedAtEpochMs < 0) fail("ERA-REFERENCE");
   return frozen({ ...reference, pipelineArtifact: frozen({ ...reference.pipelineArtifact }), freshness: frozen({ ...reference.freshness }) });
 }
 export function validateExternalAdapterCapabilities(capabilities) {
@@ -51,9 +51,22 @@ export async function bindCanonicalArtifactIdentity({ reference, resolveIdentity
 }
 
 /** Inspect and produce an exact, opaque write preview; provider data is never executed. */
-export async function planExternalReferenceWrite({ reference, capabilities, desired, inspect, preview, resolveIdentity } = {}) {
+export async function planExternalReferenceWrite({ reference, capabilities, desired, inspect, preview, resolveIdentity, organizationPolicy } = {}) {
   const ref = validateExternalReference(reference); const caps = validateExternalAdapterCapabilities(capabilities); if (!validateDesired(desired) || typeof inspect !== "function" || typeof preview !== "function" || typeof resolveIdentity !== "function") fail("ERA-REQUEST");
   if (ref.adapterProfile !== caps.adapterProfile || ref.systemClass !== caps.systemClass || ref.mode !== "controlled-publication" || ref.authorityDirection !== "pipeline-to-external" || ref.ownership !== "pipeline-owned" || !["inspect", "preview", "apply", "readback"].every((operation) => caps.operations.includes(operation))) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "rejected", reason: "capability-or-policy", plan: null });
+  // X-AC-11: a reference that declares a governed document class must consume
+  // the effective organization policy for that class rather than the adapter
+  // asserting a parallel authority; a declared class with no policy, no
+  // covering pack, a disagreeing mode, or an outstanding approval all fail
+  // closed instead of proceeding on the adapter's own say-so.
+  if (ref.pipelineArtifact.documentClass !== null) {
+    if (organizationPolicy === undefined || organizationPolicy === null) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "rejected", reason: "policy-required", plan: null });
+    const documentClasses = Array.isArray(organizationPolicy?.documentClasses) ? organizationPolicy.documentClasses : [];
+    const entry = documentClasses.find((candidate) => candidate?.class === ref.pipelineArtifact.documentClass);
+    if (!entry) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "rejected", reason: "policy-uncovered-class", plan: null });
+    if (entry.mode !== ref.mode) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "rejected", reason: "policy-mode-mismatch", plan: null });
+    if (entry.approvalRequired === true) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "rejected", reason: "policy-approval-required", plan: null });
+  }
   // X-AC-10: the canonical identity is resolved before any external contact, so
   // an unresolvable or ambiguous artifact never reaches the provider at all.
   const binding = await bindCanonicalArtifactIdentity({ reference: ref, resolveIdentity });

@@ -9,7 +9,7 @@ import { canonicalSha256 } from "./governance-event.mjs";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
-const reference = () => ({ schema: "pipeline.external-reference.v1", systemClass: "issue-tracker", adapterProfile: "synthetic-issues", objectId: "issue-42", relation: "relates-to", authorityDirection: "pipeline-to-external", pipelineArtifact: { path: "specs/feature/result.md", sha256: "a".repeat(64) }, externalRevision: "rev-1", mode: "controlled-publication", freshness: { state: "fresh", observedAtEpochMs: 1 }, ownership: "pipeline-owned" });
+const reference = () => ({ schema: "pipeline.external-reference.v1", systemClass: "issue-tracker", adapterProfile: "synthetic-issues", objectId: "issue-42", relation: "relates-to", authorityDirection: "pipeline-to-external", pipelineArtifact: { path: "specs/feature/result.md", sha256: "a".repeat(64), documentClass: null }, externalRevision: "rev-1", mode: "controlled-publication", freshness: { state: "fresh", observedAtEpochMs: 1 }, ownership: "pipeline-owned" });
 const capabilities = { schema: "pipeline.external-adapter-capabilities.v1", adapterProfile: "synthetic-issues", systemClass: "issue-tracker", operations: ["inspect", "preview", "apply", "readback", "reconcile"] };
 const desired = { requestId: "publish-42", changes: [{ field: "summary", valueSha256: "b".repeat(64), ownership: "pipeline-owned" }] };
 const identity = (overrides = {}) => ({ schema: "pipeline.artifact-identity.v1", featureId: "feature", manifest: "specs/feature/lifecycle.json", manifestSha256: "e".repeat(64), lifecycleState: "implementing", candidate: null, class: "result", path: "specs/feature/result.md", sha256: "a".repeat(64), authority: true, mutability: "append-only", retention: "active", ...overrides });
@@ -26,6 +26,17 @@ test("does not report success for revision, capability, authority, or readback c
 });
 test("rejects unclosed references and blocks non-pipeline-owned writes", async () => {
   assert.throws(() => validateExternalReference({ ...reference(), privateUrl: "https://secret" }), (error) => error.code === "ERA-REFERENCE"); const rejected = await planExternalReferenceWrite({ resolveIdentity, reference: { ...reference(), ownership: "external-owned" }, capabilities, desired, inspect: async () => ({}), preview: async () => ({}) }); assert.equal(rejected.status, "rejected");
+  // X-AC-11: pipelineArtifact.documentClass accepts null and each of the eight
+  // closed organization-policy classes, and rejects anything outside that set,
+  // including a missing key -- a stricter shape than before this change.
+  for (const documentClass of [null, "architecture", "operations", "security", "privacy", "continuity", "recovery", "release", "change-management"]) {
+    assert.equal(validateExternalReference({ ...reference(), pipelineArtifact: { ...reference().pipelineArtifact, documentClass } }).pipelineArtifact.documentClass, documentClass);
+  }
+  for (const documentClass of ["governance", 7, undefined]) {
+    assert.throws(() => validateExternalReference({ ...reference(), pipelineArtifact: { ...reference().pipelineArtifact, documentClass } }), (error) => error.code === "ERA-REFERENCE", JSON.stringify(documentClass));
+  }
+  const { documentClass: _omit, ...withoutDocumentClass } = reference().pipelineArtifact;
+  assert.throws(() => validateExternalReference({ ...reference(), pipelineArtifact: withoutDocumentClass }), (error) => error.code === "ERA-REFERENCE");
 });
 // X-AC-07: adapter credentials and private coordinates stay in approved
 // machine-local storage and never reach portable evidence or diagnostics. The
@@ -218,4 +229,47 @@ test("X-AC-12 proves one provider-neutral core contract across issue-tracker, kn
       assert.equal(mismatched.reason, "capability-or-policy");
     }
   }
+});
+
+// X-AC-11: a reference that declares a governed document class must consume
+// the effective organization policy for that class rather than the adapter
+// asserting a parallel authority.
+const organizationPolicy = (documentClasses = []) => ({ schema: "pipeline.effective-organization-policy.v1", coreVersion: "0.4.7", governanceFloors: { requireHumanDecisionLedger: true, allowExternalAuthority: false }, packs: [], documentClasses });
+const governedReference = (documentClass = "security") => ({ ...reference(), pipelineArtifact: { ...reference().pipelineArtifact, documentClass } });
+
+test("X-AC-11 rejects a governed reference when no organization policy is supplied", async () => {
+  const rejected = await planExternalReferenceWrite({ resolveIdentity, reference: governedReference(), capabilities, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }) });
+  assert.equal(rejected.status, "rejected"); assert.equal(rejected.reason, "policy-required"); assert.equal(rejected.plan, null);
+});
+
+test("X-AC-11 rejects a governed reference when the effective policy has no covering class entry", async () => {
+  const uncovered = organizationPolicy([{ class: "operations", mode: "projection", approvalRequired: false, packIds: ["operations-baseline"] }]);
+  const rejected = await planExternalReferenceWrite({ resolveIdentity, reference: governedReference(), capabilities, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }), organizationPolicy: uncovered });
+  assert.equal(rejected.status, "rejected"); assert.equal(rejected.reason, "policy-uncovered-class"); assert.equal(rejected.plan, null);
+});
+
+test("X-AC-11 rejects a governed reference when the effective policy's mode disagrees with the adapter's declared mode", async () => {
+  const mismatched = organizationPolicy([{ class: "security", mode: "reference-only", approvalRequired: false, packIds: ["security-baseline"] }]);
+  const rejected = await planExternalReferenceWrite({ resolveIdentity, reference: governedReference(), capabilities, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }), organizationPolicy: mismatched });
+  assert.equal(rejected.status, "rejected"); assert.equal(rejected.reason, "policy-mode-mismatch"); assert.equal(rejected.plan, null);
+});
+
+test("X-AC-11 rejects a governed reference when the effective policy requires approval", async () => {
+  const approvalGated = organizationPolicy([{ class: "security", mode: "controlled-publication", approvalRequired: true, packIds: ["security-baseline"] }]);
+  const rejected = await planExternalReferenceWrite({ resolveIdentity, reference: governedReference(), capabilities, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }), organizationPolicy: approvalGated });
+  assert.equal(rejected.status, "rejected"); assert.equal(rejected.reason, "policy-approval-required"); assert.equal(rejected.plan, null);
+});
+
+test("X-AC-11 permits a governed reference to proceed when the effective policy's mode matches and approval is not required", async () => {
+  const compliant = organizationPolicy([{ class: "security", mode: "controlled-publication", approvalRequired: false, packIds: ["security-baseline"] }]);
+  const planned = await planExternalReferenceWrite({ resolveIdentity, reference: governedReference(), capabilities, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }), organizationPolicy: compliant });
+  assert.equal(planned.status, "preview"); assert.equal(planned.reason, null); assert.ok(planned.plan);
+  assert.equal(planned.plan.reference.pipelineArtifact.documentClass, "security");
+});
+
+test("X-AC-11 never consults organization policy for an ungoverned reference, even when one is supplied", async () => {
+  const invalidPolicy = { not: "a valid effective policy" };
+  const withPolicy = await planExternalReferenceWrite({ resolveIdentity, reference: reference(), capabilities, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }), organizationPolicy: invalidPolicy });
+  const withoutPolicy = await planExternalReferenceWrite({ resolveIdentity, reference: reference(), capabilities, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }) });
+  assert.equal(withPolicy.status, "preview"); assert.deepEqual(withPolicy.plan, withoutPolicy.plan);
 });
