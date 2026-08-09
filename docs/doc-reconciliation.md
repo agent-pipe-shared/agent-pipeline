@@ -47,6 +47,20 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 2d295c18db2861737e9a5fb5c811834af6d94f07 — 2026-08-10, range 3387065..2d295c18, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `fc89a5f6` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `d6615c3b` through `2d295c18`: three dispatches (C-AC-02, A-AC-07, P-AC-01/P-AC-03), their
+independent verification, evidence-map bookings, and checkpoint. `governance/events/capture-
+policy.json` and `governance/schemas/*` were touched by A-AC-07 but confirmed not ADR-governed (not
+implicated by this check). No code in this range touches the canonical artifact topology ADR-0045
+governs beyond ordinary content evolution inside files it already lists. Same reading as the whole
+chain: `docs/state.md` stays ADR-0012, the generated evidence-map/closure-plan/design-doc set stays
+ADR-0045.
+
 ## Candidate fc89a5f6cc8c4ca4aab81df1e9142119c8c94c96 — 2026-08-09, range 3387065..fc89a5f6, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
