@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "9d6df79eca05b0dbd720000039a98d17f15dc4cef7af0fe3978f95b80e6227f2"
+    "transitionHead": "2e3f6f310db50702115ff96ff7cbeb3bcf5fb5ad4698a064e32346748e6b919e"
   },
   "counts": {
-    "open": 93,
+    "open": 94,
     "in_progress": 21,
     "closed": 28
   },
@@ -848,6 +848,14 @@
       "owner": "pipeline",
       "created": "2026-08-09",
       "source": "Both greenfield happy-path tests the PO ran against the 0.5.4 local candidate on 2026-08-09, one per runner, read read-only by the Elephant at the PO's invitation. Two independent runs, same two symptoms."
+    },
+    {
+      "id": "pipeline.push-gate-is-silent-in-every-consumer-project",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "Found by the PO while reviewing the Codex greenfield run of 2026-08-09: the agent pushed to a GitHub remote and no approval, verify evidence or security evidence was ever demanded."
     },
     {
       "id": "pipeline.push-guard-worktree-target",
