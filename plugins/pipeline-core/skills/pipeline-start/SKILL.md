@@ -84,7 +84,8 @@ Restart bounds and what this consent does NOT grant →
 5. **Observation governance:** run
    `node "${PIPELINE_PLUGIN_ROOT}/scripts/observation-governance-bootstrap.mjs" --root "$PWD"`
    before confirmation. `not-applicable` is the successful Consumer result; a
-   `failed` source checkout is case **F6** → `references/failure-cases.md`.
+   source checkout runs `node harness/scripts/check-observation-governance.mjs`,
+   and a `failed` one is case **F6** → `references/failure-cases.md`.
 
 6. **Restart hint for material session input:** before a first kickoff **and
    before proposing, displaying, or performing any restart, session cut or
