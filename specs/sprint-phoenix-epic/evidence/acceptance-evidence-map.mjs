@@ -332,6 +332,21 @@ const DELTA = {
   // unchanged; pipeline-authority/emergency-authority checks proven additive,
   // never bypassed, under advisory. 15/15 change-control-tests pass.
   'C-AC-12': ['implemented', 'WP-C-AC12'],
+  // WP-C-AC07 CLOSED 2026-08-09 (goldfish-deep): journalBinding/
+  // createChangeControlJournal now carry changeClass, so the journal knows
+  // it is tracking an emergency deployment. A new `retrospective` entry class
+  // records after-the-fact evidence; appendChangeControlEntry refuses one
+  // that predates, or is not strictly later than, the local event it
+  // reviews -- it cannot exist at gate time by construction. For
+  // changeClass:"emergency", projectChangeControlState now withholds
+  // `completed` (a new `emergency-review-required` /
+  // `retrospective-evidence-outstanding` status distinct from both
+  // `completed` and `reconciliation-required`) until retrospective evidence
+  // for the validated event is present, additive to C-AC-06's existing
+  // published-external-update bar, never a substitute for it. Every other
+  // changeClass (standard/normal/not-required) is proven byte-for-byte
+  // unchanged. 17/17 change-control-tests pass (independently re-run).
+  'C-AC-07': ['implemented', 'WP-C-AC07'],
 
   // --- evidence/phx-wp-a.txt (task PHX-WP-A, 2026-08-09, commit 055cb8b) ---
   // Independently re-run: 12/12 agent-decision-journal-tests pass, all three

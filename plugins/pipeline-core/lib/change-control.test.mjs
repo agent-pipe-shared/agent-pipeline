@@ -12,7 +12,8 @@ test("blocks stale, unauthenticated, mismatched, unavailable, and outside-window
   for (const externalReceipt of [null, receipt({ authenticated: false }), receipt({ state: "draft" }), receipt({ environment: "staging" })]) assert.equal(evaluateChangeControlGate({ profile: profile(), pipelineAuthority: local(), externalReceipt, nowEpochMs: 15 }).status, "blocked");
   assert.equal(evaluateChangeControlGate({ profile: profile(), pipelineAuthority: local(), externalReceipt: receipt(), nowEpochMs: 21 }).reason, "outside-window");
 });
-const binding = { profileId: "production-change", candidate, artifact, environment: "production", scopeSha256: "e".repeat(64) };
+const binding = { profileId: "production-change", candidate, artifact, environment: "production", scopeSha256: "e".repeat(64), changeClass: "normal" };
+const retrospectiveEvent = (forEvent, occurredAtEpochMs) => ({ class: "retrospective", forEvent, occurredAtEpochMs, evidenceSha256: "f".repeat(64) });
 const localEvent = (event, occurredAtEpochMs) => ({ class: "local", event, occurredAtEpochMs, evidenceSha256: "f".repeat(64) });
 const externalEvent = (forEvent, disposition, occurredAtEpochMs, receiptId = null) => ({ class: "external", forEvent, disposition, occurredAtEpochMs, receiptId });
 const journalOf = (...entries) => entries.reduce(appendChangeControlEntry, createChangeControlJournal(binding));
@@ -141,10 +142,7 @@ test("C-AC-02 requires a well-formed standardTemplate only when changeClass is s
 
 // C-AC-07: an emergency authorization is bound to the exact scope hash like any
 // other class -- it cannot be reused across a mismatched scope, so "bounded
-// scope" holds even under emergency. Retrospective evidence distinctly proving
-// the emergency was real/reviewed is ABSENT: `localEntry`'s evidenceSha256 is
-// generic to every deployment event and is never gated on changeClass (see
-// evidence/phx-wp-c.txt).
+// scope" holds even under emergency.
 test("C-AC-07 keeps emergency authority bounded to its exact scope instead of acting as a generic bypass", () => {
   const mismatched = evaluateChangeControlGate({
     profile: profile({ changeClass: "emergency" }),
@@ -154,6 +152,66 @@ test("C-AC-07 keeps emergency authority bounded to its exact scope instead of ac
   });
   assert.equal(mismatched.status, "blocked");
   assert.equal(mismatched.reason, "pipeline-authority");
+});
+
+// C-AC-07 (WP-C-AC07): retrospective evidence -- necessarily after-the-fact,
+// since appendChangeControlEntry refuses it before the local event it reviews
+// exists and requires it strictly later in time -- is now required before an
+// emergency-class deployment reports completed change control, even once its
+// external update is published exactly as C-AC-06 already requires.
+test("C-AC-07 requires retrospective evidence before an emergency-class deployment reports completed change control", () => {
+  const emergencyBinding = { ...binding, changeClass: "emergency" };
+  const emergencyJournalOf = (...entries) => entries.reduce(appendChangeControlEntry, createChangeControlJournal(emergencyBinding));
+  const deployed = emergencyJournalOf(localEvent("began", 1), externalEvent("began", "published", 2), localEvent("validated", 3), externalEvent("validated", "published", 4));
+  // The external update is published (C-AC-06's own bar), but without
+  // retrospective evidence this is distinctly NOT completed, and distinctly
+  // NOT the ordinary "external update outstanding" reconciliation-required
+  // either -- both the status and the reason name the missing artifact.
+  const pending = projectChangeControlState(deployed);
+  assert.equal(pending.status, "emergency-review-required");
+  assert.equal(pending.reason, "retrospective-evidence-outstanding");
+  assert.notEqual(pending.status, "completed");
+  assert.notEqual(pending.status, "reconciliation-required");
+  // Missing the external update entirely is still ordinary reconciliation-
+  // required, regardless of changeClass -- retrospective evidence is an
+  // ADDITIONAL bar on top of C-AC-06's, never a substitute for it.
+  const undeployedExternally = emergencyJournalOf(localEvent("began", 1), externalEvent("began", "published", 2), localEvent("validated", 3));
+  assert.equal(projectChangeControlState(undeployedExternally).status, "reconciliation-required");
+  assert.equal(projectChangeControlState(undeployedExternally).reason, "external-update-outstanding");
+  // A retrospective entry cannot be backdated to or before the event it
+  // reviews -- it must be a genuinely later act.
+  assert.throws(() => appendChangeControlEntry(deployed, retrospectiveEvent("validated", 3)), (error) => error.code === "CC-JOURNAL-ORDER");
+  assert.throws(() => appendChangeControlEntry(deployed, retrospectiveEvent("validated", 2)), (error) => error.code === "CC-JOURNAL-ORDER");
+  // Nor can it review an event that never happened locally.
+  assert.throws(() => appendChangeControlEntry(deployed, retrospectiveEvent("rolled-back", 5)), (error) => error.code === "CC-JOURNAL-ORDER");
+  // Once genuinely later retrospective evidence for the validated event is
+  // appended, the same journal now reports completed change control.
+  const reviewed = appendChangeControlEntry(deployed, retrospectiveEvent("validated", 5));
+  const completed = projectChangeControlState(reviewed);
+  assert.equal(completed.status, "completed");
+  assert.equal(completed.reason, "composed-change-control");
+});
+
+// C-AC-07 (WP-C-AC07): a non-emergency-class deployment's journal, append
+// behavior, and completion projection are completely unaffected by the
+// retrospective-evidence requirement -- the same assertions C-AC-06 already
+// proves for `changeClass: "normal"` above hold unchanged for every other
+// non-emergency class, with no retrospective entry ever appended.
+test("C-AC-07 leaves a non-emergency-class deployment's journal and completion behavior unaffected", () => {
+  for (const changeClass of ["standard", "normal", "not-required"]) {
+    const classBinding = { ...binding, changeClass };
+    const classJournalOf = (...entries) => entries.reduce(appendChangeControlEntry, createChangeControlJournal(classBinding));
+    const deployed = classJournalOf(localEvent("began", 1), externalEvent("began", "published", 2), localEvent("validated", 3), externalEvent("validated", "published", 4));
+    const state = projectChangeControlState(deployed);
+    assert.equal(state.status, "completed", changeClass);
+    assert.equal(state.reason, "composed-change-control", changeClass);
+    // Missing the external update is still ordinary reconciliation-required,
+    // never the emergency-only review status, for every non-emergency class.
+    const outstanding = classJournalOf(localEvent("began", 1), externalEvent("began", "published", 2), localEvent("validated", 3));
+    const outstandingState = projectChangeControlState(outstanding);
+    assert.equal(outstandingState.status, "reconciliation-required", changeClass);
+    assert.notEqual(outstandingState.status, "emergency-review-required", changeClass);
+  }
 });
 
 // C-AC-12: the gate names a distinct, operator-visible reason when the external

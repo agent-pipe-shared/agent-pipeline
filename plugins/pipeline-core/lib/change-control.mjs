@@ -64,15 +64,18 @@ const DEPLOYMENT_EVENTS = new Set(["began", "validated", "failed", "rolled-back"
 const DEPLOYMENT_ORDER = { began: new Set(["validated", "failed"]), validated: new Set(["rolled-back"]), failed: new Set(["rolled-back"]), "rolled-back": new Set() };
 const EXTERNAL_DISPOSITIONS = new Set(["published", "publish-failed", "readback-failed", "readback-mismatch", "unavailable"]);
 
+const CHANGE_CLASSES = new Set(["standard", "normal", "emergency", "not-required"]);
+
 function journalBinding(value) {
-  return exact(value, ["profileId", "candidate", "artifact", "environment", "scopeSha256"])
-    && ID.test(value.profileId) && candidate(value.candidate) && artifact(value.artifact) && ID.test(value.environment) && SHA.test(value.scopeSha256);
+  return exact(value, ["profileId", "candidate", "artifact", "environment", "scopeSha256", "changeClass"])
+    && ID.test(value.profileId) && candidate(value.candidate) && artifact(value.artifact) && ID.test(value.environment) && SHA.test(value.scopeSha256)
+    && CHANGE_CLASSES.has(value.changeClass);
 }
 
 /** Opens an empty append-only deployment journal bound to one change tuple. */
 export function createChangeControlJournal(binding) {
   if (!journalBinding(binding)) fail("CC-JOURNAL");
-  return Object.freeze({ schema: JOURNAL_SCHEMA, profileId: binding.profileId, candidate: Object.freeze({ ...binding.candidate }), artifact: Object.freeze({ ...binding.artifact }), environment: binding.environment, scopeSha256: binding.scopeSha256, entries: Object.freeze([]) });
+  return Object.freeze({ schema: JOURNAL_SCHEMA, profileId: binding.profileId, candidate: Object.freeze({ ...binding.candidate }), artifact: Object.freeze({ ...binding.artifact }), environment: binding.environment, scopeSha256: binding.scopeSha256, changeClass: binding.changeClass, entries: Object.freeze([]) });
 }
 
 function localEntry(value) {
@@ -85,10 +88,20 @@ function externalEntry(value) {
     && Number.isSafeInteger(value.occurredAtEpochMs) && value.occurredAtEpochMs >= 0
     && (value.receiptId === null || ID.test(value.receiptId));
 }
+// C-AC-07: retrospective evidence that an emergency change was real or was
+// reviewed after the fact. It is its own entry class, not a field on the
+// local event, precisely so it cannot exist at the moment the gate allows
+// the change (localEntry's evidenceSha256 is contemporaneous with the
+// deployment itself) -- appendChangeControlEntry below requires it to
+// reference an event that already happened locally, strictly later in time.
+function retrospectiveEntry(value) {
+  return exact(value, ["class", "forEvent", "occurredAtEpochMs", "evidenceSha256"]) && value.class === "retrospective"
+    && DEPLOYMENT_EVENTS.has(value.forEvent) && Number.isSafeInteger(value.occurredAtEpochMs) && value.occurredAtEpochMs >= 0 && SHA.test(value.evidenceSha256);
+}
 
-/** Appends one entry, rejecting any order that would let an external report precede its local event. */
+/** Appends one entry, rejecting any order that would let an external report or a retrospective review precede its local event. */
 export function appendChangeControlEntry(journal, entry) {
-  if (!exact(journal, ["schema", "profileId", "candidate", "artifact", "environment", "scopeSha256", "entries"]) || journal.schema !== JOURNAL_SCHEMA || !Array.isArray(journal.entries)) fail("CC-JOURNAL");
+  if (!exact(journal, ["schema", "profileId", "candidate", "artifact", "environment", "scopeSha256", "changeClass", "entries"]) || journal.schema !== JOURNAL_SCHEMA || !Array.isArray(journal.entries)) fail("CC-JOURNAL");
   const entries = journal.entries;
   const last = entries.length === 0 ? null : entries[entries.length - 1];
   if (last !== null && Number.isSafeInteger(entry?.occurredAtEpochMs) && entry.occurredAtEpochMs < last.occurredAtEpochMs) fail("CC-JOURNAL-ORDER");
@@ -99,16 +112,23 @@ export function appendChangeControlEntry(journal, entry) {
   } else if (externalEntry(entry)) {
     // C-AC-05: the external update is publishable only after its local event.
     if (!entries.some((item) => item.class === "local" && item.event === entry.forEvent)) fail("CC-JOURNAL-ORDER");
+  } else if (retrospectiveEntry(entry)) {
+    // C-AC-07: the review must follow, and be strictly later than, the local
+    // event it reviews -- it cannot be backdated to the moment the gate
+    // allowed the change.
+    const matchingLocals = entries.filter((item) => item.class === "local" && item.event === entry.forEvent);
+    if (matchingLocals.length === 0 || entry.occurredAtEpochMs <= matchingLocals[matchingLocals.length - 1].occurredAtEpochMs) fail("CC-JOURNAL-ORDER");
   } else fail("CC-JOURNAL-ENTRY");
   return Object.freeze({ ...journal, candidate: Object.freeze({ ...journal.candidate }), artifact: Object.freeze({ ...journal.artifact }), entries: Object.freeze([...entries.map((item) => Object.freeze({ ...item })), Object.freeze({ ...entry })]) });
 }
 
 /** Projects the journal without ever upgrading an unpublished deployment to completed change control. */
 export function projectChangeControlState(journal) {
-  if (!exact(journal, ["schema", "profileId", "candidate", "artifact", "environment", "scopeSha256", "entries"]) || journal.schema !== JOURNAL_SCHEMA
-    || !Array.isArray(journal.entries) || !journal.entries.every((entry) => localEntry(entry) || externalEntry(entry))) fail("CC-JOURNAL");
+  if (!exact(journal, ["schema", "profileId", "candidate", "artifact", "environment", "scopeSha256", "changeClass", "entries"]) || journal.schema !== JOURNAL_SCHEMA
+    || !Array.isArray(journal.entries) || !journal.entries.every((entry) => localEntry(entry) || externalEntry(entry) || retrospectiveEntry(entry))) fail("CC-JOURNAL");
   const locals = journal.entries.filter((entry) => entry.class === "local");
   const externals = journal.entries.filter((entry) => entry.class === "external");
+  const retrospectives = journal.entries.filter((entry) => entry.class === "retrospective");
   const current = locals.length === 0 ? null : locals[locals.length - 1].event;
   // Every attempt is retained, including the failed ones: a later success must
   // not be able to hide that the external system was ever out of step.
@@ -123,6 +143,11 @@ export function projectChangeControlState(journal) {
     const forEvent = attempts.filter((entry) => entry.forEvent === event);
     return forEvent.length > 0 && forEvent[forEvent.length - 1].disposition === "published";
   };
+  // C-AC-07: presence of retrospective evidence for a given local event,
+  // order-blind by design -- unlike external dispositions there is no
+  // "unpublish"; once genuine after-the-fact evidence exists for an event it
+  // stays true for that event.
+  const hasRetrospective = (event) => retrospectives.some((entry) => entry.forEvent === event);
   const projection = (status, reason) => Object.freeze({ schema: "pipeline.change-control-state.v1", status, reason, deploymentEvent: current, deploymentEvidenceRetained: locals.length > 0, attempts, failedAttempts });
   if (current === null) return projection("not-started", "no-local-event");
   if (current === "began") return projection("in-progress", "deployment-began");
@@ -130,7 +155,11 @@ export function projectChangeControlState(journal) {
   if (current === "rolled-back") return projection(published("rolled-back") ? "rolled-back" : "reconciliation-required", published("rolled-back") ? "deployment-rolled-back" : "external-update-outstanding");
   // C-AC-06: deployment succeeded, so its evidence is retained either way -- but
   // without a published external update this is not completed change control.
-  return published("validated")
-    ? projection("completed", "composed-change-control")
-    : projection("reconciliation-required", "external-update-outstanding");
+  if (!published("validated")) return projection("reconciliation-required", "external-update-outstanding");
+  // C-AC-07: an emergency-class deployment additionally needs retrospective
+  // evidence -- distinct from, and necessarily later-obtainable than, the
+  // external update above -- before it may report completed change control.
+  // Every other class is unaffected: this branch is unreachable for them.
+  if (journal.changeClass === "emergency" && !hasRetrospective("validated")) return projection("emergency-review-required", "retrospective-evidence-outstanding");
+  return projection("completed", "composed-change-control");
 }
