@@ -3930,6 +3930,29 @@ fact still gets fixed immediately rather than left for a future session to redis
 
 **Live now: none.** Both WP-H-AC12 and WP-GA-FIX are closed, verified, and booked.
 
+### PROACTIVE REPO-WIDE AUDIT: SIX MORE FILES BROKEN BY THE SAME A-AC-07 SCHEMA CHANGE
+
+Acting on the "generalized further" lesson immediately rather than waiting to stumble onto the
+next one: dispatched a read-only research agent to search the WHOLE repo for every other hand-built
+`pipeline.governance-capture-policy.v1` fixture and check its test status. Found six more currently
+broken, all the same root cause (missing `mandatoryEventClasses`, same `GES-CAPTURE-POLICY` error
+from `loadCapturePolicy`), with real failure counts: `governance-event.test.mjs` (1/2 failing),
+`human-authority-grant.test.mjs` (3/14), `human-governance-ledger.test.mjs` (5/24),
+`governance-export-delivery.test.mjs` (1/20), `guard-git-phoenix.test.mjs` (1/1),
+`guard-git-phoenix-authority-grant.test.mjs` (1/1, possibly a different downstream root cause —
+flagged for the dispatch to verify rather than assume). The real repo file
+`governance/events/capture-policy.json` itself was already correct (has all 7 classes) — this was
+purely a test-fixture-lag problem, not a production gap.
+
+Dispatched **WP-CP-FIX**, one bulk mechanical fix across all six files (same single-field addition,
+repeated identically — a goldfish-mechanic task, not six separate dispatches, since it's uniform
+repetition with zero per-file design decision). Explicitly told to verify file 6's root cause
+before assuming the identical fix applies, and to continue fixing the other five even if any one
+file needs different handling.
+
+**Live now:** WP-CP-FIX. This is currently the highest-priority live thread — it's closing real,
+already-broken test suites, not extending new coverage.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
