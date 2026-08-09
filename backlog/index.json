@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "6eccc553e253c6952c02164b3fbe2161ed5e34164330641842d072082218d07b"
+    "transitionHead": "0a4eda17e4857d1ac93474a026cd56c60aa680d8b7b26f0ef01bb7b1a33fb47a"
   },
   "counts": {
-    "open": 116,
+    "open": 117,
     "in_progress": 21,
     "closed": 38
   },
@@ -1121,6 +1121,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "PO, live during the 0.5.2 main-release session, 2026-08-07 — verbatim: 'Eine Entwickler Agent-Pipeline die nicht pushen und releasen kann ist unbrauchbar, außerdem viel zu unhandlich mit so vielen Freigaben.'"
+    },
+    {
+      "id": "pipeline.raw-apply_patch-is-unconditionally-admitted-by-the-outer-lifecycle-gate",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "GF-078 (goldfish-deep), while fixing plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs's isRestartResumeHintInputWrite for Codex's apply_patch tool, 2026-08-09. The narrow fix landed (commit 92c4ee71) and is correct; this item documents a broader, adjacent reachability question the same investigation surfaced."
     },
     {
       "id": "pipeline.ready-gate-env-var-runner-authority",
