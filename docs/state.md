@@ -3634,6 +3634,31 @@ of the six files already worked today (`governance-export-outbox.mjs`, `external
 **Live now:** O-1/O-2-design round-5 (final) Critic, WP-A-AC08 (redispatched), WP-E-AC04,
 WP-V-AC02. K-AC-05 parked. Handover fully current through this checkpoint.
 
+### E-AC-04 AND A-AC-08 CLOSED, BOTH INDEPENDENTLY VERIFIED
+
+WP-E-AC04 landed clean: an optional, closed `redactedFieldPolicy` key on the
+`governance-export-adapter.mjs` profile admits only `rationale`/`summary`, each resolved through a
+closed `REDACTION_TRANSFORMS` table to a fixed marker — never the raw value; default behavior
+(no policy) is unchanged, still omitted; a named field with a missing/unrecognised transform fails
+closed (`GEA-PROFILE`). Verified independently (7/7 tests, full diff read). Booked `implemented`
+(`4e905951`).
+
+WP-A-AC08's redispatch (with the Elephant's conservative-heuristic decision handed in as already-
+resolved) also landed clean: `harness/scripts/check-dispatch-provenance.mjs`, 376 lines, walks a
+commit range and flags `MISSING-DISPATCH-PROVENANCE` for anything touching tracked source with
+neither a valid `Dispatch:` trailer nor the stage-0 exemption (phrase match ANDed with EL-01's two
+mechanical caps); a "WHAT THIS CHECK CANNOT DO" section is present both in the module header and
+in its own runtime output, confirmed by direct read at both locations — the blind spot is
+disclosed at the point of use, not just in a comment. Verified independently (23/23 tests). Judged
+`implemented`, not `partial`: A-AC-08's own text is "retain a matching reference and detect missing
+required provenance" — the disclosed exemption-heuristic limitation is a related design choice
+about avoiding false positives on legitimate stage-0 commits, not a gap in the criterion's actual
+detection requirement (a heuristic miss there still fails closed, flagging for human review, never
+silently passing). Booked `implemented` (`295158fd`).
+
+**Live now:** O-1/O-2-design round-5 (final) Critic, WP-V-AC02. K-AC-05 parked. Handover fully
+current through this checkpoint.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
