@@ -36,10 +36,13 @@
 | pipeline.closed-input-channel-review-economics | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.codex-plugin-validator-host-parity | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
+| pipeline.codex-read-only-steps-escalate-individually-instead-of-once | open | idea | pipeline | 2026-08-09 | — |
+| pipeline.codex-restart-cannot-recover-operational-context-from-its-own-prior-transcript | open | idea | pipeline | 2026-08-09 | — |
 | pipeline.codex-sandbox-critic-longterm | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.concurrent-dispatches-share-one-index | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.contract-suite-borrows-its-fixture-by-importing-a-109-test-file | closed | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.critic-context-isolation | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
+| pipeline.critic-review-has-no-defined-path-for-a-root-commit | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.critical-human-proof-not-materialized-for-signature-mode | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.critical-human-proof-not-wired-to-push-and-prd-gates | open | defect | pipeline | 2026-08-05 | — |
 | pipeline.critical-human-proof-policy-seeded-without-trust-anchor | open | idea | pipeline | 2026-08-09 | — |
@@ -94,6 +97,7 @@
 | pipeline.native-windows-verify-red-suite-class | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.neutral-authority-tier-is-a-frozen-snapshot-the-compiler-never-updates | open | defect | pipeline | 2026-08-06 | — |
 | pipeline.no-design-to-implementation-handover-exists | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.no-durable-practice-for-mining-session-transcripts-for-happy-path-defects | open | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.no-gate-is-tested-end-to-end-for-satisfiability | open | workflow-improvement | pipeline | 2026-08-06 | — |
 | pipeline.no-governed-directory-contract | open | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.no-sanctioned-way-to-start-over | open | defect | pipeline | 2026-08-08 | — |
@@ -121,6 +125,7 @@
 | pipeline.project-scoped-github-issue-operations | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.promotion-freezes-a-prd-the-po-gate-will-reject | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.promotion-leaves-the-handover-and-the-runtime-language-frozen-at-kickoff | open | defect | pipeline | 2026-08-09 | — |
+| pipeline.push-approval-signature-ceremony-is-not-staged-by-project-profile | open | idea | pipeline | 2026-08-09 | — |
 | pipeline.push-approval-skill-reference-predates-adr-0061 | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.push-gate-is-silent-in-every-consumer-project | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.push-guard-worktree-target | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -177,6 +182,6 @@
 
 ## Counts
 
-- open: 110
+- open: 115
 - in_progress: 21
 - closed: 38

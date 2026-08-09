@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "2c7fe57f93f3e2a55689f5ec6fddf038f25e7aa5de81e46d52af3a8654b2414f"
+    "transitionHead": "d47829d5a93d763bdbbb255e6fd525293a09b97960aa2a365208edbb13c98b1f"
   },
   "counts": {
-    "open": 110,
+    "open": 115,
     "in_progress": 21,
     "closed": 38
   },
@@ -280,6 +280,22 @@
       "tracking": "Sentinel recovery baseline; no completion claim."
     },
     {
+      "id": "pipeline.codex-read-only-steps-escalate-individually-instead-of-once",
+      "status": "open",
+      "type": "idea",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "Live Codex+Pipeline 0.5.4 greenfield test session, 2026-08-09 (three rollout files) — 98 individually-escalated read-only sandbox approvals measured across the session."
+    },
+    {
+      "id": "pipeline.codex-restart-cannot-recover-operational-context-from-its-own-prior-transcript",
+      "status": "open",
+      "type": "idea",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "PO observation of a live Codex greenfield test session, 2026-08-09 (three rollout files, two restarts), plus independent forensic confirmation that the sanitized resume-hint card cannot carry this class of information by design."
+    },
+    {
       "id": "pipeline.codex-sandbox-critic-longterm",
       "status": "in_progress",
       "type": "defect",
@@ -315,6 +331,14 @@
       "owner": "pipeline",
       "created": "2026-07-20",
       "source": "Public V3 Foundation stabilization close retro: an independent Critic run was discarded after an out-of-band coordinator status message reached its context"
+    },
+    {
+      "id": "pipeline.critic-review-has-no-defined-path-for-a-root-commit",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "Codex self-report from a live greenfield test session, 2026-08-09 (rollout files under /home/skar667/.codex/sessions/2026/08/09/), cross-checked by the Elephant directly against plugins/pipeline-core/skills/critic-review/SKILL.md."
     },
     {
       "id": "pipeline.critical-human-proof-not-materialized-for-signature-mode",
@@ -780,6 +804,14 @@
       "source": "Greenfield onboarding handover from a parallel Claude session, 2026-08-08, finding 6 of 12. Located in code by that session."
     },
     {
+      "id": "pipeline.no-durable-practice-for-mining-session-transcripts-for-happy-path-defects",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "PO request, 2026-08-09: 'ergänze die Telemetrie daten der Sessions und werte detailliert ihre chat verläufe/transkripte aus um Fehler zu finden und den happy path zu optimieren' — issued alongside two real greenfield test sessions this same night that were mined ad hoc (two general-purpose forensic-analysis subagent dispatches, no reusable artifact produced)."
+    },
+    {
       "id": "pipeline.no-gate-is-tested-end-to-end-for-satisfiability",
       "status": "open",
       "type": "workflow-improvement",
@@ -1032,6 +1064,14 @@
       "owner": "pipeline",
       "created": "2026-08-09",
       "source": "Both greenfield happy-path tests the PO ran against the 0.5.4 local candidate on 2026-08-09, one per runner, read read-only by the Elephant at the PO's invitation. Two independent runs, same two symptoms."
+    },
+    {
+      "id": "pipeline.push-approval-signature-ceremony-is-not-staged-by-project-profile",
+      "status": "open",
+      "type": "idea",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "Live Claude+Pipeline 0.5.4 greenfield test session, 2026-08-09 (session 6c12cf91) — a static three-file browser game with an explicitly stated 'no backend, no install' scope still went through the full signed push-approval ceremony."
     },
     {
       "id": "pipeline.push-approval-skill-reference-predates-adr-0061",
