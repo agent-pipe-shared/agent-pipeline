@@ -1887,6 +1887,53 @@ The dispatch substituted two real sibling suites under an explicit label rather 
 skipping the check, and it removed a QG-06 deferred decision whose promise its own
 work had made obsolete instead of leaving a stale expiry standing.
 
+### PO DECISIONS OF 2026-08-09 — all three open items are now decided, and a fourth job was added
+
+**1. The 22 commits with forbidden trailers: option (a), accept and record.** The PO's
+words: *"wir machen a) ich sehe auch das risiko gering und wichtig ist die korrektur."*
+This is the acceptance, and this paragraph is the record GIT-03's public-history clause
+asks for.
+
+What is being accepted, precisely, so that nobody has to reconstruct it later: 22 commits
+reachable from `origin/sprint_phoenix` carry `Co-Authored-By: Claude Opus 5 (1M context)`
+and `Claude-Session: https://claude.ai/code/session_…`. The first is provider metadata
+that `AI-Assisted: true` already covers. The second is the one that matters: a stable
+per-session identifier that lets a reader **group** commits by the private session that
+produced them, and from that read off working hours, session lengths and ordering. The
+linked transcript is account-bound and unreadable to a stranger; the correlation is in the
+identifiers being equal, not in what they point at. That is what GIT-03 means by
+"correlation trailer".
+
+**GIT-03 is not weakened by this and is not being amended.** The guard refuses these
+trailers on every new commit with no override, proven by probe, and 0 of the 99 commits in
+`origin/sprint_phoenix..HEAD` carries one. What is accepted is 22 commits of history that
+were already public before the question was asked. Nothing here licenses a future one.
+
+**2. ADR-0040: the record was wrong, not the code.** The PO changed the advisor-export
+default themselves and the decision record was never updated. So the ADR moves to
+enabled-by-default, `setup.mjs` and its registered test stay as they are, and the
+"registered test defends the side that contradicts the ADR" problem dissolves — the test
+was defending the correct side all along.
+
+**3. ADR-0038's status line: amend to match ADR-0047's own claim**, and build the narrow
+mechanical detector proposed with it. Not a general ADR-versus-code checker.
+
+**4. The three ADRs numbered 0047 get real numbers.** The PO's reading of the cause is
+parallel sprints, which fits the dates. They are thematically unrelated, so nothing is
+merged: the advisor-preflight one keeps 0047 because every inbound status line means it,
+and the other two become 0061 (local supervisor state authority) and 0062 (governance
+event kernel). Dispatched together with items 2 and 3 as `PHX-ADR-FIX`. The collision has
+been a filed backlog item since 2026-08-07, parked on exactly the PO call that has now
+been made.
+
+**5. A new job, and it is the sharpest thing the PO said tonight.** A check must force a
+session to reconcile new content against the documentation layer — ADRs first — before a
+push or a feature/sprint close. Their reasoning is the part worth keeping: *the elephant
+that finishes and pushes is not the elephant that started, and compacts happen in
+between*, so a handover note is not a mechanism. Either the obligation is mechanical and
+bound to the commit range it covers, or it is a promise that survives exactly one context
+window. Design and dispatch pending; lightweight first, by their explicit instruction.
+
 ### THE TRAILER WINDOW WAS ALREADY CLOSED WHEN I CALLED IT CLOSING, and the PO cleared the pins (2026-08-09)
 
 Two of the three remaining decisions moved. One because the PO answered; one because I
