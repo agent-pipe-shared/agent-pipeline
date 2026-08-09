@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v2",
   "sourceBaseline": {
-    "commit": "046cb0b9c9fae12da7862f45428f52500e621efa",
-    "tree": "85ae59480a6a498fa500a67cafb9a406d38c0a52"
+    "commit": "28ff2d2b5136c3fbc62841c6ff14b946867bd4c0",
+    "tree": "79fb9b0fb428362727a11677462d43f54e9f6753"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -1397,6 +1397,12 @@
       "member": "nova-verify-resume-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:obligations-contract-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "obligations-contract-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:observation-governance-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1697,10 +1703,22 @@
       "member": "release-version-plan-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:repair-map-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "repair-map-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:repository-freshness-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "repository-freshness-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:resume-hint-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "resume-hint-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:review-economy-tests",
@@ -2385,6 +2403,7 @@
         "verify-phase:harness/scripts/verify.mjs:nova-scheduling-lifecycle-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-verify-journal-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-verify-resume-tests",
+        "verify-phase:harness/scripts/verify.mjs:obligations-contract-tests",
         "verify-phase:harness/scripts/verify.mjs:observation-governance-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-continuity-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-runner-identity-tests",
@@ -2433,7 +2452,9 @@
         "verify-phase:harness/scripts/verify.mjs:reference-path-tests",
         "verify-phase:harness/scripts/verify.mjs:release-preflight-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:release-version-plan-tests",
+        "verify-phase:harness/scripts/verify.mjs:repair-map-tests",
         "verify-phase:harness/scripts/verify.mjs:repository-freshness-tests",
+        "verify-phase:harness/scripts/verify.mjs:resume-hint-tests",
         "verify-phase:harness/scripts/verify.mjs:review-economy-tests",
         "verify-phase:harness/scripts/verify.mjs:route-receipt-tests",
         "verify-phase:harness/scripts/verify.mjs:routing-projection-check",
