@@ -1887,6 +1887,69 @@ The dispatch substituted two real sibling suites under an explicit label rather 
 skipping the check, and it removed a QG-06 deferred decision whose promise its own
 work had made obsolete instead of leaving a stale expiry standing.
 
+### FOUR OF FIVE CRITIC FINDINGS CLOSED, GATE GREEN AGAIN ON `5bd5dd6` — F3 is the last thing open
+
+**Full verify: exit 0, 368 suites, candidate `5bd5dd6`, tree `3695d78e`, `binding: "exact"`,
+clean at start and finish.**
+
+**F1 and F2 closed (`2d413d9`).** The literal instruction — read everything from the
+candidate — turned out to be impossible, and proving that is the useful part: a record
+naming commit X cannot live inside X, because writing it changes the tree and therefore the
+hash. The two inputs are not symmetric. A decision record's declaration of what it governs
+exists independently of any record, so **ADR bodies now come from the candidate commit**;
+the reconciliation record necessarily describes a commit it cannot be inside, so it now
+comes from **`--record-ref` (default `HEAD`)**. Neither is ever read from the working tree
+again. An unresolvable ref, a ref carrying no record, and a ref that cannot describe this
+candidate are three distinct typed findings rather than one silent unreconciled ADR. F2's
+`amended in <commit>` is now resolved: the commit must exist, be an ancestor of the
+candidate, and have touched the ADR it is cited for.
+
+**And the repair found what neither my briefing nor the review had right.** Both stated that
+every one of the nineteen existing fixtures commits its record before running. **Six did
+not.** They were passing for a reason their own assertion did not describe — the same defect
+class as the finding, one layer down, in the suite built to defend against it. Setup
+repaired, no assertion touched, 22/22.
+
+**F4 closed** in `7cd3c70`: the handover no longer implies the 368-suite gate executed the
+two new checks. **F5 closed** in `b0d309c`: the reconciliation obligation is now item C3a on
+the canonical Definition-of-Done checklist, not only narrative in the template that points
+at it. The same commit wrote down the two push-flow refusals that cost a failed attempt this
+morning and are documented nowhere — the millisecond-exact expiry, and the clean-checkout
+requirement the main checkout can never satisfy.
+
+**Two further findings filed rather than fixed (`5bd5dd6`).** The reconciliation layer is
+blind to changes in `docs/adr/` itself, because no `Governs:` line covers that directory —
+so the renumber that motivated the whole layer would have passed under it in silence. And
+the resume-hint validator rejects ordinary hyphenated English as credential-shaped, failing
+with a bare `RH-SCHEMA` that names neither the field nor the rule.
+
+**F3 is the one open item, and it is a PO disposition, not an edit.** Five files landed
+outside the Epic's declared file contract. Spec §7 requires the Spec updated **before
+dispatch** for any implementation file outside the inventory; I did not do that.
+
+The measurement that shapes the choice: the Epic is *Governance Sprint Phoenix*, and its
+§7.1–§7.11 cover the governance event kernel, ruleset trust root, human ledger, audit
+bundle, Evidence Viewer, external adapters and the governed execution handoff.
+**Documentation governance appears in none of them.** Note that two files the range did
+touch — `harness/definition-of-done.md` and `docs/adr/README.md` — *are* in §7.1, so those
+edits were in contract.
+
+- **Option A, declare it outside Phoenix.** This is Pipeline self-maintenance, the same
+  class as tonight's merge-audit repairs; the `PHX-*` dispatch ids were my naming
+  convention, not a scope claim. No Spec edit, no rebind, no approval renewal. The cost is
+  the Critic's second horn: gate-adjacent code then ships under no spec at all.
+- **Option B, extend §7.** Faithful to its wording, but it edits hash-bound authority: the
+  session drops to `partial` and the rebind needs explicit human confirmation, and
+  EPIC-AC-03 then requires the affected approval renewed before merge.
+
+**Recommendation: A**, with the condition that answers the horn — both checks carry their
+acceptance executably (12 and 22 cases, every one a fire/clear pair), both are parked with
+owner and expiry, and every residual finding is filed. That is not an unreviewed delivery;
+it is simply not *Phoenix*.
+
+I am not deciding this. Both branches change what the PO's plan approval covers, which is
+consent rather than method.
+
 ### CRITIC ON `a69c288..7161102`: FAIL — and the defect is in the check built to prevent it
 
 Independent review of the sixteen commits, references only, no dispatch records handed over
