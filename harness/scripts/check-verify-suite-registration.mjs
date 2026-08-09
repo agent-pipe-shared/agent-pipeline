@@ -133,7 +133,7 @@ export const REQUIRED_EXCLUSION_FIELDS = Object.freeze(["reason", "owner", "expi
  * (R1.2: filed, not fixed -- each is a debt with an owner, not a permanent
  * state). Do not add this checker's own two files here; see header.
  *
- * Six remain, and the two departures left by different routes.
+ * Seven remain, and the two departures left by different routes.
  * plugins/pipeline-core/lib/codex-host-plugin-list.test.mjs left on 2026-08-08 by
  * deletion, not by repair -- its whole subject was `observeCodexRulesetSource`,
  * retired by PO decision and superseded (see
@@ -144,8 +144,9 @@ export const REQUIRED_EXCLUSION_FIELDS = Object.freeze(["reason", "owner", "expi
  * registered entry of verify.mjs's TEST_SUITES -- the outcome this list exists to
  * reach.
  *
- * FIVE OF THE SIX ENTRIES BELOW ARE NOT OF THAT CLASS, and the difference matters more
+ * SIX OF THE SEVEN ENTRIES BELOW ARE NOT OF THAT CLASS, and the difference matters more
  * than the count. harness/lib/plan-spec-state-v2.test.mjs,
+ * harness/scripts/check-adr-consistency.test.mjs,
  * harness/scripts/check-critic-contract-citations.test.mjs,
  * harness/scripts/recovery-bridge-approval.test.mjs,
  * plugins/pipeline-core/hooks/guard-git-phoenix.test.mjs and
@@ -154,15 +155,17 @@ export const REQUIRED_EXCLUSION_FIELDS = Object.freeze(["reason", "owner", "expi
  * verify.mjs, a protected test path whose maintenance window is closed, and opening
  * one needs a human signature. The remaining entry here is parked because it is RED
  * and must not be registered until repaired -- the opposite situation. Reading this
- * list as six of a kind would misstate what it records: a passing suite waiting on a
+ * list as seven of a kind would misstate what it records: a passing suite waiting on a
  * signature is a scheduling fact, a failing suite is a defect. Their expiry is shared
  * with the rest deliberately, so that nothing here outlives a single review date, not
  * because they share the others' justification.
  *
- * The green group is growing: three of its five suites were orphaned by the 0.5.2
- * integration and have since been repaired rather than deleted. That direction of
- * travel is the point: this list shrinks by registration or deletion, never by an
- * entry quietly going stale.
+ * The green group is growing, by two different routes. Three of its six suites were
+ * orphaned by the 0.5.2 integration and have since been repaired rather than deleted;
+ * the other three are new checks written against a protected registration surface,
+ * which is the only way a new check can enter this repository while the window is
+ * closed. That direction of travel is the point: this list shrinks by registration or
+ * deletion, never by an entry quietly going stale.
  *
  * A GREEN entry here is the one shape that rots quietly: the suite passes, so nothing
  * fails, and the stale `reason` keeps asserting a defect that no longer exists. That
@@ -181,6 +184,11 @@ export const REQUIRED_EXCLUSION_FIELDS = Object.freeze(["reason", "owner", "expi
  * review date.
  */
 export const EXCLUSIONS = Object.freeze({
+  "harness/scripts/check-adr-consistency.test.mjs": Object.freeze({
+    reason: "GREEN, not red: 12/12 passing, written 2026-08-09 (PHX-ADRCHK) after two accepted ADRs were found contradicting the implementation and a three-way numbering collision had survived weeks unnoticed. Each of its five classes is pinned by a fixture that fires it and a fixture that clears it, and both motivating defects are reconstructed as a regression case. Parked solely because registering it edits verify.mjs, a protected test path whose maintenance window is closed and whose reopening needs a human signature. Register on the next window; this entry is a scheduling record, not a defect record.",
+    owner: "PO",
+    expires: "2026-09-07",
+  }),
   "harness/scripts/check-critic-contract-citations.test.mjs": Object.freeze({
     reason: "GREEN, not red: 21/21 passing. Parked solely because registering it edits verify.mjs, a protected test path whose maintenance window is closed and whose reopening needs a human signature. Register on the next window; this entry is a scheduling record, not a defect record.",
     owner: "PO",
