@@ -1,0 +1,66 @@
+{
+  "schema": "pipeline.dispatch-record.v1",
+  "taskId": "NOVA-HGOSIG-TRUST-1",
+  "model": "claude-opus-5",
+  "effort": "xhigh",
+  "rulesetSha": "2914a55713d714d95323231edaddccec5e1d6c2e5a4fbfaaaaa9d913a5fb1efc",
+  "dispatcher": "goldfish",
+  "riskClass": "high",
+  "outcome": "success-with-reported-deviation",
+  "changedFiles": [
+    "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+    "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs",
+    "plugins/pipeline-core/scripts/guard-human-override.mjs",
+    "plugins/pipeline-core/scripts/guard-human-override.test.mjs"
+  ],
+  "evidenceLog": [
+    {
+      "milestone": "context-read",
+      "note": "Read guard-lifecycle-ready.mjs (sanctionedHumanOverrideArgs :891-920, signature-mode continuation :207-218), guard-human-override.mjs (externalJson/flags/authorize-by-signature), guard-human-override.test.mjs, lib/human-guard-override.mjs (authorizeHumanGuardOverrideBySignature :1617-1748, safePath :473-477), lib/po-approval-proof.mjs, lib/critical-human-proof-policy.mjs, scripts/guard-maintenance-window.mjs (read only, not changed), ADR-0059 Decisions 1/3/4/5 + Consequences, ADR-0051/0057 references."
+    },
+    {
+      "milestone": "premise-verified",
+      "note": "All three defects confirmed independently before implementing. D1: the guidance at guard-lifecycle-ready.mjs:217, guard-testpath.mjs:290, guard-gate-strength.mjs:266 and codex-pretool-guard.mjs:452 all print `authorize-by-signature --repo ... --proof ...`, while sanctionedHumanOverrideArgs' base check requires args[0] === \"authorize\". D2: externalJson only enforced not-inside-the-repository, and the only in-tree --authority caller was the test asserting acceptance (no production caller, no doc, no skill, no guidance string). D3: the comparison used a hard-coded POSIX separator."
+    },
+    {
+      "milestone": "design-decision-D2",
+      "note": "Shape (a) chosen: --authority removed from the CLI entirely. Rationale: (1) ADR-0059 Decision 1 fixes the anchor at the committed project/critical-human-proof.json and calls the subcommand agent-safe because it 'cannot succeed without a genuine signature it is structurally incapable of producing' -- generating a keypair is not something a caller is incapable of, so the flag falsified the claim; (2) shape (b) leaves a flag whose only admissible value is the value already used by default, i.e. zero capability plus a live caller-supplied-trust-anchor code path; (3) shape (b) would also force guard-lifecycle-ready.mjs to admit a SECOND arbitrary path word inside a GUARD-LIFECYCLE-NOT-READY session; (4) no legitimate in-tree caller exists. guard-maintenance-window.mjs's own --authority was read and left untouched per the prohibition."
+    },
+    {
+      "milestone": "design-decision-proof-bound",
+      "note": "--proof and --author-source-root are paths, so HEX cannot bound them. --author-source-root keeps the existing exact-equality bound (join(root, 'plugins', 'pipeline-core')). --proof is bounded structurally by externalProofPathArgument(): string, non-empty, <= 500 utf8 bytes, no control characters (U+0000-U+001F, U+007F), case-insensitive .json suffix, no '.' or '..' path segment, absolute, and OUTSIDE the repository root (host isAbsolute/resolve/pathInside, mirroring the CLI's own externalJson discipline so the gate never admits a command the CLI would refuse). Residual: one external path word, which stays a data argument -- the closed grammar has already tokenized it, and the CLI only JSON.parses the file, whose contents must still verify under the committed anchor."
+    },
+    {
+      "milestone": "red-run-method",
+      "note": "DEVIATION from the briefed red-run method, forced. The first revert (git stash push of the two source files only) was performed and the turn ended mid-cycle, leaving the tree half-reverted; the coordinator restored control and forbade repeating the revert. The stash was recovered intact (git stash pop, all four files back, both source fixes verified by reading them back). Red evidence was then obtained WITHOUT a tree revert, per the coordinator's instruction: a scratch harness inside the repository (a) reconstructed the pre-fix predicates verbatim from HEAD -- sanctionedHumanOverrideArgs from guard-lifecycle-ready.mjs:891-920 and the externalJson outside-check from guard-human-override.mjs:39-46, both diffable against `git show HEAD:<path>` -- and (b) exercised D2's pre-fix path through the UNCHANGED library, since --authority did nothing but pass a caller-supplied JSON object as trustPolicy into authorizeHumanGuardOverrideBySignature(). Every observation is asserted inside the harness, so a wrong observation throws. Artifact: red-run.json in this directory. The harness itself was deleted afterwards (no .mjs precedent anywhere under specs/)."
+    },
+    {
+      "milestone": "red-run-observed",
+      "note": "D1: pre-fix sanctionedHumanOverrideArgs() returns false for the exact argv the guards print; the fixed isSanctionedLifecycleCommand() returns true for it and still false with a trailing --activate. D2: the pre-fix path ARMED a real capability ({status: 'armed', mutated: true}) from a proof signed with a freshly generated key plus a caller-written anchor naming it -- the bypass is concrete, not theoretical; the fixed CLI answers exit 2 / HGO-USAGE with empty stdout. D3: the pre-fix predicate run with win32 path semantics ACCEPTS C:\\repo\\project\\proof.json as external (and also accepts it under this host's POSIX semantics); the fixed CLI refuses it with exit 2 and 'outside the repository'."
+    },
+    {
+      "milestone": "verify-lifecycle-suite",
+      "note": "node plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs -> 39/39 pass, 0 fail, exit 0 (38 pre-existing + 1 new). No pre-existing test was modified, relaxed or removed."
+    },
+    {
+      "milestone": "verify-cli-suite",
+      "note": "node plugins/pipeline-core/scripts/guard-human-override.test.mjs -> 6/6 pass, 0 fail, exit 0. The pre-existing test that asserted --authority acceptance was REPLACED (not loosened) by one asserting the opposite, plus a new win32 separator test; the other four pre-existing tests are byte-identical."
+    },
+    {
+      "milestone": "regression-suites",
+      "note": "node plugins/pipeline-core/lib/human-guard-override.test.mjs -> 23/23 pass (proves the library is untouched). node plugins/pipeline-core/hooks/guard-testpath-override.test.mjs -> 18/18 pass. node plugins/pipeline-core/hooks/guard-gate-strength.test.mjs -> 29/29 pass. All four guards that print the authorize-by-signature continuation still agree with the admitted shape."
+    },
+    {
+      "milestone": "verify-gate",
+      "note": "NOT RUN. The coordinator instructed skipping the full harness/scripts/verify.mjs gate for this dispatch (a concurrent dispatch's tree state makes VERIFY-CANDIDATE-PREFLIGHT fail for reasons unrelated to this diff) and will run it once the tree is clean. DoD check 'node harness/scripts/verify.mjs -> exit 0' is therefore reported as not verifiable by this Goldfish."
+    },
+    {
+      "milestone": "scope-check",
+      "note": "git status --porcelain shows exactly the four in-scope files modified and nothing else. guard-maintenance-window.mjs, consumeHumanGuardOverride, GS-6's exclusion in guard-gate-strength.mjs and the GUARD-CROSS-REPO-MUTATION / GUARD-LIFECYCLE-NOT-READY paths are untouched. No commit was made. specs/**/evidence/ is gitignored, so this record and red-run.json are untracked by design."
+    },
+    {
+      "milestone": "residual-reported",
+      "note": "lib/human-guard-override.mjs's authorizeHumanGuardOverrideBySignature() still accepts an optional trustPolicy parameter (default null -> committed anchor). It is deliberately left in place: at the library layer the parameter is the injection point po-approval-proof.mjs:29-32 describes ('supplied by a configured external authority'), and its only in-tree caller is now the CLI, which no longer exposes it. The agent-reachable transport is closed; an actor with arbitrary in-process code execution could still call the library directly, which is outside HGO's threat model (that document's controls all assume the guard-mediated tool boundary). Flagged rather than silently changed because removing the parameter was neither of the two briefed shapes."
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "schema": "pipeline.red-run-observation.v1",
+  "taskId": "NOVA-HGOSIG-TRUST-1",
+  "method": "pre-fix predicates reconstructed verbatim from HEAD (D1, D3) and the unchanged library driven exactly as the pre-fix CLI drove it (D2); the working tree was NOT reverted",
+  "node": "v24.15.0",
+  "platform": "linux",
+  "observations": [
+    {
+      "defect": "D1",
+      "claim": "pre-fix sanctionedHumanOverrideArgs() refuses the exact command the guard prints for signature mode",
+      "observed": false
+    },
+    {
+      "defect": "D1",
+      "claim": "fixed isSanctionedLifecycleCommand() admits that same command",
+      "observed": true
+    },
+    {
+      "defect": "D1",
+      "claim": "fixed isSanctionedLifecycleCommand() still refuses it with a trailing --activate",
+      "observed": false
+    },
+    {
+      "defect": "D3",
+      "claim": "pre-fix check, run with win32 path semantics, ACCEPTS an in-repository path as external",
+      "observed": true
+    },
+    {
+      "defect": "D3",
+      "claim": "pre-fix check, run with this host's POSIX semantics, also accepts those win32 arguments",
+      "observed": true
+    },
+    {
+      "defect": "D3",
+      "claim": "fixed CLI refuses that same in-repository win32 path",
+      "observed": {
+        "status": 2,
+        "outsideRefusal": true
+      }
+    },
+    {
+      "defect": "D2",
+      "claim": "pre-fix path (caller-supplied trust anchor) ARMS a capability from a self-generated key",
+      "observed": {
+        "status": "armed",
+        "mutated": true
+      }
+    },
+    {
+      "defect": "D2",
+      "claim": "fixed CLI does not accept --authority at all",
+      "observed": {
+        "status": 2,
+        "usage": true,
+        "stdout": ""
+      }
+    }
+  ]
+}
