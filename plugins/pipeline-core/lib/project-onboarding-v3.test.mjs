@@ -2790,6 +2790,92 @@ test("the seeded dev-plan gate refuses implementation before approval and admits
   } finally { dispose(path); }
 });
 
+// PUSHSEED-2. The same standard as the dev-plan test above, for the gate the
+// 2026-08-09 seed switches on: the push the guard refuses must be admitted once
+// the shipped commands have been run, and every one of those commands must be
+// reachable in a project that configured nothing. This is the measurement that
+// makes seeding `push: blocking` defensible; without it the seed would be the
+// unsatisfiable gate the chapter comment forbids.
+//
+// The two halves are both the contract. Refusing forever is the deadlock; passing
+// with nothing done is the defect the PO found -- a push that succeeded in a
+// project whose own calibration said `push: blocking`.
+test("the seeded push gate refuses an unapproved push and admits it after the shipped commands", () => {
+  const path = root();
+  try {
+    hostGit(path, ["init", "--initial-branch=main"]);
+    hostGit(path, ["config", "user.email", "po@example.invalid"]);
+    hostGit(path, ["config", "user.name", "PO"]);
+    const seed = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+    assert.equal(applyProjectOnboardingV3(seed, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+
+    const attemptPush = () => spawnSync(
+      process.execPath,
+      [fileURLToPath(new URL("../hooks/guard-push.mjs", import.meta.url))],
+      {
+        cwd: path,
+        encoding: "utf8",
+        input: JSON.stringify({ tool_name: "Bash", tool_input: { command: "git push origin HEAD:refs/heads/feat/x" } }),
+        env: { ...process.env, CLAUDE_PROJECT_DIR: path },
+      },
+    );
+    const producer = fileURLToPath(new URL("../scripts/verify-evidence-producer.mjs", import.meta.url));
+    const produceEvidence = () => spawnSync(process.execPath, [producer, "--root", path, "--out", "evidence/verify-latest.json"], {
+      cwd: path, encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: path },
+    });
+    const state = (argv) => {
+      const stderr = [];
+      const code = pipelineStateRun(argv, { dir: path, writeError: (value) => stderr.push(String(value)) });
+      return { code, stderr: stderr.join("") };
+    };
+    // `gates.push_approval` is read from the COMMITTED bytes, so every step that
+    // changes a tracked file has to be committed before the next one observes it.
+    const commit = (message) => { hostGit(path, ["add", "-A"]); hostGit(path, ["commit", "-q", "-m", message]); };
+
+    commit("seeded consumer");
+    const refused = attemptPush();
+    assert.equal(refused.status, 2, `the seeded gate must refuse an unapproved push: ${refused.stderr}`);
+    assert.match(String(refused.stderr), /evidence\/verify-latest\.json missing/u);
+    assert.match(String(refused.stderr), /Push approval missing/u);
+
+    // (1) The seeded verify placeholder fails by design, so no evidence is written
+    // -- the artifact can never claim a pass that did not happen.
+    assert.notEqual(produceEvidence().status, 0, "an unconfigured verify contract must not yield passing evidence");
+    assert.equal(existsSync(join(path, "evidence", "verify-latest.json")), false);
+
+    // (2) The human configures a real verify command; the producer then writes
+    // candidate-bound evidence. Both steps the calibration already demands.
+    const calibrationPath = join(path, "project", "pipeline.json");
+    const calibration = JSON.parse(readFileSync(calibrationPath, "utf8"));
+    calibration.verify = `${JSON.stringify(process.execPath)} -e "process.exit(0)"`;
+    writeFileSync(calibrationPath, `${JSON.stringify(calibration, null, 2)}\n`);
+
+    // (3) The human chooses how a push is cleared. `chat` is the route for an
+    // operator without key management (ADR-0056); `signature` stays the default.
+    const userPath = join(path, "pipeline.user.yaml");
+    writeFileSync(userPath, readFileSync(userPath, "utf8").replace(/push_approval: "?signature"?/u, 'push_approval: "chat"'));
+    commit("configure verify and push approval");
+
+    // (4) The artifact the approval binds, from the plugin's shipped template.
+    assert.equal(state(["materialize-push-threat-model"]).code, 0);
+    commit("push threat model");
+    assert.equal(produceEvidence().status, 0, "a configured, passing verify command must yield evidence");
+
+    // (5) The approval itself -- the human step the whole gate exists for.
+    const approved = state(["approve-push", "--by", "po", "--remote", "origin", "--destination", "refs/heads/feat/x"]);
+    assert.equal(approved.code, 0, approved.stderr);
+
+    const admitted = attemptPush();
+    assert.equal(admitted.status, 0, `the approved push must be admitted: ${admitted.stderr}`);
+
+    // And the approval is bound to THAT commit: one more commit re-closes the gate,
+    // which is what stops an approval from becoming a standing licence.
+    writeFileSync(join(path, "README.md"), "moved on\n");
+    commit("a later commit");
+    assert.equal(attemptPush().status, 2, "an approval must not travel to a commit nobody approved");
+  } finally { dispose(path); }
+});
+
 // A runner without a native runtime readback is onboarded exactly as ADR-0057
 // decision 2a describes: portable seed, runtime targets, no barrier, and the
 // lifecycle standing at `kickoff-required`. This is the state from which the
@@ -4846,19 +4932,38 @@ test("a freshly seeded project is honest about its authority tier, its verify co
     // for the profile-neutral greenfield seed and for each of the three PO
     // profiles the kickoff flow collects.
     const seeded = parseYaml(readFileSync(join(path, "project", "pipeline.yaml"), "utf8"));
-    assert.deepEqual(seeded.gates, { "dev-plan": { mode: "blocking", type: "human" } });
+    assert.deepEqual(seeded.gates, {
+      "dev-plan": { mode: "blocking", type: "human" },
+      // The gate this test's own title claims: the calibration seeds
+      // `gates.push: blocking`, so a manifest without a push chapter makes the
+      // project DECLARE a gate that guard-push.mjs then never enforces (it reads
+      // the manifest and exits 0 on an absent gate). That is what let a push
+      // succeed unapproved in both 2026-08-09 greenfield runs. Seeded only once
+      // the satisfying path was measured end to end -- see the chapter comment in
+      // project-onboarding-v3.mjs and PUSHSEED-2 below.
+      push: { mode: "blocking", type: "human" },
+    });
     for (const profile of ["epic", "feature", "mini"]) {
-      const gate = gateConfig(parseYaml(freshManifestBytes(profile)), "dev-plan");
-      assert.notEqual(gate, null, `${profile} seeds a dev-plan gate`);
-      assert.equal(gate.mode, "blocking", `${profile} seeds an ENFORCING dev-plan gate`);
-      assert.equal(gate.type, "human");
+      for (const name of ["dev-plan", "push"]) {
+        const gate = gateConfig(parseYaml(freshManifestBytes(profile)), name);
+        assert.notEqual(gate, null, `${profile} seeds a ${name} gate`);
+        assert.equal(gate.mode, "blocking", `${profile} seeds an ENFORCING ${name} gate`);
+        assert.equal(gate.type, "human");
+      }
     }
     // The enforcing artifact names the command sequence out of its own refusal,
     // because the refusal reports the lifecycle state but not the whole path.
     const chapter = freshManifestBytes("feature");
-    for (const command of ["submit-plan", "approve-plan", "set-phase --phase implementation"]) {
+    for (const command of ["submit-plan", "approve-plan", "set-phase --phase implementation",
+      "verify-evidence-producer", "materialize-push-threat-model", "approve-push", "gates.push_approval"]) {
       assert.equal(chapter.includes(command), true, `the seeded gate names ${command}`);
     }
+    // The calibration and the manifest must not disagree about the push gate:
+    // the disagreement IS the defect, not a detail of it.
+    const userIntent = readFileSync(join(path, "pipeline.user.yaml"), "utf8");
+    assert.match(userIntent, /push: "?blocking"?/, "the calibration declares the push gate");
+    assert.match(userIntent, /push_approval: "?signature"?/,
+      "the calibration states how a human clears a push, so `chat` is discoverable without reading plugin source");
 
     // (e) guard-devplan.mjs no longer exits 0 by default, and no longer merely
     // reports: with the seeded gate chapter and an active feature whose design

@@ -691,7 +691,14 @@ function freshIntent(runner) {
     routing: { profiles: clone(registry.profiles), duties: clone(registry.duties) },
     usage: { common_projection: "pipeline.runner-usage.v1", raw_persistence: "none" },
     autonomy: { push_policy: "gated", branch_model: "feature-branch", wip_limit: 3 },
-    gates: { dev_plan: "blocking", push: "blocking", security: "warn", claude_md_max_lines: 200 },
+    // `push_approval` is seeded at its own fail-closed default rather than left
+    // absent. Absent and "signature" resolve identically (ADR-0056,
+    // readPushApprovalMode), so this changes no behaviour -- it changes what the
+    // operator can SEE. The setting is the single control over how a human clears
+    // a push, and with the key omitted the only way to learn that "chat" exists at
+    // all was to read the plugin's source, which is exactly what the 2026-08-09
+    // greenfield runs did.
+    gates: { dev_plan: "blocking", push: "blocking", push_approval: "signature", security: "warn", claude_md_max_lines: 200 },
     critic_export: clone(registry.criticExportPolicy),
     roles: { po: { display_label: "Human" } },
     session: { keep_awake: true },
@@ -738,9 +745,42 @@ const KICKOFF_PROFILES = Object.freeze(["epic", "feature", "mini"]);
 // digest once (`<!-- technical-spec-sha256: ... -->`), which is what the kickoff
 // seed writes and what a hand-authored replacement PRD must preserve.
 //
-// `push` and `security` are still deliberately NOT seeded here: their satisfying
-// path in a brand-new project was not established, and seeding an unsatisfiable
-// gate is exactly what this chapter must not do.
+// `push` is seeded `blocking` for the same reason and to the same standard, and
+// not before (2026-08-09). The defect it closes is the one the PO found in BOTH
+// greenfield runs: `pipeline.user.yaml` seeds `gates.push: blocking`, so the
+// consumer is told the gate is live, while guard-push.mjs reads the MANIFEST and
+// exits 0 on an absent gate -- a push then succeeded in a project whose own
+// calibration promised it could not. One of those runs even attempted
+// `approve-push`, was correctly refused for missing proof, and pushed anyway.
+// A gate a project declares and does not enforce is worse than no gate.
+//
+// The satisfying path was MEASURED end to end in a real temporary root, not read
+// off the code, and every step of it is reachable with SHIPPED commands:
+//   1. the human configures a real verify command (the seeded placeholder exits 1
+//      by design and says so -- this step is required of them anyway);
+//   2. `node <plugin>/scripts/verify-evidence-producer.mjs --out
+//      evidence/verify-latest.json` writes the candidate-bound evidence the gate
+//      demands (agent-executable; it refuses rather than writing when the verify
+//      command fails, so the artifact can never claim a pass that did not happen);
+//   3. the human chooses how a push is cleared -- `gates.push_approval` in
+//      `pipeline.user.yaml`, ADR-0056, defaulting to `signature`;
+//   4. `materialize-push-threat-model` creates the artifact the approval binds
+//      (agent-executable, then human-reviewed);
+//   5. `approve-push --by <name> --remote <remote> --destination <full-ref>`,
+//      plus the three proof flags in `signature` mode.
+// After (5) the same push the guard refused is admitted (guard exit 0).
+//
+// The measurement is also what found the reason this could not have been seeded
+// earlier even if someone had tried: in `chat` mode -- the mode ADR-0056 exists
+// to give a human WITHOUT key management -- `approve-push` refused every fresh
+// consumer with CRITICAL-PROOF-POLICY-KIND-REQUIRED, because it consulted the
+// policy file's `requiredKinds` before the operator's stand-down. Fixed in
+// scripts/pipeline-state.mjs (`verifyCriticalHumanProof`); without that fix this
+// seed WOULD be the unsatisfiable gate this chapter must not create.
+//
+// `security` is still deliberately NOT seeded: its satisfying path in a brand-new
+// project has not been established, and seeding an unsatisfiable gate is exactly
+// what this chapter must not do.
 const DEV_PLAN_BLOCKING_GATE = "gates:\n"
   // The refusal itself reports the lifecycle state but not the whole command
   // sequence out of it, so the enforcing artifact carries it.
@@ -749,7 +789,18 @@ const DEV_PLAN_BLOCKING_GATE = "gates:\n"
   + "  #   pipeline-state submit-plan --by <name> --profile <epic|feature|mini>\n"
   + "  #   pipeline-state approve-plan --by <name>\n"
   + "  #   pipeline-state set-phase --phase implementation\n"
-  + "  dev-plan:\n    mode: blocking\n    type: human\n";
+  + "  dev-plan:\n    mode: blocking\n    type: human\n"
+  // Same shape, same reason: the refusal reports what is missing but not the whole
+  // sequence out of it, so the enforcing artifact carries it.
+  + "  # Human push approval. `git push` is REFUSED until this commit carries passing,\n"
+  + "  # candidate-bound verify evidence AND the PO has approved this exact commit:\n"
+  + "  #   verify-evidence-producer --out evidence/verify-latest.json\n"
+  + "  #   pipeline-state materialize-push-threat-model\n"
+  + "  #   pipeline-state approve-push --by <name> --remote <remote> --destination <full-ref>\n"
+  + "  # How a human clears it is one setting, gates.push_approval in pipeline.user.yaml:\n"
+  + "  # \"signature\" (default) also demands --proof-request/--proof-authority/--proof;\n"
+  + "  # \"chat\" lets them clear it in-session. Set it to \"off\" here to disable the gate.\n"
+  + "  push:\n    mode: blocking\n    type: human\n";
 // Per PO profile. All three resolve to the same live chapter -- the
 // differentiation surface exists (the profile is a real input on the
 // partial-authority path), and the satisfying path above was measured

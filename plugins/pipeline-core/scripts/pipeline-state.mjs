@@ -2681,17 +2681,30 @@ function externalPublicJson(dir, value) {
 function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags, now, required = false }) {
   const policy = criticalHumanProofPolicy(dir);
   if (!policy.ok) return policy;
-  if (!policy.requiredKinds.has(kind)) {
-    return required ? { ok: false, code: "CRITICAL-PROOF-POLICY-KIND-REQUIRED" } : { ok: true, proof: null };
-  }
   // The cryptographic proof may be stood down for this kind — by `gates.push_approval:
   // chat` in pipeline.user.yaml for `push` (ADR-0056), or by an explicit reasoned
   // waiver in the policy file for the other kinds (ADR-0055). Never inferred, never
   // silent: it travels back to the caller so the recorded approval says on its face
   // that no proof backed it.
+  //
+  // ORDER (measured 2026-08-09, push-gate satisfiability): this stand-down is read
+  // BEFORE the `requiredKinds` gate below, and the order is the whole point. For every
+  // kind whose waiver comes from the policy file, the two orders are indistinguishable:
+  // `readCriticalHumanProofPolicy` only admits a `waivedKinds` entry whose `kind` is
+  // already in `requiredKinds`, so waived implies required there. `push` is the one kind
+  // whose stand-down lives OUTSIDE this file — in `pipeline.user.yaml`, by ADR-0056 —
+  // and with the old order it could never be exercised: a consumer project has no
+  // `project/critical-human-proof.json` at all, so `requiredKinds` is empty and
+  // `approve-push` refused with CRITICAL-PROOF-POLICY-KIND-REQUIRED, demanding that the
+  // project declare push as proof-requiring in exactly the configuration where its
+  // operator had committed the opposite. Chat mode was unreachable for every fresh
+  // consumer, which is half of why the push gate could not be seeded at all.
   const configured = criticalProofWaiverFor(dir, kind);
   if (configured.code !== null && configured.code !== undefined) return { ok: false, code: configured.code };
   if (configured.waived) return { ok: true, proof: null, waived: configured.waiver };
+  if (!policy.requiredKinds.has(kind)) {
+    return required ? { ok: false, code: "CRITICAL-PROOF-POLICY-KIND-REQUIRED" } : { ok: true, proof: null };
+  }
   const request = externalPublicJson(dir, flags["proof-request"]);
   const authority = externalPublicJson(dir, flags["proof-authority"]);
   const proof = externalPublicJson(dir, flags["proof"]);
@@ -5262,7 +5275,15 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       if (!parsed.ok || isBlank(by)) {
         console.error(pushWaived
           ? 'Error: approve-push requires --by, --remote and --destination (gates.push_approval is "chat"; no external proof is demanded).'
-          : 'Error: approve-push requires --by, --remote, --destination, --proof-request, --proof-authority and --proof.');
+          // The alternative is named here, not only in an ADR. `signature` is the
+          // fail-closed default, so this refusal is what a fresh consumer meets
+          // first, and a six-flag ceremony with no stated alternative reads as the
+          // only route -- the 2026-08-09 greenfield session hit exactly this, went
+          // looking for the route in the plugin's source, and pushed unapproved.
+          : 'Error: approve-push requires --by, --remote, --destination, --proof-request, --proof-authority and --proof. '
+            + 'The three proof flags are demanded because gates.push_approval is "signature" (its default). '
+            + 'To let a human clear a push in-session instead, commit gates.push_approval: chat in pipeline.user.yaml '
+            + '(ADR-0056); this command then takes --by, --remote and --destination alone.');
         return 2;
       }
       const head = gitHead(dir);
@@ -5295,7 +5316,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         console.error(threatModel.code === "CRITICAL-PROOF-BOUND-ARTIFACT-UNAVAILABLE"
           ? `Error: approve-push refused (${threatModel.code}); no push threat-model artifact exists yet at ` +
             `${PUSH_THREAT_MODEL_DEFAULT_PATH}. Run the "materialize-push-threat-model" subcommand of this ` +
-            "script (same --dir as this command) to create it, review it, then retry approve-push."
+            "script (from the same project directory as this command) to create it, review it, then retry approve-push."
           : `Error: approve-push refused (${threatModel.code}).`);
         return 2;
       }
@@ -5348,7 +5369,11 @@ export function run(argv = process.argv.slice(2), deps = {}) {
     case "materialize-push-threat-model": {
       const parsed = parseExactFlags(rest, new Set());
       if (!parsed.ok) {
-        console.error("Error: materialize-push-threat-model takes no flags beyond the shared --dir.");
+        // This used to name a `--dir` flag. There is no such flag anywhere in this
+        // script -- the project directory comes from CLAUDE_PROJECT_DIR or the cwd
+        // (`projectDir()`) -- and `parseExactFlags` is closed, so a consumer who
+        // followed the message got this same refusal back for obeying it.
+        console.error("Error: materialize-push-threat-model takes no flags; run it from the project directory (or with CLAUDE_PROJECT_DIR set).");
         return 2;
       }
       const target = resolve(dir, PUSH_THREAT_MODEL_DEFAULT_PATH);
