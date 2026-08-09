@@ -1256,6 +1256,15 @@ derived row-by-row from §11 rather than summarized:
   `windowCoversRule` gain the synchronous, lock-free, narrowing-only intersection
   read of §8.5.2, and `spec.md` §7.4 gains their rows at that point. Specified
   here so the residual has a named closure; not part of increment 1's inventory.
+  **Superseded by §15.2 (PO-decided 2026-08-09).** The sentence above — "not part
+  of increment 1's inventory" — no longer applies. §15.2.3/§15.3 name
+  `guard-testpath.mjs` and `guard-gate-strength.mjs` as part of increment 1's
+  inventory, not increment 2's, and the corresponding `spec.md` §7.4 rows land in
+  the same rebind this section's H-AC-12 amendment already requires, not a later
+  one. Retained here, quoted rather than deleted, so a reader consulting §9 in
+  isolation is told the same thing §15 already decided, not the opposite — the
+  same quote-and-supersede style §15.2.5 already used to retract the parallel
+  sentence in §8.5.2.
 - **For the un-representable HGO decisions (increment 2, finding F-3).** The
   portable payload cannot express an override whose only bound paths are
   dot-prefixed or absent, because `scope.artifacts` requires at least one entry
@@ -1517,6 +1526,15 @@ Gate: `node harness/scripts/check-doc-contracts.mjs` for this document;
   portable record at all, no digest of any kind is written into `scope.candidate` in
   its place, and the local plugin-install lane behaves exactly as it does today —
   no portable event, no refusal, no new capability (§7.5 layer 0, §8.1, U-10).
+- **AC-14** (added, round-1 rework) The H-AC-11 amendment text proposed in §15.1.5
+  — the paragraph beginning "Amendment for the machine-local identity registry
+  (PO, 2026-08-09)" — is present, as reviewed and rebound, in `acceptance.md`'s
+  H-AC-11 criterion before O-1's identity-registry mechanism (§15.1) is declared
+  complete. Parallel to AC-9, but not covered by it: AC-9 gates only "the
+  amendments of §9", and §15.1.5's text is not one of them, nor is it §9's own
+  text — §15.1.5's closing line already says the text is "proposed text only...
+  applied by the reviewed rebind, not here," and this criterion is the checkable
+  gate that line otherwise leaves implicit.
 
 ## 14. Open items and findings for the PO
 
@@ -1830,8 +1848,11 @@ insertion, immediately after that paragraph, same style:**
 > and the registry can attribute any decision, from **either** producer, to a natural person by role and time
 > window. This clause's "no portable counterpart or join handle" is read, as of this amendment, to forbid a
 > correlator manufactured for the purpose of joining — a decision ID, a request digest, a candidate, or any
-> value derived from the trust anchor (§5.1) — not the pre-existing role/time fields the ledger already carries
-> for authority and validity. The residual is disclosed, not softened, on the same terms the 2026-08-08
+> value derived from the trust anchor (§5.1) — not the pre-existing `authorityClass` and `occurredAtEpochMs`
+> fields the ledger already carries for authority and event time. **This does NOT exempt
+> `validity.expiresAtEpochMs`**, which the 2026-08-08 paragraph above already counts as one of the four
+> byte-identical fields constituting GMW's proven join violation; that finding is unchanged and unsoftened by
+> this amendment. The residual is disclosed, not softened, on the same terms the 2026-08-08
 > paragraph above established for GMW's separate residual, and is tracked as O-1 in
 > `design/gmw-hgo-evidence-intake-into-the-human-ledger.md` §15.1.6, owner `pipeline` (PHX-2).
 
@@ -1918,16 +1939,20 @@ record already exposes, and ask the ledger whether a live grant carries that exa
 
 ```text
 // plugins/pipeline-core/lib/guard-authority-ledger-intake.mjs
-export function ledgerConfirmsLiveGmwGrant({ rootDir, scopeRuleIds, openingTreeSha256, nowMs = Date.now() }) {
-  // never throws -- any failure below returns false, the same "not covered" outcome an absent or
-  // unusable window already produces (guard-testpath.mjs:224, guard-gate-strength.mjs:239)
+export async function ledgerConfirmsLiveGmwGrant({ rootDir, scopeRuleIds, openingTreeSha256, nowMs = Date.now() }) {
+  // never throws -- any failure below, including a rejected read, returns false, the same "not covered"
+  // outcome an absent or unusable window already produces (guard-testpath.mjs:224, guard-gate-strength.mjs:239)
   try {
     // repositoryFingerprint: the same derivePoGateRepositoryFingerprint({gitCommonDir, primaryRoot})
     // resolution §7.2's append intent already performs for `rootDir` (po-gate-authority.mjs:212-217,
     // governance-event-store.mjs:81-88) -- not a new resolution problem, the write side already has it
     const repositoryFingerprint = derivePoGateRepositoryFingerprint(topologyFor(rootDir));
     const ruleDigest = canonicalSha256({ scopeRuleIds, openingTreeSha256 });  // same preimage as §4's row
-    // synchronous, lock-free scan of the human stream (§8.5.2: "readers take none") for a decision with:
+    // async, lock-free read of the human stream (§8.5.2: "readers take none") via the existing reader --
+    // queryHumanGovernanceDecisions (human-governance-ledger.mjs:228), awaited here, not reimplemented;
+    // see the resolved-assumption note below for why no separate synchronous scan is written
+    const { decisions } = await queryHumanGovernanceDecisions({ repositoryRoot: rootDir, repositoryFingerprint });
+    // true iff `decisions` contains at least one entry with:
     //   event === "granted", outcome === "granted",
     //   scope.packageId === "guard-maintenance-window", scope.repositoryFingerprint === repositoryFingerprint,
     //   ruleDigest === ruleDigest (above), validity.notBeforeEpochMs <= nowMs <= validity.expiresAtEpochMs,
@@ -1943,35 +1968,60 @@ for GMW specifically. This function checks liveness, repository binding and rule
 properties §8.5.1 says the GMW boundary actually enforces — and adds nothing the resolver itself would not
 already treat as vacuous.
 
-**One new assumption, stated the way §10 states the others.** This function rests on the human stream being
-readable synchronously and without the append lock, since only `appendPortableGovernanceEvent` is confirmed
-async (§3.1: "`:629` is **async**"); `queryHumanGovernanceDecisions` (`:228`) is cited only as "the reader," not
-confirmed sync. If it turns out to be async, this function needs its own synchronous file-level scan rather
-than calling it — implementable the same way (event files are read-only, atomically published; §8.5.2 already
-establishes no lock is needed for a reader) but not identical code. **Flag for the implementor: verify
-`queryHumanGovernanceDecisions`'s sync/async signature against current source before wiring this in.**
+**The async question, resolved rather than flagged (Critic-round-1 rework on this amendment, verified against
+current source).**
+`queryHumanGovernanceDecisions` (`human-governance-ledger.mjs:228`) is `export async function`, built on the
+also-`async` `queryPortableGovernanceStream`; `governance-event-store.mjs` imports exclusively from
+`node:fs/promises` (`:11`) and has no synchronous fs primitive anywhere in the file. There is no synchronous
+path into the human stream to fall back to, and none is needed: `ledgerConfirmsLiveGmwGrant` is declared
+`async` above and both call sites below `await` it directly, calling the existing reader rather than
+reimplementing it — the "parallel ledger mechanism" §2's Non-scope rules out is not needed and is not written.
+
+Two questions had to be settled to make that safe, both checked against this checkout rather than assumed:
+whether top-level `await` is available in these two specific hook files, and whether one more awaited read
+fits inside the hook's execution budget. Both hooks are ESM (`.mjs`, `import` syntax throughout; `guard-testpath.mjs`'s
+call site sits directly at module top level, `guard-gate-strength.mjs`'s sits inside a top-level `if
+(process.argv[1] && ...)` block — still top-level module code, not inside any function or generator body,
+which is the only context top-level `await` is barred from) on Node 24+ (`SETUP.md:19`), where top-level
+`await` needs no wrapping async function and is not novel to this document either:
+`hooks/staleness-check.mjs:207-208` already does exactly this at its own top level today —
+`if (isDirectInvocation(import.meta.url)) { await run(); }` — inside the same `hooks/` directory this
+amendment edits. Empirically confirmed for this exact shape (an `await` inside a top-level `if` block in a
+`.mjs` file) rather than taken on the language spec alone. On the budget question: `hooks.json` gives
+`guard-testpath.mjs` an explicit 10-second PreToolUse timeout (`hooks/hooks.json:63-65`);
+`guard-gate-strength.mjs`'s entry carries no override, so Claude Code's hook default applies. Both budgets
+already cover everything the hook does after the window check today — override consumption, denial
+recording — which is local disk I/O of the same kind; one more lock-free read of the same on-disk,
+atomically-published stream (§8.5.2) does not change that order of magnitude.
+
+**This is what the original wording flagged for the implementor to discover again; it is resolved here
+instead:** `ledgerConfirmsLiveGmwGrant` is `async`, both call sites `await` it, and no parallel synchronous
+ledger mechanism exists anywhere in this design.
 
 **Call-site change, both narrower than the file they sit in:**
 
 ```text
 // hooks/guard-testpath.mjs, replacing the body of the existing try block at :216-224
 const { covered, window } = windowCoversRule({ rootDir: projectDir, ruleId: matched.id });
-if (covered && ledgerConfirmsLiveGmwGrant({ rootDir: projectDir, scopeRuleIds: window.scopeRuleIds, openingTreeSha256: window.openingTreeSha256 })) {
+if (covered && await ledgerConfirmsLiveGmwGrant({ rootDir: projectDir, scopeRuleIds: window.scopeRuleIds, openingTreeSha256: window.openingTreeSha256 })) {
   process.stderr.write(`[pipeline-guard-maintenance-window] ${matched.id} lifted: ...\n`);
   process.exit(0);
 }
 // falls through to the existing refusal path exactly as if `covered` had been false
 ```
 
-The same edit shape applies at `hooks/guard-gate-strength.mjs:231-238` for GS-6.
+The same edit shape applies at `hooks/guard-gate-strength.mjs:231-238` for GS-6, `await`ed the same way; that
+call site sits inside the top-level `if (process.argv[1] && ...)` block described above, which is still
+top-level module code and not a function body.
 
 #### 15.2.4 Failure mode, specified explicitly
 
 `ledgerConfirmsLiveGmwGrant` never throws (15.2.3's own `catch { return false; }`), and its call site is
-additionally inside the *existing* outer `try/catch` both hooks already wrap the window check in. Any failure
-— corrupted stream, missing directory, a verification failure, a transient I/O error, an async-reader mismatch
-surfacing as a rejected promise if the sync assumption above turns out false and is implemented incorrectly —
-resolves to **`false`**, which the `if (covered && ledgerConfirmsLiveGmwGrant(...))` guard turns into exactly
+additionally inside the *existing* outer `try/catch` both hooks already wrap the window check in — a `try`
+block already awaits other calls in this design's own write path, so an awaited call inside it is not a new
+pattern. Any failure — corrupted stream, missing directory, a verification failure, a transient I/O error, a
+rejected promise from the awaited read — resolves to **`false`**, which the
+`if (covered && await ledgerConfirmsLiveGmwGrant(...))` guard turns into exactly
 the same refusal path an absent or expired window already produces today. **This can never block a tool call
 harder than today's ordinary refusal, and it can never grant one it would not already have granted**: the
 window check still runs first and is still required (`covered` must be `true` before the ledger call happens
@@ -2017,11 +2067,13 @@ The rows below are additions to, or modifications of, §11's table; §11 itself 
 
 ### 15.4 §14 disposition
 
-- **O-1 — resolved.** Mechanism specified in §15.1; the identity registry requires no kernel change and can
-  ship independently of D-1/increment 2. The residual it creates (both producers now attributable at
-  role-and-time granularity by a local registry holder) is disclosed in §15.1.6, on the same terms O-4 already
-  established, and does not soften O-4 itself. The H-AC-11 amendment text is proposed in §15.1.5 and applied by
-  the reviewed rebind, not here.
+- **O-1 — mechanism resolved; completion gated by AC-14, unlike O-2.** Mechanism specified in §15.1; the
+  identity registry requires no kernel change and can ship independently of D-1/increment 2. The residual it
+  creates (both producers now attributable at role-and-time granularity by a local registry holder) is
+  disclosed in §15.1.6, on the same terms O-4 already established, and does not soften O-4 itself. The
+  H-AC-11 amendment text is proposed in §15.1.5 and applied by the reviewed rebind, not here — and, unlike
+  O-2, that step has not yet happened as of this document: §13 AC-14 is this document's own gate against
+  declaring the mechanism complete before it does.
 - **O-2 — resolved.** Mechanism specified in §15.2; D-2 is fully closed and pulled into increment 1 (§15.2.5,
   §15.3). H-AC-02 is satisfied at the guard hook as of this amendment; no non-conformance remains open for it.
 - **O-3, O-4, O-5 — unchanged.** Not reopened by this section.
