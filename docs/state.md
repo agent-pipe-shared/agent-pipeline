@@ -3999,6 +3999,20 @@ side-quest at the end of an already very long stretch.
 **Live now: none.** Everything from this entire regression-hunting thread is closed, verified, and
 committed.
 
+### WP-R-AC09 DISPATCHED
+
+Stop hook correctly flagged the sprint isn't finalized (80%, 126/157). Continuing. Researched
+R-AC-08 (rollback/cleanup as *occurred* events) and R-AC-09 (stale/duplicate detection) — R-AC-08
+needs a genuine new append-once correlation mechanism mirroring the existing readback path, real
+design surface, held back; R-AC-09 is narrower (a timestamp field plus possibly-already-covered
+duplicate detection, since `supersedesEventId` already exists and command-offer events already flow
+through `governance-event-store.mjs`'s idempotency-key mechanism). Dispatched **WP-R-AC09**, briefed
+to investigate and explicitly state whether duplicate detection is already substantially covered
+elsewhere before building a second mechanism — `agent-decision-journal.mjs`'s 4th same-day edit,
+flagged in the briefing as hot, high-precision, low-margin-for-error work given today's history.
+
+**Live now:** WP-R-AC09.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
