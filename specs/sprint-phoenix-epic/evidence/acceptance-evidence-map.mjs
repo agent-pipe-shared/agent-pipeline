@@ -510,6 +510,36 @@ const DELTA = {
   'A-AC-13': ['implemented', 'WP-A2'],
   'E-AC-06': ['implemented', 'WP-A2'],
 
+  // WP-A-AC14 2026-08-09 (goldfish-implementor, commit 2b8ad9a): "tampering"
+  // is now the 12th of 13 named scenarios with dedicated coverage -- a
+  // canonical agent-kind event tampered on disk (one payload field changed,
+  // eventDigest left stale) is rejected by both verifyPortableGovernanceStream
+  // and queryPortableGovernanceStream with GES-EVENT-INVALID (the store's
+  // existing digest-recompute check in governance-event.mjs, exercised for
+  // the first time by an agent-kind fixture rather than only the generic
+  // store tests). Stays partial: "decomposition" remains confirmed not
+  // representable in the current kind enum -- a schema question, not a
+  // missing test. 37/37 agent-decision-journal-tests pass (independently
+  // re-run).
+  'A-AC-14': ['partial', 'WP-A-AC14'],
+
+  // WP-L-AC02 2026-08-09 (goldfish-deep, commit 1b266e2): the two missing
+  // #10 exchange identities (queue, correlation) are now retained --
+  // queueRevision (non-negative integer) and correlationId (ID-pattern
+  // string) join the lifecycle correlation shape's existing packageId/
+  // dispatchId/attemptId/workerId, closing it from 4 to 6 keys. All 8 named
+  // identities (package/dispatch/attempt/queue/candidate/worker/
+  // correlation/invalidation) are now retained -- candidate and invalidation
+  // were already separate top-level fields. Both the primary validator
+  // (lifecycle-governance-events.mjs) and its redundant re-validator
+  // (governance-replay-view.mjs, which independently re-checks the same
+  // shape during replay) were updated together, confirmed by a repo-wide
+  // grep before and after showing no third site and no leftover 4-key
+  // literal. 4 production/test file pairs updated (34 tests total across
+  // lifecycle-governance-events/governance-replay/governance-replay-view/
+  // governance-event-store), all independently re-run green.
+  'L-AC-02': ['implemented', 'WP-L-AC02'],
+
   // --- evidence/phx-wp-doc3.txt (task PHX-WP-DOC-3, 2026-08-09, commit
   // 7376c2c) --- Independently verified: diffs additive-only across three
   // doc files, sanitization clean, section headers checked directly.
@@ -764,12 +794,12 @@ const POINTERS = {
   'A-AC-11': 'agent-decision-event.schema.json:14 assumptionState enumerates exactly the seven required epistemic states (landed 5d0fc6a)',
   'A-AC-12': 'agent-decision-journal-tests (PHX-WP-A + PHX-WP-A2): downstream export/projection policy is independently configurable from capture eligibility and structurally cannot weaken it; the portable path fails closed for any narrower-than-repository-public-safe stream, and the restricted profile is confirmed owner-authenticated and outside the repository',
   'A-AC-13': 'agent-decision-journal-tests (PHX-WP-A + PHX-WP-A2): the duplicate-submission clause is pinned, and agent-kind fixtures now mirror the generic store\'s interrupted/concurrent/out-of-order guarantees directly rather than relying on them by implication',
-  'A-AC-14': '11 of 13 named conformance scenarios now have dedicated coverage (PHX-WP-A + PHX-WP-A2); "decomposition" is confirmed not representable in the current `kind` enum; "tampering" stays gapped -- needs store-generic digest-recompute verification, correctly left unattempted rather than guessed at',
+  'A-AC-14': '12 of 13 named conformance scenarios now have dedicated coverage (PHX-WP-A + PHX-WP-A2 + PHX-WP-A-AC14): "tampering" now proven via GES-EVENT-INVALID on a digest-stale agent-kind fixture; "decomposition" is confirmed not representable in the current `kind` enum',
   'A-AC-15': 'docs/agent-decision-journal.md (PHX-WP-DOC-1 + PHX-WP-DOC-3): all eight named parts present -- taxonomy/materiality/trust/retention/recovery/operator docs, plus Schema (grounded in agent-decision-event.schema.json) and Privacy threat model (grounded in the R-AC-05 test and assertPortablePayload) closing the two the original briefing accidentally omitted',
   'A-AC-16': 'agent-decision-journal-tests: a journal event cannot present as approval',
 
   'L-AC-01': 'the closed lifecycle schema and validator are pinned; NO PRODUCER exists — no Pipeline path emits a lifecycle event',
-  'L-AC-02': 'six of the eight #10 exchange identities are retained; queueRevision and a distinct correlationId are absent',
+  'L-AC-02': 'lifecycle-governance-events-tests + governance-replay-view-tests (PHX-WP-L-AC02): all eight #10 exchange identities are now retained -- queueRevision and correlationId close the correlation shape from 4 to 6 keys, updated in both the primary validator and its redundant replay-side re-validator together',
   'L-AC-03': 'lifecycle-governance-events-tests: registered namespace only, no credential-carrying namespace, no opaque digest',
   'L-AC-04': 'governance-replay-view-tests (PHX-WP-L-AC04): the 9 verified lifecycle kinds now render with one of four distinct value-record-<class> CSS classes (human/agent/deterministic/runner-observed) instead of the shared "fact" default, proven by per-class tests plus a cross-class distinctness assertion within one rendered view',
   'L-AC-05': 'lifecycle-governance-events-tests: candidate invalidation visible, duplicate sequences fail closed',

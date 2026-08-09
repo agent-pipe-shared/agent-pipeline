@@ -42,8 +42,8 @@ reproduced here rather than referenced.
 
 ## The direct answer
 
-**Phoenix cannot claim complete.** 108 of 157 criteria carry a named assertion in a
-gate-registered suite; 49 do not. EPIC-AC-05 forbids a completion claim while any
+**Phoenix cannot claim complete.** 109 of 157 criteria carry a named assertion in a
+gate-registered suite; 48 do not. EPIC-AC-05 forbids a completion claim while any
 criterion remains unimplemented or unverified, and it currently bites. No issue is closeable on
 its own live acceptance bullets.
 
@@ -61,8 +61,8 @@ A bullet is therefore BLOCKED unless every criterion mapped to it is `implemente
 
 | verdict | count |
 |---|---|
-| implemented | 108 |
-| partial | 35 |
+| implemented | 109 |
+| partial | 34 |
 | designed-only | 1 |
 | not-started | 12 |
 | constraint | 1 |
@@ -149,16 +149,16 @@ clause that is not pinned or not built.
 | A-AC-11 | implemented | B | agent-decision-event.schema.json:14 assumptionState enumerates exactly the seven required epistemic states (landed 5d0fc6a) |
 | A-AC-12 | implemented | WP-A2 | agent-decision-journal-tests (PHX-WP-A + PHX-WP-A2): downstream export/projection policy is independently configurable from capture eligibility and structurally cannot weaken it; the portable path fails closed for any narrower-than-repository-public-safe stream, and the restricted profile is confirmed owner-authenticated and outside the repository |
 | A-AC-13 | implemented | WP-A2 | agent-decision-journal-tests (PHX-WP-A + PHX-WP-A2): the duplicate-submission clause is pinned, and agent-kind fixtures now mirror the generic store's interrupted/concurrent/out-of-order guarantees directly rather than relying on them by implication |
-| A-AC-14 | partial | C | 11 of 13 named conformance scenarios now have dedicated coverage (PHX-WP-A + PHX-WP-A2); "decomposition" is confirmed not representable in the current `kind` enum; "tampering" stays gapped -- needs store-generic digest-recompute verification, correctly left unattempted rather than guessed at |
+| A-AC-14 | partial | WP-A-AC14 | 12 of 13 named conformance scenarios now have dedicated coverage (PHX-WP-A + PHX-WP-A2 + PHX-WP-A-AC14): "tampering" now proven via GES-EVENT-INVALID on a digest-stale agent-kind fixture; "decomposition" is confirmed not representable in the current `kind` enum |
 | A-AC-15 | implemented | WP-DOC | docs/agent-decision-journal.md (PHX-WP-DOC-1 + PHX-WP-DOC-3): all eight named parts present -- taxonomy/materiality/trust/retention/recovery/operator docs, plus Schema (grounded in agent-decision-event.schema.json) and Privacy threat model (grounded in the R-AC-05 test and assertPortablePayload) closing the two the original briefing accidentally omitted |
 | A-AC-16 | implemented | C | agent-decision-journal-tests: a journal event cannot present as approval |
 
-### L — Lifecycle stream and replay (#17) (5/8 implemented)
+### L — Lifecycle stream and replay (#17) (6/8 implemented)
 
 | ID | verdict | src | evidence / named gap |
 |---|---|---|---|
 | L-AC-01 | partial | C | the closed lifecycle schema and validator are pinned; NO PRODUCER exists — no Pipeline path emits a lifecycle event |
-| L-AC-02 | partial | J | six of the eight #10 exchange identities are retained; queueRevision and a distinct correlationId are absent |
+| L-AC-02 | implemented | WP-L-AC02 | lifecycle-governance-events-tests + governance-replay-view-tests (PHX-WP-L-AC02): all eight #10 exchange identities are now retained -- queueRevision and correlationId close the correlation shape from 4 to 6 keys, updated in both the primary validator and its redundant replay-side re-validator together |
 | L-AC-03 | implemented | C | lifecycle-governance-events-tests: registered namespace only, no credential-carrying namespace, no opaque digest |
 | L-AC-04 | implemented | WP-L-AC04 | governance-replay-view-tests (PHX-WP-L-AC04): the 9 verified lifecycle kinds now render with one of four distinct value-record-<class> CSS classes (human/agent/deterministic/runner-observed) instead of the shared "fact" default, proven by per-class tests plus a cross-class distinctness assertion within one rendered view |
 | L-AC-05 | implemented | C | lifecycle-governance-events-tests: candidate invalidation visible, duplicate sequences fail closed |
@@ -433,7 +433,7 @@ Issues closeable on their own live acceptance bullets: **1 of 8**.
 
 53 of 157 criteria are Phoenix's own stricter contract rather than a live issue obligation.
 They block no issue, but EPIC-AC-05 still forbids an epic completion claim while any of them is not `implemented`.
-24 of those 53 are currently not `implemented` and are listed below; the rest are omitted because they are done.
+23 of those 53 are currently not `implemented` and are listed below; the rest are omitted because they are done.
 
 | criterion | verdict |
 |---|---|
@@ -447,7 +447,6 @@ They block no issue, but EPIC-AC-05 still forbids an epic completion claim while
 | EPIC-AC-04 | partial |
 | EPIC-AC-05 | constraint |
 | L-AC-01 | partial |
-| L-AC-02 | partial |
 | P-AC-08 | partial |
 | P-AC-09 | not-started |
 | PX0-AC-03 | partial |
