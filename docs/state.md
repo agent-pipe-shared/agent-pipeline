@@ -3659,6 +3659,52 @@ silently passing). Booked `implemented` (`295158fd`).
 **Live now:** O-1/O-2-design round-5 (final) Critic, WP-V-AC02. K-AC-05 parked. Handover fully
 current through this checkpoint.
 
+### O-1/O-2-DESIGN ROUND 5 (THE PO'S AUTHORIZED EXTENSION, NOW USED): FAIL AGAIN — PARKED ALONGSIDE K-AC-05
+
+The PO's authorization was explicit and singular — "a 5th round" — not open-ended. Round 5
+FAILed with 2 majors + 3 minors, and unlike round 4's findings (narrow, mechanical, all fixed in
+one pass), round 5's F1 strikes at the design's actual feasibility argument. Independently verified
+the two majors myself:
+
+- **F1 (major):** §15.2.3 claims pulling the synchronous guard-hook check (D-2) into increment 1
+  costs "one more read" of "the same order of magnitude" as today. Traced the actual call path
+  myself: `queryPortableGovernanceStream` (`governance-event-store.mjs:695-699`) calls
+  `verifyPortableGovernanceStream` — which itself calls `assertPhysicalRoot`+`loadRegistry`+
+  `scanStream` — and then REDUNDANTLY repeats all three. Confirmed two full stream scans per call,
+  not one. `discoverRepository` (`worktree-lifecycle.mjs:237,241,250`) confirmed to spawn three
+  git subprocesses on its own; the design's own pseudocode adds a fourth `discoverRepository`
+  call. Real cost: ~9-11 git subprocess spawns plus two unbounded O(n) hash-chain re-verifications
+  per hook invocation — not "one more read." This is the design's SOLE feasibility argument for the
+  increment-1 pull, and it's empirically wrong, against `guard-testpath.mjs`'s 10s timeout budget
+  with no stated bound and no budget test anywhere in §15.3's test row.
+- **F2 (major):** §15.2.5/§15.4 declare O-2 "fully closed... no non-conformance remains open,"
+  while §15.2.4 (same document) discloses a real residual (an agent with local write access could
+  delete a disposition file and the hook would still read a lifted grant as live) at the exact
+  hook §15.4 declares clean — and points its own tracking at §15.1.6, which doesn't contain it.
+  A PO reading only §15.4 to close O-2 would drop the last surviving record of a residual the
+  document itself owns.
+
+**This is not a narrow-rework situation, same reasoning as K-AC-05.** F1 means the core premise
+for closing D-2/O-2 in increment 1 needs re-examination — a caching/memoization redesign, an
+accepted-and-bounded-cost argument, or walking back the increment-1 pull entirely — not another
+paragraph-level correction. The PO's specific authorization for this round is now used. Per the
+PO's standing AFK instruction: **parked, not dispatched further.** No evidence-map entry needed —
+H-AC-02 and H-AC-11 were never booked against this design doc's optimistic claims (checked: H-AC-02
+stayed `implemented` on its pre-existing unrelated evidence, H-AC-11 stayed `partial`), so nothing
+needs correcting there. The design doc itself still asserts O-2 "resolved" in its own text — that
+assertion is now known-disputed pending PO input, tracked here rather than silently corrected
+(correcting the doc would itself be a 6th rework).
+
+Two more minors (F3: a correction misattributed to a section that doesn't contain the error it
+corrects; F4: a cross-reference pointing at the wrong line range) and one worth fixing whenever
+this thread reopens (F5: two of the five commits have a blank line inside their trailer block,
+which makes `git log --format='%(trailers)'` see only `AI-Assisted: true` and miss `Dispatch:` —
+a false orchestrator-authorship signal the Critic itself nearly acted on before reading full
+message bodies).
+
+**Both O-1/O-2 and K-AC-05 are now parked pending PO architecture-level input.** Neither blocks
+the rest of the evidence-map closure work, which continues.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
