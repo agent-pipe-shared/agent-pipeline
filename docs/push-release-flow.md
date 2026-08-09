@@ -16,6 +16,10 @@ clears it by typing a confirmation in-session rather than signing anything.
 
 ## The five layers, in order
 
+Five authorization layers, plus one preparatory step (1b) that authorizes
+nothing and gates nothing at the push itself — it exists so that the range being
+signed for has been compared against the decisions that govern it.
+
 ### Layer 1 — decide a push needs a signature at all
 
 Governed by `gates.push_approval` in `pipeline.user.yaml`. In `signature`
@@ -25,6 +29,31 @@ proof, signed with a private key that lives **outside this checkout**, before
 the agent is cryptographically incapable of producing this proof by design
 (`docs/adr/0055-critical-human-proof-waiver.md`,
 `docs/adr/0056-push-approval-mode.md`).
+
+### Layer 1b — reconcile the range against the decisions that govern it (agent work, before anything is signed)
+
+```
+node harness/scripts/check-doc-reconciliation.mjs --base <base> --candidate <tip>
+```
+
+Run this before preparing a request, not after. It fails when the range changed
+a path some ADR declares it governs and no entry in `docs/doc-reconciliation.md`
+names that exact candidate commit. Both arguments are required by design and
+every output repeats the resolved range: a reconciliation claim that does not
+say which range it covers is not a claim.
+
+Resolve each finding either by amending the ADR or by recording it as checked,
+then **commit the record last** — writing it moves `HEAD`, so the record names
+the tip of the substantive work and the push carries one extra commit touching
+only that file. The format and this write-order rule are documented in the
+record file itself.
+
+Why this sits before the signature rather than in a checklist: the session that
+prepares a push is routinely not the session that did the work, and a compact
+sits between them more often than not. An obligation recorded in the handover
+lasts one context window; one bound to a commit does not expire. What it buys is
+that nobody can *skip* the question — it cannot establish that the answer was
+given carefully.
 
 ### Layer 2 — prepare the request (agent-eligible by design, guard-blocked in practice)
 
@@ -144,6 +173,7 @@ because it structurally isn't one.
 | Layer | Step | Runs as |
 |---|---|---|
 | 1 | Policy already set in `pipeline.user.yaml` | n/a (config, not a per-push action) |
+| 1b | `check-doc-reconciliation.mjs --base … --candidate …` | Agent |
 | 2 | `prepare-critical` | Agent-eligible by design; **PO in practice** (guard-blocked) |
 | 3 | `approve-critical` | **PO only** (private key, by design) |
 | 4 | `pipeline-state.mjs approve-push` | Agent |

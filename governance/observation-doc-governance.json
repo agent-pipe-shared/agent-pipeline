@@ -117,6 +117,7 @@
           "docs/codex-onboarding-threat-model.md",
           "docs/contributor-gate-security.md",
           "docs/critic-isolation-threat-model.md",
+          "docs/doc-reconciliation.md",
           "docs/github-actions-token-permissions.md",
           "docs/gitlab-ci-pilot-threat-model.md",
           "docs/governance-events.md",

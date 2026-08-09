@@ -2,6 +2,8 @@
 
 **Status:** accepted · **Date:** 2026-07-19
 
+**Governs:** pipeline.user.yaml, setup.mjs, setup.test.mjs
+
 ## Context
 
 ADR-0038 made advisory mandatory for Epic and Feature, but the distribution did

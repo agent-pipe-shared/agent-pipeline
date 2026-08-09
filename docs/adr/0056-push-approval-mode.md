@@ -7,6 +7,8 @@ grundsätzlich ja aber die externe Signierung muss konfigurierbar sein also entw
 human gate per chat oder harte Freigabe extern mit Signatur und das per
 pipeline.user.yaml oder so konfiguriert"*. **Refines** [ADR-0055](0055-critical-human-proof-waiver.md).
 
+**Governs:** pipeline.user.yaml, project/critical-human-proof.json, project/pipeline-state.json, plugins/pipeline-core/hooks/guard-push.mjs
+
 ## Context
 
 [ADR-0055](0055-critical-human-proof-waiver.md) gave the Ed25519 gate an off-switch,

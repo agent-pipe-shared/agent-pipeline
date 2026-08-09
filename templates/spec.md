@@ -142,6 +142,17 @@ SYSTEM SHALL …".}}
   be provided, stop at a PO course gate (canonical trigger wording:
   `harness/review-protocol.md` §2.1, *Trigger decision table* — the German text is authoritative).
 - Level 2 only: spec updated BEFORE merge on any implementation deviation.
+- **Documentation reconciliation, before the feature or sprint closes and before
+  any push is prepared:** run
+  `node harness/scripts/check-doc-reconciliation.mjs --base <base> --candidate <tip>`
+  over the range being closed, and resolve every finding by amending the ADR or
+  by recording it as checked in `docs/doc-reconciliation.md`. Both arguments are
+  required and the tool names the range it measured — a reconciliation claim that
+  does not say which range it covers is not a claim. This step exists because the
+  session that closes a feature is usually not the session that opened it, so an
+  intention recorded in the handover does not survive to the point where it
+  matters; the record is bound to the candidate commit instead. It cannot verify
+  that anyone looked carefully, only that nobody skipped the question.
 - Canonical DoD checklist: `harness/definition-of-done.md` §2 (copy the block,
   strike items per the rigor matrix §4 there).
 

@@ -11,6 +11,8 @@ aktiviert wurde (kein fail! aber Warnung)"*. **Refines** [ADR-0056](0056-push-ap
 **extends** the "Attended Human guard override" system described in
 `docs/human-guard-override-threat-model.md`.
 
+**Governs:** plugins/pipeline-core/hooks/guard-gate-strength.mjs, plugins/pipeline-core/hooks/guard-testpath.mjs, plugins/pipeline-core/lib/human-guard-override.mjs, plugins/pipeline-core/lib/po-approval-proof.mjs, plugins/pipeline-core/lib/tool-write-target.mjs, plugins/pipeline-core/hooks/guard-command-grammar.mjs, plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs, plugins/pipeline-core/hooks/hooks.json, docs/human-guard-override-threat-model.md, docs/po-approval-proof-contract.md
+
 ## Context
 
 `guard-gate-strength.mjs` Rule GS-6 unconditionally refuses every Edit/Write to

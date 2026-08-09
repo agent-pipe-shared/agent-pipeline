@@ -2,6 +2,8 @@
 
 **Status:** accepted · **Date:** 2026-07-24
 
+**Governs:** specs/**
+
 ## Decision
 
 Durable rigor-1/2 feature authority is expressed by a stable package rooted at
