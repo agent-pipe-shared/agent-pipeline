@@ -411,7 +411,15 @@ const DELTA = {
   // reasons, not confirmed absent by search -- a materially different,
   // weaker claim than the other five, and the dispatch was explicit about
   // the distinction rather than blurring it.
-  'E-AC-02': ['partial', 'WP-E'],
+  // WP-E-AC02 CLOSED 2026-08-09 (goldfish-implementor, commit 8caaa61):
+  // mapGovernanceExportProjection's loss field is now computed per call
+  // instead of hardcoded empty. RFC 5424's payload only ever encodes
+  // occurredAtEpochMs/eventType, so loss now names every other EXPORT_FIELDS
+  // key present in the caller's item.fields; CloudEvents/OTLP/NDJSON embed
+  // the full fields object verbatim (confirmed by reading all three payload
+  // functions) and stay loss:[]. 6/6 governance-export-adapter-tests pass
+  // (independently re-run).
+  'E-AC-02': ['implemented', 'WP-E-AC02'],
   'E-AC-04': ['partial', 'WP-E'],
   'E-AC-08': ['partial', 'WP-E'],
   'E-AC-09': ['partial', 'WP-E'],
@@ -793,7 +801,7 @@ const POINTERS = {
   'C-AC-13': 'docs/change-control.md (PHX-WP-DOC-1): threat model, policy precedence, migration, operator runbook, and failure/rollback/recovery procedures all present and grounded in change-control.mjs; migration section honestly states no migration tooling exists',
 
   'E-AC-01': 'governance-export-adapter-tests: one validated source mapped deterministically with stable identity',
-  'E-AC-02': 'CONFIRMED ABSENT (PHX-WP-E): deterministic mapping is pinned (pre-existing); mapGovernanceExportProjection always returns loss:freeze([]) even though rfc5424() drops eventId/correlation/candidate/repositoryFingerprint/eventDigest/policyDigest -- governance-export-adapter.mjs:85,98, no lossy conversion is ever declared',
+  'E-AC-02': 'governance-export-adapter-tests (PHX-WP-E-AC02): deterministic mapping was already pinned; loss is now computed per call -- RFC 5424 names every EXPORT_FIELDS key it drops (proven with a full eight-key and a minimal-key fixture), CloudEvents/OTLP/NDJSON proven to stay loss:[] under the same full-key fixture',
   'E-AC-03': 'governance-export-adapter-tests: policy-less exports denied, only explicitly allowed fields projected',
   'E-AC-04': 'governance-export-adapter-tests (PHX-WP-E, break-proofed): default omission of rationale/summary is pinned; CONFIRMED ABSENT: the "policy allows and redacts" path -- EXPORT_FIELDS is a closed, non-configurable constant (adapter.mjs:15), no policy can ever admit the field',
   'E-AC-05': 'governance-export-outbox-tests: independent destination queues, idempotent enqueue, retryable and quarantined entries preserved',

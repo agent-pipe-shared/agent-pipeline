@@ -42,8 +42,8 @@ reproduced here rather than referenced.
 
 ## The direct answer
 
-**Phoenix cannot claim complete.** 105 of 157 criteria carry a named assertion in a
-gate-registered suite; 52 do not. EPIC-AC-05 forbids a completion claim while any
+**Phoenix cannot claim complete.** 106 of 157 criteria carry a named assertion in a
+gate-registered suite; 51 do not. EPIC-AC-05 forbids a completion claim while any
 criterion remains unimplemented or unverified, and it currently bites. No issue is closeable on
 its own live acceptance bullets.
 
@@ -61,8 +61,8 @@ A bullet is therefore BLOCKED unless every criterion mapped to it is `implemente
 
 | verdict | count |
 |---|---|
-| implemented | 105 |
-| partial | 37 |
+| implemented | 106 |
+| partial | 36 |
 | designed-only | 1 |
 | not-started | 13 |
 | constraint | 1 |
@@ -237,12 +237,12 @@ clause that is not pinned or not built.
 | C-AC-12 | partial | WP-C | change-control-tests (PHX-WP-C, break-proofed): unavailable external state blocks via C-AC-04, and the distinct "external-unavailable" gate reason is now pinned by name; the explicit advisory-vs-mandatory policy distinction remains absent -- mandatory:false is only representable together with changeClass:"not-required", which short-circuits before ITSM availability is ever inspected |
 | C-AC-13 | implemented | WP-DOC | docs/change-control.md (PHX-WP-DOC-1): threat model, policy precedence, migration, operator runbook, and failure/rollback/recovery procedures all present and grounded in change-control.mjs; migration section honestly states no migration tooling exists |
 
-### E — Governance event export (#32) (14/21 implemented)
+### E — Governance event export (#32) (15/21 implemented)
 
 | ID | verdict | src | evidence / named gap |
 |---|---|---|---|
 | E-AC-01 | implemented | C | governance-export-adapter-tests: one validated source mapped deterministically with stable identity |
-| E-AC-02 | partial | WP-E | CONFIRMED ABSENT (PHX-WP-E): deterministic mapping is pinned (pre-existing); mapGovernanceExportProjection always returns loss:freeze([]) even though rfc5424() drops eventId/correlation/candidate/repositoryFingerprint/eventDigest/policyDigest -- governance-export-adapter.mjs:85,98, no lossy conversion is ever declared |
+| E-AC-02 | implemented | WP-E-AC02 | governance-export-adapter-tests (PHX-WP-E-AC02): deterministic mapping was already pinned; loss is now computed per call -- RFC 5424 names every EXPORT_FIELDS key it drops (proven with a full eight-key and a minimal-key fixture), CloudEvents/OTLP/NDJSON proven to stay loss:[] under the same full-key fixture |
 | E-AC-03 | implemented | C | governance-export-adapter-tests: policy-less exports denied, only explicitly allowed fields projected |
 | E-AC-04 | partial | WP-E | governance-export-adapter-tests (PHX-WP-E, break-proofed): default omission of rationale/summary is pinned; CONFIRMED ABSENT: the "policy allows and redacts" path -- EXPORT_FIELDS is a closed, non-configurable constant (adapter.mjs:15), no policy can ever admit the field |
 | E-AC-05 | implemented | C | governance-export-outbox-tests: independent destination queues, idempotent enqueue, retryable and quarantined entries preserved |
@@ -372,19 +372,18 @@ No blocking criterion. Closeable subject to the epic-level gates (EPIC-AC-01..06
 
 ### #32 — Add provider-neutral governance event export for SIEM and audit platforms
 
-11 of 20 live acceptance bullets fully carried; **9 blocked**.
+12 of 20 live acceptance bullets fully carried; **8 blocked**.
 
 | # | live acceptance bullet | blocking criteria (verdict) |
 |---|---|---|
 | 1 | Human/agent/lifecycle origin and authority survive export | K-AC-10 (not-started) |
-| 2 | CloudEvents/OTLP/NDJSON/RFC 5424 mappings are deterministic/loss-declared | E-AC-02 (partial) |
-| 3 | Free-form rationale is explicit-policy-only and redacted | E-AC-04 (partial) |
-| 4 | Cursor/gap/fork/hash/schema/ack failures are typed | E-AC-08 (partial) |
-| 5 | Advisory failure preserves canonical operation | E-AC-09 (partial) |
-| 6 | Required mode blocks only exact named boundary/range | E-AC-10 (not-started) |
-| 7 | Receipts state exact acknowledgement without retention/review claims | E-AC-11 (partial) |
-| 8 | External event correlates to sources/candidate/evidence/policy/chain | K-AC-10 (not-started) |
-| 9 | #9 bundles sanitized export-policy/delivery metadata | E-AC-20 (not-started) |
+| 2 | Free-form rationale is explicit-policy-only and redacted | E-AC-04 (partial) |
+| 3 | Cursor/gap/fork/hash/schema/ack failures are typed | E-AC-08 (partial) |
+| 4 | Advisory failure preserves canonical operation | E-AC-09 (partial) |
+| 5 | Required mode blocks only exact named boundary/range | E-AC-10 (not-started) |
+| 6 | Receipts state exact acknowledgement without retention/review claims | E-AC-11 (partial) |
+| 7 | External event correlates to sources/candidate/evidence/policy/chain | K-AC-10 (not-started) |
+| 8 | #9 bundles sanitized export-policy/delivery metadata | E-AC-20 (not-started) |
 
 ## Summary
 
@@ -397,13 +396,13 @@ No blocking criterion. Closeable subject to the epic-level gates (EPIC-AC-01..06
 | #24 | 12 | 9 | 3 | **no** |
 | #30 | 17 | 9 | 8 | **no** |
 | #31 | 17 | 10 | 7 | **no** |
-| #32 | 20 | 11 | 9 | **no** |
+| #32 | 20 | 12 | 8 | **no** |
 
 Issues closeable on their own live acceptance bullets: **1 of 8**.
 
 ## The blocking set, ranked
 
-28 distinct criteria block at least one live acceptance bullet.
+27 distinct criteria block at least one live acceptance bullet.
 
 | criterion | verdict | live bullets blocked |
 |---|---|---|
@@ -420,7 +419,6 @@ Issues closeable on their own live acceptance bullets: **1 of 8**.
 | C-AC-02 | partial | 1 |
 | C-AC-09 | not-started | 1 |
 | C-AC-12 | partial | 1 |
-| E-AC-02 | partial | 1 |
 | E-AC-04 | partial | 1 |
 | E-AC-08 | partial | 1 |
 | E-AC-09 | partial | 1 |
