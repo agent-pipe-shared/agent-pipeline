@@ -315,6 +315,7 @@ import {
 import {
   inventoryFeaturePackages,
   planFeaturePackageBootstrap,
+  planFeaturePackageReconcile,
   planFeaturePackageTransition,
   validateFeaturePackage,
 } from "../lib/feature-package-topology.mjs";
@@ -5327,13 +5328,27 @@ function runFeaturePackageReadCommand(sub, argv) {
  * Routed ahead of `readState()`, like the read-only three: this family's authority is the
  * `--root` repository's own topology and its own private journal, never the operator's
  * local state file.
+ *
+ * `feature-package-reconcile` (PHX-WP-GATE, P-AC-08) is a THIRD, separate write
+ * subcommand added alongside these two: it shares this exact journal (a `kind: "reconcile"`
+ * record, retained/retired/recovered by the SAME helpers below and by the unmodified
+ * `feature-package-recover`), the same writer lock, and the same digest-bound-preview /
+ * write / readback shape -- but it is additionally PO-bound (a caller-injected approval
+ * check, bound to the exact candidate and the plan digest) because a reconcile changes
+ * authority-bearing artifact digests, which the other two kinds never do. It is the one
+ * write kind that reads Continuity State (never the operator's local file in general --
+ * only the `--root` repository's OWN `authority.result` binding, and only to satisfy the
+ * Result fence precondition on the plan itself).
  */
-const FEATURE_PACKAGE_WRITE_SUBCOMMANDS = new Set(["feature-package-apply", "feature-package-recover"]);
+const FEATURE_PACKAGE_WRITE_SUBCOMMANDS = new Set(["feature-package-apply", "feature-package-reconcile", "feature-package-recover"]);
 const FEATURE_PACKAGE_APPLY_SCHEMA = "pipeline.feature-package-apply.v1";
+const FEATURE_PACKAGE_RECONCILE_SCHEMA = "pipeline.feature-package-reconcile.v1";
+const FEATURE_PACKAGE_RECONCILE_APPROVAL_SCHEMA = "pipeline.feature-package-reconcile-approval.v1";
 const FEATURE_PACKAGE_RECOVER_SCHEMA = "pipeline.feature-package-recover.v1";
 const FEATURE_PACKAGE_APPLY_JOURNAL_SCHEMA = "pipeline.feature-package-apply-journal.v1";
 const FEATURE_PACKAGE_APPLY_LOCK_TOKEN = "pipeline-feature-package-apply-v1";
 const FEATURE_PACKAGE_APPLY_FLAGS = new Set(["root", "manifest", "next-state", "proposal", "plan-sha256"]);
+const FEATURE_PACKAGE_RECONCILE_FLAGS = new Set(["root", "manifest", "plan-sha256"]);
 
 function featurePackageApplyPrivatePaths(dir, deps = {}) {
   const common = (deps.gitCommonDir ?? defaultGitCommonDir)(dir);
@@ -5362,7 +5377,7 @@ function loadFeaturePackageApplyJournal(dir, deps = {}) {
       || value.schema !== FEATURE_PACKAGE_APPLY_JOURNAL_SCHEMA
       || !SHA256_RE.test(value.planSha256)
       || typeof value.manifestPath !== "string"
-      || !["transition", "bootstrap"].includes(value.kind)
+      || !["transition", "bootstrap", "reconcile"].includes(value.kind)
       || !(value.preSha256 === null || SHA256_RE.test(value.preSha256))
       || !SHA256_RE.test(value.postSha256)
       || typeof value.postBytesBase64 !== "string"
@@ -5563,6 +5578,143 @@ function runFeaturePackageApplyCommand(argv, deps) {
   } finally { releaseContinuityLock(lock); }
 }
 
+/**
+ * Re-derives the reconcile plan FRESH against current on-disk reality AND the CURRENT
+ * Continuity State binding (closing the TOCTOU window the earlier preview leaves open --
+ * exactly what DoD 3 requires: "recomputes the preview fresh and refuses on drift"), and
+ * turns it into a postimage IFF the re-derived plan still matches the digest the caller's
+ * preview bound. Deliberately a SEPARATE function from `computeFeaturePackagePostimage`
+ * rather than a third branch inside it: `feature-package-apply`'s transition/bootstrap
+ * paths are left byte-for-byte untouched.
+ */
+function computeFeaturePackageReconcilePostimage(root, manifest, planSha256, resultAuthority) {
+  const rebuilt = planFeaturePackageReconcile(root, manifest, resultAuthority);
+  if (rebuilt.status !== "reconcile-preview" || sha256CanonicalJson(rebuilt) !== planSha256) {
+    return { ok: false, code: "FTP-RECONCILE-DRIFT" };
+  }
+  const preFile = physicalRebindFile(root, manifest);
+  if (preFile === null) return { ok: false, code: "FTP-RECONCILE-IDENTITY" };
+  const postBytes = Buffer.from(`${JSON.stringify(rebuilt.postimage, null, 2)}\n`, "utf8");
+  const postSha256 = sha256Bytes(postBytes);
+  const mode = Number(preFile.identity.mode) & 0o777;
+  return { ok: true, preSha256: preFile.sha256, postBytes, postSha256, mode, changes: rebuilt.changes };
+}
+
+/**
+ * `feature-package-reconcile` -- the third plan kind's transactional half (PHX-WP-GATE,
+ * P-AC-08). Consumes `planFeaturePackageReconcile` under the identical `--plan-sha256`
+ * preview-digest binding `feature-package-apply` uses, is additionally PO-bound (a
+ * caller-injected `deps.featurePackageReconcileApproval` proof check, bound to the exact
+ * observed candidate and the plan digest -- the same shape `continuity-authority-
+ * revision-apply` uses for `deps.authorityRevisionApproval`), and reuses the SAME private
+ * journal, writer lock, and readback-before-retirement machinery `feature-package-apply`
+ * already uses (a `kind: "reconcile"` record; `feature-package-recover` reads it back
+ * unmodified). A reconcile without a valid bound decision fails closed and writes nothing.
+ */
+function runFeaturePackageReconcileCommand(argv, deps) {
+  const sub = "feature-package-reconcile";
+  const parsed = parseFeaturePackageReadFlags(argv, FEATURE_PACKAGE_RECONCILE_FLAGS);
+  if (!parsed.ok) return refuseFeaturePackageRead(sub, parsed.error);
+  const flags = parsed.value;
+  if (flags.root === undefined) return refuseFeaturePackageRead(sub, 'argument "--root <dir>" is required');
+  const root = resolve(flags.root);
+  let rootStat = null;
+  try { rootStat = statSync(root); } catch { rootStat = null; }
+  if (rootStat === null || !rootStat.isDirectory()) {
+    return refuseFeaturePackageRead(sub, `argument "--root" does not name a readable directory: ${flags.root}`);
+  }
+  if (flags.manifest === undefined) return refuseFeaturePackageRead(sub, 'argument "--manifest <repo-relative-path>" is required');
+  const manifest = featurePackageReadRelative(root, flags.manifest);
+  if (manifest === null) return refuseFeaturePackageRead(sub, `argument "--manifest" must be a canonical path inside --root: ${flags.manifest}`);
+  if (!SHA256_RE.test(flags["plan-sha256"] ?? "")) {
+    return refuseFeaturePackageRead(sub, 'argument "--plan-sha256 <sha256>" is required and must be a sha256 hex digest');
+  }
+  const planSha256 = flags["plan-sha256"];
+
+  const lock = acquireContinuityLock(root, FEATURE_PACKAGE_APPLY_LOCK_TOKEN, deps);
+  if (!lock.ok) return refuseFeaturePackageRead(sub, `writer lock unavailable (${lock.code})`);
+  try {
+    const stateNow = (deps.readStateRaw ?? readStateRaw)(root);
+    const resultAuthority = stateNow.status === "ok" ? (stateNow.state?.continuity?.authority?.result ?? null) : null;
+    const plan = planFeaturePackageReconcile(root, manifest, resultAuthority);
+    if (plan.status !== "reconcile-preview" || sha256CanonicalJson(plan) !== planSha256) {
+      return refuseFeaturePackageRead(sub, `argument "--plan-sha256" does not match the freshly recomputed reconcile preview digest for ${manifest}; the manifest, an artifact, or the Continuity State Result binding drifted since the preview was taken`);
+    }
+
+    if (typeof deps.featurePackageReconcileApproval !== "function") {
+      return refuseFeaturePackageRead(sub, "PO-bound approval is unavailable (FTP-RECONCILE-APPROVAL-UNAVAILABLE); zero mutation");
+    }
+    const observedCandidate = (deps.gitCandidate ?? defaultGitCandidate)(root);
+    if (!observedCandidate.ok) {
+      return refuseFeaturePackageRead(sub, "the current candidate identity is unavailable (FTP-RECONCILE-CANDIDATE-UNAVAILABLE); zero mutation");
+    }
+    const approvalCheck = deps.featurePackageReconcileApproval({
+      repoRoot: root,
+      schema: FEATURE_PACKAGE_RECONCILE_APPROVAL_SCHEMA,
+      manifest,
+      planSha256,
+      candidate: { commit: observedCandidate.commit, tree: observedCandidate.tree },
+    });
+    if (!approvalCheck?.ok) {
+      return refuseFeaturePackageRead(sub, "PO-bound approval was not confirmed for this exact candidate and plan digest (FTP-RECONCILE-APPROVAL-REJECTED); zero mutation");
+    }
+
+    const pending = loadFeaturePackageApplyJournal(root, deps);
+    if (!pending.ok) return refuseFeaturePackageRead(sub, `a prior recovery journal is unreadable or tampered (${pending.code}); run feature-package-recover`);
+    if (pending.journal !== null) {
+      return refuseFeaturePackageRead(sub, `a recovery journal is already pending for ${pending.journal.manifestPath}; run feature-package-recover before retrying. Zero new mutation; recovery journal retained`);
+    }
+
+    const postimage = computeFeaturePackageReconcilePostimage(root, manifest, planSha256, resultAuthority);
+    if (!postimage.ok) return refuseFeaturePackageRead(sub, `the preimage drifted since the preview was recomputed (${postimage.code}); zero mutation`);
+
+    const published = publishFeaturePackageApplyJournal(root, {
+      planSha256, manifestPath: manifest, kind: "reconcile",
+      preSha256: postimage.preSha256, postSha256: postimage.postSha256,
+      postBytes: postimage.postBytes, mode: postimage.mode,
+    }, deps);
+    if (!published) return refuseFeaturePackageRead(sub, "journal prepare failed; zero mutation");
+    if (deps.afterFeaturePackageReconcileJournal?.() === false) {
+      return refuseFeaturePackageRead(sub, "interrupted after journal preparation; recovery journal retained");
+    }
+
+    const target = join(root, manifest);
+    const replace = deps.replaceFeaturePackageApplyFdContents ?? ((fd, bytes) => { ftruncateSync(fd, 0); let offset = 0; while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset, offset); fsyncSync(fd); });
+    const rename = deps.renameFeaturePackageApply ?? renameSync;
+    const sync = deps.syncFeaturePackageApplyDirectory ?? syncDirectory;
+    const written = writeRebindFile(target, postimage.postBytes, postimage.mode, lock.ownerNonce, replace, rename, sync);
+    if (!written.ok) return refuseFeaturePackageRead(sub, `manifest write failed (${written.code}); recovery journal retained`);
+    if (deps.afterFeaturePackageReconcileWrite?.() === false) {
+      return refuseFeaturePackageRead(sub, "interrupted after manifest write; recovery journal retained");
+    }
+
+    const observed = physicalRebindFile(root, manifest);
+    if (observed === null || observed.sha256 !== postimage.postSha256 || !observed.bytes.equals(postimage.postBytes)) {
+      return refuseFeaturePackageRead(sub, "postimage readback did not match the predicted digest; recovery journal retained");
+    }
+    const revalidated = validateFeaturePackage(root, manifest);
+    if (!revalidated.ok) {
+      return refuseFeaturePackageRead(sub, `postimage failed package validation (${revalidated.findings.join("; ")}); recovery journal retained`);
+    }
+
+    const paths = featurePackageApplyPrivatePaths(root, deps);
+    if (!retireFeaturePackageApplyJournal(paths)) {
+      return refuseFeaturePackageRead(sub, "journal retirement is unresolved; recovery journal retained");
+    }
+
+    console.log(JSON.stringify({
+      schema: FEATURE_PACKAGE_RECONCILE_SCHEMA,
+      status: "applied",
+      kind: "reconcile",
+      manifest,
+      changes: postimage.changes,
+      planSha256,
+      manifestSha256: postimage.postSha256,
+    }, null, 2));
+    return 0;
+  } finally { releaseContinuityLock(lock); }
+}
+
 /** Read-only diagnosis of any retained journal. Never writes; never retires. */
 function runFeaturePackageRecoverCommand(argv, deps) {
   const sub = "feature-package-recover";
@@ -5606,9 +5758,9 @@ function runFeaturePackageRecoverCommand(argv, deps) {
 }
 
 function runFeaturePackageWriteCommand(sub, argv, deps) {
-  return sub === "feature-package-apply"
-    ? runFeaturePackageApplyCommand(argv, deps)
-    : runFeaturePackageRecoverCommand(argv, deps);
+  if (sub === "feature-package-apply") return runFeaturePackageApplyCommand(argv, deps);
+  if (sub === "feature-package-reconcile") return runFeaturePackageReconcileCommand(argv, deps);
+  return runFeaturePackageRecoverCommand(argv, deps);
 }
 
 /**
@@ -6556,7 +6708,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
 
     default: {
       console.error(
-        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, submit-plan, approve-plan, reopen-design, seal-plan-approval, set-phase, set-gate-estimate, revoke-plan, bind-plan-spec, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy, po-authority-rebind-plan, po-authority-rebind-apply, po-authority-decision-plan, po-authority-decision-select, po-authority-decision-apply, continuity-init, continuity-cas, continuity-apply-native, continuity-integrate-final, continuity-record-course-brief, continuity-select-course, continuity-apply-decision, continuity-clear-decision, continuity-result-bootstrap-plan, continuity-result-bootstrap-apply, continuity-result-rebind-plan, continuity-result-rebind-apply, continuity-result-case-migration-plan, continuity-result-case-migration-apply, continuity-result-close-plan, continuity-result-close-apply, continuity-authority-revision-plan, continuity-authority-revision-apply, continuity-authority-revision-recover, publication-prepare, publication-approve, publication-authorize, publication-reconcile, publication-observe, publication-start-readback, publication-close, publication-rearm, publication-block, feature-package-inspect, feature-package-status, feature-package-plan, feature-package-apply, feature-package-recover.`,
+        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, submit-plan, approve-plan, reopen-design, seal-plan-approval, set-phase, set-gate-estimate, revoke-plan, bind-plan-spec, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy, po-authority-rebind-plan, po-authority-rebind-apply, po-authority-decision-plan, po-authority-decision-select, po-authority-decision-apply, continuity-init, continuity-cas, continuity-apply-native, continuity-integrate-final, continuity-record-course-brief, continuity-select-course, continuity-apply-decision, continuity-clear-decision, continuity-result-bootstrap-plan, continuity-result-bootstrap-apply, continuity-result-rebind-plan, continuity-result-rebind-apply, continuity-result-case-migration-plan, continuity-result-case-migration-apply, continuity-result-close-plan, continuity-result-close-apply, continuity-authority-revision-plan, continuity-authority-revision-apply, continuity-authority-revision-recover, publication-prepare, publication-approve, publication-authorize, publication-reconcile, publication-observe, publication-start-readback, publication-close, publication-rearm, publication-block, feature-package-inspect, feature-package-status, feature-package-plan, feature-package-apply, feature-package-reconcile, feature-package-recover.`,
       );
       return 2;
     }

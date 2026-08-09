@@ -234,6 +234,138 @@ export function planFeaturePackageBootstrap(rootDir = process.cwd(), manifestPat
   };
 }
 
+// ---- PHX-WP-GATE: the third plan kind -- digest-only reconciliation (P-AC-08) ----
+const DIGEST_FINDING_RE = /: digest does not bind file bytes$/u;
+
+/**
+ * The canonical Result-reconciliation fence. A Result reconciliation is admitted only
+ * when the CURRENT Result bytes contain this exact marker, with everything before it
+ * hashing to the STALE manifest digest being reconciled away -- the old digest has to
+ * still be provable *inside* the new artifact (closure-plan.md, "The Result fence").
+ */
+export const RESULT_RECONCILIATION_FENCE = "\n<!-- pipeline.result-reconciliation-fence.v1 -->\n";
+
+function sameJsonValue(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+
+/**
+ * The no-drift invariant, enforced on the PLAN OBJECT itself rather than trusted from
+ * intent: the postimage must be byte-identical to the preimage once the artifacts'
+ * `sha256` fields alone are substituted -- same lifecycle state, same artifact set and
+ * order, same candidate, same schema, same every other byte. Exported so a violation is
+ * directly provable (a hand-built postimage that also changes a second field) without
+ * needing a real filesystem race to trigger it.
+ */
+export function reconcileNoDriftOk(preimageValue, postimageValue) {
+  if (!object(preimageValue) || !object(postimageValue)) return false;
+  if (!Array.isArray(preimageValue.artifacts) || !Array.isArray(postimageValue.artifacts)
+    || preimageValue.artifacts.length !== postimageValue.artifacts.length) return false;
+  for (let i = 0; i < preimageValue.artifacts.length; i++) {
+    const before = preimageValue.artifacts[i]; const after = postimageValue.artifacts[i];
+    if (!object(before) || !object(after)) return false;
+    const beforeKeys = Object.keys(before).sort(); const afterKeys = Object.keys(after).sort();
+    if (beforeKeys.join("\0") !== afterKeys.join("\0")) return false;
+    for (const key of beforeKeys) if (key !== "sha256" && !sameJsonValue(before[key], after[key])) return false;
+  }
+  const { artifacts: _pa, ...preRest } = preimageValue;
+  const { artifacts: _qa, ...postRest } = postimageValue;
+  return sameJsonValue(preRest, postRest);
+}
+
+/**
+ * Checks the Result fence's three independently-typed preconditions, each with its own
+ * refusal so evidence can tell them apart:
+ *  - `reconcile-result-unbound`: the current Result (this artifact's path, at its CURRENT
+ *    on-disk digest) is not the one Continuity State's `authority.result` names -- a
+ *    Result the State does not bind cannot be reconciled, whatever its digest says.
+ *  - `reconcile-result-metadata-only`: the canonical fence marker is entirely absent from
+ *    the current bytes, i.e. nothing SHOWS the new bytes grew from the old ones -- refused
+ *    BY NAME as a metadata-only digest refresh, distinguishable from a fence-proof failure.
+ *  - `reconcile-result-fence-mismatch`: the marker is present but the bytes preceding it do
+ *    not hash to the exact stale manifest digest -- the historical prefix is not preserved.
+ */
+function checkResultReconciliationFence(resultAuthority, artifact, currentBytes, currentSha256) {
+  if (!object(resultAuthority) || resultAuthority.path !== artifact.path || resultAuthority.sha256 !== currentSha256) {
+    return { ok: false, reason: "reconcile-result-unbound", findings: ["FTP-RECONCILE-RESULT-UNBOUND: the current Result is not the one Continuity State binds"] };
+  }
+  let text;
+  try { text = new TextDecoder("utf-8", { fatal: true }).decode(currentBytes); }
+  catch { return { ok: false, reason: "reconcile-result-metadata-only", findings: ["FTP-RECONCILE-RESULT-METADATA-ONLY: Result bytes are not decodable text; no fence is provable"] }; }
+  const fenceIndex = text.indexOf(RESULT_RECONCILIATION_FENCE);
+  if (fenceIndex === -1) {
+    return { ok: false, reason: "reconcile-result-metadata-only", findings: ["FTP-RECONCILE-RESULT-METADATA-ONLY: the canonical Result-reconciliation fence is absent; a metadata-only digest refresh is refused"] };
+  }
+  const prefix = Buffer.from(text.slice(0, fenceIndex), "utf8");
+  if (digest(prefix) !== artifact.sha256) {
+    return { ok: false, reason: "reconcile-result-fence-mismatch", findings: ["FTP-RECONCILE-RESULT-FENCE: the preserved historical prefix does not hash to the stale manifest digest"] };
+  }
+  return { ok: true };
+}
+
+/**
+ * Preview a digest-only reconciliation: recomputes every declared artifact's digest from
+ * the bytes currently on disk and returns the preimage manifest, the postimage manifest,
+ * and the per-artifact old/new digest pairs, in the same plan-object shape the other two
+ * kinds return (so `--plan-sha256` binding is inherited unchanged).
+ *
+ * Unlike the other two kinds, the CURRENT manifest is expected to be invalid in exactly
+ * one way -- one or more stale artifact digests, which is what `validateFeaturePackage`
+ * reports as its findings -- so this planner accepts that specific finding shape and
+ * refuses on any OTHER validation problem, never widening what counts as reconcilable.
+ *
+ * `resultAuthority` is the caller's current Continuity State `authority.result` binding
+ * (`{ path, sha256 }` or `null`); it is consulted ONLY when a `result`-class artifact's
+ * digest is being reconciled, per the Result fence (see `checkResultReconciliationFence`).
+ */
+export function planFeaturePackageReconcile(rootDir = process.cwd(), manifestPath, resultAuthority = null) {
+  const root = resolve(rootDir);
+  const checked = validateFeaturePackage(root, manifestPath);
+  if (checked.receipt === null) {
+    return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "invalid-current-package", findings: checked.findings };
+  }
+  const nonDigestFindings = checked.findings.filter((finding) => !DIGEST_FINDING_RE.test(finding));
+  if (nonDigestFindings.length > 0) {
+    return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "invalid-current-package", findings: checked.findings };
+  }
+  let value;
+  try { value = JSON.parse(readFileSync(join(root, checked.receipt.manifest), "utf8")); }
+  catch { return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "invalid-current-package", findings: ["FTP-MANIFEST: invalid JSON"] }; }
+  const id = value?.feature?.id;
+  const nextArtifacts = []; const changes = [];
+  for (const [index, artifact] of (Array.isArray(value.artifacts) ? value.artifacts : []).entries()) {
+    const label = `FTP-RECONCILE-${index}`;
+    const rel = packageRelative(id, artifact?.path);
+    const file = rel && canonicalRelative(root, artifact.path) ? regularFile(root, artifact.path, [], label) : null;
+    if (!file) return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "artifact-unreadable", findings: [`${label}: referenced file is missing or unsafe`] };
+    const currentBytes = readFileSync(join(root, file));
+    const currentSha256 = digest(currentBytes);
+    if (currentSha256 === artifact.sha256) { nextArtifacts.push(artifact); continue; }
+    if (artifact.class === "result") {
+      const fence = checkResultReconciliationFence(resultAuthority, artifact, currentBytes, currentSha256);
+      if (!fence.ok) return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: fence.reason, findings: fence.findings };
+    }
+    nextArtifacts.push({ ...artifact, sha256: currentSha256 });
+    changes.push({ path: artifact.path, class: artifact.class, operation: "reconcile-digest", from: artifact.sha256, to: currentSha256 });
+  }
+  if (changes.length === 0) {
+    return { schema: "pipeline.feature-package-transition-plan.v1", status: "noop", manifest: checked.receipt.manifest, from: checked.receipt.state, to: checked.receipt.state, changes: [] };
+  }
+  const nextValue = { ...value, artifacts: nextArtifacts };
+  if (!reconcileNoDriftOk(value, nextValue)) {
+    return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "reconcile-drift", findings: ["FTP-RECONCILE-DRIFT: a reconcile plan may only change artifact digest fields"] };
+  }
+  return {
+    schema: "pipeline.feature-package-transition-plan.v1",
+    status: "reconcile-preview",
+    manifest: checked.receipt.manifest,
+    from: checked.receipt.state,
+    to: checked.receipt.state,
+    changes,
+    requiredAuthority: "po",
+    preimage: value,
+    postimage: nextValue,
+  };
+}
+
 /**
  * Resolve one repository path to its sole canonical artifact identity.
  *
