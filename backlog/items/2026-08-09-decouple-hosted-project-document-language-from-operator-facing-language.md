@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.decouple-hosted-project-document-language-from-operator-facing-language
-type: enhancement
+type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-08-09

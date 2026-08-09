@@ -45,7 +45,7 @@
 | pipeline.critical-human-proof-policy-seeded-without-trust-anchor | open | idea | pipeline | 2026-08-09 | — |
 | pipeline.critical-push-signing-ceremony-gives-no-path-feedback | open | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.cross-repository-override-ledger-binding | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
-| pipeline.decouple-hosted-project-document-language-from-operator-facing-language | open | enhancement | pipeline | 2026-08-09 | — |
+| pipeline.decouple-hosted-project-document-language-from-operator-facing-language | open | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.dispatch-provenance | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.dispatch-record-does-not-bind-to-its-commit | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.dispatch-reported-creating-a-record-it-never-created | open | defect | pipeline | 2026-08-08 | — |
