@@ -47,6 +47,25 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 6b96d75c2632557381eedab77a977b1e780a708b — 2026-08-09, range 3387065..6b96d75, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `1d5298c` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `1def755`, `9816a92`, `8caaa61`, `3d2ef2b`, `6b96d75`: L-AC-04's renderer/CSS fix (a
+missing visual-class distinction, not a missing test), E-AC-02's export-adapter loss-declaration
+fix (a real correctness bug), both evidence-map deltas, and this leg's checkpoint, which also
+records four researched-but-deliberately-not-dispatched candidates (K-AC-05, P-AC-06, V-AC-02,
+C-AC-02) and why. Same reading as the whole chain: `docs/state.md` stays ADR-0012, the generated
+evidence-map/closure-plan/class-s-scoping trio stays ADR-0045.
+`plugins/pipeline-core/lib/governance-replay-view-renderer.mjs`,
+`plugins/pipeline-core/assets/evidence-viewer.css`,
+`plugins/pipeline-core/lib/governance-replay-view.test.mjs`,
+`plugins/pipeline-core/lib/governance-export-adapter.mjs`, and
+`plugins/pipeline-core/lib/governance-export-adapter.test.mjs` (the two dispatch commits' only
+changed paths) implicate neither ADR.
+
 ## Candidate 1d5298c72d4d84244bbb5cfde9a0bd282dd6f2fb — 2026-08-09, range 3387065..1d5298c, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
