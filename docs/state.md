@@ -6,7 +6,7 @@
 **Last updated:** 2026-08-09
 **Project status:** ACTIVE
 **Local candidate:** `0.5.4+<runner>.20260809131419.bf59a28` · commit `cdec8a4cdd0dbd2df3607d26fe18aaed6b5a25cb` · Verify **267/267 exit 0** bound to that exact commit · ready for the PO's manual copy (supersedes `…20260809121256.1d5bba1`)
-**Current block:** GF-058 — **the stable blocker is resolved: the push gate is seeded and live, after its satisfying path was measured end to end** (option C, as the PO chose). Two further happy-path defects fixed in the same block: the reopen-design deadlock, and the promoted state's language. Also in this block: the closure-evidence trackedness contract, three routing defects found by reading, the staging exemption, and the defects the PO's three greenfield runs produced; three suite registrations are open for the PO (TP-3); the third candidate's two TP-5-blocked findings (PG11e's commit-hash flake, and `security: warn` hard-blocking under `push: blocking`) are now fixed under one bundled HGO override; 0.5.3 is released to `main` and the human-authorization ceremony recorded as [ADR-0061](adr/0061-uniform-human-approval-ceremony.md) remains the governing thread; Nova A completion still paused on genuine ADR-gated/evidence-gated blockers
+**Current block:** Happy-path re-test round two (Claude + Codex) against the fourth local candidate — **release still not cleared.** GF-059's bounded guard hardening failed independent Critic review (scope mismatch + a security-relevant regression, not merged); GF-060 (corrected rework) and GF-061 (stale push-approval skill doc) are dispatched and pending. A turn-efficiency audit found push-approval alone cost 55% of the Claude run's wall clock; four new backlog items filed. Prior block, GF-058 — **the stable blocker is resolved: the push gate is seeded and live, after its satisfying path was measured end to end** (option C, as the PO chose). Two further happy-path defects fixed in the same block: the reopen-design deadlock, and the promoted state's language. Also in this block: the closure-evidence trackedness contract, three routing defects found by reading, the staging exemption, and the defects the PO's three greenfield runs produced; three suite registrations are open for the PO (TP-3); the third candidate's two TP-5-blocked findings (PG11e's commit-hash flake, and `security: warn` hard-blocking under `push: blocking`) are now fixed under one bundled HGO override; 0.5.3 is released to `main` and the human-authorization ceremony recorded as [ADR-0061](adr/0061-uniform-human-approval-ceremony.md) remains the governing thread; Nova A completion still paused on genuine ADR-gated/evidence-gated blockers
 **Repair baseline:** `5d2b83dcc765d50801f4491e1bd9bed32090112b`
 **Release version:** `0.5.3` released
 **Release state:** version `0.5.3` · tag `v0.5.3` · commit `2740041d59458f949b597905816af12048502469` · tree `e72cca9b69e105ec6aac9833c4ac0bccb385d25b` · status `published`
@@ -16,6 +16,97 @@ Its `observedAt` is the UTC time when this public projection was produced from
 the supplied authoritative release identity; it is not a claimed release time.
 The historical candidate-qualification sections below are retained as
 session history and no longer describes the current publication disposition.
+
+## 2026-08-09 Happy-path re-test round two (Claude + Codex) — GF-059 failed Critic review, GF-060/GF-061 dispatched, turn-efficiency findings filed (current, in progress)
+
+Both the Claude+Pipeline and Codex+Pipeline happy-path re-tests against the
+fourth local `0.5.4` candidate (`cdec8a4c`) completed. **Release is still not
+cleared** — both runs surfaced real defects that must be fixed first, per the
+PO's own gating instruction from session start.
+
+**Codex run:** hit a new dead end, `kickoff promote apply` writing correctly
+but returning `partial`/`cleanup_recovery_observation_unavailable`, with the
+only mutation-capable recovery candidate (`attended-host-recovery`) blocked
+by `guard-lifecycle-ready.mjs`'s own external-operator-required route — no
+agent-executable path exists. Filed as
+`backlog/items/2026-08-09-kickoff-promotion-cleanup-readback-has-no-in-session-recovery.md`
+(a reproduction of the already-tracked #57/NVA-B61-7 failure class, not a new
+one). The PO authorized a bounded two-part hardening: (i) make the
+`HGO-EXTERNAL-REPOSITORY-OBSERVATION` guidance actionable, (ii) fix an
+adjacent `guard-lifecycle-ready.mjs` `--runner` argv-allowlist gap found by
+direct code inspection.
+
+**GF-059 implemented that hardening; independent Critic review (self-application,
+ADR-0014, `claude-opus-5` at max per MP-07) returned FAIL.** Full report:
+`scratch/nova-4e164e09/critic-notes.md`. Not merged — worktree branch
+`worktree-agent-a2b2a34b84f687185` (`f3bbf275`, `20d562bf`) abandoned.
+Findings: **F1/F3** — the diff addressed neither the backlog item's Direction
+1-3 nor a consistent scope (an Elephant scoping error bundling an unrelated
+allowlist fix with this item's actual root cause; corrected in the backlog
+item and the allowlist gap split into its own item,
+`2026-08-09-guard-lifecycle-ready-runner-allowlist-incomplete.md`). **F2
+(security-relevant):** the guidance fix added the literal denied command to
+`codex-pretool-guard.mjs`'s `hostBoundary` catch — exactly the branch reached
+when the existing secret-eligibility screen's result is computed but then
+discarded because a `topology()`-family call throws before it's applied,
+meaning a secret-bearing denied command could be echoed verbatim into a
+persisted session transcript. **F4/F5 (minor):** the allowlist fix covered 6
+of the documented subcommands, not all; the literal-command payload is an
+empty string for non-Bash denials. **GF-060 dispatched** (no worktree
+isolation this time, informed by the prior worktree-staleness lesson below)
+to correct both properly — allowlist completion plus a guidance fix gated on
+the existing eligibility screen, never a new detection heuristic. Pending:
+Critic re-review before any merge.
+
+**Claude run:** succeeded end to end (browser-tested, working two-level
+game), but cost 76.6 min wall clock / 43m7s API time / $22.68, and the PO
+flagged it directly: "das signieren und pushen in einem neuen repo hat eine
+ekelhafte UX... das muss über skripte... und nicht so vielen [copy pastes]
+laufen," and separately, on the whole run, "das muss gehärtet sein." A
+detailed turn-efficiency root-cause audit (sanitized, no PO-identifying
+data) found **push-approval alone consumed 55% of session wall clock** — 8
+distinct human terminal commands, 6 `AskUserQuestion` round-trips, one
+rejected sub-agent dispatch, two Claude-Code-harness classifier denials
+(blocking even a read-only `Read` of a guard script) — for a single branch
+push. Root causes, not the ceremony's design: the skill reference an agent
+actually loads mid-session
+(`plugins/pipeline-core/skills/pipeline-start/references/push-approval.md`)
+still describes the pre-ADR-0061 two-step shape and never mentions
+`authorize-critical`; a fresh `signature`-mode project has no
+`project/critical-human-proof.json`, forcing the full signed
+Human-Guard-Override ceremony just to bootstrap one file; no git author
+identity is provisioned at fresh-repo onboarding; and several bootstrap/
+kickoff constraints (closed shell grammar, kickoff-promote syntax, two PRD
+guard-drift repairs) are learned only by live rejection. Filed as four new
+items plus cross-references to two existing ones this run independently
+confirms/reproduces:
+`2026-08-09-push-approval-skill-reference-predates-adr-0061.md`,
+`2026-08-09-critical-human-proof-not-materialized-for-signature-mode.md`,
+`2026-08-09-fresh-repo-onboarding-never-asks-for-git-identity.md`,
+`2026-08-09-bootstrap-and-kickoff-teach-their-own-constraints-only-by-live-rejection.md`;
+cross-referenced into `2026-08-09-the-push-gate-is-silent-in-every-consumer-project.md`
+(closed — confirms that fix was partial) and
+`2026-08-08-the-signed-guard-override-has-no-command-that-emits-the-digest-to-sign.md`
+(open — confirms its predicted "first external tester" scenario). **GF-061
+dispatched** for the highest-leverage, lowest-risk item (the stale skill
+reference, docs-only) — the larger onboarding-provisioning fixes are filed
+for deliberate follow-up, not autonomously dispatched in parallel with
+GF-060 while the PO was away.
+
+**Process lesson, self-discovered:** the Agent tool's `isolation: "worktree"`
+for GF-059 branched from a stale base (the old `v0.5.3` release tag, not
+current HEAD) rather than the checked-out branch — a 20-commit,
+652-changed-line gap in one of the two target files. De-risked by
+`git log -L` proving the touched functions were untouched across that range,
+then rebased and fully re-verified before Critic dispatch. **GF-060 and
+GF-061 both dispatched without worktree isolation** (single serial task,
+nothing running in parallel against the same files) to avoid the class
+entirely rather than repeat the rebase-and-verify workaround.
+
+Nova B dispatch (including Slice B0, named by `pipeline-state.json`'s
+`queueHead`) remains deferred per the PO's same-day instruction until 0.5.4
+is actually live — recorded in `specs/sprint-nova-epic/plans/nova-b.md` and
+`specs/sprint-nova-epic/plans/nova-b-readiness-2026-08-09.md`.
 
 ## 2026-08-09 The fourth local `0.5.4` candidate — the two TP-5-blocked findings, fixed (current)
 
