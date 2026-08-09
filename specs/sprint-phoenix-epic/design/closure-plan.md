@@ -8,7 +8,7 @@ Parent specification: [../spec.md](../spec.md) · Measurement: [../evidence/acce
 
 ## What this design is for
 
-The measurement established that 79 of 157 acceptance criteria are not
+The measurement established that 78 of 157 acceptance criteria are not
 `implemented` and that no issue is closeable. It did not say how any of them closes. This
 document does, and it is generated from the same verdict data as the measurement, so the two
 cannot drift apart.
@@ -22,9 +22,9 @@ one list is what has made the epic look larger and more uniform than it is.
 | A — assertion missing | 45 | one named test case in an already-registered, unprotected suite |
 | D — documentation missing | 7 | one document section set; no code, no gate |
 | S — seam missing | 6 | a connector between two packages that already work |
-| B — capability missing | 16 | real implementation plus its tests |
+| B — capability missing | 15 | real implementation plus its tests |
 | P — not code | 5 | a human gate, a sanctioned authority revision, or a proved impossibility |
-| **total** | **79** | |
+| **total** | **78** | |
 
 **The distribution is the finding.** The largest class by a wide margin is Class A: criteria
 whose behaviour is built, shipped and green, and which fail only because no assertion names the
@@ -33,82 +33,93 @@ consequence of the Spec's own bar — `spec.md:673` demands that *every* criteri
 test, not that its theme be covered — and it means a large fraction of the epic closes through
 test authorship in files that no maintenance window protects.
 
-## The gating slice, designed
+## The gating slice — built, one gate left
 
 P-AC-08 is the one criterion whose position in the sequence is fixed by the acceptance matrix
 itself: it declares the feature-package writer the mandatory first slice of PHX-0, and forbids
-PHX-0's ruleset-trust-root slice and PHX-1 from starting until it passes. Everything below is
-sequenced behind it for that reason and no other.
+PHX-0's ruleset-trust-root slice and PHX-1 from starting until it passes. Everything below was
+sequenced behind it for that reason and no other. It no longer is: the design below is built,
+and this section is now a record of what shipped rather than a proposal.
 
-**What exists.** `feature-package-inspect|status|plan|apply|recover` are built, registered and
-green. `apply` already carries two plan kinds — `bootstrap` for an absent manifest and
-`transition` for a state change — each with a recomputed-preview digest check that fails closed
-on manifest, proposal or target-state drift, a MAC-authenticated recovery journal, and a
-readback before the journal is retired.
+**What was already there.** `feature-package-inspect|status|plan|apply|recover` were built,
+registered and green before this pass. `apply` carried two plan kinds — `bootstrap` for an
+absent manifest and `transition` for a state change — each with a recomputed-preview digest
+check that fails closed on manifest, proposal or target-state drift, a MAC-authenticated
+recovery journal, and a readback before the journal is retired.
 
-**What is missing, precisely.** The criterion also requires reconciling an inherited `draft`
-manifest's stale PRD, Spec, acceptance, architecture and Result digests — and requires it happen
-through an existing-manifest preview, an exact PO-bound apply and a readback, **with no
-lifecycle-state, artifact-set, candidate or other authority-byte change**. Neither existing plan
-kind expresses that: `transition` exists to change state, which this operation must not do, and
-`bootstrap` applies only when the manifest is absent. `planFeaturePackageReconcile` does not
-exist in `lib/feature-package-topology.mjs`.
+**What this pass built (`PHX-WP-GATE`, commit 92b21ed).** The criterion additionally requires
+reconciling an inherited `draft` manifest's stale PRD, Spec, acceptance, architecture and Result
+digests — through an existing-manifest preview, an exact PO-bound apply and a readback, **with
+no lifecycle-state, artifact-set, candidate or other authority-byte change**. Neither existing
+plan kind could express that: `transition` exists to change state, which this operation must
+not do, and `bootstrap` applies only when the manifest is absent. `planFeaturePackageReconcile`
+now exists in `lib/feature-package-topology.mjs`, and `feature-package-reconcile` now exists as
+an apply mode in `pipeline-state.mjs`.
 
-### Design: a third plan kind, `reconcile`
+### As built: the third plan kind, `reconcile`
 
-The reconciliation is a **digest-only** transaction, and the design makes that a structural
-property rather than a promise the implementation is trusted to keep:
+The reconciliation is a **digest-only** transaction, and the no-drift property is structural
+rather than a promise the implementation is trusted to keep:
 
-1. **Preview.** `planFeaturePackageReconcile(root, manifestPath)` recomputes each declared
-   artifact digest from the bytes on disk and returns the preimage manifest, the postimage
-   manifest, and the per-artifact old/new digest pairs. It returns a plan object of the same
-   shape the other two kinds return, so `--plan-sha256` binding is inherited unchanged rather
-   than reimplemented.
-2. **The no-drift invariant is checked on the plan, not on intent.** The postimage is rejected
-   unless it is byte-identical to the preimage after the digest fields alone are substituted:
-   same lifecycle state, same artifact set and order, same candidate, same schema, same every
-   other byte. A reconcile plan that would change anything else is not a warning — it is a
-   refusal, because a transaction that can change state is a transition wearing another name.
+1. **Preview.** `planFeaturePackageReconcile(root, manifestPath, resultAuthority)` recomputes
+   each declared artifact digest from the bytes on disk and returns the preimage manifest, the
+   postimage manifest, and the per-artifact old/new digest pairs, in the same plan-object shape
+   the other two kinds return — so `--plan-sha256` binding is inherited, not reimplemented. The
+   third parameter is one deviation from the original design sketch, added because the Result
+   fence (below) has to be checked on the plan itself and needs Continuity State's binding to do
+   it — reported by the dispatch rather than built in silently.
+2. **The no-drift invariant is checked on the plan, not on intent** (`reconcileNoDriftOk`,
+   exported). The postimage is rejected unless it is byte-identical to the preimage after the
+   digest fields alone are substituted: same lifecycle state, same artifact set and order, same
+   candidate, same schema, same every other byte. Four staged cases (`RGb`..`RGb4`) each change
+   one more field — state, candidate, artifact order — and each is refused.
 3. **Apply is PO-bound.** It consumes the same critical-action proof shape the other
-   authority-changing writers use, bound to the exact candidate and to the plan digest. A
-   reconcile without a valid bound decision fails closed and writes nothing.
-4. **Readback.** The written manifest is re-read and re-validated through
-   `validateFeaturePackage` before the journal is retired — the existing apply path already
-   does this and the reconcile path reuses it rather than adding a second one.
+   authority-changing writers use, bound to the exact candidate and to the plan digest. Cases
+   `RGe` prove zero mutation on both the no-approval-function and the rejected-approval path.
+4. **Manual digest replacement is refused** (case `RGf`) — the exact workaround P-AC-08 names
+   and forbids as a substitute for the transaction.
+5. **Readback.** The written manifest is re-read and re-validated through
+   `validateFeaturePackage` before the journal is retired (case `RGc`, DoD 7) — the existing
+   apply path already did this and the reconcile path reuses it rather than adding a second one.
 
-### Design: the Result fence
+### As built: the Result fence
 
 The criterion admits a Result reconciliation only under two conditions and refuses a
-metadata-only refresh outright. Both are expressed as preconditions of the plan, so a refused
-case never reaches a writer:
+metadata-only refresh outright. All three are plan preconditions (`checkResultReconciliationFence`),
+so a refused case never reaches a writer, and each carries its own typed code so evidence can
+tell the refusals apart (cases `RGg1`..`RGg4`):
 
-- **Continuity binding.** The current Result must be the one Continuity State binds. A Result
-  the State does not name cannot be reconciled, whatever its digest says.
-- **Preserved historical prefix.** The Result bytes must contain the exact stale manifest digest
-  as a preserved historical prefix, followed by the canonical Result-reconciliation fence. This
-  is what distinguishes a Result that legitimately grew from one that was rewritten: the old
-  digest has to still be provable *inside* the new artifact.
-- **Metadata-only refresh is refused by name**, with its own typed code, so the refusal is
-  distinguishable in evidence from a drift refusal.
+- **`reconcile-result-unbound`** — the current Result is not the one Continuity State binds. A
+  Result the State does not name cannot be reconciled, whatever its digest says.
+- **`reconcile-result-metadata-only`** — no canonical fence marker is present at all: refused by
+  name, distinguishably from a drift refusal, exactly as the criterion requires.
+- **`reconcile-result-fence-mismatch`** — a fence marker is present but the preserved prefix does
+  not hash to the stale manifest digest: a Result that was rewritten, not one that legitimately
+  grew.
+- The positive case (`RGg4`) admits only when the prefix genuinely hashes to the stale digest
+  **and** the Result is Continuity-bound — both conditions, not either.
 
 **One thing this design deliberately does not repair.** The reconciliation the criterion was
 written for was already performed by hand in `ece6041`, by the exact route P-AC-08 forbids. The
-capability is still required and still buildable; its original subject is gone, and the audit
+capability is still required and was still built; its original subject is gone, and the audit
 trail for that specific repair will never exist. The PO accepted that as a recorded deviation.
-Building the transaction now is therefore about the next reconciliation, not this one, and the
-design says so rather than implying a retroactive fix.
+Building the transaction was therefore about the next reconciliation, not that one.
 
-### Where P-AC-08 meets a hard boundary
+### Where P-AC-08 still meets a hard boundary
 
 The implementation lives in `plugins/pipeline-core/scripts/pipeline-state.mjs` and
-`lib/feature-package-topology.mjs`, both unprotected. **Its tests do not.**
-`harness/scripts/pipeline-state.test.mjs` is TP-5-protected and registering anything new touches
-`harness/scripts/verify.mjs`, which is TP-3-protected. Both are liftable in **one** signed
-maintenance window (`--scope TP-3,TP-5`), whose TTL is four hours.
+`lib/feature-package-topology.mjs`, both unprotected, and both are now committed. **Its tests
+are not landed yet, and they cannot be without a human act.** The 26 cases proving the above are
+staged in `evidence/phx-wp-gate-cases.mjs` — re-run independently rather than accepted from the
+dispatch report: **26/26 pass**. Registering them touches
+`harness/scripts/pipeline-state.test.mjs` (TP-5-protected) and, to add the suite entry,
+`harness/scripts/verify.mjs` (TP-3-protected). The protected suite itself was re-run
+independently to confirm no regression from the new code: **418/418, unmodified**.
 
-The established pattern applies unchanged: build the implementation, stage the cases in an
-`evidence/` file, prove them green standalone, and land them inside one window. The window is
-the PO's act and is the first hard gate this design reaches.
+Both protected files are liftable in **one** signed maintenance window
+(`--scope TP-3,TP-5`), whose TTL is four hours — the established pattern this design already
+named, now with the implementation and the staged cases both sitting ready behind it. The window
+is the PO's act and is the one hard gate P-AC-08 has left.
 
 ## The parallel partition
 
@@ -119,7 +130,7 @@ is by module family, which makes the disjointness checkable rather than asserted
 |---|---|---|
 | WP-GATE | 1 | plugins/pipeline-core/lib/feature-package-topology.mjs, plugins/pipeline-core/scripts/pipeline-state.mjs, harness/scripts/pipeline-state.test.mjs (TP-5) |
 | WP-K | 3 | plugins/pipeline-core/lib/governance-event-store.test.mjs, plugins/pipeline-core/lib/governance-event.test.mjs |
-| WP-P | 6 | plugins/pipeline-core/lib/audit-bundle*.mjs, plugins/pipeline-core/lib/organization-policy*.mjs |
+| WP-P | 5 | plugins/pipeline-core/lib/audit-bundle*.mjs, plugins/pipeline-core/lib/organization-policy*.mjs |
 | WP-V | 4 | plugins/pipeline-core/lib/evidence-view-model*.mjs, plugins/pipeline-core/lib/evidence-view-renderer*.mjs |
 | WP-X | 3 | plugins/pipeline-core/lib/external-reference-adapter*.mjs |
 | WP-C | 4 | plugins/pipeline-core/lib/change-control*.mjs |
@@ -191,9 +202,9 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 | L-AC-07 | partial | WP-L | no serial/parallel/retry/cancellation/recovery/malicious fixture matrix is named |
 | P-AC-01 | partial | WP-P | schema/compatibility/merge pinned; provenance, dependency and signature-policy validation are not named |
 | P-AC-03 | partial | WP-P | planOrganizationPolicyActivation pinned; newly-required artifacts, external effects and backfill range are not |
-| P-AC-06 | partial | WP-P | candidate-bound bundle build and offline verify pinned; legacy, orphaned, misplaced, stale and illegally-mutable classes are not each pinned |
-| P-AC-10 | partial | WP-P | the bundle half is pinned; nothing prevents a compliance claim from a pack, log or viewer |
-| P-AC-11 | partial | WP-P | document ownership is validated; mode, owned sections, lifecycle event, preview, approval, retention, conflict policy and revision readback are not pinned |
+| P-AC-06 | partial | WP-P | audit-bundle-core-tests: missing, misplaced, illegally-mutable, stale and truncated each pinned (PHX-WP-P, break-proofed). legacy and orphaned remain unpinned: the legacy classification exists (feature-package-topology.mjs:78) but no rejection path consults it, and no code checks a package file is referenced by an artifact |
+| P-AC-08 | partial | WP-GATE | THE EPIC GATING SLICE. All three plan kinds (bootstrap, transition, reconcile) and the Result-reconciliation fence are now BUILT (PHX-WP-GATE, commit 92b21ed): 26 staged cases pass (re-run independently: 26/26), the TP-5-protected suite is unmodified and re-run independently at 418/418. Remains PARTIAL rather than implemented: the 26 cases are staged in evidence/, not registered in the gate-registered suite the criterion names by path -- landing them needs one signed TP-3+TP-5 maintenance window |
+| P-AC-11 | partial | WP-P | organization-policy-core-tests: mode (closed reference-only/projection/controlled-publication set) and approval (union, no downgrade) pinned (PHX-WP-P, break-proofed). Target class/binding, owned fields/sections, lifecycle event, preview, retention and revision readback remain unpinned: documentClasses is closed to exactly class/mode/approvalRequired, no field exists for the rest |
 | PX0-AC-01 | partial | WP-PX0 | continuity-state.mjs binds dispatch/intent to prdSha256/specSha256; no assertion names a REJECTED generic CAS authority change |
 | PX0-AC-03 | partial | WP-PX0 | apply exists and rechecks under the writer lock; the recheck breadth the criterion enumerates is not fully pinned |
 | PX0-AC-04 | partial | WP-PX0 | proof half fails closed and is pinned; the State-side preimage/revision/idempotency recheck is only partly asserted |
@@ -236,7 +247,7 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 | H-AC-09 | not-started | WP-H | NO CARRIER: external-push-ledger is scoped to single-repo push proofs; nothing binds cross-repository guarded work to one physical target |
 | X-AC-11 | not-started | WP-X | NO CARRIER: the adapter never references organization policy, and the policy modules never reference the adapter |
 
-### Class B — an absent capability (16)
+### Class B — an absent capability (15)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
@@ -250,7 +261,6 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 | H-AC-12 | partial | WP-H | guard-push/guard-devplan/change-control validate the decision reference; the DUAL-EVALUATION during migration with shared owner and expiry has no carrier |
 | L-AC-01 | partial | WP-L | the closed lifecycle schema and validator are pinned; NO PRODUCER exists — no Pipeline path emits a lifecycle event |
 | L-AC-02 | partial | WP-L | six of the eight #10 exchange identities are retained; queueRevision and a distinct correlationId are absent |
-| P-AC-08 | partial | WP-GATE | THE EPIC GATING SLICE. Command family and absent-manifest draft preview are built and registered; the existing-manifest PO-bound reconciliation and the Result-reconciliation fence are entirely absent |
 | P-AC-09 | not-started | WP-P | NO CARRIER: no export-backfill preview or explicit consent path exists |
 | PX0-AC-08 | partial | WP-PX0 | ruleset-source.mjs closed contract pinned by ruleset-source-tests; whether bootstrap actually EMITS one observation is unpinned |
 | PX0-AC-13 | partial | WP-PX0 | ruleset-freshness-host.mjs selects the host transport correctly, but no suite exercises it and bootstrap does not wire it |

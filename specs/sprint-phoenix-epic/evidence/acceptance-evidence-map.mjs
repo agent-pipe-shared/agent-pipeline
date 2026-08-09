@@ -229,6 +229,29 @@ const DELTA = {
   'A-AC-11': ['implemented', 'B'],
   // confirmed: A-AC-01, A-AC-02, A-AC-05, A-AC-07, A-AC-14, H-AC-12,
   // EPIC-AC-01, EPIC-AC-03, EPIC-AC-04.
+
+  // --- evidence/phx-wp-p.txt (task PHX-WP-P, 2026-08-09, commit 8df045f) ---
+  // Break-proofed named assertions added to already-registered suites (no
+  // registry edit). P-AC-01/P-AC-03 explicitly reported `absent`, not gamed:
+  // their named sub-clauses have no corresponding field anywhere in the pack
+  // or activation-plan schema, and the dispatch wrote no test around the gap.
+  'P-AC-06': ['partial', 'WP-P'],
+  'P-AC-10': ['implemented', 'WP-P'],
+  'P-AC-11': ['partial', 'WP-P'],
+
+  // --- evidence/phx-wp-gate.txt (task PHX-WP-GATE, 2026-08-09, commit 92b21ed) ---
+  // The third feature-package plan kind, `reconcile`, landed: the digest-only
+  // no-drift invariant, PO-bound apply, manual-replacement refusal, and the
+  // three-arm Result-reconciliation fence (unbound / metadata-only /
+  // fence-mismatch) are all built and proven by 26 staged cases (re-run
+  // independently by the Elephant: 26/26 pass). The protected suite
+  // (harness/scripts/pipeline-state.test.mjs, TP-5) is unmodified and was
+  // re-run independently: 418/418, no regression. The command family
+  // itself remains PARTIAL, not implemented: the 26 cases are staged in
+  // evidence/, not registered in the gate, because registering them needs
+  // the signed TP-3+TP-5 maintenance window this task was explicitly
+  // forbidden to open.
+  'P-AC-08': ['partial', 'WP-GATE'],
 };
 
 // --- per-criterion evidence pointer ----------------------------------------
@@ -312,12 +335,12 @@ const POINTERS = {
   'P-AC-03': 'planOrganizationPolicyActivation pinned; newly-required artifacts, external effects and backfill range are not',
   'P-AC-04': 'organization-policy-activation-tests: activation only after a bound authority readback; stale plan preimage rejected',
   'P-AC-05': 'organization-policy-tests: credential, endpoint, coordinate, actor-mapping and signing-key fields refused at every level',
-  'P-AC-06': 'candidate-bound bundle build and offline verify pinned; legacy, orphaned, misplaced, stale and illegally-mutable classes are not each pinned',
+  'P-AC-06': 'audit-bundle-core-tests: missing, misplaced, illegally-mutable, stale and truncated each pinned (PHX-WP-P, break-proofed). legacy and orphaned remain unpinned: the legacy classification exists (feature-package-topology.mjs:78) but no rejection path consults it, and no code checks a package file is referenced by an artifact',
   'P-AC-07': 'audit-bundle-tests: signs and verifies only an unchanged manifest, without identity or authority claims',
-  'P-AC-08': 'THE EPIC GATING SLICE. Command family and absent-manifest draft preview are built and registered; the existing-manifest PO-bound reconciliation and the Result-reconciliation fence are entirely absent',
+  'P-AC-08': 'THE EPIC GATING SLICE. All three plan kinds (bootstrap, transition, reconcile) and the Result-reconciliation fence are now BUILT (PHX-WP-GATE, commit 92b21ed): 26 staged cases pass (re-run independently: 26/26), the TP-5-protected suite is unmodified and re-run independently at 418/418. Remains PARTIAL rather than implemented: the 26 cases are staged in evidence/, not registered in the gate-registered suite the criterion names by path -- landing them needs one signed TP-3+TP-5 maintenance window',
   'P-AC-09': 'NO CARRIER: no export-backfill preview or explicit consent path exists',
-  'P-AC-10': 'the bundle half is pinned; nothing prevents a compliance claim from a pack, log or viewer',
-  'P-AC-11': 'document ownership is validated; mode, owned sections, lifecycle event, preview, approval, retention, conflict policy and revision readback are not pinned',
+  'P-AC-10': 'organization-policy-core-tests + audit-bundle-core-tests: pack-side compliance-claim rejection and signed-bundle no-identity-claim shape both pinned (PHX-WP-P, break-proofed). Log/viewer halves were out of the dispatched carrier scope and remain unevaluated either way',
+  'P-AC-11': 'organization-policy-core-tests: mode (closed reference-only/projection/controlled-publication set) and approval (union, no downgrade) pinned (PHX-WP-P, break-proofed). Target class/binding, owned fields/sections, lifecycle event, preview, retention and revision readback remain unpinned: documentClasses is closed to exactly class/mode/approvalRequired, no field exists for the rest',
   'P-AC-12': 'audit-bundle-tests: tampered or missing bundle bytes detected; signature invalidated when the manifest changes',
   'P-AC-13': 'organization-policy-packs.md and audit-bundles.md are stubs; no migration/versioning policy, no pack threat model',
 
@@ -465,7 +488,7 @@ const CLOSURE = {
   'P-AC-01': ['assert', 'WP-P'],
   'P-AC-03': ['assert', 'WP-P'],
   'P-AC-06': ['assert', 'WP-P'],
-  'P-AC-08': ['build', 'WP-GATE'],
+  'P-AC-08': ['assert', 'WP-GATE'],
   'P-AC-09': ['build', 'WP-P'],
   'P-AC-10': ['assert', 'WP-P'],
   'P-AC-11': ['assert', 'WP-P'],
@@ -771,82 +794,93 @@ if (MODE === 'closure') {
   w('test, not that its theme be covered — and it means a large fraction of the epic closes through');
   w('test authorship in files that no maintenance window protects.');
   w();
-  w('## The gating slice, designed');
+  w('## The gating slice — built, one gate left');
   w();
   w('P-AC-08 is the one criterion whose position in the sequence is fixed by the acceptance matrix');
   w("itself: it declares the feature-package writer the mandatory first slice of PHX-0, and forbids");
-  w("PHX-0's ruleset-trust-root slice and PHX-1 from starting until it passes. Everything below is");
-  w('sequenced behind it for that reason and no other.');
+  w("PHX-0's ruleset-trust-root slice and PHX-1 from starting until it passes. Everything below was");
+  w('sequenced behind it for that reason and no other. It no longer is: the design below is built,');
+  w("and this section is now a record of what shipped rather than a proposal.");
   w();
-  w('**What exists.** `feature-package-inspect|status|plan|apply|recover` are built, registered and');
-  w('green. `apply` already carries two plan kinds — `bootstrap` for an absent manifest and');
-  w('`transition` for a state change — each with a recomputed-preview digest check that fails closed');
-  w('on manifest, proposal or target-state drift, a MAC-authenticated recovery journal, and a');
-  w('readback before the journal is retired.');
+  w('**What was already there.** `feature-package-inspect|status|plan|apply|recover` were built,');
+  w('registered and green before this pass. `apply` carried two plan kinds — `bootstrap` for an');
+  w('absent manifest and `transition` for a state change — each with a recomputed-preview digest');
+  w('check that fails closed on manifest, proposal or target-state drift, a MAC-authenticated');
+  w('recovery journal, and a readback before the journal is retired.');
   w();
-  w('**What is missing, precisely.** The criterion also requires reconciling an inherited `draft`');
-  w("manifest's stale PRD, Spec, acceptance, architecture and Result digests — and requires it happen");
-  w('through an existing-manifest preview, an exact PO-bound apply and a readback, **with no');
-  w('lifecycle-state, artifact-set, candidate or other authority-byte change**. Neither existing plan');
-  w('kind expresses that: `transition` exists to change state, which this operation must not do, and');
-  w('`bootstrap` applies only when the manifest is absent. `planFeaturePackageReconcile` does not');
-  w('exist in `lib/feature-package-topology.mjs`.');
+  w('**What this pass built (`PHX-WP-GATE`, commit 92b21ed).** The criterion additionally requires');
+  w("reconciling an inherited `draft` manifest's stale PRD, Spec, acceptance, architecture and Result");
+  w('digests — through an existing-manifest preview, an exact PO-bound apply and a readback, **with');
+  w('no lifecycle-state, artifact-set, candidate or other authority-byte change**. Neither existing');
+  w('plan kind could express that: `transition` exists to change state, which this operation must');
+  w('not do, and `bootstrap` applies only when the manifest is absent. `planFeaturePackageReconcile`');
+  w('now exists in `lib/feature-package-topology.mjs`, and `feature-package-reconcile` now exists as');
+  w('an apply mode in `pipeline-state.mjs`.');
   w();
-  w('### Design: a third plan kind, `reconcile`');
+  w('### As built: the third plan kind, `reconcile`');
   w();
-  w('The reconciliation is a **digest-only** transaction, and the design makes that a structural');
-  w('property rather than a promise the implementation is trusted to keep:');
+  w('The reconciliation is a **digest-only** transaction, and the no-drift property is structural');
+  w('rather than a promise the implementation is trusted to keep:');
   w();
-  w('1. **Preview.** `planFeaturePackageReconcile(root, manifestPath)` recomputes each declared');
-  w('   artifact digest from the bytes on disk and returns the preimage manifest, the postimage');
-  w('   manifest, and the per-artifact old/new digest pairs. It returns a plan object of the same');
-  w('   shape the other two kinds return, so `--plan-sha256` binding is inherited unchanged rather');
-  w('   than reimplemented.');
-  w('2. **The no-drift invariant is checked on the plan, not on intent.** The postimage is rejected');
-  w('   unless it is byte-identical to the preimage after the digest fields alone are substituted:');
-  w('   same lifecycle state, same artifact set and order, same candidate, same schema, same every');
-  w('   other byte. A reconcile plan that would change anything else is not a warning — it is a');
-  w('   refusal, because a transaction that can change state is a transition wearing another name.');
+  w('1. **Preview.** `planFeaturePackageReconcile(root, manifestPath, resultAuthority)` recomputes');
+  w('   each declared artifact digest from the bytes on disk and returns the preimage manifest, the');
+  w('   postimage manifest, and the per-artifact old/new digest pairs, in the same plan-object shape');
+  w('   the other two kinds return — so `--plan-sha256` binding is inherited, not reimplemented. The');
+  w('   third parameter is one deviation from the original design sketch, added because the Result');
+  w('   fence (below) has to be checked on the plan itself and needs Continuity State\'s binding to do');
+  w('   it — reported by the dispatch rather than built in silently.');
+  w('2. **The no-drift invariant is checked on the plan, not on intent** (`reconcileNoDriftOk`,');
+  w('   exported). The postimage is rejected unless it is byte-identical to the preimage after the');
+  w('   digest fields alone are substituted: same lifecycle state, same artifact set and order, same');
+  w('   candidate, same schema, same every other byte. Four staged cases (`RGb`..`RGb4`) each change');
+  w('   one more field — state, candidate, artifact order — and each is refused.');
   w('3. **Apply is PO-bound.** It consumes the same critical-action proof shape the other');
-  w('   authority-changing writers use, bound to the exact candidate and to the plan digest. A');
-  w('   reconcile without a valid bound decision fails closed and writes nothing.');
-  w('4. **Readback.** The written manifest is re-read and re-validated through');
-  w('   `validateFeaturePackage` before the journal is retired — the existing apply path already');
-  w('   does this and the reconcile path reuses it rather than adding a second one.');
+  w('   authority-changing writers use, bound to the exact candidate and to the plan digest. Cases');
+  w('   `RGe` prove zero mutation on both the no-approval-function and the rejected-approval path.');
+  w('4. **Manual digest replacement is refused** (case `RGf`) — the exact workaround P-AC-08 names');
+  w('   and forbids as a substitute for the transaction.');
+  w('5. **Readback.** The written manifest is re-read and re-validated through');
+  w('   `validateFeaturePackage` before the journal is retired (case `RGc`, DoD 7) — the existing');
+  w('   apply path already did this and the reconcile path reuses it rather than adding a second one.');
   w();
-  w('### Design: the Result fence');
+  w('### As built: the Result fence');
   w();
   w('The criterion admits a Result reconciliation only under two conditions and refuses a');
-  w('metadata-only refresh outright. Both are expressed as preconditions of the plan, so a refused');
-  w('case never reaches a writer:');
+  w('metadata-only refresh outright. All three are plan preconditions (`checkResultReconciliationFence`),');
+  w('so a refused case never reaches a writer, and each carries its own typed code so evidence can');
+  w('tell the refusals apart (cases `RGg1`..`RGg4`):');
   w();
-  w('- **Continuity binding.** The current Result must be the one Continuity State binds. A Result');
-  w('  the State does not name cannot be reconciled, whatever its digest says.');
-  w('- **Preserved historical prefix.** The Result bytes must contain the exact stale manifest digest');
-  w('  as a preserved historical prefix, followed by the canonical Result-reconciliation fence. This');
-  w('  is what distinguishes a Result that legitimately grew from one that was rewritten: the old');
-  w('  digest has to still be provable *inside* the new artifact.');
-  w('- **Metadata-only refresh is refused by name**, with its own typed code, so the refusal is');
-  w('  distinguishable in evidence from a drift refusal.');
+  w('- **`reconcile-result-unbound`** — the current Result is not the one Continuity State binds. A');
+  w('  Result the State does not name cannot be reconciled, whatever its digest says.');
+  w('- **`reconcile-result-metadata-only`** — no canonical fence marker is present at all: refused by');
+  w('  name, distinguishably from a drift refusal, exactly as the criterion requires.');
+  w('- **`reconcile-result-fence-mismatch`** — a fence marker is present but the preserved prefix does');
+  w('  not hash to the stale manifest digest: a Result that was rewritten, not one that legitimately');
+  w('  grew.');
+  w('- The positive case (`RGg4`) admits only when the prefix genuinely hashes to the stale digest');
+  w('  **and** the Result is Continuity-bound — both conditions, not either.');
   w();
   w('**One thing this design deliberately does not repair.** The reconciliation the criterion was');
   w('written for was already performed by hand in `ece6041`, by the exact route P-AC-08 forbids. The');
-  w('capability is still required and still buildable; its original subject is gone, and the audit');
+  w('capability is still required and was still built; its original subject is gone, and the audit');
   w('trail for that specific repair will never exist. The PO accepted that as a recorded deviation.');
-  w('Building the transaction now is therefore about the next reconciliation, not this one, and the');
-  w('design says so rather than implying a retroactive fix.');
+  w('Building the transaction was therefore about the next reconciliation, not that one.');
   w();
-  w('### Where P-AC-08 meets a hard boundary');
+  w('### Where P-AC-08 still meets a hard boundary');
   w();
   w('The implementation lives in `plugins/pipeline-core/scripts/pipeline-state.mjs` and');
-  w('`lib/feature-package-topology.mjs`, both unprotected. **Its tests do not.**');
-  w('`harness/scripts/pipeline-state.test.mjs` is TP-5-protected and registering anything new touches');
-  w('`harness/scripts/verify.mjs`, which is TP-3-protected. Both are liftable in **one** signed');
-  w('maintenance window (`--scope TP-3,TP-5`), whose TTL is four hours.');
+  w('`lib/feature-package-topology.mjs`, both unprotected, and both are now committed. **Its tests');
+  w('are not landed yet, and they cannot be without a human act.** The 26 cases proving the above are');
+  w('staged in `evidence/phx-wp-gate-cases.mjs` — re-run independently rather than accepted from the');
+  w('dispatch report: **26/26 pass**. Registering them touches');
+  w('`harness/scripts/pipeline-state.test.mjs` (TP-5-protected) and, to add the suite entry,');
+  w('`harness/scripts/verify.mjs` (TP-3-protected). The protected suite itself was re-run');
+  w('independently to confirm no regression from the new code: **418/418, unmodified**.');
   w();
-  w('The established pattern applies unchanged: build the implementation, stage the cases in an');
-  w('`evidence/` file, prove them green standalone, and land them inside one window. The window is');
-  w("the PO's act and is the first hard gate this design reaches.");
+  w('Both protected files are liftable in **one** signed maintenance window');
+  w('(`--scope TP-3,TP-5`), whose TTL is four hours — the established pattern this design already');
+  w('named, now with the implementation and the staged cases both sitting ready behind it. The window');
+  w("is the PO's act and is the one hard gate P-AC-08 has left.");
   w();
   w('## The parallel partition');
   w();
@@ -1115,7 +1149,7 @@ w('work is not mistaken for paperwork:');
 w();
 w('| gate | state | evidence |');
 w('|---|---|---|');
-w('| Focused package checks | **partial** | per-package suites are green, but P-AC-08 declares the feature-package writer slice the gating first slice and its reconciliation half is unbuilt |');
+w('| Focused package checks | **partial** | per-package suites are green; P-AC-08 declares the feature-package writer the gating first slice, and it is now fully built (26/26 staged cases, independently re-run) but not yet registered in the gate-registered suite the criterion names by path -- one signed TP-3+TP-5 window away |');
 w('| Full Verify | **passed** | `evidence/verify-latest.json` — exit 0, 368/368, exact binding on `3387065`, clean at start and finish |');
 w('| Blocking Security | **passed** | `pipeline.security-verdict.v2` — `blocking: false`, `cap.sast` pass, `cap.secrets` pass |');
 w('| Privacy review | **absent** | no privacy-review artifact exists for the integrated candidate |');
