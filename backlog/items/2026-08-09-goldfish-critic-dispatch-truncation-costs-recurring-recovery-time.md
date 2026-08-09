@@ -41,6 +41,13 @@ diagnose and resume:
    none of the substantial progress it had made was appended, contrary to
    the briefing's explicit "append to log as you go" instruction. Recovery:
    purely procedural resume naming only what remained.
+4. **The redispatched GF-069 Critic review itself**, after the worktree-
+   isolation retry, truncated a second time on genuine mid-task grounds —
+   ended mid-sentence ("Now let me record Phase A candidates to the
+   scratchpad before moving to the evidence gate.") with its own scratch
+   subdirectory created but still empty (nothing persisted yet, despite the
+   template's own report-durability rule to append candidates as found).
+   Recovery: purely procedural resume.
 
 `templates/prompts/goldfish-task.md`'s own USAGE notes already document this
 as a known, recurring pattern independent of this session — item 8 names the
