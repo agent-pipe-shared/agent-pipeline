@@ -1023,6 +1023,57 @@ a dispatch the authority to clear a control whose purpose is to check that
 dispatch's own class of work. "Show your evidence" is not a substitute for
 separation of duties — it is what makes the absence of separation look rigorous.
 
+### SECOND AUDIT (`evidence/phx-audit2.md`): six more losses, and one is invisible to the gate BY CONSTRUCTION
+
+Prose has no test. That was the reason for this pass, and it produced the single worst
+shape of the night.
+
+**LIVE-2, verified by me independently — a closed taxonomy lost a class, and the checker
+was changed in lockstep so the gate stays green.** `governance/artifact-topology.json`
+carried the class `governance-event` at `998a609`; at `HEAD` it does not. I confirmed
+both with `git grep` and `rg`. `docs/artifact-topology.md` still calls that file the
+**closed** taxonomy and still names the class, and producers
+(`governance-event-store.mjs`, `guard-git.mjs`) still emit it.
+`check-artifact-topology.mjs` was edited in the same merge to match the shrunken file,
+so `artifact-topology-check` passes. **The gate cannot see this, and no amount of
+re-running it ever will.** A checker moved to match the artifact it checks is not a
+check; it is a mirror.
+
+**LIVE-1, recommended first by the audit and I agree.**
+`plugins/pipeline-core/skills/pipeline-start/SKILL.md` went 890 → 246 lines and lost
+Steps 1d/3/4/5b/6, the "Role prohibitions" block, and the **mandatory
+`Bootstrap check passed` confirmation line** — absent from the skill and from all seven
+new `references/*.md`, while `harness/session-bootstrap.md` still defines all ten steps
+and `CLAUDE.md` still calls that line mandatory. **Every session of every role starts
+there, and nothing compares it against its own spec.**
+
+**LIVE-3:** `harness/session-bootstrap.md` lost the ADR-0040 advisor-export override
+section while `setup.mjs`, `SETUP.md` and the ADR still implement and advertise it.
+**LIVE-4:** the merge created a three-way ADR-0047 collision, so "superseded by ADR-0047"
+is ambiguous in four places. Already filed.
+
+**SILENT-5:** ADR-0038 lost *"Missing or invalid advisory evidence fails closed and
+cannot create a review, readiness, gate, or conformance claim"* — no carrier anywhere,
+under an amendment record that describes only a narrower change. **SILENT-6:** the whole
+`lifecycleAuthority` block, eight machine-readable authority/retention bindings, left the
+topology file; its constraints survive only as unvalidatable prose.
+
+**Two corrections to my own framing, both of which make the earlier "closed" weaker than
+it sounded:**
+
+- I said ~490 non-code paths were unexamined. Correct (492), but only **107** carry a
+  deleted line — the real working set is a quarter of the number I quoted, and quoting
+  the bigger number made the remaining job sound more like scale than substance.
+- **The first audit's stated boundary omitted `plugins/**/SKILL.md` and `agents/*.md`** —
+  and that is exactly where the single largest non-code deletion of the merge turned out
+  to be. So the "code half" I declared closed had a hole that neither audit's boundary
+  statement covered. Both audits named a boundary; the gap was *between* them.
+
+**Its own boundary, stated:** `docs/state.md`'s line-level content (−90/+3020) is
+unexamined and is the likeliest remaining surface; also the ~100 uniform `-1/+1` backlog
+items (sampled, no ids lost) and `product-capability-inventory.json` below entry-id
+level. `specs/` needed no work — every `specs/` path in this merge is a pure addition.
+
 ### THE MERGE-LOSS INVENTORY IS CLOSED — all nine accounted for, and the audit's own boundary is the next job
 
 Every item in `evidence/phx-merge-audit.md` now has a disposition, verified rather than
