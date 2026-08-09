@@ -47,6 +47,18 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 4eba3cb32e3471fdc677c900a29eea2a42ed066b — 2026-08-09, range 3387065..4eba3cb, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `c806e49` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `641c869`, `6388de4`, `4eba3cb`: the prior doc-rec entry, WP-E-AC09 (closed, advisory-
+destination classification), and a checkpoint recording both E-AC-09's closure and the
+O-1/O-2-design Critic's own FAIL verdict. Same reading as the whole chain: `docs/state.md` stays
+ADR-0012, the generated evidence-map/closure-plan trio stays ADR-0045; the governance-export
+commit touches no ADR-governed path.
+
 ## Candidate c806e49d72e3edb1e49e580d5e56acb234178f7a — 2026-08-09, range 3387065..c806e49, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
