@@ -47,6 +47,19 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 17b07da726401e2b713ca891ed62c41ed8867553 — 2026-08-09, range 3387065..17b07da7, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `6590aeba` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `1647e1cc` through `17b07da7`: the O-1/O-2 design doc's round-5 (the PO's authorized
+extension) Critic FAIL, independently verified and parked alongside K-AC-05. No code touched in
+this range — the design doc's own optimistic O-2 claims were not booked against H-AC-02/H-AC-11
+in the evidence map (checked, neither entry references this design doc's work). Same reading as
+the whole chain: `docs/state.md` stays ADR-0012, the generated evidence-map/closure-plan/
+design-doc set stays ADR-0045.
+
 ## Candidate 6590aebad70e8938d1918259f56e8fb8c23617ba — 2026-08-09, range 3387065..6590aeba, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
