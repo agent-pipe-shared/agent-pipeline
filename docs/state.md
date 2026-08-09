@@ -2321,6 +2321,30 @@ attempted and either closed or honestly reported gapped — the wave that starte
 morning ends this leg at 96, fully verified, nothing padded, nothing claimed that the evidence
 doesn't support.
 
+### CLASS S SCOPED FOR A FUTURE WAVE, ONE MORE MEASUREMENT CORRECTION FOUND (2026-08-09, closing this leg)
+
+**`specs/sprint-phoenix-epic/design/class-s-scoping.md`** (`aa7432d`) — design-only, no code:
+for each of the six Class S criteria, what's actually missing (direct code reads, not the closure
+design's one-liners), what kind of decision blocks it, and a suggested attempt order. This is
+what "declining to force Class S unscoped" turns into when done properly: not silence, but the
+scoping that makes a future attempt safe.
+
+**Found one more measurement correction while scoping: A-AC-04's pointer text was wrong**
+(`8a98057`). It claimed "no correlation path to the human ledger is implemented." Direct read of
+`external-command-offer.mjs:29` shows `recordPipelineAttempt` already calls an injected
+`resolveHumanAuthority` resolver and fails closed exactly as the clause requires — the mechanism
+exists and is tested. What's actually missing: zero production call sites anywhere in the
+codebase invoke it. A-AC-04 is now the best-scoped Class S item precisely because of this
+correction — it needs a call site, not a new mechanism. No verdict changed; this narrows what a
+future session would need to build, same discipline as the seven Class A/B corrections earlier
+tonight.
+
+**This closes this leg.** 96 of 157, every open criterion classified, six of them now scoped
+concretely enough for someone to safely start on next time, one epic-wide measurement error less
+than an hour ago. Nothing further is safely dispatchable without either the PO's signed TP-5
+window, a PO answer to H-AC-08's "what counts as a legacy record," or a session with room to do
+real design-then-build work on Class S/B rather than bounded test-authorship.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
