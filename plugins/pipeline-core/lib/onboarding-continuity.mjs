@@ -3727,8 +3727,9 @@ function promotionArtifacts(root, input, { checkMarkers = true } = {}) {
     if (languageMarkers.length !== 1) {
       fail(
         "KICKOFF-PROMOTION-PRD-LANGUAGE-MARKER-INVALID",
-        "The promoted PRD must carry the PO-gate language marker exactly once, as <!-- po-language: de --> or"
-          + " <!-- po-language: en --> on its own line; the PO plan gate will otherwise refuse it.",
+        "The promoted PRD must carry the PO-gate language marker exactly once, as"
+          + " <!-- po-language: xx --> on its own line, where xx is any lowercase two-letter language code;"
+          + " the PO plan gate will otherwise refuse it.",
       );
     }
     const specMarkers = [...prdText.matchAll(TECHNICAL_SPEC_MARKER)].map((match) => match[1]);
