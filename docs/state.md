@@ -3458,6 +3458,118 @@ prescribed here.
 **Three dispatches live, no file overlap:** K-AC-05 round-4 Critic, O-1/O-2-design round-4 Critic,
 WP-C-AC09. Handover fully current through this checkpoint; safe to compact at any point.
 
+### C-AC-09 CLOSED (`86c25d56`); O-1/O-2 ROUND-4 CRITIC RESUMED FROM A TRUNCATED FINAL; WP-R-AC02 STARTED
+
+WP-C-AC09 landed clean: `resolveChangeControlProfile` in `change-control.mjs`, a peer to
+`evaluateChangeControlGate` that picks exactly one effective profile (or `not-required`) from a
+set of environment-scoped candidates. Verified independently (23/23 tests, diff read): zero
+candidates and all-non-mandatory both resolve to `not-required`; more than one mandatory
+candidate rejects as `CC-RESOLVE-AMBIGUOUS` with a deliberate no-tie-break decision (the schema
+carries no precedence field, so any `changeClass`-based ordering would be an invented, invisible
+rule). Booked `implemented` in the evidence-map DELTA (`49f91de5`).
+
+The O-1/O-2 round-4 Critic dispatch returned with its final turn cut off mid-sentence ("A
+security-posture claim depends on where the machine-local path actually resolves. Let me verify
+the storage topology.") — no findings, no verdict. Same truncated-final pattern as several dispatches
+earlier this session: resumed the SAME agent via `SendMessage`, asked it to finish and deliver
+its complete report rather than restarting the review (which would have meant a second, materially
+different review pass — not acceptable this late in a capped 4-round sequence).
+
+With research showing R-AC-02 well-scoped (a single ~80-line file, the two currently-unreachable
+`recovery-proposed`/`recovered` states already named in the shared journal enum, and an existing
+test at `external-command-offer.test.mjs:45-49` that documents the exact gap directly) and E-AC-20
+carrying materially higher design-ambiguity/scope-creep risk (a brand-new cross-module data flow
+between two currently fully-disjoint subsystems), dispatched **WP-R-AC02** — file-disjoint from
+every other live thread.
+
+**Live now:** K-AC-05 round-4 Critic, O-1/O-2-design round-4 Critic (resumed), WP-R-AC02. Handover
+fully current through this checkpoint; safe to compact at any point.
+
+### PO WENT AFK/ASLEEP: STANDING AUTHORIZATION TO WORK THROUGH EVERYTHING, PARK WHAT CAN'T PROCEED WITHOUT THEM
+
+The PO signalled a long AFK/asleep stretch and gave a standing instruction (saved to persistent
+memory as `feedback_afk-autonomous-marathon`): work through everything thoroughly and
+autonomously; anything that genuinely can't proceed without the PO gets **parked**, documented,
+not blocked on; stop relying on `/compact` (they won't be there to run it). This is now the
+operating mode for the remainder of this stretch — Critic-round-cap exceptions and other hard
+gates get recorded here as parked-pending-PO rather than surfaced as a blocking question.
+
+Immediately before this: asked the PO directly (via AskUserQuestion, while still reachable)
+whether to authorize a 5th Critic round for the O-1/O-2 design doc after its 4th/final round
+FAILed with 3 real, independently-verified major findings (F1: a stale CLI form left in §15.3's
+inventory row after §15.1.2 was fixed; F2: a security-residual rationale claiming GS-family
+protection is "structurally" unreachable for the identity registry — false in this repo's own
+topology, since `git rev-parse --git-common-dir` resolves to `.git`, inside the project root, not
+outside it; F3: three other sections — §2, §8.5.2, §11 — still assert the pre-O-2 position §15.2
+declares closed). **PO answer: authorize the 5th round** (all three findings are narrow/mechanical,
+high confidence of closing in one more pass). Dispatched **WP-O1O2-DESIGN-rework4** covering all
+six round-4 findings (the 3 majors above plus 3 minors: F4 unspecified absent-registry-file CLI
+outcome, F5 an invented `topologyFor` symbol, F6 the new ledger read skipping the
+completeness/integrity gate every other consumer applies) — still live.
+
+### K-AC-05 ROUND 4 (FINAL, OPUS-ROUTED): FAIL, ONE BLOCKER + SIX MAJOR — PARKED, NOT REWORKED AGAIN
+
+This round finally executed on Opus (the model-routing fix from the earlier checkpoint worked),
+and it found something categorically different from rounds 1-3: not incremental gaps in an
+otherwise-sound mechanism, but that the disposition mechanism itself is insufficient for what
+K-AC-05 actually requires. Independently verified the three most consequential findings myself
+against source:
+
+- **F1 (blocker):** `assertForkDisposition`'s closed field set is exactly `idempotencyKey,
+  sequence, acknowledgedEventIds, reasonCode, disposedAtEpochMs` — no human-decision reference, no
+  authority class, nothing binding it to an actual governance act. Confirmed: any caller with
+  library access can mint the record that K-AC-05 treats as sufficient to end a stream's
+  invalidity. A disposition its own subject can self-issue is not a governance control.
+- **F2 (major):** `governance-event.mjs`'s CLI recovery request validates a closed key set
+  `["schema","repositoryFingerprint","streamId","checkpoint","recovery"]` — confirmed no
+  `disposition` field exists anywhere in the normative public CLI surface. The mechanism is
+  reachable only from inside the library, never from the sanctioned operator-facing command.
+- **F6 (major):** confirmed via the module's own doc comment (`governance-event-store.mjs:989-993`)
+  that "restoring write availability afterward is a separate, out-of-scope policy decision" — the
+  crash/fork matrix's required compensating/superseding record is undated, unowned, and entirely
+  unbuilt.
+- F3/F4/F5/F7/F8 (majors/minor, not independently re-verified line-by-line but consistent with the
+  file's actual shape as read across all four prior rounds): read-path doesn't re-check
+  `acknowledgedEventIds` against real conflicting entries at that sequence; no symlink-ancestry
+  check on the disposition path's intermediate components (every sibling read path in this module
+  has one); the record binds `eventId` not a content digest; the new read surface has no
+  integrity/completeness typing unlike its siblings; the idempotent-replay path's canonicality
+  check is weaker than the read path's.
+
+**This is not another narrow-rework situation.** Fixing F1 alone means binding the disposition to
+an actual human/authority decision — new fields, new validation against real human-decision
+infrastructure, likely CLI/schema changes reaching outside this one file. That is redesign-scale
+work, not a fifth surgical correction, and K-AC-05 is already at its 4-round Critic cap. Per the
+PO's standing AFK instruction: **parked, not dispatched.** Synced the evidence-map POINTERS text
+to the current, accurate picture (`e0d9780f`) rather than leaving the stale "no disposition exists
+at all" text. No DELTA change — K-AC-05 was never booked `implemented`.
+
+**Two self-corrections from this same report, recorded so they don't recur:**
+
+1. **A contamination mistake, mine.** The round-4 dispatch's hunt-priming text included "Pay
+   particular attention to whether the disposition-read path (`readForkDisposition`) **now**
+   validates everything it returns" — the word "now" leaks a prior round's verdict into the
+   briefing, exactly the anti-pattern `templates/prompts/critic-review.md` and CLAUDE.md's
+   "Dispatch from the template, never freehand" rule exist to forbid (CLAUDE.md names a 2026-08-06
+   incident of the identical shape). The Critic flagged it, excluded it, and built its own search
+   surface anyway — none of F1-F7 lie on the line that sentence pointed at — but the mistake is
+   real and is recorded here so the next Critic dispatch this session is written clean.
+2. **A process bug: `scratch/dispatch-record.json` is a shared, unversioned filename.** Multiple
+   concurrent dispatches all write their dispatch record to that same generic path. The K-AC-05
+   round-4 Critic was told to read it as "most recent, for the last commit" but by the time it ran,
+   a LATER, unrelated dispatch (WP-C-AC09) had overwritten it — a genuine claims-evidence mismatch,
+   flagged correctly as a briefing violation. **Fix applied going forward:** every dispatch from
+   this point names a task-specific dispatch-record path
+   (`scratch/dispatch-record-<TASK_ID>.json`), never the bare generic name.
+
+R-AC-02 also landed and was independently verified in this same window (`3ef4ac99`,
+`recordCommandRecoveryDisposition` in `external-command-offer.mjs`, 27/27 tests) and booked
+`implemented` in the evidence-map DELTA (`74c76ba9`); C-AC-09 likewise (`86c25d56` /
+`resolveChangeControlProfile`, 23/23 tests, booked at `49f91de5`).
+
+**Live now:** O-1/O-2-design-rework4. K-AC-05 parked. Handover fully current through this
+checkpoint; no `/compact` reliance per the PO's standing instruction.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
