@@ -3735,6 +3735,16 @@ range fields to the activation-preview plan, deterministically computed rather t
 **Live now:** WP-A-AC07, WP-P-AC01-AC03. Both design-latitude threads (O-1/O-2, K-AC-05) remain
 parked pending PO input. Handover fully current through this checkpoint.
 
+Stop hook flagged context at 432k, suggesting `/compact` — not acted on, per the PO's own
+AFK/standing instruction (saved as `feedback_afk-autonomous-marathon` in persistent memory): they
+will not be there to run it, and state is persisted immediately regardless. Dispatched
+**WP-C-AC02** (change-control.mjs's anti-class-shopping detection — genuinely open design question
+on mechanism, briefed with explicit latitude and an explicit stop condition if the acceptance text
+turns out to require unstructurable human-intent judgment) while verification capacity was free.
+
+**Live now:** WP-A-AC07, WP-P-AC01-AC03, WP-C-AC02. Both design-latitude threads (O-1/O-2, K-AC-05)
+remain parked pending PO input. Handover fully current through this checkpoint.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
