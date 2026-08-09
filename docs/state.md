@@ -2473,6 +2473,51 @@ durable receipt retention exists, and no `recovered-preimage` outcome class exis
 reclassified Class A (assert) to Class B (build) rather than left as a missing test. Evidence-map
 delta applied (`71abec7`): **96 → 99 of 157**.
 
+### A-AC-04's CLI SHIPPED SELF-CONFIRMABLE AUTHORITY — CAUGHT BY THE SAME INDEPENDENT-REVIEW DISCIPLINE THAT CAUGHT P-AC-08 (2026-08-09)
+
+**Deep re-investigation of A-AC-04 found a second, real, production-wired carrier** the earlier
+correction (`class-s-scoping.md`) had missed: `guard-git.mjs`'s Phoenix override path already
+proves the "correlate to the human ledger, refuse on replay" half of A-AC-04 end to end
+(`guard-git-phoenix.test.mjs`, 1/1, independently re-run). What was genuinely missing was
+narrower than known: no production entry point ever *creates* a granted decision in the ledger —
+three already-tested library functions (`appendHumanGovernanceDecision`,
+`createExternalHumanGovernanceIntent`, `verifyExternalHumanGovernanceProof`) were each called
+only from tests. Measurement corrected (`25f48cd`), A-AC-04 reclassified Class S → Class B; count
+unchanged at 99 (still `partial`).
+
+**A CLI was dispatched and built** (`human-authority-grant.mjs`, commit `78006b4`, PHX-WP-AAC04)
+chaining those three functions behind a prepare→external-sign→install ceremony mirroring
+`guard-maintenance-window.mjs`'s own shape. Self-verified 9/9 (8 unit + 1 real end-to-end test
+against `guard-git.mjs`'s actual consumption path), independently re-run in this session,
+production code read directly. **Because this is human-authority-granting code, an independent
+Critic review (Opus, functional-equivalent lane, max effort) was dispatched before counting it
+`implemented`** — the same discipline the earlier Critic-FAIL round established, applied
+proactively this time rather than after the fact.
+
+**Verdict: FAIL, one blocker.** The CLI's own `install` command accepted a `--trust-anchor-file`
+flag letting whoever runs it supply an arbitrary trust anchor instead of the repository's
+committed one — an agent could generate its own keypair, sign its own request, and install a
+`granted`/`product-owner` decision that `guard-git.mjs` would then genuinely accept, no human
+involved at any step. **The delivered end-to-end test was itself a working demonstration of the
+exploit it was meant to prove impossible.** A second finding (major) showed the "must be supplied
+outside the repository" containment check misclassified a repo-root file named with a leading
+`..` as external, removing even the last friction. Three minor findings: an overstated docstring
+claim, a signed-subject/persisted-envelope mismatch (audit-fidelity gap, not escalation), and the
+production trust-anchor code path having no passing test (every test used the very flag Finding 1
+flagged). **A-AC-04 stays `partial` — the correlate half is real, the shall-not-self-confirm half
+is not, yet.**
+
+**This is exactly what independent review is for, working as designed**: the same construction
+error that would have let a Critic-caught blocker ship silently — self-measuring and self-closing
+sensitive new capability — is the one this session keeps deliberately routing around. Remediation
+dispatched (PHX-WP-AAC04-FIX): remove the caller-selectable trust anchor entirely, fix the
+containment check to mirror `guard-maintenance-window.mjs`'s already-correct pattern, reconstruct
+the persisted envelope from trusted sources only, and add regression coverage for both. Also
+filed: a second occurrence of a dispatch citing an evidence artifact it never wrote (this task's
+own `dispatch-record.json` claimed two TAP files that did not exist on disk — the same pattern as
+P-AC-08's F1 finding earlier tonight; remediated by regenerating the real files before the Critic
+dispatch that needed them, backlog item filed for the template gap that lets this recur).
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
