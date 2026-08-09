@@ -126,3 +126,46 @@ test("P-AC-11 records which pack(s) and revision(s) contributed each effective d
 test("P-AC-10 rejects a compliance or regulatory-assessment claim field on a portable policy pack", () => {
   assert.throws(() => validateOrganizationPolicyPack(pack({ complianceCertification: "SOC2-attested" }), { coreVersion: "0.4.7" }), (error) => error instanceof OrganizationPolicyError && error.code === "OPP-SHAPE");
 });
+// P-AC-01: provenance, dependencies, and signaturePolicy are OPTIONAL
+// pack-level fields (see organization-policy.mjs's header comment for why:
+// same escape hatch P-AC-11's targetBinding already established). A pack
+// omitting all three must still validate unchanged, with no stray key.
+test("P-AC-01 leaves provenance, dependencies, and signaturePolicy optional: a pack omitting all three still validates unchanged", () => {
+  const accepted = validateOrganizationPolicyPack(pack(), { coreVersion: "0.4.7" });
+  assert.equal(Object.hasOwn(accepted, "provenance"), false);
+  assert.equal(Object.hasOwn(accepted, "dependencies"), false);
+  assert.equal(Object.hasOwn(accepted, "signaturePolicy"), false);
+});
+test("P-AC-01 validates a pack's provenance and rejects a malformed or incomplete record", () => {
+  const accepted = validateOrganizationPolicyPack(pack({ provenance: { publisherId: "trusted-publisher", publishedAtEpochMs: 10 } }), { coreVersion: "0.4.7" });
+  assert.deepEqual(accepted.provenance, { publisherId: "trusted-publisher", publishedAtEpochMs: 10 });
+  const malformed = [
+    pack({ provenance: { publisherId: "trusted-publisher" } }),
+    pack({ provenance: { publisherId: "Trusted_Publisher!", publishedAtEpochMs: 10 } }),
+    pack({ provenance: { publisherId: "trusted-publisher", publishedAtEpochMs: -1 } }),
+    pack({ provenance: { publisherId: "trusted-publisher", publishedAtEpochMs: 10, endpoint: "https://internal.example/hook" } }),
+  ];
+  for (const value of malformed) assert.throws(() => validateOrganizationPolicyPack(value, { coreVersion: "0.4.7" }), (error) => error instanceof OrganizationPolicyError && error.code === "OPP-PROVENANCE");
+});
+test("P-AC-01 validates a pack's dependencies and rejects a self-dependency, duplicate target, or inverted version range", () => {
+  const accepted = validateOrganizationPolicyPack(pack({ dependencies: [{ packId: "operations-baseline", minimumVersion: "0.1.0", maximumVersion: "0.2.0" }] }), { coreVersion: "0.4.7" });
+  assert.deepEqual(accepted.dependencies, [{ packId: "operations-baseline", minimumVersion: "0.1.0", maximumVersion: "0.2.0" }]);
+  const malformed = [
+    pack({ dependencies: [{ packId: "security-baseline", minimumVersion: "0.1.0", maximumVersion: "0.2.0" }] }),
+    pack({ dependencies: [{ packId: "operations-baseline", minimumVersion: "0.2.0", maximumVersion: "0.1.0" }] }),
+    pack({ dependencies: [{ packId: "operations-baseline", minimumVersion: "0.1.0", maximumVersion: "0.2.0" }, { packId: "operations-baseline", minimumVersion: "0.1.0", maximumVersion: "0.2.0" }] }),
+    pack({ dependencies: [{ packId: "operations-baseline", minimumVersion: "0.1.0", maximumVersion: "0.2.0", extra: true }] }),
+  ];
+  for (const value of malformed) assert.throws(() => validateOrganizationPolicyPack(value, { coreVersion: "0.4.7" }), (error) => error instanceof OrganizationPolicyError && error.code === "OPP-DEPENDENCIES");
+});
+test("P-AC-01 validates a pack's signature policy and rejects an unknown algorithm or a required policy declaring no algorithm", () => {
+  const accepted = validateOrganizationPolicyPack(pack({ signaturePolicy: { required: true, algorithm: "ed25519" } }), { coreVersion: "0.4.7" });
+  assert.deepEqual(accepted.signaturePolicy, { required: true, algorithm: "ed25519" });
+  const malformed = [
+    pack({ signaturePolicy: { required: true, algorithm: "none" } }),
+    pack({ signaturePolicy: { required: "true", algorithm: "ed25519" } }),
+    pack({ signaturePolicy: { required: true, algorithm: "sha256-hmac" } }),
+    pack({ signaturePolicy: { required: true, algorithm: "ed25519", extra: true } }),
+  ];
+  for (const value of malformed) assert.throws(() => validateOrganizationPolicyPack(value, { coreVersion: "0.4.7" }), (error) => error instanceof OrganizationPolicyError && error.code === "OPP-SIGNATURE");
+});
