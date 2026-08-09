@@ -73,9 +73,39 @@ Codex auto-reviewer adds **27 %** on top of the agent's own consumption — a
 runner property, not a Pipeline one, so a Claude run is not comparable on totals
 without saying so.
 
-The same numbers for a Claude run and for a no-Pipeline run are what turn this
-into evidence. `scratch/rollout-telemetry.mjs` produced these; it reads Codex
-rollout JSONL and would need an equivalent for the other two.
+### The no-Pipeline control run
+
+Same brief, Claude Opus 5, no Pipeline at all (2026-08-09, transcript
+`e5004187`). Measured with the same axes:
+
+| Axis | Codex + Pipeline | Claude, no Pipeline |
+|---|---|---|
+| Wall time | ~33 min (one forced restart) | 10 min 11 s |
+| PO turns | 17 | **3** |
+| Tool calls / commands | 171 | **13** (Bash 6, Write 4, Edit 2, AskUserQuestion 1) |
+| Output tokens | 51,070 | 34,719 (the CLI's own summary reports 21.6k; the difference is which assistant messages each counts, so quote one or the other, never both as the same number) |
+| Cost | not priced by the runner | $1.62 |
+| Delivered | 12 files, 656 lines: game + tests + PRD/Spec/design-input, committed and pushed | 4 files, 1,030 lines: game only, **no test, no git repository** |
+
+**The honest reading, and it is the PO's own expectation confirmed.** At this size
+the Pipeline costs roughly 13× the tool calls and 6× the PO turns for a smaller
+game. Almost none of that difference is the product: it is installing and
+bootstrapping a Pipeline that did not exist yet, one forced restart, a plan gate,
+a promotion, a push ceremony, and the retrospective. The control run wrote more
+game because it did nothing else.
+
+What the control run does not have is also worth stating plainly, because a cost
+comparison that omits it is not a comparison: no test, no version control, no
+recorded requirement, and nothing that survives the session. A mini greenfield is
+not what this machinery is for, and this pair of runs is the measurement that
+says so rather than the assumption.
+
+**The number to watch across future runs is PO turns, not tokens.** 17 versus 3
+is the axis a human actually feels, and the analysis above says where most of the
+17 went: refusals that did not name the accepted form.
+
+`scratch/rollout-telemetry.mjs` (Codex rollout JSONL) and
+`scratch/claude-telemetry.mjs` (Claude transcript JSONL) produced these numbers.
 
 ## Direction
 
