@@ -1023,6 +1023,47 @@ a dispatch the authority to clear a control whose purpose is to check that
 dispatch's own class of work. "Show your evidence" is not a substitute for
 separation of duties — it is what makes the absence of separation look rigorous.
 
+### SILENT-5 REFUTED, and the merge did not even do it — the second audit is now closed at 6/6
+
+**No commit. Nothing changed.** The clause was removed by commit `b856139` on
+**2026-07-29**, which in the *same diff* rewrote the status line to record the ADR-0047
+supersession. One atomic, intentional edit. Merge `75b8361` produced **no combined diff
+for this file at all** — it took the 0.5.2 side unchanged. **So this was never a merge
+loss.** The audit attributed to the merge something that predates it by nine days.
+
+**The implementation confirms the reversal rather than the clause.**
+`advisory-lifecycle-v2.mjs`: with no probe and no receipt — the bootstrap case —
+`preflightAdvisoryCapability` returns `ok: true`, `state: "unknown"`, zero receipts.
+**Missing advisory evidence does not fail closed.** The *invalid*-evidence half does fail
+closed, but at the consultation boundary as a validator, not as a readiness gate; and
+`pipeline-start-preflight.mjs` does not gate on advisory preflight at all. Restoring the
+sentence would have asserted a bootstrap gate the system deliberately no longer has.
+
+**And the four surviving carriers do not state the rule.** They use the same phrase for
+the Codex review lane, a deferred hardening risk, and retained review evidence. The
+phrase was a locator, exactly as the briefing framed it — not a duplicated guarantee.
+
+**What survives as a real, small finding:** ADR-0038's status line says *"session-trigger
+semantics superseded"* while ADR-0047 claims *"session-trigger **and mandatory-receipt**
+semantics"*. The audit's observation that the note is narrower than the removal is
+correct — but the gap is in the **status wording**, not a lost guarantee. Amending it is
+a decision, and it stays one.
+
+**One dispatch claim I checked and rejected.** It reported `.claude/settings.json` as
+*staged*-modified, which would be a no-go file sitting in the index. `git status
+--porcelain` shows ` M` for all three local files: worktree-modified, **index clean**.
+Not true, and worth the thirty seconds — a staged no-go path is exactly the thing that
+rides along on someone's commit.
+
+**SECOND AUDIT CLOSED — 6 of 6 dispositioned:** LIVE-1 repaired (`67bac89`, `a54f53b`,
+`a0c6301`), LIVE-2 repaired (`dc65e46`), LIVE-3 refuted, LIVE-4 already filed, SILENT-5
+refuted and misattributed, SILENT-6 measured as genuinely silent and deliberately not
+restored. **Two repairs, four correct decisions not to act.**
+
+That ratio is the result. Every one of the four came from checking a claim before
+executing it, and three of them would have made the repository *worse* — a duplicated
+obligation, a contradicted test, and dead configuration.
+
 ### LIVE-3 REFUTED — superseded in place, and restoring it would have broken a test I forbade editing
 
 **No commit. Nothing changed. This is the most useful result of the four.**
