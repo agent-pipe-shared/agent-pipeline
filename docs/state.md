@@ -2127,9 +2127,43 @@ three production files the dispatch break-proofed show zero residual diff, sanit
 **`PHX-WP-R` dispatched** (R-AC-02/04/08/09/11/13, `external-command-offer-tests`) to fill the
 second concurrency slot while `WP-A` finished — same pattern, same honesty bar, ruleset SHA
 `ce50d74d16fdbcd0b9f8b3b606297e88af3d2f139b3cd14b692f4ea15599b023` (read from
-`evidence/dispatch-record-phx-wp-c.json` since the ruleset did not change between waves). Not yet
-landed as of this entry; will be independently verified before its delta is trusted, same as every
-prior wave.
+`evidence/dispatch-record-phx-wp-c.json` since the ruleset did not change between waves).
+
+### THE EPIC'S HARD GATE IS CLOSED: P-AC-08 IMPLEMENTED, WP-R LANDED, 86 OF 157 (2026-08-09)
+
+**`PHX-WP-R` landed** (`500d5cc`), 11 break-proofed assertions in `external-command-offer-tests`,
+verified independently at 16/16. R-AC-02 reclassifies `partial` → `not-started`: recovery-
+proposed/recovered states exist in the schema but are unreachable through any exported function —
+no correlation capability exists at all. R-AC-04/08/09/11/13 stay `partial`; all six R-AC criteria
+this wave reclassify Class A → Class B, every residual now a named, structurally-confirmed
+capability gap (missing cleanup/readback field, missing rollback/cleanup states, missing
+staleness/duplicate detection, missing machine-local storage, two of R-AC-13's eleven fixture
+states unreachable) rather than missing test coverage.
+
+**The PO signed the TP-3+TP-5 maintenance window** this epic's own closure design named as its
+single nearest hard gate — asked for the exact command, it was `prepare`d
+(`evidence/phx-p-ac-08-gmw-request.json`, intent digest `2db722ce9540e87b59f49b7afe817d148a80e3653334e0db72e1d0f9578de2e1`),
+signed externally via `scratch/phx-gmw-sign.sh` against the PO's Ed25519 key, and `install`ed.
+Under the active window, `PHX-WP-GATE`'s 26 staged `feature-package-reconcile` cases
+(`evidence/phx-wp-gate-cases.mjs`) were transplanted into the canonical, TP-5-protected
+`harness/scripts/pipeline-state.test.mjs` (`78c6ef1`) — purely additive, every helper
+(`freshDir`, `sha256Hex`, `captureBoth`, `recoverCmd`) reused by name, zero redeclaration, exactly
+the shape the staging artifact's own header comment predicted. **TP-3 needed no edit**:
+`pipeline-state-tests` was already registered in `verify.mjs` — the gap was case count inside an
+already-registered suite, not a missing registration. `node harness/scripts/pipeline-state.test.mjs`:
+**444/444** (418 pre-existing + 26 new), `node --check` clean, diff touches exactly that one file.
+The window was closed immediately after the commit landed.
+
+P-AC-08 moves `partial` → `implemented`. **85 implemented becomes 86.** Issue closeability stays
+0 of 8 — P-AC-08 alone does not clear any issue's full bullet set. Both deltas (WP-R's test-suite
+delta and P-AC-08's gate-registration delta) are one commit, `7ce3214`, because P-AC-08's own
+registration commit (`78c6ef1`) landed in between and both were verified before either delta was
+trusted.
+
+**Nothing here is a decision waiting on anyone.** The one open PO-owned act this checkpoint names
+(the signed window) is already exercised and closed; what remains is the same autonomous Class-A/
+D/S/B wave this whole checkpoint chain has been running, next candidates being the closure
+design's remaining WP-H (`H-AC-15`), WP-PX0, and WP-E packages.
 
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
