@@ -47,6 +47,17 @@ something to do here without review.
 
 ## Entries
 
+## Candidate ce03fbbeb872716b6131535ef5f05f4abf254935 — 2026-08-09, range 3387065..ce03fbb, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `e6ded9e` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `6400f3b`, `ce03fbb`: a doc-reconciliation entry and a research-only checkpoint (no code
+changed, no evidence-map delta -- six candidates checked and held for a future design pass). Same
+reading as the whole chain: `docs/state.md` stays ADR-0012, the generated evidence-map/closure-plan
+trio stays ADR-0045.
+
 ## Candidate e6ded9e24b6605bc7028280be376b8ce0b78747e — 2026-08-09, range 3387065..e6ded9e, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
