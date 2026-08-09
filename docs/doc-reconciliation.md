@@ -47,6 +47,19 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 2ae41f81932abb690d3039c42c9461db147ab253 — 2026-08-10, range 3387065..2ae41f81, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `1b2200c8` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `13a16af3` through `2ae41f81`: WP-H-AC12's narrowed closure, the discovery and fix of a
+regression in an earlier-booked closure (WP-GA-FIX), and a proactive repo-wide audit that found six
+more instances of the same regression (WP-CP-FIX dispatched, not yet landed). No code in this range
+touches the canonical artifact topology ADR-0045 governs beyond ordinary content evolution inside
+files it already lists. Same reading as the whole chain: `docs/state.md` stays ADR-0012, the
+generated evidence-map/closure-plan/design-doc set stays ADR-0045.
+
 ## Candidate 1b2200c85e9bb127211344dc4eee26b9382fa634 — 2026-08-10, range 3387065..1b2200c8, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
