@@ -2858,6 +2858,38 @@ Evidence-map deltas `6c33824` (E-AC-11), `554a173` (E-AC-08), `f3db193` (L-AC-02
 107 → 108 → 108 → 109. Both build slots stayed continuously full across this entire four-package
 leg — no idle slot after the PO's parallelism correction two entries above.
 
+**The easy tier is exhausted for this session; every remaining candidate checked needs a real
+design pass, not a briefing.** After landing the four packages above, six more candidates were
+checked before writing this note, specifically hunting for anything shaped like the safe pattern
+that worked all leg (closed-schema field addition, purely additive composition, test-only
+assertion of already-existing behavior):
+
+- **P-AC-06 (orphaned half), re-read more carefully this time:** the clause is "fail on ...
+  orphaned ... **required artifacts**", not "every filesystem file must be referenced" — my
+  earlier framing (recorded two entries above) was checking the wrong thing. What "orphaned"
+  means for a required ARTIFACT ENTRY, as opposed to a stray file on disk, is still not resolved,
+  and remains open for whoever picks this up next.
+- **H-AC-12** ("dual-evaluate during migration ... shared compatibility owner and expiry") needs a
+  migration-compatibility concept (an owner, an expiry) that exists nowhere in this codebase yet —
+  a new cross-cutting framework, not a field.
+- **PX0-AC-13**'s "bootstrap does not wire it" half touches session bootstrap's critical path
+  directly; its untested half (`ruleset-freshness-host.mjs`) is deep WSL host-transport/subprocess-
+  spawning/control-identity code — exactly the kind of security-sensitive surface this session has
+  been declining to test-author under time pressure without a dedicated pass.
+- **A-AC-03, C-AC-09, P-AC-09** are all genuine NO-CARRIER gaps (a revalidation-trigger path, a
+  multi-candidate change-control resolver, an export-backfill preview) — new capability, not a
+  gap in an existing one.
+- **K-AC-05** was reconsidered once more with a narrower, purely-additive design (a NEW disposition-
+  append function writing to a new directory, never touching the two forked canonical files, so it
+  would not need to make `scanStream` itself fork-tolerant) — but correctly replicating
+  `scanStream`'s own path/symlink/envelope-validation mechanics in a second, parallel fork-tolerant
+  scan is real security-sensitive surface area to get right under continued time pressure. Held.
+- Every doc-class (Class D) candidate in the closure plan is already `implemented` from earlier
+  legs (`P-AC-13`, `X-AC-15`, `C-AC-13`, `E-AC-21`) — no doc-only quick win remains either.
+
+Nothing was dispatched on this research; it is recorded so a future session (or the PO, choosing
+a priority) does not re-spend the time re-deriving the same six negatives.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
