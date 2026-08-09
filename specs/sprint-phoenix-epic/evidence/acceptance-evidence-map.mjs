@@ -881,6 +881,17 @@ const DELTA = {
   // activation tests pass.
   'P-AC-03': ['implemented', 'WP-P-AC01-AC03'],
 
+  // R-AC-04: an optional requiredCleanup field on validateCommandOfferEvent
+  // (agent-decision-journal.mjs -- the real edit surface; external-command-
+  // offer.mjs only consumes it) records WHAT cleanup/readback is required
+  // (cleanupClass/status/digest), distinct from recoverability's own WHETHER
+  // category. Optional at the key level so every pre-existing fixture keeps
+  // validating unchanged; scoped (ADJ-COMMAND-CLEANUP-SCOPE) to only
+  // accompany a non-"not-applicable" recoverability. 39/39 +
+  // 28/28 tests pass; governance-event-store.mjs's 28/28 (the sole other
+  // consumer) independently re-verified with no regression.
+  'R-AC-04': ['implemented', 'WP-R-AC04'],
+
   // A-AC-07: representedEventClasses (agent-decision-journal.mjs) recognizes
   // all seven named classes through existing fields/kinds -- no new kind was
   // needed for any of them (candidate=candidateDigest, always present;
@@ -1089,7 +1100,7 @@ const POINTERS = {
   'R-AC-01': 'external-command-offer-tests: public-safe offer recorded before presentation, verified append readback required',
   'R-AC-02': 'CONFIRMED ABSENT (PHX-WP-R): recovery-proposed/recovered states exist in the schema but are unreachable through any exported function -- no capability correlates a rejected path, alternatives, or selected recovery to the offer',
   'R-AC-03': 'external-command-offer-tests: a bound human decision is required for destructive attempts and appended before execution',
-  'R-AC-04': 'external-command-offer-tests (PHX-WP-R): operation class, target, exact pre/post digests, and recoverability are bound and validated together; a distinct "required cleanup/readback" field beyond the recoverability enum does not exist',
+  'R-AC-04': 'agent-decision-journal/external-command-offer-tests (PHX-WP-R + WP-R-AC04): operation class, target, exact pre/post digests, and recoverability are bound and validated together, AND requiredCleanup now records the distinct WHAT-is-required half (cleanupClass/status/digest), optional, scoped to non-"not-applicable" recoverability. 39/39 + 28/28 tests pass',
   'R-AC-05': 'agent-decision-journal-tests: every enumerated private field and every untyped digest refused at both journal boundaries',
   'R-AC-06': 'external-command-offer-tests: user execution stays unobserved; completion admitted only with bounded evidence',
   'R-AC-07': 'external-command-offer-tests: failed, partial, cancelled, mismatch and unknown outcomes retained distinctly',
