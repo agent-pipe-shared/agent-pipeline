@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import test from "node:test";
-import { appendChangeControlEntry, createChangeControlJournal, evaluateChangeControlGate, projectChangeControlState, validateChangeControlProfile } from "./change-control.mjs";
+import { appendChangeControlEntry, createChangeControlJournal, evaluateChangeControlGate, projectChangeControlState, resolveChangeControlProfile, validateChangeControlProfile } from "./change-control.mjs";
 
 const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) }; const artifact = { path: "specs/release/result.md", sha256: "c".repeat(64) }; const window = { startsAtEpochMs: 10, endsAtEpochMs: 20 };
 function profile(overrides = {}) { return { schema: "pipeline.change-control-profile.v1", profileId: "production-change", policySha256: "d".repeat(64), changeClass: "normal", candidate, artifact, environment: "production", scopeSha256: "e".repeat(64), window, mandatory: true, standardTemplate: null, reviewPolicy: "mandatory", ...overrides }; }
@@ -268,4 +268,44 @@ test("C-AC-12 requires a well-formed reviewPolicy only when mandatory is true", 
   assert.throws(() => validateChangeControlProfile(profile({ reviewPolicy: "optional" })), (error) => error.code === "CC-PROFILE");
   assert.throws(() => validateChangeControlProfile(profile({ changeClass: "not-required", mandatory: false, reviewPolicy: "advisory" })), (error) => error.code === "CC-PROFILE");
   assert.doesNotThrow(() => validateChangeControlProfile(profile({ changeClass: "not-required", mandatory: false, reviewPolicy: null })));
+});
+
+// C-AC-09: resolving an environment's candidate profiles must always land on
+// exactly one of not-required or one effective mandatory profile, never a
+// silent pick among several mandatory candidates.
+const notRequiredProfile = (overrides = {}) => profile({ profileId: "production-not-required", changeClass: "not-required", mandatory: false, reviewPolicy: null, ...overrides });
+const emergencyProfile = (overrides = {}) => profile({ profileId: "production-emergency", changeClass: "emergency", ...overrides });
+
+test("C-AC-09 resolves zero candidate profiles to not-required with no effective profile", () => {
+  assert.deepEqual(resolveChangeControlProfile([]), { schema: "pipeline.change-control-resolution.v1", status: "not-required", profile: null });
+});
+
+test("C-AC-09 resolves exactly one non-mandatory candidate to not-required with no effective profile", () => {
+  assert.deepEqual(resolveChangeControlProfile([notRequiredProfile()]), { schema: "pipeline.change-control-resolution.v1", status: "not-required", profile: null });
+});
+
+test("C-AC-09 resolves exactly one mandatory candidate to that single effective profile", () => {
+  const result = resolveChangeControlProfile([profile()]);
+  assert.equal(result.status, "effective");
+  assert.equal(result.profile.profileId, "production-change");
+  assert.equal(Object.isFrozen(result), true);
+});
+
+test("C-AC-09 rejects two mandatory candidates for the same tuple as ambiguous, with no changeClass tie-break", () => {
+  assert.throws(() => resolveChangeControlProfile([profile(), emergencyProfile()]), (error) => error.code === "CC-RESOLVE-AMBIGUOUS");
+  // Order does not matter: neither position nor changeClass rescues the pair.
+  assert.throws(() => resolveChangeControlProfile([emergencyProfile(), profile()]), (error) => error.code === "CC-RESOLVE-AMBIGUOUS");
+});
+
+test("C-AC-09 resolves one mandatory candidate mixed with several non-mandatory candidates to the single mandatory profile", () => {
+  const result = resolveChangeControlProfile([notRequiredProfile(), profile(), notRequiredProfile({ profileId: "production-not-required-2" })]);
+  assert.equal(result.status, "effective");
+  assert.equal(result.profile.profileId, "production-change");
+  assert.notEqual(result.status, "not-required");
+});
+
+test("C-AC-09 rejects malformed input and candidates that do not share the same environment/candidate/artifact/scopeSha256 tuple", () => {
+  assert.throws(() => resolveChangeControlProfile("not-an-array"), (error) => error.code === "CC-RESOLVE");
+  assert.throws(() => resolveChangeControlProfile([profile({ profileId: "malformed", note: "provider-fixture" })]), (error) => error.code === "CC-PROFILE");
+  assert.throws(() => resolveChangeControlProfile([notRequiredProfile(), notRequiredProfile({ profileId: "production-not-required-2", environment: "staging" })]), (error) => error.code === "CC-RESOLVE-SCOPE");
 });

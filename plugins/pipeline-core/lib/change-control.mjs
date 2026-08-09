@@ -49,6 +49,39 @@ export function evaluateChangeControlGate({ profile, pipelineAuthority, external
 }
 
 /**
+ * C-AC-09: resolves an environment's candidate change-control profiles -- all
+ * claiming the same environment/candidate/artifact/scopeSha256 tuple -- to
+ * exactly ONE effective outcome. The gate above already decides whether ONE
+ * profile passes; this decides WHICH profile it gets handed, before it is
+ * ever called. Zero candidates and a candidate set with no mandatory member
+ * both resolve the same way evaluateChangeControlGate already treats
+ * `mandatory: false` (line 34): `not-required`, with no profile to report --
+ * an environment nothing constrains is not an error, it is exactly what
+ * `not-required` already means elsewhere in this module. More than one
+ * mandatory profile is always rejected, with no tie-break: the schema this
+ * module validates against (validateChangeControlProfile above) carries no
+ * priority/precedence field, so any changeClass-based ordering (e.g.
+ * emergency outranking standard/normal) would be an unconfigured, invisible
+ * rule this function invents on its own -- indistinguishable, from an
+ * operator's perspective, from silently picking the wrong governance for a
+ * release. C-AC-09's own text pairs "ambiguous" and "multiple mandatory
+ * profiles" as one condition, not two different ones where a tie-break could
+ * rescue one of them.
+ */
+export function resolveChangeControlProfile(candidates) {
+  if (!Array.isArray(candidates)) fail("CC-RESOLVE");
+  const validated = candidates.map((profile) => validateChangeControlProfile(profile));
+  if (validated.length > 0) {
+    const [first, ...rest] = validated;
+    if (!rest.every((profile) => same(profile.candidate, first.candidate) && same(profile.artifact, first.artifact) && profile.environment === first.environment && profile.scopeSha256 === first.scopeSha256)) fail("CC-RESOLVE-SCOPE");
+  }
+  const mandatory = validated.filter((profile) => profile.mandatory);
+  if (mandatory.length > 1) fail("CC-RESOLVE-AMBIGUOUS");
+  if (mandatory.length === 1) return Object.freeze({ schema: "pipeline.change-control-resolution.v1", status: "effective", profile: mandatory[0] });
+  return Object.freeze({ schema: "pipeline.change-control-resolution.v1", status: "not-required", profile: null });
+}
+
+/**
  * Deployment journal and its projection.
  *
  * The local event is the record; the external update is a report about it. That
