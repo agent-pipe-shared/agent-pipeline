@@ -125,3 +125,23 @@ test("R-AC-13: duplicate/retry — recording the same outcome eventId twice is n
   assert.equal(first.status, "failed");
   assert.equal(second.status, "failed");
 });
+
+test("R-AC-12: the motivating Phoenix bootstrap trajectory fixture — rejected guard path, attended local repair, unchanged public-privacy boundary, successful readback, no remote write and no machine-specific value", async () => {
+  const guardOffer = event({ eventId: "trajectory-guard-1", relatedHumanDecisionId: "trajectory-guard-decision-1", sideEffectClass: "guard-bypass", authorityRequirement: "human-decision-required" });
+  const guardAttempt = follow("attempted", { eventId: "trajectory-guard-1-attempt", offerEventId: "trajectory-guard-1", relatedHumanDecisionId: "trajectory-guard-decision-1", sideEffectClass: "guard-bypass", authorityRequirement: "human-decision-required" });
+  await assert.rejects(recordPipelineAttempt({ offer: guardOffer, attempt: guardAttempt, append }), (error) => error.code === "ECO-AUTHORITY");
+
+  let seen = null;
+  const repairOffer = event({ eventId: "trajectory-repair-1", sideEffectClass: "non-authoritative", authorityRequirement: "not-required" });
+  const repairReceipt = await recordCommandOffer({ offer: repairOffer, append: async (value) => { seen = value; return append(value); } });
+  assert.equal(repairReceipt.status, "offered");
+  assert.equal(seen.command, undefined);
+  assert.equal(seen.rawArguments, undefined);
+
+  const readback = follow("readback-verified", { eventId: "trajectory-repair-1-readback", offerEventId: "trajectory-repair-1", postEvidenceDigest: SHA("7") });
+  const readbackReceipt = await recordCommandOutcome({ offer: repairOffer, outcome: readback, append, verifyOutcome: async () => ({ state: "readback-verified", postEvidenceDigest: SHA("7") }) });
+  assert.equal(readbackReceipt.status, "readback-verified");
+
+  assert.match(repairOffer.target.repositoryFingerprint, /^[0-9a-f]{64}$/);
+  assert.match(repairOffer.target.scopeDigest, /^[0-9a-f]{64}$/);
+});
