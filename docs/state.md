@@ -3953,6 +3953,28 @@ file needs different handling.
 **Live now:** WP-CP-FIX. This is currently the highest-priority live thread — it's closing real,
 already-broken test suites, not extending new coverage.
 
+### WP-CP-FIX: 5 OF 6 CLOSED; A SEVENTH, UNRELATED PRE-EXISTING REGRESSION FOUND AND ALSO DISPATCHED
+
+WP-CP-FIX landed (`4623b949`) and correctly applied its own stop condition: 5 of 6 files fixed
+clean, and the 6th (`governance-event.test.mjs`) correctly diagnosed as a DIFFERENT root cause
+(`GES-PAYLOAD-SCHEMA`, not `GES-CAPTURE-POLICY`) and left untouched rather than force-fitting the
+wrong fix. Verified independently, all six, myself: `human-authority-grant.test.mjs` 14/14,
+`human-governance-ledger.test.mjs` 24/24, `governance-export-delivery.test.mjs` 20/20,
+`guard-git-phoenix.test.mjs` 1/1, `guard-git-phoenix-authority-grant.test.mjs` 1/1 — all clean.
+`governance-event.test.mjs` confirmed still 1/2 failing, exactly as reported.
+
+Traced the 6th file's real root cause myself (read `lifecycle-governance-events.mjs`'s
+`validateLifecycleGovernanceEvent` directly): the test's own lifecycle-event fixture's `correlation`
+object carries only 4 keys (`packageId`/`dispatchId`/`attemptId`/`workerId`), but the validator has
+required a closed 6-key shape (adding `correlationId`/`queueRevision`) since before today's
+session — a pre-existing, unrelated stale fixture, not part of today's `mandatoryEventClasses`
+regression pattern at all. Dispatched **WP-GE-FIX**, one more small mechanical fix, scoped
+identically narrow (single file, single fixture extension, explicit stop-if-a-third-root-cause
+surfaces).
+
+**Live now:** WP-GE-FIX. Once this lands, every currently-known broken test in the repository will
+be closed.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
