@@ -3825,7 +3825,7 @@ const PO_REBIND_LOCK_TOKEN = "pipeline-po-authority-rebind-v1";
 const PO_REBIND_TXN_SCHEMA = "pipeline.po-authority-rebind-transaction.v1";
 const PO_REBIND_RUNNERS = new Set(["claude", "codex"]);
 const TECHNICAL_SPEC_MARKER_RE = /^<!-- technical-spec-sha256: ([a-f0-9]{64}) -->$/gmu;
-const PO_LANGUAGE_MARKER_RE = /^<!-- po-language: (de|en) -->$/gmu;
+const PO_LANGUAGE_MARKER_RE = /^<!-- po-language: ([a-z]{2}) -->$/gmu;
 const PO_PROFILE_SCHEMA = "pipeline.po-gate-authority-evidence.v1";
 const PO_PROFILE_KEYS = ["schema", "humanFacing", "sourceSha256", "runtimeSha256", "receiptSha256", "repositoryFingerprint"];
 
@@ -3926,7 +3926,7 @@ function validCurrentDecisionDocuments(state, prd, spec, prdText, profile) {
   if (prds.length !== 1 || prds[0].name !== basename(prd.path)
     || !prds[0].isFile() || prds[0].isSymbolicLink()) return false;
   const languages = [...prdText.matchAll(PO_LANGUAGE_MARKER_RE)].map((match) => match[1]);
-  return languages.length === 1 && languages[0] === profile.humanFacing;
+  return languages.length === 1 && languages[0] === (state.continuity?.runtime?.documentLanguage ?? profile.humanFacing);
 }
 
 function validPriorAuthority(state, prd, spec) {
