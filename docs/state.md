@@ -3865,6 +3865,30 @@ Everything is committed; `docs/state.md` and `docs/doc-reconciliation.md` are cu
 checkpoint in this stretch. No `/compact` was run or requested, per the PO's standing AFK
 instruction — safe to resume from here whenever the PO returns or the session continues.
 
+A Stop-hook check flagged that the sprint's own stop condition ("Phoenix Epic Sprint final
+umsetzen") is not yet met — correct, 126/157 is not done. Continuing.
+
+### WP-H-AC12 DISPATCHED — DELIBERATELY NARROW, guard-push.mjs EXCLUDED
+
+H-AC-12 spans guard-devplan, guard-push, pipeline-state, release/deploy, and Git-guard override
+paths — a large criterion. Researched: `guard-devplan.mjs` already has an "H-AC-12 migration
+boundary" comment and a legacy/ledger-backed dual-path that currently SKIPS validation entirely
+for legacy approvals (the actual gap); `change-control.mjs` has no `decisionId` concept at all;
+`guard-push.mjs` has its own unrelated 1936-line, 109-test "migration window" concept and is by far
+the highest blast-radius file among the five named subsystems.
+
+Dispatched **WP-H-AC12** deliberately narrow: build one shared dual-evaluation primitive (fail
+closed on disagreement, shared compatibility owner+expiry), wire it into ONLY `guard-devplan.mjs`
+and `change-control.mjs` — the two lowest-risk integration points. `guard-push.mjs`,
+`pipeline-state.mjs`, and the deploy/override paths are explicitly out of scope, with an explicit
+stop condition if closing even this narrow scope turns out to require touching them anyway. H-AC-12
+stays `partial` (narrowed, not closed) regardless of outcome — stated in the briefing itself, so the
+dispatch reports it as a partial closure by design, not a surprise. Also explicitly required: run
+BOTH full test files, not just new tests, per the broader-verification lesson from the P-AC-06
+regression.
+
+**Live now:** WP-H-AC12. Handover fully current through this checkpoint.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
