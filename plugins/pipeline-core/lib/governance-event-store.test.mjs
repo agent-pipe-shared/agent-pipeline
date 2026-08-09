@@ -336,6 +336,50 @@ test("K-AC-05 a recorded fork disposition never makes the stream normally usable
   await assert.rejects(() => recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", checkpoint: first.checkpoint, recovery }), (error) => error.code === "GES-FORK", "an ordinary recovery call carrying no matching disposition must still fail closed after a disposition is recorded");
 });
 
+test("K-AC-05 inspectForkedGovernanceStream reports a recorded disposition's own content on the corresponding fork entry, readable without touching internal storage paths", async (t) => {
+  const { root } = await forkedLifecycleFixture(); t.after(() => cleanup(root));
+  const disposition = { idempotencyKey: "fork-disp-visible-1", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 4242 };
+  const recorded = await recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition });
+  assert.equal(recorded.status, "fork-disposition-recorded");
+  const inspected = await inspectForkedGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" });
+  assert.equal(inspected.forks.length, 1);
+  assert.deepEqual(inspected.forks[0].disposition, {
+    idempotencyKey: "fork-disp-visible-1",
+    sequence: 2,
+    acknowledgedEventIds: ["evt-2", "evt-fork"].sort(),
+    reasonCode: "GOVERNED_ACK",
+    disposedAtEpochMs: 4242,
+  }, "the recorded governed disposition must be readable straight from inspectForkedGovernanceStream's own output, not from the internal fork-disposition path");
+});
+
+test("K-AC-05 inspectForkedGovernanceStream distinguishes an undisposed fork (null) from a disposed one, at two fork positions in the same stream", async (t) => {
+  const root = await fixtureRoot(); t.after(() => cleanup(root));
+  const first = await append(root);
+  const forkA1 = sealGovernanceEvent({ ...intent({ eventId: "evt-2a", idempotencyKey: "idem-2a" }), sequence: 2, previousEventDigest: first.eventDigest, payloadDigest: "0".repeat(64), eventDigest: "0".repeat(64) });
+  const forkA2 = sealGovernanceEvent({ ...intent({ eventId: "evt-2b", idempotencyKey: "idem-2b" }), sequence: 2, previousEventDigest: first.eventDigest, payloadDigest: "0".repeat(64), eventDigest: "0".repeat(64) });
+  await writeFile(path.join(root, "governance/events/lifecycle/2-evt-2a.json"), `${canonicalizeJson(forkA1)}\n`);
+  await writeFile(path.join(root, "governance/events/lifecycle/2-evt-2b.json"), `${canonicalizeJson(forkA2)}\n`);
+  const forkB1 = sealGovernanceEvent({ ...intent({ eventId: "evt-3a", idempotencyKey: "idem-3a" }), sequence: 3, previousEventDigest: "0".repeat(64), payloadDigest: "0".repeat(64), eventDigest: "0".repeat(64) });
+  const forkB2 = sealGovernanceEvent({ ...intent({ eventId: "evt-3b", idempotencyKey: "idem-3b" }), sequence: 3, previousEventDigest: "0".repeat(64), payloadDigest: "0".repeat(64), eventDigest: "0".repeat(64) });
+  await writeFile(path.join(root, "governance/events/lifecycle/3-evt-3a.json"), `${canonicalizeJson(forkB1)}\n`);
+  await writeFile(path.join(root, "governance/events/lifecycle/3-evt-3b.json"), `${canonicalizeJson(forkB2)}\n`);
+
+  const beforeDisposition = await inspectForkedGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" });
+  assert.equal(beforeDisposition.forks.length, 2);
+  assert.equal(beforeDisposition.forks[0].sequence, 2);
+  assert.equal(beforeDisposition.forks[1].sequence, 3);
+  assert.equal(beforeDisposition.forks[0].disposition, null, "an undisposed fork must report its absence as null, distinguishable from a fork with a recorded disposition");
+  assert.equal(beforeDisposition.forks[1].disposition, null);
+
+  const disposition = { idempotencyKey: "fork-disp-partial", sequence: 2, acknowledgedEventIds: ["evt-2a", "evt-2b"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 7 };
+  await recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition });
+
+  const afterDisposition = await inspectForkedGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" });
+  assert.notEqual(afterDisposition.forks[0].disposition, null, "the now-disposed sequence must report its disposition content instead of null");
+  assert.equal(afterDisposition.forks[0].disposition.reasonCode, "GOVERNED_ACK");
+  assert.equal(afterDisposition.forks[1].disposition, null, "the still-undisposed sequence must remain distinguishably null, unaffected by the other sequence's disposition");
+});
+
 test("K-AC-08 rejects a head/index checkpoint asserting an absent or invalid canonical record instead of trusting the projection", async (t) => {
   const root = await fixtureRoot(); t.after(() => cleanup(root));
   const first = await append(root);

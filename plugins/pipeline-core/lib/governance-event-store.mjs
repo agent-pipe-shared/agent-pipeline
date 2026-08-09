@@ -883,18 +883,60 @@ async function inspectStreamForForks(root, registry, streamId) {
   return { stream, streamRoot, prefix, forks };
 }
 
-/** Exported read-only projection of `inspectStreamForForks` (K-AC-05); see that function for the full detection contract. */
+/**
+ * Read one previously recorded governed fork disposition (K-AC-05), if any,
+ * for `sequence` in `streamId` — purely additive read visibility over the
+ * exact same durable record `recordGovernanceForkDisposition` writes. Never
+ * touches `heads.json` or either conflicting canonical file, and never
+ * changes whether the stream is otherwise readable/writable; it only answers
+ * "has a governed disposition already been appended here." Returns `null`
+ * when no disposition has been recorded at this sequence yet.
+ */
+async function readForkDisposition(root, registry, streamId, sequence) {
+  const target = repositoryPath(root, `${registry.storageRoot}/fork-disposition/${streamId}/${sequence}.json`);
+  const entry = await lstatOrNull(target);
+  if (!entry) return null;
+  await assertNoSymlink(target, { directory: false });
+  let record;
+  try { record = parseStrictJson(await readFile(target)); } catch { fail("GES-FORK-DISPOSITION-RECORD", "The recorded fork disposition is not strict JSON."); }
+  if (!exactKeys(record, ["schema", "repositoryFingerprint", "streamId", "idempotencyKey", "sequence", "acknowledgedEventIds", "reasonCode", "disposedAtEpochMs"])
+    || record.schema !== "pipeline.governance-fork-disposition.v1" || record.repositoryFingerprint !== registry.repositoryFingerprint
+    || record.streamId !== streamId || record.sequence !== sequence) fail("GES-FORK-DISPOSITION-RECORD", "The recorded fork disposition shape is invalid.");
+  return Object.freeze({
+    idempotencyKey: record.idempotencyKey,
+    sequence: record.sequence,
+    acknowledgedEventIds: Object.freeze([...record.acknowledgedEventIds]),
+    reasonCode: record.reasonCode,
+    disposedAtEpochMs: record.disposedAtEpochMs,
+  });
+}
+
+/**
+ * Exported read-only projection of `inspectStreamForForks` (K-AC-05); see
+ * that function for the full detection contract. Each returned fork entry
+ * also carries `disposition`: `null` when no explicit governed disposition
+ * has been appended for that sequence yet, or the same content
+ * `recordGovernanceForkDisposition` persisted when one has — so a caller can
+ * learn "was this fork ever governed-disposed, by whom [reasonCode], when
+ * [disposedAtEpochMs]" from this exported surface alone, without reading any
+ * internal storage path. This is read-visibility only: it never restores
+ * append/verify/query/plain-recovery availability for the stream.
+ */
 export async function inspectForkedGovernanceStream({ repositoryRoot, registryPath, repositoryFingerprint, streamId } = {}) {
   const { root, fingerprint } = await assertPhysicalRoot(repositoryRoot);
   const { registry } = await loadRegistry(root, registryPath);
   if (repositoryFingerprint !== fingerprint || registry.repositoryFingerprint !== fingerprint) fail("GES-CROSS-REPOSITORY", "The expected repository fingerprint does not match the physical repository.");
   const { prefix, forks } = await inspectStreamForForks(root, registry, streamId);
+  const dispositionedForks = await Promise.all(forks.map(async (fork) => Object.freeze({
+    ...fork,
+    disposition: await readForkDisposition(root, registry, streamId, fork.sequence),
+  })));
   return Object.freeze({
     schema: "pipeline.governance-event-fork-inspection.v1",
     streamId,
     repositoryFingerprint: registry.repositoryFingerprint,
     prefix: Object.freeze(prefix),
-    forks,
+    forks: dispositionedForks,
   });
 }
 
