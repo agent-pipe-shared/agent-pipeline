@@ -8,7 +8,7 @@ Parent specification: [../spec.md](../spec.md) · Measurement: [../evidence/acce
 
 ## What this design is for
 
-The measurement established that 61 of 157 acceptance criteria are not
+The measurement established that 58 of 157 acceptance criteria are not
 `implemented` and that no issue is closeable. It did not say how any of them closes. This
 document does, and it is generated from the same verdict data as the measurement, so the two
 cannot drift apart.
@@ -19,12 +19,12 @@ one list is what has made the epic look larger and more uniform than it is.
 
 | class | criteria | what closing one actually costs |
 |---|---|---|
-| A — assertion missing | 8 | one named test case in an already-registered, unprotected suite |
+| A — assertion missing | 3 | one named test case in an already-registered, unprotected suite |
 | D — documentation missing | 1 | one document section set; no code, no gate |
 | S — seam missing | 5 | a connector between two packages that already work |
-| B — capability missing | 42 | real implementation plus its tests |
+| B — capability missing | 44 | real implementation plus its tests |
 | P — not code | 5 | a human gate, a sanctioned authority revision, or a proved impossibility |
-| **total** | **61** | |
+| **total** | **58** | |
 
 **The distribution is the finding.** The largest class by a wide margin is Class A: criteria
 whose behaviour is built, shipped and green, and which fail only because no assertion names the
@@ -138,7 +138,7 @@ is by module family, which makes the disjointness checkable rather than asserted
 | WP-L | 3 | plugins/pipeline-core/lib/lifecycle-governance-events*.mjs, plugins/pipeline-core/lib/governance-replay*.mjs |
 | WP-H | 3 | plugins/pipeline-core/lib/human-governance-ledger*.mjs, plugins/pipeline-core/lib/governance-authority-resolver*.mjs, plugins/pipeline-core/lib/external-push-ledger*.mjs |
 | WP-R | 8 | plugins/pipeline-core/lib/external-command-offer*.mjs |
-| WP-PX0 | 8 | plugins/pipeline-core/lib/ruleset-source*.mjs, plugins/pipeline-core/scripts/ruleset-freshness-host.mjs, plugins/pipeline-core/lib/continuity-state.mjs |
+| WP-PX0 | 5 | plugins/pipeline-core/lib/ruleset-source*.mjs, plugins/pipeline-core/scripts/ruleset-freshness-host.mjs, plugins/pipeline-core/lib/continuity-state.mjs |
 | WP-EPIC | 1 | plugins/pipeline-core/lib/parallel-sprint-integration*.mjs |
 | WP-DOC | 1 | docs/*.md (one section set per package) |
 | WP-PO | 5 | none - human gates and recorded deviations |
@@ -173,18 +173,13 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 
 ## Per criterion
 
-### Class A — the behaviour exists, the assertion does not (8)
+### Class A — the behaviour exists, the assertion does not (3)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
 | A-AC-14 | partial | WP-A | 11 of 13 named conformance scenarios now have dedicated coverage (PHX-WP-A + PHX-WP-A2); "decomposition" is confirmed not representable in the current `kind` enum; "tampering" stays gapped -- needs store-generic digest-recompute verification, correctly left unattempted rather than guessed at |
 | E-AC-14 | partial | WP-E | in-memory, local-file, OTLP-profile and syslog fixtures are each individually cited (PHX-WP-E); dedicated failure-injection coverage was judged sufficient by indirect citation (CAS-conflict, forged-ack tests) rather than confirmed absent by search -- no new test added, budget-limited not capability-limited |
-| PX0-AC-01 | partial | WP-PX0 | continuity-state.mjs binds dispatch/intent to prdSha256/specSha256; no assertion names a REJECTED generic CAS authority change. GATE: the carrier suite is harness/scripts/pipeline-state.test.mjs (TP-5) -- closing this needs a signed TP-5 maintenance window, the same class of act P-AC-08 needed, not an ordinary dispatch |
-| PX0-AC-03 | partial | WP-PX0 | apply exists and rechecks under the writer lock; the recheck breadth the criterion enumerates is not fully pinned. GATE: carrier is harness/scripts/pipeline-state.test.mjs (TP-5), same as PX0-AC-01 |
-| PX0-AC-04 | partial | WP-PX0 | proof half fails closed and is pinned; the State-side preimage/revision/idempotency recheck is only partly asserted. GATE: carrier is harness/scripts/pipeline-state.test.mjs (TP-5), same as PX0-AC-01 |
-| PX0-AC-05 | partial | WP-PX0 | continuity-authority-revision-receipt.v1 now has an emitter; durable retention of the receipt is not pinned. GATE: carrier is harness/scripts/pipeline-state.test.mjs (TP-5), same as PX0-AC-01 |
-| PX0-AC-06 | partial | WP-PX0 | recover replays frozen journal bytes only; the recovered-preimage outcome class is not pinned. GATE: carrier is harness/scripts/pipeline-state.test.mjs (TP-5), same as PX0-AC-01 |
-| PX0-AC-07 | partial | WP-PX0 | zero-write replay implemented; the conflicting-replay/second-writer half is not pinned. GATE: carrier is harness/scripts/pipeline-state.test.mjs (TP-5), same as PX0-AC-01 |
+| PX0-AC-03 | partial | WP-PX0 | pipeline-state-tests AR03a-g (PHX-WP-PX0): apply rechecks both the next-authority artifact (AR03c) and its own fresh State preimage against a concurrent unrelated mutation (AR03e-g, new). One named axis remains unpinned: active-feature phase != design -> AR-DECISION-SCOPE, reachable in production but needing a full plan-approval fixture the dispatch's budget did not cover |
 
 ### Class D — the gap is a documentation section the criterion enumerates (1)
 
@@ -202,7 +197,7 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 | H-AC-08 | not-started | WP-H | NO CARRIER: no path imports a legacy approval/override/deploy record as an unverified observation |
 | H-AC-09 | not-started | WP-H | NO CARRIER: external-push-ledger is scoped to single-repo push proofs; nothing binds cross-repository guarded work to one physical target |
 
-### Class B — an absent capability (42)
+### Class B — an absent capability (44)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
@@ -235,6 +230,8 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 | P-AC-08 | partial | ELEPHANT | CORRECTED 2026-08-09 (independent Critic FAIL, F3): the reconcile transaction is built and gate-registered (444/444, harness/scripts/pipeline-state.test.mjs), but no shipped entry point ever supplies deps.featurePackageReconcileApproval -- pipeline-state.mjs:5644 has no default (`??`) fallback, unlike its sibling deps, and both CLI entry points call run() with none. Only the test file ever provides the resolver. The command as shipped cannot be invoked by any real operator or agent -- structurally identical to the "interface built, no caller" gap this session found and disclosed for A-AC-04, just not caught here until independent review |
 | P-AC-09 | not-started | WP-P | NO CARRIER: no export-backfill preview or explicit consent path exists |
 | P-AC-11 | partial | WP-P | organization-policy-core-tests: mode (closed reference-only/projection/controlled-publication set) and approval (union, no downgrade) pinned (PHX-WP-P, break-proofed). Target class/binding, owned fields/sections, lifecycle event, preview, retention and revision readback remain unpinned: documentClasses is closed to exactly class/mode/approvalRequired, no field exists for the rest |
+| PX0-AC-05 | not-started | WP-PX0 | CONFIRMED ABSENT (PHX-WP-PX0, full command-path read): the authority-revision receipt is only ever printed once to apply's stdout or embedded in the retired-on-success private journal -- no durable retention exists anywhere |
+| PX0-AC-06 | not-started | WP-PX0 | CONFIRMED ABSENT (PHX-WP-PX0, full command-path read): recover has exactly three outcome classes (clean, recovered-postimage x2, diverged) -- no recovered-preimage success outcome exists anywhere |
 | PX0-AC-08 | partial | WP-PX0 | ruleset-source.mjs closed contract pinned by ruleset-source-tests; whether bootstrap actually EMITS one observation is unpinned |
 | PX0-AC-13 | partial | WP-PX0 | ruleset-freshness-host.mjs selects the host transport correctly, but no suite exercises it and bootstrap does not wire it |
 | R-AC-02 | not-started | WP-R | CONFIRMED ABSENT (PHX-WP-R): recovery-proposed/recovered states exist in the schema but are unreachable through any exported function -- no capability correlates a rejected path, alternatives, or selected recovery to the offer |

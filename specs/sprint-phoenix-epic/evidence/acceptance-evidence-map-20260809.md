@@ -42,8 +42,8 @@ reproduced here rather than referenced.
 
 ## The direct answer
 
-**Phoenix cannot claim complete.** 96 of 157 criteria carry a named assertion in a
-gate-registered suite; 61 do not. EPIC-AC-05 forbids a completion claim while any
+**Phoenix cannot claim complete.** 99 of 157 criteria carry a named assertion in a
+gate-registered suite; 58 do not. EPIC-AC-05 forbids a completion claim while any
 criterion remains unimplemented or unverified, and it currently bites. No issue is closeable on
 its own live acceptance bullets.
 
@@ -61,10 +61,10 @@ A bullet is therefore BLOCKED unless every criterion mapped to it is `implemente
 
 | verdict | count |
 |---|---|
-| implemented | 96 |
-| partial | 45 |
+| implemented | 99 |
+| partial | 40 |
 | designed-only | 1 |
-| not-started | 14 |
+| not-started | 16 |
 | constraint | 1 |
 | **total** | **157** |
 
@@ -75,17 +75,17 @@ A bullet is therefore BLOCKED unless every criterion mapped to it is `implemente
 gate-registered suite that pins the operative clause; for every other verdict it names the exact
 clause that is not pinned or not built.
 
-### PX0 — Lifecycle-authority revision and runner-neutral ruleset source (9/17 implemented)
+### PX0 — Lifecycle-authority revision and runner-neutral ruleset source (12/17 implemented)
 
 | ID | verdict | src | evidence / named gap |
 |---|---|---|---|
-| PX0-AC-01 | partial | C | continuity-state.mjs binds dispatch/intent to prdSha256/specSha256; no assertion names a REJECTED generic CAS authority change. GATE: the carrier suite is harness/scripts/pipeline-state.test.mjs (TP-5) -- closing this needs a signed TP-5 maintenance window, the same class of act P-AC-08 needed, not an ordinary dispatch |
+| PX0-AC-01 | implemented | WP-PX0 | pipeline-state-tests AR01a-d (PHX-WP-PX0, break-proofed, TP-5 window): a generic continuity-cas rewriting authority.prd or authority.spec is refused (CS-PROTECTED-AUTHORITY), zero mutation, both proved |
 | PX0-AC-02 | implemented | A | continuity-authority-revision-plan emits the closed request; pinned in pipeline-state.test.mjs (registered) |
-| PX0-AC-03 | partial | A | apply exists and rechecks under the writer lock; the recheck breadth the criterion enumerates is not fully pinned. GATE: carrier is harness/scripts/pipeline-state.test.mjs (TP-5), same as PX0-AC-01 |
-| PX0-AC-04 | partial | C | proof half fails closed and is pinned; the State-side preimage/revision/idempotency recheck is only partly asserted. GATE: carrier is harness/scripts/pipeline-state.test.mjs (TP-5), same as PX0-AC-01 |
-| PX0-AC-05 | partial | A | continuity-authority-revision-receipt.v1 now has an emitter; durable retention of the receipt is not pinned. GATE: carrier is harness/scripts/pipeline-state.test.mjs (TP-5), same as PX0-AC-01 |
-| PX0-AC-06 | partial | A | recover replays frozen journal bytes only; the recovered-preimage outcome class is not pinned. GATE: carrier is harness/scripts/pipeline-state.test.mjs (TP-5), same as PX0-AC-01 |
-| PX0-AC-07 | partial | A | zero-write replay implemented; the conflicting-replay/second-writer half is not pinned. GATE: carrier is harness/scripts/pipeline-state.test.mjs (TP-5), same as PX0-AC-01 |
+| PX0-AC-03 | partial | WP-PX0 | pipeline-state-tests AR03a-g (PHX-WP-PX0): apply rechecks both the next-authority artifact (AR03c) and its own fresh State preimage against a concurrent unrelated mutation (AR03e-g, new). One named axis remains unpinned: active-feature phase != design -> AR-DECISION-SCOPE, reachable in production but needing a full plan-approval fixture the dispatch's budget did not cover |
+| PX0-AC-04 | implemented | WP-PX0 | pipeline-state-tests AR04a-i (PHX-WP-PX0, measurement correction -- already fully covered pre-dispatch): feature/revision/prestate/old-and-next-authority/expiry/candidate/decision-scope/idempotency-reuse all pinned; no new test needed |
+| PX0-AC-05 | not-started | WP-PX0 | CONFIRMED ABSENT (PHX-WP-PX0, full command-path read): the authority-revision receipt is only ever printed once to apply's stdout or embedded in the retired-on-success private journal -- no durable retention exists anywhere |
+| PX0-AC-06 | not-started | WP-PX0 | CONFIRMED ABSENT (PHX-WP-PX0, full command-path read): recover has exactly three outcome classes (clean, recovered-postimage x2, diverged) -- no recovered-preimage success outcome exists anywhere |
+| PX0-AC-07 | implemented | WP-PX0 | pipeline-state-tests AR07a-b (PHX-WP-PX0, measurement correction -- already fully covered pre-dispatch): exact zero-write replay (AR07a) and a second/conflicting writer failing closed with State preserved (AR07b) both pinned, reinforced incidentally by the new AR03e-g |
 | PX0-AC-08 | partial | C | ruleset-source.mjs closed contract pinned by ruleset-source-tests; whether bootstrap actually EMITS one observation is unpinned |
 | PX0-AC-09 | implemented | A | bootstrap-source-attestation-acceptance-tests (verify.mjs:333) — Codex-only marketplace resolution |
 | PX0-AC-10 | implemented | A | bootstrap-source-attestation-acceptance-tests — pre-HEAD consumer compares loaded plugin identity |
@@ -448,7 +448,7 @@ Issues closeable on their own live acceptance bullets: **0 of 8**.
 
 53 of 157 criteria are Phoenix's own stricter contract rather than a live issue obligation.
 They block no issue, but EPIC-AC-05 still forbids an epic completion claim while any of them is not `implemented`.
-30 of those 53 are currently not `implemented` and are listed below; the rest are omitted because they are done.
+27 of those 53 are currently not `implemented` and are listed below; the rest are omitted because they are done.
 
 | criterion | verdict |
 |---|---|
@@ -466,12 +466,9 @@ They block no issue, but EPIC-AC-05 still forbids an epic completion claim while
 | L-AC-02 | partial |
 | P-AC-08 | partial |
 | P-AC-09 | not-started |
-| PX0-AC-01 | partial |
 | PX0-AC-03 | partial |
-| PX0-AC-04 | partial |
-| PX0-AC-05 | partial |
-| PX0-AC-06 | partial |
-| PX0-AC-07 | partial |
+| PX0-AC-05 | not-started |
+| PX0-AC-06 | not-started |
 | PX0-AC-08 | partial |
 | PX0-AC-13 | partial |
 | R-AC-02 | not-started |

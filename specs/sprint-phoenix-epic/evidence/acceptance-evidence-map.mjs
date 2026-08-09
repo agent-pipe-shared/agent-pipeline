@@ -481,6 +481,38 @@ const DELTA = {
   // unconditionally rejects -- no approval-binding mechanism was built, that
   // remains a separate, larger follow-on task per the dispatch's own report.
   'X-AC-11': ['implemented', 'WP-XAC11'],
+
+  // --- evidence/phx-wp-px0.txt (task PHX-WP-PX0, 2026-08-09, commit
+  // 00b275e, under the second signed TP-5 maintenance window) --- Independently
+  // re-run: 451/451 pipeline-state-tests pass (444 baseline + 7 new), node --check
+  // clean, exactly the one declared file changed (40 lines, additive only inside
+  // runAuthorityRevisionTests()), break-proof RED confirmed (disabling
+  // CS-PROTECTED-AUTHORITY and AR-REVISION-STALE drove exactly AR01a-d/AR03f
+  // red, both restored, GREEN reconfirmed). Window closed immediately after
+  // independent verification.
+  // PX0-AC-01 pinned (AR01a-d): a generic continuity-cas rewriting authority.prd
+  // or authority.spec is refused (CS-PROTECTED-AUTHORITY), zero mutation.
+  // PX0-AC-04 and PX0-AC-07 were ALREADY fully covered by pre-existing AR04a-i
+  // (9 sub-tests) and AR07a-b -- a measurement correction, not new work; no
+  // padding test written for either. PX0-AC-03 gains AR03e-g (apply's own
+  // fresh State-preimage recheck, not just the next-authority artifact AR03c
+  // already covered) but one named axis -- active-feature phase != design ->
+  // AR-DECISION-SCOPE -- is reachable in production yet still untested, needing
+  // a full plan-approval fixture out of this dispatch's budget; stays partial.
+  // PX0-AC-05 and PX0-AC-06 are CONFIRMED ABSENT, not merely unpinned, on the
+  // same repo-wide-search bar applied all session to K-AC-10/C-AC-09/A-AC-07:
+  // the authority-revision receipt is only ever printed once to apply's stdout
+  // or embedded in the private journal, retired on success -- no durable
+  // retention exists anywhere (PX0-AC-05); the recover command has exactly
+  // three outcome classes (clean, recovered-postimage x2, diverged) and no
+  // recovered-preimage success outcome exists anywhere (PX0-AC-06). Both
+  // reclassify Class A (assert) to Class B (build).
+  'PX0-AC-01': ['implemented', 'WP-PX0'],
+  'PX0-AC-03': ['partial', 'WP-PX0'],
+  'PX0-AC-04': ['implemented', 'WP-PX0'],
+  'PX0-AC-05': ['not-started', 'WP-PX0'],
+  'PX0-AC-06': ['not-started', 'WP-PX0'],
+  'PX0-AC-07': ['implemented', 'WP-PX0'],
 };
 
 // --- per-criterion evidence pointer ----------------------------------------
@@ -488,13 +520,13 @@ const DELTA = {
 // For `implemented`: the carrier plus the gate-registered suite that pins it.
 // For anything else: the exact clause that is NOT pinned or NOT built.
 const POINTERS = {
-  'PX0-AC-01': 'continuity-state.mjs binds dispatch/intent to prdSha256/specSha256; no assertion names a REJECTED generic CAS authority change. GATE: the carrier suite is harness/scripts/pipeline-state.test.mjs (TP-5) -- closing this needs a signed TP-5 maintenance window, the same class of act P-AC-08 needed, not an ordinary dispatch',
+  'PX0-AC-01': 'pipeline-state-tests AR01a-d (PHX-WP-PX0, break-proofed, TP-5 window): a generic continuity-cas rewriting authority.prd or authority.spec is refused (CS-PROTECTED-AUTHORITY), zero mutation, both proved',
   'PX0-AC-02': 'continuity-authority-revision-plan emits the closed request; pinned in pipeline-state.test.mjs (registered)',
-  'PX0-AC-03': 'apply exists and rechecks under the writer lock; the recheck breadth the criterion enumerates is not fully pinned. GATE: carrier is harness/scripts/pipeline-state.test.mjs (TP-5), same as PX0-AC-01',
-  'PX0-AC-04': 'proof half fails closed and is pinned; the State-side preimage/revision/idempotency recheck is only partly asserted. GATE: carrier is harness/scripts/pipeline-state.test.mjs (TP-5), same as PX0-AC-01',
-  'PX0-AC-05': 'continuity-authority-revision-receipt.v1 now has an emitter; durable retention of the receipt is not pinned. GATE: carrier is harness/scripts/pipeline-state.test.mjs (TP-5), same as PX0-AC-01',
-  'PX0-AC-06': 'recover replays frozen journal bytes only; the recovered-preimage outcome class is not pinned. GATE: carrier is harness/scripts/pipeline-state.test.mjs (TP-5), same as PX0-AC-01',
-  'PX0-AC-07': 'zero-write replay implemented; the conflicting-replay/second-writer half is not pinned. GATE: carrier is harness/scripts/pipeline-state.test.mjs (TP-5), same as PX0-AC-01',
+  'PX0-AC-03': 'pipeline-state-tests AR03a-g (PHX-WP-PX0): apply rechecks both the next-authority artifact (AR03c) and its own fresh State preimage against a concurrent unrelated mutation (AR03e-g, new). One named axis remains unpinned: active-feature phase != design -> AR-DECISION-SCOPE, reachable in production but needing a full plan-approval fixture the dispatch\'s budget did not cover',
+  'PX0-AC-04': 'pipeline-state-tests AR04a-i (PHX-WP-PX0, measurement correction -- already fully covered pre-dispatch): feature/revision/prestate/old-and-next-authority/expiry/candidate/decision-scope/idempotency-reuse all pinned; no new test needed',
+  'PX0-AC-05': 'CONFIRMED ABSENT (PHX-WP-PX0, full command-path read): the authority-revision receipt is only ever printed once to apply\'s stdout or embedded in the retired-on-success private journal -- no durable retention exists anywhere',
+  'PX0-AC-06': 'CONFIRMED ABSENT (PHX-WP-PX0, full command-path read): recover has exactly three outcome classes (clean, recovered-postimage x2, diverged) -- no recovered-preimage success outcome exists anywhere',
+  'PX0-AC-07': 'pipeline-state-tests AR07a-b (PHX-WP-PX0, measurement correction -- already fully covered pre-dispatch): exact zero-write replay (AR07a) and a second/conflicting writer failing closed with State preserved (AR07b) both pinned, reinforced incidentally by the new AR03e-g',
   'PX0-AC-08': 'ruleset-source.mjs closed contract pinned by ruleset-source-tests; whether bootstrap actually EMITS one observation is unpinned',
   'PX0-AC-09': 'bootstrap-source-attestation-acceptance-tests (verify.mjs:333) — Codex-only marketplace resolution',
   'PX0-AC-10': 'bootstrap-source-attestation-acceptance-tests — pre-HEAD consumer compares loaded plugin identity',
@@ -677,8 +709,8 @@ const CLOSURE = {
   'PX0-AC-01': ['assert', 'WP-PX0'],
   'PX0-AC-03': ['assert', 'WP-PX0'],
   'PX0-AC-04': ['assert', 'WP-PX0'],
-  'PX0-AC-05': ['assert', 'WP-PX0'],
-  'PX0-AC-06': ['assert', 'WP-PX0'],
+  'PX0-AC-05': ['build', 'WP-PX0'],
+  'PX0-AC-06': ['build', 'WP-PX0'],
   'PX0-AC-07': ['assert', 'WP-PX0'],
   'PX0-AC-08': ['build', 'WP-PX0'],
   'PX0-AC-13': ['build', 'WP-PX0'],
