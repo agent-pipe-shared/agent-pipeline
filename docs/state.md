@@ -3354,6 +3354,26 @@ verify whichever round-3 Critic returns first, and if both PASS, book both K-AC-
 design amendment closed (K-AC-05's evidence-map DELTA still needs writing — deliberately withheld
 until Critic clearance, per this session's established discipline).
 
+### O-1/O-2-DESIGN ROUND 3: FAIL, ONE REAL MAJOR — FINAL REWORK DISPATCHED (ROUND 4 IS THE CAP)
+
+Round-3 Critic FAIL, verified myself: §15.1.2 claimed the identity-registry file gets "the same
+GS-family protection `critical-human-proof.json` already gets" — false. Read `gateStrengthRuleFor`
+myself: it's worktree-relative only (`rel.startsWith('..'+sep)` → no rule fires), and the registry
+is explicitly outside the worktree by design, unlike `critical-human-proof.json`. The analogy the
+design relied on doesn't hold — an unsigned, unprotected file an agent could corrupt undetected,
+in the exact mechanism O-1 adds for accountability. Two minor findings alongside (ambiguous/unknown
+misgrouping in the H-AC-11 text; underspecified CLI wiring).
+
+Dispatched **WP-O1O2-DESIGN-rework3**: correct the false protection claim to honest disclosure
+(no new guard designed — that's out of scope for a design-doc dispatch; this residual gets an
+owner+ticket like every other one in this document, not a fabricated mitigation), fix the
+ambiguous/unknown swap, resolve the CLI question. **Explicitly told this is the last correction
+before the document's 4-round Critic cap — a further FAIL needs Elephant/PO escalation, not a
+fifth silent rework.**
+
+**Session extremely long; context far past normal compaction range. Handover fully current through
+this checkpoint — nothing blocks compaction.**
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
