@@ -892,6 +892,20 @@ const DELTA = {
   // would be redundant. Narrowed, not fully closed. 41/41 + 30/30 tests pass.
   'R-AC-09': ['partial', 'WP-R-AC09'],
 
+  // R-AC-11: recordPrivateHandoffCommitment (external-command-offer.mjs)
+  // stores a private-only handoff detail via a caller-supplied `put`
+  // wiring to the EXISTING restricted-machine-local store
+  // (governance-event-store.mjs's putRestrictedGovernanceEvent -- no
+  // second storage mechanism built), returning only a commitment digest +
+  // receipt id, never the detail. commitment/commitmentReceiptId are two
+  // flat optional keys on validateCommandOfferEvent
+  // (agent-decision-journal.mjs), mirroring document-lifecycle.mjs's
+  // receiptId+commitment pairing convention, both-or-neither enforced
+  // (ADJ-COMMAND-COMMITMENT-PAIRING). Both R-AC-11 clauses (mandatory
+  // omission, sanctioned storage + commitment) are now closed. 44/44 +
+  // 36/36 + governance-event-store's 28/28 tests pass.
+  'R-AC-11': ['implemented', 'WP-R-AC11'],
+
   // H-AC-12: decision-reference-dual-evaluation.mjs is the shared "dual-
   // evaluate during migration, fail on disagreement, carry a shared
   // compatibility owner+expiry" primitive, wired into the two lowest-risk
@@ -1131,7 +1145,7 @@ const POINTERS = {
   'R-AC-08': 'external-command-offer-tests (PHX-WP-R): a readback lifecycle event appends exactly once and never rewrites the original offer; rollback/cleanup as *occurred* events are absent -- no such state exists at all, only prospective values inside recoverability',
   'R-AC-09': 'agent-decision-journal/external-command-offer-tests (PHX-WP-R + WP-R-AC09): missing offer link, contradictory outcome evidence, and cross-repository/cross-scope substitution all fail closed (never successful), AND occurredAtEpochMs now closes the stale clause. Duplicate detection remains at the store layer by design (idempotencyKey, governance-event-store.mjs), not re-built here -- deliberate, not absent. 41/41 + 30/30 tests pass',
   'R-AC-10': 'fail-closed on the append is pinned; the policy-defined typed non-material exception is absent',
-  'R-AC-11': 'external-command-offer-tests (PHX-WP-R): a mandatory public-safe typed omission is pinned; "sanctioned machine-local state" storage and a distinct "commitment" field are absent from this module (it stores nothing by design; commitment only exists in the unrelated document-lifecycle.mjs)',
+  'R-AC-11': 'external-command-offer/agent-decision-journal-tests (PHX-WP-R + WP-R-AC11): a mandatory public-safe typed omission is pinned, AND recordPrivateHandoffCommitment now wires this module to the existing restricted-machine-local store via a caller-supplied put callback, exposing only a commitment digest + receipt id. 44/44 + 36/36 tests pass',
   'R-AC-12': 'external-command-offer-tests (PHX-WP-R-AC12): the motivating Phoenix bootstrap trajectory is now encoded end to end -- a rejected guard-bypass attempt, an attended local repair through the sanctioned non-authoritative channel, an unchanged public-privacy boundary, a verified readback, and digest-only targets that never embed a machine-specific value',
   'R-AC-13': 'external-command-offer-tests (PHX-WP-R): 9 of 11 required fixture classes now named (7 pre-existing + secret/malicious command rejection + governed-script identity); approval-without-run and duplicate/retry are confirmed structurally unreachable, each pinned by a dedicated test showing the gap rather than left silently missing',
 
