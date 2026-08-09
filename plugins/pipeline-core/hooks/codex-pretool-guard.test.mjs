@@ -70,14 +70,49 @@ function decision(result) {
   return JSON.parse(result.stdout).hookSpecificOutput;
 }
 
+// Local-build stamp convention: <semver>+codex.<YYYYMMDDHHMMSS>.<short-oid>,
+// where <short-oid> is the 7-character OID of the functional commit whose
+// content the build carries. Documented in
+// docs/claude-local-plugin-development.md ("The cachebuster mechanism and
+// version convention"); the Claude manifest carries the same shape with a
+// `claude.` prefix. Base versions are compared by splitting at `+`, so both
+// manifests agree while carrying different stamps.
+const CODEX_BUILD_METADATA = /^codex\.\d{14}\.[0-9a-f]{7}$/u;
+
 check("Codex manifest matches the repository version and has a native hook descriptor", () => {
   const manifest = JSON.parse(readFileSync(join(pluginRoot, ".codex-plugin", "plugin.json"), "utf8"));
   const repositoryVersion = readFileSync(join(pluginRoot, "..", "..", "VERSION"), "utf8").trim();
   assert.equal(manifest.name, "pipeline-core");
   const [baseVersion, buildMetadata = null] = manifest.version.split("+");
   assert.equal(baseVersion, repositoryVersion);
-  if (buildMetadata !== null) assert.match(buildMetadata, /^codex\.\d{14}$/u);
+  if (buildMetadata !== null) assert.match(buildMetadata, CODEX_BUILD_METADATA);
   assert.equal(manifest.hooks, "./hooks/codex-hooks.json");
+});
+
+check("Codex build-metadata stamp admits timestamp-and-OID and rejects malformed forms", () => {
+  for (const accepted of [
+    "codex.20260808104333.c4be063",
+    "codex.20260101000000.0000000",
+    "codex.20991231235959.abcdef0",
+  ]) {
+    assert.match(accepted, CODEX_BUILD_METADATA);
+  }
+  for (const rejected of [
+    "codex.20260808104333", // timestamp only, no OID
+    "codex.20260808104333.c4be06", // OID too short
+    "codex.20260808104333.c4be0633", // OID too long
+    "codex.20260808104333.C4BE063", // OID not lowercase hex
+    "codex.20260808104333.zzzzzzz", // OID not hex
+    "codex.2026080810433.c4be063", // timestamp too short
+    "codex.202608081043330.c4be063", // timestamp too long
+    "claude.20260808104333.c4be063", // wrong runner
+    "codex.20260808104333.c4be063.extra", // trailing segment
+    "xcodex.20260808104333.c4be063", // unanchored prefix
+    "codex.20260808104333.c4be063 ", // trailing whitespace
+    "", // empty
+  ]) {
+    assert.doesNotMatch(rejected, CODEX_BUILD_METADATA);
+  }
 });
 
 check("descriptor uses quoted PLUGIN_ROOT with Windows parity for both routing families", () => {

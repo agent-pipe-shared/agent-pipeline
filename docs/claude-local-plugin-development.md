@@ -277,10 +277,15 @@ may still send back; a released artifact that is not reproducible from its own
 commit is the wrong shape for something people install. The two constraints do
 not conflict, they just apply at different moments.
 
-Only the Claude manifest carries build metadata. Codex's stays at the bare
-semver, and `codex-pretool-guard.test.mjs` compares BASE versions — it splits
-at `+` before comparing — so the two manifests agree while only one is
-cachebusted.
+Both runner manifests may carry build metadata, each stamped for its own
+runner: `+claude.<YYYYMMDDHHMMSS>.<short-oid>` on the Claude manifest and
+`+codex.<YYYYMMDDHHMMSS>.<short-oid>` on the Codex one. That is possible
+because `codex-pretool-guard.test.mjs` compares BASE versions — it splits at
+`+` before comparing — so the two manifests agree on the repository `VERSION`
+while carrying different stamps. The suite also pins the Codex stamp's shape:
+a well-formed `codex.<14 digits>.<7-hex OID>` is accepted and a malformed one
+is rejected. Either manifest may also stand at the bare semver; the stamp is
+optional, its shape is not.
 
 The Claude manifest is not the only one carrying the number. Codex has its own
 `plugins/pipeline-core/.codex-plugin/plugin.json`, and

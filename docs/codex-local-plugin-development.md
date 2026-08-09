@@ -24,7 +24,16 @@ identity — see [ADR-0052](adr/0052-marketplace-identity-restoration-and-local-
 containing `.claude-plugin/marketplace.json` with name `agent-pipeline-local`
 and `plugins/pipeline-core` as a symlink (or, on native Windows, a directory
 junction via `mklink /J`) to the checkout's real `plugins/pipeline-core`. Its
-plugin manifest must carry a fresh Codex cachebuster. Do not repoint the
+plugin manifest must carry a fresh Codex cachebuster: the Codex manifest
+`plugins/pipeline-core/.codex-plugin/plugin.json` takes a build-metadata stamp
+of the form `<semver>+codex.<YYYYMMDDHHMMSS>.<short-oid>`, the Codex-runner
+counterpart of the Claude manifest's `+claude.<...>`. Both manifests may carry
+their own stamp at the same time; `codex-pretool-guard.test.mjs` compares base
+versions by splitting at `+`, so both still agree with the repository
+`VERSION`. A released version carries no build metadata on either manifest —
+see [the cachebuster mechanism and version
+convention](claude-local-plugin-development.md#the-cachebuster-mechanism-and-version-convention)
+for the full rule and the reasons. Do not repoint the
 `agent-pipeline` marketplace name to a checkout and do not use a local
 candidate through the released selector.
 
