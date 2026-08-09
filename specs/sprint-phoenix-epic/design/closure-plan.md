@@ -1,0 +1,269 @@
+# Sprint Phoenix — closure design
+
+Status: design
+
+Date: 2026-08-09
+
+Parent specification: [../spec.md](../spec.md) · Measurement: [../evidence/acceptance-evidence-map-20260809.md](../evidence/acceptance-evidence-map-20260809.md)
+
+## What this design is for
+
+The measurement established that 79 of 157 acceptance criteria are not
+`implemented` and that no issue is closeable. It did not say how any of them closes. This
+document does, and it is generated from the same verdict data as the measurement, so the two
+cannot drift apart.
+
+The central design claim is that the remainder is **not one backlog**. It is five populations
+with different costs, different owners, and different blocking properties, and treating them as
+one list is what has made the epic look larger and more uniform than it is.
+
+| class | criteria | what closing one actually costs |
+|---|---|---|
+| A — assertion missing | 45 | one named test case in an already-registered, unprotected suite |
+| D — documentation missing | 7 | one document section set; no code, no gate |
+| S — seam missing | 6 | a connector between two packages that already work |
+| B — capability missing | 16 | real implementation plus its tests |
+| P — not code | 5 | a human gate, a sanctioned authority revision, or a proved impossibility |
+| **total** | **79** | |
+
+**The distribution is the finding.** The largest class by a wide margin is Class A: criteria
+whose behaviour is built, shipped and green, and which fail only because no assertion names the
+clause the criterion actually states. That is not implementation debt. It is the direct
+consequence of the Spec's own bar — `spec.md:673` demands that *every* criterion map to a named
+test, not that its theme be covered — and it means a large fraction of the epic closes through
+test authorship in files that no maintenance window protects.
+
+## The gating slice, designed
+
+P-AC-08 is the one criterion whose position in the sequence is fixed by the acceptance matrix
+itself: it declares the feature-package writer the mandatory first slice of PHX-0, and forbids
+PHX-0's ruleset-trust-root slice and PHX-1 from starting until it passes. Everything below is
+sequenced behind it for that reason and no other.
+
+**What exists.** `feature-package-inspect|status|plan|apply|recover` are built, registered and
+green. `apply` already carries two plan kinds — `bootstrap` for an absent manifest and
+`transition` for a state change — each with a recomputed-preview digest check that fails closed
+on manifest, proposal or target-state drift, a MAC-authenticated recovery journal, and a
+readback before the journal is retired.
+
+**What is missing, precisely.** The criterion also requires reconciling an inherited `draft`
+manifest's stale PRD, Spec, acceptance, architecture and Result digests — and requires it happen
+through an existing-manifest preview, an exact PO-bound apply and a readback, **with no
+lifecycle-state, artifact-set, candidate or other authority-byte change**. Neither existing plan
+kind expresses that: `transition` exists to change state, which this operation must not do, and
+`bootstrap` applies only when the manifest is absent. `planFeaturePackageReconcile` does not
+exist in `lib/feature-package-topology.mjs`.
+
+### Design: a third plan kind, `reconcile`
+
+The reconciliation is a **digest-only** transaction, and the design makes that a structural
+property rather than a promise the implementation is trusted to keep:
+
+1. **Preview.** `planFeaturePackageReconcile(root, manifestPath)` recomputes each declared
+   artifact digest from the bytes on disk and returns the preimage manifest, the postimage
+   manifest, and the per-artifact old/new digest pairs. It returns a plan object of the same
+   shape the other two kinds return, so `--plan-sha256` binding is inherited unchanged rather
+   than reimplemented.
+2. **The no-drift invariant is checked on the plan, not on intent.** The postimage is rejected
+   unless it is byte-identical to the preimage after the digest fields alone are substituted:
+   same lifecycle state, same artifact set and order, same candidate, same schema, same every
+   other byte. A reconcile plan that would change anything else is not a warning — it is a
+   refusal, because a transaction that can change state is a transition wearing another name.
+3. **Apply is PO-bound.** It consumes the same critical-action proof shape the other
+   authority-changing writers use, bound to the exact candidate and to the plan digest. A
+   reconcile without a valid bound decision fails closed and writes nothing.
+4. **Readback.** The written manifest is re-read and re-validated through
+   `validateFeaturePackage` before the journal is retired — the existing apply path already
+   does this and the reconcile path reuses it rather than adding a second one.
+
+### Design: the Result fence
+
+The criterion admits a Result reconciliation only under two conditions and refuses a
+metadata-only refresh outright. Both are expressed as preconditions of the plan, so a refused
+case never reaches a writer:
+
+- **Continuity binding.** The current Result must be the one Continuity State binds. A Result
+  the State does not name cannot be reconciled, whatever its digest says.
+- **Preserved historical prefix.** The Result bytes must contain the exact stale manifest digest
+  as a preserved historical prefix, followed by the canonical Result-reconciliation fence. This
+  is what distinguishes a Result that legitimately grew from one that was rewritten: the old
+  digest has to still be provable *inside* the new artifact.
+- **Metadata-only refresh is refused by name**, with its own typed code, so the refusal is
+  distinguishable in evidence from a drift refusal.
+
+**One thing this design deliberately does not repair.** The reconciliation the criterion was
+written for was already performed by hand in `ece6041`, by the exact route P-AC-08 forbids. The
+capability is still required and still buildable; its original subject is gone, and the audit
+trail for that specific repair will never exist. The PO accepted that as a recorded deviation.
+Building the transaction now is therefore about the next reconciliation, not this one, and the
+design says so rather than implying a retroactive fix.
+
+### Where P-AC-08 meets a hard boundary
+
+The implementation lives in `plugins/pipeline-core/scripts/pipeline-state.mjs` and
+`lib/feature-package-topology.mjs`, both unprotected. **Its tests do not.**
+`harness/scripts/pipeline-state.test.mjs` is TP-5-protected and registering anything new touches
+`harness/scripts/verify.mjs`, which is TP-3-protected. Both are liftable in **one** signed
+maintenance window (`--scope TP-3,TP-5`), whose TTL is four hours.
+
+The established pattern applies unchanged: build the implementation, stage the cases in an
+`evidence/` file, prove them green standalone, and land them inside one window. The window is
+the PO's act and is the first hard gate this design reaches.
+
+## The parallel partition
+
+Spec §4.6 admits parallel work only where file ownership does not overlap. The partition below
+is by module family, which makes the disjointness checkable rather than asserted:
+
+| work package | open criteria | owns |
+|---|---|---|
+| WP-GATE | 1 | plugins/pipeline-core/lib/feature-package-topology.mjs, plugins/pipeline-core/scripts/pipeline-state.mjs, harness/scripts/pipeline-state.test.mjs (TP-5) |
+| WP-K | 3 | plugins/pipeline-core/lib/governance-event-store.test.mjs, plugins/pipeline-core/lib/governance-event.test.mjs |
+| WP-P | 6 | plugins/pipeline-core/lib/audit-bundle*.mjs, plugins/pipeline-core/lib/organization-policy*.mjs |
+| WP-V | 4 | plugins/pipeline-core/lib/evidence-view-model*.mjs, plugins/pipeline-core/lib/evidence-view-renderer*.mjs |
+| WP-X | 3 | plugins/pipeline-core/lib/external-reference-adapter*.mjs |
+| WP-C | 4 | plugins/pipeline-core/lib/change-control*.mjs |
+| WP-E | 9 | plugins/pipeline-core/lib/governance-export-*.mjs |
+| WP-A | 12 | plugins/pipeline-core/lib/agent-decision-journal*.mjs, governance/schemas/agent-decision-event.schema.json |
+| WP-L | 4 | plugins/pipeline-core/lib/lifecycle-governance-events*.mjs, plugins/pipeline-core/lib/governance-replay*.mjs |
+| WP-H | 4 | plugins/pipeline-core/lib/human-governance-ledger*.mjs, plugins/pipeline-core/lib/governance-authority-resolver*.mjs, plugins/pipeline-core/lib/external-push-ledger*.mjs |
+| WP-R | 8 | plugins/pipeline-core/lib/external-command-offer*.mjs |
+| WP-PX0 | 8 | plugins/pipeline-core/lib/ruleset-source*.mjs, plugins/pipeline-core/scripts/ruleset-freshness-host.mjs, plugins/pipeline-core/lib/continuity-state.mjs |
+| WP-EPIC | 1 | plugins/pipeline-core/lib/parallel-sprint-integration*.mjs |
+| WP-DOC | 7 | docs/*.md (one section set per package) |
+| WP-PO | 5 | none - human gates and recorded deviations |
+
+Concurrency is bounded at **2**, not by preference but by the recorded capacity: the continuity
+block reserves one Critic slot and one recovery slot out of four, and the project calibration
+sets `wipLimit: 3`. Two is the tighter of the two and therefore the one that governs.
+
+## Sequence
+
+1. **WP-GATE** alone, because P-AC-08 forbids the rest of PHX-0 and PHX-1 from starting. Its
+   window is the first PO gate.
+2. **Class A and Class D packages in pairs**, highest blocked-bullet yield first. These need no
+   window and no gate: the suites are registered and unprotected, and the documents are ordinary
+   files. This is where most of the remaining count moves.
+3. **Class S**, the five seams. Each is a connector between two working packages and each needs
+   a design decision about which side owns the reference — deliberately sequenced after Class A
+   so the packages being connected are fully pinned first.
+4. **Class B**, the absent capabilities, ordered by whether anything else waits on them.
+   `L-AC-01` leads: no Pipeline path emits a lifecycle event at all, which is the single
+   structural gap behind the epic's "libraries built, integration left" shape.
+5. **Class P** last, because most of it only becomes answerable once the rest is done.
+
+## Exit criteria
+
+This design is finished when every Class A, D, S and B row above is `implemented` under the
+unchanged measurement definition — a named assertion in a gate-registered suite — and the
+measurement is regenerated to prove it. It cannot close Class P, and it does not try:
+EPIC-AC-04 needs a privacy review, an integrated-candidate Critic and the PO's acceptance;
+EPIC-AC-03 needs the sanctioned authority revision that only just became executable; and
+H-AC-11's GMW half is a proved impossibility that closes by amendment or not at all.
+
+## Per criterion
+
+### Class A — the behaviour exists, the assertion does not (45)
+
+| ID | verdict | package | what closes it |
+|---|---|---|---|
+| A-AC-02 | partial | WP-A | append-only comes from the shared store and link validity is pinned; no assertion names the transition set |
+| A-AC-07 | partial | WP-A | default-deny capture policy pinned in the kernel; "mandatory classes never silently sampled" is not pinned |
+| A-AC-12 | partial | WP-A | per-origin capture policy exists; independent projection/export configurability is not pinned |
+| A-AC-13 | partial | WP-A | determinism inherited from the store; no journal-specific interrupted/out-of-order assertion |
+| A-AC-14 | partial | WP-A | the criterion names 13 conformance scenarios; the suite carries far fewer |
+| C-AC-02 | partial | WP-C | emergency and not-required are pinned; standard vs. normal distinct inputs and the anti-class-shopping clause are not |
+| C-AC-07 | partial | WP-C | explicit emergency authority is pinned; bounded scope and retrospective evidence are not |
+| C-AC-09 | partial | WP-C | no assertion resolves exactly-one-profile or rejects multiple mandatory profiles |
+| C-AC-12 | partial | WP-C | unavailable external state blocks via C-AC-04; the explicit advisory-vs-mandatory application and operator recovery path are not pinned |
+| E-AC-02 | partial | WP-E | profiles implemented and documented; DECLARING every lossy field/semantic conversion is not pinned |
+| E-AC-04 | partial | WP-E | no assertion covers free-form rationale omission-unless-permitted-and-redacted |
+| E-AC-06 | partial | WP-E | at-least-once behaviour is exercised by the retry tests; the explicit no-exactly-once claim is documentation only |
+| E-AC-08 | partial | WP-E | two of the eight enumerated detections are pinned; cursor rollback, outbox truncation, event gap, source fork, invalid hash and schema downgrade are not |
+| E-AC-09 | partial | WP-E | viewer renders lag; no assertion shows canonical governance continuing under an unavailable advisory destination |
+| E-AC-11 | partial | WP-E | the privacy half is pinned; attempt, counts, cursor/lag and policy digests are not each pinned |
+| E-AC-14 | partial | WP-E | the in-memory collector is pinned; local-file, syslog and failure-injection fixtures are not named |
+| H-AC-15 | partial | WP-H | grant, consumption, expiry, drift, single-use, lifecycle links covered; denial, correction, retry, concurrency, interruption are not |
+| K-AC-05 | partial | WP-K | fork DETECTION is pinned; the governed disposition appended through the sanctioned recovery operation is not |
+| K-AC-08 | partial | WP-K | no assertion covers a head/index ASSERTING an absent or invalid canonical record; only the stale-head case |
+| K-AC-10 | partial | WP-K | validated-chain querying is pinned; preservation across MULTIPLE streams is not named |
+| L-AC-04 | partial | WP-L | semantic classes pinned; the VISUAL class distinction in the renderer is not pinned |
+| L-AC-07 | partial | WP-L | no serial/parallel/retry/cancellation/recovery/malicious fixture matrix is named |
+| P-AC-01 | partial | WP-P | schema/compatibility/merge pinned; provenance, dependency and signature-policy validation are not named |
+| P-AC-03 | partial | WP-P | planOrganizationPolicyActivation pinned; newly-required artifacts, external effects and backfill range are not |
+| P-AC-06 | partial | WP-P | candidate-bound bundle build and offline verify pinned; legacy, orphaned, misplaced, stale and illegally-mutable classes are not each pinned |
+| P-AC-10 | partial | WP-P | the bundle half is pinned; nothing prevents a compliance claim from a pack, log or viewer |
+| P-AC-11 | partial | WP-P | document ownership is validated; mode, owned sections, lifecycle event, preview, approval, retention, conflict policy and revision readback are not pinned |
+| PX0-AC-01 | partial | WP-PX0 | continuity-state.mjs binds dispatch/intent to prdSha256/specSha256; no assertion names a REJECTED generic CAS authority change |
+| PX0-AC-03 | partial | WP-PX0 | apply exists and rechecks under the writer lock; the recheck breadth the criterion enumerates is not fully pinned |
+| PX0-AC-04 | partial | WP-PX0 | proof half fails closed and is pinned; the State-side preimage/revision/idempotency recheck is only partly asserted |
+| PX0-AC-05 | partial | WP-PX0 | continuity-authority-revision-receipt.v1 now has an emitter; durable retention of the receipt is not pinned |
+| PX0-AC-06 | partial | WP-PX0 | recover replays frozen journal bytes only; the recovered-preimage outcome class is not pinned |
+| PX0-AC-07 | partial | WP-PX0 | zero-write replay implemented; the conflicting-replay/second-writer half is not pinned |
+| R-AC-02 | partial | WP-R | no assertion correlates a rejected sanctioned path and the alternatives considered to the offer |
+| R-AC-04 | partial | WP-R | recovery state mutation with pre/post digests, recoverability and cleanup/readback is not pinned |
+| R-AC-08 | partial | WP-R | append-without-rewrite is structural; no recovery apply/rollback/cleanup lifecycle event is named |
+| R-AC-09 | partial | WP-R | substitution is pinned; the replay-renders-unknown/invalid half is not |
+| R-AC-11 | partial | WP-R | the restricted machine-local store exists; no assertion pairs it with a public-safe typed omission/commitment |
+| R-AC-13 | partial | WP-R | five of the eleven required fixture classes are named; guard override, secret-bearing command rejection, governed-script identity and malicious external content are not |
+| V-AC-02 | partial | WP-V | part of the label set is pinned; fact, estimate, assumption, human decision, redacted, invalid and not-applicable are not all covered |
+| V-AC-06 | partial | WP-V | the renderer test claims accessibility; NO keyboard/navigation, CSP or mobile/desktop snapshot check is named |
+| V-AC-07 | partial | WP-V | the input side is pinned; no assertion modifies a viewer file or UI state and shows canonical authority unchanged |
+| V-AC-09 | partial | WP-V | pass/unknown/invalid fixtures exist; tampered, misplaced, orphaned and legacy-layout fixtures with deterministic snapshots do not |
+| X-AC-12 | partial | WP-X | the CLI test uses local synthetic observations; the four required profiles are not each named |
+| X-AC-14 | partial | WP-X | the doc carries a reconciliation section; no assertion shows an offline external system leaving canonical authority intact |
+
+### Class D — the gap is a documentation section the criterion enumerates (7)
+
+| ID | verdict | package | what closes it |
+|---|---|---|---|
+| A-AC-15 | partial | WP-DOC | agent-decision-journal.md carries one section; no taxonomy, materiality policy, trust model, retention or recovery doc |
+| C-AC-13 | partial | WP-DOC | change-control.md is a stub; no threat model, precedence, migration, runbook or rollback procedure |
+| E-AC-21 | partial | WP-DOC | governance-event-export.md carries two sections; no data-flow diagram, mapping/loss guide, retention guidance, runbook or incident procedure |
+| H-AC-14 | partial | WP-DOC | governance-events.md + po-human-approval.md + threat model exist; no migration, retention or recovery section for the ledger package |
+| L-AC-08 | partial | WP-DOC | no artifact traces each retained element to a stated user or audit need |
+| P-AC-13 | partial | WP-DOC | organization-policy-packs.md and audit-bundles.md are stubs; no migration/versioning policy, no pack threat model |
+| X-AC-15 | partial | WP-DOC | external-traceability.md carries three sections; no threat model, publication guide or recovery procedure |
+
+### Class S — two implemented packages, mutually unaware (6)
+
+| ID | verdict | package | what closes it |
+|---|---|---|---|
+| A-AC-04 | partial | WP-A | self-confirmation is prevented; no correlation path to the human ledger is implemented |
+| A-AC-05 | not-started | WP-A | NO CARRIER: neither event shape carries a runner/model/effort/profile/role/adapter field at all |
+| E-AC-20 | not-started | WP-E | NO CARRIER: audit-bundle carries nothing from the export package, and the export modules never reference the bundle |
+| H-AC-08 | not-started | WP-H | NO CARRIER: no path imports a legacy approval/override/deploy record as an unverified observation |
+| H-AC-09 | not-started | WP-H | NO CARRIER: external-push-ledger is scoped to single-repo push proofs; nothing binds cross-repository guarded work to one physical target |
+| X-AC-11 | not-started | WP-X | NO CARRIER: the adapter never references organization policy, and the policy modules never reference the adapter |
+
+### Class B — an absent capability (16)
+
+| ID | verdict | package | what closes it |
+|---|---|---|---|
+| A-AC-01 | partial | WP-A | record shape pinned; nothing enforces recording BEFORE dependent action where policy requires |
+| A-AC-03 | not-started | WP-A | NO CARRIER: no revalidation/invalidation path identifies objects affected by a changed assumption |
+| A-AC-08 | not-started | WP-A | NO CARRIER: no detector for missing dispatch provenance; the Dispatch: trailer is convention only |
+| A-AC-09 | designed-only | WP-A | materiality is documented as design intent only; no code enforces or measures it |
+| A-AC-10 | partial | WP-A | the offer path fails closed on unavailable journaling; no per-event-class fail-open/fail-closed policy exists |
+| E-AC-10 | not-started | WP-E | NO CARRIER: no named lifecycle boundary blocks only the exact unacknowledged source range |
+| EPIC-AC-02 | not-started | WP-EPIC | NO CARRIER: planParallelSprintIntegration has no concept of "unpublished" and is called only from its own test file |
+| H-AC-12 | partial | WP-H | guard-push/guard-devplan/change-control validate the decision reference; the DUAL-EVALUATION during migration with shared owner and expiry has no carrier |
+| L-AC-01 | partial | WP-L | the closed lifecycle schema and validator are pinned; NO PRODUCER exists — no Pipeline path emits a lifecycle event |
+| L-AC-02 | partial | WP-L | six of the eight #10 exchange identities are retained; queueRevision and a distinct correlationId are absent |
+| P-AC-08 | partial | WP-GATE | THE EPIC GATING SLICE. Command family and absent-manifest draft preview are built and registered; the existing-manifest PO-bound reconciliation and the Result-reconciliation fence are entirely absent |
+| P-AC-09 | not-started | WP-P | NO CARRIER: no export-backfill preview or explicit consent path exists |
+| PX0-AC-08 | partial | WP-PX0 | ruleset-source.mjs closed contract pinned by ruleset-source-tests; whether bootstrap actually EMITS one observation is unpinned |
+| PX0-AC-13 | partial | WP-PX0 | ruleset-freshness-host.mjs selects the host transport correctly, but no suite exercises it and bootstrap does not wire it |
+| R-AC-10 | partial | WP-R | fail-closed on the append is pinned; the policy-defined typed non-material exception is absent |
+| R-AC-12 | not-started | WP-R | NO CARRIER: no Phoenix bootstrap-trajectory fixture exists |
+
+### Class P — not closeable by writing code (5)
+
+| ID | verdict | package | what closes it |
+|---|---|---|---|
+| EPIC-AC-01 | partial | WP-PO | the issue-to-criterion mapping exists; no independent closure status exists for any of the eight issues |
+| EPIC-AC-03 | partial | WP-PO | an outstanding deviation is recorded (the bound Spec section 7 inventory omits six implemented modules) and is not yet repaired through the sanctioned route |
+| EPIC-AC-04 | partial | WP-PO | Full Verify and blocking Security pass on the pushed candidate; privacy review, an independent high-risk Critic on the integrated candidate, and explicit PO acceptance are absent |
+| EPIC-AC-05 | constraint | WP-PO | a prohibition, and it currently bites: 79 criteria are not implemented |
+| H-AC-11 | partial | WP-PO | portable reconstruction surface pinned; the no-join-handle clause is proved UNSATISFIABLE for the GMW half (acceptance.md amendment, tracked as O-4) |
+

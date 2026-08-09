@@ -406,6 +406,134 @@ const POINTERS = {
   'EPIC-AC-06': 'the PRD header records the PO approval binding the first implementation dispatch',
 };
 
+// --- closure classification -------------------------------------------------
+// For every criterion that is not `implemented`: how it closes, and who owns the
+// files it closes in. The class is the design decision; the work package is the
+// file-ownership partition that lets packages run in parallel under Spec 4.6.
+//
+// class:
+//   assert - the behaviour exists and is correct; what is missing is a named
+//            assertion in an already-registered suite. Closes by test authorship
+//            in an unprotected file. No maintenance window, no PO gate.
+//   doc    - the gap is a missing documentation section the criterion enumerates.
+//   seam   - two packages are each implemented and mutually unaware; closes by
+//            building the connector, not by extending either side.
+//   build  - an absent capability. Real implementation.
+//   po     - not closeable by writing code: a human gate, a recorded deviation
+//            needing the sanctioned authority route, or a proved impossibility.
+const CLOSURE = {
+  'PX0-AC-01': ['assert', 'WP-PX0'],
+  'PX0-AC-03': ['assert', 'WP-PX0'],
+  'PX0-AC-04': ['assert', 'WP-PX0'],
+  'PX0-AC-05': ['assert', 'WP-PX0'],
+  'PX0-AC-06': ['assert', 'WP-PX0'],
+  'PX0-AC-07': ['assert', 'WP-PX0'],
+  'PX0-AC-08': ['build', 'WP-PX0'],
+  'PX0-AC-13': ['build', 'WP-PX0'],
+
+  'K-AC-05': ['assert', 'WP-K'],
+  'K-AC-08': ['assert', 'WP-K'],
+  'K-AC-10': ['assert', 'WP-K'],
+
+  'H-AC-08': ['seam', 'WP-H'],
+  'H-AC-09': ['seam', 'WP-H'],
+  'H-AC-11': ['po', 'WP-PO'],
+  'H-AC-12': ['build', 'WP-H'],
+  'H-AC-14': ['doc', 'WP-DOC'],
+  'H-AC-15': ['assert', 'WP-H'],
+
+  'A-AC-01': ['build', 'WP-A'],
+  'A-AC-02': ['assert', 'WP-A'],
+  'A-AC-03': ['build', 'WP-A'],
+  'A-AC-04': ['seam', 'WP-A'],
+  'A-AC-05': ['seam', 'WP-A'],
+  'A-AC-07': ['assert', 'WP-A'],
+  'A-AC-08': ['build', 'WP-A'],
+  'A-AC-09': ['build', 'WP-A'],
+  'A-AC-10': ['build', 'WP-A'],
+  'A-AC-12': ['assert', 'WP-A'],
+  'A-AC-13': ['assert', 'WP-A'],
+  'A-AC-14': ['assert', 'WP-A'],
+  'A-AC-15': ['doc', 'WP-DOC'],
+
+  'L-AC-01': ['build', 'WP-L'],
+  'L-AC-02': ['build', 'WP-L'],
+  'L-AC-04': ['assert', 'WP-L'],
+  'L-AC-07': ['assert', 'WP-L'],
+  'L-AC-08': ['doc', 'WP-DOC'],
+
+  'P-AC-01': ['assert', 'WP-P'],
+  'P-AC-03': ['assert', 'WP-P'],
+  'P-AC-06': ['assert', 'WP-P'],
+  'P-AC-08': ['build', 'WP-GATE'],
+  'P-AC-09': ['build', 'WP-P'],
+  'P-AC-10': ['assert', 'WP-P'],
+  'P-AC-11': ['assert', 'WP-P'],
+  'P-AC-13': ['doc', 'WP-DOC'],
+
+  'V-AC-02': ['assert', 'WP-V'],
+  'V-AC-06': ['assert', 'WP-V'],
+  'V-AC-07': ['assert', 'WP-V'],
+  'V-AC-09': ['assert', 'WP-V'],
+
+  'X-AC-11': ['seam', 'WP-X'],
+  'X-AC-12': ['assert', 'WP-X'],
+  'X-AC-14': ['assert', 'WP-X'],
+  'X-AC-15': ['doc', 'WP-DOC'],
+
+  'C-AC-02': ['assert', 'WP-C'],
+  'C-AC-07': ['assert', 'WP-C'],
+  'C-AC-09': ['assert', 'WP-C'],
+  'C-AC-12': ['assert', 'WP-C'],
+  'C-AC-13': ['doc', 'WP-DOC'],
+
+  'E-AC-02': ['assert', 'WP-E'],
+  'E-AC-04': ['assert', 'WP-E'],
+  'E-AC-06': ['assert', 'WP-E'],
+  'E-AC-08': ['assert', 'WP-E'],
+  'E-AC-09': ['assert', 'WP-E'],
+  'E-AC-10': ['build', 'WP-E'],
+  'E-AC-11': ['assert', 'WP-E'],
+  'E-AC-14': ['assert', 'WP-E'],
+  'E-AC-20': ['seam', 'WP-E'],
+  'E-AC-21': ['doc', 'WP-DOC'],
+
+  'R-AC-02': ['assert', 'WP-R'],
+  'R-AC-04': ['assert', 'WP-R'],
+  'R-AC-08': ['assert', 'WP-R'],
+  'R-AC-09': ['assert', 'WP-R'],
+  'R-AC-10': ['build', 'WP-R'],
+  'R-AC-11': ['assert', 'WP-R'],
+  'R-AC-12': ['build', 'WP-R'],
+  'R-AC-13': ['assert', 'WP-R'],
+
+  'EPIC-AC-01': ['po', 'WP-PO'],
+  'EPIC-AC-02': ['build', 'WP-EPIC'],
+  'EPIC-AC-03': ['po', 'WP-PO'],
+  'EPIC-AC-04': ['po', 'WP-PO'],
+  'EPIC-AC-05': ['po', 'WP-PO'],
+};
+
+// Work package -> the files it owns exclusively. Two packages may run in parallel
+// only when their file sets are disjoint (Spec 4.6).
+const WORK_PACKAGES = {
+  'WP-GATE': ['plugins/pipeline-core/lib/feature-package-topology.mjs', 'plugins/pipeline-core/scripts/pipeline-state.mjs', 'harness/scripts/pipeline-state.test.mjs (TP-5)'],
+  'WP-K': ['plugins/pipeline-core/lib/governance-event-store.test.mjs', 'plugins/pipeline-core/lib/governance-event.test.mjs'],
+  'WP-P': ['plugins/pipeline-core/lib/audit-bundle*.mjs', 'plugins/pipeline-core/lib/organization-policy*.mjs'],
+  'WP-V': ['plugins/pipeline-core/lib/evidence-view-model*.mjs', 'plugins/pipeline-core/lib/evidence-view-renderer*.mjs'],
+  'WP-X': ['plugins/pipeline-core/lib/external-reference-adapter*.mjs'],
+  'WP-C': ['plugins/pipeline-core/lib/change-control*.mjs'],
+  'WP-E': ['plugins/pipeline-core/lib/governance-export-*.mjs'],
+  'WP-A': ['plugins/pipeline-core/lib/agent-decision-journal*.mjs', 'governance/schemas/agent-decision-event.schema.json'],
+  'WP-L': ['plugins/pipeline-core/lib/lifecycle-governance-events*.mjs', 'plugins/pipeline-core/lib/governance-replay*.mjs'],
+  'WP-H': ['plugins/pipeline-core/lib/human-governance-ledger*.mjs', 'plugins/pipeline-core/lib/governance-authority-resolver*.mjs', 'plugins/pipeline-core/lib/external-push-ledger*.mjs'],
+  'WP-R': ['plugins/pipeline-core/lib/external-command-offer*.mjs'],
+  'WP-PX0': ['plugins/pipeline-core/lib/ruleset-source*.mjs', 'plugins/pipeline-core/scripts/ruleset-freshness-host.mjs', 'plugins/pipeline-core/lib/continuity-state.mjs'],
+  'WP-EPIC': ['plugins/pipeline-core/lib/parallel-sprint-integration*.mjs'],
+  'WP-DOC': ['docs/*.md (one section set per package)'],
+  'WP-PO': ['none - human gates and recorded deviations'],
+};
+
 // --- live issue acceptance bullets -----------------------------------------
 // Transcribed verbatim from specs/sprint-phoenix-epic/design/issue-coverage.md.
 const BULLETS = {
@@ -579,6 +707,208 @@ const totals = {};
 for (const id of Object.keys(VERDICTS)) {
   const [v] = verdictOf(id);
   totals[v] = (totals[v] || 0) + 1;
+}
+
+const MODE = process.argv.includes('--mode') ? process.argv[process.argv.indexOf('--mode') + 1] : 'map';
+const open = Object.keys(VERDICTS).filter((id) => verdictOf(id)[0] !== IMPLEMENTED);
+const CLASS_ORDER = ['assert', 'doc', 'seam', 'build', 'po'];
+const CLASS_TITLE = {
+  assert: 'Class A — the behaviour exists, the assertion does not',
+  doc: 'Class D — the gap is a documentation section the criterion enumerates',
+  seam: 'Class S — two implemented packages, mutually unaware',
+  build: 'Class B — an absent capability',
+  po: 'Class P — not closeable by writing code',
+};
+
+if (MODE === 'closure') {
+  const unclassified = open.filter((id) => !CLOSURE[id]).sort();
+  const byClass = {};
+  const byPackage = {};
+  for (const id of open) {
+    const entry = CLOSURE[id];
+    if (!entry) continue;
+    const [cls, wp] = entry;
+    (byClass[cls] ||= []).push(id);
+    (byPackage[wp] ||= []).push(id);
+  }
+
+  w('# Sprint Phoenix — closure design');
+  w();
+  w('Status: design');
+  w();
+  w('Date: 2026-08-09');
+  w();
+  w('Parent specification: [../spec.md](../spec.md) · Measurement: [../evidence/acceptance-evidence-map-20260809.md](../evidence/acceptance-evidence-map-20260809.md)');
+  w();
+  w('## What this design is for');
+  w();
+  w(`The measurement established that ${open.length} of ${Object.keys(VERDICTS).length} acceptance criteria are not`);
+  w('`implemented` and that no issue is closeable. It did not say how any of them closes. This');
+  w('document does, and it is generated from the same verdict data as the measurement, so the two');
+  w('cannot drift apart.');
+  w();
+  w('The central design claim is that the remainder is **not one backlog**. It is five populations');
+  w('with different costs, different owners, and different blocking properties, and treating them as');
+  w('one list is what has made the epic look larger and more uniform than it is.');
+  w();
+  if (unclassified.length) {
+    w(`**INTEGRITY FAILURE:** open criteria with no closure class: ${unclassified.join(', ')}`);
+    w();
+  }
+  w('| class | criteria | what closing one actually costs |');
+  w('|---|---|---|');
+  w(`| A — assertion missing | ${(byClass.assert || []).length} | one named test case in an already-registered, unprotected suite |`);
+  w(`| D — documentation missing | ${(byClass.doc || []).length} | one document section set; no code, no gate |`);
+  w(`| S — seam missing | ${(byClass.seam || []).length} | a connector between two packages that already work |`);
+  w(`| B — capability missing | ${(byClass.build || []).length} | real implementation plus its tests |`);
+  w(`| P — not code | ${(byClass.po || []).length} | a human gate, a sanctioned authority revision, or a proved impossibility |`);
+  w(`| **total** | **${open.length}** | |`);
+  w();
+  w('**The distribution is the finding.** The largest class by a wide margin is Class A: criteria');
+  w('whose behaviour is built, shipped and green, and which fail only because no assertion names the');
+  w('clause the criterion actually states. That is not implementation debt. It is the direct');
+  w("consequence of the Spec's own bar — `spec.md:673` demands that *every* criterion map to a named");
+  w('test, not that its theme be covered — and it means a large fraction of the epic closes through');
+  w('test authorship in files that no maintenance window protects.');
+  w();
+  w('## The gating slice, designed');
+  w();
+  w('P-AC-08 is the one criterion whose position in the sequence is fixed by the acceptance matrix');
+  w("itself: it declares the feature-package writer the mandatory first slice of PHX-0, and forbids");
+  w("PHX-0's ruleset-trust-root slice and PHX-1 from starting until it passes. Everything below is");
+  w('sequenced behind it for that reason and no other.');
+  w();
+  w('**What exists.** `feature-package-inspect|status|plan|apply|recover` are built, registered and');
+  w('green. `apply` already carries two plan kinds — `bootstrap` for an absent manifest and');
+  w('`transition` for a state change — each with a recomputed-preview digest check that fails closed');
+  w('on manifest, proposal or target-state drift, a MAC-authenticated recovery journal, and a');
+  w('readback before the journal is retired.');
+  w();
+  w('**What is missing, precisely.** The criterion also requires reconciling an inherited `draft`');
+  w("manifest's stale PRD, Spec, acceptance, architecture and Result digests — and requires it happen");
+  w('through an existing-manifest preview, an exact PO-bound apply and a readback, **with no');
+  w('lifecycle-state, artifact-set, candidate or other authority-byte change**. Neither existing plan');
+  w('kind expresses that: `transition` exists to change state, which this operation must not do, and');
+  w('`bootstrap` applies only when the manifest is absent. `planFeaturePackageReconcile` does not');
+  w('exist in `lib/feature-package-topology.mjs`.');
+  w();
+  w('### Design: a third plan kind, `reconcile`');
+  w();
+  w('The reconciliation is a **digest-only** transaction, and the design makes that a structural');
+  w('property rather than a promise the implementation is trusted to keep:');
+  w();
+  w('1. **Preview.** `planFeaturePackageReconcile(root, manifestPath)` recomputes each declared');
+  w('   artifact digest from the bytes on disk and returns the preimage manifest, the postimage');
+  w('   manifest, and the per-artifact old/new digest pairs. It returns a plan object of the same');
+  w('   shape the other two kinds return, so `--plan-sha256` binding is inherited unchanged rather');
+  w('   than reimplemented.');
+  w('2. **The no-drift invariant is checked on the plan, not on intent.** The postimage is rejected');
+  w('   unless it is byte-identical to the preimage after the digest fields alone are substituted:');
+  w('   same lifecycle state, same artifact set and order, same candidate, same schema, same every');
+  w('   other byte. A reconcile plan that would change anything else is not a warning — it is a');
+  w('   refusal, because a transaction that can change state is a transition wearing another name.');
+  w('3. **Apply is PO-bound.** It consumes the same critical-action proof shape the other');
+  w('   authority-changing writers use, bound to the exact candidate and to the plan digest. A');
+  w('   reconcile without a valid bound decision fails closed and writes nothing.');
+  w('4. **Readback.** The written manifest is re-read and re-validated through');
+  w('   `validateFeaturePackage` before the journal is retired — the existing apply path already');
+  w('   does this and the reconcile path reuses it rather than adding a second one.');
+  w();
+  w('### Design: the Result fence');
+  w();
+  w('The criterion admits a Result reconciliation only under two conditions and refuses a');
+  w('metadata-only refresh outright. Both are expressed as preconditions of the plan, so a refused');
+  w('case never reaches a writer:');
+  w();
+  w('- **Continuity binding.** The current Result must be the one Continuity State binds. A Result');
+  w('  the State does not name cannot be reconciled, whatever its digest says.');
+  w('- **Preserved historical prefix.** The Result bytes must contain the exact stale manifest digest');
+  w('  as a preserved historical prefix, followed by the canonical Result-reconciliation fence. This');
+  w('  is what distinguishes a Result that legitimately grew from one that was rewritten: the old');
+  w('  digest has to still be provable *inside* the new artifact.');
+  w('- **Metadata-only refresh is refused by name**, with its own typed code, so the refusal is');
+  w('  distinguishable in evidence from a drift refusal.');
+  w();
+  w('**One thing this design deliberately does not repair.** The reconciliation the criterion was');
+  w('written for was already performed by hand in `ece6041`, by the exact route P-AC-08 forbids. The');
+  w('capability is still required and still buildable; its original subject is gone, and the audit');
+  w('trail for that specific repair will never exist. The PO accepted that as a recorded deviation.');
+  w('Building the transaction now is therefore about the next reconciliation, not this one, and the');
+  w('design says so rather than implying a retroactive fix.');
+  w();
+  w('### Where P-AC-08 meets a hard boundary');
+  w();
+  w('The implementation lives in `plugins/pipeline-core/scripts/pipeline-state.mjs` and');
+  w('`lib/feature-package-topology.mjs`, both unprotected. **Its tests do not.**');
+  w('`harness/scripts/pipeline-state.test.mjs` is TP-5-protected and registering anything new touches');
+  w('`harness/scripts/verify.mjs`, which is TP-3-protected. Both are liftable in **one** signed');
+  w('maintenance window (`--scope TP-3,TP-5`), whose TTL is four hours.');
+  w();
+  w('The established pattern applies unchanged: build the implementation, stage the cases in an');
+  w('`evidence/` file, prove them green standalone, and land them inside one window. The window is');
+  w("the PO's act and is the first hard gate this design reaches.");
+  w();
+  w('## The parallel partition');
+  w();
+  w('Spec §4.6 admits parallel work only where file ownership does not overlap. The partition below');
+  w('is by module family, which makes the disjointness checkable rather than asserted:');
+  w();
+  w('| work package | open criteria | owns |');
+  w('|---|---|---|');
+  for (const wp of Object.keys(WORK_PACKAGES)) {
+    const ids = (byPackage[wp] || []).sort();
+    if (!ids.length) continue;
+    w(`| ${wp} | ${ids.length} | ${WORK_PACKAGES[wp].join(', ')} |`);
+  }
+  w();
+  w('Concurrency is bounded at **2**, not by preference but by the recorded capacity: the continuity');
+  w('block reserves one Critic slot and one recovery slot out of four, and the project calibration');
+  w('sets `wipLimit: 3`. Two is the tighter of the two and therefore the one that governs.');
+  w();
+  w('## Sequence');
+  w();
+  w('1. **WP-GATE** alone, because P-AC-08 forbids the rest of PHX-0 and PHX-1 from starting. Its');
+  w('   window is the first PO gate.');
+  w('2. **Class A and Class D packages in pairs**, highest blocked-bullet yield first. These need no');
+  w('   window and no gate: the suites are registered and unprotected, and the documents are ordinary');
+  w('   files. This is where most of the remaining count moves.');
+  w('3. **Class S**, the five seams. Each is a connector between two working packages and each needs');
+  w('   a design decision about which side owns the reference — deliberately sequenced after Class A');
+  w('   so the packages being connected are fully pinned first.');
+  w('4. **Class B**, the absent capabilities, ordered by whether anything else waits on them.');
+  w('   `L-AC-01` leads: no Pipeline path emits a lifecycle event at all, which is the single');
+  w('   structural gap behind the epic\'s "libraries built, integration left" shape.');
+  w('5. **Class P** last, because most of it only becomes answerable once the rest is done.');
+  w();
+  w('## Exit criteria');
+  w();
+  w('This design is finished when every Class A, D, S and B row above is `implemented` under the');
+  w('unchanged measurement definition — a named assertion in a gate-registered suite — and the');
+  w('measurement is regenerated to prove it. It cannot close Class P, and it does not try:');
+  w('EPIC-AC-04 needs a privacy review, an integrated-candidate Critic and the PO\'s acceptance;');
+  w('EPIC-AC-03 needs the sanctioned authority revision that only just became executable; and');
+  w('H-AC-11\'s GMW half is a proved impossibility that closes by amendment or not at all.');
+  w();
+  w('## Per criterion');
+  w();
+  for (const cls of CLASS_ORDER) {
+    const ids = (byClass[cls] || []).sort();
+    if (!ids.length) continue;
+    w(`### ${CLASS_TITLE[cls]} (${ids.length})`);
+    w();
+    w('| ID | verdict | package | what closes it |');
+    w('|---|---|---|---|');
+    for (const id of ids) w(`| ${id} | ${verdictOf(id)[0]} | ${CLOSURE[id][1]} | ${POINTERS[id]} |`);
+    w();
+  }
+  const text = out.join('\n') + '\n';
+  const oi = process.argv.indexOf('--out');
+  if (oi !== -1 && process.argv[oi + 1]) {
+    const { writeFileSync } = await import('node:fs');
+    writeFileSync(process.argv[oi + 1], text);
+    process.stdout.write(`wrote ${process.argv[oi + 1]} (${text.length} bytes)\n`);
+  } else process.stdout.write(text);
+  process.exit(0);
 }
 
 const nImpl = Object.keys(VERDICTS).filter((id) => verdictOf(id)[0] === IMPLEMENTED).length;
