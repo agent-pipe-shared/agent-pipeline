@@ -1887,6 +1887,50 @@ The dispatch substituted two real sibling suites under an explicit label rather 
 skipping the check, and it removed a QG-06 deferred decision whose promise its own
 work had made obsolete instead of leaving a stale expiry standing.
 
+### F3 RE-MEASURED WHILE PREPARING ITS OWN OPTION B: §7 HAS BEEN STALE ALL SPRINT, NOT SINCE TONIGHT
+
+I went to write the Spec rows for option B and checked first whether comparable files were
+already listed. **They are not, and they never were.** Measured with
+`git log --diff-filter=A` over `harness/scripts/`:
+
+| File | Created in | In §7? |
+| --- | --- | --- |
+| `check-verify-suite-registration.mjs` | `c40f01d` — **`feat(phx-regcheck)`** | no |
+| `check-critic-contract-citations.mjs` | `e097b27`, earlier tonight | no |
+| `check-skill-spec-coverage.mjs` | `67bac89`, earlier tonight | no |
+| `check-doc-contracts.mjs`, `check-observation-governance.mjs` | pre-Phoenix | no |
+
+The first row is the one that settles it: that file's own commit is tagged **`phx-regcheck`**
+— it is Phoenix work by its author's own naming, it is registered in the gate, and it is
+absent from the Epic's file contract. Two more were created earlier in this same night's
+session and are equally absent.
+
+**So the Critic's F3 is correct on the letter and wrong on its premise.** It reviewed
+sixteen commits and found five files outside §7, which reads as a fresh breach. Against the
+whole sprint, tonight's five are instances four through eight of a pattern that has run
+unremarked since the Epic began. Treating them as *the* violation would misattribute a
+sprint-long drift to one night — and repairing only them would leave §7 exactly as wrong as
+it is now, while looking fixed.
+
+**A third framing follows, and it is the honest one: §7 is the defect.** A file contract
+that the sprint's own output has diverged from repeatedly, without anyone noticing, is not a
+contract being violated — it is a record that stopped describing its subject. That is the
+same class as the two ADR contradictions and the stale decision list at the top of this
+file, in the document that governs what may be built.
+
+This does not decide F3, and I am not deciding it. It changes what is being decided:
+
+- **A** now means declaring a *documented, repeated* practice, not carving out an exception
+  for one night.
+- **B** now means bringing §7 up to date across the whole sprint, not adding five rows —
+  and the rows for the three files above are as owed as the five.
+- Either way, the absence of any check that a §7 inventory still matches the tree is worth a
+  backlog item, because that absence is what let eight files through.
+
+**One narrowing worth stating**, since it shrinks B: §7's clause says *"a new **implementation**
+file"*. Two of the five are `.mjs` checks and two are their suites; `docs/doc-reconciliation.md`
+is a record, not an implementation file, and arguably never fell under the clause at all.
+
 ### FOUR OF FIVE CRITIC FINDINGS CLOSED, GATE GREEN AGAIN ON `5bd5dd6` — F3 is the last thing open
 
 **Full verify: exit 0, 368 suites, candidate `5bd5dd6`, tree `3695d78e`, `binding: "exact"`,
