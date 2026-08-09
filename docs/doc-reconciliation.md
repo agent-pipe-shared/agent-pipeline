@@ -47,6 +47,22 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 28df389471fda30d3a0c18bc3587195fc6b45069 — 2026-08-09, range 3387065..28df389, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `3eef8dd` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `bd8d73e`, `a7471a0`, `f9e300c`, `3f09bed`, `c48f327`, `e3967ba`, `28df389`. Same reading
+as the whole chain: `docs/state.md` stays ADR-0012, the generated evidence-map/closure-plan pair
+stays ADR-0045. This range is the first to touch `docs/*.md` PACKAGE documentation
+(`agent-decision-journal.md`, `change-control.md`, `governance-events.md`,
+`governance-event-export.md`, `organization-policy-packs.md`, `audit-bundles.md`,
+`external-traceability.md`) and to EDIT (not create) a `backlog/items/*.md` file -- checked
+explicitly rather than assumed identical to prior ranges: no ADR's `Governs:` line names any of
+these paths, confirmed by the check's own output above naming only `docs/state.md` and the three
+`specs/sprint-phoenix-epic/` files.
+
 ## Candidate bc023a0a735264e8daf7cb4e0bcf1417d3b979b7 — 2026-08-09, range 3387065..bc023a0, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
