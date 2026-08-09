@@ -1023,6 +1023,62 @@ a dispatch the authority to clear a control whose purpose is to check that
 dispatch's own class of work. "Show your evidence" is not a substitute for
 separation of duties — it is what makes the absence of separation look rigorous.
 
+### THIRD CRITIC ROUND: FAIL — and it found that every Critic dispatch I sent tonight was contaminated
+
+I had declined a third round, reasoning it would only re-read a falsifiability
+table. **I reversed that**, for a better reason than the one I used to decline: every
+byte about to be pinned should be covered by an independent review, and exactly one
+unreviewed commit touched a pinned path. The reversal was worth it twice over.
+
+**BRIEFING VIOLATION — mine, structural, and it applies retroactively to all four
+Critic dispatches tonight.** I handed each Critic `evidence/dispatch-record-*.json`
+as authorship evidence. That file format embeds the implementor's **completion
+report** — DoD results, deviations, open items, per-phase reasoning — in the same
+file as the authorship metadata. CR-01 closes admissible Critic input against exactly
+that: completion-report prose, implementor explanation, summaries. **Pointing any
+Critic at that path necessarily delivers the forbidden category.** So the isolation I
+have been carefully protecting all night, refusing to paste a single line of
+rationale into a briefing, was being breached by the one reference I thought was pure
+metadata.
+
+The Critic disclosed it properly: it opened the file only after independently
+reproducing five artifact claims and its own two mutation probes, and it states that
+no finding rests on that file beyond the authorship metadata. That is the right
+handling, and it does not make the input admissible.
+
+**The fix is not "be more careful".** The record format is the defect: authorship
+metadata and completion report must be separate artifacts so a Critic can be pointed
+at the first without receiving the second. Until that exists, a Critic briefing must
+name a narrower reference than `evidence/dispatch-record-*.json`. **I am changing my
+own practice immediately and it needs a backlog item.**
+
+**F1 (major) — the check claims coverage it does not have.** PHX-CITE-8's docstring
+says it resolves every cross-file coordinate, title included; its matcher handles a
+path followed by `§N` or `§N, *Title*`. Two forms occur live in the governed files and
+are resolved by nothing: an em-dash before the number (`roles/critic.md:214`) and a
+parenthesised title (`SKILL.md:26`). The Critic proved it by mutation — rewrote the
+coordinate to `§99.9`, rewrote a title to a bogus one, check **green, exit 0** both
+times, restored byte-identically. Meanwhile the check prints
+*"every cited target contains its cited content"*. Both gaps are masked only by
+coincidence: the same coordinate happens to be cited elsewhere in a covered form.
+Reword the twin and the off-by-one defect the class exists to catch walks straight
+back in. QG-05 requires a gate to say what it does **not** check.
+
+**F2 (minor) — the new property has no committed guard.** The anti-self-satisfaction
+behaviour exists only as a git-ignored runner; no committed test, not in the verify
+chain. A later edit can drop it with nothing going red.
+
+`PHX-CITE3` is dispatched for both, forbidden from closing the gap by narrowing the
+corpus and forbidden from making the success line vague to make it true.
+
+**What it cleared is as useful as what it found.** It independently reproduced the
+four-way matrix that separates "the check works" from "the check was fitted to the
+documents": pre-repair check green on pre-repair docs, pre-repair check green on
+post-repair docs, repaired check red on pre-repair docs with the exact expected line,
+repaired check green on the real checkout. It also confirmed the pin drift on
+`roles/critic.md` **predates** `19e3793`, and it explicitly refused to assert or clear
+an orchestrator-authorship violation on evidence it had not examined.
+
 ### RESTORED (`6d6fa5c`) — and it dissolved decision 4 rather than answering it
 
 Gate at `6d6fa5c`: exit 0, 368 steps, `binding: "exact"`, clean at tree `7d5836e`,
