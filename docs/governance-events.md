@@ -111,3 +111,87 @@ the separate restricted profile. It has no portable counterpart or join
 handle. Erasure and key destruction prove only their documented active-store
 boundaries; a missing restricted record can never be reconstructed into
 portable authority.
+
+## Human ledger: migration
+
+Honesty note: no migration tooling or schema-version transition path exists
+for the human ledger. `plugins/pipeline-core/lib/governance-event.mjs:11`
+defines exactly one envelope schema, `pipeline.governance-event-envelope.v1`,
+and the human stream accepts exactly two payload schemas,
+`pipeline.human-governance-decision.v1` and
+`pipeline.human-role-exception-decision.v1` (`governance-event.mjs:170`) —
+there is no `v2` variant, no schema-upgrade script, and no code path in
+`governance-event-store.mjs` or `human-governance-ledger.mjs` that rewrites,
+reinterprets, or converts an already-published event. A change to the schema
+itself would be a new schema id, not an in-place migration of existing
+records — consistent with the append-only, never-rewritten guarantee stated
+above ("No portable record is rewritten."). This document does not claim a
+migration procedure that does not exist.
+
+## Human ledger: retention
+
+`governance/events/capture-policy.json` declares
+`"retention": "repository-retained"` for the human stream (the same value
+used for the agent and lifecycle streams), and the envelope's
+portable-policy-coherence check enforces `retentionCompatibility ===
+"repository-retained"` for every portable human decision
+(`plugins/pipeline-core/lib/governance-event.mjs:194`). A granted, denied,
+or disposed decision is retained for as long as the repository and its Git
+history retain the file under `governance/events/human/`;
+`appendPortableGovernanceEvent` never deletes or overwrites a canonical
+record (`plugins/pipeline-core/lib/governance-event-store.mjs:629-663`). The
+only shorter- or differently-retained store is the restricted-machine-local
+profile described above, which carries its own explicit `expiresAtEpochMs`
+and is a separately profiled attribution/rationale record, not the decision
+itself, with "no portable counterpart or join handle."
+
+## Human ledger: recovery
+
+The interrupted-write recovery documented above ("Portable records",
+`recover`) applies to the human stream unmodified — it is one shared code
+path, not stream-specific. Concretely: `writeAtomic` stages every appended
+decision to a temporary file before an atomic rename
+(`plugins/pipeline-core/lib/governance-event-store.mjs:445-463`); a crash
+between those two steps leaves an orphaned temp file that the reader ignores
+(`governance-event-store.mjs:419`) and that the next append removes
+automatically under the stream's exclusive lock
+(`governance-event-store.mjs:561-566,572`). This exact behavior is pinned
+for the human stream by
+`plugins/pipeline-core/lib/human-governance-ledger.test.mjs:385-392` ("an
+append recovers from an orphaned temporary file left by an earlier
+interrupted write").
+
+The human ledger's single-use grant consumption adds one more recoverable
+race: `appendConsumedHumanGovernanceDecision` re-reads the live stream under
+the same append lock via its `assertAppend` closure
+(`plugins/pipeline-core/lib/human-governance-ledger.mjs:205-224`) and
+re-resolves authority before the consuming event is sealed, so a second
+concurrent consumption attempt against an already-consumed grant fails
+closed (`HGL-CONSUME-NOT-LIVE`, `human-governance-ledger.mjs:222`) rather
+than double-spending the grant.
+
+As stated above, a corrupted or forked canonical chain has no automated
+repair and "requires the later human-ledger disposition flow." Honesty
+note: that disposition flow does not yet exist as runnable code in this
+repository, so a corrupted human-stream chain segment has no documented
+repair procedure beyond discarding and rebuilding history outside this
+module; this document does not claim otherwise.
+
+## Human ledger: operator guidance
+
+Inspecting the human decision stream uses the same shared surface as any
+other stream, scoped by `streamId: "human"`:
+
+```text
+node plugins/pipeline-core/scripts/governance-event.mjs query --repo CHECKOUT --request-file REQUEST.json
+node plugins/pipeline-core/scripts/governance-event.mjs verify --repo CHECKOUT --request-file REQUEST.json
+```
+
+(`plugins/pipeline-core/scripts/governance-event.mjs:42-53`.) `query`
+returns validated decisions only after chain verification
+(`queryHumanGovernanceDecisions`,
+`plugins/pipeline-core/lib/human-governance-ledger.mjs:228-231`), never raw
+file contents. For the human-facing approval action itself (not ledger
+inspection), see `docs/po-human-approval.md`; that document is the
+operator/human guidance for signing, while this section is the operator
+guidance for reading back what was signed.
