@@ -792,10 +792,19 @@ export async function recoverPortableGovernanceProjection({ repositoryRoot, regi
 const FORK_DISPOSITION_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const FORK_DISPOSITION_TEMP_FILE = /^\.[1-9][0-9]*\.json\.[a-f0-9]{24}\.tmp$/u;
 
-function assertForkDisposition(disposition) {
-  if (!exactKeys(disposition, ["idempotencyKey", "sequence", "acknowledgedEventIds", "reasonCode", "disposedAtEpochMs"])) fail("GES-FORK-DISPOSITION", "A closed fork disposition is required.");
-  if (typeof disposition.idempotencyKey !== "string" || !FORK_DISPOSITION_TOKEN.test(disposition.idempotencyKey)) fail("GES-FORK-DISPOSITION", "A fork disposition requires a closed idempotency key.");
-  if (!Number.isSafeInteger(disposition.sequence) || disposition.sequence < 1) fail("GES-FORK-DISPOSITION", "A fork disposition requires the exact forked sequence number.");
+/**
+ * Field-level shape checks shared by both the write-side validator
+ * (`assertForkDisposition`, a caller-supplied intent) and the read-side
+ * validator (`readForkDisposition`, an on-disk persisted record). `code` lets
+ * each caller keep its own existing failure code — the write side already
+ * used `GES-FORK-DISPOSITION` for a bad caller intent, and the read side
+ * already used `GES-FORK-DISPOSITION-RECORD` for a structurally invalid
+ * persisted record; this only removes the duplicated regex/array/integer
+ * checks, it does not merge those two distinct failure identities.
+ */
+function assertForkDispositionFields(disposition, code) {
+  if (typeof disposition.idempotencyKey !== "string" || !FORK_DISPOSITION_TOKEN.test(disposition.idempotencyKey)) fail(code, "A fork disposition requires a closed idempotency key.");
+  if (!Number.isSafeInteger(disposition.sequence) || disposition.sequence < 1) fail(code, "A fork disposition requires the exact forked sequence number.");
   // The structural minimum is deliberately just "non-empty, unique, closed
   // tokens" — whether the named set actually has enough members to match a
   // real fork (always >= 2 conflicting entries) is a reality-binding
@@ -803,10 +812,15 @@ function assertForkDisposition(disposition) {
   // `inspectStreamForForks`, not a shape question decided here.
   if (!Array.isArray(disposition.acknowledgedEventIds) || disposition.acknowledgedEventIds.length < 1
     || disposition.acknowledgedEventIds.some((eventId) => typeof eventId !== "string" || !FORK_DISPOSITION_TOKEN.test(eventId))
-    || new Set(disposition.acknowledgedEventIds).size !== disposition.acknowledgedEventIds.length) fail("GES-FORK-DISPOSITION", "A fork disposition requires the closed set of every conflicting event identifier.");
-  if (typeof disposition.reasonCode !== "string" || !FORK_DISPOSITION_TOKEN.test(disposition.reasonCode)) fail("GES-FORK-DISPOSITION", "A fork disposition requires a closed reason code.");
-  if (!Number.isSafeInteger(disposition.disposedAtEpochMs) || disposition.disposedAtEpochMs < 0) fail("GES-FORK-DISPOSITION", "A fork disposition requires an exact integer disposition timestamp.");
+    || new Set(disposition.acknowledgedEventIds).size !== disposition.acknowledgedEventIds.length) fail(code, "A fork disposition requires the closed set of every conflicting event identifier.");
+  if (typeof disposition.reasonCode !== "string" || !FORK_DISPOSITION_TOKEN.test(disposition.reasonCode)) fail(code, "A fork disposition requires a closed reason code.");
+  if (!Number.isSafeInteger(disposition.disposedAtEpochMs) || disposition.disposedAtEpochMs < 0) fail(code, "A fork disposition requires an exact integer disposition timestamp.");
   return disposition;
+}
+
+function assertForkDisposition(disposition) {
+  if (!exactKeys(disposition, ["idempotencyKey", "sequence", "acknowledgedEventIds", "reasonCode", "disposedAtEpochMs"])) fail("GES-FORK-DISPOSITION", "A closed fork disposition is required.");
+  return assertForkDispositionFields(disposition, "GES-FORK-DISPOSITION");
 }
 
 /**
@@ -897,11 +911,25 @@ async function readForkDisposition(root, registry, streamId, sequence) {
   const entry = await lstatOrNull(target);
   if (!entry) return null;
   await assertNoSymlink(target, { directory: false });
+  let bytes;
   let record;
-  try { record = parseStrictJson(await readFile(target)); } catch { fail("GES-FORK-DISPOSITION-RECORD", "The recorded fork disposition is not strict JSON."); }
+  try {
+    bytes = await readFile(target);
+    record = parseStrictJson(bytes);
+  } catch { fail("GES-FORK-DISPOSITION-RECORD", "The recorded fork disposition is not strict JSON."); }
   if (!exactKeys(record, ["schema", "repositoryFingerprint", "streamId", "idempotencyKey", "sequence", "acknowledgedEventIds", "reasonCode", "disposedAtEpochMs"])
     || record.schema !== "pipeline.governance-fork-disposition.v1" || record.repositoryFingerprint !== registry.repositoryFingerprint
     || record.streamId !== streamId || record.sequence !== sequence) fail("GES-FORK-DISPOSITION-RECORD", "The recorded fork disposition shape is invalid.");
+  // The four binding fields are checked above; every other persisted field
+  // gets the same closed-token/deduplicated-array/safe-integer checks the
+  // write side enforces on the way in (assertForkDispositionFields), so a
+  // corrupted or hand-edited non-binding field fails closed here too instead
+  // of being surfaced verbatim as a trustworthy governed disposition.
+  assertForkDispositionFields(record, "GES-FORK-DISPOSITION-RECORD");
+  // Mirrors readEvent's own GES-NONCANONICAL check: a persisted disposition
+  // whose on-disk bytes are not the exact canonical serialization of its own
+  // parsed value is rejected rather than silently accepted.
+  if (Buffer.from(`${canonicalizeJson(record)}\n`, "utf8").compare(bytes) !== 0) fail("GES-NONCANONICAL", "A recorded fork disposition does not contain exact canonical bytes.");
   return Object.freeze({
     idempotencyKey: record.idempotencyKey,
     sequence: record.sequence,

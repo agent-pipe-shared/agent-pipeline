@@ -352,6 +352,41 @@ test("K-AC-05 inspectForkedGovernanceStream reports a recorded disposition's own
   }, "the recorded governed disposition must be readable straight from inspectForkedGovernanceStream's own output, not from the internal fork-disposition path");
 });
 
+test("K-AC-05 a persisted fork disposition with a malformed non-binding field fails closed with a GovernanceEventStoreError carrying a .code, never an uncaught raw exception", async (t) => {
+  const { root } = await forkedLifecycleFixture(); t.after(() => cleanup(root));
+  const disposition = { idempotencyKey: "fork-disp-corrupt", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 100 };
+  const recorded = await recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition });
+  const dispositionPath = path.join(root, recorded.path);
+  const persisted = JSON.parse(await readFile(dispositionPath, "utf8"));
+  const writeCorrupted = (overrides) => writeFile(dispositionPath, `${canonicalizeJson({ ...persisted, ...overrides })}\n`);
+  const isClosedStoreError = (error) => error instanceof GovernanceEventStoreError && error.code === "GES-FORK-DISPOSITION-RECORD";
+
+  await writeCorrupted({ acknowledgedEventIds: null });
+  await assert.rejects(() => inspectForkedGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" }), isClosedStoreError, "a non-iterable acknowledgedEventIds must fail closed with a store error, not a raw TypeError out of Object.freeze([...null])");
+
+  await writeCorrupted({ idempotencyKey: "not a closed token!" });
+  await assert.rejects(() => inspectForkedGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" }), isClosedStoreError, "an out-of-pattern idempotencyKey must fail closed");
+
+  await writeCorrupted({ reasonCode: "not a closed token!" });
+  await assert.rejects(() => inspectForkedGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" }), isClosedStoreError, "an out-of-pattern reasonCode must fail closed");
+
+  await writeCorrupted({ disposedAtEpochMs: -1 });
+  await assert.rejects(() => inspectForkedGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" }), isClosedStoreError, "a negative disposedAtEpochMs must fail closed");
+
+  await writeCorrupted({ disposedAtEpochMs: 1.5 });
+  await assert.rejects(() => inspectForkedGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" }), isClosedStoreError, "a non-integer disposedAtEpochMs must fail closed");
+});
+
+test("K-AC-05 a persisted fork disposition whose on-disk bytes are not the exact canonical serialization of its own parsed value is rejected with GES-NONCANONICAL", async (t) => {
+  const { root } = await forkedLifecycleFixture(); t.after(() => cleanup(root));
+  const disposition = { idempotencyKey: "fork-disp-noncanonical", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 200 };
+  const recorded = await recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition });
+  const dispositionPath = path.join(root, recorded.path);
+  const persisted = JSON.parse(await readFile(dispositionPath, "utf8"));
+  await writeFile(dispositionPath, `${JSON.stringify(persisted, null, 2)}\n`);
+  await assert.rejects(() => inspectForkedGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" }), (error) => error instanceof GovernanceEventStoreError && error.code === "GES-NONCANONICAL", "pretty-printed (non-canonical) bytes for an otherwise structurally valid disposition must be rejected, mirroring readEvent's own GES-NONCANONICAL check");
+});
+
 test("K-AC-05 inspectForkedGovernanceStream distinguishes an undisposed fork (null) from a disposed one, at two fork positions in the same stream", async (t) => {
   const root = await fixtureRoot(); t.after(() => cleanup(root));
   const first = await append(root);
