@@ -4,7 +4,7 @@ import test from "node:test";
 import { appendChangeControlEntry, createChangeControlJournal, evaluateChangeControlGate, projectChangeControlState, validateChangeControlProfile } from "./change-control.mjs";
 
 const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) }; const artifact = { path: "specs/release/result.md", sha256: "c".repeat(64) }; const window = { startsAtEpochMs: 10, endsAtEpochMs: 20 };
-function profile(overrides = {}) { return { schema: "pipeline.change-control-profile.v1", profileId: "production-change", policySha256: "d".repeat(64), changeClass: "normal", candidate, artifact, environment: "production", scopeSha256: "e".repeat(64), window, mandatory: true, ...overrides }; }
+function profile(overrides = {}) { return { schema: "pipeline.change-control-profile.v1", profileId: "production-change", policySha256: "d".repeat(64), changeClass: "normal", candidate, artifact, environment: "production", scopeSha256: "e".repeat(64), window, mandatory: true, standardTemplate: null, ...overrides }; }
 function local(overrides = {}) { return { granted: true, candidate, artifact, environment: "production", scopeSha256: "e".repeat(64), emergencyAuthorized: false, ...overrides }; }
 function receipt(overrides = {}) { return { schema: "pipeline.change-control-receipt.v1", profileId: "production-change", candidate, artifact, environment: "production", scopeSha256: "e".repeat(64), window, state: "approved", authenticated: true, ...overrides }; }
 test("allows mandatory promotion only when independent local and external authority bind the exact same tuple", () => assert.deepEqual(evaluateChangeControlGate({ profile: profile(), pipelineAuthority: local(), externalReceipt: receipt(), nowEpochMs: 15 }), { schema: "pipeline.change-control-gate.v1", status: "allowed", reason: "composed-authority" }));
@@ -104,7 +104,7 @@ test("C-AC-11 keeps provider names and fields out of the provider-neutral core s
     assert.throws(() => evaluateChangeControlGate({ profile: profile(), pipelineAuthority: { ...local(), [field]: "provider-fixture" }, externalReceipt: receipt(), nowEpochMs: 15 }), (error) => error.code === "CC-GATE", field);
     assert.throws(() => createChangeControlJournal({ ...binding, [field]: "provider-fixture" }), (error) => error.code === "CC-JOURNAL", field);
   }
-  assert.deepEqual(Object.keys(validateChangeControlProfile(profile())).sort(), ["artifact", "candidate", "changeClass", "environment", "mandatory", "policySha256", "profileId", "schema", "scopeSha256", "window"]);
+  assert.deepEqual(Object.keys(validateChangeControlProfile(profile())).sort(), ["artifact", "candidate", "changeClass", "environment", "mandatory", "policySha256", "profileId", "schema", "scopeSha256", "standardTemplate", "window"]);
   // The change class vocabulary is closed; a provider class cannot widen it.
   assert.throws(() => validateChangeControlProfile(profile({ changeClass: "expedited" })), (error) => error.code === "CC-PROFILE");
 });
@@ -117,13 +117,26 @@ test("requires explicit emergency authority and keeps not-required independent",
 
 // C-AC-02: standard is one of the four distinct changeClass values and is paired
 // with mandatory authority exactly like normal and emergency; only not-required
-// may waive it. This module does not distinguish standard's required INPUT
-// FIELDS from normal's beyond the changeClass label, and nothing here detects or
-// rejects a class picked solely to avoid approval -- both remain ABSENT for
-// C-AC-02 (see evidence/phx-wp-c.txt).
+// may waive it. Standard's required INPUT FIELDS are now distinguished from
+// normal's: a standard profile must bind a `standardTemplate` (`templateId` +
+// `revision`), the externally pre-authorized template and its still-valid
+// revision named by issue #24 §5, and every other class must carry it as
+// `null`. What remains ABSENT for C-AC-02 is the other half: nothing here
+// detects or rejects a class picked solely to avoid approval (see
+// evidence/phx-wp-c.txt).
 test("C-AC-02 validates standard as a distinct change class that still requires paired mandatory authority", () => {
-  assert.equal(evaluateChangeControlGate({ profile: profile({ changeClass: "standard" }), pipelineAuthority: local(), externalReceipt: receipt(), nowEpochMs: 15 }).status, "allowed");
-  assert.throws(() => validateChangeControlProfile(profile({ changeClass: "standard", mandatory: false })), (error) => error.code === "CC-PROFILE");
+  assert.equal(evaluateChangeControlGate({ profile: profile({ changeClass: "standard", standardTemplate: { templateId: "tmpl-1", revision: "rev-1" } }), pipelineAuthority: local(), externalReceipt: receipt(), nowEpochMs: 15 }).status, "allowed");
+  assert.throws(() => validateChangeControlProfile(profile({ changeClass: "standard", mandatory: false, standardTemplate: { templateId: "tmpl-1", revision: "rev-1" } })), (error) => error.code === "CC-PROFILE");
+});
+
+// C-AC-02: standardTemplate is required, closed, and class-conditioned -- present
+// and well-formed only when changeClass is "standard", null otherwise.
+test("C-AC-02 requires a well-formed standardTemplate only when changeClass is standard", () => {
+  assert.doesNotThrow(() => validateChangeControlProfile(profile({ changeClass: "standard", standardTemplate: { templateId: "tmpl-1", revision: "rev-1" } })));
+  assert.throws(() => validateChangeControlProfile(profile({ changeClass: "standard" })), (error) => error.code === "CC-PROFILE");
+  assert.throws(() => validateChangeControlProfile(profile({ changeClass: "normal", standardTemplate: { templateId: "tmpl-1", revision: "rev-1" } })), (error) => error.code === "CC-PROFILE");
+  assert.throws(() => validateChangeControlProfile(profile({ changeClass: "standard", standardTemplate: { templateId: "tmpl-1" } })), (error) => error.code === "CC-PROFILE");
+  assert.throws(() => validateChangeControlProfile(profile({ changeClass: "standard", standardTemplate: { templateId: "tmpl-1", revision: "rev-1", extra: "x" } })), (error) => error.code === "CC-PROFILE");
 });
 
 // C-AC-07: an emergency authorization is bound to the exact scope hash like any
