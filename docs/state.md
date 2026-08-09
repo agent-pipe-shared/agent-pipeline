@@ -2813,6 +2813,51 @@ Both build slots stayed full through this leg's second half: WP-E-AC11 (the deli
 missing per-projection digest, `goldfish-implementor`/medium) was dispatched into the second slot
 immediately after K-AC-10 landed, and was still in flight when this checkpoint was written.
 
+### FOUR MORE PACKAGES LAND WITHOUT AN IDLE SLOT: E-AC-11, E-AC-08, L-AC-02, A-AC-14 — 109 OF 157 (2026-08-09)
+
+**E-AC-11** (`goldfish-implementor`/medium, WP-E-AC11, commit `5bb4269`): closed fully. The
+criterion's own wording carries the grounding — "policy/projection digest**s**", plural — and the
+receipt only ever carried `policyRevision`. `deliverGovernanceExportBatch` now computes
+`projectionDigest` as a deterministic `canonicalSha256` over the batch's own
+`{destinationEventId, sourceEventDigest}` pairs; a new test proves both determinism (same batch
+twice, same digest) and content-sensitivity (different batch, different digest). 3/3 + 18/18 tests
+pass, independently re-run across both touched suites.
+
+**E-AC-08** (`goldfish-implementor`/medium, WP-E-AC08, commit `afe3ff0`): improves from 4 of 8 to 7
+of 8 named defect classes, stays partial. Three more get their own typed code
+(`GEO-CURSOR-BOUND`, `GEO-FORK`, `GEO-INVALID-DIGEST`) instead of falling into the generic
+`GEO-STATE` — the goldfish's own design (a relaxed-shape pre-check that only fires the new codes
+when a value is otherwise structurally sound, so nothing else regresses to a wrong error) went
+beyond the letter of the briefing and was verified correct by direct diff read. Only "outbox
+truncation" remains — a cross-state comparison this module genuinely has no capability for,
+deliberately still out of scope. 7/7 tests pass, independently re-run.
+
+**L-AC-02** (`goldfish-deep`/xhigh, WP-L-AC02, commit `1b266e2`): closed fully, the biggest package
+this leg. Grounded in the ALREADY-ACCEPTED #10 exchange contract
+(`specs/2026-07-19-sprint-sentinel-epic/shared-prerequisites-hotfix.md`), which names
+`queueRevision`/`correlationId` exactly — no guesswork on field names or types. Dispatched to the
+deep tier specifically because the correlation shape is independently re-validated in TWO places
+(`lifecycle-governance-events.mjs` and a redundant re-validator inside `governance-replay-view.mjs`
+that re-checks the same shape during replay) plus four test fixture files; missing one site would
+have left the codebase silently inconsistent — one validator admitting the two new fields, the
+other still rejecting them. The dispatch's own repo-wide grep, run before AND after editing and
+pasted into its report, is the evidence this didn't happen. All four touched test files (7/7, 9/9,
+4/4, 14/14) re-run green independently. All eight #10-named identities are now retained.
+
+**A-AC-14** (`goldfish-implementor`/medium, WP-A-AC14, commit `2b8ad9a`): improves from 11 of 13 to
+12 of 13 named conformance scenarios, stays partial. "Tampering" needed no new production code —
+`governance-event.mjs` already recomputes and compares `eventDigest` on every read
+(`validateGovernanceEventEnvelope`, `event-digest-mismatch`) — just a test that tampers a
+canonical agent-kind file's payload while leaving `eventDigest` stale, and asserts both
+`verifyPortableGovernanceStream` and `queryPortableGovernanceStream` reject it with
+`GES-EVENT-INVALID`. Only "decomposition" remains, confirmed elsewhere as structurally
+unrepresentable in the current `kind` enum — a schema question, not a test gap. 37/37 tests pass,
+independently re-run.
+
+Evidence-map deltas `6c33824` (E-AC-11), `554a173` (E-AC-08), `f3db193` (L-AC-02 + A-AC-14):
+107 → 108 → 108 → 109. Both build slots stayed continuously full across this entire four-package
+leg — no idle slot after the PO's parallelism correction two entries above.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
