@@ -435,7 +435,17 @@ const DELTA = {
   // (independently re-run).
   'E-AC-02': ['implemented', 'WP-E-AC02'],
   'E-AC-04': ['partial', 'WP-E'],
-  'E-AC-08': ['partial', 'WP-E'],
+  // WP-E-AC08 2026-08-09 (goldfish-implementor, commit afe3ff0): three more
+  // of the eight named defect classes now get their own typed code
+  // (GEO-CURSOR-BOUND, GEO-FORK, GEO-INVALID-DIGEST) via a relaxed-shape
+  // pre-check that only fires when the value is otherwise structurally
+  // sound, so every other kind of defect still falls through to the
+  // generic GEO-STATE unchanged. 7/8 classes now pinned; only "outbox
+  // truncation" (comparing a new state against a prior one -- a two-
+  // argument capability this module does not have) remains, deliberately
+  // out of scope. 7/7 governance-export-outbox-tests pass (independently
+  // re-run).
+  'E-AC-08': ['partial', 'WP-E-AC08'],
   'E-AC-09': ['partial', 'WP-E'],
   // WP-E-AC11 CLOSED 2026-08-09 (goldfish-implementor, commit 5bb4269):
   // createGovernanceDeliveryReceipt now requires projectionDigest alongside
@@ -829,7 +839,7 @@ const POINTERS = {
   'E-AC-05': 'governance-export-outbox-tests: independent destination queues, idempotent enqueue, retryable and quarantined entries preserved',
   'E-AC-06': 'governance-export-delivery-tests (PHX-WP-E + PHX-WP-A2): stable idempotency and at-least-once redelivery are pinned; the receipt\'s closed enums carry no exactly-once wording and structurally cannot ever admit one -- the SHALL-NOT-claim-exactly-once negative is now pinned directly',
   'E-AC-07': 'governance-export-delivery-tests: only the safely acknowledged prefix advances after partial delivery',
-  'E-AC-08': 'governance-export-outbox-tests (PHX-WP-E, break-proofed): 4 of 8 detections pinned (destination-mismatch/forged-ack pre-existing, event-gap/schema-downgrade new); CONFIRMED ABSENT: cursor rollback, outbox truncation, source fork, invalid hash -- no bound on cursor vs entries.length or hash-chain check anywhere in outbox.mjs:6-11',
+  'E-AC-08': 'governance-export-outbox-tests (PHX-WP-E-AC08): 7 of 8 detections pinned (destination-mismatch/forged-ack/event-gap/schema-downgrade pre-existing, cursor-bound/source-fork/invalid-hash new, each with its own typed code); outbox truncation (a cross-state comparison this module has no capability for) remains absent',
   'E-AC-09': 'governance-export-delivery-tests (PHX-WP-E, break-proofed): lag exposed on a failed acknowledgement is pinned; CONFIRMED ABSENT: the "advisory destination" concept itself -- no such distinction exists anywhere in scope, so "canonical governance continues under an unavailable advisory destination" is not representable',
   'E-AC-10': 'NO CARRIER: no named lifecycle boundary blocks only the exact unacknowledged source range',
   'E-AC-11': 'governance-export-delivery-tests (PHX-WP-E-AC11): the closed 10-field receipt schema is pinned, rejecting any retention/immutability/analyst-review/compliance-implying extension, AND now carries a projectionDigest alongside policyRevision -- deterministic over batch content, proven to change when batch content changes',
