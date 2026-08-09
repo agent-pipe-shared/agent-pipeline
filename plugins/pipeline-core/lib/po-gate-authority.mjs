@@ -155,14 +155,19 @@ const SNAPSHOT_REPAIR = "The authority snapshot is older than the documents it b
 // itself parses and emits; it names the operator's own project root and no
 // absolute path, which keeps this string inside the no-machine-path contract the
 // rest of this module's failures hold to.
-const LANGUAGE_REPAIR = (expected) =>
-  `The active PRD must declare the configured operator-facing language exactly once, as ${PO_GATE_PRD_LANGUAGE_MARKER(expected)} on its own line;`
-  + ` this project is configured for "${expected}".`
-  + " If the document is genuinely written in the other language, change the configuration rather than the document:"
-  + " run the pipeline-core script po-gate-profile-repair.mjs plan --root <project-root> --human-facing <de|en>"
-  + " against that project's own primary checkout, then po-gate-profile-repair.mjs apply --root <project-root>"
-  + " --human-facing <de|en> --plan-sha256 <sha256> --activate with the digest that plan reports."
-  + " Otherwise correct the marker in the PRD to match the configured language.";
+const LANGUAGE_REPAIR = (expected, documentLanguageSet) =>
+  documentLanguageSet
+    ? `The active PRD must declare its independently configured document language exactly once, as ${PO_GATE_PRD_LANGUAGE_MARKER(expected)} on its own line;`
+      + ` this feature's documentLanguage is set to "${expected}".`
+      + " There is no separate command to change this after the fact: correct the marker in the PRD to match the configured document language,"
+      + " or, if the document language itself genuinely needs to change, go through the same reviewed process any other material PRD change already requires."
+    : `The active PRD must declare the configured operator-facing language exactly once, as ${PO_GATE_PRD_LANGUAGE_MARKER(expected)} on its own line;`
+      + ` this project is configured for "${expected}".`
+      + " If the document is genuinely written in the other language, change the configuration rather than the document:"
+      + " run the pipeline-core script po-gate-profile-repair.mjs plan --root <project-root> --human-facing <de|en>"
+      + " against that project's own primary checkout, then po-gate-profile-repair.mjs apply --root <project-root>"
+      + " --human-facing <de|en> --plan-sha256 <sha256> --activate with the digest that plan reports."
+      + " Otherwise correct the marker in the PRD to match the configured language.";
 const UTF8 = new TextDecoder("utf-8", { fatal: true });
 
 function sha256(value) {
@@ -704,7 +709,7 @@ function prdAuthority(repoRoot, active, expectedLanguage) {
     return fail(
       "PO-GATE-PRD-LANGUAGE-MISMATCH",
       "The active PRD must declare the repository-scoped PO language exactly once.",
-      LANGUAGE_REPAIR(expectedLanguage),
+      LANGUAGE_REPAIR(expectedLanguage, active.documentLanguage != null),
     );
   }
 

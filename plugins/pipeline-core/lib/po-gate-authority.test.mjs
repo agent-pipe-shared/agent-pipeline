@@ -1145,6 +1145,22 @@ check("a language-mismatched PRD is signposted to the operator-language route, n
   });
 });
 
+check("a documentLanguage-mismatched PRD is signposted to the marker, not to the operator-facing route", () => {
+  withFixture({}, ({ primary, validate }) => {
+    write(join(primary, ".claude", "pipeline-state.json"), state("specs/feature/prd_feature.md", "fr"));
+    write(join(primary, "specs", "feature", "prd_feature.md"), prd("en"));
+    const result = validate();
+    assert.equal(result.ok, false, JSON.stringify(result));
+    assert.equal(result.code, "PO-GATE-PRD-LANGUAGE-MISMATCH", JSON.stringify(result));
+    assert.equal(/operator-facing/u.test(result.repair), false, JSON.stringify(result));
+    assert.equal(result.repair.includes("po-gate-profile-repair.mjs"), false, JSON.stringify(result));
+    assert.ok(result.repair.includes(PO_GATE_PRD_LANGUAGE_MARKER("fr")), JSON.stringify(result));
+    assert.ok(result.repair.includes("independently configured document language"), JSON.stringify(result));
+    assert.ok(result.repair.includes("no separate command to change this after the fact"), JSON.stringify(result));
+    assert.ok(result.repair.includes("correct the marker in the PRD"), JSON.stringify(result));
+  });
+});
+
 check("the language guidance names an invocation the repair script itself accepts", () => {
   const guidance = withFixture({}, ({ primary, validate }) => {
     write(join(primary, "specs", "feature", "prd_feature.md"), prd("en"));
