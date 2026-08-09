@@ -98,7 +98,9 @@ repair, or hash-rebinding cascade solely because a new design package was
 created. After promotion, a material change to a bound PRD/Spec follows the
 ordinary reviewed planning/rebind path; it is not a document cleanup.
 
-`prd_short-topic.md` must carry `<!-- po-language: (de|en) -->` and
+`prd_short-topic.md` must carry `<!-- po-language: xx -->`, where `xx` is any
+lowercase two-letter language code (not restricted to `(de|en)` — see above),
+exactly once on its own line, and
 `<!-- technical-spec-sha256: <sha256-of-spec.md> -->`.
 
 `design-input.md` is source evidence, not an unbounded conversation dump. It
