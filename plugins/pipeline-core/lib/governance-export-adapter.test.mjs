@@ -5,7 +5,7 @@ import { createInMemoryGovernanceExportCollector, mapGovernanceExportProjection,
 
 const sha = (character) => character.repeat(64);
 function projection(format, fields = { eventType: "lifecycle.dispatch", occurredAtEpochMs: 1, eventId: "event-1" }) { return { schema: "pipeline.governance-export-event.v1", destinationEventId: sha("a"), destinationProfile: "audit", format, policyRevision: sha("b"), sourceEventDigest: sha("c"), fields }; }
-function profile(format, overrides = {}) { return { schema: "pipeline.governance-export-adapter-profile.v1", profileId: "audit", format, adapterVersion: "v1", maxBatchEvents: 10, maxPayloadBytes: 10_000, acknowledgement: "per-event", ordering: "per-stream", deduplication: true, ...overrides }; }
+function profile(format, overrides = {}) { return { schema: "pipeline.governance-export-adapter-profile.v1", profileId: "audit", format, adapterVersion: "v1", maxBatchEvents: 10, maxPayloadBytes: 10_000, acknowledgement: "per-event", ordering: "per-stream", deduplication: true, advisory: false, ...overrides }; }
 
 test("maps sanitized projections deterministically into all supported interchange profiles", () => {
   const cloud = mapGovernanceExportProjection({ profile: profile("cloudevents-json"), projection: projection("cloudevents-json") });
@@ -91,4 +91,19 @@ test("E-AC-04 omits free-form rationale or agent-summary fields from every mappe
       assert.throws(() => mapGovernanceExportProjection({ profile: profile(format), projection: projection(format, { eventType: "safe", occurredAtEpochMs: 1, eventId: "event-1", ...extra }) }), (error) => error.code === "GEA-MAP", `${format} must reject ${Object.keys(extra)[0]}`);
     }
   }
+});
+// E-AC-09 (WP-E-AC09): "a destination is advisory" must be a closed,
+// representable classification -- not free text, and not a value a caller
+// can smuggle in outside the two-member boolean domain. This proves both a
+// legitimate `true`/`false` profile is accepted and that any non-boolean
+// value (string, number, null, or the field's outright absence) is rejected
+// the same way every other closed profile field already is.
+test("E-AC-09 the advisory destination classification is a closed boolean, not free text", () => {
+  assert.equal(validateGovernanceExportAdapterProfile(profile("ndjson", { advisory: true })).advisory, true);
+  assert.equal(validateGovernanceExportAdapterProfile(profile("ndjson", { advisory: false })).advisory, false);
+  for (const bad of ["advisory", "true", 1, 0, null, {}, []]) {
+    assert.throws(() => validateGovernanceExportAdapterProfile(profile("ndjson", { advisory: bad })), (error) => error.code === "GEA-PROFILE", `advisory must reject ${JSON.stringify(bad)}`);
+  }
+  const { advisory, ...withoutAdvisory } = profile("ndjson");
+  assert.throws(() => validateGovernanceExportAdapterProfile(withoutAdvisory), (error) => error.code === "GEA-PROFILE", "advisory must be a mandatory, not an optional, classification");
 });

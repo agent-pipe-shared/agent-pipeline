@@ -29,15 +29,24 @@ function string(value, fallback = "unknown") { return typeof value === "string" 
 function isoTime(value) { return Number.isSafeInteger(value) && value >= 0 ? new Date(value).toISOString() : null; }
 function escapedSyslog(value) { return string(value).replace(/[\\"][\r\n]/gu, (character) => ({ "\\": "\\\\", "\"": "\\\"", "\r": "", "\n": "" })[character]); }
 
-/** Describes a non-secret adapter capability; endpoint/authentication stay operator-local. */
+/**
+ * Describes a non-secret adapter capability; endpoint/authentication stay
+ * operator-local. `advisory` closes E-AC-09's classification: `true` marks a
+ * destination whose lag/unavailability must never block canonical local
+ * governance (E-AC-01's append-only event store takes no outbox/adapter/
+ * receipt/destination argument and stays unaffected either way); `false`
+ * leaves every other destination's own health handling exactly as before.
+ * This field alone carries no blocking/boundary behavior -- that is E-AC-10,
+ * out of scope here.
+ */
 export function validateGovernanceExportAdapterProfile(profile) {
-  const keys = ["schema", "profileId", "format", "adapterVersion", "maxBatchEvents", "maxPayloadBytes", "acknowledgement", "ordering", "deduplication"];
+  const keys = ["schema", "profileId", "format", "adapterVersion", "maxBatchEvents", "maxPayloadBytes", "acknowledgement", "ordering", "deduplication", "advisory"];
   if (!exact(profile, keys) || profile.schema !== "pipeline.governance-export-adapter-profile.v1" || !ID.test(profile.profileId)
     || !FORMATS.has(profile.format) || !ID.test(profile.adapterVersion)
     || !Number.isSafeInteger(profile.maxBatchEvents) || profile.maxBatchEvents < 1 || profile.maxBatchEvents > 1000
     || !Number.isSafeInteger(profile.maxPayloadBytes) || profile.maxPayloadBytes < 256 || profile.maxPayloadBytes > 10_000_000
     || !ACKNOWLEDGEMENTS.has(profile.acknowledgement) || !ORDERING.has(profile.ordering)
-    || typeof profile.deduplication !== "boolean") fail("GEA-PROFILE");
+    || typeof profile.deduplication !== "boolean" || typeof profile.advisory !== "boolean") fail("GEA-PROFILE");
   return freeze({ ...profile });
 }
 

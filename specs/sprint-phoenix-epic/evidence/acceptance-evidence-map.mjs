@@ -779,6 +779,33 @@ const DELTA = {
   // record, what "unverified observation" means) is answered, what remains is
   // a confirmed-absent caller capability, not a seam.
   'H-AC-08': ['partial', 'WP-HAC08'],
+
+  // --- scratch/wp-e-ac09-dispatch-record.json (task WP-E-AC09, 2026-08-09) ---
+  // A closed `advisory: boolean` classification is now mandatory on every
+  // governance-export adapter profile (validateGovernanceExportAdapterProfile,
+  // governance-export-adapter.mjs), rejecting any non-boolean value. It is
+  // threaded onto deliverGovernanceExportBatch's returned delivery result
+  // (governance-export-delivery.mjs) as `advisory`, deliberately sibling to
+  // `receipt` rather than merged into createGovernanceDeliveryReceipt's own
+  // exact()-closed 10-key schema: growing that schema would have broken two
+  // independent pre-existing pinned tests (governance-event-projection.test.mjs's
+  // direct receipt-construction test, and governance-export-delivery.test.mjs's
+  // E-AC-11 Object.keys(receipt) allowlist), both of which the dispatch's DoD
+  // required to pass unmodified -- the Goal text explicitly granted this
+  // shape/file latitude. A dedicated test proves an advisory destination's
+  // lag/failure is exposed identically to any other destination's (same
+  // terminalDisposition/lag semantics, same unchanged 10-key receipt shape,
+  // no new failure mode). A second dedicated test drives a real advisory-
+  // destination transport failure through deliverGovernanceExportBatch and,
+  // in the same test, appends/queries/verifies the canonical append-only
+  // event store (appendPortableGovernanceEvent, queryPortableGovernanceStream,
+  // verifyPortableGovernanceStream) with zero outbox/adapter/receipt/
+  // destination-health argument anywhere in those three calls, proving
+  // "canonical local governance continues" structurally. 7/7
+  // governance-export-adapter-tests, 3/3 governance-event-projection-tests
+  // (file untouched), 20/20 governance-export-delivery-tests (18 pre-existing
+  // unmodified + 2 new) all pass.
+  'E-AC-09': ['implemented', 'WP-E-AC09'],
 };
 
 // --- per-criterion evidence pointer ----------------------------------------

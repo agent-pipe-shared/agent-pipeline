@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 import { gunzipSync } from "node:zlib";
 import { createInMemoryGovernanceExportCollector, mapGovernanceExportProjection } from "./governance-export-adapter.mjs";
@@ -16,9 +20,13 @@ import {
 import { deliverGovernanceExportBatch } from "./governance-export-delivery.mjs";
 import { createGovernanceExportOutbox, enqueueGovernanceExport } from "./governance-export-outbox.mjs";
 import { createGovernanceDeliveryReceipt } from "./governance-event-projection.mjs";
+import { canonicalSha256, canonicalizeJson } from "./governance-event.mjs";
+import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
+import { discoverRepository } from "./worktree-lifecycle.mjs";
+import { appendPortableGovernanceEvent, queryPortableGovernanceStream, verifyPortableGovernanceStream } from "./governance-event-store.mjs";
 
 const sha = (character) => character.repeat(64);
-const profile = { schema: "pipeline.governance-export-adapter-profile.v1", profileId: "audit", format: "ndjson", adapterVersion: "v1", maxBatchEvents: 10, maxPayloadBytes: 10_000, acknowledgement: "per-event", ordering: "per-stream", deduplication: true };
+const profile = { schema: "pipeline.governance-export-adapter-profile.v1", profileId: "audit", format: "ndjson", adapterVersion: "v1", maxBatchEvents: 10, maxPayloadBytes: 10_000, acknowledgement: "per-event", ordering: "per-stream", deduplication: true, advisory: false };
 function projection(seed) { return { schema: "pipeline.governance-export-event.v1", destinationEventId: sha(seed), destinationProfile: "audit", format: "ndjson", policyRevision: sha("b"), sourceEventDigest: sha(seed === "a" ? "c" : "d"), fields: { eventType: "lifecycle.dispatch", eventId: `event-${seed}`, occurredAtEpochMs: 1 } }; }
 function queue() { return enqueueGovernanceExport(enqueueGovernanceExport(createGovernanceExportOutbox({ destinationProfile: "audit", policyRevision: sha("b") }), projection("a")), projection("e")); }
 
@@ -94,6 +102,76 @@ test("E-AC-09 exposes non-zero lag on the receipt when a destination fails to fu
   const result = await deliverGovernanceExportBatch({ outbox: queue(), profile, adapter, batchId: "batch-3", maxEvents: 2, attempt: 1 });
   assert.equal(result.receipt.terminalDisposition, "retryable-failure");
   assert.equal(result.receipt.lag, 2, "an unacknowledged batch must be reported as outstanding lag, not silently absorbed");
+});
+// E-AC-09 (WP-E-AC09): the closed advisory classification must be exposed
+// exactly the same way whether a destination is advisory or not -- no new
+// failure mode, no swallowed error -- so a consumer can tell "this lag/
+// failure belongs to a destination that is allowed to be behind or down"
+// from one that is not. The advisory destination below fails to acknowledge
+// exactly as the non-advisory fixture above did, and gets exactly the same
+// lag/terminalDisposition treatment; `advisory` on the delivery result is
+// the only thing that differs, sourced from the adapter profile.
+test("E-AC-09 an advisory destination's lag/failure is exposed identically to any other destination, labelled advisory on the delivery result", async () => {
+  const advisoryProfile = { ...profile, advisory: true };
+  const failing = { profile: advisoryProfile, async deliver() { return { schema: "pipeline.governance-export-acknowledgement.v1", profileId: "audit", batchId: "batch-advisory", acceptedDestinationEventIds: [], rejectedDestinationEventIds: [], receiptId: null }; } };
+  const result = await deliverGovernanceExportBatch({ outbox: queue(), profile: advisoryProfile, adapter: failing, batchId: "batch-advisory", maxEvents: 2, attempt: 1 });
+  assert.equal(result.advisory, true);
+  assert.equal(result.receipt.terminalDisposition, "retryable-failure");
+  assert.equal(result.receipt.lag, 2, "an advisory destination's unacknowledged batch is reported as lag exactly like any other destination's -- no swallowed error");
+  assert.deepEqual(Object.keys(result.receipt).sort(), ["acknowledgementClass", "attempt", "batchId", "cursor", "destinationProfile", "eventCount", "lag", "policyRevision", "projectionDigest", "schema", "terminalDisposition"].sort(), "the receipt schema itself carries no advisory-specific field or shape, proving no new failure mode");
+  const nonAdvisory = { ...profile, advisory: false };
+  const collector = createInMemoryGovernanceExportCollector({ profile: nonAdvisory });
+  const delivered = await deliverGovernanceExportBatch({ outbox: queue(), profile: nonAdvisory, adapter: collector, batchId: "batch-non-advisory", maxEvents: 1, attempt: 1 });
+  assert.equal(delivered.advisory, false);
+  assert.equal(delivered.receipt.terminalDisposition, "delivered");
+});
+// E-AC-09 (WP-E-AC09): "allowing canonical local governance to continue" is
+// proven structurally, not by absence-of-coupling assertion. This drives a
+// real advisory-destination failure through deliverGovernanceExportBatch
+// exactly as above, then appends to and queries/verifies the canonical
+// append-only event store over the *same* fixture, in the *same* test, with
+// zero outbox/adapter/receipt/destination-health argument anywhere in those
+// three calls -- their own signatures admit none -- while the destination
+// delivery beside them is actively failing.
+test("E-AC-09 canonical local governance appends, queries and verifies with zero outbox/adapter/receipt/destination-health input while an advisory destination fails", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "governance-export-delivery-eac09-"));
+  try {
+    execFileSync("git", ["init", "-q", root]);
+    const repository = discoverRepository(root);
+    const repositoryFingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: repository.commonDir, primaryRoot: repository.primaryRoot });
+    const capturePolicy = { schema: "pipeline.governance-capture-policy.v1", policyId: "fixture", revision: sha("c"), defaultAction: "deny", streams: [
+      { origin: "human", purpose: "authority-history", materiality: "required", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
+      { origin: "agent", purpose: "declared-assumption", materiality: "policy-selected", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
+      { origin: "lifecycle", purpose: "deterministic-lifecycle", materiality: "required", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
+    ], sanitizedReceipt: { allowEventId: true, allowEventDigest: true, allowCheckpoint: true, allowReasonText: false } };
+    await mkdir(path.join(root, "governance/events"), { recursive: true });
+    await writeFile(path.join(root, "governance/events/registry.json"), `${canonicalizeJson({ schema: "pipeline.governance-stream-registry.v1", repositoryFingerprint, canonicalization: "RFC8785", digestAlgorithm: "sha-256", eventDigestDomain: "pipeline.governance-event.v1\0", storageRoot: "governance/events", streams: [
+      { streamId: "human", origin: "human", authorityClass: "human-authority", relativeRoot: "human", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+      { streamId: "agent", origin: "agent", authorityClass: "non-authoritative", relativeRoot: "agent", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+      { streamId: "lifecycle", origin: "lifecycle", authorityClass: "non-authoritative", relativeRoot: "lifecycle", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+    ] })}\n`);
+    await writeFile(path.join(root, "governance/events/capture-policy.json"), `${canonicalizeJson(capturePolicy)}\n`);
+    const unavailable = { state: "not-applicable" };
+    const candidate = { commit: "b".repeat(40), tree: "c".repeat(40) };
+    const intent = { schema: "pipeline.governance-event-envelope.v1", payloadSchema: "pipeline.lifecycle-governance-event.v1", canonicalization: "RFC8785", digestAlgorithm: "sha-256", eventId: "evt-eac09-1", idempotencyKey: "idem-eac09-1", origin: "lifecycle", authorityClass: "non-authoritative", eventType: "lifecycle.dispatch", occurredAtEpochMs: 1, observedAtEpochMs: 1, timeAssurance: "locally-observed", repositoryFingerprint, sourceUri: `urn:pipeline:repository:${repositoryFingerprint}`, streamId: "lifecycle", correlation: { featureId: unavailable, packageId: "wp-e-ac09", requestId: unavailable, sessionId: unavailable, dispatchId: "dispatch-1", traceId: unavailable }, candidate, artifacts: [unavailable], policy: { policyDigest: unavailable, configurationDigest: unavailable, capturePolicyDigest: canonicalSha256(capturePolicy), redactionPolicyDigest: unavailable }, classification: "repository-public-safe", storageProfile: "repository-public-safe", retentionCompatibility: "repository-retained", disclosureClass: "repository-visible", payload: { eventId: "lifecycle-eac09-1", kind: "dispatch", status: "active", reasonCode: "DISPATCHED", correlation: { packageId: "wp-e-ac09", dispatchId: "dispatch-1", attemptId: "attempt-1", workerId: "worker-1", correlationId: "correlation-1", queueRevision: 0 }, candidate, invalidatesEventId: null, supersedesEventId: null } };
+
+    // The advisory destination is down for this whole test.
+    const advisoryProfile = { ...profile, advisory: true };
+    const unreachable = { profile: advisoryProfile, async deliver() { throw new Error("ECONNREFUSED: simulated advisory destination unreachable"); } };
+    await assert.rejects(() => deliverGovernanceExportBatch({ outbox: queue(), profile: advisoryProfile, adapter: unreachable, batchId: "batch-down", maxEvents: 1, attempt: 1 }), /ECONNREFUSED/);
+
+    // Canonical local governance proceeds regardless -- none of these three
+    // calls take an outbox/adapter/receipt/destination argument at all.
+    const appended = await appendPortableGovernanceEvent({ repositoryRoot: root, repositoryFingerprint, intent });
+    assert.equal(appended.outcome, "appended");
+    const queried = await queryPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint, streamId: "lifecycle" });
+    assert.deepEqual(queried.events.map((event) => event.sequence), [1]);
+    const verified = await verifyPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint, streamId: "lifecycle" });
+    assert.equal(verified.integrity, "prefix-valid");
+    assert.equal(verified.eventCount, 1);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 // E-AC-11: the receipt must state exactly its declared fields and reject any
 // retention/immutability/analyst-review/compliance-implying extension. Pinned

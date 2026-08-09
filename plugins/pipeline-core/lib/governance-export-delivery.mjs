@@ -25,5 +25,15 @@ export async function deliverGovernanceExportBatch({ outbox, profile, adapter, b
   const next = applyGovernanceExportDelivery(queue, { attempt, acceptedDestinationEventIds: acknowledgement.acceptedDestinationEventIds, quarantinedDestinationEventIds: acknowledgement.rejectedDestinationEventIds });
   const accepted = acknowledgement.acceptedDestinationEventIds.length;
   const receipt = createGovernanceDeliveryReceipt({ destinationProfile: active.profileId, policyRevision: queue.policyRevision, projectionDigest, batchId, eventCount: entries.length, attempt, acknowledgementClass: accepted === entries.length ? "accepted" : accepted === 0 ? "none" : "partial", terminalDisposition: entries.length === 0 || accepted === entries.length ? "delivered" : acknowledgement.rejectedDestinationEventIds.length > 0 ? "quarantined" : "retryable-failure", cursor: next.cursor, lag: next.entries.filter((entry) => entry.status === "pending").length });
-  return Object.freeze({ schema: "pipeline.governance-export-delivery-result.v1", outbox: next, mappings: Object.freeze(mappings), acknowledgement, receipt });
+  // E-AC-09: the receipt's own schema is a pinned, independently tested
+  // closed shape (governance-event-projection.mjs's exact() check plus its
+  // own key-list assertion in this module's test suite); growing it here
+  // would silently widen that contract for every caller of
+  // createGovernanceDeliveryReceipt, not just this one. `advisory` is
+  // instead threaded onto this same delivery result, alongside `receipt`,
+  // from the adapter profile that is the classification's source of truth --
+  // so a consumer reading one delivery result can tell, without a second
+  // lookup, whether *this* receipt's lag/failure belongs to a destination
+  // that is allowed to be behind or down.
+  return Object.freeze({ schema: "pipeline.governance-export-delivery-result.v1", outbox: next, mappings: Object.freeze(mappings), acknowledgement, receipt, advisory: active.advisory });
 }
