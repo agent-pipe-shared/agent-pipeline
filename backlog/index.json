@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "1a1dbc28e29166b7614bc2cd3a6b5ab3351b2ac006020530d291c1658206b021"
+    "transitionHead": "9d6df79eca05b0dbd720000039a98d17f15dc4cef7af0fe3978f95b80e6227f2"
   },
   "counts": {
-    "open": 92,
+    "open": 93,
     "in_progress": 21,
     "closed": 28
   },
@@ -87,6 +87,14 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "PO hypothesis, 2026-08-08: 'kann es sein dass sie durch die vielen neuen guards und vorgaben zu wenig Pflichtwissen darüber haben was erlaubt ist und was nicht und dadurch zu viele guard blocks und hook blocks produzieren?' — measured and confirmed by the Elephant the same day."
+    },
+    {
+      "id": "pipeline.agents-read-the-source-because-nothing-describes-the-interface",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "Full command-level analysis of the PO's Codex greenfield happy path against the 0.5.4 candidate (rollout 019fe56c + 019fe56f, 2026-08-09), read from the Codex rollout logs rather than the chat transcript."
     },
     {
       "id": "pipeline.approved-not-implementing-is-a-silent-trap",
