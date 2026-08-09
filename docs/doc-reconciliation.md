@@ -47,6 +47,20 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 6590aebad70e8938d1918259f56e8fb8c23617ba — 2026-08-09, range 3387065..6590aeba, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `506a0543` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `fe1faf1f` through `6590aeba`: E-AC-04's closure (`governance-export-adapter.mjs`) and
+A-AC-08's closure (a new standalone checker, `harness/scripts/check-dispatch-provenance.mjs` —
+confirmed by this same check it carries no `Governs:` line and isn't itself an ADR-governed path),
+plus their evidence-map bookings and checkpoint. No code in this range touches the canonical
+artifact topology ADR-0045 governs beyond ordinary content evolution inside files it already
+lists. Same reading as the whole chain: `docs/state.md` stays ADR-0012, the generated
+evidence-map/closure-plan/design-doc set stays ADR-0045.
+
 ## Candidate 506a05434b964754873931c2b42137750b58dc87 — 2026-08-09, range 3387065..506a0543, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
