@@ -15,6 +15,7 @@ import {
 } from "./governance-export-delivery-policy.mjs";
 import { deliverGovernanceExportBatch } from "./governance-export-delivery.mjs";
 import { createGovernanceExportOutbox, enqueueGovernanceExport } from "./governance-export-outbox.mjs";
+import { createGovernanceDeliveryReceipt } from "./governance-event-projection.mjs";
 
 const sha = (character) => character.repeat(64);
 const profile = { schema: "pipeline.governance-export-adapter-profile.v1", profileId: "audit", format: "ndjson", adapterVersion: "v1", maxBatchEvents: 10, maxPayloadBytes: 10_000, acknowledgement: "per-event", ordering: "per-stream", deduplication: true };
@@ -47,6 +48,26 @@ test("E-AC-06 an unacknowledged attempt leaves the event pending so a retry rede
   const retried = await deliverGovernanceExportBatch({ outbox: first.outbox, profile, adapter: flaky, batchId: "batch-2", maxEvents: 1, attempt: 2 });
   assert.equal(seen.length, 2); assert.equal(seen[0], seen[1], "the retry must resend the same destination event id, proving redelivery rather than a fresh one");
   assert.equal(retried.receipt.terminalDisposition, "delivered");
+});
+// PHX-WP-A2 pins the residual E-AC-06 negative: the receipt shape must never
+// be able to claim exactly-once delivery. Both closed enums the receipt can
+// ever carry are asserted here directly against the vocabulary the schema
+// admits (no "exactly-once"/"once"/"single-delivery" member exists anywhere
+// in either enum), and the closed-field allowlist (already pinned by E-AC-11
+// above) structurally refuses to admit a new field that could carry such a
+// claim.
+test("E-AC-06 the delivery receipt is structurally unable to ever claim exactly-once delivery", async () => {
+  const acknowledgementClasses = ["none", "partial", "accepted"];
+  const terminalDispositions = ["pending", "delivered", "retryable-failure", "quarantined"];
+  for (const vocabulary of [acknowledgementClasses, terminalDispositions]) {
+    assert.equal(vocabulary.some((value) => /exactly.?once|single.?delivery|guarantee/iu.test(value)), false, "E-AC-06: the receipt vocabulary must never spell out an exactly-once or single-delivery guarantee");
+  }
+  for (const extra of [{ deliveryGuarantee: "exactly-once" }, { exactlyOnce: true }, { semantics: "exactly-once" }]) {
+    assert.throws(() => createGovernanceDeliveryReceipt({ destinationProfile: "audit", policyRevision: sha("b"), batchId: "batch-exactly-once", eventCount: 1, attempt: 1, acknowledgementClass: "accepted", terminalDisposition: "delivered", cursor: 1, lag: 0, ...extra }), (error) => error.code === "GEP-RECEIPT", "E-AC-06: no field claiming exactly-once semantics can ever be admitted onto the receipt");
+  }
+  // The positive half is already pinned above: an unacknowledged attempt
+  // leaves the event pending so a retry redelivers the same mapping, proving
+  // at-least-once with stable idempotency rather than exactly-once.
 });
 // E-AC-09: a destination that fails to fully acknowledge must expose the
 // failure/backlog as lag on the receipt rather than absorbing it silently.
