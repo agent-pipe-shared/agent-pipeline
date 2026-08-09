@@ -31,16 +31,23 @@ something to do here without review.
 
 ## Entries
 
-## Candidate 9b279916d42b2b84fee43c056563fb7c2e83ba87 — 2026-08-09, range 8dcb1cc..9b27991, the push candidate; supersedes the 3a85891 entry below
+## Candidate 2e0ea8c8e689edaef82e7a10b2eaa09401be9fa5 — 2026-08-09, range 8dcb1cc..2e0ea8c, the substantive tip of the push candidate; supersedes the 9b27991 and 3a85891 entries below
 
 - ADR-0012: checked, no change needed.
 - ADR-0045: checked, no change needed.
 
-Same two ADRs, same findings, same reasoning as the entry below — the candidate
-moved because recording the green gate result is itself a change to the handover
-file that ADR-0012 governs. That is not bookkeeping noise, it is the write-order
-rule being real: this file is the last commit before a push, and any later
-substantive commit invalidates the entry rather than ageing it quietly.
+Same two ADRs, same findings, same reasoning as the entries below — the candidate
+moved because each further change to the handover file is itself governed by
+ADR-0012. That is not bookkeeping noise, it is the write-order rule being real.
+
+**And it does not terminate on its own.** The implicated set is computed over the
+whole range, so a governed path that changed anywhere in it keeps implicating its
+ADR no matter what the tip touches; an entry for the record commit would need
+another entry, without end. What bounds it is the rule at the top of this file:
+the check is run against the tip of the **substantive** work, and the commit that
+adds this entry sits deliberately outside the reconciled range. Anyone extending
+this file should reconcile to their own substantive tip, not to the commit they
+are about to make.
 
 The entry below is kept rather than replaced. It covers a candidate that was
 genuinely reconciled, and deleting superseded entries would make this file's own
