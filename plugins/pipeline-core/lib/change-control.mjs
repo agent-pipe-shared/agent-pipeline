@@ -1,11 +1,34 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Provider-neutral composed gate for local and external change control. */
+import { dualEvaluateDecisionReference, isDecisionReference } from "./decision-reference-dual-evaluation.mjs";
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u; const SHA = /^[a-f0-9]{64}$/u; const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 function exact(value, keys) { return value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key)); }
 function fail(code) { const error = new Error("Change control input is invalid."); error.code = code; throw error; }
 function candidate(value) { return exact(value, ["commit", "tree"]) && OID.test(value.commit) && OID.test(value.tree); }
 function artifact(value) { return exact(value, ["path", "sha256"]) && typeof value.path === "string" && SHA.test(value.sha256); }
 function window(value) { return exact(value, ["startsAtEpochMs", "endsAtEpochMs"]) && Number.isSafeInteger(value.startsAtEpochMs) && Number.isSafeInteger(value.endsAtEpochMs) && value.startsAtEpochMs >= 0 && value.endsAtEpochMs >= value.startsAtEpochMs; }
+// H-AC-12: `decisionReference` is an OPTIONAL 7th key on `pipelineAuthority`, never required
+// -- its ABSENCE leaves pipelineAuthority's shape and every downstream check byte-for-byte
+// identical to before this dispatch (regression-proof). When present, it must be exactly
+// `{ reference, resolved }`: `reference` reuses the SAME `pipeline.human-decision-reference.v1`
+// shape guard-devplan.mjs and plan-spec-state-v2.mjs already validate (via the shared
+// `isDecisionReference`, not a new one), and `resolved` is the caller's ALREADY-RESOLVED
+// second-reader verdict for that exact reference -- this module stays a pure evaluator with
+// no I/O, exactly like it already trusts a pre-resolved `externalReceipt`.
+function validPipelineAuthority(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const keys = Object.keys(value);
+  const hasDecisionReference = keys.length === 7 && Object.hasOwn(value, "decisionReference");
+  if (keys.length !== 6 && !hasDecisionReference) return false;
+  if (typeof value.granted !== "boolean" || !candidate(value.candidate) || !artifact(value.artifact)
+    || !ID.test(value.environment) || !SHA.test(value.scopeSha256) || typeof value.emergencyAuthorized !== "boolean") return false;
+  if (!hasDecisionReference) return true;
+  const decisionReference = value.decisionReference;
+  return decisionReference !== null && typeof decisionReference === "object" && !Array.isArray(decisionReference)
+    && exact(decisionReference, ["reference", "resolved"])
+    && typeof decisionReference.resolved === "boolean"
+    && isDecisionReference(decisionReference.reference);
+}
 // C-AC-02: a standard-change profile must bind to an externally pre-authorized
 // template and its still-valid revision (issue #24 §5); every other class
 // carries no such binding at all.
@@ -27,9 +50,22 @@ export function validateChangeControlReceipt(receipt) {
 function same(left, right) { return JSON.stringify(left) === JSON.stringify(right); }
 /** The gate never converts ITSM text/receipt into Pipeline or human authority. */
 export function evaluateChangeControlGate({ profile, pipelineAuthority, externalReceipt, nowEpochMs } = {}) {
-  const current = validateChangeControlProfile(profile); if (!Number.isSafeInteger(nowEpochMs) || nowEpochMs < 0 || !exact(pipelineAuthority, ["granted", "candidate", "artifact", "environment", "scopeSha256", "emergencyAuthorized"]) || typeof pipelineAuthority.granted !== "boolean" || !candidate(pipelineAuthority.candidate) || !artifact(pipelineAuthority.artifact) || !ID.test(pipelineAuthority.environment) || !SHA.test(pipelineAuthority.scopeSha256) || typeof pipelineAuthority.emergencyAuthorized !== "boolean") fail("CC-GATE");
+  const current = validateChangeControlProfile(profile); if (!Number.isSafeInteger(nowEpochMs) || nowEpochMs < 0 || !validPipelineAuthority(pipelineAuthority)) fail("CC-GATE");
   const matchesLocal = pipelineAuthority.granted && same(pipelineAuthority.candidate, current.candidate) && same(pipelineAuthority.artifact, current.artifact) && pipelineAuthority.environment === current.environment && pipelineAuthority.scopeSha256 === current.scopeSha256;
   if (!matchesLocal) return Object.freeze({ schema: "pipeline.change-control-gate.v1", status: "blocked", reason: "pipeline-authority" });
+  // H-AC-12: only reached when `decisionReference` is present (see validPipelineAuthority
+  // above) -- absent, this block never runs and behavior is byte-for-byte unchanged.
+  // `legacyOk` is `pipelineAuthority.granted`, already required `true` by `matchesLocal`
+  // above; `ledgerOk` is the caller's pre-resolved second-reader verdict. Disagreement
+  // fails closed with its own distinct, operator-visible reason.
+  if (Object.hasOwn(pipelineAuthority, "decisionReference")) {
+    const evaluation = dualEvaluateDecisionReference({
+      legacyOk: pipelineAuthority.granted,
+      reference: pipelineAuthority.decisionReference.reference,
+      ledgerOk: pipelineAuthority.decisionReference.resolved,
+    });
+    if (!evaluation.ok) return Object.freeze({ schema: "pipeline.change-control-gate.v1", status: "blocked", reason: "decision-reference-disagreement" });
+  }
   if (current.changeClass === "emergency" && !pipelineAuthority.emergencyAuthorized) return Object.freeze({ schema: "pipeline.change-control-gate.v1", status: "blocked", reason: "emergency-authority" });
   if (!current.mandatory) return Object.freeze({ schema: "pipeline.change-control-gate.v1", status: "allowed", reason: "not-required" });
   if (externalReceipt === null) {

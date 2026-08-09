@@ -3,6 +3,21 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { appendChangeControlEntry, createChangeControlJournal, detectChangeClassShopping, evaluateChangeControlGate, projectChangeControlState, resolveChangeControlProfile, validateChangeControlProfile } from "./change-control.mjs";
 
+const decisionReferenceFixture = {
+  schema: "pipeline.human-decision-reference.v1",
+  decisionId: "PHX-DEC-1",
+  decisionDigest: "1".repeat(64),
+  candidate: { commit: "2".repeat(40), tree: "3".repeat(40) },
+  checkpoint: {
+    repositoryFingerprint: "4".repeat(64),
+    streamId: "human",
+    sequence: 1,
+    eventDigest: "5".repeat(64),
+    candidateCommit: "2".repeat(40),
+    candidateTree: "3".repeat(40),
+  },
+};
+
 const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) }; const artifact = { path: "specs/release/result.md", sha256: "c".repeat(64) }; const window = { startsAtEpochMs: 10, endsAtEpochMs: 20 };
 function profile(overrides = {}) { return { schema: "pipeline.change-control-profile.v1", profileId: "production-change", policySha256: "d".repeat(64), changeClass: "normal", candidate, artifact, environment: "production", scopeSha256: "e".repeat(64), window, mandatory: true, standardTemplate: null, reviewPolicy: "mandatory", ...overrides }; }
 function local(overrides = {}) { return { granted: true, candidate, artifact, environment: "production", scopeSha256: "e".repeat(64), emergencyAuthorized: false, ...overrides }; }
@@ -334,4 +349,49 @@ test("C-AC-02 ignores alternatives for a different tuple and rejects malformed i
   assert.throws(() => detectChangeClassShopping(profile({ note: "provider-fixture" }), []), (error) => error.code === "CC-PROFILE");
   assert.throws(() => detectChangeClassShopping(profile(), "not-an-array"), (error) => error.code === "CC-SHOPPING");
   assert.throws(() => detectChangeClassShopping(profile(), [profile({ note: "provider-fixture" })]), (error) => error.code === "CC-PROFILE");
+});
+
+// H-AC-12: pipelineAuthority.decisionReference is an entirely OPTIONAL 7th key. Its
+// absence must leave every existing boolean-only assertion above byte-for-byte
+// unaffected -- this test only ADDS new assertions, no existing test above is touched.
+test("H-AC-12 pipelineAuthority.decisionReference absent leaves boolean-only behavior unchanged", () => {
+  assert.deepEqual(Object.keys(local()).sort(), ["artifact", "candidate", "emergencyAuthorized", "environment", "granted", "scopeSha256"]);
+  assert.deepEqual(evaluateChangeControlGate({ profile: profile(), pipelineAuthority: local(), externalReceipt: receipt(), nowEpochMs: 15 }), { schema: "pipeline.change-control-gate.v1", status: "allowed", reason: "composed-authority" });
+});
+
+test("H-AC-12 dual-evaluates an OPTIONAL decisionReference against pipelineAuthority.granted, agreement allows", () => {
+  const authority = local({ decisionReference: { reference: decisionReferenceFixture, resolved: true } });
+  assert.deepEqual(evaluateChangeControlGate({ profile: profile(), pipelineAuthority: authority, externalReceipt: receipt(), nowEpochMs: 15 }), { schema: "pipeline.change-control-gate.v1", status: "allowed", reason: "composed-authority" });
+});
+
+test("H-AC-12 a decisionReference that disagrees with pipelineAuthority.granted fails closed with a distinct reason", () => {
+  const authority = local({ decisionReference: { reference: decisionReferenceFixture, resolved: false } });
+  const result = evaluateChangeControlGate({ profile: profile(), pipelineAuthority: authority, externalReceipt: receipt(), nowEpochMs: 15 });
+  assert.equal(result.status, "blocked");
+  assert.equal(result.reason, "decision-reference-disagreement");
+  assert.notEqual(result.reason, "pipeline-authority");
+});
+
+// Unlike guard-devplan.mjs's own raw-State reader (which must fail closed on malformed
+// STATE data rather than crash), change-control.mjs's established convention is that
+// every caller-supplied input is already validated upstream -- exactly like a malformed
+// `externalReceipt` already throws CC-RECEIPT rather than silently reading as "blocked".
+// A malformed `reference` is consistently rejected the same way, at the pipelineAuthority
+// shape boundary, before dual-evaluation is ever reached.
+test("H-AC-12 a malformed decisionReference.reference is rejected at the input boundary (CC-GATE), consistent with every other malformed input here", () => {
+  const malformed = { reference: { ...decisionReferenceFixture, decisionDigest: "not-hex" }, resolved: true };
+  assert.throws(() => evaluateChangeControlGate({ profile: profile(), pipelineAuthority: local({ decisionReference: malformed }), externalReceipt: receipt(), nowEpochMs: 15 }), (error) => error.code === "CC-GATE");
+});
+
+test("H-AC-12 decisionReference must be a closed { reference, resolved } shape, or CC-GATE rejects it", () => {
+  assert.throws(() => evaluateChangeControlGate({ profile: profile(), pipelineAuthority: local({ decisionReference: null }), externalReceipt: receipt(), nowEpochMs: 15 }), (error) => error.code === "CC-GATE");
+  assert.throws(() => evaluateChangeControlGate({ profile: profile(), pipelineAuthority: local({ decisionReference: { reference: decisionReferenceFixture, resolved: "yes" } }), externalReceipt: receipt(), nowEpochMs: 15 }), (error) => error.code === "CC-GATE");
+  assert.throws(() => evaluateChangeControlGate({ profile: profile(), pipelineAuthority: local({ decisionReference: { reference: decisionReferenceFixture, resolved: true, extra: "x" } }), externalReceipt: receipt(), nowEpochMs: 15 }), (error) => error.code === "CC-GATE");
+});
+
+test("H-AC-12 decisionReference dual-evaluation still requires pipeline-authority to bind the exact tuple first", () => {
+  const authority = local({ granted: false, decisionReference: { reference: decisionReferenceFixture, resolved: true } });
+  const result = evaluateChangeControlGate({ profile: profile(), pipelineAuthority: authority, externalReceipt: receipt(), nowEpochMs: 15 });
+  assert.equal(result.status, "blocked");
+  assert.equal(result.reason, "pipeline-authority");
 });

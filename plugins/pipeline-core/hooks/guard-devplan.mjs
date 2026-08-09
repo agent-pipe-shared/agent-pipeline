@@ -144,6 +144,7 @@ import {
 } from "../lib/project-authority.mjs";
 import { derivePlanLifecycle } from "../lib/plan-spec-state-v2.mjs";
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
+import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
 
 // ---- PHX-LEDGERAUTH: restored read-time ledger resolution -----------------------------
 // Restored from 998a609:plugins/pipeline-core/hooks/guard-devplan.mjs (lines 138-145 and
@@ -163,6 +164,52 @@ const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 function exact(value, keys) {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+}
+
+/**
+ * The Cyborg governance-authority CLI request/readback exchange, shared by
+ * every ledger-backed resolution path below (v3's own `humanDecision` AND the
+ * generalized H-AC-12 dual-evaluation path for legacy/v2/v4 approvals). Kept
+ * as ONE spawnSync + readback-validation body rather than duplicated per
+ * caller. `authority`/`packageId` bind the readback to the exact plan/spec
+ * bytes and feature the reference is being asked to cover.
+ */
+function resolveHumanDecisionReadback(reference, projectDir, { packageId, planPath, planSha256, specPath, specSha256 }) {
+  const request = {
+    schema: "pipeline.governance-authority-request.v1",
+    repositoryFingerprint: reference.checkpoint.repositoryFingerprint,
+    decisionId: reference.decisionId,
+    candidate: reference.candidate,
+    checkpoint: reference.checkpoint,
+    nowEpochMs: Date.now(),
+  };
+  const invoked = spawnSync(process.execPath, [
+    GOVERNANCE_AUTHORITY_CLI,
+    "--repo", projectDir,
+    "--request-json", JSON.stringify(request),
+  ], { encoding: "utf8", timeout: 5000, shell: false });
+  if (invoked.status !== 0) return false;
+  let readback;
+  try { readback = JSON.parse(invoked.stdout); } catch { return false; }
+  if (!exact(readback, ["schema", "granted", "decisionId", "decisionDigest", "scope", "singleUse"])
+    || readback.schema !== "pipeline.governance-authority-readback.v1"
+    || readback.granted !== true
+    || readback.decisionId !== reference.decisionId
+    || readback.decisionDigest !== reference.decisionDigest
+    || readback.singleUse !== true
+    || !exact(readback.scope, ["repositoryFingerprint", "candidate", "packageId", "action", "environment", "artifacts"])
+    || readback.scope.repositoryFingerprint !== reference.checkpoint.repositoryFingerprint
+    || JSON.stringify(readback.scope.candidate) !== JSON.stringify(reference.candidate)
+    || readback.scope.packageId !== packageId
+    || readback.scope.action !== "APPROVE_PLAN"
+    || readback.scope.environment !== "local"
+    || !Array.isArray(readback.scope.artifacts)) return false;
+  const expected = [
+    { path: planPath, sha256: planSha256 },
+    { path: specPath, sha256: specSha256 },
+  ];
+  return expected.every((artifact) => readback.scope.artifacts.some((entry) => exact(entry, ["path", "sha256"])
+    && entry.path === artifact.path && entry.sha256 === artifact.sha256));
 }
 
 /**
@@ -195,41 +242,59 @@ function hasLedgerBackedPlanApproval(state, projectDir) {
     || reference.checkpoint.candidateCommit !== reference.candidate.commit
     || reference.checkpoint.candidateTree !== reference.candidate.tree
     || reference.checkpoint.repositoryFingerprint !== approval.poGateAuthority.repositoryFingerprint) return false;
-  const request = {
-    schema: "pipeline.governance-authority-request.v1",
-    repositoryFingerprint: reference.checkpoint.repositoryFingerprint,
-    decisionId: reference.decisionId,
-    candidate: reference.candidate,
-    checkpoint: reference.checkpoint,
-    nowEpochMs: Date.now(),
-  };
-  const invoked = spawnSync(process.execPath, [
-    GOVERNANCE_AUTHORITY_CLI,
-    "--repo", projectDir,
-    "--request-json", JSON.stringify(request),
-  ], { encoding: "utf8", timeout: 5000, shell: false });
-  if (invoked.status !== 0) return false;
-  let readback;
-  try { readback = JSON.parse(invoked.stdout); } catch { return false; }
-  if (!exact(readback, ["schema", "granted", "decisionId", "decisionDigest", "scope", "singleUse"])
-    || readback.schema !== "pipeline.governance-authority-readback.v1"
-    || readback.granted !== true
-    || readback.decisionId !== reference.decisionId
-    || readback.decisionDigest !== reference.decisionDigest
-    || readback.singleUse !== true
-    || !exact(readback.scope, ["repositoryFingerprint", "candidate", "packageId", "action", "environment", "artifacts"])
-    || readback.scope.repositoryFingerprint !== reference.checkpoint.repositoryFingerprint
-    || JSON.stringify(readback.scope.candidate) !== JSON.stringify(reference.candidate)
-    || readback.scope.packageId !== feature.id
-    || readback.scope.action !== "APPROVE_PLAN"
-    || readback.scope.environment !== "local"
-    || !Array.isArray(readback.scope.artifacts)) return false;
-  const expected = [
-    { path: approval.poGateAuthority.planPath, sha256: approval.poGateAuthority.planSha256 },
-    { path: approval.poGateAuthority.specPath, sha256: approval.poGateAuthority.specSha256 },
-  ];
-  return expected.every((artifact) => readback.scope.artifacts.some((entry) => exact(entry, ["path", "sha256"])
-    && entry.path === artifact.path && entry.sha256 === artifact.sha256));
+  return resolveHumanDecisionReadback(reference, projectDir, {
+    packageId: feature.id,
+    planPath: approval.poGateAuthority.planPath,
+    planSha256: approval.poGateAuthority.planSha256,
+    specPath: approval.poGateAuthority.specPath,
+    specSha256: approval.poGateAuthority.specSha256,
+  });
+}
+
+/**
+ * H-AC-12, generalized to every legacy/v2/v4 plan approval that is NOT
+ * `pipeline.plan-approval.v3` (the schema `hasLedgerBackedPlanApproval` above
+ * already covers). Before this dispatch, this branch was a bare skip: any
+ * schema other than v3 exited allow with NO second evaluation at all. Now it
+ * dual-evaluates: the "old mechanism" verdict is the already-true
+ * `lifecycle.ok` structural verdict this function is only called under, and
+ * the "new" reader is an OPTIONAL, top-level `state.planApprovalDecisionReference`
+ * (schema `pipeline.human-decision-reference.v1`, reused verbatim -- same
+ * shape v3's own `humanDecision` field already carries) -- independent of
+ * `planApproval` itself, so it does not require touching the exact-key
+ * schema validators in `lib/plan-spec-state-v2.mjs` (out of this dispatch's
+ * scope) to let a non-v3 approval carry one. No writer populates this field
+ * yet (`harness/scripts/pipeline-state.mjs` is out of scope for this
+ * dispatch); it is deliberately additive and forward-compatible: a reader
+ * ready to dual-evaluate the moment a reference appears, ahead of any writer
+ * change. A BARE legacy approval (`approvedBy`/`approvedAt` only, no
+ * `poGateAuthority` at all -- the sole pre-v2 compatibility shape) carries no
+ * planPath/specSha256 pair to bind a reference to; there is nothing to
+ * dual-evaluate against, so it keeps exactly its current single-evaluation
+ * standing, unchanged.
+ */
+function hasGeneralizedLedgerBackedPlanApproval(state, projectDir) {
+  const approval = state?.planApproval;
+  const feature = state?.activeFeature;
+  const authority = approval?.poGateAuthority;
+  const hasAuthority = authority !== null && typeof authority === "object" && !Array.isArray(authority)
+    && typeof authority.planPath === "string" && SHA256.test(authority.planSha256 ?? "")
+    && typeof authority.specPath === "string" && SHA256.test(authority.specSha256 ?? "")
+    && SHA256.test(authority.repositoryFingerprint ?? "");
+  const reference = state?.planApprovalDecisionReference;
+  const evaluation = dualEvaluateDecisionReference({
+    legacyOk: true, // this function is only reached once lifecycle.ok/status==="implementing" already hold
+    reference: hasAuthority ? reference : undefined,
+    resolveReference: (ref) => ref.checkpoint.repositoryFingerprint === authority.repositoryFingerprint
+      && resolveHumanDecisionReadback(ref, projectDir, {
+        packageId: feature.id,
+        planPath: authority.planPath,
+        planSha256: authority.planSha256,
+        specPath: authority.specPath,
+        specSha256: authority.specSha256,
+      }),
+  });
+  return evaluation.ok;
 }
 
 /** The one schema whose approval carries a ledger reference that must still resolve. */
@@ -359,11 +424,16 @@ const lifecycle = derivePlanLifecycle(state, {
 // PHX-LEDGERAUTH: AND-ed onto the existing permit, never a second permit path. A v3
 // approval is ledger-first by construction, so the stored human-decision reference must
 // still resolve from the canonical ledger at THIS read before the lifecycle verdict is
-// honoured. v2/v4/legacy approvals are untouched and keep exactly their current standing.
+// honoured. H-AC-12 (narrowed scope, see hasGeneralizedLedgerBackedPlanApproval's own
+// docstring above): every other schema now ALSO runs through the shared dual-evaluation
+// primitive -- trusting the old structural verdict when no ledger reference is present
+// (unchanged standing), but failing closed on disagreement the moment one is.
 let ledgerAuthorityUnresolved = false;
 if (lifecycle.status === "implementing" && lifecycle.ok && lifecycle.nextAction === null) {
-  if (state.planApproval?.schema !== LEDGER_FIRST_APPROVAL_SCHEMA
-    || hasLedgerBackedPlanApproval(state, projectDir)) {
+  const resolved = state.planApproval?.schema === LEDGER_FIRST_APPROVAL_SCHEMA
+    ? hasLedgerBackedPlanApproval(state, projectDir)
+    : hasGeneralizedLedgerBackedPlanApproval(state, projectDir);
+  if (resolved) {
     process.exit(0);
   }
   ledgerAuthorityUnresolved = true;
@@ -392,10 +462,12 @@ if (isExempt) process.exit(0);
 
 // ---- verdict --------------------------------------------------------------------------
 const lifecycleReason = ledgerAuthorityUnresolved
-  ? "The recorded pipeline.plan-approval.v3 approval is ledger-first: its human-decision "
-    + "reference must still resolve from the canonical human ledger at THIS read, and it did "
-    + "not. A mutable planApproved projection is never authority by itself. Re-record it: "
-    + "node harness/scripts/pipeline-state.mjs approve-plan --by <name> "
+  ? "The recorded plan approval has an associated human-decision reference (H-AC-12 "
+    + "migration boundary -- either the v3 approval's own ledger-first binding, or a "
+    + "top-level planApprovalDecisionReference dual-evaluated alongside a legacy/v2/v4 "
+    + "approval) that must still resolve from the canonical human ledger at THIS read, and "
+    + "it did not. A mutable planApproved projection is never authority by itself. "
+    + "Re-record it: node harness/scripts/pipeline-state.mjs approve-plan --by <name> "
     + "--human-decision-file <repo-relative-reference>."
   : lifecycle.nextAction === "reopen-design"
   ? "Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing."
