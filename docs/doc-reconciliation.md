@@ -47,6 +47,20 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 4a25e1ccfcd5c6be25ff974cf7f49d979287fe2e — 2026-08-09, range 3387065..4a25e1c, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `06a4db4` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `d2ad02a`, `01bafdf`, `cb0c26d`, `8d91106`, `4a25e1c`: WP-K-AC05 (fork-disposition
+recording, pending Critic), WP-O1O2-DESIGN (the O-1/O-2 design amendment, pending Critic),
+WP-C-AC12 (closed, advisory ITSM policy), WP-R-AC10 (closed, non-material journaling
+exception), and a checkpoint documenting a shared-working-tree evidence-map race between the
+last two. Same reading as the whole chain: `docs/state.md` stays ADR-0012, the generated
+evidence-map/closure-plan trio stays ADR-0045; the four code/design commits in this range touch
+no ADR-governed path.
+
 ## Candidate 06a4db4a904c07904fbdd629e41624cceefbf373 — 2026-08-09, range 3387065..06a4db4, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
