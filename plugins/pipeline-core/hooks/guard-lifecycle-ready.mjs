@@ -1196,14 +1196,22 @@ function sanctionedOnboardingArgs(rawArgs, root) {
     && (args.length === 6
       || (args.length === 8 && args[6] === "--intent"
         && ["onboarding", "bootstrap", "session", "dispatch"].includes(args[7])))) return true;
+  // --language <de|en> is mandatory for kickoff plan/apply since the CLI's
+  // GF-066 addition (scripts/project-onboarding-v3.mjs:56,92,114); it sits
+  // between --goal <text> and --plan-sha256 <sha256> in the CLI's own
+  // documented canonical order. Exact position, exact two-value enum, like
+  // every other branch in this function -- no reordering tolerance.
   if (args[0] === "kickoff" && args[1] === "plan"
     && exactRoot(args, root, 2) && args[4] === "--goal"
-    && typeof args[5] === "string" && args[5].trim() !== "" && args.length === 6) return true;
+    && typeof args[5] === "string" && args[5].trim() !== ""
+    && args[6] === "--language" && ["de", "en"].includes(args[7])
+    && args.length === 8) return true;
   return args[0] === "kickoff" && args[1] === "apply"
     && exactRoot(args, root, 2) && args[4] === "--goal"
     && typeof args[5] === "string" && args[5].trim() !== ""
-    && args[6] === "--plan-sha256" && HEX.test(args[7] ?? "")
-    && args[8] === "--activate" && args.length === 9;
+    && args[6] === "--language" && ["de", "en"].includes(args[7])
+    && args[8] === "--plan-sha256" && HEX.test(args[9] ?? "")
+    && args[10] === "--activate" && args.length === 11;
 }
 
 function sanctionedMigrationArgs(args, root) {

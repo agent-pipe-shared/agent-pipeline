@@ -918,8 +918,8 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
     const repairMap = `node '${REPAIR_MAP_SCRIPT}'`;
     const hostPlan = `node '${HOST_REPOSITORY_INIT_SCRIPT}' plan --root '${path}'`;
     const hostApply = `node '${HOST_REPOSITORY_INIT_SCRIPT}' apply --root '${path}' --plan-sha256 ${"b".repeat(64)} --activate`;
-    const kickoffPlan = `node '${ONBOARDING_SCRIPT}' kickoff plan --root '${path}' --goal 'Build one HTML game'`;
-    const kickoffApply = `node '${ONBOARDING_SCRIPT}' kickoff apply --root '${path}' --goal 'Build one HTML game' --plan-sha256 ${"c".repeat(64)} --activate`;
+    const kickoffPlan = `node '${ONBOARDING_SCRIPT}' kickoff plan --root '${path}' --goal 'Build one HTML game' --language de`;
+    const kickoffApply = `node '${ONBOARDING_SCRIPT}' kickoff apply --root '${path}' --goal 'Build one HTML game' --language de --plan-sha256 ${"c".repeat(64)} --activate`;
     const overlayRoute = `node '${PRIVATE_OVERLAY_SCRIPT}' route --project-root '${path}'`;
     const poRebind = `node '${PIPELINE_STATE_SCRIPT}' po-authority-rebind-apply --plan-sha256 ${"d".repeat(64)} --updated-at 2026-07-29T09:00:00.000Z --activate`;
     const poDecisionPlan = `node '${PIPELINE_STATE_SCRIPT}' po-authority-decision-plan`;
@@ -966,6 +966,18 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
       `node '${ONBOARDING_SCRIPT}' plan-kickoff --root '${path}' --goal 'Build one HTML game'`,
       `node '${ONBOARDING_SCRIPT}' plan --root '${path}' --goal 'Build one HTML game'`,
       `node '${ONBOARDING_SCRIPT}' kickoff --root '${path}' --goal 'Build one HTML game'`,
+      // GF-074: --language <de|en> is mandatory since the CLI's GF-066 addition. The
+      // pre-fix shape (no --language at all) is now a negative case -- proves the fix
+      // closes the gap rather than just widening the allowlist.
+      `node '${ONBOARDING_SCRIPT}' kickoff plan --root '${path}' --goal 'Build one HTML game'`,
+      `node '${ONBOARDING_SCRIPT}' kickoff apply --root '${path}' --goal 'Build one HTML game' --plan-sha256 ${"c".repeat(64)} --activate`,
+      // Invalid --language value (not de|en).
+      `node '${ONBOARDING_SCRIPT}' kickoff plan --root '${path}' --goal 'Build one HTML game' --language fr`,
+      `node '${ONBOARDING_SCRIPT}' kickoff apply --root '${path}' --goal 'Build one HTML game' --language fr --plan-sha256 ${"c".repeat(64)} --activate`,
+      // --language in the wrong position (before --goal); this allowlist enforces exact
+      // positional shape like every other branch in this function, not flag reordering.
+      `node '${ONBOARDING_SCRIPT}' kickoff plan --root '${path}' --language de --goal 'Build one HTML game'`,
+      `node '${ONBOARDING_SCRIPT}' kickoff apply --root '${path}' --language de --goal 'Build one HTML game' --plan-sha256 ${"c".repeat(64)} --activate`,
       `node '${PRIVATE_OVERLAY_SCRIPT}' route --project-root /tmp/other`,
       `node '${PRIVATE_OVERLAY_SCRIPT}' status --project-root '${path}'`,
       `node '${PIPELINE_STATE_SCRIPT}' po-authority-rebind-apply --plan-sha256 ${"d".repeat(64)} --updated-at invalid --activate`,
