@@ -25,7 +25,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,7 +35,7 @@ import { parseHumanArgs, runHumanApproval } from "./po-human-approval.mjs";
 import { run as runApprovalGate } from "./po-approval-gate.mjs";
 import { PO_APPROVAL_PROOF_SCHEMA, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
 import { createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
-import { MACHINE_PLANE_SCHEMA, writeMachinePlane } from "../lib/machine-plane.mjs";
+import { MACHINE_PLANE_SCHEMA, readMachinePlane, writeMachinePlane } from "../lib/machine-plane.mjs";
 // Namespace import ON PURPOSE (same reason as in lib/guard-maintenance-window.test.mjs):
 // a not-yet-existing named export must fail the checks that use it, not ESM linking for
 // the whole suite.
@@ -1024,6 +1024,82 @@ test("AC-11/AC-14: a full sign-intent ceremony resolved entirely from the machin
     assert.equal(result.code, "PO-HUMAN-SIGN-INTENT-READY");
     const proof = JSON.parse(readFileSync(join(dirs.directory, "proof-manual.json"), "utf8"));
     assert.equal(verifyPoApprovalProof({ intent: { sha256: intentSha256 }, trustPolicy: authority, proof }).verified, true);
+  } finally {
+    cleanup(dirs);
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+/* ------------------------------------------------------------------ *
+ * GF-080 Gap A: setup's own WRITE side of the machine plane's
+ * poKeyDirectory. Reading it back (AC-11..AC-14 above) was already wired
+ * in; nothing ever populated it outside a hand-authored fixture until now.
+ * ------------------------------------------------------------------ */
+
+test("GF-080 Gap A: setup with an explicit --directory persists it into the machine plane, and a later command in a DIFFERENT project resolves it without repeating --directory", () => {
+  const dirs = fixtureDirs();
+  const home = noMachinePlaneHomeFixture();
+  const otherRepo = mkdtempSync(join(tmpdir(), "po-gapA-other-repo-"));
+  try {
+    keyFixture(dirs.directory);
+    const setupResult = runHumanApproval(
+      ["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory],
+      { homedirFn: () => home },
+    );
+    assert.equal(setupResult.ok, true);
+
+    const plane = readMachinePlane({ homedirFn: () => home });
+    assert.equal(plane.status, "valid");
+    assert.equal(plane.plane.poKeyDirectory, realpathSync(dirs.directory), "setup must persist its explicit --directory into the machine plane");
+
+    // A LATER command, in a DIFFERENT project (a different --repo-root), omitting
+    // --directory entirely, must resolve it from the machine plane and actually work.
+    const intentSha256 = createHash("sha256").update("gap-a-later-command-fixture").digest("hex");
+    const result = runHumanApproval(
+      ["sign-intent", "--repo-root", otherRepo, "--intent-sha256", intentSha256],
+      { readConfirmation: () => "approve", homedirFn: () => home },
+    );
+    assert.equal(result.ok, true);
+    assert.equal(result.code, "PO-HUMAN-SIGN-INTENT-READY");
+  } finally {
+    cleanup(dirs);
+    rmSync(home, { recursive: true, force: true });
+    rmSync(otherRepo, { recursive: true, force: true });
+  }
+});
+
+test("GF-080 Gap A: a subsequent setup --directory <other-dir> never silently overwrites an already-populated, different poKeyDirectory", () => {
+  const dirs = fixtureDirs();
+  const otherDirs = fixtureDirs();
+  const home = machinePlaneHomeFixture(dirs.directory);
+  try {
+    keyFixture(otherDirs.directory);
+    const result = runHumanApproval(
+      ["setup", "--repo-root", otherDirs.repoRoot, "--directory", otherDirs.directory],
+      { homedirFn: () => home },
+    );
+    assert.equal(result.ok, true, "setup itself must still succeed even though the plane write is skipped");
+
+    const plane = readMachinePlane({ homedirFn: () => home });
+    assert.equal(plane.status, "valid");
+    assert.equal(plane.plane.poKeyDirectory, dirs.directory, "a different, already-valid poKeyDirectory must never be silently overwritten");
+  } finally {
+    cleanup(dirs);
+    cleanup(otherDirs);
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("GF-080 Gap A: a plane- or environment-sourced --directory is never written back (nothing new to persist)", () => {
+  const dirs = fixtureDirs();
+  const home = machinePlaneHomeFixture(dirs.directory);
+  try {
+    keyFixture(dirs.directory);
+    const before = readMachinePlane({ homedirFn: () => home });
+    const result = runHumanApproval(["setup", "--repo-root", dirs.repoRoot], { homedirFn: () => home });
+    assert.equal(result.ok, true);
+    const after = readMachinePlane({ homedirFn: () => home });
+    assert.deepEqual(after, before, "a directory resolved FROM the plane must not trigger a redundant write back to it");
   } finally {
     cleanup(dirs);
     rmSync(home, { recursive: true, force: true });

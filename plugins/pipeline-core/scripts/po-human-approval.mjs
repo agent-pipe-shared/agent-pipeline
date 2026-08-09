@@ -26,7 +26,7 @@ import { readPublicRepositoryFile, verifyThreatModelApprovalRequest } from "../l
 import { CRITICAL_ACTION_KINDS, createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
 import { describeGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { readMachinePlane } from "../lib/machine-plane.mjs";
+import { MACHINE_PLANE_SCHEMA, readMachinePlane, writeMachinePlane } from "../lib/machine-plane.mjs";
 
 const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication> --subject-sha256 <sha256> --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | sign-intent --repo-root <repo> --directory <external-dir> --intent-sha256 <sha256> | authorize-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication> --subject-sha256 <sha256> --expires-at <ISO-8601>";
 // This repo's own environment inputs are all named PIPELINE_<PURPOSE> (see
@@ -42,6 +42,43 @@ function directorySourceLabel(source) {
   if (source === "environment") return `the ${PO_APPROVAL_DIRECTORY_ENV} environment variable`;
   if (source === "machine-plane") return "the machine-scoped configuration plane (poKeyDirectory)";
   return "--directory";
+}
+// GF-080 Gap A: the read side above (values.directory = plane.plane.poKeyDirectory) was
+// wired in from day one, but nothing ever WROTE poKeyDirectory back into the plane -- so
+// that fallback could never fire on a machine where nobody had hand-authored
+// ~/.agent-pipeline/machine.json outside this tool entirely. `setup` is the one point a
+// human/agent first establishes a directory on purpose; an explicit --directory there is
+// persisted so a LATER command, on the same machine, in a DIFFERENT project, does not
+// need to repeat it. This is best-effort and additive only: it never blocks or fails
+// `setup` itself (a write failure here is swallowed, not surfaced), it does nothing for a
+// plane- or environment-sourced directory (there is nothing new to persist in either
+// case -- the value already came from a source that already has it), it never touches a
+// plane that already fails its own validation (a corrupt plane is reported by AC-12 the
+// next time something reads it, not silently repaired here), and it never overwrites a
+// DIFFERENT already-valid poKeyDirectory a human previously chose without them knowing --
+// only an absent/null value, or the identical one, is ever written.
+function persistExplicitDirectoryIntoMachinePlane(args, directory, dependencies) {
+  if (args.directorySource !== "flag") return;
+  const readPlane = dependencies.readMachinePlaneFn ?? readMachinePlane;
+  const writePlane = dependencies.writeMachinePlaneFn ?? writeMachinePlane;
+  const plane = readPlane(dependencies);
+  if (plane.status === "invalid") return;
+  const current = plane.status === "valid" ? plane.plane : null;
+  if (current?.poKeyDirectory === directory) return;
+  if (current && text(current.poKeyDirectory)) return;
+  const next = current
+    ? { ...current, poKeyDirectory: directory, updatedAt: new Date().toISOString() }
+    : {
+      schema: MACHINE_PLANE_SCHEMA,
+      poKeyDirectory: directory,
+      pushApprovalDefault: "signature",
+      routing: null,
+      language: null,
+      session: null,
+      usage: null,
+      updatedAt: new Date().toISOString(),
+    };
+  try { writePlane(next, dependencies); } catch { /* best-effort: never fails setup itself */ }
 }
 // Recorded as non-enumerable: pre-existing exact-shape assertions elsewhere
 // (lib/threat-model-approval-request.test.mjs) compare the whole parseHumanArgs()/
@@ -336,6 +373,7 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
       if (!text(args.humanName)) fail(SETUP_NEW_AUTHORITY_NEEDS_NAME);
       const authority = localAuthority(read(paths.publicKey, "utf8"), args.keyReference, args.humanName);
       write(paths.authority, `${JSON.stringify(authority, null, 2)}\n`, { mode: 0o600 });
+      persistExplicitDirectoryIntoMachinePlane(args, directory, dependencies);
       return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority, recovered: true };
     }
     if (present.privateKey && present.publicKey && present.authority) {
@@ -352,6 +390,7 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
       if (!namedShape || !text(authority.humanName)) {
         fail('existing PO authority record predates --human-name and has no name recorded; run setup again with --human-name "<the human this key\'s approvals will be attributed to>" to add one.');
       }
+      persistExplicitDirectoryIntoMachinePlane(args, directory, dependencies);
       return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority, recovered: false };
     }
     if (present.privateKey || present.publicKey || present.authority) fail("partial PO authority exists; refusing to overwrite it");
@@ -359,6 +398,7 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
     command("openssl", ["genpkey", "-algorithm", "ED25519", "-aes-256-cbc", "-out", paths.privateKey], dependencies);
     command("openssl", ["pkey", "-in", paths.privateKey, "-pubout", "-out", paths.publicKey], dependencies);
     const authority = localAuthority(read(paths.publicKey, "utf8"), args.keyReference, args.humanName); write(paths.authority, `${JSON.stringify(authority, null, 2)}\n`, { mode: 0o600 }); chmodSync(paths.privateKey, 0o600);
+    persistExplicitDirectoryIntoMachinePlane(args, directory, dependencies);
     return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority };
   }
   if (args.command === "authorize-critical") {
