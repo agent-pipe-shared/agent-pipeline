@@ -299,6 +299,7 @@ import {
   applyLegacyV2RevocationRecovery,
   approveSubmittedPlan,
   bindPlanSpecApproval,
+  canonicalJson as canonicalPhxJson,
   derivePlanLifecycle,
   enterPlanImplementation,
   LEGACY_V2_REVOCATION_RECOVERY_CLASS,
@@ -359,6 +360,106 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 export const SCHEMA_ID = "pipeline.state.v0";
 export const CONTINUITY_LOCK_SCHEMA_ID = "pipeline.continuity-lock.v0";
 export const CONTINUITY_LOCK_STALE_MS = 30_000;
+
+// Restored verbatim from 5f8bf1d:harness/scripts/pipeline-state.mjs (the pre-merge
+// home of this module), dropped by merge 75b8361 when the second-parent side of
+// the file won. Only the closure the decision contract itself needs is restored;
+// the Phoenix transaction adapter referenced by the block comment below is not
+// part of this restoration.
+/**
+ * Closed Recovery Bridge decision contract. The sole executable consumer is
+ * the Phoenix-only adapter below. Every new issuance is bound to the existing
+ * repository-scoped PO gate; a local caller can never create PO authority by
+ * choosing an attribution string. Legacy terminal records remain inspectable
+ * solely for recovery/readback compatibility.
+ */
+export const RECOVERY_BRIDGE_DECISION_SCHEMA = "pipeline.recovery-bridge-decision.v1";
+export const RECOVERY_BRIDGE_ISSUANCE_CUTOFF = "2026-10-31T00:00:00.000Z";
+const RECOVERY_BRIDGE_FEATURE_ID = "sprint-phoenix-epic";
+const RECOVERY_BRIDGE_OPERATION = "reconcile-mutable-design";
+const RECOVERY_BRIDGE_MANIFEST = "specs/sprint-phoenix-epic/lifecycle.json";
+const RECOVERY_BRIDGE_ARTIFACT_PATH = "specs/sprint-phoenix-epic/RECOVERY.md";
+const RECOVERY_BRIDGE_ASSURANCE = "po-gate-bound";
+const RECOVERY_BRIDGE_ID_RE = /^rb-[a-f0-9]{16,64}$/u;
+const RECOVERY_BRIDGE_BINDING_KEYS = [
+  "decisionId", "featureId", "operation", "manifest", "artifactPath", "assurance",
+  "manifestPreimageSha256", "recoveryPostimageSha256", "prdSha256", "specSha256", "poApproval", "approvedBy", "approvedAt", "expiresAt",
+];
+const RECOVERY_BRIDGE_APPROVAL_KEYS = ["what", "why", "scope", "notAuthorized"];
+const RECOVERY_BRIDGE_DECISION_KEYS = [
+  "schema", "decisionId", "decisionSha256", "featureId", "operation", "manifest", "artifactPath", "assurance",
+  "manifestPreimageSha256", "recoveryPostimageSha256", "prdSha256", "specSha256", "approvedBy", "approvedAt", "expiresAt", "status",
+];
+
+function recoveryBridgeBindingKeys(value) {
+  const legacy = !Object.hasOwn(value ?? {}, "poApproval");
+  return [
+    ...RECOVERY_BRIDGE_BINDING_KEYS.filter((key) => key !== "poApproval" || !legacy),
+    ...(Object.hasOwn(value ?? {}, "approval") ? ["approval"] : []),
+  ];
+}
+function validRecoveryBridgeApproval(value) {
+  return exactObjectKeys(value, RECOVERY_BRIDGE_APPROVAL_KEYS)
+    && RECOVERY_BRIDGE_APPROVAL_KEYS.every((key) => typeof value[key] === "string"
+      && value[key].trim().length >= 12 && value[key].length <= 1_000);
+}
+function recoveryBridgeBinding(value) {
+  return Object.fromEntries(recoveryBridgeBindingKeys(value).map((key) => [key, value?.[key]]));
+}
+function safeIso(value) { return typeof value === "string" && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/u.test(value) && !Number.isNaN(Date.parse(value)); }
+function exactPoDecision(value) {
+  return exactObjectKeys(value, ["planPath", "planSha256", "specPath", "specSha256", "approvalSha256"])
+    && typeof value.planPath === "string" && typeof value.specPath === "string"
+    && SHA256_RE.test(value.planSha256) && SHA256_RE.test(value.specSha256) && SHA256_RE.test(value.approvalSha256);
+}
+
+/** Canonical digest for the immutable, exact Recovery Bridge decision binding. */
+export function recoveryBridgeDecisionDigest(value) {
+  return sha256Bytes(canonicalPhxJson({ schema: RECOVERY_BRIDGE_DECISION_SCHEMA, ...recoveryBridgeBinding(value) }));
+}
+
+function recoveryBridgeNow(now) {
+  return safeIso(now) ? Date.parse(now) : null;
+}
+
+/**
+ * Validates a public-safe Recovery Bridge decision. `now` is optional for
+ * structural inspection; when supplied it also enforces expiry, and for an
+ * uncommitted issuance it enforces the non-extendable issuance cutoff.
+ */
+export function validateRecoveryBridgeDecision(value, { now } = {}) {
+  const hasApproval = Object.hasOwn(value ?? {}, "approval");
+  const hasPoApproval = Object.hasOwn(value ?? {}, "poApproval");
+  if (!exactObjectKeys(value, [...RECOVERY_BRIDGE_DECISION_KEYS, ...(hasPoApproval ? ["poApproval"] : []), ...(hasApproval ? ["approval"] : [])])
+    || value.schema !== RECOVERY_BRIDGE_DECISION_SCHEMA || (hasApproval && !validRecoveryBridgeApproval(value.approval))) {
+    return { ok: false, code: "RB-DECISION-SCHEMA" };
+  }
+  if (!RECOVERY_BRIDGE_ID_RE.test(value.decisionId) || !SHA256_RE.test(value.decisionSha256)
+    || !SHA256_RE.test(value.manifestPreimageSha256) || !SHA256_RE.test(value.recoveryPostimageSha256)
+    || !SHA256_RE.test(value.prdSha256) || !SHA256_RE.test(value.specSha256) || !safeIso(value.expiresAt)) {
+    return { ok: false, code: "RB-DECISION-FIELDS" };
+  }
+  if (value.featureId !== RECOVERY_BRIDGE_FEATURE_ID || value.operation !== RECOVERY_BRIDGE_OPERATION
+    || value.manifest !== RECOVERY_BRIDGE_MANIFEST || value.artifactPath !== RECOVERY_BRIDGE_ARTIFACT_PATH
+    || value.assurance !== RECOVERY_BRIDGE_ASSURANCE) return { ok: false, code: "RB-DECISION-TARGET" };
+  if (value.decisionSha256 !== recoveryBridgeDecisionDigest(value)) return { ok: false, code: "RB-DECISION-DIGEST" };
+  if (hasPoApproval && (!exactPoDecision(value.poApproval)
+    || value.poApproval.planPath !== "specs/sprint-phoenix-epic/prd_phoenix-epic.md"
+    || value.poApproval.specPath !== "specs/sprint-phoenix-epic/spec.md"
+    || value.poApproval.planSha256 !== value.prdSha256 || value.poApproval.specSha256 !== value.specSha256)) return { ok: false, code: "RB-DECISION-PO-AUTHORITY" };
+  if (value.status === "issued" && !hasPoApproval) return { ok: false, code: "RB-DECISION-PO-AUTHORITY" };
+  if (value.approvedBy !== "PO" || !safeIso(value.approvedAt)) return { ok: false, code: "RB-DECISION-ATTRIBUTION" };
+  if (Date.parse(value.approvedAt) > Date.parse(value.expiresAt)) return { ok: false, code: "RB-DECISION-CHRONOLOGY" };
+  if (!["issued", "public-committed", "consumed"].includes(value.status)) return { ok: false, code: "RB-DECISION-STATUS" };
+  if (Date.parse(value.expiresAt) > Date.parse(RECOVERY_BRIDGE_ISSUANCE_CUTOFF)) return { ok: false, code: "RB-DECISION-CUTOFF" };
+  if (now !== undefined) {
+    const nowMs = recoveryBridgeNow(now);
+    if (nowMs === null) return { ok: false, code: "RB-DECISION-NOW" };
+    if (value.status === "issued" && nowMs >= Date.parse(RECOVERY_BRIDGE_ISSUANCE_CUTOFF)) return { ok: false, code: "RB-ISSUANCE-CUTOFF" };
+    if (nowMs >= Date.parse(value.expiresAt)) return { ok: false, code: "RB-DECISION-EXPIRED" };
+  }
+  return { ok: true, value };
+}
 const CONTINUITY_REQUEST_MAX_BYTES = 32_768;
 const PUSH_THREAT_MODEL_PATH = "specs/sprint-nova-epic/implementation/critical-action-authorization-threat-model.md";
 const EXTERNAL_PUBLIC_ARTIFACT_MAX_BYTES = 1_048_576;
