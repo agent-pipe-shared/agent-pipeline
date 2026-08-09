@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "a33e051fd39553e3e5cec5ec9db16b90bb1e8692edd899571cd261d8406c1113"
+    "transitionHead": "a24f0a4c51d88bd52c2b73704ba59866c60e8b813bad0d276a962f922e208db8"
   },
   "counts": {
-    "open": 111,
+    "open": 110,
     "in_progress": 21,
-    "closed": 36
+    "closed": 37
   },
   "items": [
     {
@@ -549,11 +549,15 @@
     },
     {
       "id": "pipeline.guard-maintenance-window-rejects-a-fresh-setup1-authority-file",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "Critic review (opus tier, functional-equivalent-read-only lane) of GF-069 (commit faf4c8dd), 2026-08-09. Finding F1: the backlog item's own mandated caller sweep ('grep for any other direct caller of verifyPoApprovalProof/verifyThreatModelApprovalRequest/verifyCriticalActionApprovalRequest with an external, PO-authored authority input') was not performed as specified before that item was implemented; performing it surfaces this third instance."
+      "source": "Critic review (opus tier, functional-equivalent-read-only lane) of GF-069 (commit faf4c8dd), 2026-08-09. Finding F1: the backlog item's own mandated caller sweep ('grep for any other direct caller of verifyPoApprovalProof/verifyThreatModelApprovalRequest/verifyCriticalActionApprovalRequest with an external, PO-authored authority input') was not performed as specified before that item was implemented; performing it surfaces this third instance.",
+      "closedAt": "2026-08-09",
+      "closureRepository": "self",
+      "closureCommit": "861a5b69535b689e501b4ca4562a5eba24bd35b4",
+      "closureEvidence": "backlog/evidence/2026-08-09-guard-maintenance-window-humanname-fix-closure.md"
     },
     {
       "id": "pipeline.guard-reclassification-changed-what-a-signature-can-lift",

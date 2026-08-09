@@ -3,10 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.guard-maintenance-window-rejects-a-fresh-setup1-authority-file
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
 source: "Critic review (opus tier, functional-equivalent-read-only lane) of GF-069 (commit faf4c8dd), 2026-08-09. Finding F1: the backlog item's own mandated caller sweep ('grep for any other direct caller of verifyPoApprovalProof/verifyThreatModelApprovalRequest/verifyCriticalActionApprovalRequest with an external, PO-authored authority input') was not performed as specified before that item was implemented; performing it surfaces this third instance."
 due: 2026-08-16
+closed_at: 2026-08-09
+closure_repository: self
+closure_commit: 861a5b69535b689e501b4ca4562a5eba24bd35b4
+closure_evidence: backlog/evidence/2026-08-09-guard-maintenance-window-humanname-fix-closure.md
 ---
 
 # `guard-maintenance-window.mjs install --authority` rejects the exact authority file `setup --human-name` produces
@@ -105,7 +109,7 @@ unilaterally.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted, fixed, closed.
+- **Rationale:** Same defect class as GF-067/GF-069, fully specified fix; the mandated caller sweep was actually run this time (see closure evidence) and confirms no fourth sibling remains in the current codebase.
+- **Assignment:** GF-072 (goldfish-implementor), self-verified by the Elephant (diff read, suite re-run, Full Verify evidence checked) — no third Critic dispatch, per the standing two-round cap and this exact pattern already having cleared Critic review twice.
+- **Date:** 2026-08-09
