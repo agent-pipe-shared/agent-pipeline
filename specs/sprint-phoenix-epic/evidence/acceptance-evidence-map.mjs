@@ -317,6 +317,21 @@ const DELTA = {
   'C-AC-07': ['partial', 'WP-C'],
   'C-AC-09': ['not-started', 'WP-C'],
   'C-AC-12': ['partial', 'WP-C'],
+  // WP-C-AC12 CLOSED 2026-08-09 (goldfish-deep): reviewPolicy ("mandatory" |
+  // "advisory") is now representable independent of changeClass/mandatory --
+  // present, closed-vocabulary, and required only when mandatory is true,
+  // null otherwise (mirrors standardTemplate's present/null-by-class shape).
+  // Advisory still requires ITSM review when the receipt is available
+  // (unchanged authority/authenticity/approval/window checks); an
+  // unreachable ITSM system under advisory is now `allowed`/
+  // `reconciliation-required` -- a named, operator-visible signal distinct
+  // from both `not-required` and `composed-authority`, modeled on
+  // projectChangeControlState's existing reconciliation-required pattern.
+  // All three pre-existing gate behaviors (mandatory+available+approved,
+  // mandatory+unavailable+block, not-required+allowed) proven byte-for-byte
+  // unchanged; pipeline-authority/emergency-authority checks proven additive,
+  // never bypassed, under advisory. 15/15 change-control-tests pass.
+  'C-AC-12': ['implemented', 'WP-C-AC12'],
 
   // --- evidence/phx-wp-a.txt (task PHX-WP-A, 2026-08-09, commit 055cb8b) ---
   // Independently re-run: 12/12 agent-decision-journal-tests pass, all three
@@ -365,6 +380,26 @@ const DELTA = {
   // machine-specific value, end to end through the module's existing
   // exported functions. 17/17 tests pass (independently re-run).
   'R-AC-12': ['implemented', 'WP-R-AC12'],
+  // R-AC-10 CLOSED 2026-08-09 (WP-R-AC10, goldfish): a new export,
+  // acknowledgeNonMaterialOfferWithoutJournal, is the typed non-material
+  // exception the criterion asks policy to be able to define -- usable ONLY
+  // when journaling is genuinely unavailable (no `append` argument at all;
+  // supplying one, even a working one, is refused, not silently ignored)
+  // AND the offer is sideEffectClass "non-authoritative" with
+  // authorityRequirement "not-required". recordCommandOffer/
+  // recordPipelineAttempt keep failing closed with ECO-APPEND for every
+  // other case, byte-for-byte unchanged. The returned value is never a
+  // receipt(): its schema id and status ("unjournaled-non-material-
+  // exception") are unique to this path, never a journaled command state,
+  // and structurally rejected (ADJ-COMMAND-OFFER) if reused as an offer or
+  // outcome event -- it cannot be read as observed-completed/readback-
+  // verified proof. 24/24 external-command-offer-tests pass, including
+  // dedicated tests for the fail-closed default, the exception's admission,
+  // its rejection for destructive/guard-bypass/authority-changing and for
+  // policy-required (human-decision-required) offers, its refusal when
+  // append is actually supplied, its scoping to the offered state, and its
+  // structural non-reusability as a completion claim.
+  'R-AC-10': ['implemented', 'WP-R-AC10'],
 
   // --- evidence/phx-pac08-register.txt (Elephant, 2026-08-09, commit 78c6ef1) ---
   // The signed TP-3+TP-5 maintenance window (evidence/phx-p-ac-08-gmw-request.json)

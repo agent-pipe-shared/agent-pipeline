@@ -10,8 +10,14 @@ function window(value) { return exact(value, ["startsAtEpochMs", "endsAtEpochMs"
 // template and its still-valid revision (issue #24 §5); every other class
 // carries no such binding at all.
 function standardTemplate(value) { return exact(value, ["templateId", "revision"]) && ID.test(value.templateId) && ID.test(value.revision); }
+// C-AC-12: reviewPolicy is orthogonal to mandatory/changeClass -- it names what
+// happens when the external ITSM system is unreachable for a profile that does
+// consult it. "mandatory" keeps today's unconditional block; "advisory" still
+// wants ITSM review when reachable but never hard-blocks on its absence. Present
+// (and drawn from the closed vocabulary) only when mandatory is true, null
+// otherwise -- the same present/null-by-class shape as standardTemplate above.
 export function validateChangeControlProfile(profile) {
-  if (!exact(profile, ["schema", "profileId", "policySha256", "changeClass", "candidate", "artifact", "environment", "scopeSha256", "window", "mandatory", "standardTemplate"]) || profile.schema !== "pipeline.change-control-profile.v1" || !ID.test(profile.profileId) || !SHA.test(profile.policySha256) || !new Set(["standard", "normal", "emergency", "not-required"]).has(profile.changeClass) || !candidate(profile.candidate) || !artifact(profile.artifact) || !ID.test(profile.environment) || !SHA.test(profile.scopeSha256) || !window(profile.window) || typeof profile.mandatory !== "boolean" || (profile.changeClass === "not-required") !== !profile.mandatory || (profile.changeClass === "standard" ? !standardTemplate(profile.standardTemplate) : profile.standardTemplate !== null)) fail("CC-PROFILE");
+  if (!exact(profile, ["schema", "profileId", "policySha256", "changeClass", "candidate", "artifact", "environment", "scopeSha256", "window", "mandatory", "standardTemplate", "reviewPolicy"]) || profile.schema !== "pipeline.change-control-profile.v1" || !ID.test(profile.profileId) || !SHA.test(profile.policySha256) || !new Set(["standard", "normal", "emergency", "not-required"]).has(profile.changeClass) || !candidate(profile.candidate) || !artifact(profile.artifact) || !ID.test(profile.environment) || !SHA.test(profile.scopeSha256) || !window(profile.window) || typeof profile.mandatory !== "boolean" || (profile.changeClass === "not-required") !== !profile.mandatory || (profile.changeClass === "standard" ? !standardTemplate(profile.standardTemplate) : profile.standardTemplate !== null) || (profile.mandatory ? !new Set(["mandatory", "advisory"]).has(profile.reviewPolicy) : profile.reviewPolicy !== null)) fail("CC-PROFILE");
   return Object.freeze({ ...profile, candidate: Object.freeze({ ...profile.candidate }), artifact: Object.freeze({ ...profile.artifact }), window: Object.freeze({ ...profile.window }), standardTemplate: profile.standardTemplate === null ? null : Object.freeze({ ...profile.standardTemplate }) });
 }
 export function validateChangeControlReceipt(receipt) {
@@ -26,7 +32,16 @@ export function evaluateChangeControlGate({ profile, pipelineAuthority, external
   if (!matchesLocal) return Object.freeze({ schema: "pipeline.change-control-gate.v1", status: "blocked", reason: "pipeline-authority" });
   if (current.changeClass === "emergency" && !pipelineAuthority.emergencyAuthorized) return Object.freeze({ schema: "pipeline.change-control-gate.v1", status: "blocked", reason: "emergency-authority" });
   if (!current.mandatory) return Object.freeze({ schema: "pipeline.change-control-gate.v1", status: "allowed", reason: "not-required" });
-  if (externalReceipt === null) return Object.freeze({ schema: "pipeline.change-control-gate.v1", status: "blocked", reason: "external-unavailable" });
+  if (externalReceipt === null) {
+    // C-AC-12: advisory still wants ITSM review when reachable (see below), but
+    // an unreachable ITSM system is never a hard block under advisory policy --
+    // it is `allowed`, carrying a distinct, operator-visible reason instead of
+    // silently passing as `composed-authority`, mirroring
+    // projectChangeControlState's reconciliation-required pattern for "allowed,
+    // but flagged for operator reconciliation".
+    if (current.reviewPolicy === "advisory") return Object.freeze({ schema: "pipeline.change-control-gate.v1", status: "allowed", reason: "reconciliation-required" });
+    return Object.freeze({ schema: "pipeline.change-control-gate.v1", status: "blocked", reason: "external-unavailable" });
+  }
   const external = validateChangeControlReceipt(externalReceipt); const matchesExternal = external.profileId === current.profileId && same(external.candidate, current.candidate) && same(external.artifact, current.artifact) && external.environment === current.environment && external.scopeSha256 === current.scopeSha256 && same(external.window, current.window);
   if (!matchesExternal || !external.authenticated || external.state !== "approved") return Object.freeze({ schema: "pipeline.change-control-gate.v1", status: "blocked", reason: "external-authority" });
   if (nowEpochMs < current.window.startsAtEpochMs || nowEpochMs > current.window.endsAtEpochMs) return Object.freeze({ schema: "pipeline.change-control-gate.v1", status: "blocked", reason: "outside-window" });

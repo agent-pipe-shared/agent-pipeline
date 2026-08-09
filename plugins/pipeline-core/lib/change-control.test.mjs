@@ -4,7 +4,7 @@ import test from "node:test";
 import { appendChangeControlEntry, createChangeControlJournal, evaluateChangeControlGate, projectChangeControlState, validateChangeControlProfile } from "./change-control.mjs";
 
 const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) }; const artifact = { path: "specs/release/result.md", sha256: "c".repeat(64) }; const window = { startsAtEpochMs: 10, endsAtEpochMs: 20 };
-function profile(overrides = {}) { return { schema: "pipeline.change-control-profile.v1", profileId: "production-change", policySha256: "d".repeat(64), changeClass: "normal", candidate, artifact, environment: "production", scopeSha256: "e".repeat(64), window, mandatory: true, standardTemplate: null, ...overrides }; }
+function profile(overrides = {}) { return { schema: "pipeline.change-control-profile.v1", profileId: "production-change", policySha256: "d".repeat(64), changeClass: "normal", candidate, artifact, environment: "production", scopeSha256: "e".repeat(64), window, mandatory: true, standardTemplate: null, reviewPolicy: "mandatory", ...overrides }; }
 function local(overrides = {}) { return { granted: true, candidate, artifact, environment: "production", scopeSha256: "e".repeat(64), emergencyAuthorized: false, ...overrides }; }
 function receipt(overrides = {}) { return { schema: "pipeline.change-control-receipt.v1", profileId: "production-change", candidate, artifact, environment: "production", scopeSha256: "e".repeat(64), window, state: "approved", authenticated: true, ...overrides }; }
 test("allows mandatory promotion only when independent local and external authority bind the exact same tuple", () => assert.deepEqual(evaluateChangeControlGate({ profile: profile(), pipelineAuthority: local(), externalReceipt: receipt(), nowEpochMs: 15 }), { schema: "pipeline.change-control-gate.v1", status: "allowed", reason: "composed-authority" }));
@@ -104,14 +104,14 @@ test("C-AC-11 keeps provider names and fields out of the provider-neutral core s
     assert.throws(() => evaluateChangeControlGate({ profile: profile(), pipelineAuthority: { ...local(), [field]: "provider-fixture" }, externalReceipt: receipt(), nowEpochMs: 15 }), (error) => error.code === "CC-GATE", field);
     assert.throws(() => createChangeControlJournal({ ...binding, [field]: "provider-fixture" }), (error) => error.code === "CC-JOURNAL", field);
   }
-  assert.deepEqual(Object.keys(validateChangeControlProfile(profile())).sort(), ["artifact", "candidate", "changeClass", "environment", "mandatory", "policySha256", "profileId", "schema", "scopeSha256", "standardTemplate", "window"]);
+  assert.deepEqual(Object.keys(validateChangeControlProfile(profile())).sort(), ["artifact", "candidate", "changeClass", "environment", "mandatory", "policySha256", "profileId", "reviewPolicy", "schema", "scopeSha256", "standardTemplate", "window"]);
   // The change class vocabulary is closed; a provider class cannot widen it.
   assert.throws(() => validateChangeControlProfile(profile({ changeClass: "expedited" })), (error) => error.code === "CC-PROFILE");
 });
 
 test("requires explicit emergency authority and keeps not-required independent", () => {
   assert.equal(evaluateChangeControlGate({ profile: profile({ changeClass: "emergency" }), pipelineAuthority: local(), externalReceipt: receipt(), nowEpochMs: 15 }).reason, "emergency-authority");
-  assert.equal(evaluateChangeControlGate({ profile: profile({ changeClass: "not-required", mandatory: false }), pipelineAuthority: local(), externalReceipt: null, nowEpochMs: 15 }).reason, "not-required");
+  assert.equal(evaluateChangeControlGate({ profile: profile({ changeClass: "not-required", mandatory: false, reviewPolicy: null }), pipelineAuthority: local(), externalReceipt: null, nowEpochMs: 15 }).reason, "not-required");
   assert.throws(() => validateChangeControlProfile(profile({ changeClass: "not-required", mandatory: true })), (error) => error.code === "CC-PROFILE");
 });
 
@@ -168,4 +168,46 @@ test("C-AC-12 names a distinct external-unavailable reason when the external ITS
   const blocked = evaluateChangeControlGate({ profile: profile(), pipelineAuthority: local(), externalReceipt: null, nowEpochMs: 15 });
   assert.equal(blocked.status, "blocked");
   assert.equal(blocked.reason, "external-unavailable");
+});
+
+// C-AC-12: reviewPolicy closes the gap the test above documented -- "advisory"
+// still wants ITSM review when reachable, but never hard-blocks when it is
+// not, surfacing a distinct, operator-visible reason instead.
+test("C-AC-12 advisory review policy allows an unreachable external ITSM system with a distinct, operator-visible reason", () => {
+  const advisoryProfile = profile({ reviewPolicy: "advisory" });
+  const result = evaluateChangeControlGate({ profile: advisoryProfile, pipelineAuthority: local(), externalReceipt: null, nowEpochMs: 15 });
+  assert.equal(result.status, "allowed");
+  assert.equal(result.reason, "reconciliation-required");
+  assert.notEqual(result.reason, "not-required");
+  assert.notEqual(result.reason, "composed-authority");
+});
+
+// C-AC-12: advisory only changes what happens when the receipt is absent --
+// when it is present, review composes exactly like a mandatory profile,
+// including refusing an unapproved receipt.
+test("C-AC-12 advisory review policy still composes authority normally when the external receipt is available", () => {
+  const advisoryProfile = profile({ reviewPolicy: "advisory" });
+  assert.deepEqual(evaluateChangeControlGate({ profile: advisoryProfile, pipelineAuthority: local(), externalReceipt: receipt(), nowEpochMs: 15 }), { schema: "pipeline.change-control-gate.v1", status: "allowed", reason: "composed-authority" });
+  assert.equal(evaluateChangeControlGate({ profile: advisoryProfile, pipelineAuthority: local(), externalReceipt: receipt({ state: "rejected" }), nowEpochMs: 15 }).reason, "external-authority");
+});
+
+// C-AC-12: advisory is additive to, never a bypass of, the pre-existing
+// pipeline-authority and emergency-authority checks -- both still run and can
+// still block an advisory profile before reviewPolicy is ever consulted.
+test("C-AC-12 advisory review policy never bypasses pipeline-authority or emergency-authority checks", () => {
+  const advisoryProfile = profile({ reviewPolicy: "advisory" });
+  assert.equal(evaluateChangeControlGate({ profile: advisoryProfile, pipelineAuthority: local({ granted: false }), externalReceipt: null, nowEpochMs: 15 }).reason, "pipeline-authority");
+  const advisoryEmergency = profile({ changeClass: "emergency", reviewPolicy: "advisory" });
+  assert.equal(evaluateChangeControlGate({ profile: advisoryEmergency, pipelineAuthority: local(), externalReceipt: null, nowEpochMs: 15 }).reason, "emergency-authority");
+});
+
+// C-AC-12: reviewPolicy is closed-vocabulary and class/mandatory-conditioned,
+// exactly like standardTemplate -- required only when mandatory is true, null
+// otherwise.
+test("C-AC-12 requires a well-formed reviewPolicy only when mandatory is true", () => {
+  assert.doesNotThrow(() => validateChangeControlProfile(profile({ reviewPolicy: "advisory" })));
+  assert.throws(() => validateChangeControlProfile(profile({ reviewPolicy: null })), (error) => error.code === "CC-PROFILE");
+  assert.throws(() => validateChangeControlProfile(profile({ reviewPolicy: "optional" })), (error) => error.code === "CC-PROFILE");
+  assert.throws(() => validateChangeControlProfile(profile({ changeClass: "not-required", mandatory: false, reviewPolicy: "advisory" })), (error) => error.code === "CC-PROFILE");
+  assert.doesNotThrow(() => validateChangeControlProfile(profile({ changeClass: "not-required", mandatory: false, reviewPolicy: null })));
 });
