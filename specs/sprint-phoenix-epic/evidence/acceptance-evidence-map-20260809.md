@@ -42,8 +42,8 @@ reproduced here rather than referenced.
 
 ## The direct answer
 
-**Phoenix cannot claim complete.** 101 of 157 criteria carry a named assertion in a
-gate-registered suite; 56 do not. EPIC-AC-05 forbids a completion claim while any
+**Phoenix cannot claim complete.** 102 of 157 criteria carry a named assertion in a
+gate-registered suite; 55 do not. EPIC-AC-05 forbids a completion claim while any
 criterion remains unimplemented or unverified, and it currently bites. No issue is closeable on
 its own live acceptance bullets.
 
@@ -61,10 +61,10 @@ A bullet is therefore BLOCKED unless every criterion mapped to it is `implemente
 
 | verdict | count |
 |---|---|
-| implemented | 101 |
+| implemented | 102 |
 | partial | 38 |
 | designed-only | 1 |
-| not-started | 16 |
+| not-started | 15 |
 | constraint | 1 |
 | **total** | **157** |
 
@@ -132,15 +132,15 @@ clause that is not pinned or not built.
 | H-AC-14 | implemented | WP-DOC | docs/governance-events.md (PHX-WP-DOC-1 + PHX-WP-DOC-3): all eight named parts present -- migration/retention/recovery/operator-guidance and schema/taxonomy/authority-trust-model were already solid, and a dedicated "Human ledger: threat model" section now covers eight scenarios each tied to an HGL-* code and, where one exists, an H-AC-15 test |
 | H-AC-15 | implemented | WP-H | human-governance-ledger-tests (PHX-WP-H): all thirteen named scenarios pinned (grant/consumption/expiry/redaction pre-existing; denial/revocation/correction/retry/concurrency/interruption/tampering/stale-candidate/cross-repository-binding new and break-proofed) |
 
-### A — Agent Decision and Assumption Journal (#31) (7/16 implemented)
+### A — Agent Decision and Assumption Journal (#31) (8/16 implemented)
 
 | ID | verdict | src | evidence / named gap |
 |---|---|---|---|
 | A-AC-01 | partial | C | record shape pinned; nothing enforces recording BEFORE dependent action where policy requires |
 | A-AC-02 | implemented | WP-A | agent-decision-journal-tests (PHX-WP-A): all five lifecycle transitions (verified/contradicted/expired/invalidated/superseded) accept a linked follow-up event, exercised end-to-end through the store with the original proven byte-for-byte unchanged |
 | A-AC-03 | not-started | C | NO CARRIER: no revalidation/invalidation path identifies objects affected by a changed assumption |
-| A-AC-04 | partial | C | CORRECTED AGAIN 2026-08-09 (Elephant, direct code read): a second, real, production-wired carrier exists that the first correction missed -- guard-git.mjs's Phoenix override path (consumePhoenixOverrideAuthority, guard-git.mjs:697-728) correlates an agent's override reference to the real human ledger via governance-authority.mjs, binds it to the exact repository/candidate/rule/artifact-digest tuple, and single-use-consumes it; guard-git-phoenix.test.mjs proves refuse-without-reference, one-time-allow, and refuse-on-replay end to end (1/1, independently re-run). The correlate-and-cannot-replay half of the clause is proven, not absent. What is still missing, narrowly: no production entry point ever CREATES a granted human-governance-decision -- appendHumanGovernanceDecision, createExternalHumanGovernanceIntent and verifyExternalHumanGovernanceProof (human-governance-ledger.mjs:150,73,101) are each called only from tests (repo-wide grep confirms), so a PO has no CLI to actually grant this authority today; governance-authority.mjs's own CLI only ever consumes an existing grant, never creates one. See design/class-s-scoping.md's 2026-08-09 correction for the exact three-function wiring this needs -- no new schema or cryptography, the trust anchor at project/critical-human-proof.json already covers the same PO key |
-| A-AC-05 | not-started | J | NO CARRIER: neither event shape carries a runner/model/effort/profile/role/adapter field at all |
+| A-AC-04 | implemented | WP-AAC04FIX3 | CORRECTED AGAIN 2026-08-09 (Elephant, direct code read): a second, real, production-wired carrier exists that the first correction missed -- guard-git.mjs's Phoenix override path (consumePhoenixOverrideAuthority, guard-git.mjs:697-728) correlates an agent's override reference to the real human ledger via governance-authority.mjs, binds it to the exact repository/candidate/rule/artifact-digest tuple, and single-use-consumes it; guard-git-phoenix.test.mjs proves refuse-without-reference, one-time-allow, and refuse-on-replay end to end (1/1, independently re-run). The correlate-and-cannot-replay half of the clause is proven, not absent. What is still missing, narrowly: no production entry point ever CREATES a granted human-governance-decision -- appendHumanGovernanceDecision, createExternalHumanGovernanceIntent and verifyExternalHumanGovernanceProof (human-governance-ledger.mjs:150,73,101) are each called only from tests (repo-wide grep confirms), so a PO has no CLI to actually grant this authority today; governance-authority.mjs's own CLI only ever consumes an existing grant, never creates one. See design/class-s-scoping.md's 2026-08-09 correction for the exact three-function wiring this needs -- no new schema or cryptography, the trust anchor at project/critical-human-proof.json already covers the same PO key. CLOSED 2026-08-09 (PHX-WP-AAC04-FIX3, commit 0022d13): the missing create-half was built (human-authority-grant.mjs, a prepare/external-sign/install ceremony), survived an independent round-3 Critic PASS after two prior FAIL rounds closed a blocker, a major, and five other findings, and its final three minor findings (a docstring overclaim, runPrepare reading the wrong root, missing command/exit-code evidence headers) are also closed and independently re-verified (14/14 unit, 1/1 e2e, 25/25 regression). Both halves of the clause are now real, tested, and production-wired |
+| A-AC-05 | partial | WP-AAC05 | agent-decision-journal-tests (PHX-WP-AAC05): the observational shape now carries an optional identity array (dimension/value/provenance/assurance, closed enums, 1-7 entries, no duplicate dimension) on selection/escalation/fallback only, rejected elsewhere via ADJ-IDENTITY-SCOPE, schema/validator drift-tested. Still no production caller: CONFIRMED ABSENT (repo-wide search) that any code path emits a selection/escalation/fallback event at all |
 | A-AC-06 | implemented | C | agent-decision-journal-tests: free text, authority-shaped fields and unbound supersession rejected |
 | A-AC-07 | not-started | WP-A | CONFIRMED ABSENT (PHX-WP-A, repo-wide search): no per-event-class "mandatory" capture concept exists anywhere in the journal, the shared store, or capture-policy.json -- five of the seven named event classes are not even representable as a journal `kind` |
 | A-AC-08 | not-started | C | NO CARRIER: no detector for missing dispatch provenance; the Dispatch: trailer is convention only |
@@ -361,19 +361,18 @@ clause that is not pinned or not built.
 
 ### #31 — Add a privacy-preserving agent decision and assumption journal
 
-8 of 17 live acceptance bullets fully carried; **9 blocked**.
+9 of 17 live acceptance bullets fully carried; **8 blocked**.
 
 | # | live acceptance bullet | blocking criteria (verdict) |
 |---|---|---|
 | 1 | Closed schema/materiality policy selects journaled events | A-AC-01 (partial) |
 | 2 | Changed assumptions invalidate/revalidate affected work | A-AC-03 (not-started) |
-| 3 | Human confirmation correlates to #30; only #30 grants authority | A-AC-04 (partial) |
-| 4 | Runner/model/profile/role/capability carries assurance | A-AC-05 (not-started) |
-| 5 | Mandatory material events are never sampled/discarded silently | A-AC-07 (not-started) |
-| 6 | Offline verification detects mutation/gaps/forks/path/repository errors | K-AC-05 (partial) |
-| 7 | #17 replays all origins without authority collapse | L-AC-04 (partial) |
-| 8 | #5 shows uncertainty/status/decision with evidence | V-AC-02 (partial) |
-| 9 | Complete assumption/selection/failure/privacy fixture set | A-AC-14 (partial) |
+| 3 | Runner/model/profile/role/capability carries assurance | A-AC-05 (partial) |
+| 4 | Mandatory material events are never sampled/discarded silently | A-AC-07 (not-started) |
+| 5 | Offline verification detects mutation/gaps/forks/path/repository errors | K-AC-05 (partial) |
+| 6 | #17 replays all origins without authority collapse | L-AC-04 (partial) |
+| 7 | #5 shows uncertainty/status/decision with evidence | V-AC-02 (partial) |
+| 8 | Complete assumption/selection/failure/privacy fixture set | A-AC-14 (partial) |
 
 ### #32 — Add provider-neutral governance event export for SIEM and audit platforms
 
@@ -401,14 +400,14 @@ clause that is not pinned or not built.
 | #23 | 16 | 15 | 1 | **no** |
 | #24 | 12 | 9 | 3 | **no** |
 | #30 | 17 | 9 | 8 | **no** |
-| #31 | 17 | 8 | 9 | **no** |
+| #31 | 17 | 9 | 8 | **no** |
 | #32 | 20 | 11 | 9 | **no** |
 
 Issues closeable on their own live acceptance bullets: **0 of 8**.
 
 ## The blocking set, ranked
 
-31 distinct criteria block at least one live acceptance bullet.
+30 distinct criteria block at least one live acceptance bullet.
 
 | criterion | verdict | live bullets blocked |
 |---|---|---|
@@ -420,8 +419,7 @@ Issues closeable on their own live acceptance bullets: **0 of 8**.
 | L-AC-04 | partial | 2 |
 | A-AC-01 | partial | 1 |
 | A-AC-03 | not-started | 1 |
-| A-AC-04 | partial | 1 |
-| A-AC-05 | not-started | 1 |
+| A-AC-05 | partial | 1 |
 | A-AC-07 | not-started | 1 |
 | A-AC-14 | partial | 1 |
 | C-AC-02 | partial | 1 |

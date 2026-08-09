@@ -544,6 +544,52 @@ const DELTA = {
   // already was: backlog/items/2026-08-07-marketplace-install-topology-unattested.md,
   // untouched and not pre-empted by this task.
   'PX0-AC-08': ['implemented', 'WP-PX0AC08'],
+
+  // --- evidence/phx-wp-aac04-fix2 + phx-wp-aac04-fix3 (tasks PHX-WP-AAC04-FIX2,
+  // commit f3eeb3e, and PHX-WP-AAC04-FIX3, commit 0022d13, 2026-08-09) ---
+  // An independent round-3 Critic review (Opus, functional-equivalent lane, max
+  // effort) on FIX2's commit returned PASS with three minor findings: F-1 (a
+  // docstring overclaimed "no code path anywhere" can select a different trust
+  // anchor -- false, since a --repo-root pointed at a genuinely different
+  // repository resolves and binds to THAT repository's own anchor; the true
+  // guarantee is containment, not impossibility), F-2 (runPrepare still read
+  // plan/spec/extra-artifact/capture-policy digests from the raw --repo-root
+  // rather than the resolved repo.primaryRoot runInstall already used), and F-3
+  // (the green evidence artifacts carried no command/exit-code header, GL-01).
+  // FIX3 closed all three: the docstring now states the actual containment
+  // guarantee, runPrepare routes through repo.primaryRoot with a new
+  // break-proofed regression test (14/14 unit, independently re-run), and the
+  // TAP artifacts were regenerated with headers. Independently re-verified in
+  // this session: 14/14 unit, 1/1 e2e, 25/25 regression, all green, diffs read
+  // directly. A-AC-04 is now fully met -- the correlate half (guard-git.mjs's
+  // Phoenix override path, proven end to end) and the shall-not-self-confirm
+  // half (the CLI's trust anchor, fingerprint, and ledger append all bound to
+  // one authoritative, non-caller-selectable root) are both real and tested.
+  'A-AC-04': ['implemented', 'WP-AAC04FIX3'],
+
+  // --- evidence/phx-wp-aac05 (task PHX-WP-AAC05, 2026-08-09, commit 8244ab3) ---
+  // Independently re-run: 29/29 agent-decision-journal-tests (8 new named
+  // A-AC-05 assertions, 2 break-proofed), 13/13 governance-event-store-tests
+  // (zero collateral), node --check clean, only the four declared files
+  // changed. The observational agent-decision-event shape now carries an
+  // optional `identity` array (dimension/value/provenance/assurance, closed
+  // enums, 1-7 entries, no duplicate dimension), admissible ONLY on
+  // `selection`/`escalation`/`fallback` -- exactly the PO's "only where
+  // identity-relevant" disposition -- and rejected with a new
+  // ADJ-IDENTITY-SCOPE code on `assumption`/`verification-scope`. The
+  // published JSON Schema is byte-equivalent and drift-tested the same way
+  // `assumptionState` already is. Stays `partial`, not `implemented`: a
+  // repo-wide search (`grep -rln validateAgentDecisionEvent
+  // plugins/pipeline-core/{lib,scripts}`) confirmed no production code path
+  // anywhere ever emits a `selection`/`escalation`/`fallback` event at all --
+  // the enforcement mechanism is real and correct, but the system as a whole
+  // never actually records an identity choice in production, the same
+  // carrier-without-a-caller shape A-AC-04 was in before its CLI was built.
+  // Reclassified Class S to Class B: this is no longer a design question
+  // (the PO's disposition already answered it) but a confirmed-absent
+  // caller/emitter capability, the same bar applied all session to
+  // A-AC-07/K-AC-10/C-AC-09.
+  'A-AC-05': ['partial', 'WP-AAC05'],
 };
 
 // --- per-criterion evidence pointer ----------------------------------------
@@ -599,8 +645,8 @@ const POINTERS = {
   'A-AC-01': 'record shape pinned; nothing enforces recording BEFORE dependent action where policy requires',
   'A-AC-02': 'agent-decision-journal-tests (PHX-WP-A): all five lifecycle transitions (verified/contradicted/expired/invalidated/superseded) accept a linked follow-up event, exercised end-to-end through the store with the original proven byte-for-byte unchanged',
   'A-AC-03': 'NO CARRIER: no revalidation/invalidation path identifies objects affected by a changed assumption',
-  'A-AC-04': 'CORRECTED AGAIN 2026-08-09 (Elephant, direct code read): a second, real, production-wired carrier exists that the first correction missed -- guard-git.mjs\'s Phoenix override path (consumePhoenixOverrideAuthority, guard-git.mjs:697-728) correlates an agent\'s override reference to the real human ledger via governance-authority.mjs, binds it to the exact repository/candidate/rule/artifact-digest tuple, and single-use-consumes it; guard-git-phoenix.test.mjs proves refuse-without-reference, one-time-allow, and refuse-on-replay end to end (1/1, independently re-run). The correlate-and-cannot-replay half of the clause is proven, not absent. What is still missing, narrowly: no production entry point ever CREATES a granted human-governance-decision -- appendHumanGovernanceDecision, createExternalHumanGovernanceIntent and verifyExternalHumanGovernanceProof (human-governance-ledger.mjs:150,73,101) are each called only from tests (repo-wide grep confirms), so a PO has no CLI to actually grant this authority today; governance-authority.mjs\'s own CLI only ever consumes an existing grant, never creates one. See design/class-s-scoping.md\'s 2026-08-09 correction for the exact three-function wiring this needs -- no new schema or cryptography, the trust anchor at project/critical-human-proof.json already covers the same PO key',
-  'A-AC-05': 'NO CARRIER: neither event shape carries a runner/model/effort/profile/role/adapter field at all',
+  'A-AC-04': 'CORRECTED AGAIN 2026-08-09 (Elephant, direct code read): a second, real, production-wired carrier exists that the first correction missed -- guard-git.mjs\'s Phoenix override path (consumePhoenixOverrideAuthority, guard-git.mjs:697-728) correlates an agent\'s override reference to the real human ledger via governance-authority.mjs, binds it to the exact repository/candidate/rule/artifact-digest tuple, and single-use-consumes it; guard-git-phoenix.test.mjs proves refuse-without-reference, one-time-allow, and refuse-on-replay end to end (1/1, independently re-run). The correlate-and-cannot-replay half of the clause is proven, not absent. What is still missing, narrowly: no production entry point ever CREATES a granted human-governance-decision -- appendHumanGovernanceDecision, createExternalHumanGovernanceIntent and verifyExternalHumanGovernanceProof (human-governance-ledger.mjs:150,73,101) are each called only from tests (repo-wide grep confirms), so a PO has no CLI to actually grant this authority today; governance-authority.mjs\'s own CLI only ever consumes an existing grant, never creates one. See design/class-s-scoping.md\'s 2026-08-09 correction for the exact three-function wiring this needs -- no new schema or cryptography, the trust anchor at project/critical-human-proof.json already covers the same PO key. CLOSED 2026-08-09 (PHX-WP-AAC04-FIX3, commit 0022d13): the missing create-half was built (human-authority-grant.mjs, a prepare/external-sign/install ceremony), survived an independent round-3 Critic PASS after two prior FAIL rounds closed a blocker, a major, and five other findings, and its final three minor findings (a docstring overclaim, runPrepare reading the wrong root, missing command/exit-code evidence headers) are also closed and independently re-verified (14/14 unit, 1/1 e2e, 25/25 regression). Both halves of the clause are now real, tested, and production-wired',
+  'A-AC-05': 'agent-decision-journal-tests (PHX-WP-AAC05): the observational shape now carries an optional identity array (dimension/value/provenance/assurance, closed enums, 1-7 entries, no duplicate dimension) on selection/escalation/fallback only, rejected elsewhere via ADJ-IDENTITY-SCOPE, schema/validator drift-tested. Still no production caller: CONFIRMED ABSENT (repo-wide search) that any code path emits a selection/escalation/fallback event at all',
   'A-AC-06': 'agent-decision-journal-tests: free text, authority-shaped fields and unbound supersession rejected',
   'A-AC-07': 'CONFIRMED ABSENT (PHX-WP-A, repo-wide search): no per-event-class "mandatory" capture concept exists anywhere in the journal, the shared store, or capture-policy.json -- five of the seven named event classes are not even representable as a journal `kind`',
   'A-AC-08': 'NO CARRIER: no detector for missing dispatch provenance; the Dispatch: trailer is convention only',
@@ -761,7 +807,10 @@ const CLOSURE = {
   'A-AC-02': ['assert', 'WP-A'],
   'A-AC-03': ['build', 'WP-A'],
   'A-AC-04': ['build', 'WP-A'],
-  'A-AC-05': ['seam', 'WP-A'],
+  // Reclassified seam -> build 2026-08-09 (PHX-WP-AAC05): the PO's "only where
+  // identity-relevant" disposition already answered the design question; what
+  // remains is a confirmed-absent caller/emitter capability, not a seam.
+  'A-AC-05': ['build', 'WP-AAC05'],
   'A-AC-07': ['build', 'WP-A'],
   'A-AC-08': ['build', 'WP-A'],
   'A-AC-09': ['build', 'WP-A'],

@@ -81,6 +81,21 @@ real product decision, not something to infer from the code. Recommend: a short 
 Spec-delta section answering this before any schema field lands, since `agent-decision-event.
 schema.json` is depended on by every currently-passing agent-decision-journal test.
 
+### RESOLVED 2026-08-09: PO answered the schema-design question, PHX-WP-AAC05 built it
+
+PO disposition: "only where identity-relevant." Read against the taxonomy already documented in
+`docs/agent-decision-journal.md` (`selection`/`escalation`/`fallback`/`assumption`/
+`verification-scope`), that answers both open sub-questions at once — provenance/assurance meaning
+stayed exactly what the Critic template's own report-header contract already used informally
+(where the identity value came from; how confident/verified it is), and the "which kinds" question
+resolved to the three kinds whose own semantics are about choosing or changing something:
+`selection`, `escalation`, `fallback`. `assumption`/`verification-scope` never carry it. Built and
+independently re-verified (29/29 tests, commit `8244ab3`): an optional `identity` array, closed
+dimension/value/provenance/assurance shape, schema/validator drift-tested. Stays `partial`,
+reclassified Class S to Class B — the mechanism is real, but a repo-wide search confirmed no
+production code path anywhere emits a `selection`/`escalation`/`fallback` event at all yet, so the
+identity capability, however correct, is never actually exercised.
+
 ## E-AC-20 — needs the export package's own metadata shape settled first
 
 **Clause:** "WHEN an audit bundle includes export metadata, THE SYSTEM SHALL include only policy/
@@ -154,11 +169,11 @@ independently and never designed to know about each other.
 
 ## Suggested order for a future session
 
-1. **A-AC-04** — pure wiring, interface already fixed, lowest risk.
-2. **X-AC-11** — one new call, no new schema, moderate design latitude.
-3. **A-AC-05** — needs a schema-shape decision first (recommend as its own short design note).
-4. **E-AC-20** — sequence after E-AC-02 closes (shared root cause).
-5. **H-AC-08** — needs a PO answer to "what counts as a legacy record" before any code.
+1. **E-AC-20** — sequence after E-AC-02 closes (shared root cause).
+2. **H-AC-08** — needs a PO answer to "what counts as a legacy record" before any code.
 
-**H-AC-09** dropped from this order 2026-08-09: reclassified Class P (not closeable by writing code
-under Sprint-0 policy), see its own section above.
+**A-AC-04** and **X-AC-11** dropped from this order — both built and closed earlier in this
+session. **A-AC-05** dropped 2026-08-09: PO answered the scope question ("only where
+identity-relevant"), built (PHX-WP-AAC05), see its own section above. **H-AC-09** dropped
+2026-08-09: reclassified Class P (not closeable by writing code under Sprint-0 policy), see its
+own section above.
