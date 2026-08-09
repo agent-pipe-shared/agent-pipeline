@@ -47,6 +47,19 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 7eee663a05daa11cfa5888552d05085c7992b39f — 2026-08-09, range 3387065..7eee663, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `f7d9c0d` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `2ca38fc`, `305ca2f`, `7eee663`. Same reading as the whole chain: `docs/state.md` stays
+ADR-0012 (one new checkpoint entry recording an independent Critic FAIL and its remediation), the
+generated evidence-map/closure-plan pair stays ADR-0045. Two new `backlog/items/*.md` files in
+this range confirm the same reading the `c004d16` entry already established: `backlog/` is its
+own dedicated class under ADR-0045, not implicated by its `specs/**` glob — the check's own
+output above names only the four `specs/sprint-phoenix-epic/` files, not either backlog item.
+
 ## Candidate 13bebf6a5d15fb0c425d9599c34e82bbc510c12c — 2026-08-09, range 3387065..13bebf6, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
