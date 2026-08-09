@@ -55,6 +55,23 @@ test("E-AC-18 excludes destination secrets from every portable export record whi
   for (const value of values) assert.equal(delivered.includes(value), false);
   assert.deepEqual(receipt.acceptedDestinationEventIds, [sha("a")]);
 });
+// E-AC-02: RFC 5424 syslog encodes only occurredAtEpochMs and eventType, so
+// every other EXPORT_FIELDS key present must be declared as loss; the three
+// full-fidelity formats must stay loss-free even under the same full field set.
+test("E-AC-02 declares RFC 5424's actual dropped fields instead of always claiming no loss", () => {
+  const fullFields = { eventType: "lifecycle.dispatch", occurredAtEpochMs: 1, eventId: "event-1", eventDigest: sha("d"), repositoryFingerprint: sha("e"), correlation: "corr-1", candidate: sha("f"), policyDigest: sha("0") };
+  const syslogMapped = mapGovernanceExportProjection({ profile: profile("rfc5424"), projection: projection("rfc5424", fullFields) });
+  assert.deepEqual(syslogMapped.loss, ["candidate", "correlation", "eventDigest", "eventId", "policyDigest", "repositoryFingerprint"]);
+
+  const minimalFields = { eventType: "lifecycle.dispatch", occurredAtEpochMs: 1 };
+  const minimalSyslogMapped = mapGovernanceExportProjection({ profile: profile("rfc5424"), projection: projection("rfc5424", minimalFields) });
+  assert.deepEqual(minimalSyslogMapped.loss, []);
+
+  for (const format of ["cloudevents-json", "otlp-json", "ndjson"]) {
+    const mapped = mapGovernanceExportProjection({ profile: profile(format), projection: projection(format, fullFields) });
+    assert.deepEqual(mapped.loss, []);
+  }
+});
 test("profile and acknowledgements are closed, non-authoritative and deduplicated", () => {
   assert.equal(validateGovernanceExportAdapterProfile(profile("ndjson")).ordering, "per-stream");
   const ack = validateGovernanceExportAcknowledgement({ schema: "pipeline.governance-export-acknowledgement.v1", profileId: "audit", batchId: "batch-1", acceptedDestinationEventIds: [sha("a")], rejectedDestinationEventIds: [], receiptId: "opaque-1" });

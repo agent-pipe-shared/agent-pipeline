@@ -95,7 +95,10 @@ export function mapGovernanceExportProjection({ profile, projection: item } = {}
         : rfc5424(item);
   const bytes = Buffer.byteLength(typeof payload === "string" ? payload : JSON.stringify(payload), "utf8");
   if (bytes > active.maxPayloadBytes) fail("GEA-PAYLOAD-LIMIT");
-  return freeze({ schema: "pipeline.governance-export-mapping.v1", profileId: active.profileId, format: active.format, sourceEventDigest: item.sourceEventDigest, destinationEventId: item.destinationEventId, payload: freeze(clone(payload)), payloadBytes: bytes, loss: freeze([]) });
+  const loss = active.format === "rfc5424"
+    ? Object.keys(item.fields).filter((field) => field !== "occurredAtEpochMs" && field !== "eventType").sort()
+    : [];
+  return freeze({ schema: "pipeline.governance-export-mapping.v1", profileId: active.profileId, format: active.format, sourceEventDigest: item.sourceEventDigest, destinationEventId: item.destinationEventId, payload: freeze(clone(payload)), payloadBytes: bytes, loss: freeze(loss) });
 }
 
 /** Validates an untrusted adapter acknowledgement before it can update the local outbox. */
