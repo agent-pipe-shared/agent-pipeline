@@ -425,6 +425,29 @@ function parseJsonObject(observation, label) {
   return value;
 }
 
+/**
+ * Has the LIFECYCLE ITSELF sanctioned an edit to this feature's promoted design
+ * package? `reopen-design` exists for exactly that, and records `planInvalidation`
+ * when it does (`plan-spec-state-v2.mjs`); that record is durable across the
+ * `submit-plan`/`approve-plan` that follow, so a package edited once stays
+ * recognisable as edited-by-permission for the rest of the feature's life.
+ *
+ * Read narrowly and fail CLOSED: anything unreadable, unparseable, or not carrying
+ * a plain `planInvalidation` object answers "no", which leaves the mutual promotion
+ * binding below enforcing exactly as it did before. This is a read of a marker,
+ * never a validation -- `validPlanInvalidation` in the state module owns that, and
+ * duplicating it here would be a second source of truth for what an invalidation is.
+ */
+function promotedDesignReopened(stateObservation) {
+  if (stateObservation?.status !== "present") return false;
+  try {
+    const state = JSON.parse(stateObservation.raw.toString("utf8"));
+    return isObject(state) && isObject(state.planInvalidation);
+  } catch {
+    return false;
+  }
+}
+
 function validateHistory(value) {
   const kickoffEntryKeys = new Set([
     "kind", "transactionSha256", "goalSha256", "calibrationSha256",
@@ -572,8 +595,27 @@ function observeDetailed({
       }
       history = parseJsonObject(historyObservation, "private continuity history");
       validateHistory(history);
+      // THE BINDING BELOW IS A RECORD OF A TRANSACTION, NOT A LIVE AUTHORITY, once
+      // the lifecycle has released the documents for editing. `reopen-design`
+      // exists to make a submitted plan workable again; the agent then edits
+      // `spec.md`, which is the one action reopening the design exists to enable,
+      // and until 2026-08-09 that edit broke the mutual promotion digests, threw
+      // KICKOFF-PROMOTION-AUTHORITY-DRIFT, and reached the caller as
+      // `continuity: unavailable` with `nextAction: null` -- a session that could
+      // not act, whose only recorded escape was putting the old bytes back (on a
+      // greenfield repository with no commits, there is no `git restore` to do that
+      // with). Observed live in the PO's 2026-08-09 happy-path run; filed as
+      // `backlog/items/2026-08-09-reopen-design-invites-the-edit-that-ends-the-session.md`.
+      //
+      // The live binding for an edited package is `continuity.authority` plus
+      // `planApproval.poGateAuthority`, both re-established by `submit-plan` /
+      // `approve-plan` and both checked elsewhere. Enforcing the promotion record
+      // forever conflates history with authority, and the conflation is what made
+      // a sanctioned edit terminal. Every state the lifecycle has NOT released --
+      // which is every state that never reopened its design -- keeps the check.
+      const reopened = promotedDesignReopened(stateObservation);
       for (const entry of history.transactions.slice(1)) {
-        if (entry.designInputPath !== undefined) {
+        if (entry.designInputPath !== undefined && !reopened) {
           const evidence = observeOptionalProjectFile(root, entry.designInputPath, "promotion design input");
           if (evidence.status !== "present" || evidence.sha256 !== entry.designInputSha256) {
             fail("KICKOFF-PROMOTION-EVIDENCE-DRIFT", "promotion design input does not match its bound evidence");
@@ -585,7 +627,7 @@ function observeDetailed({
         // exactly as editing the bound design input does.  Promotions written
         // before the pair existed carry no `specPath`; that older record is
         // read-only history and is left exactly as it was written.
-        if (entry.specPath === undefined) continue;
+        if (entry.specPath === undefined || reopened) continue;
         for (const [path, expected, label] of [
           [entry.planPath, entry.prdSha256, "promotion PRD"],
           [entry.specPath, entry.specSha256, "promotion specification"],

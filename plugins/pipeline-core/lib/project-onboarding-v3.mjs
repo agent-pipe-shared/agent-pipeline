@@ -1966,11 +1966,18 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
       runtime,
       continuity: { ...continuity, status: "unavailable" },
       appServer,
+      // The guidance no longer asserts read access as the cause. This branch is a
+      // catch-all -- every classification that is neither `valid`, `damaged`, nor
+      // `absent-pristine` lands here -- and naming ONE cause for all of them sent
+      // the 2026-08-09 session looking for a read-permission problem that did not
+      // exist while its actual state was a digest disagreement. Saying what is and
+      // is not established costs nothing and stops the wrong hunt.
       diagnostics: [lifecycleDiagnostic(
         "$.continuity",
         "continuity_observation_unavailable",
-        "continuity authority could not be observed safely",
-        "repair continuity read access before retrying",
+        "continuity authority could not be established as valid",
+        "no cause is established here: the observation may be unreadable, or readable and disagreeing with its recorded digests. "
+        + "Inspect the state and the artifacts it binds read-only before changing either.",
       )],
     });
   }

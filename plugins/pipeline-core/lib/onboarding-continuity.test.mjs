@@ -1488,6 +1488,45 @@ check("editing the promoted Spec invalidates the mutual digest binding", () => {
   assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "unavailable");
 });
 
+// REOPEN-1. The two checks above are the assurance; this one is its boundary. The
+// PO's 2026-08-09 greenfield run reported it as "claude hat sich wieder selber
+// deadlocked": `reopen-design` sets the phase back to design so a submitted plan
+// can be worked on again, the agent edits `spec.md` -- the one action reopening the
+// design exists to enable -- and the mutual promotion binding above turned that
+// sanctioned edit into `continuity: unavailable` with `nextAction: null`. The only
+// escape observed was putting the old bytes back, which a greenfield repository
+// with no commits cannot do. The promotion record is history once the lifecycle has
+// released the documents; `continuity.authority` and the PO gate are the live
+// binding, and both are re-established by submit-plan/approve-plan.
+check("a reopened design may edit its promoted documents without ending the session", () => {
+  const seed = promotionSeed("reopen-drift");
+  promote(seed);
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
+
+  // Exactly what `reopenPlanDesign` records: phase back to design, approval
+  // cleared, and a durable `planInvalidation` naming the submission it invalidated.
+  const state = JSON.parse(readFileSync(seed.statePath, "utf8"));
+  state.activeFeature = { ...state.activeFeature, phase: "design" };
+  state.planApproved = false;
+  state.planInvalidation = { invalidatedSubmissionSha256: digest(Buffer.from("submission")), invalidatedAt: "2026-08-09T07:48:00.000Z" };
+  writeFileSync(seed.statePath, `${JSON.stringify(state, null, 2)}\n`);
+
+  for (const name of ["spec.md", "prd_promoted.md"]) {
+    const path = promotedArtifact(seed, name);
+    writeFileSync(path, `${readFileSync(path, "utf8")}\nEdited while the design is reopened.\n`);
+    assert.notEqual(classifyOnboardingContinuity({ rootDir: seed.root }).status, "unavailable",
+      `editing ${name} while the design is reopened must not make the session unobservable`);
+  }
+
+  // And the assurance is not gone, only scoped: a state that never reopened its
+  // design still loses the binding on the same edit. Both checks above pin that
+  // directly; this asserts the marker is what separates them, not the edit.
+  delete state.planInvalidation;
+  writeFileSync(seed.statePath, `${JSON.stringify(state, null, 2)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "unavailable",
+    "without the recorded reopening, the same edited bytes must still invalidate the binding");
+});
+
 check("promotion refuses a plan that is the Spec, a plan that is not a prd_*.md, and a noncanonical Spec", () => {
   const seed = promotionSeed("plan-subject");
   expectKickoffError("KICKOFF-PROMOTION-PLAN-IS-SPEC", () => planOnboardingKickoffPromotion({
