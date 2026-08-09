@@ -3067,6 +3067,11 @@ function handoverContent(goal, featureId, prdPath, specPath) {
     "",
     "Review the goal and establish the initial PRD and technical specification.",
     "",
+    "This text reflects state as of the last kickoff transaction and is not",
+    "updated afterwards; if it looks stale relative to the project's actual",
+    "progress, treat `project/pipeline-state.json` (or",
+    "`pipeline-state.mjs continuity-status`) as the live, authoritative source.",
+    "",
   ].join("\n");
 }
 
@@ -3103,6 +3108,11 @@ function promotionHandoverContent({ featureId, prdPath, specPath, designInputPat
     "`pipeline-state submit-plan --by <name> --profile <epic|feature|mini>`.",
     "Implementation writes stay refused until the plan is approved and the phase is",
     "switched to `implementation`.",
+    "",
+    "This text reflects state as of the last promotion transaction and is not",
+    "updated afterwards; if it looks stale relative to the project's actual",
+    "progress, treat `project/pipeline-state.json` (or",
+    "`pipeline-state.mjs continuity-status`) as the live, authoritative source.",
     "",
   ].join("\n");
 }
