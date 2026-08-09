@@ -1023,6 +1023,45 @@ a dispatch the authority to clear a control whose purpose is to check that
 dispatch's own class of work. "Show your evidence" is not a substitute for
 separation of duties — it is what makes the absence of separation look rigorous.
 
+### LIVE-1 repaired (`67bac89`): the skill every session starts with matches its spec again
+
+Verified by me from the repository root: `pipeline-start-v3` suite green, and the new
+`harness/scripts/check-skill-spec-coverage.mjs` reports **15/15 obligation anchors
+present, 0 missing, 0 stale** — after reporting **14 of 15 missing** against the
+unrepaired state.
+
+**The determination came before the repair, and it changed the answer twice.** Two of
+the six reported items were *partially relocated* rather than absent — Steps 3 and 4
+survive in `references/freshness.md` in reduced form. Restoring those wholesale would
+have duplicated an obligation, which is how two versions of one rule begin to drift.
+Only what was genuinely missing from the whole directory was restored, and each piece
+went to whichever file the restructure's own typing says should hold it.
+
+**The `Bootstrap check passed` line was the sharpest case.** The *obligation* to print a
+confirmation line survived at `SKILL.md:81`; the **literal format did not**, nor did any
+of its five defined additions or either role variant. An obligation to print "the
+auditable line" without the line is not an obligation — every session could satisfy it
+and none of them would print the same thing.
+
+**A decision it surfaced instead of taking, and my ruling.** The suite pins `SKILL.md`
+at ≤ 15,000 bytes and only 218 were free against ~1,100 bytes of mandatory restoration.
+Rather than silently exceed or silently trim, it moved three *conditional* passages out
+of core into typed references and flagged the move as unbriefed latitude. **I accept
+it**: the restructure exists precisely so the happy path stays small and conditional
+content loads on demand, so moving conditional passages out is that logic applied, not
+an exception to it. **What I am recording as a finding is the consequence** — the core
+budget is now at 14,917 of 15,000, **83 bytes free**. The skill cannot absorb one more
+mandatory obligation without another move. That is a constraint nobody has decided on,
+and it will next be discovered by whoever needs to add a rule.
+
+Also flagged, not fixed: `references/role-specific.md` is an orphan — absent from the
+skill's typed lazy-loading list and from the suite's reference array, and a near-duplicate
+of `roles.md`.
+
+**Five of the six second-audit findings remain.** The taxonomy one (LIVE-2) is next: a
+closed taxonomy missing a class its own documentation still names, with the checker
+edited in lockstep so the gate reports green.
+
 ### SECOND AUDIT (`evidence/phx-audit2.md`): six more losses, and one is invisible to the gate BY CONSTRUCTION
 
 Prose has no test. That was the reason for this pass, and it produced the single worst
