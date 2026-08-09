@@ -3831,6 +3831,20 @@ every real package directory should be the first step, not an afterthought caugh
 verification after the fact. Not re-dispatching this now; flagging it for whenever this criterion
 is revisited.
 
+**Applied immediately, going forward:** verification of any change touching a widely-consumed
+module now includes checking for and running broader downstream test suites, not only the file(s)
+the dispatch directly modified — the P-AC-06 catch above is exactly what independent verification
+exists for, and it only worked because I ran `pipeline-state.test.mjs`, which the briefing hadn't
+asked for and the dispatch itself never ran.
+
+Dispatched **WP-R-AC04** (a distinct required-cleanup/readback field, correctly scoped to
+`agent-decision-journal.mjs` — the real edit surface `recoverability` lives in, not
+`external-command-offer.mjs` as the evidence-map POINTERS text implies) — file-disjoint from
+nothing live right now, but explicitly briefed to read (not modify) today's two earlier same-file
+dispatches (`WP-A-AC07`, `WP-R-AC02`) so it composes cleanly rather than conflicting.
+
+**Live now:** WP-R-AC04. Handover fully current through this checkpoint.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
