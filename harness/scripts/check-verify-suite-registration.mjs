@@ -144,8 +144,9 @@ export const REQUIRED_EXCLUSION_FIELDS = Object.freeze(["reason", "owner", "expi
  * registered entry of verify.mjs's TEST_SUITES -- the outcome this list exists to
  * reach.
  *
- * TWO ENTRIES BELOW ARE NOT OF THAT CLASS, and the difference matters more than the
- * count. harness/scripts/check-critic-contract-citations.test.mjs and
+ * HALF THE ENTRIES BELOW ARE NOT OF THAT CLASS, and the difference matters more than
+ * the count. harness/lib/plan-spec-state-v2.test.mjs,
+ * harness/scripts/check-critic-contract-citations.test.mjs and
  * harness/scripts/recovery-bridge-approval.test.mjs are GREEN. They are parked for one
  * reason only: registering a suite means editing verify.mjs, a protected test path
  * whose maintenance window is closed, and opening one needs a human signature. Every
@@ -155,6 +156,10 @@ export const REQUIRED_EXCLUSION_FIELDS = Object.freeze(["reason", "owner", "expi
  * fact, a failing suite is a defect. Their expiry is shared with the rest
  * deliberately, so that nothing here outlives a single review date, not because they
  * share the others' justification.
+ *
+ * The green half is growing because three suites the 0.5.2 integration orphaned have
+ * been repaired rather than deleted. That direction of travel is the point: this list
+ * shrinks by registration or deletion, never by an entry quietly going stale.
  *
  * A GREEN entry here is the one shape that rots quietly: the suite passes, so nothing
  * fails, and the stale `reason` keeps asserting a defect that no longer exists. That
@@ -176,7 +181,7 @@ export const EXCLUSIONS = Object.freeze({
     expires: "2026-09-07",
   }),
   "harness/lib/plan-spec-state-v2.test.mjs": Object.freeze({
-    reason: "red (R1.2): SyntaxError, plan-spec-state-v2.mjs has no export bindPlanSpecApprovalWithHumanDecision",
+    reason: "GREEN, not red: repaired 2026-08-09 (PHX-PLANSPEC, commit 1f37b40) by restoring the human-decision-bound plan-approval writer that merge 75b8361 dropped; the suite loads and passes 8 checks. It is not a duplicate of its registered successor -- it pins the human-decision lineage the successor does not cover. Parked solely because registering it edits verify.mjs, a protected test path whose maintenance window is closed and whose reopening needs a human signature. Register on the next window; this entry is a scheduling record, not a defect record.",
     owner: "PO",
     expires: "2026-09-07",
   }),
