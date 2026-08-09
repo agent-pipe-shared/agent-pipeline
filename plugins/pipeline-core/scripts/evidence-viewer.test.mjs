@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { main } from "./evidence-viewer.mjs";
+import { buildEvidenceViewModelFromFeaturePackage } from "../lib/evidence-view-model.mjs";
 
 const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
 function fixture() {
@@ -25,4 +26,22 @@ test("renders a supplied local export observation without turning it into author
   const input = fixture(); writeFileSync(join(input.root, "export-status.json"), JSON.stringify({ schema: "pipeline.governance-export-view-status.v1", destinationProfile: "audit", state: "retryable-failure", cursor: 2, lag: 3, receipt: { batchId: "batch-1", acknowledgementClass: "partial", terminalDisposition: "retryable-failure" } }));
   await main(["build", "--root", input.root, "--manifest", input.manifest, "--output", "export.html", "--export-status-file", "export-status.json"]);
   const html = readFileSync(join(input.root, "export.html"), "utf8"); assert.match(html, /Governance export observation/); assert.match(html, /retryable-failure/); assert.match(html, /non-authoritative transport observation/);
+});
+// V-AC-07: modifying the generated viewer file must never alter canonical
+// authority. This renderer/CLI pair emits no client-side script (see the
+// `doesNotMatch(html, /<script/)` assertion in evidence-view-renderer.test.mjs),
+// so the generated file is the only mutable "viewer file or UI state" this
+// system has -- tampering it is the meaningful case to pin.
+test("V-AC-07 leaves canonical authority unchanged when the generated viewer file is modified", async () => {
+  const input = fixture();
+  const manifestPath = join(input.root, input.manifest);
+  const canonicalBefore = readFileSync(manifestPath, "utf8");
+  await main(["build", "--root", input.root, "--manifest", input.manifest, "--output", "evidence/view.html"]);
+  const reportPath = join(input.root, "evidence/view.html");
+  writeFileSync(reportPath, readFileSync(reportPath, "utf8").replace("Derived summary", "FORGED: release approved"));
+  assert.equal(readFileSync(manifestPath, "utf8"), canonicalBefore);
+  const rebuilt = buildEvidenceViewModelFromFeaturePackage({ rootDir: input.root, manifestPath: input.manifest });
+  assert.equal(rebuilt.candidate.commit, "a".repeat(40));
+  assert.equal(rebuilt.status, "unknown");
+  assert.notEqual(rebuilt.status, "pass");
 });
