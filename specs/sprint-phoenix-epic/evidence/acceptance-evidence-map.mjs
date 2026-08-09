@@ -465,6 +465,22 @@ const DELTA = {
   // of nine genuinely isn't traced yet -- an honest gap, not padding.
   'A-AC-15': ['implemented', 'WP-DOC'],
   'H-AC-14': ['implemented', 'WP-DOC'],
+
+  // --- evidence/phx-wp-xac11.txt (task PHX-WP-XAC11, 2026-08-09, commit
+  // b78fae1) --- Independently re-run: 19/19 external-reference-adapter-tests
+  // pass (13 -> 19, exactly +6 as briefed), node --check clean, only the two
+  // declared files touched. planExternalReferenceWrite now consults an
+  // injected organizationPolicy whenever pipelineArtifact.documentClass names
+  // one of the eight governed classes, failing closed with a distinct reason
+  // for no policy supplied, no covering pack entry, a disagreeing mode, or an
+  // outstanding approval requirement; an ungoverned (null) reference skips
+  // the check and is byte-identical to the pre-dispatch adapter. Break-proofed
+  // across 3 cycles (all four reject guards, the approval guard alone, and
+  // the null-class skip), each mutation driving exactly the predicted tests
+  // red before restoration. The named "approval-required" branch still
+  // unconditionally rejects -- no approval-binding mechanism was built, that
+  // remains a separate, larger follow-on task per the dispatch's own report.
+  'X-AC-11': ['implemented', 'WP-XAC11'],
 };
 
 // --- per-criterion evidence pointer ----------------------------------------
@@ -578,7 +594,7 @@ const POINTERS = {
   'X-AC-08': 'external-reference-adapter-tests: provider names and fields kept out of the normative core schemas',
   'X-AC-09': 'external-reference-adapter-tests: external content treated as untrusted data, no execution or authority injection',
   'X-AC-10': 'external-reference-adapter-tests: identity resolved through the feature package, not a path guess',
-  'X-AC-11': 'NO CARRIER: the adapter never references organization policy, and the policy modules never reference the adapter',
+  'X-AC-11': 'external-reference-adapter-tests (PHX-WP-XAC11, break-proofed): planExternalReferenceWrite consults an injected organizationPolicy for a governed documentClass, failing closed on no policy / no covering class / mode mismatch / outstanding approval; approval-binding itself is a named open follow-on, not built here',
   'X-AC-12': 'external-reference-adapter-tests: plan->apply->reconcile proven identical across synthetic issue-tracker, knowledge-base, document-store and secondary-forge profiles, and every cross-profile capability mismatch rejected (PHX-WP-X, break-proofed)',
   'X-AC-13': 'external-reference-adapter-tests: defaults to reference-only or projection, never last-write-wins',
   'X-AC-14': 'confirmed absent (PHX-WP-X): neither inspect() call site (external-reference-adapter.mjs:61,72) has a try/catch, so an unreachable external system throws uncaught instead of producing a typed observation -- filed as pipeline.external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system, a production fix not a missing test',

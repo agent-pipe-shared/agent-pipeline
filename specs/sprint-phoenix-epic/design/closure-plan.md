@@ -8,7 +8,7 @@ Parent specification: [../spec.md](../spec.md) · Measurement: [../evidence/acce
 
 ## What this design is for
 
-The measurement established that 62 of 157 acceptance criteria are not
+The measurement established that 61 of 157 acceptance criteria are not
 `implemented` and that no issue is closeable. It did not say how any of them closes. This
 document does, and it is generated from the same verdict data as the measurement, so the two
 cannot drift apart.
@@ -21,10 +21,10 @@ one list is what has made the epic look larger and more uniform than it is.
 |---|---|---|
 | A — assertion missing | 8 | one named test case in an already-registered, unprotected suite |
 | D — documentation missing | 1 | one document section set; no code, no gate |
-| S — seam missing | 6 | a connector between two packages that already work |
+| S — seam missing | 5 | a connector between two packages that already work |
 | B — capability missing | 42 | real implementation plus its tests |
 | P — not code | 5 | a human gate, a sanctioned authority revision, or a proved impossibility |
-| **total** | **62** | |
+| **total** | **61** | |
 
 **The distribution is the finding.** The largest class by a wide margin is Class A: criteria
 whose behaviour is built, shipped and green, and which fail only because no assertion names the
@@ -131,7 +131,7 @@ is by module family, which makes the disjointness checkable rather than asserted
 | WP-K | 2 | plugins/pipeline-core/lib/governance-event-store.test.mjs, plugins/pipeline-core/lib/governance-event.test.mjs |
 | WP-P | 5 | plugins/pipeline-core/lib/audit-bundle*.mjs, plugins/pipeline-core/lib/organization-policy*.mjs |
 | WP-V | 2 | plugins/pipeline-core/lib/evidence-view-model*.mjs, plugins/pipeline-core/lib/evidence-view-renderer*.mjs |
-| WP-X | 2 | plugins/pipeline-core/lib/external-reference-adapter*.mjs |
+| WP-X | 1 | plugins/pipeline-core/lib/external-reference-adapter*.mjs |
 | WP-C | 4 | plugins/pipeline-core/lib/change-control*.mjs |
 | WP-E | 8 | plugins/pipeline-core/lib/governance-export-*.mjs |
 | WP-A | 9 | plugins/pipeline-core/lib/agent-decision-journal*.mjs, governance/schemas/agent-decision-event.schema.json |
@@ -192,7 +192,7 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 |---|---|---|---|
 | L-AC-08 | partial | WP-DOC | docs/governance-replay.md "Traceability" (PHX-WP-DOC-3): 8 of 9 lifecycle-governance-events.mjs kinds traced to a stated user/audit need; the `cancellation` kind is honestly flagged unclear -- no structural distinction from `status: "cancelled"` exists in the code, so no confident justification could be constructed |
 
-### Class S — two implemented packages, mutually unaware (6)
+### Class S — two implemented packages, mutually unaware (5)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
@@ -201,7 +201,6 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 | E-AC-20 | not-started | WP-E | NO CARRIER: audit-bundle carries nothing from the export package, and the export modules never reference the bundle |
 | H-AC-08 | not-started | WP-H | NO CARRIER: no path imports a legacy approval/override/deploy record as an unverified observation |
 | H-AC-09 | not-started | WP-H | NO CARRIER: external-push-ledger is scoped to single-repo push proofs; nothing binds cross-repository guarded work to one physical target |
-| X-AC-11 | not-started | WP-X | NO CARRIER: the adapter never references organization policy, and the policy modules never reference the adapter |
 
 ### Class B — an absent capability (42)
 

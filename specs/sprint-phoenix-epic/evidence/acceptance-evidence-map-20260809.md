@@ -42,8 +42,8 @@ reproduced here rather than referenced.
 
 ## The direct answer
 
-**Phoenix cannot claim complete.** 95 of 157 criteria carry a named assertion in a
-gate-registered suite; 62 do not. EPIC-AC-05 forbids a completion claim while any
+**Phoenix cannot claim complete.** 96 of 157 criteria carry a named assertion in a
+gate-registered suite; 61 do not. EPIC-AC-05 forbids a completion claim while any
 criterion remains unimplemented or unverified, and it currently bites. No issue is closeable on
 its own live acceptance bullets.
 
@@ -61,10 +61,10 @@ A bullet is therefore BLOCKED unless every criterion mapped to it is `implemente
 
 | verdict | count |
 |---|---|
-| implemented | 95 |
+| implemented | 96 |
 | partial | 45 |
 | designed-only | 1 |
-| not-started | 15 |
+| not-started | 14 |
 | constraint | 1 |
 | **total** | **157** |
 
@@ -199,7 +199,7 @@ clause that is not pinned or not built.
 | V-AC-09 | implemented | WP-V | evidence-view-renderer-tests: all seven required fixtures now covered -- pass/fail/unknown pre-existing, tampered/misplaced/orphaned/legacy-layout added with deterministic snapshots (PHX-WP-V, break-proofed) |
 | V-AC-10 | implemented | C | evidence-viewer-tests: candidate binding rendered before any derived summary |
 
-### X — Traceability and documentation adapters (#23) (13/15 implemented)
+### X — Traceability and documentation adapters (#23) (14/15 implemented)
 
 | ID | verdict | src | evidence / named gap |
 |---|---|---|---|
@@ -213,7 +213,7 @@ clause that is not pinned or not built.
 | X-AC-08 | implemented | C | external-reference-adapter-tests: provider names and fields kept out of the normative core schemas |
 | X-AC-09 | implemented | C | external-reference-adapter-tests: external content treated as untrusted data, no execution or authority injection |
 | X-AC-10 | implemented | C | external-reference-adapter-tests: identity resolved through the feature package, not a path guess |
-| X-AC-11 | not-started | J | NO CARRIER: the adapter never references organization policy, and the policy modules never reference the adapter |
+| X-AC-11 | implemented | WP-XAC11 | external-reference-adapter-tests (PHX-WP-XAC11, break-proofed): planExternalReferenceWrite consults an injected organizationPolicy for a governed documentClass, failing closed on no policy / no covering class / mode mismatch / outstanding approval; approval-binding itself is a named open follow-on, not built here |
 | X-AC-12 | implemented | WP-X | external-reference-adapter-tests: plan->apply->reconcile proven identical across synthetic issue-tracker, knowledge-base, document-store and secondary-forge profiles, and every cross-profile capability mismatch rejected (PHX-WP-X, break-proofed) |
 | X-AC-13 | implemented | C | external-reference-adapter-tests: defaults to reference-only or projection, never last-write-wins |
 | X-AC-14 | partial | C | confirmed absent (PHX-WP-X): neither inspect() call site (external-reference-adapter.mjs:61,72) has a try/catch, so an unreachable external system throws uncaught instead of producing a typed observation -- filed as pipeline.external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system, a production fix not a missing test |
@@ -328,12 +328,11 @@ clause that is not pinned or not built.
 
 ### #23 — Define external work-system and knowledge-base traceability adapters
 
-14 of 16 live acceptance bullets fully carried; **2 blocked**.
+15 of 16 live acceptance bullets fully carried; **1 blocked**.
 
 | # | live acceptance bullet | blocking criteria (verdict) |
 |---|---|---|
-| 1 | #9 governs mandatory documents and external writes | X-AC-11 (not-started) |
-| 2 | External outage cannot erase local authority | X-AC-14 (partial) |
+| 1 | External outage cannot erase local authority | X-AC-14 (partial) |
 
 ### #24 — Add policy-governed ITSM change control to release and promotion
 
@@ -399,7 +398,7 @@ clause that is not pinned or not built.
 | #5 | 6 | 5 | 1 | **no** |
 | #9 | 11 | 3 | 8 | **no** |
 | #17 | 6 | 4 | 2 | **no** |
-| #23 | 16 | 14 | 2 | **no** |
+| #23 | 16 | 15 | 1 | **no** |
 | #24 | 12 | 9 | 3 | **no** |
 | #30 | 17 | 9 | 8 | **no** |
 | #31 | 17 | 8 | 9 | **no** |
@@ -409,7 +408,7 @@ Issues closeable on their own live acceptance bullets: **0 of 8**.
 
 ## The blocking set, ranked
 
-32 distinct criteria block at least one live acceptance bullet.
+31 distinct criteria block at least one live acceptance bullet.
 
 | criterion | verdict | live bullets blocked |
 |---|---|---|
@@ -443,7 +442,6 @@ Issues closeable on their own live acceptance bullets: **0 of 8**.
 | P-AC-03 | partial | 1 |
 | V-AC-02 | partial | 1 |
 | V-AC-06 | partial | 1 |
-| X-AC-11 | not-started | 1 |
 | X-AC-14 | partial | 1 |
 
 ## Criteria not mapped to any live issue bullet
