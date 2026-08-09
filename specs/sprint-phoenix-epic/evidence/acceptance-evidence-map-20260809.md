@@ -42,8 +42,8 @@ reproduced here rather than referenced.
 
 ## The direct answer
 
-**Phoenix cannot claim complete.** 100 of 157 criteria carry a named assertion in a
-gate-registered suite; 57 do not. EPIC-AC-05 forbids a completion claim while any
+**Phoenix cannot claim complete.** 101 of 157 criteria carry a named assertion in a
+gate-registered suite; 56 do not. EPIC-AC-05 forbids a completion claim while any
 criterion remains unimplemented or unverified, and it currently bites. No issue is closeable on
 its own live acceptance bullets.
 
@@ -61,8 +61,8 @@ A bullet is therefore BLOCKED unless every criterion mapped to it is `implemente
 
 | verdict | count |
 |---|---|
-| implemented | 100 |
-| partial | 39 |
+| implemented | 101 |
+| partial | 38 |
 | designed-only | 1 |
 | not-started | 16 |
 | constraint | 1 |
@@ -75,7 +75,7 @@ A bullet is therefore BLOCKED unless every criterion mapped to it is `implemente
 gate-registered suite that pins the operative clause; for every other verdict it names the exact
 clause that is not pinned or not built.
 
-### PX0 — Lifecycle-authority revision and runner-neutral ruleset source (12/17 implemented)
+### PX0 — Lifecycle-authority revision and runner-neutral ruleset source (13/17 implemented)
 
 | ID | verdict | src | evidence / named gap |
 |---|---|---|---|
@@ -86,7 +86,7 @@ clause that is not pinned or not built.
 | PX0-AC-05 | not-started | WP-PX0 | CONFIRMED ABSENT (PHX-WP-PX0, full command-path read): the authority-revision receipt is only ever printed once to apply's stdout or embedded in the retired-on-success private journal -- no durable retention exists anywhere |
 | PX0-AC-06 | not-started | WP-PX0 | CONFIRMED ABSENT (PHX-WP-PX0, full command-path read): recover has exactly three outcome classes (clean, recovered-postimage x2, diverged) -- no recovered-preimage success outcome exists anywhere |
 | PX0-AC-07 | implemented | WP-PX0 | pipeline-state-tests AR07a-b (PHX-WP-PX0, measurement correction -- already fully covered pre-dispatch): exact zero-write replay (AR07a) and a second/conflicting writer failing closed with State preserved (AR07b) both pinned, reinforced incidentally by the new AR03e-g |
-| PX0-AC-08 | partial | C | ruleset-source.mjs closed contract pinned by ruleset-source-tests; whether bootstrap actually EMITS one observation is unpinned |
+| PX0-AC-08 | implemented | WP-PX0AC08 | pipeline-start-preflight-tests (PHX-WP-PX0AC08, break-proofed): observePipelineStartPreflight emits a closed rulesetSource observation on every bootstrap run that resolves a loaded distribution -- real content-hash identity for self-application/dev-checkout, honest {status:"unavailable"} elsewhere, both validated against ruleset-source.mjs's own closed schema |
 | PX0-AC-09 | implemented | A | bootstrap-source-attestation-acceptance-tests (verify.mjs:333) — Codex-only marketplace resolution |
 | PX0-AC-10 | implemented | A | bootstrap-source-attestation-acceptance-tests — pre-HEAD consumer compares loaded plugin identity |
 | PX0-AC-11 | implemented | A | bootstrap-source-attestation-acceptance-tests — one common closed contract across the four source classes |
@@ -448,7 +448,7 @@ Issues closeable on their own live acceptance bullets: **0 of 8**.
 
 53 of 157 criteria are Phoenix's own stricter contract rather than a live issue obligation.
 They block no issue, but EPIC-AC-05 still forbids an epic completion claim while any of them is not `implemented`.
-26 of those 53 are currently not `implemented` and are listed below; the rest are omitted because they are done.
+25 of those 53 are currently not `implemented` and are listed below; the rest are omitted because they are done.
 
 | criterion | verdict |
 |---|---|
@@ -468,7 +468,6 @@ They block no issue, but EPIC-AC-05 still forbids an epic completion claim while
 | PX0-AC-03 | partial |
 | PX0-AC-05 | not-started |
 | PX0-AC-06 | not-started |
-| PX0-AC-08 | partial |
 | PX0-AC-13 | partial |
 | R-AC-02 | not-started |
 | R-AC-04 | partial |

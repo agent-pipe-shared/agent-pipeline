@@ -525,6 +525,25 @@ const DELTA = {
   // present and break-proofed. All five named fixture classes (in-memory, local-file,
   // OTLP-profile, syslog, failure-injection) are each individually, directly evidenced.
   'E-AC-14': ['implemented', 'WP-EAC14'],
+
+  // --- evidence/phx-wp-px0ac08 (task PHX-WP-PX0AC08, 2026-08-09, commit a67faf9) ---
+  // Independently re-run: 35/35 pipeline-start-preflight-tests pass, 22/22
+  // ruleset-source-tests pass, node --check clean, exactly the two declared files
+  // changed. observePipelineStartPreflight now builds and returns a closed
+  // pipeline.ruleset-source.v1 observation on every bootstrap run that resolves a
+  // loaded distribution, honestly: self-application/dev-checkout topology gets a
+  // real content-hash identity (captured via a non-duplicating wrapper around
+  // evaluateSelfApplicationAttestation's existing observe extension point, so the
+  // forbidden gate file is neither modified nor invoked twice); every other
+  // topology gets an honest {status:"unavailable"} rather than a fabricated
+  // identity -- both shapes independently confirmed to satisfy validateRulesetSource.
+  // The previously-dangling freshnessHostActionForPreflight read of
+  // preflight.rulesetSource now binds a real value. The marketplace-install
+  // topology's separate, larger integrity-mechanism question (whether it should
+  // eventually get a STRONGER identity than "unavailable") stays exactly where it
+  // already was: backlog/items/2026-08-07-marketplace-install-topology-unattested.md,
+  // untouched and not pre-empted by this task.
+  'PX0-AC-08': ['implemented', 'WP-PX0AC08'],
 };
 
 // --- per-criterion evidence pointer ----------------------------------------
@@ -539,7 +558,7 @@ const POINTERS = {
   'PX0-AC-05': 'CONFIRMED ABSENT (PHX-WP-PX0, full command-path read): the authority-revision receipt is only ever printed once to apply\'s stdout or embedded in the retired-on-success private journal -- no durable retention exists anywhere',
   'PX0-AC-06': 'CONFIRMED ABSENT (PHX-WP-PX0, full command-path read): recover has exactly three outcome classes (clean, recovered-postimage x2, diverged) -- no recovered-preimage success outcome exists anywhere',
   'PX0-AC-07': 'pipeline-state-tests AR07a-b (PHX-WP-PX0, measurement correction -- already fully covered pre-dispatch): exact zero-write replay (AR07a) and a second/conflicting writer failing closed with State preserved (AR07b) both pinned, reinforced incidentally by the new AR03e-g',
-  'PX0-AC-08': 'ruleset-source.mjs closed contract pinned by ruleset-source-tests; whether bootstrap actually EMITS one observation is unpinned',
+  'PX0-AC-08': 'pipeline-start-preflight-tests (PHX-WP-PX0AC08, break-proofed): observePipelineStartPreflight emits a closed rulesetSource observation on every bootstrap run that resolves a loaded distribution -- real content-hash identity for self-application/dev-checkout, honest {status:"unavailable"} elsewhere, both validated against ruleset-source.mjs\'s own closed schema',
   'PX0-AC-09': 'bootstrap-source-attestation-acceptance-tests (verify.mjs:333) — Codex-only marketplace resolution',
   'PX0-AC-10': 'bootstrap-source-attestation-acceptance-tests — pre-HEAD consumer compares loaded plugin identity',
   'PX0-AC-11': 'bootstrap-source-attestation-acceptance-tests — one common closed contract across the four source classes',
