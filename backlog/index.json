@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "41015dcbcb39a0dc8cacb54fc389c59745facd600dfc2718cf6aee6d0392efb8"
+    "transitionHead": "848309855ebfde2fbfe7234a363ed10d2f2ca15cc5fc2463634c09a727546067"
   },
   "counts": {
-    "open": 110,
+    "open": 111,
     "in_progress": 21,
     "closed": 35
   },
@@ -470,6 +470,14 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Structured handover from the greenfield happy-path test of the local 0.5.4 build, 2026-08-08 (defect D-4)."
+    },
+    {
+      "id": "pipeline.goldfish-critic-dispatch-truncation-costs-recurring-recovery-time",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "PO observation during the 2026-08-09 evaluation/fix session: dispatched Goldfish/Critic subagents keep ending their turn mid-task without a final report, each requiring an Elephant-side diagnose-and-resume cycle; explicit PO instruction to defer investigation until after the current local candidate ships, since fixing it now would itself cost more of the time it is meant to save."
     },
     {
       "id": "pipeline.grammar-refusal-does-not-say-which-part-failed",
