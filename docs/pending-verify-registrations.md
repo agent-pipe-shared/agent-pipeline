@@ -1,17 +1,52 @@
 # Pending Verify registrations
 
-> **Status 2026-08-09.** **Nothing is pending.** Both batches this file was
-> created for are resolved and are kept below as worked records, in the past
-> tense.
+> **Status 2026-08-09 (second revision).** **Two suites are pending** — see the
+> next section. Everything below that is a worked record, in the past tense.
 >
-> A previous version of this banner said "Nothing here is pending any more"
-> while the body underneath still read as a live to-do list, in the present
-> tense, under a heading announcing that the suites did not run under Verify —
-> when at that moment they did. A Critic round found it on 2026-08-09. Reading
-> that heading was enough to send someone down a route that was already closed,
-> which is the defect a status banner exists to prevent, not one it may cause.
-> If a future edit makes something pending again, the pending section goes
-> first and says so in its heading; a resolved section never keeps that word.
+> The banner said "Nothing is pending" for most of 2026-08-09 while two suites
+> sat unregistered in the table underneath, added after the batch they were
+> filed with had been resolved. That is the same defect this banner was
+> corrected for earlier the same day, in the opposite direction: the first
+> version left "pending" on resolved work, this one left "resolved" on pending
+> work. The rule stands and is now applied: the pending section goes first and
+> says so in its heading; a resolved section never keeps that word.
+
+## PENDING — two suites are written, green, and not run by the gate
+
+`plugins/pipeline-core/scripts/repair-map.test.mjs` (REPAIRMAP-1) and
+`harness/scripts/generate-agent-obligations.test.mjs` (OBLIG-1) are **not** in
+`TEST_SUITES`. Confirmed by reading `harness/scripts/verify.mjs`, not by
+recalling the batch: neither name appears in it.
+
+Both pass on their own, run 2026-08-09 at `f1645a4d`:
+
+```
+node plugins/pipeline-core/scripts/repair-map.test.mjs          # 7/7, exit 0
+node harness/scripts/generate-agent-obligations.test.mjs        # 9/9, exit 0
+```
+
+They cover the two halves of the same route. The map answers, at runtime, which
+refusals can be lifted and by whom; the obligations contract keeps the document
+that sends every dispatched agent to that map honest — including `AC-9`, which
+drives the command the document prints through the real lifecycle guard. A
+regression in either is invisible to Verify today.
+
+**The human step**, unchanged in shape from the batch below and already prepared:
+
+```
+node harness/scripts/apply-pending-protected-edits.mjs --check   # dry run, writes nothing
+node harness/scripts/apply-pending-protected-edits.mjs --only=verify
+```
+
+The dry run reports exactly these two registrations and nothing else. The tool
+refuses on a missing or ambiguous anchor, runs each newly registered suite after
+writing, and restores the original bytes if one does not pass. It does not
+commit.
+
+Its `VERIFY_ANCHOR` was re-pointed for this batch. It had gone stale the moment
+the 2026-08-08 batch landed — `nova-verify-journal-tests` stopped being the last
+entry — so the next operator run would have aborted on a missing anchor. Correct
+behaviour, and unusable until someone looked.
 
 ## Resolved 2026-08-09 — the reference-path check
 
@@ -113,9 +148,11 @@ the gate", never "not run".
 | `plugins/pipeline-core/scripts/pipeline-state-inspection-contract.test.mjs` | R1B | Drives the real `run()` from `pipeline-state.mjs` and the real `classifyOnboardingContinuity` against each other for the feature-lifecycle boundary subcommands (`set-feature`, `close-feature`, `discard-feature`), asserting the classification is `valid`. 3 tests — it caught the `discard-feature` classification gap this block fixes: RED before the fix (evidence: `evidence/r1b-contract-red-before.txt`), green after (evidence: `evidence/r1b-inspection-contract.txt`). |
 | `plugins/pipeline-core/scripts/project-reset.test.mjs` | R2A | The read-only `plan` step of the typed project reset (`project-reset.mjs`): derives the three closed sets (`remove`/`keep`/`neverTouched`) from the resolved authority tier and parsed calibration, never a hardcoded path. 13 tests, including tier/`calibration.handover` derivation, byte-for-byte read-only proof over a ready and a damaged/non-ready project, digest determinism, and three distinct fail-closed refusals. Evidence: `evidence/r2a-project-reset.txt`. |
 
-| `plugins/pipeline-core/scripts/repair-map.test.mjs` | REPAIRMAP-1 | The repair map: for each refusal class the guard union can produce, whether it is liftable, by whom, and the exact command — every answer asked of the real planner at runtime rather than stored. 7 tests, two of them contract tests that re-drive each row against a fresh independent live call. Evidence: `evidence/repairmap-1-suite.txt`. |
-
-| `harness/scripts/generate-agent-obligations.test.mjs` | OBLIG-1 | The contract that keeps `templates/prompts/agent-obligations.md` honest: the committed document must equal a fresh generation from the guards' own sources, and a protected path added at the source must change it. 8 tests, including a drift test that would fail a generator ignoring its inputs. |
+The two later additions to this table — `repair-map.test.mjs` (REPAIRMAP-1) and
+`generate-agent-obligations.test.mjs` (OBLIG-1) — were appended here after this
+section was already marked resolved, and are **still pending**. They are
+described in the PENDING section at the top of this file, which is where a
+reader should look for them.
 
 Note that `plugins/pipeline-core/scripts/po-human-approval.test.mjs` was found
 during SETUP-2b to be unregistered as well — a pre-existing gap, not created by

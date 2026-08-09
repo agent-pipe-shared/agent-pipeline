@@ -6,8 +6,11 @@
  * WHY THIS EXISTS. Two files in this repository are protected test paths, and
  * both have finished, reviewed content waiting for them:
  *
- *   A. `harness/scripts/verify.mjs`  (TP-3) -- seven suites written in this and
- *      an earlier block are not registered, so Verify does not run them.
+ *   A. `harness/scripts/verify.mjs`  (TP-3) -- suites written in this and earlier
+ *      blocks are not registered, so Verify does not run them. The list grows: the
+ *      seven of the 2026-08-08 batch are applied, and `repair-map-tests` /
+ *      `obligations-contract-tests` were added on 2026-08-09. Already-registered
+ *      entries are detected and skipped, so re-running is safe.
  *   B. `plugins/pipeline-core/hooks/guard-gate-strength.test.mjs` (TP-6) -- four
  *      checks (GST33-GST36) plus a title repair for GST14, validated 4/4 against
  *      the real committed guard.
@@ -138,15 +141,35 @@ const VERIFY_REGISTRATIONS = [
     line: '  { name: "po-human-approval-tests", file: join(pluginScriptsDir, "po-human-approval.test.mjs") },',
     file: join(REPO_ROOT, "plugins", "pipeline-core", "scripts", "po-human-approval.test.mjs"),
   },
+  // Added 2026-08-09. Both suites were written during GF-057, run green by the
+  // Elephant, and listed in docs/pending-verify-registrations.md -- under a banner
+  // that by then said nothing was pending. Registering them is the same human step
+  // as the seven above, which is why they belong in this list rather than in a
+  // second tool.
+  {
+    name: "repair-map-tests",
+    line: '  { name: "repair-map-tests", file: join(pluginScriptsDir, "repair-map.test.mjs") },',
+    file: join(REPO_ROOT, "plugins", "pipeline-core", "scripts", "repair-map.test.mjs"),
+  },
+  {
+    name: "obligations-contract-tests",
+    line: '  { name: "obligations-contract-tests", file: join(scriptDir, "generate-agent-obligations.test.mjs") },',
+    file: join(REPO_ROOT, "harness", "scripts", "generate-agent-obligations.test.mjs"),
+  },
 ];
 
-const VERIFY_ANCHOR = '  { name: "nova-verify-journal-tests", file: join(pluginScriptsDir, "verify-journal.test.mjs") },\n];';
+// The terminator moves every time a batch is registered, so this constant is
+// re-pointed with each batch rather than left to fail as a stale anchor. It failed
+// exactly that way after the 2026-08-08 batch: `nova-verify-journal-tests` was no
+// longer the last entry, and the next operator run would have aborted on a missing
+// anchor -- correctly, but with the tool unusable until someone noticed.
+const VERIFY_ANCHOR = '  { name: "reference-path-check", file: join(scriptDir, "check-reference-paths.mjs") },\n];';
 
 function stepVerify({ dryRun }) {
   const original = readFileSync(VERIFY_PATH, "utf8");
 
   const pending = VERIFY_REGISTRATIONS.filter((entry) => !original.includes(`name: "${entry.name}"`));
-  if (pending.length === 0) return { status: "already-applied", detail: "all seven suites are already registered" };
+  if (pending.length === 0) return { status: "already-applied", detail: `all ${VERIFY_REGISTRATIONS.length} suites are already registered` };
 
   // A registration pointing at a file that is not there would break Verify for
   // everyone; refuse before writing rather than after.
