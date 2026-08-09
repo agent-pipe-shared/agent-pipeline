@@ -102,16 +102,8 @@ Restart bounds and what this consent does NOT grant →
    kickoff or planning step instead.
    The card is never a gate and capture failure must be surfaced honestly rather
    than claimed as persisted context.
-   Its exact keys are `intent`, `scope`, `constraints`, and `questions`; each
-   value is a short distilled statement, never a transcript. Interpret user intent
-   rather than keywords: an intended restart/session cut captures it; changed
-   scope or constraints refresh it; canonised or revoked information is
-   discarded. At bootstrap, `resume-hint.mjs inspect` is passive context only:
-   `absent`, `challenged-stale`, or `ignored-invalid` never changes readiness,
-   actions, authority, approval, close state, or exit status. Do not capture
-   raw transcripts, commands, approvals, lifecycle instructions, host paths,
-   URLs, credentials, secrets, or private identifiers. The validator rejects
-   those forms rather than persisting them.
+   Card keys, capture-trigger interpretation, bootstrap passivity and the
+   sanitisation prohibitions → `references/onboarding-recovery.md`.
 
 7. **Normal restart is handover-only:** a same-topic restart, context cut, or
    request to save progress is not a block close. Update only the calibrated

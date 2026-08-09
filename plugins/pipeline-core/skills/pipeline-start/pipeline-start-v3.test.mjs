@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { measureBootstrapBytes } from "../../lib/bootstrap-payload-budget.mjs";
+import { DEFAULT_ENVELOPE } from "../../scripts/bootstrap-payload-measure.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const core = readFileSync(join(here, "SKILL.md"), "utf8");
@@ -11,7 +13,21 @@ const closeBlock = readFileSync(join(here, "..", "close-block", "SKILL.md"), "ut
 const refs = ["onboarding-recovery.md", "private-overlay.md", "roles.md", "freshness.md", "failure-cases.md", "continuation.md"]
   .map((name) => readFileSync(join(here, "references", name), "utf8")).join("\n");
 const all = `${core}\n${refs}`;
-assert.ok(Buffer.byteLength(core, "utf8") <= 15_000);
+// The budget is the emitted bootstrap payload, not the file alone: it is
+// BOOTSTRAP_PAYLOAD_MAX_BYTES over the SUMMED segments (core skill + machine-
+// readback envelope; lib/bootstrap-payload-budget.mjs, scripts/bootstrap-
+// payload-measure.mjs). Asserting on `core` alone granted an author bytes that
+// do not exist -- it stayed green at 14992 B while the payload measurement was
+// already red. Measured against the production DEFAULT_ENVELOPE, so passing
+// here implies passing bootstrap-payload-measure.test.mjs, never the reverse.
+const coreBudget = measureBootstrapBytes(
+  Buffer.byteLength(core, "utf8") + Buffer.byteLength(JSON.stringify(DEFAULT_ENVELOPE), "utf8"),
+  { mode: "normal" },
+);
+assert.ok(
+  coreBudget.withinBudget,
+  `core+envelope ${coreBudget.upperBoundUnits} B exceeds ${coreBudget.maxUpperBoundUnits} B`,
+);
 assert.match(core, /full Elephant bootstrap is session-bound/u);
 assert.match(core, /never for an ordinary task, message, tool result, commit, test,/u);
 assert.match(core, /does not trigger a second full Elephant bootstrap unless a real SessionStart or\n+typed recovery follows/u);
