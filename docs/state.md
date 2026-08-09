@@ -1887,6 +1887,28 @@ The dispatch substituted two real sibling suites under an explicit label rather 
 skipping the check, and it removed a QG-06 deferred decision whose promise its own
 work had made obsolete instead of leaving a stale expiry standing.
 
+### GOAL SET 2026-08-09: finish Phoenix up to the next hard PO gate — and stop asking
+
+Two instructions arrived together and they belong together. *"Goal set: phoenix bis zum
+nächsten harten PO gate abschließen"*, and *"frage solche sachen nicht und nicht anhalten!
+dein job."*
+
+**What that changes for whoever holds this next.** Method, sequencing, dispatch tiering,
+check design, repair ordering and what to build first are the Elephant's job and are not to
+be surfaced as questions. State the decision in a line and keep going. A concern about the
+work is worth one sentence and then the work continues under a named assumption.
+
+**What it does not change, and this line is the important one.** A hard gate is still a
+hard gate. The push signature, an irreversible or outward-facing act, and any
+authorization that cannot be inferred stay with the PO — the instruction says stop asking
+about *method*, not stop asking for *consent*. Earlier tonight I stood a change down
+because I had read an answer about a review as an answer about the act, and that judgement
+was right and remains right. Speed here is licensed on the process axis only.
+
+**Where the run therefore stops:** at layer 3 of `docs/push-release-flow.md`, the detached
+signature. Everything before it — the reconciliation check, its call sites, the gate run,
+this handover — is mine to finish.
+
 ### PO DECISIONS OF 2026-08-09 — all three open items are now decided, and a fourth job was added
 
 **1. The 22 commits with forbidden trailers: option (a), accept and record.** The PO's
