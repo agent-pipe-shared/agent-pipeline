@@ -47,6 +47,23 @@ something to do here without review.
 
 ## Entries
 
+## Candidate d0ce48871592c17b74583b1750d11c9a1c0c4b25 — 2026-08-09, range 3387065..d0ce4887, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `c23dc80` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `d1f272e` through `d0ce4887`: the prior doc-rec entry, WP-P-AC11's closure
+(`6de4f444`) and its POINTERS sync (`edecba17`), the O-1/O-2-design round-2 Critic FAIL and its
+rework (`d7bf77b5`), the K-AC-05 round-2 Critic FAIL and its rework
+(`aae69026`), and four `docs/state.md` checkpoints recording those verifications plus the
+O-1/O-2-design round-3 Critic FAIL and its rework (`d0ce4887`). No code in this range touches
+the canonical artifact topology ADR-0045 governs beyond ordinary content evolution inside the
+files it already lists (the design doc's own §15 content, the evidence-map DELTA/POINTERS
+blocks); no change narrows or widens what either ADR requires. Same reading as the whole chain:
+`docs/state.md` stays ADR-0012, the generated evidence-map/closure-plan/design-doc set stays
+ADR-0045.
+
 ## Candidate c23dc80a217ce98c81b9434b790bd8c055454e8c — 2026-08-09, range 3387065..c23dc80, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
