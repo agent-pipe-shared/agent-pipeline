@@ -111,14 +111,47 @@ export function validateAgentDecisionEvent(value) {
  * compare against in any case. Building a second duplicate-detection
  * mechanism here would both contradict that documented design and be
  * redundant with the store layer's existing one.
+ *
+ * R-AC-11: `commitment`/`commitmentReceiptId` are the public-safe half of
+ * a private-only handoff detail this record's own `omissions` already
+ * mandates be excluded (`raw-command`, `private-coordinates`, etc.). The
+ * detail itself never appears on this shape -- only a SHA-256 `commitment`
+ * digest of it (the same `SHA` pattern already used for `candidateDigest`/
+ * `policyDigest`) and an opaque `commitmentReceiptId` (the same `ID`
+ * pattern already used for every other identifier on this shape),
+ * correlating to wherever the detail was actually stored: sanctioned
+ * restricted machine-local state (`governance-event-store.mjs`'s
+ * `putRestrictedGovernanceEvent`/`queryRestrictedGovernanceEvent`), never
+ * this journal. Two flat top-level keys, not a nested object, deliberately
+ * mirroring `document-lifecycle.mjs`'s `receiptId`+`commitment` pairing
+ * convention field-for-field rather than inventing a third shape
+ * convention for a "receipt+digest" pair; named `commitmentReceiptId`
+ * rather than a bare `receiptId` because, unlike `document-lifecycle.mjs`,
+ * this shape already carries several other unrelated identifiers
+ * (`offerEventId`, `relatedHumanDecisionId`, `supersedesEventId`) and a
+ * bare `receiptId` would be ambiguous about which of those it correlates
+ * to. Optional at the key level, exactly like `requiredCleanup`/
+ * `occurredAtEpochMs` above, so every pre-existing command-offer fixture
+ * keeps validating unchanged; unlike `document-lifecycle.mjs`'s own
+ * always-present-but-nullable `receiptId`/`commitment` keys, this shape
+ * reuses ITS OWN existing optional-key (`Object.hasOwn`) convention
+ * instead, so the two keys' PRESENCE, not a null value, encodes "no
+ * commitment was exposed" -- WHEN policy permits exposing one (R-AC-11's
+ * own qualifier), a caller sets both; otherwise neither is present at
+ * all. Both-or-neither is enforced (ADJ-COMMAND-COMMITMENT-PAIRING): a
+ * commitment digest with no receipt to correlate it against, or a receipt
+ * id with no digest proving knowledge of the detail, is malformed either
+ * way.
  */
 export function validateCommandOfferEvent(value) {
   const keys=["eventId","kind","state","reasonCode","candidateDigest","relatedHumanDecisionId","supersedesEventId","offerOrigin","operation","target","sideEffectClass","authorityRequirement","policyDigest","redactionPolicyDigest","executionAssurance","omissions","offerEventId","preEvidenceDigest","postEvidenceDigest","recoverability"];
   const hasRequiredCleanup=rec(value)&&Object.hasOwn(value,"requiredCleanup");
   const hasOccurredAtEpochMs=rec(value)&&Object.hasOwn(value,"occurredAtEpochMs");
-  const extended=[...keys,...(hasRequiredCleanup?["requiredCleanup"]:[]),...(hasOccurredAtEpochMs?["occurredAtEpochMs"]:[])];
+  const hasCommitment=rec(value)&&Object.hasOwn(value,"commitment");
+  const hasCommitmentReceiptId=rec(value)&&Object.hasOwn(value,"commitmentReceiptId");
+  const extended=[...keys,...(hasRequiredCleanup?["requiredCleanup"]:[]),...(hasOccurredAtEpochMs?["occurredAtEpochMs"]:[]),...(hasCommitment?["commitment"]:[]),...(hasCommitmentReceiptId?["commitmentReceiptId"]:[])];
   const validRequiredCleanup=(cleanup)=>exact(cleanup,["cleanupClass","status","digest"])&&ID.test(cleanup.cleanupClass)&&CLEANUP_STATUSES.has(cleanup.status)&&(cleanup.digest===null||SHA.test(cleanup.digest));
-  if(!exact(value,extended)||value.kind!=="command-offer"||!ID.test(value.eventId)||!COMMAND_STATES.has(value.state)||!CODE.test(value.reasonCode)||!SHA.test(value.candidateDigest)||(value.relatedHumanDecisionId!==null&&!ID.test(value.relatedHumanDecisionId))||(value.supersedesEventId!==null&&!ID.test(value.supersedesEventId))||!["pipeline-initiated","user-requested-pipeline-supplied"].includes(value.offerOrigin)||!exact(value.operation,["operationClass","version","governedArtifactSha256"])||!ID.test(value.operation.operationClass)||(value.operation.version!==null&&!ID.test(value.operation.version))||(value.operation.governedArtifactSha256!==null&&!SHA.test(value.operation.governedArtifactSha256))||!exact(value.target,["repositoryFingerprint","scopeDigest"])||!SHA.test(value.target.repositoryFingerprint)||!SHA.test(value.target.scopeDigest)||!["non-authoritative","destructive","guard-bypass","authority-changing"].includes(value.sideEffectClass)||!["not-required","human-decision-required"].includes(value.authorityRequirement)||!SHA.test(value.policyDigest)||!SHA.test(value.redactionPolicyDigest)||!COMMAND_ASSURANCE.has(value.executionAssurance)||!Array.isArray(value.omissions)||value.omissions.length<4||value.omissions.length>7||new Set(value.omissions).size!==value.omissions.length||value.omissions.some((entry)=>!OMITTABLE.has(entry))||!["raw-command","arguments","private-coordinates","unrestricted-output"].every((entry)=>value.omissions.includes(entry))||(value.offerEventId!==null&&!ID.test(value.offerEventId))||(value.preEvidenceDigest!==null&&!SHA.test(value.preEvidenceDigest))||(value.postEvidenceDigest!==null&&!SHA.test(value.postEvidenceDigest))||!["not-applicable","recoverable","cleanup-required","rollback-required"].includes(value.recoverability)||(hasRequiredCleanup&&!validRequiredCleanup(value.requiredCleanup))||(hasOccurredAtEpochMs&&!(Number.isSafeInteger(value.occurredAtEpochMs)&&value.occurredAtEpochMs>=0)))fail("ADJ-COMMAND-OFFER");
+  if(!exact(value,extended)||value.kind!=="command-offer"||!ID.test(value.eventId)||!COMMAND_STATES.has(value.state)||!CODE.test(value.reasonCode)||!SHA.test(value.candidateDigest)||(value.relatedHumanDecisionId!==null&&!ID.test(value.relatedHumanDecisionId))||(value.supersedesEventId!==null&&!ID.test(value.supersedesEventId))||!["pipeline-initiated","user-requested-pipeline-supplied"].includes(value.offerOrigin)||!exact(value.operation,["operationClass","version","governedArtifactSha256"])||!ID.test(value.operation.operationClass)||(value.operation.version!==null&&!ID.test(value.operation.version))||(value.operation.governedArtifactSha256!==null&&!SHA.test(value.operation.governedArtifactSha256))||!exact(value.target,["repositoryFingerprint","scopeDigest"])||!SHA.test(value.target.repositoryFingerprint)||!SHA.test(value.target.scopeDigest)||!["non-authoritative","destructive","guard-bypass","authority-changing"].includes(value.sideEffectClass)||!["not-required","human-decision-required"].includes(value.authorityRequirement)||!SHA.test(value.policyDigest)||!SHA.test(value.redactionPolicyDigest)||!COMMAND_ASSURANCE.has(value.executionAssurance)||!Array.isArray(value.omissions)||value.omissions.length<4||value.omissions.length>7||new Set(value.omissions).size!==value.omissions.length||value.omissions.some((entry)=>!OMITTABLE.has(entry))||!["raw-command","arguments","private-coordinates","unrestricted-output"].every((entry)=>value.omissions.includes(entry))||(value.offerEventId!==null&&!ID.test(value.offerEventId))||(value.preEvidenceDigest!==null&&!SHA.test(value.preEvidenceDigest))||(value.postEvidenceDigest!==null&&!SHA.test(value.postEvidenceDigest))||!["not-applicable","recoverable","cleanup-required","rollback-required"].includes(value.recoverability)||(hasRequiredCleanup&&!validRequiredCleanup(value.requiredCleanup))||(hasOccurredAtEpochMs&&!(Number.isSafeInteger(value.occurredAtEpochMs)&&value.occurredAtEpochMs>=0))||(hasCommitment&&!SHA.test(value.commitment))||(hasCommitmentReceiptId&&!ID.test(value.commitmentReceiptId)))fail("ADJ-COMMAND-OFFER");
   if(value.authorityRequirement==="human-decision-required"&&value.relatedHumanDecisionId===null)fail("ADJ-COMMAND-AUTHORITY");
   if(value.state==="offered"&&(value.offerEventId!==null||value.executionAssurance!=="not-applicable"||value.preEvidenceDigest!==null||value.postEvidenceDigest!==null))fail("ADJ-COMMAND-OFFER");
   if(value.state!=="offered"&&value.offerEventId===null)fail("ADJ-COMMAND-LINK");
@@ -126,6 +159,7 @@ export function validateCommandOfferEvent(value) {
   if(value.state==="execution-unobserved"&&value.executionAssurance!=="execution-unobserved")fail("ADJ-COMMAND-OUTCOME");
   if(["observed-completed","readback-verified","failed","partial","cancelled","unknown","unavailable","readback-mismatch"].includes(value.state)&&value.executionAssurance!==value.state)fail("ADJ-COMMAND-OUTCOME");
   if(hasRequiredCleanup&&value.recoverability==="not-applicable")fail("ADJ-COMMAND-CLEANUP-SCOPE");
+  if(hasCommitment!==hasCommitmentReceiptId)fail("ADJ-COMMAND-COMMITMENT-PAIRING");
   return Object.freeze({...value,operation:Object.freeze({...value.operation}),target:Object.freeze({...value.target}),omissions:Object.freeze([...value.omissions]),...(hasRequiredCleanup?{requiredCleanup:Object.freeze({...value.requiredCleanup})}:{})});
 }
 

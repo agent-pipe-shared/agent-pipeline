@@ -3,6 +3,7 @@
  * PHX external-command offer lifecycle. This is a journal adapter, never a
  * command executor, authority issuer, or raw command store.
  */
+import { createHash } from "node:crypto";
 import { validateCommandOfferEvent } from "./agent-decision-journal.mjs";
 
 function fail(code, message = "External command offer operation is invalid.") { const error = new Error(message); error.code = code; throw error; }
@@ -26,6 +27,43 @@ export async function recordCommandOffer({ offer, append } = {}) {
   const event = validateCommandOfferEvent(offer);
   if (event.state !== "offered") fail("ECO-OFFER-STATE");
   return appendValidated(event, append, "offered");
+}
+
+/**
+ * R-AC-11: stores an operationally-necessary private-only handoff detail
+ * (e.g. the actual local-repair command text a public command-offer record
+ * must omit) via the EXISTING restricted-machine-local storage
+ * infrastructure `governance-event-store.mjs` already provides
+ * (`putRestrictedGovernanceEvent`/equivalent) -- never a second, parallel
+ * storage mechanism. This file owns no key custody, repository-bound
+ * authorization, or restricted-envelope construction; exactly like
+ * `recordCommandOffer` never calls `appendPortableGovernanceEvent`
+ * directly and instead takes a caller-supplied `append`, this function
+ * never calls `putRestrictedGovernanceEvent` directly either -- `put` is
+ * the restricted-store analogue of `append`: same role, same shape of
+ * contract, so a caller wires it to the real restricted-store call the
+ * same way it already wires `append` to the real portable-store call.
+ *
+ * The `commitment` (a SHA-256 digest of `detail`) is computed HERE, before
+ * `put` is ever invoked, so it can never silently drift from what was
+ * actually handed to storage; `put`'s readback is then checked against
+ * that same value (`appendValidated`'s readback discipline above, not a
+ * second, independent trust boundary). Only the digest and an opaque
+ * `commitmentReceiptId` naming where the detail was stored are returned --
+ * `detail` itself never appears in the return value, so a caller cannot
+ * accidentally fold it into a public command-offer event by spreading this
+ * function's result into one. The caller is expected to assign the
+ * returned `commitment`/`commitmentReceiptId` pair onto the public offer
+ * event it later passes to `recordCommandOffer` (agent-decision-journal.mjs's
+ * `validateCommandOfferEvent` enforces the both-or-neither pairing there).
+ */
+export async function recordPrivateHandoffCommitment({ detail, put } = {}) {
+  if (typeof detail !== "string" || detail.length === 0) fail("ECO-COMMITMENT-DETAIL");
+  if (typeof put !== "function") fail("ECO-COMMITMENT-PUT");
+  const commitment = createHash("sha256").update(detail, "utf8").digest("hex");
+  const stored = await put(frozen({ detail, commitment }));
+  if (!exact(stored, ["commitmentReceiptId", "commitment"]) || stored.commitment !== commitment || typeof stored.commitmentReceiptId !== "string" || stored.commitmentReceiptId.length === 0) fail("ECO-COMMITMENT-READBACK");
+  return frozen({ commitmentReceiptId: stored.commitmentReceiptId, commitment });
 }
 
 /** Appends an attempt before a Pipeline-initiated executor may be invoked. */

@@ -76,6 +76,30 @@ test("R-AC-09 rejects a malformed occurrence timestamp with ADJ-COMMAND-OFFER",(
   for(const occurredAtEpochMs of [-1,1.5,"1754000000000",null,NaN,Infinity,Number.MAX_SAFE_INTEGER+1])
     assert.throws(()=>validateCommandOfferEvent(offer({occurredAtEpochMs})),(error)=>error.code==="ADJ-COMMAND-OFFER",`malformed occurredAtEpochMs ${String(occurredAtEpochMs)} was admitted`);
 });
+// R-AC-11: `commitment`/`commitmentReceiptId` are the public-safe half of a
+// private-only handoff detail the `omissions` array already mandates be
+// excluded. Two flat, optional-at-the-key-level keys, mirroring
+// document-lifecycle.mjs's receiptId+commitment pairing convention
+// field-for-field (see the function's own doc comment); optional exactly
+// like requiredCleanup/occurredAtEpochMs, so every pre-existing fixture
+// keeps validating with no key present.
+test("R-AC-11 records a public-safe commitment digest paired with a receipt id, optional, both-or-neither",()=>{
+  const withCommitment=validateCommandOfferEvent(offer({commitment:"7".repeat(64),commitmentReceiptId:"restricted-record-1"}));
+  assert.equal(withCommitment.commitment,"7".repeat(64));
+  assert.equal(withCommitment.commitmentReceiptId,"restricted-record-1");
+  const plain=validateCommandOfferEvent(offer());
+  assert.equal(Object.hasOwn(plain,"commitment"),false,"absence must stay absence, not a synthesised value");
+  assert.equal(Object.hasOwn(plain,"commitmentReceiptId"),false);
+});
+test("R-AC-11 rejects a malformed commitment digest or receipt id with ADJ-COMMAND-OFFER",()=>{
+  assert.throws(()=>validateCommandOfferEvent(offer({commitment:"not-a-digest",commitmentReceiptId:"restricted-record-1"})),(error)=>error.code==="ADJ-COMMAND-OFFER");
+  assert.throws(()=>validateCommandOfferEvent(offer({commitment:"7".repeat(64),commitmentReceiptId:""})),(error)=>error.code==="ADJ-COMMAND-OFFER");
+  assert.throws(()=>validateCommandOfferEvent(offer({commitment:"7".repeat(64),commitmentReceiptId:"has a space"})),(error)=>error.code==="ADJ-COMMAND-OFFER");
+});
+test("R-AC-11 rejects one of the pair present without the other with ADJ-COMMAND-COMMITMENT-PAIRING",()=>{
+  assert.throws(()=>validateCommandOfferEvent(offer({commitment:"7".repeat(64)})),(error)=>error.code==="ADJ-COMMAND-COMMITMENT-PAIRING");
+  assert.throws(()=>validateCommandOfferEvent(offer({commitmentReceiptId:"restricted-record-1"})),(error)=>error.code==="ADJ-COMMAND-COMMITMENT-PAIRING");
+});
 // R-AC-05 enumerates what must never cross a durable boundary. The journal
 // rejects rather than redacts, and it does so structurally: no prohibited field
 // is representable in either event shape, and the single digest slot is typed

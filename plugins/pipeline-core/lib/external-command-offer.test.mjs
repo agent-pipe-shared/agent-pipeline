@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import test from "node:test";
-import { recordCommandOffer, recordPipelineAttempt, recordCommandOutcome, acknowledgeNonMaterialOfferWithoutJournal, recordCommandRecoveryDisposition } from "./external-command-offer.mjs";
+import { createHash } from "node:crypto";
+import { recordCommandOffer, recordPipelineAttempt, recordCommandOutcome, acknowledgeNonMaterialOfferWithoutJournal, recordCommandRecoveryDisposition, recordPrivateHandoffCommitment } from "./external-command-offer.mjs";
 
 const SHA = (character) => character.repeat(64);
 function event(overrides = {}) { return { eventId: "offer-1", kind: "command-offer", state: "offered", reasonCode: "EXTERNAL_OPERATION_OFFERED", candidateDigest: SHA("a"), relatedHumanDecisionId: null, supersedesEventId: null, offerOrigin: "pipeline-initiated", operation: { operationClass: "governed-repair", version: "v1", governedArtifactSha256: SHA("b") }, target: { repositoryFingerprint: SHA("c"), scopeDigest: SHA("d") }, sideEffectClass: "non-authoritative", authorityRequirement: "not-required", policyDigest: SHA("e"), redactionPolicyDigest: SHA("f"), executionAssurance: "not-applicable", omissions: ["raw-command", "arguments", "private-coordinates", "unrestricted-output"], offerEventId: null, preEvidenceDigest: null, postEvidenceDigest: null, recoverability: "not-applicable", ...overrides }; }
@@ -234,6 +235,49 @@ test("R-AC-10: the non-material exception refuses to run when an append function
 
 test("R-AC-10: the non-material exception is scoped to the offered state, not attempted or any outcome state", () => {
   assert.throws(() => acknowledgeNonMaterialOfferWithoutJournal({ offer: follow("attempted") }), (error) => error.code === "ECO-OFFER-STATE");
+});
+
+test("R-AC-11: recordPrivateHandoffCommitment stores a private-only handoff detail via a caller-supplied restricted-store put and returns a public-safe commitment digest, never the detail itself", async () => {
+  let seen = null;
+  const put = async (value) => { seen = value; return { commitmentReceiptId: "restricted-record-1", commitment: value.commitment }; };
+  const result = await recordPrivateHandoffCommitment({ detail: "actual local-repair command text", put });
+  assert.equal(result.commitment, createHash("sha256").update("actual local-repair command text", "utf8").digest("hex"));
+  assert.equal(result.commitmentReceiptId, "restricted-record-1");
+  assert.equal(Object.hasOwn(result, "detail"), false);
+  assert.equal(seen.detail, "actual local-repair command text");
+  assert.equal(Object.isFrozen(result), true);
+});
+
+test("R-AC-11: recordPrivateHandoffCommitment rejects a readback that reports a different commitment than what was computed", async () => {
+  await assert.rejects(recordPrivateHandoffCommitment({ detail: "local-repair", put: async () => ({ commitmentReceiptId: "restricted-record-1", commitment: SHA("0") }) }), (error) => error.code === "ECO-COMMITMENT-READBACK");
+});
+
+test("R-AC-11: recordPrivateHandoffCommitment rejects a malformed put readback shape", async () => {
+  await assert.rejects(recordPrivateHandoffCommitment({ detail: "local-repair", put: async (value) => ({ commitment: value.commitment }) }), (error) => error.code === "ECO-COMMITMENT-READBACK");
+  await assert.rejects(recordPrivateHandoffCommitment({ detail: "local-repair", put: async (value) => ({ commitmentReceiptId: "", commitment: value.commitment }) }), (error) => error.code === "ECO-COMMITMENT-READBACK");
+});
+
+test("R-AC-11: recordPrivateHandoffCommitment fails closed when the private detail or the put callback is missing", async () => {
+  await assert.rejects(recordPrivateHandoffCommitment({ put: async (value) => ({ commitmentReceiptId: "r-1", commitment: value.commitment }) }), (error) => error.code === "ECO-COMMITMENT-DETAIL");
+  await assert.rejects(recordPrivateHandoffCommitment({ detail: "" , put: async (value) => ({ commitmentReceiptId: "r-1", commitment: value.commitment }) }), (error) => error.code === "ECO-COMMITMENT-DETAIL");
+  await assert.rejects(recordPrivateHandoffCommitment({ detail: "local-repair" }), (error) => error.code === "ECO-COMMITMENT-PUT");
+});
+
+test("R-AC-11: end-to-end -- a stored private handoff detail's commitment flows into a public command-offer event and appends", async () => {
+  const put = async (value) => ({ commitmentReceiptId: "restricted-record-42", commitment: value.commitment });
+  const { commitment, commitmentReceiptId } = await recordPrivateHandoffCommitment({ detail: "the actual local-repair command text", put });
+  const offerWithCommitment = event({ commitment, commitmentReceiptId });
+  let seen = null;
+  const receipt = await recordCommandOffer({ offer: offerWithCommitment, append: async (value) => { seen = value; return append(value); } });
+  assert.equal(receipt.status, "offered");
+  assert.equal(seen.commitment, commitment);
+  assert.equal(seen.commitmentReceiptId, "restricted-record-42");
+  assert.equal(seen.detail, undefined);
+});
+
+test("R-AC-11: a command-offer event carrying only one half of the commitment pair is rejected before append", async () => {
+  await assert.rejects(recordCommandOffer({ offer: event({ commitment: SHA("7") }), append }), (error) => error.code === "ADJ-COMMAND-COMMITMENT-PAIRING");
+  await assert.rejects(recordCommandOffer({ offer: event({ commitmentReceiptId: "restricted-record-1" }), append }), (error) => error.code === "ADJ-COMMAND-COMMITMENT-PAIRING");
 });
 
 test("R-AC-10: the exception receipt is structurally distinct from every journaled command state/appendValidated() receipt status, and cannot be reused as an offer/outcome event to claim completion", async () => {
