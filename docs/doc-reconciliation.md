@@ -47,6 +47,18 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 3371a0d9327d5430cd876ce2be0d0baad51b5754 — 2026-08-09, range 3387065..3371a0d, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `7eee663` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `b78fae1`, `a5b1a69`, `00b275e`, `71abec7`, `3371a0d`: X-AC-11's design-followed build,
+its evidence-map delta, the second signed-window PX0 registration, its evidence-map delta, and
+this leg's checkpoint. Same reading as the whole chain: `docs/state.md` stays ADR-0012, the
+generated evidence-map/closure-plan pair stays ADR-0045. Nothing else in this range touches a
+governed path.
+
 ## Candidate 7eee663a05daa11cfa5888552d05085c7992b39f — 2026-08-09, range 3387065..7eee663, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
