@@ -1,11 +1,36 @@
 // SPDX-License-Identifier: SUL-1.0
-import assert from "node:assert/strict"; import test from "node:test"; import { AgentDecisionJournalError, validateAgentDecisionEvent, validateCommandOfferEvent, validateLegacyImportObservationEvent } from "./agent-decision-journal.mjs";
+import assert from "node:assert/strict"; import test from "node:test"; import { AgentDecisionJournalError, EVENT_CLASSES, representedEventClasses, validateAgentDecisionEvent, validateCommandOfferEvent, validateLegacyImportObservationEvent } from "./agent-decision-journal.mjs";
 const value=(overrides={})=>({eventId:"agent-1",kind:"assumption",state:"declared",reasonCode:"EVIDENCE_UNAVAILABLE",candidateDigest:"a".repeat(64),relatedHumanDecisionId:null,supersedesEventId:null,...overrides});
 test("accepts a bounded observational agent assumption",()=>assert.equal(Object.isFrozen(validateAgentDecisionEvent(value())),true));
 test("rejects free text, authority-shaped fields, and unbound supersession",()=>{for(const entry of [{...value(),reasonCode:"reason text"},{...value(),approval:true},value({state:"superseded"})])assert.throws(()=>validateAgentDecisionEvent(entry),(error)=>error instanceof AgentDecisionJournalError);});
 const offer=(overrides={})=>({eventId:"offer-1",kind:"command-offer",state:"offered",reasonCode:"EXTERNAL_OPERATION_OFFERED",candidateDigest:"a".repeat(64),relatedHumanDecisionId:null,supersedesEventId:null,offerOrigin:"pipeline-initiated",operation:{operationClass:"governed-repair",version:"v1",governedArtifactSha256:"b".repeat(64)},target:{repositoryFingerprint:"c".repeat(64),scopeDigest:"d".repeat(64)},sideEffectClass:"non-authoritative",authorityRequirement:"not-required",policyDigest:"e".repeat(64),redactionPolicyDigest:"f".repeat(64),executionAssurance:"not-applicable",omissions:["raw-command","arguments","private-coordinates","unrestricted-output"],offerEventId:null,preEvidenceDigest:null,postEvidenceDigest:null,recoverability:"not-applicable",...overrides});
 test("accepts a closed command-offer journal event while preserving raw command omissions",()=>assert.equal(validateCommandOfferEvent(offer()).kind,"command-offer"));
 test("rejects command text, omitted privacy omissions, and authority-required offers without a decision",()=>{for(const entry of [{...offer(),command:"rm -rf"},{...offer(),omissions:["raw-command"]},offer({sideEffectClass:"guard-bypass",authorityRequirement:"human-decision-required"})])assert.throws(()=>validateAgentDecisionEvent(entry),(error)=>error instanceof AgentDecisionJournalError);});
+
+// A-AC-07: representedEventClasses recognizes all seven named classes
+// through fields/kinds this module already had -- no new `kind` was added
+// to KINDS to close this criterion (see the function's own doc comment for
+// the full per-class mapping decision).
+test("A-AC-07 recognizes every named event class through an existing field or kind, never a new kind",()=>{
+  assert.deepEqual([...EVENT_CLASSES].sort(),["authority","candidate","external-side-effect","privacy","recovery","security","verification-scope"]);
+  const plain=validateAgentDecisionEvent(value());
+  assert.deepEqual([...representedEventClasses(plain)].sort(),["candidate","privacy"]);
+  const authored=validateAgentDecisionEvent(value({relatedHumanDecisionId:"human-1"}));
+  assert.equal(representedEventClasses(authored).has("authority"),true);
+  const scoped=validateAgentDecisionEvent(value({kind:"verification-scope"}));
+  assert.equal(representedEventClasses(scoped).has("verification-scope"),true);
+  const plainOffer=validateCommandOfferEvent(offer());
+  const plainClasses=representedEventClasses(plainOffer);
+  assert.equal(plainClasses.has("external-side-effect"),true);
+  assert.equal(plainClasses.has("security"),false);
+  assert.equal(plainClasses.has("recovery"),false);
+  const securityOffer=validateCommandOfferEvent(offer({sideEffectClass:"guard-bypass",authorityRequirement:"human-decision-required",relatedHumanDecisionId:"human-1"}));
+  const securityClasses=representedEventClasses(securityOffer);
+  assert.equal(securityClasses.has("security"),true);
+  assert.equal(securityClasses.has("authority"),true);
+  const recoveryOffer=validateCommandOfferEvent(offer({recoverability:"rollback-required"}));
+  assert.equal(representedEventClasses(recoveryOffer).has("recovery"),true);
+});
 // R-AC-05 enumerates what must never cross a durable boundary. The journal
 // rejects rather than redacts, and it does so structurally: no prohibited field
 // is representable in either event shape, and the single digest slot is typed
@@ -169,7 +194,7 @@ function agentCapturePolicyFixture(){
     {origin:"human",purpose:"authority-history",materiality:"required",personalIdentifiability:"prohibited",contextualIdentifiability:"prohibited",storageProfile:"repository-public-safe",retention:"repository-retained",disclosure:"repository-visible",encryptionGeneration:null},
     {origin:"agent",purpose:"declared-assumption",materiality:"policy-selected",personalIdentifiability:"prohibited",contextualIdentifiability:"prohibited",storageProfile:"repository-public-safe",retention:"repository-retained",disclosure:"repository-visible",encryptionGeneration:null},
     {origin:"lifecycle",purpose:"deterministic-lifecycle",materiality:"required",personalIdentifiability:"prohibited",contextualIdentifiability:"prohibited",storageProfile:"repository-public-safe",retention:"repository-retained",disclosure:"repository-visible",encryptionGeneration:null},
-  ],sanitizedReceipt:{allowEventId:true,allowEventDigest:true,allowCheckpoint:true,allowReasonText:false}};
+  ],sanitizedReceipt:{allowEventId:true,allowEventDigest:true,allowCheckpoint:true,allowReasonText:false},mandatoryEventClasses:[]};
 }
 async function agentFixtureRoot(){
   const root=await mkdtemp(path.join(os.tmpdir(),"agent-decision-journal-"));

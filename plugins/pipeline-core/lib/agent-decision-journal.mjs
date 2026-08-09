@@ -13,6 +13,14 @@ const OMITTABLE=new Set(["raw-command","arguments","private-coordinates","unrest
 const LEGACY_SOURCE_CLASSES=new Set(["mutable-approval-state","guard-override-jsonl-record","deployment-approval-log","override-receipt","backlog-transition-record","release-change-evidence"]), AUTHORITY_PROOF_STATUSES=new Set(["unprovable","not-attempted"]);
 /** Local mirror of governance-event.mjs's ARTIFACT_PATH; this module stays dependency-free by design (see header), so the pattern is duplicated exactly rather than imported. */
 const SOURCE_PATH=/^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9][A-Za-z0-9._\/-]{0,255}$/u;
+/**
+ * A-AC-07: the closed set of named event classes capture policy may mark
+ * `mandatory`. Investigated one by one against this module's existing shapes
+ * (see `representedEventClasses` below) rather than assumed to need new
+ * `kind`s; all seven turned out to already have an existing representation.
+ */
+export const EVENT_CLASSES=new Set(["security","privacy","authority","candidate","external-side-effect","recovery","verification-scope"]);
+const SECURITY_SIDE_EFFECTS=new Set(["guard-bypass","authority-changing","destructive"]);
 export class AgentDecisionJournalError extends Error { constructor(code){super("Agent decision event is invalid.");this.code=code;} }
 const rec=(v)=>v!==null&&typeof v==="object"&&!Array.isArray(v), exact=(v,k)=>rec(v)&&Object.keys(v).length===k.length&&k.every((x)=>Object.hasOwn(v,x)); const fail=(c)=>{throw new AgentDecisionJournalError(c);};
 const validIdentity=(identity)=>Array.isArray(identity)&&identity.length>=1&&identity.length<=7&&identity.every((entry)=>exact(entry,["dimension","value","provenance","assurance"])&&IDENTITY_DIMENSIONS.has(entry.dimension)&&ID.test(entry.value)&&IDENTITY_PROVENANCE.has(entry.provenance)&&IDENTITY_ASSURANCE.has(entry.assurance))&&new Set(identity.map((entry)=>entry.dimension)).size===identity.length;
@@ -70,4 +78,38 @@ export function validateLegacyImportObservationEvent(value) {
   if(!exact(value,keys)||value.kind!=="legacy-import-observation"||!ID.test(value.eventId)||!STATES.has(value.state)||!CODE.test(value.reasonCode)||!SHA.test(value.candidateDigest)||(value.relatedHumanDecisionId!==null&&!ID.test(value.relatedHumanDecisionId))||(value.supersedesEventId!==null&&!ID.test(value.supersedesEventId))||!LEGACY_SOURCE_CLASSES.has(value.legacySourceClass)||!AUTHORITY_PROOF_STATUSES.has(value.authorityProofStatus)||(value.sourceReferencePath!==null&&!SOURCE_PATH.test(value.sourceReferencePath))||(value.sourceReferenceDigest!==null&&!SHA.test(value.sourceReferenceDigest)))fail("ADJ-LEGACY-SHAPE");
   if(value.state==="superseded"&&value.supersedesEventId===null)fail("ADJ-SUPERSESSION");
   return Object.freeze({...value});
+}
+
+/**
+ * A-AC-07: which of the seven named `EVENT_CLASSES` a validated event
+ * represents, so a capture-policy `mandatory` marking can be recognized
+ * without a parallel tagging scheme. Every event this module admits is
+ * already `candidate`-bound (`candidateDigest` is required on all three
+ * shapes) and already subject to the unconditional, policy-independent
+ * `personalIdentifiability`/`contextualIdentifiability` "prohibited" gate at
+ * `governance-event-store.mjs` (`assertPortablePayload`), so both are always
+ * represented -- that gate already fails closed for every portable event,
+ * capture decision or not, which is a stronger guarantee than "marked
+ * mandatory". `authority` is `relatedHumanDecisionId !== null` (the A-AC-04
+ * correlation field, present on all three shapes) or, for a command offer,
+ * `authorityRequirement === "human-decision-required"`. `verification-scope`
+ * is the existing `kind` of that name. The remaining three are only ever
+ * representable on a `command-offer`: the offer's existence itself is
+ * `external-side-effect` (it is the one shape whose whole purpose is
+ * proposing an external command/script); `security` is a `sideEffectClass`
+ * of `guard-bypass`, `authority-changing`, or `destructive`
+ * (`SECURITY_SIDE_EFFECTS`); `recovery` is any `recoverability` other than
+ * `not-applicable`. No new `kind` was needed for any of the seven.
+ */
+export function representedEventClasses(value) {
+  const classes=new Set(["candidate","privacy"]);
+  if(value.relatedHumanDecisionId!==null)classes.add("authority");
+  if(value.kind==="verification-scope")classes.add("verification-scope");
+  if(value.kind==="command-offer"){
+    classes.add("external-side-effect");
+    if(SECURITY_SIDE_EFFECTS.has(value.sideEffectClass))classes.add("security");
+    if(value.recoverability!=="not-applicable")classes.add("recovery");
+    if(value.authorityRequirement==="human-decision-required")classes.add("authority");
+  }
+  return classes;
 }

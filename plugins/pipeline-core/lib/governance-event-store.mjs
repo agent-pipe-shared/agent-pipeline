@@ -24,7 +24,7 @@ import { discoverRepository } from "./worktree-lifecycle.mjs";
 import { validateHumanGovernanceDecision } from "./human-governance-decision.mjs";
 import { isHumanRoleExceptionDecision, validateHumanRoleExceptionDecision } from "./human-role-exception-decision.mjs";
 import { validateLifecycleGovernanceEvent } from "./lifecycle-governance-events.mjs";
-import { validateAgentDecisionEvent } from "./agent-decision-journal.mjs";
+import { EVENT_CLASSES, representedEventClasses, validateAgentDecisionEvent } from "./agent-decision-journal.mjs";
 
 const REGISTRY_SCHEMA = "pipeline.governance-stream-registry.v1";
 const HEADS_SCHEMA = "pipeline.governance-event-heads.v1";
@@ -287,9 +287,38 @@ async function loadCapturePolicy(root) {
   await assertNoSymlinkAncestry(target); await assertNoSymlink(target, { directory: false });
   let policy;
   try { policy = parseStrictJson(await readFile(target)); } catch { fail("GES-CAPTURE-POLICY", "Capture policy is not strict JSON."); }
-  if (!exactKeys(policy, ["schema", "policyId", "revision", "defaultAction", "streams", "sanitizedReceipt"])
-    || policy.schema !== "pipeline.governance-capture-policy.v1" || policy.defaultAction !== "deny" || !Array.isArray(policy.streams) || policy.streams.length !== 3) fail("GES-CAPTURE-POLICY", "Capture policy is invalid.");
+  // A-AC-07: additive to the pre-existing per-origin `materiality` concept on
+  // `streams` (unchanged below) -- `mandatoryEventClasses` is a second, named
+  // axis: which of the seven closed `EVENT_CLASSES` may never be silently
+  // sampled/discarded, independent of which origin stream carried them.
+  if (!exactKeys(policy, ["schema", "policyId", "revision", "defaultAction", "streams", "sanitizedReceipt", "mandatoryEventClasses"])
+    || policy.schema !== "pipeline.governance-capture-policy.v1" || policy.defaultAction !== "deny" || !Array.isArray(policy.streams) || policy.streams.length !== 3
+    || !Array.isArray(policy.mandatoryEventClasses) || new Set(policy.mandatoryEventClasses).size !== policy.mandatoryEventClasses.length
+    || !policy.mandatoryEventClasses.every((entry) => EVENT_CLASSES.has(entry))) fail("GES-CAPTURE-POLICY", "Capture policy is invalid.");
   return policy;
+}
+
+/**
+ * A-AC-07: the enforcement half of `mandatoryEventClasses`. A `captured`
+ * decision is always admitted unchanged (today's only behavior, preserved).
+ * A `sampled-out` decision -- an explicit caller choice not to durably
+ * persist this event -- is admitted only for the `agent` origin (the sole
+ * stream whose pre-existing `materiality` is `policy-selected` rather than
+ * `required`; every other origin's events were never discardable and stay
+ * that way), and only when none of the event's `representedEventClasses`
+ * intersect the active policy's `mandatoryEventClasses`. A mandatory class
+ * fails closed with a coded error rather than silently proceeding to drop
+ * the event.
+ */
+function assertMandatoryCaptureNotSkipped(event, policy, captureDecision) {
+  if (captureDecision !== "captured" && captureDecision !== "sampled-out") fail("GES-CAPTURE-DECISION", "An explicit captured or sampled-out capture decision is required.");
+  if (captureDecision === "captured") return;
+  if (event.origin !== "agent") fail("GES-MANDATORY-CAPTURE", "Only the policy-selected agent stream may ever be sampled out; this origin's events are never discardable.");
+  let journal;
+  try { journal = validateAgentDecisionEvent(event.payload); } catch { fail("GES-PAYLOAD-SCHEMA", "Agent decision payload is not closed or valid."); }
+  const classes = representedEventClasses(journal);
+  const hit = policy.mandatoryEventClasses.find((entry) => classes.has(entry));
+  if (hit !== undefined) fail("GES-MANDATORY-CAPTURE", `Capture policy marks the ${hit} event class mandatory; it cannot be silently sampled out or discarded.`);
 }
 
 function assertPortablePayload(event, policy) {
@@ -642,14 +671,31 @@ export async function loadGovernanceEventRegistry({ repositoryRoot, registryPath
  * Append one event intent. Writer-owned sequence/digests must be omitted from
  * `intent`; the returned receipt exposes only public metadata and checkpoint.
  */
-export async function appendPortableGovernanceEvent({ repositoryRoot, registryPath, repositoryFingerprint, intent, assertAppend } = {}) {
+export async function appendPortableGovernanceEvent({ repositoryRoot, registryPath, repositoryFingerprint, intent, assertAppend, captureDecision = "captured" } = {}) {
   const { root, fingerprint } = await assertPhysicalRoot(repositoryRoot);
   const { registry } = await loadRegistry(root, registryPath);
   if (repositoryFingerprint !== fingerprint || registry.repositoryFingerprint !== fingerprint) fail("GES-CROSS-REPOSITORY", "The expected repository fingerprint does not match the physical repository.");
   const streamId = intent?.streamId;
   const stream = streamFor(registry, streamId);
   const template = assertIntent(intent, stream, repositoryFingerprint);
-  assertPortablePayload(template, await loadCapturePolicy(root));
+  const policy = await loadCapturePolicy(root);
+  assertPortablePayload(template, policy);
+  assertMandatoryCaptureNotSkipped(template, policy, captureDecision);
+  if (captureDecision === "sampled-out") {
+    return Object.freeze({
+      schema: "pipeline.governance-event-receipt.v1",
+      operation: "append",
+      outcome: "sampled-out",
+      repositoryFingerprint: template.repositoryFingerprint,
+      eventId: template.eventId,
+      idempotencyKey: template.idempotencyKey,
+      requestDigest: canonicalSha256(intent),
+      eventDigest: null,
+      eventPath: null,
+      readbackDigest: null,
+      checkpoint: null,
+    });
+  }
   const streamRoot = await ensureSafeDirectory(root, `${registry.storageRoot}/${stream.relativeRoot}`);
   return withExclusiveStreamLock(streamRoot, async () => {
     const scanned = await scanStream(root, registry, streamId);

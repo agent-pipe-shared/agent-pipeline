@@ -53,7 +53,7 @@ function capturePolicyFixture() {
     { origin: "human", purpose: "authority-history", materiality: "required", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
     { origin: "agent", purpose: "declared-assumption", materiality: "policy-selected", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
     { origin: "lifecycle", purpose: "deterministic-lifecycle", materiality: "required", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
-  ], sanitizedReceipt: { allowEventId: true, allowEventDigest: true, allowCheckpoint: true, allowReasonText: false } };
+  ], sanitizedReceipt: { allowEventId: true, allowEventDigest: true, allowCheckpoint: true, allowReasonText: false }, mandatoryEventClasses: [] };
 }
 
 async function fixtureRoot() {
@@ -156,6 +156,80 @@ test("portable admission requires the exact effective policy and closed safe pay
   const root = await fixtureRoot(); t.after(() => cleanup(root));
   await assert.rejects(() => append(root, intent({ policy: { ...intent().policy, capturePolicyDigest: "d".repeat(64) } })), (error) => error.code === "GES-CAPTURE-POLICY-BINDING");
   await assert.rejects(() => append(root, intent({ payload: { ...intent().payload, privateReason: "no" } })), (error) => error.code === "GES-PAYLOAD-SCHEMA");
+});
+
+/** Same layout as `fixtureRoot`, but the written capture policy marks the
+ * given A-AC-07 event classes `mandatoryEventClasses` instead of leaving the
+ * set empty, reusing (and reassigning, exactly like `fixtureRoot`) the
+ * shared `fingerprint`/`capturePolicyDigest` module state so `intent()`
+ * still binds correctly with no further overrides. */
+async function mandatoryFixtureRoot(mandatoryEventClasses) {
+  const root = await mkdtemp(path.join(os.tmpdir(), "governance-event-store-mandatory-"));
+  execFileSync("git", ["init", "-q", root]);
+  const repository = discoverRepository(root);
+  fingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: repository.commonDir, primaryRoot: repository.primaryRoot });
+  const capturePolicy = { ...capturePolicyFixture(), mandatoryEventClasses };
+  capturePolicyDigest = canonicalSha256(capturePolicy);
+  await mkdir(path.join(root, "governance/events"), { recursive: true });
+  await writeFile(path.join(root, "governance/events/registry.json"), `${canonicalizeJson(registryFixture())}\n`);
+  await writeFile(path.join(root, "governance/events/capture-policy.json"), `${canonicalizeJson(capturePolicy)}\n`);
+  return root;
+}
+
+function offerPayload(overrides = {}) {
+  return {
+    eventId: "agent-offer-1", kind: "command-offer", state: "offered", reasonCode: "EXTERNAL_OPERATION_OFFERED",
+    candidateDigest: canonicalSha256(candidate), relatedHumanDecisionId: null, supersedesEventId: null,
+    offerOrigin: "pipeline-initiated",
+    operation: { operationClass: "governed-repair", version: "v1", governedArtifactSha256: "b".repeat(64) },
+    target: { repositoryFingerprint: "c".repeat(64), scopeDigest: "d".repeat(64) },
+    sideEffectClass: "non-authoritative", authorityRequirement: "not-required",
+    policyDigest: "e".repeat(64), redactionPolicyDigest: "f".repeat(64),
+    executionAssurance: "not-applicable",
+    omissions: ["raw-command", "arguments", "private-coordinates", "unrestricted-output"],
+    offerEventId: null, preEvidenceDigest: null, postEvidenceDigest: null, recoverability: "not-applicable",
+    ...overrides,
+  };
+}
+
+function offerIntent(overrides = {}) {
+  return intent({
+    payloadSchema: "pipeline.agent-decision-event.v1", eventId: "agent-offer-1", idempotencyKey: "agent-offer-idem-1",
+    origin: "agent", authorityClass: "non-authoritative", eventType: "agent.command-offer", streamId: "agent",
+    payload: offerPayload(),
+    ...overrides,
+  });
+}
+
+test("A-AC-07 a mandatory event class cannot be silently sampled out, while a non-mandatory class still can", async (t) => {
+  const root = await mandatoryFixtureRoot(["security"]); t.after(() => cleanup(root));
+  const securityOffer = offerIntent({ payload: offerPayload({ sideEffectClass: "guard-bypass" }) });
+  await assert.rejects(
+    () => appendPortableGovernanceEvent({ repositoryRoot: root, repositoryFingerprint: fingerprint, intent: securityOffer, captureDecision: "sampled-out" }),
+    (error) => error instanceof GovernanceEventStoreError && error.code === "GES-MANDATORY-CAPTURE",
+    "a guard-bypass command offer represents the security class, which this policy marks mandatory",
+  );
+  const captured = await appendPortableGovernanceEvent({ repositoryRoot: root, repositoryFingerprint: fingerprint, intent: securityOffer });
+  assert.equal(captured.outcome, "appended", "the default captured decision is unaffected by the new mandatory gate");
+  const recoveryOnly = offerIntent({ eventId: "agent-offer-2", idempotencyKey: "agent-offer-idem-2", payload: offerPayload({ eventId: "agent-offer-2", recoverability: "rollback-required" }) });
+  const sampledOut = await appendPortableGovernanceEvent({ repositoryRoot: root, repositoryFingerprint: fingerprint, intent: recoveryOnly, captureDecision: "sampled-out" });
+  assert.equal(sampledOut.outcome, "sampled-out", "recovery is not marked mandatory in this policy, so today's sampling behavior is unchanged");
+  assert.equal(sampledOut.eventDigest, null);
+  const scanned = await verifyPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "agent" });
+  assert.equal(scanned.eventCount, 1, "only the captured security offer was durably written; the sampled-out event left no file");
+});
+
+test("A-AC-07 capture decisions are closed, and only the policy-selected agent stream may ever be sampled out", async (t) => {
+  const root = await fixtureRoot(); t.after(() => cleanup(root));
+  await assert.rejects(
+    () => appendPortableGovernanceEvent({ repositoryRoot: root, repositoryFingerprint: fingerprint, intent: intent(), captureDecision: "maybe" }),
+    (error) => error instanceof GovernanceEventStoreError && error.code === "GES-CAPTURE-DECISION",
+  );
+  await assert.rejects(
+    () => appendPortableGovernanceEvent({ repositoryRoot: root, repositoryFingerprint: fingerprint, intent: intent(), captureDecision: "sampled-out" }),
+    (error) => error instanceof GovernanceEventStoreError && error.code === "GES-MANDATORY-CAPTURE",
+    "the lifecycle origin's materiality is required, never policy-selected, so it may never be sampled out",
+  );
 });
 
 test("verification is checkpoint-aware and queries return only validated chain records", async (t) => {

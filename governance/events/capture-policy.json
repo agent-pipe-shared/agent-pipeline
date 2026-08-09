@@ -8,5 +8,6 @@
     { "origin": "agent", "purpose": "declared-assumption", "materiality": "policy-selected", "personalIdentifiability": "prohibited", "contextualIdentifiability": "prohibited", "storageProfile": "repository-public-safe", "retention": "repository-retained", "disclosure": "repository-visible", "encryptionGeneration": null },
     { "origin": "lifecycle", "purpose": "deterministic-lifecycle", "materiality": "required", "personalIdentifiability": "prohibited", "contextualIdentifiability": "prohibited", "storageProfile": "repository-public-safe", "retention": "repository-retained", "disclosure": "repository-visible", "encryptionGeneration": null }
   ],
-  "sanitizedReceipt": { "allowEventId": true, "allowEventDigest": true, "allowCheckpoint": true, "allowReasonText": false }
+  "sanitizedReceipt": { "allowEventId": true, "allowEventDigest": true, "allowCheckpoint": true, "allowReasonText": false },
+  "mandatoryEventClasses": ["security", "privacy", "authority", "candidate", "external-side-effect", "recovery", "verification-scope"]
 }
