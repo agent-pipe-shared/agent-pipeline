@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.adr-0047-numbering-collision
 type: defect
 owner: pipeline
-status: in_progress
+status: closed
 created: 2026-08-07
 source: "specs/sprint-nova-epic/plans/nova-b-readiness-2026-08-06.md (lines 55-69), promoted from a plan-only note to a backlog item per the 0.5.2 Critic round's F2 finding, 2026-08-07."
 due: 2026-09-06
 expires: 2026-09-06
+closed_at: 2026-08-09
+closure_repository: self
+closure_commit: 88a7133caa851ba740349bafce912ddd6552b895
+closure_evidence: "backlog/items/2026-08-07-adr-0047-numbering-collision.md"
 ---
 
 # Two different ADRs both claim number 0047
@@ -72,15 +76,24 @@ session-scoped plan file rather than the versioned work queue.
   only); it is open follow-up work, tracked below. Step 3 of the Proposal (a
   Verify check against duplicate leading ADR numbers) was not part of this
   dispatch and remains open.
-- **Status note:** advanced to `in_progress`, not `closed` — a `closed` status
-  requires `closure_commit` to name an already-existing commit
-  (`plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs`), and this
-  Goldfish dispatch is forbidden from committing (`PHX-ADR-FIX` field 4). The
-  Pipeline Elephant should move this item to `closed` (with closure fields
-  bound to the actual landing commit) once the rename lands, or file the two
-  remaining follow-ups (out-of-corpus reference sweep; duplicate-number Verify
-  check) as their own items first.
+- **Status note:** closed 2026-08-09, closure bound to commit `88a7133`
+  ("fix(adr): give the three ADRs numbered 0047 real numbers, and move two
+  records to the code"), which landed the `PHX-ADR-FIX` rename and reference
+  sweep this item's Proposal step 2 called for. This closure does NOT assert
+  that Proposal step 3 (a Verify check against duplicate leading ADR numbers)
+  is done — it is not: it is being built in parallel as
+  `harness/scripts/check-adr-consistency.mjs` and has not landed as of this
+  closure. The Assignment note below (written 2026-08-07) offered a choice —
+  close directly, or split the two remaining follow-ups into their own items
+  first — rather than gating closure on step 3; this closure takes that
+  offered path and files the out-of-corpus reference sweep as its own item,
+  `2026-08-09-adr-0047-renumber-left-live-references-behind.md`, per
+  `88a7133`'s own commit message naming exactly what it deliberately did not
+  repair (Nova sprint historical references, the hash-bound Phoenix Spec
+  reference, and German reference-table drift). The duplicate-number Verify
+  check (step 3) is tracked separately by its own in-flight build and is not
+  re-filed here to avoid a duplicate.
 - **Assignment (if accepted):** land the `PHX-ADR-FIX` diff; then either close
   this item directly (closure fields bound to that commit) or split the two
   remaining follow-ups into their own backlog items before closing.
-- **Date:** 2026-08-07; triage call and execution 2026-08-09.
+- **Date:** 2026-08-07; triage call and execution 2026-08-09; closed 2026-08-09.
