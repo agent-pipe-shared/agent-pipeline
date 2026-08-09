@@ -2890,6 +2890,58 @@ assertion of already-existing behavior):
 Nothing was dispatched on this research; it is recorded so a future session (or the PO, choosing
 a priority) does not re-spend the time re-deriving the same six negatives.
 
+### THE PO CORRECTED "TIME PRESSURE" AS A FICTION, AND THEN DECIDED O-1/O-2/O-4 — NONE THE WAY THE DESIGN RECOMMENDED (2026-08-09)
+
+Offered the PO a menu (tackle K-AC-05 anyway / supply the open policy decisions / close for tonight
+/ redirect) and named "time pressure" as part of why K-AC-05 had been deferred. The PO's answer:
+*"gib mir gerne entscheidungen und warum zeitdruck? es gibt keinen druck - wir setzen phoenix
+konsequent um"* — there is no deadline; Phoenix is to be implemented thoroughly. Recorded as a
+standing correction in feedback memory ([[decide-dont-ask]]): never cite session length, context
+size, or an assumed clock as a reason to defer, water down, or hand back a decision — defer things
+on their own merits (needs a PO policy call, needs more research, carries real risk worth a second
+pair of eyes) or don't defer them at all.
+
+Pulling that thread into H-AC-12 (still open from the leg above) found it is NOT a small,
+standalone gap: reading `specs/sprint-phoenix-epic/design/gmw-hgo-evidence-intake-into-the-human-
+ledger.md` in full (delegated to a research agent, ~1675 lines) showed H-AC-12's "dual-evaluate
+during migration" clause is one small side-effect (§9) of a much larger, already Critic-reviewed
+(round 4 PASS, `546407b`) design for getting GMW/HGO evidence into the PHX-2 Human Governance
+Decision Ledger — sourced from a PO backlog item, not from acceptance-criteria drift. That design
+names three still-open PO decisions (O-1, O-2, O-4; O-3 needs none; O-5 was already decided
+2026-08-08: leave the two-live-grant divergence documented, not designed around) and explicitly
+frames all three as questions the document "does not have standing" to answer itself.
+
+**All three were put to the PO directly, with the design's own recommendation as the default
+option. Two of three went the OTHER way:**
+
+- **O-1 (accountability ceiling): PO said NO — a natural person MUST be attributable, not just
+  "product-owner / locally-attributed" forever.** The design's read of H-AC-11 as written currently
+  makes stronger attribution structurally impossible without reopening that criterion (§5.2, R-1:
+  "this follows from H-AC-11 as written... cannot be softened later without reopening H-AC-11").
+  H-AC-11 itself is therefore now back in scope for design work, not just H-AC-12 — a materially
+  bigger change than "amend one enumeration."
+- **O-2 (H-AC-02 hook gap): PO said NO — the synchronous ledger read must be part of increment 1,
+  not deferred to increment 2.** The design had scoped the dual-evaluation check to run only at
+  arming/consumption/status/reconcile boundaries, explicitly NOT inside the synchronous guard hook
+  itself (§8.5.2, D-2), citing per-call read I/O cost in the guard path as the reason to defer. The
+  PO's answer means increment 1's scope now includes a lock-free, narrowing-only ledger read
+  reachable from `guard-maintenance-window.mjs`'s `windowCoversRule` (`:559-566`) — touching the
+  live guard-hook path directly, one of the most consequence-sensitive pieces of code in this
+  repository (every git operation in every session routes through it).
+- **O-4 (H-AC-11 join-handle clause): PO took the design's own recommendation** — amend the
+  acceptance criterion via the ordinary reviewed rebind (§9's process: "proposed here, reviewed,
+  then applied by the rebind, not edited in-session") rather than restructure GMW's machine-local
+  storage. This one is now unblocked and low-risk to apply.
+
+**Net effect: this is no longer "close H-AC-12," it is "reopen and extend H-AC-11's attribution
+model, then build increment 1 (already larger than originally scoped) with the guard-hook ledger
+read included from day one, then apply the H-AC-11+H-AC-12 rebind together as §9 already specifies
+they should be bundled."** Nothing has been designed or built yet for O-1's mechanism or O-2's
+hook integration — both need real design work before any dispatch, given real accountability/
+privacy tradeoffs (O-1) and direct modification of the synchronous guard-hook critical path (O-2).
+That design work is the immediate next step, continuing in this same session under the PO's
+explicit "no time pressure, implement it thoroughly" instruction — not deferred, not rushed.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
