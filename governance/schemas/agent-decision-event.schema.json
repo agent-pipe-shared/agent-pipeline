@@ -12,6 +12,22 @@
         "kind": { "enum": ["assumption", "selection", "verification-scope", "fallback", "escalation"] },
         "state": { "enum": ["declared", "verified", "contradicted", "expired", "invalidated", "superseded"] },
         "assumptionState": { "enum": ["assumed", "inferred", "observed", "verified", "contradicted", "unavailable", "unknown"] },
+        "identity": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 7,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["dimension", "value", "provenance", "assurance"],
+            "properties": {
+              "dimension": { "enum": ["runner", "model", "effort", "profile", "role", "adapter", "capability"] },
+              "value": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+              "provenance": { "enum": ["same-dispatch-observed", "requested-route", "inherited-session", "unknown"] },
+              "assurance": { "enum": ["verified", "reported", "inferred", "unknown"] }
+            }
+          }
+        },
         "reasonCode": { "type": "string" },
         "candidateDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
         "relatedHumanDecisionId": { "type": ["string", "null"] },

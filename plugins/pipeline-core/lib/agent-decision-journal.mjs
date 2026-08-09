@@ -4,24 +4,35 @@ const ID=/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u, CODE=/^[A-Z][A-Z0-9._:-]{0,127}
 const KINDS=new Set(["assumption","selection","verification-scope","fallback","escalation"]), STATES=new Set(["declared","verified","contradicted","expired","invalidated","superseded"]);
 /** A-AC-11: the epistemic ground a claim was held on, a separate axis from the claim lifecycle `state`; the two never collapse into one enum. */
 const ASSUMPTION_STATES=new Set(["assumed","inferred","observed","verified","contradicted","unavailable","unknown"]);
+/** A-AC-05: identity provenance/assurance, admissible only on the kinds where an identity choice is material to the decision being recorded (`selection`, `escalation`, `fallback`); `assumption`/`verification-scope` never carry it. */
+const IDENTITY_DIMENSIONS=new Set(["runner","model","effort","profile","role","adapter","capability"]), IDENTITY_PROVENANCE=new Set(["same-dispatch-observed","requested-route","inherited-session","unknown"]), IDENTITY_ASSURANCE=new Set(["verified","reported","inferred","unknown"]), IDENTITY_KINDS=new Set(["selection","escalation","fallback"]);
 const COMMAND_STATES=new Set(["offered","acknowledged","authorized","copied","attempted","execution-unobserved","observed-completed","readback-verified","failed","partial","cancelled","unknown","unavailable","readback-mismatch","recovery-proposed","recovered"]);
 const COMMAND_ASSURANCE=new Set(["not-applicable","attempted","execution-unobserved","observed-completed","readback-verified","failed","partial","cancelled","unknown","unavailable","readback-mismatch"]);
 const OMITTABLE=new Set(["raw-command","arguments","private-coordinates","unrestricted-output","prompt","transcript","credential"]);
 export class AgentDecisionJournalError extends Error { constructor(code){super("Agent decision event is invalid.");this.code=code;} }
 const rec=(v)=>v!==null&&typeof v==="object"&&!Array.isArray(v), exact=(v,k)=>rec(v)&&Object.keys(v).length===k.length&&k.every((x)=>Object.hasOwn(v,x)); const fail=(c)=>{throw new AgentDecisionJournalError(c);};
+const validIdentity=(identity)=>Array.isArray(identity)&&identity.length>=1&&identity.length<=7&&identity.every((entry)=>exact(entry,["dimension","value","provenance","assurance"])&&IDENTITY_DIMENSIONS.has(entry.dimension)&&ID.test(entry.value)&&IDENTITY_PROVENANCE.has(entry.provenance)&&IDENTITY_ASSURANCE.has(entry.assurance))&&new Set(identity.map((entry)=>entry.dimension)).size===identity.length;
 /**
  * Admits only bounded reason codes/digests; this record can never grant authority.
  * `assumptionState` is optional because A-AC-11 governs the case WHEN an
  * assumption state is recorded; when the key is present it fails closed against
  * ASSUMPTION_STATES, and it constrains no `state` value and is constrained by none.
+ * `identity` is optional the same way, for A-AC-05: WHEN an identity dimension is
+ * recorded it fails closed against IDENTITY_DIMENSIONS/IDENTITY_PROVENANCE/
+ * IDENTITY_ASSURANCE, and its presence is itself scoped to IDENTITY_KINDS
+ * (ADJ-IDENTITY-SCOPE) because only `selection`/`escalation`/`fallback` ever have
+ * a material identity choice to record.
  */
 export function validateAgentDecisionEvent(value) {
   const keys=["eventId","kind","state","reasonCode","candidateDigest","relatedHumanDecisionId","supersedesEventId"];
   if(value?.kind==="command-offer") return validateCommandOfferEvent(value);
   const epistemic=rec(value)&&Object.hasOwn(value,"assumptionState");
-  if(!exact(value,epistemic?[...keys,"assumptionState"]:keys)||!ID.test(value.eventId)||!KINDS.has(value.kind)||!STATES.has(value.state)||(epistemic&&!ASSUMPTION_STATES.has(value.assumptionState))||!CODE.test(value.reasonCode)||!SHA.test(value.candidateDigest)||(value.relatedHumanDecisionId!==null&&(!ID.test(value.relatedHumanDecisionId)))||(value.supersedesEventId!==null&&!ID.test(value.supersedesEventId)))fail("ADJ-SHAPE");
+  const identified=rec(value)&&Object.hasOwn(value,"identity");
+  const extended=[...keys,...(epistemic?["assumptionState"]:[]),...(identified?["identity"]:[])];
+  if(!exact(value,extended)||!ID.test(value.eventId)||!KINDS.has(value.kind)||!STATES.has(value.state)||(epistemic&&!ASSUMPTION_STATES.has(value.assumptionState))||(identified&&!validIdentity(value.identity))||!CODE.test(value.reasonCode)||!SHA.test(value.candidateDigest)||(value.relatedHumanDecisionId!==null&&(!ID.test(value.relatedHumanDecisionId)))||(value.supersedesEventId!==null&&!ID.test(value.supersedesEventId)))fail("ADJ-SHAPE");
   if(value.state==="superseded"&&value.supersedesEventId===null)fail("ADJ-SUPERSESSION");
-  return Object.freeze({...value});
+  if(identified&&!IDENTITY_KINDS.has(value.kind))fail("ADJ-IDENTITY-SCOPE");
+  return Object.freeze({...value,...(identified?{identity:Object.freeze(value.identity.map((entry)=>Object.freeze({...entry})))}:{})});
 }
 
 /**

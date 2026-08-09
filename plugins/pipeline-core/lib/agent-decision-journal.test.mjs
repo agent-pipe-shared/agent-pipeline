@@ -78,6 +78,61 @@ test("A-AC-11 keeps the published schema closed and in step with the validator",
   for(const entry of schema.oneOf)assert.equal(entry.additionalProperties,false,"a journal event shape stopped being closed");
 });
 
+// A-AC-05 adds a third, distinct axis: identity provenance/assurance. It is
+// admissible only on the three kinds where an identity choice is actually
+// material to the decision being recorded (`selection`, `escalation`,
+// `fallback`); `assumption`/`verification-scope` never carry it, and presence
+// there is its own named shape violation (ADJ-IDENTITY-SCOPE), distinct from
+// the generic ADJ-SHAPE every other malformed field in this record falls
+// under. The key stays optional the same way `assumptionState` is: absence
+// must never change existing behavior.
+const IDENTITY_DIMENSIONS=["runner","model","effort","profile","role","adapter","capability"];
+const IDENTITY_PROVENANCE=["same-dispatch-observed","requested-route","inherited-session","unknown"];
+const IDENTITY_ASSURANCE=["verified","reported","inferred","unknown"];
+const identityEntry=(overrides={})=>({dimension:"model",value:"claude-sonnet-5",provenance:"same-dispatch-observed",assurance:"verified",...overrides});
+test("A-AC-05 accepts a well-formed identity record on each identity-material kind",()=>{
+  for(const kind of ["selection","escalation","fallback"]){
+    const accepted=validateAgentDecisionEvent(value({kind,identity:[identityEntry()]}));
+    assert.deepEqual(accepted.identity,[identityEntry()],`identity was not preserved for kind ${kind}`);
+  }
+});
+test("A-AC-05 rejects identity present on assumption with ADJ-IDENTITY-SCOPE",()=>{
+  assert.throws(()=>validateAgentDecisionEvent(value({kind:"assumption",identity:[identityEntry()]})),(error)=>error instanceof AgentDecisionJournalError&&error.code==="ADJ-IDENTITY-SCOPE","identity on assumption must fail with ADJ-IDENTITY-SCOPE specifically, not the generic ADJ-SHAPE");
+});
+test("A-AC-05 rejects identity present on verification-scope with ADJ-IDENTITY-SCOPE",()=>{
+  assert.throws(()=>validateAgentDecisionEvent(value({kind:"verification-scope",identity:[identityEntry()]})),(error)=>error instanceof AgentDecisionJournalError&&error.code==="ADJ-IDENTITY-SCOPE","identity on verification-scope must fail with ADJ-IDENTITY-SCOPE specifically, not the generic ADJ-SHAPE");
+});
+test("A-AC-05 rejects two identity entries sharing the same dimension",()=>{
+  assert.throws(()=>validateAgentDecisionEvent(value({kind:"selection",identity:[identityEntry(),identityEntry({value:"claude-haiku-5"})]})),(error)=>error instanceof AgentDecisionJournalError,"a duplicate-dimension identity array was admitted");
+});
+test("A-AC-05 rejects an empty identity array",()=>{
+  assert.throws(()=>validateAgentDecisionEvent(value({kind:"selection",identity:[]})),(error)=>error instanceof AgentDecisionJournalError,"a zero-length identity array was admitted");
+});
+test("A-AC-05 rejects an identity array exceeding the seven-dimension bound",()=>{
+  const eight=[...IDENTITY_DIMENSIONS.map((dimension)=>identityEntry({dimension})),identityEntry({value:"claude-haiku-5"})];
+  assert.throws(()=>validateAgentDecisionEvent(value({kind:"selection",identity:eight})),(error)=>error instanceof AgentDecisionJournalError,"an 8-entry identity array was admitted");
+});
+test("A-AC-05 rejects an unrecognized dimension, provenance, or assurance value",()=>{
+  for(const entry of [identityEntry({dimension:"language"}),identityEntry({provenance:"observed"}),identityEntry({assurance:"confirmed"})])
+    assert.throws(()=>validateAgentDecisionEvent(value({kind:"selection",identity:[entry]})),(error)=>error instanceof AgentDecisionJournalError,`an unrecognized enum value in ${JSON.stringify(entry)} was admitted`);
+});
+test("A-AC-05 leaves every observational kind accepted with no identity key at all, unchanged",()=>{
+  for(const kind of ["assumption","selection","verification-scope","fallback","escalation"]){
+    const accepted=validateAgentDecisionEvent(value({kind}));
+    assert.equal(Object.hasOwn(accepted,"identity"),false,`kind ${kind} synthesised an identity key from its absence`);
+  }
+});
+test("A-AC-05 keeps the published identity schema closed and in step with the validator",()=>{
+  const schema=JSON.parse(readFileSync(new URL("../../../governance/schemas/agent-decision-event.schema.json",import.meta.url),"utf8"));
+  const branch=schema.oneOf.find((entry)=>entry.properties.kind.enum?.includes("assumption"));
+  assert.deepEqual(branch.properties.identity.items.properties.dimension.enum,IDENTITY_DIMENSIONS);
+  assert.deepEqual(branch.properties.identity.items.properties.provenance.enum,IDENTITY_PROVENANCE);
+  assert.deepEqual(branch.properties.identity.items.properties.assurance.enum,IDENTITY_ASSURANCE);
+  assert.equal(branch.properties.identity.minItems,1);
+  assert.equal(branch.properties.identity.maxItems,7);
+  assert.equal(branch.required.includes("identity"),false,"identity must stay optional, matching assumptionState");
+});
+
 // PHX-WP-A pins the previously unnamed sub-clauses of A-AC-02, A-AC-12 and
 // A-AC-13. Where a journal-specific end-to-end property requires the shared
 // store or export machinery, these tests build their own minimal fixtures
