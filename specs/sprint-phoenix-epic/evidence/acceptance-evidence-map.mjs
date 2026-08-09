@@ -590,6 +590,21 @@ const DELTA = {
   // caller/emitter capability, the same bar applied all session to
   // A-AC-07/K-AC-10/C-AC-09.
   'A-AC-05': ['partial', 'WP-AAC05'],
+
+  // --- evidence/phx-wp-xac14 (task PHX-WP-XAC14, 2026-08-09, commit 0d01845) ---
+  // Independently re-run: 24/24 external-reference-adapter-tests pass (19 -> 24,
+  // +5 as briefed), node --check clean, only the two declared production/test
+  // files plus the closed backlog item's own triage section changed. Both
+  // inspect() call sites (planExternalReferenceWrite, reconcileExternalReference)
+  // now catch a thrown/rejected inspect and return the module's existing
+  // reconciliation-required shape with a new reason: "external-unreachable",
+  // distinct from the pre-existing "invalid-inspection" case -- confirmed by a
+  // dedicated regression test that the two reasons stay distinct. Break-proofed
+  // (RED with the catch removed: 2/24 fail with the uncaught inspect() error
+  // propagating, restored, GREEN reconfirmed). Backlog item
+  // pipeline.external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system
+  // closed.
+  'X-AC-14': ['implemented', 'WP-XAC14'],
 };
 
 // --- per-criterion evidence pointer ----------------------------------------
@@ -706,7 +721,7 @@ const POINTERS = {
   'X-AC-11': 'external-reference-adapter-tests (PHX-WP-XAC11, break-proofed): planExternalReferenceWrite consults an injected organizationPolicy for a governed documentClass, failing closed on no policy / no covering class / mode mismatch / outstanding approval; approval-binding itself is a named open follow-on, not built here',
   'X-AC-12': 'external-reference-adapter-tests: plan->apply->reconcile proven identical across synthetic issue-tracker, knowledge-base, document-store and secondary-forge profiles, and every cross-profile capability mismatch rejected (PHX-WP-X, break-proofed)',
   'X-AC-13': 'external-reference-adapter-tests: defaults to reference-only or projection, never last-write-wins',
-  'X-AC-14': 'confirmed absent (PHX-WP-X): neither inspect() call site (external-reference-adapter.mjs:61,72) has a try/catch, so an unreachable external system throws uncaught instead of producing a typed observation -- filed as pipeline.external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system, a production fix not a missing test',
+  'X-AC-14': 'external-reference-adapter-tests (PHX-WP-XAC14, break-proofed): both inspect() call sites now catch a thrown/rejected inspect and return the typed reconciliation-required/external-unreachable shape instead of an uncaught rejection; backlog item pipeline.external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system closed',
   'X-AC-15': 'docs/external-traceability.md (PHX-WP-DOC-2): threat model, ownership/lifecycle mapping, publication guide, recovery procedure, and conformance suite added and grounded; the recovery procedure names the adapter\'s uncaught-inspect()-rejection gap and its backlog item explicitly rather than describing a graceful path that does not exist',
 
   'C-AC-01': 'change-control-tests: profile validation plus the exact bound tuple for mandatory promotion',
