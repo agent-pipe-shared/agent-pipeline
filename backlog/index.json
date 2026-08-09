@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "5d0b1462126e47b38c13558c9bdc35419243cea8a88fff574020a19b73a894ac"
+    "transitionHead": "e826b0f88bfa6cb9ae79d381b94c5b17d5035be7e5a9c5dc3e63f7edda0af1ff"
   },
   "counts": {
-    "open": 75,
+    "open": 77,
     "in_progress": 26,
     "closed": 24
   },
@@ -319,6 +319,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "Observed six times in one Elephant session (2026-08-07) across both Goldfish and Critic dispatches. Recorded with the detection and recovery that worked, because the failure is silent by construction."
+    },
+    {
+      "id": "pipeline.doc-reconciliation-blind-to-adr-corpus-changes",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "Raised as an unverified observation by an independent review of a commit range; the review explicitly did not build a repro. Confirmed at source under dispatch PHX-BL2 (2026-08-09): read all five `**Governs:**` lines in docs/adr/ and the paths touched by the 2026-08-09 ADR-0047 renumber commit (88a7133)."
     },
     {
       "id": "pipeline.documentation-information-architecture",
@@ -862,6 +870,14 @@
       "owner": "pipeline",
       "created": "2026-08-06",
       "source": "Manual re-run of the empty-directory onboarding smoke test in scratch/onboarding-smoke-test while re-verifying backlog/items/2026-08-06-onboarding-lifecycle-plan-hardcodes-the-codex-runner.md (see backlog/evidence/2026-08-06-onboarding-runner-identity-reverification.md), 2026-08-06."
+    },
+    {
+      "id": "pipeline.resume-hint-opaque-token-rejects-hyphenated-english",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-09",
+      "source": "Found via a purpose-written probe script isolating which of twelve candidate strings caused `resume-hint.mjs capture` to fail; confirmed at source (plugins/pipeline-core/lib/resume-hint.mjs) under dispatch PHX-BL2 (2026-08-09)."
     },
     {
       "id": "pipeline.ruleset-freshness-wsl-subsystem-absent",

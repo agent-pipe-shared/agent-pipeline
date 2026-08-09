@@ -41,6 +41,7 @@
 | pipeline.dispatch-templates-cite-restructured-operating-model-sections | in_progress | defect | pipeline | 2026-08-07 | — |
 | pipeline.dispatched-agents-return-truncated-mid-step | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.dispatches-report-completed-on-a-truncated-fragment | open | defect | pipeline | 2026-08-07 | — |
+| pipeline.doc-reconciliation-blind-to-adr-corpus-changes | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.documentation-information-architecture | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.dual-channel-publication | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.el-01-has-no-in-session-tripwire | open | defect | pipeline | 2026-08-08 | — |
@@ -103,6 +104,7 @@
 | pipeline.release-preflight-has-a-builder-but-no-cli | in_progress | defect | pipeline | 2026-08-06 | — |
 | pipeline.report-early-duty-is-conditional-in-writing-and-unconditional-in-practice | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.restart-launch-is-codex-only-for-every-runner | open | defect | pipeline | 2026-08-06 | — |
+| pipeline.resume-hint-opaque-token-rejects-hyphenated-english | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.ruleset-freshness-wsl-subsystem-absent | in_progress | defect | pipeline | 2026-08-07 | — |
 | pipeline.ruleset-source-test-unregistered-in-the-verify-gate | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.runtime-projection-v2-eager-manifest-load | open | defect | pipeline | 2026-07-27 | — |
@@ -133,6 +135,6 @@
 
 ## Counts
 
-- open: 75
+- open: 77
 - in_progress: 26
 - closed: 24
