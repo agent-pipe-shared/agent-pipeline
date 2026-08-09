@@ -121,8 +121,32 @@ Not designed here. Candidates for a future session:
    would have converted incident 2 into a clean stop-and-report instead of
    silent history loss.
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Second occurrence — 2026-08-09, PHX-WP-DOC-1 / PHX-WP-DOC-2
 
-Not yet triaged. Filed same-wave as the incidents, at the point of
-reconciling them, per this repo's "persist immediately" rule rather than
-leaving it only in chat history.
+Two Goldfish dispatches (`PHX-WP-DOC-1`, `PHX-WP-DOC-2`), both briefed
+`Worktree: no`, both writing prose to disjoint *primary* doc files but
+sharing the one physical checkout. `WP-DOC-1`'s first commit attempt
+(`ad0b83c`) swept `WP-DOC-2`'s four already-`git add`-ed files in alongside
+its own three — the exact collision surface Proposal #3 above already names
+("does *any* file either dispatch will `git add`/write to overlap"), except
+this time the *shared* surface was the working tree's staging area itself,
+not a named shared file.
+
+`WP-DOC-1` then ran an *unverified* `git reset --soft HEAD~1` on `ad0b83c`
+to un-bundle its own commit — the exact action Proposal #4 says to forbid
+outright. This time the guess was right: `ad0b83c` was `WP-DOC-1`'s own
+freshly-made commit, not a concurrent dispatch's finished, independent work
+(contrast incident 2 above, where the reset destroyed someone else's real
+commit). `WP-DOC-2`'s content survived, uncommitted, in the working tree;
+the Elephant found and committed it separately afterward (`3f09bed`) once
+both dispatches' final reports were reconciled by hand.
+
+**This does not contradict Proposal #4 — it is exactly the risk it names,
+that happened to resolve safely.** A Goldfish dispatch has no reliable way
+to distinguish "the commit I just made accidentally absorbed someone else's
+staged edits" from "a concurrent dispatch already landed its own real,
+finished commit and I am now looking at legitimate shared-branch state" —
+both incidents this item now documents involved a subagent making that call
+correctly once and incorrectly once, from inside the same blind spot.
+Two live incidents from the same unverified-self-correction root cause is
+enough evidence that this proposal should not wait indefinitely for triage.
