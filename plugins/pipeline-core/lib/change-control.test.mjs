@@ -114,3 +114,45 @@ test("requires explicit emergency authority and keeps not-required independent",
   assert.equal(evaluateChangeControlGate({ profile: profile({ changeClass: "not-required", mandatory: false }), pipelineAuthority: local(), externalReceipt: null, nowEpochMs: 15 }).reason, "not-required");
   assert.throws(() => validateChangeControlProfile(profile({ changeClass: "not-required", mandatory: true })), (error) => error.code === "CC-PROFILE");
 });
+
+// C-AC-02: standard is one of the four distinct changeClass values and is paired
+// with mandatory authority exactly like normal and emergency; only not-required
+// may waive it. This module does not distinguish standard's required INPUT
+// FIELDS from normal's beyond the changeClass label, and nothing here detects or
+// rejects a class picked solely to avoid approval -- both remain ABSENT for
+// C-AC-02 (see evidence/phx-wp-c.txt).
+test("C-AC-02 validates standard as a distinct change class that still requires paired mandatory authority", () => {
+  assert.equal(evaluateChangeControlGate({ profile: profile({ changeClass: "standard" }), pipelineAuthority: local(), externalReceipt: receipt(), nowEpochMs: 15 }).status, "allowed");
+  assert.throws(() => validateChangeControlProfile(profile({ changeClass: "standard", mandatory: false })), (error) => error.code === "CC-PROFILE");
+});
+
+// C-AC-07: an emergency authorization is bound to the exact scope hash like any
+// other class -- it cannot be reused across a mismatched scope, so "bounded
+// scope" holds even under emergency. Retrospective evidence distinctly proving
+// the emergency was real/reviewed is ABSENT: `localEntry`'s evidenceSha256 is
+// generic to every deployment event and is never gated on changeClass (see
+// evidence/phx-wp-c.txt).
+test("C-AC-07 keeps emergency authority bounded to its exact scope instead of acting as a generic bypass", () => {
+  const mismatched = evaluateChangeControlGate({
+    profile: profile({ changeClass: "emergency" }),
+    pipelineAuthority: local({ emergencyAuthorized: true, scopeSha256: "f".repeat(64) }),
+    externalReceipt: receipt(),
+    nowEpochMs: 15,
+  });
+  assert.equal(mismatched.status, "blocked");
+  assert.equal(mismatched.reason, "pipeline-authority");
+});
+
+// C-AC-12: the gate names a distinct, operator-visible reason when the external
+// ITSM system is unreachable (no receipt at all) under a mandatory profile,
+// separate from every other block reason. An explicit advisory policy mode
+// distinct from not-required is ABSENT: mandatory:false is only permitted
+// together with changeClass:"not-required" (line 10), and "not-required"
+// short-circuits before ever consulting externalReceipt (line 24) -- so no
+// configuration can apply an advisory policy while noting the external system
+// is unavailable (see evidence/phx-wp-c.txt).
+test("C-AC-12 names a distinct external-unavailable reason when the external ITSM system cannot be reached", () => {
+  const blocked = evaluateChangeControlGate({ profile: profile(), pipelineAuthority: local(), externalReceipt: null, nowEpochMs: 15 });
+  assert.equal(blocked.status, "blocked");
+  assert.equal(blocked.reason, "external-unavailable");
+});
