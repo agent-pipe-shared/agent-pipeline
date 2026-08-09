@@ -32,3 +32,37 @@ test("rejects extra event data instead of exposing raw lifecycle bodies", () => 
   const unsafe = observed([{ schema: "pipeline.governance-replay.v1", authority: "non-authoritative", dispatchId: "dispatch-1", status: "observed", events: [{ ...event(1), prompt: "not allowlisted" }] }]);
   assert.throws(() => buildGovernanceReplayViewModel(unsafe), (error) => error.code === "GRV-EVENT");
 });
+
+function timelineOf(...events) { return [{ schema: "pipeline.governance-replay.v1", authority: "non-authoritative", dispatchId: "dispatch-1", status: "observed", events }]; }
+// Counts only the rendered <span class="..."> markers, not the embedded <style> stylesheet, which also contains
+// the bare `.value-record-<class>{...}` selector text once and would otherwise inflate every count by one.
+function markerCount(html, cssClass) { return (html.match(new RegExp(`class="value ${cssClass}"`, "g")) ?? []).length; }
+
+test("marks human-authority kinds (gate, review) with the value-record-human class", () => {
+  const html = renderGovernanceReplayView(buildGovernanceReplayViewModel(observed(timelineOf(event(1, { kind: "gate" }), event(2, { kind: "review" })))));
+  assert.equal(markerCount(html, "value-record-human"), 2);
+});
+
+test("marks agent-remediation kinds (recovery, reconciliation) with the value-record-agent class", () => {
+  const html = renderGovernanceReplayView(buildGovernanceReplayViewModel(observed(timelineOf(event(1, { kind: "recovery" }), event(2, { kind: "reconciliation" })))));
+  assert.equal(markerCount(html, "value-record-agent"), 2);
+});
+
+test("marks deterministically computed kinds (verification, candidate-invalidation) with the value-record-deterministic class", () => {
+  const html = renderGovernanceReplayView(buildGovernanceReplayViewModel(observed(timelineOf(event(1, { kind: "verification" }), event(2, { kind: "candidate-invalidation" })))));
+  assert.equal(markerCount(html, "value-record-deterministic"), 2);
+});
+
+test("marks raw runner-reported kinds (dispatch, status, cancellation) with the value-record-runner-observed class", () => {
+  const html = renderGovernanceReplayView(buildGovernanceReplayViewModel(observed(timelineOf(event(1, { kind: "dispatch" }), event(2, { kind: "status" }), event(3, { kind: "cancellation" })))));
+  assert.equal(markerCount(html, "value-record-runner-observed"), 3);
+});
+
+test("gives different L-AC-04 record classes visibly distinct CSS classes within the same rendered timeline", () => {
+  const html = renderGovernanceReplayView(buildGovernanceReplayViewModel(observed(timelineOf(event(1, { kind: "gate" }), event(2, { kind: "dispatch" })))));
+  assert.match(html, /value-record-human/);
+  assert.match(html, /value-record-runner-observed/);
+  const gateRow = html.split("<tr>").find((row) => row.includes("event-1<"));
+  assert.match(gateRow, /value-record-human/);
+  assert.doesNotMatch(gateRow, /value-record-runner-observed/);
+});
