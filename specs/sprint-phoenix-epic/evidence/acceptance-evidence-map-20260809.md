@@ -42,8 +42,8 @@ reproduced here rather than referenced.
 
 ## The direct answer
 
-**Phoenix cannot claim complete.** 85 of 157 criteria carry a named assertion in a
-gate-registered suite; 72 do not. EPIC-AC-05 forbids a completion claim while any
+**Phoenix cannot claim complete.** 86 of 157 criteria carry a named assertion in a
+gate-registered suite; 71 do not. EPIC-AC-05 forbids a completion claim while any
 criterion remains unimplemented or unverified, and it currently bites. No issue is closeable on
 its own live acceptance bullets.
 
@@ -61,10 +61,10 @@ A bullet is therefore BLOCKED unless every criterion mapped to it is `implemente
 
 | verdict | count |
 |---|---|
-| implemented | 85 |
-| partial | 56 |
+| implemented | 86 |
+| partial | 54 |
 | designed-only | 1 |
-| not-started | 14 |
+| not-started | 15 |
 | constraint | 1 |
 | **total** | **157** |
 
@@ -166,7 +166,7 @@ clause that is not pinned or not built.
 | L-AC-07 | implemented | WP-L | governance-replay-core-tests: serial/parallel/retry/cancellation/recovery fixtures replay to identical bounded output on repeat, and a malicious duplicate-sequence fixture is rejected deterministically (PHX-WP-L, break-proofed twice) |
 | L-AC-08 | partial | J | no artifact traces each retained element to a stated user or audit need |
 
-### P — Policy packs and signed audit bundles (#9) (6/13 implemented)
+### P — Policy packs and signed audit bundles (#9) (7/13 implemented)
 
 | ID | verdict | src | evidence / named gap |
 |---|---|---|---|
@@ -177,7 +177,7 @@ clause that is not pinned or not built.
 | P-AC-05 | implemented | C | organization-policy-tests: credential, endpoint, coordinate, actor-mapping and signing-key fields refused at every level |
 | P-AC-06 | partial | WP-P | audit-bundle-core-tests: missing, misplaced, illegally-mutable, stale and truncated each pinned (PHX-WP-P, break-proofed). legacy and orphaned remain unpinned: the legacy classification exists (feature-package-topology.mjs:78) but no rejection path consults it, and no code checks a package file is referenced by an artifact |
 | P-AC-07 | implemented | C | audit-bundle-tests: signs and verifies only an unchanged manifest, without identity or authority claims |
-| P-AC-08 | partial | WP-GATE | THE EPIC GATING SLICE. All three plan kinds (bootstrap, transition, reconcile) and the Result-reconciliation fence are now BUILT (PHX-WP-GATE, commit 92b21ed): 26 staged cases pass (re-run independently: 26/26), the TP-5-protected suite is unmodified and re-run independently at 418/418. Remains PARTIAL rather than implemented: the 26 cases are staged in evidence/, not registered in the gate-registered suite the criterion names by path -- landing them needs one signed TP-3+TP-5 maintenance window |
+| P-AC-08 | implemented | ELEPHANT | harness/scripts/pipeline-state.test.mjs (PHX-WP-GATE built it, Elephant registered it under the signed TP-3+TP-5 window): all three plan kinds (bootstrap, transition, reconcile) and the Result-reconciliation fence are built and now gate-registered, 444/444 including the 26 reconcile cases, re-run independently |
 | P-AC-09 | not-started | C | NO CARRIER: no export-backfill preview or explicit consent path exists |
 | P-AC-10 | implemented | WP-P | organization-policy-core-tests + audit-bundle-core-tests: pack-side compliance-claim rejection and signed-bundle no-identity-claim shape both pinned (PHX-WP-P, break-proofed). Log/viewer halves were out of the dispatched carrier scope and remain unevaluated either way |
 | P-AC-11 | partial | WP-P | organization-policy-core-tests: mode (closed reference-only/projection/controlled-publication set) and approval (union, no downgrade) pinned (PHX-WP-P, break-proofed). Target class/binding, owned fields/sections, lifecycle event, preview, retention and revision readback remain unpinned: documentClasses is closed to exactly class/mode/approvalRequired, no field exists for the rest |
@@ -268,18 +268,18 @@ clause that is not pinned or not built.
 | ID | verdict | src | evidence / named gap |
 |---|---|---|---|
 | R-AC-01 | implemented | C | external-command-offer-tests: public-safe offer recorded before presentation, verified append readback required |
-| R-AC-02 | partial | C | no assertion correlates a rejected sanctioned path and the alternatives considered to the offer |
+| R-AC-02 | not-started | WP-R | CONFIRMED ABSENT (PHX-WP-R): recovery-proposed/recovered states exist in the schema but are unreachable through any exported function -- no capability correlates a rejected path, alternatives, or selected recovery to the offer |
 | R-AC-03 | implemented | C | external-command-offer-tests: a bound human decision is required for destructive attempts and appended before execution |
-| R-AC-04 | partial | C | recovery state mutation with pre/post digests, recoverability and cleanup/readback is not pinned |
+| R-AC-04 | partial | WP-R | external-command-offer-tests (PHX-WP-R): operation class, target, exact pre/post digests, and recoverability are bound and validated together; a distinct "required cleanup/readback" field beyond the recoverability enum does not exist |
 | R-AC-05 | implemented | C | agent-decision-journal-tests: every enumerated private field and every untyped digest refused at both journal boundaries |
 | R-AC-06 | implemented | C | external-command-offer-tests: user execution stays unobserved; completion admitted only with bounded evidence |
 | R-AC-07 | implemented | C | external-command-offer-tests: failed, partial, cancelled, mismatch and unknown outcomes retained distinctly |
-| R-AC-08 | partial | C | append-without-rewrite is structural; no recovery apply/rollback/cleanup lifecycle event is named |
-| R-AC-09 | partial | C | substitution is pinned; the replay-renders-unknown/invalid half is not |
+| R-AC-08 | partial | WP-R | external-command-offer-tests (PHX-WP-R): a readback lifecycle event appends exactly once and never rewrites the original offer; rollback/cleanup as *occurred* events are absent -- no such state exists at all, only prospective values inside recoverability |
+| R-AC-09 | partial | WP-R | external-command-offer-tests (PHX-WP-R): missing offer link, contradictory outcome evidence, and cross-repository/cross-scope substitution all fail closed (never successful); stale and duplicate detection remain absent -- no timestamp field, no supersession semantics for command-offer events |
 | R-AC-10 | partial | C | fail-closed on the append is pinned; the policy-defined typed non-material exception is absent |
-| R-AC-11 | partial | C | the restricted machine-local store exists; no assertion pairs it with a public-safe typed omission/commitment |
+| R-AC-11 | partial | WP-R | external-command-offer-tests (PHX-WP-R): a mandatory public-safe typed omission is pinned; "sanctioned machine-local state" storage and a distinct "commitment" field are absent from this module (it stores nothing by design; commitment only exists in the unrelated document-lifecycle.mjs) |
 | R-AC-12 | not-started | C | NO CARRIER: no Phoenix bootstrap-trajectory fixture exists |
-| R-AC-13 | partial | C | five of the eleven required fixture classes are named; guard override, secret-bearing command rejection, governed-script identity and malicious external content are not |
+| R-AC-13 | partial | WP-R | external-command-offer-tests (PHX-WP-R): 9 of 11 required fixture classes now named (7 pre-existing + secret/malicious command rejection + governed-script identity); approval-without-run and duplicate/retry are confirmed structurally unreachable, each pinned by a dedicated test showing the gap rather than left silently missing |
 
 ### EPIC — Epic integration and release (1/6 implemented)
 
@@ -470,7 +470,7 @@ Issues closeable on their own live acceptance bullets: **0 of 8**.
 
 53 of 157 criteria are Phoenix's own stricter contract rather than a live issue obligation.
 They block no issue, but EPIC-AC-05 still forbids an epic completion claim while any of them is not `implemented`.
-30 of those 53 are currently not `implemented` and are listed below; the rest are omitted because they are done.
+29 of those 53 are currently not `implemented` and are listed below; the rest are omitted because they are done.
 
 | criterion | verdict |
 |---|---|
@@ -486,7 +486,6 @@ They block no issue, but EPIC-AC-05 still forbids an epic completion claim while
 | EPIC-AC-05 | constraint |
 | L-AC-01 | partial |
 | L-AC-02 | partial |
-| P-AC-08 | partial |
 | P-AC-09 | not-started |
 | PX0-AC-01 | partial |
 | PX0-AC-03 | partial |
@@ -496,7 +495,7 @@ They block no issue, but EPIC-AC-05 still forbids an epic completion claim while
 | PX0-AC-07 | partial |
 | PX0-AC-08 | partial |
 | PX0-AC-13 | partial |
-| R-AC-02 | partial |
+| R-AC-02 | not-started |
 | R-AC-04 | partial |
 | R-AC-08 | partial |
 | R-AC-09 | partial |

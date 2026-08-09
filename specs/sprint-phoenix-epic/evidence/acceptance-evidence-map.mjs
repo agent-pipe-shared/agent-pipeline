@@ -306,6 +306,39 @@ const DELTA = {
   // new `kind` enum value, not just a test).
   'A-AC-02': ['implemented', 'WP-A'],
   'A-AC-07': ['not-started', 'WP-A'],
+
+  // --- evidence/phx-wp-r.txt (task PHX-WP-R, 2026-08-09, commit 500d5cc) ---
+  // Independently re-run: 16/16 external-command-offer-tests pass, all 11 new
+  // assertions present by name. R-AC-02 reclassified `not-started` (from
+  // `partial`) and Class A to Class B: recovery-proposed/recovered states
+  // exist in the schema but are unreachable via any exported function -- no
+  // correlation capability exists at all. R-AC-04/08/09/11/13 stay `partial`
+  // but all reclassify Class A to Class B: every residual is a named,
+  // structurally-confirmed capability gap, not missing test coverage -- no
+  // distinct cleanup/readback field (R-AC-04), no rollback/cleanup
+  // COMMAND_STATES entries at all (R-AC-08), no timestamp/supersession field
+  // for staleness or duplicate detection (R-AC-09), the module stores
+  // nothing by design and "commitment" only exists in an unrelated module
+  // (R-AC-11), and two of eleven R-AC-13 fixture states (approval-without-
+  // run, duplicate/retry) are structurally unreachable, now demonstrated by
+  // a dedicated test rather than merely missing.
+  'R-AC-02': ['not-started', 'WP-R'],
+  'R-AC-04': ['partial', 'WP-R'],
+  'R-AC-08': ['partial', 'WP-R'],
+  'R-AC-09': ['partial', 'WP-R'],
+  'R-AC-11': ['partial', 'WP-R'],
+  'R-AC-13': ['partial', 'WP-R'],
+
+  // --- evidence/phx-pac08-register.txt (Elephant, 2026-08-09, commit 78c6ef1) ---
+  // The signed TP-3+TP-5 maintenance window (evidence/phx-p-ac-08-gmw-request.json)
+  // was opened, PHX-WP-GATE's 26 staged cases were transplanted into the
+  // canonical harness/scripts/pipeline-state.test.mjs suite (purely additive,
+  // reusing every existing helper by name), and the window was closed.
+  // 444/444 (418 pre-existing + 26 new), node --check clean, diff touches
+  // exactly the one file. TP-3 needed no edit: pipeline-state-tests was
+  // already registered in verify.mjs. The criterion now names a
+  // gate-registered suite that actually carries its 26 cases.
+  'P-AC-08': ['implemented', 'ELEPHANT'],
 };
 
 // --- per-criterion evidence pointer ----------------------------------------
@@ -391,7 +424,7 @@ const POINTERS = {
   'P-AC-05': 'organization-policy-tests: credential, endpoint, coordinate, actor-mapping and signing-key fields refused at every level',
   'P-AC-06': 'audit-bundle-core-tests: missing, misplaced, illegally-mutable, stale and truncated each pinned (PHX-WP-P, break-proofed). legacy and orphaned remain unpinned: the legacy classification exists (feature-package-topology.mjs:78) but no rejection path consults it, and no code checks a package file is referenced by an artifact',
   'P-AC-07': 'audit-bundle-tests: signs and verifies only an unchanged manifest, without identity or authority claims',
-  'P-AC-08': 'THE EPIC GATING SLICE. All three plan kinds (bootstrap, transition, reconcile) and the Result-reconciliation fence are now BUILT (PHX-WP-GATE, commit 92b21ed): 26 staged cases pass (re-run independently: 26/26), the TP-5-protected suite is unmodified and re-run independently at 418/418. Remains PARTIAL rather than implemented: the 26 cases are staged in evidence/, not registered in the gate-registered suite the criterion names by path -- landing them needs one signed TP-3+TP-5 maintenance window',
+  'P-AC-08': 'harness/scripts/pipeline-state.test.mjs (PHX-WP-GATE built it, Elephant registered it under the signed TP-3+TP-5 window): all three plan kinds (bootstrap, transition, reconcile) and the Result-reconciliation fence are built and now gate-registered, 444/444 including the 26 reconcile cases, re-run independently',
   'P-AC-09': 'NO CARRIER: no export-backfill preview or explicit consent path exists',
   'P-AC-10': 'organization-policy-core-tests + audit-bundle-core-tests: pack-side compliance-claim rejection and signed-bundle no-identity-claim shape both pinned (PHX-WP-P, break-proofed). Log/viewer halves were out of the dispatched carrier scope and remain unevaluated either way',
   'P-AC-11': 'organization-policy-core-tests: mode (closed reference-only/projection/controlled-publication set) and approval (union, no downgrade) pinned (PHX-WP-P, break-proofed). Target class/binding, owned fields/sections, lifecycle event, preview, retention and revision readback remain unpinned: documentClasses is closed to exactly class/mode/approvalRequired, no field exists for the rest',
@@ -462,18 +495,18 @@ const POINTERS = {
   'E-AC-21': 'governance-event-export.md carries two sections; no data-flow diagram, mapping/loss guide, retention guidance, runbook or incident procedure',
 
   'R-AC-01': 'external-command-offer-tests: public-safe offer recorded before presentation, verified append readback required',
-  'R-AC-02': 'no assertion correlates a rejected sanctioned path and the alternatives considered to the offer',
+  'R-AC-02': 'CONFIRMED ABSENT (PHX-WP-R): recovery-proposed/recovered states exist in the schema but are unreachable through any exported function -- no capability correlates a rejected path, alternatives, or selected recovery to the offer',
   'R-AC-03': 'external-command-offer-tests: a bound human decision is required for destructive attempts and appended before execution',
-  'R-AC-04': 'recovery state mutation with pre/post digests, recoverability and cleanup/readback is not pinned',
+  'R-AC-04': 'external-command-offer-tests (PHX-WP-R): operation class, target, exact pre/post digests, and recoverability are bound and validated together; a distinct "required cleanup/readback" field beyond the recoverability enum does not exist',
   'R-AC-05': 'agent-decision-journal-tests: every enumerated private field and every untyped digest refused at both journal boundaries',
   'R-AC-06': 'external-command-offer-tests: user execution stays unobserved; completion admitted only with bounded evidence',
   'R-AC-07': 'external-command-offer-tests: failed, partial, cancelled, mismatch and unknown outcomes retained distinctly',
-  'R-AC-08': 'append-without-rewrite is structural; no recovery apply/rollback/cleanup lifecycle event is named',
-  'R-AC-09': 'substitution is pinned; the replay-renders-unknown/invalid half is not',
+  'R-AC-08': 'external-command-offer-tests (PHX-WP-R): a readback lifecycle event appends exactly once and never rewrites the original offer; rollback/cleanup as *occurred* events are absent -- no such state exists at all, only prospective values inside recoverability',
+  'R-AC-09': 'external-command-offer-tests (PHX-WP-R): missing offer link, contradictory outcome evidence, and cross-repository/cross-scope substitution all fail closed (never successful); stale and duplicate detection remain absent -- no timestamp field, no supersession semantics for command-offer events',
   'R-AC-10': 'fail-closed on the append is pinned; the policy-defined typed non-material exception is absent',
-  'R-AC-11': 'the restricted machine-local store exists; no assertion pairs it with a public-safe typed omission/commitment',
+  'R-AC-11': 'external-command-offer-tests (PHX-WP-R): a mandatory public-safe typed omission is pinned; "sanctioned machine-local state" storage and a distinct "commitment" field are absent from this module (it stores nothing by design; commitment only exists in the unrelated document-lifecycle.mjs)',
   'R-AC-12': 'NO CARRIER: no Phoenix bootstrap-trajectory fixture exists',
-  'R-AC-13': 'five of the eleven required fixture classes are named; guard override, secret-bearing command rejection, governed-script identity and malicious external content are not',
+  'R-AC-13': 'external-command-offer-tests (PHX-WP-R): 9 of 11 required fixture classes now named (7 pre-existing + secret/malicious command rejection + governed-script identity); approval-without-run and duplicate/retry are confirmed structurally unreachable, each pinned by a dedicated test showing the gap rather than left silently missing',
 
   'EPIC-AC-01': 'the issue-to-criterion mapping exists; no independent closure status exists for any of the eight issues',
   'EPIC-AC-02': 'NO CARRIER: planParallelSprintIntegration has no concept of "unpublished" and is called only from its own test file',
@@ -575,14 +608,14 @@ const CLOSURE = {
   'E-AC-20': ['seam', 'WP-E'],
   'E-AC-21': ['doc', 'WP-DOC'],
 
-  'R-AC-02': ['assert', 'WP-R'],
-  'R-AC-04': ['assert', 'WP-R'],
-  'R-AC-08': ['assert', 'WP-R'],
-  'R-AC-09': ['assert', 'WP-R'],
+  'R-AC-02': ['build', 'WP-R'],
+  'R-AC-04': ['build', 'WP-R'],
+  'R-AC-08': ['build', 'WP-R'],
+  'R-AC-09': ['build', 'WP-R'],
   'R-AC-10': ['build', 'WP-R'],
-  'R-AC-11': ['assert', 'WP-R'],
+  'R-AC-11': ['build', 'WP-R'],
   'R-AC-12': ['build', 'WP-R'],
-  'R-AC-13': ['assert', 'WP-R'],
+  'R-AC-13': ['build', 'WP-R'],
 
   'EPIC-AC-01': ['po', 'WP-PO'],
   'EPIC-AC-02': ['build', 'WP-EPIC'],
