@@ -2590,6 +2590,55 @@ Class S → Class B in the evidence map and `class-s-scoping.md`: the design que
 remains is a confirmed-absent capability, not a seam between two existing packages. Count unchanged
 at 102 (already counted A-AC-04's move above in the same delta commit `73501cf`).
 
+### PO CORRECTED THE GROUNDING METHOD MID-SESSION: CODE > SPEC/PRD > ISSUE, NEVER TRUST THE FIRST SOURCE FOUND (2026-08-09)
+
+**PO feedback, delivered while clearing open items for an unattended stretch**: always check whether
+what a design leans on — an acceptance criterion's own clause, a design note's stated ambiguity —
+still matches what should sensibly be built, rather than trusting the first source consulted. Spec
+and PRD are the binding part of this repo; but even those can be older than the current rebased
+code state, so **in doubt, code is king**. The full precedence, stated by the PO directly and now
+saved as a standing rule: current code > PRD/Spec/acceptance docs > the originating GitHub issue.
+Immediately confirmed as a QUALITY question, not a compliance one: "es ist völlig okay wenn sie
+'bewusst' nicht umgesetzt oder anders umgesetzt wurden" — a criterion deliberately skipped or
+reshaped, disclosed, is a GOOD outcome of this check, not a failure to close it; the failure mode
+the check exists to catch is an *overlooked* gap, not a *documented* deviation. Saved as
+`feedback_check-issue-against-current-prd-spec.md` in the persistent memory system for future
+sessions on this repo, not only this one.
+
+**Applied immediately to H-AC-08** (see the entry below): the open "what counts as a legacy record"
+question `class-s-scoping.md` had flagged as needing a fresh PO answer turned out to already be
+answered — by the criterion's own source GitHub issue AND by this repo's own more current
+`spec.md` section 10, neither of which had been read before flagging the gap. Reading resolved it
+in minutes; asking would have cost a PO round-trip for information already on disk.
+
+### X-AC-14 AND H-AC-08 BOTH CLOSE THE SAME NIGHT: A FILED FIX AND A GROUNDING-METHOD CORRECTION, 103 OF 157 (2026-08-09)
+
+**Two builds dispatched in parallel** (concurrency cap 2, holding): PHX-WP-XAC14 closed the
+already-filed backlog defect on `external-reference-adapter.mjs` — both `inspect()` call sites now
+catch a thrown/rejected external system and return the module's existing `reconciliation-required`
+shape with a new `reason: "external-unreachable"`, distinct from the pre-existing
+`"invalid-inspection"` case. 24/24 tests (5 new, break-proofed), independently re-run, commit
+`0d01845`. The backlog item's own Proposal section had already fixed the exact design; this was
+pure execution. Evidence-map delta applied (`be825df`): **102 → 103 of 157**.
+
+**PHX-WP-HAC08 built H-AC-08's carrier** — see the grounding-method entry above for how its design
+question actually got answered. A third, independent journal event kind,
+`legacy-import-observation` (dispatched exactly like `command-offer`, its own `oneOf` branch, not
+folded into the 5-kind observational shape), represents a pre-Phoenix or external
+approval/override/deploy record whose original authority tuple cannot be reproven. It rides the
+existing, UNMODIFIED `origin === "agent"` → `authorityClass: "non-authoritative"` binding in
+`governance-event.mjs` (zero changes needed there), so it structurally cannot satisfy a gate — no
+new enforcement code, just a new closed shape. 36/36 tests (7 new, 2 break-proofed), independently
+re-run, commit `a657e14`. Stays `partial`: the same mandatory repo-wide-discovery step every build
+this session has used confirmed no production caller imports/migrates a legacy record yet.
+Reclassified Class S → Class B (evidence-map delta `d0401a2`). Count unchanged at 103 (already
+counted X-AC-14's move above in the same leg).
+
+**A truncation mid-run, same pattern as every prior occurrence tonight**: PHX-WP-HAC08's turn ended
+once mid-doc-update ("Now let's update `docs/agent-decision-journal.md`") with nothing committed;
+`git status` confirmed no live fault injection, `SendMessage` to the same agent ID resumed it
+cleanly to completion — never re-dispatched.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
