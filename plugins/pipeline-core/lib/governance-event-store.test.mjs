@@ -92,7 +92,7 @@ function intent(overrides = {}) {
     storageProfile: "repository-public-safe",
     retentionCompatibility: "repository-retained",
     disclosureClass: "repository-visible",
-    payload: { eventId: "lifecycle-1", kind: "dispatch", status: "active", reasonCode: "DISPATCHED", correlation: { packageId: "phoenix-3", dispatchId: "dispatch-1", attemptId: "attempt-1", workerId: "worker-1" }, candidate, invalidatesEventId: null, supersedesEventId: null },
+    payload: { eventId: "lifecycle-1", kind: "dispatch", status: "active", reasonCode: "DISPATCHED", correlation: { packageId: "phoenix-3", dispatchId: "dispatch-1", attemptId: "attempt-1", workerId: "worker-1", correlationId: "correlation-1", queueRevision: 0 }, candidate, invalidatesEventId: null, supersedesEventId: null },
     ...overrides,
   };
 }

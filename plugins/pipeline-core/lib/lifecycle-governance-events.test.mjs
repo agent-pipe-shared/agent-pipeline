@@ -5,7 +5,7 @@ import { LIFECYCLE_EXTENSION_NAMESPACES, LifecycleGovernanceEventError, isRegist
 
 const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
 function event(overrides = {}) {
-  return { eventId: "lifecycle-1", kind: "dispatch", status: "active", reasonCode: "DISPATCHED", correlation: { packageId: "phoenix-3", dispatchId: "dispatch-1", attemptId: "attempt-1", workerId: "worker-1" }, candidate, invalidatesEventId: null, supersedesEventId: null, ...overrides };
+  return { eventId: "lifecycle-1", kind: "dispatch", status: "active", reasonCode: "DISPATCHED", correlation: { packageId: "phoenix-3", dispatchId: "dispatch-1", attemptId: "attempt-1", workerId: "worker-1", correlationId: "correlation-1", queueRevision: 0 }, candidate, invalidatesEventId: null, supersedesEventId: null, ...overrides };
 }
 
 test("accepts a closed correlated non-authoritative lifecycle event", () => {
@@ -86,4 +86,19 @@ test("rejects open payloads, free text, private-shaped correlations, and invalid
     event({ correlation: { ...event().correlation, workerId: "/private/path" } }),
     event({ candidate: { commit: "a".repeat(40), tree: "not-an-oid" } }),
   ]) assert.throws(() => validateLifecycleGovernanceEvent(invalid), (error) => error instanceof LifecycleGovernanceEventError);
+});
+
+// L-AC-02: correlation now retains queue and correlation identity alongside package/dispatch/attempt/worker.
+test("L-AC-02 requires correlationId and a non-negative integer queueRevision as part of the closed correlation shape", () => {
+  const { correlationId, ...withoutCorrelationId } = event().correlation;
+  const { queueRevision, ...withoutQueueRevision } = event().correlation;
+  for (const invalid of [
+    event({ correlation: withoutCorrelationId }),
+    event({ correlation: withoutQueueRevision }),
+    event({ correlation: { ...event().correlation, queueRevision: 1.5 } }),
+    event({ correlation: { ...event().correlation, queueRevision: -1 } }),
+    event({ correlation: { ...event().correlation, queueRevision: "0" } }),
+    event({ correlation: { ...event().correlation, correlationId: "/private/path" } }),
+  ]) assert.throws(() => validateLifecycleGovernanceEvent(invalid), (error) => error instanceof LifecycleGovernanceEventError && error.code === "LGE-CORRELATION");
+  assert.equal(validateLifecycleGovernanceEvent(event({ correlation: { ...event().correlation, queueRevision: 3 } })).correlation.queueRevision, 3);
 });

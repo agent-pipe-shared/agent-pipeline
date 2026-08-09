@@ -4,7 +4,7 @@ import test from "node:test";
 import { projectGovernanceReplay } from "./governance-replay.mjs";
 
 const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
-function event(sequence, overrides = {}) { const payload = { eventId: `event-${sequence}`, kind: "dispatch", status: "active", reasonCode: "DISPATCHED", correlation: { packageId: "phoenix-3", dispatchId: "dispatch-1", attemptId: "attempt-1", workerId: "worker-1" }, candidate, invalidatesEventId: null, supersedesEventId: null, ...overrides }; return { sequence, eventDigest: String(sequence).repeat(64), occurredAtEpochMs: sequence, candidate, payload }; }
+function event(sequence, overrides = {}) { const payload = { eventId: `event-${sequence}`, kind: "dispatch", status: "active", reasonCode: "DISPATCHED", correlation: { packageId: "phoenix-3", dispatchId: "dispatch-1", attemptId: "attempt-1", workerId: "worker-1", correlationId: "correlation-1", queueRevision: 0 }, candidate, invalidatesEventId: null, supersedesEventId: null, ...overrides }; return { sequence, eventDigest: String(sequence).repeat(64), occurredAtEpochMs: sequence, candidate, payload }; }
 
 test("replay groups and orders lifecycle records without claiming authority", () => {
   const replay = projectGovernanceReplay([event(2), event(1)]);
@@ -28,10 +28,10 @@ test("L-AC-07 replays serial, parallel, retry, cancellation and recovery fixture
   const fixture = [
     event(1),
     event(2, { eventId: "event-2", status: "completed", reasonCode: "DONE" }),
-    event(3, { eventId: "event-3", status: "active", reasonCode: "RETRIED", correlation: { packageId: "phoenix-3", dispatchId: "dispatch-1", attemptId: "attempt-2", workerId: "worker-1" } }),
-    event(4, { eventId: "event-4", correlation: { packageId: "phoenix-3", dispatchId: "dispatch-2", attemptId: "attempt-1", workerId: "worker-2" } }),
-    event(5, { eventId: "event-5", kind: "cancellation", status: "cancelled", reasonCode: "CANCELLED", correlation: { packageId: "phoenix-3", dispatchId: "dispatch-2", attemptId: "attempt-1", workerId: "worker-2" } }),
-    event(6, { eventId: "event-6", kind: "recovery", status: "completed", reasonCode: "RECOVERED", correlation: { packageId: "phoenix-3", dispatchId: "dispatch-3", attemptId: "attempt-1", workerId: "worker-3" } }),
+    event(3, { eventId: "event-3", status: "active", reasonCode: "RETRIED", correlation: { packageId: "phoenix-3", dispatchId: "dispatch-1", attemptId: "attempt-2", workerId: "worker-1", correlationId: "correlation-1", queueRevision: 0 } }),
+    event(4, { eventId: "event-4", correlation: { packageId: "phoenix-3", dispatchId: "dispatch-2", attemptId: "attempt-1", workerId: "worker-2", correlationId: "correlation-2", queueRevision: 0 } }),
+    event(5, { eventId: "event-5", kind: "cancellation", status: "cancelled", reasonCode: "CANCELLED", correlation: { packageId: "phoenix-3", dispatchId: "dispatch-2", attemptId: "attempt-1", workerId: "worker-2", correlationId: "correlation-2", queueRevision: 0 } }),
+    event(6, { eventId: "event-6", kind: "recovery", status: "completed", reasonCode: "RECOVERED", correlation: { packageId: "phoenix-3", dispatchId: "dispatch-3", attemptId: "attempt-1", workerId: "worker-3", correlationId: "correlation-3", queueRevision: 0 } }),
   ];
   const first = projectGovernanceReplay(fixture);
   const second = projectGovernanceReplay(fixture);

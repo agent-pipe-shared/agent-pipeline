@@ -14,7 +14,7 @@ function nullableId(value) { return value === null || (typeof value === "string"
 function validateEvent(event) {
   const keys = ["sequence", "eventDigest", "occurredAtEpochMs", "kind", "status", "reasonCode", "correlation", "candidate", "eventId", "invalidatesEventId", "supersedesEventId"];
   if (!exact(event, keys) || !Number.isSafeInteger(event.sequence) || event.sequence < 1 || typeof event.eventDigest !== "string" || !/^[a-f0-9]{64}$/u.test(event.eventDigest) || !Number.isSafeInteger(event.occurredAtEpochMs) || !KINDS.has(event.kind) || !STATUSES.has(event.status) || typeof event.reasonCode !== "string" || !/^[A-Z][A-Z0-9._:-]{0,127}$/u.test(event.reasonCode) || !ID.test(event.eventId) || !nullableId(event.invalidatesEventId) || !nullableId(event.supersedesEventId)) fail("GRV-EVENT");
-  if (!exact(event.correlation, ["packageId", "dispatchId", "attemptId", "workerId"]) || !Object.values(event.correlation).every((value) => typeof value === "string" && ID.test(value))) fail("GRV-CORRELATION");
+  if (!exact(event.correlation, ["packageId", "dispatchId", "attemptId", "workerId", "correlationId", "queueRevision"]) || !["packageId", "dispatchId", "attemptId", "workerId", "correlationId"].every((key) => typeof event.correlation[key] === "string" && ID.test(event.correlation[key])) || !Number.isSafeInteger(event.correlation.queueRevision) || event.correlation.queueRevision < 0) fail("GRV-CORRELATION");
   if (!exact(event.candidate, ["commit", "tree"]) || !OID.test(event.candidate.commit) || !OID.test(event.candidate.tree)) fail("GRV-CANDIDATE");
   return Object.freeze({ ...event, correlation: Object.freeze({ ...event.correlation }), candidate: Object.freeze({ ...event.candidate }) });
 }

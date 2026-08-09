@@ -81,7 +81,7 @@ export function validateLifecycleGovernanceEvent(event) {
   const extended = record(event) && Object.hasOwn(event, "extensions");
   if (!exact(event, extended ? [...keys, "extensions"] : keys) || !ID.test(event.eventId) || !KINDS.has(event.kind) || !STATUSES.has(event.status) || !CODE.test(event.reasonCode)) fail("LGE-SHAPE");
   if (extended && !extensions(event.extensions)) fail("LGE-EXTENSIONS");
-  if (!exact(event.correlation, ["packageId", "dispatchId", "attemptId", "workerId"]) || !Object.values(event.correlation).every((value) => typeof value === "string" && ID.test(value))) fail("LGE-CORRELATION");
+  if (!exact(event.correlation, ["packageId", "dispatchId", "attemptId", "workerId", "correlationId", "queueRevision"]) || !["packageId", "dispatchId", "attemptId", "workerId", "correlationId"].every((key) => typeof event.correlation[key] === "string" && ID.test(event.correlation[key])) || !Number.isSafeInteger(event.correlation.queueRevision) || event.correlation.queueRevision < 0) fail("LGE-CORRELATION");
   if (!exact(event.candidate, ["commit", "tree"]) || !OID.test(event.candidate.commit) || !OID.test(event.candidate.tree)) fail("LGE-CANDIDATE");
   if (!nullableId(event.invalidatesEventId) || !nullableId(event.supersedesEventId) || (event.invalidatesEventId !== null && event.supersedesEventId !== null)) fail("LGE-LINKS");
   if (event.kind === "candidate-invalidation" && (event.status !== "invalidated" || event.invalidatesEventId === null)) fail("LGE-INVALIDATION");
