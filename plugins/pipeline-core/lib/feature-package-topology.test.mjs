@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { planFeaturePackageBootstrap, planFeaturePackageTransition, validateFeatureTopology } from "./feature-package-topology.mjs";
+import { planFeaturePackageBootstrap, planFeaturePackageTransition, validateFeatureTopology, validateFeaturePackage } from "./feature-package-topology.mjs";
 
 const root = mkdtempSync(join(tmpdir(), "feature-topology-"));
 const hash = (value) => createHash("sha256").update(value).digest("hex");
@@ -71,3 +71,36 @@ try {
   assert.equal(validateFeatureTopology(posixRoot).ok, true);
   console.log("feature-package-topology: forward-slash path regression, 1 passed, 0 failed");
 } finally { rmSync(posixRoot, { recursive: true, force: true }); }
+
+// P-AC-06: a manifest-shaped file inside a directory this module's own
+// inventoryFeaturePackages() still classifies as legacy (no lifecycle.json on
+// record for that directory) must not be treated as an authoritative package,
+// even though the manifest itself parses and validates as well-formed.
+const legacyRoot = mkdtempSync(join(tmpdir(), "feature-topology-legacy-"));
+try {
+  const id = "legacy-feature"; const base = `specs/${id}`;
+  const prd = fileIn(legacyRoot, `${base}/prd.md`, "prd\n");
+  const manifest = { schema: "pipeline.feature-package.v1", feature: { id, rigor: 1 }, state: "draft", artifacts: [{ class: "prd", ...prd, authority: true, mutability: "mutable", retention: "active" }], candidate: null, supersedes: null };
+  fileIn(legacyRoot, `${base}/not-lifecycle.json`, `${JSON.stringify(manifest)}\n`);
+  const checked = validateFeaturePackage(legacyRoot, `${base}/not-lifecycle.json`);
+  assert.equal(checked.ok, false);
+  assert.match(checked.findings.join("\n"), /FTP-LEGACY/u);
+  console.log("feature-package-topology: legacy-package rejection, 1 passed, 0 failed");
+} finally { rmSync(legacyRoot, { recursive: true, force: true }); }
+
+// P-AC-06: a file physically present in a validated package's own tree but
+// never referenced by any manifest artifact is orphaned; the #22 topology
+// validator must catch it directly, not merely leave it for a downstream
+// consumer to notice.
+const orphanRoot = mkdtempSync(join(tmpdir(), "feature-topology-orphan-"));
+try {
+  const id = "orphan-feature"; const base = `specs/${id}`;
+  const prd = fileIn(orphanRoot, `${base}/prd.md`, "prd\n");
+  fileIn(orphanRoot, `${base}/stray.md`, "never referenced\n");
+  const manifest = { schema: "pipeline.feature-package.v1", feature: { id, rigor: 1 }, state: "draft", artifacts: [{ class: "prd", ...prd, authority: true, mutability: "mutable", retention: "active" }], candidate: null, supersedes: null };
+  fileIn(orphanRoot, `${base}/lifecycle.json`, `${JSON.stringify(manifest)}\n`);
+  const checked = validateFeaturePackage(orphanRoot, `${base}/lifecycle.json`);
+  assert.equal(checked.ok, false);
+  assert.match(checked.findings.join("\n"), /FTP-ORPHAN/u);
+  console.log("feature-package-topology: orphaned-file rejection, 1 passed, 0 failed");
+} finally { rmSync(orphanRoot, { recursive: true, force: true }); }

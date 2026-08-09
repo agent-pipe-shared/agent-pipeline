@@ -129,6 +129,14 @@ export function validateFeaturePackage(rootDir = process.cwd(), manifestPath) {
   }
   if (["verifying", "completed"].includes(value?.state) && value?.candidate === null) findings.push("FTP-CANDIDATE: verifying/completed packages require an exact candidate binding");
   if (["superseded", "retained"].includes(value?.state) && value?.supersedes === null) findings.push("FTP-SUPERSEDES: retained/superseded packages require a relationship");
+  // A manifest is only authoritative for a package this module itself has inventoried as
+  // having a lifecycle.json on record -- any other manifest-shaped file inside a directory
+  // that inventoryFeaturePackages still classifies as legacy is not a governed package.
+  if (SAFE_ID.test(id ?? "") && inventoryFeaturePackages(root).legacy.includes(`specs/${id}`)) findings.push(`FTP-LEGACY: specs/${id} has no lifecycle.json on record; a legacy package directory is not an authoritative package`);
+  // Every file physically present in the package's own tree (other than the manifest itself)
+  // must be reachable through some declared artifact; a file nobody's manifest binds is
+  // exactly the "orphaned" gap P-AC-06 names, distinct from a merely unreferenced sibling.
+  for (const files of packageFiles.values()) for (const path of files) if (path !== manifest && !seen.has(path)) findings.push(`FTP-ORPHAN: ${path} is present in the package tree but not referenced by any manifest artifact`);
   const receipt = { schema: "pipeline.feature-package-receipt.v1", manifest, manifestSha256: digest(readFileSync(join(root, manifest))), featureId: SAFE_ID.test(id ?? "") ? id : null, state: FEATURE_STATES.includes(value?.state) ? value.state : null, candidate: value?.candidate ?? null, artifactCount: Array.isArray(value?.artifacts) ? value.artifacts.length : 0, findingCount: findings.length };
   return { ok: findings.length === 0, findings, receipt };
 }
